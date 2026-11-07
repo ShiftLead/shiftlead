@@ -12,9 +12,9 @@ import pytest
 from test_ui_queue import NOW, at, client, fake, mail, queue
 
 from sessionorc import notify
-from sessionorc.queue import KEPT, kept_or_loose, mail_card, pr_refs
+from sessionorc.queue import KEPT, holder_claims, kept_or_loose, mail_card, pr_refs
 from shiftlead.ui.inbox import inbox_sections
-from shiftlead.ui.queue import apply_picks, attach, card_index, queue_picks, queue_view
+from shiftlead.ui.queue import apply_picks, attach, card_index, items_n, queue_picks, queue_view
 
 pytestmark = pytest.mark.unit
 
@@ -251,3 +251,103 @@ def test_telegrams_card_reads_a_pr_only_item_alike():
     assert mail_card("#170", "which way?", idx, "s", True) == ("loose:s#170", "s#170")
     assert mail_card(None, "merge it?", idx, None, True, 164) is None
     assert mail_card(None, "merge it?", idx, "s", False, 164) is None
+
+
+# -- slice 3: a stopped holder's state rows (§4.5 screen 6 *One place for each thing that needs the person*)
+
+
+def hold(sid, qid, at=None, source="declared", n=0):
+    return {"sid": sid, "qid": qid, "source": source, "at": at, "n": n}
+
+
+def test_holder_claims_reads_declared_first_newest_then_the_later_in_progress():
+    idx = card_index(queue())
+    pick = lambda *hs: holder_claims(list(hs), idx)  # noqa: E731
+    # the newest declared claim an open card holds
+    assert pick(hold("a", "s#TD-20", at(3), n=0), hold("a", "s#TD-21", at(1), n=1)) == {"a": "s#TD-021"}
+    # one with no readable `at` the oldest
+    assert pick(hold("a", "s#TD-20", None, n=1), hold("a", "s#TD-21", at(5), n=0)) == {"a": "s#TD-021"}
+    # a tie: the later in the record's `progress`
+    assert pick(hold("a", "s#TD-20", at(1), n=1), hold("a", "s#TD-21", at(1), n=0)) == {"a": "s#TD-020"}
+    # a derived claim, however new, never weighs against a declared one; alone it is read
+    assert pick(hold("a", "s#TD-20", at(5)), hold("a", "s#TD-21", at(0), "derived", 1)) == {"a": "s#TD-020"}
+    assert pick(hold("a", "s#TD-21", at(0), "derived")) == {"a": "s#TD-021"}
+    # a claim on an entry no open card holds passes to the next; none left, no card
+    assert pick(hold("a", "s#TD-3", at(0), n=1), hold("a", "s#TD-20", at(2), n=0)) == {"a": "s#TD-020"}
+    assert pick(hold("a", "s#TD-3", at(0))) == {}
+    # two seats on one entry: each its own
+    assert pick(hold("a", "s#TD-20", at(1)), hold("b", "s#TD-20", at(1))) == {"a": "s#TD-020", "b": "s#TD-020"}
+
+
+def state(sid, row, **kw):
+    return {"row": row, "id": f"{sid}:{row}", "sid": sid, "name": sid, "subject": row, "text": "t", **kw}
+
+
+def holder_view(states, holds, snoozed=None):
+    q = {**queue(), "holds": holds}
+    secs = inbox_sections([], now=NOW, states=states, cards=card_index(q), attention_snoozed=snoozed)
+    return secs, queue_view(q, NOW, attach(secs, drawn, start=lambda c, i: {"item": i} if i else {}))
+
+
+def test_a_stopped_holders_state_rows_draw_on_its_card_and_a_seat_holding_nothing_keeps_them_in_the_inbox():
+    rows = [
+        state("g1", "permission", call="t1", deadline="", left="2 min"),
+        state("g2", "limited"),
+        state("g3", "needs"),
+        state("g4", "permission", call="t9"),  # holds nothing an open card holds
+        state("g5", "unpushed"),  # not one of the five
+    ]
+    holds = [
+        hold("g1", "s#TD-21", at(1)),
+        hold("g2", "s#TD-20", at(1)),
+        hold("g3", "s#TD-20", at(2)),
+        hold("g4", "s#TD-3", at(1)),
+        hold("g5", "s#TD-20", at(1)),
+    ]
+    secs, v = holder_view(rows, holds)
+    homes = {e["sid"]: (e["home"], e["on_card"], e["on_row"], e["tied"]) for e in secs["needs"]}
+    assert homes["g1"] == ("queue", "s#TD-20", "s#TD-21", {"by": "holder", "ref": "s#TD-021"})
+    assert homes["g2"][:2] == ("queue", "s#TD-20") and homes["g3"][:2] == ("queue", "s#TD-20")
+    assert homes["g4"][0] == "inbox"
+    # the Queue tab counts the three, the Inbox tab the rest: together what waits on the person
+    assert (
+        secs["queue_n"] == 3 and secs["count"] - secs["queue_n"] == len([r for r in rows if state_kind_counts(r)]) - 3
+    )
+    (c,) = [c for c in v["in_progress"] + v["up_next"] + v["waiting"] if c["id"] == "s#TD-20"]
+    do = c["wants"]["do"]
+    assert [m["id"] for m in do if m.get("holder")] == ["g1:permission", "g2:limited", "g3:needs"]
+    assert c["status"] == "needs you" and c["wants"]["n"]["do"] >= 3
+    # no Start session of their own, and outside the header's count
+    assert all(not m.get("holder") or "qistart" not in str(m["html"]) for m in do)
+    assert items_n(c["wants"]) == sum(1 for m in do + c["wants"]["decide"] if not (m.get("holder") or m.get("red")))
+
+
+def state_kind_counts(r):
+    return r["row"] in ("permission", "limited", "needs", "unpushed")
+
+
+def test_a_snoozed_stalled_row_stays_in_the_snoozed_fold():
+    rows = [state("g1", "stalled")]
+    secs, _v = holder_view(rows, [hold("g1", "s#TD-20", at(1))], {"g1|stalled": "2999-01-01T00:00:00Z"})
+    assert [e["home"] for e in secs["snoozed"]] == ["inbox"] and not secs["needs"]
+    # its time passed: drawn on the card
+    secs, _v = holder_view(rows, [hold("g1", "s#TD-20", at(1))], {"g1|stalled": "2000-01-01T00:00:00Z"})
+    assert [(e["home"], e["on_card"]) for e in secs["needs"]] == [("queue", "s#TD-20")]
+
+
+def test_a_holders_permission_row_on_its_card_draws_allow_deny_with_its_call_and_no_snooze(tmp_path, monkeypatch):
+    """§4.5a *Queue card: holder's state row*: the controls of *Inbox row: state* but Snooze, built from the same row
+    (its record id and `call`), so a permission pushed after the page was drawn is never answered unseen; the
+    *routed around* line where the seat cannot answer."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    from shiftlead.ui import app as ui
+
+    one = ui.templates.get_template("queue_mail.html")
+    perm = state("g1", "permission", call="t1", deadline="", left="2 min", want="do")
+    html = one.render(e=perm, section="needs", origin="", board_choices={})
+    assert 'data-act="allow" data-id="g1" data-call="t1"' in html and 'data-act="deny" data-id="g1"' in html
+    assert "Snooze" not in html and "qistart" not in html and "Answer" not in html
+    stalled = state("g2", "stalled", want="do", routed_to="its questions go to the techlead", routed_why="limited")
+    html = one.render(e=stalled, section="needs", origin="", board_choices={})
+    assert "Snooze" not in html and 'href="/focus/g2"' in html
+    assert 'class="meta routed"' in html and "its questions go to the techlead" in html

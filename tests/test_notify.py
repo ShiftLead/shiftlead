@@ -652,3 +652,32 @@ async def test_an_ask_withdrawn_inside_the_hold_is_never_told(agent, sent, tmp_p
     finally:
         agent.person_inbox[:] = [e for e in agent.person_inbox if e.id != "m-w1"]
         agent.sessions.pop(s.id, None)
+
+
+async def test_a_stopped_holders_row_is_linked_to_its_card(agent, sent, tmp_path):
+    """§4.5 screen 12 *Addresses* (TD-1468): a stopped holder's state row is drawn on the card of the entry it holds,
+    so its Telegram link is that card's address, its `item=` the row's own key; a seat holding nothing keeps
+    `/inbox?row=`."""
+    _on()
+    t0 = datetime.now(UTC)
+    s = _session(agent, tmp_path, state="needs-you", since=_z(t0))
+    s.pending = Pending(kind="permission", text="git push", tool_use_id="t1")
+    o = _session(agent, tmp_path, sid="ao-x-o", name="grinder-x-2", state="needs-you", since=_z(t0))
+    o.pending = Pending(kind="question", text="which?")
+    top = {"qid": "s#TD-020"}
+    agent._queue = {
+        "cards": [{"id": "s#TD-020", "top": top, "rows": [top, {"qid": "s#TD-021"}]}],
+        "completed": [],
+        "holds": [{"sid": s.id, "qid": "s#TD-21", "source": "declared", "at": _z(t0), "n": 0}],
+    }
+    try:
+        await _pass(agent, t0 + timedelta(seconds=61))
+        links = sorted(t.split("\n")[1] for _, t in sent)
+        assert links == [
+            "http://kmaster:8765/inbox?row=ao-x-o%7Cquestion",
+            "http://kmaster:8765/queue?card=s%23TD-020&row=s%23TD-021&item=ao-x-w%3Apermission",
+        ]
+    finally:
+        agent._queue = None
+        agent.sessions.pop(s.id, None)
+        agent.sessions.pop(o.id, None)

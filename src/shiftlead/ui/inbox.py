@@ -386,6 +386,10 @@ def state_rows(
             # Reopen and push (§4.5a *Inbox row: restart*, *Inbox row: state*, TD-1494) — the view's, never a copy
             "resume_confirm": v.get("resume_confirm") or "",
             "member_hold": v.get("member_hold") or "",
+            # the card view's **routed around** line (§4.5a, §4.9b, TD-1443), which a holder's row on its Queue card
+            # carries as the Sessions card does (TD-1468)
+            "routed_to": v.get("routed_to") or "",
+            "routed_why": v.get("routed_why") or "",
         }
 
     names = {str(v.get("id")): str(v.get("name") or v.get("id")) for v in views}

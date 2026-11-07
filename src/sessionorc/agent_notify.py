@@ -89,6 +89,7 @@ class NotifyMixin:
         built from structured fields alone (§4.10 *What a message says*)."""
         graph = self._graph()
         rows: dict[str, _Row] = {}
+        index = queue_mod.card_index(self._queue)
         for key, (kind, began, _text) in self._attention.items():
             sid, slot = key.split("|", 1)
             s = graph.get(sid)
@@ -97,7 +98,10 @@ class NotifyMixin:
             name, team = s.name or sid, s.team or ""
             if slot == "state" and kind in notify.STATE_KINDS:
                 k = f"{sid}|{kind}"
-                rows[k] = _Row(began, notify.state_line(name, team, kind), k, k)
+                # a stopped holder's row is on its card (TD-1468): its address the card's, its item the row's key
+                card = index.get(queue_mod.HOLDER + sid)
+                link = f"{sid}:{kind}" if card else k
+                rows[k] = _Row(began, notify.state_line(name, team, kind), link, k, card=card)
             elif slot == "alarm" and kind == "alarm":
                 k = f"{sid}|alarm"
                 rows[k] = _Row(began, notify.alarm_line(name, team), k, k)
@@ -105,7 +109,6 @@ class NotifyMixin:
             if at := _restart_at(s):
                 k = f"{sid}|restart"
                 rows[k] = _Row(at, notify.restart_line(s.name or sid, s.team or ""), k, k)
-        index = queue_mod.card_index(self._queue)
         askers = queue_mod.asker_repos(self.person_inbox, graph.values(), queue_mod.repo_roots(self._repos))
         for e in self.person_inbox:
             if e.from_ == PERSON:

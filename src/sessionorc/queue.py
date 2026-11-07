@@ -79,6 +79,9 @@ LOOSE = "loose:"
 # a PR's entry in `card_index`, keyed `pr:<repo>#<n>` to `("", <repo>#TD-n)` — no card's, the entry the PR names —
 # which only an item that needs the person and carries a PR alone reads (`pr_entry`, TD-1468)
 PR_KEY = "pr:"
+# a stopped holder's card in `card_index`, keyed `holder:<record id>` to the `(card id, row qid)` of the claim its state
+# row draws on (`holder_claim`, TD-1468)
+HOLDER = "holder:"
 
 
 def card_index(reading: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
@@ -127,6 +130,8 @@ def card_index(reading: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
             out[KEPT + tid] = out[KEPT + next(iter(qs))]
     for pr, ref in ((reading or {}).get("pr_refs") or {}).items():
         out.setdefault(PR_KEY + str(pr), ("", str(ref)))
+    for sid, q in holder_claims((reading or {}).get("holds"), out).items():
+        out[HOLDER + sid] = out[q]
     return out
 
 
@@ -159,6 +164,29 @@ def pr_entry(index: Mapping[str, tuple[str, str]] | None, repo: str | None, pr: 
         return None
     got = (index or {}).get(f"{PR_KEY}{repo}#{pr}")
     return got[1] if got else None
+
+
+def holder_claims(holds: Any, index: Mapping[str, tuple[str, str]]) -> dict[str, str]:
+    """`{record id: <repo>#TD-n}`: the claim each holder's state row draws on (§4.5 screen 6 *One place for each thing
+    that needs the person*, TD-1468), among its live claims (`holds`, the reading's: `{sid, qid, source, at, n}`) on
+    an entry an open card holds (`index`) — its declared claims first, the newest by `at` (one with no readable `at`
+    the oldest), a tie by the later in its record's `progress` (`n`); only with none declared on an open card its
+    derived ones, by the same order. A claim on an archived entry, a `board:` ref or a PR is in no `holds`, so the
+    next is read."""
+    best: dict[str, tuple[bool, datetime, int, str]] = {}
+    oldest = datetime.min.replace(tzinfo=UTC)
+    for h in holds or ():
+        if not isinstance(h, Mapping):
+            continue
+        got = refs(h.get("qid"))
+        if not got or got[0] not in index:
+            continue
+        n = h.get("n")
+        key = (h.get("source") != "derived", _aware(h.get("at")) or oldest, n if isinstance(n, int) else -1, got[0])
+        sid = str(h.get("sid") or "")
+        if sid and (sid not in best or key[:3] > best[sid][:3]):
+            best[sid] = key
+    return {sid: k[3] for sid, k in best.items()}
 
 
 def own_refs(found: Iterable[str], repo: str | None) -> list[str]:
@@ -998,14 +1026,18 @@ def reading(
 
     # who holds what: a live claim on a reading's entry, an open PR naming one
     held: dict[str, list[Any]] = {}
+    holds: list[dict[str, Any]] = []
     other: list[dict[str, Any]] = []
     for rec in recs:
         home = rs.of_record(rec)
-        for p in rec.progress:
+        for n, p in enumerate(rec.progress):
             if p.status != "claimed":
                 continue
             if home and (q := qid(home, p.ref) if re.fullmatch(r"TD-\d+", p.ref) else None) in open_:
                 held.setdefault(q, []).append((rec, p))
+                # a stopped holder's state row reads which of its claims to draw on (TD-1468): `n` its place in
+                # the record's `progress`, the tie's order
+                holds.append({"sid": str(rec.id), "qid": q, "source": p.source, "at": p.at, "n": n})
             else:  # `board:<key>`, a PR, or an id no reading holds open
                 other.append({"ref": p.ref, "pr": p.pr or p.review_pr, "holder": _holder(rec)})
     prs: dict[str, dict[str, Any]] = {}  # an open entry → the open PR that names it
@@ -1151,6 +1183,8 @@ def reading(
         "origins": {n: o for n, o in rs.origins.items() if o},
         # the entry each PR names, for an item that carries a PR alone (TD-1468)
         "pr_refs": {k: v for n, r in rs.by_name.items() for k, v in pr_refs(n, r.get("prs")).items()},
+        # every live claim on an open entry, for a stopped holder's state row (TD-1468)
+        "holds": holds,
         "at": now.isoformat(),
     }
 
