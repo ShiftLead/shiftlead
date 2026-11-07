@@ -1,15 +1,20 @@
 # ShiftLead — design history
 
+From the cut — the merge of TD-1513 — the design's history lives in [`history/`](history/README.md), one file
+per ledger entry (`history/TD-<n>.md`), and `scripts/history.py <section>` prints a section's whole record from
+there and from this file (design §4.4 *Two PRs' records merge in either order*).
+
 The dated record of how [`design.md`](design.md) came to say what it says: decisions, reversals,
-review rounds, live findings and Paul's words, by section, in date order. `design.md` is the
-present-tense specification and states only what is true now; this file is where its history went
-on 2026-09-22 (the design review, TD-109) and where every later change appends its dated fact.
+review rounds, live findings and Paul's words, by section. `design.md` is the present-tense
+specification and states only what is true now; this file is where its history went on 2026-09-22
+(the design review, TD-109), and it holds every line written before the cut. It is never written
+again: a new line goes to `docs/history/`, and `tests/test_history.py` fails any change to this file.
 Nothing here is a rule. Where a bullet and the design disagree, the design is current and the
 bullet is what was true on its date.
 
-The ADRs under [`decisions/`](decisions/) and the ledger ([`technical_debt.md`](technical_debt.md),
-[`technical_debt_archive.md`](technical_debt_archive.md)) hold the reasoning behind the larger
-decisions; this file points at them rather than repeating them.
+The ADRs under [`decisions/`](decisions/) and the ledger ([`ledger/`](ledger/README.md), one file per entry,
+archived ones under `ledger/archive/`) hold the reasoning behind the larger decisions; this file points at them
+rather than repeating them.
 
 ## Title and status
 

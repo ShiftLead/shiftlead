@@ -9,7 +9,7 @@ How many rounds a review gets — one for a wording, rounds until the reviewers 
 a rule — is cadence §4.8; here a design's Fable and Sonnet rounds both iterate until they agree. Merge
 nothing the round is still changing: [[hold-a-design-until-its-round-ends]]. Asked to review a design,
 deliver the findings first and wait for Paul's go. Once each round returns only a follow-on of the last
-adoption, Fable may close the loop, recording the override in design-history.md and the entry's Status
+adoption, Fable may close the loop, recording the override in `docs/history/TD-<n>.md` and the entry's Status
 (TD-103, 2026-09-22; Paul accepted it).
 
 **When rounds keep finding gaps in the same mechanism, ask whether the mechanism is needed** (TD-722

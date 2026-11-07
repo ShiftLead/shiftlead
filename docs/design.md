@@ -9,11 +9,13 @@ Status: **past phase 1.** The host agent, the Claude Code adapter, the Sessions,
 session pages, the CLI, teams, mail between sessions, a home/node split with one container node, and
 identity on one host are built, each with the parts still open under its ledger entry. §7 lists what each phase still lacks;
 [`ledger/`](ledger/README.md) holds what is deferred, one `TD-NNN.md` per entry;
-[`design-history.md`](design-history.md) is the dated record of how the design got here. This
+[`history/`](history/README.md) is the dated record of how the design got here, one file per ledger entry
+(`scripts/history.py <section>` reads a section's record; every line before TD-1513's cut is in the frozen
+[`design-history.md`](design-history.md)). This
 document is the requirements and architecture as they stand; each open question in §10 is a
 decision that changes what gets built.
 
-A change in behaviour is a change to the design first, and the dated fact goes to [`design-history.md`](design-history.md); a control that is not in §4.5a's table does not exist.
+A change in behaviour is a change to the design first, and the dated fact goes to `docs/history/TD-<n>.md` ([`history/`](history/README.md)); a control that is not in §4.5a's table does not exist.
 
 The design is the files under [`design/`](design/), one per section and one per subsection of §4;
 grep the directory, read a section by its file.

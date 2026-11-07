@@ -41,8 +41,10 @@ ShiftLead is a self-hosted web dashboard that orchestrates interactive AI coding
 (§7 of the design says what each phase has and lacks). The design — one file per section under `docs/design/`, [`docs/design.md`](docs/design.md) its index — is the source of truth: requirements,
 architecture, every control (§4.5a — a control that is not in that table does not exist), the
 phase plan (§7), invariants (§9), and the dated question log (§10). It is written in the present tense and says what
-is true now; the dated record of how each rule came to be is [`docs/design-history.md`](docs/design-history.md). A
-change in behaviour is a change to the design first, and the dated fact goes to the history, never the other way round. Mockups regenerate from `docs/mockups/gen.py`.
+is true now; the dated record of how each rule came to be is [`docs/history/`](docs/history/README.md), one file per ledger entry
+(`scripts/history.py <section>` reads a section's; every line before TD-1513's cut is in the frozen
+[`docs/design-history.md`](docs/design-history.md)). A
+change in behaviour is a change to the design first, and the dated fact goes to the history, `docs/history/TD-<n>.md`, never the other way round. Mockups regenerate from `docs/mockups/gen.py`.
 
 ## Stack and conventions
 
@@ -174,7 +176,7 @@ Fix them upstream in agent-cadence and bump the pin (`agent-cadence bump`, a rev
 | Need | Where |
 |---|---|
 | What ShiftLead is and how it works | [docs/design.md](docs/design.md) |
-| How the design got here: dated decisions, reversals and review rounds, by section | [docs/design-history.md](docs/design-history.md) |
+| How the design got here: dated decisions, reversals and review rounds, by section | [docs/history/](docs/history/README.md), one `TD-<n>.md` per entry, read by `scripts/history.py <section>`; before TD-1513's cut, [docs/design-history.md](docs/design-history.md) (frozen) |
 | What a word means (lead, director, worker, host agent, …) | [docs/glossary.md](docs/glossary.md) |
 | Why agent-cadence was adopted, what it changed in the design | [docs/decisions/2026-09-06-adopt-dev-cadence.md](docs/decisions/2026-09-06-adopt-dev-cadence.md) |
 | Why herdr is prior art and not the session substrate | [docs/decisions/2026-09-10-herdr-spike.md](docs/decisions/2026-09-10-herdr-spike.md) |
