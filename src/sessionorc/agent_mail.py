@@ -164,13 +164,7 @@ def seat_able(r: Session, now: datetime, unfillable: dict[str, str] | None = Non
     return seat_unable(r, now, unfillable) is None
 
 
-def pool_rank(seat: Any) -> int:
-    """A pool member's place in its pool, from 1 (§4.9b *A seat as an ordered pool*, TD-1476): its record's
-    `seat.rank`; 0 for a seat in no pool, or a rank that is not a number."""
-    try:
-        return int((seat or {}).get("rank") or 0) if isinstance(seat, dict) else 0
-    except (TypeError, ValueError):
-        return 0
+pool_rank = mail.pool_rank  # §4.9b *A seat as an ordered pool* (TD-1476): read by the card too
 
 
 class MailMixin:
@@ -588,14 +582,20 @@ class MailMixin:
     def _seat_routing(self, s: Session, records: dict[str, Session] | None, now: datetime) -> dict[str, Any]:
         """The view's reading of an `asks` seat that cannot answer (design §4.5a card *routed around* line and
         *Inbox row: routed around*'s *waits:* line, TD-1443): `seat_unable`, the why (None when able, when
-        superseded, or for a record holding no `asks` seat), and `seat_routed_to`, *the techlead* or *you*,
-        where its general questions go meanwhile. The home's alone: `unfillable` is its tick's."""
+        superseded, or for a record holding no `asks` seat), and `seat_routed_to`, where its general questions go
+        meanwhile: the name of the pool member `_pool_next` would send a general question from no sender to (§4.9b
+        *A seat as an ordered pool*, TD-1476), else *the techlead* or *you*. The home's alone: `unfillable` is its
+        tick's."""
         if self.mode == "node" or not mail.asks_seat(s) or s.superseded_by:
             return {"seat_unable": None, "seat_routed_to": None}
         why = seat_unable(s, now, self.unfillable)
         if why is None:
             return {"seat_unable": None, "seat_routed_to": None}
-        lead = self._route_lead(s, records if records is not None else self._graph(), now)
+        records = records if records is not None else self._graph()
+        member = self._pool_next(s, records, now)  # a pool's next able member first (TD-1476), the counts unread
+        if member is not None:
+            return {"seat_unable": why, "seat_routed_to": member.name or self._address(member)}
+        lead = self._route_lead(s, records, now)
         return {"seat_unable": why, "seat_routed_to": "the techlead" if lead is not None else "you"}
 
     async def _question_seat(self, team: str | None = None, repo: str | None = None) -> Session:

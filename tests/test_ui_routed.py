@@ -99,6 +99,46 @@ def test_the_seat_card_says_where_its_questions_go_while_it_cannot_answer(tmp_pa
     # the compact card (a member of a live team) draws it too
     v = {**view({**base, "seat_unable": "not supervised", "seat_routed_to": "you"}), "compact": True}
     assert "its questions go to you while it cannot answer" in card.render(s=v)
+    # a pool's member names the member its questions go to (§4.9b *A seat as an ordered pool*, TD-1476)
+    html = card.render(s=view({**base, "seat_unable": "limited", "seat_routed_to": "qa-ao-1-p2"}))
+    assert "its questions go to qa-ao-1-p2 while it cannot answer" in html
+
+
+def _pool_member(k: int, state: str) -> dict:
+    name = "qa-ao-1" if k == 1 else f"qa-ao-1-p{k}"
+    return {"id": f"ao-x-{name}", "name": name, "kind": "agent", "adapter": "claude-code", "dir": "/tmp/x",
+            "state": state, "since": "2026-11-07T01:00:00Z", "pane": False, "tail": [], "role": "fact-checker",
+            "created": "2026-11-07T00:00:00Z", "confidence": "tick", "team": "ao-grind",
+            "seat": {"trigger": "asks", "pool": "qa-ao-1", "rank": k}}  # fmt: skip
+
+
+WHENS = {
+    "ao-x-qa-ao-1": "comes on the next question",
+    "ao-x-qa-ao-1-p2": "backup 1 of 2 — comes when qa-ao-1 cannot answer",
+    "ao-x-qa-ao-1-p3": "backup 2 of 2 — comes when qa-ao-1 and qa-ao-1-p2 cannot answer",
+}
+
+
+@pytest.mark.unit
+def test_a_pools_later_members_say_they_are_backups_and_the_first_is_unmarked(tmp_path, monkeypatch):
+    """§4.9b *A seat as an ordered pool*, *How it is drawn* (TD-1476, built by TD-1522): a live member after the
+    first reads *<role> · backup for <the first member>* on its role badge; on call, *on call · backup k−1 of n−1 —
+    comes when <the members before it> cannot answer*; the first member's badge and on-call line are a seat's own."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import view
+    from shiftlead.ui.cards import card_slot
+
+    card = templates.get_template("card.html")
+    first, second = view(_pool_member(1, "working"), seats=WHENS), view(_pool_member(2, "working"), seats=WHENS)
+    assert second["role_label"] == "Fact-checker · backup for qa-ao-1"
+    assert "Fact-checker · backup for qa-ao-1" in card.render(s=second)
+    assert "backup" not in first["role_label"] and "backup" not in card.render(s=first)
+    third = view(_pool_member(3, "closed"), seats=WHENS)
+    assert "backup for" not in third["role_label"], "on call, its line says it, not its badge"
+    text = card_slot(third)["text"]
+    assert text == "on call · backup 2 of 2 — comes when qa-ao-1 and qa-ao-1-p2 cannot answer"
+    assert text in card.render(s=third)
+    assert card_slot(view(_pool_member(1, "closed"), seats=WHENS))["text"] == "on call — comes on the next question"
 
 
 @pytest.mark.unit
