@@ -2,7 +2,7 @@
 slice 1): `seat_able`'s predicate over a record's replica, the order `_one_seat` picks in, and the words
 rule 3's pass writes to the home's `unfillable` for an ended seat it would not fill."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from conftest import park_ticks
@@ -124,3 +124,28 @@ async def test_rule_3_writes_why_it_would_not_fill_an_ended_seat(agent, tmp_path
         await agent._seat_pass(s, now, records)
         assert sid not in agent.unfillable, "each pass writes it afresh"
         await person.call("kill", id=sid)
+
+
+@pytest.mark.unit
+def test_a_gated_next_exactly_thirty_minutes_away_is_waited_and_one_past_it_is_not():
+    edge = {"next": _z(NOW + timedelta(minutes=30))}
+    assert seat_able(rec(gated=edge), NOW), "ROUTE_AROUND_AFTER itself is still waited"
+    over = {"next": _z(NOW + timedelta(minutes=30, seconds=1))}
+    assert seat_unable(rec(gated=over), NOW) == "paused by the usage gate, until 02:30Z"
+
+
+@pytest.mark.unit
+def test_a_reset_in_another_zone_reads_as_its_instant_and_an_unreadable_one_as_unknown():
+    soon = (NOW + timedelta(minutes=10)).astimezone(timezone(timedelta(hours=2))).isoformat()
+    assert soon.endswith("+02:00") and seat_able(rec(state="limited", limited_reset=soon), NOW)
+    for bad in ("not a time", "2026-11-07T02:10:00"):  # garbage, and a time with no zone
+        assert seat_unable(rec(state="limited", limited_reset=bad), NOW) == "limited"
+        assert seat_unable(rec(gated={"next": bad}), NOW) == "paused by the usage gate"
+
+
+@pytest.mark.unit
+def test_two_able_techlead_seats_live_alike_are_refused_naming_both():
+    one = agent_mail.MailMixin._one_seat
+    with pytest.raises(agent_mail.RpcError, match="t has 2 question seats: a, b"):
+        one("t", [rec("a"), rec("b")], NOW)
+    assert one("t", [rec("a"), rec("b", state="limited")], NOW).name == "a", "the able one of two tagged"

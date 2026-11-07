@@ -104,6 +104,18 @@ def _hhmmz(at: datetime) -> str:
     return at.astimezone(UTC).strftime("%H:%MZ")
 
 
+def _when(raw: Any) -> datetime | None:
+    """A replica's ISO time, or None where it is missing, unreadable, or names no zone: an unknown reset (review of
+    #3094), never a crash in the send that reads it."""
+    if not raw:
+        return None
+    try:
+        at = _parse(str(raw))
+    except ValueError:
+        return None
+    return at if at.tzinfo is not None else None
+
+
 def seat_unable(r: Session, now: datetime, unfillable: dict[str, str] | None = None) -> str | None:
     """Why a record holding an `asks` seat cannot answer now, or None when it is able (§4.9b *A seat that
     cannot answer is routed around*, TD-1443): `stalled?` for two ticks running (`stalled_ticks`, node-owned,
@@ -117,14 +129,14 @@ def seat_unable(r: Session, now: datetime, unfillable: dict[str, str] | None = N
     if r.state == "stalled?" and r.stalled_ticks >= 2:
         return "stalled?"
     if r.state == "limited":
-        reset = _parse(r.limited_reset) if r.limited_reset else None
+        reset = _when(r.limited_reset)
         if reset is None:
             return "limited"
         if reset <= now or reset - now > wait:
             return f"limited, resets {_hhmmz(reset)}"
     gated = r.gated if isinstance(r.gated, dict) else None
     if gated is not None:
-        nxt = _parse(str(gated["next"])) if gated.get("next") else None
+        nxt = _when(gated.get("next"))
         if nxt is None or nxt - now > wait:
             return "paused by the usage gate" + (f", until {_hhmmz(nxt)}" if nxt is not None else "")
     if r.state in ("exited", "closed"):
@@ -204,6 +216,9 @@ class MailMixin:
                     raise RpcError("--team or --repo, not both: each is the whole address (design §4.10)")
                 to = [self._address(await self._question_seat(team=team, repo=repo))]
             said = await self._checks_at_ask(sender, kind, pr)
+            to, routed = self._route_around(sender, to, kind, pr, reply_to, thread)
+            if routed and pr is not None:
+                answers = None  # a reader's routed ask carries no suggested answers (§4.9b)
             if key and key in self._nonces:
                 # a retry of this nonce landed while the read was out: the first send's verdict stands
                 result, error = self._nonces[key]
@@ -232,17 +247,60 @@ class MailMixin:
                 subject,
                 shots_at,
                 shots_ref,
+                routed,
             )
         except RpcError as e:
             if key:
                 self._remember_nonce(key, (None, e))
             raise
+        if routed:
+            result["routed"] = dict(routed)
         if said:  # one line from the home, not a refusal: the CLI prints `advice`
             result["checks_said"] = said
             result["advice"] = f"{result['advice']}\n{said}" if result.get("advice") else said
         if key:
             self._remember_nonce(key, (result, None))
         return result
+
+    def _route_around(
+        self, sender: str, to: Any, kind: str, pr: Any, reply_to: str | None, thread: str | None
+    ) -> tuple[Any, dict[str, Any] | None]:
+        """Where a new `ask` to one `asks` seat goes when that seat cannot answer (§4.9b *A seat that cannot
+        answer is routed around*, TD-1443): `(to, routed)`. A general question (no `pr`) goes to its team's
+        techlead seat when that is able and is not the seat itself, else to the person; a reader's `ask`
+        (carrying `pr`) is never re-seated and goes to the person. `routed` is `{seat, name, why, at}`, None
+        where nothing moved: an able seat, a superseded one (its mail follows the chain), a reply or a thread, any
+        kind but `ask`, the person's own send, or an address that is not exactly one seat."""
+        if kind != "ask" or sender == PERSON or reply_to or thread:
+            return to, None
+        named = [str(x) for x in ([to] if isinstance(to, str) else list(to or [])) if str(x).strip()]
+        if len(named) != 1:
+            return to, None
+        records, now = self._graph(), datetime.now(UTC)
+        seat = records.get(self._addr(named[0]))
+        if seat is None or not mail.asks_seat(seat) or seat.superseded_by:
+            return to, None  # a superseded record's mail follows its chain to the record continuing it
+        why = seat_unable(seat, now, self.unfillable)
+        if why is None:
+            return to, None
+        target = PERSON
+        if pr is None and str(seat.team or "").strip():
+            leads = [
+                r
+                for r in records.values()
+                if r is not seat
+                and r.team == seat.team
+                and mail.asks_seat(r)
+                and (r.seat or {}).get("tags") is True
+                and not r.superseded_by
+                and _fillable(r)
+                and seat_able(r, now, self.unfillable)
+            ]
+            if leads:
+                rank = {"exited": 1, "closed": 2}  # live first, then on call, then closed
+                target = self._address(min(leads, key=lambda r: (rank.get(r.state, 0), r.name)))
+        at = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        return [target], {"seat": seat.id, "name": seat.name, "why": why, "at": at}
 
     async def _question_seat(self, team: str | None = None, repo: str | None = None) -> Session:
         """The question seat `--team` or `--repo` names (§4.10 *A team or a repo as the address*,
@@ -445,6 +503,7 @@ class MailMixin:
         subject: str | None = None,
         shots_at: Any = None,
         shots_ref: Any = None,
+        routed: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """One message, every rule of §4.10 in the order it applies. Long on purpose: the order is
         the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land).
@@ -867,6 +926,8 @@ class MailMixin:
         if taken is not None:
             # §4.9b *Why it did not answer* (TD-1430): the addressee's record as it stands, on every copy
             entry.unanswered = self._unanswered(records, taken, now)
+        if routed:  # §4.9b *A seat that cannot answer is routed around* (TD-1443): the seat it was moved from
+            entry.routed = dict(routed)
         landed: list[str] = []
         failed: list[str] = []
         for sid in copies:
@@ -1070,6 +1131,7 @@ class MailMixin:
             answers=list(entry.answers),
             shots=list(entry.shots),
             unanswered=dict(entry.unanswered) if entry.unanswered else None,
+            routed=dict(entry.routed) if entry.routed else None,
         )
 
     def _pair(self, r: Session, other: str, now: datetime) -> Tally:
