@@ -1613,19 +1613,19 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the home first closes an idle extra seat to make room (rule 3) and, with none, writes *+0: host full, 30
      live* on the line — `scale.last` with `did: stopped` on its lowest-placed held extra, the line having no
      record of its own. **Down, with no idle timer**: an extra that **declares out of work** (`ao progress
-     none`, §4.9a) is closed back to held at once — once nothing is dirty or unpushed, no subagent or shell is
-     live, and **no PR of its own is open** — this rule's own test, not rule 3's (where a PR handed to a reader no
-     longer holds a seat): an open PR of the extra's, one handed to a reader included, holds it open with no
-     bound; a worker extra whose PR waits on its reader stays open idle, as an extra seat does (no tokens, only a slot), until the PR
-     merges or closes, so the reader's reply reaches a live record that holds the work's context, and the
-     eviction, which takes only extra seats (rule 3), never closes it; while it waits it reads *waiting on
-     <reader>: #n* as any member does (§4.9a), so the team is neither wound down nor finished until the PR
-     resolves; until then it is closed at the first tick they
-     pass. At the close a claim of its that is not `done` is dropped (*extra
-     closed*), as a succession drops one, (a claim with no open PR, its PR having merged or closed), so the lane reads its entry as nobody's; mail
-     that comes
-     to the held extra after waits in its mailbox for its next
-     fill. Its record stays with its mailbox and its `scale`, never marked sat
+     none`, §4.9a) is closed back to held once it is clean — nothing dirty or unpushed, no subagent or shell
+     live, **no PR of its own open**, and **no unread mail** — at once if it is, else at the first tick it is.
+     The PR test is this rule's own, not rule 3's (where a PR handed to a reader no longer holds a seat): an
+     open PR of the extra's, one handed to a reader included, holds it open with no bound, so a worker extra
+     whose PR waits on its reader stays open idle, as an extra seat does (no tokens, only a slot), until the PR
+     merges or closes; and the unread-mail test keeps it open past a merge until it has read the reader's reply
+     that follows, so that reply reaches the live record holding the work's context and its claim is marked
+     `done`. The eviction, which takes only extra seats (rule 3), never closes it. While a seat of the team
+     holds its PR's ask it reads *waiting on <reader>: #n* as any member does (§4.9a), and the team is neither
+     wound down nor finished; an open PR nobody was asked about holds the extra open but not the team, and a
+     wind-down closes it held with the rest. At the close a claim of its not `done` (one with no open PR) is
+     dropped (*extra closed*), as a succession drops one, so the lane reads its entry as nobody's; mail that
+     comes to the held extra after waits in its mailbox for its next fill. Its record stays with its mailbox and its `scale`, never marked sat
      out, so the line's next short event fills it again. An extra is never sent rule 6's *new work* note: out
      of work, it closes, and new work fills whichever extra is held. Its out-of-work declaration ends only its
      own run: the wound-down and finished readings (`work.wound_down`, `work.finished`; §4.9a) pass over a held
