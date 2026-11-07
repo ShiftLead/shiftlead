@@ -411,6 +411,14 @@
 {%- if na %}<div class="st dflt notanswered" title="why the session it was first put to did not answer, as the home read it when the question was taken up (design §4.9b)"><span class="nalabel">not answered by {{ na.name }} (as read at {{ na.at }}):</span> {{ na.words }}</div>{% endif %}
 {%- endmacro %}
 
+{# §4.5a **Inbox row: routed around** (§4.9b *A seat that cannot answer is routed around*, TD-1443): a question
+   whose entry carries `routed`, moved from a seat that could not answer, draws one line under the thread, the
+   words from `sessionorc.mail.routed_line`, as text. -#}
+{% macro routed_line(e) -%}
+{%- set ra = routed_around(e) %}
+{%- if ra %}<div class="st dflt routed" title="the seat it was put to could not answer, so it came here (design §4.9b)">{{ ra }}</div>{% endif %}
+{%- endmacro %}
+
 {# The seat's reading brought back on the look (`looked_by`, §4.5a **Send to reviewer**): its outcome
    line, drawn above the answers as text — the answer is still the person's one press. #}
 {% macro looked_by(e) -%}
@@ -431,6 +439,7 @@
 {{ head(e) }}
 {{ body(e) }}
 {{ not_answered_line(e) }}
+{{ routed_line(e) }}
 {{ recommends(e) }}
 {{ looked_by(e) }}
 {%- set whole = card_whole(mode, e) %}

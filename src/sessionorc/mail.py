@@ -195,6 +195,18 @@ PERSON_SESSION = frozenset({"ledger_decide"})
 _CONTROLS = re.compile(r"[\x00-\x1f]")
 
 
+def routed_line(routed: Any) -> str | None:
+    """A question moved from a seat that could not answer (design §4.9b *A seat that cannot answer is routed
+    around*, TD-1443): *routed around <name>: <why>*, the one place the words are written, which the Inbox row,
+    the message page, the Queue's mail item, `ao inbox` and `ao msg`'s reply all draw. None where the entry
+    carries no `routed` envelope; a malformed one names what it has."""
+    if not isinstance(routed, Mapping):
+        return None
+    name = str(routed.get("name") or routed.get("seat") or "its seat")
+    why = str(routed.get("why") or "").strip()
+    return f"routed around {name}: {why}" if why else f"routed around {name}"
+
+
 def clip_subject(line: str) -> str:
     """A subject as one line of at most `SUBJECT_CHARS` (§4.10 *A subject on every entry*): whitespace
     and control characters folded to single spaces, and a longer one clipped at a word with an
