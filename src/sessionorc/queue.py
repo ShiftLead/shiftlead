@@ -70,12 +70,22 @@ def refs(text: Any) -> list[str]:
     return seen
 
 
+# a completed card's entry in `card_index`, keyed `kept:<ref>` so no open card's lookup meets it: only an item that
+# needs the person draws there, the card then kept (§4.5 screen 12 *Recently completed*, TD-1468)
+KEPT = "kept:"
+# a loose card's id, `loose:<ref>` (§4.5 screen 12 *In progress*, TD-1468): an item that needs the person and names
+# a ref no card holds, open or completed
+LOOSE = "loose:"
+
+
 def card_index(reading: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
     """The open cards' entries (§4.5 screen 6 *Where a row is drawn*): each `<repo>#TD-n` a card holds —
     its top entry and every row, an open card's archived rows among them — to `(card id, row qid)`, and
     the bare `TD-n` too where one repo alone holds it, and `<origin path>#TD-n` where the reading's `origins`
-    give the repo one (TD-1371). An entry on a completed card, or on none, is in no card: the item that names
-    it stays in the Inbox."""
+    give the repo one (TD-1371). An entry on a completed card is in no open card: it is keyed `kept:<ref>`
+    (`KEPT`, by the same three spellings, its bare one where one repo's completed cards alone hold it) to
+    `(completed card id, its qid)`, which only an item that needs the person reads (TD-1468); an item that
+    needs nobody and names it stays in the Inbox."""
     out: dict[str, tuple[str, str]] = {}
     bare: dict[str, set[str]] = {}
     origins = (reading or {}).get("origins") or {}
@@ -95,6 +105,23 @@ def card_index(reading: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
     for tid, qs in bare.items():
         if len(qs) == 1:
             out[tid] = out[next(iter(qs))]
+    kept_bare: dict[str, set[str]] = {}
+    for c in (reading or {}).get("completed") or []:
+        if not isinstance(c, Mapping) or not c.get("id"):
+            continue
+        ids = c.get("ids") or [e.get("qid") for e in c.get("entries") or () if isinstance(e, Mapping)]
+        for q in map(str, ids or ()):
+            got = refs(q)
+            if "#" not in q or not got:
+                continue
+            out.setdefault(KEPT + got[0], (str(c["id"]), q))
+            name, _, tid = got[0].partition("#")
+            if path := origins.get(name):
+                out.setdefault(f"{KEPT}{path}#{tid}", (str(c["id"]), q))
+            kept_bare.setdefault(tid, set()).add(got[0])
+    for tid, qs in kept_bare.items():
+        if len(qs) == 1:
+            out[KEPT + tid] = out[KEPT + next(iter(qs))]
     return out
 
 
@@ -205,15 +232,47 @@ def held_refs(
     return held, ("about" if held and held[0] in about_refs else "words")
 
 
+def named_refs(about: Any, words: Any, repo: str | None = None) -> tuple[list[str], list[str]]:
+    """Every ref a mail item names, in order — `about`'s, then those of `words` — each bare `TD-n` read as `repo`'s
+    (`own_refs`), and `about`'s alone, which say where the first was read (TD-1468)."""
+    about_refs = own_refs(refs(about), repo)
+    return about_refs + [r for r in own_refs(refs(words), repo) if r not in about_refs], about_refs
+
+
+def kept_or_loose(named: Iterable[str], index: Mapping[str, tuple[str, str]] | None) -> tuple[str, str, str] | None:
+    """Where an item that needs the person draws when no open card holds its refs (§4.5 screen 6 *Every item that
+    needs the person draws on a card*, TD-1468): `(card id, row qid, ref)` — the completed card that holds the first
+    of `named` a completed card holds, kept (`card_index`'s `kept:<ref>`), `ref` that ref; else the loose card of
+    its first ref, `loose:<ref>`, its row the ref. None — the Inbox — where it names none, or where `index` is empty
+    (a home that serves no Queue)."""
+    named = list(named)
+    if not named or not index:
+        return None
+    for r in named:
+        if KEPT + r in index:
+            card, row = index[KEPT + r]
+            return card, row, r
+    return LOOSE + named[0], named[0], named[0]
+
+
 def mail_card(
-    about: Any, words: str, index: Mapping[str, tuple[str, str]] | None, repo: str | None = None
+    about: Any,
+    words: str,
+    index: Mapping[str, tuple[str, str]] | None,
+    repo: str | None = None,
+    needs: bool = False,
 ) -> tuple[str, str] | None:
     """The `(card id, row qid)` a mail item is drawn on (§4.5 screen 6 *Where a row is drawn*): the first of its refs
     an open card holds (`held_refs`: its `about`'s, then those of `words`, its subject and text), a bare one read as
-    `repo`'s — its sender's (`mail_repo`, TD-1467) — None — its home is the Inbox — where no card holds one. The
-    Inbox's own `item_home` and Telegram's link (§4.10 *What a message says*, TD-795) read it alike."""
+    `repo`'s — its sender's (`mail_repo`, TD-1467) — None — its home is the Inbox — where no card holds one, unless
+    it `needs` the person (an open `ask` or `steer` to them), when it draws on its kept or loose card
+    (`kept_or_loose`, TD-1468). The Inbox's own `item_home` and Telegram's link (§4.10 *What a message says*,
+    TD-795) read it alike."""
     held, _by = held_refs(about, words, index, repo)
-    return (index or {}).get(held[0]) if held else None
+    if held:
+        return (index or {}).get(held[0])
+    got = kept_or_loose(named_refs(about, words, repo)[0], index) if needs else None
+    return got[:2] if got else None
 
 
 # an answered question's word holds after a `done` outcome no longer than this (§4.4 *The card's status*, TD-1316)

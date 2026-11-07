@@ -1873,6 +1873,19 @@ def board_horizon(rows: Collection[dict[str, Any]], mode: str | None = None, tod
     }
 
 
+def needs_person(e: Mapping[str, Any], section: str) -> bool:
+    """Whether an Inbox row is an item that needs the person, which draws on a kept or a loose card where no open
+    card holds its entry (§4.5 screen 6 *Every item that needs the person draws on a card*, TD-1468): an open `ask`
+    or `steer` to them, and an undecided board line but a `watch` or an `fyi`, under *Needs you* or *Steering*. A
+    note, an outcome, a state row and a PR's row are not."""
+    if section not in ("needs", "steering"):
+        return False
+    row = e.get("row")
+    if row == "board":
+        return not e.get("answered") and str(e.get("kind") or "").lower() not in ("watch", "fyi")
+    return not row and _entry_open(dict(e))
+
+
 def board_waits(r: Mapping[str, Any]) -> bool:
     """Whether a board row is drawn under *Waiting on them* (§4.5 screen 6, TD-305): answered, and
     not yet `BOARD_WAIT_DAYS` from the answer — in no count and out of the board's horizon."""
@@ -2256,7 +2269,10 @@ def inbox_sections(
     askers = asker_repos(entries, fleet, roots) if cards else {}
     for k, rows in out.items():
         # a snoozed row stays the Inbox's: the Queue has no Snooze (§4.5 screen 12)
-        out[k] = [{**e, **item_home(e, cards if k != "snoozed" else None, askers)} for e in rows]
+        out[k] = [
+            {**e, **item_home(e, cards if k != "snoozed" else None, askers, k != "snoozed" and needs_person(e, k))}
+            for e in rows
+        ]
     queue_n = sum(1 for e in out["needs"] if e["home"] == "queue")
     return {**out, "count": len(out["needs"]), "fyi_n": len(out["fyi"]), "overdue_n": overdue, "queue_n": queue_n}
 
