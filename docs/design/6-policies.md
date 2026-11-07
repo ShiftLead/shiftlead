@@ -488,7 +488,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      `ao progress restart --why "context bound"`*, with *; #2015, #2018 carry over* when it holds
      waiting claims; `context_sent_at` marks it, and it is sent again after twenty minutes if the
      member is still idle and over. **A waiting claim is not in progress, for this rule and rule 4**
-     (TD-820; rules 9 and 3, the flow's restart (§4.9c) and §4.10 still count it as in progress):
+     (TD-820; and for rule 7's boundary, TD-1485; rules 9 and 3, the flow's restart (§4.9c) and §4.10 still count it as in progress):
      a claim whose PR is open (the claim's `pr` or `review_pr`, TD-814's *review* phase) **and**
      whose next move is someone else's — the *waiting* reading of §4.2: an open `ask` or `steer` of
      the member's about that reference, or its ask held in a seat's `prs_waiting.asks`. A designer's
@@ -653,13 +653,18 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      first read), cleared by the next create under the name or when the files read as recorded
      again; a source that cannot be read now is no change. A replay of the stored prompt writes no
      `brief`. The card and `ao status -v` say it (§4.5a **brief changed** chip). Then, as rule 5
-     does and in the same two ways: a member that is **`working`** is not interrupted — every `ao`
-     reply it makes ends with *(your brief changed — finish what you hold, then `ao progress restart
-     --why "brief changed"`)*, and rule 2 restarts it on its word — a word said while the record
-     carries the mark is never *early*, and a member that has declared, or a seat, is not given the
-     clause; a member that is **hook-confirmed `idle`, holds no claim in progress, has declared
-     nothing, and has nothing uncommitted or unpushed** (known, as in rule 2) **is restarted by the
-     tick itself**, closed first and replayed, `restarts: [{why: brief}]`, under the ceiling as
+     does and in the same two ways. **A changed brief applies at the next entry boundary, never
+     mid-entry** (TD-1485): the boundary is rule 5's — the member holds no claim in progress, a
+     waiting claim not counting (rule 5) — so a designer whose design waits on its steer or its
+     reader is between entries, and one whose rounds are still running is not. A member that is
+     **`working`** is not interrupted — every `ao` reply it makes ends with *(your brief changed —
+     it applies from your next entry: finish the one you hold, merged, dropped or waiting, then
+     `ao progress restart --why "brief changed"`)*, and rule 2 restarts it on its word — a word said
+     while the record carries the mark is never *early*, and a member that has declared, or a seat,
+     is not given the clause; a member that is **hook-confirmed `idle`, holds no claim in progress
+     (a waiting claim not counting, as for rule 5; the replay carries it), has declared nothing,
+     and has nothing uncommitted or unpushed** (known, as in rule 2) **is restarted by the tick
+     itself**, closed first and replayed, `restarts: [{why: brief}]`, under the ceiling as
      every replay is; a close or replay that failed keeps its `brief` entry with `error`, counts
      toward the ceiling, and is tried again by the tick, while a Close by anyone else is never
      undone. The same tick restart, under the same precondition, serves §4.10 *A lapsed cache is
