@@ -2043,6 +2043,7 @@
         : e.closed_reason === "declined" ? "declined"
         : e.closed_reason === "asker_gone" ? "closed · the asker is gone"
         : e.closed_reason === "asked_person" ? "closed · the asker took it to the person"
+        : e.closed_reason === "rerouted" ? "closed · routed around a seat that could not answer"
         : e.closed_reason === "withdrawn" ? "withdrawn"
         : e.closed_by ? `answered by ${esc(e.closed_by)}`
         : e.expired_at ? "expired"
@@ -2062,6 +2063,8 @@
       + (e.reply_to ? `<div class="st">reply to ${esc(e.reply_to)}</div>` : "")
       + AO.foldBody(e)
       + (e.default ? `<div class="st">unless you say otherwise: ${esc(e.default)}</div>` : "")
+      // §4.9b *A question already waiting* (TD-1480): a move a count holds says why, as text
+      + (e.waits && !e.closed_reason ? `<div class="st dflt routed">${esc(e.waits)}</div>` : "")
       + `<div class="row gap">${st ? `<span class="st${e.expired_at ? " expired" : ""}">${st}</span>` : ""}<span class="grow"></span>${reply}`
       + ` <button class="btn sm ghost" data-act="unmail" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-confirm="${confirmText}">Delete</button></div></div>`;
   };
@@ -5881,6 +5884,7 @@
       : r === "asker_gone" ? "closed · the asker is gone"
       : r === "withdrawn" ? "withdrawn"
       : r === "asked_person" ? "passed to the person"
+      : r === "rerouted" ? "routed around"
       : r ? r
       : "waiting";
   };
@@ -5895,6 +5899,7 @@
       + `<span class="grow"></span><span class="st age" data-since="${esc(e.at || "")}">${fmtAge(e.at)}</span></div>`
       + (e.subject ? `<div class="st subj">${esc(e.subject)}</div>` : "")
       + AO.foldBody(e)
+      + (e.waits && !e.closed_reason ? `<div class="st dflt routed">${esc(e.waits)}</div>` : "")
       + (st ? `<div class="row gap"><span class="st${st === "waiting" ? " waiting" : ""}">${esc(st)}</span></div>` : "")
       + `</div>`;
   };

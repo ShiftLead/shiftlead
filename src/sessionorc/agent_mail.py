@@ -335,11 +335,17 @@ class MailMixin:
                 continue
             why = seat_unable(seat, now, self.unfillable)
             for e in list(seat.inbox):
-                if not e.open or e.kind != "ask" or e.entry is not None or e.handed or e.to != [key]:
+                if not e.open or e.kind != "ask" or e.to != [key]:
                     continue
+                blank = e.handed_entry and isinstance(e.entry, dict) and not e.entry.get("picked")
+                if (e.entry is not None or e.handed) and not blank:
+                    continue  # the person's team pick and a session's own ledger request wait on their seat
                 if why is None:
                     if e.waits:  # able again: it waits for nothing but its answer
                         self._mark(e.id, waits=None)
+                    continue
+                if blank:
+                    self._move_handed(e, key, seat, why, stamp, touched)
                     continue
                 sender = e.from_
                 me = records.get(sender) if sender != PERSON else None
@@ -393,6 +399,51 @@ class MailMixin:
             self.person_store.save(self.person_inbox)
         if touched or person_changed:
             await self._push_changes()
+
+    def _move_handed(
+        self, e: MailEntry, key: str, seat: Session, why: str, stamp: str, touched: dict[str, Session]
+    ) -> bool:
+        """A handed entry with a blank Team pick waiting on a seat that cannot answer (§4.9b *A handed entry*, *A
+        question already waiting*, TD-1480): moved to the first team of its `entry.teams` whose techlead seat is
+        able — its `entry.team` that team's, `picked` false, its `handed` mark, `draft` and no bound kept, carrying
+        `routed` — the original closed `rerouted` on every copy. None able, or the new seat's mailbox full, and it
+        waits where it is. Returns whether it moved."""
+        records = self._graph()
+        for t in (e.entry or {}).get("teams") or []:
+            if not isinstance(t, dict) or not str(t.get("seat") or "").strip():
+                continue
+            target = self._seat_followed(str(t["seat"]).strip())
+            if target == key or not self._seat_id_able(target):
+                continue
+            r = records.get(target)
+            if r is None:
+                continue  # a seat with no record yet: nothing to land in until rule 3 fills it
+            if mail.MAILBOX_DEPTH is not None and r.unread() >= mail.MAILBOX_DEPTH:
+                line = f"waits on {r.name or target}: its inbox holds {mail.MAILBOX_DEPTH} unread entries"
+                if e.waits != line:
+                    self._mark(e.id, waits=line)
+                return False
+            moved = MailEntry(
+                id="m-" + secrets.token_hex(6),
+                from_=e.from_,
+                to=[target],
+                at=stamp,
+                kind="ask",
+                text=e.text,
+                about=e.about,
+                root=e.root,
+            )
+            moved.subject, moved.team, moved.draft, moved.handed = e.subject, e.team, e.draft, True
+            moved.entry = {**(e.entry or {}), "team": str(t.get("team") or "").strip(), "picked": False}
+            moved.routed = {"seat": seat.id, "name": seat.name, "why": why, "at": stamp}
+            self._mark(e.id, waits=None)
+            self._close_entry(e.id, "rerouted", stamp)
+            r.inbox.append(self._copy(moved))
+            touched[target] = r
+            return True
+        if e.waits:
+            self._mark(e.id, waits=None)  # waiting on its seat: the row's *waits:* line says why (§4.5a)
+        return False
 
     def _landing_refusal(self, records: dict[str, Session], sender: str, target: str, moved: MailEntry) -> str | None:
         """Why a moved question cannot land with `target` now (§4.9b *The move is a landing, not a send*): the
@@ -591,6 +642,11 @@ class MailMixin:
         if s is not None:
             for e in s.inbox:
                 if e.id == mid and e.handed:
+                    if e.closed_reason == "rerouted":
+                        raise RpcError(
+                            f"{mid} was routed around while you could not answer: another seat holds it now, and "
+                            "nothing is owed on it here (design §4.9b)"
+                        )
                     if e.outcome:
                         raise RpcError(
                             f"{mid} is settled — its outcome is recorded as {e.outcome.get('state')}. If more is "

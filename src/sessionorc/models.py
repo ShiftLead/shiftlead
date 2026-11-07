@@ -495,8 +495,9 @@ class MailEntry:
     # An entry handed to a seat (design §4.10 *An entry handed to a seat*, TD-180, TD-218): the
     # Add entry form's `{repo, type}` — the repo's name in the home's registry and `debt` or
     # `feature` — on a `handed` `ask` from the person. From the form's fields, never read out of
-    # the text.
-    entry: dict[str, str] | None = None
+    # the text. A blank Team pick also keeps `teams`, its ordered `{team, seat}` list, which the tick's move
+    # reads when the seat cannot answer (§4.9b *A question already waiting*, TD-1480).
+    entry: dict[str, Any] | None = None
     # The Add entry form's draft folder the hand claimed (§4.4 *The Add entry form's draft*, TD-630):
     # `draft-<8 hex>`, beside `entry`, where the form attached files; None where it attached none.
     draft: str | None = None
@@ -564,7 +565,8 @@ class MailEntry:
         `closed_reason` have nothing to say. A future writer that hands an `ask` would have to
         settle what an unanswered one owes before setting the mark (review of PR #318)."""
         if self.handed:
-            return self.from_ == PERSON and not self.outcome
+            # one moved from a seat that could not answer owes on its copy, not here (§4.9b, TD-1480)
+            return self.from_ == PERSON and not self.outcome and self.closed_reason != "rerouted"
         return (
             (PERSON in self.to or bool(self.passed_up))  # a question passed up is the person's to answer (§4.9b)
             and self.kind in ASK_KINDS
