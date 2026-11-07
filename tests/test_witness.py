@@ -13,6 +13,7 @@ import tomllib
 from datetime import UTC, datetime
 
 import pytest
+from conftest import park_ticks
 
 from sessionorc import agent_common, mail, modes, witness
 from sessionorc import push as push_mod
@@ -98,7 +99,11 @@ def test_witness_press_is_the_persons_own_and_the_homes_alone():
 ORIGIN = "git@github.com:Org/ShiftLead.git"
 
 
-def _registered(agent, repo, remote: str = ORIGIN) -> None:
+async def _registered(agent, repo, remote: str = ORIGIN) -> None:
+    """The repo written straight into the agent's reading, with the ticks parked first (TD-1460): a tick's repo
+    refresh replaces `_repos` with the home's roster, which does not hold it, and a press under load then read
+    as in no registered repo (*no team: the home names the repo*, `recorded` None)."""
+    await park_ticks(agent)
     agent._witness_repo = lambda d: witness.repo_named(d, [str(repo)])
     agent._repos[str(repo)] = {"name": repo.name, "root": str(repo), "remote": remote}
 
@@ -108,7 +113,7 @@ async def test_a_press_is_recorded_with_its_repo_and_refused_for_an_unknown_word
     """A session's call is refused as every person-only RPC is (tests/test_person_only.py)."""
     repo = tmp_path / "shiftlead"
     repo.mkdir()
-    _registered(agent, repo)
+    await _registered(agent, repo)
     assert witness.start() is not None, "start is written at the agent's start"
     async with LocalClient() as person:
         got = await person.call("witness_press", word="apply", target="dc-grind", dir=str(repo))
@@ -147,6 +152,7 @@ async def test_a_press_reads_the_origin_once_off_the_loop_where_the_reading_has_
         return origins["x"]
 
     monkeypatch.setattr(reports, "git_origin", git_origin)
+    await park_ticks(agent)  # TD-1460: this test writes `_repos` too, which a tick's refresh replaces
     agent._witness_repo = lambda d: witness.repo_named(d, [str(repo)])
     agent._repos.pop(str(repo), None)
     assert await agent._witness_press_of("apply", "t", str(repo)), "no reading: read off the loop"
