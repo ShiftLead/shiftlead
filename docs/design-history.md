@@ -1923,6 +1923,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-02 (TD-269, the designer): *A person in the team* prefills Controllers with the team's manager when it is live or a seat on call, not when live alone. The build is TD-276.
 
 ## 4.9a Winding down: a team that runs out of work
+- 2026-11-07 (TD-1485's review rounds, docs/reviews/TD-1485.md): rounds 1–3 — fact-checks R1, R4, R7, Fable R2, R5, R8, Sonnet R3, R6, R9, F1–F62; build-changing per round (design reviews) 5, 6, 2, the fact-checks apart 3, 3, 2. The prompt's closing line for an owed outcome was dropped in round 2 (F42) as redundant with `mail.owed`; a member rule 2 does not replay is still refused a restart while it owes (F45).
 - 2026-11-07 (TD-1485, the designer; from Paul's trial review of three seats' transcripts, 2026-11-06): *The third declaration* — the later declaration stands (a restart clears the session's own standing `none`, and the reverse), and a restart is no longer refused while an outcome is owed: the debt rides the kept mail to the next run (a close made for that replay leaves it, a create without the mail settles it), and that run's `none` stays refused until it is reported (builds TD-1516).
 - 2026-10-30 (TD-1066, the designer): *A line found done* — a session closes an `act` or `decide` line whose task is already done in a PR of its own, never folded into a feature PR, where a conflict held a close back on 2026-10-26 (#2408).
 
