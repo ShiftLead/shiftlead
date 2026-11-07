@@ -3769,8 +3769,8 @@ class TickMixin:
             ):
                 return
             got = queue_mod.reading(
-                self._repos, graph, now, waiting=waiting, doing=doing, questions=list(self.person_inbox),
-                archived=self._archived,
+                {r: self._applied(r, v) for r, v in self._repos.items()}, graph, now, waiting=waiting, doing=doing,
+                questions=list(self.person_inbox), archived=self._archived,
             )  # fmt: skip
         except Exception:  # noqa: BLE001 — the Queue is a reading: the last one stands, the next tick tries again
             log.exception("reading the queue failed")
@@ -3780,12 +3780,21 @@ class TickMixin:
         if {k: v for k, v in got.items() if k != "at"} != {k: v for k, v in old.items() if k != "at"}:
             await self._broadcast({"event": "queue", "queue": self._queue_ranked(got)})
 
+    def _applied(self, root: str, v: dict[str, Any]) -> dict[str, Any]:
+        """A reading with this home's press marks laid over its board items and ledger entries (`_applying`,
+        §4.4 *A press is drawn as it lands*, TD-1508): a copy where a mark stands, the reading itself where none."""
+        marks = self._applying.get(root)
+        if not marks or not isinstance(v, dict):
+            return v
+        return queue_mod.lay_applying(v, marks, str(v.get("name") or Path(root).name))
+
     def _repo_view(self, root: str) -> dict[str, Any] | None:
         """A checkout's reading as the `repos` RPC and event serve it: the reading, and under
         `balance` the marks of the teams over their line in this repo (§6 *Balance*), by team."""
         v = self._repos.get(root)
         if v is None:
             return None
+        v = self._applied(root, v)  # a press landing, laid over (§4.4 *A press is drawn as it lands*, TD-1508)
         marks = {
             team: rec["balance"]
             for team, rec in (self._host_rec.get("teams") or {}).items()

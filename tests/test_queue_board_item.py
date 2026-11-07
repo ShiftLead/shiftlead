@@ -98,3 +98,15 @@ def test_a_bold_word_past_the_heads_reach_is_no_head():
     late = "decide 2026-10-01 — " + "word " * 60 + "**foo** bar."
     got = inbox_mod.board_card(late, {}, "samscrape")
     assert got["sentence"].startswith("decide 2026-10-01") and got["sentence"].endswith("**foo** bar.")
+
+
+def test_a_board_row_carries_the_homes_press_mark(tmp_path, monkeypatch):
+    """TD-1508 (§4.4 *A press is drawn as it lands*): `board_rows` keeps the home's `applying` mark on the row, and a
+    row with none carries None."""
+    host(tmp_path, monkeypatch)
+    root = tmp_path / "samscrape"
+    mark = {"act": "decide", "answer": "Alpha", "at": "2026-10-30T10:00:00+00:00"}
+    dec = {**item(12, DECIDE, "2026-10-29", "1d overdue"), "kind": "decide", "key": "board:91aa0000"}
+    plain = {**item(9, ACT, "2026-10-29", "1d overdue"), "kind": "act", "key": "board:741e117b"}
+    got = board_rows(report(root, {**dec, "applying": mark}, plain), {str(root.resolve()): {"name": "samscrape"}})
+    assert [r["applying"] for r in got] == [mark, None]

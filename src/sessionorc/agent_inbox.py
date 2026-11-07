@@ -7,8 +7,10 @@ dismiss, pause, resume, go with it, the attention store — as a mixin `HostAgen
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import time
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -353,13 +355,17 @@ class InboxMixin:
             raise RpcError(f"a board {action or 'edit'} names the item's line or its id (design §4.4)")
         try:
             said = self._board_answer(action, answer, answers)
-            done = await asyncio.to_thread(
-                board_mod.write_back, root, line, text, action, due, answer=said, key=str(key or "")
-            )
         except board_mod.Refused as e:
             raise RpcError(str(e)) from None
-        log.info("board %s: %s", root, done["message"])
-        await self._reread_board(root)
+        async with self._applying_mark(root, str(key or ""), action, said):  # drawn as it lands (TD-1508)
+            try:
+                done = await asyncio.to_thread(
+                    board_mod.write_back, root, line, text, action, due, answer=said, key=str(key or "")
+                )
+            except board_mod.Refused as e:
+                raise RpcError(str(e)) from None
+            log.info("board %s: %s", root, done["message"])
+            await self._reread_board(root)
         return {
             "board": str(want),
             "line": done.get("line", line),
@@ -653,21 +659,22 @@ class InboxMixin:
         if line is None and not key:
             raise RpcError("a board reply names the item's line or its id (design §4.4)")
         try:
-            try:
-                at: int | None = int(line) if line is not None else None
-            except (TypeError, ValueError):
-                if not key:
-                    raise
-                at = None  # a line it cannot read, and the line's id: found by the id
-            done = await asyncio.to_thread(
-                board_mod.write_back, root, at, text, "reply", None, reply=reply, key=str(key or "")
-            )
+            at: int | None = int(line) if line is not None else None
         except (TypeError, ValueError):
-            raise RpcError("a board reply names the item's line (design §4.4)") from None
-        except board_mod.Refused as e:
-            raise RpcError(str(e)) from None
-        log.info("board %s: %s", root, done["message"])
-        await self._reread_board(root)
+            if not key:
+                raise RpcError("a board reply names the item's line (design §4.4)") from None
+            at = None  # a line it cannot read, and the line's id: found by the id
+        async with self._applying_mark(root, str(key or ""), "reply", reply):  # drawn as it lands (TD-1508)
+            try:
+                done = await asyncio.to_thread(
+                    board_mod.write_back, root, at, text, "reply", None, reply=reply, key=str(key or "")
+                )
+            except (TypeError, ValueError):
+                raise RpcError("a board reply names the item's line (design §4.4)") from None
+            except board_mod.Refused as e:
+                raise RpcError(str(e)) from None
+            log.info("board %s: %s", root, done["message"])
+            await self._reread_board(root)
         text = str(done.get("text") or text)  # the line found, by its id where the press named one
         head = ledgerboard.bold_head(text) or " ".join(text.split())
         by = await asyncio.to_thread(board_mod.author, root)
@@ -1008,16 +1015,17 @@ class InboxMixin:
         self._board_adding.add(key)
         try:
             today = datetime.now().date().isoformat()
-            try:
-                done = await asyncio.to_thread(
-                    board_mod.add_decided, root, str(e.get("title") or ""), id, answers, default, said, today
-                )
-            except board_mod.Refused as err:
-                raise RpcError(str(err)) from None
-            log.info("board %s: %s", root, done["message"])
-            # held through the re-read: a second press in between would pass the decided check on
-            # the reading from before the line (review of #1542)
-            await self._reread_board(root)
+            async with self._applying_mark(root, f"ledger:{queue_mod.qid(name, id)}", "decide", said):  # TD-1508
+                try:
+                    done = await asyncio.to_thread(
+                        board_mod.add_decided, root, str(e.get("title") or ""), id, answers, default, said, today
+                    )
+                except board_mod.Refused as err:
+                    raise RpcError(str(err)) from None
+                log.info("board %s: %s", root, done["message"])
+                # held through the re-read: a second press in between would pass the decided check on
+                # the reading from before the line (review of #1542)
+                await self._reread_board(root)
         finally:
             self._board_adding.discard(key)
         return {"repo": root, "id": id, "decided": " ".join(said.split()), **done}
@@ -1094,24 +1102,69 @@ class InboxMixin:
         who = "the person" if mine else self._presser_words(str(caller))
         self._board_adding.add(key)
         try:
-            tell = (f"is closed by {who}" if road == "done" else "goes back to design") + (f" — {w}" if w else "")
-            told, readers, untold = await self._tell_holders(id, tell)
-            if untold:
-                raise RpcError(
-                    f"nothing was written: {'; '.join(untold)} — a worker would run on against "
-                    f"{id} (design §4.4 *The tell*)"
-                )
-            try:
-                done = await asyncio.to_thread(
-                    board_mod.add_decided, root, str(e.get("title") or ""), id, [], None, said, today, session=session
-                )
-            except board_mod.Refused as err:
-                raise RpcError(str(err)) from None
-            log.info("board %s: %s", root, done["message"])
-            await self._reread_board(root)
+            async with self._applying_mark(root, f"ledger:{queue_mod.qid(name, id)}", LEDGER_ROADS[road], w):  # TD-1508
+                tell = (f"is closed by {who}" if road == "done" else "goes back to design") + (f" — {w}" if w else "")
+                told, readers, untold = await self._tell_holders(id, tell)
+                if untold:
+                    raise RpcError(
+                        f"nothing was written: {'; '.join(untold)} — a worker would run on against "
+                        f"{id} (design §4.4 *The tell*)"
+                    )
+                try:
+                    done = await asyncio.to_thread(
+                        board_mod.add_decided,
+                        root,
+                        str(e.get("title") or ""),
+                        id,
+                        [],
+                        None,
+                        said,
+                        today,
+                        session=session,
+                    )
+                except board_mod.Refused as err:
+                    raise RpcError(str(err)) from None
+                log.info("board %s: %s", root, done["message"])
+                await self._reread_board(root)
         finally:
             self._board_adding.discard(key)
         return {"repo": root, "id": id, "decided": said, "told": told, "readers": readers, **done}
+
+    @contextlib.asynccontextmanager
+    async def _applying_mark(self, root: str | Path, key: str, act: str, answer: str = "") -> AsyncIterator[None]:
+        """A press drawn as it lands (§4.4 *A press is drawn as it lands*, TD-1508): its token `{act, answer, at}`
+        added to `key`'s mark and `repos` pushed before the write-back starts; removed when the press's call
+        returns — landed and re-read, refused or failed — and `repos` pushed again, so a failure never leaves a row
+        *applying*. A clear removes only its own token, the mark gone with its last. No `key`, no mark."""
+        root, key = str(root), str(key or "")
+        if not key:
+            yield
+            return
+        self._applying_seq += 1
+        token = self._applying_seq
+        mark = {"act": act, "answer": " ".join(str(answer or "").split()), "at": datetime.now(UTC).isoformat()}
+        try:  # the token is added inside: a press cancelled during the first push still clears it (review)
+            self._applying.setdefault(root, {}).setdefault(key, {})[token] = mark
+            await self._applying_push(root)
+            yield
+        finally:
+            marks = self._applying.get(root) or {}
+            (toks := marks.get(key) or {}).pop(token, None)
+            if not toks:
+                marks.pop(key, None)
+            if not marks:
+                self._applying.pop(root, None)
+            await self._applying_push(root)
+
+    async def _applying_push(self, root: str) -> None:
+        """A mark set or cleared: `repos` pushed with it, and the Queue read again over it (TD-1508). A surprise is
+        a log line: the press goes on, and the next tick's push carries the mark as it then stands."""
+        try:
+            if root in self._repos:
+                await self._broadcast({"event": "repos", "root": root, "repo": self._repo_view(root)})
+            await self._queue_pass(datetime.now(UTC))
+        except Exception:  # noqa: BLE001
+            log.exception("pushing the press mark of %s failed", root)
 
     async def _reread_board(self, root: str | Path, *, fetch: bool = False) -> None:
         """The repo's board and ledger read again at once after a write-back the host agent made (§4.4 *Each

@@ -5,6 +5,7 @@ cards of the archive and the passed-over flags, from the home's readings alone."
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -471,3 +472,30 @@ def test_an_owner_alone_holds_nothing(tmp_path):
     cards = _by_id(_cards({root: r}, []))
     assert [cards[f"r#TD-00{n}"]["top"]["needs"] for n in (1, 2, 3)] == [None, "owner", "decision"]
     assert cards["r#TD-001"]["status"] != "needs you"
+
+
+def test_a_press_mark_is_laid_over_a_copy_of_the_reading():
+    """TD-1508 (§4.4 *A press is drawn as it lands*): `lay_applying` gives a marked board item and a marked ledger
+    entry `applying`, the newest standing token's, and never writes the reading; the words are *answered — applying*
+    for a decide and *applying <act>* for the rest."""
+    from sessionorc.queue import applying_words, lay_applying
+
+    view = {
+        "name": "r",
+        "boards": {"boards": [{"items": [{"key": "board:a"}, {"key": "board:b"}]}]},
+        "ledger": {"entries": [{"id": "TD-1"}, {"id": "TD-2"}]},
+    }
+    before = json.dumps(view)
+    marks = {
+        "board:a": {1: {"act": "decide", "answer": "Go", "at": "t1"}, 2: {"act": "done", "answer": "", "at": "t2"}},
+        f"ledger:{queue.qid('r', 'TD-2')}": {3: {"act": "decide", "answer": "blue", "at": "t3"}},
+        "board:gone": {},
+    }
+    got = lay_applying(view, marks, "r")
+    assert json.dumps(view) == before, "the reading is never written"
+    items = got["boards"]["boards"][0]["items"]
+    assert items[0]["applying"]["act"] == "done", "the newest standing token's"
+    assert "applying" not in items[1]
+    assert [e.get("applying", {}).get("answer") for e in got["ledger"]["entries"]] == [None, "blue"]
+    assert applying_words({"act": "decide"}) == "answered — applying"
+    assert applying_words({"act": "snooze"}) == "applying snooze"
