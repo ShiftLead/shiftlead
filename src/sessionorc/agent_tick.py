@@ -14,7 +14,6 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import time
 from collections.abc import Callable, Collection, Mapping
 from datetime import UTC, date, datetime, timedelta
@@ -158,29 +157,6 @@ def filled_for(cause: dict[str, Any] | None) -> str | None:
     else:
         what = cause.get("member")
     return f"{FILLED_FOR}{cause['by']}" + (f" — {what}" if what else "")
-
-
-# Seconds a write-back's entries are held over a checkout that has not pulled (TD-1433). A checkout on a feature
-# branch or a diverged main never holds the press's commit, so there the hold lasts this whole bound.
-PRESS_HOLD = 6 * 3600.0
-
-
-def _holds_commit(root: str, commit: str) -> bool:
-    """Whether the checkout's HEAD holds `commit` (the pull brought the press in); a commit it cannot test,
-    false."""
-    if not commit:
-        return True
-    try:
-        cp = subprocess.run(
-            ["git", "-C", root, "merge-base", "--is-ancestor", commit, "HEAD"],
-            capture_output=True,
-            timeout=30,
-            check=False,
-            stdin=subprocess.DEVNULL,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return False
-    return cp.returncode == 0
 
 
 def _carry_live(reading: dict[str, Any], old: dict[str, Any]) -> None:
@@ -3650,7 +3626,9 @@ class TickMixin:
                 self._repos_fresh = False
             boards = due or time.monotonic() - self._boards_read_at >= BOARD_EVERY
             roots = hosts.local_host().repos()
-            mtimes = await asyncio.to_thread(self._ledger_mtimes, roots)
+            # the stamp taken before the pass's fetch: a fetch that moves origin costs one more read next tick
+            mtimes, branches = await asyncio.to_thread(self._ledger_mtimes, roots, dict(self._ledger_branch))
+            self._ledger_branch.update(branches)
             ledgers = {r for r in roots if due or mtimes.get(r) != self._ledger_mtime.get(r) or r not in self._repos}
             todo = [r for r in roots if boards or r in ledgers]
             gone = [r for r in self._repos if r not in roots]
@@ -3664,8 +3642,12 @@ class TickMixin:
             read, keys = self._read_repos, self._held_keys(roots)
             emit = self._witness_precheck_soon
             got = {}
+            # the archive's entries each ledger read gave (`_archived`), and the branch names a fetch found moved
+            side: dict[str, Any] = {"archived": {}, "branches": dict(self._ledger_branch), "moved": set()}
             if todo:
-                got = await asyncio.to_thread(read, todo, prev, full, roots, live, ledgers, boards, keys, emit)
+                got = await asyncio.to_thread(read, todo, prev, full, roots, live, ledgers, boards, keys, emit, side)
+            for r in side["moved"]:
+                self._ledger_branch.pop(r, None)
             if due:
                 self._repos_read_at = time.monotonic()  # after the read: a read that raised is retried next tick
             if boards:
@@ -3679,16 +3661,21 @@ class TickMixin:
                 # and the sync pass's outcomes are the pass's (§6 *Sync*, TD-685)
                 if (so := (self._repos.get(r) or {}).get("sync")) is not None:
                     v.setdefault("sync", so)
-                # a write-back re-read this board while the pass ran: its reading is the newer (`_reread_board`)
+                # a write-back re-read this board and ledger while the pass ran: its reading is the newer
+                # (`_reread_board`), and the archive it read with stands too (TD-1471)
                 if self._boards_pressed.get(r, float("-inf")) >= began and r in self._repos:
-                    v.update({k: self._repos[r][k] for k in ("boards", "work_orders") if k in self._repos[r]})
-            await self._hold_pressed(got)
+                    keep = ("boards", "work_orders", "ledger", "completed")
+                    v.update({k: self._repos[r][k] for k in keep if k in self._repos[r]})
+                elif (arch := side["archived"].get(r)) is not None:
+                    self._archived[r] = arch  # installed with the reading it was read with
             changed = {r: v for r, v in got.items() if v != self._repos.get(r)}
             for r, v in changed.items():
                 self._turned_unserved(r, self._repos.get(r), v)
             for r in gone:
                 self._repos.pop(r, None)
                 self._ledger_mtime.pop(r, None)
+                self._archived.pop(r, None)
+                self._ledger_branch.pop(r, None)
             self._repos.update(changed)
             if changed or gone:
                 self.repos_store.save(self._repos)
@@ -3771,9 +3758,20 @@ class TickMixin:
                     if isinstance(a, dict) and a.get("from"):
                         waiting.add(naming.split_address(str(a["from"]))[0])
             doing = {t: list(r) for t, r in self.doing_log.rings.items()}
+            # a repo with no archive yet (after a restart, before its first ledger read) keeps the last cards
+            # rather than drawing them without one (§4.4 *The ledger is read against origin*, TD-1471); one whose
+            # ledger read failed holds nothing back, so a repo that keeps failing never freezes the Queue
+            if self._queue is not None and any(
+                r not in self._archived
+                and isinstance((led := v.get("ledger") or {}).get("entries"), list)
+                and "error" not in led
+                for r, v in self._repos.items()
+            ):
+                return
             got = queue_mod.reading(
-                self._repos, graph, now, waiting=waiting, doing=doing, questions=list(self.person_inbox)
-            )
+                self._repos, graph, now, waiting=waiting, doing=doing, questions=list(self.person_inbox),
+                archived=self._archived,
+            )  # fmt: skip
         except Exception:  # noqa: BLE001 — the Queue is a reading: the last one stands, the next tick tries again
             log.exception("reading the queue failed")
             return
@@ -3930,9 +3928,15 @@ class TickMixin:
         return {"since": since, "repo": repo, "crossed": crossed}
 
     @staticmethod
-    def _ledger_mtimes(roots: list[str]) -> dict[str, tuple[str, float] | None]:
-        """Each root's `ledger.stamp`: the resolved path and its newest mtime, either layout (§4.4)."""
-        return {root: ledger_mod.stamp(root) for root in roots}
+    def _ledger_mtimes(
+        roots: list[str], branches: dict[str, str]
+    ) -> tuple[dict[str, tuple[str, float, str | None] | None], dict[str, str]]:
+        """Each root's `ledger.stamp` — the resolved path, its newest mtime, either layout, and `origin/<default>`'s
+        sha (§4.4, TD-1471) — and the default branch's name by root: `branches`' where it holds the root, else
+        found once (`workorders.default_branch`) and kept until a pass's fetch finds it moved, never the probes on
+        each tick."""
+        names = {r: branches.get(r) or workorders.default_branch(Path(r)) for r in roots}
+        return {root: ledger_mod.stamp(root, names[root]) for root in roots}, names
 
     def _live_commits(self) -> dict[str, str]:
         """Each repo's live commit as the promote reading holds it (§6 *Promote*), by the repo's
@@ -3963,6 +3967,7 @@ class TickMixin:
         boards: bool = False,
         keys: dict[str, list[str]] | None = None,
         emit: Callable[[str, str, str, datetime], None] | None = None,
+        side: dict[str, Any] | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Each checkout's reading, in a thread: `{name, root, remote, ledger, prs, at}`. A root in
         `full` has its PRs and the ledger's history read; the others their ledger's entries alone,
@@ -3975,7 +3980,12 @@ class TickMixin:
         reading gave it (§6 rule 6, TD-516), so a restart never takes one out of a lane and brings
         it back as new. A promote pass that keeps failing keeps it unknown, and nothing goes live
         while it does. `keys` is each root's held key (`_held_keys`): the thread has no records. `emit` is the
-        witness log's `precheck-fail` writer, handed to the PR reading (`reports.pr_reading`, TD-1386)."""
+        witness log's `precheck-fail` writer, handed to the PR reading (`reports.pr_reading`, TD-1386).
+
+        `side`, where given, is what the pass hands back beside the readings (TD-1471): under `archived` each root's
+        archive entries its ledger read gave (`ledger.archived`, kept by the host agent as `_archived`, never in the
+        reading), from `branches` each root's default branch's name as the tick keeps it, and into `moved` the
+        roots whose fetch found that name moved."""
         now = datetime.now(UTC)
         stamp = now.isoformat()
         by_remote: dict[str, dict[str, Any]] = {}
@@ -3988,10 +3998,16 @@ class TickMixin:
             try:
                 reader = ledger_mod.LiveReader(root, (live or {}).get(Path(root).name))
                 led = ledgers is None or root in ledgers or "ledger" not in old
-                out[root] = TickMixin._read_repo(
+                out[root], arch, fetched = TickMixin._read_repo(
                     root, old, root in full, now, by_remote, resolve, reader, ledger=led, boards=boards,
                     held=(keys or {}).get(root), roster=registry if registry is not None else roots, emit=emit,
+                    branch=((side or {}).get("branches") or {}).get(root),
                 )  # fmt: skip
+                if side is not None:
+                    if arch is not None:
+                        side.setdefault("archived", {})[root] = arch
+                    if fetched is not None and fetched.moved:
+                        side.setdefault("moved", set()).add(root)
                 if live is None:  # no promote reading yet since the start: unknown is not *not live* (TD-516)
                     _carry_live(out[root], old)
             except Exception as e:  # noqa: BLE001 — one checkout's surprise is its reading's error, not the batch's
@@ -4007,40 +4023,6 @@ class TickMixin:
                     "at": str(old.get("at") or stamp),
                 }
         return out
-
-    def _pressed_entries(
-        self, root: str, tree: Path, ids: list[str], old: dict[str, Any]
-    ) -> dict[str, dict[str, Any] | None] | None:
-        """The entries `ids` a write-back wrote, as its tree gives them (`ledger.entries_at`), read as `_read_repos`
-        reads the checkout's — the registry resolving, the live commits where a promote reading has them, else each
-        live check's last `live` — and marked by the settle clock without recording (TD-1433). In a thread."""
-        live = self._live_commits() if self._promotes_read else None
-        reader = ledger_mod.LiveReader(root, (live or {}).get(Path(root).name))
-        resolve = ledger_mod.Registry(hosts.local_host().repos())
-        by = ledger_mod.entries_at(root, tree, ids, resolve=resolve, live=reader)
-        if not by:
-            return by
-        mine = [e for e in by.values() if e is not None]
-        if live is None:
-            _carry_live({"ledger": {"entries": mine}}, old)
-        self._settle(root, str(old.get("remote") or ""), mine, datetime.now(UTC), fresh=False)
-        return by
-
-    async def _hold_pressed(self, got: dict[str, dict[str, Any]]) -> None:
-        """Each fresh reading in `got` of a repo with entries a write-back wrote (`_ledger_pressed`, TD-1433) takes
-        those entries in place of the checkout's while the checkout's HEAD lacks the press's commit — the pull
-        fast-forwards it only between turns (§6 *Pull*) — and for at most `PRESS_HOLD`; then the hold is dropped
-        and the checkout's own reading stands."""
-        for r, v in got.items():
-            hold = self._ledger_pressed.get(r)
-            if hold is None:
-                continue
-            gone = time.monotonic() - float(hold.get("at") or 0) > PRESS_HOLD
-            if gone or await asyncio.to_thread(_holds_commit, r, str(hold.get("commit") or "")):
-                self._ledger_pressed.pop(r, None)
-                continue
-            if isinstance(v.get("ledger"), dict):
-                v["ledger"] = ledger_mod.with_entries(v["ledger"], hold["entries"])
 
     @staticmethod
     def _fork_lines(root: str, prs: Any) -> Any:
@@ -4077,24 +4059,27 @@ class TickMixin:
         held: list[str] | None = None,
         roster: list[str] | None = None,
         emit: Callable[[str, str, str, datetime], None] | None = None,
-    ) -> dict[str, Any]:
-        """One checkout's reading (`_read_repos`): `by_remote` holds the PR readings taken in this
+        branch: str | None = None,
+    ) -> tuple[dict[str, Any], list[dict[str, Any]] | None, workorders.Fetched | None]:
+        """One checkout's reading (`_read_repos`), the archive's entries its ledger read gave (None: not read, or
+        failed) and the outcome of its fetch (None: none run): `by_remote` holds the PR readings taken in this
         pass, so two checkouts of one remote are one `gh` read. `ledger` False keeps the last
         ledger as it stands (a pass for the board alone); `boards` is the board's clock (`_read_boards`);
-        `roster` the registry's checkouts, where the seams find agent-cadence's (§5 *Which agent-cadence*)."""
+        `roster` the registry's checkouts, where the seams find agent-cadence's (§5 *Which agent-cadence*).
+        A due pass fetches the default branch (`branch`, the tick's name for it) **before** it reads the ledger,
+        and the board's read reuses that fetch (§4.4 *The ledger is read against origin*, TD-1471)."""
         stamp = now.isoformat()
         remote = reports._git(root, "remote", "get-url", "origin") if due else None
         remote = (remote or "").strip() if due else str(old.get("remote") or "")
+        fetched = workorders.fetch_origin(root, branch) if due and remote else None
+        if fetched is not None and fetched.ok:
+            branch = fetched.branch
         old_led = old.get("ledger") or {}
-        led = ledger_mod.reading(root, now, with_history=due, resolve=resolve, live=live) if ledger else old_led
-        if not ledger:
+        archived: list[dict[str, Any]] | None = None
+        if ledger:
+            led, archived = TickMixin._read_ledger(root, old_led, due, now, resolve, live, branch=branch)
+        else:
             led = dict(old_led)  # a pass for the board alone
-        elif "error" in led:
-            led = {**old_led, "error": led["error"], "failed_at": stamp}
-        elif not due:
-            led.update({k: old_led[k] for k in ("windows", "recent", "history_error") if k in old_led})
-        elif "history_error" in led:
-            led.update({k: old_led[k] for k in ("windows", "recent") if k in old_led})
         prs = old.get("prs")
         if due:
             if remote and remote in by_remote:
@@ -4112,17 +4097,9 @@ class TickMixin:
             except Exception:  # noqa: BLE001 — a seam that cannot be read keeps the last reading
                 log.exception("reading the seams of %s failed", root)
             seams = seams_mod.with_adoption(seams, root, prs)  # *adoption PR #n open* (§5 *The seams*, TD-1010)
-        if isinstance(led.get("entries"), list) and not seams_mod.unserved({"seams": seams}):
-            # the settle clock (§4.4 *A new entry settles before it is pickable*, TD-710): a fresh reading is
-            # recorded and marked, a carried one marked again, so a window ends when its time does; an
-            # unserved repo has none (§5 *The seams*, TD-1011)
-            TickMixin._settle(root, remote, led["entries"], now, fresh=ledger and "error" not in led)
-        elif isinstance(led.get("entries"), list):
-            # but its waits are marked all the same, since a wait needs no clock: a gated build would otherwise
-            # read pickable in every count but `ao repo`'s (TD-1403)
-            settle_mod.mark_waits([e for e in led["entries"] if isinstance(e, dict)], now)
-        bds, wos = TickMixin._read_boards(root, old, due, boards, stamp)
-        return {
+        TickMixin._settle_ledger(root, remote, led, seams, now, fresh=ledger and "error" not in led)
+        bds, wos = TickMixin._read_boards(root, old, due, boards, stamp, fetched=fetched)
+        reading = {
             "name": Path(root).name,
             "root": root,
             "remote": remote,
@@ -4135,6 +4112,72 @@ class TickMixin:
             "completed": ledger_mod.completed(led.get("recent"), (prs or {}).get("recent")),
             "at": stamp if due else str(old.get("at") or stamp),
         }
+        return reading, archived, fetched
+
+    @staticmethod
+    def _read_ledger(
+        root: str,
+        old_led: dict[str, Any],
+        due: bool,
+        now: datetime,
+        resolve: ledger_mod.Resolve | None = None,
+        live: ledger_mod.Live | None = None,
+        *,
+        branch: str | None = None,
+    ) -> tuple[dict[str, Any], list[dict[str, Any]] | None]:
+        """The repo reading's ledger step (`_read_repo`, and a press's re-read, `_reread_board`): the ledger read
+        against origin as last fetched (`ledger.read`, §4.4 *The ledger is read against origin*, TD-1471), and the
+        archive's entries it was read with. `due` reads the history; a pass that is not due carries `windows`,
+        `recent` and `history_error` from `old_led`, and a history that failed carries the last good one. A read
+        that fails — the file, or the compare's own git — keeps the last reading with its error beside it, and
+        no archive (None: the last one stands)."""
+        stamp = now.isoformat()
+        led, archived = ledger_mod.read(root, now, with_history=due, resolve=resolve, live=live, branch=branch)
+        if "error" in led:
+            return {**old_led, "error": led["error"], "failed_at": stamp}, None
+        if not due:
+            led.update({k: old_led[k] for k in ("windows", "recent", "history_error") if k in old_led})
+        elif "history_error" in led:
+            led.update({k: old_led[k] for k in ("windows", "recent") if k in old_led})
+        return led, archived
+
+    def _reread_repo(
+        self, root: str, old: dict[str, Any], tree: Path | None, live: dict[str, str] | None
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any] | None, list[dict[str, Any]] | None]:
+        """A press's re-read (`_reread_board`), in a thread: the board — `tree`, the write-back's own, as the
+        checkout's board read from origin, else read against origin with a fetch — and then the whole ledger
+        against origin through the pass's own ledger step (`_read_ledger`, §4.4 *The ledger is read against
+        origin*, TD-1471), never a bare `ledger.reading`: without its history (carried from `old`), the Registry
+        and the live reader resolving each entry, each live check's last `live` where no promote reading has the
+        live commits (`live` None), and the settle clock observing as the tick's own reading does. Returns the
+        boards, the work orders, and the ledger and its archive (both None where the ledger read failed: the old
+        ledger stands)."""
+        now = datetime.now(UTC)
+        bds, wos = self._read_boards(root, old, tree is None, False, now.isoformat(), tree=tree)
+        reader = ledger_mod.LiveReader(root, (live or {}).get(Path(root).name))
+        resolve = ledger_mod.Registry(hosts.local_host().repos())
+        branch = self._ledger_branch.get(root)
+        led, arch = self._read_ledger(root, old.get("ledger") or {}, False, now, resolve, reader, branch=branch)
+        if arch is None:
+            return bds, wos, None, None
+        if live is None:
+            _carry_live({"ledger": led}, old)
+        self._settle_ledger(root, str(old.get("remote") or ""), led, old.get("seams"), now, fresh=True)
+        return bds, wos, led, arch
+
+    @staticmethod
+    def _settle_ledger(root: str, remote: str, led: dict[str, Any], seams: Any, now: datetime, *, fresh: bool) -> None:
+        """The settle clock over a ledger reading's entries (§4.4 *A new entry settles before it is pickable*,
+        TD-710): a fresh reading is recorded and marked, a carried one marked again, so a window ends when its
+        time does; an unserved repo has none (§5 *The seams*, TD-1011), but its waits are marked all the same,
+        since a wait needs no clock: a gated build would otherwise read pickable in every count but `ao repo`'s
+        (TD-1403)."""
+        if not isinstance(led.get("entries"), list):
+            return
+        if not seams_mod.unserved({"seams": seams}):
+            TickMixin._settle(root, remote, led["entries"], now, fresh=fresh)
+        else:
+            settle_mod.mark_waits([e for e in led["entries"] if isinstance(e, dict)], now)
 
     @staticmethod
     def _settle(root: str, remote: str, entries: list[Any], now: datetime, *, fresh: bool) -> None:
@@ -4158,7 +4201,14 @@ class TickMixin:
 
     @staticmethod
     def _read_boards(
-        root: str, old: dict[str, Any], due: bool, clock: bool, stamp: str, *, tree: Path | None = None
+        root: str,
+        old: dict[str, Any],
+        due: bool,
+        clock: bool,
+        stamp: str,
+        *,
+        tree: Path | None = None,
+        fetched: workorders.Fetched | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """The checkout's board and the work orders derived from it (§4.4 *Each reading has one owner*,
         *The boards*, TD-615): `boards` — `workorders.read_boards`' reading, with `file` the checkout's
@@ -4172,7 +4222,7 @@ class TickMixin:
         read keeps the last boards and orders with `error` and `failed_at` beside them. A board read of
         the checkout alone (the clock's, or a due pass whose fetch was skipped) carries the last `swept`
         of the same board (`root` and `label`) forward: only a read against origin writes it (§4.9b
-        *The sweep*, TD-1090)."""
+        *The sweep*, TD-1090). `fetched` is the pass's own fetch, which a read against origin reuses (TD-1471)."""
         bds, wos = old.get("boards"), old.get("work_orders")
         try:
             st = (Path(root) / workorders.board_rel(root)).stat()
@@ -4187,7 +4237,7 @@ class TickMixin:
         # a new day re-reads a board last read from origin against origin: the checkout's would bring
         # back a press it has not pulled (review of TD-615)
         from_origin = new_day and any(isinstance(b, dict) and b.get("source") for b in bds.get("boards") or ())
-        got = workorders.read_boards(root, fetch=due or from_origin, board=tree)
+        got = workorders.read_boards(root, fetch=due or from_origin, board=tree, fetched=fetched if due else None)
         if "error" in got:
             # the same error again is the same reading: no save and no push every `BOARD_EVERY`
             same = bds is not None and bds.get("error") == got["error"] and bds.get("failed_at")

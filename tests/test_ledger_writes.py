@@ -19,7 +19,7 @@ VENDORED = SRC / "sessionorc" / "ledgerboard"
 
 # what names a ledger's files in ShiftLead's code: sessionorc.ledger's paths and ledgerboard's layout names
 LEDGER_NAMES = re.compile(
-    r"\b(?:ledger_path|ledger_default|ledger_set|archive_of|archive_path|LEDGER_DIR_REL|ARCHIVE_REL|LEDGER_REL"
+    r"\b(?:ledger_path|ledger_default|ledger_set|archive_path|LEDGER_DIR_REL|ARCHIVE_REL|LEDGER_REL"
     r"|LEDGER_ARCHIVE|LEDGER_README|ENTRY_FILE_RE|entry_file)\b|technical_debt|docs/ledger"
 )
 PATH_WRITES = {"write_text", "write_bytes", "unlink", "touch"}  # a write on any receiver

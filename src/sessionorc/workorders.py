@@ -22,6 +22,7 @@ import os
 import re
 import signal
 import subprocess
+import threading
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -150,27 +151,77 @@ def default_branch(root: Path) -> str:
     return "main"
 
 
-def _against_origin(root: Path, board: Path, timeout: float = FETCH_TIMEOUT) -> Origin:
+_FETCH_LOCKS: dict[str, threading.Lock] = {}
+_FETCH_LOCKS_LOCK = threading.Lock()
+
+
+def fetch_lock(root: Path | str) -> threading.Lock:
+    """The home's one lock per checkout around each `git fetch` it runs there or in its board tree (§4.4 *The
+    ledger is read against origin*, TD-1471), held around the fetch alone: the tick's fetch and a press's never
+    race for the ref's lock, so a press never fails as *origin unreachable* on the tick's fetch."""
+    key = str(Path(root))
+    with _FETCH_LOCKS_LOCK:
+        return _FETCH_LOCKS.setdefault(key, threading.Lock())
+
+
+def refspec(branch: str) -> str:
+    """The explicit refspec every fetch the compares rely on uses: a narrowed `remote.origin.fetch` still moves,
+    or makes, `origin/<branch>` (`fetch origin <branch>` alone moves only FETCH_HEAD there)."""
+    return f"+refs/heads/{branch}:refs/remotes/origin/{branch}"
+
+
+@dataclass
+class Fetched:
+    """One fetch of the default branch (`fetch_origin`): `ok`, `why` it failed, the `branch` fetched, and `moved`
+    — `origin/HEAD` names another branch than `branch`, or `origin/<branch>` is gone — so a caller that keeps the
+    branch's name drops it."""
+
+    ok: bool
+    branch: str
+    why: str | None = None
+    moved: bool = False
+
+
+def fetch_origin(root: Path | str, branch: str | None = None, timeout: float = FETCH_TIMEOUT) -> Fetched:
+    """Fetch `origin`'s default branch into `origin/<branch>` with the explicit refspec, never `--prune`, no local
+    branch or working file moved, under `fetch_lock(root)` (§4.4 *The ledger is read against origin*, TD-1471).
+    Never raises: a fetch that fails or passes its bound is `ok` False with its `why`."""
+    root = Path(root)
+    try:
+        branch = branch or default_branch(root)
+        with fetch_lock(root):
+            got = _git(root, ["fetch", "-q", "--no-prune", "origin", refspec(branch)], timeout)
+        if got.returncode != 0:
+            err = got.stderr.decode("utf-8", errors="replace").strip().splitlines()
+            return Fetched(False, branch, why=err[-1] if err else "git fetch failed")
+        head = _git(root, ["symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD"], READ_TIMEOUT)
+        named = head.stdout.decode().strip().removeprefix("origin/") if head.returncode == 0 else ""
+        have = _git(root, ["rev-parse", "--verify", "-q", f"refs/remotes/origin/{branch}"], READ_TIMEOUT)
+        return Fetched(True, branch, moved=bool(named and named != branch) or have.returncode != 0)
+    except subprocess.TimeoutExpired:
+        return Fetched(False, branch or "", why="timeout")
+    except Exception as e:  # noqa: BLE001 — a read without origin beats no read
+        return Fetched(False, branch or "", why=str(e))
+
+
+def _against_origin(root: Path, board: Path, timeout: float = FETCH_TIMEOUT, fetched: Fetched | None = None) -> Origin:
     """The checkout's board against `origin/<default>` (§4.5 screen 6 *Boards are read against
-    origin*), never raising: one fetch of the default branch alone — never `--prune`, no local
-    branch or working file moved — then the three-way compare of the checkout's file, origin's and
-    their merge-base's. Merely behind (the checkout's untouched since the merge-base) reads origin's
-    copy; anything else reads the checkout's and says which way it differs."""
+    origin*), never raising: one fetch of the default branch alone (`fetch_origin`) — or none, where the
+    caller fetched already and hands its outcome in `fetched` (the repo reading's pass, TD-1471) — then the
+    three-way compare of the checkout's file, origin's and their merge-base's. Merely behind (the checkout's
+    untouched since the merge-base) reads origin's copy; anything else reads the checkout's and says which way
+    it differs. A failed fetch reads the checkout's, *fetch skipped (<why>)*."""
 
     def blob(at: str, rel: str) -> str | None:
         got = _git(root, ["show", f"{at}:{rel}"], READ_TIMEOUT)
         return got.stdout.decode("utf-8", errors="replace") if got.returncode == 0 else None
 
     try:
-        branch = default_branch(root)
-        have = _git(root, ["rev-parse", "--verify", "-q", f"refs/remotes/origin/{branch}"], READ_TIMEOUT)
-        # an explicit refspec: `fetch origin <branch>` moves only FETCH_HEAD where remote.origin.fetch is narrowed
-        spec = [f"+refs/heads/{branch}:refs/remotes/origin/{branch}"] if have.returncode == 0 else []
-        got = _git(root, ["fetch", "-q", "--no-prune", "origin", *spec], timeout)
-        if got.returncode != 0:
-            err = got.stderr.decode("utf-8", errors="replace").strip().splitlines()
-            why = err[-1] if err else "git fetch failed"
+        fetched = fetched or fetch_origin(root, timeout=timeout)
+        if not fetched.ok:
+            why = fetched.why or "git fetch failed"
             return Origin("skipped", f"fetch skipped ({why})", why=why)
+        branch = fetched.branch
         at = f"origin/{branch}"
         rel = (board.relative_to(root) if board.is_relative_to(root) else board_rel(root)).as_posix()
         theirs = blob(at, rel)
@@ -357,7 +408,9 @@ def carried(content: str, archive: str | None = None) -> list[dict[str, Any]]:
     return out
 
 
-def read_boards(root: str | Path, *, fetch: bool = True, board: str | Path | None = None) -> dict[str, Any]:
+def read_boards(
+    root: str | Path, *, fetch: bool = True, board: str | Path | None = None, fetched: Fetched | None = None
+) -> dict[str, Any]:
     """The repo's board as the host agent keeps it (design §4.4 *Each reading has one owner*, *The
     boards*, TD-615), read in-process through ledgerboard (TD-585): `{boards: [...], today}`, each
     board `{label, board, root, source, fetch_note, fetch_case, fetch_why, items}` — and `swept`, once
@@ -378,7 +431,10 @@ def read_boards(root: str | Path, *, fetch: bool = True, board: str | Path | Non
     `swept` (§4.9b *The sweep*, TD-1090) is the stamp of origin's copy, whichever copy is shown: written
     only by a read against origin — `{at, deep_at}` (`swept`), or None when origin holds no board — and
     by `board`, the tree a write-back pushed. A read of the checkout alone (no fetch, or a fetch
-    skipped) has no `swept` key, and the caller carries the last one forward."""
+    skipped) has no `swept` key, and the caller carries the last one forward.
+
+    `fetched` is the outcome of the fetch the caller ran (the repo reading's pass fetches before it reads the
+    ledger, TD-1471): the read against origin reuses it and fetches nothing."""
     root = Path(root)
     rel = board_path(root)[1]
     if rel is None:
@@ -388,7 +444,7 @@ def read_boards(root: str | Path, *, fetch: bool = True, board: str | Path | Non
     if not path.is_file():
         return {"boards": []}
     today = datetime.now().date()  # the board's dates are civil dates, local
-    found = _against_origin(root, checkout) if fetch and board is None else None
+    found = _against_origin(root, checkout, fetched=fetched) if fetch and board is None else None
     try:
         content = found.content if found is not None and found.content is not None else path.read_text(encoding="utf-8")
         items = board_items(content, today)
@@ -489,9 +545,10 @@ def board_lines(root: str | Path, *, fetch: bool = True) -> tuple[list[str], str
     if fetch:
         try:
             # a fetch that failed leaves origin's ref as stale as the checkout: the checkout it is
-            fetched = subprocess.run(
-                ["git", "-C", str(root), "fetch", "-q", "origin"], capture_output=True, timeout=FETCH_TIMEOUT
-            )
+            with fetch_lock(root):
+                fetched = subprocess.run(
+                    ["git", "-C", str(root), "fetch", "-q", "origin"], capture_output=True, timeout=FETCH_TIMEOUT
+                )
             cp = subprocess.run(
                 ["git", "-C", str(root), "symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD"],
                 capture_output=True, text=True, timeout=READ_TIMEOUT,

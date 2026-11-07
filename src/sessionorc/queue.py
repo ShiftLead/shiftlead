@@ -14,7 +14,6 @@ person inbox's classification.
 
 from __future__ import annotations
 
-import hashlib
 import re
 from collections.abc import Collection, Iterable, Mapping
 from datetime import UTC, date, datetime, timedelta
@@ -43,13 +42,6 @@ DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 RESOLVED_CLIP = 600
 RESOLVED_PR = re.compile(r"\(PR #(\d+)\)")
 ANY_PR = re.compile(r"#(\d+)")
-# an archived entry's `**Resolved:**` line, wherever its body writes it — most write it last, under the
-# header block, where ledgerboard's `fields` do not reach
-ENTRY_HEAD = re.compile(r"^## (TD-\d+):", re.M)
-RESOLVED_LINE = re.compile(r"^\*\*Resolved:\*\*[ \t]*(.+)$", re.M)
-
-# the archive's entries per file: (mtime_ns, size, blob sha, entries) — re-parsed only when its blob changes
-_ARCHIVES: dict[str, tuple[Any, Any, str, list[dict[str, Any]]]] = {}  # `_archive_stat`, the text's sha, entries
 
 
 def qid(repo: str, tid: str) -> str:
@@ -441,61 +433,6 @@ def board_hold(
     return {"kind": "board", "asker": held, "closed_at": ln["decided"], "outcome": None, "line": line}
 
 
-def blob_sha(data: bytes) -> str:
-    """The git blob sha of a file's bytes, as `git hash-object` gives it."""
-    return hashlib.sha1(b"blob %d\0" % len(data) + data, usedforsecurity=False).hexdigest()
-
-
-def _archive_stat(path: Path) -> tuple[Any, Any]:
-    """The cache's first key: a file's mtime and size; a v2 `archive/` directory's mtime, and its entry
-    files' count and newest mtime (§4.4 *Completed cards*' cache, TD-1144). Raises OSError as `stat` does."""
-    st = path.stat()
-    if not path.is_dir():
-        return st.st_mtime_ns, st.st_size
-    files = [f.stat().st_mtime_ns for f in path.iterdir() if lb.ENTRY_FILE_RE.match(f.name)]
-    return st.st_mtime_ns, (len(files), max(files, default=0))
-
-
-def archive_entries(path: Path) -> list[dict[str, Any]]:
-    """ledgerboard's `entries()` of an archive — a v1 file, or a v2 ledger's `archive/` directory joined
-    by `lb.load()` — cached by the sha of its text (a stat first, so an unchanged archive is not even read),
-    each entry's `fields` carrying its `resolved` line wherever the body writes it. One that cannot be read
-    has none."""
-    key = str(path)
-    try:
-        st = _archive_stat(path)
-    except OSError:
-        _ARCHIVES.pop(key, None)
-        return []
-    got = _ARCHIVES.get(key)
-    if got and (got[0], got[1]) == st:
-        return got[3]
-    if path.is_dir():
-        data = lb.load(path.name, *ledger_mod.fs_io(path.parent))[0].encode()
-    else:
-        try:
-            data = path.read_bytes()
-        except OSError:
-            return []
-    sha = blob_sha(data)
-    if got and got[2] == sha:
-        _ARCHIVES[key] = (*st, sha, got[3])
-        return got[3]
-    text = ledger_mod.strip_comments(data.decode("utf-8", errors="replace"))
-    ents = lb.entries(text)
-    resolved: dict[str, str] = {}
-    heads = list(ENTRY_HEAD.finditer(text))
-    for i, h in enumerate(heads):
-        body = text[h.end() : heads[i + 1].start() if i + 1 < len(heads) else len(text)]
-        if m := RESOLVED_LINE.search(body):
-            resolved.setdefault(h.group(1), m.group(1).strip())
-    for e in ents:
-        if "resolved" not in e["fields"] and e["id"] in resolved:
-            e["fields"] = {**e["fields"], "resolved": resolved[e["id"]]}
-    _ARCHIVES[key] = (*st, sha, ents)
-    return ents
-
-
 def _when(value: Any) -> datetime | None:
     try:
         at = datetime.fromisoformat(str(value))
@@ -596,6 +533,7 @@ def reading(
     waiting: Collection[str] = (),
     doing: Mapping[str, list[Mapping[str, Any]]] | None = None,
     questions: Iterable[Any] = (),
+    archived: Mapping[str, list[dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     """The `queue` reading (§4.4 *The Queue*): `{cards, completed, other_work, origins, at}`.
 
@@ -604,7 +542,9 @@ def reading(
     holding their ask), which keeps an idle holder from reading *stalled*; `doing` the doing log by
     team (`{team: [{id, text, at}]}`), whose first line after a claim is a passed-over flag's reason;
     `questions` the person inbox, whose answered questions about a held entry read *answered — waiting on
-    <asker>* (`answered_hold`, TD-1316).
+    <asker>* (`answered_hold`, TD-1316); `archived` each root's archive entries as its ledger read gave them
+    (`ledger.archived`, the host agent's `_archived`, TD-1471) — read through the same compare against origin as
+    the open entries, so one id never reads open and archived at once, and the Queue runs no git.
 
     Each **card**: `id` (its top entry's `<repo>#TD-n`), `key` and `lined`, `top` and `rows` (each a row:
     `qid`, `repo`, `id`, `title`, `priority`, `state` — the one word of §4.4 *A row's state*, '' for a
@@ -633,10 +573,10 @@ def reading(
         for e in r["ledger"]["entries"]:
             if isinstance(e, Mapping) and e.get("id"):
                 open_.setdefault(qid(name, e["id"]), {**e, "repo": name})
-    archived: dict[str, dict[str, Any]] = {}  # every archived entry, by qid
-    for name, r in rs.by_name.items():
-        path = ledger_mod.archive_of(rs.roots[name], str(r["ledger"].get("path") or ledger_mod.DEFAULT))
-        for a in archive_entries(path):
+    given = archived or {}
+    archived = {}  # every archived entry, by qid
+    for name in rs.by_name:
+        for a in given.get(rs.roots[name]) or ():
             archived.setdefault(qid(name, a["id"]), {**a, "repo": name})
     closed_at: dict[str, Mapping[str, Any]] = {}  # *What closed* (TD-604): the closing commit's time and PR
     for name, r in rs.by_name.items():

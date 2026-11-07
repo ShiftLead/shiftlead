@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from datetime import timedelta
 
-from test_queue import NOW, _by_id, _cards, _entry, _rec, _repo
+from test_queue import NOW, _by_id, _cards, _entry, _rec, _repo, archives
 
 from sessionorc import ledger, queue
 from sessionorc.models import MailEntry, Session
@@ -169,6 +169,7 @@ async def test_the_home_hands_its_person_inbox_to_the_reading_it_pushes(agent, t
     await park_ticks(agent)
     root, r = _held(tmp_path, written=ANSWERED - timedelta(hours=2))
     agent._repos = {root: r}
+    agent._archived = archives(agent._repos)  # what the ledger reads hand the Queue
     agent.sessions["ao-r-designer"] = _asker()
     sent: list[dict] = []
 

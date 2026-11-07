@@ -638,7 +638,7 @@ def test_the_boards_clock_rereads_only_a_moved_board_and_the_full_pass_fetches(t
     real = workorders.read_boards
     calls: list[bool] = []
 
-    def spy(r, *, fetch=True, board=None):
+    def spy(r, *, fetch=True, board=None, fetched=None):
         calls.append(fetch)
         return real(r, fetch=False, board=board)
 
@@ -686,7 +686,7 @@ def test_a_pass_for_the_board_alone_keeps_the_ledger_unread(tmp_path, monkeypatc
     root = _repo(tmp_path, DECIDED)
     full = TickMixin._read_repos([str(root)], {}, {str(root)})[str(root)]
     assert full["boards"]["boards"][0]["items"]
-    monkeypatch.setattr(ledger_mod, "reading", lambda *a, **kw: pytest.fail("the ledger was read"))
+    monkeypatch.setattr(ledger_mod, "read", lambda *a, **kw: pytest.fail("the ledger was read"))
     (root / workorders.BOARD).write_text((root / workorders.BOARD).read_text().replace(DECIDED + "\n", ""))
     alone = TickMixin._read_repos([str(root)], {str(root): full}, set(), None, None, set(), True)[str(root)]
     assert alone["ledger"] == full["ledger"]

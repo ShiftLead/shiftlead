@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 from conftest import scratch_dir
+from test_queue import archives
 from test_rank import NOW, _cards, _entry, _repo, _ups
 
 from sessionorc import rank
@@ -100,6 +101,7 @@ async def test_rank_move_takes_the_scope_and_the_reading_serves_places(agent, tm
     ra, a = _repo(tmp_path, "a", A)
     rb, b = _repo(tmp_path, "b", B)
     agent._repos = {ra: a, rb: b}
+    agent._archived = archives(agent._repos)  # what the ledger reads hand the Queue
     await agent._queue_pass(NOW)
     with pytest.raises(RpcError, match="not adjacent"):
         await agent.rpc_rank_move(ids=["a#TD-005"], prev="a#TD-001", next="a#TD-003")

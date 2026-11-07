@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from test_queue import archives
 
 from sessionorc import board, ledger, queue, rank
 from sessionorc import ledgerboard as lb
@@ -46,7 +47,7 @@ def _rec(rid: str, repo: str, *refs: str, unattended: bool = True) -> Session:
 
 
 def _cards(repos: dict[str, dict[str, Any]], records: list[Session] = ()) -> list[dict[str, Any]]:
-    return queue.reading(repos, list(records), NOW)["cards"]
+    return queue.reading(repos, list(records), NOW, archived=archives(repos))["cards"]
 
 
 def _ups(cards: list[dict[str, Any]], keys: dict[str, str] | None = None) -> list[str]:
@@ -191,6 +192,7 @@ async def test_rank_move_is_the_persons_and_an_interactive_sessions(agent, tmp_p
     await park_ticks(agent)
     root, r = _repo(tmp_path, "r", FIVE)
     agent._repos = {root: r}
+    agent._archived = archives(agent._repos)  # what the ledger reads hand the Queue
     await agent._queue_pass(NOW)
     agent.sessions["ao-w"] = Session(id="ao-w", name="w", kind="agent", adapter="claude-code", dir="", unattended=True)
     agent.sessions["ao-i"] = Session(id="ao-i", name="i", kind="agent", adapter="claude-code", dir="", unattended=False)
@@ -218,6 +220,7 @@ async def test_the_flush_lands_per_repo_and_a_failed_pr_keeps_its_intent(agent, 
     a, ra = _repo(tmp_path, "a", FIVE)
     b, rb = _repo(tmp_path, "b", [_entry(9, "names a", Priority="Low", Blocked_by="a#TD-004")])
     agent._repos = {a: ra, b: rb}
+    agent._archived = archives(agent._repos)  # what the ledger reads hand the Queue
     await agent._queue_pass(NOW)
     await agent.rpc_rank_move(ids=["b#TD-009"], prev=None, next="a#TD-001")
     landed: list[tuple[str, dict, str]] = []
@@ -270,8 +273,10 @@ async def test_a_repo_whose_reading_is_empty_or_unknown_ids_are_never_pruned(age
     root, r = _repo(tmp_path, "r", FIVE, archive=[_entry(9, "done", Resolved="2026-10-16")],
                     lines="TD-009: 0|1\nTD-077: 0|2\n")  # fmt: skip
     agent._repos = {root: r}
+    agent._archived = archives(agent._repos)  # what the ledger reads hand the Queue
     assert agent._rank_lined(agent._rank_repos()) == {"r": ["TD-009"]}  # TD-077: in neither file
     agent._repos = {root: {**r, "ledger": {**r["ledger"], "entries": []}}}
+    agent._archived = archives(agent._repos)  # what the ledger reads hand the Queue
     assert agent._rank_lined(agent._rank_repos()) == {}
 
 
@@ -281,6 +286,7 @@ async def test_a_flush_is_due_rank_flush_after_the_last_move(agent, tmp_path, mo
     await park_ticks(agent)
     root, r = _repo(tmp_path, "r", FIVE)
     agent._repos = {root: r}
+    agent._archived = archives(agent._repos)  # what the ledger reads hand the Queue
     await agent._queue_pass(NOW)
     flushed: list[int] = []
     monkeypatch.setattr(agent, "_rank_flush", lambda cards, repos: flushed.append(len(cards)))
@@ -317,6 +323,7 @@ async def test_a_join_and_a_prune_land_a_pr_each_rank_flush_after_they_are_found
     await park_ticks(agent)
     root, r = _join_and_prune(tmp_path)
     agent._repos = {root: r}
+    agent._archived = archives(agent._repos)  # what the ledger reads hand the Queue
     await agent._queue_pass(NOW)
     landed: list[tuple[str, dict, str]] = []
     monkeypatch.setattr(
@@ -347,6 +354,7 @@ async def test_a_join_that_did_not_land_is_found_again(agent, tmp_path, monkeypa
     await park_ticks(agent)
     root, r = _join_and_prune(tmp_path)
     agent._repos = {root: r}
+    agent._archived = archives(agent._repos)  # what the ledger reads hand the Queue
     await agent._queue_pass(NOW)
 
     def land(root, rel, lines, msg):
@@ -373,6 +381,7 @@ async def test_a_landed_key_stands_in_for_landed_keep_and_no_longer(agent, tmp_p
     await park_ticks(agent)
     root, r = _repo(tmp_path, "r", FIVE)
     agent._repos = {root: r}
+    agent._archived = archives(agent._repos)  # what the ledger reads hand the Queue
     await agent._queue_pass(NOW)
     state = agent.rank_store.load()
     t = time.time()
@@ -391,6 +400,7 @@ async def test_a_move_tells_the_page_and_a_move_where_it_is_does_not(agent, tmp_
     await park_ticks(agent)
     root, r = _repo(tmp_path, "r", FIVE)
     agent._repos = {root: r}
+    agent._archived = archives(agent._repos)  # what the ledger reads hand the Queue
     await agent._queue_pass(NOW)
     told: list[dict[str, Any]] = []
 
