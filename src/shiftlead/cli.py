@@ -1047,6 +1047,8 @@ def _team_line(rec: dict[str, Any], team: str, p: teams.Plan) -> str:
     role = f" {launch.role}" if launch and launch.role else ""
     # a manager on call is written held, with no pane (§6 rule 3, TD-410): its line says when it comes
     when = f"  {teamrun.ON_CALL_LINE}" if launch and launch.lead and rec.get("state") == "closed" else ""
+    if launch and teamrun.pool_gate(launch) and rec.get("state") == "closed":
+        when = f"  {teamrun.pool_line(launch)}"  # a pool's later member, written held (§4.9b, TD-1476)
     return f"{rec['id']}  {what}{role}  {rec.get('dir', '')}{when}"
 
 

@@ -122,7 +122,7 @@ class Launch:
     unattended: bool = True
     lead: bool = False
     seat: bool = False  # a seat of the team: its techlead, or one with a trigger (§4.9b)
-    trigger: dict[str, str] | None = None  # a seat's `{trigger, after?}`, written on its record (§6, TD-103)
+    trigger: dict[str, Any] | None = None  # a seat's `{trigger, after?}`, written on its record (§6, TD-103)
     tags: bool = False  # the techlead seat's `tags: true` beside its trigger: it tags its repo's entries (TD-730)
     ledger: str | None = None
     host: str = ""  # the host this session lands on; "" is the host the start runs on
@@ -130,6 +130,7 @@ class Launch:
     context_bound: int | None = None  # tokens past which rule 5 tells it to end its run (§4.8, TD-190)
     prompt_from: dict[str, Any] | None = None  # what `prompt` was made from (§6 rule 7, TD-217)
     set_aside: bool = False  # its role's own `review:` was set aside under the team's flow (§4.9c item 2)
+    pool_size: int = 0  # a pool member's definition's member count, for its held line (§4.9b, TD-1476)
 
     def create_params(self, controllers: list[str]) -> dict[str, Any]:
         """The `create` RPC's arguments. `worktree=name` is §4.9 "Home and reach": every team
@@ -424,7 +425,7 @@ def flow_rows(
                 held=cfg.held or (),
                 team=team.name,
                 node=host if host != here else "",
-                seats=[(x.role, x.trigger) for x in team.seats],
+                seats=[(x.role, x.trigger, bool(x.pool), x.name) for x in team.seats],
                 held_sets=cfg.held_sets,
                 repo=team.repo,
             ):
@@ -655,7 +656,7 @@ def _check_flows(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, fi
             held=cfg.held or (),
             team=team.name,
             node=host if host != here else "",
-            seats=[(x.role, x.trigger) for x in team.seats],
+            seats=[(x.role, x.trigger, bool(x.pool), x.name) for x in team.seats],
             held_sets=cfg.held_sets,
             repo=home,
         )
@@ -1004,13 +1005,15 @@ def team_roles(team: orgmod.TeamDef, cfg: repoconfig.RepoConfig, overlay: dict[s
     return out
 
 
-def _trigger(member: Spec) -> dict[str, str]:
+def _trigger(member: Spec) -> dict[str, Any]:
     """A seat's trigger as its record carries it (design §4.9b, §6 rule 3): a seat with a trigger
     gives its own, `{trigger, after}`; the techlead's is a question landing, `asks`; a manager on
     call's is `team`, a member needing a reading no policy makes (§6 *A manager on call*, TD-247)."""
     if isinstance(member, orgmod.ManagerDef):
         return {"trigger": "team"}
     if isinstance(member, orgmod.SeatDef):
+        if member.rank:  # a pool's member (§4.9b *The members*): the pool's name and its place, no count
+            return {"trigger": member.trigger, "pool": member.pool_name, "rank": member.rank}
         return {"trigger": member.trigger, **({"after": member.after} if member.after else {})}
     return {"trigger": "asks"}
 
@@ -1107,7 +1110,7 @@ def plan(
         if missing:
             p.notes.append(missing)
     made = sweep_seat(team, sweep)
-    for trig in [*team.seats, *([made] if made else [])]:
+    for trig in [*team.seat_records(), *([made] if made else [])]:
         # A seat with a trigger (§4.9b, TD-098): launched as the techlead is — its manager its
         # controller, no grants — and filled again by the manager when its trigger is met.
         if trig.name in seen:
@@ -1122,7 +1125,8 @@ def plan(
                 home=team.repo,
                 host=host,
                 here=here,
-                profile_override=profile or trig.profile,
+                # a pool's member runs the pool's profile: `--profile` changes no member's (§4.9b)
+                profile_override=trig.profile if trig.rank else profile or trig.profile,
                 member=trig,
                 lead=False,
                 block=block,
@@ -1134,6 +1138,7 @@ def plan(
                 seat=True,
             )
         )
+        p.seats[-1].pool_size = trig.pool_size if isinstance(trig, orgmod.SeatDef) else 0
         if trig is made:
             # the switch's, not the definition's: the tick reads `every` from settings.yml (§6 rule 3)
             p.seats[-1].trigger = {**(p.seats[-1].trigger or {}), "by": "settings"}
