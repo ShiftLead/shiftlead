@@ -1618,12 +1618,14 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      The PR test is this rule's own, not rule 3's (where a PR handed to a reader no longer holds a seat): an
      open PR of the extra's, one handed to a reader included, holds it open with no bound, so a worker extra
      whose PR waits on its reader stays open idle, as an extra seat does (no tokens, only a slot), until the PR
-     merges or closes; and the unread-mail test keeps it open past a merge until it has read the reader's reply
-     that follows, so that reply reaches the live record holding the work's context and its claim is marked
-     `done`. The eviction, which takes only extra seats (rule 3), never closes it. While a seat of the team
+     merges or closes; and the unread-mail test keeps it open past a merge while the reader's reply is waiting unread, so a
+     reply sent before the close reaches the live record holding the work's context; a close in the moment
+     between the merge and the reply drops a claim whose PR merged, harmlessly, the merge having derived the
+     entry done (§4.8). The eviction, which takes only extra seats (rule 3), never closes it. While a seat of the team
      holds its PR's ask it reads *waiting on <reader>: #n* as any member does (§4.9a), and the team is neither
      wound down nor finished; an open PR nobody was asked about holds the extra open but not the team, and a
-     wind-down closes it held with the rest. At the close a claim of its not `done` (one with no open PR) is
+     wind-down closes it held with the rest — accepted: the PR keeps its branch and the entry its PR, which the
+     lane's next member finds as it finds any dropped claim's. At the close a claim of its not `done` is
      dropped (*extra closed*), as a succession drops one, so the lane reads its entry as nobody's; mail that
      comes to the held extra after waits in its mailbox for its next fill. Its record stays with its mailbox and its `scale`, never marked sat
      out, so the line's next short event fills it again. An extra is never sent rule 6's *new work* note: out
