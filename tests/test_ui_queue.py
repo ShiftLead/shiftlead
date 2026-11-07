@@ -1113,3 +1113,15 @@ def test_a_card_dots_done_or_back_to_design_draws_its_state_on_the_press():
     assert "const t = AO.qFind(qkey); if (t) AO.unDrawQState(t);" in js
     assert "AO.pressErrs[qled] = words; delete AO.inflight[qled];" in js
     assert 'if (f && f.kind === "qrow") AO.drawQState(t, f.text, true);' in js
+
+
+def test_a_pressed_board_row_reads_applying_and_is_no_need():
+    """TD-1508 (§4.4 *A press is drawn as it lands*): a board row whose item carries the home's `applying` is drawn
+    under *Waiting on them* with the mark's words — *answered — applying* for a decide, *applying <act>* else — in
+    no count; without the mark the same row needs the person."""
+    row = {"row": "board", "id": "board:/r:5", "key": "board:k", "text": "decide — **Go?**", "due": "2026-10-01"}
+    assert inbox_sections([], now=NOW, boards=[row])["count"] == 1
+    secs = inbox_sections([], now=NOW, boards=[{**row, "applying": {"act": "decide", "answer": "Go", "at": "t"}}])
+    assert secs["count"] == 0 and [e["waiting_on"] for e in secs["waiting"]] == ["answered — applying"]
+    secs = inbox_sections([], now=NOW, boards=[{**row, "applying": {"act": "snooze", "answer": "", "at": "t"}}])
+    assert [e["waiting_on"] for e in secs["waiting"]] == ["applying snooze"]

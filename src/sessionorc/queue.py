@@ -224,6 +224,44 @@ def _aware(v: Any) -> datetime | None:
     return t if t.tzinfo else t.replace(tzinfo=UTC)
 
 
+def applying_words(mark: Mapping[str, Any]) -> str:
+    """A press's mark as a row reads it (§4.4 *A press is drawn as it lands*, TD-1508): *answered — applying* for a
+    decide, *applying <act>* for the rest."""
+    act = str(mark.get("act") or "")
+    return "answered — applying" if act == "decide" else f"applying {act}".strip()
+
+
+def lay_applying(
+    view: Mapping[str, Any], marks: Mapping[str, Mapping[Any, Mapping[str, Any]]], name: str
+) -> dict[str, Any]:
+    """`view` (a repo reading) with each press mark laid over it (§4.4 *A press is drawn as it lands*, TD-1508):
+    `marks` `{key: {token: {act, answer, at}}}` — `board:<key>` a board line's, `ledger:<name>#TD-n` an entry's —
+    each item or entry it names given `applying`, the newest standing token's fields. A copy of what it touches; the
+    reading itself is never written."""
+    newest = {k: dict(list(toks.values())[-1]) for k, toks in marks.items() if toks}
+    if not newest:
+        return dict(view)
+    out = dict(view)
+    bds = view.get("boards")
+    if isinstance(bds, Mapping) and isinstance(bds.get("boards"), list):
+        boards = []
+        for b in bds["boards"]:
+            if isinstance(b, Mapping) and isinstance(b.get("items"), list):
+                b = {**b, "items": [
+                    {**it, "applying": newest[k]} if isinstance(it, Mapping) and (k := str(it.get("key") or ""))
+                    in newest else it for it in b["items"]
+                ]}  # fmt: skip
+            boards.append(b)
+        out["boards"] = {**bds, "boards": boards}
+    led = view.get("ledger")
+    if isinstance(led, Mapping) and isinstance(led.get("entries"), list):
+        out["ledger"] = {**led, "entries": [
+            {**e, "applying": newest[k]} if isinstance(e, Mapping)
+            and (k := f"ledger:{qid(name, str(e.get('id') or ''))}") in newest else e for e in led["entries"]
+        ]}  # fmt: skip
+    return out
+
+
 def answered_hold(
     member: Mapping[str, Any],
     questions: Iterable[Any],
@@ -784,6 +822,18 @@ def reading(
             elif home and re.fullmatch(r"TD-\d+", p.ref):
                 claims.setdefault(qid(home, p.ref), str(rec.id))
 
+    # a press landing (§4.4 *A press is drawn as it lands*, TD-1508): an entry's own mark (a ledger decide or road),
+    # else the mark of an open board line naming it in its `Context:` or `Parts:`
+    pressing: dict[str, dict[str, Any]] = {q: dict(e["applying"]) for q, e in open_.items() if e.get("applying")}
+    for name, bl in boards.items():
+        for b in bl:
+            for it in (b.get("items") or ()) if isinstance(b, Mapping) else ():
+                if not isinstance(it, Mapping) or not isinstance(it.get("applying"), Mapping):
+                    continue
+                for ref in [*(it.get("refs") or ()), *(it.get("parts") or ())]:
+                    if (q := _line_qid(str(ref), name, linked)) in open_:
+                        pressing.setdefault(q, dict(it["applying"]))
+
     def row(q: str) -> dict[str, Any]:
         if q in open_:
             e = open_[q]
@@ -811,6 +861,9 @@ def reading(
             elif answered:
                 answered["name"] = names.get(answered["asker"], answered["asker"])
                 st = f"answered — waiting on {answered['name']}"
+            applying = pressing.get(q) if not mine else None  # *with you* first, then the mark (TD-1508)
+            if applying:
+                st, needs, answered = applying_words(applying), None, None  # the mark is no need of the person
             return {
                 "qid": q,
                 "repo": e["repo"],
@@ -824,6 +877,7 @@ def reading(
                 "holder": mine or (_holder(claim[0][0]) if claim else None),
                 "with_you": mine["name"] if mine else None,
                 "answered": answered,
+                "applying": applying,
                 # what the row's controls read (§4.5 screen 12 *any open row*, TD-905): its page kind, an open
                 # id in its `Blocked by:` or an open part, and a design's open builds (`ledger.builds_open`, TD-1130)
                 "page": str(e.get("for_page") or ""),
@@ -849,6 +903,7 @@ def reading(
             "holder": None,
             "with_you": None,
             "answered": None,
+            "applying": None,
             "page": "",
             "after": [],
             "blocked_open": False,

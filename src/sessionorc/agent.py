@@ -865,6 +865,11 @@ class HostAgent(
         # monotonic, by root: when a write-back last re-read that board (`_reread_board`), so a tick's
         # read that began before it does not put the board from before the press back
         self._boards_pressed: dict[str, float] = {}
+        # by root, then `board:<key>` or `ledger:<repo>#TD-n`: each press's token `{act, answer, at}` from the press
+        # to its call's return (§4.4 *A press is drawn as it lands*, TD-1508) — in memory alone, laid over the views
+        # (`_applied`), never in `_repos` nor saved with it, so no tick's read drops it and none outlives the home
+        self._applying: dict[str, dict[str, dict[int, dict[str, Any]]]] = {}
+        self._applying_seq = 0
         # by root: the archive's entries the last ledger read gave, read through the same compare against origin
         # as the open entries (`ledger.archived`, TD-1471) — the Queue's archive, kept in memory beside the
         # reading, never in it nor saved with it; installed with the reading it was read with

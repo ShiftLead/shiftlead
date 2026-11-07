@@ -1760,6 +1760,8 @@ def board_rows(report: Any, repos_of: Mapping[str, Mapping[str, Any]] | None = N
                     "answers": [str(a) for a in it.get("answers") or () if str(a).strip()],
                     "default": str(it.get("default") or ""),
                     "decided": _decided(it),
+                    # a press landing (§4.4 *A press is drawn as it lands*, TD-1508): the home's mark, laid over
+                    "applying": dict(it["applying"]) if isinstance(it.get("applying"), Mapping) else None,
                     "kind": str(it.get("kind") or ""),
                     # §4.5a **Works** / **Not right…** (TD-255 slice 3): a live look's pair, known
                     # by its words; `head` and `name` are what the *Not right* hand-off sends
@@ -2232,7 +2234,10 @@ def inbox_sections(
         until = datetime.combine(d, dtime.min).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ") if d else ""
         out["snoozed"].append({**r, "snoozed_until": until, "until_words": _left(until, at)})
     for r in boards:
-        if board_waits(r):
+        if r.get("applying"):
+            # a press landing is no need of the person (§4.4 *A press is drawn as it lands*, TD-1508)
+            out["waiting"].append({**r, "waiting_on": queue_mod.applying_words(r["applying"])})
+        elif board_waits(r):
             # a copy: the board rows are the page's cache, read again by the next request
             out["waiting"].append({**r, "waiting_on": board_waiting_on(r, fleet, at, starting)})
         else:

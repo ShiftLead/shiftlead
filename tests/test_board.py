@@ -14,6 +14,7 @@ import pytest
 from conftest import copy_pinned_ledgerboard, park_ticks, pinned_script, served
 
 from sessionorc import board, ledgerboard
+from sessionorc.agent import RpcError
 from sessionorc.client import AgentError, LocalClient
 
 ITEM = (
@@ -1480,14 +1481,18 @@ async def test_a_ledger_answer_finds_its_repo_by_path_and_the_reading_after_it_l
             id = "TD-8" if isinstance(failing, dict) else "TD-9"
             got = await me.call("ledger_decide", repo=str(link), id=id, go=True)
             assert got["repo"] == root and f"Context: {id}." in origin_board(repo)
-            assert agent._repos[root]["work_orders"] is stale and not events
+            assert agent._repos[root]["work_orders"] is stale
+            # the press mark's own pushes alone (TD-1508): the reading in them is the one before the line
+            assert all(e["repo"]["work_orders"] == stale for e in events)
+            events.clear()
         monkeypatch.setattr(workorders, "read_boards", real_read)
         got = await me.call("ledger_decide", repo=str(link), id="TD-10", answer=1)
         assert got["repo"] == root and got["decided"] == "No"
         saved = agent.repos_store.load()[root]["work_orders"]["orders"]
         assert {r for o in saved for r in o["refs"]} >= {"TD-8", "TD-9", "TD-10"}
-        (ev,) = [e for e in events if e.get("event") == "repos"]
-        assert ev["root"] == root and ev["repo"]["work_orders"]["orders"] == saved
+        landed = [e for e in events if e.get("event") == "repos" and e["repo"]["work_orders"] != stale]
+        assert landed and all(e["root"] == root for e in landed)
+        assert landed[-1]["repo"]["work_orders"]["orders"] == saved
 
 
 def test_ledger_decide_is_the_homes_edit():
@@ -2090,3 +2095,149 @@ async def test_an_orphaned_questions_answer_is_read_at_once_on_the_stale_checkou
     assert "Shall the widget be blue?" not in (repo / board.BOARD).read_text(), "the checkout has not pulled"
     assert pushed, "the answer pushed `repos` at once, with no tick"
     assert "Shall the widget be blue?" in json.dumps(pushed[-1]["repo"]["boards"])
+
+
+def _member(agent, ref: str) -> dict:
+    """The Queue's row for `ref` (`<repo>#TD-n`) in the home's last reading."""
+    for c in (agent._queue or {}).get("cards") or ():
+        for r in [c.get("top"), *(c.get("rows") or [])]:
+            if isinstance(r, dict) and r.get("qid") == ref:
+                return r
+    raise AssertionError(f"{ref} is on no card")
+
+
+def _item(push: dict, key: str) -> dict:
+    """The board item `key` of a `repos` push."""
+    return next(it for b in push["repo"]["boards"]["boards"] for it in b["items"] if it.get("key") == key)
+
+
+async def test_a_decide_press_reads_answered_applying_until_it_lands(agent, repo, tmp_path, monkeypatch):
+    """TD-1508 (§4.4 *A press is drawn as it lands*): from the press until its re-read, the line's item carries
+    `applying` in the `repos` push and the Queue's member reads *answered — applying* with no need; a tick's read in
+    that window keeps it (the mark is not in the reading), and after the landing the mark is gone."""
+    import threading
+
+    from sessionorc import agent_inbox
+
+    _gated(repo)
+    pushed = await _registered(agent, repo, tmp_path, monkeypatch)
+    name = repo.name
+    await agent._queue_pass(datetime.now(UTC))
+    assert _member(agent, f"{name}#TD-190")["needs"], "the gated member needs the person before the press"
+    item = next(
+        it for b in agent._repos[str(repo)]["boards"]["boards"] for it in b["items"] if it.get("kind") == "decide"
+    )
+    key, at = item["key"], item["line"]
+    release, started = threading.Event(), threading.Event()
+    real = agent_inbox.board_mod.write_back
+
+    def slow(*a, **kw):
+        started.set()
+        assert release.wait(30)
+        return real(*a, **kw)
+
+    monkeypatch.setattr(agent_inbox.board_mod, "write_back", slow)
+    press = asyncio.create_task(
+        agent.rpc_board_edit(board=str(repo / board.BOARD), line=at, text=GATED, action="decide", answer="Go",
+                             answers=["Go", "Not yet"], key=key)
+    )  # fmt: skip
+    while not started.is_set():
+        await asyncio.sleep(0.01)
+    assert _item(pushed[-1], key)["applying"]["act"] == "decide"
+    assert _item(pushed[-1], key)["applying"]["answer"] == "Go"
+    m = _member(agent, f"{name}#TD-190")
+    assert m["state"] == "answered — applying" and m["needs"] is None and m["applying"]["act"] == "decide"
+    assert "applying" not in json.dumps(agent._repos[str(repo)]), "kept apart from the reading"
+    agent._repos_read_at = float("-inf")
+    await agent._refresh_repos()  # a tick's read in the window
+    await agent._queue_pass(datetime.now(UTC))
+    assert _member(agent, f"{name}#TD-190")["state"] == "answered — applying", "a tick's read keeps the mark"
+    release.set()
+    got = await press
+    assert got["action"] == "decide"
+    assert agent._applying == {}
+    assert all(not it.get("applying") for b in pushed[-1]["repo"]["boards"]["boards"] for it in b["items"])
+    assert "applying" not in json.dumps(agent.repos_store.load())
+
+
+async def test_a_failed_or_refused_press_leaves_no_mark(agent, repo, tmp_path, monkeypatch):
+    """TD-1508: a write-back that fails, one the board refuses, and a re-read that fails each clear the mark and
+    push `repos` again, the press's error returned; two presses on one key, the second refused, leave the first's
+    words standing until the first returns."""
+    from sessionorc import agent_inbox
+
+    _gated(repo)
+    pushed = await _registered(agent, repo, tmp_path, monkeypatch)
+    item = next(
+        it for b in agent._repos[str(repo)]["boards"]["boards"] for it in b["items"] if it.get("kind") == "decide"
+    )
+    key, path = item["key"], str(repo / board.BOARD)
+
+    def boom(*a, **kw):
+        raise OSError("disk gone")
+
+    monkeypatch.setattr(agent_inbox.board_mod, "write_back", boom)
+    with pytest.raises(OSError):
+        await agent.rpc_board_edit(
+            board=path, line=item["line"], text=GATED, action="snooze", due="2099-01-01", key=key
+        )
+    assert agent._applying == {} and not _item(pushed[-1], key).get("applying")
+    with pytest.raises(RpcError):
+        await agent.rpc_board_edit(board=path, line=item["line"], text=GATED, action="decide", answer="Maybe",
+                                   answers=["Go", "Not yet"], key=key)  # fmt: skip
+    assert agent._applying == {}
+
+    # two presses: the first's token stands while the second's is refused and cleared
+    async with agent._applying_mark(repo, key, "decide", "Go"):
+
+        def refused(*a, **kw):
+            raise board.Refused("the line moved")
+
+        monkeypatch.setattr(agent_inbox.board_mod, "write_back", refused)
+        with pytest.raises(RpcError, match="the line moved"):
+            await agent.rpc_board_edit(board=path, line=item["line"], text=GATED, action="done", key=key)
+        assert _item(pushed[-1], key)["applying"] == {**_item(pushed[-1], key)["applying"], "act": "decide"}
+    assert agent._applying == {} and not _item(pushed[-1], key).get("applying")
+
+    async def reread_fails(root, **kw):
+        raise RuntimeError("origin unreachable")
+
+    monkeypatch.setattr(agent_inbox.board_mod, "write_back", lambda *a, **kw: {"message": "m", "line": item["line"]})
+    monkeypatch.setattr(agent, "_reread_board", reread_fails)
+    with pytest.raises(RuntimeError):
+        await agent.rpc_board_edit(board=path, line=item["line"], text=GATED, action="done", key=key)
+    assert agent._applying == {}
+
+
+async def test_a_ledger_decide_marks_the_entrys_member(agent, repo, tmp_path, monkeypatch):
+    """TD-1508: a ledger decide marks `ledger:<repo>#TD-n` — the entry in the `repos` push carries `applying`
+    while the write lands, and the mark is gone once the call returns."""
+    import threading
+
+    from sessionorc import agent_inbox
+
+    _gated(repo)
+    pushed = await _registered(agent, repo, tmp_path, monkeypatch)
+    seen: list[dict] = []
+    real = agent_inbox.board_mod.add_decided
+    ran = threading.Event()
+
+    def watch(*a, **kw):
+        ran.set()
+        return real(*a, **kw)
+
+    monkeypatch.setattr(agent_inbox.board_mod, "add_decided", watch)
+    real_mark = agent._applying_push
+
+    async def push(root):
+        await real_mark(root)
+        seen.append(json.loads(json.dumps(agent._applying.get(root) or {})))
+
+    monkeypatch.setattr(agent, "_applying_push", push)
+    await agent.rpc_ledger_decide(repo=str(repo), id="TD-190", words="blue", caller=None)
+    assert ran.is_set()
+    k = f"ledger:{repo.name}#TD-190"
+    assert list(seen[0]) == [k] and list(seen[0][k].values())[0] == {**list(seen[0][k].values())[0], "act": "decide",
+                                                                      "answer": "blue"}  # fmt: skip
+    assert agent._applying == {} and seen[-1] == {}
+    assert pushed
