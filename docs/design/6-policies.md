@@ -1633,12 +1633,22 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   own smoke failed is not either. The failure is read as the pass leaves it, after any conclusion the
   pass makes, and before any start the same pass makes (an `auto` run that starts as the last one
   concludes leaves the concluded build read): a rollback's concluding watch pass clears `failed.json`
-  and reads. Dismiss is no word that the build is good, so Dismiss of a failure (never of a hold) moves the
-  failure's `sha` to the file `~/.shiftlead/promotes/<repo>/untagged`, beside `live_ref` and, unlike it, in
-  no reading or `ao promote status`: a full pass whose **live** is that sha reads and pushes nothing, as
+  and reads. Dismiss is no word that the build is good, so Dismiss of a failure (never of a hold) whose `sha` is
+  **live** — read by `check` at the press, not from the last pass's reading, and an answer of *unknown*, or
+  none, counted as live (it fails closed: a needless file lasts only to the next pass that reads another live
+  commit) — moves that `sha` to the file
+  `~/.shiftlead/promotes/<repo>/untagged`, beside `live_ref` and, unlike it, in no reading or `ao promote
+  status`; a failure at a sha that is not live writes nothing and leaves a standing file as it is, since that
+  sha becomes live only by a run that concludes or a hand install, and a file holds the one live sha it
+  names: a full pass whose **live** is that sha reads and pushes nothing, as
   while the failure stood, and the first pass that reads (one that reads nothing keeps the file) with
   another live commit deletes the file and reads; so a build that failed, or never had its
-  smoke, is tagged only once a promote or a rollback that concludes moves **live** off it.
+  smoke, is tagged only once a promote or a rollback that concludes moves **live** off it. Dismiss holds the
+  pass's lock (`_promote_lock`) across both of its writes and writes the file before it clears the failure,
+  so no pass reads between them. The press order is the person's: a failed sha installed by hand while its
+  failure stands is left untagged by a later Dismiss, and the same install after the Dismiss is tagged; and a
+  rollback whose own smoke failed leaves the tag at the build it replaced while the rollback's target runs
+  untagged, until a run that concludes moves **live** — both accepted.
   The sha compared is the ref's own object as `ls-remote`
   prints it (`--refs` leaves out an annotated tag's peeled `^{}` line), so an annotated tag (its tag
   object's sha) never reads as at the live commit. A read that
