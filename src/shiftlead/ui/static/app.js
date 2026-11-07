@@ -1082,9 +1082,11 @@
   // the open box's item, while it is open: a re-read that takes the item off the page closes the box, its words
   // kept (TD-1555). A re-read that moves the item, or the cards round it, changes nothing: the box sends what it
   // was opened on
-  AO.composeGone = function (dlg, row, text) {
+  // `keep`: the key the words are kept by — a board line's `board:<key>`, which outlives its row's id (that names the
+  // line's number, so an edit above it changes the id); else the row's own
+  AO.composeGone = function (dlg, row, text, keep) {
     if (!row || !dlg.open || document.querySelector(`.mailrow[data-msg="${CSS.escape(row)}"]`)) return false;
-    if (text.trim()) AO.keptWords[row] = text;
+    if (text.trim()) AO.keptWords[keep || row] = text;
     dlg.close("gone");
     AO.toast(text.trim() ? "the item changed — your words are kept: Answer… on it again to send them" : "the item changed — the box was closed", false);
     return true;
@@ -1110,7 +1112,8 @@
     $("#mailquote").textContent = q ? `re: “${q.length > 160 ? q.slice(0, 160) + "…" : q}”` : "";
     $("#mailkind").value = "ask"; $("#mailabout").value = ""; $("#mailtext").value = o.text || "";  // an ask by default (§4.5a **Message**, 2026-09-25)
     // words a re-read's close kept for this item (TD-1555) come back, once
-    if (o.row && AO.keptWords[o.row]) { $("#mailtext").value = AO.keptWords[o.row]; delete AO.keptWords[o.row]; }
+    const keep = o.keep || o.row;
+    if (keep && AO.keptWords[keep]) { $("#mailtext").value = AO.keptWords[keep]; delete AO.keptWords[keep]; }
     // §4.10 *When it is read* (TD-168): the addressee's pair, from its record's view, never a
     // request; a reply reads as a note does, and switching the kind swaps the sentence
     const when = $("#mailwhen");
@@ -1122,7 +1125,7 @@
     }
     // while the box is open, every swap of the page is checked for its item (TD-1555): one observer, gone with the box
     const watch = o.row && typeof MutationObserver === "function"
-      ? new MutationObserver(() => { if (AO.composeGone(dlg, o.row, $("#mailtext").value)) watch.disconnect(); }) : null;
+      ? new MutationObserver(() => { if (AO.composeGone(dlg, o.row, $("#mailtext").value, keep)) watch.disconnect(); }) : null;
     if (watch) watch.observe(document.body, { childList: true, subtree: true });
     return new Promise((resolve) => {
       dlg.addEventListener("close", () => {
@@ -1709,7 +1712,7 @@
       // is not Done — and the refresh brings it back with the reply on it. `refs` are the reader's,
       // handed as they came: the home mails each live lease holder on one of them (TD-142).
       if (action === "board_reply") {
-        const m = await AO.compose({ to: at.name || "the board", reply: true, quote: atLine, item: atItem, row: AO.answerRow(b) });
+        const m = await AO.compose({ to: at.name || "the board", reply: true, quote: atLine, item: atItem, row: AO.answerRow(b), keep: at.key || "" });
         if (!m) return;
         let refs = [];
         try { refs = JSON.parse(at.refs || "[]"); } catch (_) { refs = []; }
@@ -1729,7 +1732,7 @@
       // does (`entry_add`), its first line the item's head and the person's words — after the
       // decide has committed, and a refusal there is toasted: the decision stands.
       if (action === "board_notright") {
-        const m = await AO.compose({ to: at.name || "the board", reply: true, quote: atLine, text: "Not right: ", item: atItem, row: AO.answerRow(b) });
+        const m = await AO.compose({ to: at.name || "the board", reply: true, quote: atLine, text: "Not right: ", item: atItem, row: AO.answerRow(b), keep: at.key || "" });
         if (!m) return;
         const said = m.text.split(/\s+/).filter(Boolean).join(" ");
         // the prefix is the form's, whatever case it was retyped in

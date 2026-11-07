@@ -190,7 +190,7 @@ def test_the_composers_line_swaps_with_the_kind_and_a_reply_reads_as_a_note():
     assert got["note"] == got["reply"] == "When it is read: waits in the seat's mailbox."
     assert got["none"] == "" and got["empty"] == ""
     js = (UI / "static" / "app.js").read_text()
-    assert '$("#mailkind").onchange = show' in js and "when: { ask: b.dataset.whenAsk" in js
+    assert '$("#mailkind").onchange = show' in js and "when: { ask: at.whenAsk" in js
     assert 'id="mailwhen"' in (UI / "templates" / "base.html").read_text()
 
 

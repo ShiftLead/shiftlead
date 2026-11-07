@@ -11,7 +11,6 @@ import shutil
 import subprocess
 
 import pytest
-
 from test_ui_queue_cards import FOLDS_PROBE, JS
 
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
@@ -38,13 +37,16 @@ document.querySelectorAll = () => [];
 // a row as a Queue card draws it, with its *on <ref>* link before it, and its Answer… button inside it
 const row = (msg, kind, on, data) => {
   const r = { dataset: { msg, kind, text: data.text || "" }, isConnected: true, querySelector: () => null,
-    classList: { contains: () => false, add: noop, remove: noop, toggle: noop }, setAttribute: noop, removeAttribute: noop,
-    getAttribute: () => null, remove: noop, appendChild: noop, insertAdjacentHTML: noop, style: {},
+    classList: { contains: () => false, add: noop, remove: noop, toggle: noop },
+    setAttribute: noop, removeAttribute: noop, getAttribute: () => null,
+    remove: noop, appendChild: noop, insertAdjacentHTML: noop, style: {},
     querySelectorAll: () => [], contains: () => false, focus: noop,
     previousElementSibling: { matches: (s) => s === ".qon", dataset: { on } } };
   r.closest = (sel) => (sel.includes(".boardrow") && kind === "board" ? r : sel === ".mailrow" ? r : null);
   const b = { dataset: data, classList: { contains: () => false }, parentElement: null };
-  b.closest = (sel) => (sel === "[data-act], [data-copy]" ? b : sel === ".mailrow" ? r : sel.includes(".boardrow") && kind === "board" ? r : null);
+  b.closest = (sel) =>
+    sel === "[data-act], [data-copy]" ? b
+      : sel === ".mailrow" ? r : sel.includes(".boardrow") && kind === "board" ? r : null;
   r.button = b;
   return r;
 };
@@ -60,9 +62,11 @@ AO.toast = (t) => { toasts.push(t); return { settle: noop }; };
 AO.refreshInboxPage = noop;
 const tick = () => new Promise((r) => setImmediate(r));
 const press = async (b) => { heard.click.forEach((f) => f({ target: b, shiftKey: false })); await tick(); };
-const draw = () => {
-  const board = row("board:k1", "board", "shiftlead#TD-1437", { act: "board_reply", id: "person", board: "docs/user_attention.md",
-    key: "board:k1", line: "17", refs: "[]", name: "shiftlead's board", text: "Decide the end of TD-1437's rounds" });
+// a board row's id names its line's number (`board:<root>:<line>`), its `data-key` the line's own key
+const draw = (line) => {
+  const board = row(`board:r:${line || 17}`, "board", "shiftlead#TD-1437", { act: "board_reply", id: "person",
+    board: "docs/user_attention.md", key: "board:k1", line: String(line || 17), refs: "[]",
+    name: "shiftlead's board", text: "Decide the end of TD-1437's rounds" });
   const ask = row("m-998", "ask", "shiftlead#TD-1529", { act: "reply", id: "person", msg: "m-998", from: "designer",
     name: "designer", quote: "td-max's shape?" });
   return { board, ask };
@@ -71,10 +75,10 @@ const out = {};
 (async () => {
   // 1. Answer… on the board line; under the open box a re-read reorders the cards, and the pressed button is
   //    rewritten to carry the ask's data (the worst a swap could do): the words still go to the board line
-  let p = draw(); live = { "board:k1": p.board, "m-998": p.ask };
+  let p = draw(); live = { "board:r:17": p.board, "m-998": p.ask };
   await press(p.board.button);
   out.title = ids["#mailtitle"].textContent;
-  const fresh = draw(); live = { "m-998": fresh.ask, "board:k1": fresh.board };
+  const fresh = draw(); live = { "m-998": fresh.ask, "board:r:17": fresh.board };
   p.board.isConnected = false; p.ask.isConnected = false;
   p.board.button.dataset = { ...p.ask.button.dataset };
   if (observe) observe();
@@ -82,7 +86,7 @@ const out = {};
   box.close("send"); await tick(); await tick();
   out.first = posts.splice(0);
   // 2. Answer… on the ask, with the board line drawn where it was: the words go back as the ask's reply
-  p = draw(); live = { "board:k1": p.board, "m-998": p.ask };
+  p = draw(); live = { "board:r:17": p.board, "m-998": p.ask };
   await press(p.ask.button);
   out.askTitle = ids["#mailtitle"].textContent;
   p.ask.button.dataset = { ...p.board.button.dataset };
@@ -91,10 +95,10 @@ const out = {};
   out.second = posts.splice(0);
   // 3. a re-read that takes the item off the page closes the box: nothing is sent, the words are kept and come
   //    back when Answer… is pressed on the same item again
-  p = draw(); live = { "board:k1": p.board, "m-998": p.ask };
+  p = draw(); live = { "board:r:17": p.board, "m-998": p.ask };
   await press(p.ask.button);
   ids["#mailtext"].value = "words in flight";
-  live = { "board:k1": draw().board };
+  live = { "board:r:17": draw().board };
   if (observe) observe();
   await tick();
   out.gone = { open: box.open, posts: posts.splice(0), toast: toasts[toasts.length - 1] || "" };
@@ -102,6 +106,19 @@ const out = {};
   p = draw(); live = { "m-998": p.ask };
   await press(p.ask.button);
   out.kept = ids["#mailtext"].value;
+  box.close("cancel"); await tick();
+  // 4. a line added above the board line moves it: its row's id changes, so the box closes; its words are kept by
+  //    the line's own key and come back on its Answer… at its new place
+  p = draw(); live = { "board:r:17": p.board };
+  await press(p.board.button);
+  ids["#mailtext"].value = "kept across a move";
+  const moved = draw(18).board; live = { "board:r:18": moved };
+  if (observe) observe();
+  await tick();
+  out.movedOpen = box.open;
+  ids["#mailtext"].value = "";
+  await press(moved.button);
+  out.movedKept = ids["#mailtext"].value;
   box.close("cancel"); await tick();
   console.log(JSON.stringify(out));
 })();
@@ -134,6 +151,8 @@ def test_a_reread_that_takes_the_item_away_closes_the_box_with_its_words_kept(tm
     assert out["gone"]["open"] is False and out["gone"]["posts"] == []
     assert out["gone"]["toast"].startswith("the item changed — your words are kept")
     assert out["kept"] == "words in flight"
+    # a board line's words are kept by its own key, which outlives its row's id when the line moves
+    assert out["movedOpen"] is False and out["movedKept"] == "kept across a move"
 
 
 CARD_MENUS_PROBE = (
@@ -153,8 +172,9 @@ const card = (items, open) => {
   c.all = [own[0], ...rows.flatMap((r) => r.menus), own[1]];
   c.querySelectorAll = (sel) => (sel === "details.more" ? c.all : []);
   const homes = [c, ...rows];
-  return { c, rows, all: () => c.all, querySelectorAll: (sel) => (sel === "details.more[open]" ? c.all.filter((d) => d.open) : []),
-    querySelector: (sel) => homes.find((h) => Object.entries(h.dataset).some(([k, v]) => sel === `[data-${k}="${v}"]`)) || null };
+  const opened = (sel) => (sel === "details.more[open]" ? c.all.filter((d) => d.open) : []);
+  const named = (sel) => homes.find((h) => Object.entries(h.dataset).some(([k, v]) => sel === `[data-${k}="${v}"]`));
+  return { c, rows, all: () => c.all, querySelectorAll: opened, querySelector: (sel) => named(sel) || null };
 };
 const before = card(["a", "b", "c"], ["tail", "b"]);
 const keys = AO.openMenus(before);
