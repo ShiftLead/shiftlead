@@ -3550,7 +3550,10 @@ def cmd_td_next(args: argparse.Namespace) -> int:
     the script's warnings (TD-970), the exit still 0. The branch of the directory it runs in goes with the call when
     that directory is a checkout of the repo named (§4.4 *The branch*, TD-1089), and the take's `**Id take:**` line,
     where the home gives one, is said on standard error, and so, last, is the script's filing question where the repo
-    sets `review-outcomes` on (TD-1282)."""
+    sets `review-outcomes` on (TD-1282). `--out <file>` writes the `--json` reply whole to the file before anything is
+    printed, and `--show <take|last>` reads again the ids one call already gave, spending nothing (TD-1484)."""
+    if args.show and args.count is not None:
+        raise SystemExit("ao td reserve: --show reads a take again and spends nothing, so it takes no --count")
     if args.repo and re.fullmatch(r"[\w.-]+/[\w.-]+", args.repo) and not pathlib.Path(args.repo).expanduser().exists():
         try:
             _td_repo(args.repo)
@@ -3581,21 +3584,42 @@ def _td_branch(key: str) -> str:
     return cp.stdout.strip() if cp.returncode == 0 else ""
 
 
+def _td_out(args: argparse.Namespace, out: dict[str, Any]) -> None:
+    """`--out <file>` (TD-1484): the `--json` reply, whole, to the file, written before any line is printed, so a pipe
+    or a pager that cuts standard output never takes the ids with it."""
+    if args.out:
+        path = pathlib.Path(args.out).expanduser()
+        tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        try:
+            tmp.write_text(json.dumps(out, indent=1) + "\n", encoding="utf-8")
+            tmp.replace(path)
+        except OSError as e:  # the ids are spent already: say so and print them, never lose them to the file
+            print(f"--out {args.out} not written ({e.strerror or e}); the reply is below", file=sys.stderr)
+
+
+def _td_show(args: argparse.Namespace, name: str) -> int:
+    """`ao td reserve --show <take|last>`: the home's `td_take`, its ids one a line, and on standard error when and
+    to whom they were given, and that nothing new was spent."""
+    got = call_sync("td_take", repo=name, take=args.show)
+    out = {k: got.get(k) for k in ("repo", "ids", "by", "at", "id_take", "id_take_line")}
+    out["ids"] = out["ids"] or []
+    _td_out(args, out)
+    print(f"given to {out['by']} at {out['at']}; read again, nothing new spent", file=sys.stderr)
+    if out["id_take_line"]:
+        print(f"write `{out['id_take_line']}` in each entry's header", file=sys.stderr)
+    return emit(args, out, lambda: print("\n".join(out["ids"])))
+
+
 def _td_next_send(args: argparse.Namespace, name: str, branch: str = "") -> int:
+    if args.show:
+        return _td_show(args, name)
     extra: dict[str, Any] = {}
     if branch:
         extra["branch"] = branch
-    got = call_sync("td_next", repo=name, count=args.count, **extra)  # the home's 45 s budget is under the client's
-    for line in got.get("unread") or ():
-        print(line, file=sys.stderr)
+    # the home's 45 s budget is under the client's
+    got = call_sync("td_next", repo=name, count=args.count or 1, **extra)
     reserved = got.get("reserved") is not False  # an older home has no counter road: its ids are recorded
-    if not reserved:
-        print(f"not reserved on origin's counter: {got.get('why') or 'the script did not say why'}", file=sys.stderr)
-    for line in got.get("warnings") or ():
-        print(line, file=sys.stderr)
     take_line = got.get("id_take_line") or None  # a home from before TD-1363 answers neither id_take key
-    if take_line:
-        print(f"write `{take_line}` in each entry's header", file=sys.stderr)
     out = {
         "repo": got.get("repo"),
         "ids": got.get("ids") or [],
@@ -3608,6 +3632,15 @@ def _td_next_send(args: argparse.Namespace, name: str, branch: str = "") -> int:
         "id_take_line": take_line,
         "question": got.get("question") or None,  # an older home answers no question
     }
+    _td_out(args, out)
+    for line in out["unread"]:
+        print(line, file=sys.stderr)
+    if not reserved:
+        print(f"not reserved on origin's counter: {got.get('why') or 'the script did not say why'}", file=sys.stderr)
+    for line in out["warnings"]:
+        print(line, file=sys.stderr)
+    if take_line:
+        print(f"write `{take_line}` in each entry's header", file=sys.stderr)
     if getattr(args, "td_alias", False):  # the old name (TD-1200): its bare ids, and its new name said once
         code = emit(args, out, lambda: print("\n".join(out["ids"])))
         if out["ids"]:
@@ -5625,7 +5658,15 @@ def build_parser() -> argparse.ArgumentParser:
         q.add_argument(
             "--repo", help="a registered repo's name, or its origin's owner/repo (default: this directory's)"
         )
-        q.add_argument("--count", type=int, default=1, help="how many ids in a row, 1 to 10 (default: 1)")
+        q.add_argument("--count", type=int, help="how many ids in a row, 1 to 10 (default: 1)")
+        q.add_argument(
+            "--out", metavar="FILE", help="also write the --json reply whole to FILE, before anything is printed"
+        )
+        q.add_argument(
+            "--show",
+            metavar="TAKE",
+            help="read again the ids a call already gave, by its id_take, or 'last' for your newest; spends nothing",
+        )
         q.set_defaults(fn=cmd_td_next, td_alias=verb == "next")
     for road, what in (
         ("done", "Done…: the entry is done, a decided line on the board for its session"),

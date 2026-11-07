@@ -118,10 +118,11 @@ HOME_READS = frozenset({"repos", "doing_log", "queue", "shape", "seats", "pr_wai
 # a closed client cancels (`_serve_wait`), and a node forwards it with no bound but its own
 BLOCKING = frozenset({"wait", "pr_wait"})
 # The ledger ids the home gives (§4.4 *A ledger entry's id is handed out by the home*, TD-696): `ids.json` is the
-# home's alone, so `td_next` is forwarded while the link is up and refused offline — a person's call too, checked
+# home's alone, so `td_next`, and `td_take` that reads its record again (TD-1484), are forwarded while the link is up
+# and refused offline — a person's call too, checked
 # before the person-is-served return, or a node would give its own ids and the counter would split per host. It is
 # in neither `HOME_EDITS` (whose `PERSON_NODE_BOUND` would refuse a person's call from a node) nor `identity.READS`.
-IDS = frozenset({"td_next"})
+IDS = frozenset({"td_next", "td_take"})
 # The rank's intents (§4.4 *A move lands*, TD-769): `ranks.json` is the home's, and a move is a person's or an
 # interactive session's wherever it sits, so `rank_move` is forwarded while the link is up and refused offline.
 RANKS = frozenset({"rank_move"})
@@ -178,6 +179,8 @@ def offline_refusal(
         return f"the repo facts and the doing log are kept at the home, and this host holds neither: {tail}"
     if method in HOME_EDITS:
         return f"{method} edits what the home owns, so it waits for the link: {tail}"
+    if method == "td_take":
+        return f"ids.json is the home's: the record of the ids it gave is read there alone: {tail}"
     if method in IDS:
         return (
             f"ids.json is the home's: the ledger ids are handed out there alone: {tail}; run the checkout's "
