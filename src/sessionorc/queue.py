@@ -334,8 +334,8 @@ def mail_card(
     `repo`'s — its sender's (`mail_repo`, TD-1467) — None — its home is the Inbox — where no card holds one, unless
     it `needs` the person (an open `ask` or `steer` to them), when it draws on its kept or loose card
     (`kept_or_loose`, TD-1468) — one that names no entry but carries a PR (`pr`, or an `about` of `#n`) on the
-    card of the entry that PR names, else its PR's loose card (`pr_card`). The Inbox's own `item_home` and Telegram's link (§4.10 *What a message says*,
-    TD-795) read it alike."""
+    card of the entry that PR names, else its PR's loose card (`pr_card`). The Inbox's own `item_home` and
+    Telegram's link (§4.10 *What a message says*, TD-795) read it alike."""
     held, _by = held_refs(about, words, index, repo)
     if held:
         return (index or {}).get(held[0])
