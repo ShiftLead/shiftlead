@@ -42,7 +42,7 @@ import copy
 import dataclasses
 import re
 from collections.abc import Callable, Collection, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -127,9 +127,42 @@ class SeatDef:
     lane: list[str] = field(default_factory=list)
     grants: list[str] | None = field(default_factory=list)  # [], never None: the role's grants are not read (§4.9b)
     unattended: bool = True
+    # `pool:` (§4.9b *A seat as an ordered pool*, TD-1476): on a definition's line, its profiles in order, in
+    # place of `profile:`; [] on a line with none and on each member `members()` gives
+    pool: list[str] = field(default_factory=list)
+    # on a pool's member (`members()`): the pool's name (its line's `name`), its place from 1, and the
+    # definition's member count — what its `seat` field and its when-words are made from; "" / 0 otherwise
+    pool_name: str = ""
+    rank: int = 0
+    pool_size: int = 0
+
+    def members(self) -> list[SeatDef]:
+        """The records the line starts (§4.9b *The members*): itself, or for a `pool:` one `SeatDef` per
+        profile — the first named as the line, the k-th `<name>-p<k>` — each with its profile, the pool's
+        name and its rank, so a trigger, a when-line and a launch stay per record."""
+        if not self.pool:
+            return [self]
+        n = len(self.pool)
+        return [
+            replace(
+                self,
+                name=pool_member_name(self.name, k),
+                profile=prof,
+                pool=[],
+                pool_name=self.name,
+                rank=k,
+                pool_size=n,
+            )
+            for k, prof in enumerate(self.pool, start=1)
+        ]
 
     def when(self) -> str:
-        """What would make it come, in the card's words (§4.5 *on call — runs after 10 PRs*)."""
+        """What would make it come, in the card's words (§4.5 *on call — runs after 10 PRs*); a pool's
+        member after the first, *backup k−1 of n−1 — comes when <the members before it> cannot answer*
+        (§4.9b *How it is drawn*)."""
+        if self.rank > 1:
+            before = " and ".join(pool_member_name(self.pool_name, k) for k in range(1, self.rank))
+            return f"backup {self.rank - 1} of {self.pool_size - 1} — comes when {before} cannot answer"
         if self.trigger == "prs":
             return f"runs after {self.after} PR" + ("" if self.after == "1" else "s")
         if self.trigger == "every":
@@ -138,6 +171,12 @@ class SeatDef:
             # §4.9b *What a sweep seat's card says*: *sweeps when unswept 7 d*
             return "sweeps when unswept " + re.sub(r"(\d+)([mhd])", r"\1 \2", self.after)
         return "comes on the next question"
+
+
+def pool_member_name(name: str, rank: int) -> str:
+    """A pool's k-th member's name (§4.9b *The members*): the line's `name` for the first, `<name>-p<k>`
+    after it."""
+    return name if rank == 1 else f"{name}-p{rank}"
 
 
 @dataclass
@@ -241,7 +280,12 @@ class TeamDef:
     def started_names(self) -> list[str]:
         """Every session name a start of the team gives — its manager, techlead, seats and members —
         which no other team on its repo may give (design §4.9 *Names are the org's*)."""
-        return self.session_names() + [s.name for s in self.seats]
+        return self.session_names() + [s.name for s in self.seat_records()]
+
+    def seat_records(self) -> list[SeatDef]:
+        """Each record the `seats:` lines start, in order: a line, or each member of its `pool:` (§4.9b
+        *A seat as an ordered pool*) — what every reader that knows a seat by its name reads."""
+        return [m for s in self.seats for m in s.members()]
 
     def twice_named(self) -> list[str]:
         """The names the definition holds more than once, in order — what `ao org check` and the
@@ -726,7 +770,7 @@ TECHLEAD_ROLE = "techlead"
 ANCHOR_RETIRED = "`anchor:` is retired — the anchor seat is gone (§4.9b *No anchor seat*); delete the key"
 # the seat ledger reads the person's own sessions and the unowned turns under these (§4.9 *Names are the org's*)
 RESERVED = (INTERACTIVE, OUTSIDE)
-SEAT_KEYS = ("name", "role", "trigger", "brief", "profile")
+SEAT_KEYS = ("name", "role", "trigger", "brief", "profile", "pool")
 # A definition written before TD-722 (design §4.9): `projects:` on a team and `home:` on any of its
 # sessions pass `_no_stray` so `_validate` can refuse them by name, saying the fix (`_refuse_old`)
 OLD_TEAM_KEYS = ("projects",)
@@ -790,6 +834,8 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
             raise ValueError(f"{key}.projects must be a list of project names")
         old["projects"] = [_str(p, f"{key}.projects") for p in projects]
     manager_raw = _mapping(raw.get("manager"), f"{key}.manager")
+    if "pool" in manager_raw:
+        raise ValueError(f"{key}.manager.pool: " + POOL_NOT_HERE.format(who="manager"))
     _no_stray(manager_raw, MANAGER_KEYS, f"{key}.manager", OLD_KEYS)
     _old(manager_raw, "manager", f"{key}.manager", old)
     manager_role = _str(manager_raw.get("role"), f"{key}.manager.role", default=DEFAULT_MANAGER_ROLE)
@@ -819,7 +865,7 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
     if not isinstance(members_raw, list):
         raise ValueError(f"{key}.members must be a list")
     members = [_member(m, f"{key}.members[{i}]", old, f"members[{i}]") for i, m in enumerate(members_raw)]
-    return TeamDef(
+    team = TeamDef(
         name,
         _str(raw.get("repo"), f"{key}.repo").strip(),
         manager,
@@ -832,6 +878,25 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
         flows=_flows(raw.get("flows"), f"{key}.flows"),
         old=old,
     )
+    _pool_names(team, f"{key}.seats")
+    return team
+
+
+def _pool_names(team: TeamDef, key: str) -> None:
+    """A pool member's name that another record of the team holds is refused, naming its line (§4.9b
+    *Where it is refused*): `qa-1` with `pool: [a, b]` makes `qa-1-p2`, which no other session or seat
+    of the team may be called."""
+    others = team.session_names()
+    for i, line in enumerate(team.seats):
+        if not line.pool:
+            continue
+        rest = others + [r.name for j, s in enumerate(team.seats) if j != i for r in s.members()]
+        for m in line.members():
+            if m.name in rest:
+                raise ValueError(
+                    f"{key}[{i}].pool: its member {m.name} is the name of another session of the team — "
+                    f"rename one (design §4.9b *A seat as an ordered pool*)"
+                )
 
 
 def _flows(raw: Any, key: str) -> list[str]:
@@ -872,6 +937,8 @@ def _techlead(team: str, raw: Any, key: str, old: dict[str, Any]) -> TechleadDef
     and no `grants:`: the preset holds none (identity alarms go to the person, §4.8a).
     `techlead: person` is refused as any non-mapping is."""
     raw = _mapping(raw, key)
+    if "pool" in raw:
+        raise ValueError(f"{key}.pool: " + POOL_NOT_HERE.format(who="techlead"))
     _no_stray(raw, TECHLEAD_KEYS, key, OLD_KEYS)
     _old(raw, "techlead", key, old)
     return TechleadDef(
@@ -914,9 +981,34 @@ def _seats(team: str, raw: Any, key: str, old: dict[str, Any]) -> list[SeatDef]:
                 after=after,
                 profile=_opt_str(item.get("profile"), f"{skey}.profile"),
                 brief=_opt_str(item.get("brief"), f"{skey}.brief"),
+                pool=_pool(item, trigger, skey),
             )
         )
     return out
+
+
+def _pool(item: dict[str, Any], trigger: str, key: str) -> list[str]:
+    """A `seats:` line's `pool:` (§4.9b *Where it is refused*): two or more profiles, in order, a profile
+    repeating as often as it likes, on an `asks` line with no `profile:` beside it; [] for a line with none."""
+    if "pool" not in item:
+        return []
+    raw = item["pool"]
+    if "profile" in item:
+        raise ValueError(f"{key}: pool: names its members' profiles — drop profile: beside it (design §4.9b)")
+    if trigger != "asks":
+        raise ValueError(
+            f"{key}.pool: a pool is an asks seat's — its questions go to the first able member (design §4.9b)"
+        )
+    if not isinstance(raw, list) or not all(isinstance(p, str) and p.strip() for p in raw):
+        raise ValueError(f"{key}.pool must be a list of profile names")
+    if len(raw) < 2:
+        raise ValueError(f"{key}.pool: a pool is two or more profiles — one is a seat's profile: (design §4.9b)")
+    return [p.strip() for p in raw]
+
+
+POOL_NOT_HERE = (
+    "pool: is an asks seat's, under seats: — a {who} is one session (design §4.9b *A seat as an ordered pool*)"
+)
 
 
 def _trigger(raw: Any, key: str) -> tuple[str, str]:

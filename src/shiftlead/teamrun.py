@@ -190,6 +190,21 @@ def on_call_gate(x: teams.Launch) -> dict[str, Any]:
     return {"held": True} if x.lead and x.trigger and x.unattended else {}
 
 
+def pool_gate(x: teams.Launch) -> dict[str, Any]:
+    """`create`'s `held` for a pool's member after the first (§4.9b *The members*, TD-1476): written
+    closed with no pane, as a manager on call is, so rule 3 fills it only when its pool routes a question
+    to it; the first member starts live as any seat does. Unattended only, as `create` writes a held
+    record."""
+    return {"held": True} if x.trigger and int(x.trigger.get("rank") or 0) > 1 and x.unattended else {}
+
+
+def pool_line(x: teams.Launch) -> str:
+    """A Start's or an Apply's line for a held pool member (§4.9b): *starts held — pool member k of n,
+    comes when its pool routes to it*."""
+    rank = int((x.trigger or {}).get("rank") or 0)
+    return f"starts held — pool member {rank} of {x.pool_size}, comes when its pool routes to it"
+
+
 def can_control(sessions: list[dict[str, Any]], sid: str) -> dict[str, Any] | None:
     """The record `sid` when it may stand as a new session's controller — live, or a seat on call
     (TD-269, built by TD-276) — else None."""
@@ -359,7 +374,7 @@ def _seat_whens(team: orgmod.TeamDef) -> dict[str, str]:
     a manager on call (§4.9, TD-259) — with what would make it come, in the card's words
     (`SeatDef.when`, `org.MANAGER_WHEN`)."""
     out = {team.techlead.name: "comes on the next question"} if team.techlead is not None else {}
-    out.update({s.name: s.when() for s in team.seats})
+    out.update({s.name: s.when() for s in team.seat_records()})
     if team.manager.on_call and team.manager.name:  # §4.9, §6 rule 3's `team` trigger (TD-259)
         out[team.manager.name] = orgmod.MANAGER_WHEN
     return out
@@ -385,7 +400,7 @@ def _seat_of(team: orgmod.TeamDef, sessions: list[dict[str, Any]]) -> dict[str, 
     # started with until its next Start (§4.9 `on_call`), so a standing manager started before the
     # definition read *on call* is no seat — nothing would fill it, and it still declares
     lead = team.manager.name if team.manager.on_call else None
-    named = {s.name for s in team.seats} | ({team.techlead.name} if team.techlead is not None else set())
+    named = {s.name for s in team.seat_records()} | ({team.techlead.name} if team.techlead is not None else set())
     out: dict[str, str] = {}
     for s in sessions:
         n = str(s.get("name") or "")
@@ -449,7 +464,7 @@ def role_holders(t: orgmod.TeamDef) -> list[dict[str, Any]]:
     if t.techlead:
         add("techlead", [t.techlead.name], True)
     for seat in t.seats:
-        add(seat.role, [seat.name], True)
+        add(seat.role, [m.name for m in seat.members()], True)
     for m in t.members:
         add(m.role, m.names(), False)
     return list(out.values())
@@ -544,7 +559,12 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | Non
                 # the role Add entry's **Open a session** starts, per Type (§4.9, TD-219), each said
                 "entries": {k: t.entry_role(k) for k in orgmod.ENTRY_TYPES},
                 # seats with a trigger (§4.9b, TD-098): what the manager reads to fill each one
-                "seats": [{"name": s.name, "role": s.role, "trigger": s.trigger, "after": s.after} for s in t.seats],
+                # a pooled line carries its `pool:` (§4.9b *A seat as an ordered pool*, TD-1476)
+                "seats": [
+                    {"name": s.name, "role": s.role, "trigger": s.trigger, "after": s.after}
+                    | ({"pool": list(s.pool)} if s.pool else {})
+                    for s in t.seats
+                ],
                 "members": sum(len(m.names()) for m in t.members),
                 # each line its size sets to other than its count (§4.9 *A team's size*, TD-1164)
                 "sizes": size_words(t.size, t),
@@ -882,7 +902,9 @@ def start(
         for x in plan.seats:
             # A seat with a trigger (§4.9b, TD-098): started with the team, as the techlead is, so it
             # runs once now and is on call after; its manager fills it again when its trigger is met.
-            created.append(call("create", **params(x, [lead_id] if lead_id else [])))
+            # a pool's later member is written held (§4.9b *The members*, TD-1476): rule 3 fills it
+            # when its pool routes a question to it
+            created.append(call("create", **params(x, [lead_id] if lead_id else []), **pool_gate(x)))
         for m in plan.members:
             # A person runs a team start, so no attenuation applies (§4.8 create rule); a
             # lead running it is subject to it as for any create, in the host agent.
@@ -1069,7 +1091,11 @@ def _seat_moved(record: dict[str, Any], x: teams.Launch) -> list[str]:
         return []
 
     def trigger(seat: Any) -> str:
-        return str(seat.get("trigger") or "?") if isinstance(seat, dict) else "none"
+        if not isinstance(seat, dict):
+            return "none"
+        # a pool's member names its place (§4.9b, TD-1476): *seat asks → asks · pool 1*
+        rank = f" · pool {seat['rank']}" if seat.get("rank") else ""
+        return str(seat.get("trigger") or "?") + rank
 
     return [f"seat {trigger(was)} → {trigger(now)}"]
 
@@ -1639,11 +1665,11 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
                 keeps, said = keep_mail_for(call, {x.name: verdict}, caller, concluded=False)
                 keep = {"keep_mail": True} if keeps else {}
                 ctl = [lead_id] if lead_id and x is not plan.lead else []
-                gate = on_call_gate(x) if x is plan.lead else {}
+                gate = on_call_gate(x) if x is plan.lead else pool_gate(x)
                 got = call("create", **x.create_params(ctl), **keep, **gate)
                 row["id"] = got.get("id")
                 if gate:
-                    row["line"] = f"{x.name}: {ON_CALL_LINE}"
+                    row["line"] = f"{x.name}: {ON_CALL_LINE if x is plan.lead else pool_line(x)}"
                 row["line"] += "".join(f" — {n}" for n in said)
         except (AgentError, teams.TeamError) as e:
             row["line"] = f"{d.name}: not applied — {e}"

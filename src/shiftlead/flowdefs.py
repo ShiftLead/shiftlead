@@ -343,7 +343,7 @@ def unfollowable(
     held: Collection[str],
     team: str = "",
     node: str = "",
-    seats: Collection[tuple[str, str]] = (),
+    seats: Collection[tuple[str, str] | tuple[str, str, bool, str]] = (),
     held_sets: Mapping[str, Collection[str]] | None = None,
     repo: str = "",
 ) -> list[str]:
@@ -354,8 +354,11 @@ def unfollowable(
     the team starts no member of; a review stage with no reader — the `techlead:` seat for the role
     `techlead`, else exactly one `seats:` entry of its role on `asks` (TD-315) — or with nothing to
     hold: its repos write no `held:`, or no path set of the name it gives. `staffed` is the roles the
-    definition's members take, `seats` its `seats:` entries as `(role, trigger)`, `held_sets` the
-    repo's named sets (`repo`'s)."""
+    definition's members take, `seats` its `seats:` entries as `(role, trigger, pooled, name)` (a
+    `(role, trigger)` pair reads unpooled) — one per definition line, never per pool member: a review
+    stage whose one `asks` seat of its role is a `pool:` is unstaffed (§4.9b *A seat as an ordered pool*) —
+    `held_sets` the repo's named sets (`repo`'s)."""
+    lines = [(s[0], s[1], bool(s[2]), str(s[3])) if len(s) > 2 else (s[0], s[1], False, "") for s in seats]
     out: list[str] = []
     if node and flow.place == "org":
         out.append(f"an org flow, and {team} runs on {node} — define it in the repo")
@@ -367,15 +370,17 @@ def unfollowable(
             if st.role == REVIEW_ROLE:
                 if not techlead:
                     out.append("no techlead seat — add `techlead:` to the team")
-            elif (asks := sum(1 for r, t in seats if r == st.role and t == "asks")) > 1:
+            elif (asks := sum(1 for r, t, _p, _n in lines if r == st.role and t == "asks")) > 1:
                 out.append(f"{asks} seats of role {st.role} on asks — a review stage has one reader")
             elif not asks:
-                other = next((t for r, t in seats if r == st.role), "")
+                other = next((t for r, t, _p, _n in lines if r == st.role), "")
                 out.append(
                     f"the seat of role {st.role} is on trigger {other} — a review seat's trigger is asks"
                     if other
                     else f"no seat of role {st.role} — add one under seats: with trigger: asks"
                 )
+            elif (pooled := next((n for r, t, p, n in lines if r == st.role and t == "asks" and p), None)) is not None:
+                out.append(f"{pooled} is a pool: a review stage has one reader")
             if len(out) > had:
                 continue
             if st.held and not (held_sets or {}).get(st.held):
