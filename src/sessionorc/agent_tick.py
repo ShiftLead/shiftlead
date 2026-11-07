@@ -1196,7 +1196,9 @@ class TickMixin:
             # a claim in progress: the clause on its `ao` replies says it. For the `brief` trigger alone a
             # waiting claim (rule 5's, `_waiting_claims`) is not in progress — a changed brief applies at the
             # next entry boundary (§6 rule 7, TD-1485) — and the replay carries it; a record a person's Apply
-            # relaunched too keeps the relaunch's stricter boundary, as `flow` and `cache` keep every claim
+            # relaunched too keeps the relaunch's stricter boundary, as `flow` and `cache` keep every claim.
+            # The replay reads the waiting claims again: one whose wait was answered between a failed replay
+            # and its retry is no longer waiting, and is not carried (the retry skips this test)
             waiting = {id(e) for e in self._waiting_claims(s)} if why == "brief" and not s.relaunch else set()
             if any(e.status == "claimed" and e.source == "declared" and id(e) not in waiting for e in s.progress):
                 return

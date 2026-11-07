@@ -440,7 +440,8 @@ async def test_a_brief_restart_takes_a_member_holding_only_waiting_claims_and_ca
     """§6 rule 7 *A changed brief applies at the next entry boundary* (TD-1485, built by TD-1517): a waiting
     claim (rule 5's: its PR open and the next move someone else's) is no claim in progress for the `brief`
     trigger, so an idle member holding only that is restarted and the claim rides the replay; a claim whose
-    PR waits on its own CI holds it back, and so does any claim on a record a person's Apply relaunched."""
+    PR waits on its own CI holds it back, beside a waiting one too, and so does any claim on a record a
+    person's Apply relaunched."""
     from sessionorc.models import MailEntry, ProgressEntry
 
     await park_ticks(agent)
@@ -455,7 +456,7 @@ async def test_a_brief_restart_takes_a_member_holding_only_waiting_claims_and_ca
 
     async with LocalClient() as person:
         ids = {}
-        num = {"waiting": 1, "ci": 2, "relaunched": 3}
+        num = {"waiting": 1, "ci": 2, "relaunched": 3, "mixed": 4}
         for n in num:
             (tmp_path / n).mkdir()
             params = {"dir": str(tmp_path / n), "adapter": "shell", "argv": ["bash", "--norc", "--noprofile"]}
@@ -465,9 +466,11 @@ async def test_a_brief_restart_takes_a_member_holding_only_waiting_claims_and_ca
             rec.repo = "/r"
             rec.progress = [ProgressEntry(ref=f"TD-00{num[n]}", review_pr=11)]
             ids[n] = sid
+        # one waiting claim beside one in progress: still mid-entry
+        agent.sessions[ids["mixed"]].progress.append(ProgressEntry(ref="TD-005", review_pr=11))
         agent._repos["/r"] = {"prs": {"open": [{"number": 11}]}}
         # the waiting one's next move is the person's; the CI one's is its own; the relaunched one waits too
-        agent.person_inbox[:] = [steer(ids["waiting"], "TD-001"), steer(ids["relaunched"], "TD-003")]
+        agent.person_inbox[:] = [steer(ids[n], f"TD-00{num[n]}") for n in ("waiting", "relaunched", "mixed")]
         agent.sessions[ids["relaunched"]].relaunch = {"at": at}
         assert [e.ref for e in agent._waiting_claims(agent.sessions[ids["waiting"]])] == ["TD-001"]
         assert agent._waiting_claims(agent.sessions[ids["ci"]]) == []
@@ -476,7 +479,7 @@ async def test_a_brief_restart_takes_a_member_holding_only_waiting_claims_and_ca
         assert [r["why"] for r in new.restarts] == ["brief"] and new.brief_changed is None
         (carried,) = new.progress
         assert (carried.ref, carried.status, carried.review_pr) == ("TD-001", "claimed", 11)
-        for n in ("ci", "relaunched"):
+        for n in ("ci", "relaunched", "mixed"):
             assert not [r for r in agent.sessions[ids[n]].restarts if r.get("why") in ("brief", "flow")], n
         for sid in ids.values():
             with contextlib.suppress(Exception):
