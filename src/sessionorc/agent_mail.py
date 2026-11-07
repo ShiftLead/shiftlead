@@ -337,9 +337,9 @@ class MailMixin:
             for e in list(seat.inbox):
                 if not e.open or e.kind != "ask" or e.to != [key]:
                     continue
-                blank = e.handed_entry and isinstance(e.entry, dict) and not e.entry.get("picked")
+                blank = e.handed_entry and isinstance(e.entry, dict) and not e.entry.get("picked") and not e.outcome
                 if (e.entry is not None or e.handed) and not blank:
-                    continue  # the person's team pick and a session's own ledger request wait on their seat
+                    continue  # the person's pick, a session's own ledger request and a settled entry stay
                 if why is None:
                     if e.waits:  # able again: it waits for nothing but its answer
                         self._mark(e.id, waits=None)

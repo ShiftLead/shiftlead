@@ -318,7 +318,8 @@ async def test_a_blank_pick_waiting_on_a_seat_that_turns_unable_moves_and_a_pers
     """A question already waiting (§4.9b, TD-1480): a handed entry with a blank pick on a techlead that turns
     unable moves the first tick another servicing team's techlead is able — closed `rerouted` (owing nothing
     there), its copy keeping `entry` (its `team` the new team's), `draft`, the handed mark and no bound, carrying
-    `routed` — while the person's own pick stays on its seat; the old seat's outcome on it is refused."""
+    `routed` — while the person's own pick, and an entry its seat already settled, stay on their seat; the old
+    seat's outcome on it is refused."""
     repo = tmp_path / "shiftlead"
     repo.mkdir()
     _registry(tmp_path, repo)
@@ -331,6 +332,9 @@ async def test_a_blank_pick_waiting_on_a_seat_that_turns_unable_moves_and_a_pers
         blank = await person.call("entry_add", repo="shiftlead", type="debt", text="blank", teams=teams)
         mine = await person.call("entry_add", repo="shiftlead", type="debt", text="mine", teams=teams, team="db")
         assert blank["to"] == first and mine["to"] == first
+        settled = await person.call("entry_add", repo="shiftlead", type="debt", text="settled", teams=teams)
+        async with LocalClient(caller=first) as c:
+            await c.call("msg", to=PERSON, text="blocked on a decision", outcome="blocked", for_=settled["id"])
         agent.sessions[first].state, agent.sessions[first].limited_reset = "limited", None
         await agent._reroute_waiting(datetime.now(UTC))
         held = {e.id: e for e in agent.sessions[first].inbox}
@@ -340,6 +344,8 @@ async def test_a_blank_pick_waiting_on_a_seat_that_turns_unable_moves_and_a_pers
         old = held[blank["id"]]
         assert old.closed_reason == "rerouted" and not old.owes and agent.sessions[first].asks_waiting() == 1
         assert held[mine["id"]].open, "the person's pick waits on its own seat"
+        assert held[settled["id"]].closed_reason is None, "a settled entry is not moved"
+        assert not any(e.root == settled["id"] for e in agent.sessions[second].inbox)
         moved = next(e for e in agent.sessions[second].inbox if e.root == blank["id"])
         assert moved.handed_entry and moved.owes and moved.bound is None and moved.routed["seat"] == first
         assert (moved.entry["team"], moved.entry["picked"], moved.entry["repo"]) == ("ao-grind", False, "shiftlead")
