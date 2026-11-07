@@ -436,6 +436,19 @@ def only_pr(pr: Any, about: Any) -> int | None:
     return int(m.group(1)) if m else None
 
 
+# the PR a board line's `Context:` names (§4.5 screen 6 *Every item that needs the person draws on a card*, TD-1552):
+# `#n` with nothing of a word, a path or a repo before its `#` — `PR #164`, `#164` and `(#164)` read 164; `PR#164`,
+# `agent-cadence#164`, `owner/name#12` and `a.b#3` read nothing
+_CONTEXT_PR = re.compile(r"(?<![\w./-])#(\d+)\b")
+
+
+def context_pr(text: Any) -> int | None:
+    """The PR a board line's `Context:` names, its first `#n` (`_CONTEXT_PR`); None where it names none (TD-1552). The
+    caller reads it only where the `Context:` names no entry."""
+    m = _CONTEXT_PR.search(str(text or ""))
+    return int(m.group(1)) if m else None
+
+
 def pr_card(
     pr: int | None, repo: str | None, index: Mapping[str, tuple[str, str]] | None
 ) -> tuple[str, str, str] | None:
