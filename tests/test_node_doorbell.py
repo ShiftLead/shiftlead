@@ -243,6 +243,25 @@ async def test_a_typed_ring_is_judged_once_from_the_report_bringing_its_stop(age
         assert agent._unread_rings[ADDR] == 3 and agent.remote[HOST][RID].doorbell_held
 
 
+async def test_a_ring_answered_with_nothing_read_is_rung_again_with_no_new_mail(agent):
+    """TD-1488 through a node: the home judges the ring's turn read nothing, and the record's next stretch
+    rings the same mail again though nothing rose past the watermark — the watermark stays put."""
+    async with _linked(agent) as node:
+        _mail(agent)
+        await _ring(agent)
+        decided = agent.remote[HOST][RID].mail_decided
+        node.rec.ring_seen = {**node.rec.ring_seen, "turned": "t", "stopped": "t"}
+        _report(agent, node)
+        assert agent._unread_rings[ADDR] == 1
+        node.rec.since = _iso(datetime.now(UTC) + timedelta(seconds=5))
+        _report(agent, node)
+        await _ring(agent)
+        assert len(node.rings) == 2 and node.rings[1]["line"] == mail.unread_line(1)
+        home = agent.remote[HOST][RID]
+        assert [(w["charged"], w["covered"]) for w in home.wakes] == [(True, 1), (True, 0)]
+        assert home.mail_decided == decided
+
+
 async def test_a_read_after_the_ring_ends_the_run_and_a_newer_token_drops_the_judgement(agent):
     async with _linked(agent) as node:
         _mail(agent)

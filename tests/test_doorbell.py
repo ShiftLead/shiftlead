@@ -210,22 +210,55 @@ async def test_a_ring_that_will_not_submit_is_tried_once_more_then_recorded(
             assert re.search(r"doorbell failed \S+: prompt-stuck", capsys.readouterr().out)
 
 
-async def _unread_ring(agent, ld, w: str, n: int, *, read: bool = False) -> None:
-    """Mail lands, the bell rings with `n` unread, the ring's turn runs — reading its inbox or not —
-    and its `Stop` reports idle: one ring, judged at that Stop (§4.10, TD-347)."""
-    before = len(await _submitted(agent, w))
-    await ld.call("msg", to=w, text=f"mail {n}")
+async def _answer_ring(agent, w: str, k: int, n: int, *, read: bool = False) -> None:
+    """The bell's `k`th line, with `n` unread, is submitted; its turn runs — reading its inbox or not —
+    and its `Stop` reports idle: one ring, judged at that Stop (§4.10, TD-347). The count of lines is
+    the test's to keep, since a ring answered with nothing read is rung again at once (TD-1488)."""
 
     async def rung() -> bool:
         got = await _submitted(agent, w)
-        return len(got) > before and got[-1] == "SUBMITTED " + mail.unread_line(n)
+        return len(got) >= k and got[k - 1] == "SUBMITTED " + mail.unread_line(n)
 
-    assert await wait_for(rung, timeout=6), f"ring {n} never came"
+    assert await wait_for(rung, timeout=6), f"ring {k} never came"
     await agent.rpc_hook(w, state="working", prompt=True)  # the ring's UserPromptSubmit
     if read:
         async with LocalClient(caller=w) as me:
             await me.call("inbox", unread=True)
     await _idle(agent, w)
+
+
+async def test_a_ring_answered_with_nothing_read_is_rung_again_in_the_next_stretch(agent, composerstubs, tmp_path):
+    """TD-1488: on 2026-11-05 a seat's `ao inbox` was refused by its tool's permission check, the ring's
+    turn ended with the mail unread, and the next ring came 4.5 hours later with new mail — the ring had
+    covered the mail, and a ring was rung only for mail past that watermark. A ring answered by a turn
+    that read nothing is now rung again in the next idle stretch: the same mail, the same count, charged
+    as a ring, `covered: 0`, the watermark where it was. A turn that reads ends it (design §4.10)."""
+    async with LocalClient() as c:
+        w = await _worker(agent, c, tmp_path, "w")
+        lead = await _lead(c, tmp_path, w)
+        await _idle(agent, w)
+        async with LocalClient(caller=lead) as ld:
+            await ld.call("msg", to=w, text="one")
+            await _answer_ring(agent, w, 1, 1)  # the read failed: nothing read
+
+            async def again() -> bool:
+                return await _submitted(agent, w) == [LINE_1, LINE_1]
+
+            assert await wait_for(again, timeout=6), "a ring answered with nothing read was never rung again"
+            rec = await c.call("get", id=w)
+            decided = rec["mail_decided"]
+            assert [(x["charged"], x["covered"], x["via"]) for x in rec["wakes"]] == [
+                (True, 1, "doorbell"),
+                (True, 0, "doorbell"),
+            ]
+            assert agent._unread_rings[w] == 1
+            await agent.rpc_hook(w, state="working", prompt=True)
+            async with LocalClient(caller=w) as me:
+                await me.call("inbox", unread=True)
+            await _idle(agent, w)
+            await _ticks()
+            assert await _submitted(agent, w) == [LINE_1, LINE_1], "a read ends it"
+            assert w not in agent._unread_rings and (await c.call("get", id=w))["mail_decided"] == decided
 
 
 async def test_three_rings_answered_with_nothing_read_hold_the_bell_until_a_read(
@@ -240,13 +273,15 @@ async def test_three_rings_answered_with_nothing_read_hold_the_bell_until_a_read
         lead = await _lead(c, tmp_path, w)
         await _idle(agent, w)
         async with LocalClient(caller=lead) as ld:
-            # a read in the run ends it: two unread rings, then one answered by a read
-            await _unread_ring(agent, ld, w, 1)
-            await _unread_ring(agent, ld, w, 2)
-            await _unread_ring(agent, ld, w, 3, read=True)
+            # a read in the run ends it: an unread ring, the same mail rung again and answered by a read
+            await ld.call("msg", to=w, text="mail 1")
+            await _answer_ring(agent, w, 1, 1)
+            await _answer_ring(agent, w, 2, 1, read=True)
             assert agent._unread_rings.get(w) is None and agent.sessions[w].doorbell_held is None
-            for n in (1, 2, 3):
-                await _unread_ring(agent, ld, w, n)
+            # three rings in a row with nothing read: one entry, rung again after each turn (TD-1488)
+            await ld.call("msg", to=w, text="mail 2")
+            for k in (3, 4, 5):
+                await _answer_ring(agent, w, k, 1)
 
             async def held() -> dict | None:
                 return (await c.call("get", id=w))["doorbell_held"]
@@ -255,18 +290,18 @@ async def test_three_rings_answered_with_nothing_read_hold_the_bell_until_a_read
             assert (await held())["rings"] == mail.DOORBELL_HELD
             assert agent._bell_blocked(agent.sessions[w], datetime.now(UTC)) == "holding its mail unread"
             rung = await _submitted(agent, w)
-            await ld.call("msg", to=w, text="mail 4")
+            await ld.call("msg", to=w, text="mail 3")
             await _ticks()
             assert await _submitted(agent, w) == rung, "the bell is silent while held"
             # `ao status -v` says it on the mail line
             capsys.readouterr()
             assert await asyncio.to_thread(cli.main, ["status", "-v"]) == 0
-            assert "mail:   4 unread · doorbell held · 3 unread rings" in capsys.readouterr().out
+            assert "mail:   2 unread · doorbell held · 3 unread rings" in capsys.readouterr().out
             # a read lifts it, and the next mail rings again
             async with LocalClient(caller=w) as me:
                 await me.call("inbox", unread=True)
             assert agent.sessions[w].doorbell_held is None
-            await ld.call("msg", to=w, text="mail 5")
+            await ld.call("msg", to=w, text="mail 4")
 
             async def rung_again() -> bool:
                 return (await _submitted(agent, w))[len(rung) :] == [LINE_1]
@@ -282,8 +317,9 @@ async def test_a_persons_send_lifts_a_held_doorbell(agent, composerstubs, tmp_pa
         lead = await _lead(c, tmp_path, w)
         await _idle(agent, w)
         async with LocalClient(caller=lead) as ld:
-            for n in (1, 2, 3):
-                await _unread_ring(agent, ld, w, n)
+            await ld.call("msg", to=w, text="mail 1")
+            for k in (1, 2, 3):
+                await _answer_ring(agent, w, k, 1)
 
         async def held() -> bool:
             return bool(agent.sessions[w].doorbell_held)
