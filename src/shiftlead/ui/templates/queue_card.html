@@ -13,7 +13,7 @@
    no grip and no arrows, its wait phrase as its status; an In progress one *d/m done* where the status would be. Each card is its own box, its 4 px left edge `c.edge` (amber for a Decide or Do item, else
    teal Waiting, else green In progress, else grey; TD-915). Amber is spent on what needs the person alone. A card sends no `data-find`: the page
    builds its find text from the ids and titles it draws (`AO.qFindText`, §4.5 *Page loads*, TD-892). #}
-{% from "queue_row.html" import row, fold, meter, pbadge, state, holder, extras, builds, mentioned, want, read, with_you, pill, menu %}
+{% from "queue_row.html" import row, fold, meter, pbadge, state, holder, extras, builds, mentioned, want, read, with_you, pill, menu, synopsis %}
 {% macro card(c, repo='') %}{% set t = c.top %}{% set up = c.group == 'up_next' %}
 {%- set w = c.wants or {} %}{% set n = w.n or {} %}
 {%- set body = c.rows or w.read %}
@@ -29,7 +29,7 @@
     {%- else %}<span class="qplace">{{ c.place if c.place else '' }}</span>{% endif %}
     <div class="qmain">
     <span class="qid mono strong">{{ t.show }}</span>{% if c.group != 'loose' %}{{ pbadge(t.priority) }}{% endif %}
-    <span class="qtitle">{{ t.title }}</span>
+    <span class="qtitle">{{ t.title }}{{ synopsis(t.synopsis, ' ') }}</span>
     <span class="qright">
       {#- the move arrows, Start session, then the ⋯ (TD-914), a gap, then the facts #}
       {% if up %}<span class="qmoves"><button type="button" class="qmove" data-move="top" title="to the top of Up next" aria-label="to the top">⤒</button><button type="button" class="qmove" data-move="up" title="up one card" aria-label="up one">↑</button><button type="button" class="qmove" data-move="down" title="down one card" aria-label="down one">↓</button></span>{% endif %}

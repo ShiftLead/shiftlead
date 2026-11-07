@@ -108,10 +108,21 @@
    (§4.5 screen 12 *A card*, TD-915, TD-1131) — a part hangs on its parent's spine, a 2 px rule down each level's
    left edge in its branch's colour, `r.rails` one per level, its ancestors' then its own, "" where a level is a
    loose row's and draws none; a parent's parts meter beside its word #}
+{#- §4.5 screen 6 *A design links its synopsis* (§4.5a *Queue card: what needs the person*, *Queue page: card*,
+    TD-1527, built by TD-1536): *synopsis*, the person's file link to `docs/synopses/TD-<design>.md` (the `file_link`
+    macro), and *GitHub*, the file on the forge; with no file link *synopsis* itself links GitHub and no *GitHub* is
+    drawn. `s` is `synopsis_view`'s `{editor, web}`; `lead` the separator before it -#}
+{% macro synopsis(s, lead=' · ') -%}
+{%- if s and (s.editor or s.web) %}{% from "file_link.html" import file_link %}<span class="st synopsis">{{ lead }}
+{%- if s.editor %}{{ file_link(s.editor, 'synopsis', "the design's synopsis, in your editor", 'ref') }}{% if s.web %} · <a class="ref" href="{{ s.web }}" target="_blank" rel="noopener" title="the synopsis on GitHub">GitHub</a>{% endif %}
+{%- else %}<a class="ref synweb" href="{{ s.web }}" target="_blank" rel="noopener" title="the design's synopsis, on GitHub">synopsis</a>{% endif %}</span>
+{%- endif %}
+{%- endmacro %}
+
 {% macro row(r, repo='') %}
   <div class="qrow{% if r.archived %} archived{% endif %}{% if r.needs and not (r.with_you or r.answered) %} needsyou{% endif %}{% if r.state == 'stalled' %} stalled{% endif %}" style="--qd: {{ r.depth or 1 }}"{% if r.anchor %} id="{{ r.anchor }}"{% endif %} data-qid="{{ r.qid }}">
     {%- for b in r.rails or [] %}{% if b %}<span class="qrail b-{{ b }}" style="--ql: {{ loop.index }}" aria-hidden="true"></span>{% endif %}{% endfor %}
-    <span class="qid mono">{{ r.show }}</span>{{ pbadge(r.priority) }}<span class="qtitle">{{ r.title }}</span>
+    <span class="qid mono">{{ r.show }}</span>{{ pbadge(r.priority) }}<span class="qtitle">{{ r.title }}{{ synopsis(r.synopsis, ' ') }}</span>
     <span class="qright">{{ extras(r.ext, repo) }}{{ meter(r.meter) }}{{ state(r) }}{{ afters(r) }}{% if not (r.state or '').startswith('held by') and not r.with_you %}{{ holder(r.holder) }}{% endif %}{% if not r.ext %}{{ menu(r) }}{% endif %}</span>
     {{ builds(r.ext) }}
     {{ mentioned(r) }}
