@@ -379,7 +379,7 @@ async def test_push_key_is_a_persons_own_and_the_homes(agent, tmp_path, child):
     assert "push_key" in mail.PERSON_ONLY and "push_key" not in modes.HOME_EDITS
     assert "notify_test" in modes.HOME_EDITS
     _settings()
-    _store()  # a key reading stored, so a tick that runs meanwhile starts no `--public` read (TD-1391)
+    _store()
     async with LocalClient() as person:
         sid = (await person.call("create", name="w", dir=str(tmp_path), adapter="shell", role="worker",
                                  argv=["bash", "--norc", "--noprofile"]))["id"]  # fmt: skip
