@@ -88,7 +88,7 @@ def test_the_banner_is_the_endings_words_and_its_buttons_with_restart_where_the_
     banner = js[js.index("The ending banner (§4.5") : js.index('} else ex.classList.add("hidden");')]
     assert '<b class="endwords">${esc(words)}</b>${guess}' in banner
     assert "v.ending_unnamed && gone" in banner, "the guess only where the record does not name the ending"
-    for gone in ("The pane is kept", "read its transcript", "This session's process has", "memberback\">To put"):
+    for gone in ("The pane is kept", "read its transcript", "This session's process has", 'memberback">To put'):
         assert gone not in banner, gone
     assert "v.restartable" in banner and 'data-act="restart"' in banner and "v.restart_marked" in banner
     assert 'data-confirm="Restart ${esc(v.name || id)}? It is closed if still there' in banner

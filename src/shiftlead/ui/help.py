@@ -188,10 +188,10 @@ HELP: tuple[Help, ...] = (
         "Resume with changes…",
         "the ending banner",
         (
-            'Opens the New session form filled in from this record: its name, directory, tool, profile, role and '
-            'team, and Unattended as the record had it. Press it to bring a finished session back with '
+            "Opens the New session form filled in from this record: its name, directory, tool, profile, role and "
+            "team, and Unattended as the record had it. Press it to bring a finished session back with "
             "something changed, unattended again or under another profile. Nothing starts until the form's Start,"
-            ' and a changed name starts a record beside this one rather than in its place.'
+            " and a changed name starts a record beside this one rather than in its place."
         ),
     ),
     Help(
@@ -200,8 +200,8 @@ HELP: tuple[Help, ...] = (
         "the ending banner",
         (
             "Opens the New session form with this session's directory filled in and nothing else. Press it to "
-            'start fresh work in the same place. It does not continue this conversation, which is Resume, and it '
-            'leaves this record as it is.'
+            "start fresh work in the same place. It does not continue this conversation, which is Resume, and it "
+            "leaves this record as it is."
         ),
     ),
     Help(

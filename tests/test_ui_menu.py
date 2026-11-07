@@ -158,5 +158,5 @@ def test_an_esc_that_closed_a_menu_presses_no_page_key():
     menu alone (TD-1337's review) — the keys table returns on the mark `AO.menuEsc` puts on the event."""
     js = (UI / "static" / "app.js").read_text()
     assert "ev.aoMenuClosed = true;" in js
-    keys = js[js.index('const page = AO.keyPage(location.pathname);') :]
+    keys = js[js.index("const page = AO.keyPage(location.pathname);") :]
     assert keys.index("if (ev.aoMenuClosed) return;") < keys.index("const name = AO.keyName(ev);")

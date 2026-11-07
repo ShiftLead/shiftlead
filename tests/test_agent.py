@@ -4,6 +4,7 @@ import asyncio
 import dataclasses
 import json
 import subprocess
+import tempfile
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -2393,6 +2394,29 @@ async def test_a_launch_tells_the_start_hook_whose_board_to_nudge_from(agent, tm
                 await asyncio.sleep(0.1)
             assert out.read_text().strip() == want
             await c.call("kill", id=s["id"])
+
+
+async def test_a_launch_sets_tmpdir_to_the_host_agents_temp_directory(agent, tmp_path, monkeypatch):
+    """TD-1487 (design §4.2): every launch sets `TMPDIR` — the host agent's temp directory, `/tmp` where a systemd
+    unit gave it none — so a session's `$TMPDIR/pc.log` is never `/pc.log`."""
+    want = tmp_path / "tmpd"
+    want.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(want))  # what gettempdir() answers, as from the agent's env
+    out = tmp_path / "tmpdir.txt"
+    async with LocalClient() as c:
+        s = await c.call(
+            "create",
+            name="tmpdir",
+            dir=str(tmp_path),
+            adapter="command",
+            argv=["bash", "-c", f'echo "$TMPDIR" > {out}; sleep 30'],
+        )
+        for _ in range(50):
+            if out.exists() and out.read_text().strip():
+                break
+            await asyncio.sleep(0.1)
+        assert out.read_text().strip() == str(want)
+        await c.call("kill", id=s["id"])
 
 
 async def test_the_model_rides_the_env_and_its_file_follows_the_model_in_use(agent, tmp_path, monkeypatch):

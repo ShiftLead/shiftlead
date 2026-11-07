@@ -25,6 +25,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
@@ -1610,6 +1611,7 @@ class HostAgent(
                 # AGENT_MODEL_FILE name the model for its `Agent-Model:` trailer (§4.2, TD-638).
                 shown = name if sid == base else name + sid[len(base) :]  # a shown suffix, never a hidden one
                 env = {
+                    "TMPDIR": tempfile.gettempdir(),  # §4.2, TD-1487: a systemd unit gives none; the adapter's wins
                     **spec.env,
                     "SHIFTLEAD_SESSION": sid,
                     "SHIFTLEAD_HOME": str(paths.home()),

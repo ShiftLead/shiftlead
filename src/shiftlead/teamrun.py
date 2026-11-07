@@ -1348,11 +1348,7 @@ def wait_words(e: Mapping[str, Any], short: bool = False) -> str:
         return ""
     if w.get("on") == "until" and (date := str(w.get("until") or "")):
         return f"waits until {date[5:] if short else date}"
-    why = (
-        str(w.get("why") or "")
-        or (f"event ({w['name']})" if w.get("name") else "")
-        or "an event"
-    )
+    why = str(w.get("why") or "") or (f"event ({w['name']})" if w.get("name") else "") or "an event"
     if short and len(why) > WAIT_CLAMP:
         why = why[: WAIT_CLAMP - 1].rstrip() + "…"
     return f"waits: {why}"
