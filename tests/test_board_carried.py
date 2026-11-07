@@ -54,6 +54,17 @@ def _repo(tmp_path: Path, board: list[str], archive: list[str] | None = None) ->
         ("Go", []),
         ("", []),
         ("done: carried to TD-9", []),
+        # *see TD-m* reads as the same words (TD-1528)
+        ("see TD-1525: the bought sixth round, the designer's", ["TD-1525"]),
+        ("see TD-9 — carried to TD-4", ["TD-9"]),
+        ("See TD-9", ["TD-9"]),
+        ("— see TD-9", ["TD-9"]),
+        ("see TD-5, TD-6 and TD-7", ["TD-5", "TD-6", "TD-7"]),
+        ("Carried to TD-9", ["TD-9"]),
+        ("seen TD-9", []),
+        ("done, see TD-9", []),
+        ("see the PR", []),
+        ("SEE TD-9", []),
     ],
 )
 def test_a_closes_carried_to_ids_end_at_the_first_other_word_dash_or_sentence_end(reason, to):

@@ -307,10 +307,11 @@ def board_items(content: str, today: date) -> list[dict[str, Any]]:
 
 
 _ID = rf"(?:{ledgerboard.REPO}#)?TD-\d+"
-# a `Closed:` reason's leading *carried to* ids (§4.4 *The boards*, TD-1368): joined only by `,`, `and` or `&`,
-# ending at the first other word, dash or sentence end — *carried to TD-9 — see TD-4* is TD-9
+# a `Closed:` reason's leading *carried to* or *see* ids (§4.4 *The boards*, TD-1368; *see* TD-1528), either case of
+# the first letter: joined only by `,`, `and` or `&`, ending at the first other word, dash, colon or sentence end —
+# *carried to TD-9 — see TD-4* is TD-9, *see TD-1525: the bought sixth round* is TD-1525
 _JOIN = r"(?:\s*,\s*(?:(?:and|&)\s+)?|\s+(?:and|&)\s+)"
-CARRIED_RE = re.compile(rf"^[\s—–-]*[Cc]arried to\s+(?P<ids>{_ID}(?:{_JOIN}{_ID})*)")
+CARRIED_RE = re.compile(rf"^[\s—–-]*(?:[Cc]arried to|[Ss]ee)\s+(?P<ids>{_ID}(?:{_JOIN}{_ID})*)")
 _ID_RE = re.compile(_ID)
 # the archive's file beside the board's (§4.4 *The boards*): `<board stem>_archive.md`
 ARCHIVE_SUFFIX = "_archive"
@@ -365,8 +366,8 @@ def _archive_origin(root: Path, at: str, rel: Path) -> str | None:
 
 
 def carried_to(reason: str) -> list[str]:
-    """The ids a `Closed:` reason's leading *carried to* lists, as written, each once — [] for any other reason
-    (§4.4 *The boards*, TD-1368)."""
+    """The ids a `Closed:` reason's leading *carried to* or *see* lists, as written, each once — [] for any other
+    reason (§4.4 *The boards*, TD-1368; *see*, the form sessions came to write, read as the same words, TD-1528)."""
     m = CARRIED_RE.match(reason)
     return list(dict.fromkeys(x.group(0) for x in _ID_RE.finditer(m.group("ids")))) if m else []
 

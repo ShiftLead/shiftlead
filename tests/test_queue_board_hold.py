@@ -161,6 +161,34 @@ def test_a_line_carried_to_an_entry_holds_while_it_is_open_filed_for_the_answer_
 
 
 @pytest.mark.unit
+def test_a_line_closed_see_an_entry_holds_as_carried_to_does(tmp_path):
+    """TD-1528 (§4.4 *The boards* `to`): *see TD-m: …*, the close sessions came to write, is *carried to TD-m*."""
+    design = _entry(1, "the design", Priority="High", Kind="design-first", Blocked_by="decision (paul)")
+    build = _entry(2, "a build", Priority="High", Part_of="TD-001", Blocked_by="decision (paul)", Added="2026-10-01")
+    rnd = _entry(5, "the bought round", Priority="High", Kind="design-first", Part_of="TD-001", Added="2026-10-15")
+    line = _closed("TD-001 decision (paul). Parts: TD-002", "see TD-005: the bought round")
+    root, r = _setup(tmp_path, [design, build, rnd], line)
+    q = _read({root: r})
+    for ref in ("r#TD-001", "r#TD-002"):
+        row = _row(q, ref)
+        assert row["state"] == "answered — waiting on TD-005" and row["answered"]["line"]["to"] == ["TD-005"], ref
+    assert not any(c["status"] == "needs you" for c in q["cards"] if c["top"]["qid"] in ("r#TD-001", "r#TD-002"))
+    rec = _worker("ao-r-designer", "TD-005")
+    rec.repo = rec.dir = root
+    assert _row(_read({root: r}, [rec]), "r#TD-002")["state"] == "answered — waiting on designer"
+    # TD-005 archived: the person's again
+    root2, r2 = _setup(tmp_path / "a", [design, build], line)
+    assert _row(_read({root2: r2}), "r#TD-001")["answered"] is None
+    # *see TD-k* naming an older, unrelated open entry holds nothing, and no longer gets the other-words wait on a
+    # live claim of a covered member (an accepted change)
+    old = _entry(4, "older", Priority="High", Added="2026-10-01")
+    root3, r3 = _setup(tmp_path / "k", [design, build, old], _closed("TD-001 decision (paul)", "see TD-004"))
+    claim = _worker("ao-r-designer", "TD-001")
+    claim.repo = claim.dir = root3
+    assert _row(_read({root3: r3}, [claim]), "r#TD-001")["answered"] is None
+
+
+@pytest.mark.unit
 def test_an_archived_carried_line_is_read_from_the_archive(tmp_path):
     held = _entry(1, "the held one", **HELD)
     rnd = _entry(5, "the round", Priority="High", Added="2026-10-15")
