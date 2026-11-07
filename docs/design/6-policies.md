@@ -1423,9 +1423,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        holder's state row (TD-1453) draws the same actor **on the same card** (or both in the Inbox), the
        stuck words are a line under it alone, and the work's own row stays where it was, in no number: one
        counted item for one cause (§4.5 screen 6, TD-1500); a moved row is counted while it is stuck. On
-       two cards — the holder holding one entry, the work naming
-       another — each row is drawn on its own, the stuck row's words ending *— its holder row is on
-       <TD-n>*. Several stuck works with the same actor and reason draw each row, the first by its open
+       two surfaces — the holder's row on one card and the work on another, or one of them in the Inbox (a
+       stuck line with no `Context:`, or a holder that holds no card's entry) — each row is drawn on its own,
+       the stuck row's words ending *— its holder row is on <TD-n>* or *— its holder row is in the
+       Inbox*. Several stuck works with the same actor and reason draw each row, the first by its open
        time in full and the rest with the reason cut to *— <actor>, as on <first work>*, so one parked
        seat reads once — the first chosen per surface (one card, or the Inbox), at render, never stored. Its one control is **Open**, the actor's Focus (none for a `gone` actor, a work order
        with no live actor or a released PR) (§4.5a
