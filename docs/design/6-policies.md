@@ -186,7 +186,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      resumed, where Resume is the person's own), the prompt as rule 7's replay hands it — refilled
      from the files it was made from, as merged, on the home's own host; the stored prompt for a
      node's member or a launch record with no `prompt_from` — and the mail kept: the create moves
-     the old record's mail to the new one, as a seat's fill does (`keep_mail`, §4.9b). What it
+     the old record's mail to the new one, as a seat's fill does (`keep_mail`, §4.9b), and with it any owed
+     outcome, named in the prompt's closing line (§4.9a *The third declaration*); a seat's Restart creates
+     nothing, so it gets none. What it
      asked the person follows the close, not the mail: an `idle` member is closed first, and a
      close ends the open `ask`s and `steer`s it put to the person (`asker_gone`, §4.10; one about a
      ledger id or a PR is orphaned instead, and the new record, holding the name, adopts it), while
@@ -667,7 +669,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      itself**, closed first and replayed, `restarts: [{why: brief}]`, under the ceiling as
      every replay is; a close or replay that failed keeps its `brief` entry with `error`, counts
      toward the ceiling, and is tried again by the tick, while a Close by anyone else is never
-     undone. The same tick restart, under the same precondition, serves §4.10 *A lapsed cache is
+     undone. The same tick restart, under its precondition as it stood before TD-1485 (every claim in
+     progress: the shared test `tick_ready`, unchanged), serves §4.10 *A lapsed cache is
      started again, not rung*: the doorbell hands it a member idle past the cache lifetime with a
      long context, and the entry reads `why: cache`. Never a seat, never — for `brief_changed` — a
      member that declared `out_of_work`, never an interactive session, never past a stop time, into
