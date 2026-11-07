@@ -1191,6 +1191,8 @@ class InboxMixin:
         fetched = None
         if fetch:  # the merge moved origin: fetched first, and a fetch that fails is the re-read failing (TD-1508)
             fetched = await asyncio.to_thread(workorders.fetch_origin, root, self._ledger_branch.get(root))
+            if fetched.moved or not fetched.ok:  # a moved name is dropped, as the tick's pass drops it
+                self._ledger_branch.pop(root, None)
             if not fetched.ok:
                 log.warning(
                     "re-reading %s after its merge: the fetch failed (%s); the reading stands", root, fetched.why

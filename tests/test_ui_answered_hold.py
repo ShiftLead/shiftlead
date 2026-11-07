@@ -480,6 +480,8 @@ def test_a_ledger_row_under_a_press_reads_its_mark_and_draws_only_open(tmp_path)
     road = _pressed(tmp_path, act="back to design", answer="")
     assert road["applying_words"] == "applying back to design"
     assert "landing on r" in _render(road) and "you answered" not in _render(road)
+    worded = _pressed(tmp_path, act="done", answer="shipped in #1")
+    assert "you wrote &ldquo;shipped in #1&rdquo; — landing on r" in _render(worded)
     assert _rows(_repos(tmp_path, "r"), [])[0]["applying"] is None, "no press: no mark"
 
 

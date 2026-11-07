@@ -1264,7 +1264,7 @@
 <div class="row gap wrap mfoot">
   {%- if app %}
   {#- a press landing (§4.4 *A press is drawn as it lands*, TD-1508): what was pressed, and where it lands -#}
-  <span class="st">{% if app.answer %}you answered &ldquo;{{ app.answer }}&rdquo; — {% endif %}landing on {{ e.name }}'s board</span>
+  <span class="st">{% if app.answer %}you {{ 'answered' if app.act == 'decide' else 'wrote' }} &ldquo;{{ app.answer }}&rdquo; — {% endif %}landing on {{ e.name }}'s board</span>
   {%- elif ans and ans.kind == 'board' %}
   {#- a board answer's foot (§4.5 screen 12 *Three wants*, TD-1364): its `Decided:` words and age, then the
       entry it was carried to, else its holder; a kept-waiting answer, the date it is asked again -#}
