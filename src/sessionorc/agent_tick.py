@@ -1162,7 +1162,8 @@ class TickMixin:
 
     async def _brief_restart(self, s: Session, now: datetime) -> None:
         """Rule 7's second telling (design §6, TD-217 slice 4): a member whose record carries
-        `brief_changed` and that is hook-confirmed `idle`, holds no claim in progress, has declared
+        `brief_changed` and that is hook-confirmed `idle`, holds no claim in progress — a waiting claim, rule
+        5's, is not one, so the brief applies at the next entry boundary (TD-1485) — has declared
         nothing, and has its git fields known and showing nothing uncommitted or unpushed is closed
         and replayed by the tick itself, `why: brief`, under the ceiling as every replay is. Never a
         seat, an interactive session, one past its stop time, into a wrap-up, a gate pause or a
@@ -1192,8 +1193,15 @@ class TickMixin:
         if not closed_by_tick:
             if s.state != "idle" or not s.told or s.pending:
                 return
-            if any(e.status == "claimed" and e.source == "declared" for e in s.progress):
-                return  # a claim in progress: the clause on its `ao` replies says it
+            # a claim in progress: the clause on its `ao` replies says it. For the `brief` trigger alone a
+            # waiting claim (rule 5's, `_waiting_claims`) is not in progress — a changed brief applies at the
+            # next entry boundary (§6 rule 7, TD-1485) — and the replay carries it; a record a person's Apply
+            # relaunched too keeps the relaunch's stricter boundary, as `flow` and `cache` keep every claim.
+            # The replay reads the waiting claims again: one whose wait was answered between a failed replay
+            # and its retry is no longer waiting, and is not carried (the retry skips this test)
+            waiting = {id(e) for e in self._waiting_claims(s)} if why == "brief" and not s.relaunch else set()
+            if any(e.status == "claimed" and e.source == "declared" and id(e) not in waiting for e in s.progress):
+                return
         if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
             return
         if self._profile_gated(s.profile, now, s.team) or self._just_restarted(s, now):

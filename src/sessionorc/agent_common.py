@@ -167,7 +167,10 @@ CONTEXT_AGAIN = timedelta(minutes=20)
 # Read at the reports' cadence (`DERIVE_EVERY`), detached from the tick: each read is a `git show`.
 BRIEF_SETTLE = timedelta(minutes=10)
 # Rule 7's clause on every `ao` reply to a member whose record carries `brief_changed` (TD-217 slice 4)
-BRIEF_CLAUSE = 'your brief changed — finish what you hold, then `ao progress restart --why "brief changed"`'
+BRIEF_CLAUSE = (
+    "your brief changed — it applies from your next entry: finish the one you hold, merged, dropped or waiting,"
+    ' then `ao progress restart --why "brief changed"`'
+)
 # and its second trigger's (§4.9c *Switching*, TD-309 slice 5), to a member whose record carries `relaunch`
 FLOW_CLAUSE = 'your team\'s flow changed — finish what you hold, then `ao progress restart --why "flow changed"`'
 # What a relaunch replaces in a launch record (§4.9c): each as handed, an absent one removed; the rest stands.
