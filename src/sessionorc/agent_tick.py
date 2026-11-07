@@ -3758,20 +3758,24 @@ class TickMixin:
                     if isinstance(a, dict) and a.get("from"):
                         waiting.add(naming.split_address(str(a["from"]))[0])
             doing = {t: list(r) for t, r in self.doing_log.rings.items()}
+            applied = {r: self._applied(r, v) for r, v in self._repos.items()}
             # a repo with no archive yet (after a restart, before its first ledger read) keeps the last cards
-            # rather than drawing them without one (§4.4 *The ledger is read against origin*, TD-1471); one whose
-            # ledger read failed holds nothing back, so a repo that keeps failing never freezes the Queue
+            # rather than drawing them without one (§4.4 *The ledger is read against origin*, TD-1471), with the
+            # press marks laid over them (TD-1518); one whose ledger read failed holds nothing back, so a repo
+            # that keeps failing never freezes the Queue
             if self._queue is not None and any(
                 r not in self._archived
                 and isinstance((led := v.get("ledger") or {}).get("entries"), list)
                 and "error" not in led
                 for r, v in self._repos.items()
             ):
-                return
-            got = queue_mod.reading(
-                {r: self._applied(r, v) for r, v in self._repos.items()}, graph, now, waiting=waiting, doing=doing,
-                questions=list(self.person_inbox), archived=self._archived,
-            )  # fmt: skip
+                got = queue_mod.lay_held(self._queue_read or self._queue, applied)
+            else:
+                got = queue_mod.reading(
+                    applied, graph, now, waiting=waiting, doing=doing, questions=list(self.person_inbox),
+                    archived=self._archived,
+                )  # fmt: skip
+                self._queue_read = got
         except Exception:  # noqa: BLE001 — the Queue is a reading: the last one stands, the next tick tries again
             log.exception("reading the queue failed")
             return

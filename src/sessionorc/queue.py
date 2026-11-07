@@ -633,6 +633,52 @@ def _holder_stuck(rec: Any, waiting: Collection[str], now: datetime) -> bool:
     return not (agent_common.subagents_live(rec, now) or agent_common.shells_live(rec, now))
 
 
+def _pressing(
+    open_: Mapping[str, Mapping[str, Any]], boards: Mapping[str, Iterable[Any]], linked: Mapping[str, str]
+) -> dict[str, dict[str, Any]]:
+    """Each open member's press mark by qid (§4.4 *A press is drawn as it lands*, TD-1508): an entry's own mark (a
+    ledger decide or road), else the mark of an open board line naming it in its `Context:` or `Parts:`."""
+    pressing: dict[str, dict[str, Any]] = {q: dict(e["applying"]) for q, e in open_.items() if e.get("applying")}
+    for name, bl in boards.items():
+        for b in bl:
+            for it in (b.get("items") or ()) if isinstance(b, Mapping) else ():
+                if not isinstance(it, Mapping) or not isinstance(it.get("applying"), Mapping):
+                    continue
+                for ref in [*(it.get("refs") or ()), *(it.get("parts") or ())]:
+                    if (q := _line_qid(str(ref), name, linked)) in open_:
+                        pressing.setdefault(q, dict(it["applying"]))
+    return pressing
+
+
+def lay_held(queue: Mapping[str, Any], repos: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    """The Queue held back after a restart (`_queue_pass`, TD-1471) with the press marks of `repos` (the readings
+    with `lay_applying`'s marks) laid over its members, so a press during the hold is drawn at once (TD-1518): a
+    marked open row reads `applying_words` with no need, as `reading` draws it; a row the person holds
+    (`with_you`) keeps its state. `queue` is the last reading `reading` gave, never one this wrote, so a mark that
+    clears during the hold leaves the row as that reading drew it. A copy; `queue` is never written."""
+    rs = _Repos(repos)
+    open_ = {
+        qid(name, e["id"]): e for name, r in rs.by_name.items() for e in r["ledger"]["entries"]
+        if isinstance(e, Mapping) and e.get("id")
+    }  # fmt: skip
+    boards = {n: list((r.get("boards") or {}).get("boards") or ()) for n, r in rs.by_name.items()}
+    pressing = _pressing(open_, boards, open_refs(open_, rs.origins))
+
+    def mark(row: Any) -> Any:
+        if not isinstance(row, Mapping) or row.get("archived") or row.get("with_you"):
+            return row
+        if (applying := pressing.get(str(row.get("qid") or ""))) is None:
+            return row
+        return {**row, "state": applying_words(applying), "needs": None, "answered": None, "applying": applying}
+
+    cards = [
+        {**c, "top": mark(c.get("top")), "rows": [mark(r) for r in c.get("rows") or ()]}
+        if isinstance(c, Mapping) else c
+        for c in queue.get("cards") or ()
+    ]  # fmt: skip
+    return {**queue, "cards": cards}
+
+
 def reading(
     repos: Mapping[str, Mapping[str, Any]],
     records: Iterable[Any],
@@ -822,17 +868,7 @@ def reading(
             elif home and re.fullmatch(r"TD-\d+", p.ref):
                 claims.setdefault(qid(home, p.ref), str(rec.id))
 
-    # a press landing (§4.4 *A press is drawn as it lands*, TD-1508): an entry's own mark (a ledger decide or road),
-    # else the mark of an open board line naming it in its `Context:` or `Parts:`
-    pressing: dict[str, dict[str, Any]] = {q: dict(e["applying"]) for q, e in open_.items() if e.get("applying")}
-    for name, bl in boards.items():
-        for b in bl:
-            for it in (b.get("items") or ()) if isinstance(b, Mapping) else ():
-                if not isinstance(it, Mapping) or not isinstance(it.get("applying"), Mapping):
-                    continue
-                for ref in [*(it.get("refs") or ()), *(it.get("parts") or ())]:
-                    if (q := _line_qid(str(ref), name, linked)) in open_:
-                        pressing.setdefault(q, dict(it["applying"]))
+    pressing = _pressing(open_, boards, linked)
 
     def row(q: str) -> dict[str, Any]:
         if q in open_:

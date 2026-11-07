@@ -336,6 +336,37 @@ async def test_the_queue_keeps_its_last_cards_until_a_repo_has_an_archive(tmp_pa
     assert [c["id"] for c in agent._queue["cards"]] == ["repo#TD-001"]
 
 
+async def test_a_press_during_the_queues_hold_is_drawn_at_once(tmp_path, agent):
+    """TD-1518 (§4.4 *A press is drawn as it lands*): while the Queue keeps its last cards for a repo with no archive
+    yet, a press mark is laid over them at once — the member reads *answered — applying* with no need — and once the
+    mark clears the row reads as the last reading drew it; the hold itself stands."""
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    root, _ = scratch(tmp_path, v2_files([entry(1, "one"), entry(2, "two")]))
+    led = ledger.reading(root, NOW, with_history=False)
+    r = {"name": "repo", "root": str(root), "remote": "", "ledger": led, "prs": {"open": []}}
+    agent._repos = {str(root): r}
+    agent._archived = archives(agent._repos)
+    await agent._queue_pass(NOW)
+
+    def row(q: str) -> dict:
+        return next(x for c in agent._queue["cards"] for x in [c["top"], *c["rows"]] if x["qid"] == q)
+
+    before = row("repo#TD-001")
+    agent._archived = {}  # a restart: no ledger read yet
+    agent._repos = {str(root): {**r, "ledger": {**led, "entries": led["entries"][:1]}}}
+    agent._applying = {str(root): {"ledger:repo#TD-001": {1: {"act": "decide", "answer": "Go", "at": NOW.isoformat()}}}}
+    await agent._queue_pass(NOW + timedelta(seconds=2))
+    assert sorted(c["id"] for c in agent._queue["cards"]) == ["repo#TD-001", "repo#TD-002"], "the hold stands"
+    got = row("repo#TD-001")
+    assert got["state"] == "answered — applying" and got["needs"] is None and got["applying"]["answer"] == "Go"
+    assert row("repo#TD-002")["applying"] is None, "an unmarked row as it was"
+    agent._applying = {}
+    await agent._queue_pass(NOW + timedelta(seconds=3))
+    assert row("repo#TD-001") == before, "the mark cleared: the row as the last reading drew it"
+
+
 async def test_a_repo_whose_ledger_read_failed_holds_no_queue_back(tmp_path, agent):
     """A repo with no archive whose ledger reading carries an error (its read failing since the restart) holds
     nothing back: the Queue is drawn from the other repos' readings (#3151's review)."""

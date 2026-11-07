@@ -882,6 +882,8 @@ class HostAgent(
         # the Queue's reading (§4.4 *The Queue*, TD-769): derived each tick at the home from the repo
         # readings, the claims and the archive (`_queue_pass`), served by `queue`, pushed when it changes
         self._queue: dict[str, Any] | None = None
+        # the last Queue `reading` derived, which a hold lays the press marks over (`queue.lay_held`, TD-1518)
+        self._queue_read: dict[str, Any] | None = None
         self._rank_init()  # the rank's intents and their flush (§4.4 *A move lands*, TD-769)
         self._shape_init()  # the teams' shape, sampled once a minute (§4.4 *Team shape*, TD-834)
         # The home's own `host` record (§6 *Balance*, TD-239): a team's balance mark, kept in `host.json`.
