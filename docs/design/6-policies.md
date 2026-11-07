@@ -1377,23 +1377,27 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   installed by hand that `check` reads), reads the tag and a branch of that name with one
   `git ls-remote origin refs/tags/promote/live refs/heads/promote/live`, off the loop, so a tag deleted
   or moved between promotes is seen within a full pass. Then, by what it finds:
-  - **the tag at the live commit**, no branch: adopted as the lease if the lease differs (a push that
+  - **a branch `promote/live`**, which may shadow the tag (the forge reader resolves a ref by name):
+    the home keeps its lease, pushes nothing, and sends the person one `system` note, as the promote's
+    *promoted* notes go (§4.10): *a branch promote/live on <repo> shadows the home's live tag: delete it
+    (`git push origin :refs/heads/promote/live`)*. Once it is gone, the tag is read as below;
+  - otherwise, **the tag at the live commit**: adopted as the lease if the lease differs (a push that
     landed before its lease was written); nothing is pushed;
-  - **neither**: the home pushes onto the absent tag;
-  - **the tag at the stored lease**, no branch, the lease not the live commit: the home pushes with the
-    lease;
-  - **anything else** — a tag at another commit with no lease stored, a tag at neither the lease nor the
-    live commit, or a branch `promote/live` (which may shadow the tag, since the forge reader resolves
-    a ref by name) — is someone else's: the home clears the stored lease, pushes nothing, and sends the
-    person one `system` note, as the promote's *promoted* notes go (§4.10), once per sha the tag or
-    branch was found at: *the promote/live tag on <repo> was moved by someone else: delete it
-    (`git push origin :refs/tags/promote/live`) and the home pushes it again*. Until then the checks
-    read what that tag names, and a lift from it is caught by review.
+  - **no tag**: the home pushes onto the absent tag;
+  - **the tag at the stored lease**, the lease not the live commit: the home pushes with the lease;
+  - **the tag anywhere else** — at another commit with no lease stored, or at neither the lease nor the
+    live commit — is someone else's: the home clears the stored lease, pushes nothing, and sends the
+    person one `system` note: *the promote/live tag on <repo> was moved by someone else: delete it
+    (`git push origin :refs/tags/promote/live`) and the home pushes it again*.
+  Each note is sent once per sha the ref it names was found at; until it is acted on, the checks read
+  what that ref names, and a lift from it is caught by review.
   The push is `git push --force-with-lease=refs/tags/promote/live:<lease> origin <live>:refs/tags/promote/live`,
   from the checkout, its lease empty onto an absent tag. The lease is **`promotes.<repo>.live_ref`**,
   the sha the home last pushed or adopted, written to `~/.shiftlead/promotes/<repo>/live_ref` beside
-  `last.json`, and the sha last noted to `live_ref_noted` beside it, both read from there at the home's
-  start, since a promote of this repo restarts the home that pushed it. A push refused for its lease
+  `last.json`, and the sha last noted to `live_ref_noted` beside it (cleared when a push or an adoption
+  lands, so a second move to the same sha is noted again), both read from there at the home's start,
+  since a promote of this repo restarts the home that pushed it. The read and the push run in the
+  pass's thread under the promote lock, so no promote moves **live** between them. A push refused for its lease
   (the tag moved between the read and the push) changes nothing: the next read acts on what is there.
   Any other failure is logged and retried on the next full pass. A live that is *unknown*, or a commit
   `origin/main` does not hold, reads and moves nothing. The tag is the home's alone: no session pushes
