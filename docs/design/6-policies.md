@@ -1362,14 +1362,16 @@ block. A policy is agent code and needs no grant; a session doing the same work 
          **`STUCK_ORDER_AFTER`**, sixty minutes.
        - **A PR waiting on its holder**: an open PR, green or not (a holder that hit its ceiling before
          its precheck leaves a PR nobody moves as surely as one after it), that
-         a record's newest claim not yet `done` names — its derived `review_pr`, kept while that PR is
-         open, or a declared `pr` (`ao progress claim --pr`) (§4.8 `ao progress`). Its actors are every
-         record whose newest claim names it (an author's and a reader's may both); it is stuck only when
-         none acts. A claim dropped, or ended by a `restart` its next run has not taken up, leaves the PR
+         an **open claim** of a record names — every one of the record's progress entries, not its newest
+         alone, since a record holds one entry per reference and may hold several claims at once (a reader
+         with two reviews, an author with a stacked PR): `source: declared`, `status: claimed`, `why` not
+         `PR_CLOSED`, naming the PR by its `pr` (`ao progress claim --pr`) or its derived `review_pr`, kept
+         while that PR is open (§4.8 `ao progress`) — the filter rule 5's `_waiting_claims` applies. Its
+         actors are every record with an open claim naming it (an author's and a reader's may both); it is
+         stuck only when none acts. A claim dropped, or ended by a `restart` its next run has not taken up, leaves the PR
          with no actor, read *released*. A PR no claim ever named is not read: the Repo
          page lists it. Wait: **`STUCK_PR_AFTER`**, two hours, past a precheck and the merge that
-         follows it; its open time the newest claim among its actors'
-         claims, derived each tick, else, a released PR having none, its `stuck_open.at` (*The clock*, below).
+         follows it; its open time its `stuck_open.at`, which never moves back (*The clock*, below).
      - **Acting.** `_stuck_pass` runs after rule 3's pass in the same tick, so `unfillable` holds this
        tick's words, and reads the repo readings (`_repos`) as the tick finds them — the detached repo pass's
        last readings, loaded from disk at a restart, stale but good — so a reading is absent only for a repo
@@ -1416,22 +1418,30 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        unpicked* (its cure the team's Start). Its members are the team's records that no newer record
        supersedes, as the lanes read them; these team words take the place of the members' own `ended`
        or `not_filled`. A PR with no actor reads *released by <name>*: its `stuck_open` entry's **`by`**,
-       the name of the first actor (as *actor* below orders them) on the last tick it had one, written
-       each tick it has one, since a dropped claim's entry (`ao progress drop` with no `--pr`) no longer
-       names the PR; an entry with no `by` reads *released* alone.
+       `{id, host, name, ref}` — the first actor (as *actor* below orders them) on the last tick it had one,
+       its record's `id` and `host`, its `name` (the words draw it) and the `ref` of its earliest open claim naming
+       the PR that is not a waiting claim (the one that orders it) — written each tick it has one, since a dropped claim's entry (`ao progress drop` with no `--pr`)
+       no longer names the PR, and a seat's successive fills share one name, so the record is found by `id`;
+       an entry with no `by` reads *released* alone.
      - **Never stuck.** Work whose only actors are the person's own live sessions (`unattended: false`
        and no member — `by_person`, §4.4 *The card's status*, TD-1281): the person is already there; beside
        other actors, a person's own session is passed over: not in the acting test, nor `since`, nor the
        choice of the first actor and its reason. A
-       member the person took over is not the person's own: it reads `taken_over`. And a PR whose
-       holder's claim is a **waiting claim** (rule 5, TD-820: an open `ask` or `steer` of the holder's
-       about it, or its ask held in a seat's `prs_waiting.asks` — its reader asked) is not read as a PR:
-       an `ask` is the work, read as a question, its reader the actor; a claim waiting on a `steer` alone
-       is not read at all, since a steer lapses to its default at its bound (one to the person is on
-       their card as *steer* until then), after which the PR is read again.
+       member the person took over is not the person's own: it reads `taken_over`. And a **waiting claim**
+       (rule 5, TD-820, `_waiting_claims`: an open `ask` or `steer` of the holder's to the person about it,
+       `work.waiting_of`, or its ask held in a seat's `prs_waiting.asks` — its reader asked) is read per
+       claim: that claim makes no actor, and its record is no actor of the PR only when no other open claim of
+       it names the PR. Where other actors remain, the PR is read through them
+       alone. Where none remains, the PR is not read as a PR: an ask held in `prs_waiting.asks` is the work,
+       read as a question to the seat that holds it, that seat the actor; an `ask` or `steer` to the person
+       reads nothing until it closes or lapses (it is on their card, and an ask to the person is never this
+       rule's question), after which the PR is read again. While a PR is not read for want of an actor that is
+       not waiting, its `stuck_open` entry stays as stored (`rel` neither written nor cleared, `by` unchanged)
+       and its `stuck` entry drops: a tick with only waiting claims is no release (the unread-repo rule and a
+       good reading's drop of a PR no longer open, *The clock*, still govern first).
      - **The clock.** The work's **open time** is the ask's `at`, the first tick the home read the line
        decided (below), or the claim's `at`. The home keeps a board line's and a PR's moving
-       parts on `host.json` as **`stuck_open: {<key>: {at, oid?, repo, by?, rel?}}`** (shape-checked by
+       parts on `host.json` as **`stuck_open: {<key>: {at, oid?, repo, by?: {id, host, name, ref}, rel?}}`** (shape-checked by
        `HostStore.load` as
        `stuck` is, an entry that fails it dropped), so a home restart keeps them: a line's `at` is the
        first tick it was among `workorders.orders()`'s work orders (every open decided line that is
@@ -1439,9 +1449,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        and to the release when it lets it go (its drop's own `at`: the drop's ref is the line's `board:<key>`,
        which a PR's drop with no `--pr` does not name), the entry dropped when the line closes or is no longer
        decided as a reading that holds it says, and a PR's when a good PR reading no longer lists it open
-       (merged or closed; a reading that lists 200 open PRs, `pr_reading`'s cap, drops none) or, on a tick
-       with no actor, when the record its `by` names holds a `done` naming the PR — its last actor finished
-       it, so it is no work; any other PR with no actor is *released* (a drop, or an untaken restart) — a repo
+       (merged or closed; a reading that lists as many open PRs as its cap, `pr_reading`'s — 200 for `gh`, one
+       page of 100 for GitLab — drops none) or, on a tick with no actor, when the record `by.id` names holds a
+       `done` on `by.ref`, naming the PR or not (a plain `ao progress done <ref>` names none) — its last actor
+       finished it, so it is no work; any other PR with no actor is *released* (a drop, or an untaken restart) — a repo
        whose board or PR reading is absent (not yet read, or its read raised), errored, or fell back to the
        checkout's (`fetch_case` *skipped*, or no `fetch_case` at all, null: the board pass's plain checkout read, which
        may only
@@ -1464,11 +1475,14 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        entry, the only kind the reading's `carried` lists — never one it finds absent from both `items` and
        `carried`,
        which the stale checkout may not yet have; a PR's `oid` is its head (the PR row's `head`) and `at`
-       the latest of the first tick that read that head (moved on every push), the newest claim's `at`
-       among its actors, and its release, **`rel`**: written on the first tick that reads it with no actor
-       and cleared on any tick that reads one, so each release starts its own clock and a restart keeps it (a
-       drop with no `--pr` names no PR, so no claim's instant can stand for it) — read only as a
-       released PR's open time and an idle actor's figure (below). Its **`since`** is the later of its open
+       the latest of its stored `at` (so it never moves back: a later claim that finishes leaves an older one's
+       actor its full wait), the first tick that read that head (moved on every push), every open claim's `at`
+       among its actors, and its release — the first tick that reads it with no actor, always the tick's
+       instant, never a drop's (a drop with no `--pr` names no PR, so no claim's instant can stand for it).
+       **`rel`** marks the release: written with that tick's instant on the first tick that reads the PR with
+       no actor and cleared on any tick that reads one; its presence alone tells a later tick with no actor
+       from the first, so each release moves `at` once and a restart keeps it. The released PR's open time
+       and an idle actor's figure (below) read `at`, never `rel`. Its **`since`** is the later of its open
        time and the newest state change among its actors (each record's `since`, which moves only on a
        real change of state, or its `subagent_at` or `shells_at` where later — `agent_common.idle_from`,
        as rule 4 clocks), except an **`idle`** actor, whose own state changes say nothing of this work, since a
@@ -1499,7 +1513,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        for your Start*, `{why: "stopped"}` and `{why: "wound_down"}` for the other two), a released PR's
        as `{state: "released", by}`, *no lane takes it* as `{state: "no_lane"}`; **`actor`** `{id, host,
        name, more}` — the first not acting (an ask's in its `to` order, an order's by lane order then id, a
-       PR's by claim `at`), `more` the count of the rest, none
+       PR's by each record's earliest open claim naming it that is not a waiting claim, by that claim's `at`, then by record `id`), `more`
+       the count of the rest, none
        for a team's or a released PR's. The sentence and the `+n` are made at render. Kept on
        disk, so a home restart keeps the row standing, and time the home was down counts: nothing
        could act then either.
