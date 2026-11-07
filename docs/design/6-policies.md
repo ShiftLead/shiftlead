@@ -1820,7 +1820,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   run finished at it, so this one is taken, runs that commit again and tags it when it concludes. Its `from`
   is its own commit, so it **writes no hold** (none stood for the hand install, and a hold *rolled back from*
   itself would name nothing; one standing already is kept as it is), and its failed smoke rolls nothing
-  back; `auto` goes on as it would after the hand install, which is why CLAUDE.md's going back by hand turns
+  back, its failure blocking main's head as any person's rollback's does; `auto` goes on as it would after the hand install, which is why CLAUDE.md's going back by hand turns
   `auto` off first.
   The sha compared is the ref's own object as `ls-remote`
   prints it (`--refs` leaves out an annotated tag's peeled `^{}` line), so an annotated tag (its tag
