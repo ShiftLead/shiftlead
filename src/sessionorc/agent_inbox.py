@@ -1143,9 +1143,9 @@ class InboxMixin:
         self._applying_seq += 1
         token = self._applying_seq
         mark = {"act": act, "answer": " ".join(str(answer or "").split()), "at": datetime.now(UTC).isoformat()}
-        self._applying.setdefault(root, {}).setdefault(key, {})[token] = mark
-        await self._applying_push(root)
-        try:
+        try:  # the token is added inside: a press cancelled during the first push still clears it (review)
+            self._applying.setdefault(root, {}).setdefault(key, {})[token] = mark
+            await self._applying_push(root)
             yield
         finally:
             marks = self._applying.get(root) or {}

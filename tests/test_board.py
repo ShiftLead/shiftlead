@@ -1483,7 +1483,9 @@ async def test_a_ledger_answer_finds_its_repo_by_path_and_the_reading_after_it_l
             assert got["repo"] == root and f"Context: {id}." in origin_board(repo)
             assert agent._repos[root]["work_orders"] is stale
             # the press mark's own pushes alone (TD-1508): the reading in them is the one before the line
-            assert all(e["repo"]["work_orders"] == stale for e in events)
+            assert events and all(e["repo"]["work_orders"] == stale for e in events)
+            last = events[-1]["repo"]
+            assert not any(e.get("applying") for e in last["ledger"]["entries"]), "the last push carries no mark"
             events.clear()
         monkeypatch.setattr(workorders, "read_boards", real_read)
         got = await me.call("ledger_decide", repo=str(link), id="TD-10", answer=1)
@@ -2241,3 +2243,28 @@ async def test_a_ledger_decide_marks_the_entrys_member(agent, repo, tmp_path, mo
                                                                       "answer": "blue"}  # fmt: skip
     assert agent._applying == {} and seen[-1] == {}
     assert pushed
+
+
+async def test_a_press_cancelled_during_its_first_push_leaves_no_mark(agent, repo, tmp_path, monkeypatch):
+    """TD-1508 review: a press cancelled while its mark's first push runs still clears its token."""
+    _gated(repo)
+    await _registered(agent, repo, tmp_path, monkeypatch)
+    gate = asyncio.Event()
+
+    async def hang(root):
+        if not gate.is_set():
+            gate.set()
+            await asyncio.sleep(30)
+
+    monkeypatch.setattr(agent, "_applying_push", hang)
+
+    async def press():
+        async with agent._applying_mark(repo, "board:k", "done"):
+            raise AssertionError("never reached")
+
+    t = asyncio.create_task(press())
+    await gate.wait()
+    t.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await t
+    assert agent._applying == {}
