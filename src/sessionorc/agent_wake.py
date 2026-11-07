@@ -254,11 +254,11 @@ class WakeMixin:
             self._ringing.pop(addr, None)
 
     async def _ring_node_once(self, s: Session, addr: str, *, retry: bool) -> None:
-        """One ring of a node's record, decided here and typed there. The budget and the watermark (or an
-        unread ring to repeat, TD-1488) are checked first and charged nothing; the `ring` act carries the
-        line built here, the record's `since` and a fresh token; the decision is recorded on `typed` alone. `busy` keeps no bell and is
-        looked at again next tick; `typed` and `failed` keep the bell for the stretch, a failure retried
-        once (the node writes `doorbell_failed` when the retry fails); no verdict is nothing at all."""
+        """One ring of a node's record, decided here and typed there. The budget and the watermark (or an unread ring to
+        repeat, TD-1488) are checked first and charged nothing; the `ring` act carries the line built here, the record's
+        `since` and a fresh token; the decision is recorded on `typed` alone. `busy` keeps no bell and is looked at
+        again next tick; `typed` and `failed` keep the bell for the stretch, a failure retried once (the node writes
+        `doorbell_failed` when the retry fails); no verdict is nothing at all."""
         fresh, again = mail.undecided_mail(s), self._ring_again(s, addr)
         if not (fresh or again) or (
             not any(e.uncharged for e in fresh) and mail.wake_budget_spent(s, datetime.now(UTC))
