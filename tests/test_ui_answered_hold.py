@@ -75,13 +75,16 @@ def test_ledger_for_you_carries_answered_while_the_question_owes(tmp_path):
 
 
 def test_a_bare_id_carried_by_two_repos_links_to_neither(tmp_path):
-    repos = _repos(tmp_path, "r", "s")
-    assert all(r["answered"] is None for r in _rows(repos, [_ask()]))
+    """An asker whose record names no repo: its bare id is looked up by the one-repo rule (TD-1509)."""
+    repos, nowhere = _repos(tmp_path, "r", "s"), [{**FLEET[0], "repo": ""}]
+    assert all(r["answered"] is None for r in _rows(repos, [_ask()], nowhere))
     # the Repo page passes one repo, and every repo's facts for the link's index
     one = {k: v for k, v in repos.items() if v["name"] == "r"}
-    assert _rows(one, [_ask()], every=repos)[0]["answered"] is None
-    assert _rows(one, [_ask()])[0]["answered"] is not None, "one repo alone: the bare id links"
-    assert _rows(one, [_ask(about="r#TD-60")], every=repos)[0]["answered"] is not None
+    assert _rows(one, [_ask()], nowhere, every=repos)[0]["answered"] is None
+    assert _rows(one, [_ask()], nowhere)[0]["answered"] is not None, "one repo alone: the bare id links"
+    assert _rows(one, [_ask(about="r#TD-60")], nowhere, every=repos)[0]["answered"] is not None
+    by = {r["name"]: r["answered"] for r in _rows(repos, [_ask()])}  # FLEET's asker works in r
+    assert by["r"] is not None and by["s"] is None, "an asker in r: r's TD-60, never s's"
 
 
 def test_a_done_outcome_draws_the_askers_line(tmp_path):
@@ -439,3 +442,15 @@ def test_a_stale_open_decided_line_is_a_need_standing_in_its_members_place(tmp_p
     assert _ids(_board_repos(tmp_path, [line], extra=[_build()])) == []
     got = board_answered({"decided": line["decided"]}, NOW.date().isoformat())
     assert got["stale"] and not board_waits(got)
+
+
+def test_ledger_for_you_reads_a_bare_ref_as_its_askers_repos(tmp_path):
+    """TD-1509 (§4.5 screen 6 *A bare ref elsewhere*): the Inbox's *ledger · your decision* row links a question as
+    the Queue's reading does — a bare `TD-60` from a session of repo `a` is never `b`'s, though `b` alone holds one
+    open; from a session of `b`, by its record's root named as the reading names it, it is."""
+    repos = _repos(tmp_path, "b")
+    in_a = [{**FLEET[0], "repo": str(tmp_path / "a")}]
+    (row,) = _rows(repos, [_ask()], in_a)
+    assert row["answered"] is None and row["answers"] == ["Yes", "No"]
+    (row,) = _rows(repos, [_ask()], [{**FLEET[0], "repo": str(tmp_path / "b")}])
+    assert row["answered"] is not None and row["answered"]["mid"] == "m-1"

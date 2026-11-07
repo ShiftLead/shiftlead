@@ -2559,6 +2559,10 @@ def ledger_for_you(
     linked = queue_mod.open_refs(
         opens, {n: o for n, r in readings.items() if (o := lb.origin_path(str(r.get("remote") or "")))}
     )
+    # a question's bare `TD-n` is its asker's repo's, as the Queue's reading links it (TD-1509)
+    roots = {n: str(r.get("root") or k) for k, r in (every if every is not None else repos or {}).items()
+             if isinstance(r, dict) and (n := str(r.get("name") or Path(str(r.get("root") or k)).name))}  # fmt: skip
+    askers = queue_mod.asker_repos(questions, fleet, roots)
     boards, claims, alive = _hold_inputs(readings, fleet, now)
     # an entry an open decided line covers has been answered: that line is its row now, a *Waiting on them* row
     # while it waits on its session (TD-565) — names it, names its parent while it carries `decision (paul)`, or
@@ -2618,6 +2622,7 @@ def ledger_for_you(
                     claims=claims,
                     entries=opens,
                     live=alive,
+                    asker_repo=askers,
                 )  # fmt: skip
                 if not owner
                 else None

@@ -113,25 +113,37 @@ def _repo_name(root: Any) -> str:
     return str(root or "").rstrip("/").rpartition("/")[2]
 
 
-def asker_repos(questions: Iterable[Any], records: Iterable[Any]) -> dict[str, str]:
+def asker_repos(
+    questions: Iterable[Any], records: Iterable[Any], roots: Mapping[str, str] | None = None
+) -> dict[str, str]:
     """`{mail id: repo}` for the person inbox's items (§4.5 screen 6 *A bare ref elsewhere*, TD-1509): a question's
     repo is its asker's record's — `from_` looked up in `records` (live, ended or kept; `Session`s or their view
-    dicts), its `repo` root's last component — else an orphaned question's `orphaned.repo` (a path: its last
-    component too); an item with neither is left out, and its bare refs stay bare."""
-    roots: dict[str, str] = {}
+    dicts) — else an orphaned question's `orphaned.repo`; either a checkout's root, named as the reading names it
+    (`roots`, `{name: root}`, the repo whose root it is) or else by its last component. An item with neither is
+    left out, and its bare refs stay bare."""
+    named: dict[str, str] = {}
+
+    def name_of(root: Any) -> str:
+        key = str(root or "")
+        if key and key not in named:
+            hit = next((n for n, r in (roots or {}).items() if _same_dir(key, r)), None)
+            named[key] = hit or _repo_name(key)
+        return named.get(key, "")
+
+    by_id: dict[str, Any] = {}
     for r in records:
         rid, root = _get(r, "id"), _get(r, "repo")
         if rid and root:
-            roots.setdefault(str(rid), _repo_name(root))
+            by_id.setdefault(str(rid), root)
     out: dict[str, str] = {}
     for q in questions:
         mid = _get(q, "id")
         if not mid:
             continue
-        repo = roots.get(naming.split_address(str(_get(q, "from_") or ""))[0], "")
+        repo = name_of(by_id.get(naming.split_address(str(_get(q, "from_") or ""))[0]))
         orphaned = _get(q, "orphaned")
         if not repo and isinstance(orphaned, Mapping):
-            repo = _repo_name(orphaned.get("repo"))
+            repo = name_of(orphaned.get("repo"))
         if repo:
             out[str(mid)] = repo
     return out
@@ -614,7 +626,7 @@ def reading(
     states = {str(r.id): str(getattr(r, "state", "") or "") for r in records}
     names = {str(r.id): str(getattr(r, "name", "") or r.id) for r in records}
     questions = list(questions)
-    askers = asker_repos(questions, records)  # a question's bare `TD-n` is its asker's repo's (TD-1509)
+    askers = asker_repos(questions, records, rs.roots)  # a question's bare `TD-n` is its asker's repo's (TD-1509)
     recs = [r for r in records if getattr(r, "state", "") not in ("exited", "closed") and not r.superseded_by]
     open_: dict[str, dict[str, Any]] = {}
     for name, r in rs.by_name.items():
