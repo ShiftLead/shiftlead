@@ -540,7 +540,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      first write and `origin/<default>` does not. That is the first write's alone: an entry that
      appears in the checkout's reading only after it (a person's session checking out a ledger branch) is
      told once, as any new id is, though its note's *read the ledger on `origin/main`* will not
-     find it there — the ledger read is the checkout's file; where the history cannot be read, the
+     find it there — the ledger read is the checkout's for an entry only the checkout holds (§4.4 *The
+     ledger is read against origin, as the board is*); where the history cannot be read, the
      reading at that tick. **A work order is never in the first write**: a decided line or a red PR's
      order that sat unclaimed while its member declared is told on the next tick — save one the member
      itself reported `done` (a `pr:<n>` by its ref or a `done`'s `pr`) while the reading that holds it,
@@ -581,8 +582,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      `dropped` removed with it, for a live member and a gone one alike, so an entry that leaves
      the lane and comes back is news once more — a live check whose `event (live…)` gates were
      lifted, a `Blocked by` that reopened and cleared, an `Owner:` that moved away and back; an id
-     the reading does not hold is kept, since an entry absent from the checkout's file is archived
-     or the checkout's moment, not the lane's. The reading is one function (`sessionorc.work`),
+     the reading does not hold is kept, since an entry absent from the ledger reading is archived
+     or origin's moment, not the lane's. The reading is one function (`sessionorc.work`),
      the memory pruned and the news read in one pass, so rule 6 and rule 8 never disagree on what is new; it keys on the id alone, since
      *matches the lane now and did not when last seen* is what being news means, and no kind or
      workability is written beside the id. The promote tells nobody itself: it is one of the ways
@@ -613,7 +614,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      team has wound down. A finished member closed while the team runs on — by rule 9's pass, by
      its manager, or by itself — is rule 8's *A member that finished while its team runs on*: told
      nothing where it sits, it is started again alone for what its lane gained. The ledger read is
-     the checkout's file at the home, so an entry counts from the moment that checkout holds it.
+     against origin (§4.4 *The ledger is read against origin, as the board is*), the checkout's only for an
+     entry only the checkout holds, so an entry counts from the moment either holds it.
   7. **Brief changed.** A member reads its brief once, at its start; a restart replays the brief's
      files, not the prompt its first start was handed. Two halves. **A replay reads the brief's
      files again.** The client that composes a brief (§4.8) hands the create, beside the filled
@@ -1949,7 +1951,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   it never touches a worktree (a member's home is its own, §4.9 *Home and reach*), and it never
   moves a checkout to a branch or a commit (that is the person's, and a rollback's tree is the host
   agent's own, §6 *A rollback*). *The tree is a person's* (§6 *Promote*) stands: the pull is the one
-  move the host agent makes in a person's checkout, and only ever a fast-forward.
+  move the host agent makes in a person's checkout, and only ever a fast-forward. What the views show does not
+  wait on it: the board and the ledger are read against origin (§4.4 *The ledger is read against origin, as
+  the board is*, TD-1471), so the pull moves the person's tree and the promote's precondition, and no
+  reading.
 - **Sync: a mechanical sync PR is merged at the home** (TD-681; steps 1 and 2 built as `sessionorc.sync.check`
   by TD-685 slice 1, and replaced by the bump's check, TD-1015; the pass, the evidence, the gate, the merge and the setting by slice 2, as
   `sessionorc.sync`'s pass functions and `agent_sync`; the Repos card's switch by slice 3; step 4's precheck by TD-1039; Paul,
