@@ -404,7 +404,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      no wait before it (§4.9 *Mail to a scaled seat*). Mail goes first to a free live record of the seat in place order (the seat,
      then its extras), so a warm idle extra takes it while the own record is held; where none is free and the
      seat's own record is not live — held after its linger, never filled, or `exited` — the own
-     record takes it and is filled on its cause as today (rule 1 restarts no seat's own record): the own record comes back before an
+     record takes it and is filled on its cause as today (rule 1 restarts no seat's own record, save the replay of a seat whose run never started, *A lost brief*): the own record comes back before an
      extra is added. **Each tick, by the state** and never by how the mail got there: a seat whose
      own record is live and busy, each live extra busy, and holding unread mail §4.9's *Mail to a scaled seat*
      lets move fills its lowest-placed held extra once one can be filled (not every extra live and busy, the
