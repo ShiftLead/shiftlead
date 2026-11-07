@@ -69,3 +69,10 @@ def test_ao_msgs_reply_prints_where_it_went_before_when_it_is_read(monkeypatch, 
     assert cli.main(["msg", "ao-x-techlead-ao-1", "--kind", "ask", "which test covers this?"]) == 0
     out = capsys.readouterr().out
     assert out.count("routed around") == 1 and out.index(LINE) < out.index("person: on the Inbox now")
+
+
+@pytest.mark.unit
+def test_the_homes_words_are_escaped():
+    hostile = {**ROUTED, "why": "<script>x</script>"}
+    html = rows("needs", [entry("m-1", "ask", text="which?", routed=hostile)])
+    assert "&lt;script&gt;" in html and "<script>x" not in html
