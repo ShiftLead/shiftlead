@@ -9,10 +9,10 @@ from __future__ import annotations
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-from test_ui_queue import NOW, client, fake, mail, queue
+from test_ui_queue import NOW, at, client, fake, mail, queue
 
 from sessionorc import notify
-from sessionorc.queue import KEPT, kept_or_loose, mail_card
+from sessionorc.queue import KEPT, kept_or_loose, mail_card, pr_refs
 from shiftlead.ui.inbox import inbox_sections
 from shiftlead.ui.queue import apply_picks, attach, card_index, queue_picks, queue_view
 
@@ -166,3 +166,88 @@ def test_a_running_steer_alone_leaves_its_kept_or_loose_card_steer():
     assert c["status"] == "steer" and v["n"]["needs_you"] == 1  # TD-30's alone
     _, v = view([steer], picks={"filter": "needs-you"})
     assert v["loose"][0]["off"]
+
+
+# -- slice 2: an item whose only anchor is a PR (§4.5 screen 6 *Every item that needs the person draws on a card*)
+
+
+def pr_view(entries, pr_refs):
+    q = {**queue(), "pr_refs": pr_refs}
+    secs = inbox_sections(list(entries), now=NOW, cards=card_index(q))
+    return secs, queue_view(q, NOW, attach(secs, drawn))
+
+
+def test_pr_refs_reads_open_prs_by_branch_then_title_and_recent_by_title_then_branch():
+    prs = {
+        "open": [
+            {"number": 160, "branch": "td20-split", "title": "TD-30: other words"},
+            {"number": 161, "branch": "fix-x", "title": "TD-21: the build"},
+            {"number": 162, "branch": "fix-y", "title": "no entry"},
+            {"number": 163, "branch": "fix-z", "title": "other#TD-9 upstream"},
+        ],
+        "recent": [
+            {"number": 160, "branch": "td40-x", "title": "TD-40"},  # open wins
+            {"number": 164, "branch": "td9-x", "title": "TD-3: the archived one"},
+            {"number": 165, "branch": "td9-x", "title": "no ref"},
+            {"number": True, "title": "TD-1"},
+            {"number": 162, "branch": "fix-y", "title": "TD-8: named in its month alone"},
+            {"number": 166, "branch": 7, "title": None},  # an odd shape reads as no entry, never raises
+        ],
+    }
+    assert pr_refs("s", prs) == {
+        "s#160": "s#TD-020",
+        "s#161": "s#TD-021",
+        "s#162": "s#TD-008",
+        "s#163": "other#TD-009",
+        "s#164": "s#TD-003",
+        "s#165": "s#TD-009",
+    }
+    assert pr_refs("s", None) == {} and pr_refs("s", {"error": "x"}) == {}
+
+
+def test_a_merge_ask_carrying_only_a_pr_draws_on_the_card_of_the_entry_its_pr_names():
+    ask = mail("m1", "merge it?", pr=164, repo="s")
+    secs, v = pr_view([ask], {"s#164": "s#TD-021"})
+    (a,) = secs["needs"]
+    assert (a["home"], a["on_card"], a["on_row"]) == ("queue", "s#TD-20", "s#TD-21")
+    assert a["tied"] == {"by": "pr", "ref": "s#TD-021"}
+    assert not v["loose"]  # none on `loose:s#164`
+    # with no repo (none stamped, no orphan stamp, no record) it has no repo to search: the Inbox
+    secs, v = pr_view([mail("m2", "merge it?", pr=164)], {"s#164": "s#TD-021"})
+    assert secs["needs"][0]["home"] == "inbox" and not v["loose"]
+
+
+def test_a_pr_only_item_whose_entry_is_on_a_completed_card_draws_on_that_kept_card():
+    secs, v = pr_view([mail("m1", "merge it?", pr=164, repo="s")], {"s#164": "s#TD-003"})
+    (a,) = secs["needs"]
+    assert (a["on_card"], a["on_row"], a["tied"]) == ("s#TD-3", "s#TD-3", {"by": "pr", "ref": "s#TD-003"})
+    assert [k["id"] for k in v["kept"]] == ["s#TD-3"]
+
+
+def test_a_pr_only_item_naming_no_entry_draws_on_its_prs_loose_card_counted_on_the_queue_tab():
+    steer = {**mail("m2", "which way?", kind="steer", about="#170", repo="s"), "paused_at": at(0)}
+    secs, v = pr_view([mail("m1", "merge it?", pr=170, repo="s"), steer], {})
+    homes = {e["id"]: (e["home"], e["on_card"], e["on_row"], e["tied"]) for e in secs["needs"]}
+    assert homes["m1"] == ("queue", "loose:s#170", "s#170", {"by": "pr", "ref": "s#170"})
+    assert homes["m2"] == homes["m1"]  # an `about` of `#n` is the same PR: one card
+    assert secs["queue_n"] == 2 and secs["count"] == 2
+    (c,) = v["loose"]
+    assert c["id"] == "loose:s#170" and c["top"]["show"] == "#170" and c["status"] == "needs you"
+    # an entry the PR names that no card holds: that entry's loose card, not the PR's
+    secs, v = pr_view([mail("m1", "merge it?", pr=170, repo="s")], {"s#170": "other#TD-009"})
+    assert secs["needs"][0]["on_card"] == "loose:other#TD-009"
+
+
+def test_a_pr_only_note_stays_in_the_inbox_and_an_ask_naming_an_entry_ignores_its_pr():
+    secs, _v = pr_view([mail("m1", "merged", kind="note", pr=164, repo="s")], {"s#164": "s#TD-021"})
+    assert secs["fyi"][0]["home"] == "inbox"
+    secs, _v = pr_view([mail("m2", "merge?", about="TD-20", pr=164, repo="s")], {"s#164": "s#TD-021"})
+    assert secs["needs"][0]["on_row"] == "s#TD-20"
+
+
+def test_telegrams_card_reads_a_pr_only_item_alike():
+    idx = card_index({**queue(), "pr_refs": {"s#164": "s#TD-021"}})
+    assert mail_card(None, "merge it?", idx, "s", True, 164) == ("s#TD-20", "s#TD-21")
+    assert mail_card("#170", "which way?", idx, "s", True) == ("loose:s#170", "s#170")
+    assert mail_card(None, "merge it?", idx, None, True, 164) is None
+    assert mail_card(None, "merge it?", idx, "s", False, 164) is None

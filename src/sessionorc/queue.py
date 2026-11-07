@@ -76,6 +76,9 @@ KEPT = "kept:"
 # a loose card's id, `loose:<ref>` (§4.5 screen 12 *In progress*, TD-1468): an item that needs the person and names
 # a ref no card holds, open or completed
 LOOSE = "loose:"
+# a PR's entry in `card_index`, keyed `pr:<repo>#<n>` to `("", <repo>#TD-n)` — no card's, the entry the PR names —
+# which only an item that needs the person and carries a PR alone reads (`pr_entry`, TD-1468)
+PR_KEY = "pr:"
 
 
 def card_index(reading: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
@@ -122,7 +125,40 @@ def card_index(reading: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
     for tid, qs in kept_bare.items():
         if len(qs) == 1:
             out[KEPT + tid] = out[KEPT + next(iter(qs))]
+    for pr, ref in ((reading or {}).get("pr_refs") or {}).items():
+        out.setdefault(PR_KEY + str(pr), ("", str(ref)))
     return out
+
+
+def pr_refs(name: str, prs: Mapping[str, Any] | None) -> dict[str, str]:
+    """`{<repo>#<n>: <repo>#TD-n}`: the entry each of a repo's PRs names (§4.5 screen 6 *Every item that needs the
+    person draws on a card*, TD-1468) — an open PR's by its branch, else its title; then a PR of its month
+    (`recent`) by its title, else its branch — each bare `TD-n` read as the repo's own (`own_refs`); an open PR
+    naming none is read again in `recent`, title first. A PR naming no entry is left out."""
+    out: dict[str, str] = {}
+    for which, order in (("open", ("branch", "title")), ("recent", ("title", "branch"))):
+        for pr in (prs or {}).get(which) or ():
+            if not isinstance(pr, Mapping) or not isinstance(pr.get("number"), int) or isinstance(pr["number"], bool):
+                continue
+            key = f"{name}#{pr['number']}"
+            if key in out:
+                continue
+            for field in order:
+                text = str(pr.get(field) or "")
+                got = [branch_ref(text)] if field == "branch" else refs(text)
+                if got := own_refs([r for r in got if r], name):
+                    out[key] = got[0]
+                    break
+    return out
+
+
+def pr_entry(index: Mapping[str, tuple[str, str]] | None, repo: str | None, pr: Any) -> str | None:
+    """The entry a PR names, `<repo>#TD-n`, as the reading's `pr_refs` read it (`card_index`'s `pr:` keys,
+    TD-1468); None for no `repo`, no PR, or a PR naming none."""
+    if not repo or not isinstance(pr, int) or isinstance(pr, bool):
+        return None
+    got = (index or {}).get(f"{PR_KEY}{repo}#{pr}")
+    return got[1] if got else None
 
 
 def own_refs(found: Iterable[str], repo: str | None) -> list[str]:
@@ -255,23 +291,58 @@ def kept_or_loose(named: Iterable[str], index: Mapping[str, tuple[str, str]] | N
     return LOOSE + named[0], named[0], named[0]
 
 
+_PR_ABOUT = re.compile(r"#(\d+)")
+
+
+def only_pr(pr: Any, about: Any) -> int | None:
+    """The PR an item carries as its only anchor (§4.5 screen 6 *Every item that needs the person draws on a card*,
+    TD-1468): its `pr`, else an `about` of the shape `#n`; None otherwise. The caller has found no entry ref in it."""
+    if isinstance(pr, int) and not isinstance(pr, bool):
+        return pr
+    m = _PR_ABOUT.fullmatch(" ".join(str(about or "").split()))
+    return int(m.group(1)) if m else None
+
+
+def pr_card(
+    pr: int | None, repo: str | None, index: Mapping[str, tuple[str, str]] | None
+) -> tuple[str, str, str] | None:
+    """Where an item that needs the person and carries a PR alone draws (TD-1468): `(card id, row qid, ref)` — the
+    open card that holds the entry the PR names (`pr_entry`), else that entry's kept or loose card
+    (`kept_or_loose`); with none named, the loose card of the PR itself, `loose:<repo>#<n>`. None — the Inbox —
+    with no `repo` (no repo to search, no key that is one repo's), no PR, or an empty `index`."""
+    if not index or not repo or pr is None:
+        return None
+    if entry := pr_entry(index, repo, pr):
+        if entry in index:
+            card, row = index[entry]
+            return card, row, entry
+        return kept_or_loose([entry], index)
+    ref = f"{repo}#{pr}"
+    return LOOSE + ref, ref, ref
+
+
 def mail_card(
     about: Any,
     words: str,
     index: Mapping[str, tuple[str, str]] | None,
     repo: str | None = None,
     needs: bool = False,
+    pr: Any = None,
 ) -> tuple[str, str] | None:
     """The `(card id, row qid)` a mail item is drawn on (§4.5 screen 6 *Where a row is drawn*): the first of its refs
     an open card holds (`held_refs`: its `about`'s, then those of `words`, its subject and text), a bare one read as
     `repo`'s — its sender's (`mail_repo`, TD-1467) — None — its home is the Inbox — where no card holds one, unless
     it `needs` the person (an open `ask` or `steer` to them), when it draws on its kept or loose card
-    (`kept_or_loose`, TD-1468). The Inbox's own `item_home` and Telegram's link (§4.10 *What a message says*,
-    TD-795) read it alike."""
+    (`kept_or_loose`, TD-1468) — one that names no entry but carries a PR (`pr`, or an `about` of `#n`) on the
+    card of the entry that PR names, else its PR's loose card (`pr_card`). The Inbox's own `item_home` and
+    Telegram's link (§4.10 *What a message says*, TD-795) read it alike."""
     held, _by = held_refs(about, words, index, repo)
     if held:
         return (index or {}).get(held[0])
-    got = kept_or_loose(named_refs(about, words, repo)[0], index) if needs else None
+    if not needs:
+        return None
+    named = named_refs(about, words, repo)[0]
+    got = kept_or_loose(named, index) if named else pr_card(only_pr(pr, about), repo, index)
     return got[:2] if got else None
 
 
@@ -1078,6 +1149,8 @@ def reading(
         "completed": _completed(archived, open_, names_open, closed_at, xref, now),
         "other_work": other,
         "origins": {n: o for n, o in rs.origins.items() if o},
+        # the entry each PR names, for an item that carries a PR alone (TD-1468)
+        "pr_refs": {k: v for n, r in rs.by_name.items() for k, v in pr_refs(n, r.get("prs")).items()},
         "at": now.isoformat(),
     }
 

@@ -72,7 +72,8 @@ def _card(
     set aside with a reviewer (`snoozed_for`), which the Inbox keeps."""
     if e.snoozed_for:
         return None
-    return queue_mod.mail_card(e.about, f"{e.subject or ''} {e.text or ''}", index, askers.get(e.id), needs)
+    words = f"{e.subject or ''} {e.text or ''}"
+    return queue_mod.mail_card(e.about, words, index, askers.get(e.id), needs, getattr(e, "pr", None))
 
 
 def _work_ids(mark: dict[str, Any]) -> list[str]:

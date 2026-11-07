@@ -3363,10 +3363,12 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         ref = str(entry["id"]) if entry is not None else ref  # the ledger's own spelling: a card's is `TD-009`
         cards: list[dict[str, Any]] = []
         origins: dict[str, str] = {}
+        pr_refs: dict[str, str] = {}  # the entry each PR names, for a PR-only item (TD-1468)
         with contextlib.suppress(HTTPException):  # an older home serves no `queue`: the prompt names the entry
             got = (await call("queue", omit=["completed"])) or {}
             cards = [c for c in got.get("cards") or [] if isinstance(c, dict)]
             origins = got.get("origins") or {}
+            pr_refs = got.get("pr_refs") or {}
         records = await call("list")
         if card_id:  # a Queue card: the entry is the card's `start` now, not *for you*
             card = next((c for c in cards if c.get("id") == card_id), None)
@@ -3396,7 +3398,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         walk = False  # the header's press on a card where two or more items count (TD-1340)
         if card is not None:  # every Decide and Do item, by its id (§4.5 screen 12 *Started from an item*)
             with contextlib.suppress(Exception):  # unread, *waits on me* is the card's ledger entries
-                got = (await card_mail(h, records, card_index({"cards": cards, "origins": origins})))[1]
+                index = card_index({"cards": cards, "origins": origins, "pr_refs": pr_refs})
+                got = (await card_mail(h, records, index))[1]
                 wants = card_wants((got.get("cards") or {}).get(str(card.get("id"))), "", False)
                 mine = waits_on_me(mine, wants)
                 # counted afresh at the press, whatever the page drew: with two or more the walk sentence, and
