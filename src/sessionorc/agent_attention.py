@@ -4,6 +4,7 @@ and who ended it — as a mixin `HostAgent` inherits. Moved as written; the stat
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import secrets
 from datetime import UTC, datetime
@@ -261,6 +262,10 @@ class AttentionMixin:
         if not todo or not self._repos:
             return
         roots = queue_mod.repo_roots(self._repos)
+        keys = {
+            name: next((k for k, r in self._repos.items() if (r or {}).get("root", k) == root), root)
+            for name, root in roots.items()
+        }  # a name to its reading's key in `_repos`
         graph = self._graph()
         names: dict[str, str] = {}  # a path, or a live record's root, to its registry name
         live: dict[str, str] = {}  # a sender's bare id to its root, for `mail_repo`
@@ -281,10 +286,13 @@ class AttentionMixin:
         at = now_iso()
         for e in todo:
             name = queue_mod.mail_repo(e, live, lambda root: names.get(str(root or ""), ""))
-            root = roots.get(name or "")
+            root = keys.get(name or "")
             if root is None:
                 continue
-            got = mail.work_settles(e, self._repos.get(root), self._archived.get(root))
+            try:
+                got = mail.work_settles(e, self._repos.get(root), self._archived.get(root))
+            except (TypeError, ValueError):  # one malformed row or stamp: this question waits, the rest settle
+                continue
             if got is None:
                 continue
             reason, pr = got
@@ -297,7 +305,7 @@ class AttentionMixin:
         host = str(host or "") or self.host
         try:
             if host == self.host:
-                return list(hosts.local_host().repos())
+                return list(await asyncio.to_thread(lambda: hosts.local_host().repos()))
             return await self._host_roster(host)
         except Exception:  # noqa: BLE001 — a registry unreadable: the question settles nothing this tick
             return []

@@ -172,6 +172,16 @@ async def test_a_merged_pr_closes_its_ask_on_the_tick_and_a_closed_one_does_not(
         first = next(e for e in agent.person_inbox if e.id == a).closed_at
         await agent._settle_by_work()
         assert next(e for e in agent.person_inbox if e.id == a).closed_at == first, "closed once"
+        async with LocalClient(caller=w) as c:  # a new ask about a PR already merged: not refused, closed next tick
+            late = (await c.call("msg", to="person", text="merge #164 now?", kind="ask", about="#164"))["entry"]["id"]
+        assert all(e.open for e in _copies(agent, late))
+        await agent._settle_by_work()
+        assert [e.closed_reason for e in agent.person_inbox if e.id == late] == ["merged"]
+        # a closed `merged` entry is pruned by retention from its `closed_at`
+        got = next(e for e in agent.person_inbox if e.id == a)
+        got.read_at = got.closed_at = _iso(datetime.now(UTC) - timedelta(days=30))
+        await agent._sweep_mail(datetime.now(UTC))
+        assert a not in [e.id for e in agent.person_inbox]
         await person.call("kill", id=w)
 
 
