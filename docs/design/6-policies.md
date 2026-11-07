@@ -1438,8 +1438,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        usage cap: resets 08:00Z — it is rung after*; *stuck 1h: the One more round on TD-1437 — ao-grind
        is held by its daily start cap: 3 idle starts today*). Where the person already sees the work as
        a row — a decided line, drawn under *Waiting on them* while it waits on its session — that row
-       **moves** while it is stuck and a need — at *waiting* it stays under *Waiting on them*, the stuck
-       words its line, uncounted — : to the card's Do group, or, its `Context:` naming no entry, under the
+       **moves** while it is stuck and a need (at *waiting* it stays under *Waiting on them*, the stuck
+       words its line, uncounted): to the card's Do group, or, its `Context:` naming no entry, under the
        Inbox's *Needs you*, with the stuck words as a line under it, never a second row (`ao card` prints it as the stuck row, its id the `stuck` key and its kind *stuck*); it goes back
        under *Waiting on them* the tick an actor acts; while the line's item carries `applying` (§4.4 *A
        press is drawn as it lands*) the row reads as the mark says and the stuck row makes no *needs you*,
@@ -1462,7 +1462,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      - **A send that did not land.** A session's `ao` that finds no host agent exits 3 (§4.8a *With no
        host agent to ask*), and to a session says so — after a verb that writes a missed mark (below):
        *error: the host agent is down — this did not land: end your turn and run it again when you are rung*;
-       after any other verb, which writes none, so no note rings it: *error: the host agent is down — nothing was done: end your
+       after any other verb, which writes none, so no note rings it: *error: the host agent is down — nothing was
+       done: end your
        turn and run it again*, without `missed` (the session branch's `hint`, under
        `--json` too, which also carries `missed: true` after a marked verb; a restart under the command keeps *run it
        again* and writes no mark). Before it exits, a verb a session files with (§4.7: those that call the host agent to file — `msg`, `td add`, `td reserve`, `progress`, `doing`,
