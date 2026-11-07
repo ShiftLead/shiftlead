@@ -415,7 +415,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      fill, and a second ask that landed on a closed seat behind the first before its fill, are one case. The same
      pass moves unread mail left on an extra that is not live (held, closed, or `exited` and not restarted) to
      the seat's first free live record, else to the own record filled on its cause (§4.9 *Mail to a scaled
-     seat*); the send's choice of record and its delivery are one step under the lock that serializes `create`
+     seat*); the send's choice of record and its delivery are one step under the lock, new with td-max, that serializes `create`
      and the eviction.
      **The cause pass never fills an extra**: `seat_due` and a seat's fill on its cause pass over a record
      carrying `scale`, whose fills are the send's and this mover's alone, both reading `scale.live`. An idle record, one lingering, is free and takes its mail
