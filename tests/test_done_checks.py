@@ -374,7 +374,8 @@ async def test_an_ask_with_a_pr_is_refused_on_failed_and_on_pending_and_sends_no
         await w.call("msg", to=["person"], text="read #842", kind="ask", pr=842)
     views[842] = _view(_run("test", "IN_PROGRESS", ""))
     with pytest.raises(
-        AgentError, match=r"still running on 9c1e0f2: test — ask again once they pass \(`ao pr wait 842`, in the background\)"
+        AgentError,
+        match=r"still running on 9c1e0f2: test — ask again once they pass \(`ao pr wait 842`, in the background\)",
     ):
         await w.call("msg", to=["person"], text="read #842", kind="ask", pr=842, nonce="n-1")
     assert rec.outbox == [] and agent.person_inbox == []

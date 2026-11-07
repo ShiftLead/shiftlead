@@ -3815,7 +3815,9 @@ class HostAgent(
         if slice and word != "merged":
             raise RpcError(f"a slice is a merged PR — #{pr} is {'closed unmerged' if word == 'closed' else 'open'}")
         again = f"report done again (ao progress done {ref} --pr {pr})"
-        if refusal := self._not_green(pr, got, again, f"report done once they pass (`ao pr wait {pr}`, in the background)"):
+        if refusal := self._not_green(
+            pr, got, again, f"report done once they pass (`ao pr wait {pr}`, in the background)"
+        ):
             raise refusal
         if word == "not_run":  # after a real failure, before one still running (TD-686)
             raise self._not_run_refusal(pr, ref, got)
@@ -3844,7 +3846,9 @@ class HostAgent(
         got = await self._pr_checks(s, pr)
         if got["word"] == "unknown":
             return f"PR #{pr}: checks unknown: {got['why']}"
-        if refusal := self._not_green(pr, got, "ask again", f"ask again once they pass (`ao pr wait {pr}`, in the background)"):
+        if refusal := self._not_green(
+            pr, got, "ask again", f"ask again once they pass (`ao pr wait {pr}`, in the background)"
+        ):
             raise refusal
         if got["word"] == "not_run":  # §4.9b names no refusal for it: the ask sends, saying so (TD-686)
             reason = (got.get("not_run_why") or {}).get("reason") or "unknown"
