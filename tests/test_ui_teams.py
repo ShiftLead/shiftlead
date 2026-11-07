@@ -1015,6 +1015,7 @@ def test_a_live_team_whose_records_differ_reads_flow_changed_and_apply_relaunche
         "prompt",
         "prompt_from",
         "review",
+        "seat",  # always handed: the definition's seat, or None (TD-1455)
     ]
     assert client.post("/api/teams/nobody/flow/apply").status_code == 400
 

@@ -190,7 +190,7 @@ def _running(p: teams.Plan, without: tuple[str, ...] = ("tl",)) -> list[dict]:
     """A live record of every launch but `without`'s: the team as it ran before it had that seat."""
     rec = {"team": "t", "state": "working"}
     return [
-        {**rec, "id": f"ao-alpha-{x.name}", "name": x.name, "lane": x.lane, "review": x.review}
+        {**rec, "id": f"ao-alpha-{x.name}", "name": x.name, "lane": x.lane, "review": x.review, "seat": x.seat_params()}
         for x in p.launches
         if x.name not in without
     ]
@@ -209,7 +209,7 @@ def test_a_seat_the_run_lacks_is_a_start_under_a_flow_or_none_and_one_with_a_rec
     # a member a team with no flow lacks is no difference (no flow compiles it)
     assert [x.name for x in teamrun.differences(p, _running(p, ("tl", "g")))] == ["tl"]
     for state in ("working", "closed"):
-        rec = {"id": "ao-alpha-tl", "name": "tl", "team": "t", "state": state, "seat": {"trigger": "asks"}}
+        rec = {"id": "ao-alpha-tl", "name": "tl", "team": "t", "state": state, "seat": p.techlead.seat_params()}
         assert teamrun.differences(p, [*live, rec]) == []
     p.flow = "td"
     starts = [d for d in teamrun.differences(p, live) if d.act == "start"]

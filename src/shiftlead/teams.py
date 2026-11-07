@@ -160,11 +160,16 @@ class Launch:
             # every session a team start creates is one someone chose to keep running (§6, TD-103)
             "supervised": True,
             # a seat's ending is its own: the record says it is one, so no crash restart acts on it
-            **({"seat": {**self.trigger, **({"tags": True} if self.tags else {})}} if self.trigger else {}),
+            **({"seat": self.seat_params()} if self.trigger else {}),
             **({"review": dict(self.review)} if self.review else {}),
             **({"context_bound": self.context_bound} if self.context_bound else {}),
             **({"prompt_from": self.prompt_from} if self.prompt_from else {}),
         }
+
+    def seat_params(self) -> dict[str, Any] | None:
+        """The `seat` a create writes on the record (`{**trigger, tags?}`), or None for no seat: what Apply
+        compares a record's `seat` with, whole, and hands the home's `relaunch` (§4.9c, TD-1435)."""
+        return {**self.trigger, **({"tags": True} if self.tags else {})} if self.trigger else None
 
 
 @dataclass

@@ -927,6 +927,7 @@ class Difference:
     record: dict[str, Any] | None = None
     launch: teams.Launch | None = None
     seat: bool = False  # a seat the definition names that the run has no record of (§4.9c, TD-399)
+    node: bool = False  # a member of a node, whose record takes a seat line at its next replay (TD-1435)
 
     def line(self, flow: str | None) -> str:
         if self.act == "rename" and self.launch is not None:
@@ -940,17 +941,21 @@ class Difference:
         if self.act == "left":
             return f"{self.name}: sits out under {flow} — a person's session, left running: close it yourself"
         if self.definition:  # its profile alone (TD-619): *techlead-ao-1: profile grind-fable → grind (next restart)*
-            return f"{self.name}: {'; '.join(self.what)} (next restart)"
+            # a seat's line alone is written on the home's record at once (TD-1435)
+            now = not self.node and all(w.startswith("seat ") for w in self.what)
+            return f"{self.name}: {'; '.join(self.what)} ({'written now' if now else 'next restart'})"
         return f"{self.name}: relaunched — {'; '.join(self.what)}"
 
     @property
     def definition(self) -> bool:
-        """A relaunch whose one difference is the profile the definition names (§4.9c *Switching*,
-        TD-619): the definition's, which a flow does not compile, so the mark reads **definition
+        """A relaunch whose differences are the profile and the seat the definition names (§4.9c *Switching*,
+        TD-619, TD-1435): the definition's, which a flow does not compile, so the mark reads **definition
         changed** where nothing else differs. A rename and a removal are the definition's too (TD-703)."""
         if self.act in MOVED:
             return True
-        return self.act == "relaunch" and bool(self.what) and all(w.startswith("profile ") for w in self.what)
+        return (
+            self.act == "relaunch" and bool(self.what) and all(w.startswith(("profile ", "seat ")) for w in self.what)
+        )
 
     def as_dict(self, flow: str | None) -> dict[str, Any]:
         rec = self.record or {}
@@ -1054,6 +1059,19 @@ def _profile_moved(record: dict[str, Any], x: teams.Launch) -> list[str]:
     one it runs next; nothing where they match."""
     was, now = _next_profile(record), x.profile or ""
     return [] if was == now else [f"profile {was or 'default'} → {now or 'default'}"]
+
+
+def _seat_moved(record: dict[str, Any], x: teams.Launch) -> list[str]:
+    """The seat line, *seat asks → none*, where the record's `seat` is not the definition's, compared
+    whole (§4.9c *Switching*, TD-1435): each named by its trigger, *none* for no seat."""
+    was, now = record.get("seat") or None, x.seat_params()
+    if was == now:
+        return []
+
+    def trigger(seat: Any) -> str:
+        return str(seat.get("trigger") or "?") if isinstance(seat, dict) else "none"
+
+    return [f"seat {trigger(was)} → {trigger(now)}"]
 
 
 def _review_key(review: Any) -> Any:
@@ -1163,10 +1181,13 @@ def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Differ
                     out.append(Difference(x.name, "start", launch=x, seat=True))
                 continue
             seat = x.name in seats or rec.get("seat") is not None
-            if persons(rec) or rec.get("sit_out") or sat_out(rec) or (rec.get("state") in DEAD and not seat):
+            if persons(rec) or rec.get("sit_out") or sat_out(rec):
                 continue
-            if what := _profile_moved(rec, x):
-                out.append(Difference(x.name, "relaunch", what, record=rec, launch=x))
+            what = _seat_moved(rec, x)  # live, ended or closed (TD-1435)
+            if not (rec.get("state") in DEAD and not seat):
+                what += _profile_moved(rec, x)
+            if what:
+                out.append(Difference(x.name, "relaunch", what, record=rec, launch=x, node=bool(x.host)))
         return out
     out: list[Difference] = list(moved)
     for name in plan.sit_out:
@@ -1188,12 +1209,14 @@ def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Differ
             continue  # still winding down from a sit-out: once the home has closed it, it reads `start`
         if persons(rec):
             continue  # a person's lane, brief and profile are theirs
+        seat_what = _seat_moved(rec, x)  # live, ended or closed (TD-1435)
         if rec.get("state") == "closed":
             # a closed member is the next Start's, but a seat's next fill replays its record (TD-619)
-            if (x.name in seats or rec.get("seat") is not None) and (what := _profile_moved(rec, x)):
-                out.append(Difference(x.name, "relaunch", what, record=rec, launch=x))
+            what = seat_what + (_profile_moved(rec, x) if x.name in seats or rec.get("seat") is not None else [])
+            if what:
+                out.append(Difference(x.name, "relaunch", what, record=rec, launch=x, node=bool(x.host)))
             continue
-        what = []
+        what = list(seat_what)
         runs = _next_run(rec)
         if list(runs.get("lane") or []) != list(x.lane):
             what.append(f"lane {', '.join(runs.get('lane') or []) or 'none'} → {', '.join(x.lane) or 'none'}")
@@ -1205,7 +1228,7 @@ def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Differ
             what.append(f"stage {_short(was)} → {_short(now)}")
         what += _profile_moved(rec, x)
         if what:
-            out.append(Difference(x.name, "relaunch", what, record=rec, launch=x))
+            out.append(Difference(x.name, "relaunch", what, record=rec, launch=x, node=bool(x.host)))
     return out
 
 
@@ -1554,6 +1577,8 @@ def relaunch_params(x: teams.Launch) -> dict[str, Any]:
         "lane": list(x.lane),
         "review": x.review,
         "profile": x.profile or "",
+        # always handed: the definition's whole seat, or None so the home removes a stray one (TD-1435)
+        "seat": x.seat_params(),
     }
 
 
