@@ -57,8 +57,10 @@ teams:                                        # per team, by the name org.yml or
     flow: build-review                        # §4.9c: which of the team's flows it runs now; absent, the first
     balance: {prs: 10, oldest: 2d, review: true}   # §6 *Balance*: over any of these the team's members take no new claim; absent, no rule
     size: {grinder-ao: 3}                     # §4.9 *A team's size* (TD-1149): sessions per member line, by its name:, over its count:; a line absent runs its count
+    max: {grinder-ao: 6, techlead-ao-1: 3}    # §4.9 *Scaling with the work* (td-max, TD-1529): the most sessions a worker line or an asks seat runs while work waits on all it has, by its name:; past the size, extras written held and filled by §6 rules 3 and 14; absent or at the size, no scaling; refused on the manager, plain roles, seats on other triggers, pools and stageless lanes
 permissions:                                  # TD-636, §4.9b *The director seat*: per role, the adapter's rule syntax; a deny wins
   grinder: {allow: ["Bash(pdm run test:*)", "Bash(gh pr view:*)"], deny: ["Bash(rm -rf:*)"]}
+scale: {live: 6}                              # TD-1529, §4.9 *Scaling with the work*: the most td-max extras live at once on one host, over every team that runs there; six when absent
 sweep: {on: false, every: 7d, profile: grind}   # TD-1061, §4.9b *The sweep*: on, ao team start gives every team it starts a sweeper seat, one filled per repo, due once its board's Swept: stamp is `every` old (read each tick); profile from the next start, absent the role's precedence; a team's own sweeper seat wins
 director: {level: conservative, groom: 7d}    # TD-657, §4.9b *The director answers what is passed up to it*: conservative | extrapolate | liberal; groom every <duration> | off
 repos:                                        # per registered checkout, by its directory name
