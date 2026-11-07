@@ -133,8 +133,8 @@ def card_index(reading: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
 def pr_refs(name: str, prs: Mapping[str, Any] | None) -> dict[str, str]:
     """`{<repo>#<n>: <repo>#TD-n}`: the entry each of a repo's PRs names (§4.5 screen 6 *Every item that needs the
     person draws on a card*, TD-1468) — an open PR's by its branch, else its title; then a PR of its month
-    (`recent`) by its title, else its branch — each bare `TD-n` read as the repo's own (`own_refs`). A PR naming
-    no entry is left out."""
+    (`recent`) by its title, else its branch — each bare `TD-n` read as the repo's own (`own_refs`); an open PR
+    naming none is read again in `recent`, title first. A PR naming no entry is left out."""
     out: dict[str, str] = {}
     for which, order in (("open", ("branch", "title")), ("recent", ("title", "branch"))):
         for pr in (prs or {}).get(which) or ():
@@ -144,8 +144,8 @@ def pr_refs(name: str, prs: Mapping[str, Any] | None) -> dict[str, str]:
             if key in out:
                 continue
             for field in order:
-                text = pr.get(field)
-                got = ([branch_ref(text)] if branch_ref(text) else []) if field == "branch" else refs(text)
+                text = str(pr.get(field) or "")
+                got = [branch_ref(text)] if field == "branch" else refs(text)
                 if got := own_refs([r for r in got if r], name):
                     out[key] = got[0]
                     break

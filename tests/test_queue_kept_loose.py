@@ -190,11 +190,14 @@ def test_pr_refs_reads_open_prs_by_branch_then_title_and_recent_by_title_then_br
             {"number": 164, "branch": "td9-x", "title": "TD-3: the archived one"},
             {"number": 165, "branch": "td9-x", "title": "no ref"},
             {"number": True, "title": "TD-1"},
+            {"number": 162, "branch": "fix-y", "title": "TD-8: named in its month alone"},
+            {"number": 166, "branch": 7, "title": None},  # an odd shape reads as no entry, never raises
         ],
     }
     assert pr_refs("s", prs) == {
         "s#160": "s#TD-020",
         "s#161": "s#TD-021",
+        "s#162": "s#TD-008",
         "s#163": "other#TD-009",
         "s#164": "s#TD-003",
         "s#165": "s#TD-009",
