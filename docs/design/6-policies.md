@@ -1457,7 +1457,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        stuck words are a line under it alone, and the work's own row stays where it was, in no number: one
        counted item for one cause (§4.5 screen 6, TD-1500); a moved row is counted while it is stuck. On
        two surfaces — the holder's row on one card and the work on another, or one on a card and the other in
-       the Inbox (a stuck line with no `Context:`, or a holder that holds no card's entry); both in the Inbox
+       the Inbox (a stuck line with no `Context:`, or a holder that holds no card's entry), or a line whose `Context:` names a card
+       other than the holder's; both in the Inbox
        is one surface, as above — each row is drawn on its own,
        the stuck row's words ending *— its holder row is on <TD-n>* or *— its holder row is in the
        Inbox*. Several stuck works with the same actor and reason draw each row, the first by its open
