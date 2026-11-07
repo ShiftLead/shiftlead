@@ -1720,7 +1720,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   fifteen seconds, `PROMOTE_WATCH`, while it is in flight), and the agent that judges it need not be
   the one that started it — a restart mid-run finds the file and carries on. Live reads the wanted
   commit **and the run has ended** (`alive(pid, started)` false, TD-1031: *The smoke*, *When and
-  where*) → done (where the run's tree's block has `smoke:`, once the smoke passes, *The smoke* below): the file cleared, any failure standing cleared, **`done`** written into `last.json` (*The live ref*, below) and a `system` note to the person inbox, *promoted `<repo>`
+  where*) → done (where the run's tree's block has `smoke:`, once the smoke passes, *The smoke* below): the file cleared, **`done`** written into `last.json` (*The live ref*, below) and a `system` note to the person inbox, *promoted `<repo>`
   `<sha>` — n commits* (FYI, uncounted, §4.10); the wheel and the nodes follow §4.4a. The process
   gone with live still elsewhere, or `PROMOTE_BOUND` (twenty minutes) passed — the process killed at
   the bound as the stop time kills, and only while it is still the run: the intent keeps the
@@ -1729,7 +1729,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   beside it, the Inbox row under *Needs you*, and **a failure blocks only the commit it failed at**
   (TD-1554, Paul's Hold on TD-1437). The commit it blocks is `failed.json`'s **`blocks`**: a promote's own
   `sha`; a rollback's `from`, the commit it went back from (a person's rollback or the smoke's: what was
-  judged bad, never the old commit it failed to reach, which `auto` would never start). `auto` starts
+  judged bad, never the old commit it failed to reach, which `auto` would never start), and nothing when
+  that `from` was not read (`SHIFTLEAD_PROMOTE_FROM` empty: `blocks` null); a `failed.json` written before
+  `blocks` was blocks its `sha`. `auto` starts
   nothing while main's head is that commit, and retries once main's head moves past it — a run at the new
   head, the settle and the wait as ever, the row reading the policy's clock (§4.5a) meanwhile. A person's
   press — Promote of main's head, that commit among them (a retry is the person's word), or a rollback
@@ -1737,7 +1739,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   rollback — once the run has started: under the promote lock, after `start` returns with the intent
   written, so a start that raises (its tree not made, its process not spawned) leaves the failure as it
   was, and `failed.json` and `inflight.json` never stand together. A run that fails writes its own in its
-  place. Nothing else clears it: there is no Dismiss. Sessions are never told: no send, no state change; they
+  place. **A reading clears it too** when main's head has moved past `blocks` and live reads main's head
+  (installed there by hand): no start is left to clear it, and nothing remains for it to block. Nothing else
+  clears it: there is no Dismiss. Sessions are never told: no send, no state change; they
   live in tmux and survive a restart of the home, an attached Focus reconnects under §4.6's
   contract, and a blocked `wait` ends with the socket as §4.7 says. This repo's block is CLAUDE.md's
   pair: `run` rebuilds the live venv from the checkout (its path from where it runs, never written
@@ -1790,7 +1794,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   main's head is nothing for the policy to promote, so a hand install under `auto` is tagged by the next run
   that concludes, after the next merge. A hand install of an older commit is tagged by a rollback to it
   (`ao promote --sha`), as any going back is: a rollback whose commit is live already is refused only when a
-  run finished at it, so this one is taken, runs that commit again and tags it when it concludes.
+  run finished at it, so this one is taken, runs that commit again and tags it when it concludes. Its `from`
+  is its own commit, so it **writes no hold** (none stood for the hand install, and a hold *rolled back from*
+  itself would name nothing; one standing already is kept as it is), and its failed smoke rolls nothing
+  back; `auto` goes on as it would after the hand install, which is why CLAUDE.md's going back by hand turns
+  `auto` off first.
   The sha compared is the ref's own object as `ls-remote`
   prints it (`--refs` leaves out an annotated tag's peeled `^{}` line), so an annotated tag (its tag
   object's sha) never reads as at the live commit. A read that
@@ -1882,7 +1890,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     the note reads *rolled back `<repo>` to `<sha7>` from `<sha7>` — main is n commits ahead*. The
     wheel and the nodes follow as after any promote: the run writes the wheel of what it installed,
     and that is the newest.
-  - **The hold.** A rollback whose `check` reads its commit writes `~/.shiftlead/promotes/<repo>/held.json` (before its smoke, if it has one, *The smoke*) — `{sha,
+  - **The hold.** A rollback whose `check` reads its commit, its `from` another commit (*A copy installed by hand*), writes `~/.shiftlead/promotes/<repo>/held.json` (before its smoke, if it has one, *The smoke*) — `{sha,
     from, main, at}`, with `by` and `why` when a failed smoke started it (*The smoke*) — and the reading carries it as `held`. **While it stands the policy starts
     nothing for that repo**, whatever `auto` says and however far main moves: the commit the person
     went back from is still on main, and a later merge that is not its cure would put it live again.
