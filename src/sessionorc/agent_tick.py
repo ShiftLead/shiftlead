@@ -5097,6 +5097,8 @@ class TickMixin:
         pending = m.pending
         if pending is None or m.state != "limited" or s.state != "limited" or not s.limited_reset:
             return pending
+        if not getattr(m, "resets", None):
+            return pending  # a rule that names no reset is given none (review of #3081)
         return dataclasses.replace(pending, text=screen_mod.resets_text(pending.text, _parse(s.limited_reset)))
 
     def _hook_fresh(self, sid: str, now: datetime) -> bool:
