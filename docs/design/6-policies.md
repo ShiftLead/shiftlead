@@ -540,7 +540,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      first write and `origin/<default>` does not. That is the first write's alone: an entry that
      appears in the checkout's reading only after it (a person's session checking out a ledger branch) is
      told once, as any new id is, though its note's *read the ledger on `origin/main`* will not
-     find it there — the ledger read is the checkout's file; where the history cannot be read, the
+     find it there — the ledger read is the checkout's for an entry only the checkout holds (§4.4 *The
+     ledger is read against origin, as the board is*); where the history cannot be read, the
      reading at that tick. **A work order is never in the first write**: a decided line or a red PR's
      order that sat unclaimed while its member declared is told on the next tick — save one the member
      itself reported `done` (a `pr:<n>` by its ref or a `done`'s `pr`) while the reading that holds it,
