@@ -1405,6 +1405,9 @@ def read(
         "origin": cmp.origin,
         "at": now.isoformat(),
     }
+    if rank_text is not None and archive is not None:  # what the rank's prune may weigh, read once (TD-1515)
+        known = ids_in(archive) | {str(e["id"]) for e in got}
+        out["rank_lined"] = [t for t in lb.rank(rank_text)[0] if t in known]
     gone = archived_entries(archive)
     if not with_history:
         return out, gone
@@ -1447,6 +1450,8 @@ def reading(
     origin, windows, recent, at}`, or `{path, error}` when the file cannot be read, or the compare against origin
     failed. Each file is read against `origin/<default>` as last fetched (`compare`, §4.4 *The ledger is read
     against origin, as the board is*, TD-1471), and `origin` says where it came from: `{source, case, files}`.
+    `rank_lined` is the ids the rank file gives a line that are open or archived, read through the same compare —
+    what the rank's prune weighs (`RankMixin._rank_lined`, TD-1515) — absent with no rank file or no archive.
     The archive beside the ledger
     (`archive_path`; none there, nothing archived) and `resolve` — the home's `Registry` — derive each entry's
     `pickable`; `live` — the home's `LiveReader` — a live check's `live`; the rank file beside the ledger
