@@ -2982,13 +2982,8 @@ class TickMixin:
         # undecided mail, so one read and left open is named here; an answer to its own question is a seat's alone
         n = s.asks_waiting(home=self.host)
         h = s.asks_waiting(home=self.host, handed_only=True) if n else 0
+        # an entry the person handed it is named once, by `owed()`'s clause, which reads the inbox's handed half too
         parts = [f"you have {n - h} questions waiting — run `ao inbox`"] if n > h else []
-        if h:
-            parts.append(
-                f"{h} {'entry' if h == 1 else 'entries'} the person handed you "
-                f"{'owes its' if h == 1 else 'owe their'} outcome — "
-                '`ao msg person --outcome done|blocked|dropped "…" --for <id>`'
-            )
         owed = self._owed_part(s.owed())
         parts += [owed] if owed else []
         minutes = int(IDLE_NUDGE.total_seconds() // 60)

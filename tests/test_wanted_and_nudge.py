@@ -233,6 +233,18 @@ async def test_a_member_that_is_no_seat_is_nudged_for_the_questions_waiting_on_i
         ]  # fmt: skip
         assert agent._nudge_line(rec) is None
 
+        # a passed-up question is the person's now; a handed entry is named once, as the outcome it owes
+        rec.inbox = [
+            _asked("m-8", sid, at, passed_up=True),
+            _asked("m-9", sid, at, from_="person", handed=True),
+        ]
+        rec.outbox = []
+        assert rec.owed() == ["m-9"]
+        assert agent._nudge_line(rec) == (
+            "[shiftlead] you have been idle 20 minutes: you owe 1 outcome on m-9 — "
+            '`ao msg person --outcome done|blocked|dropped "…" --for m-9`'
+        )
+
         # a member that declared is not nudged for its questions
         rec.inbox, rec.outbox = [_asked("m-7", sid, at)], []
         rec.out_of_work = {"at": at, "why": "nothing open"}
