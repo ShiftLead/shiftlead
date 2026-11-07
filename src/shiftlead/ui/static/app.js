@@ -1059,6 +1059,36 @@
     };
   };
   let mailAttach = null;
+  // §4.5 screen 12 *Three verbs: Answer* (TD-1555): the item an Answer… answers, named from the pressed button —
+  // its kind, and on a Queue card the item's *on <ref>* — so the box says which item it writes to.
+  // On 2026-11-07 a press meant for a board line landed on another card's ask after a re-read moved the cards,
+  // and the box, titled only *Reply to <sender>*, did not show it.
+  AO.answerItem = function (b) {
+    const row = b && b.closest ? b.closest(".mailrow") : null;
+    if (!row) return "";
+    const prev = row.previousElementSibling, on = prev && prev.matches && prev.matches(".qon") ? prev.dataset.on || "" : "";
+    const act = b.dataset.act || "", kind = row.dataset.kind || "";
+    const bk = b.dataset.key || "";  // a line's `board:<key>`, as the board names it
+    const what = act.startsWith("board") || kind === "board" ? `the board line${bk ? ` ${bk.startsWith("board:") ? bk : `board:${bk}`}` : ""}`
+      : act.startsWith("ledger") || kind === "ledger" ? `the entry ${b.dataset.ref || ""}`.trim()
+      : kind ? `the ${kind}` : "";
+    return [what, on && !what.includes(on) ? `on ${on}` : ""].filter(Boolean).join(" ");
+  };
+  // the pressed item's row key (`data-msg`), which a re-read keeps for the same item
+  AO.answerRow = (b) => { const row = b && b.closest ? b.closest(".mailrow") : null; return (row && row.dataset.msg) || ""; };
+  // words typed for an item whose box a re-read closed (the item left the page), by its row key: offered again
+  // when the person opens Answer… on the same item
+  AO.keptWords = AO.keptWords || {};
+  // the open box's item, while it is open: a re-read that takes the item off the page closes the box, its words
+  // kept (TD-1555). A re-read that moves the item, or the cards round it, changes nothing: the box sends what it
+  // was opened on
+  AO.composeGone = function (dlg, row, text) {
+    if (!row || !dlg.open || document.querySelector(`.mailrow[data-msg="${CSS.escape(row)}"]`)) return false;
+    if (text.trim()) AO.keptWords[row] = text;
+    dlg.close("gone");
+    AO.toast(text.trim() ? "the item changed — your words are kept: Answer… on it again to send them" : "the item changed — the box was closed", false);
+    return true;
+  };
   AO.compose = function (o) {
     const dlg = $("#mailbox");
     if (!mailAttach && $("#mailattach")) {
@@ -1069,7 +1099,8 @@
       );
     }
     if (mailAttach) mailAttach.open(o.id);
-    $("#mailtitle").textContent = o.reply ? `Reply to ${o.to}` : `Message ${o.to}`;
+    // a Reply names the item it answers, not only the addressee (TD-1555)
+    $("#mailtitle").textContent = o.reply ? `Reply to ${o.to}${o.item ? ` · ${o.item}` : ""}` : `Message ${o.to}`;
     $("#mailkindrow").hidden = !!o.reply;
     // §4.8 (TD-171): the role's line, the definition's words as text; a Reply shows none — the
     // sender chose already
@@ -1078,6 +1109,8 @@
     const q = AO.quoteText(o.quote);
     $("#mailquote").textContent = q ? `re: “${q.length > 160 ? q.slice(0, 160) + "…" : q}”` : "";
     $("#mailkind").value = "ask"; $("#mailabout").value = ""; $("#mailtext").value = o.text || "";  // an ask by default (§4.5a **Message**, 2026-09-25)
+    // words a re-read's close kept for this item (TD-1555) come back, once
+    if (o.row && AO.keptWords[o.row]) { $("#mailtext").value = AO.keptWords[o.row]; delete AO.keptWords[o.row]; }
     // §4.10 *When it is read* (TD-168): the addressee's pair, from its record's view, never a
     // request; a reply reads as a note does, and switching the kind swaps the sentence
     const when = $("#mailwhen");
@@ -1087,8 +1120,13 @@
       };
       $("#mailkind").onchange = show; show();
     }
+    // while the box is open, every swap of the page is checked for its item (TD-1555): one observer, gone with the box
+    const watch = o.row && typeof MutationObserver === "function"
+      ? new MutationObserver(() => { if (AO.composeGone(dlg, o.row, $("#mailtext").value)) watch.disconnect(); }) : null;
+    if (watch) watch.observe(document.body, { childList: true, subtree: true });
     return new Promise((resolve) => {
       dlg.addEventListener("close", () => {
+        if (watch) watch.disconnect();
         const text = $("#mailtext").value;
         // `empty`: a send with no words is still a send (Done…'s and Back to design…'s line is optional)
         resolve(dlg.returnValue === "send" && (text.trim() || o.empty) ? { text, kind: $("#mailkind").value, about: $("#mailabout").value.trim() } : null);
@@ -1399,6 +1437,9 @@
       return;
     }
     const id = b.dataset.id, action = b.dataset.act;
+    // §4.5 screen 12 *Three verbs: Answer* (TD-1555): what an Answer… sends is read from the button **when it is
+    // pressed** — a copy of its data and its line, never the button again after the box closes
+    const at = { ...b.dataset }, atLine = lineText(b), atItem = AO.answerItem(b);
     let action2 = null;  // the endpoint's name when it differs from the button's (controllers chip)
     // design §4.5a **Inbox row: state** (TD-069 step 2): a state row on the Inbox page carries the
     // card's own controls, so the press goes to the card's own route — and the row, which is the
@@ -1549,16 +1590,17 @@
       // design §4.5a **Message**, Focus Inbox **Reply** and delete (§4.10): mail, never a send
       if (action === "message" || action === "reply") {
         const m = await AO.compose({
-          to: b.dataset.name || id, reply: action === "reply", quote: b.dataset.quote, line: b.dataset.line || "",
+          to: at.name || id, reply: action === "reply", quote: at.quote, line: at.line || "",
           // the addressee's session for Attach (TD-531): a Message's own card, a Reply's sender — none on a seat
-          id: action === "reply" ? b.dataset.from || "" : b.dataset.seat ? "" : id,
-          when: { ask: b.dataset.whenAsk || "", note: b.dataset.whenNote || "" }, text: b.dataset.begun || "",
+          id: action === "reply" ? at.from || "" : at.seat ? "" : id,
+          when: { ask: at.whenAsk || "", note: at.whenNote || "" }, text: at.begun || "",
+          ...(action === "reply" ? { item: atItem, row: AO.answerRow(b) } : {}),
         });
         if (!m) return;
         // §4.5a **Inbox row: a look** (TD-292): **Not right…** begins the reply with the form, and
         // the form's prefix is kept whatever case it was retyped in, as a board row's is
-        if (b.dataset.begun === "Not right: ") m.text = `Not right: ${m.text.trim().replace(/^not right\s*:?\s*/i, "")}`.trim();
-        body = action === "reply" ? { reply_to: b.dataset.msg, text: m.text } : m;
+        if (at.begun === "Not right: ") m.text = `Not right: ${m.text.trim().replace(/^not right\s*:?\s*/i, "")}`.trim();
+        body = action === "reply" ? { reply_to: at.msg, text: m.text } : m;
       }
       // design §4.5a **Inbox row: suggested answers** (§4.10, TD-070): a press is an ordinary
       // reply — the same route, the same RPC, the same wake — and what it sends is **the index**,
@@ -1667,13 +1709,13 @@
       // is not Done — and the refresh brings it back with the reply on it. `refs` are the reader's,
       // handed as they came: the home mails each live lease holder on one of them (TD-142).
       if (action === "board_reply") {
-        const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: lineText(b) });
+        const m = await AO.compose({ to: at.name || "the board", reply: true, quote: atLine, item: atItem, row: AO.answerRow(b) });
         if (!m) return;
         let refs = [];
-        try { refs = JSON.parse(b.dataset.refs || "[]"); } catch (_) { refs = []; }
+        try { refs = JSON.parse(at.refs || "[]"); } catch (_) { refs = []; }
         pressed(m.text);
         const res = await act("person", "board", {
-          action: "reply", board: b.dataset.board, line: Number(b.dataset.line), text: lineText(b), key: b.dataset.key || "", reply: m.text, refs,
+          action: "reply", board: at.board, line: Number(at.line), text: atLine, key: at.key || "", reply: m.text, refs,
         });
         answered(m.text);  // the words without *landing…*: on the board now
         const to = (res.sent || []).map((x) => `${x.session} (holds ${x.ref})`).join(", ");
@@ -1687,20 +1729,20 @@
       // does (`entry_add`), its first line the item's head and the person's words — after the
       // decide has committed, and a refusal there is toasted: the decision stands.
       if (action === "board_notright") {
-        const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: lineText(b), text: "Not right: " });
+        const m = await AO.compose({ to: at.name || "the board", reply: true, quote: atLine, text: "Not right: ", item: atItem, row: AO.answerRow(b) });
         if (!m) return;
         const said = m.text.split(/\s+/).filter(Boolean).join(" ");
         // the prefix is the form's, whatever case it was retyped in
         const answer = `Not right: ${said.replace(/^not right\s*:?\s*/i, "")}`.trim();
         pressed(answer);
         await act("person", "board", {
-          action: "decide", board: b.dataset.board, line: Number(b.dataset.line), text: lineText(b), key: b.dataset.key || "",
-          answer, answers: JSON.parse(b.dataset.answers || "[]"),
+          action: "decide", board: at.board, line: Number(at.line), text: atLine, key: at.key || "",
+          answer, answers: JSON.parse(at.answers || "[]"),
         });
         answered(`decided: ${answer} · ${AO.today()}`);  // the decided line on the decide's answer, the toast after both
         let handed = "", refused = false;
         try {
-          const r = await fetch("/api/entry/hand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo: b.dataset.repo, type: "debt", words: `${b.dataset.head} — ${answer}` }) });
+          const r = await fetch("/api/entry/hand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo: at.repo, type: "debt", words: `${at.head} — ${answer}` }) });
           const j = await r.json().catch(() => ({}));
           if (!r.ok) throw new Error(j.detail || r.statusText);
           handed = j.text || "handed to the techlead";
@@ -1715,24 +1757,24 @@
       // default, **Reply** the composer's words — each `ledger_decide`, one decided line written on the
       // repo's board. The row leaves on the press, its toast waiting (§4.5 screen 6 rule 4, TD-1321).
       if (action === "ledger" || action === "ledger_reply") {
-        const want = { repo: b.dataset.repo, id: b.dataset.ref };
+        const want = { repo: at.repo, id: at.ref };
         // **Done…** / **Back to design…** on any open row (§4.5 screen 12 *any open row*, TD-905): a box for
         // one line of words, then the road — the home tells the entry's holders and its PR's reader, then
         // writes *done — <words>* or *back to design — <words>* as one decided line
-        if (b.dataset.road) {
-          const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: b.dataset.quote, empty: true });
+        if (at.road) {
+          const m = await AO.compose({ to: at.name || "the board", reply: true, quote: at.quote, empty: true, item: atItem, row: AO.answerRow(b) });
           if (!m) return;
-          want.road = b.dataset.road; want.words = m.text;
+          want.road = at.road; want.words = m.text;
           if (qt) qpressed(); else pressed();
           const res = await act("person", "ledger", want);
           if (qt) qanswered(); else answered();
           const told = (res.told || []).length ? ` · told ${res.told.join(", ")}` : "";
-          say(`decided: ${res.decided || b.dataset.road} — written on the board on origin, ${b.dataset.ref}'s work order${told}`, true);
+          say(`decided: ${res.decided || at.road} — written on the board on origin, ${at.ref}'s work order${told}`, true);
           if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
           return;
         }
         if (action === "ledger_reply") {
-          const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: b.dataset.quote });
+          const m = await AO.compose({ to: at.name || "the board", reply: true, quote: at.quote, item: atItem, row: AO.answerRow(b) });
           if (!m) return;
           want.words = m.text;
         } else if (b.dataset.words) want.words = b.dataset.words;  // Done, Lift the hold: fixed words (TD-771)
@@ -1741,7 +1783,7 @@
         pressed();
         const res = await act("person", "ledger", want);
         answered();
-        say(`decided: ${res.decided || b.dataset.answer} — written on the board on origin, ${b.dataset.ref}'s work order`, true);
+        say(`decided: ${res.decided || at.answer} — written on the board on origin, ${at.ref}'s work order`, true);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
@@ -1968,17 +2010,20 @@
   // and the key in it that held focus (its mark or a name) holds it again, so the ⋯'s keys (`AO.qDots`) still work
   const menuHome = (d) => d.closest && d.closest("[data-qid], [data-msg], [data-card]");
   const menuKeys = (d) => [$("summary", d), ...$$('.menu [role="menuitem"]', d)];
+  // a home's own menus, never those of a row or item inside it (TD-1555): an index among these does not move when a
+  // re-read reorders the items of a card
+  const ownMenus = (home) => $$("details.more", home).filter((x) => menuHome(x) === home);
   AO.openMenus = function (root) {
     return (root ? $$("details.more[open]", root) : []).map((d) => {
       const home = menuHome(d);
       if (!home) return null;
       const [k, v] = home.dataset.qid ? ["qid", home.dataset.qid] : home.dataset.msg ? ["msg", home.dataset.msg] : ["card", home.dataset.card];
-      return { k, v, i: $$("details.more", home).indexOf(d), f: menuKeys(d).indexOf(document.activeElement) };
+      return { k, v, i: ownMenus(home).indexOf(d), f: menuKeys(d).indexOf(document.activeElement) };
     }).filter(Boolean);
   };
   AO.reopenMenus = function (root, keys) {
     (keys || []).forEach(({ k, v, i, f }) => {
-      const home = root && $(`[data-${k}="${CSS.escape(v)}"]`, root), d = home && $$("details.more", home)[i];
+      const home = root && $(`[data-${k}="${CSS.escape(v)}"]`, root), d = home && ownMenus(home)[i];
       if (!d || menuHome(d) !== home) return;
       // focus goes back after the page's own `toggle` capture (which places the menu, and would move a focused mark's
       // focus to the first name), so the key the person was on is the one focused
