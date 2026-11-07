@@ -1313,7 +1313,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
          none acts. A claim dropped, or ended by a `restart` its next run has not taken up, leaves the PR
          with no actor, read *released*. A PR no claim ever named is not read: the Repo
          page lists it. Wait: **`STUCK_PR_AFTER`**, two hours, past a precheck and the merge that
-         follows it; its open time the claim's `at` (*The clock*, below).
+         follows it; its open time the newest claim or release among its
+         actors' claims, derived each tick, never kept (*The clock*, below).
      - **Acting.** `_stuck_pass` runs after rule 3's pass in the same tick, so `unfillable` holds this
        tick's words. An actor is **acting** when `unanswered.read` (§4.9b *Why it did not answer*,
        TD-1423 — called, never copied; its `question_at` the work's open time, below, and its other
@@ -1327,11 +1328,15 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        acting**, and its state is the **reason**: `gone`, `suspended`, `fills_exhausted` (*parked at its
        fill ceiling*), `restart_ceiling`, `unreachable`, `scheduled`, `taken_over` (*interactive*: a
        member the person took over, whose Hand back is the cure), `gated`, `limited`, `not_filled`,
-       `ended`, each in `unanswered.words`' fixed words; and two whose words are this rule's own, for which
+       `ended`, each in `unanswered.words`' fixed words — a seat the exited or closed branch finds
+       unfillable reads `unfillable`'s word instead, `{state: "unfillable", why}` as `seat_unable` returns it; and
+       two whose words are this rule's own, for which
        `words` is not called: a record
        with `stalled_ticks` at least 2 reads **`stalled`**, *`<name>` is `stalled?` — a request held past
        `STALL_AFTER` with nothing new on its screen*; and an `idle` one reads *`<name>` has been idle
-       since `<time>` with it open* (TD-1435's cause: a seat that read its asks and ends every turn on
+       since `<time>` with it open*, `<time>` the record's own idle start (`agent_common.idle_from`), the
+       stamp's `since` keeping the clock's instant (*The clock*, below) (TD-1435's cause: a seat that read its asks
+       and ends every turn on
        them; making it act stays rule 4's and rule 6's, and this rule only says so once the wait is
        past). A **`needs_you`** actor is waiting on the person's own pending row (a permission, a
        question on its pane): the work is read as stuck as any, but its words are a line under that row
@@ -1365,8 +1370,12 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        and to the release when it lets it go, the entry dropped when the line closes or is no longer
        decided as a reading that holds it says — a repo whose board or PR reading is absent (a restart
        before its first pass), errored, or fell back to the checkout's (`fetch_case` *skipped*) is not read
-       that tick, its `stuck_open` and `stuck` entries kept as they were, as any failed read keeps the last
-       good reading; a PR's `oid` is its head (`headRefOid`) and `at` the first tick that read that head, moved
+       that tick for which works stand: the last reading's works and their `stuck_open` are kept, as any
+       failed read keeps the last good reading, while their actors are read as on any tick (acting still
+       drops a row; `since`, `reason` and `actor` move); a checkout-fallback read may still close a work —
+       a line it finds closed or absent drops its entries, since the checkout lags a close but never
+       invents one — and opens none; a PR's `oid` is its head (`headRefOid`) and `at` the first tick that read that
+       head, moved
        on every push, and also to a claim's `at` and to a release, as a line's is. Its **`since`** is the later of its open
        time and the newest state change among its actors (each record's `since`, which moves only on a
        real change of state, or its `subagent_at` or `shells_at` where later — `agent_common.idle_from`,
@@ -1399,7 +1408,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        for a team's or a released PR's. The sentence and the `+n` are made at render. Kept on
        disk, so a home restart keeps the row standing, and time the home was down counts: nothing
        could act then either.
-     - **A reason that names its own end waits.** Where **every** actor not acting has a reason that
+     - **A reason that names its own end waits.** (A person's own live session, passed over above, is
+       neither acting nor a reason here, nor in `more`.) Where **every** actor not acting has a reason that
        carries an instant when it comes back — `scheduled`'s `start_at`, `limited`'s `limited_reset` on
        the record, `gated`'s `gate.resets` (the `unanswered` stamp's, from the profile's usage row), a team held `until` (its instant), `early` (its last start
        plus `WORK_EARLY`) or `usage` with a `resets` (one without is a need) — and the **earliest** of them
@@ -1448,7 +1458,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        turn and run it again*, without `missed` (the session branch's `hint`, under
        `--json` too, which also carries `missed: true` after a marked verb; a restart under the command keeps *run it
        again* and writes no mark). Before it exits, a verb a session files with (§4.7: those that call the host agent to file — `msg`, `td add`, `td reserve`, `progress`, `doing`,
-       `finding`, `rank`; `board edit` writes the branch with no host agent, and every other verb is a read
+       `finding`, `rank` with a move, never `rank --list`, a read; `board edit` writes the branch with no host agent,
+       and every other verb is a read
        or a person's, so none writes a mark) writes a **missed mark**,
        `$SHIFTLEAD_HOME/missed/<session id>-<at>.json` (its `SHIFTLEAD_SESSION`, else the ancestry walk's) `{at, verb}`,
        one file per miss, written to a temporary name and renamed, so no read meets half a file — the verb alone (`msg`, `td add`,
