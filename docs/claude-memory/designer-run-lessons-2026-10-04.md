@@ -1,13 +1,13 @@
 ---
 name: designer-run-lessons-2026-10-04
-description: A design PR that waits on a steer — keep its appended lines off the contested tails, expect its build number to be taken, and hold the worktree still while a reviewer reads
+description: A design PR that waits on a steer — its history line in its own entry's docs/history/ file, expect its build number to be taken, and hold the worktree still while a reviewer reads
 metadata:
   type: feedback
 ---
 
 Three things that cost CI cycles on 2026-10-04 (PRs #981, #1006, #1009, #1022), each a design PR that sat open for a steer while grinders merged:
 
-- **A history line goes above the newest lines of its section, not at the tail.** Every grinder slice appends at the tail of the same `docs/design-history.md` section, so a line added there conflicts with each merge; #1022 took three rebases, five minutes of CI each, until its line was moved above the `TD-309 slice` lines. Same date, so the order is still true.
+- **A history line goes to its own entry's file, `docs/history/TD-<n>.md`.** Until TD-1513's cut every PR appended to the same `docs/design-history.md` section, so a line added there conflicted with each merge (#1022 took three rebases, five minutes of CI each); the file is frozen now, and two PRs for two entries write two files (design §4.4 *Two PRs' records merge in either order*).
 - **The build entry's number**: ids and renumbers come from `ao td reserve` (cadence §2.10).
 - **While a reviewer reads, the author leaves its tree alone**: cadence §4.8 (dev-cadence TD-136). A second design that touches the same passages is stacked on the first's branch (see [[retarget-a-stacked-pr-with-the-api]]).
 

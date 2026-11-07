@@ -58,11 +58,12 @@ precheck = "T=$(mktemp -d /var/tmp/pc.XXXXXX) && trap 'rm -rf \"$T\"' EXIT && pd
 # same cadence/precheck status, its description naming the command. `pdm run test-docs` is the tests that read the
 # checkout's docs/ (pyproject.toml lists them, ~35 s against the suite's ~140 s); the host-log validation, the ledger
 # check and lint run as in `precheck`. Left out, so a PR touching them takes the whole suite: docs/cadence.toml (the
-# pin, which moves every agent-cadence script the suite runs), docs/cadence-local.conf, docs/reviews/, and anything
-# outside docs/. A glob over a file a test outside test-docs reads would let a PR that breaks that test merge on this
+# pin, which moves every agent-cadence script the suite runs), docs/cadence-local.conf, and anything outside docs/.
+# docs/reviews/ and docs/history/ are in: no test reads a review record (TD-1513), and test-docs holds the history's
+# shape. A glob over a file a test outside test-docs reads would let a PR that breaks that test merge on this
 # check; main's own precheck (design §6 *The precheck on main*) still runs the whole suite before a promote.
 [precheck-paths]
-"docs/ledger/* docs/user_attention.md docs/user_attention_archive.md docs/design/* docs/design.md docs/design-history.md docs/briefs/* docs/claude-memory/* docs/decisions/* docs/glossary.md docs/mockups/*" = "T=$(mktemp -d /var/tmp/pc.XXXXXX) && trap 'rm -rf \"$T\"' EXIT && pdm use \"$(PATH=/usr/local/bin:/usr/bin:/bin command -v python3)\" && pdm sync -G ui -G dev && pdm run python src/sessionorc/agent_cadence.py -C . run hostlog.py validate --repo-config docs/ledger/log-sources.toml --ledger docs/ledger && pdm run python src/sessionorc/agent_cadence.py -C . run ledger.py --check && pdm run lint && TMPDIR=$T TERM=xterm-256color pdm run test-docs --basetemp=$T/p"
+"docs/ledger/* docs/user_attention.md docs/user_attention_archive.md docs/design/* docs/design.md docs/design-history.md docs/history/* docs/reviews/* docs/briefs/* docs/claude-memory/* docs/decisions/* docs/glossary.md docs/mockups/*" = "T=$(mktemp -d /var/tmp/pc.XXXXXX) && trap 'rm -rf \"$T\"' EXIT && pdm use \"$(PATH=/usr/local/bin:/usr/bin:/bin command -v python3)\" && pdm sync -G ui -G dev && pdm run python src/sessionorc/agent_cadence.py -C . run hostlog.py validate --repo-config docs/ledger/log-sources.toml --ledger docs/ledger && pdm run python src/sessionorc/agent_cadence.py -C . run ledger.py --check && pdm run lint && TMPDIR=$T TERM=xterm-256color pdm run test-docs --basetemp=$T/p"
 
 # --- opt-outs (cadence.md Adoption checklist step 9): what this repo does not adopt, each
 # naming the ADR that decided it. Read by sync.sh and sync.sh --verify; --verify reports each

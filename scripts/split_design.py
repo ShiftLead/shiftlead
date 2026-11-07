@@ -63,7 +63,7 @@ HEADING = re.compile(r"^(##|###) (\d+(?:\.\d+[a-z]?)?)\.? (.*)$")
 LINK = re.compile(r"\]\((?![a-z][a-z0-9+.-]*:|#|/|\.\./)")
 RULE = (
     "A change in behaviour is a change to the design first, and the dated fact goes to "
-    "[`design-history.md`](design-history.md); a control that is not in §4.5a's table does not exist."
+    "`docs/history/TD-<n>.md` ([`history/`](history/README.md)); a control that is not in §4.5a's table does not exist."
 )
 
 
