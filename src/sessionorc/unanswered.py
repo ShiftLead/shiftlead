@@ -7,10 +7,11 @@ every copy. `read` makes that stamp from what the send already knows; `words` is
 sentence is written, which the CLI and the UI both call — never two copies.
 
 The stamp carries the design's fields — `{by, state, at, since?, ended?, held?, lapsed?, gate?, cap?,
-modal?, resets?, kind?, start_at?, waiting?}` — and three the words need when read later from the stamp
-alone: `name` (the record's name, the words' `<name>`), `seat` (a seat's ceiling reads *Resume*, a
-non-seat's *Restart*) and `tail` (the *when it is read* sentence a session's send to it would have printed
-at the read, on `working` and `idle`)."""
+modal?, resets?, kind?, start_at?, waiting?, taken_by?}` — and four the words need when read later from the
+stamp alone: `name` (the record's name, the words' `<name>`), `seat` (a seat's ceiling reads *Resume*, a
+non-seat's *Restart*), `tail` (the *when it is read* sentence a session's send to it would have printed
+at the read, on `working` and `idle`) and `taken_name` (on `taken_over`, the name of the session that
+took it over, when `taken_by` is one)."""
 
 from __future__ import annotations
 
@@ -18,10 +19,10 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
-from sessionorc.mail import _NOT_LIVE
+from sessionorc.mail import _NOT_LIVE, mail_wakes
 from sessionorc.models import Session
 
-# design §4.9b's states, in the order the first that holds is chosen (`taken_over` is TD-1444's)
+# design §4.9b's states, in the order the first that holds is chosen
 STATES = (
     "gone",
     "suspended",
@@ -29,6 +30,7 @@ STATES = (
     "restart_ceiling",
     "unreachable",
     "scheduled",
+    "taken_over",
     "gated",
     "limited",
     "not_filled",
@@ -74,11 +76,15 @@ def read(
     modal: bool = False,
     waiting: int = 0,
     tail: str = "",
+    agent: bool = True,
+    names: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """The stamp, the first state that holds (§4.9b). `r` is the walk's last record (None: `gone`), `by` its
     address; `question_at` the taken question's `at`; `over` the profile's usage-gate row (`_profile_over`)
     or None; `modal` whether a `limited` record's cap is a dialog; `waiting` its questions waiting, the taken
-    one left out; `tail` the `read_when` sentence a session's send to it would print now."""
+    one left out; `tail` the `read_when` sentence a session's send to it would print now; `agent` whether the
+    record runs an agent (a shell is never `taken_over`); `names` the home's records' names by id, for the
+    session a `taken_over` stamp names."""
     out: dict[str, Any] = {"by": by, "at": at}
     if r is None:
         return {**out, "state": "gone"}
@@ -105,6 +111,11 @@ def read(
         out["state"] = "unreachable"
     elif r.state == "scheduled":
         out.update(state="scheduled", start_at=r.start_at)
+    elif live and agent and (r.team or r.controllers) and not r.by_person and not mail_wakes(r):
+        # held: a member taken over, its mail not waking it (§4.5 *A taken-over member*, TD-1444)
+        out.update(state="taken_over", since=r.mode_at, taken_by=r.mode_by)
+        if r.mode_by and r.mode_by != "person":
+            out["taken_name"] = (names or {}).get(r.mode_by) or None
     elif gate is not None and (live or seat):
         out.update(state="gated", gate=gate)
         if gate.get("resets"):
@@ -207,6 +218,16 @@ def words(stamp: Mapping[str, Any], now: datetime | None = None) -> str:
         text = f"{name}'s host is not answering; the question is delivered when it is back"
     elif s == "scheduled":
         text = f"{name} starts at {t('start_at')}"
+    elif s == "taken_over":
+        by = stamp.get("taken_by")
+        if not stamp.get("since"):
+            held = "held interactive"
+        elif not by:  # a start's stamp names nobody
+            held = f"held interactive since {t('since')}, from its start"
+        else:
+            who = "you" if by == "person" else str(stamp.get("taken_name") or by)
+            held = f"held interactive since {t('since')} by {who}"
+        text = f"{name} is {held} — its mail does not wake it; Hand back on its Focus or its held row returns it"
     elif s == "gated":
         if gate is None or not gate.get("profile"):
             return plain

@@ -1004,6 +1004,8 @@ class MailMixin:
             modal=kw["modal_limit"],
             waiting=len([i for i in r.asks_ids(home=self.host) if i != taken.id]),
             tail=tail,
+            agent=adapters.has_agent(r.adapter),
+            names={k: v.name for k, v in records.items() if v.name},
         )
 
     @staticmethod
