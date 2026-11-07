@@ -582,8 +582,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      `dropped` removed with it, for a live member and a gone one alike, so an entry that leaves
      the lane and comes back is news once more — a live check whose `event (live…)` gates were
      lifted, a `Blocked by` that reopened and cleared, an `Owner:` that moved away and back; an id
-     the reading does not hold is kept, since an entry absent from the checkout's file is archived
-     or the checkout's moment, not the lane's. The reading is one function (`sessionorc.work`),
+     the reading does not hold is kept, since an entry absent from the ledger reading is archived
+     or origin's moment, not the lane's. The reading is one function (`sessionorc.work`),
      the memory pruned and the news read in one pass, so rule 6 and rule 8 never disagree on what is new; it keys on the id alone, since
      *matches the lane now and did not when last seen* is what being news means, and no kind or
      workability is written beside the id. The promote tells nobody itself: it is one of the ways
@@ -614,7 +614,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      team has wound down. A finished member closed while the team runs on — by rule 9's pass, by
      its manager, or by itself — is rule 8's *A member that finished while its team runs on*: told
      nothing where it sits, it is started again alone for what its lane gained. The ledger read is
-     the checkout's file at the home, so an entry counts from the moment that checkout holds it.
+     against origin (§4.4 *The ledger is read against origin, as the board is*), the checkout's only for an
+     entry only the checkout holds, so an entry counts from the moment either holds it.
   7. **Brief changed.** A member reads its brief once, at its start; a restart replays the brief's
      files, not the prompt its first start was handed. Two halves. **A replay reads the brief's
      files again.** The client that composes a brief (§4.8) hands the create, beside the filled
