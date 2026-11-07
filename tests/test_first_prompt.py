@@ -229,11 +229,13 @@ async def test_a_composer_that_never_reads_empty_is_marked_at_the_bound(agent, b
 async def test_a_hook_before_the_bound_keeps_the_ordinary_road(agent, briefstubs, tmp_path, monkeypatch):
     """A record a hook has reached is never marked *no hook since launch*, however long its brief waits,
     and its hook `idle` sends as before — no `scraped` on the send."""
-    monkeypatch.setattr(agent_common, "FIRST_PROMPT_HOOK_WAIT", 0.2)
-    monkeypatch.setattr(agent_common, "FIRST_PROMPT_BOUND", 0.5)
     async with LocalClient() as c:
         w = await _start(agent, c, tmp_path, "w", "brief0", prompt=BRIEF)
         await agent.rpc_hook(w, state="working")
+        # the bounds shrink only once the hook has landed: both run from `created`, and `_start` (the pane's
+        # launch and paint) can outlast them under a loaded suite (TD-1530) — what is tested is the wait after
+        monkeypatch.setattr(agent_common, "FIRST_PROMPT_HOOK_WAIT", 0.2)
+        monkeypatch.setattr(agent_common, "FIRST_PROMPT_BOUND", 0.5)
         await asyncio.sleep(1.0)
         rec = agent.sessions[w]
         assert rec.first_prompt_error is None and await _submitted(agent, w) == []
