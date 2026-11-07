@@ -1420,7 +1420,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        or `not_filled`. A PR with no actor reads *released by <name>*: its `stuck_open` entry's **`by`**,
        `{id, host, name, ref}` — the first actor (as *actor* below orders them) on the last tick it had one,
        its record's `id` and `host`, its `name` (the words draw it) and the `ref` of its earliest open claim naming
-       the PR (the one that orders it) — written each tick it has one, since a dropped claim's entry (`ao progress drop` with no `--pr`)
+       the PR that is not a waiting claim (the one that orders it) — written each tick it has one, since a dropped claim's entry (`ao progress drop` with no `--pr`)
        no longer names the PR, and a seat's successive fills share one name, so the record is found by `id`;
        an entry with no `by` reads *released* alone.
      - **Never stuck.** Work whose only actors are the person's own live sessions (`unattended: false`
@@ -1437,7 +1437,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        reads nothing until it closes or lapses (it is on their card, and an ask to the person is never this
        rule's question), after which the PR is read again. While a PR is not read for want of an actor that is
        not waiting, its `stuck_open` entry stays as stored (`rel` neither written nor cleared, `by` unchanged)
-       and its `stuck` entry drops: a tick with only waiting claims is no release.
+       and its `stuck` entry drops: a tick with only waiting claims is no release (the unread-repo rule and a
+       good reading's drop of a PR no longer open, *The clock*, still govern first).
      - **The clock.** The work's **open time** is the ask's `at`, the first tick the home read the line
        decided (below), or the claim's `at`. The home keeps a board line's and a PR's moving
        parts on `host.json` as **`stuck_open: {<key>: {at, oid?, repo, by?: {id, host, name, ref}, rel?}}`** (shape-checked by
@@ -1512,7 +1513,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        for your Start*, `{why: "stopped"}` and `{why: "wound_down"}` for the other two), a released PR's
        as `{state: "released", by}`, *no lane takes it* as `{state: "no_lane"}`; **`actor`** `{id, host,
        name, more}` — the first not acting (an ask's in its `to` order, an order's by lane order then id, a
-       PR's by each record's earliest open claim naming it, by that claim's `at`, then by record `id`), `more`
+       PR's by each record's earliest open claim naming it that is not a waiting claim, by that claim's `at`, then by record `id`), `more`
        the count of the rest, none
        for a team's or a released PR's. The sentence and the `+n` are made at render. Kept on
        disk, so a home restart keeps the row standing, and time the home was down counts: nothing
