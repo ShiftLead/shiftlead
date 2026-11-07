@@ -70,6 +70,8 @@ CLOSED_REASONS = (
     "asked_person",
     "withdrawn",  # its sender took it back: `ao msg --withdraw` (§4.10 *Withdrawing a question*, TD-1382)
     "rerouted",  # moved from a seat that could not answer, a copy landing elsewhere (§4.9b, TD-1480)
+    "merged",  # its PR merged in its repo (§4.10 *A question the work settled closes itself*, TD-1469)
+    "settled",  # the entry its `about` names was archived after it was asked (same section, TD-1469)
 )
 
 # Who owns which field of a record (design §4.4a, §9 invariant 15): the node observes and enforces
@@ -546,6 +548,9 @@ class MailEntry:
     # *A question already waiting*, TD-1480): *waits on <name>: <the refusal>*, on every copy, cleared once it moves
     # or the seat is able again. Written only by the tick's move — never taken from a caller.
     waits: str | None = None
+    # The PR that archived the entry a question closed `settled` names (§4.10 *A question the work settled closes
+    # itself*, TD-1469): the closing commit's number, None where the archive names none (a direct push, a drop).
+    settled_by: int | None = None
 
     def __post_init__(self) -> None:
         self.root = self.root or self.id  # a message replying to nothing is its own thread's root

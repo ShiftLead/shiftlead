@@ -375,7 +375,8 @@
 
 {# What became of a question, in the words §4.10 gives each close path. Never a control. #}
 {% macro state_line(e, sender='') -%}
-{%- if e.closed_reason == 'withdrawn' %}withdrawn by {{ sender or e['from'] }}
+{%- if e.closed_reason in ('merged', 'settled') %}{{ settled_by_work(e) }}
+{%- elif e.closed_reason == 'withdrawn' %}withdrawn by {{ sender or e['from'] }}
 {%- elif e.closed_reason == 'lapsed' %}lapsed · the sender went with its default
 {%- elif e.closed_reason == 'go_with_it' %}closed · go with it
 {%- elif e.closed_reason == 'declined' %}declined · the sender was told

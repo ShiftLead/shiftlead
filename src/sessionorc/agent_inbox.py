@@ -1295,6 +1295,10 @@ class InboxMixin:
         here ever reaches it."""
         stamp = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
         self._adopt_orphans()  # before the bounds: an adopted `steer` lapses to its successor on time
+        try:  # before the bounds: a `steer` the work settled applies no default (§4.10, TD-1469)
+            await self._settle_by_work()
+        except Exception:  # noqa: BLE001 — a reading it could not use: the bounds below still run
+            log.exception("settling the person inbox's questions by the work failed")
         for r in list(self._graph().values()):
             for e in list(r.inbox):
                 if not e.open or e.paused_at:

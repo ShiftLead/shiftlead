@@ -2047,6 +2047,7 @@
         : e.closed_reason === "asked_person" ? "closed · the asker took it to the person"
         : e.closed_reason === "rerouted" ? "closed · routed around a seat that could not answer"
         : e.closed_reason === "withdrawn" ? "withdrawn"
+        : e.closed_reason === "merged" || e.closed_reason === "settled" ? esc(AO.settledWords(e))
         : e.closed_by ? `answered by ${esc(e.closed_by)}`
         : e.expired_at ? "expired"
         : e.paused_at ? "paused · the clock is stopped"
@@ -5873,6 +5874,17 @@
     if (!sent) return "";
     return waiting ? `${sent} sent<span class="waiting">, ${waiting} waiting</span>` : `${sent} sent`;
   };
+  // a question the work settled (§4.10 *A question the work settled closes itself*, TD-1469), in
+  // `sessionorc.mail.settled_words`'s words: *settled — #164 merged*, *settled — TD-221 archived (#164)*
+  AO.settledWords = function (e) {
+    const about = String(e.about || "").trim();
+    if (e.closed_reason === "merged") {
+      const m = /^#(\d{1,6})$/.exec(about);
+      const pr = e.kind === "ask" && Number.isInteger(e.pr) ? e.pr : m ? Number(m[1]) : null;
+      return pr !== null ? `settled — #${pr} merged` : "settled — merged";
+    }
+    return `settled — ${about || "its entry"} archived (${e.settled_by ? `#${e.settled_by}` : "no PR"})`;
+  };
   // what became of a sent question, in the words the Inbox page's FYI section gives each close path
   // (§4.5 screen 6): *waiting* while it is open, *answered by <name>* once a reply closed it
   AO.sentState = function (e) {
@@ -5887,6 +5899,7 @@
       : r === "withdrawn" ? "withdrawn"
       : r === "asked_person" ? "passed to the person"
       : r === "rerouted" ? "routed around"
+      : r === "merged" || r === "settled" ? AO.settledWords(e)
       : r ? r
       : "waiting";
   };
