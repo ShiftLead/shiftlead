@@ -1700,8 +1700,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   agent — **or main has been ahead of live for `PROMOTE_MAX_WAIT` (thirty minutes)** whether or not it
   has stood still (TD-581: on 2026-10-12 a team merging every few minutes kept main from standing
   still for over half an hour, and the fix for Paul's lagging terminals stayed off the live copy that
-  long): the reading keeps `ahead_since`, the time main first moved past the live commit, cleared
-  when live catches up, and the settle is a batching rule, never a hold without limit. **The person's
+  long): the reading keeps `ahead_since`, the time main first moved past the live commit — while a failure
+  stands whose `blocks` main's head has moved past, the time main first moved past `blocks` (the first
+  commit of `blocks..main`, TD-1554) — cleared when live catches up, and the settle is a batching rule, never a hold without limit. **The person's
   press stands under `auto` too**: the Inbox row (§4.5a *Inbox row: promote*, drawn under FYI while
   main is ahead, saying when the home will act) and `ao promote` (§4.7) promote main's head at once —
   the settle and the wait are the policy's clocks, not preconditions, so a press skips both and is
@@ -1727,20 +1728,20 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   process's start time beside its pid, so after a restart of the home a pid taken again by another
   process reads gone and is never killed — → **failed**: `failed.json` `{sha, at, log, exit, why, blocks}`
   beside it, the Inbox row under *Needs you*, a `system` note to the person inbox (*promote of `<repo>`
-  `<sha7>` failed — <why>*, FYI, uncounted, §4.10), so the reason outlives a row the next start takes away,
+  `<sha7>` failed — <why>*, FYI, uncounted, §4.10, sent as the *promoted* notes are), so the reason outlives a row the next start takes away,
   and **a failure blocks only the commit it failed at** (TD-1554, Paul's Hold on TD-1437). The commit it
   blocks is `failed.json`'s **`blocks`**:
   - a promote's own `sha`;
   - the smoke's rollback's `from`, the commit the smoke failed on, or null when that `from` was not read
     (`SHIFTLEAD_PROMOTE_FROM` empty);
-  - a person's rollback's `main`, main's head as the press read it (kept on the intent as the hold's `main`
-    is): the rollback took no hold, so the commit the person meant to keep from running stays blocked; a
+  - a person's rollback's `main`, main's head as the press read it (the reading's `main`, which the press writes
+    on the intent as `main`, as `_concluded` gives the hold the same reading's): the rollback took no hold, so the commit the person meant to keep from running stays blocked; a
     merge after the press moves main past it and `auto` goes on — accepted, as the person's rollback never
     took hold;
   - and, in a `failed.json` written before `blocks` was, its `sha`.
   `auto` starts nothing while main's head is that commit, and retries once main's head **moves past it** —
   `blocks` an ancestor of main's head and not main's head itself — a run at the new head, the settle and the
-  wait as ever, the row reading the policy's clock (§4.5a) meanwhile: `ahead_since` restarts at that move, so
+  wait as ever, the row reading the policy's clock (§4.5a) meanwhile: `ahead_since` is then read from that move, so
   a failed commit that sat ahead of live past `PROMOTE_MAX_WAIT` does not spend the next merge's cap. A
   person's press — Promote of main's head, that commit among them (a retry is the person's word), or a
   rollback (below) — is never refused by it. **Every start clears it**, on the one start path every run
@@ -2040,8 +2041,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   - **It never rolls back a rollback.** In three cases a failed smoke leaves live where it is:
     a rollback's own smoke fails (the person's or the smoke's), no `from` was read, or `from` is
     the commit itself. The result stands as a **failure** in `failed.json`, with *smoke failed on
-    `<sha7>`* and the log's tail, under *Needs you*. It blocks that commit alone, as any failure does
-    (*Promote*), and the person's next press clears it. After a rollback that leaves the failure beside
+    `<sha7>`* and the log's tail, under *Needs you*. It blocks the commit *Promote*'s `blocks` names for
+    its run (a promote's own commit, a person's rollback's `main`, the smoke's rollback's `from` or none), as any
+    failure does, and the person's next press clears it. After a rollback that leaves the failure beside
     its hold, that press clears the failure as it starts and ends the hold when it concludes, as *The
     hold* says.
   - **What it is not.**
