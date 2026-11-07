@@ -1737,7 +1737,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   - a person's rollback's `main`, main's head as the press read it (the reading's `main`, which the press writes
     on the intent as `main`, as `_concluded` gives the hold the same reading's): the rollback took no hold, so the commit the person meant to keep from running stays blocked; a
     merge after the press moves main past it and `auto` goes on — accepted, as the person's rollback never
-    took hold (an intent written before it carried `main`: main's head as the failing pass reads it);
+    took hold (an intent written before it carried `main`: main's head as the failing pass reads it, which the pass
+    hands `fail`, or the intent's `sha` where that too is unread);
   - and, in a `failed.json` written before `blocks` was, its `sha`.
   `fail` tells them apart by the intent: `kind: rollback` with `by: smoke` blocks `from`, any other
   rollback `main`, a promote its `sha`.
@@ -1805,7 +1806,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   its smoke too, and the pass that concludes it writes `done` and tags it (a run whose `from` is its own
   commit writes as `last.json`'s `from` the standing `last.json`'s `sha`, the last commit a run put live, or
   that file's own `from` where the two are the same, so `--back` still goes somewhere; with no `last.json` at
-  all, `from` null, so `--back` is refused as it is before any first run), its note reading *promoted
+  all, `from` null, so `--back` is refused as *never read*, as after any run whose `from` was not read), its note reading *promoted
   `<repo>` `<sha7>` again — tagged* (a rollback to the live commit's: *rolled back `<repo>` to `<sha7>` again
   — tagged*). The press at main's head is refused as *nothing to promote* only when a run finished there
   **and** no failure blocks it, so a failure at main's head is always a press away from its retry. Its `from` is the commit itself,
