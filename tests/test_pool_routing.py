@@ -176,6 +176,33 @@ async def test_a_waiting_ask_passes_a_full_member_on_the_tick_and_writes_no_wait
         await agent._reroute_waiting(datetime.now(UTC))
         assert len(_open_on(agent, m3, first["root"])) == 1
         assert not _open_on(agent, m2, first["root"])
+        assert not any(e.waits for r in agent.sessions.values() for e in r.inbox if e.root == first["root"])
+
+
+async def test_a_member_holding_the_senders_open_question_is_passed_over(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        tl, (m1, m2, m3), w = await _team(agent, tmp_path, person)
+        outsider = (
+            await person.call(
+                "create", name="x", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"], unattended=True
+            )
+        )["id"]
+        assert (await _ask(agent, outsider, m2, "first?"))["entry"]["to"] == [m2]
+        _limited(agent, m1)
+        got = await _ask(agent, outsider, m1, "second?")
+        assert got["entry"]["to"] == [m3], "one open question per sender per seat: member 2 is passed over"
+
+
+async def test_an_on_call_member_is_able_unless_rule_3_would_not_fill_it(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        tl, (m1, m2, m3), w = await _team(agent, tmp_path, person)
+        agent.sessions[m2].state = "closed"
+        _limited(agent, m1)
+        assert (await _ask(agent, w, m1, "first?"))["entry"]["to"] == [m2], "on call, rule 3 fills it"
+        agent.unfillable = {**(agent.unfillable or {}), m2: "fill ceiling"}
+        assert (await _ask(agent, w, m1, "second?"))["entry"]["to"] == [m3], "the fill ceiling skips it"
 
 
 async def test_the_persons_question_to_an_unable_member_moves_within_the_pool_and_else_stays(agent, tmp_path):
@@ -189,7 +216,11 @@ async def test_the_persons_question_to_an_unable_member_moves_within_the_pool_an
         await agent._reroute_waiting(datetime.now(UTC))
         moved = _open_on(agent, m2, first["root"])
         assert len(moved) == 1 and moved[0].from_ == PERSON and moved[0].routed["seat"] == m1
-        _limited(agent, m1, m2, m3, tl)
+        _limited(agent, m1, m2, m3)
+        third = (await person.call("msg", to=m1, text="and that one?", kind="ask"))["entry"]
+        await agent._reroute_waiting(datetime.now(UTC))
+        assert len(_open_on(agent, tl, third["root"])) == 1, "no member able: the team's able techlead"
+        _limited(agent, tl)
         again = (await person.call("msg", to=m1, text="and this one?", kind="ask"))["entry"]
         await agent._reroute_waiting(datetime.now(UTC))
         assert len(_open_on(agent, m1, again["root"])) == 1, "no member and no techlead able: it stays"
