@@ -182,7 +182,7 @@ def holder_claims(holds: Any, index: Mapping[str, tuple[str, str]]) -> dict[str,
         if not got or got[0] not in index:
             continue
         n = h.get("n")
-        key = (h.get("source") != "derived", _aware(h.get("at")) or oldest, n if isinstance(n, int) else -1, got[0])
+        key = (h.get("source") == "declared", _aware(h.get("at")) or oldest, n if isinstance(n, int) else -1, got[0])
         sid = str(h.get("sid") or "")
         if sid and (sid not in best or key[:3] > best[sid][:3]):
             best[sid] = key
