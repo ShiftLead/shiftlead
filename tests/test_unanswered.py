@@ -122,6 +122,53 @@ def test_unreachable_scheduled_gated_and_limited():
     assert "cap" not in modal and _words(modal) == "tl is at its usage cap — answered on its pane."
 
 
+def _held(**kw) -> Session:
+    """A member held interactive (§4.5 *A taken-over member*): its mail does not wake it."""
+    return _rec(**{"team": "ao-grind", "state": "idle", "unattended": False, **kw})
+
+
+def test_taken_over_comes_after_scheduled_and_before_gated():
+    # TD-1444: the gate leaves an interactive record alone, so the hold is the reason
+    got = _read(_held(mode_at="2026-11-05T10:30:00Z", mode_by="person"), over={"resets": "2026-11-05T15:00:00Z"})
+    assert got["state"] == "taken_over" and got["since"] == "2026-11-05T10:30:00Z" and got["taken_by"] == "person"
+    assert "gate" not in got and "resets" not in got
+    sched = _read(_held(state="scheduled", start_at="2026-11-05T20:00:00Z"))
+    assert sched["state"] == "scheduled"
+    assert _read(_held(), unreachable=True)["state"] == "unreachable"
+    # a member by its controllers, no team
+    assert _read(_held(team="", controllers=["ao-x-lead"]))["state"] == "taken_over"
+
+
+def test_who_is_never_taken_over():
+    over = {"resets": "2026-11-05T15:00:00Z"}
+    # the person's own team session, a non-member, a shell, an unattended member and an ended one
+    assert _read(_held(by_person=True), over=over)["state"] == "gated"
+    assert _read(_held(team=""))["state"] == "idle"
+    assert _read(_held(), agent=False)["state"] == "idle"
+    assert _read(_held(unattended=True))["state"] == "idle"
+    assert _read(_held(state="exited", ended={"at": "2026-11-05T11:00:00Z"}))["state"] == "ended"
+
+
+def test_taken_over_words_for_each_stamp():
+    tail = " — its mail does not wake it; Hand back on its Focus or its held row returns it."
+    at = "2026-11-05T10:30:00Z"
+    by_you = _read(_held(mode_at=at, mode_by="person", mode_via="focus"))
+    assert "taken_name" not in by_you
+    assert _words(by_you) == f"tl is held interactive since {_t(at)} by you{tail}"
+    lead = _read(_held(mode_at=at, mode_by="ao-x-lead", mode_via="cli"), names={"ao-x-lead": "lead"})
+    assert lead["taken_by"] == "ao-x-lead" and lead["taken_name"] == "lead"
+    assert _words(lead) == f"tl is held interactive since {_t(at)} by lead{tail}"
+    # a session the home no longer knows by name: its id
+    gone = _read(_held(mode_at=at, mode_by="ao-x-lead"))
+    assert "taken_name" not in gone and _words(gone) == f"tl is held interactive since {_t(at)} by ao-x-lead{tail}"
+    start = _read(_held(mode_at=at, mode_by=None, mode_via="start"))
+    assert "taken_by" not in start
+    assert _words(start) == f"tl is held interactive since {_t(at)}, from its start{tail}"
+    unstamped = _read(_held())
+    assert "since" not in unstamped and "taken_by" not in unstamped
+    assert _words(unstamped) == f"tl is held interactive{tail}"
+
+
 def test_not_filled_ended_and_lapsed():
     nf = _read(_rec(seat={"trigger": "asks"}, state="exited", ended={"at": "2026-11-05T09:50:00Z"}))
     assert nf["state"] == "not_filled" and _words(nf) == "tl was never filled for this question."
@@ -198,6 +245,39 @@ async def test_a_take_up_stamps_every_copy_and_the_reply_prints_it(agent, tmp_pa
         assert mine[0].unanswered is not out[0].unanswered  # each copy its own dict
         # the question it took up carries none, and a later `--thread` on the person's question writes none
         assert all(e.unanswered is None for e in agent.sessions[tl].inbox)
+
+
+@pytest.mark.integration
+async def test_a_take_up_from_a_held_member_names_who_took_it_over(agent, tmp_path, monkeypatch, capsys):
+    """TD-1444: the stamp reads `taken_over` with `taken_by` and the taker's name, every copy carries it,
+    and the `ao msg` reply and `ao inbox` print the words, `--json` the stamp."""
+    from shiftlead import cli
+
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w, tl, lead = [await mk(n, team="ao-grind", unattended=True) for n in ("w", "tl", "lead")]
+        async with LocalClient(caller=w) as wc:
+            q = (await wc.call("msg", to=tl, text="rebase or merge?", kind="ask"))["entry"]
+            held = agent.sessions[tl]
+            held.state, held.unattended, held.kind, held.by_person = "idle", False, "interactive", None
+            held.mode_at, held.mode_by, held.mode_via = "2026-11-05T10:30:00Z", lead, "cli"
+            up = await wc.call(
+                "msg", to="person", text="rebase or merge? tl did not answer", kind="ask", thread=q["id"]
+            )
+    stamp = up["entry"]["unanswered"]
+    assert stamp["state"] == "taken_over" and stamp["taken_by"] == lead and stamp["taken_name"] == "lead"
+    assert [e.unanswered for e in agent.person_inbox if e.id == up["entry"]["id"]] == [stamp]
+    words = unanswered.words(stamp)
+    assert "held interactive since" in words and "by lead" in words
+    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: up)
+    assert cli.main(["msg", "person", "--kind", "ask", "--thread", q["id"], "rebase or merge?"]) == 0
+    assert words in capsys.readouterr().out
+    entry = {**up["entry"], "from_role": "other"}
+    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"id": "person", "entries": [entry], "unread": 0})
+    assert cli.main(["inbox"]) == 0
+    assert words in capsys.readouterr().out
+    assert cli.main(["inbox", "--json"]) == 0
+    assert '"taken_by": "' + lead + '"' in capsys.readouterr().out
 
 
 @pytest.mark.integration
