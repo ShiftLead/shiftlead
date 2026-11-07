@@ -249,7 +249,7 @@ async def test_a_session_asks_another_repos_seat_for_a_ledger_entry(agent, tmp_p
             assert (got["to"], got["repo"], got["team"], got["priority"]) == (seat, "samscrape", "ss-grind", "high")
             held = _ask_in(agent.sessions[seat], got["id"])
             assert held.kind == "ask" and held.from_ == asker and not held.handed and held.bound is None
-            assert held.entry == {"repo": "samscrape", "type": "debt", "team": "", "priority": "high"}
+            assert held.entry == {"repo": "samscrape", "type": "debt", "team": "", "priority": "high", "picked": False}
             assert agent.sessions[seat].asks_waiting(home=agent.host) == 1
             # one open question to the seat: a second request is refused naming the first
             with pytest.raises(AgentError, match=rf"{got['id']} is still open"):
@@ -283,6 +283,7 @@ async def test_a_session_asks_another_repos_seat_for_a_ledger_entry(agent, tmp_p
             async with LocalClient(caller=asker) as a:
                 got = await a.call("entry_add", repo="contractmatch", team="cm-node", type="feature", text="w")
                 assert got["to"] == "ao-cm@laptop" and got["team"] == "cm-node"
+                assert agent.remote["laptop"]["ao-cm"].inbox[-1].entry["picked"] is True
                 with pytest.raises(
                     AgentError, match=r"ops has no seat record on samscrape: the teams with one are ss-grind"
                 ):
@@ -351,3 +352,20 @@ def test_a_teams_question_seat_is_live_then_on_call_then_closed():
     assert one("t", [closed, on_call]) is on_call
     assert one("t", [closed]) is closed
     assert one("t", [closed, rec("d", "idle", tags=False)]) is closed, "the techlead seat wins among two"
+
+
+async def test_a_sessions_own_ledger_request_waits_on_its_unable_seat(agent, tmp_path):
+    """A session's own ledger request (TD-995: `entry`, no `handed` mark) waits on its seat even when that seat
+    cannot answer: it never takes a general question's road to the person (§4.9b, TD-1443, TD-1473 slice 3)."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        seat = await mk("seat", team="ss-grind", project="S", seat={"trigger": "asks", "tags": True})
+        asker = await mk("asker", team="cm-grind", project="C")
+        agent.sessions[seat].repo, agent.sessions[asker].repo = "/src/samscrape", "/src/contractmatch"
+        agent.sessions[seat].state, agent.sessions[seat].limited_reset = "limited", None
+        async with LocalClient(caller=asker) as a:
+            got = await a.call("entry_add", repo="samscrape", type="debt", text="parse the new feed")
+        assert got["to"] == seat and _ask_in(agent.sessions[seat], got["id"]).entry["picked"] is False
+        assert not any(e.id == got["id"] for e in agent.person_inbox)
+        for sid in (seat, asker):
+            await person.call("kill", id=sid)

@@ -39,6 +39,7 @@ from sessionorc.agent_common import (
     _prune_tallies,
     log,
 )
+from sessionorc.agent_mail import seat_able
 from sessionorc.models import (
     ATTENTION_KINDS,
     PERSON,
@@ -410,6 +411,17 @@ class InboxMixin:
         if lacks := seams_mod.unserved(self._repos.get(str(root))):
             raise RpcError(f"{root.name} is {lacks[0]}; the home writes nothing to its board until it is cured")
 
+    def _seat_id_able(self, seat: str) -> bool:
+        """Whether the record a team's techlead seat id names can answer now (`seat_able`, §4.9b, TD-1443),
+        followed along a closed record's `superseded_by` chain as `_msg` follows it; a seat with no record yet
+        is able, rule 3 filling it."""
+        records, sid, seen = self._graph(), self._addr(seat), set()
+        while (r := records.get(sid)) is not None and r.state == "closed" and r.superseded_by and sid not in seen:
+            seen.add(sid)
+            sid = self._addr(r.superseded_by)
+        r = records.get(sid)
+        return r is None or seat_able(r, datetime.now(UTC), self.unfillable)
+
     async def rpc_entry_add(
         self,
         repo: str = "",
@@ -431,7 +443,9 @@ class InboxMixin:
         else definition order), each `{team, seat}` — `seat` the id the team's techlead takes, or
         empty where the team defines none — as `board_reply`'s `refs` come from the reader. `team`,
         the form's **Team** pick or `--team` (TD-730, TD-764), hands to that team's seat and is
-        `entry.team`; blank, the first team with a seat takes it and `entry.team` is empty. `priority`,
+        `entry.team`; blank, the first team whose techlead seat is able takes it (`seat_able`, §4.9b *A seat
+        that cannot answer is routed around*, TD-1443), else the first team with a seat, where it waits, and
+        `entry.team` names the team it went to; `entry.picked` is true only when the caller gave `team`. `priority`,
         the form's **Priority** pick or `--priority` (TD-851), is `entry.priority`, `medium` when absent.
         `teams` absent (None) is the person's shell on a node whose registry has no such repo and which reads
         no `org.yml` (§4.7 *Entries*, TD-1404): `repo` is a name, resolved in the home's registry, and the seat
@@ -480,8 +494,10 @@ class InboxMixin:
                     names = ", ".join(str(t["team"]).strip() for t in servicing)
                     raise RpcError(f"{pick} does not service {name}: its teams are {names} (design §4.10)")
                 pick = str(to["team"]).strip()
-            else:  # a blank pick: the first team with a techlead seat, in the order the caller gives them
-                to = next((t for t in servicing if str(t.get("seat") or "").strip()), servicing[0])
+            else:  # a blank pick: the first team whose techlead seat is able, else the first with a seat (TD-1443)
+                seated = [t for t in servicing if str(t.get("seat") or "").strip()]
+                to = next((t for t in seated if self._seat_id_able(str(t["seat"]).strip())), None)
+                to = to or (seated or servicing)[0]
             team = str(to["team"]).strip()
             seat = str(to.get("seat") or "").strip()
             if not seat:
@@ -494,7 +510,7 @@ class InboxMixin:
         # a seat closed and started again under its name is followed to the record that took it (review of #764)
         seat = next(iter(sent.get("delivered") or ()), seat)
         # the debt, the envelope's fields and no bound: an entry never lapses (§4.10)
-        entry = {"repo": name, "type": kind, "team": pick, "priority": rank}
+        entry = {"repo": name, "type": kind, "team": team, "priority": rank, "picked": bool(pick)}
         self._mark(mid, handed=True, entry=entry, bound=None, draft=draft or None)
         if folder is not None:  # the form's files are the ask's, kept `runs_keep_days` from now (§4.4, TD-630)
             try:
@@ -567,7 +583,15 @@ class InboxMixin:
         to = next(iter(sent.get("delivered") or ()), self._address(seat))
         name = Path(str(seat.repo)).name
         self._mark(
-            mid, entry={"repo": name, "type": kind, "team": str(team or "").strip(), "priority": rank}, bound=None
+            mid,
+            entry={
+                "repo": name,
+                "type": kind,
+                "team": str(team or "").strip(),
+                "priority": rank,
+                "picked": bool(str(team or "").strip()),
+            },
+            bound=None,
         )
         await self._push_changes()
         log.info("entry_add: %s asked %s for an entry in %s (%s)", sender, to, name, kind)
