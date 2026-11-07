@@ -317,7 +317,10 @@ class TickMixin:
             live |= {str(self._rounds_log(s)) for s in self.sessions.values() if s.state not in ended}
             # an attachment's folder is kept whole while any record of its session is live (§4.4, TD-469)
             live_ids = {s.id for s in self.sessions.values() if s.state not in ended}
-            await asyncio.to_thread(self._prune_runs, snapshot_at, live, live_ids)
+            # kept as a pass (TD-1506): a thread outlives the tick that started it, so a cancelled tick
+            # leaves the sweep running; `_prune_task` is what waits for it, as every `*_task` pass is waited for
+            self._prune_task = asyncio.ensure_future(asyncio.to_thread(self._prune_runs, snapshot_at, live, live_ids))
+            await asyncio.shield(self._prune_task)
         if self.mode == "home":
             self._supervise_containers()
             day = datetime.now().astimezone().date().isoformat()

@@ -14,6 +14,7 @@ import stat
 import subprocess
 
 import pytest
+from conftest import park_ticks
 from fastapi.testclient import TestClient
 
 from sessionorc import paths
@@ -140,6 +141,7 @@ async def test_the_sweep_takes_an_hour_idle_part_whatever_runs_keep_days(agent, 
     import os
     from datetime import UTC, datetime
 
+    await park_ticks(agent)  # the fixture's own tick sweeps too, under the default retention (TD-1506)
     (paths.home() / "hosts.yml").write_text("local:\n  runs_keep_days: 0\n")
     where = paths.attachments_dir() / "ao-att-4"
     where.mkdir(parents=True)
@@ -152,6 +154,29 @@ async def test_the_sweep_takes_an_hour_idle_part_whatever_runs_keep_days(agent, 
         os.utime(f, (old, old))
     await asyncio.to_thread(agent._prune_runs, datetime.now(UTC), set())
     assert not idle.exists() and fresh.exists() and done.exists() and named.exists()
+
+
+async def test_a_parked_tick_leaves_no_sweep_running(agent, monkeypatch):
+    """TD-1506: the hourly sweep runs in a thread, which a cancelled tick does not stop; it is kept as the
+    `_prune_task` pass, so `park_ticks` waits for it and a test that parked the ticks owns the files."""
+    import threading
+    import time
+    from datetime import UTC, datetime
+
+    await park_ticks(agent)
+    started, finished = threading.Event(), threading.Event()
+
+    def slow(*_a, **_kw):
+        started.set()
+        time.sleep(0.5)
+        finished.set()
+
+    monkeypatch.setattr(agent, "_prune_runs", slow)
+    agent._pruned_at = datetime.min.replace(tzinfo=UTC)
+    agent._ticker = asyncio.create_task(agent.tick())
+    assert await asyncio.to_thread(started.wait, 5), "the tick never started its sweep"
+    await park_ticks(agent)  # cancels that tick mid-sweep
+    assert finished.is_set(), "park_ticks returned with the sweep's thread still running"
 
 
 @pytest.mark.unit

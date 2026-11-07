@@ -729,6 +729,7 @@ class HostAgent(
         # must still know that the killed run's own `SessionEnd`, landing late, is not the new run's end.
         self._killed_run_at: dict[str, float] = {}
         self._derive_task: asyncio.Task[None] | None = None
+        self._prune_task: asyncio.Task[None] | None = None  # the hourly sweep's thread (TD-1506)
         self._seat_count_task: asyncio.Task[None] | None = None  # §6 rule 3's `gh` read, detached
         self._seat_counted_at = datetime.min.replace(tzinfo=UTC)
         # rule 7's mark (TD-217 slice 3): the detached read of every brief's sources, when it last
