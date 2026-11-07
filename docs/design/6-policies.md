@@ -1285,7 +1285,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      - **The work it reads**, three kinds, each with its **actors** — the records whose act moves it:
        - **An open question to a session**: an `ask` open in a session's mailbox (§4.10), a handed entry
          and a session's own ledger request among them; never a `steer`, which lapses to its default, and
-         never one whose `to` includes the person, which is the person's, nor one whose seat passed it up (`Entry.passed_up` set:
+         never one whose `to` includes the person, which is the person's, nor one whose seat passed it up (`MailEntry.passed_up` set:
          the seat's copy stays open only for its thread, as `asks_ids` leaves it out of an ask and `owes` of a
          handed entry, whose passed-up copy is the person's likewise). Its actors are its addressees, each walked to
          its newest record by `_successor` as a send's is (a seat: its current fill or its empty record) —
@@ -1348,7 +1348,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        supersedes, as the lanes read them; these team words take the place of the members' own `ended`
        or `not_filled`. A PR with no actor reads *released by <name>*.
      - **Never stuck.** Work whose only actors are the person's own live sessions (`unattended: false`
-       and no member — `by_person`, §4.4 *The card's status*, TD-1281): the person is already there. A
+       and no member — `by_person`, §4.4 *The card's status*, TD-1281): the person is already there; beside
+       other actors, a person's own session is passed over when the first actor and its reason are chosen. A
        member the person took over is not the person's own: it reads `taken_over`. And a PR whose
        holder's claim is a **waiting claim** (rule 5, TD-820: an open `ask` or `steer` of the holder's
        about it, or its ask held in a seat's `prs_waiting.asks` — its reader asked) is not read as a PR:
@@ -1362,7 +1363,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        first tick it was among `workorders.orders()`'s work orders (every open decided line that is
        not `fyi`), moved to a claimant's claim `at` when one takes it
        and to the release when it lets it go, the entry dropped when the line closes or is no longer
-       decided; a PR's `oid` is its head (`headRefOid`) and `at` the first tick that read that head, moved
+       decided as a reading that holds it says — a repo whose board or PR reading is absent (a restart
+       before its first pass), errored, or fell back to the checkout's (`fetch_case` *skipped*) is not read
+       that tick, its `stuck_open` and `stuck` entries kept as they were, as any failed read keeps the last
+       good reading; a PR's `oid` is its head (`headRefOid`) and `at` the first tick that read that head, moved
        on every push, and also to a claim's `at` and to a release, as a line's is. Its **`since`** is the later of its open
        time and the newest state change among its actors (each record's `since`, which moves only on a
        real change of state, or its `subagent_at` or `shells_at` where later — `agent_common.idle_from`,
@@ -1416,9 +1420,12 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        usage cap: resets 08:00Z — it is rung after*; *stuck 1h: the One more round on TD-1437 — ao-grind
        is held by its daily start cap: 3 idle starts today*). Where the person already sees the work as
        a row — a decided line, drawn under *Waiting on them* while it waits on its session — that row
-       **moves** while it is stuck: to the card's Do group, or, its `Context:` naming no entry, under the
+       **moves** while it is stuck and a need — at *waiting* it stays under *Waiting on them*, the stuck
+       words its line, uncounted — : to the card's Do group, or, its `Context:` naming no entry, under the
        Inbox's *Needs you*, with the stuck words as a line under it, never a second row (`ao card` prints it as the stuck row, its id the `stuck` key and its kind *stuck*); it goes back
-       under *Waiting on them* the tick an actor acts; a handed entry's row under *Waiting on
+       under *Waiting on them* the tick an actor acts; while the line's item carries `applying` (§4.4 *A
+       press is drawn as it lands*) the row reads as the mark says and the stuck row makes no *needs you*,
+       its `stuck_open` entry untouched until the press's re-read; a handed entry's row under *Waiting on
        them* (screen 6) moves the same way, to *Needs you* or its named entry's Do group. Where a stopped
        holder's state row (TD-1453) draws the same actor **on the same surface** (one card, or both in the Inbox), the
        stuck words are a line under it alone, and the work's own row stays where it was, in no number: one
@@ -1435,9 +1442,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        back, a team's Start) is drawn where it already is. The row goes on the tick the work has an
        acting actor or closes.
      - **A send that did not land.** A session's `ao` that finds no host agent exits 3 (§4.8a *With no
-       host agent to ask*), and to a session says so: *error: the host agent is down — this did not
-       land: end your turn and run it again when you are rung* (the session branch's `hint`, under
-       `--json` too, which also carries `missed: true`; a restart under the command keeps *run it
+       host agent to ask*), and to a session says so — after a verb that writes a missed mark (below):
+       *error: the host agent is down — this did not land: end your turn and run it again when you are rung*;
+       after any other verb, which writes none, so no note rings it: *error: the host agent is down — nothing was done: end your
+       turn and run it again*, without `missed` (the session branch's `hint`, under
+       `--json` too, which also carries `missed: true` after a marked verb; a restart under the command keeps *run it
        again* and writes no mark). Before it exits, a verb a session files with (§4.7: those that call the host agent to file — `msg`, `td add`, `td reserve`, `progress`, `doing`,
        `finding`, `rank`; `board edit` writes the branch with no host agent, and every other verb is a read
        or a person's, so none writes a mark) writes a **missed mark**,
