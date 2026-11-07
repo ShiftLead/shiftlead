@@ -1041,7 +1041,7 @@ def queue_view(
         "in_progress": len(in_progress) + len(loose),
         "waiting": len(waiting),
         "up_next": len(up_next),
-        "needs_you": sum(1 for c in shaped if c.get("status") == "needs you") + len(kept) + len(loose),
+        "needs_you": sum(1 for c in [*shaped, *kept, *loose] if c.get("status") == "needs you"),
     }
     return {
         "completed": {"lines": lines, "counts": counts},
@@ -1057,6 +1057,12 @@ def queue_view(
         "repos": sorted(repos - {""}),
         "served": q.get("at") is not None or bool(cards),
     }
+
+
+def _side_status(wants: Mapping[str, Any]) -> str:
+    """A kept or loose card's status (TD-1468): *needs you* while an item on it is not a running steer, else
+    *steer*, as an open card's mail raises it (`_mail_status`)."""
+    return "needs you" if any(not m.get("running") for w in WANTS for m in wants.get(w) or ()) else "steer"
 
 
 def _kept_card(
@@ -1096,8 +1102,8 @@ def _kept_card(
     return {
         "id": cid,
         "group": "kept",
-        "status": "needs you",
-        "edge": card_edge("kept", "needs you", wants),
+        "status": _side_status(wants),
+        "edge": card_edge("kept", _side_status(wants), wants),
         "top": top,
         "rows": rows,
         "lines": [{"row": r} for r in rows],
@@ -1137,7 +1143,7 @@ def _loose_card(cid: str, got: Mapping[str, list[Any]] | None, one_repo: bool) -
     return {
         "id": cid,
         "group": "loose",
-        "status": "needs you",
+        "status": _side_status(wants),
         "edge": "",
         "top": top,
         "rows": [],
@@ -1312,9 +1318,11 @@ def apply_picks(view: dict[str, Any], picks: Mapping[str, Any], teams: Mapping[s
             needs[str(c["group"])] += 1
     for c in extra:
         nf = by_repo_find(c.get("repos"), str(c.get("find") or ""))
-        c["off"] = not nf
-        k += int(nf)
-        if nf and c.get("group") == "loose":
+        wants = c.get("status") == "needs you"
+        ok = nf and wants if picks.get("filter") == "needs-you" else nf
+        c["off"] = not ok
+        k += int(nf and wants)
+        if ok and wants and c.get("group") == "loose":
             needs["in_progress"] += 1
     status_pick = bool(picks.get("filter"))
     for ln in (view.get("completed") or {}).get("lines") or ():
@@ -1332,7 +1340,7 @@ def apply_picks(view: dict[str, Any], picks: Mapping[str, Any], teams: Mapping[s
             view["find_miss"] = {"id": tid, "repos": [{"name": r, "url": f"/repo/{quote(r)}#{tid}"} for r in where]}
     view["picks"] = dict(picks)
     loose = view.get("loose") or ()
-    view["shown"] = sum(1 for c in cards if not c["off"]) + sum(1 for c in loose if not c["off"])
+    view["shown"] = sum(1 for c in [*cards, *extra] if not c["off"])  # a kept card is shown too (TD-1468)
     # each group's share while a pick or a find is on (§4.5 screen 12 *Groups*: *Up next (4 of 28)*)
     done = (view.get("completed") or {}).get("lines") or ()
     view["shown_in"] = {

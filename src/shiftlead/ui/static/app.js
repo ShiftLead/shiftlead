@@ -4877,6 +4877,7 @@
       if (on.length) bar.push({ key, word, color, n: on.length, needs: on.filter((el) => el.dataset.status === "needs you").length });
       shown += on.length;
     });
+    shown += $$(".qgroup .qcard.g-kept:not(.qoff)", lists).length;  // a kept card is shown, in no bar group (TD-1468)
     bar.forEach((s) => { s.flex = AO.qBarFlex(s.n, shown); });
     const all = $$(".qgroup .qcard", lists);
     const k = all.filter((el) => el.dataset.status === "needs you" && pass(el, { ...picks, filter: "" })).length;

@@ -144,3 +144,25 @@ def test_the_page_draws_a_kept_card_and_a_loose_card_and_the_inbox_neither(tmp_p
     assert "merge #13?" not in rows and "is other#TD-9 done?" not in rows
     got = c.get("/api/person/inbox?counts=1").json()
     assert got["queue_n"] == 2 and got["needs"] == 2
+
+
+def test_a_lone_kept_card_is_counted_shown_and_reads_one_card_needs_you():
+    """The review of #3193: the summary counts a kept card among the cards shown, so a lone one reads *1 card needs
+    you* with the switch on."""
+    _, v = view([mail("m1", "merge #13?", about="TD-3")], picks={"filter": "needs-you"})
+    assert v["shown"] == 2 and v["summary"]["needs"] == 2  # TD-30's card and the kept one
+    q = queue()
+    q["cards"] = []
+    secs = inbox_sections([mail("m1", "merge #13?", about="TD-3")], now=NOW, cards=card_index(q))
+    v = apply_picks(queue_view(q, NOW, attach(secs, drawn)), queue_picks({"filter": "needs-you"}), {})
+    assert v["shown"] == 1 and v["summary"] == {"cards": 1, "needs": 1, "of": 1}
+
+
+def test_a_running_steer_alone_leaves_its_kept_or_loose_card_steer():
+    """The review of #3193: a steer whose clock runs is no *needs you*, as on an open card (`_mail_status`)."""
+    steer = mail("m3", "other#TD-9 next?", kind="steer", bound="2026-10-17T00:00:00+00:00", default="go")
+    _, v = view([steer])
+    (c,) = v["loose"]
+    assert c["status"] == "steer" and v["n"]["needs_you"] == 1  # TD-30's alone
+    _, v = view([steer], picks={"filter": "needs-you"})
+    assert v["loose"][0]["off"]
