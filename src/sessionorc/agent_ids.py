@@ -638,8 +638,9 @@ def _record_given(key: str, ids: list[str], by: str, take: str | None = None) ->
 
 
 def given_take(key: str, take: str, by: str) -> list[dict[str, Any]]:
-    """The records of one call the home gave for the origin (`ids.json`'s `given`, TD-1484): those whose `take` is
-    `take`, or, where `take` is `last`, the newest call given to `by`; none where the record no longer holds it."""
+    """The records of one call the home gave for the origin (`ids.json`'s `given`, TD-1484): those of the newest call
+    whose `take` is `take`, or, where `take` is `last`, the newest call given to `by`; none where the record no longer
+    holds it."""
     with _STORE:
         rec = _load().get(key)
     given = [g for g in (rec.get("given") if isinstance(rec, dict) else None) or [] if isinstance(g, dict)]
@@ -650,7 +651,11 @@ def given_take(key: str, take: str, by: str) -> list[dict[str, Any]]:
         newest = mine[-1]
         same = ("call", "take") if newest.get("call") else ("at", "take")  # a record from before the mark: its second
         return [g for g in mine if all(g.get(k) == newest.get(k) for k in same)]
-    return [g for g in given if g.get("take") == take]
+    named = [g for g in given if g.get("take") == take]
+    if not named:
+        return []
+    newest = named[-1]  # a nonce a script gave twice names its newest call alone (review of #3096)
+    return [g for g in named if g.get("call") == newest.get("call")]
 
 
 def _load() -> dict[str, Any]:

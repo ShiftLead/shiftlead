@@ -1256,3 +1256,38 @@ def test_an_out_file_that_cannot_be_written_still_prints_the_ids(tmp_path, monke
     assert cli.main(["td", "reserve", "--repo", "ShiftLead/shiftlead", "--out", str(bad)]) == 0
     out, err = capsys.readouterr()
     assert out == "reserved TD-007\n" and f"--out {bad} not written" in err
+
+
+@pytest.mark.unit
+def test_a_refused_call_leaves_no_earlier_out_file_and_the_alias_shows_too(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    _register()
+    monkeypatch.chdir(tmp_path)
+    f = tmp_path / "r.json"
+    f.write_text('{"ids": ["TD-001"]}')
+
+    def refuse(m, **p):
+        raise cli.AgentError("busy, ask again")
+
+    monkeypatch.setattr(cli, "call_sync", refuse)
+    assert cli.main(["td", "reserve", "--repo", "ShiftLead/shiftlead", "--out", str(f)]) != 0
+    assert not f.exists(), "a refused call leaves no earlier reply to be read as its own"
+    shown = {"repo": "shiftlead", "ids": ["TD-004"], "by": "ao-w", "at": "t", "id_take": None, "id_take_line": None}
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: dict(shown))
+    capsys.readouterr()
+    assert cli.main(["td", "next", "--repo", "ShiftLead/shiftlead", "--show", "last", "--out", str(f)]) == 0
+    assert capsys.readouterr().out == "TD-004\n" and json.loads(f.read_text()) == shown
+
+
+@pytest.mark.integration
+async def test_a_nonce_given_twice_names_its_newest_call_and_last_spans_old_and_marked_records(home, gh, tmp_path):
+    _one(tmp_path, gh)
+    given = [
+        {"id": "TD-090", "by": "ao-o", "at": "t1", "take": "n"},
+        {"id": "TD-091", "by": "ao-o", "at": "t2", "call": "c1", "take": "n"},
+        {"id": "TD-092", "by": "ao-o", "at": "t2", "call": "c1", "take": "n"},
+        {"id": "TD-093", "by": "ao-o", "at": "t3"},
+    ]
+    paths.ids_file().write_text(json.dumps({"shiftlead/shiftlead": {"last": 93, "given": given}}))
+    assert (await home.rpc_td_take(repo="shiftlead", take="n", caller="ao-x"))["ids"] == ["TD-091", "TD-092"]
+    assert (await home.rpc_td_take(repo="shiftlead", take="last", caller="ao-o"))["ids"] == ["TD-093"]

@@ -3594,7 +3594,16 @@ def _td_out(args: argparse.Namespace, out: dict[str, Any]) -> None:
             tmp.write_text(json.dumps(out, indent=1) + "\n", encoding="utf-8")
             tmp.replace(path)
         except OSError as e:  # the ids are spent already: say so and print them, never lose them to the file
+            tmp.unlink(missing_ok=True)
             print(f"--out {args.out} not written ({e.strerror or e}); the reply is below", file=sys.stderr)
+
+
+def _td_out_clear(args: argparse.Namespace) -> None:
+    """Remove an `--out` file before the call, so a refused call never leaves an earlier reply there to be read as
+    this one's (review of #3096)."""
+    if args.out:
+        with contextlib.suppress(OSError):
+            pathlib.Path(args.out).expanduser().unlink(missing_ok=True)
 
 
 def _td_show(args: argparse.Namespace, name: str) -> int:
@@ -3611,6 +3620,7 @@ def _td_show(args: argparse.Namespace, name: str) -> int:
 
 
 def _td_next_send(args: argparse.Namespace, name: str, branch: str = "") -> int:
+    _td_out_clear(args)
     if args.show:
         return _td_show(args, name)
     extra: dict[str, Any] = {}
