@@ -1691,8 +1691,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   between the readings and a promote: **(1) the checkout is on main's head with a clean tree** —
   `HEAD == origin/main` and `git status --porcelain` empty — because `run` installs from the tree
   (the tree is a person's: the policy reads it and never makes it — no checkout, no reset, nothing
-  beyond the fetch); **(2) checks green**; **(3) nothing in flight and no failure standing** for
-  that repo. With **`auto: true`** (§5 `settings.yml` `repos.<repo>.promote.auto`, the Settings
+  beyond the fetch); **(2) checks green**; **(3) nothing in flight** for that repo, and for the policy,
+  **no failure standing at the commit it would start** — a failure blocks only the commit it failed at
+  (below). With **`auto: true`** (§5 `settings.yml` `repos.<repo>.promote.auto`, the Settings
   page's switch — the one part of the block a person flips, so it is not in the checked-in file) the
   home promotes when live ≠ main, the three hold, and main has stood still for `PROMOTE_SETTLE` (ten
   minutes) — a burst of merges is one promote, since for this repo every promote restarts the host
@@ -1719,15 +1720,18 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   fifteen seconds, `PROMOTE_WATCH`, while it is in flight), and the agent that judges it need not be
   the one that started it — a restart mid-run finds the file and carries on. Live reads the wanted
   commit **and the run has ended** (`alive(pid, started)` false, TD-1031: *The smoke*, *When and
-  where*) → done (where the run's tree's block has `smoke:`, once the smoke passes, *The smoke* below): the file cleared and a `system` note to the person inbox, *promoted `<repo>`
+  where*) → done (where the run's tree's block has `smoke:`, once the smoke passes, *The smoke* below): the file cleared, any failure standing cleared, **`done`** written into `last.json` (*The live ref*, below) and a `system` note to the person inbox, *promoted `<repo>`
   `<sha>` — n commits* (FYI, uncounted, §4.10); the wheel and the nodes follow §4.4a. The process
   gone with live still elsewhere, or `PROMOTE_BOUND` (twenty minutes) passed — the process killed at
   the bound as the stop time kills, and only while it is still the run: the intent keeps the
   process's start time beside its pid, so after a restart of the home a pid taken again by another
   process reads gone and is never killed — → **failed**: `failed.json` `{sha, at, log, exit, why}`
-  beside it, the Inbox row under *Needs you*, and **nothing further is promoted for that repo, auto
-  or press, until the person clears it** — the row's Dismiss, or a rollback that concludes (below; with a smoke, once it passes),
-  the one press a failure does not refuse. Sessions are never told: no send, no state change; they
+  beside it, the Inbox row under *Needs you*, and **a failure blocks only the commit it failed at**
+  (TD-1554, Paul's Hold on TD-1437): `auto` starts nothing at that sha, and retries once main's head moves
+  past it — a run at the new head, the settle and the wait as ever; a person's press — Promote of main's
+  head, that sha among them (a retry is the person's word), or a rollback (below) — is never refused by
+  it and clears it as the run starts; a run that concludes clears it too, and a run that fails writes its
+  own in its place. Nothing else clears it: there is no Dismiss. Sessions are never told: no send, no state change; they
   live in tmux and survive a restart of the home, an attached Focus reconnects under §4.6's
   contract, and a blocked `wait` ends with the socket as §4.7 says. This repo's block is CLAUDE.md's
   pair: `run` rebuilds the live venv from the checkout (its path from where it runs, never written
@@ -1743,37 +1747,37 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   matched by a tag protection rule. It says which commit is live, so on a public repo that is public
   too. It assumes one home per origin: a second home that promotes the same repo reads the first's tag
   as someone else's, below.
-  **The home reads the tag before it acts.** Each full pass that reads **live** at a commit of
-  `origin/main` (a copy installed by hand that `check` reads among them) with no promote or rollback of
-  the repo in flight, and the watch pass that finds one concluding there (a smoke that fails concludes
-  nothing: its rollback is then in flight, and the pass that concludes the rollback reads), reads the
-  tag and a branch of that name with one
+  **The home tags only a commit a run finished at** (TD-1554; Fable's F132 form, Paul's Hold on TD-1437). A
+  run **finishes** when it concludes — `check` reads its commit, the run has ended, and its smoke, where the
+  run's tree's block has `smoke:`, has passed (*The smoke*, below) — and the conclusion then writes **`done`**,
+  its time, into `last.json`, the record the run's first reading wrote (*The outcome*). Each full pass that
+  reads **live** at the commit `last.json` names with `done` set, a commit of `origin/main`, with no promote or
+  rollback of the repo in flight, and the watch pass that concludes a run, reads the tag and a branch of that
+  name with one
   `git ls-remote --refs origin refs/tags/promote/live refs/heads/promote/live`, off the loop, so a tag
-  deleted or moved between promotes is seen within a full pass. While a run is in
-  flight — its smoke included, though `check` already reads the new commit (*The promote is in flight
-  until the smoke ends*, below) — nothing is read or pushed: a tag at a build whose smoke then fails
-  would lift a gate no rollback puts back. So too while the repo's failure stands (`failed.json`: a run
-  that did not conclude, or a failed smoke that rolls nothing back, *The smoke* below), though `check`
-  may read a commit of `origin/main` as live: the failed build is never tagged, and a rollback whose
-  own smoke failed is not either. The failure is read as the pass leaves it, after any conclusion the
-  pass makes, and before any start the same pass makes (an `auto` run that starts as the last one
-  concludes leaves the concluded build read): a rollback's concluding watch pass clears `failed.json`
-  and reads. Dismiss is no word that the build is good, so Dismiss of a failure (never of a hold) whose `sha` is
-  **live** — read by `check` at the press, not from the last pass's reading, and an answer of *unknown*, or
-  none, counted as live (it fails closed: a needless file lasts only to the next pass that reads another live
-  commit) — moves that `sha` to the file
-  `~/.shiftlead/promotes/<repo>/untagged`, beside `live_ref` and, unlike it, in no reading or `ao promote
-  status`; a failure at a sha that is not live writes nothing and leaves a standing file as it is, since that
-  sha becomes live only by a run that concludes or a hand install, and a file holds the one live sha it
-  names: a full pass whose **live** is that sha reads and pushes nothing, as
-  while the failure stood, and the first pass that reads (one that reads nothing keeps the file) with
-  another live commit deletes the file and reads; so a build that failed, or never had its
-  smoke, is tagged only once a promote or a rollback that concludes moves **live** off it. Dismiss holds the
-  pass's lock (`_promote_lock`) across both of its writes and writes the file before it clears the failure,
-  so no pass reads between them. The press order is the person's: a failed sha installed by hand while its
-  failure stands is left untagged by a later Dismiss, and the same install after the Dismiss is tagged; and a
-  rollback whose own smoke failed leaves the tag at the build it replaced while the rollback's target runs
-  untagged, until a run that concludes moves **live** — both accepted.
+  deleted or moved between promotes is seen within a full pass. Every other pass reads and pushes nothing:
+  - **a run in flight** — its smoke included, though `check` already reads the new commit (*The promote is
+    in flight until the smoke ends*, below): a tag at a build whose smoke then fails would lift a gate no
+    rollback puts back;
+  - **a run that did not finish** — `last.json` names its commit with no `done`: a run that failed after
+    `check` read it, a failed smoke that rolls nothing back, and a rollback whose own smoke failed, so a
+    failed build is never tagged, whatever the failure's state;
+  - **a copy installed by hand**, which `last.json` does not name (*A copy installed by hand*, below).
+  One rule stands where the failure's, the smoke's and a dismissed failure's exceptions stood: nothing is
+  tagged that no run finished at, and no other file is kept for it. A `last.json` written before `done` was
+  reads as not finished, so after the build lands the tag first moves at the next run that concludes, and
+  the row reads *installed by hand* until then — accepted. While
+  live is at any commit but the one a run finished at, the tag stays where the last push left it, so it may
+  name a build no longer live — after a hand install of an older commit, or a run that failed after `check`
+  read it — and a gate it lifted stays lifted, as one lifted before a rollback does: accepted.
+  **A copy installed by hand** — CLAUDE.md's pair, or its going back by hand — is tagged only by a run.
+  While live reads main's head and `last.json` does not name it with `done`, the row (§4.5a *Inbox row:
+  promote*) is drawn under FYI, uncounted, *installed by hand — promote to tag it*, and its **Promote**, or
+  `ao promote`, is taken, never refused as *nothing to promote*: the press runs `run` again at that commit,
+  its smoke too, and the pass that concludes it writes `done` and tags it. `auto` never starts it: live at
+  main's head is nothing for the policy to promote, so a hand install under `auto` is tagged by the next run
+  that concludes, after the next merge. A hand install of an older commit is tagged by a rollback to it
+  (`ao promote --sha`), as any going back is.
   The sha compared is the ref's own object as `ls-remote`
   prints it (`--refs` leaves out an annotated tag's peeled `^{}` line), so an annotated tag (its tag
   object's sha) never reads as at the live commit. A read that
@@ -1806,7 +1810,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   ref at its noted sha (the branch gone, the tag absent or elsewhere) clears that ref's line, so a
   ref put back at a noted sha is noted again; a landed push clears the tag's line too, since it moves
   the tag. A pass that reads nothing (a run in flight, a failed read, a live *unknown* or off
-  `origin/main`, a failure standing, live at the `untagged` sha) keeps the lines,
+  `origin/main`, a live no run finished at) keeps the lines,
   so a ref removed and put back at its noted sha
   within it is not noted again. Both files are read at every read, never held from the home's start:
   a press's or a rollback's own full read carries no earlier reading, and a promote of this repo restarts the home that
@@ -1852,8 +1856,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   - **What stands in its way.** Precondition (1) is not asked: the checkout's tree is not what is
     installed, so a rollback goes through with a branch checked out there or a change left in it.
     (2) is the person's word, as on any press, and the reply says what the checks read on *that*
-    commit. Of (3), a run in flight refuses it and **a failure standing does not**: a rollback that
-    concludes clears the failure.
+    commit. Of (3), a run in flight refuses it and **a failure never does**: the rollback clears it
+    as it starts, as any press does (*Promote*).
   - **What the repo may refuse.** `run` is started with `SHIFTLEAD_PROMOTE_SHA` (the commit),
     `SHIFTLEAD_PROMOTE_FROM` (what is live, empty when unread) and `SHIFTLEAD_PROMOTE_ROOT` (the
     checkout, for what a run needs that no commit holds), on every promote. The home knows no repo's
@@ -1869,9 +1873,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     nothing for that repo**, whatever `auto` says and however far main moves: the commit the person
     went back from is still on main, and a later merge that is not its cure would put it live again.
     The hold ends by the person's word alone: a plain press that concludes (main's head, by then
-    holding the cure or the revert), or Dismiss — `ao promote clear` — after which `auto` goes on as
-    if nothing had been held. **With a failure standing too** (a plain press under the hold that
-    failed) Dismiss clears the failure and the hold stands, a second Dismiss ending it. **A second
+    holding the cure or the revert), after which `auto` goes on as if nothing had been held. There is
+    no Dismiss (TD-1554): a person who wants `auto` back presses Promote, which is what `auto` would
+    do. **With a failure standing too** (a plain press under the hold that failed) the person's next
+    press clears the failure as it starts and ends the hold when it concludes. **A second
     rollback under a hold** rewrites `sha` and `at` and keeps `from`: what the person first went
     back from is what the row goes on naming. The row (§4.5a) is drawn while it stands and says
     *rolled back*, never *behind*: live is older than main because a person put it there.
@@ -1987,7 +1992,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
       held*.
     - The note reads *rolled back `<repo>` to `<sha7>`: the smoke failed on `<sha7>` — <why>*.
     - The hold ends as any hold does: a press that concludes once main holds the cure, its smoke
-      passing, or Dismiss.
+      passing.
     - A rollback that cannot start (its tree cannot be made) stands as a
       failure of the promote, with live left where it is. Its `failed.json` carries both reasons:
       *smoke failed on `<sha7>`: <why>; its rollback could not start: <why>*.
@@ -1995,9 +2000,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   - **It never rolls back a rollback.** In three cases a failed smoke leaves live where it is:
     a rollback's own smoke fails (the person's or the smoke's), no `from` was read, or `from` is
     the commit itself. The result stands as a **failure** in `failed.json`, with *smoke failed on
-    `<sha7>`* and the log's tail, under *Needs you*. Nothing further is promoted until the person
-    clears it, as after any failure. After a rollback that leaves the failure beside its hold:
-    Dismiss clears the failure first and the hold second, as *The hold* says.
+    `<sha7>`* and the log's tail, under *Needs you*. It blocks that commit alone, as any failure does
+    (*Promote*), and the person's next press clears it. After a rollback that leaves the failure beside
+    its hold, that press clears the failure as it starts and ends the hold when it concludes, as *The
+    hold* says.
   - **What it is not.**
     - It is no gate before the promote. Nothing runs a build against a copy of the person's state
       before it is live. A second host agent on a copy of the home acts on what it reads: the
