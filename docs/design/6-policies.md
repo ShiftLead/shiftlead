@@ -187,8 +187,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      from the files it was made from, as merged, on the home's own host; the stored prompt for a
      node's member or a launch record with no `prompt_from` — and the mail kept: the create moves
      the old record's mail to the new one, as a seat's fill does (`keep_mail`, §4.9b), and with it any owed
-     outcome, named in the prompt's closing line (§4.9a *The third declaration*); a seat's Restart creates
-     nothing, so it gets none. What it
+     outcome, which its own close leaves standing (§4.9a *The third declaration*). What it
      asked the person follows the close, not the mail: an `idle` member is closed first, and a
      close ends the open `ask`s and `steer`s it put to the person (`asker_gone`, §4.10; one about a
      ledger id or a PR is orphaned instead, and the new record, holding the name, adopts it), while
