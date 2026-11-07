@@ -300,7 +300,15 @@ async def test_a_blank_pick_goes_to_the_first_able_techlead_and_a_persons_pick_w
         rec.state, rec.stalled_ticks = "stalled?", 2
         waits = await person.call("entry_add", repo="shiftlead", type="debt", text="waits", teams=teams)
         assert (waits["to"], waits["team"]) == (first, "db"), "none able: the first team's seat, where it waits"
-        for sid in (first, second):
+        # a closed seat is read through the record that continues it, as `_msg` follows it
+        third = await _seat_session(person, tmp_path / "c")
+        rec.state, rec.stalled_ticks = "idle", 0
+        old, new = agent.sessions[first], agent.sessions[third]
+        old.state, old.superseded_by = "closed", third
+        new.state, new.limited_reset = "limited", None
+        chained = await person.call("entry_add", repo="shiftlead", type="debt", text="chained", teams=teams)
+        assert (chained["to"], chained["team"]) == (second, "ao-grind"), "its successor is limited"
+        for sid in (first, second, third):
             await person.call("kill", id=sid)
 
 

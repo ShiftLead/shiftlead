@@ -249,7 +249,13 @@ async def test_a_session_asks_another_repos_seat_for_a_ledger_entry(agent, tmp_p
             assert (got["to"], got["repo"], got["team"], got["priority"]) == (seat, "samscrape", "ss-grind", "high")
             held = _ask_in(agent.sessions[seat], got["id"])
             assert held.kind == "ask" and held.from_ == asker and not held.handed and held.bound is None
-            assert held.entry == {"repo": "samscrape", "type": "debt", "team": "", "priority": "high", "picked": False}
+            assert held.entry == {
+                "repo": "samscrape",
+                "type": "debt",
+                "team": "ss-grind",
+                "priority": "high",
+                "picked": False,
+            }
             assert agent.sessions[seat].asks_waiting(home=agent.host) == 1
             # one open question to the seat: a second request is refused naming the first
             with pytest.raises(AgentError, match=rf"{got['id']} is still open"):

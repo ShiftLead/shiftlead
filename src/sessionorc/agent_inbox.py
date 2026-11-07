@@ -418,7 +418,7 @@ class InboxMixin:
         records, sid, seen = self._graph(), self._addr(seat), set()
         while (r := records.get(sid)) is not None and r.state == "closed" and r.superseded_by and sid not in seen:
             seen.add(sid)
-            sid = self._addr(r.superseded_by)
+            sid = self._successor(sid, r) or sid
         r = records.get(sid)
         return r is None or seat_able(r, datetime.now(UTC), self.unfillable)
 
@@ -587,7 +587,7 @@ class InboxMixin:
             entry={
                 "repo": name,
                 "type": kind,
-                "team": str(team or "").strip(),
+                "team": str(team or "").strip() or str(seat.team or "").strip(),  # blank: the seat's (§4.10)
                 "priority": rank,
                 "picked": bool(str(team or "").strip()),
             },
