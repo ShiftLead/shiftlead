@@ -412,7 +412,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      mail** there, oldest first, `entry` envelopes and an `ask` carrying a `pr` among them — a mover of its own
      beside the tick's move of a routed ask (`_reroute_waiting`, which moves only from a seat that cannot answer,
      passes an `entry` envelope over, and moves a `pr` ask only to the person); the sender's `ao inbox --sent` reads where it went. So a send that could not
-     fill, and a second ask that landed on a closed seat behind the first before its fill, are one case.
+     fill, and a second ask that landed on a closed seat behind the first before its fill, are one case. The same
+     pass moves unread mail left on an extra that is not live (held, closed, or `exited` and not restarted) to
+     the seat's first free live record, else to the own record filled on its cause (§4.9 *Mail to a scaled
+     seat*); the send's choice of record and its delivery are one step under the lock that serializes `create`
+     and the eviction.
      **The cause pass never fills an extra**: `seat_due` and a seat's fill on its cause pass over a record
      carrying `scale`, whose fills are the send's and this mover's alone, both reading `scale.live`. An idle record, one lingering, is free and takes its mail
      at the ring as today; a seat that cannot answer is routing around's case (§4.9b, TD-1443), which reads its
@@ -1615,8 +1619,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      out, so the line's next short event fills it again. An extra is never sent rule 6's *new work* note: out
      of work, it closes, and new work fills whichever extra is held. Its out-of-work declaration ends only its
      own run: the wound-down and finished readings (`work.wound_down`, `work.finished`; §4.9a) pass over a held
-     extra as they pass over a seat, so a team winds down when its kept members and its live extras have
-     declared, and one with held extras is not kept running by them. A filled extra is otherwise a member:
+     extra as they pass over a seat, so a team winds down when its kept members and its live worker extras have
+     declared (a seat's extra counts as a seat does, never declaring), and one with held extras is not kept running by them. A filled extra is otherwise a member:
      rules 1, 2, 4, 5 and 7 apply to it (rule 1's restart replays the record and is no start of the crew; an
      extra `exited` after declaring out of work is closed held, never restarted), rule 8 and a schedule's start never replay it (`_work_replays` skips a
      record carrying `scale`) — every start of the team (`ao team start`, Apply's *starts*, rule 8's and a
