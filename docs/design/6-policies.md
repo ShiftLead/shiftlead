@@ -391,25 +391,30 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      standing or on call, the manager seat itself is a group of one (its controller is a
      director's, where there is one), and in a person-led team, whose seats have empty
      `controllers`, every seat is its own group with six fills an hour of its own.
-     **An extra seat** (§4.9 *Scaling with the work*, TD-1529): a held record carrying `scale` whose
-     `line` names an `asks` seat carries `seat: {trigger: asks}` and fills by that trigger as any `asks` seat
-     does — due once mail waits on it. What puts mail there is this pass: when the seat is **short** — mail
-     addressed to the seat (a question, a reader's `ask` carrying `pr`, an `entry` envelope) has waited unread
-     for a minute (`SEAT_SCALE_WAIT`) in one of the seat's live records, and each of the seat's live records is
-     busy, `working` (on its own included, §4.2) or `needs-you` — the pass **moves the waiting mail** to the
-     seat's lowest-placed held extra, oldest first, every unread entry §4.9's *Mail to a scaled seat* lets
-     move, as the tick's move of a routed ask does (`_reroute_waiting`; the sender's `ao inbox --sent` reads
-     where it went), and the extra is then due by `asks`, filled on the same terms as any seat (not suspended,
-     the profile not gated, under `scale.live`). An idle record, one lingering, is free and takes its mail at
-     the ring as today; a seat that cannot answer is routing around's case (§4.9b, TD-1443), which reads its
-     extras first. One extra is given mail per pass per seat; a seat still short on the next pass gives the
-     next. **An extra's fills count toward a `FILL_CEILING` of their own**: the group is the seat's extras
-     together, never the seats sharing their controller, so churn among extras never refuses the seat's own
-     fill or a sibling seat's. A live extra is closed back to held by this rule's `asks` close — idle
-     `SEAT_ASK_LINGER`, nothing dirty or unpushed, no live subagent or shell, and no PR of its own waiting
-     within `SEAT_PR_WAIT` — as any `asks` seat is: its record stays, held, with its mailbox. The seat's own
-     record is no extra, and closes and fills as it always has. The fill and the close each write
-     `scale.last` (*filled: 2 asks waiting on techlead-ao-1, busy*; *back to held: idle*).
+     **An extra seat** (§4.9 *Scaling with the work*, TD-1529; Paul, 2026-11-07: *up, on need, no timers*): a
+     held record carrying `scale` whose `line` names an `asks` seat carries `seat: {trigger: asks}`. **Up, at
+     the send**: mail addressed to the seat (a question, a reader's `ask` carrying `pr`, an `entry` envelope)
+     that finds each of the seat's live records busy — `working` (on its own included, §4.2) or `needs-you` —
+     fills the seat's lowest-placed held extra at once, `create` from its launch record with `keep_mail`, and
+     is delivered to it (§4.9 *Mail to a scaled seat*); there is no wait before it. A send that cannot fill
+     one (every extra live and busy, the host at `scale.live`, the profile gated, the team's balance mark)
+     leaves the mail on the seat's own record, and this pass, each tick, fills the lowest-placed held extra for
+     it once one can be filled and **moves the waiting mail** there, oldest first, every unread entry §4.9's
+     *Mail to a scaled seat* lets move, as the tick's move of a routed ask does (`_reroute_waiting`; the
+     sender's `ao inbox --sent` reads where it went). An idle record, one lingering, is free and takes its mail
+     at the ring as today; a seat that cannot answer is routing around's case (§4.9b, TD-1443), which reads its
+     extras first. **An extra's fills count toward a `FILL_CEILING` of their own**: the group is the seat's
+     extras together, never the seats sharing their controller, so churn among extras never refuses the seat's
+     own fill or a sibling seat's. **Down, only when the slot is needed**: a live extra seat is never closed by
+     the `asks` linger — idle, it costs no tokens, only a slot, and keeps its thread's context warm for a
+     follow-up — and is closed back to held only when its host is at `scale.live` and a start needs the room
+     there (an extra of any line or seat, a member's fill, a team's start, a person's new session): the home
+     first closes the host's longest-idle extra seat that is idle at the composer, with nothing dirty or
+     unpushed, no live subagent or shell, and no PR of its own waiting within `SEAT_PR_WAIT`, then starts. A
+     team that winds down or stops closes its extras with the rest, held for the next run. Its record stays,
+     held, with its mailbox. The seat's own record is no extra, and closes and fills as it always has. The fill
+     and the close each write `scale.last` (*filled: an ask for techlead-ao-1, every record busy*; *back to held:
+     host full, room for grinder-ao-4*).
   4. **The idle nudge.** A supervised member that has been hook-confirmed `idle` for `IDLE_NUDGE`
      (twenty minutes) with **open work on its record** — a `lane` reference with no `done` or
      `dropped` entry, a declared `claimed` entry with no `done` or `dropped` that is not a waiting
@@ -1553,40 +1558,40 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        not land, to be run again on the next turn, and a member that ended its turn on it is rung by
        rule 4's idle nudge if it holds open work (a seat by its next question); one with nothing open
        is not rung, accepted: what it lost, its record does not show as owed.
-  14. **Scale with the work** (§4.9 *Scaling with the work*, TD-1529; Paul, 2026-11-07). For each running
-     team whose records carry a held **extra** of a worker line (a record with `scale`, its `line` naming a
-     member line), the tick reads, on each shape sample (§4.4 *Team shape*, once a minute), whether the
-     line is **short**: the queue of its members' stage holds work and every sampled member of the stage
-     is `working` or `on its claim` — the shape's *backed up* less one class: a member `waiting:review` makes
-     the line not short, since another worker would only add to the reader's queue, which the reader's own
-     extras answer (rule 3) — in **three samples running** (`SCALE_AFTER`, a count `agent_shape` keeps per
-     stage beside its sample), so a member between claims for a minute is not a reason. Short, the tick **fills**
-     the line's lowest-placed held extra: `create` from its launch record with `keep_mail`, as rule 3
-     fills a seat, the record keeping `scale`. **One at a time per stage**: where two lines share a stage the
-     first in record order with a held extra is filled, and the tick fills no other extra of the stage while
-     one it filled has not yet claimed (`progress` holds no claim) and was filled less than ten minutes
-     ago (`SCALE_STEP`), so the extra it just started takes work off the queue before the queue is read
-     again. **It fills nothing** for a team its balance mark holds (*Balance*, below: the team takes no new
-     work), on a profile the usage gate pauses or would pause, while the line's stage has no live member
-     (*unstaffed* is rule 8's and a Start's, not this rule's: the line's kept members come first), while
-     the team winds down (§4.9a), or past **`scale.live`** live extras on the extra's host (§5, six unless
-     set; a node's extras counted at the node's host). A sample the shape skips (the ledger not read) is
-     not a run of three. **Down**: an extra that declared out of work (`ao progress none`, §4.9a) and has
-     been hook-confirmed `idle` for five minutes (`SCALE_IDLE_GRACE`, counted from the later of `since`,
-     `subagent_at` and `shells_at`, as rule 4 counts), with nothing dirty or unpushed, no live subagent or
-     shell, and no claim waiting on a PR of its own within `SEAT_PR_WAIT` (rule 3's test), is **closed back
-     to held** — the
-     record stays with its mailbox and its `scale`, never marked sat out, so the next short sample fills it
-     again. An extra is never sent rule 6's *new work* note: out of work, it closes, and new work fills
-     whichever extra is held. Its out-of-work declaration ends only its own run: the
-     wound-down and finished readings (`work.wound_down`, `work.finished`; §4.9a) pass over a held extra as
-     they pass over a seat, so a team winds down when its kept members and its live extras have declared, and
-     one with held extras is not kept running by them. A filled
-     extra is otherwise a member: rules 1, 2, 4, 5 and 7 apply to it, rule 8 and a schedule's start never
-     replay it (`_work_replays` skips a record carrying `scale`), and a team that winds down or stops closes it
-     with the rest, held for the next run. Each fill and close writes
-     **`scale.last: {at, did: fill | hold, why}`** on the extra's record (*filled: build queue backed up 3
-     min, 4 waiting*; *back to held: out of work*), which the team card's *td-max* line reads (§4.9).
+  14. **Scale with the work** (§4.9 *Scaling with the work*, TD-1529; Paul, 2026-11-07: *up, on need, no
+     timers; down, no idle timers*). For each running team whose records carry a held **extra** of a worker
+     line (a record with `scale`, its `line` naming a member line), the home asks whether the line is
+     **short** at the events that change the answer, never on a timer: **an entry becoming pickable** in the
+     line's lane (filed, or its block dropped — the repo reading's `lanes.<team>` gaining an id it did not
+     hold, §4.4 *Repo facts*), and **a member of the line claiming** (`ao progress claim`, §4.8) while that lane
+     still holds a pickable entry nobody holds. The line is short when its lane holds a pickable entry nobody
+     holds and **every live member of the line is busy — holding a lease**, a claim declared or derived that
+     is not `done` or `dropped` (a waiting claim included, §4.8 *A claim is a lease*); a member between items,
+     holding no lease, idle or not, is free and picks, so the line is not short. Short, the home **fills** the
+     line's lowest-placed held extra: `create` from its launch record with `keep_mail`, as rule 3 fills a seat,
+     the record keeping `scale`. **One guard**: no second extra on a line until the last one filled has
+     claimed (its `progress` holds a claim); an extra filled ten minutes ago (`SCALE_STEP`) with no claim no
+     longer holds the guard — that is a start that stuck, not a reason to wait, and its `scale.last` says *not
+     claimed in 10 min* — so the line's next event may fill another. **It fills nothing** for a team its
+     balance mark holds (*Balance*, below: the team takes no new work), on a profile the usage gate pauses or
+     would pause, while the line has no live member (*unstaffed* is rule 8's and a Start's, not this rule's:
+     the line's kept members come first), while the team winds down (§4.9a), or while the extra's host is at
+     **`scale.live`** (§4.9 *The bounds*: every live session on the host; a node's at the node's host), where
+     the home first closes an idle extra seat to make room (rule 3) and, with none, writes *+0: host full, 30
+     live* on the line. **Down, with no idle timer**: an extra that **declares out of work** (`ao progress
+     none`, §4.9a) is closed back to held at once — once nothing is dirty or unpushed, no subagent or shell is
+     live, and no claim waits on a PR of its own within `SEAT_PR_WAIT` (rule 3's test); until then it is
+     closed at the first tick they pass. Its record stays with its mailbox and its `scale`, never marked sat
+     out, so the line's next short event fills it again. An extra is never sent rule 6's *new work* note: out
+     of work, it closes, and new work fills whichever extra is held. Its out-of-work declaration ends only its
+     own run: the wound-down and finished readings (`work.wound_down`, `work.finished`; §4.9a) pass over a held
+     extra as they pass over a seat, so a team winds down when its kept members and its live extras have
+     declared, and one with held extras is not kept running by them. A filled extra is otherwise a member:
+     rules 1, 2, 4, 5 and 7 apply to it, rule 8 and a schedule's start never replay it (`_work_replays` skips a
+     record carrying `scale`), and a team that winds down or stops closes it with the rest, held for the next
+     run. Each fill and close writes **`scale.last: {at, did: fill | hold | stopped, why}`** on the extra's
+     record (*filled: 4 pickable, every grinder claimed*; *back to held: out of work*; *stopped: host full, 30
+     live*), which the team card's *td-max* line reads (§4.9).
 - **Promote**: a repo's live copy — the host agent and every session's `ao` for this repo, a cluster
   for samscrape — is made from `main` by **a person's press or this policy, never by a session**
   (CLAUDE.md: a worker never promotes; the `promote` RPC is refused to a session as `set_settings`
