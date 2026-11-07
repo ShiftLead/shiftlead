@@ -64,7 +64,7 @@ dev = [
 test = "pytest -q -n 8"
 test-fast = "pytest -q -m unit"
 # the tests that read this checkout's docs/ (TD-1483): what docs/cadence.toml's [precheck-paths] runs for a
-# docs-only PR. Found by an audit hook over the whole suite (every open/listdir under docs/, 2026-11-07),
+# docs-only PR. Found by an audit hook over the whole suite (every open, listdir and stat under docs/, 2026-11-07),
 # plus test_ledger*, test_design_doc* and test_help*. A test that reads docs/ joins this list.
 test-docs = { cmd = ["pytest", "-q", "-n", "8",
     "tests/test_board.py",
@@ -82,6 +82,7 @@ test-docs = { cmd = ["pytest", "-q", "-n", "8",
     "tests/test_ledger_writes.py",
     "tests/test_ledgerboard_fixtures.py",
     "tests/test_look_home.py",
+    "tests/test_org.py",
     "tests/test_primer.py",
     "tests/test_rank_order.py",
     "tests/test_repo_adopt.py",
