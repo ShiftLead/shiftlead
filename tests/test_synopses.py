@@ -110,8 +110,10 @@ def test_a_good_synopsis_passes_and_the_title_is_not_compared():
         (lambda t: t.replace("# TD-7: A seat", "# A seat"), "first line"),
         (lambda t: t.replace("## What it rules out", "## What it leaves out"), "sections"),
         (
-            lambda t: t.replace("## What it rules out\n\nPools only on question seats.\n\n", "")
-            + "\n## What it rules out\n\nPools.\n",
+            lambda t: (
+                t.replace("## What it rules out\n\nPools only on question seats.\n\n", "")
+                + "\n## What it rules out\n\nPools.\n"
+            ),
             "sections",
         ),
         (lambda t: t + "\n".join(f"line {i}" for i in range(40)), "non-blank lines"),
