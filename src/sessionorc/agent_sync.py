@@ -210,5 +210,8 @@ class SyncMixin:
         # home lands is read at once*, TD-1508)
         if (cur := self._repos.get(root)) is not None:
             self._repos[root] = {**cur, "sync": {**(cur.get("sync") or {}), str(n): got}}
-        await self._reread_board(root, fetch=True)
+        if not await self._reread_board(root, fetch=True) and self._repos.get(root) is not None:
+            # a re-read that pushed nothing (its fetch failed, nothing changed): the verdict saved and pushed here
+            self.repos_store.save(self._repos)
+            await self._broadcast({"event": "repos", "root": root, "repo": self._repo_view(root)})
         return got

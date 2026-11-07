@@ -343,7 +343,8 @@ async def test_a_press_during_the_queues_hold_is_drawn_at_once(tmp_path, agent):
     from conftest import park_ticks
 
     await park_ticks(agent)
-    root, _ = scratch(tmp_path, v2_files([entry(1, "one"), entry(2, "two")]))
+    asked = entry(1, "one", priority="Low", blocked_by="decision (paul)") + "**Ask:** go?\n"
+    root, _ = scratch(tmp_path, v2_files([asked, entry(2, "two")]))
     led = ledger.reading(root, NOW, with_history=False)
     r = {"name": "repo", "root": str(root), "remote": "", "ledger": led, "prs": {"open": []}}
     agent._repos = {str(root): r}
@@ -354,6 +355,8 @@ async def test_a_press_during_the_queues_hold_is_drawn_at_once(tmp_path, agent):
         return next(x for c in agent._queue["cards"] for x in [c["top"], *c["rows"]] if x["qid"] == q)
 
     before = row("repo#TD-001")
+    status = {c["id"]: c["status"] for c in agent._queue["cards"]}
+    assert before["needs"] and status["repo#TD-001"] == "needs you", "the person's decision, before the press"
     agent._archived = {}  # a restart: no ledger read yet
     agent._repos = {str(root): {**r, "ledger": {**led, "entries": led["entries"][:1]}}}
     agent._applying = {str(root): {"ledger:repo#TD-001": {1: {"act": "decide", "answer": "Go", "at": NOW.isoformat()}}}}
@@ -362,9 +365,12 @@ async def test_a_press_during_the_queues_hold_is_drawn_at_once(tmp_path, agent):
     got = row("repo#TD-001")
     assert got["state"] == "answered — applying" and got["needs"] is None and got["applying"]["answer"] == "Go"
     assert row("repo#TD-002")["applying"] is None, "an unmarked row as it was"
+    card = next(c for c in agent._queue["cards"] if c["id"] == "repo#TD-001")
+    assert card["status"] != "needs you", "the card's status read again over the marked row (#3161's review)"
     agent._applying = {}
     await agent._queue_pass(NOW + timedelta(seconds=3))
     assert row("repo#TD-001") == before, "the mark cleared: the row as the last reading drew it"
+    assert {c["id"]: c["status"] for c in agent._queue["cards"]} == status
 
 
 async def test_a_repo_whose_ledger_read_failed_holds_no_queue_back(tmp_path, agent):

@@ -654,13 +654,15 @@ def lay_held(queue: Mapping[str, Any], repos: Mapping[str, Mapping[str, Any]]) -
     """The Queue held back after a restart (`_queue_pass`, TD-1471) with the press marks of `repos` (the readings
     with `lay_applying`'s marks) laid over its members, so a press during the hold is drawn at once (TD-1518): a
     marked open row reads `applying_words` with no need, as `reading` draws it; a row the person holds
-    (`with_you`) keeps its state. `queue` is the last reading `reading` gave, never one this wrote, so a mark that
-    clears during the hold leaves the row as that reading drew it. A copy; `queue` is never written."""
+    (`with_you`) keeps its state, and a marked card's status is read again over its rows where all its members are
+    in the readings. `queue` is the last reading `reading` gave, never one this wrote, so a mark that clears during
+    the hold leaves the row and the card as that reading drew them. A copy; `queue` is never written."""
     rs = _Repos(repos)
-    open_ = {
-        qid(name, e["id"]): e for name, r in rs.by_name.items() for e in r["ledger"]["entries"]
-        if isinstance(e, Mapping) and e.get("id")
-    }  # fmt: skip
+    open_: dict[str, Mapping[str, Any]] = {}
+    for name, r in rs.by_name.items():
+        for e in r["ledger"]["entries"]:
+            if isinstance(e, Mapping) and e.get("id"):
+                open_.setdefault(qid(name, e["id"]), e)
     boards = {n: list((r.get("boards") or {}).get("boards") or ()) for n, r in rs.by_name.items()}
     pressing = _pressing(open_, boards, open_refs(open_, rs.origins))
 
@@ -671,12 +673,21 @@ def lay_held(queue: Mapping[str, Any], repos: Mapping[str, Mapping[str, Any]]) -
             return row
         return {**row, "state": applying_words(applying), "needs": None, "answered": None, "applying": applying}
 
-    cards = [
-        {**c, "top": mark(c.get("top")), "rows": [mark(r) for r in c.get("rows") or ()]}
-        if isinstance(c, Mapping) else c
-        for c in queue.get("cards") or ()
-    ]  # fmt: skip
-    return {**queue, "cards": cards}
+    def card(c: Any) -> Any:
+        if not isinstance(c, Mapping):
+            return c
+        top, rows = mark(c.get("top")), [mark(r) for r in c.get("rows") or ()]
+        if top is c.get("top") and all(a is b for a, b in zip(rows, c.get("rows") or (), strict=True)):
+            return c  # no mark on it: the card as the reading drew it
+        out = {**c, "top": top, "rows": rows}
+        # its status read again over the marked rows, as `reading` reads it, where every member is in the readings
+        members = [str(q) for q in c.get("order") or ()]  # the open members
+        if isinstance(top, Mapping) and members and all(q in open_ for q in members):
+            out["status"] = _status([top, *(r for r in rows if isinstance(r, Mapping) and not r.get("archived"))],
+                                    [open_[q] for q in members])  # fmt: skip
+        return out
+
+    return {**queue, "cards": [card(c) for c in queue.get("cards") or ()]}
 
 
 def reading(
