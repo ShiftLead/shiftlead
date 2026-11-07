@@ -283,25 +283,49 @@ class MailMixin:
         why = seat_unable(seat, now, self.unfillable)
         if why is None:
             return to, None
-        target = PERSON
-        if pr is None and str(seat.team or "").strip():
-            leads = [
-                r
-                for r in records.values()
-                if r is not seat
-                and self._address(r) != self._addr(sender)  # never back to its own sender: the person instead
-                and r.team == seat.team
-                and mail.asks_seat(r)
-                and (r.seat or {}).get("tags") is True
-                and not r.superseded_by
-                and _fillable(r)
-                and seat_able(r, now, self.unfillable)
-            ]
-            if leads:
-                rank = {"exited": 1, "closed": 2}  # live first, then on call, then closed
-                target = self._address(min(leads, key=lambda r: (rank.get(r.state, 0), r.name)))
+        lead = self._route_lead(seat, records, now, sender) if pr is None else None
+        target = self._address(lead) if lead is not None else PERSON
         at = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
         return [target], {"seat": seat.id, "name": seat.name, "why": why, "at": at}
+
+    def _route_lead(
+        self, seat: Session, records: dict[str, Session], now: datetime, sender: str | None = None
+    ) -> Session | None:
+        """The techlead seat a general question to an unable `seat` goes to (§4.9b *A seat that cannot answer is
+        routed around*, TD-1443): its team's able techlead seat (`tags`), never the seat itself nor the sender —
+        live first, then on call, then closed — or None, where it goes to the person. The send and the seat card's
+        *its questions go to* line read this one choice."""
+        if not str(seat.team or "").strip():
+            return None
+        leads = [
+            r
+            for r in records.values()
+            if r is not seat
+            and (sender is None or self._address(r) != self._addr(sender))  # never back to its own sender
+            and r.team == seat.team
+            and mail.asks_seat(r)
+            and (r.seat or {}).get("tags") is True
+            and not r.superseded_by
+            and _fillable(r)
+            and seat_able(r, now, self.unfillable)
+        ]
+        if not leads:
+            return None
+        rank = {"exited": 1, "closed": 2}  # live first, then on call, then closed
+        return min(leads, key=lambda r: (rank.get(r.state, 0), r.name))
+
+    def _seat_routing(self, s: Session, records: dict[str, Session] | None, now: datetime) -> dict[str, Any]:
+        """The view's reading of an `asks` seat that cannot answer (design §4.5a card *routed around* line and
+        *Inbox row: routed around*'s *waits:* line, TD-1443): `seat_unable`, the why (None when able, when
+        superseded, or for a record holding no `asks` seat), and `seat_routed_to`, *the techlead* or *you*,
+        where its general questions go meanwhile. The home's alone: `unfillable` is its tick's."""
+        if self.mode == "node" or not mail.asks_seat(s) or s.superseded_by:
+            return {"seat_unable": None, "seat_routed_to": None}
+        why = seat_unable(s, now, self.unfillable)
+        if why is None:
+            return {"seat_unable": None, "seat_routed_to": None}
+        lead = self._route_lead(s, records if records is not None else self._graph(), now)
+        return {"seat_unable": why, "seat_routed_to": "the techlead" if lead is not None else "you"}
 
     async def _question_seat(self, team: str | None = None, repo: str | None = None) -> Session:
         """The question seat `--team` or `--repo` names (§4.10 *A team or a repo as the address*,

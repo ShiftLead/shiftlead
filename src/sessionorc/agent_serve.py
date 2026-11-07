@@ -98,6 +98,9 @@ class ServeMixin:
             s, "reply", now, unreachable=down, rings=rings, refills=True, modal_limit=modal
         )
         v.update(self._held_mail(s, v))
+        # §4.9b *A seat that cannot answer is routed around* (TD-1443): why an `asks` seat cannot answer and
+        # where its questions go meanwhile — the card's *routed around* line and *Waiting on them*'s *waits:*
+        v.update(self._seat_routing(s, graph, now))
         if s.host == self.host:
             if self.mode == "node":
                 v["asks_waiting"] = self._asks_hints.get(s.id, 0)  # the mailbox is the home's (§4.4a)

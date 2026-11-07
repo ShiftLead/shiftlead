@@ -76,3 +76,46 @@ def test_the_homes_words_are_escaped():
     hostile = {**ROUTED, "why": "<script>x</script>"}
     html = rows("needs", [entry("m-1", "ask", text="which?", routed=hostile)])
     assert "&lt;script&gt;" in html and "<script>x" not in html
+
+
+@pytest.mark.unit
+def test_the_seat_card_says_where_its_questions_go_while_it_cannot_answer(tmp_path, monkeypatch):
+    """§4.5a card **routed around** line (TD-1473 slice 4b): an `asks` seat the home reads unable draws one line,
+    *its questions go to <the techlead | you> while it cannot answer*, display only; gone once it is able."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import view
+
+    base = {"id": "ao-x-rv", "name": "rv", "kind": "agent", "adapter": "claude-code", "dir": "/tmp/x",
+            "state": "limited", "since": "2026-11-07T01:00:00Z", "pane": False, "tail": [],
+            "created": "2026-11-07T00:00:00Z", "confidence": "tick", "seat": {"trigger": "asks"}}  # fmt: skip
+    card = templates.get_template("card.html")
+    for to in ("the techlead", "you"):
+        html = card.render(s=view({**base, "seat_unable": "limited, resets 08:00Z", "seat_routed_to": to}))
+        line = html[html.index('class="meta routed"') :]
+        line = line[: line.index("</div>")]
+        assert f"its questions go to {to} while it cannot answer" in line and "limited, resets 08:00Z" in line
+        assert "<button" not in line and "<a " not in line
+    assert "its questions go to" not in card.render(s=view({**base, "seat_unable": None, "seat_routed_to": None}))
+    # the compact card (a member of a live team) draws it too
+    v = {**view({**base, "seat_unable": "not supervised", "seat_routed_to": "you"}), "compact": True}
+    assert "its questions go to you while it cannot answer" in card.render(s=v)
+
+
+@pytest.mark.unit
+def test_a_handed_entry_waiting_on_an_unable_seat_says_why_under_waiting_on_them():
+    """§4.5a *Inbox row: routed around* (TD-1473 slice 4b): a handed entry under *Waiting on them* whose holder
+    cannot answer says *waits: <name> <why>*; an able holder's row says nothing of it."""
+    from datetime import UTC, datetime
+
+    from test_ui_inbox import handed_entry
+
+    from shiftlead.ui.app import handed_rows, inbox_sections
+
+    at = datetime(2026, 9, 19, 12, tzinfo=UTC)
+    rec = {"id": "ao-shiftlead-techlead-ao-1", "name": "techlead-ao-1", "team": "ao-grind", "state": "limited"}
+    fleet = {rec["id"]: {**rec, "seat_unable": "limited, resets 08:00Z"}}
+    got = inbox_sections([], now=at, handed=handed_rows([handed_entry("m-h1")], fleet, at))
+    html = rows("waiting", got["waiting"])
+    assert "waits: techlead-ao-1 limited, resets 08:00Z" in html
+    able = inbox_sections([], now=at, handed=handed_rows([handed_entry("m-h1")], {rec["id"]: rec}, at))
+    assert "waits:" not in rows("waiting", able["waiting"])

@@ -567,6 +567,10 @@ def view(
     d["stop_note"] = stop_note(s)
     d["start_note"] = start_note(s)  # §6 *Start time*, §4.5a **starts** note (TD-152): a scheduled record's
     d["gated"] = gated_view(s.get("gated"))  # the usage gate's pause (§6, TD-100): a mark, never a state
+    # §4.5a card **routed around** line (§4.9b, TD-1443): an `asks` seat the home reads unable says where its
+    # questions go meanwhile; display only, gone once it is able. The why on hover.
+    d["routed_to"] = mail.seat_routed_to_line(s.get("seat_routed_to") if s.get("seat_unable") else None)
+    d["routed_why"] = str(s.get("seat_unable") or "")
     d["brief_unsent"] = brief_unsent(s)  # §4.5a **brief not sent** (TD-339): the slot's and Focus's mark
     d["grants_all"] = list(GRANTS)
     # §4.3 *A record with no agent* (TD-665, built by TD-666): what is typed at it is a command line,

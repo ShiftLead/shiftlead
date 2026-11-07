@@ -207,6 +207,20 @@ def routed_line(routed: Any) -> str | None:
     return f"routed around {name}: {why}" if why else f"routed around {name}"
 
 
+def seat_waits_line(name: Any, why: Any) -> str | None:
+    """What waits on a seat that cannot answer says under *Waiting on them* (design §4.5a *Inbox row: routed
+    around*, §4.9b, TD-1443): *waits: <name> <why>* (*waits: techlead-ao-1 limited, resets 08:00Z*). None where
+    the seat is able (no `why`)."""
+    why = str(why or "").strip()
+    return f"waits: {name} {why}" if why else None
+
+
+def seat_routed_to_line(to: Any) -> str | None:
+    """The card line of an `asks` seat that cannot answer (design §4.5a card *routed around* line, §4.9b,
+    TD-1443): *its questions go to <the techlead | you> while it cannot answer*. None where it is able."""
+    return f"its questions go to {to} while it cannot answer" if to else None
+
+
 def clip_subject(line: str) -> str:
     """A subject as one line of at most `SUBJECT_CHARS` (§4.10 *A subject on every entry*): whitespace
     and control characters folded to single spaces, and a longer one clipped at a word with an
