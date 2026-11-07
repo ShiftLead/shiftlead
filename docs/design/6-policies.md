@@ -1561,20 +1561,28 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   as someone else's, below.
   **The home reads the tag before it acts.** Each full pass that reads **live** at a commit of
   `origin/main` (a copy installed by hand that `check` reads among them) with no promote or rollback of
-  the repo in flight, and the watch pass that finds one concluding there, reads the tag and a branch of
-  that name with one `git ls-remote origin refs/tags/promote/live refs/heads/promote/live`, off the
-  loop, so a tag deleted or moved between promotes is seen within a full pass. While a run is in
+  the repo in flight, and the watch pass that finds one concluding there (a smoke that fails concludes
+  nothing: its rollback is then in flight, and the pass that concludes the rollback reads), reads the
+  tag and a branch of that name with one
+  `git ls-remote --refs origin refs/tags/promote/live refs/heads/promote/live`, off the loop, so a tag
+  deleted or moved between promotes is seen within a full pass. While a run is in
   flight — its smoke included, though `check` already reads the new commit (*The promote is in flight
   until the smoke ends*, below) — nothing is read or pushed: a tag at a build whose smoke then fails
-  would lift a gate no rollback puts back. The sha compared is the ref's own object as `ls-remote`
-  prints it, so an annotated tag (its tag object's sha) never reads as at the live commit. A read that
+  would lift a gate no rollback puts back. So too while the repo's failure stands (`failed.json`: a run
+  that did not conclude, or a failed smoke that rolls nothing back, *The smoke* below), though `check`
+  may read a commit of `origin/main` as live: the failed build is never tagged, and a rollback whose
+  own smoke failed is not either; the next full pass after the failure is cleared (a rollback that
+  concludes, or Dismiss) reads. The sha compared is the ref's own object as `ls-remote`
+  prints it (`--refs` leaves out an annotated tag's peeled `^{}` line), so an annotated tag (its tag
+  object's sha) never reads as at the live commit. A read that
   fails (the origin not answering, refused, timed out) is no reading: it pushes nothing, keeps the
   lease and the noted lines, is logged and is read again on the next full pass; only a read that
   answers can find a ref absent. Then, by what it finds:
   - **a branch `promote/live`**, which may shadow the tag (the forge reader resolves a ref by name):
     the home keeps its lease, pushes nothing, and sends the person one `system` note, as the promote's
     *promoted* notes go (§4.10): *a branch promote/live on <repo> shadows the home's live tag: delete it
-    (`git push origin :refs/heads/promote/live`)*. Once it is gone, the tag is read as below;
+    (`git push origin :refs/heads/promote/live`)*. While it stands the tag's noted line is neither read
+    nor cleared; once it is gone, the tag is read as below;
   - otherwise, **the tag at the live commit**: adopted as the lease if the lease differs (a push that
     landed before its lease was written); nothing is pushed;
   - **no tag**: the home pushes onto the absent tag;
@@ -1595,10 +1603,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   ref at its noted sha (the branch gone, the tag absent or elsewhere) clears that ref's line, so a
   ref put back at a noted sha is noted again; a landed push clears the tag's line too, since it moves
   the tag. A pass that reads nothing (a run in flight, a failed read, a live *unknown* or off
-  `origin/main`) keeps the lines, so a ref removed and put back at its noted sha within it is not
-  noted again. Both files are read at every read, never held from
-  the home's start: a press's or a rollback's own full read carries no earlier reading, and a
-  promote of this repo restarts the home that pushed it; the reading's `live_ref` is a copy for
+  `origin/main`, a failure standing) keeps the lines, so a ref removed and put back at its noted sha
+  within it is not noted again. Both files are read at every read, never held from the home's start:
+  a press's or a rollback's own full read carries no earlier reading, and a promote of this repo restarts the home that
+  pushed it; the reading's `live_ref` is a copy for
   `ao promote status` (its `--json`'s `promotes.<repo>.live_ref`, §4.7).
   The read and the push run in the
   pass's thread under the promote lock, so no promote moves **live** between them. A push refused for its lease
@@ -1606,7 +1614,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   Any other failure of the push is logged and retried on the next full pass. A live that is *unknown*, or a commit
   `origin/main` does not hold, reads and moves nothing. The tag is the home's alone: no session pushes
   it (the briefs say so), and a lift read from a tag someone else moved is caught as any forged lift
-  is, by review. A push that lands clears that repo's last-swept day (the event runner's `_swept_on`,
+  is, by review. A push that lands, or an adoption that changes the lease (the tag put at the live
+  commit by hand reads at once too), clears that repo's last-swept day (the event runner's `_swept_on`,
   §4.4), or, while its sweep is running, adds it to `_resweep`, which clears its day when that run
   ends; the check reads the forge, so the next sweep reads the gate at once, and only its lift PR is
   written from the clone as last fetched. GitHub and GitLab both answer `file-contains` at a tag (the
