@@ -325,8 +325,16 @@ def test_carried_to_checks_its_own_repos_name_and_takes_anothers_as_written(tmp_
 def test_carried_to_on_main_gives_the_branch_refusal(tmp_path, monkeypatch, capsys):
     root = ledger_repo(tmp_path)
     git(root, "switch", "-q", "main")
-    rc, out, _ = carried(root, monkeypatch, capsys, "--carried-to", "TD-9")
-    assert rc == 1 and "a default branch" in out and "TD-9" not in out
+    for value in ("TD-9", "td-5"):
+        rc, out, _ = carried(root, monkeypatch, capsys, "--carried-to", value)
+        assert rc == 1 and "a default branch" in out and value not in out
+
+
+@pytest.mark.unit
+def test_carried_to_refuses_an_id_too_long_for_any_ledger(tmp_path, monkeypatch, capsys):
+    root = ledger_repo(tmp_path)
+    rc, out, lines = carried(root, monkeypatch, capsys, "--carried-to", "TD-" + "9" * 5000)
+    assert rc == 1 and "neither open nor archived" in out and lines[4] == f"- [ ] {ITEM}"
 
 
 @pytest.mark.unit

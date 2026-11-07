@@ -3528,6 +3528,9 @@ def _carried_reason(action: str, value: str, why: str) -> str:
     the one given."""
     if action != "done":
         raise board_mod.Refused("--carried-to is for done only")
+    root = _edit_root(os.getcwd())
+    if root is None:
+        return why  # branch_edit refuses this tree in its own words, before any id is read
     ids: list[str] = []
     for part in value.split(","):
         tid = part.strip()
@@ -3538,9 +3541,6 @@ def _carried_reason(action: str, value: str, why: str) -> str:
         if tid not in ids:
             ids.append(tid)
     reason = f"carried to {_and_list(ids)}" + (f": {why}" if why.strip() else "")
-    root = _edit_root(os.getcwd())
-    if root is None:
-        return reason  # branch_edit refuses this tree in its own words
     try:
         own = pathlib.Path(_td_repo(None)[0]).name
     except AgentError:
@@ -3560,7 +3560,7 @@ def _carried_reason(action: str, value: str, why: str) -> str:
                 else f"{rel} cannot be read, so --carried-to cannot be checked"
             )
         known = ledger_mod.ids_in(led) | ledger_mod.ids_in(arch)
-        if missing := [t for t in local if ledger_mod._norm(t) not in known]:
+        if missing := [t for t in local if len(t) > 12 or ledger_mod._norm(t) not in known]:
             raise board_mod.Refused(
                 f"--carried-to names {_and_list(missing)}, which {at} holds neither open nor archived — "
                 "file the entry first (ledger.py new), then close the line"
