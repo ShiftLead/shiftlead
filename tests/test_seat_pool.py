@@ -177,6 +177,33 @@ def test_apply_of_a_pool_grown_at_the_tail_starts_the_new_member_held_and_moves_
 
 
 @pytest.mark.unit
+def test_apply_reads_a_members_changed_profile_and_a_dropped_member(tmp_path, monkeypatch):
+    """§4.9b *A pool is compared member by member*: names follow places, so a member whose place now holds
+    another profile reads *profile … → …*, and a member the definition no longer names is removed."""
+    org = _org(tmp_path, monkeypatch, _team(POOL))
+    before = _live(teams.plan(org, "t", HOST))
+    org = _org(tmp_path, monkeypatch, _team({**POOL, "pool": ["sonnet", "gemini-reader"]}))
+    calls: list[tuple[str, dict]] = []
+
+    def call(method, **params):
+        calls.append((method, params))
+        if method == "list":
+            return before
+        if method in ("relaunch", "create"):
+            return {"id": params.get("id") or f"ao-alpha-{params['name']}"}
+        raise AssertionError((method, params))
+
+    got = teamrun.apply(call, org, "t", HOST)
+    assert sorted(r["line"] for r in got["applied"]) == [
+        "qa-p2: profile sonnet → gemini-reader (next restart)",
+        "qa-p3: removed from the definition",
+        "qa: profile gemini-reader → sonnet (next restart)",
+    ]
+    dropped = [p for m, p in calls if m == "relaunch" and p.get("dropped")]
+    assert [p["id"] for p in dropped] == ["ao-alpha-qa-p3"]
+
+
+@pytest.mark.unit
 def test_a_profile_seat_turned_into_a_pool_reads_its_rank_in_the_seat_line():
     x = teams.Launch(name="qa", role="fact-checker", home="alpha", dir=Path("/d"), team="t", project="p")
     x.trigger = {"trigger": "asks", "pool": "qa", "rank": 1}
@@ -224,6 +251,9 @@ async def test_a_pool_member_with_no_mail_waiting_is_not_filled(agent, tmp_path)
                 held=True,
             )
         )["id"]
-    rec = agent.sessions[sid]
-    assert rec.state == "closed" and rec.seat == {"trigger": "asks", "pool": "qa", "rank": 2}
-    assert agent._seat_due(rec, datetime.now(UTC), list(agent.sessions.values())) is None
+        rec = agent.sessions[sid]
+        assert rec.state == "closed" and rec.seat == {"trigger": "asks", "pool": "qa", "rank": 2}
+        assert agent._seat_due(rec, datetime.now(UTC), list(agent.sessions.values())) is None
+        # and when a question waits on it, it is due, as any `asks` seat is
+        await person.call("msg", to=sid, text="is this figure right?", kind="ask")
+        assert agent._seat_due(rec, datetime.now(UTC), list(agent.sessions.values())) is not None
