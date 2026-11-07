@@ -1394,12 +1394,14 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   The push is `git push --force-with-lease=refs/tags/promote/live:<lease> origin <live>:refs/tags/promote/live`,
   from the checkout, its lease empty onto an absent tag. The lease is **`promotes.<repo>.live_ref`**,
   the sha the home last pushed or adopted, written to `~/.shiftlead/promotes/<repo>/live_ref` beside
-  `last.json`, and the ref and sha last noted to `live_ref_noted` beside it (`refs/heads/promote/live <sha>`
-  or `refs/tags/promote/live <sha>`, so a branch note never stands for a tag note at the same sha;
-  cleared whenever a read finds the tag at the live commit and no branch, so a second move to a noted
-  sha is noted again). Both are read from their files at every read, never held from the home's
-  start: a press's or a rollback's own full read carries no earlier reading, and a promote of this
-  repo restarts the home that pushed it; the reading's `live_ref` is a copy for `ao repo`. The read and the push run in the
+  `last.json`, and the last note sent to `live_ref_noted` beside it: one pair, its ref and sha
+  (`refs/heads/promote/live <sha>` or `refs/tags/promote/live <sha>`), overwritten by each new note,
+  so a branch note never stands for a tag note at the same sha. A read that does not find the noted
+  ref at the noted sha (the branch gone, the tag absent or elsewhere) clears it, so a ref put back at
+  a noted sha is noted again. Both files are read at every read, never held from the home's start:
+  a press's or a rollback's own full read carries no earlier reading, and a promote of this repo
+  restarts the home that pushed it; the reading's `live_ref` is a copy for `ao repo`.
+  The read and the push run in the
   pass's thread under the promote lock, so no promote moves **live** between them. A push refused for its lease
   (the tag moved between the read and the push) changes nothing: the next read acts on what is there.
   Any other failure is logged and retried on the next full pass. A live that is *unknown*, or a commit
