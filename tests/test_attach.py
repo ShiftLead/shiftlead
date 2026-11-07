@@ -900,7 +900,7 @@ def test_the_message_dialog_is_wired_with_each_callers_addressee():
     js = (UI / "static" / "app.js").read_text()
     assert 'upload: AO.attachUpload(id, Number($("#attach").dataset.piece)),' in js
     assert "(id) => AO.attachUpload(id, Number(button.dataset.piece))," in js
-    assert 'id: action === "reply" ? b.dataset.from || "" : b.dataset.seat ? "" : id,' in js
+    assert 'id: action === "reply" ? at.from || "" : at.seat ? "" : id,' in js
     assert 'data-act="reply" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-from="${esc(e.from)}"' in js
     rows = (UI / "templates" / "inbox_row.html").read_text()
     # Reply, a look's Not right…, Overrule, and a card's Answer row: Not right… and Answer… (TD-914)

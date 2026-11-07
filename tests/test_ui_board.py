@@ -1217,7 +1217,7 @@ def test_not_right_opens_the_composer_begun_decides_then_hands_an_entry_on():
     block = js[at : js.index('if (action === "board_add") {', at)]
     assert 'text: "Not right: "' in block and '$("#mailtext").value = o.text || "";' in js
     decide, hand = block.index('action: "decide"'), block.index('fetch("/api/entry/hand"')
-    assert decide < hand and 'type: "debt"' in block and "words: `${b.dataset.head} — ${answer}`" in block
+    assert decide < hand and 'type: "debt"' in block and "words: `${at.head} — ${answer}`" in block
     assert "no entry was handed on" in block and 'board_notright: "Not right…"' in js
     assert "!refused);" in block and "/^not right\\s*:?\\s*/i" in block  # a refusal is not a green toast
     assert 'text: ["Go with it", "Go with it: Works"]' in js
@@ -1779,7 +1779,9 @@ def test_every_board_row_draws_its_id_and_every_press_on_it_carries_it(tmp_path,
     rows, html = rows_html(tmp_path, monkeypatch, {**it, "key": ""})
     assert rows[0]["key"] == "" and "boardkey" not in html and 'data-key=""' in html
     js = (pathlib.Path(__file__).resolve().parent.parent / "src/shiftlead/ui/static/app.js").read_text()
-    assert js.count('key: b.dataset.key || ""') == 3  # Snooze/Done/decide, Reply, Not right…
+    assert (
+        js.count('key: b.dataset.key || ""') == 1 and js.count('key: at.key || ""') == 2
+    )  # Snooze/Done/decide, Reply, Not right…
     assert 'AO.toast(b.dataset.copied || "copied", true)' in js
 
 
