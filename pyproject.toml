@@ -63,6 +63,36 @@ dev = [
 # eight workers (TD-1068): ~100 s against 12 min on one core, and room beside other prechecks on 16 cores
 test = "pytest -q -n 8"
 test-fast = "pytest -q -m unit"
+# the tests that read this checkout's docs/ (TD-1483): what docs/cadence.toml's [precheck-paths] runs for a
+# docs-only PR. Found by an audit hook over the whole suite (every open/listdir under docs/, 2026-11-07),
+# plus test_ledger*, test_design_doc* and test_help*. A test that reads docs/ joins this list.
+test-docs = { cmd = ["pytest", "-q", "-n", "8",
+    "tests/test_board.py",
+    "tests/test_briefs_layout.py",
+    "tests/test_cli.py",
+    "tests/test_cli_teams.py",
+    "tests/test_decision_coverage_gate.py",
+    "tests/test_design_doc.py",
+    "tests/test_gate_sweep.py",
+    "tests/test_help.py",
+    "tests/test_host_log_sources.py",
+    "tests/test_ledger.py",
+    "tests/test_ledger_derived.py",
+    "tests/test_ledger_layout.py",
+    "tests/test_ledger_writes.py",
+    "tests/test_ledgerboard_fixtures.py",
+    "tests/test_look_home.py",
+    "tests/test_primer.py",
+    "tests/test_rank_order.py",
+    "tests/test_repo_adopt.py",
+    "tests/test_repo_facts.py",
+    "tests/test_screen.py",
+    "tests/test_td_next.py",
+    "tests/test_ui.py",
+    "tests/test_ui_board.py",
+    "tests/test_ui_board_add.py",
+    "tests/test_worktree_reap.py",
+] }
 lint = "ruff check src tests"
 fmt = "ruff format src tests"
 # the adapter conformance suite's live walk, by hand (design §4.3, TD-784): `pdm run conformance <adapter> --profile <p>`
