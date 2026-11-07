@@ -1540,6 +1540,11 @@ class HostAgent(
             holder = starting if starting is not None else await self._name_holder(directory, repo, name)
             if isinstance(holder, Session):
                 self._refuse_suspended(holder, caller, "a create under that name")
+            if seat is None and resume and isinstance(holder, Session) and holder.adapter_id == resume and holder.seat:
+                # a seat stays a seat when it is resumed (§4.9b, TD-1435): the name's own record holding the
+                # conversation, never a record of another name that held it — so the record and the launch
+                # record below carry it, as `supervised` is carried; a `seat` the call gives wins
+                seat = dict(holder.seat)
             succeeding = self._check_succeeds(succeeds, name, caller, resume, keep_mail, starting) if succeeds else None
             if keep_mail:
                 self._check_keep_mail(holder, caller, resume)
@@ -2664,6 +2669,11 @@ class HostAgent(
         never one with no launch record. Nothing is touched before every check passes;
         the reply is the record.
 
+        **`seat`** (TD-1435): the definition's whole seat, or None to remove one, written on the record at
+        once for a member of this host (the tick's seat machinery reads the record), a removal clearing
+        `seat_due` with it. Where nothing but the seat changes, the launch record and the record's seat
+        are written alone: no mark, no brief re-record, so a pending `brief_changed` or rename stands.
+
         **`sit_out: true`** is its other form (slice 5b): a member the flow no longer uses is wound
         down as **Members…**'s remove winds one down — the wrap-up sent now, a working member finishing
         what it holds — but by the home, which writes `sit_out: {at}` and, once the member is settled,
@@ -2691,10 +2701,14 @@ class HostAgent(
         stray = sorted(k for k in launch if k not in RELAUNCH_KEYS)
         if stray:
             raise RpcError(f"a relaunch replaces {', '.join(RELAUNCH_KEYS)} alone, not {', '.join(stray)} {rule}")
-        kinds = {"prompt": str, "prompt_from": dict, "lane": list, "review": dict, "profile": str, "name": str}
+        kinds = {
+            "prompt": str, "prompt_from": dict, "lane": list, "review": dict, "profile": str, "name": str, "seat": dict
+        }  # fmt: skip
         for k, v in launch.items():
             if v is not None and not isinstance(v, kinds[k]):
                 raise RpcError(f"a relaunch's {k} is a {kinds[k].__name__}, not {type(v).__name__} {rule}")
+        if (seat := launch.get("seat")) is not None and not (isinstance(seat.get("trigger"), str) and seat["trigger"]):
+            raise RpcError(f"a relaunch's seat is {{trigger, after?}}: the trigger its team definition gives it {rule}")
         if launch.get("name") is not None and not str(launch["name"]).strip():
             raise RpcError(f"a relaunch's name is the member's new name, never blank {rule}")
         if not s.unattended:
@@ -2715,10 +2729,29 @@ class HostAgent(
         if launch.get("profile") is not None and s.host == self.host:
             await self._relaunch_profile(s, str(launch["profile"]), rule)
         before = params.get("name")
+        was = dict(params)
         for k in RELAUNCH_KEYS:
             if k not in RELAUNCH_KEPT or launch.get(k) is not None:
                 params.pop(k, None)
         params.update({k: v for k, v in launch.items() if v is not None})
+
+        def write_seat() -> None:
+            # the tick's seat machinery reads the record, so the seat is written there at once (TD-1435); a
+            # node member's record is the replica's, which takes the launch record's at its next replay
+            if s.host == self.host:
+                s.seat = dict(params["seat"]) if params.get("seat") else None
+                if s.seat is None:
+                    s.seat_due = None  # `_seat_pass` returns before touching a seatless record's seat fields
+
+        if _same_but_seat(was, params):
+            # a seat-only Apply (§4.9c *Switching*, TD-1435): the launch record and the record's seat alone,
+            # no relaunch mark, no brief re-record, no rename — a pending `brief_changed` or rename stands
+            self._write_launch(address, s, params)
+            write_seat()
+            self._save(s)
+            await self._push_changes()
+            log.info("%s relaunched by the person: its seat alone", address)
+            return self._view(s)
         # a rename is the launch record's name moved off the record's, by this Apply or one before it
         # whose replay has not run yet — a second Apply keeps the first one's rename, and one that hands
         # the record's own name back cancels it (the review of TD-706 slice 2)
@@ -2729,6 +2762,7 @@ class HostAgent(
         # a node member's files are that host's, which rule 7 never reads here (as the replay)
         read = await asyncio.to_thread(brief.record, made, False) if made and s.host == self.host else None
         self._write_launch(address, s, params)
+        write_seat()  # after the brief's read: nothing is touched before every step that can fail
         s.brief, s.brief_changed = read, None
         self._brief_differs.pop(s.id, None)
         s.relaunch = {
@@ -3453,6 +3487,13 @@ class HostAgent(
         if resume_prompt is not None:
             s.resume_prompt = str(resume_prompt).strip() or None
         self._save(s)
+        if unattended:
+            # Hand back reaches the launch record every later replay reads (§4.9b *A seat stays a seat when
+            # it is resumed*, TD-1435): a Resume wrote `unattended: false` and no gate texts there. Also on a
+            # record already unattended, so `ao mode <id> unattended` mends one; the texts key by key, as the
+            # record takes them. A switch to interactive writes the record alone: nothing replays it.
+            texts = {"pause_prompt": pause_prompt, "resume_prompt": resume_prompt}
+            self._mend_launch(s, {"unattended": True}, {k: v for k, v in texts.items() if v is not None})
         # pushed now, as `set_stop` is: another tab's Focus re-attaches read-only or with the keyboard
         # at the press, not on the next tick (§4.6, TD-096)
         await self._push_changes()
@@ -3466,15 +3507,33 @@ class HostAgent(
         s = self._find(id)  # the home's own copy of another host's record too (4a)
         s.run_only = False
         self._save(s)
-        if self.mode != "node":
-            path = paths.launch_dir() / f"{self._address(s)}.json"
-            with contextlib.suppress(OSError, ValueError):
-                launch = json.loads(path.read_text(encoding="utf-8"))
-                if isinstance(launch, dict) and launch.get("run_only"):
-                    launch.pop("run_only")
-                    self._write_launch(self._address(s), s, {k: v for k, v in launch.items() if k not in ("id", "at")})
+        self._mend_launch(s, {}, {"run_only": ""})
         await self._push_changes()
         return self._view(s)
+
+    def _mend_launch(self, s: Session, values: dict[str, Any], texts: dict[str, Any]) -> None:
+        """Set keys on a record's launch record in place (`keep`'s `run_only`, `set_mode`'s mend, TD-1435):
+        `values` as given, `texts` stripped, an empty one removing its key. The home's alone (a node
+        member's launch record is the home's); a record with none writes none, and nothing is written
+        where nothing changes. Read, set and written through `_write_launch`, so a failed read writes no
+        partial record."""
+        if self.mode == "node":
+            return
+        address = self._address(s)
+        path = paths.launch_dir() / f"{address}.json"
+        with contextlib.suppress(OSError, ValueError):
+            launch = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(launch, dict):
+                return
+            params = {k: v for k, v in launch.items() if k not in ("id", "at")}
+            params.update(values)
+            for k, v in texts.items():
+                if text := (str(v).strip() if v else ""):
+                    params[k] = text
+                else:
+                    params.pop(k, None)
+            if params != {k: v for k, v in launch.items() if k not in ("id", "at")}:
+                self._write_launch(address, s, params)
 
     async def rpc_set_stop(
         self, id: str, run_until: str | None = None, wrapup_prompt: str | None = None
@@ -4220,6 +4279,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "link":
         return asyncio.run(link.bridge(args.host))
     return 2
+
+
+def _same_but_seat(was: dict[str, Any], now: dict[str, Any]) -> bool:
+    """Whether a relaunch changes nothing of the launch record but its `seat` (§4.9c, TD-1435), `profile`
+    read `or ""` on both sides; a `prompt` composed differently is a real difference. `name` is compared
+    as the launch record holds it before and after: an earlier pending rename, kept when no `name` is
+    handed, reads the same on both sides and stands, while a rename this Apply hands is a change."""
+
+    def key(p: dict[str, Any]) -> dict[str, Any]:
+        return {**{k: v for k, v in p.items() if k != "seat"}, "profile": p.get("profile") or ""}
+
+    return key(was) == key(now)
 
 
 if __name__ == "__main__":

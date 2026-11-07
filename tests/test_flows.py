@@ -797,7 +797,7 @@ def _switching(world, tmp_path, monkeypatch, flows):  # noqa: F811
     plan, _ = teamrun.start(cli.call_sync, org, "ao-grind", HOST)
     for x, rec in zip(plan.launches, state["sessions"], strict=True):
         stage = teamrun.stage_of(x.prompt_from)
-        rec.update(brief={"sources": [{"path": stage}] if stage else []}, seat=(x.trigger if x.seat else None))
+        rec.update(brief={"sources": [{"path": stage}] if stage else []}, seat=x.seat_params())
     fake = cli.call_sync
 
     def call(method, **params):
@@ -859,7 +859,14 @@ def test_a_switch_sits_the_designer_out_and_relaunches_whose_stage_or_reader_mov
     handed = {p["id"]: p["launch"] for _, p in calls if "launch" in p}
     assert sorted(handed) == ["ao-shiftlead-grind-1", "ao-shiftlead-grind-2"]
     launch = handed["ao-shiftlead-grind-1"]
-    assert sorted(launch) == ["lane", "profile", "prompt", "prompt_from", "review"]  # profile always (TD-620)
+    assert sorted(launch) == [
+        "lane",
+        "profile",
+        "prompt",
+        "prompt_from",
+        "review",
+        "seat",
+    ]  # profile and seat always (TD-620, TD-1455)
     assert launch["prompt_from"]["slots"]["{stage}"]["file"].endswith("build-review/build.md")
     assert "designer-ao: sits out under build-review" in out
     assert "grind-1: relaunched — stage td/build.md → build-review/build.md" in out

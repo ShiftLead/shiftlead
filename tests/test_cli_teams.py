@@ -116,6 +116,7 @@ def world(tmp_path, monkeypatch):
                 "team": params.get("team", ""),
                 "project": params.get("project", ""),
                 "lane": list(params.get("lane") or []),
+                "seat": params.get("seat"),  # the home writes the seat on the record (§4.9b)
                 "previous_run": None,
             }
             state["sessions"].append(rec)
@@ -128,6 +129,7 @@ def world(tmp_path, monkeypatch):
                 s["sit_out"] = {"at": "now", **({"dropped": True} if params.get("dropped") else {})}
             else:
                 s["relaunch"] = {"at": "now", **({"name": n} if (n := params["launch"].get("name")) else {})}
+                s["seat"] = params["launch"].get("seat")  # written on the record at once (TD-1435)
             return s
         if method in ("send", "kill", "close"):
             if (why := state.get("refuse", {}).get(params["id"])) is not None:
