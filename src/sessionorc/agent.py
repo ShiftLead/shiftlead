@@ -2734,16 +2734,20 @@ class HostAgent(
             if k not in RELAUNCH_KEPT or launch.get(k) is not None:
                 params.pop(k, None)
         params.update({k: v for k, v in launch.items() if v is not None})
-        if s.host == self.host:
+
+        def write_seat() -> None:
             # the tick's seat machinery reads the record, so the seat is written there at once (TD-1435); a
             # node member's record is the replica's, which takes the launch record's at its next replay
-            s.seat = dict(params["seat"]) if params.get("seat") else None
-            if s.seat is None:
-                s.seat_due = None  # `_seat_pass` returns before touching a seatless record's seat fields
+            if s.host == self.host:
+                s.seat = dict(params["seat"]) if params.get("seat") else None
+                if s.seat is None:
+                    s.seat_due = None  # `_seat_pass` returns before touching a seatless record's seat fields
+
         if _same_but_seat(was, params):
             # a seat-only Apply (§4.9c *Switching*, TD-1435): the launch record and the record's seat alone,
             # no relaunch mark, no brief re-record, no rename — a pending `brief_changed` or rename stands
             self._write_launch(address, s, params)
+            write_seat()
             self._save(s)
             await self._push_changes()
             log.info("%s relaunched by the person: its seat alone", address)
@@ -2758,6 +2762,7 @@ class HostAgent(
         # a node member's files are that host's, which rule 7 never reads here (as the replay)
         read = await asyncio.to_thread(brief.record, made, False) if made and s.host == self.host else None
         self._write_launch(address, s, params)
+        write_seat()  # after the brief's read: nothing is touched before every step that can fail
         s.brief, s.brief_changed = read, None
         self._brief_differs.pop(s.id, None)
         s.relaunch = {

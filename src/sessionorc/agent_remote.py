@@ -584,6 +584,8 @@ class RemoteMixin:
                 # what the node made of the call — an auto-name, a worktree's resolved repo — so a
                 # replay recreates this session, not a new one (review of PR #447)
                 made = {**launch_params(params), "name": held.name, "repo": held.repo, "worktree": held.worktree}
+                if held.seat and not params.get("seat"):  # a Resume's carried seat, as the replica took it (TD-1435)
+                    made["seat"] = dict(held.seat)
                 self._write_launch(f"{held.id}@{host}", held, {k: v for k, v in made.items() if v is not None})
             if method == "create" and person:
                 self._lift_by_person(host, str(reply["record"].get("id") or ""))
