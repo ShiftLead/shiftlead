@@ -82,13 +82,14 @@ def test_names_headings_and_lines_are_held(tmp_path):
             "td-8.md": good,  # misnamed
             "2026-11-07-Board_Edit.md": good,  # slug not lowercased
             "TD-9.md": good,  # no such entry
-            "TD-10.md": "## §6.\n- 2026-11-07 (TD-x): x.\n## §4.11\n- 2026-11-07 (TD-x): y.\n",  # §4.11 is not indexed
+            "TD-10.md": "## §6\n- 2026-11-07 (TD-x): x.\n## §4.11\n- 2026-11-07 (TD-x): y.\n## §6.\n",  # not indexed
+            "TD-14.md": "## §6\n- 2026-13-45 (TD-x): no such day.\n",
             "TD-11.md": "# A title\n## §6\n- 2026-11-07 (TD-x): x.\n",  # a title
             "TD-12.md": "## §6\n- 2026-11-07 (TD-x): x.\nprose under it\n- undated: x.\n",  # prose, an undated line
             "TD-13.md": "- 2026-11-07 (TD-x): before any heading.\n",
             "README.md": "# anything goes here\n",
         },
-        entries=("TD-7", "TD-10", "TD-11", "TD-12", "TD-13"),
+        entries=("TD-7", "TD-10", "TD-11", "TD-12", "TD-13", "TD-14"),
     )
     (root / "docs" / "history" / "sub").mkdir()
     problems = "\n".join(history.check(root))
@@ -100,6 +101,8 @@ def test_names_headings_and_lines_are_held(tmp_path):
     assert "TD-11.md:1:" in problems
     assert "TD-12.md:3:" in problems and "TD-12.md:4:" in problems
     assert "TD-13.md:1:" in problems
+    assert "TD-10.md:5: `## §6.` names no section" in problems  # the frozen file's `6.`, not the index's `§6`
+    assert "TD-14.md:2:" in problems
     assert "docs/history/sub: a subdirectory" in problems
 
 

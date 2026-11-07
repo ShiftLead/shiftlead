@@ -21,6 +21,7 @@ import argparse
 import re
 import sys
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -136,6 +137,14 @@ def render(section: str, grep: str | None = None, root: Path = ROOT) -> str:
     return "\n".join(out)
 
 
+def _is_date(text: str) -> bool:
+    try:
+        date.fromisoformat(text)
+    except ValueError:
+        return False
+    return True
+
+
 def check(root: Path = ROOT) -> list[str]:
     """What is wrong with `docs/history/`'s shape (design §4.4): each problem as one line, none when sound.
 
@@ -168,11 +177,11 @@ def check(root: Path = ROOT) -> list[str]:
                 continue
             m = HEADING.match(raw)
             if m:
-                key = normal(m.group(1))
+                key = m.group(1)  # as the index writes it: `§6`, never the frozen file's `6.`
                 if key not in known:
                     problems.append(f"{rel}:{n}: `{raw}` names no section docs/design.md indexes")
                 in_heading, in_bullet = True, False
-            elif DATED.match(raw) and in_heading:
+            elif (d := DATED.match(raw)) and in_heading and _is_date(d.group(1)):
                 in_bullet = True
             elif raw.startswith((" ", "\t")) and in_bullet:
                 pass
