@@ -3563,7 +3563,7 @@ def _carried_reason(action: str, value: str, why: str) -> str:
         if missing := [t for t in local if len(t) > 12 or ledger_mod._norm(t) not in known]:
             raise board_mod.Refused(
                 f"--carried-to names {_and_list(missing)}, which {at} holds neither open nor archived — "
-                "file the entry first (ledger.py new), then close the line"
+                "file its entry first, then close the line"
             )
     return reason
 
