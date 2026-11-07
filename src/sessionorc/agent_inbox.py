@@ -1166,7 +1166,7 @@ class InboxMixin:
         except Exception:  # noqa: BLE001
             log.exception("pushing the press mark of %s failed", root)
 
-    async def _reread_board(self, root: str | Path, *, fetch: bool = False) -> None:
+    async def _reread_board(self, root: str | Path, *, fetch: bool = False) -> bool:
         """The repo's board and ledger read again at once after a write-back the host agent made (§4.4 *Each
         reading has one owner*, *The boards*, TD-615; *Every write the home lands is read at once*, TD-1471), so a
         Snooze, a Done, a Decide, a Reply or an add is in the next `repos` push and not a minute later, and a
@@ -1179,12 +1179,12 @@ class InboxMixin:
         write-back's tree (a sync's) passes `fetch`: the board is read against origin with a fetch first, never the
         tree, whose head is as old as its last press, and the ledger against the ref that fetch moved; a fetch that
         fails is the re-read failing, so the last reading stands (§4.4 *Every write the home lands is read at once*,
-        TD-1508)."""
+        TD-1508). True where it saved and pushed `repos`; False where nothing was pushed (TD-1518)."""
         root = str(root)
         self._boards_pressed[root] = time.monotonic()
         old = self._repos.get(root)
         if old is None:
-            return
+            return False
         tree = board_mod.tree_dir(Path(root)) / workorders.board_rel(root)
         here = tree if tree.is_file() and not fetch else None
         live = self._live_commits() if self._promotes_read else None
@@ -1197,14 +1197,14 @@ class InboxMixin:
                 log.warning(
                     "re-reading %s after its merge: the fetch failed (%s); the reading stands", root, fetched.why
                 )
-                return
+                return False
         try:
             bds, wos, led, arch = await asyncio.to_thread(self._reread_repo, root, old, here, live, fetched)
         except Exception:  # noqa: BLE001 — the line is landed; the reading catches up on its own
             log.exception("re-reading the board of %s failed", root)
-            return
+            return False
         if root not in self._repos:
-            return
+            return False
         cur = self._repos[root]
         got: dict[str, Any] = {} if "error" in bds else {"boards": bds, "work_orders": wos}
         if led is not None:
@@ -1213,12 +1213,13 @@ class InboxMixin:
             got["ledger"] = led
             got["completed"] = ledger_mod.completed(led.get("recent"), (cur.get("prs") or {}).get("recent"))
         if not got:
-            return
+            return False
         self._repos[root] = {**cur, **got}
         # marked again as it lands: a tick's pass that began while this read ran is older too (review of TD-615)
         self._boards_pressed[root] = time.monotonic()
         self.repos_store.save(self._repos)
         await self._broadcast({"event": "repos", "root": root, "repo": self._repo_view(root)})
+        return True
 
     async def rpc_inbox_pause(self, msg: str, caller: Any = None) -> dict[str, Any]:
         """**Pause** (design §4.10, TD-069): on a `steer` in the person inbox — *I want to answer

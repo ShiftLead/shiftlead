@@ -121,7 +121,8 @@ class SyncMixin:
                     sync[n] = e
             if covered:
                 self._sync_ran[root] = datetime.now(UTC)
-        if sync != old and (cur := self._repos.get(root)) is not None:
+        # compared with the reading as it now stands: a merge wrote its verdict there before its re-read pushed it
+        if (cur := self._repos.get(root)) is not None and sync != (cur.get("sync") or {}):
             self._repos[root] = {**cur, "sync": sync}  # never the snapshot: a re-read may have landed
             self.repos_store.save(self._repos)
             await self._broadcast({"event": "repos", "root": root, "repo": self._repo_view(root)})
@@ -203,7 +204,14 @@ class SyncMixin:
         text = f"merged {repo} #{n} — bump of the agent-cadence pin to {(e.get('commit') or '?')[:7]}"
         self._system_note(PERSON, text)
         log.info("sync: %s", text)
-        # board and ledger read at once against origin, fetched first: the merge moved origin, not the board's
-        # tree (§4.4 *Every write the home lands is read at once*, TD-1508)
-        await self._reread_board(root, fetch=True)
-        return {**e, "verdict": "merged", "why": "", "at": now_iso()}
+        got = {**e, "verdict": "merged", "why": "", "at": now_iso()}
+        # the verdict in the reading first, so the re-read's push carries it (TD-1518); then board and ledger read at
+        # once against origin, fetched first: the merge moved origin, not the board's tree (§4.4 *Every write the
+        # home lands is read at once*, TD-1508)
+        if (cur := self._repos.get(root)) is not None:
+            self._repos[root] = {**cur, "sync": {**(cur.get("sync") or {}), str(n): got}}
+        if not await self._reread_board(root, fetch=True) and self._repos.get(root) is not None:
+            # a re-read that pushed nothing (its fetch failed, nothing changed): the verdict saved and pushed here
+            self.repos_store.save(self._repos)
+            await self._broadcast({"event": "repos", "root": root, "repo": self._repo_view(root)})
+        return got

@@ -175,6 +175,40 @@ async def test_a_sync_merge_rereads_board_and_ledger_against_origin_at_once(agen
     assert (got or {}).get("verdict") != "merged" and reread == []
 
 
+async def test_a_sync_merges_verdict_rides_in_its_rereads_push(agent, gh, monkeypatch, tmp_path):  # noqa: F811
+    """TD-1518 (§4.4 *Every write the home lands is read at once*): the `merged` verdict is in the reading before the
+    re-read pushes it, so the page reads the merge and its verdict in one push, never the verdict a push later."""
+    e, _ = _handed(tmp_path)
+    monkeypatch.setattr(sync, "compose", _composer(gh))
+    agent._repos[ROOT] = {"name": "r", "sync": {"7": {"verdict": "off"}}}
+    seen: list[dict] = []
+    pushed: list[dict] = []
+    landed = [True]
+
+    async def spy(root, *, fetch=False):
+        seen.append(dict(agent._repos[str(root)].get("sync") or {}))
+        return landed[0]
+
+    async def cast(ev):
+        if ev.get("event") == "repos":
+            pushed.append(ev)
+
+    monkeypatch.setattr(agent, "_reread_board", spy)
+    monkeypatch.setattr(agent, "_broadcast", cast)
+    got = await agent._sync_merge(ROOT, _pr(), e)
+    assert got["verdict"] == "merged"
+    assert seen == [{"7": {"verdict": "off"}, "1097": got}], "the verdict in the reading as the re-read runs"
+    assert "gate_dir" not in seen[0]["1097"]
+    assert pushed == [], "the re-read pushed it: nothing pushed again"
+    # a re-read that pushes nothing (its fetch failed): the merge saves and pushes its verdict itself (#3161's review)
+    e, _ = _handed(tmp_path)
+    landed[0] = False
+    agent._repos[ROOT] = {"name": "r", "sync": {}}
+    got = await agent._sync_merge(ROOT, _pr(), e)
+    assert [p["repo"]["sync"]["1097"]["verdict"] for p in pushed] == ["merged"]
+    assert agent.repos_store.load()[ROOT]["sync"]["1097"]["verdict"] == "merged"
+
+
 async def test_a_sync_reread_fetches_first_and_a_failed_fetch_keeps_the_reading(agent, monkeypatch, tmp_path):  # noqa: F811
     """TD-1508 slice 3 (§4.4 *Every write the home lands is read at once*): `_reread_board(fetch=True)` fetches
     origin first and hands that fetch to the read — never the write-back's tree, though one is there — and a fetch
