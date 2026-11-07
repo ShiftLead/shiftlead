@@ -737,9 +737,10 @@ def board_hold(
     asks again: None. Of the covering lines `Decided:` with no `by` or `by` the person, the newest by `Decided:`
     (an open line before a closed one, then the later `Closed:`, then the smaller `at`) alone decides: an open
     line holds while open; one closed *carried to TD-m* or *see TD-m* (the same words, TD-1528) while a TD-m is
-    open, not covered, not the person's and `Added:` no earlier than a day before the `Decided:`; one closed `— kept waiting.` until its `kept waiting`
-    Log date plus `REASK_DAYS`; one closed in other words while a live claim holds a covered member, within
-    `BOARD_WAIT_DAYS` of its `Closed:`. `{kind: "board", asker, closed_at, outcome: None, line: {key, open, to}}`,
+    open, not covered, not the person's and `Added:` no earlier than a day before the `Decided:`; one closed
+    `— kept waiting.` until its `kept waiting` Log date plus `REASK_DAYS`; one closed in other words while a live
+    claim holds a covered member, within `BOARD_WAIT_DAYS` of its `Closed:`. `{kind: "board", asker, closed_at,
+    outcome: None, line: {key, open, to}}`,
     `asker` a record's id, `TD-m` (`<repo>#TD-m` when not the member's repo) or *a pick*; a kept-waiting one
     `{kind: "board", until, line}`, no `asker`."""
     me = qid(str(member.get("repo") or ""), str(member.get("id") or ""))
