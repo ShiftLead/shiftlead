@@ -1,6 +1,7 @@
 """The question-seat edge (design §4.10 *to a question seat, from anywhere in the org*, TD-995, TD-1000
 slice 1): an `ask` from any session to a record whose seat's trigger is `asks`, one open per sender
-per seat counted along the sender's `superseded_by` chain, and that seat's `reply` back to its asker."""
+per seat counted along the sender's `superseded_by` chain; and the `asked` edge (TD-1457): any record's `reply`
+to an `ask` in its own inbox, back to its asker."""
 
 from datetime import UTC, datetime
 
@@ -156,6 +157,9 @@ def test_any_record_answers_an_ask_in_its_own_inbox_and_nothing_else_widens():
     assert mail.message_edge(records, "tl", "a2", kind="reply", replied=ask) == "asked", "a resumed asker"
     assert mail.message_edge(records, "tl", "a", kind="reply", replied=copied) == "asked", "a copy it holds"
     assert mail.message_gate(records, "tl", "a", kind="reply", replied=ask) is None
+    lapsed = MailEntry(id="m-4", from_="a", to=["tl"], at="2026-11-07T00:00:00Z", kind="ask", text="q",
+                       closed_reason="expired")  # fmt: skip
+    assert mail.message_edge(records, "tl", "a", kind="reply", replied=lapsed) == "asked", "a lapsed ask's answer"
     refused = mail.message_gate(records, "tl", "a", kind="reply", replied=note)
     assert refused and "a reply to an ask it holds" in refused
     assert mail.message_gate(records, "tl", "x", kind="reply", replied=ask) is not None, "off the asker's chain"
