@@ -186,7 +186,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      resumed, where Resume is the person's own), the prompt as rule 7's replay hands it — refilled
      from the files it was made from, as merged, on the home's own host; the stored prompt for a
      node's member or a launch record with no `prompt_from` — and the mail kept: the create moves
-     the old record's mail to the new one, as a seat's fill does (`keep_mail`, §4.9b). What it
+     the old record's mail to the new one, as a seat's fill does (`keep_mail`, §4.9b), and with it any owed
+     outcome, which its own close leaves standing (§4.9a *The third declaration*). What it
      asked the person follows the close, not the mail: an `idle` member is closed first, and a
      close ends the open `ask`s and `steer`s it put to the person (`asker_gone`, §4.10; one about a
      ledger id or a PR is orphaned instead, and the new record, holding the name, adopts it), while
@@ -488,7 +489,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      `ao progress restart --why "context bound"`*, with *; #2015, #2018 carry over* when it holds
      waiting claims; `context_sent_at` marks it, and it is sent again after twenty minutes if the
      member is still idle and over. **A waiting claim is not in progress, for this rule and rule 4**
-     (TD-820; rules 9 and 3, the flow's restart (§4.9c) and §4.10 still count it as in progress):
+     (TD-820; and for rule 7's boundary, TD-1485; rules 9 and 3, the flow's restart (§4.9c) and §4.10 still count it as in progress):
      a claim whose PR is open (the claim's `pr` or `review_pr`, TD-814's *review* phase) **and**
      whose next move is someone else's — the *waiting* reading of §4.2: an open `ask` or `steer` of
      the member's about that reference, or its ask held in a seat's `prs_waiting.asks`. A designer's
@@ -637,7 +638,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      included, until the team's next start or Apply. A record
      carrying **`relaunch: {at, lane, review, profile}`** (§4.9c *Switching*) is restarted under this rule's
      conditions as one carrying `brief_changed` is, save that a declaration of `out_of_work` does
-     not hold it back. The host agent knows a file and a slot and no role, template or team, and
+     not hold it back and a waiting claim still counts as in progress (§4.9c; the entry boundary
+     below is the `brief` trigger's alone). The host agent knows a file and a slot and no role, template or team, and
      never reads a definition. A file inside a checkout is read **as merged** —
      `origin/<default>:<path>` as last fetched — so a branch checked out there is never a running
      team's brief; the template is the installed package's, so it is what was promoted. *Origin's
@@ -653,16 +655,22 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      first read), cleared by the next create under the name or when the files read as recorded
      again; a source that cannot be read now is no change. A replay of the stored prompt writes no
      `brief`. The card and `ao status -v` say it (§4.5a **brief changed** chip). Then, as rule 5
-     does and in the same two ways: a member that is **`working`** is not interrupted — every `ao`
-     reply it makes ends with *(your brief changed — finish what you hold, then `ao progress restart
-     --why "brief changed"`)*, and rule 2 restarts it on its word — a word said while the record
-     carries the mark is never *early*, and a member that has declared, or a seat, is not given the
-     clause; a member that is **hook-confirmed `idle`, holds no claim in progress, has declared
-     nothing, and has nothing uncommitted or unpushed** (known, as in rule 2) **is restarted by the
-     tick itself**, closed first and replayed, `restarts: [{why: brief}]`, under the ceiling as
+     does and in the same two ways. **A changed brief applies at the next entry boundary, never
+     mid-entry** (TD-1485): the boundary is rule 5's — the member holds no claim in progress, a
+     waiting claim not counting (rule 5) — so a designer whose design waits on its steer or its
+     reader is between entries, and one whose rounds are still running is not. A member that is
+     **`working`** is not interrupted — every `ao` reply it makes ends with *(your brief changed —
+     it applies from your next entry: finish the one you hold, merged, dropped or waiting, then
+     `ao progress restart --why "brief changed"`)*, and rule 2 restarts it on its word — a word said
+     while the record carries the mark is never *early*, and a member that has declared, or a seat,
+     is not given the clause; a member that is **hook-confirmed `idle`, holds no claim in progress
+     (a waiting claim not counting, as for rule 5; the replay carries it), has declared nothing,
+     and has nothing uncommitted or unpushed** (known, as in rule 2) **is restarted by the tick
+     itself**, closed first and replayed, `restarts: [{why: brief}]`, under the ceiling as
      every replay is; a close or replay that failed keeps its `brief` entry with `error`, counts
      toward the ceiling, and is tried again by the tick, while a Close by anyone else is never
-     undone. The same tick restart, under the same precondition, serves §4.10 *A lapsed cache is
+     undone. The same tick restart, under its precondition as it stood before TD-1485 (every claim in
+     progress: the shared test `tick_ready`, unchanged), serves §4.10 *A lapsed cache is
      started again, not rung*: the doorbell hands it a member idle past the cache lifetime with a
      long context, and the entry reads `why: cache`. Never a seat, never — for `brief_changed` — a
      member that declared `out_of_work`, never an interactive session, never past a stop time, into
