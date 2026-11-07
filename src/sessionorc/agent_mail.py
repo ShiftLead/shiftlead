@@ -267,10 +267,10 @@ class MailMixin:
     ) -> tuple[Any, dict[str, Any] | None]:
         """Where a new `ask` to one `asks` seat goes when that seat cannot answer (§4.9b *A seat that cannot
         answer is routed around*, TD-1443): `(to, routed)`. A general question (no `pr`) goes to its team's
-        techlead seat when that is able and is neither the seat itself nor the sender, else to the person; a reader's `ask`
-        (carrying `pr`) is never re-seated and goes to the person. `routed` is `{seat, name, why, at}`, None
-        where nothing moved: an able seat, a superseded one (its mail follows the chain), a reply or a thread, any
-        kind but `ask`, the person's own send, or an address that is not exactly one seat."""
+        techlead seat when that is able and is neither the seat itself nor the sender, else to the person; a
+        reader's `ask` (carrying `pr`) is never re-seated and goes to the person. `routed` is `{seat, name, why,
+        at}`, None where nothing moved: an able seat, a superseded one (its mail follows the chain), a reply or a
+        thread, any kind but `ask`, the person's own send, or an address that is not exactly one seat."""
         if kind != "ask" or sender == PERSON or reply_to or thread:
             return to, None
         named = [str(x) for x in ([to] if isinstance(to, str) else list(to or [])) if str(x).strip()]
