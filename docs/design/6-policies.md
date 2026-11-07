@@ -1325,8 +1325,12 @@ block. A policy is agent code and needs no grant; a session doing the same work 
          page lists it. Wait: **`STUCK_PR_AFTER`**, two hours, past a precheck and the merge that
          follows it; its open time the newest claim among its actors'
          claims, derived each tick, else, a released PR having none, its `stuck_open.at` (*The clock*, below).
-     - **Acting.** `_stuck_pass` runs after rule 3's pass and after the tick's repo readings, in the same
-       tick, so `unfillable` holds this tick's words and an absent reading is a restart's first ticks alone.
+     - **Acting.** `_stuck_pass` runs after rule 3's pass in the same tick, so `unfillable` holds this
+       tick's words, and reads the repo readings (`_repos`) as the tick finds them — the detached repo pass's
+       last readings, loaded from disk at a restart, stale but good — so a reading is absent only for a repo
+       never yet read well, or whose board reading a raised pass left out (a raise keeps the PR reading with its
+       error, errored, and drops the board reading, absent, which only the board's own failed read keeps errored;
+       absent and errored read alike, below).
        An actor is **acting** when `unanswered.read` (§4.9b *Why it did not answer*,
        TD-1423 — called, never copied; its `question_at` the work's open time, below, and its other
        inputs gathered as `MailMixin._unanswered` gathers them) gives `working` — or `idle` with a live
@@ -1382,30 +1386,43 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        their card as *steer* until then), after which the PR is read again.
      - **The clock.** The work's **open time** is the ask's `at`, the first tick the home read the line
        decided (below), or the claim's `at`. The home keeps a board line's and a PR's moving
-       parts on `host.json` as **`stuck_open: {<key>: {at, oid?, repo, by?}}`** (shape-checked by `HostStore.load` as
+       parts on `host.json` as **`stuck_open: {<key>: {at, oid?, repo, by?, rel?}}`** (shape-checked by
+       `HostStore.load` as
        `stuck` is, an entry that fails it dropped), so a home restart keeps them: a line's `at` is the
        first tick it was among `workorders.orders()`'s work orders (every open decided line that is
        not `fyi`), moved to a claimant's claim `at` when one takes it
        and to the release when it lets it go (its drop's own `at`: the drop's ref is the line's `board:<key>`,
        which a PR's drop with no `--pr` does not name), the entry dropped when the line closes or is no longer
-       decided as a reading that holds it says — a repo whose board or PR reading is absent (a restart
-       before its first pass), errored, or fell back to the checkout's (`fetch_case` *skipped*, which may
-       only close, below) is not read
+       decided as a reading that holds it says, and a PR's when a good PR reading no longer lists it open
+       (merged or closed; a reading that lists 200 open PRs, `pr_reading`'s cap, drops none) or, on a tick
+       with no actor, when the record its `by` names holds a `done` naming the PR — its last actor finished
+       it, so it is no work; any other PR with no actor is *released* (a drop, or an untaken restart) — a repo
+       whose board or PR reading is absent (not yet read, or its read raised), errored, or fell back to the
+       checkout's (`fetch_case` *skipped*, or no `fetch_case` at all, null: the board pass's plain checkout read, which
+       may only
+       close, below) is not read
        that tick for which works stand: the works its `stuck_open` and `stuck` entries name are kept (on
        disk, so a restart has them; each `board:` and `pr:` entry of both maps carries its **`repo`**, the
        repo's `root.name` (as in `pr:<repo>#<n>`) whose board and PR readings it was read from, since a
-       `board:<key>` names none, and a repo is unread when either of its readings is absent, errored or skipped;
-       a repo that leaves the
-       home's roster (`repos.txt`, or `hosts.yml`'s `repos_registry`) drops its entries), as any failed read
+       `board:<key>` names none; each kind is unread by its own reading — a `board:` entry while its repo's
+       board reading is absent, errored or skipped, a `pr:` entry while its PR reading is absent or errored, so
+       a repo with no usable PR reading still opens and closes its lines; a repo that leaves the
+       home's roster (the tick's `hosts.local_host().repos()`: the registry — `hosts.yml`'s `repos_registry`, else
+       the home's `repos.txt` — then agent-cadence's imported roster where no registry is set) drops its entries;
+       it has left when no roster path's basename is the entry's `repo`, and two checkouts sharing a basename
+       share their `pr:<repo>#<n>` keys, as every reader of those keys does), as any failed read
        keeps the last good reading: every work of that repo, a PR's and a board line's alike
        (a fallback read's close aside), stays exactly as stored until a good read (a PR's row drops
        a tick late; an ask needs no repo reading), and nothing of that repo opens — a PR a claim first
        names is read once a PR reading says it is open; a board read that fell back to the
-       checkout may still close a line it finds closed or archived there — never one it finds absent,
-       which the stale checkout may not yet have; a PR's `oid` is its head (`headRefOid`) and `at`
+       checkout may still close a line it finds closed or archived there — a closed decided line naming an
+       entry, the only kind the reading's `carried` lists — never one it finds absent from both `items` and
+       `carried`,
+       which the stale checkout may not yet have; a PR's `oid` is its head (the PR row's `head`) and `at`
        the latest of the first tick that read that head (moved on every push), the newest claim's `at`
-       among its actors, and its release, the first tick that read it with no actor (a drop with no `--pr`
-       names no PR, so no claim's instant can stand for it) — read only as a
+       among its actors, and its release, **`rel`**: written on the first tick that reads it with no actor
+       and cleared on any tick that reads one, so each release starts its own clock and a restart keeps it (a
+       drop with no `--pr` names no PR, so no claim's instant can stand for it) — read only as a
        released PR's open time and an idle actor's figure (below). Its **`since`** is the later of its open
        time and the newest state change among its actors (each record's `since`, which moves only on a
        real change of state, or its `subagent_at` or `shells_at` where later — `agent_common.idle_from`,
