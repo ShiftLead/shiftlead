@@ -691,6 +691,8 @@
 <div class="body">{% if e.parts %}{% for p in e.parts %}{% if p.url %}<a class="ref" href="{{ p.url }}" target="_blank" rel="noopener" title="the pull request, on its forge">{{ p.text }}</a>{% else %}{{ p.text }}{% endif %}{% endfor %}{% else %}{{ e.text }}{% endif %}</div>
 {%- if e.held %}{% from "held_line.html" import held_line %}{{ held_line(e.held) }}{% endif %}
 {{ doing_line(e) }}
+{#- on its Queue card, a holder's row carries the card's **routed around** line (§4.5a, §4.9b, TD-1443, TD-1468) #}
+{%- if drawn_on_queue and e.routed_to %}<div class="meta routed" title="cannot answer now: {{ e.routed_why }} (design §4.9b)">{{ e.routed_to }}</div>{% endif %}
 {%- if section == 'snoozed' %}<div class="row">{{ snoozed_says(e) }}<span class="st">&nbsp;— the state itself is untouched</span></div>{% endif %}
 <div class="row gap wrap mfoot">
   {%- if e.row == 'permission' %}

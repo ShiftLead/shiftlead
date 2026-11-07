@@ -17,6 +17,7 @@ from typing import Any
 from urllib.parse import quote
 
 from sessionorc.queue import (  # noqa: F401 — the home's
+    HOLDER,
     LOOSE,
     TD_REF,
     asker_repos,
@@ -51,6 +52,9 @@ WINDOW_WORD = {
 }
 DATE_ONLY = re.compile(r"\d{4}-\d{2}-\d{2}")
 CONTEXT = re.compile(r"\bContext:\s*(.*?)(?=\s+(?:Due|Answers|Decided|Closed):|$)", re.S)
+# a stopped holder's state rows, drawn on the card of the entry it holds (§4.5 screen 6 *One place for each thing that
+# needs the person*, TD-1468) — those five and no other
+HOLDER_ROWS = ("permission", "question", "needs", "limited", "stalled")
 # the filter row's one status pick (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): the
 # **Needs you** switch, beside the team chips and the find box (TD-1287)
 FILTERS = {"needs-you": "Needs you"}
@@ -108,6 +112,20 @@ def item_home(
         refs, by = own_refs(_refs(f"{e.get('branch') or ''} {e.get('title') or ''}"), e.get("repo")), "pr"
     elif kind == "fork_pr":  # by its title alone: a fork's branch is a stranger's name (TD-1292)
         refs, by = own_refs(_refs(str(e.get("title") or "")), e.get("repo")), "title"
+    elif kind in HOLDER_ROWS and not e.get("handed_row"):
+        # a stopped holder's state row: on the card of the claim it draws on (`holder_claims`, TD-1468), else the
+        # Inbox's — a seat holding no entry an open card holds
+        got = index.get(HOLDER + str(e.get("sid") or ""))
+        if not got:
+            return inbox
+        ref = _refs(got[1])[0]
+        return {
+            "home": "queue",
+            "on_card": got[0],
+            "on_row": got[1],
+            "mentions": [],
+            "tied": {"by": "holder", "ref": ref},
+        }
     elif kind and not e.get("handed_row"):
         return inbox  # a state row, an alarm, a promote, a team start, the trail: no entry's
     else:
@@ -340,7 +358,7 @@ def items_n(wants: Mapping[str, Any]) -> int:
     whose entry another session holds included, and every item *with you in <name>*; an item *answered — waiting
     on <asker>* is outside them, in `wants['answered']`. With one the item's button is the header's; with two or
     more the header draws its own beside them, and its press walks them all."""
-    n = sum(1 for w in WANTS for m in wants.get(w) or () if not (m.get("red") or m.get("fork")))
+    n = sum(1 for w in WANTS for m in wants.get(w) or () if not (m.get("red") or m.get("fork") or m.get("holder")))
     return n + len(wants.get("with_you") or ())
 
 
@@ -425,7 +443,7 @@ def attach(
         elif e.get("row") == "ledger" and (e.get("applying") or e.get("answered")) and want in WANTS:
             # a press landing (TD-1508) or an answer acted on (TD-1316): no need of the person
             want, kind = "answered", ""
-        pr_row = e.get("row") in ("red_pr", "fork_pr")  # a PR's row starts no session (TD-1246, TD-1292)
+        pr_row = e.get("row") in ("red_pr", "fork_pr", *HOLDER_ROWS)  # starts no session (TD-1246, TD-1292, TD-1468)
         go = start(card, ref) if start is not None and want in (*WANTS, "with_you") and not pr_row else {}
         rows[len(rows)] = str(e.get("row") or "")  # its row kind, kept beside the item rather than drawn in it
         src[len(rows) - 1] = e
@@ -448,6 +466,8 @@ def attach(
                 ),
                 "red": e.get("row") == "red_pr",
                 "fork": e.get("row") == "fork_pr",  # a fork's PR: no Start session, as a red PR's (TD-1292)
+                # a stopped holder's state row: its own controls, no Start session and outside the header's count
+                **({"holder": True} if e.get("row") in HOLDER_ROWS else {}),
                 "running": sec == "steering",
                 "on_row": e["on_row"],
                 **({"row": dict(e), "tied": e.get("tied"), "repo": _repo_of(e)} if raw else {}),
