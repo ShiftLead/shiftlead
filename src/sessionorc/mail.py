@@ -525,10 +525,11 @@ def message_edge(
       to a question seat (that one takes the seat's edge); and back along it, a `reply` from any
       record on an entry in its own inbox (`replied`) whose sender is such an own end with no
       `controllers`, to that sender or a record its `superseded_by` chain reaches;
-    - **question seat**: tried last (TD-995) — an `ask` carrying no `pr` or `cites` (`carries`) to a
-      record whose seat's trigger is `asks`, from anywhere in the org; and that seat's `reply` to an
-      `ask` it holds (`replied`, from the sender's own inbox), to its asker or a record the asker's
-      `superseded_by` chain reaches.
+    - **question seat**: an `ask` carrying no `pr` or `cites` (`carries`) to a record whose seat's
+      trigger is `asks`, from anywhere in the org (TD-995);
+    - **asked**: tried last (TD-1435) — the `reply` of any record, a seat or not, to an `ask` it holds
+      (`replied`, from the sender's own inbox, a copy included), to its asker or a record the asker's
+      `superseded_by` chain reaches, whatever either's team, project or seat.
     """
     me, it = records.get(sender), records.get(target)
     if me is None or it is None:
@@ -560,10 +561,9 @@ def message_edge(
         kind == "reply"
         and replied is not None
         and replied.kind == "ask"
-        and asks_seat(me)
         and target in chain(records, replied.from_, successor)
     ):
-        return "question seat"
+        return "asked"
     return None
 
 
@@ -582,7 +582,7 @@ def message_gate(
     """Design §4.10: may `sender` message `target`? A person (`sender == PERSON`) always may — they
     are not a session and may message anyone (§4.8) — and any session may message the person
     inbox (`target == PERSON`). Otherwise a session may message along one of
-    `message_edge`'s seven edges and nothing else, refused by naming §4.10's graph rather than
+    `message_edge`'s eight edges and nothing else, refused by naming §4.10's graph rather than
     invariant 11: messaging is not acting. An `ask` passing the question-seat edge alone is one open
     question per sender per seat: the sender counted along its `superseded_by` chain, the count read
     in the target's inbox, since a seat's mail moves with its fills (TD-995). A sender with no agent
@@ -608,7 +608,7 @@ def message_gate(
         return (
             f"{sender} cannot message {target}: not one of its controllers, its members, its team, "
             f"its project, or a controller of a session it controls — nor an ask to a question seat, "
-            f"or that seat's reply to an ask it holds, nor from a session the person started by hand, "
+            f"nor a reply to an ask it holds, nor from a session the person started by hand, "
             f"or a reply to one (design §4.10)"
         )
     if edge == "own" and kind in ("ask", "steer") and agentless:
