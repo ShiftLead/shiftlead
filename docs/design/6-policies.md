@@ -1328,7 +1328,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      - **Acting.** `_stuck_pass` runs after rule 3's pass in the same tick, so `unfillable` holds this
        tick's words, and reads the repo readings (`_repos`) as the tick finds them — the detached repo pass's
        last readings, loaded from disk at a restart, stale but good — so a reading is absent only for a repo
-       not yet read or whose read raised.
+       never yet read well (a read that raises after a good one keeps that reading with its error: errored).
        An actor is **acting** when `unanswered.read` (§4.9b *Why it did not answer*,
        TD-1423 — called, never copied; its `question_at` the work's open time, below, and its other
        inputs gathered as `MailMixin._unanswered` gathers them) gives `working` — or `idle` with a live
@@ -1396,7 +1396,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        with no actor, when the record its `by` names holds a `done` naming the PR — its last actor finished
        it, so it is no work; any other PR with no actor is *released* (a drop, or an untaken restart) — a repo
        whose board or PR reading is absent (not yet read, or its read raised), errored, or fell back to the
-       checkout's (`fetch_case` *skipped*, or none: the board pass's plain checkout read, which may only
+       checkout's (`fetch_case` *skipped*, or no `fetch_case` at all, null: the board pass's plain checkout read, which
+       may only
        close, below) is not read
        that tick for which works stand: the works its `stuck_open` and `stuck` entries name are kept (on
        disk, so a restart has them; each `board:` and `pr:` entry of both maps carries its **`repo`**, the
@@ -1412,8 +1413,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        (a fallback read's close aside), stays exactly as stored until a good read (a PR's row drops
        a tick late; an ask needs no repo reading), and nothing of that repo opens — a PR a claim first
        names is read once a PR reading says it is open; a board read that fell back to the
-       checkout may still close a line it finds closed or archived there (in the reading's `carried`) — never one
-       it finds absent from both `items` and `carried`,
+       checkout may still close a line it finds closed or archived there — a closed decided line naming an
+       entry, the only kind the reading's `carried` lists — never one it finds absent from both `items` and
+       `carried`,
        which the stale checkout may not yet have; a PR's `oid` is its head (the PR row's `head`) and `at`
        the latest of the first tick that read that head (moved on every push), the newest claim's `at`
        among its actors, and its release, **`rel`**: written on the first tick that reads it with no actor
