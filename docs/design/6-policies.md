@@ -1738,8 +1738,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     merge after the press moves main past it and `auto` goes on — accepted, as the person's rollback never
     took hold;
   - and, in a `failed.json` written before `blocks` was, its `sha`.
-  `auto` starts nothing while main's head is that commit, and retries once main's head moves past it — a run
-  at the new head, the settle and the wait as ever, the row reading the policy's clock (§4.5a) meanwhile. A
+  `auto` starts nothing while main's head is that commit, and retries once main's head **moves past it** —
+  `blocks` an ancestor of main's head and not main's head itself — a run at the new head, the settle and the
+  wait as ever, the row reading the policy's clock (§4.5a) meanwhile: `ahead_since` restarts at that move, so
+  a failed commit that sat ahead of live past `PROMOTE_MAX_WAIT` does not spend the next merge's cap. A
   person's press — Promote of main's head, that commit among them (a retry is the person's word), or a
   rollback (below) — is never refused by it. **Every start clears it**, on the one start path every run
   takes, once the run has started: under the promote lock, after `start` returns with the intent written,
@@ -1797,7 +1799,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   flight, any failure stands or a hold stands, whose rows stand in its place (the held row's
   Promote is the same press) — and its **Promote**, or
   `ao promote`, is taken, never refused as *nothing to promote*: the press runs `run` again at that commit,
-  its smoke too, and the pass that concludes it writes `done` and tags it, its note reading *promoted
+  its smoke too, and the pass that concludes it writes `done` and tags it (a run whose `from` is its own
+  commit writes as `last.json`'s `from` the standing `last.json`'s `sha`, the last commit a run put live, or
+  that file's own `from` where the two are the same, so `--back` still goes somewhere), its note reading *promoted
   `<repo>` `<sha7>` again — tagged* (a rollback to the live commit's: *rolled back `<repo>` to `<sha7>` again
   — tagged*). The press at main's head is refused as *nothing to promote* only when a run finished there
   **and** no failure blocks it, so a failure at main's head is always a press away from its retry. Its `from` is the commit itself,
