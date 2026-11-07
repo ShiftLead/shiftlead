@@ -274,7 +274,8 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   the PRs that show an adoption PR) and **the two passes that make it served**:
   *Pull* (§6), which fast-forwards the checkout once an adoption or a sync has merged, and, for a repo
   whose one lack is an older tree, *Sync* (§6), whose gate is there. No gate run of any other PR, no
-  promote, no lane, no write-back, no settle. `ao team start` refuses a team of an unserved repo,
+  promote, no lane, no write-back, no settle — though its reading's waits are marked, since a wait needs no clock (§4.4
+  *What a wait does*), so a gated entry is counted waiting on every page. `ao team start` refuses a team of an unserved repo,
   naming the lack (§4.7 *Teams*). A team already running there is not stopped (a stop is the person's): its lanes read
   empty, `ao repo`'s first line and each member's lane note say *unserved: <the lack>* (§4.7 `ao repo`,
   `--json` `serve` on the repo), so each declares out of

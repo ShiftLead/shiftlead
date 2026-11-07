@@ -4106,6 +4106,10 @@ class TickMixin:
             # recorded and marked, a carried one marked again, so a window ends when its time does; an
             # unserved repo has none (§5 *The seams*, TD-1011)
             TickMixin._settle(root, remote, led["entries"], now, fresh=ledger and "error" not in led)
+        elif isinstance(led.get("entries"), list):
+            # but its waits are marked all the same, since a wait needs no clock: a gated build would otherwise
+            # read pickable in every count but `ao repo`'s (TD-1403)
+            settle_mod.mark_waits([e for e in led["entries"] if isinstance(e, dict)], now)
         bds, wos = TickMixin._read_boards(root, old, due, boards, stamp)
         return {
             "name": Path(root).name,

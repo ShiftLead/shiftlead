@@ -185,6 +185,28 @@ def test_an_unserved_repo_has_no_settle(tmp_path):
     assert paths.ledger_seen_file().exists()
 
 
+def test_an_unserved_repos_gated_build_waits_and_is_not_counted_pickable(tmp_path):
+    """TD-1403: the tick skips the settle clock in an unserved repo (TD-1011), but a wait needs no clock, so
+    its reading still marks a gated build `waiting`, and `lane_kinds` — the org card's count — leaves it out
+    of *pickable*, as `ao repo` does."""
+    from shiftlead import teamrun
+
+    root = tmp_path / "r"
+    (root / "docs").mkdir(parents=True)
+    gated = _entry(2, "build", "**Event (sync):** the sync lands\ncheck: pr-merged o/r#5\n").replace(
+        "**Kind:** build\n", "**Kind:** build\n**Blocked by:** event (sync)\n"
+    )
+    (root / "docs" / "technical_debt.md").write_text("# Ledger\n\n" + _entry(1, "build") + "\n" + gated)
+    _git(root, "init", "-q")
+    _git(root, "remote", "add", "origin", "https://github.com/o/r.git")
+    got = TickMixin._read_repos([str(root)], {}, {str(root)})[str(root)]
+    assert got["seams"]["serve"]["ok"] is False and not paths.ledger_seen_file().exists()  # unserved: no clock
+    by = _by_id(got["ledger"]["entries"])
+    assert by["TD-002"]["for_page"] == "pickable" and by["TD-002"]["waiting"]["on"] == "event"
+    assert "waiting" not in by["TD-001"]
+    assert got["ledger"]["by_kind"]["pickable"] == 2 and teamrun.lane_kinds(got)["pickable"] == 1
+
+
 def test_a_clock_that_cannot_be_written_marks_no_settling_says_so_and_still_marks_waits(tmp_path, caplog):
     paths.ledger_seen_file().mkdir(parents=True)  # a directory in its place: the write raises OSError
     root = tmp_path / "r"
