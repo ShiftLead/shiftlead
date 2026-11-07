@@ -74,19 +74,19 @@ async def test_an_ask_reaches_another_projects_question_seat_once_at_a_time_and_
             # the seat's reply goes to its asker, never to a session that did not ask
             with pytest.raises(AgentError, match=GRAPH):
                 await s.call("msg", to=mgr, text="yes", kind="reply", reply_to=third["id"])
-        # a seat's reply to an entry that is no ask is no question-seat reply
+        # a seat's reply to an entry that is no ask is refused
         note = await person.call("msg", to=seat, text="from the person", kind="note")
         agent.sessions[seat].inbox[-1].from_ = asker  # as if the asker's note had come another way
         async with LocalClient(caller=seat) as s:
             with pytest.raises(AgentError, match=GRAPH):
                 await s.call("msg", text="re", kind="reply", reply_to=note["entry"]["id"])
-        # a reply from a record whose seat is not `asks` is refused, an ask in its inbox notwithstanding
+        # a record that is no `asks` seat answers an ask in its own inbox too (TD-1435): the `asked` edge
         await person.call("msg", to=mgr, text="q?", kind="ask")
         held = agent.sessions[mgr].inbox[-1]
         held.from_ = asker
         async with LocalClient(caller=mgr) as m:
-            with pytest.raises(AgentError, match=GRAPH):
-                await m.call("msg", text="answer", kind="reply", reply_to=held.id)
+            answer = (await m.call("msg", text="answer", kind="reply", reply_to=held.id))["entry"]
+            assert answer["to"] == [asker]
         for sid in (seat, asker, mgr, mate):
             await person.call("kill", id=sid)
 
@@ -128,6 +128,42 @@ def test_an_ask_carrying_a_pr_or_cites_passes_no_question_seat():
     records = {"s": seat, "a": asker}
     assert mail.message_gate(records, "a", "s", kind="ask") is None
     assert "question seat" in mail.message_gate(records, "a", "s", kind="ask", carries=True)
+
+
+def test_any_record_answers_an_ask_in_its_own_inbox_and_nothing_else_widens():
+    """The `asked` edge (design §4.10 *an answer, to the `ask` that reached it*, TD-1435, TD-1457): a record
+    with no seat, in another team and project, replies on the thread of an `ask` it holds — addressed to it
+    or copied — to its asker or the record the asker's chain reaches; a reply on a note's thread, or to a
+    record off the chain, and an unrelated ask or note between the two, are still refused."""
+
+    def rec(sid: str, team: str, project: str) -> models.Session:
+        return models.Session(id=sid, name=sid, kind="claude", adapter="claude-code", dir=f"/{sid}", team=team,
+                              project=project)  # fmt: skip
+
+    tl, asker, resumed, stranger = (
+        rec("tl", "beta", "B"),
+        rec("a", "alpha", "A"),
+        rec("a2", "alpha", "A"),
+        rec("x", "gamma", "C"),
+    )
+    asker.state, asker.superseded_by = "closed", "a2"
+    records = {r.id: r for r in (tl, asker, resumed, stranger)}
+    ask = MailEntry(id="m-1", from_="a", to=["tl"], at="2026-11-07T00:00:00Z", kind="ask", text="q")
+    copied = MailEntry(id="m-2", from_="a", to=["y"], at="2026-11-07T00:00:00Z", kind="ask", text="q")
+    note = MailEntry(id="m-3", from_="a", to=["tl"], at="2026-11-07T00:00:00Z", kind="note", text="fyi")
+    assert tl.seat is None
+    assert mail.message_edge(records, "tl", "a", kind="reply", replied=ask) == "asked"
+    assert mail.message_edge(records, "tl", "a2", kind="reply", replied=ask) == "asked", "a resumed asker"
+    assert mail.message_edge(records, "tl", "a", kind="reply", replied=copied) == "asked", "a copy it holds"
+    assert mail.message_gate(records, "tl", "a", kind="reply", replied=ask) is None
+    refused = mail.message_gate(records, "tl", "a", kind="reply", replied=note)
+    assert refused and "a reply to an ask it holds" in refused
+    assert mail.message_gate(records, "tl", "x", kind="reply", replied=ask) is not None, "off the asker's chain"
+    for kind in ("ask", "note", "steer"):
+        assert mail.message_gate(records, "tl", "a", kind=kind) is not None, kind
+    # a seat's reply passes the same edge
+    tl.seat = {"trigger": "asks"}
+    assert mail.message_edge(records, "tl", "a", kind="reply", replied=ask) == "asked"
 
 
 async def test_a_node_askers_chain_is_read_as_the_home_keys_it(agent):
