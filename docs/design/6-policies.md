@@ -1270,6 +1270,191 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      carrying its reason (every exit 2 prints one as its last stderr line), and a pinned root whose tree cannot
      be made, which today passes silently, logs *pinned, no tree: <why>* (the why from `cadence.tree`)
      once per root and line.
+  13. **Stuck work** (`sessionorc.stuck`, the tick's `_stuck_pass`; TD-1470; Paul, 2026-11-06: *nothing asks
+     whether open work has a live session able to act on it*). Every other rule acts on a session; this one
+     asks of the **work**, each tick at the home, whether any live session is able to act on it, and where
+     none has been for longer than its kind's wait it tells the person, naming why. It rings no session and
+     presses nothing: each cause keeps its own cure (TD-1443's routing around, TD-1435's nudge, TD-1441's
+     cap, TD-1434's held member), and this rule is the one alarm over all of them, so a cause nobody has
+     named yet still reaches the person as the reading of the session that cannot act. It runs in the
+     home's tick, which no seat runs, so a stuck seat cannot stop it; a home that is down runs nothing,
+     and is drawn by the page itself (§4.6: its banner, *agent down on <host>*) and by the sends that missed
+     it (*A send that did not land*, below).
+     - **The work it reads**, three kinds, each with its **actors** — the records whose act moves it:
+       - **An open question to a session**: an `ask` open in a session's mailbox (§4.10), a handed entry
+         and a session's own ledger request among them; never a `steer`, which lapses to its default, and
+         never one whose `to` includes the person, which is the person's, nor one whose seat passed it up (`Entry.passed_up` set:
+         the seat's copy stays open only for its thread, as `asks_ids` leaves it out of an ask and `owes` of a
+         handed entry, whose passed-up copy is the person's likewise). Its actors are its addressees, each walked to
+         its newest record by `_successor` as a send's is (a seat: its current fill or its empty record) —
+         an `ask` to two or more sessions is answered by either, so it is stuck only when none is acting.
+         Wait:
+         **`STUCK_ASK_AFTER`**, sixty minutes — twice `ROUTE_AROUND_AFTER`, so a question a seat could
+         not answer has been routed around first (§4.9b) and one still stuck is one routing could not
+         move: an addressee that is no seat, a seat the person's team pick holds, a session's own ledger
+         request.
+       - **A decided board line waiting on a session**: a work order `board:<key>` (§4.9a *What a
+         session does with a decided line*), read from the lanes as `ao repo` reads them, open while
+         its line is open. Its actors are the records of every lane that takes it (a seat has no lane,
+         §4.9b, so none is an order's actor, nor is a member its flow sat out, `work.sat_out`); a team none of
+         whose members is live and that `work.team_wound_down` reads wound down, or `work.team_stopped`
+         stopped, is read whole, by its `work_waiting` (rule 8) — one whose members ended otherwise (a
+         crash, a restart ceiling) keeps each member's own state as its reason, the cure's name — where two teams' lanes
+         take it, each team's, the reason the first's in `teams` order. A line no team's lane takes reads
+         *no lane takes it* once past the wait. A claimant is its only actor once one holds it. Wait:
+         **`STUCK_ORDER_AFTER`**, sixty minutes.
+       - **A PR waiting on its holder**: an open PR, green or not (a holder that hit its ceiling before
+         its precheck leaves a PR nobody moves as surely as one after it), that
+         a record's newest claim not yet `done` names — its derived `review_pr`, kept while that PR is
+         open, or a declared `pr` (`ao progress claim --pr`) (§4.8 `ao progress`). Its actors are every
+         record whose newest claim names it (an author's and a reader's may both); it is stuck only when
+         none acts. A claim dropped, or ended by a `restart` its next run has not taken up, leaves the PR
+         with no actor, read *released*. A PR no claim ever named is not read: the Repo
+         page lists it. Wait: **`STUCK_PR_AFTER`**, two hours, past a precheck and the merge that
+         follows it; its open time the claim's `at` (*The clock*, below).
+     - **Acting.** `_stuck_pass` runs after rule 3's pass in the same tick, so `unfillable` holds this
+       tick's words. An actor is **acting** when `unanswered.read` (§4.9b *Why it did not answer*,
+       TD-1423 — called, never copied; its `question_at` the work's open time, below, and its other
+       inputs gathered as `MailMixin._unanswered` gathers them) gives `working` — or `idle` with a live
+       subagent or background shell, which rule 4 counts as working (`agent_common.on_its_own`, §4.2
+       *Working on its own*, bounded by `STALL_AFTER` and `SHELL_WAIT`) —, unless its
+       `stalled_ticks` is at least 2 (TD-1443's test, `agent_mail.seat_unable`), and when it is a supervised,
+       unattended seat whose record is not live and for which `unfillable` holds no word this tick (the
+       `exited`/`closed` branch of `seat_unable`), which overrides `ended` and `not_filled`: a working
+       session gets to its work, and a fillable seat is filled for it. Every other actor is **not
+       acting**, and its state is the **reason**: `gone`, `suspended`, `fills_exhausted` (*parked at its
+       fill ceiling*), `restart_ceiling`, `unreachable`, `scheduled`, `taken_over` (*interactive*: a
+       member the person took over, whose Hand back is the cure), `gated`, `limited`, `not_filled`,
+       `ended`, each in `unanswered.words`' fixed words; and two whose words are this rule's own, for which
+       `words` is not called: a record
+       with `stalled_ticks` at least 2 reads **`stalled`**, *`<name>` is `stalled?` — a request held past
+       `STALL_AFTER` with nothing new on its screen*; and an `idle` one reads *`<name>` has been idle
+       since `<time>` with it open* (TD-1435's cause: a seat that read its asks and ends every turn on
+       them; making it act stays rule 4's and rule 6's, and this rule only says so once the wait is
+       past). A **`needs_you`** actor is waiting on the person's own pending row (a permission, a
+       question on its pane): the work is read as stuck as any, but its words are a line under that row
+       wherever it is drawn, never a row of their own. A work order whose team is read whole (wound down or stopped, above) reads its team's
+       `work_waiting.held` (rule 8), in words that are this rule's: `day` *<team> is held by its daily
+       start cap: <count> idle starts today*; `usage` *<team> is held by the usage gate on `<profile>`
+       until <resets>* (with no `resets`, *until its usage reading resets*); `until` *<team> is held until <instant>*; `early` *<team> started at <last> and
+       waits to start again*; `balance` *<team> is over its balance line on <repo>*; `link` *<team> waits
+       for <hosts> to answer*; `nothing` *<team> has no record left to start*. A `work_waiting` with no
+       `held` (`on_work: ask`) reads *<team> waits for your Start*; none at all (`on_work: off`, a
+       team stopped), *<team> is not running*; none where the team wound down with the line in its
+       members' `lane_seen` (rule 8 writes no mark for a seen id), *<team> wound down with it seen and
+       unpicked* (its cure the team's Start). Its members are the team's records that no newer record
+       supersedes, as the lanes read them; these team words take the place of the members' own `ended`
+       or `not_filled`. A PR with no actor reads *released by <name>*.
+     - **Never stuck.** Work whose only actors are the person's own live sessions (`unattended: false`
+       and no member — `by_person`, §4.4 *The card's status*, TD-1281): the person is already there. A
+       member the person took over is not the person's own: it reads `taken_over`. And a PR whose
+       holder's claim is a **waiting claim** (rule 5, TD-820: an open `ask` or `steer` of the holder's
+       about it, or its ask held in a seat's `prs_waiting.asks` — its reader asked) is not read as a PR:
+       an `ask` is the work, read as a question, its reader the actor; a claim waiting on a `steer` alone
+       is not read at all, since a steer lapses to its default at its bound (one to the person is on
+       their card as *steer* until then), after which the PR is read again.
+     - **The clock.** The work's **open time** is the ask's `at`, the first tick the home read the line
+       decided (below), or the claim's `at`. The home keeps a board line's and a PR's moving
+       parts on `host.json` as **`stuck_open: {<key>: {at, oid?}}`** (shape-checked by `HostStore.load` as
+       `stuck` is, an entry that fails it dropped), so a home restart keeps them: a line's `at` is the
+       first tick it was among `workorders.orders()`'s work orders (every open decided line that is
+       not `fyi`), moved to a claimant's claim `at` when one takes it
+       and to the release when it lets it go, the entry dropped when the line closes or is no longer
+       decided; a PR's `oid` is its head (`headRefOid`) and `at` the first tick that read that head, moved
+       on every push, and also to a claim's `at` and to a release, as a line's is. Its **`since`** is the later of its open
+       time and the newest state change among its actors (each record's `since`, which moves only on a
+       real change of state, or its `subagent_at` or `shells_at` where later — `agent_common.idle_from`,
+       as rule 4 clocks), except an **`idle`** actor, whose own state changes say nothing of this work, since a
+       turn that woke for other mail and ended with it open moved nothing: for a question it gives the
+       later of the `read_at` of the copy in the walk's last record's mailbox (stamped when `ao inbox`
+       printed it, and carried onto a fill's copy, so bounded below by that record's `created`) and that
+       record's `created`, or, unread there, that record's `since`; for an order or a PR, the
+       `stuck_open` entry's `at` (the claim, the release, the last push, which moves the clock for an
+       idle holder alone) — in every case the later of that and its `subagent_at` or `shells_at`, so one
+       whose shell has just ended gets its grace; and a **`stalled`** actor, whose `since` (the start of
+       its turn) says nothing of the stall, gives the instant nothing new began — the later of the two
+       clocks §4.2 *Liveness cross-check* reads (`work_at`, its last work-naming hook event, and `screen_at`), which is
+       also its stamp's `since`. Every actor's figure is floored at the work's open time — the moment from which
+       no actor has been acting — recomputed every tick, never kept from an earlier one. The work is **stuck**
+       when no actor is acting and `since` is older than its kind's wait: one wait from the last moment
+       anything moved, never two. The home keeps **`stuck: {<key>: {since, reason, actor}}`** on its
+       `host.json` for the work that is stuck (a key `HostStore.load` keeps beside `teams`, `last_tick`
+       and `ci_spells`, shape-checked as `ci_spells` is; the key `ask:<id>`, `board:<key>` or
+       `pr:<repo>#<n>`), its `since` the recomputed one (the row's age is drawn from it), dropped on the
+       first tick an actor acts, the work closes or is no longer one of the three kinds as read that tick, or `since` is no longer older than the wait — the map recomputed whole each tick; `reason` and `actor`
+       re-read every tick: **`reason`** the first actor's `unanswered` stamp — `needs_you` among the
+       reasons, its words a line under its pending row — as `read` gives it (with its
+       `since`, `start_at`, `gate`, `ended` and the rest), rule 13's own as `{state: "stalled" | "idle",
+       since}`, a team's as `{state: "team", team, held}` (`held` as rule 8 writes it, none for *waits
+       for your Start*, `{why: "stopped"}` and `{why: "wound_down"}` for the other two), a released PR's
+       as `{state: "released", by}`, *no lane takes it* as `{state: "no_lane"}`; **`actor`** `{id, host,
+       name, more}` — the first not acting (an ask's in its `to` order, an order's by lane order then id, a
+       PR's by claim `at`), `more` the count of the rest, none
+       for a team's or a released PR's. The sentence and the `+n` are made at render. Kept on
+       disk, so a home restart keeps the row standing, and time the home was down counts: nothing
+       could act then either.
+     - **A reason that names its own end waits.** Where **every** actor not acting has a reason that
+       carries an instant when it comes back — `scheduled`'s `start_at`, `limited`'s `limited_reset` on
+       the record, `gated`'s `gate.resets` (the `unanswered` stamp's, from the profile's usage row), a team held `until` (its instant), `early` (its last start
+       plus `WORK_EARLY`) or `usage` with a `resets` (one without is a need) — and the **earliest** of them
+       (any one actor is enough) is ahead of now by no more than the kind's wait, the stuck work is drawn
+       at *waiting* (§4.4 *The card's status*; on the card under *Waiting on them*, in no number), its
+       words the same; one actor whose reason carries no instant makes it a need, as does the earliest
+       instant passing with the work still stuck. It is recomputed every tick from each actor's own reading,
+       never from the stored `reason` (the first actor's alone), served
+       with the reading as `waiting_until` (that earliest instant), and never stored. Nothing is the
+       person's to do while the work's own reason says when it ends.
+     - **What the person sees.** A stuck work's **stuck row** is a need of the person's (§4.4 *The card's
+       status*: it makes its card *needs you*), drawn once (§4.5 screen 6 *One place for each thing
+       that needs the person*): on the card of the entry its work names — the question's first held
+       ref (`item_home`), the board line's `Context:`, the entry the PR's claim names — as a **Do** item
+       (screen 12 *Three wants*), else in the Inbox under *Needs you* (`item_home` gains a branch for a
+       stuck row, whose refs are its work's). It reads *stuck <age>: <the
+       work> — <reason>* (*stuck 1h 10m: grinder-ao-2's ask to techlead-ao-1 — techlead-ao-1 is at its
+       usage cap: resets 08:00Z — it is rung after*; *stuck 1h: the One more round on TD-1437 — ao-grind
+       is held by its daily start cap: 3 idle starts today*). Where the person already sees the work as
+       a row — a decided line, drawn under *Waiting on them* while it waits on its session — that row
+       **moves** while it is stuck: to the card's Do group, or, its `Context:` naming no entry, under the
+       Inbox's *Needs you*, with the stuck words as a line under it, never a second row (`ao card` prints it as the stuck row, its id the `stuck` key and its kind *stuck*); it goes back
+       under *Waiting on them* the tick an actor acts; a handed entry's row under *Waiting on
+       them* (screen 6) moves the same way, to *Needs you* or its named entry's Do group. Where a stopped
+       holder's state row (TD-1453) draws the same actor **on the same card** (or both in the Inbox), the
+       stuck words are a line under it; on two cards — the holder leased to one entry, the work naming
+       another — each row is drawn on its own, the stuck row's words ending *— its holder row is on
+       <TD-n>*. Several stuck works with the same actor and reason draw each row, the first by its open
+       time in full and the rest with the reason cut to *— <actor>, as on <first work>*, so one parked
+       seat reads once — the first chosen per surface (one card, or the Inbox), at render, never stored. Its one control is **Open**, the actor's Focus (none for a `gone` actor, a work order
+       with no live actor or a released PR) (§4.5a
+       *Queue card / Inbox: stuck row*); the cure the reason's words name (Restart on its row, Hand
+       back, a team's Start) is drawn where it already is. The row goes on the tick the work has an
+       acting actor or closes.
+     - **A send that did not land.** A session's `ao` that finds no host agent exits 3 (§4.8a *With no
+       host agent to ask*), and to a session says so: *error: the host agent is down — this did not
+       land: end your turn and run it again when you are rung* (the session branch's `hint`, under
+       `--json` too, which also carries `missed: true`; a restart under the command keeps *run it
+       again* and writes no mark). Before it exits, a verb a session files with (§4.7: those that call the host agent to file — `msg`, `td add`, `td reserve`, `progress`, `doing`,
+       `finding`, `rank`; `board edit` writes the branch with no host agent, and every other verb is a read
+       or a person's, so none writes a mark) writes a **missed mark**,
+       `$SHIFTLEAD_HOME/missed/<session id>-<at>.json` (its `SHIFTLEAD_SESSION`, else the ancestry walk's) `{at, verb}`,
+       one file per miss, written to a temporary name and renamed, so no read meets half a file — the verb alone (`msg`, `td add`,
+       `progress`), never its arguments, which may hold what a message says. Each host agent, a node's
+       as the home's, reads its own `$SHIFTLEAD_HOME`'s marks: every tick reads the directory (empty, it costs nothing), so a mark written after the first tick back, by a
+       call that timed out on the restart, is read on the next (`_unavailable`'s ping decides: an agent
+       that answers it is a restart, no mark; one that does not is down, a mark). For each mark it walks the session it names to its
+       newest record by `_successor` as a send does (a seat to its current fill; a note is no cause of
+       rule 3's, so an empty seat's note waits in its mailbox for the next fill a question makes, within `MAIL_RETENTION`), sends that record, where it is live or an empty seat, a `[system]` note — *the host agent was not
+       answering when you ran `ao <verb>` at <at>* (one line per mark) *: it may not have landed — check
+       `ao inbox --sent` or `ao status`, and run it again if it did not* — which rings it as any mail does, and deletes the
+       files it read, leaving one that fails to parse for the next tick; and whenever the walk ends on no live record (none, a non-seat that ended, or an empty seat,
+       whose note still waits for its next fill) the person inbox is sent a note (*a send from <name> at <at> did not land and no
+       session is left to run it again*) — a node's note forwarded to the home as a node's mail is. An `ao` that is
+       not there at all (the shell's *command not found*, exit 127, as a promote's install can leave
+       it for a moment) runs no code and writes no mark, and nothing on the host can know who ran it — a
+       note to every session after every install was weighed and not taken, since it would ring every
+       session on every promote for a window of seconds: every brief's rule says such a command did
+       not land, to be run again on the next turn, and a member that ended its turn on it is rung by
+       rule 4's idle nudge if it holds open work (a seat by its next question); one with nothing open
+       is not rung, accepted: what it lost, its record does not show as owed.
 - **Promote**: a repo's live copy — the host agent and every session's `ao` for this repo, a cluster
   for samscrape — is made from `main` by **a person's press or this policy, never by a session**
   (CLAUDE.md: a worker never promotes; the `promote` RPC is refused to a session as `set_settings`
