@@ -312,15 +312,18 @@ def test_terminal_scrollback_reaches_tmux(client, subprocess_agent, tmp_path):
 
 
 def _jumped(ws) -> bool:
-    """The `/term/` socket's next `{jumped}` frame, past pane bytes and the attach's other words."""
-    words: list = []
-    deadline = time.time() + 10
-    while time.time() < deadline:
-        pane_bytes(ws, words)
-        if got := [w["jumped"] for w in words if "jumped" in w]:
-            return got[0]
-        ws.send_text(json.dumps({"resize": [100, 20]}))  # keeps pane frames coming while it waits
-    raise AssertionError("no {jumped} frame reached the page")
+    """The `/term/` socket's next `{jumped}` frame, past pane bytes and the attach's other words.
+
+    It reads frames itself and returns on the `{jumped}` text frame (TD-1446). Through `pane_bytes`, it
+    waited for a pane frame *after* the word, and a miss on a pane already on the live screen redraws
+    nothing: under load no frame came, `ws.receive()` has no bound, and the 120 s thread timeout killed
+    the xdist worker. The server sends the word for every press, so the read always ends."""
+    while True:
+        msg = ws.receive()
+        if msg.get("type") == "websocket.close":
+            raise WebSocketDisconnect(msg.get("code", 1000), msg.get("reason"))
+        if msg.get("text") is not None and "jumped" in (word := json.loads(msg["text"])):
+            return word["jumped"]
 
 
 def test_a_jump_over_the_term_socket_lands_or_misses_and_says_so(client, subprocess_agent, tmp_path, monkeypatch):
