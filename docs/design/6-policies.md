@@ -1430,11 +1430,14 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        member the person took over is not the person's own: it reads `taken_over`. And a **waiting claim**
        (rule 5, TD-820, `_waiting_claims`: an open `ask` or `steer` of the holder's to the person about it,
        `work.waiting_of`, or its ask held in a seat's `prs_waiting.asks` — its reader asked) is read per
-       claim: it makes its record no actor of the PR. Where other actors remain, the PR is read through them
+       claim: that claim makes no actor, and its record is no actor of the PR only when no other open claim of
+       it names the PR. Where other actors remain, the PR is read through them
        alone. Where none remains, the PR is not read as a PR: an ask held in `prs_waiting.asks` is the work,
        read as a question to the seat that holds it, that seat the actor; an `ask` or `steer` to the person
        reads nothing until it closes or lapses (it is on their card, and an ask to the person is never this
-       rule's question), after which the PR is read again.
+       rule's question), after which the PR is read again. While a PR is not read for want of an actor that is
+       not waiting, its `stuck_open` entry stays as stored (`rel` neither written nor cleared, `by` unchanged)
+       and its `stuck` entry drops: a tick with only waiting claims is no release.
      - **The clock.** The work's **open time** is the ask's `at`, the first tick the home read the line
        decided (below), or the claim's `at`. The home keeps a board line's and a PR's moving
        parts on `host.json` as **`stuck_open: {<key>: {at, oid?, repo, by?: {id, host, name, ref}, rel?}}`** (shape-checked by
