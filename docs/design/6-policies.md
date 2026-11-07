@@ -400,8 +400,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      one (every extra live and busy, the host at `scale.live`, the profile gated, the team's balance mark)
      leaves the mail on the seat's own record, and this pass, each tick, fills the lowest-placed held extra for
      it once one can be filled and **moves the waiting mail** there, oldest first, every unread entry §4.9's
-     *Mail to a scaled seat* lets move, as the tick's move of a routed ask does (`_reroute_waiting`; the
-     sender's `ao inbox --sent` reads where it went). An idle record, one lingering, is free and takes its mail
+     *Mail to a scaled seat* lets move, `entry` envelopes and an `ask` carrying a `pr` among them — a mover
+     of its own beside the tick's move of a routed ask (`_reroute_waiting`, which moves only from a seat that
+     cannot answer and passes those two over); the sender's `ao inbox --sent` reads where it went. An idle record, one lingering, is free and takes its mail
      at the ring as today; a seat that cannot answer is routing around's case (§4.9b, TD-1443), which reads its
      extras first. **An extra's fills count toward a `FILL_CEILING` of their own**: the group is the seat's
      extras together, never the seats sharing their controller, so churn among extras never refuses the seat's
@@ -1562,8 +1563,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      timers; down, no idle timers*). For each running team whose records carry a held **extra** of a worker
      line (a record with `scale`, its `line` naming a member line), the home asks whether the line is
      **short** at the events that change the answer, never on a timer: **an entry becoming pickable** in the
-     line's lane (filed, or its block dropped — the repo reading's `lanes.<team>` gaining an id it did not
-     hold, §4.4 *Repo facts*), and **a member of the line claiming** (`ao progress claim`, §4.8) while that lane
+     line's lane (filed, or its block dropped — the team's lane reading — `ledger.in_lanes` (§4.4 *In a
+     team's lanes*), read home-side as the shape reads it — gaining an id it did not hold, a reading of its
+     own beside rule 8's `lane_seen`), and **a member of the line claiming** (`ao progress claim`, §4.8) while that lane
      still holds a pickable entry nobody holds. The line is short when its lane holds a pickable entry nobody
      holds and **every live member of the line is busy — holding a lease**, a claim declared or derived that
      is not `done` or `dropped` (a waiting claim included, §4.8 *A claim is a lease*); a member between items,
