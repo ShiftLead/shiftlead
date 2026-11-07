@@ -2,7 +2,7 @@
 
 A session never waits inside its own turn: what it waits on outside mail runs as one background
 command, whose end wakes it. `waits` reads a shell command's shape and names a CI watch —
-`gh pr checks … --watch` or `gh run watch` — read as the kill guard reads a kill: the text masked,
+`gh pr checks … --watch`, `gh run watch` or `ao pr wait` — read as the kill guard reads a kill: the text masked,
 each command's word found past the same wrappers. A single `gh pr checks <n>`, a short `sleep` and a
 loop pass. Whether the call is refused is the hook's: only in the foreground of an unattended record
 (Claude Code's hook also tests the main thread; Gemini CLI's carries no subagent marker). It reads text
@@ -41,6 +41,10 @@ def waits(command: str) -> bool:
     """True when `command` runs a CI watch (§4.3 *A wait the guard refuses*)."""
     for segment in SEPARATORS.split(mask(command)):
         word, args = command_word(segment.split())
+        if word == "ao":  # the waiter the briefs name (TD-1487): `ao [--json] pr wait <n>`
+            if [a for a in args if not a.startswith("-")][:2] == ["pr", "wait"]:
+                return True
+            continue
         if word != "gh":
             continue
         sub = gh_subcommand(args)

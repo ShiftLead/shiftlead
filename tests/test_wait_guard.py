@@ -28,6 +28,8 @@ WATCHES = [
     "gh --repo a/b pr checks 12 --watch",
     "gh --repo=a/b pr checks 12 --watch",
     "gh pr checks 12 --watch=true",
+    "ao pr wait 12",  # the waiter the briefs name (TD-1487)
+    "ao --json pr wait 12 --timeout 600",
 ]
 NOT_WATCHES = [
     "gh pr checks 12",
@@ -37,6 +39,9 @@ NOT_WATCHES = [
     "echo gh run watch",
     "gh run view 99",
     "# gh pr checks 12 --watch",
+    "ao pr held 12",
+    "ao progress done TD-1 --pr 12",
+    'echo "ao pr wait 12"',
 ]
 
 

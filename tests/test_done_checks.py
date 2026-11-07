@@ -214,7 +214,7 @@ async def test_pending_is_refused_naming_the_running_checks_and_writes_nothing(w
     with pytest.raises(
         AgentError,
         match=r"PR #842's required checks are still running on 9c1e0f2: test — report done once they pass "
-        r"\(`gh pr checks 842 --watch`\)",
+        r"\(`ao pr wait 842`, in the background\)",
     ):
         await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
     (e,) = rec.progress
@@ -374,7 +374,8 @@ async def test_an_ask_with_a_pr_is_refused_on_failed_and_on_pending_and_sends_no
         await w.call("msg", to=["person"], text="read #842", kind="ask", pr=842)
     views[842] = _view(_run("test", "IN_PROGRESS", ""))
     with pytest.raises(
-        AgentError, match=r"still running on 9c1e0f2: test — ask again once they pass \(`gh pr checks 842 --watch`\)"
+        AgentError,
+        match=r"still running on 9c1e0f2: test — ask again once they pass \(`ao pr wait 842`, in the background\)",
     ):
         await w.call("msg", to=["person"], text="read #842", kind="ask", pr=842, nonce="n-1")
     assert rec.outbox == [] and agent.person_inbox == []
