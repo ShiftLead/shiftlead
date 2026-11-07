@@ -243,9 +243,11 @@ async def test_the_flush_lands_per_repo_and_a_failed_pr_keeps_its_intent(agent, 
     assert time.time() - state["moved_at"] < 5  # retried RANK_FLUSH on, not on the next tick
     assert (await agent.rpc_queue())["cards"][0]["not_landed"]
     # the next flush lands it, and the intent goes; its key stands in until the reading shows it
-    monkeypatch.setattr(board, "land_rank", lambda root, rel, lines, msg: {"pr": 8})
+    called: set[str] = set()
+    monkeypatch.setattr(board, "land_rank", lambda root, rel, lines, msg: called.add(str(root)) or {"pr": 8})
     _age(agent)
-    agent._rank_flush(cards, agent._rank_repos())
+    got = agent._rank_flush(cards, agent._rank_repos())
+    assert got and got == called, "the roots it landed in, for the re-read (TD-1508)"
     state = agent.rank_store.load()
     assert state["intents"] == [] and state["not_landed"] == {} and state["moved_at"] is None
     assert list(state["landed"]) == ["a#TD-004"]
@@ -447,3 +449,26 @@ def test_ao_rank_names_the_neighbours_the_design_says(monkeypatch, tmp_path):
         cli.cmd_rank(cli.build_parser().parse_args(["rank", "TD-5", "--above", "TD-5"]))
     with pytest.raises(cli.AgentError, match="on no open card"):
         cli.cmd_rank(cli.build_parser().parse_args(["rank", "TD-50", "--top"]))
+
+
+async def test_a_flush_rereads_each_repo_it_landed_in_at_once(agent, monkeypatch):
+    """TD-1508 (§4.4 *Every write the home lands is read at once*): the rank's landing is read again as a press's is —
+    `_rank_run` awaits `_reread_board` on each root the flush landed in, once the thread returns; a flush that
+    raises re-reads nothing."""
+    reread: list[str] = []
+
+    async def spy(root, *, fetch=False):
+        reread.append(str(root))
+
+    monkeypatch.setattr(agent, "_reread_board", spy)
+    monkeypatch.setattr(agent, "_rank_flush", lambda cards, repos: {"/r/b", "/r/a"})
+    await agent._rank_run([], {})
+    assert reread == ["/r/a", "/r/b"]
+    reread.clear()
+
+    def boom(cards, repos):
+        raise RuntimeError("the forge is down")
+
+    monkeypatch.setattr(agent, "_rank_flush", boom)
+    await agent._rank_run([], {})
+    assert reread == []

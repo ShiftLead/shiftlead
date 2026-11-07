@@ -203,4 +203,7 @@ class SyncMixin:
         text = f"merged {repo} #{n} — bump of the agent-cadence pin to {(e.get('commit') or '?')[:7]}"
         self._system_note(PERSON, text)
         log.info("sync: %s", text)
+        # board and ledger read at once against origin, fetched first: the merge moved origin, not the board's
+        # tree (§4.4 *Every write the home lands is read at once*, TD-1508)
+        await self._reread_board(root, fetch=True)
         return {**e, "verdict": "merged", "why": "", "at": now_iso()}

@@ -154,6 +154,27 @@ async def test_the_composed_merge_runs_in_order_and_drops_the_dir(agent, gh, mon
     assert merge[1] == (ROOT, 1097, HEAD)  # positional; the composed words as keywords (recorded below)
 
 
+async def test_a_sync_merge_rereads_board_and_ledger_against_origin_at_once(agent, gh, monkeypatch, tmp_path):  # noqa: F811
+    """TD-1508 (§4.4 *Every write the home lands is read at once*): the merge moved origin, not the board's tree, so
+    the repo is read again at once with a fetch first (`fetch=True`, never the tree); a merge that does not land
+    re-reads nothing."""
+    e, _ = _handed(tmp_path)
+    monkeypatch.setattr(sync, "compose", _composer(gh))
+    reread: list[tuple[str, bool]] = []
+
+    async def spy(root, *, fetch=False):
+        reread.append((str(root), fetch))
+
+    monkeypatch.setattr(agent, "_reread_board", spy)
+    got = await agent._sync_merge(ROOT, _pr(), e)
+    assert got["verdict"] == "merged" and reread == [(ROOT, True)]
+    reread.clear()
+    e, _ = _handed(tmp_path)
+    monkeypatch.setattr(sync, "merge", lambda root, n, head, **kw: "the forge refused it")
+    got = await agent._sync_merge(ROOT, _pr(), e)
+    assert (got or {}).get("verdict") != "merged" and reread == []
+
+
 async def test_the_composed_merge_passes_subject_and_body(agent, gh, monkeypatch, tmp_path):  # noqa: F811
     e, d = _handed(tmp_path)
     monkeypatch.setattr(sync, "compose", _composer(gh))
