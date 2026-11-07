@@ -1633,9 +1633,12 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   own smoke failed is not either. The failure is read as the pass leaves it, after any conclusion the
   pass makes, and before any start the same pass makes (an `auto` run that starts as the last one
   concludes leaves the concluded build read): a rollback's concluding watch pass clears `failed.json`
-  and reads. Dismiss is no word that the build is good, so Dismiss of a failure (never of a hold) moves the
-  failure's `sha` to the file `~/.shiftlead/promotes/<repo>/untagged`, beside `live_ref` and, unlike it, in
-  no reading or `ao promote status`: a full pass whose **live** is that sha reads and pushes nothing, as
+  and reads. Dismiss is no word that the build is good, so Dismiss of a failure (never of a hold) whose `sha` is
+  the commit `check` last read as **live** moves that `sha` to the file
+  `~/.shiftlead/promotes/<repo>/untagged`, beside `live_ref` and, unlike it, in no reading or `ao promote
+  status`; a failure at a sha that is not live writes nothing and leaves a standing file as it is, since that
+  sha becomes live only by a run that concludes or a hand install, and a file holds the one live sha it
+  names: a full pass whose **live** is that sha reads and pushes nothing, as
   while the failure stood, and the first pass that reads (one that reads nothing keeps the file) with
   another live commit deletes the file and reads; so a build that failed, or never had its
   smoke, is tagged only once a promote or a rollback that concludes moves **live** off it.
