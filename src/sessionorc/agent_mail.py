@@ -267,7 +267,7 @@ class MailMixin:
     ) -> tuple[Any, dict[str, Any] | None]:
         """Where a new `ask` to one `asks` seat goes when that seat cannot answer (§4.9b *A seat that cannot
         answer is routed around*, TD-1443): `(to, routed)`. A general question (no `pr`) goes to its team's
-        techlead seat when that is able and is not the seat itself, else to the person; a reader's `ask`
+        techlead seat when that is able and is neither the seat itself nor the sender, else to the person; a reader's `ask`
         (carrying `pr`) is never re-seated and goes to the person. `routed` is `{seat, name, why, at}`, None
         where nothing moved: an able seat, a superseded one (its mail follows the chain), a reply or a thread, any
         kind but `ask`, the person's own send, or an address that is not exactly one seat."""
@@ -289,6 +289,7 @@ class MailMixin:
                 r
                 for r in records.values()
                 if r is not seat
+                and self._address(r) != self._addr(sender)  # never back to its own sender: the person instead
                 and r.team == seat.team
                 and mail.asks_seat(r)
                 and (r.seat or {}).get("tags") is True

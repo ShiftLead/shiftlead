@@ -108,3 +108,13 @@ async def test_one_stalled_tick_or_an_able_seat_moves_nothing_and_a_reply_is_nev
         async with LocalClient(caller=tl) as t:  # the seat's own reply goes to its asker as ever
             back = await t.call("msg", text="yes", kind="reply", reply_to=got["entry"]["id"])
         assert back["entry"]["to"] == [w] and "routed" not in back
+
+
+async def test_the_techleads_own_ask_to_an_unable_review_seat_goes_to_the_person_never_back_to_it(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        tl, rv, w = await _team(agent, tmp_path, person)
+        _limited(agent, rv)
+        async with LocalClient(caller=tl) as c:
+            got = await c.call("msg", to=rv, text="did #12 pass?", kind="ask")
+        assert got["entry"]["to"] == [PERSON] and got["routed"]["seat"] == rv, "never back to its own sender"
