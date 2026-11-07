@@ -1751,13 +1751,21 @@ class MailMixin:
                 replies[e.reply_to] = e
         reads = []
         for e in sorted(asks, key=lambda e: e.at):
-            last = replies.get(e.id)
+            if e.routed and any(x.closed_reason == "rerouted" and x.root == e.root for x in asks):
+                continue  # a moved copy is read through the reader's ask it was moved from, below
+            # a reader's ask moved from a reader that could not answer (§4.9b, TD-1480) reads as its moved copy
+            # does: the PR stays asked while the copy is out, and the person's reply to it is the PR's read
+            now_at = e
+            if e.closed_reason == "rerouted":
+                moved = [x for x in s.outbox if x.root == e.root and x.routed and x.id != e.id and x.at >= e.at]
+                now_at = moved[-1] if moved else e
+            last = replies.get(now_at.id)
             reads.append(
                 {
                     "id": e.id,
                     "to": list(e.to),
                     "at": e.at,
-                    "open": e.open,
+                    "open": now_at.open,
                     "verdict": last.verdict if last else None,
                     "replied_at": last.at if last else None,
                 }

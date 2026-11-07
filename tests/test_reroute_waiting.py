@@ -148,3 +148,23 @@ async def test_thread_follows_the_move_and_is_refused_once_the_person_holds_it(a
             await _move(agent)  # tl's own question goes to the person
             with pytest.raises(AgentError, match="the person holds it"):
                 await c.call("msg", to=PERSON, text="again", kind="ask", thread=to_tl["entry"]["id"])
+
+
+async def test_a_readers_rerouted_ask_leaves_the_pr_asked_while_its_copy_is_out(agent, tmp_path):
+    """§4.9b: the PR reads as asked while the ask is out — `pr_reads` reads a rerouted reader's ask through its
+    moved copy, so `ao pr held` never tells the author to ask the unable reader again."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        tl, rv, w = await _team(agent, tmp_path, person)
+        async with LocalClient(caller=w) as c:
+            got = await c.call("msg", to=rv, text="#12: the fix", kind="ask", pr=12)
+            rec = agent.sessions[rv]
+            rec.state, rec.stalled_ticks = "stalled?", 2
+            await _move(agent)
+            reads = (await c.call("pr_reads", id=w, pr=12))["asks"]
+        assert [(r["id"], r["to"], r["open"]) for r in reads] == [(got["entry"]["id"], [rv], True)]
+        m = next(e for e in agent.person_inbox if e.root == got["entry"]["root"])
+        await person.call("msg", text="read it: fine", kind="reply", reply_to=m.id)
+        async with LocalClient(caller=w) as c:
+            reads = (await c.call("pr_reads", id=w, pr=12))["asks"]
+        assert len(reads) == 1 and reads[0]["open"] is False and reads[0]["replied_at"]
