@@ -49,6 +49,9 @@ PUSH_OPEN = b'{"event": "session", "session": '  # a pushed view's envelope, mea
 TAIL_LINES = 15  # cards show the last 3; the screen rules (TD-015) need the dialog above the options
 CLOSED_KEEP = timedelta(days=1)
 STALL_AFTER = timedelta(minutes=20)
+# How long an open tool call holds the liveness clocks (design §4.2 *Liveness cross-check*, TD-1475): past
+# it a hung call, or one whose post-tool hook was lost, reads `stalled?` like any other silence.
+OPEN_TOOL_CEILING = timedelta(hours=3)
 # How long after a prompt's sure end the tool's `permission_prompt` notice is still that prompt's (design §4.2
 # *Open prompts are a stack*, TD-950): it lands about six seconds after the dialog is drawn (every subagent capture).
 NOTICE_LAG = 10.0
