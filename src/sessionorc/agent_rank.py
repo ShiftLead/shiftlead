@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import board as board_mod
-from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
 from sessionorc import mail
 from sessionorc import rank as rank_mod
@@ -284,27 +283,19 @@ class RankMixin:
         return landed
 
     def _rank_lined(self, repos: Mapping[str, tuple[str, str, Any]]) -> dict[str, list[str]]:
-        """Repo name → the ids its checkout's rank file gives a line that are open or archived — what a prune
-        may weigh. A repo whose ledger reading failed or holds no entry, or whose archive cannot be read, is
-        left out: a reading that is missing must never read as every line's card archived. The rank file and the
-        archive are read through the ledger's own compare against origin (`ledger.compare`, TD-1471), so a prune
-        never weighs a stale rank file against an origin reading."""
+        """Repo name → the ids its rank file gives a line that are open or archived — what a prune may weigh. A
+        repo whose ledger reading failed or holds no entry, or whose reading carries no `rank_lined` (no rank
+        file, no archive to read), is left out: a reading that is missing must never read as every line's card
+        archived. `rank_lined` is the ledger reading's own, taken through its compare against origin
+        (`ledger.read`, TD-1471), so a prune never weighs a stale rank file against an origin reading and runs
+        no second compare (TD-1515)."""
         out: dict[str, list[str]] = {}
-        for name, (root, rel, led) in repos.items():
+        for name, (_root, _rel, led) in repos.items():
             if led.get("error") or not led.get("entries"):
                 continue
-            cmp = ledger_mod.compare(root, str(led["path"]))
-            if cmp.error:
-                continue
-            text = cmp.io[1](rel)
-            if text is None:
-                continue
-            lined = rank_mod.lined_ids(text)
-            archive = ledger_mod.read_pair(str(led["path"]), cmp.io)[2]  # either layout
-            if archive is None:
-                continue
-            known = ledger_mod.ids_in(archive) | {str(e.get("id")) for e in led["entries"]}
-            out[name] = [t for t in lined if t in known]
+            lined = led.get("rank_lined")
+            if isinstance(lined, list):
+                out[name] = [str(t) for t in lined]
         return out
 
 

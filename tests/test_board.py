@@ -1100,6 +1100,35 @@ def test_a_merge_the_forge_took_while_origins_board_moved_elsewhere_is_a_landed_
     assert f"- [x] {ITEM}" in origin_board(repo)
 
 
+def test_a_landing_whose_fetch_fails_lands_the_press_and_reports_the_reread_failing(repo, monkeypatch):
+    """TD-1515 (§4.4 *Every write the home lands is read at once*): the press merged, and the fetch after it
+    failed — the press stands (its line on origin, its PR named), no `commit` is reported, and `reread_error`
+    says the re-read failed and why; the tree is reset all the same, so the next press lands."""
+    real, merged = board._fetch, []
+    real_quiet = board._git_quiet
+
+    def quiet(t, *args):
+        if "--delete" in args:  # the branch deleted after the merge: the landing's fetch is next
+            merged.append(True)
+        return real_quiet(t, *args)
+
+    def fetch(root, at, want, timeout):
+        if merged:
+            return subprocess.CompletedProcess(["git", "fetch"], 128, "", "fatal: unable to access origin\n")
+        return real(root, at, want, timeout)
+
+    monkeypatch.setattr(board, "_git_quiet", quiet)
+    monkeypatch.setattr(board, "_fetch", fetch)
+    got = board.write_back(repo, 7, ITEM, "done")
+    assert got["pr"] == 1 and got["commit"] == ""
+    assert got["reread_error"].startswith(board.REREAD_FAILED) and "unable to access origin" in got["reread_error"]
+    assert f"- [x] {ITEM}" in origin_board(repo)
+    merged.clear()
+    monkeypatch.setattr(board, "_fetch", real)
+    got = board.write_back(repo, 8, "n/a — undated.", "done")
+    assert "reread_error" not in got and got["commit"] == on_origin(repo, "rev-parse", "--short", "origin/main")
+
+
 async def test_the_home_writes_the_trail_line_a_node_handed_it(agent):
     """`board_reply_hand` with `repo` (a node's Reply, §4.4a): the home writes the trail line in the
     result's words, holder or none — the trail is the home's, beside the person inbox (§4.10)."""

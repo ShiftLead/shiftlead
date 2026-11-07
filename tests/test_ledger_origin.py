@@ -242,7 +242,7 @@ def test_a_ledger_first_added_on_origin_stamps_and_reads_origins(tmp_path):
     assert sorted(by_id(led)) == ["TD-001"] and led["origin"]["source"] == "origin"
 
 
-def test_a_rank_file_changed_on_origin_orders_the_queue_and_the_prune_reads_it(tmp_path):
+def test_a_rank_file_changed_on_origin_orders_the_queue_and_the_prune_reads_it(tmp_path, monkeypatch):
     """The rank file is one id of its own: changed on origin it gives the entries their keys before the pull, and
     the prune (`_rank_lined`) weighs origin's lines."""
     from sessionorc.agent_rank import RankMixin
@@ -253,8 +253,17 @@ def test_a_rank_file_changed_on_origin_orders_the_queue_and_the_prune_reads_it(t
     fetch(root)
     led = ledger.reading(root, NOW, with_history=False)
     assert by_id(led)["TD-002"]["key"] == "0|1" and by_id(led)["TD-001"]["key"] == "0|2"
+    assert led["rank_lined"] == ["TD-001", "TD-002"], "TD-009 is on origin's rank file and in neither ledger file"
+
+    def no_second_compare(*a, **kw):
+        raise AssertionError("the prune reads the reading's own rank_lined (TD-1515)")
+
+    monkeypatch.setattr(ledger, "compare", no_second_compare)
     lined = RankMixin._rank_lined(None, {"repo": (str(root), "docs/ledger/rank.yml", led)})
-    assert lined == {"repo": ["TD-001", "TD-002"]}, "TD-009 is on origin's rank file and in neither ledger file"
+    assert lined == {"repo": ["TD-001", "TD-002"]}
+    # a reading with no `rank_lined` (no rank file, or one saved before it) is left out, never read as empty
+    bare = {k: v for k, v in led.items() if k != "rank_lined"}
+    assert RankMixin._rank_lined(None, {"repo": (str(root), "docs/ledger/rank.yml", bare)}) == {}
 
 
 def test_a_failed_fetch_a_failed_compare_and_no_origin_ref(tmp_path, monkeypatch):
