@@ -2580,6 +2580,19 @@ def test_the_presets_say_what_over_its_line_means():
     assert "one line in your round log" in manager and "do not restart or wind them down" in manager
 
 
+def test_the_briefs_send_another_repos_work_to_its_question_seat():
+    """TD-1544 (design §4.7 *Entries*): work a session meets in another repo goes by `ao td add --repo`,
+    and a board `act` line only where that repo has no question seat, its text naming the cause."""
+    root = pathlib.Path(__file__).parents[1]
+    for name in ("grinder.md", "designer.md", "manager.md"):
+        brief = (root / "src/shiftlead/briefs" / name).read_text()
+        assert "**Work you meet in another repo** is that repo's" in brief, name
+        assert "`ao td add --repo <repo> \"<what, and why>\"`" in brief, name
+        assert "only where that is refused *<repo> has no question seat* write an `act` line on {board}" in brief, name
+        assert "*<repo> has no question seat, so no session here can file it*" in brief, name
+    design = (root / "docs/design/4.7-cli.md").read_text()
+    assert "**Work a session meets in another repo goes this way** (TD-1544)" in design
+
 def test_status_v_says_what_a_close_did_with_the_worktree(monkeypatch, capsys):
     """design §4.1 *Kept, and said* (TD-979): `ao status -v` prints a closed record's `worktree_kept`,
     `worktree_reaped_at` and `branch_kept` in the Session card's words, and the branches it deleted."""
