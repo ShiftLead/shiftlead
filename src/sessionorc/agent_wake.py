@@ -181,7 +181,7 @@ class WakeMixin:
     async def _ring_once(self, sid: str, *, retry: bool) -> None:
         """One ring: the composer must read empty — a person's half-typed words would otherwise be
         submitted with the line appended — then the wake decision (the budget, and mail no wake has
-        covered: *rung only when the count has risen*), then the fixed line through `_type`. A
+        covered or a ring answered with nothing read, TD-1488), then the fixed line through `_type`. A
         retry was decided and charged by the first try, so it takes no second decision; it rings
         only into an empty composer, since a stuck first try may have left the line there. All of
         it holds the pane's typing lock, and a pane a `send` is typing into is left to the next
@@ -213,7 +213,7 @@ class WakeMixin:
             if composer:  # the first try's own line is still there: nothing more is typed
                 self._bell_failed(s, bell, "prompt-stuck: the line is still in the composer")
                 return
-        elif self._decide_wake(s, member_change=False, via="doorbell") is None:
+        elif self._decide_wake(s, member_change=False, via="doorbell", again=self._ring_again(s, sid)) is None:
             return  # nothing new since the last wake, or the budget is spent: the mail waits
         else:
             # only a decided ring has a stretch to keep: an undecided tick is taken again next tick,
@@ -254,14 +254,16 @@ class WakeMixin:
             self._ringing.pop(addr, None)
 
     async def _ring_node_once(self, s: Session, addr: str, *, retry: bool) -> None:
-        """One ring of a node's record, decided here and typed there. The budget and the watermark are
-        checked first and charged nothing; the `ring` act carries the line built here, the record's
-        `since` and a fresh token; the decision is recorded on `typed` alone. `busy` keeps no bell and is
-        looked at again next tick; `typed` and `failed` keep the bell for the stretch, a failure retried
-        once (the node writes `doorbell_failed` when the retry fails); no verdict is nothing at all."""
-        fresh = mail.undecided_mail(s)
-        if not fresh or (not any(e.uncharged for e in fresh) and mail.wake_budget_spent(s, datetime.now(UTC))):
-            return  # nothing new since the last wake, or the budget is spent: the mail waits
+        """One ring of a node's record, decided here and typed there. The budget and the watermark (or an unread ring to
+        repeat, TD-1488) are checked first and charged nothing; the `ring` act carries the line built here, the record's
+        `since` and a fresh token; the decision is recorded on `typed` alone. `busy` keeps no bell and is looked at
+        again next tick; `typed` and `failed` keep the bell for the stretch, a failure retried once (the node writes
+        `doorbell_failed` when the retry fails); no verdict is nothing at all."""
+        fresh, again = mail.undecided_mail(s), self._ring_again(s, addr)
+        if not (fresh or again) or (
+            not any(e.uncharged for e in fresh) and mail.wake_budget_spent(s, datetime.now(UTC))
+        ):
+            return  # nothing new since the last wake and no unread ring to repeat, or the budget is spent
         since, token = s.since, secrets.token_hex(6)
         self._rang.pop(addr, None)  # a new ring: a judgement still pending for an older one drops uncounted
         dispatched = datetime.now(UTC).replace(microsecond=0)  # `read_at` is whole seconds: the window favours a read
@@ -276,7 +278,7 @@ class WakeMixin:
             bell["failures"] += 1
             log.warning("doorbell for %s did not submit (%d of %d)", addr, bell["failures"], DOORBELL_TRIES)
             return
-        self._decide_wake(s, member_change=False, via="doorbell")
+        self._decide_wake(s, member_change=False, via="doorbell", again=again)  # as decided before the await
         bell["rung"] = True
         self._rang[addr] = {"token": token, "dispatched": dispatched}  # judged from the report bringing its Stop
         await self._push_changes()
@@ -525,7 +527,9 @@ class WakeMixin:
             s.doorbell_failed = {"at": now_iso(), "error": error}
             self._save(s)
 
-    def _decide_wake(self, s: Session, *, member_change: bool, via: str = "wait") -> dict[str, Any] | None:
+    def _decide_wake(
+        self, s: Session, *, member_change: bool, via: str = "wait", again: bool = False
+    ) -> dict[str, Any] | None:
         """The one wake decision (design §4.10), taken when `s` is reachable — blocked in `wait`
         here; step 7's doorbell calls it at a hook-confirmed `idle`. Looks at the unread mail past
         the `mail_decided` watermark:
@@ -541,13 +545,16 @@ class WakeMixin:
         - the budget holds → one unit spent however many entries it covers, `charged: True`,
           watermark advanced;
         - the budget is spent → None: the mail has landed, nothing wakes, **the watermark stays**,
-          so the same mail is still undecided when the window refills.
+          so the same mail is still undecided when the window refills;
+        - nothing past the watermark, but `again` — the doorbell's last ring was answered by a turn that
+          read none of its mail (TD-1488) → the same mail is rung again, charged like any ring,
+          `covered: 0`, the watermark where it was.
 
         Returns the decision as recorded, plus the `entries` it covered."""
         if not mail.mail_wakes(s):
             return None
         fresh = mail.undecided_mail(s)
-        if not fresh:
+        if not fresh and not again:
             return None
         now = datetime.now(UTC)
         free = member_change or any(e.uncharged for e in fresh)
@@ -561,7 +568,8 @@ class WakeMixin:
             "via": via,
         }
         s.wakes = (s.wakes + [decision])[-mail.WAKES_KEEP :]
-        s.mail_decided = {"id": fresh[-1].id, "at": fresh[-1].at}
+        if fresh:
+            s.mail_decided = {"id": fresh[-1].id, "at": fresh[-1].at}
         self._save(s)
         return {**decision, "entries": fresh}
 
@@ -594,6 +602,14 @@ class WakeMixin:
         if run >= mail.DOORBELL_HELD and not s.doorbell_held:
             s.doorbell_held = {"at": now_iso(), "rings": run}
             log.info("%s: doorbell held after %d rings answered with nothing read", key, run)
+
+    def _ring_again(self, s: Session, key: str) -> bool:
+        """The doorbell's last ring was answered by a turn that read none of its mail, and the bell is not
+        held: the same mail is rung again in the next idle stretch, though no new mail has risen past the
+        watermark (design §4.10, TD-1488). Without it a turn whose read failed — a tool's permission
+        check refusing `ao inbox` — left its mail covered and unrung until new mail landed, hours later.
+        `DOORBELL_HELD` unread rings in a row still hold the bell."""
+        return self._unread_rings.get(key, 0) > 0 and not s.doorbell_held
 
     def _bell_cleared(self, s: Session) -> bool:
         """A read, or a person's act toward it, ends the run and lifts `doorbell_held` (TD-347).
