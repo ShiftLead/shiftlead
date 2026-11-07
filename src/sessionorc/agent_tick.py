@@ -3759,9 +3759,12 @@ class TickMixin:
                         waiting.add(naming.split_address(str(a["from"]))[0])
             doing = {t: list(r) for t, r in self.doing_log.rings.items()}
             # a repo with no archive yet (after a restart, before its first ledger read) keeps the last cards
-            # rather than drawing them without one (§4.4 *The ledger is read against origin*, TD-1471)
+            # rather than drawing them without one (§4.4 *The ledger is read against origin*, TD-1471); one whose
+            # ledger read failed holds nothing back, so a repo that keeps failing never freezes the Queue
             if self._queue is not None and any(
-                r not in self._archived and isinstance((v.get("ledger") or {}).get("entries"), list)
+                r not in self._archived
+                and isinstance((led := v.get("ledger") or {}).get("entries"), list)
+                and "error" not in led
                 for r, v in self._repos.items()
             ):
                 return

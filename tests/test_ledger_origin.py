@@ -327,6 +327,34 @@ async def test_the_queue_keeps_its_last_cards_until_a_repo_has_an_archive(tmp_pa
     assert [c["id"] for c in agent._queue["cards"]] == ["repo#TD-001"]
 
 
+async def test_a_repo_whose_ledger_read_failed_holds_no_queue_back(tmp_path, agent):
+    """A repo with no archive whose ledger reading carries an error (its read failing since the restart) holds
+    nothing back: the Queue is drawn from the other repos' readings (#3151's review)."""
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    root, _ = scratch(tmp_path, v2_files([entry(1, "one"), entry(2, "two")]))
+    led = ledger.reading(root, NOW, with_history=False)
+    r = {"name": "repo", "root": str(root), "remote": "", "ledger": led, "prs": {"open": []}}
+    agent._repos = {str(root): r}
+    agent._archived = archives(agent._repos)
+    await agent._queue_pass(NOW)
+    agent._archived = {}  # a restart, and the first ledger read failed: entries kept, an error beside them
+    agent._repos = {str(root): {**r, "ledger": {**led, "entries": led["entries"][:1], "error": "faulted"}}}
+    await agent._queue_pass(NOW + timedelta(seconds=2))
+    assert [c["id"] for c in agent._queue["cards"]] == ["repo#TD-001"]
+
+
+def test_a_blob_git_cannot_give_is_an_error_never_an_absent_entry(tmp_path, monkeypatch):
+    """`git cat-file --batch` failing for a file origin lists is the compare's error, not an entry gone."""
+    root, other = scratch(tmp_path, v2_files([entry(1, "one")]))
+    land(other, {"docs/ledger/TD-001.md": entry(1, "one, edited")})
+    fetch(root)
+    monkeypatch.setattr(ledger, "_batch", lambda *a, **k: {})
+    cmp = ledger.compare(root, "docs/ledger", "main")
+    assert cmp.error and "could not read" in cmp.error
+
+
 def test_the_rule_is_by_id_and_takes_no_rename(tmp_path):
     """Both diffs run `--no-renames`: a move into `archive/` reads as a delete and an add, so the id is origin's
     placement and the open file is gone from the listing."""

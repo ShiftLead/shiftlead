@@ -932,14 +932,14 @@ def compare(root: Path | str, rel: str, branch: str | None = None, timeout: floa
         meta, tab, p = rec.partition("\t")
         if tab and meta.split()[1:2] == ["blob"] and p in taken:
             blobs[p] = meta.split()[2]
-    texts: dict[str, str] = {}
+    texts = _batch(root, blobs, timeout) if blobs else {}
+    if len(texts) != len(blobs):  # a blob origin lists and git could not give: an error, never an absent entry
+        return Compare(fs, {}, error=f"git could not read the ledger's files on origin/{branch}")
     fs_ls, fs_read = fs
 
     def read(path: str) -> str | None:
         if path not in taken:
             return fs_read(path)
-        if path in blobs and not texts:
-            texts.update(_batch(root, blobs, timeout))
         return texts.get(path)
 
     def ls(path: str) -> list[str] | None:
