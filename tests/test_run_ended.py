@@ -259,7 +259,7 @@ def test_ao_team_add_is_refused_on_a_team_not_running_and_to_a_session(world, ca
     started(state)
     for s in state["sessions"]:
         if s["name"] == "orc-ao":
-            s["state"] = "closed"  # its manager gone, and not a seat on call
+            s["state"], s["seat"] = "closed", None  # its manager gone, and not a seat on call
     assert cli.main(["team", "add", "ao-grind", "grind"]) == 1
     assert "not running" in capsys.readouterr().err
     monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-shiftlead-grind-1")
