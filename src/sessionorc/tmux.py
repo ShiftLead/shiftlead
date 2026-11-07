@@ -221,8 +221,11 @@ class Tmux:
         cp = self.run("list-sessions", "-F", "#{session_name}\t#{status}", check=False)
         if cp.returncode != 0:
             return []  # no server
-        names = [n for n, _, s in (line.partition("\t") for line in cp.stdout.splitlines()) if n.startswith(prefix)
-                 and s != "off"]
+        names = [
+            n
+            for n, _, s in (line.partition("\t") for line in cp.stdout.splitlines())
+            if n.startswith(prefix) and s != "off"
+        ]
         for n in names:
             self.run("set-option", "-t", f"={n}:", "status", "off", check=False)
         return names

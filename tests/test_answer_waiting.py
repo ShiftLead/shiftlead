@@ -154,8 +154,15 @@ def test_read_when_says_fills_this_seat_for_a_reply_to_its_own_question_and_wait
 async def _make_seat(person, tmp_path) -> str:
     return (
         await person.call(
-            "create", name="tl", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc", "--noprofile"],
-            unattended=True, supervised=True, prompt="the seat's brief", seat={"trigger": "asks"},
+            "create",
+            name="tl",
+            dir=str(tmp_path),
+            adapter="agentshell",
+            argv=["bash", "--norc", "--noprofile"],
+            unattended=True,
+            supervised=True,
+            prompt="the seat's brief",
+            seat={"trigger": "asks"},
         )  # fmt: skip
     )["id"]
 
@@ -205,8 +212,12 @@ async def test_a_sessions_reply_closing_the_seats_own_ask_fills_it(agent, tmp_pa
         (tmp_path / "w").mkdir()
         w = (
             await person.call(
-                "create", name="w", dir=str(tmp_path / "w"), adapter="agentshell",
-                argv=["bash", "--norc", "--noprofile"], unattended=True,
+                "create",
+                name="w",
+                dir=str(tmp_path / "w"),
+                adapter="agentshell",
+                argv=["bash", "--norc", "--noprofile"],
+                unattended=True,
             )  # fmt: skip
         )["id"]
         await person.call("set_controllers", id=w, add=[sid])
