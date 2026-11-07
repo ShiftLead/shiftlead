@@ -141,6 +141,7 @@ not mix:
   techlead's is a question; an **auditor**'s is a count of merged PRs or a period (TD-098); a **sweeper**'s is its board's `Swept:` stamp growing old (TD-1061). —
   **decided** 2026-09-21 (asked for by Paul: the word was in use and not defined; *on call* his
   choice the same evening).
+- **pool** — an `asks` seat's ordered list of profiles (`pool:` in place of `profile:`), each a **member**: a record and a seat of its own, the first taking the seat's name, the k-th `<name>-p<k>`; a question to a member that cannot answer goes to the first able member after it before it leaves the seat (design §4.9b *A seat as an ordered pool*, TD-1476). *Not:* a team's members, which are workers. — *proposed* 2026-11-07
 - **on call** — what a seat's card says while nobody is in it: grey, nothing for the person to
   do, and the slot says what would make it come. Not a state: the record is `exited` or `closed`.
   — **decided** 2026-09-21 (Paul; *empty* and *available* read as something to do). A manager on

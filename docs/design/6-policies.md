@@ -219,7 +219,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      puts on the board, and the press is the person's. Restart, not *Resume with changes…*, is a
      supervised member's way back into its team's run (§4.9a *One member back, today*).
   3. **Seats.** `ao team start` writes each seat's trigger on its record as **`seat: {trigger}`**
-     (home-owned, set at create like `review`, §4.9b), and the tick computes **`seat_due: {at,
+     (home-owned, set at create like `review`, §4.9b) — each member of a pool as a seat of its own, its `seat`
+     also carrying `pool` and `rank` (§4.9b *A seat as an ordered pool*, TD-1476), so this rule fills a member
+     only when mail waits on it — and the tick computes **`seat_due: {at,
      by}`** from it — set only once the trigger is met, `by` naming what met it (`asks`, `prs`,
      `every`, **`swept`**, `work`, **`tag`** — the repo's tagging seat while the reading's `needs_team` holds
      ids not yet filled for, `seat_due: {at, by: tag, ids}` and `seat_filled` keeping `{by: tag,
