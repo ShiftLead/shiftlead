@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import copy
+import dataclasses
 import json
 import os
 import re
@@ -39,6 +40,7 @@ from sessionorc import held as held_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc import promote as promote_mod
 from sessionorc import queue as queue_mod
+from sessionorc import screen as screen_mod
 from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
@@ -75,7 +77,6 @@ from sessionorc.agent_common import (
     STALL_AFTER,
     TAIL_LINES,
     RpcError,
-    _cap,
     _clean,
     _cool_left,
     _duration,
@@ -4794,11 +4795,14 @@ class TickMixin:
         between polls alike (TD-233 slice 2): a session's cap is marked when it is read, not on the
         next poll. A `limited` a modal screen rule set is never lifted: only its screen ends it (§4.3)."""
         for s in live:
-            cap = None if s.profile in metered else _cap(self._usage.get(s.profile))
-            if cap and s.state not in ("limited", "needs-you"):
+            found = None if s.profile in metered else agent_common.cap_window(self._usage.get(s.profile))
+            cap = found[0] if found else None
+            if found and s.state not in ("limited", "needs-you"):
                 # the tool's own endpoint, not the screen: reported, so `hook` (design §9 invariant 4)
                 self._pre_limited[s.id] = s.state
-                s.set_state("limited", confidence="hook", pending=Pending(kind="limit", text=cap))
+                s.set_state("limited", confidence="hook", pending=Pending(kind="limit", text=found[0]))
+                if found[1] is not None:  # the spell's reset, read once (§4.3, TD-1474)
+                    s.limited_reset = found[1].isoformat().replace("+00:00", "Z")
                 self.store.save(s)
             elif not cap and s.state == "limited" and s.pending and s.pending.kind == "limit":
                 if agent_common.limit_is_modal(s, adapters.get(s.adapter)):
@@ -5059,12 +5063,15 @@ class TickMixin:
                 s.set_state("idle", confidence="tick")
         elif (m := self._screen_verdict(s, adapter, now)) is not None:
             # Hook-fed adapter, screen rule fired, no fresher hook state: the labelled fallback
+            pending = self._spell_pending(s, m)
             if s.state == m.state == "limited" and s.confidence == "hook":
                 pass  # the poll's `limited` keeps its reset, pending and confidence (§4.3, TD-944)
-            elif m.state != s.state or (m.pending and m.pending != s.pending):
+            elif m.state != s.state or (pending and pending != s.pending):
                 if not self._screen_held(s):  # what the verdict replaces, unless it is a verdict itself
                     self._hook_state[s.id] = (s.state, s.pending, s.confidence)
-                s.set_state(m.state, confidence="scraped", pending=m.pending)
+                s.set_state(m.state, confidence="scraped", pending=pending)
+                if m.state == "limited" and s.limited_reset is None:
+                    s.limited_reset = getattr(m, "resets", None)  # the spell's first tick reads it (§4.3, TD-1474)
         elif self._screen_gone(s, adapter, now):
             # The screen that set this state is gone and no hook has spoken since (TD-306): back to
             # what the last hook said, or `idle` when no hook has reported — not the scraped verdict
@@ -5081,6 +5088,18 @@ class TickMixin:
             # `needs-you` or `idle` session is silent by design.
             s.set_state("stalled?", confidence="tick")
         self.store.save(s)
+
+    @staticmethod
+    def _spell_pending(s: Session, m: Any) -> Pending | None:
+        """A verdict's pending, its *resets HH:MMZ* rewritten from the record's `limited_reset` while a
+        `limited` spell holds one (design §4.3, TD-1474): a daily reset the rule recomputes each tick moves
+        to tomorrow once passed, and the card, the routed lines and `seat_able` must read one time."""
+        pending = m.pending
+        if pending is None or m.state != "limited" or s.state != "limited" or not s.limited_reset:
+            return pending
+        if not getattr(m, "resets", None):
+            return pending  # a rule that names no reset is given none (review of #3081)
+        return dataclasses.replace(pending, text=screen_mod.resets_text(pending.text, _parse(s.limited_reset)))
 
     def _hook_fresh(self, sid: str, now: datetime) -> bool:
         last = self._last_hook.get(sid)

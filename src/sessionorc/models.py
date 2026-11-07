@@ -82,6 +82,7 @@ NODE_OWNED = frozenset(
         "since",
         "turn_at",
         "pending",
+        "limited_reset",
         "pendings",
         "kept",
         "confidence",
@@ -1068,6 +1069,10 @@ class Session:
     # takes back once the last ends. Both empty while nothing is open.
     pendings: list[Pending] = field(default_factory=list)
     kept: dict[str, Any] | None = None
+    # When a `limited` spell's limit resets, ISO UTC (design §4.3, §4.9b *A seat that cannot answer*, TD-1474):
+    # read once, at the spell's first tick, from the screen rule's `resets` or the usage cap's window, and kept
+    # until the state leaves `limited` — so a daily reset already passed is not recomputed into tomorrow.
+    limited_reset: str | None = None
     confidence: Confidence = "scraped"
     unattended: bool = False
     # Who last changed the mode, when and from which control (design §4.5 *A taken-over member*, §4.4a,
@@ -1682,6 +1687,8 @@ class Session:
         self.state = state
         self.confidence = confidence
         self.pending = pending
+        if state != "limited":
+            self.limited_reset = None  # the spell is over: the next one reads its own reset (§4.3, TD-1474)
         if state not in ("exited", "closed"):
             self.ended = None  # a run that came back has not ended
         else:

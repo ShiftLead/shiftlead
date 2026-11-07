@@ -18,3 +18,5 @@ region = 15
 modal = true
 all = ["^\\s*│\\s*Usage limit reached for\\b", "^\\s*│\\s*\\S?\\s*2\\.\\s*Stop\\b"]
 pending = { kind = "limit", text = "Gemini's usage limit reached — answer its dialog in the terminal" }
+# The free tier's per-model daily quota, reset at midnight Pacific (§4.3, TD-1474): the pending gains *resets HH:MMZ*.
+resets = "daily 00:00 America/Los_Angeles"

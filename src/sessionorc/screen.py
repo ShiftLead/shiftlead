@@ -12,7 +12,9 @@ from __future__ import annotations
 import re
 import tomllib
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sessionorc.models import Pending, State
 
@@ -44,6 +46,41 @@ def painted_text(row: str) -> str:
     return _ESC.sub("", "".join(out))
 
 
+_DAILY = re.compile(r"daily\s+(\d{1,2}):(\d{2})\s+(\S+)")
+_RESETS_TEXT = re.compile(r"resets \d{2}:\d{2}Z")
+
+
+def next_daily(spec: str, now: datetime) -> datetime:
+    """The first instant strictly after `now` at a rule's `resets = "daily HH:MM <IANA zone>"` (design §4.3,
+    TD-1474), in UTC. `zoneinfo` decides the offset: a local time in a DST gap moves forward (fold 0 takes
+    the offset before the gap), one in a fold takes the first. A malformed spec is a ValueError."""
+    m = _DAILY.fullmatch(spec.strip())
+    if m is None:
+        raise ValueError(f"resets must read 'daily HH:MM <zone>', not {spec!r}")
+    try:
+        hh, mm, zone = int(m[1]), int(m[2]), ZoneInfo(m[3])
+    except (ZoneInfoNotFoundError, ValueError) as e:
+        raise ValueError(f"resets names no known zone: {spec!r}") from e
+    if hh > 23 or mm > 59:
+        raise ValueError(f"resets names no time of day: {spec!r}")
+    day = now.astimezone(zone).date()
+    for k in range(3):
+        d = day + timedelta(days=k)
+        at = datetime(d.year, d.month, d.day, hh, mm, tzinfo=zone).astimezone(UTC)
+        if at > now:
+            return at
+    raise AssertionError("unreachable: a daily time recurs within two days")
+
+
+def resets_text(text: str, at: datetime) -> str:
+    """A pending text with its *resets HH:MMZ* set to `at` (design §4.3: the tick rewrites it from
+    `limited_reset`), appended when it carries none."""
+    clock = f"resets {at.astimezone(UTC).strftime('%H:%MZ')}"
+    if _RESETS_TEXT.search(text):
+        return _RESETS_TEXT.sub(clock, text, count=1)
+    return f"{text} · {clock}" if text else clock
+
+
 @dataclass
 class Rule:
     id: str
@@ -56,8 +93,12 @@ class Rule:
     pending_kind: str | None = None
     pending_text: str | None = None  # "$line" → the first line that matched
     modal: bool = False  # a dialog the tool draws over its composer: the usage poll never lifts it (§4.3)
+    # `daily HH:MM <IANA zone>`: the reset of the limit the rule reads (design §4.3, TD-1474); None, unknown
+    resets: str | None = None
 
     def __post_init__(self) -> None:
+        if self.resets is not None:
+            next_daily(self.resets, datetime.now(UTC))  # a malformed spec fails the load, not a tick
         flags = re.IGNORECASE
         self._any = [re.compile(p, flags) for p in self.any]
         self._all = [re.compile(p, flags) for p in self.all]
@@ -94,6 +135,9 @@ class Match:
     pending: Pending | None = None
     modal: bool = False  # the rule's `modal` (design §4.3 *The limit dialog is read off the screen*)
     title: bool = False  # a title verdict, not a screen rule's: core writes it `title`, a rule's `scraped` (§4.3)
+    # The next reset the rule's `resets` names, ISO UTC, from the moment it was read (§4.3, TD-1474): the
+    # tick keeps the first one of a `limited` spell as the record's `limited_reset`. None: unknown.
+    resets: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -102,6 +146,7 @@ class Match:
             "evidence": self.evidence,
             "pending": self.pending.to_dict() if self.pending else None,
             "modal": self.modal,
+            "resets": self.resets,
         }
 
 
@@ -129,21 +174,29 @@ class Manifest:
                     pending_kind=pend.get("kind"),
                     pending_text=pend.get("text"),
                     modal=bool(raw.get("modal", False)),
+                    resets=str(raw["resets"]) if raw.get("resets") else None,
                 )
             )
         rules.sort(key=lambda r: -r.priority)
         return cls(tool=str(data.get("tool", "")), version=int(data.get("version", 1)), rules=rules)
 
-    def explain(self, tail: list[str]) -> Match | None:
+    def explain(self, tail: list[str], now: datetime | None = None) -> Match | None:
+        """The highest-priority rule's match, else None. A rule with `resets` names its next reset from
+        `now` (the present by default) in the match and in its pending text (*resets HH:MMZ*, §4.3)."""
         for rule in self.rules:
             hits = rule.match(tail)
             if hits is None:
                 continue
+            at = next_daily(rule.resets, now or datetime.now(UTC)) if rule.resets else None
             pending = None
             if rule.pending_kind:
                 text = rule.pending_text or ""
                 if text == "$line":
                     text = hits[0].strip()
-                pending = Pending(kind=rule.pending_kind, text=text[:200])
-            return Match(rule=rule.id, state=rule.state, evidence=hits, pending=pending, modal=rule.modal)
+                text = text[:200]
+                pending = Pending(kind=rule.pending_kind, text=resets_text(text, at) if at else text)
+            resets = at.isoformat().replace("+00:00", "Z") if at else None
+            return Match(
+                rule=rule.id, state=rule.state, evidence=hits, pending=pending, modal=rule.modal, resets=resets
+            )
         return None
