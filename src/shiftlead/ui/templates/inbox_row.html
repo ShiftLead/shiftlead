@@ -1224,7 +1224,9 @@
    draws no answers, Reply, Go with it or Start session: **Lift the hold** and **Open** are in its ⋯. A board
    answer (`ans.kind == 'board'`, TD-1364) is the same row, its foot *you answered "<Decided: words>" on the
    board, <age> ago* then *carried to TD-m* or *<holder> acts on it*; a kept-waiting one reads *waits until
-   <date>*. #}
+   <date>*. A row a press is landing on (`e.applying`, §4.4 *A press is drawn as it lands*, TD-1508) reads its
+   mark's words — *answered — applying*, or *applying <act>* — after *with you*, before an answer's hold, and draws
+   no answers nor any press until it lands: its foot what was pressed, and **Open** in its ⋯. #}
 {% macro ledger(e, section) -%}
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e.name }}'s ledger">{{ e.name }}</span>
@@ -1232,9 +1234,11 @@
   <span class="badge kindmark k-ledger">{{ e.kind }}</span>
   {#- an entry the person's own session holds (TD-1281): the word names the session, so no *held by* beside it #}
   {%- set with_you = e.want == 'with_you' and e.with_you %}
-  {%- set ans = e.answered if not with_you else none %}
+  {%- set app = e.applying if not with_you else none %}
+  {%- set ans = e.answered if not (with_you or app) else none %}
   {%- if e.held and not with_you %} <span class="st">held by {{ e.held }}</span>{% endif %}
-  {%- if ans and ans.until %} <span class="st qans">waits until {{ ans.until }}</span>
+  {%- if app %} <span class="st qans">{{ e.applying_words }}</span>
+  {%- elif ans and ans.until %} <span class="st qans">waits until {{ ans.until }}</span>
   {%- elif ans %} <span class="st qans">answered — waiting on {{ ans.name }}</span>
   {%- elif e.home == 'queue' %} <span class="st qneed">{% if with_you %}with you in {{ e.with_you }}{% elif e.why == 'yours' %}yours to do{% else %}held until {{ e.until or 'your decision' }}{% endif %}</span>{% endif %}
   <span class="grow"></span>
@@ -1247,7 +1251,7 @@
 {{ fold(e.row_id, fold_open or (e.answers and not card_whole(mode, e)), 'ledger', e) }}
 {%- endif %}
 {%- set whole = card_whole(mode, e) %}
-{%- if ans %}
+{%- if ans or app %}
 {%- elif whole %}{{ answer_row(e, 'ledger') }}
 {%- elif e.answers %}
 <div class="row gap wrap sugg" role="group" aria-label="this entry's answers">
@@ -1258,7 +1262,10 @@
 </div>
 {%- endif %}
 <div class="row gap wrap mfoot">
-  {%- if ans and ans.kind == 'board' %}
+  {%- if app %}
+  {#- a press landing (§4.4 *A press is drawn as it lands*, TD-1508): what was pressed, and where it lands -#}
+  <span class="st">{% if app.answer %}you {{ 'answered' if app.act == 'decide' else 'wrote' }} &ldquo;{{ app.answer }}&rdquo; — {% endif %}landing on {{ e.name }}'s board</span>
+  {%- elif ans and ans.kind == 'board' %}
   {#- a board answer's foot (§4.5 screen 12 *Three wants*, TD-1364): its `Decided:` words and age, then the
       entry it was carried to, else its holder; a kept-waiting answer, the date it is asked again -#}
   <span class="st">{{ ans.words }}, {{ ans.age ~ ' ago' if ans.age else 'today' }} — {% if ans.until %}it waits until {{ ans.until }}, then you are asked again{% elif ans.board.to %}carried to {{ ans.board.to | map('replace', e.name ~ '#', '') | join(' and ') }}{% else %}{{ ans.name }} acts on it{% endif %}</span>
@@ -1270,7 +1277,9 @@
   <span class="st">in {{ e.name }}'s ledger — waits on you, with no date; an answer is written on {{ e.name }}'s board as a decided line, its session's work order</span>
   {%- endif %}
   <span class="grow"></span>
-  {%- if ans %}
+  {%- if app %}
+  {%- call qrow.dots(['Open']) %}<a role="menuitem" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>{% endcall %}
+  {%- elif ans %}
   {%- call qrow.dots(['Lift the hold', 'Open']) %}<button role="menuitem" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="go ahead" data-answer="go ahead" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: go ahead — its session drops decision (paul) from Blocked by" data-confirm="Lift the hold? &ldquo;go ahead&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Lift the hold</button><a role="menuitem" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>{% endcall %}
   {%- else %}
   {%- if not whole %}

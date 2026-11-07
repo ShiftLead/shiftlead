@@ -1177,7 +1177,9 @@ class InboxMixin:
         a failed ledger read the ledger: the next reading catches up. The press is marked, so a tick's read that
         began before it does not put the old board, ledger or archive back. A merge the home made outside the
         write-back's tree (a sync's) passes `fetch`: the board is read against origin with a fetch first, never the
-        tree, whose head is as old as its last press (§4.4 *Every write the home lands is read at once*, TD-1508)."""
+        tree, whose head is as old as its last press, and the ledger against the ref that fetch moved; a fetch that
+        fails is the re-read failing, so the last reading stands (§4.4 *Every write the home lands is read at once*,
+        TD-1508)."""
         root = str(root)
         self._boards_pressed[root] = time.monotonic()
         old = self._repos.get(root)
@@ -1186,8 +1188,18 @@ class InboxMixin:
         tree = board_mod.tree_dir(Path(root)) / workorders.board_rel(root)
         here = tree if tree.is_file() and not fetch else None
         live = self._live_commits() if self._promotes_read else None
+        fetched = None
+        if fetch:  # the merge moved origin: fetched first, and a fetch that fails is the re-read failing (TD-1508)
+            fetched = await asyncio.to_thread(workorders.fetch_origin, root, self._ledger_branch.get(root))
+            if fetched.moved or not fetched.ok:  # a moved name is dropped, as the tick's pass drops it
+                self._ledger_branch.pop(root, None)
+            if not fetched.ok:
+                log.warning(
+                    "re-reading %s after its merge: the fetch failed (%s); the reading stands", root, fetched.why
+                )
+                return
         try:
-            bds, wos, led, arch = await asyncio.to_thread(self._reread_repo, root, old, here, live)
+            bds, wos, led, arch = await asyncio.to_thread(self._reread_repo, root, old, here, live, fetched)
         except Exception:  # noqa: BLE001 — the line is landed; the reading catches up on its own
             log.exception("re-reading the board of %s failed", root)
             return

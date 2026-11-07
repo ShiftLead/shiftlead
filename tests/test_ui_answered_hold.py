@@ -454,3 +454,43 @@ def test_ledger_for_you_reads_a_bare_ref_as_its_askers_repos(tmp_path):
     assert row["answered"] is None and row["answers"] == ["Yes", "No"]
     (row,) = _rows(repos, [_ask()], [{**FLEET[0], "repo": str(tmp_path / "b")}])
     assert row["answered"] is not None and row["answered"]["mid"] == "m-1"
+
+
+def _pressed(tmp_path, act="decide", answer="Yes") -> dict:
+    """The ledger row of `r#TD-60` while a press on it lands: the mark `lay_applying` gives the entry (TD-1508)."""
+    repos = _repos(tmp_path, "r")
+    for v in repos.values():
+        v["ledger"]["entries"][0]["applying"] = {"act": act, "answer": answer, "at": NOW.isoformat()}
+    (row,) = _rows(repos, [_ask()])
+    return row
+
+
+def test_a_ledger_row_under_a_press_reads_its_mark_and_draws_only_open(tmp_path):
+    """TD-1508 slice 3 (§4.4 *A press is drawn as it lands*, §4.5a *Inbox row: ledger entry*): the mark wins over an
+    answer's hold, the row reads its words with what was pressed, and draws no answers, Reply, Go with it, Start
+    session or Lift the hold — Open alone, in its ⋯; a road reads *applying <act>*."""
+    row = _pressed(tmp_path)
+    assert row["applying"]["act"] == "decide" and row["applying_words"] == "answered — applying"
+    for html in (_render(row), _render(row, mode="card", home="queue")):
+        assert '<span class="st qans">answered — applying</span>' in html and "waiting on designer" not in html
+        assert "you answered &ldquo;Yes&rdquo; — landing on r's board" in html
+        assert 'data-index="0"' not in html and ">Reply<" not in html and ">Go with it<" not in html
+        assert ">Start session<" not in html and ">Lift the hold<" not in html and "Answer…" not in html
+        assert ">Open</a>" in html.split('class="more qdots"')[1]
+    road = _pressed(tmp_path, act="back to design", answer="")
+    assert road["applying_words"] == "applying back to design"
+    assert "landing on r" in _render(road) and "you answered" not in _render(road)
+    worded = _pressed(tmp_path, act="done", answer="shipped in #1")
+    assert "you wrote &ldquo;shipped in #1&rdquo; — landing on r" in _render(worded)
+    assert _rows(_repos(tmp_path, "r"), [])[0]["applying"] is None, "no press: no mark"
+
+
+def test_on_its_card_a_ledger_row_under_a_press_is_no_want(tmp_path):
+    """TD-1508 slice 3: on the Queue card the pressed row leaves the Decide count, as an answered one does."""
+    row = _pressed(tmp_path)
+    q = qid("r", "TD-60")
+    item = {**row, "home": "queue", "on_card": q, "on_row": q}
+    drawn: list[dict] = []
+    attach({"needs": [item]}, lambda e, sec: drawn.append(e) or Markup("<div></div>"), ())
+    (e,) = drawn
+    assert e["want"] == "answered"

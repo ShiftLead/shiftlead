@@ -175,6 +175,41 @@ async def test_a_sync_merge_rereads_board_and_ledger_against_origin_at_once(agen
     assert (got or {}).get("verdict") != "merged" and reread == []
 
 
+async def test_a_sync_reread_fetches_first_and_a_failed_fetch_keeps_the_reading(agent, monkeypatch, tmp_path):  # noqa: F811
+    """TD-1508 slice 3 (§4.4 *Every write the home lands is read at once*): `_reread_board(fetch=True)` fetches
+    origin first and hands that fetch to the read — never the write-back's tree, though one is there — and a fetch
+    that fails is the re-read failing: nothing is read and the last reading stands."""
+    from sessionorc import board as board_mod
+    from sessionorc import workorders
+
+    root = tmp_path / "repo"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "user_attention.md").write_text("# User attention\n", encoding="utf-8")
+    tree = board_mod.tree_dir(root) / workorders.board_rel(root)
+    tree.parent.mkdir(parents=True, exist_ok=True)
+    tree.write_text("# User attention\n", encoding="utf-8")  # a write-back's tree, as old as its last press
+    before = {"name": "repo", "root": str(root), "ledger": {"entries": [], "path": "docs/ledger"}}
+    agent._repos = {str(root): dict(before)}
+    reads: list[tuple[object, object]] = []
+
+    def reread(r, old, here, live, fetched=None):
+        reads.append((here, fetched))
+        return {"boards": []}, {"orders": []}, None, None
+
+    monkeypatch.setattr(agent, "_reread_repo", reread)
+    monkeypatch.setattr(
+        workorders, "fetch_origin", lambda r, branch=None, **kw: workorders.Fetched(False, "main", why="unreachable")
+    )
+    await agent._reread_board(root, fetch=True)
+    assert reads == [] and agent._repos[str(root)] == before, "a failed fetch: no read, the last reading stands"
+    ok = workorders.Fetched(True, "main")
+    monkeypatch.setattr(workorders, "fetch_origin", lambda r, branch=None, **kw: ok)
+    await agent._reread_board(root, fetch=True)
+    assert reads == [(None, ok)], "the tree is not read; the read reuses the fetch"
+    await agent._reread_board(root)
+    assert reads[-1] == (tree, None), "a press's re-read reads its tree and fetches nothing"
+
+
 async def test_the_composed_merge_passes_subject_and_body(agent, gh, monkeypatch, tmp_path):  # noqa: F811
     e, d = _handed(tmp_path)
     monkeypatch.setattr(sync, "compose", _composer(gh))
