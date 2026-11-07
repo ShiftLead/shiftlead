@@ -3191,9 +3191,13 @@ class TickMixin:
         was waiting is still there — under `FILL_CEILING`, and the close of a seat that has run and
         sits idle with nothing due — or a due that is the next fill's (`_seat_done`) — and nothing
         left unpushed."""
+        self.unfillable.pop(s.id, None)  # written again below where rule 3 would not fill it (TD-1443)
+        if s.seat and s.suspended:
+            self.unfillable[s.id] = "suspended"
         if not (s.seat and s.supervised and s.unattended) or s.superseded_by or s.suspended:
             return
         if s.sit_out or work_mod.sat_out(s):
+            self.unfillable[s.id] = "sat out"
             return  # a seat the definition dropped (TD-706): `_sit_out_close` ends it, and nothing fills it
         filled, seen, count = s.seat_filled, s.lane_seen, s.seat_count
         due = self._seat_due(s, now, records)
@@ -3213,6 +3217,8 @@ class TickMixin:
             s.fill_lapsed = {"at": now.replace(microsecond=0).isoformat().replace("+00:00", "Z")}
             self._save(s)
             await self._push_changes()
+        if s.state in ("exited", "closed"):
+            self._unfillable_word(s, now)  # due or not, a question asks whether rule 3 would fill it (TD-1443)
         if s.state in ("exited", "closed") and s.seat_due:
             await self._fill(s, now, records)
         elif s.state == "idle" and self._seat_done(s) and self._seat_has_run(s, now):
@@ -3471,6 +3477,19 @@ class TickMixin:
             return s.seat_due
         return {"at": now_iso(), "by": "tag", "ids": ids}
 
+    def _unfillable_word(self, s: Session, now: datetime) -> str | None:
+        """Rule 3's refusal of an ended seat for its own ceiling or its profile's gate, written to `unfillable`
+        for `seat_able` (§4.9b *A seat that cannot answer is routed around*, TD-1443), or None."""
+        ceiling = s.restart_ceiling if isinstance(s.restart_ceiling, dict) else None
+        if ceiling:
+            why = "fill ceiling" if ceiling.get("why") == "fill" else "restart ceiling"
+        elif self._profile_gated(s.profile, now, s.team):
+            why = "profile gated"
+        else:
+            return None
+        self.unfillable[s.id] = why
+        return why
+
     async def _fill(self, s: Session, now: datetime, records: list[Session]) -> None:
         """A due seat, ended, is filled — unless its profile is paused, or it or its fellows are at
         the fill ceiling: six fills an hour over all seats sharing a controller (the graph, never the
@@ -3478,7 +3497,7 @@ class TickMixin:
         fellows are merely refused until the hour rolls. Fills never count toward `RESTART_CEILING`.
         A seat whose ceiling a person's restart cleared (a `{why: person}` entry with no fill after it)
         is filled once past the count; that fill is written and counted as any (§6 rule 2, TD-1422)."""
-        if s.restart_ceiling or self._profile_gated(s.profile, now, s.team):
+        if self._unfillable_word(s, now):
             return
         mine = set(self._ctl(s))
         fellows = [
@@ -3491,6 +3510,7 @@ class TickMixin:
             if isinstance(e, dict) and e.get("why") == "fill" and _recent(e.get("at"), now, FILL_WINDOW)
         ]
         if len(fills) >= FILL_CEILING and not _person_cleared(s.restarts):
+            self.unfillable[s.id] = "fill ceiling"
             tripped = any(
                 r is not s
                 and isinstance(r.restart_ceiling, dict)
