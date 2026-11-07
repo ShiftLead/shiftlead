@@ -1737,8 +1737,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   - a person's rollback's `main`, main's head as the press read it (the reading's `main`, which the press writes
     on the intent as `main`, as `_concluded` gives the hold the same reading's): the rollback took no hold, so the commit the person meant to keep from running stays blocked; a
     merge after the press moves main past it and `auto` goes on — accepted, as the person's rollback never
-    took hold;
+    took hold (an intent written before it carried `main`: main's head as the failing pass reads it);
   - and, in a `failed.json` written before `blocks` was, its `sha`.
+  `fail` tells them apart by the intent: `kind: rollback` with `by: smoke` blocks `from`, any other
+  rollback `main`, a promote its `sha`.
   `auto` starts nothing while main's head is that commit, and retries once main's head **moves past it** —
   `blocks` an ancestor of main's head and not main's head itself — a run at the new head, the settle and the
   wait as ever, the row reading the policy's clock (§4.5a) meanwhile: `ahead_since` is then read from that move, so
