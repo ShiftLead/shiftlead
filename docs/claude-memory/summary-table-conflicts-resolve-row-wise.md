@@ -13,7 +13,8 @@ command again on it, never resolve the hunk by hand (design §4.4 *A session wri
 
 The board conflicts too (two PRs' `board_edit.py add`s insert at the same place): at the stopped rebase run
 `agent-cadence run board_edit.py replay --board docs/user_attention.md` — it reads the three sides from git, makes your
-side's writes again on main's board (and archive), stages them — then `git rebase --continue`; never by hand (TD-1514,
+side's writes again on main's board (and archive), stages them — then `git rebase --continue`; never by hand, and
+yours to run as the PR's author before the re-precheck (a cloud session's PR: its reader's; TD-1514,
 design §4.4 *Two PRs' records merge in either order*). A `done` that archives (nine closed items already) runs without
 `--no-commit`, the board committed first, so its archive is the helper's own commit.
 
