@@ -532,6 +532,10 @@ class MailEntry:
     # TD-1430): the stamp `unanswered.read` makes of the addressee's record at the take-up, on the new
     # question's every copy. Written only by the take-up branch of the send — never taken from a caller.
     unanswered: dict[str, Any] | None = None
+    # A question moved from a seat that could not answer (design §4.9b *A seat that cannot answer is routed
+    # around*, TD-1443): `{seat, name, why, at}`, on every copy. Written only by the send's routing (and the
+    # tick's move, TD-1480) — never taken from a caller. A reader's routed `ask` (carrying `pr`) owes no outcome.
+    routed: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         self.root = self.root or self.id  # a message replying to nothing is its own thread's root
@@ -561,6 +565,7 @@ class MailEntry:
             and self.kind in ASK_KINDS
             and self.closed_reason in ("replied", "go_with_it")
             and not self.outcome
+            and not (self.routed and self.pr is not None)  # the person's reply is the PR's read (§4.9b)
         )
 
     def owes_for(self, *, session_inbox: bool) -> bool:

@@ -177,6 +177,7 @@ async def test_a_team_or_a_repo_addresses_its_question_seat(agent, tmp_path, mon
         member = await mk("member", team="delta", project="D")
         agent.sessions[old].state, agent.sessions[old].superseded_by = "closed", seat
         agent.sessions[seat].state = "exited"  # on call: the ask fills it
+        agent.sessions[seat].supervised = True  # rule 3 fills it, so `seat_able` reads it able (TD-1443)
         agent.sessions[seat].repo = agent.sessions[old].repo = "/src/samscrape"
         node = models.Session(id="ao-cm", name="cm-techlead", kind="claude", adapter="claude-code", dir="/w")
         node.team, node.project, node.repo, node.host = "cm", "C", "/home/u/contractmatch", "laptop"
