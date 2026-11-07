@@ -383,7 +383,8 @@ def attach(
         mine = with_of(card, ref) if with_of is not None and e.get("row") == "ledger" and want in WANTS else None
         if mine:
             want, kind = "with_you", ""
-        elif e.get("row") == "ledger" and e.get("answered") and want in WANTS:
+        elif e.get("row") == "ledger" and (e.get("applying") or e.get("answered")) and want in WANTS:
+            # a press landing (TD-1508) or an answer acted on (TD-1316): no need of the person
             want, kind = "answered", ""
         pr_row = e.get("row") in ("red_pr", "fork_pr")  # a PR's row starts no session (TD-1246, TD-1292)
         go = start(card, ref) if start is not None and want in (*WANTS, "with_you") and not pr_row else {}

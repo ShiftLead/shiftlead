@@ -2530,7 +2530,8 @@ def ledger_for_you(
     order), one group per repo with any, each in the Repo page's order (priority, then id). A row is
     a mail row's shape — `row: "ledger"`, its `kind` (*ledger · yours* for a gated `Owner: paul`, *ledger ·
     your decision* for a `decision (paul)` item), `name` the repo, `team`, `at` its `Added:` date and
-    `added` its words, `pri`, `held`, `title`, `detail`, `answers`, `default` (the default's text),
+    `added` its words, `pri`, `held`, `title`, `detail`, `answers`, `default` (the default's text), `applying` and
+    `applying_words` while a press on it lands (§4.4 *A press is drawn as it lands*, TD-1508),
     `root` and `url`, and for **Start session** (TD-678) the entry's `type`, `why` (`yours` or
     `decision`) and `holder`, the id of the first live record claiming it — with `held` the names of
     the live records of that repo claiming it; an entry an
@@ -2668,6 +2669,11 @@ def ledger_for_you(
                     if ledger_mod.decided_by(dict(e), queue_mod.PERSON)
                     else "",
                     "answered": _held_answered(got_q, questions, names, now) if got_q else None,
+                    # a press landing on it (§4.4 *A press is drawn as it lands*, TD-1508): no need of the person
+                    "applying": dict(e["applying"]) if isinstance(e.get("applying"), Mapping) else None,
+                    "applying_words": queue_mod.applying_words(e["applying"])
+                    if isinstance(e.get("applying"), Mapping)
+                    else "",
                 }
             )
         groups.append({"repo": name, "rows": rows})

@@ -4151,7 +4151,12 @@ class TickMixin:
         return led, archived
 
     def _reread_repo(
-        self, root: str, old: dict[str, Any], tree: Path | None, live: dict[str, str] | None
+        self,
+        root: str,
+        old: dict[str, Any],
+        tree: Path | None,
+        live: dict[str, str] | None,
+        fetched: workorders.Fetched | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any] | None, list[dict[str, Any]] | None]:
         """A press's re-read (`_reread_board`), in a thread: the board — `tree`, the write-back's own, as the
         checkout's board read from origin, else read against origin with a fetch — and then the whole ledger
@@ -4160,9 +4165,10 @@ class TickMixin:
         and the live reader resolving each entry, each live check's last `live` where no promote reading has the
         live commits (`live` None), and the settle clock observing as the tick's own reading does. Returns the
         boards, the work orders, and the ledger and its archive (both None where the ledger read failed: the old
-        ledger stands)."""
+        ledger stands). `fetched` is a fetch the caller ran first (a sync merge's re-read, TD-1508), which the board's
+        read against origin reuses rather than fetching again."""
         now = datetime.now(UTC)
-        bds, wos = self._read_boards(root, old, tree is None, False, now.isoformat(), tree=tree)
+        bds, wos = self._read_boards(root, old, tree is None, False, now.isoformat(), tree=tree, fetched=fetched)
         reader = ledger_mod.LiveReader(root, (live or {}).get(Path(root).name))
         resolve = ledger_mod.Registry(hosts.local_host().repos())
         branch = self._ledger_branch.get(root)
