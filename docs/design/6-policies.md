@@ -638,7 +638,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      included, until the team's next start or Apply. A record
      carrying **`relaunch: {at, lane, review, profile}`** (§4.9c *Switching*) is restarted under this rule's
      conditions as one carrying `brief_changed` is, save that a declaration of `out_of_work` does
-     not hold it back. The host agent knows a file and a slot and no role, template or team, and
+     not hold it back and a waiting claim still counts as in progress (§4.9c; the entry boundary
+     below is the `brief` trigger's alone). The host agent knows a file and a slot and no role, template or team, and
      never reads a definition. A file inside a checkout is read **as merged** —
      `origin/<default>:<path>` as last fetched — so a branch checked out there is never a running
      team's brief; the template is the installed package's, so it is what was promoted. *Origin's
