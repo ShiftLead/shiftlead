@@ -1614,10 +1614,14 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      live* on the line — `scale.last` with `did: stopped` on its lowest-placed held extra, the line having no
      record of its own. **Down, with no idle timer**: an extra that **declares out of work** (`ao progress
      none`, §4.9a) is closed back to held at once — once nothing is dirty or unpushed, no subagent or shell is
-     live, and no claim waits on a PR of its own within `SEAT_PR_WAIT` (rule 3's test); until then it is
-     closed at the first tick they pass. At the close a claim of its that is not `done` is dropped (*extra
-     closed*), as a succession drops one, so the lane reads its entry, or its PR, as nobody's; mail that comes
-     to the held extra after (a reader's reply on its PR's thread among them) waits in its mailbox for its next
+     live, and no claim waits on a PR of its own — rule 3's test without its `SEAT_PR_WAIT` bound: a worker extra
+     whose PR waits on its reader stays open idle, as an extra seat does (no tokens, only a slot), until the PR
+     merges or closes, so the reader's reply reaches a live record that holds the work's context, and the
+     eviction never closes it (rule 3: no PR of its own waiting); until then it is closed at the first tick they
+     pass. At the close a claim of its that is not `done` is dropped (*extra
+     closed*), as a succession drops one, (a claim with no open PR, its PR having merged or closed), so the lane reads its entry as nobody's; mail
+     that comes
+     to the held extra after waits in its mailbox for its next
      fill. Its record stays with its mailbox and its `scale`, never marked sat
      out, so the line's next short event fills it again. An extra is never sent rule 6's *new work* note: out
      of work, it closes, and new work fills whichever extra is held. Its out-of-work declaration ends only its
