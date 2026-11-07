@@ -17,6 +17,7 @@ from typing import Any
 from urllib.parse import quote
 
 from sessionorc.queue import (  # noqa: F401 — the home's
+    DESIGN_KEY,
     HOLDER,
     LOOSE,
     TD_REF,
@@ -32,6 +33,7 @@ from sessionorc.queue import (  # noqa: F401 — the home's
     qid,
 )
 from sessionorc.queue import refs as _refs
+from shiftlead import review as review_mod
 
 from .common import _age, _instant, close_state, promote_reading
 
@@ -172,6 +174,45 @@ def ledger_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | Non
     return {"home": "queue", "on_card": card, "on_row": row, "mentions": [], "tied": {"by": "entry", "ref": refs[0]}}
 
 
+# the mail kinds whose `about` links its entry's design PR (§4.5 screen 6 *An item about a design links the
+# design's PR*, TD-1531)
+DESIGN_MAIL = ("ask", "steer", "note")
+
+
+def design_link(
+    e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None, askers: Mapping[str, str] | None = None
+) -> dict[str, Any]:
+    """`{design_pr, design_pr_url}` for an item about a design (§4.5 screen 6 *An item about a design links the
+    design's PR*, §4.5a *Queue card: what needs the person*, TD-1531), else {}: a mail item (`ask`, `steer`,
+    `note`) by its `about`'s first ref, a board line by its `Context:`'s first, a held ledger row by its own id —
+    the ref qualified by the item's repo (a mail item's sender's, `askers` as `item_home` reads it; a board line's
+    `repo_name`; a ledger row's `name`) unless it names its own, and looked up in `card_index`'s `design:` keys,
+    apart from any card. An item whose own `pr` is that number carries none; `design_pr_url` is the link where
+    the entry's repo's origin says where it is (`review.pr_url`), else ''. Never from the item's words."""
+    if not index:
+        return {}
+    kind = e.get("row")
+    if kind == "board":
+        m = CONTEXT.search(str(e.get("text") or ""))
+        got, repo = (_refs(m.group(1)) if m else []), str(e.get("repo_name") or "")
+    elif kind == "ledger":
+        if e.get("why") == "yours":  # the entry's own *held* row draws it, not one the person owns
+            return {}
+        got, repo = _refs(str(e.get("id") or "")), str(e.get("name") or "")
+    elif kind or e.get("kind") not in DESIGN_MAIL:
+        return {}
+    else:
+        got, repo = _refs(e.get("about")), str((askers or {}).get(str(e.get("id") or "")) or "")
+    if not got:
+        return {}
+    ref = got[0] if "#" in got[0] or not repo else f"{repo}#{got[0]}"
+    hit = index.get(DESIGN_KEY + ref)
+    own = str(e.get("pr") or "").strip().lstrip("#")
+    if not hit or not hit[0].isdigit() or (n := int(hit[0])) == (int(own) if own.isdigit() else None):
+        return {}
+    return {"design_pr": n, "design_pr_url": review_mod.pr_url(hit[1], n) if hit[1] else ""}
+
+
 def line_names(e: Mapping[str, Any]) -> set[str]:
     """The entries a board line's row names, `<repo>#TD-n`: each ref of its `Context:` and each id of its `Parts:`
     (§4.4 *The card's status*, TD-1364), a bare `TD-n` read as the line's own repo's, as `item_home` reads it."""
@@ -233,20 +274,22 @@ def split_later(
         keep = []
         for e in g.get("rows") or []:
             home = ledger_home(e, index)
+            link = design_link(e, index)  # an item about a design links its PR (TD-1531)
             if home["home"] == "queue":
-                moved.append({**e, **home, "later_section": "later"})
+                moved.append({**e, **home, **link, "later_section": "later"})
             elif not (asked and covered_by(e, asked)):
-                keep.append(e)
+                keep.append({**e, **link})
         if keep:
             groups.append({**g, "rows": keep})
     rest, unshown = [], []
     for lines, keep in ((ahead, rest), (hidden, unshown)):
         for e in lines or ():
             home = item_home(e, index)
+            link = design_link(e, index)
             if home["home"] == "queue":
-                moved.append({**e, **home, "later_section": "coming"})
+                moved.append({**e, **home, **link, "later_section": "coming"})
             else:
-                keep.append(e)
+                keep.append({**e, **link})
     return {"n": sum(len(g["rows"]) for g in groups), "groups": groups}, rest, moved, unshown
 
 
@@ -470,6 +513,8 @@ def attach(
                 **({"holder": True} if e.get("row") in HOLDER_ROWS else {}),
                 "running": sec == "steering",
                 "on_row": e["on_row"],
+                # the design PR it links, *· design #n* (TD-1531)
+                **({"design_pr": e["design_pr"]} if e.get("design_pr") else {}),
                 **({"row": dict(e), "tied": e.get("tied"), "repo": _repo_of(e)} if raw else {}),
             }
         )

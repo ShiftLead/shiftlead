@@ -158,6 +158,24 @@ def ask_of(body: str) -> str:
     return " ".join(" ".join(out).split()).removeprefix("**Ask:**").strip()
 
 
+DESIGN_PR_NUM = re.compile(r"#(\d+)\b")
+
+
+def design_pr_of(body: str) -> list[int]:
+    """The entry's `**Design PR:**` section, from it to the next blank line, as its `#n` numbers in order — the
+    design PRs that wrote it, oldest first (§4.5 screen 6 *An item about a design links the design's PR*, §4.9c
+    *The designer records its PR*, TD-1531); [] when the body has none. Read from the body, as `ask_of` is."""
+    lines = body.split("\n")
+    at = next((i for i, ln in enumerate(lines) if (m := lb.FIELD_RE.match(ln)) and m.group(1) == "Design PR"), None)
+    if at is None:
+        return []
+    out: list[str] = []
+    while at < len(lines) and lines[at].strip():
+        out.append(lines[at])
+        at += 1
+    return [int(n) for n in DESIGN_PR_NUM.findall(" ".join(out).removeprefix("**Design PR:**"))]
+
+
 def detail_of(body: str) -> list[str]:
     """The entry's **Why** and **Fix** paragraphs, each from its `**Name:**` line to the next blank
     line, at most `MAX_DETAIL_LINES` lines in all — what a *for you* row folds under *details*."""
@@ -598,6 +616,8 @@ def entries(
         e["added"] = added.group(0) if added else ""
         body = t[m.end() : nxt.start() if nxt else len(t)]
         e["detail"] = detail_of(body)
+        if design := design_pr_of(body):
+            e["design_pr"] = design  # its design PRs, on every entry whatever its page (TD-1531)
         if kept := kept_waiting_of(t[m.start() : nxt.start() if nxt else len(t)]):
             e["kept_waiting"] = kept  # the newest `kept waiting` date per gate (§4.4 *The card's status*, TD-1368)
         if e["for_page"] == "for-you":
@@ -1339,20 +1359,26 @@ RESOLVED_LINE = re.compile(r"^\*\*Resolved:\*\*[ \t]*(.+)$", re.M)
 
 def archived_entries(archive: str | None) -> list[dict[str, Any]]:
     """ledgerboard's `entries()` of an archive's text, each entry's `fields` carrying its `resolved` line
-    wherever the body writes it (§4.4 *Completed cards*)."""
+    wherever the body writes it (§4.4 *Completed cards*), and its `design_pr` where its body has a `Design PR:`
+    section (`design_pr_of`, TD-1531)."""
     if not archive:
         return []
     text = strip_comments(archive)
     ents = lb.entries(text)
     resolved: dict[str, str] = {}
+    design: dict[str, list[int]] = {}  # each entry's `Design PR:` numbers (TD-1531)
     heads = list(ENTRY_HEAD.finditer(text))
     for i, h in enumerate(heads):
         body = text[h.end() : heads[i + 1].start() if i + 1 < len(heads) else len(text)]
         if m := RESOLVED_LINE.search(body):
             resolved.setdefault(h.group(1), m.group(1).strip())
+        if (got := design_pr_of(body)) and h.group(1) not in design:
+            design[h.group(1)] = got
     for e in ents:
         if "resolved" not in e["fields"] and e["id"] in resolved:
             e["fields"] = {**e["fields"], "resolved": resolved[e["id"]]}
+        if e["id"] in design:
+            e["design_pr"] = design[e["id"]]  # an archived design still links its PR (TD-1531)
     return ents
 
 

@@ -44,7 +44,7 @@ from . import render as rendermod
 from . import uiconf
 from .cards import MODE_VIA_WORDS, _clock, _first_line, alarm_note, alarm_to_view, fill_words, subagent_held
 from .common import _age, _countdown, _instant, _iso, _left, editor_file_link, host_name, templates
-from .queue import asker_repos, item_home
+from .queue import asker_repos, design_link, item_home
 
 # -- the Inbox page (design §4.5 screen 6, §4.5a **Inbox page**, §4.10; TD-069 step 1) -------------
 
@@ -2274,7 +2274,11 @@ def inbox_sections(
     for k, rows in out.items():
         # a snoozed row stays the Inbox's: the Queue has no Snooze (§4.5 screen 12)
         out[k] = [
-            {**e, **item_home(e, cards if k != "snoozed" else None, askers, k != "snoozed" and needs_person(e, k))}
+            {
+                **e,
+                **item_home(e, cards if k != "snoozed" else None, askers, k != "snoozed" and needs_person(e, k)),
+                **design_link(e, cards, askers),  # an item about a design links its PR (TD-1531)
+            }
             for e in rows
         ]
     queue_n = sum(1 for e in out["needs"] if e["home"] == "queue")
