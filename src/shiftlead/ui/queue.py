@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from sessionorc.queue import TD_REF, card_entries, card_index, qid  # noqa: F401 — the page's names for the home's
+from sessionorc.queue import TD_REF, asker_repos, card_entries, card_index, own_refs, qid  # noqa: F401 — the home's
 from sessionorc.queue import refs as _refs
 
 from .common import _age, _instant, close_state, promote_reading
@@ -43,7 +43,9 @@ CONTEXT = re.compile(r"\bContext:\s*(.*?)(?=\s+(?:Due|Answers|Decided|Closed):|$
 FILTERS = {"needs-you": "Needs you"}
 
 
-def item_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None) -> dict[str, Any]:
+def item_home(
+    e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None, askers: Mapping[str, str] | None = None
+) -> dict[str, Any]:
     """Where an Inbox item is drawn (§4.5 screen 6 *Where a row is drawn*, screen 12 *What is attached to a
     card*): `{home, on_card, on_row, mentions}` — `queue` with the card and row its entry is on, for a question,
     steer or note whose `about` names an entry an open card holds (else the first `TD-n` of its subject
@@ -53,7 +55,11 @@ def item_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None)
     tied it*, TD-1411): `{by, ref}`, `by` where its first held ref — the one that sets `on_card` — was read
     (`context` for a board line; `about`, else `words`, the subject and text read as one, for mail; `pr` for a red
     PR, its title and branch read as one; `title` for a fork's PR) and `ref` that ref as the card's index matched it;
-    None for an `inbox` home. Nothing on the page draws it."""
+    None for an `inbox` home. Nothing on the page draws it.
+
+    A bare `TD-n` is its own repo's wherever the row names one (screen 6 *A bare ref elsewhere*, TD-1509): a board
+    line's `repo_name`, a red PR's or a fork PR's `repo`, a question's asker's repo (`askers`, `{mail id: repo}`,
+    `asker_repos`); a row with none is looked up bare, by `card_index`'s one-repo rule."""
     inbox = {"home": "inbox", "on_card": "", "on_row": "", "mentions": [], "tied": None}
     if not index:
         return inbox
@@ -70,17 +76,19 @@ def item_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None)
         # its home is the first of its refs an open card holds, the later held ones its mentions (TD-1400)
         refs = [r for r in refs if r in index]
     elif kind == "red_pr":
-        refs, by = _refs(f"{e.get('branch') or ''} {e.get('title') or ''}"), "pr"
+        refs, by = own_refs(_refs(f"{e.get('branch') or ''} {e.get('title') or ''}"), e.get("repo")), "pr"
     elif kind == "fork_pr":  # by its title alone: a fork's branch is a stranger's name (TD-1292)
-        refs, by = _refs(str(e.get("title") or "")), "title"
+        refs, by = own_refs(_refs(str(e.get("title") or "")), e.get("repo")), "title"
     elif kind and not e.get("handed_row"):
         return inbox  # a state row, an alarm, a promote, a team start, the trail: no entry's
     else:
-        about = _refs(e.get("about"))
-        refs = about or _refs(f"{e.get('subject') or ''} {e.get('text') or ''}")
+        repo = (askers or {}).get(str(e.get("id") or ""))
+        about = own_refs(_refs(e.get("about")), repo)
+        words = own_refs(_refs(f"{e.get('subject') or ''} {e.get('text') or ''}"), repo)
+        refs = about or words
         by = "about" if about else "words"
         if about:
-            refs += [r for r in _refs(f"{e.get('subject') or ''} {e.get('text') or ''}") if r not in about]
+            refs += [r for r in words if r not in about]
     if not refs or refs[0] not in index:
         return inbox
     card, row = index[refs[0]]

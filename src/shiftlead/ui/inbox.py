@@ -44,7 +44,7 @@ from . import render as rendermod
 from . import uiconf
 from .cards import MODE_VIA_WORDS, _clock, _first_line, alarm_note, alarm_to_view, fill_words, subagent_held
 from .common import _age, _countdown, _instant, _iso, _left, editor_file_link, host_name, templates
-from .queue import item_home
+from .queue import asker_repos, item_home
 
 # -- the Inbox page (design §4.5 screen 6, §4.5a **Inbox page**, §4.10; TD-069 step 1) -------------
 
@@ -2245,9 +2245,11 @@ def inbox_sections(
     # the Needs you board items past their `Due:` date — a civil date, so read in this host's calendar
     today = at.astimezone().date().isoformat()
     overdue = sum(1 for e in out["needs"] if e.get("row") == "board" and e.get("due") and str(e["due"]) < today)
+    # a question's bare `TD-n` is its asker's repo's (§4.5 screen 6 *A bare ref elsewhere*, TD-1509)
+    askers = asker_repos(entries, fleet) if cards else {}
     for k, rows in out.items():
         # a snoozed row stays the Inbox's: the Queue has no Snooze (§4.5 screen 12)
-        out[k] = [{**e, **item_home(e, cards if k != "snoozed" else None)} for e in rows]
+        out[k] = [{**e, **item_home(e, cards if k != "snoozed" else None, askers)} for e in rows]
     queue_n = sum(1 for e in out["needs"] if e["home"] == "queue")
     return {**out, "count": len(out["needs"]), "fyi_n": len(out["fyi"]), "overdue_n": overdue, "queue_n": queue_n}
 

@@ -285,6 +285,32 @@ async def test_a_question_on_an_open_card_is_linked_to_its_card(agent, sent, tmp
         agent.sessions.pop(s.id, None)
 
 
+async def test_a_questions_bare_ref_is_its_askers_repos_on_telegram(agent, sent, tmp_path):
+    """TD-1509 (§4.5 screen 6 *A bare ref elsewhere*): a question about bare TD-051 from a session of repo `a` is
+    never linked to `b`'s TD-051 card though `b` alone holds one; from a session that names no repo, it is."""
+    _on()
+    t0 = datetime.now(UTC)
+    s = _session(agent, tmp_path, state="idle", since=_z(t0), repo=str(tmp_path / "a"))
+    bare = _session(agent, tmp_path, sid="ao-x-v", name="grinder-x-2", state="idle", since=_z(t0))
+    mine = MailEntry(id="m-r1", from_=s.id, to=["person"], at=_z(t0), kind="ask", text="done?", about="TD-051")
+    other = MailEntry(id="m-r2", from_=bare.id, to=["person"], at=_z(t0), kind="ask", text="done?", about="TD-051")
+    agent.person_inbox.extend([mine, other])
+    top = {"qid": "b#TD-051"}
+    agent._queue = {"cards": [{"id": "b#TD-051", "top": top, "rows": [top]}], "completed": []}
+    try:
+        await _pass(agent, t0 + timedelta(seconds=61))
+        links = sorted(t.split("\n")[1] for _, t in sent)
+        assert links == [
+            "http://kmaster:8765/inbox/m-r1",
+            "http://kmaster:8765/queue?card=b%23TD-051&row=b%23TD-051&item=m-r2",
+        ]
+    finally:
+        agent._queue = None
+        agent.person_inbox[:] = [e for e in agent.person_inbox if e.id not in ("m-r1", "m-r2")]
+        agent.sessions.pop(s.id, None)
+        agent.sessions.pop(bare.id, None)
+
+
 async def test_a_blocked_outcome_on_an_open_card_is_linked_to_it_and_a_reviewers_look_is_not(agent, sent, tmp_path):
     """TD-795, the review: a `blocked` outcome — the person inbox's and a handed entry's — is drawn on its card
     and linked to it; an item set aside with a reviewer (`snoozed_for`) stays the Inbox's, so its message page."""

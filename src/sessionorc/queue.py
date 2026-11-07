@@ -98,19 +98,62 @@ def card_index(reading: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
     return out
 
 
-def first_ref(about: Any, words: Any) -> str | None:
+def own_refs(found: Iterable[str], repo: str | None) -> list[str]:
+    """`found` (`refs`'s) with each bare `TD-n` read as `repo`'s, `<repo>#TD-n` (§4.5 screen 6 *A bare ref
+    elsewhere*, TD-1509): a row that names its repo never draws on another repo's card; no `repo` leaves them bare,
+    looked up by `card_index`'s one-repo rule."""
+    found = list(found)
+    if not repo:
+        return found
+    return list(dict.fromkeys(r if "#" in r else f"{repo}#{r}" for r in found))
+
+
+def _repo_name(root: Any) -> str:
+    """A checkout's name from its root, as a board line's `repo_name` reads it: the path's last component."""
+    return str(root or "").rstrip("/").rpartition("/")[2]
+
+
+def asker_repos(questions: Iterable[Any], records: Iterable[Any]) -> dict[str, str]:
+    """`{mail id: repo}` for the person inbox's items (§4.5 screen 6 *A bare ref elsewhere*, TD-1509): a question's
+    repo is its asker's record's — `from_` looked up in `records` (live, ended or kept; `Session`s or their view
+    dicts), its `repo` root's last component — else an orphaned question's `orphaned.repo` (a path: its last
+    component too); an item with neither is left out, and its bare refs stay bare."""
+    roots: dict[str, str] = {}
+    for r in records:
+        rid, root = _get(r, "id"), _get(r, "repo")
+        if rid and root:
+            roots.setdefault(str(rid), _repo_name(root))
+    out: dict[str, str] = {}
+    for q in questions:
+        mid = _get(q, "id")
+        if not mid:
+            continue
+        repo = roots.get(naming.split_address(str(_get(q, "from_") or ""))[0], "")
+        orphaned = _get(q, "orphaned")
+        if not repo and isinstance(orphaned, Mapping):
+            repo = _repo_name(orphaned.get("repo"))
+        if repo:
+            out[str(mid)] = repo
+    return out
+
+
+def first_ref(about: Any, words: Any, repo: str | None = None) -> str | None:
     """The one entry a mail item names (§4.5 screen 6 *Where a row is drawn*): the first ref of its `about`,
-    else the first `TD-n` of `words` (its subject and text); None where it names none."""
-    named = refs(about) or refs(words)
+    else the first `TD-n` of `words` (its subject and text), a bare one read as `repo`'s (its asker's, `own_refs`,
+    TD-1509); None where it names none."""
+    named = own_refs(refs(about), repo) or own_refs(refs(words), repo)
     return named[0] if named else None
 
 
-def mail_card(about: Any, words: str, index: Mapping[str, tuple[str, str]] | None) -> tuple[str, str] | None:
+def mail_card(
+    about: Any, words: str, index: Mapping[str, tuple[str, str]] | None, repo: str | None = None
+) -> tuple[str, str] | None:
     """The `(card id, row qid)` a mail item is drawn on (§4.5 screen 6 *Where a row is drawn*): the entry
-    its `about` names, else the first `TD-n` of `words` (its subject and text), where an open card holds
-    it; None — its home is the Inbox — for the rest. The Inbox's own `item_home` and Telegram's link
-    (§4.10 *What a message says*, TD-795) read it alike."""
-    named = first_ref(about, words)
+    its `about` names, else the first `TD-n` of `words` (its subject and text), a bare one read as `repo`'s — its
+    asker's (`asker_repos`, TD-1509) — where an open card holds it; None — its home is the Inbox — for the rest.
+    The Inbox's own `item_home`, the Queue's mail hold (`_mail_hold`) and Telegram's link (§4.10 *What a message
+    says*, TD-795) read it alike."""
+    named = first_ref(about, words, repo)
     return (index or {}).get(named) if named else None
 
 
@@ -169,6 +212,7 @@ def answered_hold(
     claims: Mapping[str, str] | None = None,
     entries: Mapping[str, Mapping[str, Any]] | None = None,
     live: Mapping[str, str] | None = None,
+    asker_repo: Mapping[str, str] | None = None,
 ) -> dict[str, Any] | None:
     """A `decision (paul)` member whose question the person has answered, while its asker acts on the answer
     (§4.4 *The card's status*, TD-1316): `{mid, asker, kind, closed_at, outcome}` of the newest such question
@@ -178,13 +222,14 @@ def answered_hold(
     `member` is the open entry with its `repo` and `written` (its file's mtime); `questions` the person inbox's
     entries (`MailEntry`s or their view dicts); `states` each record's state by bare id, from the **unfiltered**
     records, an absent id gone; `refs_open` the open members' index (`open_refs`) over every repo. A question
-    links by its first ref (`first_ref`), resolved through `refs_open`. The newest linked question answered by
+    links by its first ref (`first_ref`), a bare one read as its asker's repo's (`asker_repo`, `asker_repos`'s map,
+    TD-1509), resolved through `refs_open`. The newest linked question answered by
     the person (`replied`, or `go_with_it`) holds while it owes its outcome and its asker's record is neither
     exited, closed nor absent; after a `done` outcome, while the entry's file is not written after the answer
     and no longer than `ANSWERED_DONE_FOR` past the outcome's `at`; never on any other outcome."""
     if not ledger_mod.decided_by(dict(member), PERSON):
         return None
-    mail = _mail_hold(member, questions, states, refs_open, now)
+    mail = _mail_hold(member, questions, states, refs_open, now, asker_repo)
     if mail is not None or boards is None:
         return mail  # a mail question that holds wins (§4.4 *The card's status*, TD-1368)
     return board_hold(member, boards, refs_open, now, claims=claims or {}, entries=entries or {}, live=live or {})
@@ -196,6 +241,7 @@ def _mail_hold(
     states: Mapping[str, str],
     refs_open: Mapping[str, str],
     now: datetime,
+    asker_repo: Mapping[str, str] | None = None,
 ) -> dict[str, Any] | None:
     """`answered_hold`'s mail half (TD-1316): the newest linked question the person answered, while it holds."""
     me = qid(str(member.get("repo") or ""), str(member.get("id") or ""))
@@ -203,7 +249,8 @@ def _mail_hold(
     for q in questions:
         if _get(q, "kind") not in ("ask", "steer") or _get(q, "closed_reason") not in ("replied", "go_with_it"):
             continue
-        ref = first_ref(_get(q, "about"), f"{_get(q, 'subject') or ''} {_get(q, 'text') or ''}")
+        words = f"{_get(q, 'subject') or ''} {_get(q, 'text') or ''}"
+        ref = first_ref(_get(q, "about"), words, (asker_repo or {}).get(str(_get(q, "id"))))
         if not ref or refs_open.get(ref) != me:
             continue
         at = _aware(_get(q, "closed_at"))
@@ -567,6 +614,7 @@ def reading(
     states = {str(r.id): str(getattr(r, "state", "") or "") for r in records}
     names = {str(r.id): str(getattr(r, "name", "") or r.id) for r in records}
     questions = list(questions)
+    askers = asker_repos(questions, records)  # a question's bare `TD-n` is its asker's repo's (TD-1509)
     recs = [r for r in records if getattr(r, "state", "") not in ("exited", "closed") and not r.superseded_by]
     open_: dict[str, dict[str, Any]] = {}
     for name, r in rs.by_name.items():
@@ -720,7 +768,18 @@ def reading(
             claim = held.get(q)
             # *with you in <name>* first; then a held entry's answered question (§4.4 *A row's state*, TD-1316)
             answered = (
-                answered_hold(e, questions, states, linked, now, boards=boards, claims=claims, entries=open_, live=live)
+                answered_hold(
+                    e,
+                    questions,
+                    states,
+                    linked,
+                    now,
+                    boards=boards,
+                    claims=claims,
+                    entries=open_,
+                    live=live,
+                    asker_repo=askers,
+                )  # fmt: skip
                 if needs and not mine
                 else None
             )

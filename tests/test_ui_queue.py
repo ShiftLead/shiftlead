@@ -419,6 +419,35 @@ def test_a_board_lines_bare_ref_its_repo_holds_only_archived_never_homes_on_anot
     assert item_home(line, both)["mentions"] == ["contractmatch#TD-017"]
 
 
+def test_a_bare_ref_on_a_red_pr_a_fork_pr_or_a_question_is_its_own_repos():
+    """TD-1509 (§4.5 screen 6 *A bare ref elsewhere*): A holds TD-051 archived, B an open TD-051 card. A red PR, a
+    fork's PR and a question of A's naming bare TD-051 stay in the Inbox — never on B's card; a row with no repo, B
+    alone holding it, is drawn on B's card by the bare lookup."""
+    index = {"b#TD-051": ("b#TD-051", "b#TD-051"), "TD-051": ("b#TD-051", "b#TD-051")}
+    red = {"row": "red_pr", "id": "red_pr:a:5", "repo": "a", "title": "TD-051: the fix", "branch": "td051-fix"}
+    fork = {"row": "fork_pr", "id": "fork_pr:a:6", "repo": "a", "title": "fix TD-51", "pr": 6}
+    ask = mail("m-a", "is TD-051 done?", about="TD-051")
+    askers = {"m-a": "a"}
+    assert item_home(red, index)["home"] == "inbox"
+    assert item_home(fork, index)["home"] == "inbox"
+    assert item_home(ask, index, askers)["home"] == "inbox"
+    assert item_home({**ask, "about": None}, index, askers)["home"] == "inbox", "its words read alike"
+    # B's own rows are on B's card, and a row naming no repo falls back to the bare lookup
+    assert item_home({**red, "repo": "b"}, index)["on_row"] == "b#TD-051"
+    assert item_home({**fork, "repo": "b"}, index)["on_row"] == "b#TD-051"
+    assert item_home(ask, index, {"m-a": "b"})["on_row"] == "b#TD-051"
+    assert item_home({**red, "repo": ""}, index)["on_row"] == "b#TD-051"
+    assert item_home(ask, index)["on_row"] == "b#TD-051"
+    # the Inbox's rows read the asker's repo from its record, `from` → the record's `repo` root
+    fleet = [{"id": "g1", "repo": "/home/k/a"}]
+    secs = inbox_sections([ask], now=NOW, cards=index, fleet=fleet)
+    assert secs["needs"][0]["home"] == "inbox" and secs["queue_n"] == 0
+    secs = inbox_sections([ask], now=NOW, cards=index, fleet=[{"id": "g1", "repo": "/home/k/b/"}])
+    assert secs["needs"][0]["on_row"] == "b#TD-051"
+    orphan = {**ask, "from": "gone@kmaster", "orphaned": {"repo": "/home/k/a", "ref": "TD-051", "how": "closed"}}
+    assert inbox_sections([orphan], now=NOW, cards=index)["needs"][0]["home"] == "inbox"
+
+
 def test_a_question_about_a_td_is_on_its_card_and_still_counted():
     entries = [
         mail("m1", "TD-21: which?"),
