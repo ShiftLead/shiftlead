@@ -4147,6 +4147,8 @@ def cmd_msg(args: argparse.Namespace) -> int:
             print(f"forwarded: {asked} was resumed as {now}")
         if isinstance(e.get("unanswered"), dict):  # §4.9b *Why it did not answer* (TD-1430): what the person reads
             print(_unanswered_line(e["unanswered"]))
+        if routed := mailmod.routed_line(got.get("routed") or e.get("routed")):  # §4.9b, TD-1443: where it went
+            print(routed)
         # design §4.10 *When it is read* (TD-168): the reply ends with when each addressee reads it
         for sid, when in (got.get("read_when") or {}).items():
             print(f"{sid}: {when}")
@@ -4391,6 +4393,8 @@ def cmd_inbox(args: argparse.Namespace) -> int:
                 print(f"  {line}")
             if isinstance(e.get("unanswered"), dict):  # a question taken up: why it was not answered (§4.9b)
                 print(f"  {_unanswered_line(e['unanswered'])}")
+            if routed := mailmod.routed_line(e.get("routed")):  # moved from a seat that could not answer (§4.9b)
+                print(f"  {routed}")
             if e.get("default"):  # a steer says what it will do unless answered (design §4.10)
                 print(f"  default: {e['default']}")
             if r := e.get("recommend"):  # passed up: the passer's line, labelled as its own (design §4.9b)

@@ -149,6 +149,15 @@ def not_answered(e: Any) -> dict[str, str] | None:
 templates.env.globals["not_answered"] = not_answered
 
 
+def routed_around(e: Any) -> str | None:
+    """A question moved from a seat that could not answer (design §4.5a *Inbox row: routed around*, TD-1443):
+    `sessionorc.mail.routed_line` of its `routed` envelope, a template global as `not_answered` is."""
+    return mail.routed_line(e.get("routed")) if isinstance(e, Mapping) else None
+
+
+templates.env.globals["routed_around"] = routed_around
+
+
 def shaped(text: Any, origin: Any = None) -> dict[str, Markup]:
     """A mail row's text as the row draws it (design §4.5a **Inbox row: details**, §4.10 *How a
     message to a person is written*; TD-138): `lead`, the first paragraph, and `rest`, what goes

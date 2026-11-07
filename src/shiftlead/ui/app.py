@@ -189,6 +189,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     restart_note,  # noqa: F401
     role_icons,  # noqa: F401
     role_prompts,  # noqa: F401
+    routed_around,  # noqa: F401
     rpc,  # noqa: F401
     shaped,  # noqa: F401
     start_fields,  # noqa: F401
