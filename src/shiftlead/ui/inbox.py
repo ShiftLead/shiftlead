@@ -382,6 +382,10 @@ def state_rows(
             "at": v.get("since") or "",
             "age": v.get("age") or "",
             "find": _find_text(v.get("name"), v.get("title"), doing.get("text"), text, extra),
+            # the card view's Resume confirm and its shared sentences, for the restart and unpushed rows' Resume and
+            # Reopen and push (§4.5a *Inbox row: restart*, *Inbox row: state*, TD-1494) — the view's, never a copy
+            "resume_confirm": v.get("resume_confirm") or "",
+            "member_hold": v.get("member_hold") or "",
         }
 
     names = {str(v.get("id")): str(v.get("name") or v.get("id")) for v in views}

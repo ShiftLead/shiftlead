@@ -176,7 +176,7 @@
         controls' own — how long a closed record is kept, and on a team member (`app.js` shows it) Resume vs Restart -#}
     {% call hm.panel('exited', 'exited') %}
     <p>A closed record is {{ closed_keep() }}; until then its run log stays readable.</p>
-    <p class="hidden" id="fmemberback">On a team's member, Resume starts it attended, under you; Restart puts it back in its team's run as its launch record started it. With no launch record, use Resume with changes… and tick Unattended.</p>
+    <p class="hidden" id="fmemberback">On a team's member, Resume starts it attended, under you, and asks first; Restart puts it back in its team's run as its launch record started it. With no launch record, use Resume with changes… and tick Unattended.</p>
     {% endcall %}
     <template id="exitedmark">{{ hm.mark('exited', 'exited') }}</template>
     <div class="inline-banner hidden" id="fbanner"></div>

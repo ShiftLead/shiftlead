@@ -179,7 +179,8 @@ HELP: tuple[Help, ...] = (
             "Starts the conversation again under this name, on this record: the same mail, a new process at "
             "the tool's composer. Press it when you want to continue a finished session's conversation. To "
             "only read it, press Transcript instead: a resume is a start, which a manager may act on and "
-            "which has to be closed again."
+            "which has to be closed again. On a team's member it asks first: while you hold it, its mail does not "
+            "wake it. Restart, where drawn, puts it back unattended."
         ),
     ),
     Help(

@@ -67,6 +67,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     FLOW_ACTS,  # noqa: F401
     FLOW_RENAMES,  # noqa: F401
     FLOWS,  # noqa: F401
+    MEMBER_HOLD,  # noqa: F401
     MODE_VIA_WORDS,  # noqa: F401
     NO_TEAM,  # noqa: F401
     NODE_RESTART,  # noqa: F401

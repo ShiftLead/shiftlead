@@ -7650,9 +7650,10 @@
         ex.innerHTML = `<b class="endwords">${esc(words)}</b>${guess} `
           // design §4.5a **Focus (exited / closed)** (TD-081 step 2): **Resume** is one press and no form — the same
           // name, so the record is replaced in place and keeps its mail — and **Resume with changes…** is that same
-          // create as a filled-in form; a `closed` record resumes too
+          // create as a filled-in form; a `closed` record resumes too. On a member it asks first, in the view's words
+          // (`resume_confirm`, §4.5 *Resume on a member confirms too*, TD-1494), read again on every render
           + (v.adapter_id
-            ? `<button class="btn sm primary" data-act="resume" data-id="${id}">Resume</button> `
+            ? `<button class="btn sm primary" data-act="resume" data-id="${id}"${v.resume_confirm ? ` data-confirm="${esc(v.resume_confirm)}"` : ""}>Resume</button> `
               + `<button class="btn sm" data-act="resume-form" data-id="${id}">Resume with changes…</button> `
             : "")
           + `<a class="btn sm" href="/new?${q}" data-help-key="new-here">New session here</a> <button class="btn sm ghost" data-act="remove" data-id="${id}">Forget</button>`
