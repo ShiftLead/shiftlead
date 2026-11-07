@@ -359,7 +359,9 @@ def test_mail_card_reads_about_first_then_the_words():
     index = q.card_index({"cards": [{"id": "s#TD-020", "top": {"qid": "s#TD-020"}, "rows": [{"qid": "s#TD-021"}]}]})
     assert q.mail_card("TD-21", "about TD-20", index) == ("s#TD-020", "s#TD-021")
     assert q.mail_card("", "about TD-20 and TD-21", index) == ("s#TD-020", "s#TD-020")
-    assert q.mail_card("board:abc", "nothing", index) is None and q.mail_card("TD-99", "TD-20", index) is None
+    assert q.mail_card("board:abc", "nothing", index) is None and q.mail_card("TD-99", "TD-98", index) is None
+    # its home is the first of its refs a card holds, not its first ref alone (§4.5 screen 6, TD-1467)
+    assert q.mail_card("TD-99", "TD-20", index) == ("s#TD-020", "s#TD-020")
     assert q.mail_card("TD-20", "", {}) is None  # a home that serves no Queue
 
 

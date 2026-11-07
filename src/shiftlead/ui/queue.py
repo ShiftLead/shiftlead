@@ -16,7 +16,15 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from sessionorc.queue import TD_REF, asker_repos, card_entries, card_index, own_refs, qid  # noqa: F401 — the home's
+from sessionorc.queue import (  # noqa: F401 — the home's
+    TD_REF,
+    asker_repos,
+    card_entries,
+    card_index,
+    held_refs,
+    own_refs,
+    qid,
+)
 from sessionorc.queue import refs as _refs
 
 from .common import _age, _instant, close_state, promote_reading
@@ -48,9 +56,9 @@ def item_home(
 ) -> dict[str, Any]:
     """Where an Inbox item is drawn (§4.5 screen 6 *Where a row is drawn*, screen 12 *What is attached to a
     card*): `{home, on_card, on_row, mentions}` — `queue` with the card and row its entry is on, for a question,
-    steer or note whose `about` names an entry an open card holds (else the first `TD-n` of its subject
-    and text, the others its mentions), a board line whose `Context:` names one, and a red PR whose title
-    or branch names one; `inbox` for the rest — a state row, a promote or team-start row, mail about no
+    steer or note one of whose refs an open card holds (the first held — `about`'s refs, then its subject and
+    text's — the later held ones its mentions, TD-1467), a board line whose `Context:` names one, and a red PR
+    whose title or branch names one; `inbox` for the rest — a state row, a promote or team-start row, mail about no
     entry, an entry on a completed card or found nowhere. `tied` says how its entry was found (screen 6 *What
     tied it*, TD-1411): `{by, ref}`, `by` where its first held ref — the one that sets `on_card` — was read
     (`context` for a board line; `about`, else `words`, the subject and text read as one, for mail; `pr` for a red
@@ -58,8 +66,9 @@ def item_home(
     None for an `inbox` home. Nothing on the page draws it.
 
     A bare `TD-n` is its own repo's wherever the row names one (screen 6 *A bare ref elsewhere*, TD-1509): a board
-    line's `repo_name`, a red PR's or a fork PR's `repo`, a question's asker's repo (`askers`, `{mail id: repo}`,
-    `asker_repos`); a row with none is looked up bare, by `card_index`'s one-repo rule."""
+    line's `repo_name`, a red PR's or a fork PR's `repo`, a mail item's sender's repo (`askers`, `{mail id: repo}`,
+    `asker_repos`: its stamped `repo`, else its orphan stamp's, else its sender's record's, TD-1467); a row with
+    none is looked up bare, by `card_index`'s one-repo rule."""
     inbox = {"home": "inbox", "on_card": "", "on_row": "", "mentions": [], "tied": None}
     if not index:
         return inbox
@@ -82,13 +91,11 @@ def item_home(
     elif kind and not e.get("handed_row"):
         return inbox  # a state row, an alarm, a promote, a team start, the trail: no entry's
     else:
+        # a bare `TD-n` is its sender's repo's (`askers`: the entry's stamped `repo`, else its orphan stamp's, else
+        # its sender's live record's, TD-1467), and its home the first of its refs an open card holds, `about`'s
+        # first, the later held ones its mentions — never the first ref alone (§4.5 screen 6)
         repo = (askers or {}).get(str(e.get("id") or ""))
-        about = own_refs(_refs(e.get("about")), repo)
-        words = own_refs(_refs(f"{e.get('subject') or ''} {e.get('text') or ''}"), repo)
-        refs = about or words
-        by = "about" if about else "words"
-        if about:
-            refs += [r for r in words if r not in about]
+        refs, by = held_refs(e.get("about"), f"{e.get('subject') or ''} {e.get('text') or ''}", index, repo)
     if not refs or refs[0] not in index:
         return inbox
     card, row = index[refs[0]]

@@ -152,7 +152,29 @@ def test_a_bare_id_is_the_askers_repos(tmp_path):
     q = _q()
     q.orphaned = {"repo": str(c), "ref": "TD-001", "how": "closed"}
     assert queue.asker_repos([q], []) == {"m-1": "gamma"}
-    assert queue.asker_repos([q], [_asker_in(a)]) == {"m-1": "alpha"}, "the record first"
+    # §4.10's order (TD-1467): the entry's stamp, else its orphan stamp's, else its asker's live record's
+    assert queue.asker_repos([q], [_asker_in(a)]) == {"m-1": "gamma"}, "the orphan stamp before the record"
+    q.orphaned = None
+    assert queue.asker_repos([q], [_asker_in(a)]) == {"m-1": "alpha"}, "the record where nothing is stamped"
+    q.repo = "beta"
+    assert queue.asker_repos([q], [_asker_in(a)]) == {"m-1": "beta"}, "the send's stamp first"
+
+
+def test_answered_hold_links_a_question_by_its_own_stamped_repo(tmp_path):
+    """TD-1467 (§4.4 *The card's status*, §4.10 *An envelope carries its sender's `repo`*): `answered_hold` reads a
+    question's bare `TD-n` as its own stamped `repo`'s, never the member's nor its asker's record's — a question
+    stamped `gamma` naming bare `TD-001` does not link alpha's TD-001, and one stamped `alpha` does, though its
+    asker's record is now in gamma."""
+    a, ra = _held(tmp_path, "alpha", written=ANSWERED - timedelta(hours=2))
+    c, rc = _repo(tmp_path, "gamma", [_entry(1, "gamma's own TD-001", Priority="Low")])
+    other = _q()
+    other.repo = "gamma"
+    _, cards = _top({a: ra}, [other], [_asker_in(a)])
+    assert cards["alpha#TD-001"]["top"]["answered"] is None, "another repo's question never links this member"
+    mine = _q()
+    mine.repo = "alpha"
+    _, cards = _top({a: ra, c: rc}, [mine], [_asker_in(c)])
+    assert cards["alpha#TD-001"]["top"]["answered"] is not None, "its own stamp, not its asker's record now"
 
 
 def test_an_origin_path_ref_links_its_repos_member(tmp_path):

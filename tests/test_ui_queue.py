@@ -365,6 +365,35 @@ def test_an_item_is_drawn_where_its_entry_is():
     assert "TD-020" not in two and two["db#TD-020"][0] == "db#TD-20"
 
 
+def test_a_mail_items_bare_ref_is_its_senders_repos_and_its_home_the_first_held_ref():
+    """TD-1467 (§4.5 screen 6 *A mail item's bare ref is its sender's repo's*): agent-cadence's grinder's *TD-221:
+    merge #164?* with `about: TD-221` draws on agent-cadence's card though shiftlead holds a TD-221 too, or holds it
+    only archived; a mail item whose `about` names an entry no card holds draws on the first held one its words
+    name; an item the helper finds no repo for is read bare, as before."""
+    from sessionorc.queue import asker_repos
+
+    ac, sl = row("agent-cadence", "TD-221", "a cadence entry"), row("shiftlead", "TD-221", "a shiftlead entry")
+    both = card_index({"cards": [card(ac), card(sl)]})
+    ask = mail("m1", "TD-221: merge #164?", about="TD-221", repo="agent-cadence")
+    askers = asker_repos([ask], [])
+    assert askers == {"m1": "agent-cadence"}, "the send's stamp is the item's repo"
+    assert item_home(ask, both, askers)["on_card"] == "agent-cadence#TD-221"
+    assert item_home(ask, both, askers)["tied"] == {"by": "about", "ref": "agent-cadence#TD-221"}
+    assert item_home(ask, both)["home"] == "inbox", "read bare, the id two repos hold is neither's"
+    only = card_index({"cards": [card(ac)]})  # shiftlead's TD-221 archived: on no open card
+    assert item_home(ask, only, askers)["on_card"] == "agent-cadence#TD-221"
+    shift = {"m1": "shiftlead"}  # the same words from shiftlead's sender never draw on agent-cadence's card
+    assert item_home(ask, only, shift)["home"] == "inbox"
+    # its home is the first of its refs a card holds: `about` names one no card holds, its words a held one
+    idx = card_index(queue())
+    got = item_home(mail("m2", "TD-20 waits on this", about="TD-99"), idx)
+    assert got["on_card"] == "s#TD-20" and got["tied"] == {"by": "words", "ref": "TD-020"}
+    got = item_home(mail("m3", "TD-30 and TD-21", about="TD-99, TD-21"), idx)
+    assert got["on_row"] == "s#TD-21" and got["tied"]["by"] == "about" and got["mentions"] == ["s#TD-30"]
+    # no repo found for it: read bare by the one-repo rule, as before
+    assert item_home(mail("m4", "x", about="TD-21"), idx, asker_repos([mail("m4", "x")], []))["on_row"] == "s#TD-21"
+
+
 def test_a_board_line_naming_a_held_entry_is_on_its_own_repos_card_in_the_entrys_place():
     """TD-1355 (§4.5 screen 12 *Three verbs*): a repo's board line whose `Context:` names a bare `TD-n` is that
     repo's entry, however many repos hold the number — `TD-n / PR #n` too, as ledgerboard#TD-023's line read —

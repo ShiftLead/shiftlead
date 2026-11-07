@@ -15,14 +15,14 @@ person inbox's classification.
 from __future__ import annotations
 
 import re
-from collections.abc import Collection, Iterable, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
-from sessionorc import naming, workorders
+from sessionorc import naming, witness, workorders
 from sessionorc import rank as rank_mod
 from sessionorc.mail import LEASE_TTL
 from sessionorc.reports import branch_ref
@@ -124,14 +124,43 @@ def repo_roots(repos: Mapping[Any, Any] | None) -> dict[str, str]:
     return out
 
 
+def record_repo(repo: Any, dir: Any, roots: Iterable[str], names: Mapping[str, str] | None = None) -> str | None:
+    """The record's entry point of the repo helper (§4.10 *An envelope carries its sender's `repo`*, TD-1467): the
+    registry's name for a record's repo — `witness.repo_named` over its `repo` (a worktree's record names its main
+    checkout there), else its `dir`, against `roots`, the checkouts the home registers for the **record's own
+    host** — named as the readings name it (`names`, `{name: root}`, `repo_roots`'), else by the root's last
+    component, the name a card's qid carries (`<name>#TD-n`); None where neither is in a registered checkout. The
+    send's stamp calls it, and TD-1468's holder row."""
+    roots = list(roots)
+    got = witness.repo_named(repo, roots) or witness.repo_named(dir, roots)
+    if got is None:
+        return None
+    root, name = got
+    return next((n for n, r in (names or {}).items() if _same_dir(root, r)), None) or name
+
+
+def mail_repo(q: Any, records: Mapping[str, Any], name_of: Callable[[Any], str]) -> str | None:
+    """The entry's entry point of the repo helper (§4.10, §4.5 screen 6 *A mail item's bare ref is its sender's
+    repo's*, TD-1467), the one place its order is written: its stamped `repo` (a name, as the send wrote it), else its
+    orphan stamp's `repo` (TD-213: the asker's checkout then), else its sender's live record's `repo` — `records`,
+    `{bare id: root}` — each root named by `name_of`; None where all three find none, and its bare refs stay bare.
+    `item_home` reads it through `asker_repos`, `answered_hold` per question, and Telegram's link alike."""
+    if stamped := str(_get(q, "repo") or "").strip():
+        return stamped
+    orphaned = _get(q, "orphaned")
+    if isinstance(orphaned, Mapping) and (name := name_of(orphaned.get("repo"))):
+        return name
+    return name_of(records.get(naming.split_address(str(_get(q, "from_") or ""))[0])) or None
+
+
 def asker_repos(
     questions: Iterable[Any], records: Iterable[Any], roots: Mapping[str, str] | None = None
 ) -> dict[str, str]:
-    """`{mail id: repo}` for the person inbox's items (§4.5 screen 6 *A bare ref elsewhere*, TD-1509): a question's
-    repo is its asker's record's — `from_` looked up in `records` (live, ended or kept; `Session`s or their view
-    dicts) — else an orphaned question's `orphaned.repo`; either a checkout's root, named as the reading names it
-    (`roots`, `{name: root}`, the repo whose root it is) or else by its last component. An item with neither is
-    left out, and its bare refs stay bare."""
+    """`{mail id: repo}` for the person inbox's items (§4.5 screen 6 *A bare ref elsewhere*, TD-1509; *A mail item's
+    bare ref is its sender's repo's*, TD-1467): each item's repo by `mail_repo`'s order — its stamped `repo`, else its
+    orphan stamp's, else its asker's record's (`from_` looked up in `records`: live, ended or kept; `Session`s or
+    their view dicts) — a checkout's root named as the reading names it (`roots`, `{name: root}`, the repo whose
+    root it is) or else by its last component. An item with none is left out, and its bare refs stay bare."""
     named: dict[str, str] = {}
 
     def name_of(root: Any) -> str:
@@ -149,13 +178,7 @@ def asker_repos(
     out: dict[str, str] = {}
     for q in questions:
         mid = _get(q, "id")
-        if not mid:
-            continue
-        repo = name_of(by_id.get(naming.split_address(str(_get(q, "from_") or ""))[0]))
-        orphaned = _get(q, "orphaned")
-        if not repo and isinstance(orphaned, Mapping):
-            repo = name_of(orphaned.get("repo"))
-        if repo:
+        if mid and (repo := mail_repo(q, by_id, name_of)):
             out[str(mid)] = repo
     return out
 
@@ -168,16 +191,29 @@ def first_ref(about: Any, words: Any, repo: str | None = None) -> str | None:
     return named[0] if named else None
 
 
+def held_refs(
+    about: Any, words: Any, index: Mapping[str, Any] | None, repo: str | None = None
+) -> tuple[list[str], str]:
+    """A mail item's refs an open card holds, in order, and where the first was read (§4.5 screen 6 *A mail item's
+    bare ref is its sender's repo's*, TD-1467): `about`'s refs first, then those of `words` (its subject and text),
+    each bare `TD-n` read as `repo`'s (`own_refs`), kept where `index` holds them — its home the first, the later
+    ones its mentions, never the first ref alone. `by` is `about` when the first held ref came from `about`, else
+    `words`."""
+    about_refs = own_refs(refs(about), repo)
+    named = about_refs + [r for r in own_refs(refs(words), repo) if r not in about_refs]
+    held = [r for r in named if r in (index or {})]
+    return held, ("about" if held and held[0] in about_refs else "words")
+
+
 def mail_card(
     about: Any, words: str, index: Mapping[str, tuple[str, str]] | None, repo: str | None = None
 ) -> tuple[str, str] | None:
-    """The `(card id, row qid)` a mail item is drawn on (§4.5 screen 6 *Where a row is drawn*): the entry
-    its `about` names, else the first `TD-n` of `words` (its subject and text), a bare one read as `repo`'s — its
-    asker's (`asker_repos`, TD-1509) — where an open card holds it; None — its home is the Inbox — for the rest.
-    The Inbox's own `item_home`, the Queue's mail hold (`_mail_hold`) and Telegram's link (§4.10 *What a message
-    says*, TD-795) read it alike."""
-    named = first_ref(about, words, repo)
-    return (index or {}).get(named) if named else None
+    """The `(card id, row qid)` a mail item is drawn on (§4.5 screen 6 *Where a row is drawn*): the first of its refs
+    an open card holds (`held_refs`: its `about`'s, then those of `words`, its subject and text), a bare one read as
+    `repo`'s — its sender's (`mail_repo`, TD-1467) — None — its home is the Inbox — where no card holds one. The
+    Inbox's own `item_home` and Telegram's link (§4.10 *What a message says*, TD-795) read it alike."""
+    held, _by = held_refs(about, words, index, repo)
+    return (index or {}).get(held[0]) if held else None
 
 
 # an answered question's word holds after a `done` outcome no longer than this (§4.4 *The card's status*, TD-1316)
