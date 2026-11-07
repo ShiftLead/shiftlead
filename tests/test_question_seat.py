@@ -341,6 +341,7 @@ def test_a_teams_question_seat_is_live_then_on_call_then_closed():
     def rec(n: str, state: str, tags: bool = True) -> models.Session:
         s = models.Session(id=f"ao-{n}", name=n, kind="claude", adapter="claude-code", dir="/w", state=state)
         s.seat = {"trigger": "asks", **({"tags": True} if tags else {})}
+        s.supervised = s.unattended = True  # rule 3 fills an ended one: every record here is able (TD-1443)
         return s
 
     live, on_call, closed = rec("a", "idle"), rec("b", "exited"), rec("c", "closed")

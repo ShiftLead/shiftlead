@@ -56,6 +56,9 @@ PERSON_SENDER_DEPTH: int | None = 100
 PERSON_FYI_DEPTH: int | None = 1000  # Paul's figure
 PERSON_FYI_SENDER_DEPTH: int | None = 500  # so one looping sender leaves the others room
 ASK_BOUND = timedelta(hours=24)  # an `ask`'s default bound, wall-clock on the home's clock
+# how long a question seat may stay unable before a question is routed around it (§4.9b *A seat that
+# cannot answer is routed around*, TD-1443): `TECHLEAD_WAIT`'s figure, which the briefs and the design name
+ROUTE_AROUND_AFTER = timedelta(minutes=30)
 DEFAULT_CAP = 200  # characters of a `steer`'s `default`, cleaned and capped as a `doing` line is (§4.8)
 RULES = "rules"  # the answerer of an *Answered for you* FYI the person's `permissions:` rules filed (§4.9b, TD-641)
 SOURCE_CAP = 200  # characters of a reply's `source` (§4.9b): one line, where the answer is written down

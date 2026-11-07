@@ -100,6 +100,47 @@ def _fillable(r: Session) -> bool:
     return bool(r.supervised and r.unattended) and not r.suspended and not r.sit_out and not work_mod.sat_out(r)
 
 
+def _hhmmz(at: datetime) -> str:
+    return at.astimezone(UTC).strftime("%H:%MZ")
+
+
+def seat_unable(r: Session, now: datetime, unfillable: dict[str, str] | None = None) -> str | None:
+    """Why a record holding an `asks` seat cannot answer now, or None when it is able (§4.9b *A seat that
+    cannot answer is routed around*, TD-1443): `stalled?` for two ticks running (`stalled_ticks`, node-owned,
+    so no clock is compared across hosts); `limited` with its reset (`limited_reset`, kept for the spell)
+    unknown, more than `ROUTE_AROUND_AFTER` away, or passed while the state stays `limited`; paused by the
+    usage gate (`gated`) unless its `next` is within `ROUTE_AROUND_AFTER`; `exited` or `closed` where rule 3
+    would not fill it this tick — not a supervised unattended seat, or the word the home's tick wrote in
+    `unfillable` (*suspended*, *sat out*, *restart ceiling*, *profile gated*, *fill ceiling*). Runs on the
+    home, reading the record's replica; an empty `unfillable` (before the first tick) means fillable."""
+    wait = mail.ROUTE_AROUND_AFTER
+    if r.state == "stalled?" and r.stalled_ticks >= 2:
+        return "stalled?"
+    if r.state == "limited":
+        reset = _parse(r.limited_reset) if r.limited_reset else None
+        if reset is None:
+            return "limited"
+        if reset <= now or reset - now > wait:
+            return f"limited, resets {_hhmmz(reset)}"
+    gated = r.gated if isinstance(r.gated, dict) else None
+    if gated is not None:
+        nxt = _parse(str(gated["next"])) if gated.get("next") else None
+        if nxt is None or nxt - now > wait:
+            return "paused by the usage gate" + (f", until {_hhmmz(nxt)}" if nxt is not None else "")
+    if r.state in ("exited", "closed"):
+        if not (r.supervised and r.unattended):
+            return "not supervised"
+        why = (unfillable or {}).get(r.id)
+        if why:
+            return why
+    return None
+
+
+def seat_able(r: Session, now: datetime, unfillable: dict[str, str] | None = None) -> bool:
+    """Whether a question seat's record can answer now (§4.9b): `seat_unable` says nothing against it."""
+    return seat_unable(r, now, unfillable) is None
+
+
 class MailMixin:
     # -- mail (design §4.10, TD-052 step 1) ------------------------------------------------------
 
@@ -218,7 +259,7 @@ class MailMixin:
         want = repo or team
         if not want:
             raise RpcError("--team and --repo each name a team or a repo (design §4.10)")
-        records = self._graph()
+        records, now = self._graph(), datetime.now(UTC)
         seats = [
             (a, r)
             for a, r in records.items()
@@ -235,7 +276,7 @@ class MailMixin:
                     f"no team {want} has a seat record: the teams with one are {', '.join(teams) or 'none'} "
                     "(a team never started has none; design §4.10)"
                 )
-            return self._one_seat(want, [r for _a, r in mine])
+            return self._one_seat(want, [r for _a, r in mine], now, self.unfillable)
         mine = [(a, r) for a, r in seats if r.repo and Path(r.repo).name == want]
         if not mine:
             await self._no_seat_for_repo(want, records)
@@ -246,19 +287,25 @@ class MailMixin:
             if team not in by_team:
                 names = ", ".join(sorted(by_team))
                 raise RpcError(f"{team} has no seat record on {want}: the teams with one are {names} (design §4.10)")
-            return self._one_seat(team, by_team[team])
+            return self._one_seat(team, by_team[team], now, self.unfillable)
         if len(by_team) > 1:
             raise RpcError(
                 f"{want} is served by {', '.join(sorted(by_team))}: name one with --team <team> (design §4.10)"
             )
         ((name, recs),) = by_team.items()
-        return self._one_seat(name, recs)
+        return self._one_seat(name, recs, now, self.unfillable)
 
     @staticmethod
-    def _one_seat(team: str, recs: list[Session]) -> Session:
-        """One team's question seat among its records (§4.10): the techlead seat (`tags: true`) of
-        two, then a live record over one on call, and one on call over a closed one; two left is
-        refused naming them."""
+    def _one_seat(
+        team: str, recs: list[Session], now: datetime | None = None, unfillable: dict[str, str] | None = None
+    ) -> Session:
+        """One team's question seat among its records (§4.10, §4.9b *A seat that cannot answer is routed
+        around*): an able record (`seat_able`) first, then the techlead seat (`tags: true`) of two, then a
+        live record over one on call, and one on call over a closed one; two left is refused naming them."""
+        if len(recs) > 1:
+            when = now or datetime.now(UTC)
+            able = [r for r in recs if seat_able(r, when, unfillable)]
+            recs = able or recs
         if len(recs) > 1:
             tagged = [r for r in recs if (r.seat or {}).get("tags") is True]
             if not tagged:
