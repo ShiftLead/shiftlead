@@ -122,6 +122,29 @@ async def test_set_mode_on_a_record_with_no_launch_record_writes_none(agent, tmp
         await person.call("kill", id=loose["id"])
 
 
+async def test_a_corrupt_launch_record_is_left_as_it_was_and_named_in_the_log(agent, hookstub, tmp_path, caplog):
+    """TD-1512: a launch record that cannot be parsed is left unmended and the log names its address; a
+    missing one says nothing."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        s = await _ended_seat(person, tmp_path)
+        new = await person.call("create", name="tl", dir=str(tmp_path), adapter="hookstub", resume="cc-seat")
+        path = paths.launch_dir() / f"{new['id']}.json"
+        path.write_text("{not json")
+        with caplog.at_level("WARNING", logger="shiftlead.agent"):
+            await person.call("set_mode", id=new["id"], unattended=True, pause_prompt="pause")
+        assert path.read_text() == "{not json"
+        assert any(new["id"] in r.getMessage() and "launch record" in r.getMessage() for r in caplog.records)
+        caplog.clear()
+        path.unlink()
+        with caplog.at_level("WARNING", logger="shiftlead.agent"):
+            await person.call("set_mode", id=new["id"], unattended=True)
+        assert not path.exists()
+        assert not [r for r in caplog.records if "launch record" in r.getMessage()]
+        assert s["id"] == new["id"]
+        await person.call("kill", id=new["id"])
+
+
 async def test_set_mode_to_interactive_leaves_a_seats_launch_record(agent, hookstub, tmp_path):
     await park_ticks(agent)
     async with LocalClient() as person:

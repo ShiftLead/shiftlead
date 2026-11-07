@@ -3517,24 +3517,31 @@ class HostAgent(
         `values` as given, `texts` stripped, an empty one removing its key. The home's alone (a node
         member's launch record is the home's); a record with none writes none, and nothing is written
         where nothing changes. Read, set and written through `_write_launch`, so a failed read writes no
-        partial record."""
+        partial record. One that cannot be read or parsed is left as it was and named in the log
+        (TD-1512); a missing one is the quiet case."""
         if self.mode == "node":
             return
         address = self._address(s)
         path = paths.launch_dir() / f"{address}.json"
-        with contextlib.suppress(OSError, ValueError):
+        try:
             launch = json.loads(path.read_text(encoding="utf-8"))
-            if not isinstance(launch, dict):
-                return
-            params = {k: v for k, v in launch.items() if k not in ("id", "at")}
-            params.update(values)
-            for k, v in texts.items():
-                if text := (str(v).strip() if v else ""):
-                    params[k] = text
-                else:
-                    params.pop(k, None)
-            if params != {k: v for k, v in launch.items() if k not in ("id", "at")}:
-                self._write_launch(address, s, params)
+        except FileNotFoundError:
+            return
+        except (OSError, ValueError) as e:
+            log.warning("%s: its launch record could not be read, so it is left unmended: %s", address, e)
+            return
+        if not isinstance(launch, dict):
+            log.warning("%s: its launch record is not an object, so it is left unmended", address)
+            return
+        params = {k: v for k, v in launch.items() if k not in ("id", "at")}
+        params.update(values)
+        for k, v in texts.items():
+            if text := (str(v).strip() if v else ""):
+                params[k] = text
+            else:
+                params.pop(k, None)
+        if params != {k: v for k, v in launch.items() if k not in ("id", "at")}:
+            self._write_launch(address, s, params)
 
     async def rpc_set_stop(
         self, id: str, run_until: str | None = None, wrapup_prompt: str | None = None
