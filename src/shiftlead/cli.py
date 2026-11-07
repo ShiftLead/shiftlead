@@ -3487,15 +3487,19 @@ def cmd_board_edit(args: argparse.Namespace) -> int:
     """`ao board edit done|snooze --line <n> --expect "<start>" | --key board:<key> [--why … | --until …]
     [--board <path>]` (design §4.7, TD-587): a session's own edit of one board line on the branch it is
     on, committed there by `sessionorc.board.branch_edit` — ledgerboard's edit and subject, nothing
-    pushed, no host agent. `decide` and `reply` are the person's words, and not offered."""
+    pushed, no host agent. `decide` and `reply` are the person's words, and not offered. `--carried-to`
+    (TD-1528, `done` alone) composes the reason the Queue reads, *carried to TD-n*, its ids checked here first."""
+    why = args.why or ""
     try:
+        if args.carried_to is not None:
+            why = _carried_reason(args.edit, args.carried_to, why)
         got = board_mod.branch_edit(
             os.getcwd(),
             args.edit,
             line=args.line,
             expect=args.expect or "",
             key=args.key or "",
-            why=args.why or "",
+            why=why,
             until=args.until or "",
             board=args.board,
         )
@@ -3508,6 +3512,75 @@ def cmd_board_edit(args: argparse.Namespace) -> int:
         print("  not pushed: it lands with this branch's PR")
 
     return emit(args, got, prose)
+
+
+def _and_list(items: list[str]) -> str:
+    """`a`, `a and b`, `a, b and c` — the join the Queue's *carried to* reader reads (`workorders.CARRIED_RE`)."""
+    return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} and {items[-1]}"
+
+
+def _carried_reason(action: str, value: str, why: str) -> str:
+    """`ao board edit done --carried-to TD-n[,TD-m…]` (design §4.7, TD-1528): the `Closed:` reason *carried to
+    TD-n* (then `: <why>` where one is given), refused before anything is written for any action but `done`, an
+    element that is not the reader's id (`TD-<n>` or `<repo>#TD-<n>`), and a bare id — or one naming this repo —
+    that the work tree's ledger holds neither open nor archived. Where the branch is one `branch_edit` refuses
+    (no work tree, a detached head, a default branch, a staged index), the ids are not read: its refusal is
+    the one given."""
+    if action != "done":
+        raise board_mod.Refused("--carried-to is for done only")
+    root = _edit_root(os.getcwd())
+    if root is None:
+        return why  # branch_edit refuses this tree in its own words, before any id is read
+    ids: list[str] = []
+    for part in value.split(","):
+        tid = part.strip()
+        if not workorders._ID_RE.fullmatch(tid):
+            raise board_mod.Refused(
+                f"--carried-to takes ids as TD-<n> or <repo>#TD-<n>, comma-separated: {tid!r} is not one"
+            )
+        if tid not in ids:
+            ids.append(tid)
+    reason = f"carried to {_and_list(ids)}" + (f": {why}" if why.strip() else "")
+    try:
+        own = pathlib.Path(_td_repo(None)[0]).name
+    except AgentError:
+        own = pathlib.Path(_main_checkout(str(root)) or root).name
+    local: list[str] = []
+    for tid in ids:
+        repo, _, bare = tid.rpartition("#")
+        if repo in ("", own):
+            local.append(bare)  # another repo's id is taken as written
+    if local:
+        rel = ledger_mod.ledger_path(root)
+        at, led, arch, faults = ledger_mod.read_pair(rel, ledger_mod.fs_io(root))
+        if led is None:
+            raise board_mod.Refused(
+                ledger_mod.fault_words(at, faults)
+                if faults
+                else f"{rel} cannot be read, so --carried-to cannot be checked"
+            )
+        known = ledger_mod.ids_in(led) | ledger_mod.ids_in(arch)
+        if missing := [t for t in local if len(t) > 12 or ledger_mod._norm(t) not in known]:
+            raise board_mod.Refused(
+                f"--carried-to names {_and_list(missing)}, which {at} holds neither open nor archived — "
+                "file its entry first, then close the line"
+            )
+    return reason
+
+
+def _edit_root(cwd: str) -> pathlib.Path | None:
+    """The work tree `branch_edit` would edit in, or None where it refuses the branch before reading anything —
+    not a work tree, a detached head, a default branch, a staged index — so its own refusal is the one given."""
+    top = board_mod._git(pathlib.Path(cwd), "rev-parse", "--show-toplevel")
+    if top.returncode != 0:
+        return None
+    root = pathlib.Path(top.stdout.strip())
+    branch = board_mod._git(root, "symbolic-ref", "--quiet", "--short", "HEAD").stdout.strip()
+    if not branch or branch in board_mod._default_names(root):
+        return None
+    if board_mod._git(root, "diff", "--cached", "--quiet").returncode != 0:
+        return None
+    return root
 
 
 def _td_repo(repo: str | None) -> tuple[str, str]:
@@ -5648,6 +5721,11 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--key", help="the line's id, board: and eight hex digits, in place of --line and --expect")
     q.add_argument("--why", help="done: what was done, for its Closed: field")
     q.add_argument("--until", help="snooze: the date it is hidden until (its Hide until:), YYYY-MM-DD")
+    q.add_argument(
+        "--carried-to", metavar="TD-n[,TD-m…]",
+        help="done: the answer is another entry's work — the reason reads 'carried to TD-n' (then ': <why>'), "
+        "each bare id one this branch's ledger holds",
+    )  # fmt: skip
     q.add_argument("--board", help="the board file (default: .shiftlead.yml's board:, else docs/user_attention.md)")
     q.add_argument(
         "--json", action="store_true", default=argparse.SUPPRESS,

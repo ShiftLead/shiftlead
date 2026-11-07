@@ -187,3 +187,162 @@ def test_a_commit_git_refuses_restores_the_board(tmp_path):
         board.branch_edit(root, "done", line=5, expect="act")
     assert (root / "docs/user_attention.md").read_text() == BOARD_TEXT
     assert git(root, "rev-list", "--count", "HEAD") == "1"
+
+
+# `--carried-to` (design §4.7, TD-1528/TD-1540): the reason the Queue reads, its ids checked before the write
+V1_LEDGER = (
+    "# Technical debt\n\n| ID | Title | Priority | Status |\n|---|---|---|---|\n"
+    "| TD-005 | Five | Low | Open |\n| TD-006 | Six | Low | Open |\n\n"
+    "## TD-005: Five\n\n**Priority:** Low\n**Added:** 2026-10-01\n**Status:** Open\n\n"
+    "**Why:** five.\n\n**Fix:** five.\n\n"
+    "## TD-006: Six\n\n**Priority:** Low\n**Added:** 2026-10-01\n**Status:** Open\n\n"
+    "**Why:** six.\n\n**Fix:** six.\n"
+)
+V1_ARCHIVE = (
+    "# Technical debt archive\n\n## TD-007: Seven\n\n**Priority:** Low\n**Added:** 2026-10-01\n"
+    "**Status:** Resolved 2026-10-02\n\n**Why:** seven.\n\n**Resolved:** 2026-10-02\n"
+)
+
+
+def ledger_repo(tmp_path: Path, layout: str = "v2") -> Path:
+    root = make_repo(tmp_path, branch="")
+    if layout == "v1":
+        (root / "docs/technical_debt.md").write_text(V1_LEDGER, encoding="utf-8")
+        (root / "docs/technical_debt_archive.md").write_text(V1_ARCHIVE, encoding="utf-8")
+    else:
+        for rel, text in ledgerboard.split(V1_LEDGER, V1_ARCHIVE).items():
+            (root / "docs/ledger" / rel).parent.mkdir(parents=True, exist_ok=True)
+            (root / "docs/ledger" / rel).write_text(text, encoding="utf-8")
+    git(root, "add", "-A")
+    git(root, "commit", "-q", "-m", "ledger")
+    git(root, "switch", "-q", "-c", "td1-work")
+    return root
+
+
+def carried(root: Path, monkeypatch, capsys, *extra: str, line: str = "5", expect: str = "act 2026-10-10"):
+    from shiftlead import cli
+
+    monkeypatch.chdir(root)
+    rc = cli.main(["board", "edit", "done", "--line", line, "--expect", expect, *extra])
+    out = capsys.readouterr()
+    return rc, out.out + out.err, (root / "docs/user_attention.md").read_text().splitlines()
+
+
+@pytest.mark.unit
+def test_carried_to_writes_the_reason_the_queue_reads(tmp_path, monkeypatch, capsys):
+    root = ledger_repo(tmp_path)
+    rc, out, lines = carried(root, monkeypatch, capsys, "--carried-to", "TD-5")
+    assert rc == 0, out
+    assert lines[4].startswith("- [x] act 2026-10-10") and lines[4].endswith("— carried to TD-5.")
+    why = lines[4].rsplit("Closed: ", 1)[1].split(" — ", 1)[1].rstrip(".")
+    assert workorders.carried_to(why) == ["TD-5"]
+    # several, with a why; the archived one counts; the reader reads back the ids given
+    rc, out, lines = carried(
+        root, monkeypatch, capsys, "--carried-to", "TD-5, TD-006,TD-7", "--why", "the bought round",
+        line="6", expect="act 2026-10-11",
+    )  # fmt: skip
+    assert rc == 0, out
+    assert lines[5].endswith("— carried to TD-5, TD-006 and TD-7: the bought round.")
+    why = lines[5].rsplit("Closed: ", 1)[1].split(" — ", 1)[1]
+    assert workorders.carried_to(why) == ["TD-5", "TD-006", "TD-7"]
+
+
+@pytest.mark.unit
+def test_carried_to_lists_a_repeat_once_and_works_by_key(tmp_path, monkeypatch, capsys):
+    root = ledger_repo(tmp_path)
+    key = workorders.ref(root, ITEM)
+    from shiftlead import cli
+
+    monkeypatch.chdir(root)
+    assert cli.main(["board", "edit", "done", "--key", key, "--carried-to", "TD-5, TD-5"]) == 0
+    assert (root / "docs/user_attention.md").read_text().splitlines()[4].endswith("— carried to TD-5.")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("value", ["TD-9", "td-5", "5", "TD-5,", "TD-5,,TD-6", ""])
+def test_carried_to_refuses_an_unknown_or_malformed_id_writing_nothing(tmp_path, monkeypatch, capsys, value):
+    root = ledger_repo(tmp_path)
+    head = git(root, "rev-parse", "HEAD")
+    rc, out, lines = carried(root, monkeypatch, capsys, "--carried-to", value)
+    assert rc == 1 and "refused" in out
+    assert ("TD-9" in out and "neither open nor archived" in out) if value == "TD-9" else "is not one" in out
+    assert lines[4] == f"- [ ] {ITEM}" and git(root, "rev-parse", "HEAD") == head
+
+
+@pytest.mark.unit
+def test_carried_to_is_for_done_alone(tmp_path, monkeypatch, capsys):
+    from shiftlead import cli
+
+    root = ledger_repo(tmp_path)
+    monkeypatch.chdir(root)
+    argv = [
+        "board",
+        "edit",
+        "snooze",
+        "--line",
+        "5",
+        "--expect",
+        "act",
+        "--until",
+        "2026-11-02",
+        "--carried-to",
+        "TD-5",
+    ]
+    assert cli.main(argv) == 1
+    assert "--carried-to is for done only" in capsys.readouterr().err
+    assert "Hide until" not in (root / "docs/user_attention.md").read_text()
+
+
+@pytest.mark.unit
+def test_carried_to_reads_a_v1_ledger_and_an_untracked_entry(tmp_path, monkeypatch, capsys):
+    root = ledger_repo(tmp_path, "v1")
+    rc, out, lines = carried(root, monkeypatch, capsys, "--carried-to", "TD-7")  # archived, in the v1 archive
+    assert rc == 0, out
+    assert lines[4].endswith("— carried to TD-7.")
+    two = ledger_repo(tmp_path / "two")
+    entry = ledgerboard.split(V1_LEDGER.replace("TD-006", "TD-008").replace("Six", "Eight"), "")
+    rel = next(r for r in entry if r.startswith("TD-008"))
+    (two / "docs/ledger" / rel).write_text(entry[rel], encoding="utf-8")  # filed by ledger.py new, not staged
+    rc, out, lines = carried(two, monkeypatch, capsys, "--carried-to", "TD-8")
+    assert rc == 0, out
+    assert lines[4].endswith("— carried to TD-8.")
+
+
+@pytest.mark.unit
+def test_carried_to_checks_its_own_repos_name_and_takes_anothers_as_written(tmp_path, monkeypatch, capsys):
+    from shiftlead import cli
+
+    root = ledger_repo(tmp_path)  # a checkout no registry names: its own name is its directory's
+    monkeypatch.setattr(cli, "_td_repo", lambda repo: (_ for _ in ()).throw(cli.AgentError("not registered")))
+    rc, out, _ = carried(root, monkeypatch, capsys, "--carried-to", f"{root.name}#TD-9")
+    assert rc == 1 and f"{root.name}#TD-9" not in out and "TD-9" in out and "neither open nor archived" in out
+    rc, out, lines = carried(root, monkeypatch, capsys, "--carried-to", f"{root.name}#TD-5,agent-cadence#TD-999")
+    assert rc == 0, out
+    assert lines[4].endswith(f"— carried to {root.name}#TD-5 and agent-cadence#TD-999.")
+
+
+@pytest.mark.unit
+def test_carried_to_on_main_gives_the_branch_refusal(tmp_path, monkeypatch, capsys):
+    root = ledger_repo(tmp_path)
+    git(root, "switch", "-q", "main")
+    for value in ("TD-9", "td-5"):
+        rc, out, _ = carried(root, monkeypatch, capsys, "--carried-to", value)
+        assert rc == 1 and "a default branch" in out and value not in out
+
+
+@pytest.mark.unit
+def test_carried_to_refuses_an_id_too_long_for_any_ledger(tmp_path, monkeypatch, capsys):
+    root = ledger_repo(tmp_path)
+    rc, out, lines = carried(root, monkeypatch, capsys, "--carried-to", "TD-" + "9" * 5000)
+    assert rc == 1 and "neither open nor archived" in out and lines[4] == f"- [ ] {ITEM}"
+
+
+@pytest.mark.unit
+def test_the_briefs_close_anothers_work_with_carried_to():
+    """§4.9a *What a session does with a decided line* (TD-1540): the briefs that close a line for another entry's
+    work name the option, so no session types *see TD-n* again."""
+    top = Path(__file__).parents[1]
+    for rel in ("src/shiftlead/briefs/grinder.md", "docs/briefs/designer-ao-1.md"):
+        text = (top / rel).read_text(encoding="utf-8")
+        assert "ao board edit done" in text and "--carried-to TD-n" in text, rel
+        assert '--why "see TD-n"' not in text and '--why "carried to TD-n"' not in text, rel
