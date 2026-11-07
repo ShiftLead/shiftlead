@@ -98,6 +98,7 @@ async def test_an_ask_to_a_limited_techlead_goes_to_the_person_unbounded_and_wai
         assert all(e.closed_reason == "rerouted" and e.waits is None for e in _copies(agent, asked["entry"]["id"]))
         m = next(e for e in agent.person_inbox if e.root == asked["entry"]["root"] and e.id != asked["entry"]["id"])
         assert m.bound is None and m.answers == ["yes", "no"] and m.routed["seat"] == tl
+        assert m.subject, "mail the person reads carries a subject"
 
 
 async def test_a_waits_line_clears_when_the_seat_is_able_again(agent, tmp_path):

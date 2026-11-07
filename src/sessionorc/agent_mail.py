@@ -343,11 +343,13 @@ class MailMixin:
                     continue
                 sender = e.from_
                 me = records.get(sender) if sender != PERSON else None
-                if sender != PERSON and me is None:
-                    continue  # an asker with no record: the asker-gone path closes it, not this one
                 lead = self._route_lead(seat, records, now, sender) if e.pr is None else None
-                if lead is None and sender == PERSON:
-                    continue  # the person's own question goes only to an able techlead
+                if (sender != PERSON and me is None) or (lead is None and sender == PERSON):
+                    # an asker with no record (the asker-gone path closes it), or the person's own question with
+                    # no able techlead to go to: it stays, and says nothing it no longer waits on
+                    if e.waits:
+                        self._mark(e.id, waits=None)
+                    continue
                 target = self._address(lead) if lead is not None else PERSON
                 moved = MailEntry(
                     id="m-" + secrets.token_hex(6),
@@ -363,6 +365,8 @@ class MailMixin:
                 moved.pr, moved.subject, moved.team, moved.draft = e.pr, e.subject, e.team, e.draft
                 moved.answers = [] if e.pr is not None else list(e.answers)  # a reader's carries none (§4.9b)
                 moved.shots, moved.shots_at, moved.shots_ref = list(e.shots), e.shots_at, e.shots_ref
+                if target == PERSON and not moved.subject:
+                    moved.subject = mail.subject_of(e.text)  # mail the person reads has one (§4.10, TD-561)
                 moved.bound = None if target == PERSON else e.bound
                 moved.routed = {"seat": seat.id, "name": seat.name, "why": why, "at": stamp}
                 refusal = self._landing_refusal(records, sender, target, moved)
