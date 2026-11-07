@@ -1325,16 +1325,18 @@ block. A policy is agent code and needs no grant; a session doing the same work 
          page lists it. Wait: **`STUCK_PR_AFTER`**, two hours, past a precheck and the merge that
          follows it; its open time the newest claim among its actors'
          claims, derived each tick, else, a released PR having none, its `stuck_open.at` (*The clock*, below).
-     - **Acting.** `_stuck_pass` runs after rule 3's pass in the same tick, so `unfillable` holds this
-       tick's words. An actor is **acting** when `unanswered.read` (§4.9b *Why it did not answer*,
+     - **Acting.** `_stuck_pass` runs after rule 3's pass and after the tick's repo readings, in the same
+       tick, so `unfillable` holds this tick's words and an absent reading is a restart's first ticks alone.
+       An actor is **acting** when `unanswered.read` (§4.9b *Why it did not answer*,
        TD-1423 — called, never copied; its `question_at` the work's open time, below, and its other
        inputs gathered as `MailMixin._unanswered` gathers them) gives `working` — or `idle` with a live
        subagent or background shell, which rule 4 counts as working (`agent_common.on_its_own`, §4.2
        *Working on its own*, bounded by `STALL_AFTER` and `SHELL_WAIT`) —, unless its
-       `stalled_ticks` is at least 2 (TD-1443's test, `agent_mail.seat_unable`), and when it is a supervised,
-       unattended seat whose record is not live and for which `unfillable` holds no word this tick (the
-       `exited`/`closed` branch of `seat_unable`), which overrides `ended` and `not_filled`: a working
-       session gets to its work, and a fillable seat is filled for it. Every other actor is **not
+       `stalled_ticks` is at least 2 (TD-1443's test, `agent_mail.seat_unable`). An actor is also
+       **acting** when it is a supervised, unattended seat whose record is not live and for which
+       `unfillable` holds no word this tick (the `exited`/`closed` branch of `seat_unable`); this overrides
+       `ended` and `not_filled`. A working session gets to its work, and a fillable seat is filled for it. Every
+       other actor is **not
        acting**, and its state is the **reason**: `gone`, `suspended`, `fills_exhausted` (*parked at its
        fill ceiling*), `restart_ceiling`, `unreachable`, `scheduled`, `taken_over` (*interactive*: a
        member the person took over, whose Hand back is the cure), `gated`, `limited`, `not_filled`,
@@ -1364,7 +1366,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        members' `lane_seen` (rule 8 writes no mark for a seen id), *<team> wound down with it seen and
        unpicked* (its cure the team's Start). Its members are the team's records that no newer record
        supersedes, as the lanes read them; these team words take the place of the members' own `ended`
-       or `not_filled`. A PR with no actor reads *released by <name>*.
+       or `not_filled`. A PR with no actor reads *released by <name>*: its `stuck_open` entry's **`by`**,
+       the name of the first actor (as *actor* below orders them) on the last tick it had one, written
+       each tick it has one, since a dropped claim's entry (`ao progress drop` with no `--pr`) no longer
+       names the PR; an entry with no `by` reads *released* alone.
      - **Never stuck.** Work whose only actors are the person's own live sessions (`unattended: false`
        and no member — `by_person`, §4.4 *The card's status*, TD-1281): the person is already there; beside
        other actors, a person's own session is passed over: not in the acting test, nor `since`, nor the
@@ -1377,23 +1382,30 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        their card as *steer* until then), after which the PR is read again.
      - **The clock.** The work's **open time** is the ask's `at`, the first tick the home read the line
        decided (below), or the claim's `at`. The home keeps a board line's and a PR's moving
-       parts on `host.json` as **`stuck_open: {<key>: {at, oid?}}`** (shape-checked by `HostStore.load` as
+       parts on `host.json` as **`stuck_open: {<key>: {at, oid?, repo, by?}}`** (shape-checked by `HostStore.load` as
        `stuck` is, an entry that fails it dropped), so a home restart keeps them: a line's `at` is the
        first tick it was among `workorders.orders()`'s work orders (every open decided line that is
        not `fyi`), moved to a claimant's claim `at` when one takes it
-       and to the release when it lets it go, the entry dropped when the line closes or is no longer
+       and to the release when it lets it go (its drop's own `at`: the drop's ref is the line's `board:<key>`,
+       which a PR's drop with no `--pr` does not name), the entry dropped when the line closes or is no longer
        decided as a reading that holds it says — a repo whose board or PR reading is absent (a restart
-       before its first pass), errored, or fell back to the checkout's (`fetch_case` *skipped*) is not read
+       before its first pass), errored, or fell back to the checkout's (`fetch_case` *skipped*, which may
+       only close, below) is not read
        that tick for which works stand: the works its `stuck_open` and `stuck` entries name are kept (on
-       disk, so a restart has them), as any failed read keeps the last good reading; a PR's actors, its
-       claims, are read as on any tick (acting drops its row; `since`, `reason` and `actor` move), and a
-       board line's `stuck` entry stays exactly as stored until a good read, its actors needing the lane
-       or team only that reading gives (an ask needs no repo reading); a board read that fell back to the
+       disk, so a restart has them; each `board:` and `pr:` entry of both maps carries its **`repo`**, the
+       repo's `root.name` (as in `pr:<repo>#<n>`) whose board and PR readings it was read from, since a
+       `board:<key>` names none, and a repo is unread when either of its readings is absent, errored or skipped;
+       a repo that leaves the
+       home's roster (`repos.txt`, or `hosts.yml`'s `repos_registry`) drops its entries), as any failed read
+       keeps the last good reading: every work of that repo, a PR's and a board line's alike
+       (a fallback read's close aside), stays exactly as stored until a good read (a PR's row drops
+       a tick late; an ask needs no repo reading), and nothing of that repo opens — a PR a claim first
+       names is read once a PR reading says it is open; a board read that fell back to the
        checkout may still close a line it finds closed or archived there — never one it finds absent,
-       which the stale checkout may not yet have — and opens none; a PR's `oid` is its head (`headRefOid`) and `at`
-       the first tick that read that
-       head, moved
-       on every push, and also to a claim's `at` and to a release, as a line's is — read only as a
+       which the stale checkout may not yet have; a PR's `oid` is its head (`headRefOid`) and `at`
+       the latest of the first tick that read that head (moved on every push), the newest claim's `at`
+       among its actors, and its release, the first tick that read it with no actor (a drop with no `--pr`
+       names no PR, so no claim's instant can stand for it) — read only as a
        released PR's open time and an idle actor's figure (below). Its **`since`** is the later of its open
        time and the newest state change among its actors (each record's `since`, which moves only on a
        real change of state, or its `subagent_at` or `shells_at` where later — `agent_common.idle_from`,
@@ -1408,14 +1420,17 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        its turn) says nothing of the stall, gives the instant nothing new began — the later of the two
        clocks §4.2 *Liveness cross-check* reads (`work_at`, its last work-naming hook event, and `screen_at`), which is
        also its stamp's `since`. Every actor's figure is floored at the work's open time — the moment from which
-       no actor has been acting — recomputed every tick, never kept from an earlier one. The work is **stuck**
+       no actor has been acting — recomputed every tick, never kept from an earlier one
+       (an unread repo's works excepted, *The clock*). The work is **stuck**
        when no actor is acting and `since` is older than its kind's wait: one wait from the last moment
-       anything moved, never two. The home keeps **`stuck: {<key>: {since, reason, actor}}`** on its
+       anything moved, never two. The home keeps **`stuck: {<key>: {since, reason, actor, repo?}}`** on its
        `host.json` for the work that is stuck (a key `HostStore.load` keeps beside `teams`, `last_tick`
        and `ci_spells`, shape-checked as `ci_spells` is; the key `ask:<id>`, `board:<key>` or
        `pr:<repo>#<n>`), its `since` the recomputed one (the row's age is drawn from it), dropped on the
-       first tick an actor acts, the work closes or is no longer one of the three kinds as read that tick, or `since` is no longer older than the wait — the map recomputed whole each tick; `reason` and `actor`
-       re-read every tick: **`reason`** the first actor's `unanswered` stamp — `needs_you` among the
+       first tick an actor acts, the work closes or is no longer one of the three kinds as read that tick, or
+       `since` is no longer older than the wait — the map recomputed whole each tick (an unread repo's works
+       excepted: they stay as stored, *The clock* above); `reason` and `actor` re-read every tick: **`reason`**
+       the first actor's `unanswered` stamp — `needs_you` among the
        reasons, its words a line under its pending row — as `read` gives it (with its
        `since`, `start_at`, `gate`, `ended` and the rest), rule 13's own as `{state: "stalled" | "idle",
        since}`, a team's as `{state: "team", team, held}` (`held` as rule 8 writes it, none for *waits
