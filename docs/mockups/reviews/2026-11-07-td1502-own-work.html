@@ -1,0 +1,56 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>TD-1502 Own-work icon</title>
+<style>
+/* design §4.5 *A tab's icon* (TD-1502): candidates for the Focus tab icon of a session working on its own
+   (an idle record with a live subagent or background shell, its card's own_work set), beside today's tiles. */
+body { background: #f4f5f7; color: #1c2128; font: 15px/1.5 system-ui, sans-serif; margin: 0; padding: 24px 16px 40px; }
+main { max-width: 1120px; margin: 0 auto; display: grid; gap: 20px; }
+h1 { font-size: 21px; margin: 0; } h2 { font-size: 15px; margin: 0; color: #374151; }
+p { margin: 0; max-width: 84ch; color: #4b5563; font-size: 14px; }
+.strip { border: 1px solid #dfe3e8; border-radius: 6px; overflow: hidden; }
+.chrome { display: flex; flex-wrap: wrap; gap: 1px; padding: 6px 6px 0; }
+.chrome.light { background: #dee1e6; --tab: #eceef0; --on: #fff; --fg: #1f2328; }
+.chrome.dark { background: #1f2125; --tab: #2a2c30; --on: #35363a; --fg: #e8eaed; }
+.tab { display: flex; align-items: center; gap: 8px; width: 196px; padding: 7px 10px; background: var(--tab); color: var(--fg); border-radius: 8px 8px 0 0; font-size: 12px; white-space: nowrap; overflow: hidden; margin-bottom: 4px; }
+.tab svg { width: 16px; height: 16px; flex: none; } .tab span { overflow: hidden; text-overflow: ellipsis; }
+.row { display: grid; grid-template-columns: 210px 1fr; gap: 12px; align-items: center; }
+.ladder { display: flex; gap: 16px; align-items: end; }
+.cell { display: grid; justify-items: center; gap: 4px; font: 11px ui-monospace, monospace; color: #6b7280; }
+.sizes { display: flex; gap: 6px; align-items: end; padding: 6px; border-radius: 4px; background: #fff; }
+.sizes.dk { background: #1f2125; }
+.s16 { width: 16px; height: 16px; } .s32 { width: 32px; height: 32px; } .s64 { width: 64px; height: 64px; }
+.lbl b { display: block; } .lbl small { color: #6b7280; font-size: 12px; }
+</style>
+<main>
+  <h1>TD-1502 — a Focus tab icon for <i>working on its own</i></h1>
+  <p>Today a Focus tab shows the green ∿ tile both while the session's own turn runs and after its turn has ended with only a subagent or a background shell left running (its card's <code>working · 1 shell</code>). The rows below draw one candidate each for the second case, beside today's tile. Each strip is one browser: the first tab is a turn in progress, the second the same session working on its own, then a needs-you and an idle tab for scale. Light strip, then dark. The title in each own-work tab is the proposed one, <code>· working · 1 shell</code>.</p>
+  <div id="root" style="display:grid;gap:22px"></div>
+</main>
+<script>
+const tile = (fill, edge, glyph, ew = 1) =>
+  `<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><rect x=".5" y=".5" width="15" height="15" rx="3.5" fill="${fill}" stroke="${edge}" stroke-width="${ew}"/><g transform="translate(8 8) scale(0.8) translate(-8 -8)">${glyph}</g></svg>`;
+const WAVE = (c, extra = "") => `<path d="M2.8 8.6c1.3-3.6 3.9-3.6 5.2 0s3.9 3.6 5.2 0" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${extra}/>`;
+const G = "#16a34a", E = "rgba(0,0,0,.18)";
+const T = {
+  working: tile(G, E, WAVE("#fff")),
+  needs: tile("#f59e0b", E, `<path d="M8 3.2 13 12.4H3z" fill="#1c2128"/>`),
+  idle: tile("#2563eb", E, `<path d="M3.4 5 6.4 8 3.4 11M8.4 11.6h4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`),
+};
+const C = [
+  { key: "A", name: "A · Outline (recommended)", note: "pale green tile, green edge and green ∿: the same green, read as quieter — its turn is over", svg: tile("#dcfce7", G, WAVE(G), 1.4) },
+  { key: "B", name: "B · ∿ over ⋯", note: "today's tile, the ∿ raised over three dots: on its own, still running", svg: tile(G, E, `<path d="M2.8 6.6c1.3-3.6 3.9-3.6 5.2 0s3.9 3.6 5.2 0" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><circle cx="4.6" cy="12" r="1.15" fill="#fff"/><circle cx="8" cy="12" r="1.15" fill="#fff"/><circle cx="11.4" cy="12" r="1.15" fill="#fff"/>`) },
+  { key: "C", name: "C · Loop ↻", note: "today's green with a circling arrow in place of the ∿: runs by itself", svg: tile(G, E, `<path d="M12.4 8.4A4.4 4.4 0 1 1 10.6 4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><path d="M9.4 2.6 12.4 4.2 10.2 6.8" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`) },
+  { key: "D", name: "D · Dashed ∿", note: "today's tile, the ∿ broken: going on, at a distance", svg: tile(G, E, WAVE("#fff", 'stroke-dasharray="2.1 1.6"')) },
+];
+const strip = (cls, own) => `<div class="chrome ${cls}">
+  <div class="tab">${T.working}<span>designer-ao-1 · working</span></div>
+  <div class="tab">${own}<span>grinder-ao-2 · working · 1 shell</span></div>
+  <div class="tab">${T.needs}<span>▲ grinder-ao-1 · needs you</span></div>
+  <div class="tab">${T.idle}<span>techlead-ao-1 · idle</span></div></div>`;
+const ladder = (svg) => `<div class="ladder">${["", "dk"].map((d) => `<div class="cell"><div class="sizes ${d}">${["s16", "s32", "s64"].map((s) => `<span class="${s}">${svg}</span>`).join("")}</div></div>`).join("")}</div>`;
+let h = `<div class="row"><div class="lbl"><b>Today · working</b><small>both cases draw this</small></div>${ladder(T.working)}</div>`;
+for (const c of C) h += `<section style="display:grid;gap:8px"><div class="row"><div class="lbl"><b>${c.name}</b><small>${c.note}</small></div>${ladder(c.svg)}</div><div class="strip">${strip("light", c.svg)}${strip("dark", c.svg)}</div></section>`;
+document.getElementById("root").innerHTML = h;
+document.querySelectorAll(".s16 svg,.s32 svg,.s64 svg").forEach((s) => { s.setAttribute("width", "100%"); s.setAttribute("height", "100%"); });
+</script>
