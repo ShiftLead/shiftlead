@@ -127,7 +127,10 @@ full conventions in `docs/cadence.md` (the pinned tree's: `agent-cadence path ca
    fields as flags, `--why`, `--fix` and `--done-when` from files). A board line is `agent-cadence run board_edit.py
    add --board docs/user_attention.md --no-commit` (with a `Due:` or a `Context:`; `add --help` lists the
    rest), and a change to one its `done`, `snooze` or `due` with `--no-commit`, or `ao board edit
-   done|snooze`; a `decide` or a `reply` is Paul's. Commit a helper's result in your own PR. Due items are printed
+   done|snooze`; a `decide` or a `reply` is Paul's. Commit a helper's result in your own PR — but a `done` that
+   archives (the board already holds nine closed items) runs without `--no-commit`, the board committed first. A
+   conflict on the board resolves by `agent-cadence run board_edit.py replay --board docs/user_attention.md`, then
+   `git rebase --continue` (design §4.4 *Two PRs' records merge in either order*). Due items are printed
    into the context of every session started in a repo that wires the SessionStart hook (this
    repo does, via `.claude/settings.json`). If parked work has a branch, push it and name it.
 2. **Periodic sweep.** Run `/stranded-work` weekly or whenever in doubt; `/attention` is the
