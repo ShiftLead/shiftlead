@@ -84,6 +84,55 @@ PR_KEY = "pr:"
 HOLDER = "holder:"
 
 
+# an entry's design PR in `card_index`, keyed `design:<repo>#TD-n` to `("<n>", <the repo's root>)` — no card's —
+# which only an item about the entry reads (`design_prs`, §4.5 screen 6 *An item about a design links the design's
+# PR*, TD-1531)
+DESIGN_KEY = "design:"
+# a PR whose title leads with an entry's id and the word *design* (§4.9c *The designer records its PR*): `TD-n
+# design: …`, never a build's (*TD-m: … TD-n …*) or a ledger edit's (*TD-n: …*)
+DESIGN_TITLE = re.compile(r"^\s*TD-(\d+)\s+design(?=[\s:]|$)", re.I)
+
+
+def design_prs(
+    roots: Mapping[str, str],
+    prs: Mapping[str, Any],
+    open_: Mapping[str, Mapping[str, Any]],
+    archived: Mapping[str, Mapping[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """`{<repo>#TD-n: {n, root}}`: the design PR an item about each open or archived entry links (§4.5 screen 6 *An
+    item about a design links the design's PR*, TD-1531). An entry's own: the lowest of its repo's open PRs (`prs`,
+    by repo name, each `{open: [{number, title}]}`) whose title leads with its id and *design* and whose number is
+    above its `Design PR:` section's last, else that last; where it has neither, its `Part of:` parent's own the
+    same way — one hop, never the parent's parent. `root` is the entry's repo's, for the link (`review.pr_url`);
+    `only` says no other repo holds the id, open or archived, so a bare `TD-n` may be looked up by it."""
+    open_design: dict[str, list[int]] = {}
+    for name, got in prs.items():
+        for pr in (got or {}).get("open") or () if isinstance(got, Mapping) else ():
+            n = pr.get("number") if isinstance(pr, Mapping) else None
+            if isinstance(n, int) and not isinstance(n, bool) and (m := DESIGN_TITLE.match(str(pr.get("title") or ""))):
+                open_design.setdefault(qid(name, f"TD-{m.group(1)}"), []).append(n)
+
+    def own(q: str, e: Mapping[str, Any]) -> int | None:
+        section = [n for n in e.get("design_pr") or () if isinstance(n, int) and not isinstance(n, bool)]
+        last = section[-1] if section else None
+        above = sorted(n for n in open_design.get(q, ()) if last is None or n > last)
+        return above[0] if above else last
+
+    held: dict[str, set[str]] = {}  # each bare id, by the repos holding it open or archived
+    for q in [*archived, *open_]:
+        name, _, tid = q.partition("#")
+        held.setdefault(tid, set()).add(name)
+    out: dict[str, dict[str, Any]] = {}
+    for q, e in [*archived.items(), *open_.items()]:
+        n = own(q, e)
+        parent = e.get("part_of") if q in open_ else lb.parse_part_of(e.get("part_of_raw"))[0]
+        if n is None and parent and (pq := qid(str(e["repo"]), str(parent))) != q:
+            n = own(pq, open_.get(pq) or archived.get(pq) or {})
+        if n is not None:
+            out[q] = {"n": n, "root": str(roots.get(str(e["repo"])) or ""), "only": len(held[q.partition("#")[2]]) == 1}
+    return out
+
+
 def card_index(reading: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
     """The open cards' entries (§4.5 screen 6 *Where a row is drawn*): each `<repo>#TD-n` a card holds —
     its top entry and every row, an open card's archived rows among them — to `(card id, row qid)`, and
@@ -132,6 +181,23 @@ def card_index(reading: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
         out.setdefault(PR_KEY + str(pr), ("", str(ref)))
     for sid, q in holder_claims((reading or {}).get("holds"), out).items():
         out[HOLDER + sid] = out[q]
+    # each entry's design PR (`design_prs`, TD-1531), by the same three spellings, its bare one where one repo alone
+    # holds that id, open or archived (`only`)
+    design_bare: dict[str, set[str]] = {}
+    for q, d in ((reading or {}).get("design_prs") or {}).items():
+        got = refs(q)
+        if "#" not in str(q) or not got or not isinstance(d, Mapping) or not isinstance(d.get("n"), int):
+            continue
+        val = (str(d["n"]), str(d.get("root") or ""))
+        out.setdefault(DESIGN_KEY + got[0], val)
+        name, _, tid = got[0].partition("#")
+        if path := origins.get(name):
+            out.setdefault(f"{DESIGN_KEY}{path}#{tid}", val)
+        if d.get("only"):
+            design_bare.setdefault(tid, set()).add(got[0])
+    for tid, qs in design_bare.items():
+        if len(qs) == 1:
+            out[DESIGN_KEY + tid] = out[DESIGN_KEY + next(iter(qs))]
     return out
 
 
@@ -921,7 +987,8 @@ def reading(
     **Completed** cards (`ids`, `top`, `titles`, `closed`, `pr`) are the archive's components no open
     entry touches, closed within `COMPLETED_WINDOW`, newest first. `other_work` is each live claim that
     names no open entry (`board:<key>`, a PR naming none), with its holder. `origins` maps each repo's name to its
-    origin path, for a repo with a readable origin (`card_index`, TD-1371)."""
+    origin path, for a repo with a readable origin (`card_index`, TD-1371); `design_prs` the design PR an item about
+    each entry links (`design_prs`, TD-1531)."""
     rs = _Repos(repos)
     records = list(records)
     # every record's state by id, ended ones too: an answered question's asker exited or closed is gone (TD-1316)
@@ -1185,6 +1252,8 @@ def reading(
         "pr_refs": {k: v for n, r in rs.by_name.items() for k, v in pr_refs(n, r.get("prs")).items()},
         # every live claim on an open entry, for a stopped holder's state row (TD-1468)
         "holds": holds,
+        # the design PR an item about each entry links (TD-1531)
+        "design_prs": design_prs(rs.roots, {n: r.get("prs") for n, r in rs.by_name.items()}, open_, archived),
         "at": now.isoformat(),
     }
 

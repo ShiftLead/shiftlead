@@ -11,6 +11,14 @@
    — where one thing ends and the next begins is never in doubt. #}
 {% import "queue_row.html" as qrow %}
 
+{#- §4.5 screen 6 *An item about a design links the design's PR* (§4.5a *Queue card: what needs the person*,
+    TD-1531): an item about a design — a mail item by its `about`, a board line by its `Context:`, a held entry's
+    own row — ends its first line *· design #n*, the last PR its entry's `Design PR:` names (or its open design
+    PR), a link where the repo's origin says where it is -#}
+{% macro design_link(e) -%}
+{%- if e.design_pr is number %} <span class="st designpr" title="the design's pull request: an item about a design opens it (design §4.5 screen 6)">· design {% if e.design_pr_url %}<a class="ref" href="{{ e.design_pr_url }}" target="_blank" rel="noopener">#{{ e.design_pr }}</a>{% else %}#{{ e.design_pr }}{% endif %}</span>{% endif %}
+{%- endmacro %}
+
 {% macro head(e) -%}
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e['from'] }}{% if e.from_role %} · {{ e.from_role }}{% endif %}">{{ e.from_name or e['from'] }}</span>
@@ -22,6 +30,7 @@
   {%- if e.pr is number %} {% if e.pr_url %}<a class="ref" href="{{ e.pr_url }}" target="_blank" rel="noopener" title="the pull request this asks you to read (design §4.9b)">#{{ e.pr }}</a>{% else %}<span class="ref" title="the pull request this asks you to read (design §4.9b)">#{{ e.pr }}</span>{% endif %}{% endif %}
   {%- if e.about %} <span class="st">re {{ e.about }}</span>{% endif %}
   {%- if e.reply_to %} <span class="st">reply to {{ e.reply_to }}</span>{% endif %}
+  {{- design_link(e) }}
   <span class="grow"></span>
   {#- §4.5 screen 6 *The message page* (TD-136): the entry whole, with its thread — a link, so a
       keyboard and a new tab reach it; `Enter` on the ringed row presses it. Not on the page itself. -#}
@@ -868,6 +877,7 @@
   <span class="badge kindmark k-{{ e.want }}">{{ e.want }}</span>
   {%- if e.card and e.card.in_repo %}<b class="inrepo" title="the line's Context names {{ e.card.in_repo }}: its task is there">in {{ e.card.in_repo }}</b>{% endif %}
   <span class="st">board line</span>
+  {{- design_link(e) }}
   <span class="grow"></span>
   <span class="st" data-slot title="Due: {{ e.due }}">{{ e.ahead if section in ('coming', 'unshown', 'snoozed') and e.ahead else e.due_tag }}</span>
 </div>
@@ -884,6 +894,7 @@
   {%- if e.standing and section != 'waiting' %}
   <span class="st boardstanding" title="where a Reply goes: always the board line; mailed as well to a live session holding the lease on one of its references">{% if e.session %}{{ e.session }} · {% endif %}{{ e.standing.text }}</span>
   {%- endif %}
+  {{- design_link(e) }}
   <span class="grow"></span>
   {#- §4.5a *board row: id* (§4.4 *A board line's id*, TD-603): the line's derived `board:<key>`
       before its due words; a click copies it, as Copy tmux command copies -#}
@@ -1244,6 +1255,7 @@
   {%- elif ans and ans.until %} <span class="st qans">waits until {{ ans.until }}</span>
   {%- elif ans %} <span class="st qans">answered — waiting on {{ ans.name }}</span>
   {%- elif e.home == 'queue' %} <span class="st qneed">{% if with_you %}with you in {{ e.with_you }}{% elif e.why == 'yours' %}yours to do{% else %}held until {{ e.until or 'your decision' }}{% endif %}</span>{% endif %}
+  {{- design_link(e) }}
   <span class="grow"></span>
   <span class="st" title="Added: {{ e.at or 'not written' }} · Priority: {{ e.pri }}">{% if e.added %}{{ e.added }} · {% endif %}{{ e.pri }}</span>
 </div>
