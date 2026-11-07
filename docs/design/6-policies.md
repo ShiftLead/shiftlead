@@ -404,7 +404,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      no wait before it (§4.9 *Mail to a scaled seat*). Mail goes first to a free live record of the seat in place order (the seat,
      then its extras), so a warm idle extra takes it while the own record is held; where none is free and the
      seat's own record is not live — held after its linger, never filled, or `exited` — the own
-     record takes it and is filled on its cause as today (rule 1 restarts no seat): the own record comes back before an
+     record takes it and is filled on its cause as today (rule 1 restarts no seat's own record): the own record comes back before an
      extra is added. **Each tick, by the state** and never by how the mail got there: a seat whose
      own record is live and busy, each live extra busy, and holding unread mail §4.9's *Mail to a scaled seat*
      lets move fills its lowest-placed held extra once one can be filled (not every extra live and busy, the
@@ -1614,10 +1614,13 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      live* on the line — `scale.last` with `did: stopped` on its lowest-placed held extra, the line having no
      record of its own. **Down, with no idle timer**: an extra that **declares out of work** (`ao progress
      none`, §4.9a) is closed back to held at once — once nothing is dirty or unpushed, no subagent or shell is
-     live, and no claim waits on a PR of its own — rule 3's test without its `SEAT_PR_WAIT` bound: a worker extra
-     whose PR waits on its reader stays open idle, as an extra seat does (no tokens, only a slot), until the PR
+     live, and **no PR of its own is open** — this rule's own test, not rule 3's (where a PR handed to a reader no
+     longer holds a seat): an open PR of the extra's, one handed to a reader included, holds it open with no
+     bound; a worker extra whose PR waits on its reader stays open idle, as an extra seat does (no tokens, only a slot), until the PR
      merges or closes, so the reader's reply reaches a live record that holds the work's context, and the
-     eviction never closes it (rule 3: no PR of its own waiting); until then it is closed at the first tick they
+     eviction, which takes only extra seats (rule 3), never closes it; while it waits it reads *waiting on
+     <reader>: #n* as any member does (§4.9a), so the team is neither wound down nor finished until the PR
+     resolves; until then it is closed at the first tick they
      pass. At the close a claim of its that is not `done` is dropped (*extra
      closed*), as a succession drops one, (a claim with no open PR, its PR having merged or closed), so the lane reads its entry as nobody's; mail
      that comes
