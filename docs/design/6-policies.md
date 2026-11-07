@@ -1420,7 +1420,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        Inbox's *Needs you*, with the stuck words as a line under it, never a second row (`ao card` prints it as the stuck row, its id the `stuck` key and its kind *stuck*); it goes back
        under *Waiting on them* the tick an actor acts; a handed entry's row under *Waiting on
        them* (screen 6) moves the same way, to *Needs you* or its named entry's Do group. Where a stopped
-       holder's state row (TD-1453) draws the same actor **on the same card** (or both in the Inbox), the
+       holder's state row (TD-1453) draws the same actor **on the same surface** (one card, or both in the Inbox), the
        stuck words are a line under it alone, and the work's own row stays where it was, in no number: one
        counted item for one cause (§4.5 screen 6, TD-1500); a moved row is counted while it is stuck. On
        two surfaces — the holder's row on one card and the work on another, or one on a card and the other in
