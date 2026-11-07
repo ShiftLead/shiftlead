@@ -1389,14 +1389,17 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     live commit — is someone else's: the home clears the stored lease, pushes nothing, and sends the
     person one `system` note: *the promote/live tag on <repo> was moved by someone else: delete it
     (`git push origin :refs/tags/promote/live`) and the home pushes it again*.
-  Each note is sent once per sha the ref it names was found at; until it is acted on, the checks read
+  Each note is sent once per ref and sha it was found at; until it is acted on, the checks read
   what that ref names, and a lift from it is caught by review.
   The push is `git push --force-with-lease=refs/tags/promote/live:<lease> origin <live>:refs/tags/promote/live`,
   from the checkout, its lease empty onto an absent tag. The lease is **`promotes.<repo>.live_ref`**,
   the sha the home last pushed or adopted, written to `~/.shiftlead/promotes/<repo>/live_ref` beside
-  `last.json`, and the sha last noted to `live_ref_noted` beside it (cleared when a push or an adoption
-  lands, so a second move to the same sha is noted again), both read from there at the home's start,
-  since a promote of this repo restarts the home that pushed it. The read and the push run in the
+  `last.json`, and the ref and sha last noted to `live_ref_noted` beside it (`refs/heads/promote/live <sha>`
+  or `refs/tags/promote/live <sha>`, so a branch note never stands for a tag note at the same sha;
+  cleared whenever a read finds the tag at the live commit and no branch, so a second move to a noted
+  sha is noted again). Both are read from their files at every read, never held from the home's
+  start: a press's or a rollback's own full read carries no earlier reading, and a promote of this
+  repo restarts the home that pushed it; the reading's `live_ref` is a copy for `ao repo`. The read and the push run in the
   pass's thread under the promote lock, so no promote moves **live** between them. A push refused for its lease
   (the tag moved between the read and the push) changes nothing: the next read acts on what is there.
   Any other failure is logged and retried on the next full pass. A live that is *unknown*, or a commit
