@@ -255,3 +255,39 @@ async def test_a_held_seat_with_keep_mail_settles_nothing(agent, composerstubs, 
         )
         assert agent.sessions[sid].state == "closed" and qid in agent.sessions[sid].owed()
         assert _person_copy(agent, qid).owes
+
+
+async def test_an_early_restart_with_a_debt_is_taken_and_keeps_it_until_a_person_acts(agent, composerstubs, tmp_path):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _member(agent, person, tmp_path)
+        qid = await _owe(agent, person, sid)
+        rec = agent.sessions[sid]
+        await _declare(agent, sid, "restart", "context bound")  # seconds into the run: early
+        assert rec.restart_wanted.get("early") is True
+        await agent.rpc_hook(sid, state="idle")
+        rec.since, rec.git = _iso(now - timedelta(minutes=1)), dict(CLEAN)
+        await agent._keep_running(now)
+        assert agent.sessions[sid] is rec and rec.state == "idle", "the person's, not the tick's"
+        assert qid in rec.owed() and _person_copy(agent, qid).owes
+        await person.call("restart", id=sid)
+        assert agent.sessions[sid] is not rec and qid in agent.sessions[sid].owed()
+        await person.call("kill", id=sid)
+
+
+async def test_a_second_restart_carries_the_debt_on(agent, composerstubs, tmp_path):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _member(agent, person, tmp_path)
+        qid = await _owe(agent, person, sid)
+        for n in (1, 2):
+            rec = agent.sessions[sid]
+            await agent.rpc_hook(sid, state="idle")
+            rec.since, rec.git = _iso(now - timedelta(minutes=1)), dict(CLEAN)
+            rec.restart_wanted = {"at": _iso(now), "why": "context bound"}
+            await agent._keep_running(now + timedelta(minutes=10 * n))
+            assert agent.sessions[sid] is not rec, n
+            assert qid in agent.sessions[sid].owed() and _person_copy(agent, qid).owes, n
+        await person.call("kill", id=sid)
