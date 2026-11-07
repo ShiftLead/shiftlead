@@ -102,8 +102,7 @@ class NotifyMixin:
                 k = f"{sid}|restart"
                 rows[k] = _Row(at, notify.restart_line(s.name or sid, s.team or ""), k, k)
         index = queue_mod.card_index(self._queue)
-        roots = {str(r.get("name") or os.path.basename(str(k).rstrip("/"))): k for k, r in self._repos.items()}
-        askers = queue_mod.asker_repos(self.person_inbox, graph.values(), roots)
+        askers = queue_mod.asker_repos(self.person_inbox, graph.values(), queue_mod.repo_roots(self._repos))
         for e in self.person_inbox:
             if e.from_ == PERSON:
                 continue

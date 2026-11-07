@@ -15,6 +15,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from sessionorc.client import AgentError
+from sessionorc.queue import asker_repos, repo_roots
 from shiftlead.ui.inbox import horizon_left, inbox_sections, rail_rows
 from shiftlead.ui.queue import (
     apply_picks,
@@ -446,6 +447,24 @@ def test_a_bare_ref_on_a_red_pr_a_fork_pr_or_a_question_is_its_own_repos():
     assert secs["needs"][0]["on_row"] == "b#TD-051"
     orphan = {**ask, "from": "gone@kmaster", "orphaned": {"repo": "/home/k/a", "ref": "TD-051", "how": "closed"}}
     assert inbox_sections([orphan], now=NOW, cards=index)["needs"][0]["home"] == "inbox"
+
+
+def test_the_inbox_names_an_askers_repo_as_the_reading_names_it():
+    """TD-1509, the techlead's pass on #3154: a repo whose reading's `name` differs from its directory's is named
+    through `roots` (`repo_roots`), as the Queue's reading names it — without them the directory's name misses the
+    card; a question from the person has no asker record, and its bare ref stays bare."""
+    index = {"b#TD-051": ("b#TD-051", "b#TD-051"), "TD-051": ("b#TD-051", "b#TD-051")}
+    ask = mail("m-a", "is TD-051 done?", about="TD-051")
+    repos = {"/home/k/b-checkout": {"name": "b", "root": "/home/k/b-checkout"}, "/home/k/a": {"root": "/home/k/a"}}
+    roots = repo_roots(repos)
+    assert roots == {"b": "/home/k/b-checkout", "a": "/home/k/a"}
+    fleet = [{"id": "g1", "repo": "/home/k/b-checkout"}, {"id": "g2", "repo": "/home/k/a"}]
+    secs = inbox_sections([ask], now=NOW, cards=index, fleet=fleet, roots=roots)
+    assert secs["needs"][0]["on_row"] == "b#TD-051", "named as the reading names it"
+    secs = inbox_sections([{**ask, "from": "g2"}], now=NOW, cards=index, fleet=fleet, roots=roots)
+    assert secs["needs"][0]["home"] == "inbox", "a's question is about a's TD-051"
+    assert asker_repos([{**ask, "from": "g1"}], fleet) == {"m-a": "b-checkout"}, "no roots: the directory's name"
+    assert asker_repos([{**ask, "from": "person"}], fleet, roots) == {}, "the person's own: no asker, bare"
 
 
 def test_a_question_about_a_td_is_on_its_card_and_still_counted():

@@ -113,6 +113,17 @@ def _repo_name(root: Any) -> str:
     return str(root or "").rstrip("/").rpartition("/")[2]
 
 
+def repo_roots(repos: Mapping[Any, Any] | None) -> dict[str, str]:
+    """`{name: root}` of a `repos` reading (`{root: reading}`), each named as the reading names it — its `name`, else
+    its root's last component — for `asker_repos` (TD-1509): a repo whose name differs from its directory's."""
+    out: dict[str, str] = {}
+    for k, r in (repos or {}).items():
+        if isinstance(r, Mapping):
+            root = str(r.get("root") or k)
+            out.setdefault(str(r.get("name") or _repo_name(root)), root)
+    return out
+
+
 def asker_repos(
     questions: Iterable[Any], records: Iterable[Any], roots: Mapping[str, str] | None = None
 ) -> dict[str, str]:

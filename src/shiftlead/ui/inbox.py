@@ -2100,6 +2100,7 @@ def inbox_sections(
     fleet: Collection[Mapping[str, Any]] = (),
     cards: Mapping[str, tuple[str, str]] | None = None,
     snoozed: Collection[dict[str, Any]] = (),
+    roots: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Design §4.5 screen 6: the person inbox split into the page's three sections, plus what is
     snoozed — and, from TD-069 step 2, the **session states** (`states`, from `state_rows`) joined
@@ -2161,7 +2162,8 @@ def inbox_sections(
     cards' entries (`ui.queue.card_index`), every row is tagged `home: inbox|queue` with the `on_card` and
     `on_row` it is drawn on and its `mentions` (`ui.queue.item_home`); a view rule, so the sections and the
     counts are what they were, and `queue_n` is how many counted rows the Queue draws. Without `cards`
-    every row is `home: inbox`."""
+    every row is `home: inbox`. A question's bare `TD-n` is its asker's repo's (TD-1509), named through `roots`
+    (`{name: root}`, `queue.repo_roots`) as the Queue's reading names it."""
     at = now or datetime.now(UTC)
     out: dict[str, list[dict[str, Any]]] = {k: [] for k in INBOX_SECTIONS}
     snoozed_rows = attention_snoozed or {}
@@ -2246,7 +2248,7 @@ def inbox_sections(
     today = at.astimezone().date().isoformat()
     overdue = sum(1 for e in out["needs"] if e.get("row") == "board" and e.get("due") and str(e["due"]) < today)
     # a question's bare `TD-n` is its asker's repo's (§4.5 screen 6 *A bare ref elsewhere*, TD-1509)
-    askers = asker_repos(entries, fleet) if cards else {}
+    askers = asker_repos(entries, fleet, roots) if cards else {}
     for k, rows in out.items():
         # a snoozed row stays the Inbox's: the Queue has no Snooze (§4.5 screen 12)
         out[k] = [{**e, **item_home(e, cards if k != "snoozed" else None, askers)} for e in rows]
@@ -2560,9 +2562,7 @@ def ledger_for_you(
         opens, {n: o for n, r in readings.items() if (o := lb.origin_path(str(r.get("remote") or "")))}
     )
     # a question's bare `TD-n` is its asker's repo's, as the Queue's reading links it (TD-1509)
-    roots = {n: str(r.get("root") or k) for k, r in (every if every is not None else repos or {}).items()
-             if isinstance(r, dict) and (n := str(r.get("name") or Path(str(r.get("root") or k)).name))}  # fmt: skip
-    askers = queue_mod.asker_repos(questions, fleet, roots)
+    askers = queue_mod.asker_repos(questions, fleet, queue_mod.repo_roots(every if every is not None else repos))
     boards, claims, alive = _hold_inputs(readings, fleet, now)
     # an entry an open decided line covers has been answered: that line is its row now, a *Waiting on them* row
     # while it waits on its session (TD-565) — names it, names its parent while it carries `decision (paul)`, or
