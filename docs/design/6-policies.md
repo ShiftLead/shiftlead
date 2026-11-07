@@ -1772,12 +1772,14 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   read it — and a gate it lifted stays lifted, as one lifted before a rollback does: accepted.
   **A copy installed by hand** — CLAUDE.md's pair, or its going back by hand — is tagged only by a run.
   While live reads main's head and `last.json` does not name it with `done`, the row (§4.5a *Inbox row:
-  promote*) is drawn under FYI, uncounted, *installed by hand — promote to tag it*, and its **Promote**, or
+  promote*) is drawn under FYI, uncounted, *installed by hand — promote to tag it* — never while a run is in
+  flight or a failure stands at that commit, whose rows stand in its place — and its **Promote**, or
   `ao promote`, is taken, never refused as *nothing to promote*: the press runs `run` again at that commit,
   its smoke too, and the pass that concludes it writes `done` and tags it. `auto` never starts it: live at
   main's head is nothing for the policy to promote, so a hand install under `auto` is tagged by the next run
   that concludes, after the next merge. A hand install of an older commit is tagged by a rollback to it
-  (`ao promote --sha`), as any going back is.
+  (`ao promote --sha`), as any going back is: a rollback whose commit is live already is refused only when a
+  run finished at it, so this one is taken, runs that commit again and tags it when it concludes.
   The sha compared is the ref's own object as `ls-remote`
   prints it (`--refs` leaves out an annotated tag's peeled `^{}` line), so an annotated tag (its tag
   object's sha) never reads as at the live commit. A read that
@@ -1835,7 +1837,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     it is not hex (a branch, a tag or `HEAD` would be read in the person's checkout, not on main),
     when it names no commit or more than one, when it is **not an ancestor of `origin/main`** (a
     branch is never promoted, CLAUDE.md; a hotfix is a merge and then a press), and when it is live
-    already. Main's head is the plain press, by the path above. `--back` is `from` in
+    already and a run finished at it (`last.json` names it with `done`; a copy installed by hand there is
+    taken, *A copy installed by hand*). Main's head is the plain press, by the path above. `--back` is `from` in
     `~/.shiftlead/promotes/<repo>/last.json` — `{sha, from, at, by, kind}`, written on the first pass whose
     `check` reads the run's commit (*The smoke*, *When and where*: `read_at`), `from` being what
     `check` read before the run — so a run killed at the bound after that reading leaves it, and
