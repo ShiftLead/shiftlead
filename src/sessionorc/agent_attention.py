@@ -4,14 +4,19 @@ and who ended it — as a mixin `HostAgent` inherits. Moved as written; the stat
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import secrets
 from datetime import UTC, datetime
+from typing import Any
 
 from sessionorc import (
     agent_common,
+    hosts,
     mail,
+    naming,
 )
+from sessionorc import queue as queue_mod
 from sessionorc.agent_common import (
     TRAIL_FLOOR,
     _alarm_since,
@@ -21,6 +26,7 @@ from sessionorc.agent_common import (
     _parse,
 )
 from sessionorc.models import (
+    PERSON,
     Session,
     attention_kind,
     now_iso,
@@ -243,3 +249,63 @@ class AttentionMixin:
             if r is None or r.state in ("closed", "scheduled") or r.superseded_by:
                 continue
             self._mark(e.id, orphaned=None, adopted_at=now_iso())
+
+    async def _settle_by_work(self) -> None:
+        """**A question the work settled closes itself** (§4.10, TD-1469): once a tick, every open `ask` or `steer`
+        in the person inbox, orphaned or not — never one the person sent — closes `merged` when the PR it carries
+        merged in its repo, else `settled` when the entry its `about` names was archived after it was asked
+        (`mail.work_settles`), `settled_by` the closing PR. Its repo is its stamp, else its orphan stamp's path,
+        else its sender's live record, each named through TD-1467's helper (`queue.mail_repo`'s order) against
+        the record's own host's registered checkouts; none of the three, and it settles nothing. The close sets
+        `closed_at` alone and tells nobody: a `steer` so closed applies no default and writes no lapse note."""
+        todo = [e for e in self.person_inbox if e.open and e.from_ != PERSON]
+        if not todo or not self._repos:
+            return
+        roots = queue_mod.repo_roots(self._repos)
+        keys = {
+            name: next((k for k, r in self._repos.items() if (r or {}).get("root", k) == root), root)
+            for name, root in roots.items()
+        }  # a name to its reading's key in `_repos`
+        graph = self._graph()
+        names: dict[str, str] = {}  # a path, or a live record's root, to its registry name
+        live: dict[str, str] = {}  # a sender's bare id to its root, for `mail_repo`
+        for e in todo:
+            if e.repo:
+                continue
+            o = e.orphaned if isinstance(e.orphaned, dict) else None
+            if o and o.get("repo") and str(o["repo"]) not in names:
+                host_roots = await self._roots_of(o.get("host"))
+                names[str(o["repo"])] = queue_mod.record_repo(o["repo"], None, host_roots, roots) or ""
+            bare = naming.split_address(e.from_)[0]
+            r = graph.get(e.from_) or graph.get(bare)
+            if r is not None and r.state not in ("closed", "scheduled") and not r.superseded_by:
+                key = str(r.repo or r.dir or "")
+                live[bare] = key
+                if key and key not in names:
+                    names[key] = await self._record_repo(r) or ""
+        at = now_iso()
+        for e in todo:
+            name = queue_mod.mail_repo(e, live, lambda root: names.get(str(root or ""), ""))
+            root = keys.get(name or "")
+            if root is None:
+                continue
+            try:
+                got = mail.work_settles(e, self._repos.get(root), self._archived.get(root))
+            except (TypeError, ValueError):  # one malformed row or stamp: this question waits, the rest settle
+                continue
+            if got is None:
+                continue
+            reason, pr = got
+            if reason == "settled":
+                self._mark(e.id, settled_by=pr)
+            self._close_entry(e.id, reason, at)
+
+    async def _roots_of(self, host: Any) -> list[str]:
+        """The checkouts the home registers for `host` (§4.10, TD-1467): this host's registry, or a node's roster."""
+        host = str(host or "") or self.host
+        try:
+            if host == self.host:
+                return list(await asyncio.to_thread(lambda: hosts.local_host().repos()))
+            return await self._host_roster(host)
+        except Exception:  # noqa: BLE001 — a registry unreadable: the question settles nothing this tick
+            return []

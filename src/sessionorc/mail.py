@@ -416,6 +416,102 @@ def withdrawn_refusal(e: MailEntry) -> str | None:
     return f"{e.id} was withdrawn by its sender at {e.closed_at}: nothing waits on an answer (design §4.10)"
 
 
+# -- a question the work settled closes itself (design §4.10, TD-1469) ------------------------------------------------
+_PR_ABOUT = re.compile(r"#(\d{1,6})")
+_TD_ABOUT = re.compile(r"(?i)[a-z]{2,6}-\d{1,4}")
+
+
+def _get(e: Any, key: str) -> Any:
+    return e.get(key) if isinstance(e, Mapping) else getattr(e, key, None)
+
+
+def question_pr(e: Any) -> int | None:
+    """The PR a question carries (§4.10 *A question the work settled closes itself*): an `ask`'s `pr`, else an
+    `about` of the PR shape `#n` — a `steer`'s only way; None otherwise. `e` is an entry or its dict."""
+    pr = _get(e, "pr")
+    if _get(e, "kind") == "ask" and isinstance(pr, int) and not isinstance(pr, bool):
+        return pr
+    m = _PR_ABOUT.fullmatch(" ".join(str(_get(e, "about") or "").split()))
+    return int(m.group(1)) if m else None
+
+
+def _local_day(at: str) -> Any:
+    """`at`'s day on the home's local calendar (§4.10: a `Resolved:` date is a local day, never read as UTC)."""
+    return datetime.fromisoformat(str(at).replace("Z", "+00:00")).astimezone().date()
+
+
+def _resolved_day(line: Any) -> Any:
+    m = re.match(r"\s*(\d{4}-\d{2}-\d{2})", str(line or ""))
+    if not m:
+        return None
+    try:
+        return datetime.strptime(m.group(1), "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def work_settles(
+    e: Any, reading: Mapping[str, Any] | None, archived: Iterable[Mapping[str, Any]] | None
+) -> tuple[str, int | None] | None:
+    """What of its repo's work settled an open question to the person (§4.10 *A question the work settled closes
+    itself*, TD-1469): `("merged", n)` when the PR it carries (`question_pr`) is `merged` in the repo's month of
+    PRs (`reading["prs"]`: `recent` and `open`); else `("settled", n)` when its `about` names an entry archived by
+    a commit later than its `at` — the closing commit's time from the reading's `completed` (*What closed, and by
+    which PR*), `n` that commit's PR, None for none — or, with no closing commit read, an archive `Resolved:` day
+    later than `at`'s on the home's local calendar. `reading` is the entry's own repo's (its `repo`, resolved by
+    the caller); None, or nothing that settles, is None. A PR closed unmerged, or in neither list, settles
+    nothing; an entry already archived when asked, or open again, settles nothing."""
+    if not isinstance(reading, Mapping):
+        return None
+    at = str(_get(e, "at") or "")
+    if (pr := question_pr(e)) is not None:
+        prs = reading.get("prs") or {}
+        for p in [*(prs.get("recent") or []), *(prs.get("open") or [])]:
+            if isinstance(p, Mapping) and p.get("number") == pr and p.get("state") == "merged":
+                return ("merged", pr)
+    about = " ".join(str(_get(e, "about") or "").split())
+    if not at or not _TD_ABOUT.fullmatch(about):
+        return None
+    ref = about.upper()
+    ledger = reading.get("ledger") or {}
+    if any(str(x.get("id") or "").upper() == ref for x in ledger.get("entries") or () if isinstance(x, Mapping)):
+        return None  # open again (reopened), whatever its history says
+    asked = datetime.fromisoformat(at.replace("Z", "+00:00"))
+    closes = [
+        c
+        for c in reading.get("completed") or ()
+        if isinstance(c, Mapping) and str(c.get("id") or "").upper() == ref and c.get("closed")
+    ]
+    if closes:  # the closing commit's time is read: it alone decides
+        c = max(closes, key=lambda c: datetime.fromisoformat(str(c["closed"])))
+        if datetime.fromisoformat(str(c["closed"])) > asked:
+            pr = c.get("pr")
+            return ("settled", pr if isinstance(pr, int) and not isinstance(pr, bool) else None)
+        return None
+    for a in archived or ():
+        if isinstance(a, Mapping) and str(a.get("id") or "").upper() == ref:
+            day = _resolved_day((a.get("fields") or {}).get("resolved"))
+            if day is not None and day > _local_day(at):
+                return ("settled", None)
+            return None
+    return None
+
+
+def settled_words(e: Any) -> str | None:
+    """The FYI's words for a question the work settled (§4.10, §4.5 screen 6, TD-1469): *settled — #164 merged*,
+    *settled — TD-221 archived (#164)*, *(no PR)* where the archive names none; None for any other close. The
+    Inbox's FYI, the Focus side panel's **Sent** fold and `ao inbox --sent` read these words."""
+    reason = _get(e, "closed_reason")
+    if reason == "merged":
+        pr = question_pr(e)
+        return f"settled — #{pr} merged" if pr is not None else "settled — merged"
+    if reason == "settled":
+        ref = " ".join(str(_get(e, "about") or "").split()) or "its entry"
+        by = _get(e, "settled_by")
+        return f"settled — {ref} archived ({f'#{by}' if by else 'no PR'})"
+    return None
+
+
 def self_decide_refusal(caller: Any) -> str:
     """TD-119, design §4.8: whatever it holds, a session never answers its own permission prompt."""
     return f"{caller} cannot decide itself: a session does not answer its own permission prompt (design §4.8)"

@@ -1147,6 +1147,14 @@ class MailMixin:
         entry.shots_ref = mail.shots_ref(shots_ref) if entry.shots_at else None
         entry.team = (me.team or None) if me is not None else None  # the envelope carries its sender's team (§4.10)
         entry.repo = stamped_repo  # and its sender's repo, beside it (§4.10, TD-1467)
+        if taken is not None and kind == "ask":
+            # a question passed up on its thread takes the `pr` of the ask it closes where it gives none, and that
+            # ask's `repo` where its own stamp is empty: a merge settles it, and the person's reply is the PR's read
+            # (§4.10 *A question the work settled closes itself*, §4.9b *The bound*, TD-1469)
+            if entry.pr is None and taken.pr is not None:
+                entry.pr = taken.pr
+            if not entry.repo and taken.repo:
+                entry.repo = taken.repo
         # §4.10 *A subject on every entry* (TD-561): a thread has one subject, so an answer, an outcome
         # and a follow-up carry their question's; mail the person reads is given one or warned, never
         # refused; mail between sessions takes a given one and derives nothing (a session reads the text)

@@ -192,6 +192,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     role_prompts,  # noqa: F401
     routed_around,  # noqa: F401
     rpc,  # noqa: F401
+    settled_by_work,  # noqa: F401
     shaped,  # noqa: F401
     start_fields,  # noqa: F401
     static_url,  # noqa: F401

@@ -158,6 +158,15 @@ def routed_around(e: Any) -> str | None:
 templates.env.globals["routed_around"] = routed_around
 
 
+def settled_by_work(e: Any) -> str | None:
+    """A question the work settled (§4.10 *A question the work settled closes itself*, TD-1469): `sessionorc.mail.
+    settled_words` — *settled — #164 merged*, *settled — TD-221 archived (#164)* — a template global as above."""
+    return mail.settled_words(e) if isinstance(e, Mapping) else None
+
+
+templates.env.globals["settled_by_work"] = settled_by_work
+
+
 def shaped(text: Any, origin: Any = None) -> dict[str, Markup]:
     """A mail row's text as the row draws it (design §4.5a **Inbox row: details**, §4.10 *How a
     message to a person is written*; TD-138): `lead`, the first paragraph, and `rest`, what goes

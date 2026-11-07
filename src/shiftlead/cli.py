@@ -4245,6 +4245,8 @@ def _sent(args: argparse.Namespace) -> int:
             reply = f" re {e['reply_to']}" if e.get("reply_to") else ""
             about = f" about {e['about']}" if e.get("about") else ""
             state = f" · {e['closed_reason']}" if e.get("closed_reason") else ""
+            if words := mailmod.settled_words(e):  # the work settled it (§4.10, TD-1469): the FYI's words
+                state = f" · {words}"
             to = ", ".join(e.get("to") or [])
             print(f"\n→ {to} · {e['id']} · {e['kind']}{reply}{_subj(e)} · {e['at']}{about}{state}")
             for line in str(e["text"]).splitlines() or [""]:
