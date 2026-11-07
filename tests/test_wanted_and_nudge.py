@@ -328,18 +328,19 @@ async def test_a_wanted_restart_counts_toward_the_ceiling_and_a_failed_close_is_
         assert agent.sessions[sid] is rec and rec.restart_ceiling["count"] == RESTART_CEILING
         # below the ceiling, a close whose tail fails after marking it closed is retried next tick
         rec.restart_ceiling, rec.restarts = None, []
-        real_close = agent.rpc_close
+        real_close = agent._close
 
-        async def close_then_fail(id, closer=None, reap=True):
+        async def close_then_fail(id, closer=None, reap=True, keep_debt=False):
             assert reap is False  # a restart keeps the worktree (§4.1, TD-979)
-            await real_close(id, closer=closer, reap=reap)
+            assert keep_debt is True  # the replay carries the mail, and the debt with it (§4.9a, TD-1485)
+            await real_close(id, closer=closer, reap=reap, keep_debt=keep_debt)
             raise RuntimeError("push failed")
 
-        monkeypatch.setattr(agent, "rpc_close", close_then_fail)
+        monkeypatch.setattr(agent, "_close", close_then_fail)
         await agent._keep_running(now)
         assert agent.sessions[sid] is rec and rec.state == "closed"
         assert rec.restarts[-1]["why"] == "wanted" and "push failed" in rec.restarts[-1]["error"]
-        monkeypatch.setattr(agent, "rpc_close", real_close)
+        monkeypatch.setattr(agent, "_close", real_close)
         await agent._keep_running(now)
         new = agent.sessions[sid]
         assert new is not rec and [r["why"] for r in new.restarts] == ["wanted", "wanted"]
@@ -467,16 +468,17 @@ async def test_the_ticks_own_failed_close_is_marked_and_a_person_s_close_in_the_
         await _idle_for(agent, sid, now, timedelta(minutes=1))
         rec.restart_wanted = {"at": _iso(now), "why": "context is long"}
         rec.git = dict(CLEAN)
-        real_close = agent.rpc_close
+        real_close = agent._close
 
-        async def close_then_fail(id, closer=None, reap=True):
+        async def close_then_fail(id, closer=None, reap=True, keep_debt=False):
             assert reap is False  # a restart keeps the worktree (§4.1, TD-979)
-            await real_close(id, closer=closer, reap=reap)
+            assert keep_debt is True  # the replay carries the mail, and the debt with it (§4.9a, TD-1485)
+            await real_close(id, closer=closer, reap=reap, keep_debt=keep_debt)
             raise RuntimeError("push failed")
 
-        monkeypatch.setattr(agent, "rpc_close", close_then_fail)
+        monkeypatch.setattr(agent, "_close", close_then_fail)
         await agent._keep_running(now)
-        monkeypatch.setattr(agent, "rpc_close", real_close)
+        monkeypatch.setattr(agent, "_close", real_close)
         assert (
             rec.state == "closed"
             and rec.closed_for == {"why": "wanted", "closed_at": rec.closed_at}
@@ -501,15 +503,15 @@ async def test_a_close_that_fails_before_marking_the_record_leaves_no_mark(agent
         await _idle_for(agent, sid, now, timedelta(minutes=1))
         rec.restart_wanted = {"at": _iso(now), "why": "context is long"}
         rec.git = dict(CLEAN)
-        real_close = agent.rpc_close
+        real_close = agent._close
 
-        async def fail_at_once(id, closer=None, reap=True):
+        async def fail_at_once(id, closer=None, reap=True, keep_debt=False):
             raise RuntimeError("kill failed")
 
-        monkeypatch.setattr(agent, "rpc_close", fail_at_once)
+        monkeypatch.setattr(agent, "_close", fail_at_once)
         await agent._keep_running(now)
         assert rec.state == "idle" and rec.closed_for is None and "kill failed" in rec.restarts[-1]["error"]
-        monkeypatch.setattr(agent, "rpc_close", real_close)
+        monkeypatch.setattr(agent, "_close", real_close)
         await agent._keep_running(now)
         new = agent.sessions[sid]
         assert new is not rec and [r["why"] for r in new.restarts] == ["wanted", "wanted"]

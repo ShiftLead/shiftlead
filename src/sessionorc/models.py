@@ -1275,8 +1275,8 @@ class Session:
     # all. `early` marks one declared inside `RESTART_EARLY` of the record's own start by a run that
     # reported nothing new, and `repeat: {ref}` beside it one whose `done` an earlier run reported
     # or that leaves a claim a third time (`agent_common._restart_reading`, TD-249): the word
-    # stands, and a controller does not act on it. It and `out_of_work` refuse each other: a
-    # session is out of work or it wants another run at it, never both.
+    # stands, and a controller does not act on it. It and `out_of_work` clear each other, the later
+    # declaration standing (TD-1485): a session is out of work or it wants another run at it, never both.
     restart_wanted: dict[str, Any] | None = None
     # `{at, by, why}` once a **person** has suspended this session over an identity alarm
     # (design §4.8a *An alarm's answers*, TD-077 a2), `None` otherwise. **The home's field**
