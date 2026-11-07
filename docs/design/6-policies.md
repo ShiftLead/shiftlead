@@ -78,8 +78,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   rules on the next tick, and **Hand back** returns it); a suspended record never is (§4.8a).
   **A restart is not a start.** The host agent still starts nothing *new* by itself, and what it
   starts again without a press at the time is a person's standing word — a schedule, or rule 8's
-  `on_work: start`, which starts the team, or one member of a team that runs on; a schedule is a
-  person's to turn on and is off by default. A restart re-creates a session the person or
+  `on_work: start`, which starts the team, or one member of a team that runs on, or a team's `max`
+  (§4.9 *Scaling with the work*, TD-1529), which fills an **extra** a Start (`ao team start`, Apply's *starts*) already wrote held under a `max` not
+  written `off`, as a Start writes a manager on call; a schedule is a person's to turn on and is off by default,
+  and a `max` is on by default only for a team defined after td-max lands (§4.9 *On by default*). A restart re-creates a session the person or
   `ao team start` already chose to run — same name, directory, worktree, profile, brief, lane,
   role, badges and `controllers` — and supersedes its record in place (§4.1), so nothing appears on
   the Sessions page that a person did not put there. It replays the session's **launch record**: at every
@@ -105,7 +107,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   refused, not queued, looked at again on the next tick; the nudge and the seat close run at the
   home and execute on the member's node as any act does. A policy needs no grant and passes no
   gate; it acts on the record's own fields and never on text a session wrote. The rules:
-  1. **Crash restart.** A supervised member **other than a seat** (a seat's ending is its own,
+  1. **Crash restart.** A supervised member **other than a seat** (an extra seat excepted: restarted here while it holds unread mail or
+     an unanswered ask addressed to it, closed held otherwise, §4.9 *Scaling with the work*; a seat's ending is its own,
      and rule 3 is the only rule that fills one, save the replay of a seat whose run never started,
      *A lost brief* below) that is `exited` by a **natural exit** — `pane` true,
      the tool left on its own — with **no declaration** (`out_of_work` and `restart_wanted` both
@@ -390,6 +393,48 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      standing or on call, the manager seat itself is a group of one (its controller is a
      director's, where there is one), and in a person-led team, whose seats have empty
      `controllers`, every seat is its own group with six fills an hour of its own.
+     **An extra seat** (§4.9 *Scaling with the work*, TD-1529; Paul, 2026-11-07: *up, on need, no timers*): a
+     held record carrying `scale` whose `line` names an `asks` seat carries `seat: {trigger: asks}`. **Up, at
+     the send**: mail addressed to the seat (a question, a reader's `ask` carrying `pr`, an `entry` envelope)
+     that finds **the seat's own record live and busy** (a record filled and not yet reported on by any hook is
+     free, §4.9 *Mail to a scaled seat*) — `working` (on its own included, §4.2) or
+     `needs-you` — and each live extra busy too fills the seat's lowest-placed held extra, `create` from its
+     launch record with `keep_mail`: the mail is written to the held extra's mailbox and the fill started in
+     the same call, the sender's reply naming where it went, and the send does not wait for the pane; there is
+     no wait before it (§4.9 *Mail to a scaled seat*). Mail goes first to a free live record of the seat in place order (the seat,
+     then its extras), so a warm idle extra takes it while the own record is held; where none is free and the
+     seat's own record is not live — held after its linger, never filled, or `exited` — the own
+     record takes it and is filled on its cause as today (rule 1 restarts no seat's own record, save the replay of a seat whose run never started, *A lost brief*): the own record comes back before an
+     extra is added. **Each tick, by the state** and never by how the mail got there: a seat whose
+     own record is live and busy, each live extra busy, and holding unread mail §4.9's *Mail to a scaled seat*
+     lets move fills its lowest-placed held extra once one can be filled (not every extra live and busy, the
+     host below `scale.live`, the profile not gated; the balance mark holds no seat's extra, §4.9 *The bounds*) and **moves that
+     mail** there, oldest first, `entry` envelopes and an `ask` carrying a `pr` among them — a mover of its own
+     beside the tick's move of a routed ask (`_reroute_waiting`, which moves only from a seat that cannot answer,
+     passes an `entry` envelope over, and moves a `pr` ask only to the person); the sender's `ao inbox --sent` reads where it went. So a send that could not
+     fill, and a second ask that landed on a closed seat behind the first before its fill, are one case. The same
+     pass moves unread mail left on an extra that is not live (held, closed, or `exited` and not restarted) to
+     the seat's first free live record, else to the own record filled on its cause (§4.9 *Mail to a scaled
+     seat*); the send's choice of record and its delivery are one step under the lock, new with td-max, that serializes `create`
+     and the eviction.
+     **The cause pass never fills an extra**: `seat_due` and a seat's fill on its cause pass over a record
+     carrying `scale`, whose fills are the send's and this mover's alone, both reading `scale.live`. An idle record, one lingering, is free and takes its mail
+     at the ring as today; a seat that cannot answer is routing around's case (§4.9b, TD-1443), which reads its
+     extras first. **An extra's fills count toward a `FILL_CEILING` of their own**: the group is the seat's
+     extras together, never the seats sharing their controller, so churn among extras never refuses the seat's
+     own fill or a sibling seat's. **Down, only when the slot is needed**: a live extra seat is never closed by
+     the `asks` linger — idle, it costs no tokens, only a slot, and keeps its thread's context warm for a
+     follow-up — and is closed back to held only when its host is at `scale.live` and a start needs the room
+     there (an extra of any line or seat, a member's fill, a team's start, a person's new session): the home
+     first closes the host's longest-idle extra seat that is idle at the composer, with nothing dirty or
+     unpushed, no live subagent or shell, no PR of its own waiting within `SEAT_PR_WAIT`, and no unread mail in its mailbox, then starts. A start **needs the room** when the host's live count is at or
+     above `scale.live` as it starts; the eviction runs in the host agent's `create`, which every start goes
+     through (the person's `ao new` and the UI's New session among them), the start itself never refused; an
+     extra seat's fill never evicts an extra of its own seat. A
+     team that winds down or stops closes its extras with the rest, held for the next run. Its record stays,
+     held, with its mailbox. The seat's own record is no extra, and closes and fills as it always has. The fill
+     and the close each write `scale.last` (*filled: an ask for techlead-ao-1, every record busy*; *back to held:
+     host full, room for grinder-ao-4*).
   4. **The idle nudge.** A supervised member that has been hook-confirmed `idle` for `IDLE_NUDGE`
      (twenty minutes) with **open work on its record** — a `lane` reference with no `done` or
      `dropped` entry, a declared `claimed` entry with no `done` or `dropped` that is not a waiting
@@ -1533,6 +1578,69 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        not land, to be run again on the next turn, and a member that ended its turn on it is rung by
        rule 4's idle nudge if it holds open work (a seat by its next question); one with nothing open
        is not rung, accepted: what it lost, its record does not show as owed.
+  14. **Scale with the work** (§4.9 *Scaling with the work*, TD-1529; Paul, 2026-11-07: *up, on need, no
+     timers; down, no idle timers*). For each running team whose records carry a held **extra** of a worker
+     line (a record with `scale`, its `line` naming a member line), the home asks whether the line is
+     **short** at the events that change the answer, never on a timer: **an entry becoming pickable** in the
+     line's lane (filed, or its block dropped — the team's lane reading — `ledger.in_lanes` (§4.4 *In a
+     team's lanes*), read home-side as the shape reads it — gaining an id it did not hold, a reading of its
+     own beside rule 8's `lane_seen`), and **a member of the line claiming** (`ao progress claim`, §4.8) while that lane
+     still holds a pickable entry nobody holds; and the events that clear what held a fill back — a start of the
+     team or a raised `max`, an extra closing, a session closing on the host, the balance mark or the usage gate
+     lifting, the guard's ten minutes passing — which the tick reads as it passes: while a line is short with
+     a fill held back (its newest `scale.last` `stopped`, or a guard standing), each tick reads it again until
+     it fills or is no longer short, so a backlog never waits on a claim that does not come. The line is short when its lane holds a pickable entry nobody
+     holds — no live record at the home holding a lease on it, a claim declared or derived that is not `done`
+     or `dropped` (the lease's test, §4.8 *A claim is a lease*, as `ao progress claim` reads it) — and **every live member of the line is busy — holding a lease** — its kept members, its run-only members and
+     its live extras alike, so a live extra between items is free and the line not short —, a claim declared or derived that
+     is not `done` or `dropped` (a waiting claim included, §4.8 *A claim is a lease*); a member between items,
+     holding no lease, idle or not, is free and picks, so the line is not short; a member `limited` or paused by
+     the usage gate with no lease is neither free nor busy — it cannot pick — so a line whose members are each
+     busy or so held is short (the gate, below, still holds back an extra on the gated profile). A kept member
+     rule 1 is restarting (`exited`, its restart due) counts as free — it picks on its return — so a crash
+     never reads as a short line. Short, the home **fills** the
+     line's lowest-placed held extra: `create` from its launch record with `keep_mail`, as rule 3 fills a seat,
+     the record keeping `scale`. A line's extras' fills count toward a `FILL_CEILING` of their own, the line's extras together, as a
+     seat's extras' do (rule 3). **One guard**: no second extra on a line until the last one filled has
+     claimed (its `progress` holds a claim), and a closed extra holds no guard, so one that filled, found its entry
+     taken by a freed sibling and declared out of work frees the line at its close; an extra filled ten minutes
+     ago (`SCALE_STEP`) with no claim no longer holds the guard — that is a start that stuck, not a reason to
+     wait, and its `scale.last` says so (`did: unstuck`, *not claimed in 10 min*) — so the line's next event may fill another. **It fills nothing** for a team its
+     balance mark holds (*Balance*, below: the team takes no new work), on a profile the usage gate pauses or
+     would pause, while the line has no live member (*unstaffed* is rule 8's and a Start's, not this rule's:
+     the line's kept members come first), while the team winds down (§4.9a), or while the extra's host is at
+     **`scale.live`** (§4.9 *The bounds*: every live session on the host; a node's at the node's host), where
+     the home first closes an idle extra seat to make room (rule 3) and, with none, writes *+0: host full, 30
+     live* on the line — `scale.last` with `did: stopped` on its lowest-placed held extra, the line having no
+     record of its own. **Down, with no idle timer**: an extra that **declares out of work** (`ao progress
+     none`, §4.9a) is closed back to held once it is clean — nothing dirty or unpushed, no subagent or shell
+     live, **no PR of its own open**, and **no unread mail** — at once if it is, else at the first tick it is.
+     The PR test is this rule's own, not rule 3's (where a PR handed to a reader no longer holds a seat): an
+     open PR of the extra's, one handed to a reader included, holds it open with no bound, so a worker extra
+     whose PR waits on its reader stays open idle, as an extra seat does (no tokens, only a slot), until the PR
+     merges or closes; and the unread-mail test keeps it open past a merge while the reader's reply is waiting unread, so a
+     reply sent before the close reaches the live record holding the work's context; a close in the moment
+     between the merge and the reply drops a claim whose PR merged, harmlessly, the merge having derived the
+     entry done (§4.8). The eviction, which takes only extra seats (rule 3), never closes it. While a seat of the team
+     holds its PR's ask it reads *waiting on <reader>: #n* as any member does (§4.9a), and the team is neither
+     wound down nor finished; an open PR nobody was asked about holds the extra open but not the team, and a
+     wind-down closes it held with the rest — accepted: the PR keeps its branch and the entry its PR, which the
+     lane's next member finds as it finds any dropped claim's. At the close a claim of its not `done` is
+     dropped (*extra closed*), as a succession drops one, so the lane reads its entry as nobody's; mail that
+     comes to the held extra after waits in its mailbox for its next fill. Its record stays with its mailbox and its `scale`, never marked sat
+     out, so the line's next short event fills it again. An extra is never sent rule 6's *new work* note: out
+     of work, it closes, and new work fills whichever extra is held. Its out-of-work declaration ends only its
+     own run: the wound-down and finished readings (`work.wound_down`, `work.finished`; §4.9a) pass over a held
+     extra as they pass over a seat, so a team winds down when its kept members and its live worker extras have
+     declared (a seat's extra counts as a seat does, never declaring), and one with held extras is not kept running by them. A filled extra is otherwise a member:
+     rules 1, 2, 4, 5 and 7 apply to it (rule 1's restart replays the record and is no start of the crew; an
+     extra `exited` after declaring out of work is closed held, never restarted), rule 8 and a schedule's start never replay it (`_work_replays` skips a
+     record carrying `scale`) — every start of the team (`ao team start`, Apply's *starts*, rule 8's and a
+     schedule's) first reconciles its held extras to the merged `max`, writing the missing and removing the
+     surplus, so a `max` changed while the team was down is read at its next run — and a team that winds down or stops closes it with the rest, held for the next
+     run. Each fill and close writes **`scale.last: {at, did: fill | hold | stopped | unstuck, why}`** on the extra's
+     record (*filled: 4 pickable, every grinder claimed*; *back to held: out of work*; *stopped: host full, 30
+     live*), which the team card's *td-max* line reads (§4.9).
 - **Promote**: a repo's live copy — the host agent and every session's `ao` for this repo, a cluster
   for samscrape — is made from `main` by **a person's press or this policy, never by a session**
   (CLAUDE.md: a worker never promotes; the `promote` RPC is refused to a session as `set_settings`
