@@ -1157,3 +1157,153 @@ def test_the_help_says_reserve_spends_and_next_is_its_old_name(capsys):
     text = " ".join(capsys.readouterr().out.split())
     keys = "{repo, ids, unread, reserved, why, warnings, taken_by, id_take, id_take_line, question}"
     assert keys in text and "--held" not in text
+
+
+# -- a lost reply (TD-1484) --------------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+async def test_a_take_is_read_again_by_its_nonce_or_as_the_callers_last_and_spends_nothing(home, gh, tmp_path):
+    root = _one(tmp_path, gh)
+    _stub(root, ids=("TD-060", "TD-061"), id_take="abc123")
+    await home.rpc_td_next(repo="shiftlead", count=2, caller="ao-w")
+    _stub(root, ids=("TD-062",), id_take="def456")
+    await home.rpc_td_next(repo="shiftlead", caller="ao-v")
+    before = paths.ids_file().read_text()
+    got = await home.rpc_td_take(repo="shiftlead", take="abc123", caller="ao-v")
+    assert got["ids"] == ["TD-060", "TD-061"] and got["by"] == "ao-w" and got["id_take"] == "abc123"
+    assert got["repo"] == "shiftlead" and got["origin"] == "shiftlead/shiftlead" and got["at"]
+    assert (await home.rpc_td_take(repo="shiftlead", take="last", caller="ao-w"))["ids"] == ["TD-060", "TD-061"]
+    assert (await home.rpc_td_take(repo="shiftlead", take="last", caller="ao-v"))["ids"] == ["TD-062"]
+    assert paths.ids_file().read_text() == before, "a read spends nothing"
+    with pytest.raises(RpcError, match="no take given to person"):
+        await home.rpc_td_take(repo="shiftlead", take="last")
+    with pytest.raises(RpcError, match="no take zzz"):
+        await home.rpc_td_take(repo="shiftlead", take="zzz", caller="ao-w")
+    for bad in ("", "a b", "x" * 200):
+        with pytest.raises(RpcError, match="name the take"):
+            await home.rpc_td_take(repo="shiftlead", take=bad, caller="ao-w")
+
+
+@pytest.mark.integration
+async def test_last_on_the_homes_own_road_is_the_callers_newest_call_and_an_old_record_groups_by_its_second(
+    home, gh, tmp_path
+):
+    _one(tmp_path, gh, nums=(1, 2))
+    await home.rpc_td_next(repo="shiftlead", count=2, caller="ao-w")
+    await home.rpc_td_next(repo="shiftlead", count=1, caller="ao-w")
+    got = await home.rpc_td_take(repo="shiftlead", take="last", caller="ao-w")
+    assert got["ids"] == ["TD-005"] and got["id_take"] is None and got["id_take_line"] is None
+    old = [{"id": "TD-090", "by": "ao-o", "at": "t1"}, {"id": "TD-091", "by": "ao-o", "at": "t2"},
+           {"id": "TD-092", "by": "ao-o", "at": "t2"}]  # fmt: skip
+    paths.ids_file().write_text(json.dumps({"shiftlead/shiftlead": {"last": 92, "given": old}}))
+    assert (await home.rpc_td_take(repo="shiftlead", take="last", caller="ao-o"))["ids"] == ["TD-091", "TD-092"]
+
+
+@pytest.mark.unit
+def test_td_take_is_forwarded_and_its_offline_refusal_names_no_script():
+    why = modes.offline_refusal("td_take", None, {}, host="laptop", home="kmaster")
+    assert why and "ids.json is the home's" in why and "ledger_next_id" not in why
+    assert "td_take" in modes.IDS and "td_take" not in modes.HOME_EDITS
+
+
+@pytest.mark.unit
+def test_out_writes_the_whole_reply_before_printing_and_show_reads_a_take(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    _register()
+    monkeypatch.chdir(tmp_path)
+    sent: list[tuple[str, dict]] = []
+    reply = {"repo": "shiftlead", "ids": ["TD-001", "TD-002"], "unread": [], "id_take": "n1",
+             "id_take_line": "**Id take:** n1"}  # fmt: skip
+    out_file = tmp_path / "reply.json"
+    real_print = print
+
+    def spy(*a, **kw):
+        assert out_file.exists(), "the file is written before anything is printed"
+        real_print(*a, **kw)
+
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: sent.append((m, p)) or dict(reply))
+    monkeypatch.setattr("builtins.print", spy)
+    assert cli.main(["td", "reserve", "--repo", "ShiftLead/shiftlead", "--count", "2", "--out", str(out_file)]) == 0
+    monkeypatch.setattr("builtins.print", real_print)
+    out, _ = capsys.readouterr()
+    assert out == "reserved TD-001\nreserved TD-002\n"
+    got = json.loads(out_file.read_text())
+    assert got["ids"] == ["TD-001", "TD-002"] and got["id_take"] == "n1" and set(got) >= {"reserved", "question"}
+    assert not list(tmp_path.glob(".reply.json.*")), "no temporary file is left"
+    assert sent[-1] == ("td_next", {"repo": "ShiftLead/shiftlead", "count": 2})
+
+    shown = {"repo": "shiftlead", "ids": ["TD-001", "TD-002"], "by": "ao-w", "at": "2026-11-07T01:00:00Z",
+             "id_take": "n1", "id_take_line": "**Id take:** n1", "origin": "shiftlead/shiftlead"}  # fmt: skip
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: sent.append((m, p)) or dict(shown))
+    assert cli.main(["td", "reserve", "--repo", "ShiftLead/shiftlead", "--show", "n1"]) == 0
+    out, err = capsys.readouterr()
+    assert out == "TD-001\nTD-002\n" and sent[-1] == ("td_take", {"repo": "ShiftLead/shiftlead", "take": "n1"})
+    assert "given to ao-w at 2026-11-07T01:00:00Z; read again, nothing new spent" in err and "**Id take:** n1" in err
+    assert cli.main(["td", "reserve", "--repo", "ShiftLead/shiftlead", "--show", "last", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out) == {k: v for k, v in shown.items() if k != "origin"}
+    with pytest.raises(SystemExit, match="takes no --count"):
+        cli.main(["td", "reserve", "--repo", "ShiftLead/shiftlead", "--show", "last", "--count", "2"])
+
+
+@pytest.mark.unit
+def test_an_out_file_that_cannot_be_written_still_prints_the_ids(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    _register()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: {"repo": "shiftlead", "ids": ["TD-007"], "unread": []})
+    bad = tmp_path / "no" / "such" / "dir" / "f.json"
+    assert cli.main(["td", "reserve", "--repo", "ShiftLead/shiftlead", "--out", str(bad)]) == 0
+    out, err = capsys.readouterr()
+    assert out == "reserved TD-007\n" and f"--out {bad} not written" in err
+
+
+@pytest.mark.unit
+def test_a_refused_call_leaves_an_existing_out_file_as_it_was_and_the_alias_shows_too(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    _register()
+    monkeypatch.chdir(tmp_path)
+    f = tmp_path / "r.json"
+    f.write_text('{"ids": ["TD-001"]}')
+
+    def refuse(m, **p):
+        raise cli.AgentError("busy, ask again")
+
+    monkeypatch.setattr(cli, "call_sync", refuse)
+    assert cli.main(["td", "reserve", "--repo", "ShiftLead/shiftlead", "--out", str(f)]) != 0
+    assert f.read_text() == '{"ids": ["TD-001"]}', "a refused call never removes or writes the --out file"
+    assert f"--out {f} not written: the call was refused" in capsys.readouterr().err
+    shown = {"repo": "shiftlead", "ids": ["TD-004"], "by": "ao-w", "at": "t", "id_take": None, "id_take_line": None}
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: dict(shown))
+    capsys.readouterr()
+    assert cli.main(["td", "next", "--repo", "ShiftLead/shiftlead", "--show", "last", "--out", str(f)]) == 0
+    assert capsys.readouterr().out == "TD-004\n" and json.loads(f.read_text()) == shown
+
+
+@pytest.mark.integration
+async def test_a_nonce_given_twice_names_its_newest_call_and_last_spans_old_and_marked_records(home, gh, tmp_path):
+    _one(tmp_path, gh)
+    given = [
+        {"id": "TD-090", "by": "ao-o", "at": "t1", "take": "n"},
+        {"id": "TD-091", "by": "ao-o", "at": "t2", "call": "c1", "take": "n"},
+        {"id": "TD-092", "by": "ao-o", "at": "t2", "call": "c1", "take": "n"},
+        {"id": "TD-093", "by": "ao-o", "at": "t3"},
+    ]
+    paths.ids_file().write_text(json.dumps({"shiftlead/shiftlead": {"last": 93, "given": given}}))
+    assert (await home.rpc_td_take(repo="shiftlead", take="n", caller="ao-x"))["ids"] == ["TD-091", "TD-092"]
+    assert (await home.rpc_td_take(repo="shiftlead", take="last", caller="ao-o"))["ids"] == ["TD-093"]
+
+
+def test_count_zero_goes_to_the_home_and_is_never_turned_into_one(tmp_path, monkeypatch):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    _register()
+    monkeypatch.chdir(tmp_path)
+    sent = []
+
+    def refuse(m, **p):
+        sent.append(p["count"])
+        raise cli.AgentError("count must be 1 to 10")
+
+    monkeypatch.setattr(cli, "call_sync", refuse)
+    assert cli.main(["td", "reserve", "--repo", "ShiftLead/shiftlead", "--count", "0"]) != 0
+    assert sent == [0], "--count 0 is refused by the home, never spent as one id"

@@ -17,6 +17,7 @@ import signal
 import sys
 import threading
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +36,7 @@ FILES_CAP = 3000  # GitHub lists at most this many files of a PR: a listing that
 PR_READERS = 4  # PRs read at once
 GIVEN_KEEP = 200
 COUNT_MAX = 10
+LAST_TAKE = "last"  # `ao td reserve --show last`: the caller's newest take (TD-1484)
 # the start of the id script's filing question (agent-cadence TD-204): its stderr's last line where the repo sets
 # `review-outcomes` on; parity with its `FILING_QUESTION` (cadence.md §7.9)
 FILING_QUESTION = "ledger_next_id: if this entry is a defect, did a design miss it?"
@@ -342,6 +344,38 @@ class IdsMixin:
             log.info("td_next %s: %s", name, line)
         return {"repo": name, "origin": key, **got}
 
+    async def rpc_td_take(self, repo: str = "", take: str = "", caller: Any = None) -> dict[str, Any]:
+        """`ao td reserve --show <take>` (design §4.4 *The record*, §4.7 *Entries*; TD-1484): the ids one call
+        already gave for the repo, read from `ids.json` again, spending nothing — the call whose take's nonce is
+        `take`, or, for `last`, the newest call given to the caller (`by` as `td_next` reads it). Returns `{repo,
+        origin, ids, by, at, id_take, id_take_line}`; refused where the record no longer holds the take."""
+        start = time.monotonic()
+        take = str(take or "").strip()
+        if not take or not re.fullmatch(r"[\w-]{1,128}", take):
+            raise RpcError(f"name the take: its id_take, or {LAST_TAKE!r} for your newest")
+        root, key, name = await self._ids_repo(str(repo or "").strip(), start + LOCK_BY)
+        by = PERSON if caller is None or mail.is_person(caller) else str(caller)
+        got = await asyncio.to_thread(given_take, key, take, by)
+        if not got:
+            whose = f"no take given to {by}" if take == LAST_TAKE else f"no take {take}"
+            raise RpcError(f"{name}: {whose} in the home's record, which keeps the newest {GIVEN_KEEP} ids")
+        id_take = got[-1].get("take") if isinstance(got[-1].get("take"), str) else None
+        take_line = None
+        left = max(0.1, start + BUDGET - time.monotonic())
+        if id_take and (script := await asyncio.to_thread(ids_script, root, left)):
+            rel = await asyncio.to_thread(ledger_mod.ledger_path, root)
+            led = (await asyncio.to_thread(layout, root, rel))[0]
+            take_line = await asyncio.to_thread(id_take_line, script, root, led, id_take)
+        return {
+            "repo": name,
+            "origin": key,
+            "ids": [str(g.get("id")) for g in got],
+            "by": got[-1].get("by"),
+            "at": got[-1].get("at"),
+            "id_take": id_take,
+            "id_take_line": take_line,
+        }
+
     async def _ids_repo(self, want: str, by: float) -> tuple[str, str, str]:
         """`(root, origin key, name)` for a registered name or an `owner/repo`. A name registered checkouts
         of different origins share is refused, naming them; checkouts of one origin are one repo, so the
@@ -423,10 +457,10 @@ class IdsMixin:
         if rc == 2:
             raise RpcError(f"{name}'s ids were not given: {why or 'the script refused'}")
         ids = [str(i) for i in res["ids"]]
-        await asyncio.to_thread(_record_given, key, ids, by)
+        id_take = res.get("id_take") if isinstance(res.get("id_take"), str) and res["id_take"] else None
+        await asyncio.to_thread(_record_given, key, ids, by, id_take)
         refs = [str(r) for r in res.get("unread") or [] if str(r).strip()]
         taken_by = res.get("taken_by") if isinstance(res.get("taken_by"), str) and res["taken_by"] else None
-        id_take = res.get("id_take") if isinstance(res.get("id_take"), str) and res["id_take"] else None
         take_line = await asyncio.to_thread(id_take_line, script, root, led, id_take)
         last = ((err or "").strip().splitlines() or [""])[-1].strip()
         question = last if last.startswith(FILING_QUESTION) else None  # review-outcomes on: the script asked
@@ -574,7 +608,8 @@ def _record(key: str, floor: int, count: int, by: str) -> list[str]:
         ids = [f"TD-{n:03d}" for n in range(top + 1, top + 1 + count)]
         at = now_iso()
         given = [g for g in rec.get("given") or [] if isinstance(g, dict)]
-        given += [{"id": i, "by": by, "at": at} for i in ids]
+        call = uuid.uuid4().hex[:12]
+        given += [{"id": i, "by": by, "at": at, "call": call} for i in ids]
         store[key] = {"last": top + count, "given": given[-GIVEN_KEEP:]}
         _save(store)
         return ids
@@ -587,17 +622,40 @@ def _last(key: str) -> int:
     return rec["last"] if isinstance(rec, dict) and isinstance(rec.get("last"), int) else 0
 
 
-def _record_given(key: str, ids: list[str], by: str) -> None:
-    """Record ids the script gave, as they are: appended to `given`, `last` moved to the highest of them."""
+def _record_given(key: str, ids: list[str], by: str, take: str | None = None) -> None:
+    """Record ids the script gave, as they are: appended to `given` with the call's mark and the take's nonce
+    where the script answered one (TD-1484), `last` moved to the highest of them."""
     with _STORE:
         store = _load()
         rec = store.get(key) if isinstance(store.get(key), dict) else {}
         last = rec.get("last") if isinstance(rec.get("last"), int) else 0
         at = now_iso()
         given = [g for g in rec.get("given") or [] if isinstance(g, dict)]
-        given += [{"id": i, "by": by, "at": at} for i in ids]
+        call = uuid.uuid4().hex[:12]
+        given += [{"id": i, "by": by, "at": at, "call": call} | ({"take": take} if take else {}) for i in ids]
         store[key] = {"last": max([last, *(int(i[3:]) for i in ids)]), "given": given[-GIVEN_KEEP:]}
         _save(store)
+
+
+def given_take(key: str, take: str, by: str) -> list[dict[str, Any]]:
+    """The records of one call the home gave for the origin (`ids.json`'s `given`, TD-1484): those of the newest call
+    whose `take` is `take`, or, where `take` is `last`, the newest call given to `by`; none where the record no longer
+    holds it."""
+    with _STORE:
+        rec = _load().get(key)
+    given = [g for g in (rec.get("given") if isinstance(rec, dict) else None) or [] if isinstance(g, dict)]
+    if take == LAST_TAKE:
+        mine = [g for g in given if g.get("by") == by]
+        if not mine:
+            return []
+        newest = mine[-1]
+        same = ("call", "take") if newest.get("call") else ("at", "take")  # a record from before the mark: its second
+        return [g for g in mine if all(g.get(k) == newest.get(k) for k in same)]
+    named = [g for g in given if g.get("take") == take]
+    if not named:
+        return []
+    newest = named[-1]  # a nonce a script gave twice names its newest call alone (review of #3096)
+    return [g for g in named if g.get("call") == newest.get("call")]
 
 
 def _load() -> dict[str, Any]:
