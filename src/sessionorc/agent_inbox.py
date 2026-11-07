@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import os
 import time
-from collections.abc import Collection
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -360,7 +359,7 @@ class InboxMixin:
         except board_mod.Refused as e:
             raise RpcError(str(e)) from None
         log.info("board %s: %s", root, done["message"])
-        await self._reread_board(root, done.get("entries") or (), str(done.get("commit") or ""))
+        await self._reread_board(root)
         return {
             "board": str(want),
             "line": done.get("line", line),
@@ -1113,19 +1112,16 @@ class InboxMixin:
             self._board_adding.discard(key)
         return {"repo": root, "id": id, "decided": said, "told": told, "readers": readers, **done}
 
-    async def _reread_board(self, root: str | Path, entries: Collection[str] = (), commit: str = "") -> None:
-        """The repo's board read again at once after a write-back the host agent made (§4.4 *Each
-        reading has one owner*, *The boards*, TD-615), so a Snooze, a Done, a Decide, a Reply or an
-        add is in the next `repos` push and not a minute later, and a ledger entry answered on the
-        board leaves *Later* with it. It reads the write-back's own tree — origin's head, the press
-        landed — as the checkout's board read from origin, and fetches where there is no tree. A
-        failed read changes nothing: the next reading lists the line. The press is marked, so a
-        tick's read that began before it does not put the old board back.
-
-        `entries` are the ledger entries the write-back wrote beside the line (a decide lift, TD-1375), landed
-        as `commit`: read from the same tree into the ledger reading, and held over each later read of the
-        checkout's ledger until the checkout's HEAD holds `commit` (`_hold_pressed`, TD-1433), so a Go's
-        lifted gate leaves the Queue's card with its line and not a pull later."""
+    async def _reread_board(self, root: str | Path) -> None:
+        """The repo's board and ledger read again at once after a write-back the host agent made (§4.4 *Each
+        reading has one owner*, *The boards*, TD-615; *Every write the home lands is read at once*, TD-1471), so a
+        Snooze, a Done, a Decide, a Reply or an add is in the next `repos` push and not a minute later, and a
+        ledger entry answered on the board — a Go's lifted gate (TD-1375) — leaves the Queue's card with its line.
+        It reads the write-back's own tree — origin's head, the press landed — as the checkout's board read from
+        origin, and fetches where there is no tree; the ledger is read against origin, whose ref the write-back's
+        landing moved, through the pass's own ledger step (`_reread_repo`). A failed board read keeps the board,
+        a failed ledger read the ledger: the next reading catches up. The press is marked, so a tick's read that
+        began before it does not put the old board, ledger or archive back."""
         root = str(root)
         self._boards_pressed[root] = time.monotonic()
         old = self._repos.get(root)
@@ -1133,31 +1129,24 @@ class InboxMixin:
             return
         tree = board_mod.tree_dir(Path(root)) / workorders.board_rel(root)
         here = tree if tree.is_file() else None
+        live = self._live_commits() if self._promotes_read else None
         try:
-            bds, wos = await asyncio.to_thread(self._read_boards, root, old, here is None, False, now_iso(), tree=here)
+            bds, wos, led, arch = await asyncio.to_thread(self._reread_repo, root, old, here, live)
         except Exception:  # noqa: BLE001 — the line is landed; the reading catches up on its own
             log.exception("re-reading the board of %s failed", root)
             return
-        if "error" in bds or root not in self._repos:
+        if root not in self._repos:
             return
-        led = self._repos[root].get("ledger")
-        if entries and commit and here is not None and isinstance(led, dict):
-            try:
-                by = await asyncio.to_thread(
-                    self._pressed_entries, root, board_mod.tree_dir(Path(root)), list(entries), self._repos[root]
-                )
-            except Exception:  # noqa: BLE001 — the gate is lifted on origin; the pull brings it all the same
-                log.exception("re-reading the pressed entries of %s failed", root)
-                by = None
-            if by:
-                hold = self._ledger_pressed.setdefault(root, {"entries": {}})
-                hold["entries"].update(by)
-                hold.update(commit=commit, at=time.monotonic())
-                if root not in self._repos:
-                    return
-                # the ledger as it stands now: a tick's that landed while the entries were read is the newer
-                led = ledger_mod.with_entries(self._repos[root].get("ledger") or led, by)
-        self._repos[root] = {**self._repos[root], "boards": bds, "work_orders": wos, **({"ledger": led} if led else {})}
+        cur = self._repos[root]
+        got: dict[str, Any] = {} if "error" in bds else {"boards": bds, "work_orders": wos}
+        if led is not None:
+            self._archived[root] = arch or []
+        if led is not None and led != cur.get("ledger"):
+            got["ledger"] = led
+            got["completed"] = ledger_mod.completed(led.get("recent"), (cur.get("prs") or {}).get("recent"))
+        if not got:
+            return
+        self._repos[root] = {**cur, **got}
         # marked again as it lands: a tick's pass that began while this read ran is older too (review of TD-615)
         self._boards_pressed[root] = time.monotonic()
         self.repos_store.save(self._repos)

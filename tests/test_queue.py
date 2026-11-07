@@ -31,7 +31,18 @@ def _repo(tmp: Path, name: str, entries: list[str], archive: list[str] = ()) -> 
                        "prs": {"open": []}}  # fmt: skip
 
 
+def archives(repos: dict[str, dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Each root's archive entries as the home hands them to the Queue (`_archived`, TD-1471): `ledger.archived`
+    over the checkout's files, read beside the reading."""
+    return {
+        root: ledger.archived(ledger.fs_io(root), str(r["ledger"].get("path") or ledger.DEFAULT))
+        for root, r in repos.items()
+        if isinstance(r.get("ledger"), dict) and "entries" in r["ledger"]
+    }
+
+
 def _cards(repos: dict[str, dict[str, Any]], records: list[Session] = (), **kw: Any) -> dict[str, Any]:
+    kw.setdefault("archived", archives(repos))
     return queue.reading(repos, list(records), NOW, **kw)
 
 
@@ -250,14 +261,19 @@ def test_a_claim_on_no_open_entry_is_other_work(tmp_path):
     ]
 
 
-def test_the_archive_is_cached_by_its_blob(tmp_path):
-    p = tmp_path / "a.md"
+def test_the_archive_is_read_through_the_io_it_is_handed(tmp_path):
+    """`ledger.archived` (TD-1471) reads the archive the io gives — an edit is read at once, no cache between —
+    each entry's `Resolved:` line read wherever its body writes it."""
+    root = tmp_path / "r"
+    (root / "docs").mkdir(parents=True)
+    p = root / "docs" / "technical_debt_archive.md"
     p.write_text(_entry(1, "x"), encoding="utf-8")
-    first = queue.archive_entries(p)
-    assert queue.archive_entries(p) is first
-    p.write_text(_entry(1, "x") + _entry(2, "y"), encoding="utf-8")
-    assert [e["id"] for e in queue.archive_entries(p)] == ["TD-001", "TD-002"]
-    assert queue.blob_sha(b"hello\n") == "ce013625030ba8dba906f756967f9e9ca394464a"
+    (root / "docs" / "technical_debt.md").write_text("# Technical Debt\n", encoding="utf-8")
+    io = ledger.fs_io(root)
+    assert [e["id"] for e in ledger.archived(io, "docs/technical_debt.md")] == ["TD-001"]
+    p.write_text(_entry(1, "x") + _entry(2, "y") + "Body.\n\n**Resolved:** 2026-10-01 (PR #12)\n", encoding="utf-8")
+    got = {e["id"]: e for e in ledger.archived(io, "docs/technical_debt.md")}
+    assert sorted(got) == ["TD-001", "TD-002"] and got["TD-002"]["fields"]["resolved"] == "2026-10-01 (PR #12)"
 
 
 async def test_the_home_serves_the_reading_and_pushes_it_when_it_changes(agent, tmp_path, monkeypatch):
@@ -266,6 +282,7 @@ async def test_the_home_serves_the_reading_and_pushes_it_when_it_changes(agent, 
     await park_ticks(agent)
     root, r = _repo(tmp_path, "r", [_entry(1, "x", Priority="Low"), _entry(2, "y", Priority="High")])
     agent._repos = {root: r}
+    agent._archived = archives(agent._repos)  # what the ledger reads hand the Queue
     sent: list[dict[str, Any]] = []
 
     async def push(ev: dict[str, Any]) -> None:

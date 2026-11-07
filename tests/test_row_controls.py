@@ -174,12 +174,12 @@ def _ledger(tmp_path):
 def test_the_queue_builds_the_keys_the_controls_read(tmp_path):
     """`queue.reading` gives each row its page kind, an open blocker and a design's open builds, and the macro
     drawn from those rows, not a literal, puts Done… and Back to design… where the rule says (TD-910)."""
-    from test_queue import NOW
+    from test_queue import NOW, archives
 
     from sessionorc import queue
 
     root, r = _ledger(tmp_path)
-    q = queue.reading({root: r}, [], NOW)
+    q = queue.reading({root: r}, [], NOW, archived=archives({root: r}))
     rows = {x["id"]: x for c in q["cards"] for x in (c["top"], *c["rows"])}
     keys = {i: (x["page"], x["blocked_open"], x["builds_open"]) for i, x in rows.items()}
     assert keys == {
@@ -221,7 +221,7 @@ def test_a_parents_open_parts_keep_done_off_and_back_to_design_on(tmp_path):
     """TD-1130 (§4.5 screen 12, §4.9c): an entry some open entry names in `Part of:` has open builds and,
     blocked by its open parts, a way back to design; an open id a `Blocked by:` names is a blocker, never a
     build, whether the entry has archived parts or none (TD-1133 removed the not-yet-backfilled reading)."""
-    from test_queue import NOW, _entry, _repo
+    from test_queue import NOW, _entry, _repo, archives
 
     from sessionorc import queue
 
@@ -237,7 +237,7 @@ def test_a_parents_open_parts_keep_done_off_and_back_to_design_on(tmp_path):
         ],
         [_entry(9, "a done part", Part_of="TD-003")],
     )
-    q = queue.reading({root: r}, [], NOW)
+    q = queue.reading({root: r}, [], NOW, archived=archives({root: r}))
     rows = {x["id"]: x for c in q["cards"] for x in (c["top"], *c["rows"])}
     keys = {i: (x["page"], x["blocked_open"], x["builds_open"]) for i, x in rows.items()}
     assert keys["TD-001"] == ("blocked", True, True)
@@ -256,7 +256,7 @@ def test_no_reading_or_row_carries_a_hold_and_the_repo_row_settles_with_no_press
     `held` mark on the reading is read as nothing."""
     from datetime import timedelta
 
-    from test_queue import NOW
+    from test_queue import NOW, archives
 
     from sessionorc import queue
     from shiftlead.ui import repo
@@ -265,7 +265,7 @@ def test_no_reading_or_row_carries_a_hold_and_the_repo_row_settles_with_no_press
     by = {e["id"]: e for e in r["ledger"]["entries"]}
     by["TD-002"]["held"] = {"at": NOW.isoformat(), "by": "s-1", "why": "after Friday"}
     by["TD-005"]["settling"] = {"until": (NOW + timedelta(minutes=7, seconds=30)).isoformat()}
-    q = queue.reading({root: r}, [], NOW)
+    q = queue.reading({root: r}, [], NOW, archived=archives({root: r}))
     for c in q["cards"]:
         for x in (c["top"], *c["rows"]):
             assert "held" not in x and x["state"] != "held (person)", x["id"]

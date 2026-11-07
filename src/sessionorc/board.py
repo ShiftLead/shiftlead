@@ -215,6 +215,7 @@ def _apply(plan: lb_board.Plan) -> None:
 # -- origin's head (design §4.4 *The edit is made on origin's head, and landed there*, TD-264) ----
 
 BOUND = 40.0  # seconds from the fetch to the merge (§4.4)
+REREAD_FAILED = "the press landed, and origin could not be re-read"  # §4.4 *Every write the home lands is read at once*
 MOVED = "that line of the board no longer holds this item: reload the Inbox and try again"
 NOT_ON_ORIGIN = "this line is not on origin yet: push the checkout first"
 PR_BODY = "shiftlead's board write-back: one line of the board, at the person's press (cadence §4.5)."
@@ -309,7 +310,7 @@ def _tree(root: Path, clock: _Clock) -> tuple[Path, str]:
     want = default_branch(root)
     if _git(root, "remote", "get-url", "origin").returncode != 0:
         raise unreachable(f"{root} has no origin")
-    cp = _git(root, "fetch", "-q", "origin", want, timeout=clock.left("git fetch"))
+    cp = _fetch(root, root, want, clock.left("git fetch"))
     if cp.returncode != 0:
         raise unreachable(_why(cp, "git fetch"))
     t = tree_dir(root)
@@ -330,6 +331,14 @@ def _tree(root: Path, clock: _Clock) -> tuple[Path, str]:
         why = _why(cp, "git reset")
         _drop_tree(root, t)
     raise Refused(f"the board's own tree {t} cannot be made or reset ({why}): the edit was not made")
+
+
+def _fetch(root: Path, at: Path, want: str, timeout: float) -> subprocess.CompletedProcess[str]:
+    """`git fetch` of origin's `want` in `at` (the checkout `root` or its tree, one repository's refs), with the
+    explicit refspec so `origin/<want>` moves even where `remote.origin.fetch` is narrowed, under the home's one
+    fetch lock of `root` (`workorders.fetch_lock`, §4.4 *The ledger is read against origin*, TD-1471)."""
+    with workorders.fetch_lock(root):
+        return _git(at, "fetch", "-q", "origin", workorders.refspec(want), timeout=timeout)
 
 
 def _common_dir(root: Path) -> str:
@@ -481,7 +490,7 @@ def _land(
             landed = state == "MERGED"
             moved = shifted = False
             with contextlib.suppress(Refused):
-                if not landed and _git(t, "fetch", "-q", "origin", want, timeout=GIT_TIMEOUT).returncode == 0:
+                if not landed and _fetch(root, t, want, GIT_TIMEOUT).returncode == 0:
                     landed = _git(t, "diff", "--quiet", sha, f"origin/{want}", "--", rel).returncode == 0
                     moved = not landed and not still()
                     # the forge's own word that it did not merge, and origin's board changed under it: never a
@@ -502,10 +511,19 @@ def _land(
         _reset(t, want)
         raise
     _git_quiet(t, "push", "-q", "origin", "--delete", branch)  # a repo that auto-deletes has done it
-    _git_quiet(t, "fetch", "-q", "origin", want)
-    head = _git(t, "rev-parse", "--short", f"origin/{want}").stdout.strip()
+    # the merge brought in (§4.4 *Every write the home lands is read at once*, TD-1471): checked, and `commit`
+    # reported only from a fetch that moved the ref; one that failed is the re-read failing
+    try:
+        cp = _fetch(root, t, want, GIT_TIMEOUT)
+        why = "" if cp.returncode == 0 else _why(cp, "git fetch")
+    except Refused as e:
+        why = str(e)
+    head = _git(t, "rev-parse", f"origin/{want}").stdout.strip()
     _reset(t, want)
-    return {"commit": head, "message": msg, "pr": n}
+    if why or not head or head == base:
+        why = why or f"origin/{want} did not move"
+        return {"commit": "", "message": msg, "pr": n, "reread_error": f"{REREAD_FAILED} ({why})"}
+    return {"commit": _git(t, "rev-parse", "--short", head).stdout.strip(), "message": msg, "pr": n}
 
 
 def _pr_state(t: Path, n: int) -> str | None:

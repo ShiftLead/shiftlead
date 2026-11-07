@@ -60,6 +60,12 @@ def origin_board(root: Path) -> str:
     return on_origin(root, "show", f"origin/main:{board.BOARD.as_posix()}") + "\n"
 
 
+def keep_ledger(agent, monkeypatch) -> None:
+    """A test that hands the home a ledger reading of its own keeps it over a press's re-read, which reads the
+    whole ledger against origin (`_read_ledger`, TD-1471): the step answers with the reading as it stands."""
+    monkeypatch.setattr(agent, "_read_ledger", lambda root, old_led, *a, **kw: (dict(old_led), []))
+
+
 def test_a_line_is_done_or_snoozed_only_while_it_holds_the_item():
     line = f"- [ ] {ITEM}\n"
     # Done ticks it and closes it today: ledgerboard's edit (TD-585; was a tick alone)
@@ -1262,6 +1268,7 @@ async def test_a_ledger_answer_is_the_persons_and_written_from_the_homes_reading
         return None
 
     monkeypatch.setattr(agent, "_refresh_repos", held)
+    keep_ledger(agent, monkeypatch)  # the ledger reading below is the test's own
     await park_ticks(agent)  # a repos pass already in flight would land after `_repos` below (TD-1050)
     entry = {
         "id": "TD-133", "title": LEDGER_TITLE, "for_page": "for-you", "owner": "grinder",
@@ -1343,6 +1350,7 @@ async def test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write
         return None
 
     monkeypatch.setattr(agent, "_refresh_repos", held)
+    keep_ledger(agent, monkeypatch)  # the ledger reading below is the test's own
     # a repos pass the fixture's first tick started before the patch lands after `_repos` is set below and
     # empties it (*…/repo is not a repo this home reads*, under a loaded run): finished first (TD-1050)
     await park_ticks(agent)
@@ -1425,6 +1433,7 @@ async def test_a_ledger_answer_finds_its_repo_by_path_and_the_reading_after_it_l
         return None
 
     monkeypatch.setattr(agent, "_refresh_repos", held)
+    keep_ledger(agent, monkeypatch)  # the ledger reading below is the test's own
     await park_ticks(agent)  # a repos pass already in flight would land after `_repos` below (TD-1050)
     real_read = workorders.read_boards
     events: list[dict] = []
@@ -1601,6 +1610,7 @@ async def test_a_persons_session_presses_done_and_back_to_design_but_answers_no_
         return None
 
     monkeypatch.setattr(agent, "_refresh_repos", held)
+    keep_ledger(agent, monkeypatch)  # the ledger reading below is the test's own
     await park_ticks(agent)
     entries = [
         {"id": "TD-30", "title": "a build", "for_page": "pickable"},
@@ -1739,13 +1749,14 @@ def test_a_not_yet_on_a_gated_decide_keeps_it_waiting_in_the_same_write(repo):
     assert line.startswith("- [x] ") and "Decided: Not yet" in line and "kept waiting" in line
 
 
-async def test_a_go_lifts_the_entrys_card_at_once_and_holds_it_until_the_checkout_pulls(
+async def test_a_go_lifts_the_entrys_card_at_once_and_it_stays_lifted_on_the_stale_checkout(
     agent, repo, tmp_path, monkeypatch
 ):
-    """TD-1433 (§4.4 *Each reading has one owner*): after a Go on a gated decide item the write-back re-reads the
-    entry it lifted from its own tree, so the reading pushed right after the press has the gate gone and no
-    *for you* row (no **Lift the hold**) while the checkout's ledger still holds the gate; a tick's later read
-    of the checkout keeps the lifted entry until the checkout's HEAD holds the press's commit."""
+    """TD-1471 (§4.4 *The ledger is read against origin, as the board is*; TD-1433's outcome): after a Go on a
+    gated decide item the write-back re-reads the whole ledger against origin, whose ref its landing moved, so the
+    reading pushed right after the press has the gate gone and no *for you* row (no **Lift the hold**) while the
+    checkout's ledger still holds the gate; a tick's later read of the stale checkout reads origin's file too, with
+    no hold of its own, and after the pull the checkout's."""
     from sessionorc import reports
     from shiftlead.ui.inbox import ledger_for_you
 
@@ -1757,6 +1768,15 @@ async def test_a_go_lifts_the_entrys_card_at_once_and_holds_it_until_the_checkou
     await park_ticks(agent)
     monkeypatch.setattr(reports, "pr_reading", lambda d, now, **kw: {"open": [], "at": now.isoformat()})
     root = str(repo)
+    pushed: list[dict] = []
+    real_broadcast = agent._broadcast
+
+    async def broadcast(ev: dict) -> None:
+        if ev.get("event") == "repos":
+            pushed.append(ev)
+        await real_broadcast(ev)
+
+    monkeypatch.setattr(agent, "_broadcast", broadcast)
 
     async def tick() -> dict:
         agent._repos_read_at = float("-inf")
@@ -1764,6 +1784,7 @@ async def test_a_go_lifts_the_entrys_card_at_once_and_holds_it_until_the_checkou
         return next(e for e in agent._repos[root]["ledger"]["entries"] if e["id"] == "TD-190")
 
     assert (await tick())["for_page"] == "for-you"
+    pushed.clear()
     at = origin_board(repo).splitlines().index(f"- [ ] {GATED}") + 1
     async with LocalClient() as me:
         got = await me.call(
@@ -1776,13 +1797,66 @@ async def test_a_go_lifts_the_entrys_card_at_once_and_holds_it_until_the_checkou
     def lifted(e: dict) -> bool:
         return e["for_page"] != "for-you" and not any("decision" in str(b) for b in e.get("blocked_by") or ())
 
-    now = next(e for e in agent._repos[root]["ledger"]["entries"] if e["id"] == "TD-190")
-    assert lifted(now), now
+    (ev,) = pushed  # the press's own `repos` push, with no fetch cadence waited
+    assert lifted(next(e for e in ev["repo"]["ledger"]["entries"] if e["id"] == "TD-190"))
+    assert ev["repo"]["ledger"]["origin"]["source"] == "origin"
     assert not [r for g in ledger_for_you(agent._repos, [])["groups"] for r in g["rows"] if r.get("id") == "TD-190"]
-    assert lifted(await tick()), "a tick's read of the checkout keeps the press's entry"
-    assert root in agent._ledger_pressed
+    assert lifted(await tick()), "a tick's read of the stale checkout reads origin's file"
+    assert not hasattr(agent, "_ledger_pressed")
     git(repo, "pull", "-q", "--ff-only", "origin", "main")
-    assert lifted(await tick()) and root not in agent._ledger_pressed, "the pull brought it in: the hold is dropped"
+    assert lifted(await tick()) and agent._repos[root]["ledger"]["origin"]["source"] == "checkout"
+
+
+async def test_a_pass_begun_before_a_go_lands_after_its_reread_keeps_the_lift(agent, repo, tmp_path, monkeypatch):
+    """TD-1471: a tick's pass that began before a press, whose ledger read took origin from before the landing,
+    lands after the press's re-read: the pass keeps the re-read's ledger as it keeps its board (`_boards_pressed`),
+    so the stale read never lands over it, and the archive it read with stands too."""
+    import asyncio
+
+    _gated(repo)
+    tick = await _press_go_meanwhile(agent, repo, tmp_path, monkeypatch)
+    root = str(repo)
+    e = next(e for e in agent._repos[root]["ledger"]["entries"] if e["id"] == "TD-190")
+    assert _lifted(e), "the pass's stale read did not land over the press's re-read"
+    assert await asyncio.wait_for(tick(), 60) and _lifted((await tick())["TD-190"])
+
+
+async def _press_go_meanwhile(agent, repo: Path, tmp_path: Path, monkeypatch):
+    """Register `repo`, read it once, then run a due pass whose read is taken before a Go lands and returned after
+    the press's re-read; returns the tick."""
+    import asyncio
+
+    from sessionorc import reports
+
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (home / "repos.txt").write_text(f"{repo}\n")
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+    await park_ticks(agent)
+    monkeypatch.setattr(reports, "pr_reading", lambda d, now, **kw: {"open": [], "at": now.isoformat()})
+    root = str(repo)
+
+    async def tick() -> dict[str, dict]:
+        agent._repos_read_at = float("-inf")
+        await agent._refresh_repos()
+        return {e["id"]: e for e in agent._repos[root]["ledger"]["entries"]}
+
+    assert (await tick())["TD-190"]["for_page"] == "for-you"
+    real = agent._read_repos
+    loop = asyncio.get_running_loop()
+
+    def press_meanwhile(*args):
+        got = real(*args)  # read before the press: the gate stands on origin still
+        at = origin_board(repo).splitlines().index(f"- [ ] {GATED}") + 1
+        board.write_back(repo, at, GATED, "decide", answer="Go")
+        asyncio.run_coroutine_threadsafe(agent._reread_board(root), loop).result(60)
+        return got
+
+    monkeypatch.setattr(agent, "_read_repos", press_meanwhile)
+    agent._repos_read_at = float("-inf")
+    await agent._refresh_repos()
+    monkeypatch.setattr(agent, "_read_repos", real)
+    return tick
 
 
 async def _press_go(agent, repo: Path, tmp_path: Path, monkeypatch, text: str):
@@ -1816,19 +1890,109 @@ def _lifted(e: dict) -> bool:
     return e["for_page"] != "for-you" and not any("decision" in str(b) for b in e.get("blocked_by") or ())
 
 
-async def test_a_press_hold_past_its_bound_gives_way_to_the_checkouts_reading(agent, repo, tmp_path, monkeypatch):
-    """TD-1433: the hold lasts at most `PRESS_HOLD` — a checkout that never pulls the press's commit (a feature
-    branch, a diverged main) reads as itself again once the bound passes, and the hold is dropped."""
-    from sessionorc import agent_tick
-
+async def test_a_narrowed_fetch_still_moves_origins_ref_and_the_lift_reads_at_once(agent, repo, tmp_path, monkeypatch):
+    """TD-1471: every fetch the compare relies on uses the explicit refspec, so a repo whose `remote.origin.fetch`
+    is narrowed to another branch still moves `origin/main` at a press's landing, and the lift reads at once."""
     _gated(repo)
+    # a bare `git fetch origin` moves another ref than `origin/main`
+    git(repo, "config", "remote.origin.fetch", "+refs/heads/main:refs/remotes/origin/elsewhere")
+    before = git(repo, "rev-parse", "refs/remotes/origin/main")
     tick = await _press_go(agent, repo, tmp_path, monkeypatch, GATED)
     root = str(repo)
-    assert _lifted((await tick())["TD-190"]) and root in agent._ledger_pressed
-    agent._ledger_pressed[root]["at"] -= agent_tick.PRESS_HOLD + 1
-    again = (await tick())["TD-190"]
-    assert not _lifted(again), "past the bound the checkout's own gated entry stands"
-    assert root not in agent._ledger_pressed
+    assert git(repo, "rev-parse", "refs/remotes/origin/main") != before, "the landing moved the ref"
+    assert _lifted(next(e for e in agent._repos[root]["ledger"]["entries"] if e["id"] == "TD-190"))
+    assert _lifted((await tick())["TD-190"])
+
+
+async def test_a_reread_resolves_and_settles_as_the_ticks_reading_does(agent, repo, tmp_path, monkeypatch):
+    """TD-1471: a press's re-read is the pass's own ledger step: entries still carry `pickable`, `live`, `waiting`
+    and `settling` as the tick's reading gives them, and an entry new on origin, first seen by the re-read (after a
+    first settled reading of the repo), is settling, not pickable."""
+    from sessionorc import reports
+
+    _gated(repo)
+    later = (datetime.now(UTC).date().replace(year=datetime.now(UTC).year + 1)).isoformat()
+    (repo / "docs" / "ledger" / "TD-195.md").write_text(
+        GATED_ENTRY.replace("TD-190: A window to keep", "TD-195: Waits for a day").replace(
+            "**Blocked by:** decision (paul)", f"**Blocked by:** until {later}"
+        )
+    )
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "a waiting one")
+    git(repo, "push", "-q", "origin", "main")
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (home / "repos.txt").write_text(f"{repo}\n")
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+    await park_ticks(agent)
+    monkeypatch.setattr(reports, "pr_reading", lambda d, now, **kw: {"open": [], "at": now.isoformat()})
+    root = str(repo)
+    agent._repos_read_at = float("-inf")
+    await agent._refresh_repos()
+    tick = {e["id"]: e for e in agent._repos[root]["ledger"]["entries"]}
+    other = tmp_path / "other"
+    git(tmp_path, "clone", "-q", git(repo, "remote", "get-url", "origin"), str(other))
+    (other / "docs" / "ledger" / "TD-196.md").write_text(
+        GATED_ENTRY.replace("TD-190: A window to keep", "TD-196: New on origin").replace(
+            "**Blocked by:** decision (paul)\n", "**Kind:** design-first\n"
+        )
+    )
+    git(other, "add", "-A")
+    git(other, "-c", "user.name=o", "-c", "user.email=o@x", "commit", "-qm", "new")
+    git(other, "push", "-q", "origin", "main")
+    at = origin_board(repo).splitlines().index(f"- [ ] {ITEM}") + 1
+    async with LocalClient() as me:
+        await me.call(
+            "board_edit", board=str(repo / board.BOARD), line=at, text=ITEM, action="snooze", due="2099-01-01"
+        )
+    got = {e["id"]: e for e in agent._repos[root]["ledger"]["entries"]}
+    for i in ("TD-190", "TD-195"):
+        assert {k: got[i].get(k) for k in ("pickable", "live", "waiting", "settling")} == {
+            k: tick[i].get(k) for k in ("pickable", "live", "waiting", "settling")
+        }, i
+    assert got["TD-195"].get("waiting"), "a wait is marked on the re-read"
+    assert got["TD-196"].get("settling"), "first seen by the re-read: it settles, not yet pickable"
+
+
+async def test_a_pass_begun_before_a_reread_keeps_the_entry_the_press_archived(agent, repo, tmp_path, monkeypatch):
+    """TD-1471: a pass begun before a press's re-read lands after it: the entry origin archived, which the re-read
+    took, stays archived in the Queue — the pass installs neither its ledger nor its archive over the re-read's."""
+    import asyncio
+
+    from sessionorc import reports
+
+    _gated(repo)
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (home / "repos.txt").write_text(f"{repo}\n")
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+    await park_ticks(agent)
+    monkeypatch.setattr(reports, "pr_reading", lambda d, now, **kw: {"open": [], "at": now.isoformat()})
+    root = str(repo)
+    agent._repos_read_at = float("-inf")
+    await agent._refresh_repos()
+    real = agent._read_repos
+    loop = asyncio.get_running_loop()
+    other = tmp_path / "other"
+    git(tmp_path, "clone", "-q", git(repo, "remote", "get-url", "origin"), str(other))
+
+    def done_meanwhile(*args):
+        got = real(*args)  # read before the Done… lands
+        (other / "docs" / "ledger" / "archive").mkdir()
+        git(other, "mv", "docs/ledger/TD-190.md", "docs/ledger/archive/TD-190.md")
+        git(other, "-c", "user.name=o", "-c", "user.email=o@x", "commit", "-qm", "TD-190: done (#9)")
+        git(other, "push", "-q", "origin", "main")
+        git(repo, "fetch", "-q", "origin")  # the landing's own fetch
+        asyncio.run_coroutine_threadsafe(agent._reread_board(root), loop).result(60)
+        return got
+
+    monkeypatch.setattr(agent, "_read_repos", done_meanwhile)
+    agent._repos_read_at = float("-inf")
+    await agent._refresh_repos()
+    assert "TD-190" not in {e["id"] for e in agent._repos[root]["ledger"]["entries"]}
+    assert "TD-190" in {e["id"] for e in agent._archived[root]}
+    await agent._queue_pass(datetime.now(UTC))
+    assert not [c for c in agent._queue["cards"] if c["id"].endswith("#TD-190")]
 
 
 GATED_PARTS = (
@@ -1838,8 +2002,9 @@ GATED_PARTS = (
 
 
 async def test_a_go_on_a_design_and_its_parts_lifts_every_entry_it_wrote_at_once(agent, repo, tmp_path, monkeypatch):
-    """TD-1433: a lift that writes several entries (a design and its `Parts:`) re-reads each one it wrote, so no
-    part stays on the Queue with **Lift the hold** while the checkout has not pulled."""
+    """TD-1433, TD-1471: a lift that writes several entries (a design and its `Parts:`) lands them on origin, and the
+    re-read against origin reads each one, so no part stays on the Queue with **Lift the hold** while the checkout
+    has not pulled."""
     from shiftlead.ui.inbox import ledger_for_you
 
     _gated(repo)
@@ -1857,7 +2022,6 @@ async def test_a_go_on_a_design_and_its_parts_lifts_every_entry_it_wrote_at_once
     root = str(repo)
     for n in (191, 192):
         assert "decision (paul)" in (repo / "docs" / "ledger" / f"TD-{n}.md").read_text(), "the checkout has not pulled"
-    assert sorted(agent._ledger_pressed[root]["entries"]) == ["TD-190", "TD-191", "TD-192"]
     ids = ("TD-190", "TD-191", "TD-192")
     for reading in (agent._repos[root]["ledger"]["entries"], (await tick()).values()):
         got = {e["id"]: e for e in reading if e["id"] in ids}

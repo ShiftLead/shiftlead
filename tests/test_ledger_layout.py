@@ -371,43 +371,34 @@ def test_the_ticks_change_test_reads_a_directory_but_not_its_rank_file(tmp_path)
     for p in [base, *base.rglob("*")]:
         os.utime(p, (1000, 1000))
     first = ledger.stamp(two)
-    assert first == ("docs/ledger", 1000)
+    assert first == ("docs/ledger", 1000, None)  # no origin: no sha beside the mtime (TD-1471)
     rank.write_text("TD-001: 1\n", encoding="utf-8")  # a rank write, in place: the directory's mtime stays
     assert rank.stat().st_mtime > 1000 and ledger.stamp(two) == first
     entry = next(base.glob("TD-*.md"))
     os.utime(entry, (2000, 2000))
-    assert ledger.stamp(two) == ("docs/ledger", 2000)
+    assert ledger.stamp(two) == ("docs/ledger", 2000, None)
     archived = next((base / lb.LEDGER_ARCHIVE).glob("TD-*.md"))  # an archived entry edited in place
     os.utime(archived, (3000, 3000))
-    assert ledger.stamp(two) == ("docs/ledger", 3000)
+    assert ledger.stamp(two) == ("docs/ledger", 3000, None)
     os.utime(base / lb.LEDGER_README, (4000, 4000))
-    assert ledger.stamp(two) == ("docs/ledger", 4000)
+    assert ledger.stamp(two) == ("docs/ledger", 4000, None)
     one = _v1(tmp_path / "one")
     assert ledger.stamp(one)[0] == "docs/technical_debt.md"
 
 
 def test_the_queues_archive_reads_a_v2_archive_as_its_v1_twin(tmp_path):
-    """§4.4 *Completed cards*' cache: a v2 `archive/` reads the v1 archive's entries (a set by id), and an
-    unchanged directory is served from the cache; an entry file edited in place, which moves no directory
-    mtime, is read again (TD-1172)."""
-    import os
-
-    from sessionorc import queue
-
+    """§4.4 *Completed cards*: `ledger.archived` reads a v2 `archive/` as the v1 archive's entries (a set by id),
+    through the io it is handed — the reading's own (TD-1471) — so an entry file added or edited in place is read
+    at once, no cache between."""
     one, two = _v1(tmp_path / "one"), _v2(tmp_path / "two")
-    a = queue.archive_entries(ledger.archive_of(one, "docs/technical_debt.md"))
-    path = ledger.archive_of(two, "docs/ledger")
-    assert path == two / "docs" / "ledger" / "archive"
-    b = queue.archive_entries(path)
+    a = ledger.archived(ledger.fs_io(one), "docs/technical_debt.md")
+    b = ledger.archived(ledger.fs_io(two), "docs/ledger")
     assert a and {e["id"] for e in a} == {e["id"] for e in b}
-    assert queue.archive_entries(path) is b
+    path = two / "docs" / "ledger" / "archive"
     (path / "TD-999.md").write_text(_entry(999, "late"), encoding="utf-8")
-    assert "TD-999" in {e["id"] for e in queue.archive_entries(path)}
-    dir_st, f = path.stat(), path / "TD-999.md"
-    f.write_text(_entry(999, "edit"), encoding="utf-8")
-    os.utime(f, ns=(f.stat().st_atime_ns, f.stat().st_mtime_ns + 10**9))
-    os.utime(path, ns=(dir_st.st_atime_ns, dir_st.st_mtime_ns))
-    assert {e["id"]: e["title"] for e in queue.archive_entries(path)}["TD-999"] == "edit"
+    assert "TD-999" in {e["id"] for e in ledger.archived(ledger.fs_io(two), "docs/ledger")}
+    (path / "TD-999.md").write_text(_entry(999, "edit"), encoding="utf-8")
+    assert {e["id"]: e["title"] for e in ledger.archived(ledger.fs_io(two), "docs/ledger")}["TD-999"] == "edit"
 
 
 def test_the_rank_prunes_archive_reads_a_v2_archive(tmp_path):

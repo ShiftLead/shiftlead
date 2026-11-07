@@ -865,10 +865,14 @@ class HostAgent(
         # monotonic, by root: when a write-back last re-read that board (`_reread_board`), so a tick's
         # read that began before it does not put the board from before the press back
         self._boards_pressed: dict[str, float] = {}
-        # by root: the entries a write-back wrote (a decide lift), as its tree gave them, held over the checkout's
-        # ledger until the checkout's HEAD holds `commit` (`_reread_board`, `_hold_pressed`, TD-1433)
-        self._ledger_pressed: dict[str, dict[str, Any]] = {}
-        self._ledger_mtime: dict[str, tuple[str, float] | None] = {}  # `ledger.stamp` as last read
+        # by root: the archive's entries the last ledger read gave, read through the same compare against origin
+        # as the open entries (`ledger.archived`, TD-1471) — the Queue's archive, kept in memory beside the
+        # reading, never in it nor saved with it; installed with the reading it was read with
+        self._archived: dict[str, list[dict[str, Any]]] = {}
+        self._ledger_mtime: dict[str, tuple[str, float, str | None] | None] = {}  # `ledger.stamp` as last read
+        # by root: the default branch's name the stamp reads (`workorders.default_branch`), found once and kept
+        # until a pass's fetch finds `origin/HEAD` moved or the ref gone (TD-1471)
+        self._ledger_branch: dict[str, str] = {}
         self._repos_task: asyncio.Task[None] | None = None
         # the Queue's reading (§4.4 *The Queue*, TD-769): derived each tick at the home from the repo
         # readings, the claims and the archive (`_queue_pass`), served by `queue`, pushed when it changes

@@ -784,6 +784,181 @@ def default_ref(root: Path | str, timeout: float = 10.0) -> str | None:
     return None
 
 
+@dataclass
+class Compare:
+    """One read of the ledger against `origin/<default>` (§4.4 *The ledger is read against origin, as the board
+    is*, TD-1471): `io` the overlay — each id's files origin's or the checkout's by the rule — `origin` the
+    reading's `{source, case, files}`, `ref` the remote-tracking ref where it exists (the history's revision),
+    `base` the merge-base, `paths` both layouts' paths, `taken` the paths read from origin (absent there: deleted),
+    `present` those of them origin holds, and `error` where the compare's own git failed."""
+
+    io: Io
+    origin: dict[str, Any]
+    ref: str | None = None
+    base: str | None = None
+    paths: tuple[str, ...] = ()
+    taken: frozenset[str] = frozenset()
+    present: frozenset[str] = frozenset()
+    error: str | None = None
+
+
+def _null_io() -> Io:
+    return (lambda p: None), (lambda p: None)
+
+
+def layout_paths(rel: str) -> tuple[str, ...]:
+    """Both layouts' paths of the ledger at `rel`, as `layout_at` reads them: a v1 file, its archive and its
+    rank file, then the `ledger/` directory beside them (a split on either side reads as that side has it)."""
+    if rel.endswith(".md"):
+        led, d = rel, layout_at(rel, archive_path(rel), _null_io())[0]
+    else:
+        led, d = layout_at(rel, None, _null_io())[0], rel
+    return led, archive_path(led), lb.rank_path(led), d
+
+
+def _unit(path: str, d: str, v1: Collection[str]) -> str:
+    """The unit `path` is read by (the rule is by id, never by file): an entry's id, open or archived, under the
+    v2 directory `d`; `v1` for a one-file ledger and its archive file together; any other file — the README, a
+    rank file — its own path."""
+    if path.startswith(f"{d}/"):
+        sub, _, leaf = path[len(d) + 1 :].rpartition("/")
+        if sub in ("", lb.LEDGER_ARCHIVE) and (m := lb.ENTRY_FILE_RE.match(leaf)):
+            return f"id:{int(m.group(1))}"
+        return path
+    return "v1" if path in v1 else path
+
+
+def _z_pairs(out: str) -> list[tuple[str, str]]:
+    """`git diff --name-status -z`'s records: (status letter, path)."""
+    parts = out.split("\0")
+    return [(parts[i][:1], parts[i + 1]) for i in range(0, len(parts) - 1, 2) if parts[i]]
+
+
+def _batch(root: Path | str, blobs: Mapping[str, str], timeout: float) -> dict[str, str]:
+    """The texts of `blobs` (path → blob sha), in one `git cat-file --batch`; a path it cannot give is left out."""
+    want = sorted(blobs)
+    try:
+        cp = subprocess.run(
+            ["git", "-C", str(root), "cat-file", "--batch"], capture_output=True, timeout=timeout,
+            input="".join(blobs[p] + "\n" for p in want).encode(), check=False,
+        )  # fmt: skip
+        data = cp.stdout if cp.returncode == 0 else b""
+    except (OSError, subprocess.TimeoutExpired):
+        data = b""
+    out: dict[str, str] = {}
+    at = 0
+    for p in want:
+        nl = data.find(b"\n", at)
+        head = data[at:nl].split() if nl >= 0 else []
+        if len(head) != 3 or head[1] != b"blob":
+            break
+        size = int(head[2])
+        text = data[nl + 1 : nl + 1 + size].decode("utf-8", errors="replace")
+        out[p] = text.replace("\r\n", "\n").replace("\r", "\n")
+        at = nl + 1 + size + 1
+    return out
+
+
+def compare(root: Path | str, rel: str, branch: str | None = None, timeout: float = 10.0) -> Compare:
+    """The ledger at `rel` read against `origin/<default>` as last fetched (§4.4 *The ledger is read against
+    origin, as the board is*, TD-1471), fetching nothing: origin's changes since the merge-base of `HEAD` and it
+    (`theirs`) and the checkout's, committed, staged, unstaged or untracked (`ours`), over both layouts' paths,
+    `--no-renames -z`. By id: an id `theirs` holds and `ours` does not, or one origin moved into or out of
+    `archive/`, is read as origin has it (absent where origin deleted it); a one-file ledger and its archive are
+    one unit; every other file is the checkout's. `origin` is `{source, case, files}`. `branch` is the default
+    branch's name (`workorders.default_branch`), found here when None. Never raises: a git that fails is
+    `error`, and no `origin/<default>` reads the checkout (`case` *skipped*)."""
+    fs = fs_io(root)
+    paths = layout_paths(rel)
+
+    def plain(case: str, ref: str | None = None) -> Compare:
+        return Compare(fs, {"source": "checkout", "case": case, "files": 0}, ref=ref, paths=paths)
+
+    if branch is None:
+        got = default_ref(root, timeout=timeout)
+        branch = got.removeprefix("origin/") if got else None
+    ref = f"refs/remotes/origin/{branch}"
+    if not branch or not (_git(root, "rev-parse", "--verify", "-q", ref, timeout=timeout) or "").strip():
+        return plain("skipped")
+    held = _git(root, "ls-tree", "--name-only", "-z", ref, "--", *paths, timeout=timeout)
+    if held is None:
+        return Compare(fs, {}, error=f"git could not list origin/{branch}")
+    if not held.strip("\0"):
+        return plain("none", ref)
+    base = (_git(root, "merge-base", "HEAD", ref, timeout=timeout) or "").strip()
+    if not base:
+        return plain("both", ref)
+    theirs_out = _git(root, "diff", "--name-status", "--no-renames", "-z", base, ref, "--", *paths, timeout=timeout)
+    ours_out = _git(root, "diff", "--name-only", "--no-renames", "-z", base, "--", *paths, timeout=timeout)
+    new_out = _git(root, "ls-files", "--others", "--exclude-standard", "-z", "--", *paths, timeout=timeout)
+    if theirs_out is None or ours_out is None or new_out is None:
+        return Compare(fs, {}, error=f"git could not compare the ledger with origin/{branch}")
+    theirs = _z_pairs(theirs_out)
+    d, v1 = paths[3], set(paths[:2])
+    t_units: dict[str, set[str]] = {}
+    for _, p in theirs:
+        t_units.setdefault(_unit(p, d, v1), set()).add(p)
+    o_units: dict[str, set[str]] = {}
+    for p in (ours_out + new_out).split("\0"):
+        if p:
+            o_units.setdefault(_unit(p, d, v1), set()).add(p)
+    archive_dir = f"{d}/{lb.LEDGER_ARCHIVE}"
+
+    def moved(unit: str) -> bool:
+        """Origin moved the id into or out of `archive/`: a delete in one place and an add in the other."""
+        where = {(s, p.rpartition("/")[0] == archive_dir) for s, p in theirs if p in t_units[unit]}
+        return unit.startswith("id:") and any(("D", a) in where and ("A", not a) in where for a in (True, False))
+
+    taken: set[str] = set()
+    for u in (u for u in t_units if u not in o_units or moved(u)):
+        for p in t_units[u] | o_units.get(u, set()):
+            taken.add(p)
+            if u.startswith("id:"):  # one id is one file: its other placement is origin's too (absent there)
+                taken |= {f"{d}/{p.rpartition('/')[2]}", f"{archive_dir}/{p.rpartition('/')[2]}"}
+        if u == "v1":
+            taken |= v1
+    case = {(True, True): "both", (True, False): "behind", (False, True): "local"}.get(
+        (bool(t_units), bool(o_units)), "matches"
+    )
+    files = len(taken & {p for _, p in theirs})
+    origin = {"source": "origin" if files else "checkout", "case": case, "files": files}
+    if not taken:
+        return Compare(fs, origin, ref=ref, base=base, paths=paths)
+    listed = _git(root, "ls-tree", "-r", "-z", "--full-tree", ref, "--", *sorted(taken), timeout=timeout)
+    if listed is None:
+        return Compare(fs, {}, error=f"git could not list origin/{branch}")
+    blobs: dict[str, str] = {}
+    for rec in listed.split("\0"):
+        meta, tab, p = rec.partition("\t")
+        if tab and meta.split()[1:2] == ["blob"] and p in taken:
+            blobs[p] = meta.split()[2]
+    texts: dict[str, str] = {}
+    fs_ls, fs_read = fs
+
+    def read(path: str) -> str | None:
+        if path not in taken:
+            return fs_read(path)
+        if path in blobs and not texts:
+            texts.update(_batch(root, blobs, timeout))
+        return texts.get(path)
+
+    def ls(path: str) -> list[str] | None:
+        got = fs_ls(path)
+        pre = f"{path.rstrip('/')}/" if path else ""
+        names = set(got or [])
+        for p in taken:
+            if p.startswith(pre) and "/" not in p[len(pre) :]:
+                names.discard(p[len(pre) :])
+                if p in blobs:
+                    names.add(p[len(pre) :])
+        if got is None and not any(p.startswith(pre) for p in blobs):
+            return None
+        return sorted(names)
+
+    return Compare((ls, read), origin, ref=ref, base=base, paths=paths, taken=frozenset(taken),
+                   present=frozenset(blobs))  # fmt: skip
+
+
 def pick_repo[K](repo: str, paths: Mapping[K, str], names: Mapping[K, str] | None = None) -> K | None:
     """The one checkout a `<repo>` names (§4.4 *Repo facts*, ledgerboard's target design §3.2, TD-1371): a `<repo>`
     with a `/` is an origin path (`owner/name`, deeper for a nested group) and matches a checkout's `paths` value —
@@ -989,7 +1164,15 @@ def _log(root: Path | str, timeout: float, *args: str) -> str | None:
     return cp.stdout if cp.returncode == 0 else None
 
 
-def history(root: Path | str, rel: str, text: str = "", timeout: float = 30.0) -> dict[str, Change] | None:
+def history(
+    root: Path | str,
+    rel: str,
+    text: str = "",
+    timeout: float = 30.0,
+    *,
+    io: Io | None = None,
+    ref: str | None = None,
+) -> dict[str, Change] | None:
     """Every entry's opened / closed instants from the ledger's git history in `root`, or None
     when git could not be asked (not a repo, git missing, a timeout) — *could not look*, never
     *nothing changed*. `text` is the ledger as it stands (`load()`'s, for a directory), so the ids of
@@ -997,22 +1180,26 @@ def history(root: Path | str, rel: str, text: str = "", timeout: float = 30.0) -
     history reads as opened at its first commit, which is all its history says. A v2 directory's
     `--name-status` log is merged with its v1 file's patches (never its archive's), *Across a split* (§4.4
     *Its history*): the commit adding the directory's `README.md` opens and closes nothing, so an entry keeps
-    its v1 opening and one closed before the split stays closed."""
+    its v1 opening and one closed before the split stays closed. `ref` is the revision the log walks —
+    `origin/<default>` where the ref exists (§4.4 *The ledger is read against origin*, TD-1471), else `HEAD` — and
+    `io` the reading's (the compare's overlay), which gives the layout and the archive's titles."""
+    io = io or fs_io(root)
+    rev = ref or "HEAD"
     skip = {m.group(1) for m in lb.HEADING_RE.finditer(text)} - {
         m.group(1) for m in lb.HEADING_RE.finditer(strip_comments(text))
     }
     fmt = "--format=%x00C %H %cI %s"
-    if not (Path(root) / rel).is_dir():
-        out = _log(root, timeout, fmt, "-p", "--unified=0", "--", rel)
+    if io[0](rel) is None:
+        out = _log(root, timeout, fmt, "-p", "--unified=0", rev, "--", rel)
         return None if out is None else _parse_log(out, skip)
     # the v1 file beside the directory, by agent-cadence's names (`layout_at`): a custom-named v1 file is not read
-    v1 = layout_at(rel, None, (lambda p: None, lambda p: None))[0]
-    one = _log(root, timeout, fmt, "-p", "--unified=0", "--", v1)
-    two = _log(root, timeout, fmt, "--name-status", "--", rel)
-    order = _log(root, timeout, "--format=%H", "--", v1, rel)
+    v1 = layout_at(rel, None, _null_io())[0]
+    one = _log(root, timeout, fmt, "-p", "--unified=0", rev, "--", v1)
+    two = _log(root, timeout, fmt, "--name-status", rev, "--", rel)
+    order = _log(root, timeout, "--format=%H", rev, "--", v1, rel)
     if one is None or two is None or order is None:
         return None
-    archive = lb.load(rel, *fs_io(root))[1]
+    archive = lb.load(rel, *io)[1]
     titles = {m.group(1): m.group(3).strip() for m in lb.HEADING_RE.finditer(f"{text}\n{archive}")}
     events, split = _dir_events(two, rel, titles)
     at = {sha: i for i, sha in enumerate(order.split())}
@@ -1022,23 +1209,24 @@ def history(root: Path | str, rel: str, text: str = "", timeout: float = 30.0) -
     return _replay([e for e in merged if e[0] not in split])
 
 
-def archive_of(root: Path | str, rel: str) -> Path:
-    """The archive of the ledger at `rel` in the working tree: a directory's `archive/`, else the v1 file
-    beside it (`archive_path`)."""
-    return Path(root) / rel / lb.LEDGER_ARCHIVE if (Path(root) / rel).is_dir() else Path(root) / archive_path(rel)
-
-
-def stamp(root: Path | str) -> tuple[str, float] | None:
+def stamp(root: Path | str, branch: str | None = None) -> tuple[str, float, str | None] | None:
     """What the tick's change test compares (§4.4 *What changes with no one file*): the resolved ledger
-    path and its newest mtime — a v1 file's own; a directory's newest among itself, its `archive/`, the
+    path, its newest mtime — a v1 file's own; a directory's newest among itself, its `archive/`, the
     `TD-NNN.md` files of both and its `README.md`, its `rank.yml` alone left out, so a rank write re-reads
-    nothing. None when there is no ledger to stat. A path that resolves anew always differs."""
+    nothing — and `origin/<default>`'s sha (§4.4 *The ledger is read against origin*, TD-1471), so a fetch that
+    moves origin re-reads the ledger; `branch` is the default branch's name, found here when None. A ledger only
+    origin holds stamps an mtime of 0; None only when neither side has one. A path that resolves anew always
+    differs."""
     io = fs_io(root)
     rel = layout_at(ledger_path(root), None, io)[0]
+    if branch is None:
+        got = default_ref(root)
+        branch = got.removeprefix("origin/") if got else None
+    sha = (_git(root, "rev-parse", "--verify", "-q", f"refs/remotes/origin/{branch}") or "").strip() if branch else ""
     base = Path(root) / rel
     try:
         if not base.is_dir():
-            return rel, base.stat().st_mtime
+            return rel, base.stat().st_mtime, sha or None
         times = [base.stat().st_mtime]
         for d in (base, base / lb.LEDGER_ARCHIVE):
             if not d.is_dir():
@@ -1047,30 +1235,59 @@ def stamp(root: Path | str) -> tuple[str, float] | None:
             for f in d.iterdir():
                 if f.name == lb.LEDGER_README and d == base or lb.ENTRY_FILE_RE.match(f.name):
                     times.append(f.stat().st_mtime)
-        return rel, max(times)
+        return rel, max(times), sha or None
     except OSError:
-        return None
+        return (rel, 0, sha) if sha else None
 
 
-def written(root: Path | str, rel: str, got: list[dict[str, Any]]) -> None:
-    """Each entry's `written` (§4.4 *Repo facts*, TD-1331): its own `TD-NNN.md`'s mtime in a v2 ledger, the
-    one file's in a v1 ledger, as epoch seconds; None where the file cannot be stat'd. What the Queue reads to
-    tell a held entry's file written after the person's answer (*The card's status*, TD-1316)."""
-    base = Path(root) / rel
-    one: float | None = None
-    if not base.is_dir():
+def _origin_times(root: Path | str, cmp: Compare, timeout: float = 10.0) -> dict[str, float]:
+    """The committer time of origin's last commit touching each ledger file since the merge-base, from one walk
+    (`git log --first-parent base..origin/<default>`, newest first, `_log`'s merge flags but never `--reverse`):
+    the first time a file appears is its last commit."""
+    if not (cmp.taken and cmp.base and cmp.ref):
+        return {}
+    try:
+        cp = subprocess.run(
+            ["git", "log", "--first-parent", "--diff-merges=first-parent", "--no-renames", "--format=%x00%ct",
+             "--name-only", f"{cmp.base}..{cmp.ref}", "--", *cmp.paths],
+            capture_output=True, text=True, errors="replace", timeout=timeout, cwd=str(root),
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired):
+        return {}
+    out: dict[str, float] = {}
+    for rec in cp.stdout.split("\0") if cp.returncode == 0 else ():
+        head, _, names = rec.partition("\n")
         try:
-            one = base.stat().st_mtime
-        except OSError:
-            one = None
-    for e in got:
-        if not base.is_dir():
-            e["written"] = one
+            at = float(head.strip())
+        except ValueError:
             continue
+        for name in names.splitlines():
+            if name.strip():
+                out.setdefault(name.strip(), at)
+    return out
+
+
+def written(root: Path | str, rel: str, got: list[dict[str, Any]], cmp: Compare | None = None) -> None:
+    """Each entry's `written` (§4.4 *Repo facts*, TD-1331): its own `TD-NNN.md`'s in a v2 ledger, the one
+    file's in a v1 ledger, as epoch seconds — for a file read from origin (`cmp`, TD-1471), the committer time of
+    origin's last commit touching it since the merge-base; the checkout's mtime otherwise, and for a file read
+    from origin that no commit since the merge-base touches (it has the checkout's text); None where the file
+    cannot be stat'd. What the Queue reads to tell a held entry's file written after the person's answer (*The
+    card's status*, TD-1316)."""
+    times = _origin_times(root, cmp) if cmp is not None else {}
+    is_dir = (cmp.io if cmp is not None else fs_io(root))[0](rel) is not None
+
+    def when(path: str) -> float | None:
+        if cmp is not None and path in cmp.present and path in times:
+            return times[path]
         try:
-            e["written"] = (base / f"{_norm(e['id'])}.md").stat().st_mtime
+            return (Path(root) / path).stat().st_mtime
         except OSError:
-            e["written"] = None
+            return None
+
+    one = None if is_dir else when(rel)
+    for e in got:
+        e["written"] = when(f"{rel}/{_norm(e['id'])}.md") if is_dir else one
 
 
 def entries_before(
@@ -1114,57 +1331,39 @@ def repo_key(root: Path | str) -> str:
     return Path(root).name.lower()
 
 
-def entries_at(
-    root: Path | str,
-    tree: Path | str,
-    ids: Collection[str],
-    *,
-    resolve: Resolve | None = None,
-    live: Live | None = None,
-) -> dict[str, dict[str, Any] | None] | None:
-    """The entries `ids` as the ledger in `tree` gives them — another worktree of `root`'s repo, the write-back's
-    own at origin's head (§4.4 *Each reading has one owner*, TD-1433) — each as `reading()` makes an entry of
-    `root`'s, keyed by `root`'s repo; an id no longer open there is None (archived). None when the tree's ledger
-    cannot be read."""
-    io = fs_io(tree)
-    rel, text, archive, faults = read_pair(ledger_path(tree), io)
-    if faults or text is None:
-        return None
-    got = entries(text, archive, resolve, live, rank_text=io[1](lb.rank_path(rel)), repo=repo_key(root))
-    done_parts = parts_of_open(archive, got)
-    want = {_norm(i): str(i) for i in ids}
-    mine = [e for e in got if _norm(e["id"]) in want]
-    for e in mine:
-        e["parts_archived"] = list(done_parts.get(_norm(e["id"]), []))
-    written(tree, rel, mine)
-    found = {_norm(e["id"]): e for e in mine}
-    return {i: found.get(n) for n, i in want.items()}
+# an archived entry's `**Resolved:**` line, wherever its body writes it — most write it last, under the
+# header block, where ledgerboard's `fields` do not reach
+ENTRY_HEAD = re.compile(r"^## (TD-\d+):", re.M)
+RESOLVED_LINE = re.compile(r"^\*\*Resolved:\*\*[ \t]*(.+)$", re.M)
 
 
-def with_entries(led: dict[str, Any], by: Mapping[str, dict[str, Any] | None]) -> dict[str, Any]:
-    """The ledger reading `led` with each entry `by` names put in place of its own (None: taken out), and the
-    counts made again (TD-1433); a reading with no entries (an error) is returned as it is."""
-    ents = led.get("entries")
-    if not isinstance(ents, list) or not by:
-        return led
-    keys = {_norm(k): v for k, v in by.items()}
-    got = []
+def archived_entries(archive: str | None) -> list[dict[str, Any]]:
+    """ledgerboard's `entries()` of an archive's text, each entry's `fields` carrying its `resolved` line
+    wherever the body writes it (§4.4 *Completed cards*)."""
+    if not archive:
+        return []
+    text = strip_comments(archive)
+    ents = lb.entries(text)
+    resolved: dict[str, str] = {}
+    heads = list(ENTRY_HEAD.finditer(text))
+    for i, h in enumerate(heads):
+        body = text[h.end() : heads[i + 1].start() if i + 1 < len(heads) else len(text)]
+        if m := RESOLVED_LINE.search(body):
+            resolved.setdefault(h.group(1), m.group(1).strip())
     for e in ents:
-        n = _norm(str(e.get("id"))) if isinstance(e, dict) else None
-        if n in keys:
-            if keys[n] is not None:
-                got.append(keys[n])
-        else:
-            got.append(e)
-    return {
-        **led,
-        "entries": got,
-        "by_priority": {p: sum(1 for e in got if e.get("priority") == p) for p in PRIORITIES},
-        "by_kind": {k: sum(1 for e in got if e.get("for_page") == k) for k in KINDS},
-    }
+        if "resolved" not in e["fields"] and e["id"] in resolved:
+            e["fields"] = {**e["fields"], "resolved": resolved[e["id"]]}
+    return ents
 
 
-def reading(
+def archived(io: Io, rel: str) -> list[dict[str, Any]]:
+    """The archive's entries of the ledger at `rel` as `io` reads it (`archived_entries`): a v1 archive file, or
+    a v2 ledger's `archive/` — through the compare's overlay, the archive the Queue reads (§4.4 *The ledger is
+    read against origin*, TD-1471), so one id never reads open and archived at once. None to read, none."""
+    return archived_entries(read_pair(rel, io)[2])
+
+
+def read(
     root: Path | str,
     now: datetime,
     *,
@@ -1172,32 +1371,27 @@ def reading(
     rel: str | None = None,
     resolve: Resolve | None = None,
     live: Live | None = None,
-) -> dict[str, Any]:
-    """The ledger reading of one checkout (§4.4 *Repo facts*): `{path, entries, by_priority, by_kind, archived,
-    windows, recent, at}`, or `{path, error}` when the file cannot be read. The archive beside the ledger
-    (`archive_path`; none there, nothing archived) and `resolve` — the home's `Registry` — derive each entry's
-    `pickable`; `live` — the home's `LiveReader` — a live check's `live`; the rank file beside the ledger
-    (`lb.rank_path`) gives each entry its `key` and `order`. `windows` is `{day|week|month: {opened, closed}}` from
-    the history and `recent` the entries opened or closed in the longest window, newest first — both absent when the
-    history was not read, and marked `history_error` when git could not be asked. `archived` is the archived ids
-    some entry's `blocked_ids` names, or whose `Part of:` names an open entry (TD-1130), never the whole archive
-    (§4.5 screen 11 *Its builds*, TD-693); each entry carries `parts_archived`, the archived ids naming it in
-    `Part of:`.
-    `declared_teams` is the `Fields:` line's `Team` vocabulary in its order, and `needs_team` the ids marked so
-    (§4.4 *An entry names its team*, TD-730)."""
-    io = fs_io(root)
-    rel, text, archive, faults = read_pair(rel or ledger_path(root), io)
+    branch: str | None = None,
+) -> tuple[dict[str, Any], list[dict[str, Any]] | None]:
+    """The ledger reading (`reading`) and the archive's entries it was read with (`archived_entries`), both
+    through one compare against origin (`compare`, TD-1471); the archive None where the reading is an error."""
+    want = rel or ledger_path(root)
+    cmp = compare(root, want, branch)
+    if cmp.error:
+        return {"path": want, "error": cmp.error, "at": now.isoformat()}, None
+    io = cmp.io
+    rel, text, archive, faults = read_pair(want, io)
     if faults:  # no entry of it is read: the reading's ledger is an error with the words
-        return {"path": rel, "error": fault_words(rel, faults), "at": now.isoformat()}
+        return {"path": rel, "error": fault_words(rel, faults), "at": now.isoformat()}, None
     if text is None:
         why = "cannot be read" if (Path(root) / rel).exists() else "No such file or directory"
-        return {"path": rel, "error": f"{rel}: {why}", "at": now.isoformat()}
+        return {"path": rel, "error": f"{rel}: {why}", "at": now.isoformat()}, None
     rank_text = io[1](lb.rank_path(rel))  # none: every entry's key is its implicit one
     got = entries(text, archive, resolve, live, rank_text=rank_text, repo=repo_key(root))
     done_parts = parts_of_open(archive, got)
     for e in got:
         e["parts_archived"] = list(done_parts.get(_norm(e["id"]), []))
-    written(root, rel, got)
+    written(root, rel, got, cmp)
     out: dict[str, Any] = {
         "path": rel,
         "entries": got,
@@ -1208,14 +1402,17 @@ def reading(
         ),
         "declared_teams": list(declared_teams(text)),
         "needs_team": [e["id"] for e in got if e.get("needs_team")],
+        "origin": cmp.origin,
         "at": now.isoformat(),
     }
+    gone = archived_entries(archive)
     if not with_history:
-        return out
-    life = history(root, rel, text)
+        return out, gone
+    # origin's log where origin holds the ledger; the checkout's where it has none to compare (`none`, `skipped`)
+    life = history(root, rel, text, io=io, ref=cmp.ref if cmp.origin.get("case") != "none" else None)
     if life is None:
         out["history_error"] = "git could not read the ledger's history"
-        return out
+        return out, gone
     opened = [c.opened for c in life.values()]
     closed = [c.closed for c in life.values() if c.closed]
     out["windows"] = {w: {"opened": o, "closed": _count(closed, now)[w]} for w, o in _count(opened, now).items()}
@@ -1233,7 +1430,36 @@ def reading(
         }
         for c in recent
     ]
-    return out
+    return out, gone
+
+
+def reading(
+    root: Path | str,
+    now: datetime,
+    *,
+    with_history: bool = True,
+    rel: str | None = None,
+    resolve: Resolve | None = None,
+    live: Live | None = None,
+    branch: str | None = None,
+) -> dict[str, Any]:
+    """The ledger reading of one checkout (§4.4 *Repo facts*): `{path, entries, by_priority, by_kind, archived,
+    origin, windows, recent, at}`, or `{path, error}` when the file cannot be read, or the compare against origin
+    failed. Each file is read against `origin/<default>` as last fetched (`compare`, §4.4 *The ledger is read
+    against origin, as the board is*, TD-1471), and `origin` says where it came from: `{source, case, files}`.
+    The archive beside the ledger
+    (`archive_path`; none there, nothing archived) and `resolve` — the home's `Registry` — derive each entry's
+    `pickable`; `live` — the home's `LiveReader` — a live check's `live`; the rank file beside the ledger
+    (`lb.rank_path`) gives each entry its `key` and `order`. `windows` is `{day|week|month: {opened, closed}}` from
+    the history — origin's log where the ref exists — and `recent` the entries opened or closed in the longest
+    window, newest first — both absent when the history was not read, and marked `history_error` when git could not
+    be asked. `archived` is the archived ids
+    some entry's `blocked_ids` names, or whose `Part of:` names an open entry (TD-1130), never the whole archive
+    (§4.5 screen 11 *Its builds*, TD-693); each entry carries `parts_archived`, the archived ids naming it in
+    `Part of:`.
+    `declared_teams` is the `Fields:` line's `Team` vocabulary in its order, and `needs_team` the ids marked so
+    (§4.4 *An entry names its team*, TD-730)."""
+    return read(root, now, with_history=with_history, rel=rel, resolve=resolve, live=live, branch=branch)[0]
 
 
 def completed(recent: list[dict[str, Any]] | None, prs: list[dict[str, Any]] | None) -> list[dict[str, Any]]:

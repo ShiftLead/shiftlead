@@ -277,16 +277,21 @@ class RankMixin:
     def _rank_lined(self, repos: Mapping[str, tuple[str, str, Any]]) -> dict[str, list[str]]:
         """Repo name → the ids its checkout's rank file gives a line that are open or archived — what a prune
         may weigh. A repo whose ledger reading failed or holds no entry, or whose archive cannot be read, is
-        left out: a reading that is missing must never read as every line's card archived."""
+        left out: a reading that is missing must never read as every line's card archived. The rank file and the
+        archive are read through the ledger's own compare against origin (`ledger.compare`, TD-1471), so a prune
+        never weighs a stale rank file against an origin reading."""
         out: dict[str, list[str]] = {}
         for name, (root, rel, led) in repos.items():
             if led.get("error") or not led.get("entries"):
                 continue
-            try:
-                lined = rank_mod.lined_ids((Path(root) / rel).read_text(encoding="utf-8", errors="replace"))
-            except OSError:
+            cmp = ledger_mod.compare(root, str(led["path"]))
+            if cmp.error:
                 continue
-            archive = ledger_mod.read_pair(str(led["path"]), ledger_mod.fs_io(root))[2]  # either layout
+            text = cmp.io[1](rel)
+            if text is None:
+                continue
+            lined = rank_mod.lined_ids(text)
+            archive = ledger_mod.read_pair(str(led["path"]), cmp.io)[2]  # either layout
             if archive is None:
                 continue
             known = ledger_mod.ids_in(archive) | {str(e.get("id")) for e in led["entries"]}
