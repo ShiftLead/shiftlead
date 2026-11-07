@@ -107,7 +107,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   refused, not queued, looked at again on the next tick; the nudge and the seat close run at the
   home and execute on the member's node as any act does. A policy needs no grant and passes no
   gate; it acts on the record's own fields and never on text a session wrote. The rules:
-  1. **Crash restart.** A supervised member **other than a seat** (a seat's ending is its own,
+  1. **Crash restart.** A supervised member **other than a seat** (an extra seat excepted: restarted here while it holds unread mail or
+     an open ask, closed held otherwise, §4.9 *Scaling with the work*; a seat's ending is its own,
      and rule 3 is the only rule that fills one, save the replay of a seat whose run never started,
      *A lost brief* below) that is `exited` by a **natural exit** — `pane` true,
      the tool left on its own — with **no declaration** (`out_of_work` and `restart_wanted` both
@@ -395,7 +396,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      **An extra seat** (§4.9 *Scaling with the work*, TD-1529; Paul, 2026-11-07: *up, on need, no timers*): a
      held record carrying `scale` whose `line` names an `asks` seat carries `seat: {trigger: asks}`. **Up, at
      the send**: mail addressed to the seat (a question, a reader's `ask` carrying `pr`, an `entry` envelope)
-     that finds **the seat's own record live and busy** — `working` (on its own included, §4.2) or
+     that finds **the seat's own record live and busy** (a record filled and not yet reported on by any hook is
+     free, §4.9 *Mail to a scaled seat*) — `working` (on its own included, §4.2) or
      `needs-you` — and each live extra busy too fills the seat's lowest-placed held extra, `create` from its
      launch record with `keep_mail`: the mail is written to the held extra's mailbox and the fill started in
      the same call, the sender's reply naming where it went, and the send does not wait for the pane; there is
@@ -406,7 +408,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      extra is added. **Each tick, by the state** and never by how the mail got there: a seat whose
      own record is live and busy, each live extra busy, and holding unread mail §4.9's *Mail to a scaled seat*
      lets move fills its lowest-placed held extra once one can be filled (not every extra live and busy, the
-     host below `scale.live`, the profile not gated, the team not held by its balance mark) and **moves that
+     host below `scale.live`, the profile not gated; the balance mark holds no seat's extra, §4.9 *The bounds*) and **moves that
      mail** there, oldest first, `entry` envelopes and an `ask` carrying a `pr` among them — a mover of its own
      beside the tick's move of a routed ask (`_reroute_waiting`, which moves only from a seat that cannot answer,
      passes an `entry` envelope over, and moves a `pr` ask only to the person); the sender's `ao inbox --sent` reads where it went. So a send that could not
@@ -1585,7 +1587,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      a fill held back (its newest `scale.last` `stopped`, or a guard standing), each tick reads it again until
      it fills or is no longer short, so a backlog never waits on a claim that does not come. The line is short when its lane holds a pickable entry nobody
      holds — no live record at the home holding a lease on it, a claim declared or derived that is not `done`
-     or `dropped` (the lease's test, §4.8 *A claim is a lease*, as `ao progress claim` reads it) — and **every live member of the line is busy — holding a lease**, a claim declared or derived that
+     or `dropped` (the lease's test, §4.8 *A claim is a lease*, as `ao progress claim` reads it) — and **every live member of the line is busy — holding a lease** — its kept members, its run-only members and
+     its live extras alike, so a live extra between items is free and the line not short —, a claim declared or derived that
      is not `done` or `dropped` (a waiting claim included, §4.8 *A claim is a lease*); a member between items,
      holding no lease, idle or not, is free and picks, so the line is not short; a member `limited` or paused by
      the usage gate with no lease is neither free nor busy — it cannot pick — so a line whose members are each
@@ -1614,7 +1617,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      own run: the wound-down and finished readings (`work.wound_down`, `work.finished`; §4.9a) pass over a held
      extra as they pass over a seat, so a team winds down when its kept members and its live extras have
      declared, and one with held extras is not kept running by them. A filled extra is otherwise a member:
-     rules 1, 2, 4, 5 and 7 apply to it, rule 8 and a schedule's start never replay it (`_work_replays` skips a
+     rules 1, 2, 4, 5 and 7 apply to it (rule 1's restart replays the record and is no start of the crew; an
+     extra `exited` after declaring out of work is closed held, never restarted), rule 8 and a schedule's start never replay it (`_work_replays` skips a
      record carrying `scale`) — every start of the team (`ao team start`, Apply's *starts*, rule 8's and a
      schedule's) first reconciles its held extras to the merged `max`, writing the missing and removing the
      surplus, so a `max` changed while the team was down is read at its next run — and a team that winds down or stops closes it with the rest, held for the next
