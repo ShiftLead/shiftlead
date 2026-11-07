@@ -12,6 +12,7 @@ import sys
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from conftest import park_ticks
 
 from sessionorc import mail, modes, notify
 from sessionorc import push as push_mod
@@ -81,7 +82,12 @@ class Child:
 
 
 @pytest.fixture
-def child(agent, monkeypatch):
+async def child(agent, monkeypatch):
+    """The fake child, with the agent's tick loop parked (TD-1438): a tick runs the notify pass, whose key reading
+    (`--public`) lands in `calls` and in the push config while a test acts — a refused `--key` was no longer
+    `calls[-1]`, a kept reading of another config came back, a cleared key was read in again. Every pass here is
+    one the test takes by hand (`_pass`)."""
+    await park_ticks(agent)
     got = Child()
     monkeypatch.setattr(agent, "_push_run", got)
     return got
@@ -373,7 +379,7 @@ async def test_push_key_is_a_persons_own_and_the_homes(agent, tmp_path, child):
     assert "push_key" in mail.PERSON_ONLY and "push_key" not in modes.HOME_EDITS
     assert "notify_test" in modes.HOME_EDITS
     _settings()
-    _store()  # a key reading stored, so a tick that runs meanwhile starts no `--public` read (TD-1391)
+    _store()
     async with LocalClient() as person:
         sid = (await person.call("create", name="w", dir=str(tmp_path), adapter="shell", role="worker",
                                  argv=["bash", "--norc", "--noprofile"]))["id"]  # fmt: skip
