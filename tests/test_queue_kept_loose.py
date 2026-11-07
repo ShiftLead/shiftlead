@@ -12,9 +12,22 @@ import pytest
 from test_ui_queue import NOW, at, client, fake, mail, queue
 
 from sessionorc import notify
-from sessionorc.queue import KEPT, holder_claims, kept_or_loose, mail_card, pr_refs
+from sessionorc.queue import KEPT, context_pr, holder_claims, kept_or_loose, mail_card, pr_refs
 from shiftlead.ui.inbox import inbox_sections
-from shiftlead.ui.queue import apply_picks, attach, card_index, items_n, queue_picks, queue_view
+from shiftlead.ui.queue import (
+    apply_picks,
+    asked_entries,
+    attach,
+    card_index,
+    covered_by,
+    design_link,
+    item_home,
+    items_n,
+    line_names,
+    queue_picks,
+    queue_view,
+    split_later,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -351,3 +364,99 @@ def test_a_holders_permission_row_on_its_card_draws_allow_deny_with_its_call_and
     html = one.render(e=stalled, section="needs", origin="", board_choices={})
     assert "Snooze" not in html and 'href="/focus/g2"' in html
     assert 'class="meta routed"' in html and "its questions go to the techlead" in html
+
+
+# -- TD-1552: a board line whose `Context:` names only a PR ties by that PR (§4.5 screen 6 *Every item that needs the
+# person draws on a card*)
+
+
+def pr_line(context="PR #164", lid="b1", kind="decide", **kw):
+    return {"row": "board", "id": lid, "kind": kind, "repo_name": "s", "due": "2026-10-16",
+            "text": f"Ship it? Context: {context}. Due: 2026-10-16", **kw}  # fmt: skip
+
+
+def pr_idx(refs):
+    return card_index({**queue(), "pr_refs": refs})
+
+
+def home_of(line, refs, needs=True):
+    h = item_home(line, pr_idx(refs), needs=needs)
+    return h["home"], h["on_card"], h["on_row"], h["tied"]
+
+
+def test_context_pr_reads_a_bare_hash_number_alone():
+    assert [context_pr(t) for t in ("PR #3142", "#3142", "(#3142)", "TD-9 / PR #164 and #170")] == [
+        3142,
+        3142,
+        3142,
+        164,
+    ]
+    assert [context_pr(t) for t in ("agent-cadence#164", "owner/name#12", "a.b#3", "PR#164", "TD-12", "", None)] == [
+        None
+    ] * 7
+
+
+def test_an_undecided_pr_only_decide_line_draws_on_the_open_card_of_its_prs_entry():
+    want = ("queue", "s#TD-20", "s#TD-21", {"by": "pr", "ref": "s#TD-021"})
+    for context in ("PR #164", "#164", "the review (#164)"):
+        assert home_of(pr_line(context), {"s#164": "s#TD-021"}) == want
+    # #164 found only in the month's merged PRs, by its title
+    refs = pr_refs("s", {"open": [], "recent": [{"number": 164, "branch": "fix-x", "title": "TD-21: the build"}]})
+    assert home_of(pr_line(), refs) == want
+
+
+def test_a_pr_only_line_whose_entry_is_archived_draws_on_its_kept_card_else_its_loose_card():
+    assert home_of(pr_line(), {"s#164": "s#TD-003"}) == ("queue", "s#TD-3", "s#TD-3", {"by": "pr", "ref": "s#TD-003"})
+    assert home_of(pr_line(), {"s#164": "s#TD-077"}) == (
+        "queue", "loose:s#TD-077", "s#TD-077", {"by": "pr", "ref": "s#TD-077"})  # fmt: skip
+
+
+def test_a_pr_only_line_naming_no_entry_draws_on_its_prs_loose_card_counted_on_the_queue_tab():
+    q = {**queue(), "pr_refs": {}}
+    secs = inbox_sections([], now=NOW, boards=[pr_line()], cards=card_index(q))
+    (b,) = [e for e in secs["needs"] if e["id"] == "b1"]
+    assert (b["home"], b["on_card"], b["on_row"], b["tied"]) == (
+        "queue",
+        "loose:s#164",
+        "s#164",
+        {"by": "pr", "ref": "s#164"},
+    )
+    assert secs["queue_n"] == 1 and secs["count"] == 1  # the Queue tab's; both tabs add up to what waits
+    v = queue_view(q, NOW, attach(secs, drawn))
+    assert [c["id"] for c in v["loose"]] == ["loose:s#164"]
+
+
+def test_a_line_that_names_no_pr_or_no_repo_stays_in_the_inbox():
+    refs = {"s#164": "s#TD-021"}
+    for context in ("PR#164", "agent-cadence#164"):
+        assert home_of(pr_line(context), refs)[0] == "inbox"
+    no_repo = {**pr_line(), "repo_name": ""}
+    assert home_of(no_repo, refs)[0] == "inbox"
+
+
+def test_a_context_naming_an_entry_ties_by_it_and_ignores_its_pr():
+    assert home_of(pr_line("TD-20 / PR #164"), {"s#164": "s#TD-021"}) == (
+        "queue", "s#TD-20", "s#TD-20", {"by": "context", "ref": "s#TD-020"})  # fmt: skip
+
+
+def test_a_pr_only_line_needing_nobody_follows_its_prs_entry_to_an_open_card_alone():
+    """A decided line, a `watch` or `fyi` line, and a line not yet due (`needs` false) draw on the open card of the
+    PR's entry as lines naming that entry do, and stay in the Inbox where no open card holds it."""
+    for line in (pr_line(), pr_line(kind="watch"), pr_line(kind="fyi"), pr_line(decided=True)):
+        assert home_of(line, {"s#164": "s#TD-021"}, needs=False)[:3] == ("queue", "s#TD-20", "s#TD-21")
+        assert home_of(line, {"s#164": "s#TD-003"}, needs=False)[0] == "inbox"
+        assert home_of(line, {}, needs=False)[0] == "inbox"
+    # not yet due: the card attachment's `coming` road
+    _lf, rest, moved, _unshown = split_later({"n": 0, "groups": []}, [pr_line()], pr_idx({"s#164": "s#TD-021"}))
+    assert [(e["id"], e["on_row"], e["tied"]["by"], e["later_section"]) for e in moved] == [
+        ("b1", "s#TD-21", "pr", "coming")
+    ]
+    _lf, rest, moved, _unshown = split_later({"n": 0, "groups": []}, [pr_line()], pr_idx({"s#164": "s#TD-003"}))
+    assert moved == [] and [e["id"] for e in rest] == ["b1"]
+
+
+def test_a_pr_tied_line_covers_no_ledger_row_and_draws_no_design_link():
+    assert line_names(pr_line()) == set()
+    assert line_names({**pr_line(), "parts": ["TD-7"]}) == {"s#TD-007"}
+    assert not covered_by({"name": "s", "id": "TD-21"}, asked_entries([pr_line()]))
+    assert design_link(pr_line(), pr_idx({"s#164": "s#TD-021"})) == {}

@@ -25,12 +25,14 @@ from sessionorc.queue import (  # noqa: F401 — the home's
     asker_repos,
     card_entries,
     card_index,
+    context_pr,
     held_refs,
     kept_or_loose,
     named_refs,
     only_pr,
     own_refs,
     pr_card,
+    pr_entry,
     qid,
 )
 from sessionorc.queue import refs as _refs
@@ -92,12 +94,18 @@ def item_home(
     TD-1468); one naming no entry but carrying a PR (its `pr`, or an `about` of `#n`) draws on the card of the entry
     that PR names in its repo's PRs, else on the PR's own loose card, `loose:<repo>#<n>` (`pr_card`, `tied.by:
     pr`) — with no `repo` it stays in the Inbox; one naming neither stays in the Inbox, and so does every row where
-    `index` is empty (a home that serves no Queue)."""
+    `index` is empty (a home that serves no Queue).
+
+    A board line whose `Context:` names no entry but a PR (`context_pr`: `PR #n`, `#n`) ties by that PR (TD-1552,
+    `tied.by: pr`): the entry the PR names in its `repo_name`'s PRs stands in for one the `Context:` would name — on
+    its open card whatever `needs` is; where it needs the person and no open card holds it, `pr_card`'s rest. Tied,
+    never named: the PR covers no ledger row. A line with no `repo_name` stays in the Inbox."""
     inbox = {"home": "inbox", "on_card": "", "on_row": "", "mentions": [], "tied": None}
     if not index:
         return inbox
     repo: str | None = None
     named: list[str] = []  # every ref it names, in order: its kept or loose card's where no open card holds one
+    pr: int | None = None  # a board line's `Context:` PR, where it names no entry (TD-1552)
     kind = e.get("row")
     if kind == "board":
         by = "context"
@@ -111,6 +119,12 @@ def item_home(
         named = refs
         # its home is the first of its refs an open card holds, the later held ones its mentions (TD-1400)
         refs = [r for r in refs if r in index]
+        if not named and name and m and (pr := context_pr(m.group(1))) is not None:
+            # a `Context:` naming no entry but a PR ties by that PR (TD-1552): the entry it names stands in for one
+            # the `Context:` would name — on its open card whatever `needs` is; tied, never named
+            by = "pr"
+            entry = pr_entry(index, name, pr)
+            refs = [entry] if entry and entry in index else []
     elif kind == "red_pr":
         refs, by = own_refs(_refs(f"{e.get('branch') or ''} {e.get('title') or ''}"), e.get("repo")), "pr"
     elif kind == "fork_pr":  # by its title alone: a fork's branch is a stranger's name (TD-1292)
@@ -145,6 +159,9 @@ def item_home(
             # an item whose only anchor is a PR: the entry that PR names, else the PR (TD-1468)
             got = pr_card(only_pr(e.get("pr"), e.get("about")), repo, index)
             by = "pr"
+        elif not got and needs and pr is not None:
+            # a board line whose `Context:` names a PR alone: its entry's kept or loose card, else the PR's (TD-1552)
+            got = pr_card(pr, str(e.get("repo_name") or ""), index)
         if not got:
             return inbox
         card, row, ref = got
