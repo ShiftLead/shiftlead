@@ -9,6 +9,7 @@ import asyncio
 import contextlib
 import logging
 import secrets
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -163,6 +164,15 @@ def seat_able(r: Session, now: datetime, unfillable: dict[str, str] | None = Non
     return seat_unable(r, now, unfillable) is None
 
 
+def pool_rank(seat: Any) -> int:
+    """A pool member's place in its pool, from 1 (§4.9b *A seat as an ordered pool*, TD-1476): its record's
+    `seat.rank`; 0 for a seat in no pool, or a rank that is not a number."""
+    try:
+        return int((seat or {}).get("rank") or 0) if isinstance(seat, dict) else 0
+    except (TypeError, ValueError):
+        return 0
+
+
 class MailMixin:
     # -- mail (design §4.10, TD-052 step 1) ------------------------------------------------------
 
@@ -276,11 +286,13 @@ class MailMixin:
         self, sender: str, to: Any, kind: str, pr: Any, reply_to: str | None, thread: str | None
     ) -> tuple[Any, dict[str, Any] | None]:
         """Where a new `ask` to one `asks` seat goes when that seat cannot answer (§4.9b *A seat that cannot
-        answer is routed around*, TD-1443): `(to, routed)`. A general question (no `pr`) goes to its team's
-        techlead seat when that is able and is neither the seat itself nor the sender, else to the person; a
-        reader's `ask` (carrying `pr`) is never re-seated and goes to the person. `routed` is `{seat, name, why,
-        at}`, None where nothing moved: an able seat, a superseded one (its mail follows the chain), a reply or a
-        thread, any kind but `ask`, the person's own send, or an address that is not exactly one seat."""
+        answer is routed around*, TD-1443): `(to, routed)`. A general question (no `pr`) to a pool member goes
+        first to the first able member after it in pool order whose counts take it (`_pool_next`, §4.9b *A seat
+        as an ordered pool*, TD-1476); with none, it goes to its team's techlead seat when that is able and is
+        neither the seat itself nor the sender, else to the person; a reader's `ask` (carrying `pr`) is never
+        re-seated and goes to the person. `routed` is `{seat, name, why, at}` of the unable seat, None where
+        nothing moved: an able seat, a superseded one (its mail follows the chain), a reply or a thread, any kind
+        but `ask`, the person's own send, or an address that is not exactly one seat."""
         if kind != "ask" or sender == PERSON or reply_to or thread:
             return to, None
         named = [str(x) for x in ([to] if isinstance(to, str) else list(to or [])) if str(x).strip()]
@@ -293,10 +305,55 @@ class MailMixin:
         why = seat_unable(seat, now, self.unfillable)
         if why is None:
             return to, None
-        lead = self._route_lead(seat, records, now, sender) if pr is None else None
-        target = self._address(lead) if lead is not None else PERSON
         at = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        nxt = None
+        if pr is None:  # the entry the send would land, so a member's counts are read before it is chosen
+            probe = MailEntry(id="m-probe", from_=sender, to=[], at=at, kind="ask", text="")
+            nxt = self._pool_next(seat, records, now, sender, probe) or self._route_lead(seat, records, now, sender)
+        target = self._address(nxt) if nxt is not None else PERSON
         return [target], {"seat": seat.id, "name": seat.name, "why": why, "at": at}
+
+    def _pool_next(
+        self,
+        seat: Session,
+        records: dict[str, Session],
+        now: datetime,
+        sender: str | None = None,
+        probe: MailEntry | None = None,
+    ) -> Session | None:
+        """The member a general question to the unable pool member `seat` goes to (§4.9b *A seat as an ordered
+        pool*, *Routing within the pool comes first*, TD-1476): the first member of the same team and pool after
+        it in pool order (`rank` above its own, never an earlier one) that is not superseded, is fillable, is
+        able (`seat_able`: a working member is able, an on-call one rule 3 would not fill is not) and is not the
+        sender — and, given `probe`, the entry that would land, one whose counts take it (`_landing_refusal`:
+        mailbox depth, one open question per sender per seat), a refusing member passed over as an unable one
+        is. None for a seat in no pool, or where no later member qualifies. With no `probe` the counts are not
+        read: `--team`'s any-member test (`_question_seat`)."""
+        pool = str((seat.seat or {}).get("pool") or "").strip() if isinstance(seat.seat, dict) else ""
+        team, rank = str(seat.team or "").strip(), pool_rank(seat.seat)
+        if not pool or not team or rank < 1:
+            return None
+        later = sorted(
+            (
+                (key, r)
+                for key, r in records.items()
+                if r is not seat
+                and r.team == seat.team
+                and mail.asks_seat(r)
+                and str((r.seat or {}).get("pool") or "").strip() == pool
+                and pool_rank(r.seat) > rank
+                and not r.superseded_by
+                and (sender is None or self._address(r) != self._addr(sender))  # never back to its own sender
+                and _fillable(r)
+                and seat_able(r, now, self.unfillable)
+            ),
+            key=lambda kr: (pool_rank(kr[1].seat), kr[1].name),
+        )
+        for key, r in later:
+            if probe is not None and self._landing_refusal(records, str(sender), key, probe) is not None:
+                continue
+            return r
+        return None
 
     def _route_lead(
         self, seat: Session, records: dict[str, Session], now: datetime, sender: str | None = None
@@ -327,13 +384,15 @@ class MailMixin:
     async def _reroute_waiting(self, now: datetime) -> None:
         """Once a tick, at the home (§4.9b *A question already waiting*, TD-1480): an open `ask` already waiting on
         an `asks` seat that cannot answer is moved by the send's rules — a general question (no `pr`, no `entry`)
-        to its team's able techlead seat, else to the person; a reader's `ask` (carrying `pr`) to the person. It
+        on a pool member to the first able member after it whose counts take it (`_pool_next`, TD-1476), else to
+        its team's able techlead seat, else to the person; a reader's `ask` (carrying `pr`) to the person. It
         closes on every copy as `rerouted`, and a copy on the same `root` lands with the new addressee carrying
         `routed` — no bound with the person, its own bound on a seat. The move is a landing, not a send: no gate,
         no tally; where a count would refuse it (the person inbox's depths, *One open copy*, an addressee's
         mailbox depth, one open question per sender per seat) it stays, its copies saying *waits on <name>: <the
-        refusal>*, and is tried again next tick. A `steer` is left to lapse; an `entry` envelope and a person's
-        question with no able techlead to go to stay on their seat."""
+        refusal>*, and is tried again next tick (a refusing pool member is passed over, never written as a wait).
+        A `steer` is left to lapse; an `entry` envelope and a person's question with no able member after it and
+        no able techlead to go to stay on their seat."""
         if self.mode != "home":
             return
         records = self._graph()
@@ -359,10 +418,15 @@ class MailMixin:
                     continue
                 sender = e.from_
                 me = records.get(sender) if sender != PERSON else None
-                lead = self._route_lead(seat, records, now, sender) if e.pr is None else None
+                lead = None
+                if e.pr is None and (sender == PERSON or me is not None):
+                    lead = self._pool_next(seat, records, now, sender, e) or self._route_lead(
+                        seat, records, now, sender
+                    )
                 if (sender != PERSON and me is None) or (lead is None and sender == PERSON):
                     # an asker with no record (the asker-gone path closes it), or the person's own question with
-                    # no able techlead to go to: it stays, and says nothing it no longer waits on
+                    # no able member after it and no able techlead to go to: it stays, and says nothing it no
+                    # longer waits on
                     if e.waits:
                         self._mark(e.id, waits=None)
                     continue
@@ -553,8 +617,16 @@ class MailMixin:
         seats = [
             (a, r)
             for a, r in records.items()
-            if mail.asks_seat(r) and not r.superseded_by and str(r.team or "").strip() and _fillable(r)
+            if mail.asks_seat(r)
+            and not r.superseded_by
+            and str(r.team or "").strip()
+            and _fillable(r)
+            and pool_rank(r.seat) < 2  # a pool is one candidate, its first member (§4.9b, TD-1476)
         ]
+
+        def able(r: Session) -> bool:  # a pool's first member is able when any member is: no sender, no counts
+            return seat_able(r, now, self.unfillable) or self._pool_next(r, records, now) is not None
+
         teams = sorted({r.team for _a, r in seats})
         if not repo:
             mine = [(a, r) for a, r in seats if r.team == want]
@@ -566,7 +638,7 @@ class MailMixin:
                     f"no team {want} has a seat record: the teams with one are {', '.join(teams) or 'none'} "
                     "(a team never started has none; design §4.10)"
                 )
-            return self._one_seat(want, [r for _a, r in mine], now, self.unfillable)
+            return self._one_seat(want, [r for _a, r in mine], now, self.unfillable, able)
         mine = [(a, r) for a, r in seats if r.repo and Path(r.repo).name == want]
         if not mine:
             await self._no_seat_for_repo(want, records)
@@ -577,25 +649,30 @@ class MailMixin:
             if team not in by_team:
                 names = ", ".join(sorted(by_team))
                 raise RpcError(f"{team} has no seat record on {want}: the teams with one are {names} (design §4.10)")
-            return self._one_seat(team, by_team[team], now, self.unfillable)
+            return self._one_seat(team, by_team[team], now, self.unfillable, able)
         if len(by_team) > 1:
             raise RpcError(
                 f"{want} is served by {', '.join(sorted(by_team))}: name one with --team <team> (design §4.10)"
             )
         ((name, recs),) = by_team.items()
-        return self._one_seat(name, recs, now, self.unfillable)
+        return self._one_seat(name, recs, now, self.unfillable, able)
 
     @staticmethod
     def _one_seat(
-        team: str, recs: list[Session], now: datetime | None = None, unfillable: dict[str, str] | None = None
+        team: str,
+        recs: list[Session],
+        now: datetime | None = None,
+        unfillable: dict[str, str] | None = None,
+        able: Callable[[Session], bool] | None = None,
     ) -> Session:
         """One team's question seat among its records (§4.10, §4.9b *A seat that cannot answer is routed
-        around*): an able record (`seat_able`) first, then the techlead seat (`tags: true`) of two, then a
-        live record over one on call, and one on call over a closed one; two left is refused naming them."""
+        around*): an able record (`seat_able`, or `able` where given — a pool's first member read able when any
+        member is, TD-1476) first, then the techlead seat (`tags: true`) of two, then a live record over one on
+        call, and one on call over a closed one; two left is refused naming them."""
         if len(recs) > 1:
             when = now or datetime.now(UTC)
-            able = [r for r in recs if seat_able(r, when, unfillable)]
-            recs = able or recs
+            fit = [r for r in recs if (able(r) if able is not None else seat_able(r, when, unfillable))]
+            recs = fit or recs
         if len(recs) > 1:
             tagged = [r for r in recs if (r.seat or {}).get("tags") is True]
             if not tagged:
