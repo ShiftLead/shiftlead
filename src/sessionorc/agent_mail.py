@@ -314,6 +314,110 @@ class MailMixin:
         rank = {"exited": 1, "closed": 2}  # live first, then on call, then closed
         return min(leads, key=lambda r: (rank.get(r.state, 0), r.name))
 
+    async def _reroute_waiting(self, now: datetime) -> None:
+        """Once a tick, at the home (§4.9b *A question already waiting*, TD-1480): an open `ask` already waiting on
+        an `asks` seat that cannot answer is moved by the send's rules — a general question (no `pr`, no `entry`)
+        to its team's able techlead seat, else to the person; a reader's `ask` (carrying `pr`) to the person. It
+        closes on every copy as `rerouted`, and a copy on the same `root` lands with the new addressee carrying
+        `routed` — no bound with the person, its own bound on a seat. The move is a landing, not a send: no gate,
+        no tally; where a count would refuse it (the person inbox's depths, *One open copy*, an addressee's
+        mailbox depth, one open question per sender per seat) it stays, its copies saying *waits on <name>: <the
+        refusal>*, and is tried again next tick. A `steer` is left to lapse; an `entry` envelope and a person's
+        question with no able techlead to go to stay on their seat."""
+        if self.mode != "home":
+            return
+        records = self._graph()
+        stamp = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        touched: dict[str, Session] = {}
+        person_changed = False
+        for key, seat in list(records.items()):
+            if not mail.asks_seat(seat) or seat.superseded_by:
+                continue
+            why = seat_unable(seat, now, self.unfillable)
+            for e in list(seat.inbox):
+                if not e.open or e.kind != "ask" or e.entry is not None or e.handed or e.to != [key]:
+                    continue
+                if why is None:
+                    if e.waits:  # able again: it waits for nothing but its answer
+                        self._mark(e.id, waits=None)
+                    continue
+                sender = e.from_
+                me = records.get(sender) if sender != PERSON else None
+                if sender != PERSON and me is None:
+                    continue  # an asker with no record: the asker-gone path closes it, not this one
+                lead = self._route_lead(seat, records, now, sender) if e.pr is None else None
+                if lead is None and sender == PERSON:
+                    continue  # the person's own question goes only to an able techlead
+                target = self._address(lead) if lead is not None else PERSON
+                moved = MailEntry(
+                    id="m-" + secrets.token_hex(6),
+                    from_=sender,
+                    to=[target],
+                    at=stamp,
+                    kind="ask",
+                    text=e.text,
+                    about=e.about,
+                    reply_to=e.reply_to,
+                    root=e.root,
+                )
+                moved.pr, moved.subject, moved.team, moved.draft = e.pr, e.subject, e.team, e.draft
+                moved.answers = [] if e.pr is not None else list(e.answers)  # a reader's carries none (§4.9b)
+                moved.shots, moved.shots_at, moved.shots_ref = list(e.shots), e.shots_at, e.shots_ref
+                moved.bound = None if target == PERSON else e.bound
+                moved.routed = {"seat": seat.id, "name": seat.name, "why": why, "at": stamp}
+                refusal = self._landing_refusal(records, sender, target, moved)
+                if refusal is not None:
+                    name = "the person" if target == PERSON else (records[target].name or target)
+                    line = f"waits on {name}: {refusal}"
+                    if e.waits != line:
+                        self._mark(e.id, waits=line)
+                    continue
+                self._mark(e.id, waits=None)
+                self._close_entry(e.id, "rerouted", stamp)
+                if target == PERSON:
+                    self.person_inbox.append(self._copy(moved))
+                    person_changed = True
+                else:
+                    records[target].inbox.append(self._copy(moved))
+                    touched[target] = records[target]
+                if me is not None:
+                    me.outbox.append(self._copy(moved))
+                    touched[sender] = me
+        for r in touched.values():
+            self._save(r)
+        if person_changed:
+            self.person_store.save(self.person_inbox)
+        if touched or person_changed:
+            await self._push_changes()
+
+    def _landing_refusal(self, records: dict[str, Session], sender: str, target: str, moved: MailEntry) -> str | None:
+        """Why a moved question cannot land with `target` now (§4.9b *The move is a landing, not a send*): the
+        counts any open ask meets — the person inbox's depths and *One open copy* (TD-1379), or the addressee's
+        mailbox depth and one open question per sender per seat — as the refusal's words, else None."""
+        try:
+            if target == PERSON:
+                self._check_person_depth(sender, question=True)
+                self._check_one_open_copy(records, sender, moved)
+                return None
+        except RpcError as e:
+            return str(e)
+        r = records[target]
+        if mail.MAILBOX_DEPTH is not None and r.unread() >= mail.MAILBOX_DEPTH:
+            return f"its inbox holds {mail.MAILBOX_DEPTH} unread entries"
+        if sender == PERSON:
+            return None
+        edge = mail.message_edge(
+            records, sender, target, controllers=self._ctl, kind="ask", carries=moved.pr is not None,
+            successor=self._successor,
+        )  # fmt: skip
+        if edge != "question seat":
+            return None  # one open question per sender is the question-seat edge's alone (§4.10)
+        mine = {k for k in records if sender in mail.chain(records, k, self._successor)}
+        first = next((x for x in r.inbox if x.kind == "ask" and x.open and x.from_ in mine), None)
+        if first is not None:
+            return f"your question {first.id} to it is still open"
+        return None
+
     def _seat_routing(self, s: Session, records: dict[str, Session] | None, now: datetime) -> dict[str, Any]:
         """The view's reading of an `asks` seat that cannot answer (design §4.5a card *routed around* line and
         *Inbox row: routed around*'s *waits:* line, TD-1443): `seat_unable`, the why (None when able, when
@@ -445,6 +549,17 @@ class MailMixin:
         if not held:
             return None
         e = held[0]
+        if e.closed_reason == "rerouted":
+            # `--thread` follows the move (§4.9b *A question already waiting*, TD-1480): the open copy on its root
+            moved = [x for x in me.outbox if x.root == e.root and x.id != e.id and x.open and x.routed] if me else []
+            if not moved:
+                raise RpcError(f"{mid} was routed around and its copy is closed: nothing waits on it (design §4.9b)")
+            if PERSON in moved[-1].to:
+                raise RpcError(
+                    f"{mid} was routed around to the person as {moved[-1].id}: passed up — the person holds it "
+                    "already, wait for their answer (design §4.9b)"
+                )
+            e = moved[-1]
         if e.kind not in ("ask", "steer"):
             raise RpcError(f"{mid} is a {e.kind}: only an ask or a steer is taken to the person on its thread")
         if e.passed_up:

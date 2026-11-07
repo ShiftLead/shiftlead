@@ -69,6 +69,7 @@ CLOSED_REASONS = (
     "expired",
     "asked_person",
     "withdrawn",  # its sender took it back: `ao msg --withdraw` (§4.10 *Withdrawing a question*, TD-1382)
+    "rerouted",  # moved from a seat that could not answer, a copy landing elsewhere (§4.9b, TD-1480)
 )
 
 # Who owns which field of a record (design §4.4a, §9 invariant 15): the node observes and enforces
@@ -536,6 +537,10 @@ class MailEntry:
     # around*, TD-1443): `{seat, name, why, at}`, on every copy. Written only by the send's routing (and the
     # tick's move, TD-1480) — never taken from a caller. A reader's routed `ask` (carrying `pr`) owes no outcome.
     routed: dict[str, Any] | None = None
+    # A question the tick would move from a seat that cannot answer but whose landing a count refuses (design §4.9b
+    # *A question already waiting*, TD-1480): *waits on <name>: <the refusal>*, on every copy, cleared once it moves
+    # or the seat is able again. Written only by the tick's move — never taken from a caller.
+    waits: str | None = None
 
     def __post_init__(self) -> None:
         self.root = self.root or self.id  # a message replying to nothing is its own thread's root
