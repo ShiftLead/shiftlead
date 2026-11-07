@@ -426,6 +426,7 @@ from .queue import (
     card_session,
     card_view,
     card_wants,
+    design_link,
     filter_chips,
     item_start,
     items_n,
@@ -2051,7 +2052,9 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             fy = ledger_for_you(
                 {str(r.get("root") or ""): r}, sessions, {here_root: named} if named else None, now, asked, repos
             )
-            fy_rows = {str(x.get("id") or ""): x for x in ledger_rows(fy)}
+            # an entry's own held row links its design and the design's synopsis, as on its card (TD-1531, TD-1536)
+            fy_index = card_index(queue) if queue else None
+            fy_rows = {str(x.get("id") or ""): {**x, **design_link(x, fy_index)} for x in ledger_rows(fy)}
             fy_ids = {str(x["id"]) for g in bd["foryou"]["groups"] for x in g["rows"]} | {
                 str(x["id"]) for x in bd["foryou"]["claimed"]
             }

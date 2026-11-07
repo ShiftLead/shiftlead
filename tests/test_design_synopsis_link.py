@@ -64,7 +64,13 @@ def checkout(tmp_path: Path) -> dict[str, Any]:
         "open": [
             {"number": 30, "title": "TD-014 design: another", "branch": "td12-design", "head": head14, "fork": False},
             {"number": 31, "title": "TD-015 design: a third", "branch": "td15-design", "head": head15, "fork": False},
-            {"number": 32, "title": "TD-016 design: from a fork", "branch": "td12-design", "head": head14, "fork": True},
+            {
+                "number": 32,
+                "title": "TD-016 design: from a fork",
+                "branch": "td12-design",
+                "head": head14,
+                "fork": True,
+            },
             {"number": 33, "title": "TD-017 design: not fetched", "branch": "x", "head": "f" * 40, "fork": False},
             {"number": 34, "title": "TD-99: a build", "branch": "td99", "head": head15, "fork": False},
         ]
@@ -96,7 +102,9 @@ def test_an_entry_reads_the_pr_head_before_the_merge_and_origin_after(checkout):
     syn = synopsis.reading(root, prs, "main")
     pr = {p["number"]: p for p in prs["open"]}
     merged = synopsis.entry("TD-012", None, syn, root)
-    assert merged["exists"] and merged["branch"] == "main" and merged["editor_path"] == f"{root}/docs/synopses/TD-012.md"
+    assert (
+        merged["exists"] and merged["branch"] == "main" and merged["editor_path"] == f"{root}/docs/synopses/TD-012.md"
+    )
     assert merged["sha"] == syn["default_sha"] and merged["path"] == "docs/synopses/TD-012.md"
     before = synopsis.entry("TD-014", pr[30], syn, root)  # the worktree on the PR's branch holds the editor's copy
     assert before["exists"] and before["branch"] == "td12-design"
@@ -123,6 +131,9 @@ def test_design_prs_carries_the_resolved_entrys_synopsis_and_whose_it_is(checkou
     assert not got["s#TD-020"]["own"] and got["s#TD-020"]["synopsis"]["path"] == "docs/synopses/TD-012.md"
     assert got["s#TD-014"]["n"] == 30 and got["s#TD-014"]["synopsis"]["branch"] == "td12-design"
     assert "synopsis" not in design_prs({"s": root}, {"s": prs}, open_, {})["s#TD-012"]  # no reading, no synopsis
+    # the section's last number still open: the same number, read from the PR's head
+    still = design_prs({"s": root}, {"s": prs}, {"s#TD-014": e("TD-014", design_pr=[30])}, {}, {"s": syn})["s#TD-014"]
+    assert still["n"] == 30 and still["synopsis"]["branch"] == "td12-design" and still["synopsis"]["exists"]
 
 
 def _q(syn: dict[str, Any] | None = None, **design: int) -> dict[str, Any]:
@@ -135,8 +146,17 @@ def _q(syn: dict[str, Any] | None = None, **design: int) -> dict[str, Any]:
     return q
 
 
-def _syn(editor: str | None = "/r/s/docs/synopses/TD-20.md", branch: str = "main", exists: bool = True) -> dict[str, Any]:
-    return {"sha": "a" * 40, "exists": exists, "editor_path": editor, "branch": branch, "path": "docs/synopses/TD-20.md", "root": "/r/s"}
+def _syn(
+    editor: str | None = "/r/s/docs/synopses/TD-20.md", branch: str = "main", exists: bool = True
+) -> dict[str, Any]:
+    return {
+        "sha": "a" * 40,
+        "exists": exists,
+        "editor_path": editor,
+        "branch": branch,
+        "path": "docs/synopses/TD-20.md",
+        "root": "/r/s",
+    }
 
 
 @pytest.fixture
@@ -167,7 +187,10 @@ def test_an_item_links_the_editor_copy_and_github(github):
 
 def test_with_no_editor_link_synopsis_links_github(github, monkeypatch):
     idx = card_index(_q(_syn(editor=None), TD20=12))
-    assert design_link(mail("m1", "?", about="TD-20"), idx)["synopsis"] == {"editor": None, "web": f"{WEB}/blob/main/docs/synopses/TD-20.md"}
+    assert design_link(mail("m1", "?", about="TD-20"), idx)["synopsis"] == {
+        "editor": None,
+        "web": f"{WEB}/blob/main/docs/synopses/TD-20.md",
+    }
     monkeypatch.setattr(uiconf, "open_in", lambda: uiconf.OpenIn(kind="none"))
     idx = card_index(_q(_syn(), TD20=12))
     assert design_link(mail("m1", "?", about="TD-20"), idx)["synopsis"]["editor"] is None
@@ -198,7 +221,10 @@ def test_the_card_the_inbox_row_and_the_design_s_own_header_draw_it(github, tmp_
     assert len(items) == 3  # the header's, and each item's
     assert card20.count('class="st designpr"') == 1 and f'href="{WEB}/pull/12"' in card20  # the ask --pr 12 drops it
     first = items[1]
-    assert re.search(r"<a class=\"editor ref\"[^>]*data-file-link[^>]*title=\"the design(&#39;|')s synopsis, in your editor\">synopsis</a>", first)
+    assert re.search(
+        r"<a class=\"editor ref\"[^>]*data-file-link[^>]*title=\"the design(&#39;|')s synopsis, in your editor\">synopsis</a>",
+        first,
+    )
     assert f'href="{WEB}/blob/main/docs/synopses/TD-20.md"' in first and 'title="the synopsis on GitHub"' in first
     # a build's row under it draws none: its own id has no design link
     build = card20[card20.index("build the queue") - 300 : card20.index("build the queue") + 200]
@@ -212,7 +238,9 @@ def test_with_no_editor_link_the_word_itself_links_github(github, tmp_path, monk
     monkeypatch.setattr(uiconf, "open_in", lambda: uiconf.OpenIn(kind="none"))
     c = client(monkeypatch, tmp_path, fake(_q(_syn(), TD20=12), [mail("m1", "which way?", about="TD-20")]))
     (got,) = _draws(html_mod.unescape(c.get("/queue").text))
-    assert 'title="the design\'s synopsis, on GitHub">synopsis</a>' in got and "GitHub</a>" not in got.replace(">synopsis</a>", "")
+    assert 'title="the design\'s synopsis, on GitHub">synopsis</a>' in got and "GitHub</a>" not in got.replace(
+        ">synopsis</a>", ""
+    )
     assert "data-file-link" not in got
 
 

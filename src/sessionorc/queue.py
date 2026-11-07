@@ -125,8 +125,9 @@ def design_prs(
     def own(q: str, e: Mapping[str, Any]) -> tuple[int, Mapping[str, Any] | None] | None:
         section = [n for n in e.get("design_pr") or () if isinstance(n, int) and not isinstance(n, bool)]
         last = section[-1] if section else None
+        # the section's last still open is read from its head too, so its synopsis is the branch's (TD-1536 review)
         above = sorted(
-            (p for p in open_design.get(q, ()) if last is None or p["number"] > last), key=lambda p: p["number"]
+            (p for p in open_design.get(q, ()) if last is None or p["number"] >= last), key=lambda p: p["number"]
         )
         if above:
             return above[0]["number"], above[0]
