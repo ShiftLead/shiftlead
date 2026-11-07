@@ -166,6 +166,16 @@ async def _submitted(agent, sid: str) -> list[str]:
     return [t.rstrip() for t in await agent.rpc_tail(sid, 30) if t.startswith("SUBMITTED ")]
 
 
+async def _keep_running(agent, now: datetime) -> None:
+    """The keeping pass for the rules that tell (TD-1442): its rule 10 starts a detached `_cadence_pass` whenever
+    the cadence was last read more than `DERIVE_EVERY` ago, and that pass raced the test's own, so a PR was read
+    twice (`gh.ran == [842, 843, 843]`). `park_ticks` does not stop it, since the test calls this itself. Marking
+    the cadence as just read leaves each test's explicit `_cadence_pass` the only reader."""
+    agent._cadence_read_at = now
+    await agent._keep_running(now)
+    assert agent._cadence_task is None or agent._cadence_task.done(), "no detached cadence pass was started"
+
+
 def _done(rec: Session, ref: str, pr: int) -> None:
     rec.progress = [*rec.progress, ProgressEntry(ref=ref, status="done", pr=pr)]
 
@@ -204,7 +214,7 @@ async def test_a_pass_writes_the_entry_and_nothing_else(agent, composerstubs, tm
         gh.heads[842] = None  # a merged PR's settled read asks nothing more, not even its head
         await agent._cadence_pass([rec])
         assert len(gh.ran) == 4
-        await agent._keep_running(now)
+        await _keep_running(agent, now)
         assert await _submitted(agent, rec.id) == [], "a pass tells nobody"
         await person.call("kill", id=rec.id)
 
@@ -219,25 +229,25 @@ async def test_a_fail_types_the_line_once_and_a_second_fail_marks_the_row(agent,
         _done(rec, "TD-257", 842)
         gh.heads[842], gh.verdicts[842] = ("aaa", "open"), FAIL
         await agent._cadence_pass([rec])
-        await agent._keep_running(now)
+        await _keep_running(agent, now)
         lines = await _submitted(agent, rec.id)
         assert len(lines) == 1 and "PR #842 failed the cadence check: review, ledger — fix it" in lines[0]
         assert "`ao progress done TD-257 --pr 842` again" in lines[0]
         assert rec.checks[0]["told"] and "row" not in rec.checks[0] and rec.sends[-1].from_ == "system"
-        await agent._keep_running(now)
+        await _keep_running(agent, now)
         await agent._cadence_pass([rec])
         assert len(await _submitted(agent, rec.id)) == 1 and gh.ran == [842], "told once, read once at that head"
         _done(rec, "TD-257", 842)  # reported again, and it still fails
         rec.progress[-1].at = "9999-01-01T00:00:00Z"
         await agent._cadence_pass([rec])
         assert rec.checks[0]["row"] and gh.ran == [842, 842]
-        await agent._keep_running(now)
+        await _keep_running(agent, now)
         assert len(await _submitted(agent, rec.id)) == 1, "the second fail is the row's, not another line"
         gh.verdicts[842], gh.heads[842] = UNKNOWN, ("bbb", "open")
         await agent._cadence_pass([rec])
         await agent._cadence_pass([rec])
         assert gh.ran == [842] * 4 and rec.checks[0]["row"], "an unknown is read again each cadence, no mark moved"
-        await agent._keep_running(now)
+        await _keep_running(agent, now)
         assert len(await _submitted(agent, rec.id)) == 1, "and nothing is told"
         gh.verdicts[842], gh.heads[842] = PASS, ("ccc", "open")
         await agent._cadence_pass([rec])
@@ -265,7 +275,7 @@ async def test_a_merged_fail_marks_the_row_at_once_and_one_pr_is_read_a_run(
         await agent._cadence_pass([rec])
         assert gh.ran == [842] and [c["pr"] for c in rec.checks] == [842], "one PR per run"
         assert rec.checks[0]["row"] and rec.checks[0]["merged"] is True
-        await agent._keep_running(now)
+        await _keep_running(agent, now)
         assert await _submitted(agent, rec.id) == [] and "told" not in rec.checks[0], "no re-report cures it: no line"
         await agent._cadence_pass([rec])
         assert gh.ran == [842, 843] and {c["pr"]: c["verdict"] for c in rec.checks} == {842: "fail", 843: "pass"}
@@ -311,7 +321,7 @@ async def test_who_is_read_and_who_is_told(agent, composerstubs, tmp_path, monke
             _done(rec, "TD-257", 842)
             await agent._cadence_pass([rec])
             assert rec.checks[0]["verdict"] == "fail"
-        await agent._keep_running(now)
+        await _keep_running(agent, now)
         for rec in (working, attended):
             assert await _submitted(agent, rec.id) == [], "never typed mid-turn, never into a person's session"
             assert rec.checks[0]["told"], "the clause is the telling"
@@ -503,7 +513,7 @@ async def test_a_repo_with_no_gate_is_unserved_nothing_written_and_read_when_it_
         for _ in range(3):
             await agent._cadence_pass([rec])
         assert rec.checks == [] and gh.ran == [] and gh.asked == []
-        await agent._keep_running(now)
+        await _keep_running(agent, now)
         assert await _submitted(agent, rec.id) == []
         (tmp_path / "repo" / "scripts" / "check_cadence.py").write_text("# the stub stands in for it\n")
         gh.heads, gh.verdicts = {842: ("aaa", "open"), 843: ("bbb", "open")}, {842: PASS, 843: FAIL}
