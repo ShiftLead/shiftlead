@@ -1313,8 +1313,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
          none acts. A claim dropped, or ended by a `restart` its next run has not taken up, leaves the PR
          with no actor, read *released*. A PR no claim ever named is not read: the Repo
          page lists it. Wait: **`STUCK_PR_AFTER`**, two hours, past a precheck and the merge that
-         follows it; its open time the newest claim or release among its
-         actors' claims, derived each tick, never kept (*The clock*, below).
+         follows it; its open time the newest claim among its actors'
+         claims, derived each tick, else, a released PR having none, its `stuck_open.at` (*The clock*, below).
      - **Acting.** `_stuck_pass` runs after rule 3's pass in the same tick, so `unfillable` holds this
        tick's words. An actor is **acting** when `unanswered.read` (§4.9b *Why it did not answer*,
        TD-1423 — called, never copied; its `question_at` the work's open time, below, and its other
@@ -1329,7 +1329,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        fill ceiling*), `restart_ceiling`, `unreachable`, `scheduled`, `taken_over` (*interactive*: a
        member the person took over, whose Hand back is the cure), `gated`, `limited`, `not_filled`,
        `ended`, each in `unanswered.words`' fixed words — a seat the exited or closed branch finds
-       unfillable reads `unfillable`'s word instead, `{state: "unfillable", why}` as `seat_unable` returns it; and
+       unfillable is this rule's own reason instead, built from `agent.unfillable[r.id]` (its words —
+       *suspended*, *sat out*, *restart ceiling*, *profile gated*, *fill ceiling*), stored as
+       `{state: "unfillable", why}` and drawn as `why`, never through `words` (the `stuck` shape check takes
+       any `state` string); and
        two whose words are this rule's own, for which
        `words` is not called: a record
        with `stalled_ticks` at least 2 reads **`stalled`**, *`<name>` is `stalled?` — a request held past
@@ -1354,7 +1357,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        or `not_filled`. A PR with no actor reads *released by <name>*.
      - **Never stuck.** Work whose only actors are the person's own live sessions (`unattended: false`
        and no member — `by_person`, §4.4 *The card's status*, TD-1281): the person is already there; beside
-       other actors, a person's own session is passed over when the first actor and its reason are chosen. A
+       other actors, a person's own session is passed over: not in the acting test, nor `since`, nor the
+       choice of the first actor and its reason. A
        member the person took over is not the person's own: it reads `taken_over`. And a PR whose
        holder's claim is a **waiting claim** (rule 5, TD-820: an open `ask` or `steer` of the holder's
        about it, or its ask held in a seat's `prs_waiting.asks` — its reader asked) is not read as a PR:
@@ -1370,13 +1374,17 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        and to the release when it lets it go, the entry dropped when the line closes or is no longer
        decided as a reading that holds it says — a repo whose board or PR reading is absent (a restart
        before its first pass), errored, or fell back to the checkout's (`fetch_case` *skipped*) is not read
-       that tick for which works stand: the last reading's works and their `stuck_open` are kept, as any
-       failed read keeps the last good reading, while their actors are read as on any tick (acting still
-       drops a row; `since`, `reason` and `actor` move); a checkout-fallback read may still close a work —
-       a line it finds closed or absent drops its entries, since the checkout lags a close but never
-       invents one — and opens none; a PR's `oid` is its head (`headRefOid`) and `at` the first tick that read that
+       that tick for which works stand: the works its `stuck_open` and `stuck` entries name are kept (on
+       disk, so a restart has them), as any failed read keeps the last good reading; a PR's actors, its
+       claims, are read as on any tick (acting drops its row; `since`, `reason` and `actor` move), and a
+       board line's `stuck` entry stays exactly as stored until a good read, its actors needing the lane
+       or team only that reading gives (an ask needs no repo reading); a board read that fell back to the
+       checkout may still close a line it finds closed or archived there — never one it finds absent,
+       which the stale checkout may not yet have — and opens none; a PR's `oid` is its head (`headRefOid`) and `at`
+       the first tick that read that
        head, moved
-       on every push, and also to a claim's `at` and to a release, as a line's is. Its **`since`** is the later of its open
+       on every push, and also to a claim's `at` and to a release, as a line's is — read only as a
+       released PR's open time and an idle actor's figure (below). Its **`since`** is the later of its open
        time and the newest state change among its actors (each record's `since`, which moves only on a
        real change of state, or its `subagent_at` or `shells_at` where later — `agent_common.idle_from`,
        as rule 4 clocks), except an **`idle`** actor, whose own state changes say nothing of this work, since a
@@ -1459,8 +1467,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        `--json` too, which also carries `missed: true` after a marked verb; a restart under the command keeps *run it
        again* and writes no mark). Before it exits, a verb a session files with (§4.7: those that call the host agent to file — `msg`, `td add`, `td reserve`, `progress`, `doing`,
        `finding`, `rank` with a move, never `rank --list`, a read; `board edit` writes the branch with no host agent,
-       and every other verb is a read
-       or a person's, so none writes a mark) writes a **missed mark**,
+       and every other verb writes no mark, so nothing rings the session: its exit-3 words say run it again) writes a
+       **missed mark**,
        `$SHIFTLEAD_HOME/missed/<session id>-<at>.json` (its `SHIFTLEAD_SESSION`, else the ancestry walk's) `{at, verb}`,
        one file per miss, written to a temporary name and renamed, so no read meets half a file — the verb alone (`msg`, `td add`,
        `progress`), never its arguments, which may hold what a message says. Each host agent, a node's
