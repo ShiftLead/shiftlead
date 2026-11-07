@@ -435,6 +435,10 @@ class MailEntry:
     cites: list[str] = field(default_factory=list)  # an `ask` to two or more: the `sends` ids it cannot reconcile
     default: str | None = None  # a `steer`: the one line saying what the sender will do, required on it
     team: str | None = None  # the sender's `team` at send, stamped by the home (§4.10, 2026-09-19)
+    # the registry's name for the sender's record's repo, stamped by the home at the send beside `team` (§4.10
+    # *An envelope carries its sender's `repo`*, TD-1467): a bare `TD-n` in `about` or the words is that repo's;
+    # None for the person, a session that resolves to none, and an entry sent before the stamp
+    repo: str | None = None
     snoozed_until: str | None = None  # a person-inbox entry the person set aside; the Inbox page only
     # A look handed to a reviewer (design §4.10 *A look*, §4.5a **Send to reviewer**, TD-292 slice 4):
     # `snoozed_for` is the id of the `handed` `ask` that carries it to its sender's team's techlead

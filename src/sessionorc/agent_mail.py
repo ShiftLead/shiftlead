@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import secrets
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -20,6 +21,7 @@ from sessionorc import (
     mail,
     unanswered,
 )
+from sessionorc import queue as queue_mod
 from sessionorc import work as work_mod
 from sessionorc.agent_common import (
     RpcError,
@@ -42,6 +44,14 @@ from sessionorc.models import (
     Tally,
     now_iso,
 )
+
+log = logging.getLogger(__name__)
+
+# a node's registered checkouts, read for the send's `repo` stamp (§4.10, TD-1467): kept this long once read, waited
+# on no longer than this at a send, and asked again no sooner than this after a node that did not answer
+ROSTER_KEEP = timedelta(minutes=10)
+ROSTER_WAIT = 2.0
+ROSTER_RETRY = timedelta(minutes=1)
 
 
 def _claim_about(rec: Any) -> str | None:
@@ -369,6 +379,7 @@ class MailMixin:
                     root=e.root,
                 )
                 moved.pr, moved.subject, moved.team, moved.draft = e.pr, e.subject, e.team, e.draft
+                moved.repo = e.repo  # a landing carries the entry's repo as its team (§4.10, TD-1467)
                 moved.answers = [] if e.pr is not None else list(e.answers)  # a reader's carries none (§4.9b)
                 moved.shots, moved.shots_at, moved.shots_ref = list(e.shots), e.shots_at, e.shots_ref
                 if target == PERSON and not moved.subject:
@@ -434,6 +445,7 @@ class MailMixin:
                 root=e.root,
             )
             moved.subject, moved.team, moved.draft, moved.handed = e.subject, e.team, e.draft, True
+            moved.repo = e.repo  # a landing, not a send: the repo moves with it (TD-1467)
             moved.entry = {**(e.entry or {}), "team": str(t.get("team") or "").strip(), "picked": False}
             moved.routed = {"seat": seat.id, "name": seat.name, "why": why, "at": stamp}
             self._mark(e.id, waits=None)
@@ -444,6 +456,42 @@ class MailMixin:
         if e.waits:
             self._mark(e.id, waits=None)  # waiting on its seat: the row's *waits:* line says why (§4.5a)
         return False
+
+    async def _record_repo(self, r: Session | None) -> str | None:
+        """The registry's name for `r`'s repo, stamped on its mail at the send (§4.10 *An envelope carries its
+        sender's `repo`*, TD-1467): `queue.record_repo` over its `repo`, else its `dir`, against the checkouts the
+        home registers for the record's **own host** — this host's registry, or a node's as its `repos` request
+        answers (`_host_roster`) — named as the repo readings name it. None for the person and for a record in no
+        registered checkout, whose refs the read side resolves by `queue.mail_repo`'s order."""
+        if r is None:
+            return None
+        host = str(r.host or "") or self.host
+        try:
+            if host == self.host:
+                roots = await asyncio.to_thread(lambda: hosts.local_host().repos())
+            else:
+                roots = await self._host_roster(host)
+            return queue_mod.record_repo(r.repo, r.dir, roots, queue_mod.repo_roots(self._repos))
+        except Exception:  # noqa: BLE001 — a registry unreadable: no stamp, and the send stands (§4.10)
+            log.exception("send from %s: its repo could not be read, so its mail carries none", r.id)
+            return None
+
+    async def _host_roster(self, host: str) -> list[str]:
+        """A node's registered checkouts for `_record_repo` (TD-1467), from its `repos` request (`rpc_host_repos`),
+        kept `ROSTER_KEEP` so a send does not ask the node each time; a node that does not answer within
+        `ROSTER_WAIT` gives none, kept `ROSTER_RETRY` before it is asked again."""
+        now = datetime.now(UTC)
+        kept = self.__dict__.setdefault("_rosters", {})
+        got = kept.get(host)
+        if got is not None and now < got[0]:
+            return list(got[1])
+        try:
+            roots = list((await asyncio.wait_for(self.rpc_host_repos(host), ROSTER_WAIT))["repos"] or [])
+            kept[host] = (now + ROSTER_KEEP, roots)
+        except (RpcError, TimeoutError, KeyError, TypeError):
+            roots = []
+            kept[host] = (now + ROSTER_RETRY, roots)
+        return roots
 
     def _landing_refusal(self, records: dict[str, Session], sender: str, target: str, moved: MailEntry) -> str | None:
         """Why a moved question cannot land with `target` now (§4.9b *The move is a landing, not a send*): the
@@ -735,6 +783,9 @@ class MailMixin:
         me = records.get(sender) if sender != PERSON else None
         if sender != PERSON and me is None:
             raise RpcError(f"{sender} cannot send mail: this host agent has no record of it (design §4.10)")
+        # the sender's repo for the envelope (§4.10, TD-1467), read here, before any count or gate is checked: from
+        # the first check to the landing no `await` falls, so two sends can never both pass a cap one of them fills
+        stamped_repo = await self._record_repo(me)
         named = [self._addr(x) for x in ([to] if isinstance(to, str) else list(to or [])) if str(x).strip()]
         named = list(dict.fromkeys(named))
         if PERSON in named and sender == PERSON:
@@ -1095,6 +1146,7 @@ class MailMixin:
         entry.shots_at = mail.shots_at(shots_at) if looks else None
         entry.shots_ref = mail.shots_ref(shots_ref) if entry.shots_at else None
         entry.team = (me.team or None) if me is not None else None  # the envelope carries its sender's team (§4.10)
+        entry.repo = stamped_repo  # and its sender's repo, beside it (§4.10, TD-1467)
         # §4.10 *A subject on every entry* (TD-561): a thread has one subject, so an answer, an outcome
         # and a follow-up carry their question's; mail the person reads is given one or warned, never
         # refused; mail between sessions takes a given one and derives nothing (a session reads the text)
@@ -1177,7 +1229,7 @@ class MailMixin:
                 about=replied.about,
                 root=root,
             )
-            note.team = entry.team
+            note.team, note.repo = entry.team, entry.repo
             note.subject = entry.subject  # the question's (§4.10)
             note.answered = {"question": replied.text, "asker": replied.from_, "answerer": sender, "source": src}
             self.person_inbox.append(note)
