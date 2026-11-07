@@ -75,9 +75,10 @@ def fill_words(ceiling: Mapping[str, Any]) -> str:
 
 
 def state_icons() -> dict[str, str]:
-    """Each state class's tab icon, `static/icons/state-<class>.svg` by its hashed URL: what Focus's
-    link carries in `data-icons`, so `AO.focusIcon` swaps it as the state moves (TD-1155)."""
-    return {c: static_url(f"icons/state-{c}.svg") for c in sorted(STATE_ICON_CLASSES)}
+    """Each state class's tab icon, `static/icons/state-<class>.svg` by its hashed URL, and `own`'s beside
+    them (working on its own, keyed by the view's `own_work`, no state class, TD-1502): what Focus's link
+    carries in `data-icons`, so `AO.focusIcon` swaps it as the state moves (TD-1155)."""
+    return {c: static_url(f"icons/state-{c}.svg") for c in sorted(STATE_ICON_CLASSES | {"own"})}
 
 
 templates.env.globals["state_icons"] = state_icons

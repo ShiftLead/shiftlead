@@ -686,10 +686,12 @@
     return (v) => { last = v || last; look(); };
   };
   // `<name> · <state>`, ` · unseen` after it while the record carries the unseen mark (TD-1228), `▲ ` in front
-  // while it needs the person: the switcher's one line.
-  AO.focusTitle = (v) => `${v.state === "needs-you" ? "▲ " : ""}${v.name} · ${v.state_label || v.state}${v.unseen ? " · unseen" : ""}`;
+  // while it needs the person: the switcher's one line. Working on its own reads the view's `own_work`
+  // (`working · 1 shell`), never `own_slot`, which carries the shell's command (TD-1502).
+  AO.focusTitle = (v) => `${v.state === "needs-you" ? "▲ " : ""}${v.name} · ${v.own_work || v.state_label || v.state}${v.unseen ? " · unseen" : ""}`;
   // §4.5 *A tab's icon* (TD-1155): the tab's tile follows the state its title says, from the URLs the
-  // page's icon link carries (`data-icons`, read once); none, or a class with no URL, leaves it as it is
+  // page's icon link carries (`data-icons`, read once); none, or a class with no URL, leaves it as it is.
+  // Working on its own (the view's `own_work`) takes `own`'s outlined tile where the link has it (TD-1502)
   let focusIcons;
   AO.focusIcon = (v) => {
     const link = document.querySelector("link[rel=icon]");
@@ -697,7 +699,7 @@
     if (focusIcons === undefined) {
       try { focusIcons = JSON.parse(link.dataset.icons || "null") || null; } catch (e) { focusIcons = null; }
     }
-    const url = focusIcons && focusIcons[v.state_class];
+    const url = focusIcons && ((v.own_work && focusIcons.own) || focusIcons[v.state_class]);
     if (url) link.href = url;
   };
   // The window's size and position are the person's, remembered per session in this browser; the
