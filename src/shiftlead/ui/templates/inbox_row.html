@@ -308,6 +308,7 @@
 {{ body(e) }}
 {{ outcome_line(e) }}
 {%- if e.holder_doing %}<div class="st" title="what the holder says it is doing (design §4.8): its own words">doing: {{ e.holder_doing.text }}{% if e.holder_doing.age %} · says {{ e.holder_doing.age }} ago{% endif %}</div>{% endif %}
+{%- if e.holder_waits and section != 'needs' %}<div class="st dflt routed" title="its seat cannot answer now (design §4.9b *A seat that cannot answer is routed around*)">{{ e.holder_waits }}</div>{% endif %}
 <div class="row gap wrap mfoot">
   {%- if section == 'needs' %}
   <span class="st">blocked on something only a person can move — {{ e.holder_name }}'s questions come as rows of their own</span>

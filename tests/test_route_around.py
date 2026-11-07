@@ -118,3 +118,23 @@ async def test_the_techleads_own_ask_to_an_unable_review_seat_goes_to_the_person
         async with LocalClient(caller=tl) as c:
             got = await c.call("msg", to=rv, text="did #12 pass?", kind="ask")
         assert got["entry"]["to"] == [PERSON] and got["routed"]["seat"] == rv, "never back to its own sender"
+
+
+async def test_the_view_says_why_a_seat_cannot_answer_and_where_its_questions_go(agent, tmp_path):
+    """§4.5a card *routed around* line (TD-1473 slice 4b): the home's view of an `asks` seat `seat_able` reads
+    unable carries `seat_unable` (the why) and `seat_routed_to` — *the techlead* while the team's techlead is
+    able, *you* once it is not; an able seat and a record holding no seat carry neither."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        tl, rv, w = await _team(agent, tmp_path, person)
+
+        def seen(sid):
+            v = next(x for x in agent._views() if x["id"] == sid)
+            return v["seat_unable"], v["seat_routed_to"]
+
+        assert seen(rv) == (None, None) and seen(w) == (None, None)
+        _limited(agent, rv)
+        assert seen(rv) == ("limited", "the techlead")
+        _limited(agent, tl)
+        assert seen(rv) == ("limited", "you") and seen(tl) == ("limited", "you")
+        assert seen(w) == (None, None), "a record holding no asks seat"

@@ -22,6 +22,9 @@
       {%- import "unseen_mark.html" as um %}{{ um.chip(s) }}
     </div>
     <div class="row r2"><span class="meta cline" title="{{ s.slot.full or s.slot.text }}">{{ s.compact_line }}</span><span class="grow"></span>{% if s.unread %}<a class="badge unread" href="/focus/{{ s.id }}#inbox" title="{{ s.unread }} unread message{{ '' if s.unread == 1 else 's' }} in this session's inbox — open the Inbox panel">✉ {{ s.unread }}</a>{% endif %}{% if s.flag %}<span class="flag" title="{{ s.flag }}">⚠ {{ s.flag_short or s.flag }}</span>{% endif %}</div>
+    {# design §4.5a card **routed around** line (§4.9b, TD-1443): on the compact card too, a seat on call
+       being the common unable one #}
+    {% if s.routed_to %}<div class="meta routed" title="cannot answer now: {{ s.routed_why }} (design §4.9b)">{{ s.routed_to }}</div>{% endif %}
   </div>
   {% else %}
   <div class="sc-body">
@@ -95,6 +98,8 @@
     <div class="status {{ s.slot.kind }}" title="{{ s.slot.full }}">{{ s.slot.text }}</div>
     {% if s.held %}{% from "held_line.html" import held_line %}{{ held_line(s.held) }}{% endif %}
     {% if s.others %}{% from "held_line.html" import prompt_line %}{% for e in s.others %}{{ prompt_line(s.id, e) }}{% endfor %}{% endif %}
+    {# design §4.5a card **routed around** line (§4.9b, TD-1443): display only, while the seat cannot answer #}
+    {% if s.routed_to %}<div class="meta routed" title="cannot answer now: {{ s.routed_why }} (design §4.9b)">{{ s.routed_to }}</div>{% endif %}
     <div class="caption meta {{ s.slot.ccls }}"{% if s.slot.ccls == 'countdown' %} data-deadline="{{ s.deadline }}"{% endif %}>{{ s.slot.caption }}</div>
   </div>
   {% endif %}
