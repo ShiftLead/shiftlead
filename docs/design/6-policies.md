@@ -108,7 +108,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   home and execute on the member's node as any act does. A policy needs no grant and passes no
   gate; it acts on the record's own fields and never on text a session wrote. The rules:
   1. **Crash restart.** A supervised member **other than a seat** (an extra seat excepted: restarted here while it holds unread mail or
-     an open ask, closed held otherwise, §4.9 *Scaling with the work*; a seat's ending is its own,
+     an unanswered ask addressed to it, closed held otherwise, §4.9 *Scaling with the work*; a seat's ending is its own,
      and rule 3 is the only rule that fills one, save the replay of a seat whose run never started,
      *A lost brief* below) that is `exited` by a **natural exit** — `pane` true,
      the tool left on its own — with **no declaration** (`out_of_work` and `restart_wanted` both
@@ -403,8 +403,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the same call, the sender's reply naming where it went, and the send does not wait for the pane; there is
      no wait before it (§4.9 *Mail to a scaled seat*). Mail goes first to a free live record of the seat in place order (the seat,
      then its extras), so a warm idle extra takes it while the own record is held; where none is free and the
-     seat's own record is not live — held after its linger, never filled, or `exited` awaiting rule 1 — the own
-     record takes it and is filled on its cause (or restarted) as today: the own record comes back before an
+     seat's own record is not live — held after its linger, never filled, or `exited` — the own
+     record takes it and is filled on its cause as today (rule 1 restarts no seat): the own record comes back before an
      extra is added. **Each tick, by the state** and never by how the mail got there: a seat whose
      own record is live and busy, each live extra busy, and holding unread mail §4.9's *Mail to a scaled seat*
      lets move fills its lowest-placed held extra once one can be filled (not every extra live and busy, the
@@ -1615,7 +1615,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      record of its own. **Down, with no idle timer**: an extra that **declares out of work** (`ao progress
      none`, §4.9a) is closed back to held at once — once nothing is dirty or unpushed, no subagent or shell is
      live, and no claim waits on a PR of its own within `SEAT_PR_WAIT` (rule 3's test); until then it is
-     closed at the first tick they pass. Its record stays with its mailbox and its `scale`, never marked sat
+     closed at the first tick they pass. At the close a claim of its that is not `done` is dropped (*extra
+     closed*), as a succession drops one, so the lane reads its entry, or its PR, as nobody's; mail that comes
+     to the held extra after (a reader's reply on its PR's thread among them) waits in its mailbox for its next
+     fill. Its record stays with its mailbox and its `scale`, never marked sat
      out, so the line's next short event fills it again. An extra is never sent rule 6's *new work* note: out
      of work, it closes, and new work fills whichever extra is held. Its out-of-work declaration ends only its
      own run: the wound-down and finished readings (`work.wound_down`, `work.finished`; §4.9a) pass over a held
