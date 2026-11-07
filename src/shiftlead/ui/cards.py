@@ -564,6 +564,13 @@ def view(
         repoconfig.default_label(role),
         str((repoconfig.PRESETS.get(role) or {}).get("message") or ""),
     )
+    # §4.9b *A seat as an ordered pool*, *How it is drawn* (TD-1476): a live member after the first says it is a
+    # backup, *fact-checker · backup for qa-ao-1*, from its `seat` field's `pool` (the first member's name) and
+    # `rank`; on call its *on call · backup …* line says so instead, and the first member's badge is a seat's own
+    d["pool_rank"] = mail.pool_rank(s.get("seat"))
+    pool = str((s.get("seat") or {}).get("pool") or "").strip() if isinstance(s.get("seat"), dict) else ""
+    if d["pool_rank"] > 1 and pool and not d["seat"]:
+        d["role_label"] = f"{d['role_label'] or role} · backup for {pool}"
     # §4.8 *A role says when to message it* (TD-171): the definition's line, drawn as text — the
     # composer's first line and the Message control's `title`; "" for a role without one
     # design §6 / §4.5a: when this session stops, from the same formatter `ao status -v` uses, in
@@ -1159,7 +1166,15 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         # what would make it come (§4.5): the techlead's trigger is a question landing (§4.9b)
         # (§4.9b) — or a seat's own trigger: after n PRs, every so often (TD-098)
         text = f"on call — {d.get('seat_when') or 'comes on the next question'}"
-        if d.get("seat_when") == MANAGER_WHEN:
+        if d.get("pool_rank", 0) > 1 and d.get("seat_when"):
+            # a pool's backup (§4.9b *How it is drawn*, TD-1476): *on call · backup 1 of 1 — comes when qa-ao-1
+            # cannot answer*, the words after `on call · ` whole from the team's when-words
+            text = f"on call · {d['seat_when']}"
+            full = (
+                f"{text}: a question its pool routes to it fills the seat, and it ends again once it has answered "
+                "(design §4.9b)"
+            )
+        elif d.get("seat_when") == MANAGER_WHEN:
             # a manager on call (§4.9, §6 rule 3's `team` trigger, TD-259)
             full = (
                 f"{text}: a question to it, a member's permission, a stalled member or one idle with its work "

@@ -225,3 +225,27 @@ async def test_the_persons_question_to_an_unable_member_moves_within_the_pool_an
         await agent._reroute_waiting(datetime.now(UTC))
         assert len(_open_on(agent, m1, again["root"])) == 1, "no member and no techlead able: it stays"
         assert not any(e.root == again["root"] for e in agent.person_inbox), "never to the person"
+
+
+async def test_the_views_routed_around_line_names_the_next_able_member_before_the_techlead(agent, tmp_path):
+    """§4.5a card **routed around** line, §4.9b *How it is drawn* (TD-1476, built by TD-1522): an unable member's
+    `seat_routed_to` names the member a general question from no sender would go to — the next able member after
+    it, never an earlier one — and only with none able today's *the techlead*, else *you*."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        tl, (m1, m2, m3), w = await _team(agent, tmp_path, person)
+
+        def seen(sid):
+            v = next(x for x in agent._views() if x["id"] == sid)
+            return v["seat_unable"], v["seat_routed_to"]
+
+        assert seen(m1) == (None, None)
+        _limited(agent, m1)
+        assert seen(m1) == ("limited", "qa-p2")
+        _limited(agent, m2)
+        assert seen(m1) == ("limited", "qa-p3") and seen(m2) == ("limited", "qa-p3")
+        _limited(agent, m3)
+        assert seen(m3) == ("limited", "the techlead"), "the last member: no later one, so today's road"
+        assert seen(m1) == ("limited", "the techlead")
+        _limited(agent, tl)
+        assert seen(m1) == ("limited", "you")

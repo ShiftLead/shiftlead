@@ -215,9 +215,19 @@ def seat_waits_line(name: Any, why: Any) -> str | None:
     return f"waits: {name} {why}" if why else None
 
 
+def pool_rank(seat: Any) -> int:
+    """A pool member's place in its pool, from 1 (§4.9b *A seat as an ordered pool*, TD-1476): its record's
+    `seat.rank`; 0 for a seat in no pool, or a rank that is not a number."""
+    try:
+        return int((seat or {}).get("rank") or 0) if isinstance(seat, dict) else 0
+    except (TypeError, ValueError):
+        return 0
+
+
 def seat_routed_to_line(to: Any) -> str | None:
     """The card line of an `asks` seat that cannot answer (design §4.5a card *routed around* line, §4.9b,
-    TD-1443): *its questions go to <the techlead | you> while it cannot answer*. None where it is able."""
+    TD-1443): *its questions go to <the next able pool member's name | the techlead | you> while it cannot
+    answer* (a pool's member first, TD-1476). None where it is able."""
     return f"its questions go to {to} while it cannot answer" if to else None
 
 
