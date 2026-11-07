@@ -1728,8 +1728,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   process reads gone and is never killed — → **failed**: `failed.json` `{sha, at, log, exit, why}`
   beside it, the Inbox row under *Needs you*, and **a failure blocks only the commit it failed at**
   (TD-1554, Paul's Hold on TD-1437). The commit it blocks is `failed.json`'s **`blocks`**: a promote's own
-  `sha`; a rollback's `from`, the commit it went back from (a person's rollback or the smoke's: what was
-  judged bad, never the old commit it failed to reach, which `auto` would never start), and nothing when
+  `sha`; a rollback's `from`, the commit it went back from (a person's rollback or the smoke's; never the
+  old commit it failed to reach, which `auto` would never start), and nothing when
   that `from` was not read (`SHIFTLEAD_PROMOTE_FROM` empty: `blocks` null); a `failed.json` written before
   `blocks` was blocks its `sha`. `auto` starts
   nothing while main's head is that commit, and retries once main's head moves past it — a run at the new
@@ -1737,10 +1737,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   press — Promote of main's head, that commit among them (a retry is the person's word), or a rollback
   (below) — is never refused by it. **Every start clears it** — the press's, `auto`'s retry, the smoke's
   rollback — once the run has started: under the promote lock, after `start` returns with the intent
-  written, so a start that raises (its tree not made, its process not spawned) leaves the failure as it
-  was, and `failed.json` and `inflight.json` never stand together. A run that fails writes its own in its
-  place. **A reading clears it too** when main's head has moved past `blocks` and live reads main's head
-  (installed there by hand): no start is left to clear it, and nothing remains for it to block. Nothing else
+  written, so a start that raises (its tree not made, its process not spawned, the intent it had written
+  then removed) leaves no intent and the failure as it was, and `failed.json` and `inflight.json` never stand together. A run that fails writes its own in its
+  place. **A reading clears it too** when live reads main's head (installed there by hand) and main's head
+  is not `blocks` (a `blocks` of null among them): no start is left to clear it, and nothing remains for it to block. Nothing else
   clears it: there is no Dismiss. Sessions are never told: no send, no state change; they
   live in tmux and survive a restart of the home, an attached Focus reconnects under §4.6's
   contract, and a blocked `wait` ends with the socket as §4.7 says. This repo's block is CLAUDE.md's
