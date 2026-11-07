@@ -197,19 +197,26 @@ class RankMixin:
             self._rank_task = asyncio.create_task(self._rank_run(cards, repos))
 
     async def _rank_run(self, cards: list[dict[str, Any]], repos: Mapping[str, tuple[str, str, Any]]) -> None:
-        """The flush off the event loop, then the page told what it changed (`pending` gone, `not_landed`)."""
+        """The flush off the event loop, then each repo it landed in re-read at once, as a press is (§4.4 *Every
+        write the home lands is read at once*, TD-1508), and the page told what it changed (`pending` gone,
+        `not_landed`)."""
+        landed: set[str] = set()
         try:
-            await asyncio.to_thread(self._rank_flush, cards, repos)
+            landed = await asyncio.to_thread(self._rank_flush, cards, repos)
         except Exception:  # noqa: BLE001 — the intents stay for the next flush
             log.exception("the rank flush failed")
+        for root in sorted(landed or ()):
+            await self._reread_board(root)
         if self._queue:
             await self._broadcast({"event": "queue", "queue": self._queue_ranked(self._queue)})
 
-    def _rank_flush(self, cards: list[dict[str, Any]], repos: Mapping[str, tuple[str, str, Any]]) -> None:
+    def _rank_flush(self, cards: list[dict[str, Any]], repos: Mapping[str, tuple[str, str, Any]]) -> set[str]:
         """One flush (§4.4 *A move lands*): every intent re-derived against `cards` in the order made, its
         lines landed as one `queue: rank` PR per repo; then the joins and the prunes, each kind a PR per
         repo. A repo whose rank PR fails after its retry keeps every intent that touches it, retried at the
-        next flush, and its cards read *not landed*; an intent that no longer derives is dropped."""
+        next flush, and its cards read *not landed*; an intent that no longer derives is dropped. Returns the
+        roots a PR landed in, for `_rank_run` to re-read (TD-1508)."""
+        landed: set[str] = set()
         with self.rank_store.lock:
             state = self.rank_store.load()
         # the moves only once `RANK_FLUSH` has passed since the last one, so a run of drags lands as one PR
@@ -251,6 +258,7 @@ class RankMixin:
                     missed = missed or kind != "rank"
                     continue
                 if got:
+                    landed.add(str(root))
                     log.info("rank flush %s %s: PR #%s", kind, repo, got.get("pr"))
         keep = [it for it, card in made if set(card.get("repos") or ()) & failed.keys()]
         t = time.time()
@@ -273,6 +281,7 @@ class RankMixin:
             elif not state["intents"]:
                 state["moved_at"] = None
             self.rank_store.save(state)
+        return landed
 
     def _rank_lined(self, repos: Mapping[str, tuple[str, str, Any]]) -> dict[str, list[str]]:
         """Repo name → the ids its checkout's rank file gives a line that are open or archived — what a prune

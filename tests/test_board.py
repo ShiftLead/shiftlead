@@ -2044,3 +2044,49 @@ def test_a_go_on_another_repos_gated_entry_is_answered_on_the_board_alone(repo):
     files = on_origin(repo, "show", "--name-only", "--format=", "origin/main").split()
     assert files == ["docs/user_attention.md"]
     assert origin_board(repo).splitlines()[at - 1].startswith("- [ ] ")
+
+
+async def _registered(agent, repo: Path, tmp_path: Path, monkeypatch) -> list[dict]:
+    """Register `repo`, read it once, and return the `repos` pushes from then on."""
+    from sessionorc import reports
+
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (home / "repos.txt").write_text(f"{repo}\n")
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+    await park_ticks(agent)
+    monkeypatch.setattr(reports, "pr_reading", lambda d, now, **kw: {"open": [], "at": now.isoformat()})
+    pushed: list[dict] = []
+    real_broadcast = agent._broadcast
+
+    async def broadcast(ev: dict) -> None:
+        if ev.get("event") == "repos":
+            pushed.append(ev)
+        await real_broadcast(ev)
+
+    monkeypatch.setattr(agent, "_broadcast", broadcast)
+    agent._repos_read_at = float("-inf")
+    await agent._refresh_repos()
+    assert str(repo) in agent._repos
+    pushed.clear()
+    return pushed
+
+
+async def test_an_orphaned_questions_answer_is_read_at_once_on_the_stale_checkout(agent, repo, tmp_path, monkeypatch):
+    """TD-1508 (§4.4 *Every write the home lands is read at once*): the person's answer to an orphaned question
+    lands a board line through the write-back, and the board is read again at once — the line is in the `repos`
+    push the answer makes, while the checkout has not pulled."""
+    from sessionorc.models import MailEntry
+
+    _gated(repo)
+    pushed = await _registered(agent, repo, tmp_path, monkeypatch)
+    o = {"at": "2026-10-02T09:00:00Z", "how": "closed", "ref": "TD-190", "name": "designer", "repo": str(repo),
+         "host": "h", "team": "g"}  # fmt: skip
+    e = MailEntry(id="m-orph", from_="ao-t-designer", to=["person"], at="2026-10-02T08:00:00Z", kind="ask",
+                  text="Shall the widget be blue?", about="TD-190", orphaned=o)  # fmt: skip
+    agent.person_inbox.append(e)
+    got = await agent._answer_orphan(e, "Blue, yes", "replied")
+    assert got["closed"] == "m-orph"
+    assert "Shall the widget be blue?" not in (repo / board.BOARD).read_text(), "the checkout has not pulled"
+    assert pushed, "the answer pushed `repos` at once, with no tick"
+    assert "Shall the widget be blue?" in json.dumps(pushed[-1]["repo"]["boards"])
