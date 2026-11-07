@@ -1949,7 +1949,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   it never touches a worktree (a member's home is its own, §4.9 *Home and reach*), and it never
   moves a checkout to a branch or a commit (that is the person's, and a rollback's tree is the host
   agent's own, §6 *A rollback*). *The tree is a person's* (§6 *Promote*) stands: the pull is the one
-  move the host agent makes in a person's checkout, and only ever a fast-forward.
+  move the host agent makes in a person's checkout, and only ever a fast-forward. What the views show does not
+  wait on it: the board and the ledger are read against origin (§4.4 *The ledger is read against origin, as
+  the board is*, TD-1471), so the pull moves the person's tree and the promote's precondition, and no
+  reading.
 - **Sync: a mechanical sync PR is merged at the home** (TD-681; steps 1 and 2 built as `sessionorc.sync.check`
   by TD-685 slice 1, and replaced by the bump's check, TD-1015; the pass, the evidence, the gate, the merge and the setting by slice 2, as
   `sessionorc.sync`'s pass functions and `agent_sync`; the Repos card's switch by slice 3; step 4's precheck by TD-1039; Paul,
