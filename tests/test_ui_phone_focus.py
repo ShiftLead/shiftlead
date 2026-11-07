@@ -539,3 +539,148 @@ def test_the_focus_delta_sets_and_clears_take_overs_confirm():
     assert "if (v.mode_confirm) el.dataset.confirm = v.mode_confirm; else delete el.dataset.confirm;" in js
     click = js.index("if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;")
     assert click < js.index('if (action === "mode") body = {', click)
+
+
+# -- TD-1494: Resume on a member confirms too (§4.5 *Resume on a member confirms too*, §4.5a *Focus (exited /
+# closed)*, *Inbox row: restart*, *Inbox row: state*) ---------------------------------------------------------
+
+RESUME_TEXT = (
+    "Resume w attended? While you hold it, its mail does not wake it, and asks to it wait for you. Hand back returns "
+    "it. To resume it unattended, cancel and use Resume with changes… on its page, with Unattended ticked."
+)
+
+
+def _ended(**kw) -> dict:
+    s = {"id": "ao-x-w", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": "/w", "repo": "/w",
+         "state": "exited", "pane": False, "tail": [], "since": "2026-11-06T10:00:00Z", "confidence": "hook",
+         "adapter_id": "sess-1"}  # fmt: skip
+    s.update(kw)
+    return s
+
+
+def test_resume_confirm_is_set_on_an_ended_member_whatever_mode_it_ended_in(tmp_path, monkeypatch):
+    """TD-1494: `resume_confirm` on an exited or closed agent record holding a tool session id that is a member — a
+    team or controllers, not the person's own — whether it ended unattended or interactive; `member_hold` is the
+    shared sentences alone there, the one constant Take over's confirm reads too. Empty on everything else."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import view
+    from shiftlead.ui.cards import MEMBER_HOLD
+
+    assert MEMBER_HOLD in RESUME_TEXT
+    for member in ({"team": "t"}, {"controllers": ["ao-x-m"]}):
+        for mode in (True, False):
+            for state in ("exited", "closed"):
+                v = view(_ended(unattended=mode, state=state, **member))
+                assert v["resume_confirm"] == RESUME_TEXT, (member, mode, state)
+                assert v["member_hold"] == MEMBER_HOLD
+    # a seat gets the member text and nothing more
+    assert view(_ended(team="t", seat={"trigger": "asks"}))["resume_confirm"] == RESUME_TEXT
+    # the name, else the id
+    assert view(_ended(team="t", name=""))["resume_confirm"].startswith("Resume ao-x-w attended? ")
+    for other in (
+        {"team": "t", "by_person": True},  # the person's own
+        {},  # not a member
+        {"team": "t", "adapter_id": ""},  # no tool session id: lands on the form unasked
+        {"team": "t", "agent": False},  # a record with no agent
+        {"team": "t", "state": "idle", "pane": True},  # a live record (the restart row can stand on one)
+    ):
+        v = view(_ended(**other))
+        assert v["resume_confirm"] == "" and v["member_hold"] == "", other
+    # Take over's confirm reads the same constant (TD-1440), so the sites cannot drift
+    assert view(_ended(team="t", state="idle", unattended=True))["mode_confirm"] == f"Take over w? {MEMBER_HOLD}"
+
+
+def test_a_member_resumed_unsupervised_keeps_hand_back_and_is_not_woken_by_mail(tmp_path, monkeypatch):
+    """TD-1494: a member the person resumed (attended, `by_person` after) still offers Hand back on its card, and
+    while interactive its mail does not wake it — which is what the confirm says."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from sessionorc.mail import mail_wakes
+    from sessionorc.models import Session
+    from shiftlead.ui.app import view
+
+    v = view(_ended(team="t", state="idle", pane=True, unattended=False, by_person=True))
+    assert v["mode_act"] == "Hand back" and v["resume_confirm"] == ""
+    s = Session(id="ao-x-w", name="w", kind="interactive", adapter="claude-code", dir="/w", state="idle")  # type: ignore[arg-type]
+    s.unattended = False
+    assert mail_wakes(s) is False
+
+
+def test_the_ending_banners_resume_carries_the_confirm_through_esc_and_restart_none():
+    """TD-1494: the ending banner's Resume sets `data-confirm` from `v.resume_confirm`, escaped, on every render (the
+    banner is rebuilt from the view, so a cleared field drops it); Resume with changes…, New session here, Forget and
+    Restart carry none of it. The page's one generic `data-confirm` check stands before the resume branch, so a press
+    asks first and Cancel sends no create — never a per-`data-act` confirm, since the paused steer's Resume shares
+    `data-act="resume"` and stays one press."""
+    js = (UI / "static" / "app.js").read_text(encoding="utf-8")
+    line = (
+        '`<button class="btn sm primary" data-act="resume" data-id="${id}"'
+        '${v.resume_confirm ? ` data-confirm="${esc(v.resume_confirm)}"` : ""}>Resume</button> `'
+    )
+    assert line in js
+    banner = js[js.index('const ex = $("#fexited");') : js.index("drawEnd(v);", js.index('const ex = $("#fexited");'))]
+    assert line in banner
+    restart = banner[banner.index('data-act="restart"') :]
+    assert "resume_confirm" not in restart and "member_hold" not in restart
+    click = js.index("if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;")
+    assert click < js.index('if (action === "resume" || action === "reopen-push") {', click)
+    assert js.count("if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;") == 1
+    # the esc the banner's line calls escapes a quote, so a name with one cannot end the attribute
+    assert """'"': "&quot;\"""" in js[js.index("function esc(t)") :][:200]
+
+
+def test_the_inbox_restart_and_unpushed_rows_resume_confirms_on_a_member(tmp_path, monkeypatch):
+    """TD-1494 (§4.5a *Inbox row: restart*, *Inbox row: state*): the restart row's Resume and the unpushed state row's
+    Resume carry the card view's `resume_confirm`, and its Reopen and push its own confirm with `member_hold` after a
+    space — on a closed member and a controllers-only one too; on a non-member each is as before. Restart carries
+    none. A name with a quote in it is escaped by Jinja."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import state_rows, templates, view
+    from shiftlead.ui.cards import MEMBER_HOLD
+
+    git = {"ahead": 3, "dirty": 0, "upstream": "origin/main", "unpushed": 3, "pushed_against": "origin/main"}
+    ceiling = {"at": "2026-11-06T11:00:00Z", "count": 3}
+
+    def rows_of(**kw) -> dict[str, dict]:
+        r = _ended(git=git, exit_code=1, restart_ceiling=ceiling, **kw)
+        return {e["row"]: e for e in state_rows([view(r, [r])])}
+
+    def confirm(html: str, act: str) -> str | None:
+        tag = re.search(rf'<button[^>]*data-act="{act}"[^>]*>', html)
+        assert tag, act
+        got = re.search(r'data-confirm="([^"]*)"', tag.group(0))
+        return got.group(1) if got else None
+
+    def render(e: dict) -> str:
+        return templates.get_template("inbox_rows.html").render(rows=[e], section="needs")
+
+    reopen = (
+        "Reopen w under its own name and ask it to push? It resumes the conversation, attended, with one prompt this "
+        "page wrote — push the branch, open or update the PR, then report the outcome."
+    )
+    cases = (({"team": "t"}, "exited"), ({"team": "t"}, "closed"), ({"controllers": ["ao-x-m"]}, "exited"))
+    for member, state in cases:
+        by = rows_of(state=state, **member)
+        assert {"restart", "unpushed"} <= set(by) or state == "closed", (member, state, sorted(by))
+        restart = render(by["restart"])
+        assert confirm(restart, "resume") == RESUME_TEXT, (member, state)
+        if "restart" in restart and 'data-act="restart"' in restart:
+            assert confirm(restart, "restart") is None
+        if "unpushed" in by:
+            un = render(by["unpushed"])
+            assert confirm(un, "resume") == RESUME_TEXT
+            assert confirm(un, "reopen-push") == f"{reopen} {MEMBER_HOLD}"
+    # a closed member's unpushed row, built straight from its view (state_kind reads `exited` alone today)
+    v = view(_ended(state="closed", team="t"))
+    un = render({"row": "unpushed", "id": "ao-x-w:unpushed", "sid": "ao-x-w", "name": "w", "text": "3 unpushed",
+                 "resume_confirm": v["resume_confirm"], "member_hold": v["member_hold"]})  # fmt: skip
+    assert confirm(un, "resume") == RESUME_TEXT and confirm(un, "reopen-push") == f"{reopen} {MEMBER_HOLD}"
+    # a non-member: one press, and Reopen and push's own text unchanged
+    by = rows_of()
+    assert confirm(render(by["restart"]), "resume") is None
+    assert confirm(render(by["unpushed"]), "resume") is None
+    assert confirm(render(by["unpushed"]), "reopen-push") == reopen
+    # a name with a quote is escaped in the attribute
+    by = rows_of(team="t", name='w"x')
+    assert 'data-confirm="Resume w&#34;x attended? ' in render(by["restart"]) or (
+        'data-confirm="Resume w&quot;x attended? ' in render(by["restart"])
+    )

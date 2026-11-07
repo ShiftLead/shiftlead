@@ -57,6 +57,9 @@ from .transcript import transcript_editor
 
 # A record's state as its card's class (§4.5 *The card's anatomy*): the two whose word is not a class name
 STATE_CLASS = {"needs-you": "needs", "stalled?": "stalled"}
+# What holding a member costs, in the one wording Take over's, Resume's and Reopen and push's confirms share
+# (§4.5 *A taken-over member*, *Resume on a member confirms too*; TD-1440, TD-1494)
+MEMBER_HOLD = "While you hold it, its mail does not wake it, and asks to it wait for you. Hand back returns it."
 # Every class a Focus tab's icon is drawn for (§4.5 *A tab's icon*, TD-1155): each state's, then the two
 # the card composes over a state — an empty seat's *on call* and a declared wait's *waiting*
 STATE_ICON_CLASSES = frozenset({STATE_CLASS.get(s, s) for s in typing.get_args(State)} | {"oncall", "waiting"})
@@ -602,12 +605,20 @@ def view(
     # over*, TD-1440): a record with a team or controllers that the person did not start by hand, since holding it
     # stops its doorbell. Empty on a non-member and on an interactive record: Hand back never confirms.
     member = bool(s.get("team") or s.get("controllers")) and not s.get("by_person")
-    d["mode_confirm"] = (
-        f"Take over {s.get('name') or s.get('id')}? While you hold it, its mail does not wake it, and asks to it "
-        "wait for you. Hand back returns it."
-        if d["agent"] and s.get("unattended") and member
+    who = s.get("name") or s.get("id")
+    d["mode_confirm"] = f"Take over {who}? {MEMBER_HOLD}" if d["agent"] and s.get("unattended") and member else ""
+    # Resume on a member confirms too (§4.5 *Resume on a member confirms too*, §4.5a *Focus (exited / closed)*,
+    # *Inbox row: restart*, *Inbox row: state*, TD-1494): a one-press Resume starts it attended, whatever mode it
+    # ended in, so it asks first in the same words. `member_hold` is the shared sentences alone, which Reopen and
+    # push appends to its own confirm.
+    resumable = d["agent"] and bool(s.get("adapter_id")) and s.get("state") in ("exited", "closed") and member
+    d["resume_confirm"] = (
+        f"Resume {who} attended? {MEMBER_HOLD} To resume it unattended, cancel and use Resume with changes… on its "
+        "page, with Unattended ticked."
+        if resumable
         else ""
     )
+    d["member_hold"] = MEMBER_HOLD if resumable else ""
     # where the toggle is drawn (TD-964, TD-1408): Take over and Hand back share the acts line's one slot,
     # *Switch to unattended* alone is more ▾'s, and an ended record draws it nowhere (§4.5a *Focus: Take over*)
     if not d["mode_act"] or s.get("state") in ("exited", "closed"):
