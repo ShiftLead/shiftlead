@@ -369,6 +369,7 @@ class TickMixin:
         await self._schedules(snapshot_at)
         await self._work_marks(snapshot_at)
         await self._sweep_mail(snapshot_at)
+        await self._reroute_waiting(snapshot_at)  # after the sweep: an expired ask is not moved (§4.9b, TD-1480)
         self._poke_waits()  # the wake decision is re-taken every tick for a session blocked in `wait`
         self._send_first_prompts()  # before the doorbell, which a brief not yet typed holds off
         self._ring_doorbells()
