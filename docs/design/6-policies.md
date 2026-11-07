@@ -1565,10 +1565,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   flight — its smoke included, though `check` already reads the new commit (*The promote is in flight
   until the smoke ends*, below) — nothing is read or pushed: a tag at a build whose smoke then fails
   would lift a gate no rollback puts back. The sha compared is the ref's own object as `ls-remote`
-  prints it, so an annotated tag (its tag object's sha) never reads as at the live commit. A read that fails (the origin not answering,
-  refused, timed out) is no reading: it pushes nothing, keeps the lease and the noted lines, is logged
-  and is read again on the next full pass; only a read that answers can find a ref absent. Then, by
-  what it finds:
+  prints it, so an annotated tag (its tag object's sha) never reads as at the live commit. A read that
+  fails (the origin not answering, refused, timed out) is no reading: it pushes nothing, keeps the
+  lease and the noted lines, is logged and is read again on the next full pass; only a read that
+  answers can find a ref absent. Then, by what it finds:
   - **a branch `promote/live`**, which may shadow the tag (the forge reader resolves a ref by name):
     the home keeps its lease, pushes nothing, and sends the person one `system` note, as the promote's
     *promoted* notes go (§4.10): *a branch promote/live on <repo> shadows the home's live tag: delete it
