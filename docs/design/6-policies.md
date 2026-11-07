@@ -1558,10 +1558,13 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   too. It assumes one home per origin: a second home that promotes the same repo reads the first's tag
   as someone else's, below.
   **The home reads the tag before it acts.** Each full pass that reads **live** at a commit of
-  `origin/main`, and the watch pass that finds a promote or a rollback concluding there (or a copy
-  installed by hand that `check` reads), reads the tag and a branch of that name with one
+  `origin/main` (a copy installed by hand that `check` reads among them), and the watch pass that finds
+  a promote or a rollback concluding there, reads the tag and a branch of that name with one
   `git ls-remote origin refs/tags/promote/live refs/heads/promote/live`, off the loop, so a tag deleted
-  or moved between promotes is seen within a full pass. Then, by what it finds:
+  or moved between promotes is seen within a full pass. A read that fails (the origin not answering,
+  refused, timed out) is no reading: it pushes nothing, keeps the lease and the noted lines, is logged
+  and is read again on the next full pass; only a read that answers can find a ref absent. Then, by
+  what it finds:
   - **a branch `promote/live`**, which may shadow the tag (the forge reader resolves a ref by name):
     the home keeps its lease, pushes nothing, and sends the person one `system` note, as the promote's
     *promoted* notes go (§4.10): *a branch promote/live on <repo> shadows the home's live tag: delete it
@@ -1579,17 +1582,19 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   The push is `git push --force-with-lease=refs/tags/promote/live:<lease> origin <live>:refs/tags/promote/live`,
   from the checkout, its lease empty onto an absent tag. The lease is **`promotes.<repo>.live_ref`**,
   the sha the home last pushed or adopted, written to `~/.shiftlead/promotes/<repo>/live_ref` beside
-  `last.json`, and the last note sent to `live_ref_noted` beside it: one pair, its ref and sha
-  (`refs/heads/promote/live <sha>` or `refs/tags/promote/live <sha>`), overwritten by each new note,
-  so a branch note never stands for a tag note at the same sha. A read that does not find the noted
-  ref at the noted sha (the branch gone, the tag absent or elsewhere) clears it, so a ref put back at
-  a noted sha is noted again. Both files are read at every read, never held from the home's start:
-  a press's or a rollback's own full read carries no earlier reading, and a promote of this repo
-  restarts the home that pushed it; the reading's `live_ref` is a copy for `ao repo`.
+  `last.json`, and each ref's last note in `live_ref_noted` beside it: at most two lines, one per
+  ref, its ref and sha (`refs/heads/promote/live <sha>`, `refs/tags/promote/live <sha>`), a new
+  note of a ref replacing that ref's line alone, so a branch note never stands for a tag note and
+  a tag noted before a branch came and went is not noted again. A read that does not find a noted
+  ref at its noted sha (the branch gone, the tag absent or elsewhere) clears that ref's line, so a
+  ref put back at a noted sha is noted again. Both files are read at every read, never held from
+  the home's start: a press's or a rollback's own full read carries no earlier reading, and a
+  promote of this repo restarts the home that pushed it; the reading's `live_ref` is a copy for
+  `ao promote status` (its `--json`'s `promotes.<repo>.live_ref`, §4.7).
   The read and the push run in the
   pass's thread under the promote lock, so no promote moves **live** between them. A push refused for its lease
   (the tag moved between the read and the push) changes nothing: the next read acts on what is there.
-  Any other failure is logged and retried on the next full pass. A live that is *unknown*, or a commit
+  Any other failure of the push is logged and retried on the next full pass. A live that is *unknown*, or a commit
   `origin/main` does not hold, reads and moves nothing. The tag is the home's alone: no session pushes
   it (the briefs say so), and a lift read from a tag someone else moved is caught as any forged lift
   is, by review. A push that lands clears that repo's last-swept day (the event runner's `_swept_on`,
