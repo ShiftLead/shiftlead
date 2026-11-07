@@ -1732,8 +1732,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   and **a failure blocks only the commit it failed at** (TD-1554, Paul's Hold on TD-1437). The commit it
   blocks is `failed.json`'s **`blocks`**:
   - a promote's own `sha`;
-  - the smoke's rollback's `from`, the commit the smoke failed on, or null when that `from` was not read
-    (`SHIFTLEAD_PROMOTE_FROM` empty);
+  - the smoke's rollback's `from`, the commit the smoke failed on (the smoke starts a rollback only with a
+    `from` read; without one the promote fails itself, blocking its own `sha`);
   - a person's rollback's `main`, main's head as the press read it (the reading's `main`, which the press writes
     on the intent as `main`, as `_concluded` gives the hold the same reading's): the rollback took no hold, so the commit the person meant to keep from running stays blocked; a
     merge after the press moves main past it and `auto` goes on — accepted, as the person's rollback never
@@ -1751,8 +1751,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   restarts with both files; the pass that finds `failed.json` beside `inflight.json` clears the failure, the
   intent being the newer fact, so the two never stand together past one pass. A run that fails writes its
   own in its place. **A reading clears it too** when live reads main's head (installed there by hand) and
-  main's head has moved past a `blocks` that names a commit: no start is left to clear it, and nothing
-  remains for it to block. A `blocks` of null is cleared by a start alone. Nothing else clears it: there is
+  main's head has moved past `blocks`: no start is left to clear it, and nothing remains for it to block.
+  Nothing else clears it: there is
   no Dismiss. Sessions are never told: no send, no state change; they
   live in tmux and survive a restart of the home, an attached Focus reconnects under §4.6's
   contract, and a blocked `wait` ends with the socket as §4.7 says. This repo's block is CLAUDE.md's
@@ -1802,7 +1802,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   `ao promote`, is taken, never refused as *nothing to promote*: the press runs `run` again at that commit,
   its smoke too, and the pass that concludes it writes `done` and tags it (a run whose `from` is its own
   commit writes as `last.json`'s `from` the standing `last.json`'s `sha`, the last commit a run put live, or
-  that file's own `from` where the two are the same, so `--back` still goes somewhere), its note reading *promoted
+  that file's own `from` where the two are the same, so `--back` still goes somewhere; with no `last.json` at
+  all, `from` null, so `--back` is refused as it is before any first run), its note reading *promoted
   `<repo>` `<sha7>` again — tagged* (a rollback to the live commit's: *rolled back `<repo>` to `<sha7>` again
   — tagged*). The press at main's head is refused as *nothing to promote* only when a run finished there
   **and** no failure blocks it, so a failure at main's head is always a press away from its retry. Its `from` is the commit itself,
@@ -2042,7 +2043,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     a rollback's own smoke fails (the person's or the smoke's), no `from` was read, or `from` is
     the commit itself. The result stands as a **failure** in `failed.json`, with *smoke failed on
     `<sha7>`* and the log's tail, under *Needs you*. It blocks the commit *Promote*'s `blocks` names for
-    its run (a promote's own commit, a person's rollback's `main`, the smoke's rollback's `from` or none), as any
+    its run (a promote's own commit, a person's rollback's `main`, the smoke's rollback's `from`), as any
     failure does, and the person's next press clears it. After a rollback that leaves the failure beside
     its hold, that press clears the failure as it starts and ends the hold when it concludes, as *The
     hold* says.
