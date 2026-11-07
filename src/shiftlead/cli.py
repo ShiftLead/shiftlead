@@ -3598,12 +3598,12 @@ def _td_out(args: argparse.Namespace, out: dict[str, Any]) -> None:
             print(f"--out {args.out} not written ({e.strerror or e}); the reply is below", file=sys.stderr)
 
 
-def _td_out_clear(args: argparse.Namespace) -> None:
-    """Remove an `--out` file before the call, so a refused call never leaves an earlier reply there to be read as
-    this one's (review of #3096)."""
+def _td_out_kept(args: argparse.Namespace) -> None:
+    """Say on standard error that a refused call left `--out` as it was: the file is never removed or written on a
+    refusal, so a mistyped path loses nothing, and the non-zero exit and this line say it holds no reply of this call's
+    (review of #3096)."""
     if args.out:
-        with contextlib.suppress(OSError):
-            pathlib.Path(args.out).expanduser().unlink(missing_ok=True)
+        print(f"--out {args.out} not written: the call was refused; any file there is not its reply", file=sys.stderr)
 
 
 def _td_show(args: argparse.Namespace, name: str) -> int:
@@ -3620,14 +3620,21 @@ def _td_show(args: argparse.Namespace, name: str) -> int:
 
 
 def _td_next_send(args: argparse.Namespace, name: str, branch: str = "") -> int:
-    _td_out_clear(args)
     if args.show:
-        return _td_show(args, name)
+        try:
+            return _td_show(args, name)
+        except AgentError:
+            _td_out_kept(args)
+            raise
     extra: dict[str, Any] = {}
     if branch:
         extra["branch"] = branch
-    # the home's 45 s budget is under the client's
-    got = call_sync("td_next", repo=name, count=args.count or 1, **extra)
+    # the home's 45 s budget is under the client's; --count 0 goes to the home, which refuses it
+    try:
+        got = call_sync("td_next", repo=name, count=1 if args.count is None else args.count, **extra)
+    except AgentError:
+        _td_out_kept(args)
+        raise
     reserved = got.get("reserved") is not False  # an older home has no counter road: its ids are recorded
     take_line = got.get("id_take_line") or None  # a home from before TD-1363 answers neither id_take key
     out = {

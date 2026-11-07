@@ -1259,7 +1259,7 @@ def test_an_out_file_that_cannot_be_written_still_prints_the_ids(tmp_path, monke
 
 
 @pytest.mark.unit
-def test_a_refused_call_leaves_no_earlier_out_file_and_the_alias_shows_too(tmp_path, monkeypatch, capsys):
+def test_a_refused_call_leaves_an_existing_out_file_as_it_was_and_the_alias_shows_too(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     _register()
     monkeypatch.chdir(tmp_path)
@@ -1271,7 +1271,8 @@ def test_a_refused_call_leaves_no_earlier_out_file_and_the_alias_shows_too(tmp_p
 
     monkeypatch.setattr(cli, "call_sync", refuse)
     assert cli.main(["td", "reserve", "--repo", "ShiftLead/shiftlead", "--out", str(f)]) != 0
-    assert not f.exists(), "a refused call leaves no earlier reply to be read as its own"
+    assert f.read_text() == '{"ids": ["TD-001"]}', "a refused call never removes or writes the --out file"
+    assert f"--out {f} not written: the call was refused" in capsys.readouterr().err
     shown = {"repo": "shiftlead", "ids": ["TD-004"], "by": "ao-w", "at": "t", "id_take": None, "id_take_line": None}
     monkeypatch.setattr(cli, "call_sync", lambda m, **p: dict(shown))
     capsys.readouterr()
@@ -1291,3 +1292,18 @@ async def test_a_nonce_given_twice_names_its_newest_call_and_last_spans_old_and_
     paths.ids_file().write_text(json.dumps({"shiftlead/shiftlead": {"last": 93, "given": given}}))
     assert (await home.rpc_td_take(repo="shiftlead", take="n", caller="ao-x"))["ids"] == ["TD-091", "TD-092"]
     assert (await home.rpc_td_take(repo="shiftlead", take="last", caller="ao-o"))["ids"] == ["TD-093"]
+
+
+def test_count_zero_goes_to_the_home_and_is_never_turned_into_one(tmp_path, monkeypatch):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    _register()
+    monkeypatch.chdir(tmp_path)
+    sent = []
+
+    def refuse(m, **p):
+        sent.append(p["count"])
+        raise cli.AgentError("count must be 1 to 10")
+
+    monkeypatch.setattr(cli, "call_sync", refuse)
+    assert cli.main(["td", "reserve", "--repo", "ShiftLead/shiftlead", "--count", "0"]) != 0
+    assert sent == [0], "--count 0 is refused by the home, never spent as one id"
