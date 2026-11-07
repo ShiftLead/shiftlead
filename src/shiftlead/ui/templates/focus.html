@@ -2,8 +2,9 @@
 {# design §4.5a Focus **title** (TD-046): `<name> · <state>`, ` · unseen` while the record carries the mark
    (TD-1228), `▲ ` while it needs you — what a window switcher shows. `AO.focusTitle` keeps it current from
    the feed; this is the first paint. #}
-{% block title %}{% if s.state == 'needs-you' %}▲ {% endif %}{{ s.name }} · {{ s.state_label }}{% if s.unseen %} · unseen{% endif %}{% endblock %}
-{% block icon %}state-{{ s.state_class }}{% endblock %}
+{% block title %}{% if s.state == 'needs-you' %}▲ {% endif %}{{ s.name }} · {{ s.own_work or s.state_label }}{% if s.unseen %} · unseen{% endif %}{% endblock %}
+{#- working on its own (TD-1502): the outlined tile, `state-own`, keyed by the view's `own_work`, never a state -#}
+{% block icon %}{% if s.own_work %}state-own{% else %}state-{{ s.state_class }}{% endif %}{% endblock %}
 {% block icon_attrs %} data-icons='{{ state_icons()|tojson }}'{% endblock %}
 {#- design §4.5 *Phone layout* (TD-1299): the keyboard resizes the page on Android, and the safe-area insets are
     the screen's to pad; other pages keep `base.html`'s viewport -#}
