@@ -408,8 +408,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      lets move fills its lowest-placed held extra once one can be filled (not every extra live and busy, the
      host below `scale.live`, the profile not gated, the team not held by its balance mark) and **moves that
      mail** there, oldest first, `entry` envelopes and an `ask` carrying a `pr` among them — a mover of its own
-     beside the tick's move of a routed ask (`_reroute_waiting`, which moves only from a seat that cannot answer
-     and passes those two over); the sender's `ao inbox --sent` reads where it went. So a send that could not
+     beside the tick's move of a routed ask (`_reroute_waiting`, which moves only from a seat that cannot answer,
+     passes an `entry` envelope over, and moves a `pr` ask only to the person); the sender's `ao inbox --sent` reads where it went. So a send that could not
      fill, and a second ask that landed on a closed seat behind the first before its fill, are one case.
      **The cause pass never fills an extra**: `seat_due` and a seat's fill on its cause pass over a record
      carrying `scale`, whose fills are the send's and this mover's alone, both reading `scale.live`. An idle record, one lingering, is free and takes its mail
