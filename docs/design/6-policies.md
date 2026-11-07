@@ -1558,10 +1558,14 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   too. It assumes one home per origin: a second home that promotes the same repo reads the first's tag
   as someone else's, below.
   **The home reads the tag before it acts.** Each full pass that reads **live** at a commit of
-  `origin/main` (a copy installed by hand that `check` reads among them), and the watch pass that finds
-  a promote or a rollback concluding there, reads the tag and a branch of that name with one
-  `git ls-remote origin refs/tags/promote/live refs/heads/promote/live`, off the loop, so a tag deleted
-  or moved between promotes is seen within a full pass. A read that fails (the origin not answering,
+  `origin/main` (a copy installed by hand that `check` reads among them) with no promote or rollback of
+  the repo in flight, and the watch pass that finds one concluding there, reads the tag and a branch of
+  that name with one `git ls-remote origin refs/tags/promote/live refs/heads/promote/live`, off the
+  loop, so a tag deleted or moved between promotes is seen within a full pass. While a run is in
+  flight — its smoke included, though `check` already reads the new commit (*The promote is in flight
+  until the smoke ends*, below) — nothing is read or pushed: a tag at a build whose smoke then fails
+  would lift a gate no rollback puts back. The sha compared is the ref's own object as `ls-remote`
+  prints it, so an annotated tag (its tag object's sha) never reads as at the live commit. A read that fails (the origin not answering,
   refused, timed out) is no reading: it pushes nothing, keeps the lease and the noted lines, is logged
   and is read again on the next full pass; only a read that answers can find a ref absent. Then, by
   what it finds:
@@ -1587,7 +1591,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   note of a ref replacing that ref's line alone, so a branch note never stands for a tag note and
   a tag noted before a branch came and went is not noted again. A read that does not find a noted
   ref at its noted sha (the branch gone, the tag absent or elsewhere) clears that ref's line, so a
-  ref put back at a noted sha is noted again. Both files are read at every read, never held from
+  ref put back at a noted sha is noted again; a landed push clears the tag's line too, since it moves
+  the tag. A pass that reads nothing (a run in flight, a failed read, a live *unknown* or off
+  `origin/main`) keeps the lines, so a ref removed and put back at its noted sha within it is not
+  noted again. Both files are read at every read, never held from
   the home's start: a press's or a rollback's own full read carries no earlier reading, and a
   promote of this repo restarts the home that pushed it; the reading's `live_ref` is a copy for
   `ao promote status` (its `--json`'s `promotes.<repo>.live_ref`, §4.7).
