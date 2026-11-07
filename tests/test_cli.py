@@ -2587,11 +2587,15 @@ def test_the_briefs_send_another_repos_work_to_its_question_seat():
     for name in ("grinder.md", "designer.md", "manager.md"):
         brief = (root / "src/shiftlead/briefs" / name).read_text()
         assert "**Work you meet in another repo** is that repo's" in brief, name
-        assert "`ao td add --repo <repo> \"<what, and why>\"`" in brief, name
-        assert "only where that is refused *<repo> has no question seat* write an `act` line on {board}" in brief, name
+        assert '`ao td add --repo <repo> "<what, and why>"`' in brief, name
+        assert (
+            "refused *<repo> has no question seat* (or *no registered repo <repo>*) write an `act` line on {board}"
+            in brief
+        ), name
         assert "*<repo> has no question seat, so no session here can file it*" in brief, name
     design = (root / "docs/design/4.7-cli.md").read_text()
     assert "**Work a session meets in another repo goes this way** (TD-1544)" in design
+
 
 def test_status_v_says_what_a_close_did_with_the_worktree(monkeypatch, capsys):
     """design §4.1 *Kept, and said* (TD-979): `ao status -v` prints a closed record's `worktree_kept`,
