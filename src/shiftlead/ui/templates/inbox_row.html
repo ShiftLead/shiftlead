@@ -17,6 +17,8 @@
     PR), a link where the repo's origin says where it is -#}
 {% macro design_link(e) -%}
 {%- if e.design_pr is number %} <span class="st designpr" title="the design's pull request: an item about a design opens it (design §4.5 screen 6)">· design {% if e.design_pr_url %}<a class="ref" href="{{ e.design_pr_url }}" target="_blank" rel="noopener">#{{ e.design_pr }}</a>{% else %}#{{ e.design_pr }}{% endif %}</span>{% endif %}
+{#- and its synopsis after it, where the design has one (§4.5 screen 6 *A design links its synopsis*, TD-1536) -#}
+{{- qrow.synopsis(e.synopsis) }}
 {%- endmacro %}
 
 {% macro head(e) -%}

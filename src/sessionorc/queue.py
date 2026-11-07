@@ -24,6 +24,7 @@ from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
 from sessionorc import naming, witness, workorders
 from sessionorc import rank as rank_mod
+from sessionorc import synopsis as synopsis_mod
 from sessionorc.mail import LEASE_TTL
 from sessionorc.reports import branch_ref
 
@@ -88,6 +89,10 @@ HOLDER = "holder:"
 # which only an item about the entry reads (`design_prs`, §4.5 screen 6 *An item about a design links the design's
 # PR*, TD-1531)
 DESIGN_KEY = "design:"
+# the synopsis of the entry an item about a design resolved to, keyed `synopsis:<repo>#TD-n` by the item's entry's
+# spellings, to `(editor_path or "", branch, path, root)` — drawn only where the file is there (§4.5 screen 6 *A
+# design links its synopsis*, TD-1536)
+SYNOPSIS_KEY = "synopsis:"
 # a PR whose title leads with an entry's id and the word *design* (§4.9c *The designer records its PR*): `TD-n
 # design: …`, never a build's (*TD-m: … TD-n …*) or a ledger edit's (*TD-n: …*)
 DESIGN_TITLE = re.compile(r"^\s*TD-(\d+)\s+design(?=[\s:]|$)", re.I)
@@ -98,25 +103,34 @@ def design_prs(
     prs: Mapping[str, Any],
     open_: Mapping[str, Mapping[str, Any]],
     archived: Mapping[str, Mapping[str, Any]],
+    synopses: Mapping[str, Any] | None = None,
 ) -> dict[str, dict[str, Any]]:
-    """`{<repo>#TD-n: {n, root}}`: the design PR an item about each open or archived entry links (§4.5 screen 6 *An
-    item about a design links the design's PR*, TD-1531). An entry's own: the lowest of its repo's open PRs (`prs`,
-    by repo name, each `{open: [{number, title}]}`) whose title leads with its id and *design* and whose number is
-    above its `Design PR:` section's last, else that last; where it has neither, its `Part of:` parent's own the
-    same way — one hop, never the parent's parent. `root` is the entry's repo's, for the link (`review.pr_url`);
-    `only` says no other repo holds the id, open or archived, so a bare `TD-n` may be looked up by it."""
-    open_design: dict[str, list[int]] = {}
+    """`{<repo>#TD-n: {n, root, only, own, synopsis}}`: the design PR an item about each open or archived entry links
+    (§4.5 screen 6 *An item about a design links the design's PR*, TD-1531). An entry's own: the lowest of its repo's
+    open PRs (`prs`, by repo name, each `{open: [{number, title, branch, head, fork}]}`) whose title leads with its id
+    and *design* and whose number is above its `Design PR:` section's last, else that last; where it has neither, its
+    `Part of:` parent's own the same way — one hop, never the parent's parent. `root` is the entry's repo's, for the
+    link (`review.pr_url`); `only` says no other repo holds the id, open or archived, so a bare `TD-n` may be looked
+    up by it; `own` that the link is the entry's own, not its parent's. `synopsis` is the synopsis of the entry the
+    link was read from (`synopsis.entry`, §4.5 screen 6 *A design links its synopsis*, TD-1536): read from the open
+    design PR's head where the link is that PR, else from `origin/<default>`; `synopses` is each repo's synopsis
+    reading by name (`synopsis.reading`), and a repo with none carries no `synopsis`."""
+    open_design: dict[str, list[Mapping[str, Any]]] = {}
     for name, got in prs.items():
         for pr in (got or {}).get("open") or () if isinstance(got, Mapping) else ():
             n = pr.get("number") if isinstance(pr, Mapping) else None
             if isinstance(n, int) and not isinstance(n, bool) and (m := DESIGN_TITLE.match(str(pr.get("title") or ""))):
-                open_design.setdefault(qid(name, f"TD-{m.group(1)}"), []).append(n)
+                open_design.setdefault(qid(name, f"TD-{m.group(1)}"), []).append(pr)
 
-    def own(q: str, e: Mapping[str, Any]) -> int | None:
+    def own(q: str, e: Mapping[str, Any]) -> tuple[int, Mapping[str, Any] | None] | None:
         section = [n for n in e.get("design_pr") or () if isinstance(n, int) and not isinstance(n, bool)]
         last = section[-1] if section else None
-        above = sorted(n for n in open_design.get(q, ()) if last is None or n > last)
-        return above[0] if above else last
+        above = sorted(
+            (p for p in open_design.get(q, ()) if last is None or p["number"] > last), key=lambda p: p["number"]
+        )
+        if above:
+            return above[0]["number"], above[0]
+        return (last, None) if last is not None else None
 
     held: dict[str, set[str]] = {}  # each bare id, by the repos holding it open or archived
     for q in [*archived, *open_]:
@@ -124,16 +138,22 @@ def design_prs(
         held.setdefault(tid, set()).add(name)
     out: dict[str, dict[str, Any]] = {}
     for q, e in [*archived.items(), *open_.items()]:
-        n = own(q, e)
+        at, got = q, own(q, e)
         parent = e.get("part_of") if q in open_ else lb.parse_part_of(e.get("part_of_raw"))[0]
-        if n is None and parent and (pq := qid(str(e["repo"]), str(parent))) != q:
-            n = own(pq, open_.get(pq) or archived.get(pq) or {})
-        if n is not None:
-            out[q] = {"n": n, "root": str(roots.get(str(e["repo"])) or ""), "only": len(held[q.partition("#")[2]]) == 1}
+        if got is None and parent and (pq := qid(str(e["repo"]), str(parent))) != q:
+            at, got = pq, own(pq, open_.get(pq) or archived.get(pq) or {})
+        if got is None:
+            continue
+        root = str(roots.get(str(e["repo"])) or "")
+        d: dict[str, Any] = {"n": got[0], "root": root, "only": len(held[q.partition("#")[2]]) == 1, "own": at == q}
+        name, _, tid = at.partition("#")
+        if (syn := synopsis_mod.entry(tid, got[1], (synopses or {}).get(name), root)) is not None:
+            d["synopsis"] = syn
+        out[q] = d
     return out
 
 
-def card_index(reading: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
+def card_index(reading: Mapping[str, Any] | None) -> dict[str, tuple[str, ...]]:
     """The open cards' entries (§4.5 screen 6 *Where a row is drawn*): each `<repo>#TD-n` a card holds —
     its top entry and every row, an open card's archived rows among them — to `(card id, row qid)`, and
     the bare `TD-n` too where one repo alone holds it, and `<origin path>#TD-n` where the reading's `origins`
@@ -189,15 +209,33 @@ def card_index(reading: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
         if "#" not in str(q) or not got or not isinstance(d, Mapping) or not isinstance(d.get("n"), int):
             continue
         val = (str(d["n"]), str(d.get("root") or ""))
-        out.setdefault(DESIGN_KEY + got[0], val)
+        syn = d.get("synopsis")
+        sval = (  # the synopsis it resolved to, where the file is there (TD-1536)
+            (
+                str(syn.get("editor_path") or ""),
+                str(syn.get("branch") or ""),
+                str(syn.get("path")),
+                str(syn.get("root")),
+            )
+            if isinstance(syn, Mapping) and syn.get("exists")
+            else None
+        )
         name, _, tid = got[0].partition("#")
-        if path := origins.get(name):
-            out.setdefault(f"{DESIGN_KEY}{path}#{tid}", val)
+        path = origins.get(name)
+        for key, v in ((DESIGN_KEY, val), (SYNOPSIS_KEY, sval)):
+            if v is None:
+                continue
+            out.setdefault(key + got[0], v)
+            if path:
+                out.setdefault(f"{key}{path}#{tid}", v)
         if d.get("only"):
             design_bare.setdefault(tid, set()).add(got[0])
     for tid, qs in design_bare.items():
         if len(qs) == 1:
-            out[DESIGN_KEY + tid] = out[DESIGN_KEY + next(iter(qs))]
+            q = next(iter(qs))
+            out[DESIGN_KEY + tid] = out[DESIGN_KEY + q]
+            if SYNOPSIS_KEY + q in out:
+                out[SYNOPSIS_KEY + tid] = out[SYNOPSIS_KEY + q]
     return out
 
 
@@ -1147,6 +1185,15 @@ def reading(
                 claims.setdefault(qid(home, p.ref), str(rec.id))
 
     pressing = _pressing(open_, boards, linked)
+    # the design PR an item about each entry links (TD-1531), with its synopsis (TD-1536)
+    synopses = {n: r.get("synopses") for n, r in rs.by_name.items() if isinstance(r.get("synopses"), Mapping)}
+    designs = design_prs(rs.roots, {n: r.get("prs") for n, r in rs.by_name.items()}, open_, archived, synopses)
+
+    def own_synopsis(q: str) -> dict[str, Any] | None:
+        """A design entry's own line's synopsis, by its own id alone (a build's, read from its parent, is none)."""
+        d = designs.get(q) or {}
+        syn = d.get("synopsis")
+        return dict(syn) if d.get("own") and isinstance(syn, Mapping) and syn.get("exists") else None
 
     def row(q: str) -> dict[str, Any]:
         if q in open_:
@@ -1202,6 +1249,7 @@ def reading(
                 "key": e.get("key") or "",
                 "lined": bool(e.get("lined")),
                 "archived": False,
+                "synopsis": own_synopsis(q),  # a design entry's own line ends its title with it (TD-1536)
             }
         a = archived[q]
         pr = _resolved_pr(a["fields"])
@@ -1228,6 +1276,7 @@ def reading(
             "closed": _closed(a["fields"], closed_at.get(q)),
             "sha": (closed_at.get(q) or {}).get("sha"),  # the closing commit, the page's live mark (TD-904)
             "resolved": _resolved_text(a["fields"]),
+            "synopsis": own_synopsis(q),
         }
 
     cards: list[dict[str, Any]] = []
@@ -1253,7 +1302,7 @@ def reading(
         # every live claim on an open entry, for a stopped holder's state row (TD-1468)
         "holds": holds,
         # the design PR an item about each entry links (TD-1531)
-        "design_prs": design_prs(rs.roots, {n: r.get("prs") for n, r in rs.by_name.items()}, open_, archived),
+        "design_prs": designs,
         "at": now.isoformat(),
     }
 

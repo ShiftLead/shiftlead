@@ -41,6 +41,7 @@ from .org import (
     team_repo,
     team_summary,
 )
+from .queue import synopsis_view
 from .spend import team_figure
 
 # -- Add entry (design §4.9 *Add an entry to the ledger*, §4.5a **Add entry…**, TD-219 slice 3) -------
@@ -489,6 +490,7 @@ def debt_cards(queue: Mapping[str, Any] | None, name: str, lists: list[dict[str,
             "afters": [_shown(str(a), name) for a in r.get("after") or []],
             "anchor": str(r.get("id") or "") if own and not r.get("archived") else "",
             "ext": ext.get(str(r.get("id"))) if own and not r.get("archived") else None,
+            "synopsis": synopsis_view(r.get("synopsis")),  # a design's row ends its title with it (TD-1536)
         }
 
     out: list[dict[str, Any]] = []

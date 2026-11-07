@@ -20,6 +20,7 @@ from sessionorc.queue import (  # noqa: F401 — the home's
     DESIGN_KEY,
     HOLDER,
     LOOSE,
+    SYNOPSIS_KEY,
     TD_REF,
     asker_repos,
     card_entries,
@@ -35,7 +36,7 @@ from sessionorc.queue import (  # noqa: F401 — the home's
 from sessionorc.queue import refs as _refs
 from shiftlead import review as review_mod
 
-from .common import _age, _instant, close_state, promote_reading
+from .common import _age, _instant, close_state, editor_file_link, promote_reading
 
 # Recently completed's window picker (§4.5 screen 12, §4.5a *Queue page, Recently completed*): its
 # words, in order, and how far back each reaches; *day* is drawn first (26–69 entries close in a day)
@@ -179,16 +180,35 @@ def ledger_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | Non
 DESIGN_MAIL = ("ask", "steer", "note")
 
 
+def synopsis_view(syn: Any) -> dict[str, Any] | None:
+    """What *· synopsis · GitHub* draws for a synopsis that is there (§4.5 screen 6 *A design links its synopsis*,
+    TD-1536): `{editor, web}` — `editor` the person's file link to the copy on this host's disk (`editor_file_link`,
+    None under `open_in: none`, a template with no `{path}`, or no copy on the disk), `web` the file on GitHub,
+    `<repo_web>/blob/<branch>/<path>`, the branch percent-encoded with its `/` kept ('' where the repo's origin is
+    no GitHub). `syn` is the reading's `{editor_path, branch, path, root}` (a mapping, or `card_index`'s tuple of
+    them in that order); None where there is neither link, or no synopsis."""
+    if isinstance(syn, tuple):
+        syn = dict(zip(("editor_path", "branch", "path", "root"), syn, strict=False))
+    if not isinstance(syn, Mapping) or not syn.get("path"):
+        return None
+    editor = editor_file_link(str(syn["editor_path"])) if syn.get("editor_path") else None
+    base = review_mod.repo_web(str(syn.get("root") or "")) if syn.get("root") and syn.get("branch") else ""
+    web = f"{base}/blob/{quote(str(syn['branch']), safe='/')}/{syn['path']}" if base else ""
+    return {"editor": editor, "web": web} if editor or web else None
+
+
 def design_link(
-    e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None, askers: Mapping[str, str] | None = None
+    e: Mapping[str, Any], index: Mapping[str, tuple[str, ...]] | None, askers: Mapping[str, str] | None = None
 ) -> dict[str, Any]:
-    """`{design_pr, design_pr_url}` for an item about a design (§4.5 screen 6 *An item about a design links the
-    design's PR*, §4.5a *Queue card: what needs the person*, TD-1531), else {}: a mail item (`ask`, `steer`,
+    """`{design_pr, design_pr_url, synopsis}` for an item about a design (§4.5 screen 6 *An item about a design links
+    the design's PR*, §4.5a *Queue card: what needs the person*, TD-1531), else {}: a mail item (`ask`, `steer`,
     `note`) by its `about`'s first ref, a board line by its `Context:`'s first, a held ledger row by its own id —
     the ref qualified by the item's repo (a mail item's sender's, `askers` as `item_home` reads it; a board line's
     `repo_name`; a ledger row's `name`) unless it names its own, and looked up in `card_index`'s `design:` keys,
-    apart from any card. An item whose own `pr` is that number carries none; `design_pr_url` is the link where
-    the entry's repo's origin says where it is (`review.pr_url`), else ''. Never from the item's words."""
+    apart from any card. An item whose own `pr` is that number carries no `design_pr`; `design_pr_url` is the link where
+    the entry's repo's origin says where it is (`review.pr_url`), else ''. `synopsis` is `synopsis_view` of the
+    synopsis the link resolved to, where the file is there (TD-1536), and stays where the repeated number is
+    dropped. Never from the item's words."""
     if not index:
         return {}
     kind = e.get("row")
@@ -207,10 +227,14 @@ def design_link(
         return {}
     ref = got[0] if "#" in got[0] or not repo else f"{repo}#{got[0]}"
     hit = index.get(DESIGN_KEY + ref)
-    own = str(e.get("pr") or "").strip().lstrip("#")
-    if not hit or not hit[0].isdigit() or (n := int(hit[0])) == (int(own) if own.isdigit() else None):
+    if not hit or not hit[0].isdigit():
         return {}
-    return {"design_pr": n, "design_pr_url": review_mod.pr_url(hit[1], n) if hit[1] else ""}
+    syn = synopsis_view(index.get(SYNOPSIS_KEY + ref))
+    out: dict[str, Any] = {"synopsis": syn} if syn else {}
+    own = str(e.get("pr") or "").strip().lstrip("#")
+    if (n := int(hit[0])) == (int(own) if own.isdigit() else None):
+        return out  # its own `#n` is the design's: the number is not repeated, the synopsis is drawn (TD-1536)
+    return {**out, "design_pr": n, "design_pr_url": review_mod.pr_url(hit[1], n) if hit[1] else ""}
 
 
 def line_names(e: Mapping[str, Any]) -> set[str]:
@@ -347,6 +371,7 @@ def _row(r: Mapping[str, Any], one_repo: bool, mentioned: Mapping[str, Any] | No
         "afters": [_show(str(a), one_repo) for a in r.get("after") or []],
         "anchor": "" if r.get("archived") else _show(q, one_repo),
         "ext": None,
+        "synopsis": synopsis_view(r.get("synopsis")),  # a design entry's own line ends its title with it (TD-1536)
     }
 
 
@@ -513,8 +538,9 @@ def attach(
                 **({"holder": True} if e.get("row") in HOLDER_ROWS else {}),
                 "running": sec == "steering",
                 "on_row": e["on_row"],
-                # the design PR it links, *· design #n* (TD-1531)
+                # the design PR it links, *· design #n* (TD-1531), and its synopsis (TD-1536)
                 **({"design_pr": e["design_pr"]} if e.get("design_pr") else {}),
+                **({"synopsis": e["synopsis"]} if e.get("synopsis") else {}),
                 **({"row": dict(e), "tied": e.get("tied"), "repo": _repo_of(e)} if raw else {}),
             }
         )

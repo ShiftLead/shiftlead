@@ -18,7 +18,7 @@ from test_ui_repo_page import fake, reading
 from sessionorc import hosts
 
 TEMPLATES = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui" / "templates"
-FILE_TEXTS = ("Open file", "Open ledger", "Open board")
+FILE_TEXTS = ("Open file", "Open ledger", "Open board", "synopsis")
 TAG = re.compile(r"<(a|button)\b([^>]*)>(.*?)</\1>", re.S)
 
 # the person's `open_in` forms the pages are rendered under: (local, a template or None)
@@ -57,13 +57,16 @@ def _attr(tag: str, name: str) -> str | None:
 def test_every_file_button_in_the_templates_is_drawn_by_file_link():
     """No template writes a file button's tag itself: every **Open file**, **Open ledger** and **Open
     board**, the Focus header's `#ftranscript_editor` and the Transcript page's **VS Code** is a
-    `file_link` call; the Session card's folder button `#feditor` is not."""
+    `file_link` call; the Session card's folder button `#feditor` is not. A design's **synopsis** (§4.5 screen 6 *A
+    design links its synopsis*, TD-1536) is a `file_link` too; only its GitHub fallback, `a.synweb` (no file link on
+    this host), is written by hand, since it opens the forge, not the editor."""
     seen = {t: 0 for t in FILE_TEXTS}
     for f in sorted(TEMPLATES.glob("*.html")):
         src = f.read_text(encoding="utf-8")
         for m in TAG.finditer(src):
             inner = re.sub(r"\{#.*?#\}", "", m.group(3), flags=re.S).strip()
-            assert not any(inner.endswith(t) for t in FILE_TEXTS), f"{f.name}: {m.group(0)[:160]}"
+            web = m.group(1) == "a" and 'class="ref synweb"' in m.group(2)  # the forge's copy, no file link
+            assert web or not any(inner.endswith(t) for t in FILE_TEXTS), f"{f.name}: {m.group(0)[:160]}"
             assert 'id="ftranscript_editor"' not in m.group(2), f"{f.name}: the transcript button is a file_link"
             if m.group(1) == "a" and 'id="feditor"' in m.group(2):
                 assert "data-file-link" not in m.group(2), f"{f.name}: #feditor is the folder button"
