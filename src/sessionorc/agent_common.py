@@ -921,8 +921,15 @@ def _clean_answer(text: Any) -> str:
 
 
 def _cap(usage: dict[str, Any] | None) -> str | None:
-    """The pending text for a capped profile, or None: **any** window the adapter reports at or
-    over 100% whose `resets` has not passed (TD-073). The windows and their labels are the
+    """The pending text of `cap_window`, or None."""
+    found = cap_window(usage)
+    return found[0] if found else None
+
+
+def cap_window(usage: dict[str, Any] | None) -> tuple[str, datetime | None] | None:
+    """The pending text and the reset (None: unknown) for a capped profile, or None: **any** window
+    the adapter reports at or over 100% whose `resets` has not passed (TD-073); the reset is what a
+    poll's `limited` keeps as `limited_reset` (§4.3, TD-1474). The windows and their labels are the
     adapter's — a tool with one daily window, three windows or none says so and this package names
     none of them (design §4.3). A window whose `resets` has passed is not a cap any more even
     before the next poll says so."""
@@ -945,7 +952,7 @@ def _cap(usage: dict[str, Any] | None) -> str | None:
         if at is not None and at <= now:
             continue
         label = _clean(str(w.get("label") or "usage"))[:24] or "usage"
-        return f"{label} cap · resets {at.strftime('%H:%MZ') if at else 'unknown'}"
+        return f"{label} cap · resets {at.strftime('%H:%MZ') if at else 'unknown'}", at
     return None
 
 

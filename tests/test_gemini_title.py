@@ -15,6 +15,7 @@ import pytest
 from conftest import wait_for
 
 from sessionorc import adapters, agent_common, agent_tick
+from sessionorc import screen as screen_mod
 from sessionorc.client import LocalClient
 from sessionorc.models import Pending, Session, now_iso
 from sessionorc.screen import Match, painted_text
@@ -28,6 +29,23 @@ PAD = " " * 40
 READY, WORKING, QUIET, ACTION = (
     f"{g}  {w} (t1){PAD}" for g, w in (("◇", "Ready"), ("✦", "Working…"), ("⏲", "Working…"), ("✋", "Action Required"))
 )
+
+
+class _Frozen(datetime):
+    """The screen rules' clock, held still so a rule's *resets HH:MMZ* is known (§4.3, TD-1474)."""
+
+    at = datetime(2026, 11, 6, 20, 0, tzinfo=UTC)
+
+    @classmethod
+    def now(cls, tz=None):
+        return cls.at.astimezone(tz) if tz else cls.at.replace(tzinfo=None)
+
+
+@pytest.fixture(autouse=True)
+def _rules_clock(monkeypatch):
+    monkeypatch.setattr(_Frozen, "at", datetime(2026, 11, 6, 20, 0, tzinfo=UTC))
+    monkeypatch.setattr(screen_mod, "datetime", _Frozen)
+    return _Frozen
 
 
 @pytest.fixture
@@ -216,7 +234,7 @@ def test_the_limit_box_reads_limited_over_the_titles_working():
     ad = GeminiAdapter(binary="gemini")
     m = ad.explain(BOX, title=WORKING)
     assert (m.rule, m.state, m.modal) == ("gemini-usage-limit", "limited", True)
-    assert m.pending == Pending(kind="limit", text="Gemini's usage limit reached — answer its dialog in the terminal")
+    assert m.pending == LIMIT and m.resets == "2026-11-07T08:00:00Z"  # midnight Pacific (PST), TD-1474
     assert m.to_dict()["modal"] is True and ad.explain(BOX).state == "limited"  # with no title, the manifest alone
     painted = [painted_text(r) for r in BOX]
     on_stop = [r.replace("● 1. Keep trying", "  1. Keep trying").replace("  2. Stop", "● 2. Stop") for r in painted]
@@ -239,7 +257,7 @@ def _box(agent, s: Session, title: str, hook_age: float | None = 60.0, tail: lis
     return s
 
 
-LIMIT = Pending(kind="limit", text="Gemini's usage limit reached — answer its dialog in the terminal")
+LIMIT = Pending(kind="limit", text="Gemini's usage limit reached — answer its dialog in the terminal · resets 08:00Z")
 
 
 async def test_the_box_takes_the_screen_road_and_the_title_takes_over_once_it_goes(agent, gem, tmp_path):
@@ -351,3 +369,71 @@ async def test_explain_on_a_live_record_at_the_box_gives_the_rules_reason(agent,
         handed = await c.call("entry_add", repo="shiftlead", type="debt", text="the parser drops a line", teams=teams)
         assert handed["to"] == s["id"] and handed["read_when"].startswith(no_reset)
         await c.call("kill", id=s["id"])
+
+
+# ── the quota box names its daily reset (design §4.3, §4.9b `limited_reset`, TD-1474) ─────────────
+
+
+def test_the_quota_rule_names_midnight_pacific_and_a_rule_without_resets_names_none():
+    """At 2026-11-06T20:00Z (PST) the box reads `limited` with *resets 08:00Z*; across the March change
+    the same midnight is 08:00Z before it and 07:00Z after; a rule with no `resets` gives none."""
+    ad = GeminiAdapter(binary="gemini")
+    m = ad.explain(BOX)
+    assert (m.state, m.resets, m.to_dict()["resets"]) == ("limited", "2026-11-07T08:00:00Z", "2026-11-07T08:00:00Z")
+    assert m.pending.text.endswith("· resets 08:00Z")
+    at = ad.rules.explain([painted_text(r) for r in BOX], now=datetime(2026, 3, 7, 20, 0, tzinfo=UTC))
+    assert at.resets == "2026-03-08T08:00:00Z" and at.pending.text.endswith("resets 08:00Z")
+    at = ad.rules.explain([painted_text(r) for r in BOX], now=datetime(2026, 3, 8, 20, 0, tzinfo=UTC))
+    assert at.resets == "2026-03-09T07:00:00Z" and at.pending.text.endswith("resets 07:00Z")
+    plain = screen_mod.Rule(id="r", state="limited", all=["^x$"], pending_kind="limit", pending_text="capped")
+    m = screen_mod.Manifest(tool="t", version=1, rules=[plain]).explain(["x"])
+    assert m.resets is None and m.pending.text == "capped" and "resets" not in m.pending.text
+
+
+def test_next_daily_takes_the_first_time_strictly_after_and_refuses_a_malformed_spec():
+    nd = screen_mod.next_daily
+    la = "daily 00:00 America/Los_Angeles"
+    assert nd(la, datetime(2026, 11, 7, 8, 0, tzinfo=UTC)) == datetime(2026, 11, 8, 8, 0, tzinfo=UTC)  # not now
+    # a time in the spring gap moves forward; one in the autumn fold takes the first
+    assert nd("daily 02:30 America/Los_Angeles", datetime(2026, 3, 8, 9, 0, tzinfo=UTC)) == datetime(
+        2026, 3, 8, 10, 30, tzinfo=UTC
+    )
+    assert nd("daily 01:30 America/Los_Angeles", datetime(2026, 11, 1, 7, 0, tzinfo=UTC)) == datetime(
+        2026, 11, 1, 8, 30, tzinfo=UTC
+    )
+    for bad in ("weekly 00:00 UTC", "daily 25:00 UTC", "daily 00:00 Nowhere/Here"):
+        with pytest.raises(ValueError):
+            nd(bad, datetime(2026, 1, 1, tzinfo=UTC))
+    with pytest.raises(ValueError):
+        screen_mod.Rule(id="r", state="limited", all=["x"], resets="daily soon")
+    assert screen_mod.resets_text("cap · resets 01:00Z", datetime(2026, 1, 1, 8, tzinfo=UTC)) == "cap · resets 08:00Z"
+
+
+async def test_the_spell_keeps_its_first_reset_past_midnight(agent, gem, tmp_path, _rules_clock):
+    """First seen at 23:50 PT (07:50Z) the box holds `limited_reset` 08:00Z; at 00:10 PT, the box still up,
+    the record still carries 08:00Z (passed) and its pending still reads *resets 08:00Z*, not tomorrow's.
+    Once the state leaves `limited` the reset goes with it, and the next spell reads its own."""
+    _rules_clock.at = datetime(2026, 11, 7, 7, 50, tzinfo=UTC)
+    s = _box(agent, _rec(tmp_path, state="working"), WORKING)
+    assert (s.state, s.limited_reset) == ("limited", "2026-11-07T08:00:00Z")
+    _rules_clock.at = datetime(2026, 11, 7, 8, 10, tzinfo=UTC)
+    assert gem.explain(BOX).resets == "2026-11-08T08:00:00Z"  # what the rule alone would say now
+    rev = s.rev
+    s = _box(agent, s, WORKING)
+    assert (s.state, s.limited_reset, s.pending) == ("limited", "2026-11-07T08:00:00Z", LIMIT) and s.rev == rev
+    assert _look(agent, s, READY).state == "working" and s.limited_reset is None  # *Stop*: the spell is over
+    s = _box(agent, s, WORKING)
+    assert s.limited_reset == "2026-11-08T08:00:00Z" and s.pending.text.endswith("resets 08:00Z")
+
+
+async def test_the_polls_limited_keeps_its_windows_reset(agent, gem, tmp_path):
+    """A `limited` the usage cap marks keeps that window's reset as the spell's (§4.3, TD-1474)."""
+    s = _rec(tmp_path, state="working")
+    s.profile = "p"
+    at = datetime.now(UTC).replace(microsecond=0) + timedelta(hours=2)
+    agent._usage["p"] = {"windows": [{"label": "5h", "pct": 100, "resets": at.isoformat()}]}
+    agent._usage_limits([s], set())
+    assert s.state == "limited" and s.limited_reset == at.isoformat().replace("+00:00", "Z")
+    agent._usage["p"] = {"windows": [{"label": "5h", "pct": 10, "resets": at.isoformat()}]}
+    agent._usage_limits([s], set())
+    assert s.state == "working" and s.limited_reset is None
