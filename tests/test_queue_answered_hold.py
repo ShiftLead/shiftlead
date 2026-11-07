@@ -37,7 +37,7 @@ def _held(tmp_path, name: str = "r", n: int = 1, *, written=None):
 
 
 def _asker(state: str = "working") -> Session:
-    s = _rec("ao-r-designer", "/x", state=state)
+    s = _rec("ao-r-designer", "/x/r", state=state)  # works in repo `r` (TD-1509)
     s.name = "designer"
     return s
 
@@ -116,16 +116,43 @@ def test_the_newest_answered_question_names_the_asker_and_an_open_one_is_its_own
     assert cards["r#TD-001"]["top"]["answered"] is None
 
 
+def _asker_in(repo: str) -> Session:
+    """The asker, its record's repo `repo` ('' for a record that names none)."""
+    s = _rec("ao-r-designer", repo)
+    s.name = "designer"
+    return s
+
+
 def test_a_bare_id_links_only_where_one_repo_carries_it_open(tmp_path):
+    """An asker whose record names no repo: its bare id is looked up by the one-repo rule."""
+    nowhere = [_asker_in("")]
     a, ra = _held(tmp_path, "alpha", written=ANSWERED - timedelta(hours=2))
     b, rb = _repo(tmp_path, "beta", [_entry(2, "another", Priority="Low")])
-    _, cards = _top({a: ra, b: rb}, [_q()])
+    _, cards = _top({a: ra, b: rb}, [_q()], nowhere)
     assert cards["alpha#TD-001"]["top"]["answered"] is not None
     c, rc = _repo(tmp_path, "gamma", [_entry(1, "gamma's own TD-001", Priority="Low")])
-    _, cards = _top({a: ra, c: rc}, [_q()])
+    _, cards = _top({a: ra, c: rc}, [_q()], nowhere)
     assert cards["alpha#TD-001"]["top"]["answered"] is None, "two repos' TD-001: no link"
-    _, cards = _top({a: ra, c: rc}, [_q("alpha#TD-001")])
+    _, cards = _top({a: ra, c: rc}, [_q("alpha#TD-001")], nowhere)
     assert cards["alpha#TD-001"]["top"]["answered"] is not None, "a `<repo>#` ref links"
+
+
+def test_a_bare_id_is_the_askers_repos(tmp_path):
+    """TD-1509 (§4.5 screen 6 *A bare ref elsewhere*): a question's bare `TD-n` is its asker's record's repo's — an
+    asker in alpha links alpha's TD-001 though gamma carries one too, and an asker in gamma never answers alpha's,
+    whether or not alpha alone carries it; an orphaned question's `orphaned.repo` stands in for a gone record."""
+    a, ra = _held(tmp_path, "alpha", written=ANSWERED - timedelta(hours=2))
+    c, rc = _repo(tmp_path, "gamma", [_entry(1, "gamma's own TD-001", Priority="Low")])
+    _, cards = _top({a: ra, c: rc}, [_q()], [_asker_in(a)])
+    assert cards["alpha#TD-001"]["top"]["answered"] is not None, "the asker's repo settles two repos' TD-001"
+    _, cards = _top({a: ra, c: rc}, [_q()], [_asker_in(c)])
+    assert cards["alpha#TD-001"]["top"]["answered"] is None, "gamma's asker is about gamma's TD-001"
+    _, cards = _top({a: ra}, [_q()], [_asker_in(c)])
+    assert cards["alpha#TD-001"]["top"]["answered"] is None, "alpha alone holding it is no reason to link"
+    q = _q()
+    q.orphaned = {"repo": str(c), "ref": "TD-001", "how": "closed"}
+    assert queue.asker_repos([q], []) == {"m-1": "gamma"}
+    assert queue.asker_repos([q], [_asker_in(a)]) == {"m-1": "alpha"}, "the record first"
 
 
 def test_an_origin_path_ref_links_its_repos_member(tmp_path):

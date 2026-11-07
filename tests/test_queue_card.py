@@ -33,7 +33,7 @@ def test_item_home_says_how_each_item_found_its_entry():
     red = {"row": "red_pr", "id": "red_pr:s:5", "title": "slice 2", "branch": "TD-10-thing"}
     assert item_home(red, idx)["tied"] == {"by": "pr", "ref": "TD-010"}
     fork = {"row": "fork_pr", "id": "fork_pr:s:6", "title": "fix TD-20", "repo": "s", "pr": 6}
-    assert item_home(fork, idx)["tied"] == {"by": "title", "ref": "TD-020"}
+    assert item_home(fork, idx)["tied"] == {"by": "title", "ref": "s#TD-020"}  # its own repo's (TD-1509)
     assert item_home(mail("m3", "about nothing"), idx)["tied"] is None
     assert item_home({"row": "state", "id": "x"}, idx)["tied"] is None
     assert ledger_home({"name": "s", "id": "TD-21"}, idx)["tied"] == {"by": "entry", "ref": "s#TD-021"}

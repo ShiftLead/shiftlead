@@ -44,7 +44,7 @@ from . import render as rendermod
 from . import uiconf
 from .cards import MODE_VIA_WORDS, _clock, _first_line, alarm_note, alarm_to_view, fill_words, subagent_held
 from .common import _age, _countdown, _instant, _iso, _left, editor_file_link, host_name, templates
-from .queue import item_home
+from .queue import asker_repos, item_home
 
 # -- the Inbox page (design §4.5 screen 6, §4.5a **Inbox page**, §4.10; TD-069 step 1) -------------
 
@@ -2100,6 +2100,7 @@ def inbox_sections(
     fleet: Collection[Mapping[str, Any]] = (),
     cards: Mapping[str, tuple[str, str]] | None = None,
     snoozed: Collection[dict[str, Any]] = (),
+    roots: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Design §4.5 screen 6: the person inbox split into the page's three sections, plus what is
     snoozed — and, from TD-069 step 2, the **session states** (`states`, from `state_rows`) joined
@@ -2161,7 +2162,8 @@ def inbox_sections(
     cards' entries (`ui.queue.card_index`), every row is tagged `home: inbox|queue` with the `on_card` and
     `on_row` it is drawn on and its `mentions` (`ui.queue.item_home`); a view rule, so the sections and the
     counts are what they were, and `queue_n` is how many counted rows the Queue draws. Without `cards`
-    every row is `home: inbox`."""
+    every row is `home: inbox`. A question's bare `TD-n` is its asker's repo's (TD-1509), named through `roots`
+    (`{name: root}`, `queue.repo_roots`) as the Queue's reading names it."""
     at = now or datetime.now(UTC)
     out: dict[str, list[dict[str, Any]]] = {k: [] for k in INBOX_SECTIONS}
     snoozed_rows = attention_snoozed or {}
@@ -2245,9 +2247,11 @@ def inbox_sections(
     # the Needs you board items past their `Due:` date — a civil date, so read in this host's calendar
     today = at.astimezone().date().isoformat()
     overdue = sum(1 for e in out["needs"] if e.get("row") == "board" and e.get("due") and str(e["due"]) < today)
+    # a question's bare `TD-n` is its asker's repo's (§4.5 screen 6 *A bare ref elsewhere*, TD-1509)
+    askers = asker_repos(entries, fleet, roots) if cards else {}
     for k, rows in out.items():
         # a snoozed row stays the Inbox's: the Queue has no Snooze (§4.5 screen 12)
-        out[k] = [{**e, **item_home(e, cards if k != "snoozed" else None)} for e in rows]
+        out[k] = [{**e, **item_home(e, cards if k != "snoozed" else None, askers)} for e in rows]
     queue_n = sum(1 for e in out["needs"] if e["home"] == "queue")
     return {**out, "count": len(out["needs"]), "fyi_n": len(out["fyi"]), "overdue_n": overdue, "queue_n": queue_n}
 
@@ -2557,6 +2561,8 @@ def ledger_for_you(
     linked = queue_mod.open_refs(
         opens, {n: o for n, r in readings.items() if (o := lb.origin_path(str(r.get("remote") or "")))}
     )
+    # a question's bare `TD-n` is its asker's repo's, as the Queue's reading links it (TD-1509)
+    askers = queue_mod.asker_repos(questions, fleet, queue_mod.repo_roots(every if every is not None else repos))
     boards, claims, alive = _hold_inputs(readings, fleet, now)
     # an entry an open decided line covers has been answered: that line is its row now, a *Waiting on them* row
     # while it waits on its session (TD-565) — names it, names its parent while it carries `decision (paul)`, or
@@ -2616,6 +2622,7 @@ def ledger_for_you(
                     claims=claims,
                     entries=opens,
                     live=alive,
+                    asker_repo=askers,
                 )  # fmt: skip
                 if not owner
                 else None

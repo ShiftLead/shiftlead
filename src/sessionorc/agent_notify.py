@@ -15,6 +15,7 @@ import contextlib
 import json
 import os
 import signal
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -62,10 +63,13 @@ def _restart_at(s: Any) -> str:
     return ""
 
 
-def _card(e: Any, index: dict[str, tuple[str, str]]) -> tuple[str, str] | None:
+def _card(e: Any, index: dict[str, tuple[str, str]], askers: Mapping[str, str]) -> tuple[str, str] | None:
     """The open card a mail row is drawn on, as the Inbox's `item_home` reads it (§4.5 screen 6 *Where a row is
-    drawn*, TD-795); None for one set aside with a reviewer (`snoozed_for`), which the Inbox keeps."""
-    return None if e.snoozed_for else queue_mod.mail_card(e.about, f"{e.subject or ''} {e.text or ''}", index)
+    drawn*, TD-795), a bare `TD-n` read as its asker's repo's (`askers`, `queue.asker_repos`, TD-1509); None for one
+    set aside with a reviewer (`snoozed_for`), which the Inbox keeps."""
+    if e.snoozed_for:
+        return None
+    return queue_mod.mail_card(e.about, f"{e.subject or ''} {e.text or ''}", index, askers.get(e.id))
 
 
 def _work_ids(mark: dict[str, Any]) -> list[str]:
@@ -98,10 +102,11 @@ class NotifyMixin:
                 k = f"{sid}|restart"
                 rows[k] = _Row(at, notify.restart_line(s.name or sid, s.team or ""), k, k)
         index = queue_mod.card_index(self._queue)
+        askers = queue_mod.asker_repos(self.person_inbox, graph.values(), queue_mod.repo_roots(self._repos))
         for e in self.person_inbox:
             if e.from_ == PERSON:
                 continue
-            card = _card(e, index)
+            card = _card(e, index, askers)
             s = graph.get(e.from_)
             name, team = (s.name or e.from_, s.team or "") if s is not None else (e.from_, e.team or "")
             ref = reference_of(e.about) or ""
@@ -128,7 +133,7 @@ class NotifyMixin:
                         e.id,
                         mail=True,
                         until=e.snoozed_until,
-                        card=_card(e, index),
+                        card=_card(e, index, askers),
                     )
         doc = settings_mod.load()
         on_work = {

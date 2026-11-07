@@ -46,7 +46,7 @@ from sessionorc.models import (
     start_note,
     stop_note,
 )
-from sessionorc.queue import TD_REF, card_entries, qid
+from sessionorc.queue import TD_REF, card_entries, qid, repo_roots
 from sessionorc.store import kept as doing_kept
 from shiftlead import org as orgmod
 from shiftlead import profiles as profiles_mod
@@ -1099,6 +1099,14 @@ class Readings:
             memo.update(got=got, at=time.monotonic())
         return got
 
+    async def repo_roots(self) -> dict[str, str]:
+        """`{name: root}` of the `repos` reading (`queue.repo_roots`), so a question's bare `TD-n` is linked by its
+        asker's repo as the Queue's reading names it (TD-1509); `{}` when the reading cannot be had."""
+        try:
+            return repo_roots(await self.repos())
+        except Exception:  # an older home, a node's link down: a repo is named by its directory
+            return {}
+
     async def repo_facts(self) -> tuple[dict[str, Any], dict[str, Any]]:
         """The home's repo facts and doing log (§4.4 *Repo facts*, TD-176), each `{}` when the agent
         cannot give it — an older agent, a node whose link is down: the facets then read *no repo
@@ -1702,6 +1710,7 @@ def create_app() -> FastAPI:
         flow_views=flow_views,
         repo_facts=repo_facts,
         repos=rd.repos,  # the `repos` reading, once per request (TD-739)
+        repo_roots=rd.repo_roots,  # its `{name: root}`, a question's asker's repo (TD-1509)
         with_lanes=rd.with_lanes,  # what a team with no record holds, its card's note (TD-781)
         identity_info=identity_info,
         person_states=person_states,
@@ -1819,6 +1828,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 fleet=sessions,
                 handed=handed_rows(handed, {s.get("id"): s for s in sessions}, datetime.now(UTC)),
                 cards=await h.queue_cards(),
+                roots=await h.repo_roots(),
             )
             # the rollup's *in the Inbox* is the Inbox tab's number (TD-932); *m overdue* still counts both homes
             tabs = tab_counts(secs)
@@ -4091,6 +4101,7 @@ async def card_mail(
         snoozed=hz["snoozed"],
         fleet=fleet,
         cards=index,
+        roots=await h.repo_roots(),
     )
     later = split_later(await h.ledger_view(fleet, inbox["entries"]), hz["ahead"], index, hz["hidden"])[2]
     with timing.step("render"):  # each attached row drawn by the Inbox's own renderer
@@ -4823,6 +4834,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             snoozed=hz["snoozed"],
             fleet=fleet,
             cards=cards,
+            roots={} if agent_down else await h.repo_roots(),
         )
         picks = rail_picks(request.query_params)
         lf = {"n": 0, "groups": []} if agent_down else await ledger_view(fleet, got["entries"])
@@ -5026,7 +5038,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         lf = await ledger_view(fleet, got["entries"])
         origin = page_origin(request)
         gz = gzip_ok(request)
-        cards = await h.queue_cards()
+        cards, roots = await h.queue_cards(), await h.repo_roots()
         lf, ahead, _, unshown = split_later(
             lf, hz["ahead"], cards, hz["hidden"], hz["due"]
         )  # a card's is drawn there (TD-771)
@@ -5047,6 +5059,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 snoozed=hz["snoozed"],
                 fleet=fleet,
                 cards=cards,
+                roots=roots,
             )
             got["board_note"] = board_note
             got["sections"] = {k: [e["id"] for e in sections[k]] for k in INBOX_SECTIONS}
