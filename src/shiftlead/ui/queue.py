@@ -25,7 +25,9 @@ from sessionorc.queue import (  # noqa: F401 — the home's
     held_refs,
     kept_or_loose,
     named_refs,
+    only_pr,
     own_refs,
+    pr_card,
     qid,
 )
 from sessionorc.queue import refs as _refs
@@ -80,11 +82,14 @@ def item_home(
     `needs_person`, the caller's): one whose refs no open card holds draws on the completed card that holds the
     first of them, **kept** (`card_index`'s `kept:<ref>` keys), else on a **loose card**, `loose:<ref>` its first
     ref, `on_row` that ref, no mentions (§4.5 screen 6 *Every item that needs the person draws on a card*,
-    TD-1468); one naming no entry stays in the Inbox, and so does every row where `index` is empty (a home that
-    serves no Queue)."""
+    TD-1468); one naming no entry but carrying a PR (its `pr`, or an `about` of `#n`) draws on the card of the entry
+    that PR names in its repo's PRs, else on the PR's own loose card, `loose:<repo>#<n>` (`pr_card`, `tied.by:
+    pr`) — with no `repo` it stays in the Inbox; one naming neither stays in the Inbox, and so does every row where
+    `index` is empty (a home that serves no Queue)."""
     inbox = {"home": "inbox", "on_card": "", "on_row": "", "mentions": [], "tied": None}
     if not index:
         return inbox
+    repo: str | None = None
     named: list[str] = []  # every ref it names, in order: its kept or loose card's where no open card holds one
     kind = e.get("row")
     if kind == "board":
@@ -115,10 +120,14 @@ def item_home(
         named, about = named_refs(e.get("about"), words, repo)
     if not refs or refs[0] not in index:
         got = kept_or_loose(named, index) if needs and kind in (None, "", "board") else None
+        if not got and needs and not named and not kind:
+            # an item whose only anchor is a PR: the entry that PR names, else the PR (TD-1468)
+            got = pr_card(only_pr(e.get("pr"), e.get("about")), repo, index)
+            by = "pr"
         if not got:
             return inbox
         card, row, ref = got
-        if kind != "board":
+        if kind != "board" and by != "pr":
             by = "about" if ref in about else "words"
         return {"home": "queue", "on_card": card, "on_row": row, "mentions": [], "tied": {"by": by, "ref": ref}}
     card, row = index[refs[0]]
@@ -1134,7 +1143,9 @@ def _loose_card(cid: str, got: Mapping[str, list[Any]] | None, one_repo: bool) -
         "title": str(first.get("subject") or ""),
         "priority": "",
         "state": "",
-        "show": _show(ref, one_repo) if "#" in ref else ref,
+        "show": (f"#{ref.rpartition('#')[2]}" if one_repo else ref)
+        if ref.rpartition("#")[2].isdigit()
+        else (_show(ref, one_repo) if "#" in ref else ref),
         "afters": [],
         "anchor": "",
         "ext": None,
