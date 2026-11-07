@@ -3043,7 +3043,8 @@ def cmd_progress(args: argparse.Namespace) -> int:
     nothing it may pick, which tells its lead an exit is an ending rather than a crash. And
     `ao progress restart --why "…"` (§4.9a *A run that ends with work left*, TD-083) is the
     third ending: **my run is over and my lane is not** — start me again, under this name and
-    this brief, with nothing of this conversation. The two refuse each other."""
+    this brief, with nothing of this conversation but its waiting claims and its mail. The later of the
+    two stands, clearing the other (TD-1485); an owed outcome rides a restart the tick replays."""
     sid = _own_session(args)
     if sid is None:
         return 2

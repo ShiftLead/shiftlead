@@ -1992,9 +1992,8 @@ def test_progress_restart_is_the_third_ending(subprocess_agent, tmp_path, capsys
     work, its `/exit` did not leave, and a team sat parked for ninety minutes until a person
     acted. `ao progress restart --why` says it: my run is over and my lane is not.
 
-    It is the session's own word (§9 invariant 14), refused without a reason, refused while an
-    outcome is owed — the fresh run does not carry the conversation the debt was made in — and it
-    and `none` refuse each other. A later declared claim takes it back."""
+    It is the session's own word (§9 invariant 14), refused without a reason, and the later of it
+    and `none` stands, clearing the other (TD-1485). A later declared claim takes it back."""
     assert cli.main(["--json", "shell", "again", "-d", str(tmp_path)]) == 0
     sid = json.loads(capsys.readouterr().out)["id"]
     monkeypatch.setenv("SHIFTLEAD_SESSION", sid)
@@ -2015,9 +2014,15 @@ def test_progress_restart_is_the_third_ending(subprocess_agent, tmp_path, capsys
     # a record started seconds ago: the word stands, and it is marked early (§4.9a)
     assert rec["restart_wanted"]["early"] is True
 
-    # the two endings refuse each other
-    assert cli.main(["progress", "none", "--why", "nothing left"]) == 1
-    assert "already wants a restart" in capsys.readouterr().err
+    # the later ending stands: a `none` clears the restart, and a restart the `none` (TD-1485)
+    assert cli.main(["progress", "none", "--why", "nothing left"]) == 0
+    capsys.readouterr()
+    rec = call_sync("get", id=sid)
+    assert rec["restart_wanted"] is None and rec["out_of_work"]["why"] == "nothing left"
+    assert cli.main(["progress", "restart", "--why", "context bound after all"]) == 0
+    capsys.readouterr()
+    rec = call_sync("get", id=sid)
+    assert rec["out_of_work"] is None and rec["restart_wanted"]["why"] == "context bound after all"
 
     # and a claim takes it back: the session went on after all
     assert cli.main(["progress", "claim", "TD-083"]) == 0

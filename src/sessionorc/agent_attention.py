@@ -173,7 +173,7 @@ class AttentionMixin:
         forget — and a slot's own word is spent once, while `*` stands until the record goes."""
         self._attention_how[f"{sid}|{slot}"] = how
 
-    def _asker_gone(self, s: Session, *ids: str, how: str = "closed") -> None:
+    def _asker_gone(self, s: Session, *ids: str, how: str = "closed", keep_debt: bool = False) -> None:
         """Design §4.10 *What a person is asked*: an `ask` to the person cannot expire, so the
         other half of its lifecycle is the **asker's** — closing or forgetting a record closes the
         open `ask`s and `steer`s it put to the person, `closed_reason: asker_gone`, or a forgotten
@@ -192,7 +192,12 @@ class AttentionMixin:
         `orphaned` from the record as it is now (`how`: `closed`, `forgotten` or `cancelled`), and
         a pause on it is cleared, there being no session left to hold. `repo` is the record's, or
         its directory when it names none (a session in a main checkout), which is where its board
-        is. One already orphaned (a close, then the forget a day later) keeps its first stamp."""
+        is. One already orphaned (a close, then the forget a day later) keeps its first stamp.
+
+        **`keep_debt`** (§4.9a *The third declaration*, TD-1485): the close made for a replay that keeps
+        the mail — the tick's before rule 2's, rule 7's, rule 1's lost-brief replay, and a person's
+        Restart's — leaves the owed outcomes standing, since the next run under the name carries them;
+        its open questions are handled as at any close. Only `_close` passes it, never `rpc_close`."""
         if s.superseded_by:
             return
         at = now_iso()
@@ -210,7 +215,16 @@ class AttentionMixin:
         # to report it, and the row must not wait in the Inbox for a session that cannot come back.
         # An asker that merely **exited** still owes: that row waits until the person opens the
         # session or dismisses it, which is why this runs from close and forget and not from exit.
-        for e in [e for e in self.person_inbox if e.from_ in (s.id, *ids) and e.owes]:
+        if not keep_debt:
+            self._settle_owed(s.id, *ids, at=at)
+
+    def _settle_owed(self, *addresses: str, at: str | None = None) -> None:
+        """Each owed person-inbox entry asked from one of `addresses`, settled `asker_gone` (§4.10
+        *Outcomes*): `_asker_gone`'s debt half, and a create that does not carry the old run's mail
+        (§4.9a *The third declaration*, TD-1485), which replaces that mail in place. Touches no open
+        question."""
+        at = at or now_iso()
+        for e in [e for e in self.person_inbox if e.from_ in addresses and e.owes]:
             self._mark(e.id, outcome={"state": "asker_gone", "text": "", "at": at, "by": ""})
 
     def _adopt_orphans(self, address: str | None = None) -> None:

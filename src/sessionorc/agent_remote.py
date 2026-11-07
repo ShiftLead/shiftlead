@@ -995,6 +995,7 @@ class RemoteMixin:
                 self._move_mail(old, new)
             elif old is held:
                 self._attention_gone(old, "forgotten")
+                self._settle_owed(self._address(old))  # its mail is not carried: nobody left to report (TD-1485)
                 self._scrub(self._address(old))
             if old is not held:
                 # the home's field (§4.4a), as the graph addresses the successor — `_msg`'s forwarding

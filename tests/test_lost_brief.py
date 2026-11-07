@@ -240,17 +240,17 @@ async def test_a_close_that_fails_is_a_failed_replay_and_the_next_tick_replays(a
         sid = await _create(person, tmp_path, "w", supervised=True, prompt="the brief")
         _lose(agent, sid)
         rec, now = agent.sessions[sid], datetime.now(UTC)
-        real, closes = agent.rpc_close, []
+        real, closes = agent._close, []
 
         async def refused(id, **kw):
             closes.append(id)
             raise RuntimeError("boom")
 
-        monkeypatch.setattr(agent, "rpc_close", refused)
+        monkeypatch.setattr(agent, "_close", refused)
         assert await agent._lost_brief(rec, now) is False, "nothing closed: the pass goes on"
         assert rec.state != "closed" and rec.closed_for is None
         assert [(r["why"], r["error"]) for r in rec.restarts] == [("lost-brief", "close: boom")]
-        monkeypatch.setattr(agent, "rpc_close", real)
+        monkeypatch.setattr(agent, "_close", real)
         assert await agent._lost_brief(rec, now + timedelta(seconds=1)) is True
         new = agent.sessions[sid]
         assert new is not rec and [r["why"] for r in new.restarts] == ["lost-brief", "lost-brief"]
@@ -266,14 +266,14 @@ async def test_a_close_that_closed_then_failed_is_replayed_next_tick_without_a_s
         sid = await _create(person, tmp_path, "w", supervised=True, prompt="the brief")
         _lose(agent, sid)
         rec, now = agent.sessions[sid], datetime.now(UTC)
-        real, closes = agent.rpc_close, []
+        real, closes = agent._close, []
 
         async def closed_then_failed(id, **kw):
             closes.append(id)
             await real(id, **kw)
             raise RuntimeError("after the close")
 
-        monkeypatch.setattr(agent, "rpc_close", closed_then_failed)
+        monkeypatch.setattr(agent, "_close", closed_then_failed)
         assert await agent._lost_brief(rec, now) is True, "closed: the rest of the pass leaves it"
         assert rec.state == "closed" and rec.closed_for["why"] == "lost-brief"
         assert [r.get("error") for r in rec.restarts] == ["close: after the close"]

@@ -1691,13 +1691,19 @@ class HostAgent(
                 # caller is read. A node's is the home's, set on its copy from this create's reply.
                 s.by_person = mail.as_person(caller, self._graph()) and not s.supervised and not s.seat
                 _stamp_start(s)  # a start names nobody: a person's create and a policy's both have no caller
+            dropped: str | None = None  # the replaced run's address, when this create does not carry its mail
             if isinstance(holder, Session):
                 # the record of this name it replaced, for the home, which holds the mail (§4.4a)
                 kept = bool(keep_mail or starting is not None or (resume and holder.adapter_id == resume))
                 s.supersedes = [{"id": holder.id, "mail": kept, "at": s.created}]
+                dropped = None if kept else self._address(holder)
             s.worktree_made = made or _inherits_made(s, holder)
             self.sessions[sid] = s
             self.store.save(s)
+            if dropped and self.mode != "node":
+                # a create that does not carry the mail replaces it in place, so nobody is left to report
+                # the old run's owed outcomes: settled once the create stands (§4.9a, TD-1485)
+                self._settle_owed(dropped)
             if draft_dir is not None:  # the form's files are the new session's from here (§4.4, TD-630)
                 try:
                     await asyncio.to_thread(agent_common.claim_draft, draft_dir, s.id, datetime.now(UTC))
@@ -1800,6 +1806,10 @@ class HostAgent(
         self.sessions[sid] = s
         if kept:
             self._move_mail(holder, s)
+        elif isinstance(holder, Session) and self.mode != "node":
+            # a scheduled start carries no mail (its start moves its own), so the old run's debt is settled
+            # here, as any create's that does not carry it (§4.9a *The third declaration*, TD-1485)
+            self._settle_owed(self._address(holder))
         if given.get("succeeding") is not None:  # a held seat renamed: the record rule 3 fills is the new name's
             self._succeed(given["succeeding"], s)
         self.store.save(s)
@@ -2338,9 +2348,13 @@ class HostAgent(
         closer: dict[str, Any] | None = None,
         reap: bool | str = True,
         restart: bool = False,
+        keep_debt: bool = False,
     ) -> dict[str, Any]:
         """`rpc_close` past its gate. A close the home routed here (`_act`) comes in at this door: a string
-        `reap` over the link is the home's why whatever session closed (§4.1), so it is never refused."""
+        `reap` over the link is the home's why whatever session closed (§4.1), so it is never refused.
+        `keep_debt` (§4.9a *The third declaration*, TD-1485) is the home's own close before a replay that
+        keeps the mail: its owed outcomes ride to the next run (`_asker_gone`). Never `rpc_close`'s
+        parameter, so no `ao close` and no client envelope can carry it."""
         s = self._get(id)
         if s.state == "scheduled":
             # **Cancel** (design §6 *Start time*, §4.5a): nothing ran, so there is nothing to keep —
@@ -2372,7 +2386,8 @@ class HostAgent(
         # way — but it would make the guard's one-tick bound untrue (review of PR #199).
         self._killed_at.pop(id, None)
         self.store.save(s)
-        self._asker_gone(s, self._address(s))  # its open questions to the person close with it (§4.10)
+        # its open questions to the person close with it (§4.10); its debt too, but for a replay's close
+        self._asker_gone(s, self._address(s), keep_debt=keep_debt)
         await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
         if await self._reap(s, reap):  # after the `closed` save, so a crash midway leaves a record to retry
             await self._push_changes()
@@ -2631,7 +2646,8 @@ class HostAgent(
         read = await self._refill_prompt(s, params, entry)  # before the close: a read that raises touches nothing
         if s.state == "idle":  # a restart keeps the worktree: the new run takes up its directory and branch
             if s.host == self.host:
-                await self.rpc_close(s.id, reap=False, restart=True)  # its own close marks no run ended (§4.9)
+                # its own close marks no run ended (§4.9), and leaves the debt for the run it carries on to (§4.9a)
+                await self._close(s.id, reap=False, restart=True, keep_debt=True)
             else:
                 await self._route_act("close", {"id": s.id, "reap": False, "restart": True}, None, s.host)
         try:
@@ -3687,7 +3703,8 @@ class HostAgent(
         *A run that ends with work left*, TD-083): the same shape, setting
         `restart_wanted: {at, why, early?, repeat?, decided?}` — *my run is over and my lane is not*. They are the
         two writes on this channel that are not open to everyone — only the session itself may
-        make either, declared, with a reason (§9 invariant 14) — and they refuse each other.
+        make either, declared, with a reason (§9 invariant 14) — and the later one stands, clearing the
+        other (TD-1485).
 
         A declared claim is a **lease** (§4.8, TD-056): refused while another live record holds an
         unexpired declared claim on the same reference, naming the holder; `force` claims anyway and
@@ -4002,8 +4019,11 @@ class HostAgent(
         """The two ways a run ends by the session's own word (design §4.9a): **`none`** — I
         searched and there is nothing I may pick — and **`restart`** — my run is over and my lane
         is not (TD-083). Both are facts about the session, not states, both are written only by
-        the session they are about (§9 invariant 14), and **they refuse each other**: a session is
-        out of work or it wants another run at it, never both.
+        the session they are about (§9 invariant 14), and **the later one stands** (TD-1485): a
+        `restart` said while the session's own `none` stands clears it, and a `none` said while its
+        `restart` stands clears that, so a session is out of work or it wants another run at it,
+        never both — and a member out of work whose context is past its bound restarts by its own
+        word without claiming an entry to be allowed to.
 
         A **third** ending was missing until 2026-09-20 and its absence parked a team for ninety
         minutes: a grinder ended a long run on purpose with work still on the ledger, and could
@@ -4023,15 +4043,25 @@ class HostAgent(
                 f'ao progress {status} needs --why "<{reason}>": a declaration without its '
                 "reason is refused (design §4.9a)"
             )
-        if owed := s.owed():
+        # rule 2's own test (agent_tick `_wanted`): a restart of such a member is replayed with its mail
+        replayed = bool(s.supervised and s.unattended and s.seat is None)
+        if (owed := s.owed()) and (status == "none" or not replayed):
             # Design §4.10 *Outcomes*: the person answered; what became of it is owed before this
-            # session stops. `dropped` is an honest way out, and one line settles each. A restart
-            # owes them for a reason of its own: the fresh run does not carry the conversation the
-            # debt was made in, so nobody is left who can report it.
+            # session stops. `dropped` is an honest way out, and one line settles each. `none` is the
+            # run that ends with no successor. A restart of a member rule 2 replays is taken: the replay
+            # keeps the mail, so the debt rides to the next run under the name, whose `mail.owed` names
+            # it (§4.9a *The third declaration*, TD-1485); any other restart is refused as before —
+            # its controller's `ao close` settles the debt, so nobody would be left to report it.
+            said = (
+                "out of work: none is the run with no successor"
+                if status == "none"
+                else "a restart: it is not a member the tick replays with its mail (supervised, unattended, "
+                "not a seat), so its controller's close would leave nobody to report it"
+            )
             raise RpcError(
                 f"{s.id} owes {len(owed)} outcome{'s' if len(owed) != 1 else ''} to the person: report each with "
                 f'ao msg person --outcome done|blocked|dropped "<one line>" --for <id> before declaring '
-                f"{word} — {', '.join(owed)} (design §4.9a, §4.10 *Outcomes*)",
+                f"{said} — {', '.join(owed)} (design §4.9a, §4.10 *Outcomes*)",
                 owed=owed,
             )
         if unread := s.unread():
@@ -4045,16 +4075,15 @@ class HostAgent(
                 f"answer what needs answering before declaring {word} (design §4.9a)",
                 unread=unread,
             )
-        other = "restart_wanted" if status == "none" else "out_of_work"
-        if getattr(s, other):
-            said = "wants a restart" if other == "restart_wanted" else "is out of work"
-            raise RpcError(
-                f"{s.id} already {said} (since {getattr(s, other)['at']}): a session is out of work or it wants "
-                "another run at it, never both — claim something to take that back (design §4.9a)"
-            )
         if status == "none" and (words := self._balance_refusal(s, None, caller)):
-            # a member refused a claim is not out of work (§6 *Balance*): its team idles, never winds down
+            # a member refused a claim is not out of work (§6 *Balance*): its team idles, never winds down.
+            # Before any clearing, so a refused `none` leaves a standing restart as it was
             raise RpcError(words, balance=self._balance_of(s))
+        # the later declaration stands (§4.9a, TD-1485): it clears the other, never both at once
+        if status == "none":
+            s.restart_wanted = s.restart_blocked = s.restart_blocked_sent_at = None  # never restart_ceiling
+        else:
+            s.out_of_work = s.lane_seen = None
         if status == "none":
             s.out_of_work = {"at": now_iso(), "why": why.strip()}
             s.balance_refused = None  # taken, so the mark has gone: nothing left to ring
