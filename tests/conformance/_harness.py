@@ -10,6 +10,10 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import os
+import shlex
+import stat
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, get_args
@@ -206,6 +210,38 @@ class RecordedProc:
         return None
 
 
+# -- the seat's life (design §4.3 *A seat's life end to end, in CI, with no model*, TD-1647) ------------
+
+
+def suite_bin(tmp: Path, monkeypatch: Any) -> Path:
+    """The suite's own `shiftlead-hook` and `ao`, first on `PATH` (the test's, so a launch's layer names this
+    hook, and the pane's, which the stub's wrapper exports): each runs this interpreter on the code under test."""
+    import shiftlead
+
+    d = tmp / "suite-bin"
+    d.mkdir(parents=True, exist_ok=True)
+    src = Path(shiftlead.__file__).resolve().parents[1]  # the code under test, a worktree's own
+    for name, entry in (("shiftlead-hook", "shiftlead.hook_entry"), ("ao", "shiftlead.cli")):
+        f = d / name
+        f.write_text(
+            f"#!/bin/sh\nPYTHONPATH={shlex.quote(str(src))}${{PYTHONPATH:+:$PYTHONPATH}} "
+            f"exec {shlex.quote(sys.executable)} -c "
+            f'\'import sys; from {entry} import main; sys.argv[0] = "{name}"; sys.exit(main())\' "$@"\n',
+            encoding="utf-8",
+        )
+        f.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{d}{os.pathsep}{os.environ.get('PATH', '')}")
+    return d
+
+
+def _flag(argv: list[str], *names: str) -> str | None:
+    """The value after the first of `names` in `argv`, or None."""
+    for i, a in enumerate(argv[:-1]):
+        if a in names:
+            return argv[i + 1]
+    return None
+
+
 # -- the harnesses: where each tool keeps its files ------------------------------------------------
 
 
@@ -245,6 +281,21 @@ class ClaudeCodeHarness:
             f"default: t\nprofiles:\n  t: {{account: t, config_dir: {tmp_path / 'cc'}}}\n", encoding="utf-8"
         )
         return "t"
+
+    skip_flags = ("--dangerously-skip-permissions",)
+
+    def stub_setup(self, tmp: Path, monkeypatch: Any) -> None:
+        """Nothing for the layer, which is the `--settings` file the launch writes; the suite's hook on `PATH`."""
+        suite_bin(tmp, monkeypatch)
+
+    def hook_command(self, argv: list[str], env: dict[str, str]) -> str:
+        """The hook command the launch's `--settings` layer names for every event."""
+        layer = json.loads(Path(_flag(argv, "--settings") or "").read_text(encoding="utf-8"))
+        return layer["hooks"]["Stop"][0]["hooks"][0]["command"]
+
+    def session_id(self, argv: list[str], env: dict[str, str]) -> tuple[str | None, str]:
+        """The launch's `--session-id` or `--resume`, and the payload field that carries a captured one."""
+        return _flag(argv, "--session-id", "--resume"), "session_id"
 
     def hook_params(self, payload: dict[str, Any], *, at_composer: bool) -> dict[str, Any] | None:
         from shiftlead.adapters.claude_code.hook import translate
@@ -297,6 +348,28 @@ class GeminiHarness:
         )
         return "t"
 
+    skip_flags = ("--approval-mode yolo", "--approval-mode=yolo", "--yolo", "-y")
+
+    def stub_setup(self, tmp: Path, monkeypatch: Any) -> None:
+        """A scratch machine layer naming the suite's hook, the adapter's `MACHINE_LAYER` and `_lstat` patched to
+        it (as tests/test_gemini_adapter.py does): the real one is root-owned under `/etc/shiftlead/`."""
+        from shiftlead.adapters import gemini
+
+        hook = suite_bin(tmp, monkeypatch) / "shiftlead-hook"
+        machine = tmp / "etc" / "gemini-settings.json"
+        machine.parent.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr(gemini, "MACHINE_LAYER", machine)
+        monkeypatch.setattr(gemini, "_lstat", _rooted)
+        machine.write_text(gemini.layer_text(str(hook)), encoding="utf-8")  # the person ran the install line
+
+    def hook_command(self, argv: list[str], env: dict[str, str]) -> str:
+        """The hook command the machine layer the launch names (`GEMINI_CLI_SYSTEM_SETTINGS_PATH`) holds."""
+        layer = json.loads(Path(env["GEMINI_CLI_SYSTEM_SETTINGS_PATH"]).read_text(encoding="utf-8"))
+        return layer["hooks"]["AfterAgent"][0]["hooks"][0]["command"]
+
+    def session_id(self, argv: list[str], env: dict[str, str]) -> tuple[str | None, str]:
+        return _flag(argv, "--session-id", "--resume"), "session_id"
+
     def hook_params(self, payload: dict[str, Any], *, at_composer: bool) -> dict[str, Any] | None:
         from shiftlead.adapters.gemini.hook import translate
 
@@ -314,6 +387,13 @@ class GeminiHarness:
         out = project / "chats" / f"session-2026-10-22T00-00-{session_id[:8]}.jsonl"
         out.write_bytes(data.replace(captured, session_id.encode()))
         return cwd
+
+
+def _rooted(p: Any) -> os.stat_result:
+    """An `lstat` that reads every path root-owned and 0755, the machine layer's test run on a scratch file."""
+    st = os.lstat(p)
+    mode = stat.S_IFMT(st.st_mode) | 0o755
+    return os.stat_result((mode, st.st_ino, st.st_dev, st.st_nlink, 0, 0, st.st_size, 0, 0, 0))
 
 
 HARNESSES: dict[str, Any] = {"claude-code": ClaudeCodeHarness(), "gemini": GeminiHarness()}
