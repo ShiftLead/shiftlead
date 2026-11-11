@@ -78,3 +78,16 @@ def test_a_team_at_off_or_on_its_defaults_sets_nothing_aside(world):  # noqa: F8
         orgmod.with_settings(orgmod.load(), {"ao-grind": {"max": {"hunt": 3, "x": 2}}}).teams["ao-grind"]
     )
     assert got == [("x", "team ao-grind has no member line or seat 'x'")]
+
+
+def test_the_dialogs_lane_refusals_name_an_area_lane_alone(world, monkeypatch):  # noqa: F811
+    """The Members dialog's **up to** (§4.5a, TD-1545 slice 15): `lane_refusals` reads one plan and names the member
+    line whose lane is in no stage — the fixture's hunter — and no other; `members_view` draws it disabled."""
+    monkeypatch.setattr(teamrun, "files_via", lambda call: None)  # the plan reads this host's checkout
+    org = orgmod.with_home_settings(orgmod.load())
+    got = teamrun.lane_refusals(lambda *a, **k: None, org, "ao-grind", HOST)
+    assert got == {"hunt": "hunt's lane is in no stage: its lane has no queue to read"}
+    v = teamrun.members_view(org, "ao-grind", [], None, got)
+    ups = {e["name"]: e["up_to"] for e in v["members"]}
+    assert (ups["hunt"]["why"], ups["hunt"]["value"]) == ("its lane has no queue to read", None)
+    assert ups["grind"]["why"] == "" and ups["grind"]["value"] is not None
