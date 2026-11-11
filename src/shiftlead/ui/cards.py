@@ -276,7 +276,7 @@ def view(
     # is in every payload. A seat ends between questions by design, and drawn as *exited* the one
     # card behaving exactly as designed looked like the one that had failed.
     seats = seats or {}
-    d["seat"] = state in DEAD and s.get("id") in seats
+    d["seat"] = state in DEAD and s.get("id") in seats and not s.get("scale")  # a held extra is not on call
     # design §4.5a **Restart** (§6 rule 2 *A person's restart*, TD-250): where the control is drawn — a
     # supervised record that is idle, exited or closed and is not a seat (rule 3 fills one); the
     # host agent makes every other refusal, in its own words. A press with no restart mark confirms.

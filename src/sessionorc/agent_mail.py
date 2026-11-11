@@ -704,6 +704,7 @@ class MailMixin:
             and str(r.team or "").strip()
             and _fillable(r)
             and pool_rank(r.seat) < 2  # a pool is one candidate, its first member (§4.9b, TD-1476)
+            and not r.scale  # an extra's seat stands for it, never the extra (§4.9 *Scaling with the work*)
         ]
 
         def able(r: Session) -> bool:  # a pool's first member is able when any member is: no sender, no counts

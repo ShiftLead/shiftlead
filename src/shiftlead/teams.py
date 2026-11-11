@@ -20,6 +20,7 @@ container node sharing the path), and otherwise from the checkout on that host, 
 
 from __future__ import annotations
 
+import dataclasses
 import re
 from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
@@ -131,6 +132,7 @@ class Launch:
     prompt_from: dict[str, Any] | None = None  # what `prompt` was made from (§6 rule 7, TD-217)
     set_aside: bool = False  # its role's own `review:` was set aside under the team's flow (§4.9c item 2)
     pool_size: int = 0  # a pool member's definition's member count, for its held line (§4.9b, TD-1476)
+    scale: str = ""  # an extra's line or seat (§4.9 *Scaling with the work*, TD-1545): written held, `scale: {line}`
 
     def create_params(self, controllers: list[str]) -> dict[str, Any]:
         """The `create` RPC's arguments. `worktree=name` is §4.9 "Home and reach": every team
@@ -165,6 +167,7 @@ class Launch:
             **({"review": dict(self.review)} if self.review else {}),
             **({"context_bound": self.context_bound} if self.context_bound else {}),
             **({"prompt_from": self.prompt_from} if self.prompt_from else {}),
+            **({"scale": {"line": self.scale}} if self.scale else {}),
         }
 
     def seat_params(self) -> dict[str, Any] | None:
@@ -194,6 +197,8 @@ class Plan:
     flow: str | None = None  # the flow the team runs now, compiled into the launches (§4.9c); None: no flow
     sit_out: list[str] = field(default_factory=list)
     """Members not started: their role is a stage of another listed flow and of none of the current one (§4.9c)."""
+    extras: list[Launch] = field(default_factory=list)
+    """Each line's and seat's extras, written held after the launches (§4.9 *Scaling with the work*, TD-1545)."""
 
     @property
     def launches(self) -> list[Launch]:
@@ -1033,6 +1038,47 @@ def sweep_seat(team: orgmod.TeamDef, switch: dict[str, Any] | None) -> orgmod.Se
     )
 
 
+def _extras(team: orgmod.TeamDef, p: Plan, under: Compiled | None, seen: set[str]) -> list[Launch]:
+    """The extras a Start writes held (§4.9 *Scaling with the work*, TD-1545): for each member line and seat
+    that may scale, one per name `TeamDef.extra_names` gives past its size, each the launch its line's last
+    kept member runs — its profile, lane, brief and reader under the current flow — renamed, unattended, and
+    marked `scale: {line}`; a seat's extra carries its trigger alone, `{trigger: asks}`, never `tags` or a
+    `pool`. A line the flow sits out, or whose role is no stage of it, writes none (its lane has no queue), and
+    so does one whose members run attended (`unattended: false`): an extra is the tick's to fill."""
+    bases: list[tuple[str, Launch]] = []
+    if team.techlead is not None and p.techlead is not None:
+        bases.append((team.techlead.name, p.techlead))
+    by_name = {x.name: x for x in p.seats}
+    bases += [(s.name, by_name[s.name]) for s in team.seats if not s.pool and s.name in by_name]
+    for m in team.members:
+        if under is not None and under.flow.stage_of(m.role) is None:
+            continue  # sat out, or a lane in no stage: *its lane has no queue to read*
+        line = [x for x in p.members if x.name in m.names()]
+        if line and line[-1].unattended:  # a line a person watches is no tick's to fill
+            bases.append((m.name, line[-1]))
+    out: list[Launch] = []
+    for name, base in bases:
+        for extra in team.extra_names(name):
+            if extra in seen:
+                raise TeamError(f"team {team.name}: two sessions would be called {extra!r} — a name is one session")
+            seen.add(extra)
+            out.append(
+                dataclasses.replace(
+                    base,
+                    name=extra,
+                    scale=name,
+                    unattended=True,
+                    trigger={"trigger": "asks"} if base.seat else None,
+                    tags=False,
+                    pool_size=0,
+                )
+            )
+    return out
+
+
+EXTRAS = _extras  # the real one, which a test of the extras puts back over conftest's stub
+
+
 def plan(
     org: orgmod.Org,
     name: str,
@@ -1172,6 +1218,7 @@ def plan(
                     under=under,
                 )
             )
+    p.extras = _extras(team, p, under, seen)
     _check_flows(org, team, host, here, files)
     if under is not None:
         # §4.9c item 2: a role's own `review:` set aside under a flow is said once, at start

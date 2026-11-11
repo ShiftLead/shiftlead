@@ -453,3 +453,21 @@ async def test_a_sessions_ledger_request_lands_on_the_unable_techlead_seat_not_t
         assert asked["entry"]["to"] == [fc], "a general question still takes the able seat"
         for sid in (tl, fc, asker):
             await person.call("kill", id=sid)
+
+
+async def test_a_seats_extra_is_never_a_teams_question_seat(agent, tmp_path):
+    """td-max (design §4.9 *Scaling with the work*, TD-1545): a seat's extra carries `seat: {trigger: asks}`, and
+    its seat stands for it — `--team` resolves to the seat, never the extra, even while the extra is live."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        seat = await mk("tl", team="beta", project="B", seat={"trigger": "asks"})
+        extra = await mk("tl-2", team="beta", project="B", seat={"trigger": "asks"})
+        asker = await mk("asker", team="alpha", project="A")
+        agent.sessions[seat].state, agent.sessions[seat].supervised = "exited", True  # on call: the ask fills it
+        agent.sessions[extra].state, agent.sessions[extra].scale = "idle", {"line": "tl"}
+        try:
+            async with LocalClient(caller=asker) as a:
+                got = await a.call("msg", team="beta", text="may beta take an entry?")
+                assert got["delivered"] == [seat]
+        finally:
+            await park_ticks(agent)

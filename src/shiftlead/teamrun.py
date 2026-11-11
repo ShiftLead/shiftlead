@@ -174,7 +174,8 @@ def on_call(s: dict[str, Any]) -> bool:
     """A seat with nobody in it (§4.9b, §6 rule 3): a record carrying `seat` that is `exited` or
     `closed`. Its id and its grants survive the close, so whoever fills it is the controller a
     session names now (design §4.5a New session **Controllers**, TD-269)."""
-    return bool(s.get("seat")) and s.get("state") in ("exited", "closed")
+    # a held extra is capacity its seat stands for, never a seat on call (§4.9 *Scaling with the work*)
+    return bool(s.get("seat")) and s.get("state") in ("exited", "closed") and not s.get("scale")
 
 
 # A Start's and an Apply's line for a manager on call, written held (§6 rule 3, TD-410): the card's words
@@ -787,6 +788,51 @@ def undeclared(call: Call, org: orgmod.Org, plan: teams.Plan, host: str) -> str 
     return None
 
 
+def write_extras(
+    call: Call, plan: teams.Plan, controllers: list[str], caller: str | None
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Write the plan's extras held (§4.9 *Scaling with the work*, TD-1545), after the team's sessions: each
+    `create(held=True)` with its launch record, `scale: {line}` among it, and the controllers the line's next
+    kept member gets. A name a current record already holds as an extra — held, or filled — is left as it is;
+    a name another live record holds is left to it and said; a closed record of the name is superseded with
+    its mail kept, as a member's is (`keep_mail_for`). A refused create is said, and the start stands: an
+    extra is capacity, never the team. Returns `(records written, notes)`."""
+    if not plan.extras:
+        return [], []
+    on = {"host": plan.host} if plan.host else {}
+    verdicts: dict[str, Any] = {}
+    written: list[dict[str, Any]] = []
+    notes: list[str] = []
+    try:  # the team's sessions exist by now: a read that fails writes no extra and is said, never a failed start
+        records = call("list")
+        for x in plan.extras:
+            rec = _current(x.name, records)
+            if rec is not None and rec.get("scale"):
+                continue  # already this line's extra, held or filled: the reconcile's, not the start's
+            v = call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir), **on)
+            if v.get("verdict") in ("live", "suspended"):
+                notes.append(
+                    f"{x.name}: not written as an extra of {x.scale} — {v.get('holder') or x.name} holds the name"
+                )
+                continue
+            verdicts[x.name] = v
+        keeps, notes_kept = keep_mail_for(call, verdicts, caller, concluded=False)
+    except Exception as e:  # noqa: BLE001 — whatever the transport raised, the answer is the same
+        return [], [f"no extras written — the home could not be read: {e}"]
+    notes += notes_kept
+    for x in plan.extras:
+        if x.name not in verdicts:
+            continue
+        params = {**x.create_params(controllers), "team_start": True, "held": True}
+        if x.name in keeps:
+            params["keep_mail"] = True
+        try:
+            written.append(call("create", **params))
+        except AgentError as e:
+            notes.append(f"{x.name}: the extra of {x.scale} was not written — {e}")
+    return written, notes
+
+
 def start(
     call: Call, org: orgmod.Org, name: str, host: str, *, profile: str | None = None, caller: str | None = None
 ) -> tuple[teams.Plan, dict[str, Any]]:
@@ -911,6 +957,8 @@ def start(
             created.append(call("create", **params(m, [lead_id] if lead_id else [])))
     except Exception as e:
         raise PartialStart(name, created, plan, e) from e
+    extras, extra_notes = write_extras(call, plan, [lead_id] if lead_id else [], caller)
+    notes += extra_notes
     # §9 invariant 5, as TD-041 made it a gate: no session acts on an interactive one, so a member
     # the definition starts interactive carries `controllers: [lead]` that can never fire. The list
     # is set and the start stands — it is a fact about the definition — but it is said out loud.
@@ -924,6 +972,7 @@ def start(
         "moved": moved,  # the definition's renames and removals (§4.9, TD-706): *grind-1 → mill-1*, *hunt removed*
         "manager": lead_id or None,
         "sessions": created,
+        "extras": extras,  # the held extras written (§4.9 *Scaling with the work*, TD-1545)
         "out_of_reach": out_of_reach,
         "unrepeatable": list(plan.warnings),
         "notes": notes,
@@ -1125,8 +1174,9 @@ def _pairing(
         r
         for n in gone
         if (r := _current(n, mine)) is not None
-        and not (r.get("sit_out") or sat_out(r) or r.get("superseded_by") or r.get("run_only"))
-    ]  # a run-only member, live or exited inside its run, is neither: it ends with the run (§4.9, TD-1166)
+        and not (r.get("sit_out") or sat_out(r) or r.get("superseded_by") or r.get("run_only") or r.get("scale"))
+    ]  # a run-only member, live or exited inside its run, is neither: it ends with the run (§4.9, TD-1166);
+    # nor is an extra, which no definition names by its own name (§4.9 *Scaling with the work*, TD-1545)
     carried = {str(r.get("name")) for r in badged(plan.team, sessions) if not r.get("superseded_by")}
     newcomers = [x for x in plan.launches if x.name not in carried]
     held: dict[str, dict[str, Any]] = {}
@@ -1676,6 +1726,11 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
             out["skipped"].append(row)
             continue
         out["applied"].append(row)
+    if any(r["act"] == "start" for r in out["applied"]):
+        # Apply's *starts* write the extras a Start would (§4.9 *Scaling with the work*, TD-1545)
+        extras, said = write_extras(call, plan, [lead_id] if lead_id else [], caller)
+        out["extras"] = [str(r.get("id")) for r in extras]
+        out["notes"] = said
     if out["applied"]:
         witness_press(call, "apply", name, team_dir(plan))
     return out
