@@ -40,16 +40,20 @@ def test_a_reserve_field_takes_what_ao_gate_takes():
 
 
 @pytest.mark.unit
-def test_usage_cards_group_by_account_and_draw_each_reported_window():
-    """A card per profile under its account, as the chip groups them (TD-122); a row per window the
-    adapter reports, with the reserve as the field takes it and the line it makes today; a profile
-    with no reading draws its reserves' labels and says they are not checked; a metered profile's
-    card carries the home's three windows, each an amount with the account's spend beside it."""
+def test_usage_cards_are_one_per_account_and_draw_each_reported_window():
+    """A card per account (§4.5a *Settings page: Usage*, TD-1610): the home's `profiles.yml`'s and each the
+    `gate` reply's accounts name, its badge the profiles on it; a row per window its reading reports, with the
+    account's reserve as the field takes it and the line it makes today; an account with no reading draws its
+    reserves' labels and says they are not checked; a metered account's card carries the home's three
+    windows, each an amount with the account's spend beside it; one whose profiles disagree on billing takes
+    no reserve; a node's account draws a card from the reply alone."""
     profiles = {
         "grind": profiles_mod.Profile(name="grind", account="paul"),
         "paul": profiles_mod.Profile(name="paul", account="paul"),
         "cold": profiles_mod.Profile(name="cold", account="other"),
         "api": profiles_mod.Profile(name="api", account="key", billing="metered", prices={"input": 3, "output": 15}),
+        "sa": profiles_mod.Profile(name="sa", account="split"),
+        "sb": profiles_mod.Profile(name="sb", account="split", billing="metered"),
     }
     resets = (NOW + timedelta(days=3, hours=19)).isoformat()
     usage = {
@@ -60,26 +64,31 @@ def test_usage_cards_group_by_account_and_draw_each_reported_window():
             {"label": "day", "pct": 64, "resets": resets, "spent": {"total": 9, "cost": 3.2}},
             {"label": "week", "pct": None, "resets": resets, "spent": {"total": 1_200_000, "cost": 9.8}}]},
     }  # fmt: skip
-    gate = {
-        "grind": {"reserves": {"5h": 30, "week": {"per_day": 10}}, "windows": [
+    accounts = {
+        "claude-code:paul": {"profiles": ["grind", "paul"], "billing": "subscription",
+            "reserves": {"5h": 30, "week": {"per_day": 10}}, "windows": [
             {"label": "5h", "line": 70, "reserve": 30, "resets": None, "next": None},
             {"label": "week", "line": 60, "reserve": {"per_day": 10}, "resets": resets, "next": None}]},
-        "cold": {"reserves": {"5h": 20}, "windows": []},
-        "api": {"reserves": {"day": "$5", "week": "2M tok"}, "windows": [], "metered": True},
+        "claude-code:other": {"profiles": ["cold"], "billing": "subscription", "reserves": {"5h": 20}, "windows": []},
+        "claude-code:key": {"profiles": ["api"], "billing": "metered",
+            "amounts": {"day": "$5", "week": "2M tok"}, "windows": []},
+        "claude-code:split": {"profiles": ["sa", "sb"], "billing": "mixed",
+            "billings": {"sa": "subscription", "sb": "metered"}},
+        "claude-code:nodeacct": {"profiles": ["np"], "billing": "subscription", "reserves": {}, "windows": []},
     }  # fmt: skip
-    groups = setmod.usage_cards(profiles, gate, usage, NOW)
-    assert [g["account"] for g in groups] == ["claude-code · paul", "claude-code · other", "claude-code · key"]
-    grind, paul = groups[0]["cards"]
-    assert [(r["label"], r["value"], r["line"]) for r in grind["rows"]] == [
+    cards = {c["account"]: c for c in setmod.usage_cards(profiles, accounts, usage, NOW)}
+    assert list(cards) == sorted(accounts)
+    paul = cards["claude-code:paul"]
+    assert paul["profiles"] == ["grind", "paul"] and paul["badge"] == "grind, paul · claude-code"
+    assert [(r["label"], r["value"], r["line"]) for r in paul["rows"]] == [
         ("5h", "30", "→ line 70%"),
         ("week", "10/day", "→ line 60% · 4 days left"),
     ]
-    assert grind["rows"][1]["resets"] == resets and not grind["unchecked"]
-    assert [(r["label"], r["value"], r["line"]) for r in paul["rows"]] == [("5h", "", "no line")]
-    cold = groups[1]["cards"][0]
+    assert paul["rows"][1]["resets"] == resets and not paul["unchecked"]
+    cold = cards["claude-code:other"]
     assert cold["rows"] == [{"label": "5h", "value": "20", "line": "no reading yet", "resets": "", "pct": None}]
     assert cold["unchecked"]
-    api = groups[2]["cards"][0]
+    api = cards["claude-code:key"]
     assert api["metered"] and "metered · $3 in / $15 out per M" in api["badge"]
     at = datetime.fromisoformat(resets).astimezone().strftime("%H:%M")
     assert [(r["label"], r["value"], r["line"]) for r in api["rows"]] == [
@@ -87,6 +96,13 @@ def test_usage_cards_group_by_account_and_draw_each_reported_window():
         ("week", "2M tok", f"spent 1.2M tok · resets {at}"),
         ("month", "", "no reading yet"),
     ]
+    split = cards["claude-code:split"]
+    assert split["mixed"] == "sa subscription, sb metered" and split["rows"] == []
+    node = cards["claude-code:nodeacct"]
+    assert node["profiles"] == ["np"] and node["rows"] == [] and node["unchecked"]
+    # with no `gate` reply (an older host agent), the file's accounts still draw, with empty fields
+    bare = {c["account"]: c for c in setmod.usage_cards(profiles, None, usage, NOW)}
+    assert [r["value"] for r in bare["claude-code:paul"]["rows"]] == ["", ""] and bare["claude-code:split"]["mixed"]
     assert setmod.parse_reserve_text(" $5 ") == "$5" and setmod.parse_reserve_text("20M tok") == "20M tok"
 
 
@@ -100,7 +116,7 @@ def test_a_usage_cards_rows_say_how_old_the_reading_is():
 
     def rows(fetched: str, resets: str = later) -> list[dict]:
         usage = {"grind": {"fetched": fetched, "windows": [{"label": "week", "pct": 58, "resets": resets}]}}
-        return setmod.usage_cards(profiles, {}, usage, NOW)[0]["cards"][0]["rows"]
+        return setmod.usage_cards(profiles, {}, usage, NOW)[0]["rows"]
 
     assert rows((NOW - timedelta(minutes=7)).isoformat())[0]["age"] == "58% · read 7m ago, asked of the endpoint"
     was = NOW - timedelta(hours=4)
@@ -292,9 +308,17 @@ def test_a_save_writes_settings_yml_through_set_settings(client, subprocess_agen
     from sessionorc.client import call_sync
 
     try:
-        ok = client.post("/api/settings/usage", json={"profile": "grind", "reserves": {"5h": "30", "week": "10/day"}})
+        # an account's card posts its account (TD-1610)
+        body = {"account": "claude-code:paul", "reserves": {"5h": "30", "week": "10/day"}}
+        ok = client.post("/api/settings/usage", json=body)
         assert ok.status_code == 200 and ok.json()["ok"]
-        assert call_sync("settings")["usage_gate"]["grind"]["reserves"] == {"5h": 30, "week": {"per_day": 10}}
+        got = call_sync("settings")["usage_accounts"]["claude-code:paul"]
+        assert got["reserves"] == {"5h": 30, "week": {"per_day": 10}}
+        page = client.get("/settings").text
+        assert 'data-account="claude-code:paul"' in page and "grind · claude-code" in page
+        # a page loaded before TD-1610 posts a profile, resolved to its account
+        ok = client.post("/api/settings/usage", json={"profile": "grind", "reserves": {"5h": "20"}})
+        assert ok.json()["ok"] and call_sync("settings")["usage_accounts"]["claude-code:paul"]["reserves"]["5h"] == 20
         bad = client.post("/api/settings/usage", json={"profile": "grind", "reserves": {"5h": "lots"}})
         assert bad.status_code == 400 and "whole percent" in bad.json()["detail"]
         assert client.post("/api/settings/usage", json={"profile": "grind", "reserves": {"5h": "", "week": ""}}).json()[
