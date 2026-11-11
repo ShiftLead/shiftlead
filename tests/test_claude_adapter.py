@@ -416,6 +416,8 @@ def test_launch_argv_and_env(tmp_path, monkeypatch):
     gem = GeminiAdapter()
     assert (gem.account_for("gem"), gem.account_for("grind"), gem.account_for("")) == ("g", None, None)
     assert gem.profiles() == [{"name": "gem", "account": "g", "billing": "subscription"}]
+    (tmp_path / "home" / "profiles.yml").write_text("profiles: [unclosed\n")  # unreadable: none answered
+    assert (ad.account_for("paul"), ad.profiles(), gem.profiles()) == (None, [], [])
     assert ad.label == "Claude"
 
 
