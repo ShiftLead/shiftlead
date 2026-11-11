@@ -49,10 +49,11 @@ from sessionorc.models import (
 
 log = logging.getLogger(__name__)
 
-# a node's registered checkouts, read for the send's `repo` stamp (§4.10, TD-1467): kept this long once read, waited
-# on no longer than this at a send, and asked again no sooner than this after a node that did not answer
 # design §4.9b *What it does* (TD-1576): the refusal of an `ask --pr` to a fact-check seat
 FACT_CHECK_NO_PR = "a fact-check seat reads no PR as its reader (§4.9b): ask the reader your flow names"
+
+# a node's registered checkouts, read for the send's `repo` stamp (§4.10, TD-1467): kept this long once read, waited
+# on no longer than this at a send, and asked again no sooner than this after a node that did not answer
 ROSTER_KEEP = timedelta(minutes=10)
 ROSTER_WAIT = 2.0
 ROSTER_RETRY = timedelta(minutes=1)
