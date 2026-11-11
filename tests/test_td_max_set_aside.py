@@ -6,7 +6,7 @@ from __future__ import annotations
 import yaml
 from test_cli_teams import HOST, world  # noqa: F401 — the fixture, by name
 
-from shiftlead import cli, teamrun, teams
+from shiftlead import cli, orgcheck, teamrun, teams
 from shiftlead import org as orgmod
 
 REFUSED = {"orc-ao": 3, "mill": 2, "sweeper": 2, "hunt": 3}
@@ -91,3 +91,36 @@ def test_the_dialogs_lane_refusals_name_an_area_lane_alone(world, monkeypatch): 
     ups = {e["name"]: e["up_to"] for e in v["members"]}
     assert (ups["hunt"]["why"], ups["hunt"]["value"]) == ("its lane has no queue to read", None)
     assert ups["grind"]["why"] == "" and ups["grind"]["value"] is not None
+
+
+def _org_with_mill(tmp_path) -> orgmod.Org:
+    _file(tmp_path, {"grind": 4, "mill": 2})
+    return orgmod.with_home_settings(orgmod.load())
+
+
+MILL = (
+    "teams.ao-grind.max.mill in settings.yml: team ao-grind has no member line or seat 'mill' — set aside, "
+    "no extra runs for it"
+)
+
+
+def test_org_check_says_a_key_set_aside_on_an_unlanded_team(world):  # noqa: F811
+    """TD-1621: an unlanded team skips its plan, and its set-aside keys are still said (#3349)."""
+    tmp_path, _ = world
+    org = _org_with_mill(tmp_path)
+    org.unlanded["ao-grind"] = "place.ao-grind: the node could not be asked"
+    assert MILL in orgcheck.check(org, [], HOST, [], [])["warnings"]
+
+
+def test_org_check_says_a_key_set_aside_on_a_team_whose_plan_fails(world, monkeypatch):  # noqa: F811
+    """TD-1621: a team whose start would be refused is a lack, and its set-aside keys are still said (#3349)."""
+    tmp_path, _ = world
+    org = _org_with_mill(tmp_path)
+
+    def refused(*a, **k):
+        raise teams.TeamError("brief gone")
+
+    monkeypatch.setattr(teams, "plan", refused)
+    got = orgcheck.check(org, [], HOST, [], [])
+    assert "brief gone" in got["lacks"]
+    assert MILL in got["warnings"]
