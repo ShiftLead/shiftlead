@@ -247,3 +247,23 @@ def test_ao_rank_list_prints_waiting_unnumbered_after_in_progress_with_its_phras
     monkeypatch.setattr(cli, "_td_repo", lambda repo: (str(root), str(root)))
     assert cli.main(["rank", "TD-002", "--top"]) != 0
     assert "TD-002's card is Waiting, which does not move" in capsys.readouterr().err
+
+
+def test_a_live_check_whose_reading_says_no_is_held_by_its_gate_alone(tmp_path):
+    """§4.9b *A live check is held by its gate alone* (TD-1452, TD-1595): a live check with no gate in force reads
+    as ready whatever its `live` reading says — the reading holds nothing once its gate has lifted."""
+    cards = _read(tmp_path, [
+        _entry(1, "a live check, its gate lifted", Priority="High", Kind="live-check #7"),
+    ], TD_001={"live": "no"})  # fmt: skip
+    card = cards["r#TD-001"]
+    assert card["wait"] is None and card["group"] == "up_next" and card["status"] == "ready"
+
+
+def test_a_live_checks_not_live_mark_is_for_its_own_live_gate_alone(tmp_path):
+    """TD-1452, TD-1597: *(not live #n)* is added to a live check's phrase only when the gate it waits on is its
+    own `event (live…)`; another event gate's phrase stands unmarked, whatever the reading says."""
+    cards = _read(tmp_path, [
+        _entry(1, "a live check on another event", Priority="High", Kind="live-check #7",
+               Blocked_by="event (merge)") + _ev("merge", "the merge"),
+    ], TD_001={"live": "no"})  # fmt: skip
+    assert cards["r#TD-001"]["wait"] == {"column": "event", "phrase": "waits on the merge", "id": "r#TD-001"}
