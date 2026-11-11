@@ -2952,3 +2952,38 @@ def test_a_shot_s_branch_is_its_upstream_only_where_the_upstream_holds_head(tmp_
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     with pytest.raises(ValueError, match=r"^elsewhere.png is not in .*: a look's shots are of one checkout$"):
         cli._shot_commit([str(shot), str(other)])
+
+
+def test_ao_gate_says_a_mixed_accounts_profiles_disagree_and_ao_settings_skips_an_empty_account(capsys, monkeypatch):
+    """TD-1636 (design §4.7 `ao gate`, §4.2a, TD-1610): an account whose profiles disagree on billing says so on its
+    `ao gate` line, naming each profile's billing; `ao settings` prints only the accounts that hold a reserve or an
+    amount, so an account with nothing set leaves no line in its `usage_gate:` block."""
+    mixed = {
+        "profiles": ["", "grind"],
+        "billing": "mixed",
+        "billings": {"": "subscription", "grind": "metered"},
+        "reserves": {"5h": 30},
+    }
+    plain = {"profiles": ["ask"], "billing": "subscription", "reserves": {"5h": 20}}
+    canned = {
+        "gate": {"file": "settings.yml", "accounts": {"claude-code:paul": mixed, "claude-code:sam": plain}},
+        "settings": {
+            "file": "settings.yml",
+            "usage_accounts": {"claude-code:empty": {"profiles": ["idle"]}, "claude-code:sam": plain},
+            "teams": {},
+        },
+    }
+    monkeypatch.setattr(cli, "call_sync", lambda method, **_: canned[method])
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
+    assert cli.main(["gate"]) == 0
+    paul, sam = capsys.readouterr().out.splitlines()
+    assert paul.endswith(
+        " · its profiles disagree on billing ((default) subscription, grind metered): fix profiles.yml to set a reserve"
+    )
+    assert paul.startswith("claude-code:paul ((default), grind) · 5h 30")
+    assert sam.startswith("claude-code:sam (ask) · 5h 20") and "disagree" not in sam
+    assert cli.main(["settings"]) == 0
+    out = capsys.readouterr().out
+    block = out.split("usage_gate:\n", 1)[1].split("teams:\n", 1)[0]
+    assert block.splitlines() == ["  " + cli._gate_account_line("claude-code:sam", plain)]
+    assert "claude-code:empty" not in out
