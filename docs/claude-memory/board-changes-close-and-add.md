@@ -9,4 +9,12 @@ A decide item's `Parts:` is part of its item key (ledgerboard SPEC; TD-050's D3,
 
 **Why:** On TD-1551 (PR #3447, 2026-11-11) restoring the board file to re-add an item made `board_edit.py replay` refuse on rebase ("removed an item without archiving it"), and an archive folded into the big commit failed the gate; together with board contention they cost four of seven precheck runs.
 
+**An item added and replaced on the same unmerged PR** is the exception (TD-1569, #3465, 2026-11-11): its `done` leaves a closed line with no item on the base, which the gate's board row refuses (*a closed line with no open line it closes*). A helper `archive` under `ARCHIVE_AT` fails too (*not the writer's archive at the threshold*). The cure that passed was:
+1. Squash the branch (`git reset --soft $(git merge-base origin/main HEAD)`).
+2. Restore the board and its archive to the merge-base.
+3. Run the one `add` again.
+4. Force-push.
+
+Better still, write the end-of-rounds item only after the closing fact-check raises nothing.
+
 **How to apply:** Board edits go through `board_edit.py` only, in this order when one item replaces another: `done` (without `--no-commit` when it archives, the board committed first), then `add --no-commit`. Lifting one part of a shared decide with its answer marks the whole item decided (ledgerboard TD-067); split the item first. See [[decided-in-the-filing-pr]], [[summary-table-conflicts-resolve-row-wise]].
