@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import inspect
 import json
+from pathlib import Path
 
 import pytest
 from _harness import (
@@ -72,6 +73,37 @@ def test_the_constructor_takes_binary(name):
     builds it with `binary` set to the stub's wrapper."""
     params = inspect.signature(type(adapters.get(name))).parameters
     assert "binary" in params, f"{name}'s constructor takes no `binary`"
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_each_agent_adapter_declares_its_default_home(name):
+    """The home a launch uses for a profile naming no `config_dir`, which the walk and the seat smoke refuse
+    (§4.3's Protocol block, TD-1648): every agent adapter declares it."""
+    assert callable(getattr(adapters.get(name), "default_home", None)), f"{name} declares no default_home()"
+
+
+# each agent adapter's home variable and the default it falls back to (§4.3's Protocol block): a new adapter
+# fails `test_default_home_reads_the_variable_outside_a_session` until it is named here
+HOME_VARIABLES = {"claude-code": ("CLAUDE_CONFIG_DIR", "~/.claude"), "gemini": ("GEMINI_CLI_HOME", "~")}
+
+
+@pytest.mark.parametrize("name", AGENTS)
+@pytest.mark.parametrize("session", [False, True])
+@pytest.mark.parametrize("variable", [False, True])
+def test_default_home_reads_the_variable_outside_a_session(name, session, variable, tmp_path):
+    """`default_home(env)`: the tool's variable where it is set and `env` holds no `SHIFTLEAD_SESSION`, else the
+    tool's own default, expanded — a session's variable is its own launch's, never the person's (TD-1648)."""
+    assert name in HOME_VARIABLES, f"{name}: name its home variable in HOME_VARIABLES"
+    var, default = HOME_VARIABLES[name]
+    env = {"PATH": "/usr/bin"}
+    if session:
+        env["SHIFTLEAD_SESSION"] = "ao-x-y"
+    if variable:
+        env[var] = str(tmp_path / "set")
+    got = adapters.get(name).default_home(env)
+    want = tmp_path / "set" if variable and not session else Path(default).expanduser()
+    assert got == want
+    assert got == got.expanduser()
 
 
 def test_shell_declares_no_permission_channel():

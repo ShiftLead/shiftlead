@@ -323,12 +323,14 @@ def _brief(
     context: str = "",
     manager: str = "",
     flow: repoconfig.UnderFlow | None = None,
+    template_file: Path | None = None,
 ) -> tuple[str | None, dict[str, Any] | None]:
     """The role's template with the member's `brief:` in its `{repo}` slot — in place of the role's
     own `roles.<name>.brief`, never beside it (design §4.8, TD-114) — and `{lane}`, `{techlead}`,
     `{manager}` and `{context}` filled. The `brief:` is read from the home checkout, where `role`
-    was resolved. A manager on call takes the template's seat shape (§6 rule 3, TD-259). Beside it,
-    what it was made from (`Role.compose`, §6 rule 7)."""
+    was resolved. A manager on call takes the template's seat shape (§6 rule 3, TD-259). `template_file`
+    replaces the role's template (the seat smoke's `--brief`, §4.3, TD-1648). Beside it, what it was made
+    from (`Role.compose`, §6 rule 7)."""
     supplement = member.brief if member is not None and member.brief else None
     return role.compose(
         lane,
@@ -339,6 +341,7 @@ def _brief(
         supplement=supplement,
         on_call=isinstance(member, orgmod.ManagerDef) and member.on_call,
         flow=flow,
+        template_file=template_file,
     )
 
 

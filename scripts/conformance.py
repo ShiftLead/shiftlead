@@ -21,6 +21,14 @@ It spends a few requests of the profile it names, so it refuses to run in CI (`C
 `--profile`, and on a profile with no `config_dir` of its own — none, the tool's default, or one another
 profile names (that is the person's own tool home).
 
+`--smoke` is *the seat smoke* (design §4.3 *The live smoke, unattended*, TD-1648), never the promote's smoke:
+the real tool launched as an unattended seat is — the profile's own `permission_prompts`, the role's brief
+(`--role`, `fact-checker` by default; `--seat`, `--brief`) — in a scratch clone of this checkout's `HEAD`, asked
+once as the person; it passes when a reply lands on the ask's thread within ten minutes and the record never
+read `needs-you`. Its last line is *seat smoke: passed* or *seat smoke: failed — <step>: <what it read>*, with
+the tool's version. A `config_dir` shared with other profiles is not refused for it (a seat runs in the home
+its profile names); `--keep` leaves its scratch home and clone for a look.
+
 `--capture` writes what the tool handed the adapter's hook — the hook payloads and the status line's —
 under `tests/conformance/fixtures/<adapter>/captured/`, with the pane titles the tool set and each step's
 pane and title (`panes/<n>-<step>.txt`, `capture-pane -e`): the fixtures the offline suite reads once they
@@ -78,15 +86,38 @@ def refusal(env: dict[str, str], profile: str | None) -> str | None:
     return None
 
 
-def scratch_profile(adapter: str, name: str, live_profiles: Path) -> dict[str, Any]:
-    """The named profile's entry from the live home's `profiles.yml`, as the scratch home declares it:
-    `permission_prompts: all`, so the adapter adds its asking arguments (§4.3 `asking_args`: Claude Code's
-    default, `auto`, allowed the walk's `touch` before any hook saw a permission, TD-784, TD-823) and the
-    walk sees a permission. Refused when it is not there, names
-    another adapter, or has no `config_dir` of its own."""
+def refused_homes(env: dict[str, str]) -> set[Path]:
+    """The homes no walk and no seat smoke runs in (design §4.3, TD-1648): each agent adapter's
+    `default_home(env)` and `default_home({})`, resolved — so Claude Code's `~/.claude` stays refused when
+    `$CLAUDE_CONFIG_DIR` points elsewhere. `env` is the environment the run started in, read once."""
+    from sessionorc import adapters
+
+    out: set[Path] = set()
+    for n in adapters.names():
+        if not adapters.has_agent(n):
+            continue
+        home = getattr(adapters.get(n), "default_home", None)
+        if home is None:
+            continue
+        out |= {Path(home(e)).expanduser().resolve() for e in (env, {})}
+    return out
+
+
+def scratch_profile(
+    adapter: str, name: str, live_profiles: Path, env: dict[str, str] | None = None, smoke: bool = False
+) -> dict[str, Any]:
+    """The named profile's entry from the live home's `profiles.yml`, as the scratch home declares it.
+    For the walk, `permission_prompts: all`, so the adapter adds its asking arguments (§4.3 `asking_args`:
+    Claude Code's default, `auto`, allowed the walk's `touch` before any hook saw a permission, TD-784,
+    TD-823) and the walk sees a permission; for the seat smoke (`smoke`), the profile's own, as a seat runs it.
+    Refused when it is not there, names another adapter, has no `config_dir`, or its `config_dir` is a tool's
+    default home (`refused_homes(env)`, `env` the run's starting environment); the walk's alone also when
+    another profile names its `config_dir`."""
     import yaml
 
     from shiftlead import profiles
+
+    env = dict(os.environ) if env is None else env
 
     try:
         known, _default = profiles.load(live_profiles)
@@ -100,24 +131,35 @@ def scratch_profile(adapter: str, name: str, live_profiles: Path) -> dict[str, A
     if prof.config_dir is None:
         raise Refused(f"profile {name!r} names no config_dir: it is the person's own tool home, never walked")
     mine = prof.config_dir.expanduser().resolve()
-    defaults = {
-        Path(d).expanduser().resolve() for d in ("~/.claude", os.environ.get("CLAUDE_CONFIG_DIR") or "~/.claude")
-    }
+    if mine in refused_homes(env):
+        run = "a seat smoke" if smoke else "a walk"
+        raise Refused(
+            f"profile {name!r}'s config_dir {prof.config_dir} is a tool's default home: {run} takes a home of its own"
+        )
     shared = sorted(
         n for n, p in known.items() if n != name and p.config_dir and p.config_dir.expanduser().resolve() == mine
     )
-    if mine in defaults or shared:
-        why = f"shares it with {', '.join(shared)}" if shared else "is the tool's default home"
-        raise Refused(f"profile {name!r}'s config_dir {prof.config_dir} {why}: a walk takes a home of its own")
+    if shared and not smoke:  # a seat runs in the home its profile names, shared or not: the smoke runs it so
+        raise Refused(
+            f"profile {name!r}'s config_dir {prof.config_dir} shares it with {', '.join(shared)}: "
+            "a walk takes a home of its own"
+        )
     raw = (yaml.safe_load(live_profiles.read_text(encoding="utf-8")) or {}).get("profiles", {})[name] or {}
+    if smoke:
+        return {**raw, "config_dir": str(prof.config_dir)}
     return {**raw, "config_dir": str(prof.config_dir), "permission_prompts": "all"}
+
+
+def write_profiles(home: Path, name: str, entry: dict[str, Any]) -> None:
+    """The scratch home's `profiles.yml`: the one profile, its default."""
+    import yaml
+
+    (home / "profiles.yml").write_text(yaml.safe_dump({"default": name, "profiles": {name: entry}}), encoding="utf-8")
 
 
 def write_home(home: Path, name: str, entry: dict[str, Any]) -> Path:
     """The scratch home's `profiles.yml` and the walk's directory; returns the directory."""
-    import yaml
-
-    (home / "profiles.yml").write_text(yaml.safe_dump({"default": name, "profiles": {name: entry}}), encoding="utf-8")
+    write_profiles(home, name, entry)
     work = home / "walk"
     work.mkdir()
     git = ["git", "-C", str(work), "-c", "user.name=walk", "-c", "user.email=walk@localhost"]
@@ -373,14 +415,131 @@ def save_pane(capture: Path, sock: str, n: int, step: str, sid: str) -> Path:
     return out
 
 
+def smoke_line(ok: bool, step: str, said: str, version: str) -> str:
+    """The seat smoke's last line, which a PR, an entry or a seat line's PR quotes (design §4.3)."""
+    head = "seat smoke: passed" if ok else f"seat smoke: failed — {step}: {' '.join(said.split())[:300]}"
+    return f"{head} · {version}"
+
+
+def run_smoke(args: argparse.Namespace, entry: dict[str, Any], start_env: dict[str, str]) -> int:
+    """The seat smoke (design §4.3 *The live smoke, unattended*, TD-1648): the real tool launched as an
+    unattended seat is, in a scratch clone, with the role's brief; one ask as the person; a pass when a reply
+    lands on its thread within ten minutes and the record never read `needs-you`. Kills the seat, stops the
+    host agent and removes the scratch home and clone however it ends, unless `--keep`."""
+    import seat_run
+
+    from sessionorc import adapters
+
+    version = seat_run.tool_version(adapters.get(args.adapter).binary)
+    home = Path(tempfile.mkdtemp(prefix="aos-", dir="/tmp"))
+    sock = f"ao-smoke-{uuid.uuid4().hex[:8]}"
+    agent: subprocess.Popen | None = None
+    sid = ""
+    call: Callable[..., Any] | None = None
+    print(f"conformance: the seat smoke of {args.adapter} on profile {args.profile} ({version})")
+
+    def failed(step: str, said: str) -> int:
+        print(smoke_line(False, step, said, version))
+        return 1
+
+    try:
+        try:
+            clone, _bare = seat_run.scratch_clone(ROOT, home)
+        except subprocess.CalledProcessError as e:
+            return failed("clone", (e.stderr or str(e)).strip())
+        print(f"clone: {clone} (of {ROOT}'s HEAD; origin a local bare repository)")
+        for line in seat_run.uncommitted(ROOT):
+            print(f"uncommitted, not in the clone: {line}")
+        try:
+            brief = seat_run.compose(
+                clone, args.role, args.profile, args.seat, Path(args.brief).resolve() if args.brief else None
+            )
+        except seat_run.SeatRefused as e:
+            print(f"conformance: refused — {e}", file=sys.stderr)
+            return 2
+        print(f"brief: role {brief.role}, {brief.line}; the seat named {brief.name}")
+        write_profiles(home, args.profile, entry)
+        env = seat_run.agent_env(agent_env(home, sock, None))
+        agent = subprocess.Popen([sys.executable, str(ROOT / "scripts" / "look_home.py"), "--agent", sock], env=env)
+        if not look_home.wait_for(lambda: (home / "agent.sock").exists() or agent.poll() is not None, 15):
+            return failed("host agent", "it never opened its socket")
+        if agent.poll() is not None:
+            return failed("host agent", f"it exited {agent.returncode}")
+        os.environ.update({k: env[k] for k in ("SHIFTLEAD_HOME", "SHIFTLEAD_TMUX_SOCKET")})
+        for k in seat_run.NOT_A_SESSION:  # the smoke is the person
+            os.environ.pop(k, None)
+        from sessionorc.client import call_sync
+
+        def call(m: str, **p: Any) -> Any:
+            return call_sync(m, **p)
+
+        print(f"conformance: SHIFTLEAD_HOME={home}, tmux -L {sock}")
+        try:
+            rec = seat_run.launch(call, brief, args.adapter, args.profile, clone)
+        except Exception as e:  # noqa: BLE001 — a refused create is the step's failure, said
+            return failed("launch", f"{type(e).__name__}: {e}")
+        sid = rec["id"]
+        nonce = seat_run.new_nonce()
+        try:
+            ask_id = seat_run.ask(sid, seat_run.ask_text(nonce), env)
+        except (RuntimeError, OSError, subprocess.SubprocessError) as e:
+            return failed("ask", str(e))
+        print(f"launch: {sid}; ask {ask_id} sent as the person, the token {nonce}")
+        got = seat_run.watch(lambda: call("get", id=sid), lambda: (call("inbox") or {}).get("entries") or [], ask_id)
+        if got.step == "needs-you":
+            print(f"pending: {json.dumps((got.record or {}).get('pending'))}")
+        if not got.ok:  # what the tool shows, on any failure: a needs-you's dialog, or a launch that never hooked
+            print(f"pane ({sid}, capture-pane -e):\n{seat_run.capture_pane(sock, sid)}")
+        if not got.ok:
+            return failed(got.step, got.said)
+        carried = nonce in (got.said or "")
+        print(f"reply: {(got.reply or {}).get('id')} — {'carries' if carried else 'does not carry'} the token")
+        print(smoke_line(True, "", "", version))
+        return 0
+    except KeyboardInterrupt:
+        return failed("stopped", "interrupted")
+    finally:
+        if sid and call is not None:
+            with contextlib.suppress(Exception):
+                call("kill", id=sid)
+        look_home.stop(agent)
+        with contextlib.suppress(OSError, subprocess.SubprocessError):
+            subprocess.run(["tmux", "-L", sock, "kill-server"], capture_output=True, timeout=5)
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(f"/tmp/tmux-{os.getuid()}/{sock}")
+        if args.keep:
+            print(f"kept: {home} (the scratch home, the clone under it)")
+        else:
+            look_home.remove_home(home)
+
+
 def main(argv: list[str] | None = None) -> int:
+    start_env = dict(os.environ)  # read once, before the walk removes SHIFTLEAD_SESSION from its own
     ap = argparse.ArgumentParser(prog="conformance", description=__doc__.split("\n\n")[0])
     ap.add_argument("adapter", help="the adapter to walk, e.g. claude-code")
     ap.add_argument("--profile", help="the profile set aside for the walk (required)")
     ap.add_argument("--capture", action="store_true", help="record the hook and status-line payloads as fixtures")
+    ap.add_argument(
+        "--smoke",
+        action="store_true",
+        help="the seat smoke: the real tool launched as an unattended seat, asked once as the person "
+        "(never the promote's smoke)",
+    )
+    ap.add_argument("--role", default="fact-checker", help="the seat smoke's role (default fact-checker)")
+    ap.add_argument("--seat", help="the seat smoke's seat line, by name (its brief and name)")
+    ap.add_argument("--brief", help="the seat smoke's template in place of the role's (an older brief)")
+    ap.add_argument("--keep", action="store_true", help="the seat smoke keeps its scratch home and clone for a look")
     args = ap.parse_args(argv)
-    if why := refusal(dict(os.environ), args.profile):
+    if why := refusal(start_env, args.profile):
         print(f"conformance: refused — {why}", file=sys.stderr)
+        return 2
+    if not args.smoke and (args.seat or args.brief or args.keep or args.role != "fact-checker"):
+        print(
+            "conformance: refused — --role, --seat, --brief and --keep are the seat smoke's (--smoke)", file=sys.stderr
+        )
+        return 2
+    if args.smoke and args.capture:
+        print("conformance: refused — --capture is the walk's, not the seat smoke's", file=sys.stderr)
         return 2
 
     from sessionorc import adapters, paths
@@ -390,10 +549,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"conformance: refused — {args.adapter!r} is no agent adapter ({adapters.names()})", file=sys.stderr)
         return 2
     try:
-        entry = scratch_profile(args.adapter, args.profile, paths.home() / "profiles.yml")
+        entry = scratch_profile(
+            args.adapter, args.profile, paths.home() / "profiles.yml", env=start_env, smoke=args.smoke
+        )
     except Refused as e:
         print(f"conformance: refused — {e}", file=sys.stderr)
         return 2
+    if args.smoke:
+        return run_smoke(args, entry, start_env)
 
     home = Path(tempfile.mkdtemp(prefix="aoc-", dir="/tmp"))
     sock = f"ao-conf-{uuid.uuid4().hex[:8]}"

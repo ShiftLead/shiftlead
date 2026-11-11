@@ -17,7 +17,7 @@ import shlex
 import shutil
 import sys
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -924,6 +924,13 @@ class ClaudeCodeAdapter:
             return json.loads(p.read_text(encoding="utf-8")).get("claudeAiOauth")
         except (OSError, ValueError, AttributeError):
             return None
+
+    def default_home(self, env: Mapping[str, str]) -> Path:
+        """The home a launch uses for a profile naming no `config_dir` (design §4.3's Protocol block, TD-1648):
+        `$CLAUDE_CONFIG_DIR`, else `~/.claude` — the variable read from `env` and ignored where `env` holds
+        `SHIFTLEAD_SESSION`, a session's being its own launch's. What the walk and the seat smoke refuse."""
+        own = None if "SHIFTLEAD_SESSION" in env else env.get("CLAUDE_CONFIG_DIR")
+        return Path(own or "~/.claude").expanduser()
 
     def credentials_ok(self, profile: Profile) -> bool | None:
         c = self._creds(profile)

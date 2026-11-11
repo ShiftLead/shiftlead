@@ -620,6 +620,7 @@ class Role:
         supplement: str | None = None,
         on_call: bool = False,
         flow: UnderFlow | None = None,
+        template_file: Path | None = None,
     ) -> tuple[str | None, dict[str, Any] | None]:
         """The opening prompt this role gives a session: its template with `{repo}` filled from the
         repo's brief (design §4.8 *A repo's brief is a supplement*, TD-114) — `supplement`, a path,
@@ -636,7 +637,9 @@ class Role:
         `flow` is what a member started under a team's current flow is told of it (§4.9c item 5):
         `{flow}` and `{stage}` from it; without one, `none` and the template's `<stem>.stage.md`. Every
         preset's template wraps it, flow or none — the designer's too, since TD-310 cut its one repo
-        brief to a supplement (§4.9c *The designer gets a template*).
+        brief to a supplement (§4.9c *The designer gets a template*). `template_file` replaces the role's
+        template, composed with the same slots — the seat smoke's `--brief`, replaying an older brief (design
+        §4.3 *The live smoke, unattended*, TD-1648).
 
         Beside the text, what it was made from (design §6 *Keeping a team running* rule 7, TD-217):
         `prompt_from = {base, slots}` — `base` the template's path as installed, or the repo's brief
@@ -649,7 +652,10 @@ class Role:
         slots: dict[str, dict[str, str]] = {}
         template = ON_CALL_BRIEFS.get(self.template, self.template) if on_call and self.template else self.template
         default_stage: Path | None = None
-        if self.defined is not None:
+        if template_file is not None:
+            text, base = self._read(str(template_file), None), str(template_file)
+            default_stage = _stage_default(template) if template is not None else None
+        elif self.defined is not None:
             src_path = self.defined / (ROLE_TEMPLATE_ON_CALL if on_call else ROLE_TEMPLATE)
             text, base = self._defined_template(src_path, read, on_call), str(src_path)
         elif template is None:
@@ -662,7 +668,7 @@ class Role:
             text = src.read_text(encoding="utf-8")
             base = str(src)
             default_stage = _stage_default(template)
-        if self.defined is not None or template is not None:
+        if template_file is not None or self.defined is not None or template is not None:
             added = self._read(extra, read).strip() if extra else ""
             text = text.replace(REPO_PLACEHOLDER, added or NO_REPO)
             slots[REPO_PLACEHOLDER] = {"file": str(self._path(extra))} if extra else {"text": NO_REPO}
