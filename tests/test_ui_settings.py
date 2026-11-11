@@ -241,6 +241,10 @@ class _Tree(html.parser.HTMLParser):
         if tag not in self.VOID:
             self.stack.append(node)
 
+    def handle_startendtag(self, tag, attrs):  # `<x/>` opens nothing, so it closes nothing
+        node = {"tag": tag, "attrs": {k: v or "" for k, v in attrs}, "children": [], "text": ""}
+        self.stack[-1]["children"].append(node)
+
     def handle_endtag(self, tag):
         while len(self.stack) > 1 and self.stack.pop()["tag"] != tag:
             pass
