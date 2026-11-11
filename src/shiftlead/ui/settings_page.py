@@ -144,14 +144,6 @@ def line_text(row: Mapping[str, Any] | None, now: datetime | None = None) -> str
     return out
 
 
-def _account(p: profiles_mod.Profile, reading: Mapping[str, Any] | None) -> tuple[str, str]:
-    """The account a profile's card is grouped under, as the chip names it (TD-122): the reading's
-    `<tool> · <account>` when there is one, else the profile's own `account:` and adapter."""
-    tool = str((reading or {}).get("tool") or p.adapter)
-    acct = str((reading or {}).get("account") or p.account or p.name)
-    return f"{tool} · {acct}", acct
-
-
 def reading_age(w: Mapping[str, Any], read: Mapping[str, Any] | None, now: datetime) -> str:
     """A window's reading as the chip's hover gives it (§4.5a *Settings page: Usage*, *The reading's
     age*; TD-233 slice 1): *week 88% · read 6h ago, asked of the endpoint*; past its reset or past
@@ -167,33 +159,78 @@ def reading_age(w: Mapping[str, Any], read: Mapping[str, Any] | None, now: datet
     return f"{pct} · read {read['age']} ago, {read['source']}"
 
 
+def _usage_key(p: profiles_mod.Profile) -> str:
+    """The usage key `<adapter>:<account>` a profile's reserve is kept under (§6 *Names*, TD-1581)."""
+    return f"{p.adapter}:{p.account or p.name or 'default'}"
+
+
 def usage_cards(
     profiles: Mapping[str, profiles_mod.Profile],
-    gate: Mapping[str, Any] | None,
+    accounts: Mapping[str, Any] | None,
     usage: Mapping[str, Any] | None,
     now: datetime | None = None,
 ) -> list[dict[str, Any]]:
-    """**Usage** (§4.5 screen 8): a card per profile, grouped under its account as the chip is, a
-    row per window label the adapter reports — each with its reserve as the field takes it, the line
-    it makes today, and what the page's preview needs to draw a new line before the press lands
-    (`resets`). A profile with no reading yet draws the labels it has reserves for, and says the
-    labels are not checked. A **metered** profile's card (§4.2a) carries the home's three windows,
-    each taking an amount (`$5`, `20M tok`), with the account's spend beside it."""
+    """**Usage** (§4.5 screen 8, §4.5a *Settings page: Usage*; §6 *A reserve is the account's*, TD-1610): a
+    card per account — the home's `profiles.yml`'s, and each the `gate` reply's `accounts` names (a node's once
+    it has reported) — its badge listing the profiles on it, a row per window label its reading reports, each
+    with the account's reserve as the field takes it, the line it makes today, and what the page's preview
+    needs to draw a new line before the press lands (`resets`). An account with no reading yet draws the
+    labels it has reserves for, and says the labels are not checked; one absent from `usage_gate:` shows
+    empty fields. A **metered** account's card (§4.2a) carries the home's three windows, each taking an
+    amount (`$5`, `20M tok`), with the account's spend beside it. An account whose profiles disagree on
+    billing (`mixed`) takes no reserve and says so."""
     now = now or datetime.now(UTC)
-    gate, usage = gate or {}, usage or {}
-    groups: dict[str, dict[str, Any]] = {}
+    accounts, usage = accounts or {}, usage or {}
+    in_file: dict[str, list[str]] = {}
     for name, p in profiles.items():
-        reading = usage.get(name) if isinstance(usage.get(name), dict) else None
-        g = gate.get(name) if isinstance(gate.get(name), dict) else {}
-        key, acct = _account(p, reading)
+        in_file.setdefault(_usage_key(p), []).append(name)
+    cards = []
+    for key in sorted({*in_file, *(k for k, v in accounts.items() if isinstance(v, dict))}):
+        a = accounts.get(key) if isinstance(accounts.get(key), dict) else {}
+        names = sorted({*(in_file.get(key) or []), *(str(n) for n in a.get("profiles") or [])})
+        mine = [profiles[n] for n in names if n in profiles]
+        bills = {p.billing for p in mine}
+        billing = str(a.get("billing") or ("mixed" if len(bills) > 1 else next(iter(bills), "subscription")))
+        # the account's one reading: the freshest of its profiles' copies
+        got = [usage[n] for n in names if isinstance(usage.get(n), dict)]
+        reading = max(got, key=lambda u: str(u.get("fetched") or ""), default=None)
+        tool = str((reading or {}).get("tool") or key.split(":", 1)[0])
         windows = [w for w in (reading or {}).get("windows") or [] if isinstance(w, dict) and w.get("label")]
-        reserves = g.get("reserves") or {}
-        rows_by = {str(r.get("label")): r for r in g.get("windows") or [] if isinstance(r, dict)}
+        rows_by = {str(r.get("label")): r for r in a.get("windows") or [] if isinstance(r, dict)}
+        badge = f"{', '.join(n or '(default)' for n in names) or 'no profile here'} · {tool}"
+        card: dict[str, Any] = {"account": key, "profiles": names, "metered": billing == "metered", "rows": []}
+        if billing == "mixed":
+            each = ", ".join(f"{p or '(default)'} {b}" for p, b in (a.get("billings") or {}).items()) or ", ".join(
+                f"{p.name or '(default)'} {p.billing}" for p in mine
+            )
+            cards.append(card | {"badge": badge, "mixed": each, "unchecked": False})
+            continue
+        if billing == "metered":
+            prices = next((p.prices for p in mine if p.prices), {})
+            words = " / ".join(f"${v:g} {PRICE_WORDS.get(k, k)}" for k, v in prices.items())
+            badge += f" · metered · {words + ' per M' if words else 'tokens'}"
+            amounts = a.get("amounts") or {}
+            # the home's three windows, each an amount (§4.5a *Settings page: Usage*): the account's spend
+            # beside it, as the chip draws it
+            by_label = {str(w["label"]): w for w in windows}
+            for label in spend_mod.LABELS:
+                value = str(amounts.get(label) or "")
+                card["rows"].append(
+                    {
+                        "label": label,
+                        "value": value,
+                        "line": spend_text(by_label.get(label), "tok" if value.endswith("tok") else ""),
+                        "resets": str((by_label.get(label) or {}).get("resets") or ""),
+                        "pct": None,
+                    }
+                )
+            cards.append(card | {"badge": badge, "unchecked": False})
+            continue
+        reserves = a.get("reserves") or {}
         read = usage_read(reading, now)
-        rows = []
         for w in windows:
             label = str(w["label"])
-            rows.append(
+            card["rows"].append(
                 {
                     "label": label,
                     "value": reserve_text(reserves.get(label)),
@@ -204,40 +241,12 @@ def usage_cards(
                 }
             )
         for label, r in reserves.items():  # a reserve on a label no reading has shown yet
-            if not any(x["label"] == label for x in rows):
-                rows.append(
+            if not any(x["label"] == label for x in card["rows"]):
+                card["rows"].append(
                     {"label": label, "value": reserve_text(r), "line": "no reading yet", "resets": "", "pct": None}
                 )
-        metered = p.billing == "metered"
-        badge = f"account {acct} · {p.adapter}"
-        if metered:
-            prices = " / ".join(f"${v:g} {PRICE_WORDS.get(k, k)}" for k, v in p.prices.items())
-            badge += f" · metered · {prices + ' per M' if prices else 'tokens'}"
-            # the home's three windows, each an amount (§4.5a *Settings page: Usage*): the account's
-            # spend beside it, as the chip draws it
-            by_label = {str(w["label"]): w for w in windows}
-            rows = []
-            for label in spend_mod.LABELS:
-                value = str(reserves.get(label) or "")
-                rows.append(
-                    {
-                        "label": label,
-                        "value": value,
-                        "line": spend_text(by_label.get(label), "tok" if value.endswith("tok") else ""),
-                        "resets": str((by_label.get(label) or {}).get("resets") or ""),
-                        "pct": None,
-                    }
-                )
-        groups.setdefault(key, {"account": key, "cards": []})["cards"].append(
-            {
-                "profile": name,
-                "badge": badge,
-                "metered": metered,
-                "rows": rows,
-                "unchecked": not windows and not metered,
-            }
-        )
-    return list(groups.values())
+        cards.append(card | {"badge": badge, "unchecked": not windows})
+    return cards
 
 
 WEIGHT_KINDS = ("input", "output", "cache_read", "cache_write")  # `settings.WEIGHT_KINDS`, in the card's order

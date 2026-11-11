@@ -8451,7 +8451,7 @@
       return bal;
     };
     const forms = {
-      usage: (f) => ["usage", { profile: f.dataset.profile, reserves: Object.fromEntries($$(".setin", f).map((i) => [i.name, i.value.trim()])) }],
+      usage: (f) => ["usage", { account: f.dataset.account, reserves: Object.fromEntries($$(".setin", f).map((i) => [i.name, i.value.trim()])) }],
       max_age: (f) => ["max_age", { max_age: f.elements.max_age.value.trim() }],  // **trust a reading for** (TD-233)
       settle: (f) => ["settle", { settle: f.elements.settle.value.trim() }],  // **settle** (§4.5a, TD-710)
       teams: (f) => {

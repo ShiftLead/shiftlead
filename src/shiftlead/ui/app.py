@@ -4446,7 +4446,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             request,
             "settings.html",
             {
-                "usage_groups": setmod.usage_cards(profiles, got.get("usage_gate"), usage),
+                "usage_cards": setmod.usage_cards(profiles, got.get("usage_accounts"), usage),
                 "max_age": str((got.get("usage") or {}).get("max_age") or ""),
                 # **settle** (§4.5a *Settings page: settle*, TD-710): the install's map as the field writes it
                 "settle": settle_mod.text_of(got.get("settle")),
@@ -4549,19 +4549,23 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/settings/usage")
     async def settings_usage(request: Request):
-        """§4.5a *Settings page: Usage* → **Save** on a profile card: `{profile, reserves: {label:
+        """§4.5a *Settings page: Usage* → **Save** on an account's card (TD-1610): `{account, reserves: {label:
         text}}`, each text in `ao gate`'s forms (`30`, `10/day`, empty to clear; on a metered card an
         amount, `$5` or `20M tok`) — refused in place with the same words when it is not one — then
-        `set_settings {profile, reserves}`, whose refusal names the billing when the kind is wrong."""
+        `set_settings {account, reserves}`, whose refusal names the billing when the kind is wrong. A
+        `profile` in place of the account (a page loaded before TD-1610) is resolved to its account there."""
         body = await body_of(request)
         raw = body.get("reserves")
         if not isinstance(raw, dict) or not raw:
-            raise HTTPException(400, "usage: send {profile, reserves: {label: reserve}}")
+            raise HTTPException(400, "usage: send {account, reserves: {label: reserve}}")
         try:
             reserves = {str(k): setmod.parse_reserve_text(v) for k, v in raw.items()}
         except ValueError as e:
             raise HTTPException(400, str(e)) from None
-        return answer(await call("set_settings", profile=str(body.get("profile") or ""), reserves=reserves))
+        where = (
+            {"account": str(body["account"])} if body.get("account") else {"profile": str(body.get("profile") or "")}
+        )
+        return answer(await call("set_settings", reserves=reserves, **where))
 
     @app.post("/api/settings/settle")
     async def settings_settle(request: Request):

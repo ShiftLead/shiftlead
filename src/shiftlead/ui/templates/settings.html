@@ -60,12 +60,14 @@
         <span class="note">{% if max_age == "off" %}never project: an old reading is read as it is{% else %}past it, the gate projects each account's reading while unattended sessions work{% endif %}</span></label>
       {{ saverow("an age, 90m or 2h · off never projects · empty for the hour · applies on the next tick") }}
     </form>
-    {% for g in usage_groups %}
-      <div class="note setgroup">{{ g.account }}</div>
-      {% for c in g.cards %}
-      <form class="card pad setcard" data-section="usage" data-profile="{{ c.profile }}">
-        <div class="row gap wrap"><span class="h2 mono">{{ c.profile or "(default)" }}</span><span class="note">{{ c.badge }}</span>{% if c.metered %}{{ filehead(profiles_file, "billing and prices in") }}{% endif %}</div>
-        {% if c.metered %}
+    {#- a card per account (§4.5a *Settings page: Usage*, §6 *A reserve is the account's*; TD-1610): its badge
+        the profiles on it, its Save `set_settings {account, reserves}` -#}
+    {% for c in usage_cards %}
+      <form class="card pad setcard" data-section="usage" data-account="{{ c.account }}">
+        <div class="row gap wrap"><span class="h2 mono">{{ c.account }}</span><span class="note">{{ c.badge }}</span>{% if c.metered or c.mixed %}{{ filehead(profiles_file, "billing and prices in") }}{% endif %}</div>
+        {% if c.mixed %}
+          <div class="note">Its profiles disagree on billing ({{ c.mixed }}), so it takes no reserve: give them one billing in <span class="mono">profiles.yml</span>.</div>
+        {% elif c.metered %}
           {% for w in c.rows %}
           <label class="setrow"><span class="setlabel">{{ w.label }} amount</span>
             <input class="input setin" name="{{ w.label }}" value="{{ w.value }}" placeholder="no amount" data-metered="1" autocomplete="off" spellcheck="false">
@@ -78,14 +80,13 @@
             <input class="input setin" name="{{ w.label }}" value="{{ w.value }}" placeholder="no line" data-resets="{{ w.resets }}" data-pct="{{ w.pct if w.pct is not none else '' }}" autocomplete="off" spellcheck="false">
             <span class="note setline" data-was="{{ w.line }}">{{ w.line }}</span>{% if w.age %}<span class="note dim setage">{{ w.age }}</span>{% endif %}</label>
           {% else %}
-          <div class="note">No window reported yet: the adapter has not read this profile's usage. A reserve can be set with <span class="mono">ao gate</span>, which says the labels were not checked.</div>
+          <div class="note">No window reported yet: the adapter has not read this account's usage. A reserve can be set with <span class="mono">ao gate {{ c.account }}</span>, which says the labels were not checked.</div>
           {% endfor %}
           {% if c.rows %}
           {{ saverow("applies on the next tick · the chip shows the line" ~ (" · no reading yet, so the labels are not checked" if c.unchecked else "")) }}
           {% endif %}
         {% endif %}
       </form>
-      {% endfor %}
     {% else %}
       <div class="note">No profiles.</div>
     {% endfor %}

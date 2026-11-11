@@ -1079,7 +1079,6 @@ html.phonefocus .composer.nopen #send { min-height: 40px; border-radius: 20px; m
    column (TD-082) at a reading width — a section is a heading with its i mark, a row is a card; a
    field is a label, its input and what it makes today, on one line that wraps on a phone */
 .inboxpage.setpage { max-width: 880px; display: flex; flex-direction: column; gap: 18px; }
-.setpage .setgroup { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-top: 4px; }
 .setpage .setcard { display: flex; flex-direction: column; gap: 10px; }
 .setpage .setrow { display: grid; grid-template-columns: 150px minmax(0, 220px) minmax(0, 1fr); gap: 10px; align-items: center; }
 .setpage .setpullcol { display: flex; flex-wrap: wrap; column-gap: 10px; row-gap: 2px; align-items: baseline; min-width: 0; }  /* the pull row's note and its reading, one column (TD-296 #17) */
