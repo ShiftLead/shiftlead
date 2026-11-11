@@ -105,6 +105,11 @@ async def test_rule_3_writes_why_it_would_not_fill_an_ended_seat(agent, tmp_path
         now = datetime.now(UTC)
         records = list(agent.sessions.values())
         await agent._seat_pass(s, now, records)
+        # the person's Close of a team's last live record is a Stop: held, and no word (§6 rule 3, TD-1564)
+        assert s.stop_held and sid not in agent.unfillable
+        s.closer = {"by": "tick", "why": "seat", "at": _z(now)}  # rule 3's own close between questions instead
+        await agent._seat_pass(s, now, records)
+        assert s.stop_held is None
         assert sid not in agent.unfillable and seat_able(s, now, agent.unfillable), "a closed seat rule 3 fills"
         s.restart_ceiling = {"at": _z(now), "count": 3, "why": "crash"}
         await agent._seat_pass(s, now, records)

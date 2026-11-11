@@ -343,7 +343,8 @@ async def test_a_session_asks_another_repos_seat_for_a_ledger_entry(agent, tmp_p
 async def test_a_closed_seat_is_the_address_and_the_ask_fills_it(agent, tmp_path):
     """TD-1128, design §4.10 *A team or a repo as the address*: rule 3 leaves an empty seat `closed`
     (§4.10 *A seat is the exception*), so `--repo` and `--team` resolve to it while its team runs, and
-    when nobody of the team is live — the `ask` waits pending, and rule 3 fills the seat for it."""
+    when nobody of the team is live — the `ask` waits pending, and rule 3 fills the seat for it, unless the team's
+    last end was the person's or its stop time's, which holds the seat until its Start (TD-1564)."""
     await park_ticks(agent)
     async with LocalClient() as person:
         mk = _mk(person, tmp_path)
@@ -373,10 +374,17 @@ async def test_a_closed_seat_is_the_address_and_the_ask_fills_it(agent, tmp_path
         async with LocalClient(caller=asker) as a:
             got = await a.call("entry_add", repo="agent-cadence", type="debt", text="the address refuses a closed seat")
         assert got["to"] == seat and _ask_in(rec, got["id"]).open
-        # nobody of the team live (stopped): the address still resolves, and the ask still fills it
+        # nobody of the team live, the person's kill its last end (a Stop): the address still resolves, the ask
+        # lands and waits, and the seat is held — filled at the team's Start (§6 rule 3, TD-1564)
         await person.call("kill", id=grinder)
         agent.sessions[grinder].state = "closed"
         assert (await agent._question_seat(repo="agent-cadence")) is rec
+        await agent._keep_running(datetime.now(UTC))
+        assert agent.sessions[seat] is rec and rec.stop_held and rec.stop_held["by"] == "person"
+        # nobody live, its last end another's (a session's kill; the seat closed by rule 3): filled for the ask
+        now = datetime.now(UTC).isoformat()
+        agent.sessions[grinder].ended = {"how": "kill", "at": now, "by": "ao-cm-session"}
+        rec.ended, rec.closer = None, {"by": "tick", "why": "seat", "at": now}
         await agent._keep_running(datetime.now(UTC))
         new = agent.sessions[seat]
         assert new is not rec and [r["why"] for r in new.restarts][-1:] == ["fill"], "the ask filled the seat"
