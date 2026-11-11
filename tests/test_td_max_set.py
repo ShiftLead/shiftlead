@@ -138,9 +138,7 @@ def test_on_a_live_team_a_raise_writes_the_new_extras_held_at_once(world, extras
     assert got["grind-3"]["controllers"] == ["ao-shiftlead-orc-ao"]  # under the live manager
 
 
-def test_on_a_live_team_a_lowered_max_removes_held_extras_and_winds_down_a_live_one(
-    world, extras_on, monkeypatch, capsys
-):  # noqa: F811
+def test_a_lowered_max_on_a_live_team_drops_held_extras_and_winds_down_live_ones(world, extras_on, monkeypatch, capsys):  # noqa: F811, E501
     _, state = world
     _removes(state, monkeypatch)
     assert cli.main(["team", "max", "ao-grind", "grind", "4"]) == 0
