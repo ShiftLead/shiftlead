@@ -754,7 +754,7 @@ async def test_a_missed_mark_brings_its_session_a_note_and_is_deleted(agent):
     b = _mark(home, "ao-w", "td add", "2026-11-11T10:01:00Z")
     bad = home / "missed" / "ao-w-broken.json"
     bad.write_text('{"at": "2026-11')  # half a file: left for the next tick
-    agent._missed_pass()
+    await agent._missed_pass()
     (note,) = [e for e in w.inbox if e.from_ == models.SYSTEM]
     assert "when you ran `ao msg` at 2026-11-11T10:00:00Z" in note.text
     assert "`ao td add` at 2026-11-11T10:01:00Z" in note.text and "run it again if it did not" in note.text
@@ -778,9 +778,88 @@ async def test_a_mark_for_an_empty_seat_waits_in_its_mailbox_and_tells_the_perso
     put(agent, seat)
     _mark(paths.home(), "ao-rv", "msg", "2026-11-11T10:00:00Z")
     _mark(paths.home(), "ao-gone", "doing", "2026-11-11T10:02:00Z")
-    agent._missed_pass()
+    await agent._missed_pass()
     assert [e for e in seat.inbox if e.from_ == models.SYSTEM], "the empty seat's note waits for its fill"
     told = [e.text for e in agent.person_inbox if "did not land" in e.text]
     assert "a send from rv at 2026-11-11T10:00:00Z did not land and no session is left to run it again" in told
     assert any("ao-gone at 2026-11-11T10:02:00Z" in t for t in told), "no record at all: the person"
     assert not list((paths.home() / "missed").glob("*.json"))
+
+
+class _Mux:
+    """A node's link to its home: what `missed` it was sent, and what it answers."""
+
+    def __init__(self, fails: Exception | None = None):
+        self.sent: list[dict] = []
+        self.fails = fails
+
+    async def request(self, method, timeout=None, **params):
+        if self.fails is not None:
+            raise self.fails
+        self.sent.append({"method": method, **params})
+        return {"noted": len(params.get("marks") or [])}
+
+
+@pytest.mark.integration
+async def test_a_nodes_marks_go_to_the_home_and_are_deleted_once_taken(agent, monkeypatch):
+    """A node's records hold no mail (§6 rule 13, TD-1498): its tick sends its marks to the home as `missed`,
+    `{id, at, verb}` each and nothing more, and deletes them once taken; no link, or a home that refuses, leaves
+    them for the next tick, and nothing is noted at the node."""
+    from sessionorc import link, paths
+
+    await park_ticks(agent)
+    monkeypatch.setattr(agent, "mode", "node")
+    w = rec("w", state="idle")
+    put(agent, w)
+    a = _mark(paths.home(), "ao-w", "msg", "2026-11-11T10:00:00Z")
+    agent._home_mux = None
+    await agent._missed_pass()
+    assert a.exists(), "no link: kept for the next tick"
+    agent._home_mux = _Mux(fails=link.LinkError("unknown link method 'missed'"))
+    await agent._missed_pass()
+    assert a.exists(), "a home that refuses: kept"
+    agent._home_mux = mux = _Mux()
+    await agent._missed_pass()
+    assert mux.sent == [{"method": "missed", "marks": [{"id": "ao-w", "at": "2026-11-11T10:00:00Z", "verb": "msg"}]}]
+    assert not a.exists(), "taken: deleted"
+    # a mark the home would refuse (an address for an id) is never sent and never holds the rest back
+    odd = _mark(paths.home(), "ao-w@else", "msg", "2026-11-11T10:03:00Z")
+    c = _mark(paths.home(), "ao-w", "doing", "2026-11-11T10:04:00Z")
+    await agent._missed_pass()
+    assert mux.sent[-1]["marks"] == [{"id": "ao-w", "at": "2026-11-11T10:04:00Z", "verb": "doing"}]
+    assert not odd.exists() and not c.exists()
+    assert not [e for e in w.inbox if e.from_ == models.SYSTEM] and not agent.person_inbox, "the home notes it"
+    agent._home_mux = None
+
+
+@pytest.mark.integration
+async def test_the_home_notes_a_nodes_marks_on_its_own_records_alone(agent):
+    """The home takes a node's `missed` (§6 rule 13, TD-1498): each id read as the link's host's record, noted as
+    the home's own marks are — a live record its note, no record the person's — and a mark that is not three
+    strings, or names another host, refused whole."""
+    from sessionorc import link
+
+    await park_ticks(agent)
+    w = rec("w", state="idle", host="laptop")
+    agent.remote["laptop"] = {"ao-w": w}
+    here = rec("w", state="idle")
+    put(agent, here)  # the home's own record of the same bare id is not the node's
+    got = await agent._take_missed(
+        "laptop",
+        {
+            "marks": [
+                {"id": "ao-w", "at": "2026-11-11T10:00:00Z", "verb": "msg"},
+                {"id": "ao-gone", "at": "2026-11-11T10:02:00Z", "verb": "doing"},
+            ]
+        },
+    )
+    assert got == {"noted": 2}
+    (note,) = [e for e in w.inbox if e.from_ == models.SYSTEM]
+    assert "when you ran `ao msg` at 2026-11-11T10:00:00Z" in note.text
+    assert not [e for e in here.inbox if e.from_ == models.SYSTEM], "the home's own ao-w is another record"
+    told = [e.text for e in agent.person_inbox if "did not land" in e.text]
+    assert told == ["a send from ao-gone at 2026-11-11T10:02:00Z did not land and no session is left to run it again"]
+    for bad in ([{"id": "ao-w", "at": "t"}], [{"id": "ao-w@home", "at": "t", "verb": "msg"}], "x", [["ao-w"]]):
+        with pytest.raises(link.LinkError):
+            await agent._take_missed("laptop", {"marks": bad})
+    assert len([e for e in w.inbox if e.from_ == models.SYSTEM]) == 1, "a refused batch notes nothing"

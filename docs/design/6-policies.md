@@ -1684,14 +1684,20 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        `progress`), never its arguments, which may hold what a message says. Each host agent, a node's
        as the home's, reads its own `$SHIFTLEAD_HOME`'s marks: every tick reads the directory (empty, it costs nothing), so a mark written after the first tick back, by a
        call that timed out on the restart, is read on the next (`_unavailable`'s ping decides: an agent
-       that answers it is a restart, no mark; one that does not is down, a mark). For each mark it walks the session it names to its
+       that answers it is a restart, no mark; one that does not is down, a mark). A node's records hold no mail, so a node sends
+       what it read to the home over its link (`missed {marks: [{id, at, verb}]}`, each id its own record's bare id, read
+       there as `id@<node>` and never another host's; a mark not three strings refuses the batch, so the node sends none
+       such and deletes it with the rest) and deletes the files once the home has taken them — a link that is down, or a
+       home that refuses, leaves them for the next tick, and a reply lost after the home took them sends them again, a
+       second note (at least once, never none) — and the home
+       answers them as it answers its own. For each mark the home walks the session it names to its
        newest record by `_successor` as a send does (a seat to its current fill; a note is no cause of
        rule 3's, so an empty seat's note waits in its mailbox for the next fill a question makes, within `MAIL_RETENTION`), sends that record, where it is live or an empty seat, a `[system]` note — *the host agent was not
        answering when you ran `ao <verb>` at <at>* (one line per mark) *: it may not have landed — check
        `ao inbox --sent` or `ao status`, and run it again if it did not* — which rings it as any mail does, and deletes the
        files it read, leaving one that fails to parse for the next tick; and whenever the walk ends on no live record (none, a non-seat that ended, or an empty seat,
        whose note still waits for its next fill) the person inbox is sent a note (*a send from <name> at <at> did not land and no
-       session is left to run it again*) — a node's note forwarded to the home as a node's mail is. An `ao` that is
+       session is left to run it again*), a node's mark's as the home's own. An `ao` that is
        not there at all (the shell's *command not found*, exit 127, as a promote's install can leave
        it for a moment) runs no code and writes no mark, and nothing on the host can know who ran it — a
        note to every session after every install was weighed and not taken, since it would ring every

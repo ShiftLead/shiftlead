@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sessionorc import agent_common, mail, work, workorders
+from sessionorc import agent_common, mail, naming, work, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc.models import PERSON, MailEntry, Session, normalize_ref
 
@@ -402,3 +402,11 @@ def lane_records(
 def no_lane(open_at: datetime, now: datetime, wait: timedelta) -> dict[str, Any] | None:
     """A line no lane takes (§6 rule 13): `{since, reason: {state: no_lane}}` once past the wait, else None."""
     return {"since": iso(open_at), "reason": {"state": "no_lane"}} if now - open_at > wait else None
+
+
+def missed_ok(rid: Any, at: Any, verb: Any) -> bool:
+    """Whether a node's missed mark is one the home takes (§6 *A send that did not land*, TD-1498): three non-empty
+    strings of at most 200 characters, the id a bare one — the node's own record's, never an address."""
+    if not all(isinstance(v, str) and v and len(v) <= 200 for v in (rid, at, verb)):
+        return False
+    return not naming.split_address(rid)[1] and "@" not in rid
