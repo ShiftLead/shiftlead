@@ -360,3 +360,59 @@ def test_read_when_says_the_scaled_seat_rows_for_an_ask_alone():
     lands = mail.read_when(extra, "ask", NOW, extras={"lands": True})
     assert lands.startswith('lands on tl-2, an extra of this seat, then rung within a tick: the doorbell types "you')
     assert mail.read_when(own, "note", NOW, extras={"fill": "tl-2"}) == mail.read_when(own, "note", NOW)
+
+
+@pytest.mark.integration
+async def test_a_failed_fill_puts_the_ask_back_on_the_own_record(agent, tmp_path, monkeypatch):
+    """A send's fill that does not start leaves nothing on the held extra: its unread mail is back on the seat's own
+    record, addressed there, where it waits as it would have with no extra to fill (§4.9 *nothing is stranded*)."""
+    await park_ticks(agent)
+
+    async def replay(s, why, **kw):  # the create refused: the record stays as it was
+        return None
+
+    monkeypatch.setattr(agent, "_replay", replay)
+    async with LocalClient() as person:
+        own, (tl2, _) = await _seat(agent, person, tmp_path, own_live=True)
+        _set(_rec(agent, own), "working")
+        (w1, *_) = await _askers(person, tmp_path, 1)
+        async with LocalClient(caller=w1) as a:
+            got = await a.call("msg", to=own, text="read #12?", kind="ask")
+        assert got["delivered"] == [tl2]
+        await (agent._send_filling.get(tl2) or asyncio.sleep(0))
+        mid = got["entry"]["id"]
+        assert not _rec(agent, tl2).inbox, "nothing left on a record nothing reads"
+        assert [e.id for e in _rec(agent, own).inbox] == [mid]
+        assert _rec(agent, own).inbox[0].to == [own]
+        assert [e.to for e in _rec(agent, w1).outbox if e.id == mid] == [[own]]
+        assert not agent._send_filling
+
+
+@pytest.mark.integration
+async def test_a_send_never_lands_on_the_extra_the_eviction_is_closing(agent, tmp_path, blocked_replay):
+    await park_ticks(agent)
+    gate, _ = blocked_replay
+    async with LocalClient() as person:
+        own, (tl2, tl3) = await _seat(agent, person, tmp_path, own_live=True, live_extras=1)
+        _set(_rec(agent, own), "working")
+        _set(_rec(agent, tl2), "idle")  # free, but the host cap's eviction is closing it
+        agent._evicting.add(tl2)
+        (w1, *_) = await _askers(person, tmp_path, 1)
+        async with LocalClient(caller=w1) as a:
+            got = await a.call("msg", to=own, text="read #12?", kind="ask")
+        assert got["delivered"] == [tl3] and not _rec(agent, tl2).inbox
+        gate.set()
+        await agent._send_filling[tl3]
+
+
+@pytest.mark.unit
+def test_a_reply_that_closes_nothing_goes_to_the_own_record_on_a_thread_an_extra_answered():
+    own = _r("ao-tl", "tl", "working")
+    e2 = _r("ao-tl-2", "tl-2", "idle", scale={"line": "tl"})
+    e2.outbox = [
+        models.MailEntry(id="m-1", from_="ao-tl-2", to=["ao-w1"], at=HOOK, kind="reply", text="pass", root="m-0")
+    ]
+    got = seat_send.choose(own, [e2], kind="reply", now=NOW, root="m-0", closes_seat_question=False)
+    assert got == seat_send.Choice("ao-tl")
+    closing = seat_send.choose(own, [e2], kind="reply", now=NOW, root="m-0", closes_seat_question=True)
+    assert closing.to == "ao-tl-2", "a reply closing the extra's own question goes to it"

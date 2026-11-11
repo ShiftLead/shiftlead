@@ -111,10 +111,10 @@ def choose(
     """The record of the seat `own` (its extras `extras`, in place order) that takes mail of `kind`, in the order
     §4.9 *Mail to a scaled seat* gives:
 
-    1. on a thread (`root`) a live record of the seat sent or answered — its outbox holds an entry of the thread —
-       that record keeps it (a `note` excepted, which is the own record's alone);
-    2. a `note`, and a `reply` that closes no question a record of the seat asked (`closes_seat_question`), goes to
-       the own record alone;
+    1. a `note`, and a `reply` that closes no question a record of the seat asked (`closes_seat_question`), goes to
+       the own record alone, never moved — on a thread an extra answered too (§4.9: *the extras never see it*);
+    2. on a thread (`root`) a live record of the seat sent or answered — its outbox holds an entry of the thread —
+       that record keeps it;
     3. an `ask` carrying `pr` that a live record of the seat already holds an ask about stays with that record;
     4. the first free live record in place order — the own record, then the extras — a held extra the send is
        filling (`filling`) among them, one the eviction is closing (`evicting`) never;
@@ -131,12 +131,12 @@ def choose(
         return r.id not in evicting and (r.state not in DEAD or r.id in filling)
 
     ask = kind == "ask"
-    if root and kind != "note":
+    if kind == "note" or (kind == "reply" and not closes_seat_question):
+        return Choice(own.id)
+    if root:
         for r in seat:
             if live(r) and any(e.root == root for e in r.outbox):
                 return Choice(r.id, words={"lands": True} if ask and r is not own else None)
-    if kind == "note" or (kind == "reply" and not closes_seat_question):
-        return Choice(own.id)
     if ask and pr is not None:
         for r in seat:
             if live(r) and any(e.kind == "ask" and e.pr == pr for e in r.inbox):

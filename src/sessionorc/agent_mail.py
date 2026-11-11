@@ -1229,7 +1229,7 @@ class MailMixin:
         seated: dict[str, str] = {}  # the seat's own id the sender wrote → the record of the seat that takes it
         seat_words: dict[str, dict[str, Any]] = {}  # the delivered record → `read_when`'s `extras`
         seat_of: dict[str, str] = {}  # the delivered record → the seat's own id, which `read_when` is keyed by
-        to_fill: list[tuple[Session, str]] = []
+        to_fill: list[tuple[Session, str, str]] = []
         if not routed:
             picked_to: list[str] = []
             for sid in named:
@@ -1244,7 +1244,7 @@ class MailMixin:
                 if choice.words:
                     seat_words[choice.to] = choice.words
                 if choice.fill is not None:
-                    to_fill.append((choice.fill, records[sid].name))
+                    to_fill.append((choice.fill, records[sid].name, sid))
             named = list(dict.fromkeys(picked_to))
         # -- the gate, per addressee, all or nothing ------------------------------------------------
         for sid in named:
@@ -1421,9 +1421,9 @@ class MailMixin:
         if me is not None:
             me.outbox.append(self._copy(entry))
             touched.append(me)
-        for extra, seat_name in to_fill:
+        for extra, seat_name, seat_id in to_fill:
             # marked before the first `await`, so a racing send takes it as filled and fills no second (TD-1547)
-            self._send_filling[extra.id] = asyncio.create_task(self._send_fill(extra, seat_name))
+            self._send_filling[extra.id] = asyncio.create_task(self._send_fill(extra, seat_name, seat_id))
         if counts:
             for r in touched:
                 r.threads.setdefault(root, Tally()).count += 1
@@ -1504,7 +1504,9 @@ class MailMixin:
         read_when = {
             seat_of.get(sid, sid): mail.read_when(
                 # a seat's fill or wait reads as the seat's own record; mail an extra took, as that extra (TD-1547)
-                records[seat_of[sid]] if sid in seat_of and "lands" not in seat_words.get(sid, {}) else records[sid],
+                records[seat_of[sid]]
+                if sid in seat_of and ("fill" in seat_words.get(sid, {}) or sid == seat_of[sid])
+                else records[sid],
                 entry.kind,
                 now,
                 person=sender == PERSON,
@@ -1599,11 +1601,12 @@ class MailMixin:
             guard=guard,
         )
 
-    async def _send_fill(self, extra: Session, seat: str) -> None:
+    async def _send_fill(self, extra: Session, seat: str, own_id: str) -> None:
         """The send's fill (§6 rule 3 *An extra seat*, TD-1547): the held extra created from its launch record with
         `keep_mail`, as rule 3 fills a seat — the mail just landed on it moves to the new record — a `fill` in its
         `restarts`, its `scale.last` saying why. Run as a task the send starts, so the send never waits for the
         pane; the extra counts as filling (free, `seat_send.choose`) until its record stands or the replay fails."""
+        new: Session | None = None
         try:
             await self._replay(extra, "fill", keep_mail=True, mark={"for": "send"})
             here = (extra.host or self.host) == self.host
@@ -1617,6 +1620,27 @@ class MailMixin:
             log.warning("%s: the send's fill failed: %s", extra.id, e)
         finally:
             self._send_filling.pop(extra.id, None)
+            if new is None or new is extra:
+                self._send_fill_failed(extra, own_id)
+
+    def _send_fill_failed(self, extra: Session, own_id: str) -> None:
+        """A send's fill that did not start (TD-1547): the unread mail it landed on the held extra goes back to the
+        seat's own record, where it waits as it would have with no extra to fill — never stranded on a record nothing
+        reads (§4.9 *nothing is stranded on a held extra*; the tick's mover is a later slice)."""
+        records = self._graph()
+        own, extra = records.get(own_id), records.get(extra.id, extra)
+        if own is None:
+            return
+        back = [e for e in extra.inbox if not e.read_at]
+        if not back:
+            return
+        extra.inbox = [e for e in extra.inbox if e.read_at]
+        own.inbox.extend(back)
+        self._save(extra)
+        self._save(own)
+        for e in back:
+            self._mark(e.id, to=[own_id])
+        log.info("%s: the send's fill failed: %d unread back on %s", extra.id, len(back), own_id)
 
     def _away(self, r: Session) -> bool:
         """Whether a record's host is not this one and its link is down (§4.4a *When the recipient's host is
