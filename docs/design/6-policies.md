@@ -1521,14 +1521,15 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        and no member — `by_person`, §4.4 *The card's status*, TD-1281): the person is already there; beside
        other actors, a person's own session is passed over: not in the acting test, nor `since`, nor the
        choice of the first actor and its reason. A
-       member the person took over is not the person's own: it reads `taken_over`. And a **holder waiting
-       on the person** — an `ask` or `steer` open in the person inbox whose `from` is the holder's record
-       id and whose `about`, read by `reference_of` (an `about` that is no bare `TD-n` matches nothing), is the `TD-n` the line's `Context:` names (a line whose
-       `Context:` names no entry has no such question, and its holder stays an actor) — is no actor while
-       it is open; where every holder waits so, the line is not read, whatever its lanes hold: its `stuck`
-       entry drops (the question is on the person's card already) and its `stuck_open` entry is kept and
-       still moved by its holders (*The clock*: a claim, a release), with `asked` set; it is read again
-       the tick no holder waits so, that tick's instant its open time (below).
+       member the person took over is not the person's own: it reads `taken_over`. And a **line the person
+       is asked about** — one whose `Context:` names a `TD-n` that an open `ask` or `steer` in the person
+       inbox is about, from any sender (`work.waiting_of` over the person inbox: open only, its `about` by
+       `reference_of`, so one that is no bare `TD-n` names nothing) — is not read while one is open,
+       whatever holds it or its lanes hold: its `stuck` entry drops (the question is on the person's card
+       already, a need of its own) and its `stuck_open` entry is kept and still moved (*The clock*: a
+       claim, a release), with `asked` set; a line whose `Context:` names no entry has no such question.
+       It is read again the tick none is open, that tick's instant its open time (below). Matching by the
+       entry and not the sender keeps a replayed holder, a node's address and a lapsed lease out of it.
      - **The clock.** The work's **open time** is the ask's `at`, or the first tick the home read the line
        decided (below). The home keeps a board line's moving
        parts on `host.json` as **`stuck_open`** (below; shape-checked by
@@ -1538,12 +1539,13 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        not `fyi`), and from then the **latest** of its stored `at` (so it never moves back), the holder's
        claim `at` (the latest among its holders) while one holds it, the release — the first tick that
        reads no holder where the tick before read one: a drop, a `done`, an exit, a restart or a lapsed
-       lease alike, the tick's own instant — and the answer — the first tick that reads no holder waiting
-       on the person where the tick before read every one waiting, the tick's own instant. Two markers
-       tell those ticks from the next, so a restart keeps them and each moves `at` once: **`holder`**, the
-       first holder's record id, written on each tick one holds the line and cleared on the release tick,
-       and **`asked`**, `true` on each tick every holder waits on the person and cleared on the answer's
-       tick (`stuck_open: {<key>: {at, repo, holder?, asked?}}`);
+       lease alike, the tick's own instant — and the answer — the first tick that reads no open question
+       about the line's entry (above) where `asked` is set, the tick's own instant. Two markers tell those
+       ticks from the next, so a restart keeps them and each moves `at` once: **`holder`**, `true` on each
+       tick the line has a holder (which holder, under a `--force`, does not matter: a change of holder is no
+       release) and cleared on the release tick, and **`asked`**, `true` on each tick such a question is
+       open and cleared on the answer's tick; a tick that is both moves `at` once, to its instant, and clears
+       both (`stuck_open: {<key>: {at, repo, holder?, asked?}}`);
        the entry dropped when the line closes or is no longer
        decided as a reading that holds it says — a repo
        whose board reading is absent (not yet read, or its read raised), errored, or fell back to the
