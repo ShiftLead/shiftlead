@@ -250,15 +250,17 @@ def _held_words(s: Mapping[str, Any], fleet: Collection[Mapping[str, Any]]) -> d
     """What the seat card's composer sentence tells `mail.read_when` of a held seat (§4.10 *When it is read*, the
     held row; §6 rule 3 *A stopped team's seats are held*, TD-1564): the view's `stop_held` — `{by, team}`, display
     only — with the team's wound-down reading (`work.wound_down` over its crew's records, a person's own and its seats
-    left out, as the team's card reads it); None where the record carries no `stop_held`."""
+    left out, as the team's card reads it); None where the record carries no `stop_held`, or one naming no team."""
     mark = s.get("stop_held")
     if not isinstance(mark, Mapping):
         return None
     team = str(mark.get("team") or s.get("team") or "")
+    if not team:
+        return None  # a mark naming no team has no sentence to give: the seat's own row stands
     mine = {
         str(r.get("id")): dict(r)
         for r in (*fleet, s)
-        if isinstance(r, Mapping) and team and r.get("team") == team and r.get("unattended") is not False
+        if isinstance(r, Mapping) and r.get("team") == team and r.get("unattended") is not False
     }
     seats = {str(r.get("name") or "") for r in mine.values() if r.get("seat")}
     wound = bool(mine) and work.wound_down(list(mine.values()), seats) is not None

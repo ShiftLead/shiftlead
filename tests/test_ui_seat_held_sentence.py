@@ -51,3 +51,16 @@ def test_a_seat_with_no_stop_held_keeps_the_on_call_row():
     rw = view(_seat(), [_member()], seats=SEATS)["read_when"]
     assert rw["ask"].startswith("fills this seat"), rw["ask"]
     assert "Start" not in rw["ask"]
+
+
+def test_a_persons_own_record_and_the_other_seats_leave_the_wound_down_reading_alone():
+    s = _seat(stop_held={"at": "2026-11-11T06:00:00Z", "by": "person", "team": "g"})
+    done = _member(out_of_work={"at": "2026-11-11T05:50:00Z", "why": "nothing left"})
+    own = _member(id="ao-g-me", name="me", unattended=False)  # a person's own session never declares
+    fc = _seat(id="ao-g-fc", name="fc")  # another seat of the team: a seat never declares either
+    assert "its team g is wound down (by you)" in view(s, [done, own, fc], seats=SEATS)["read_when"]["ask"]
+
+
+def test_a_mark_naming_no_team_keeps_the_on_call_row():
+    s = _seat(team=None, stop_held={"at": "2026-11-11T06:00:00Z", "by": "person"})
+    assert view(s, [_member()], seats=SEATS)["read_when"]["ask"].startswith("fills this seat")
