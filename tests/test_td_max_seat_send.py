@@ -704,3 +704,37 @@ async def test_a_handed_entry_a_live_extra_took_reads_lands_on_it(agent, tmp_pat
         assert got["delivered"] == [tl2]
         said = agent._entry_read_when(tl2, got)
         assert said.startswith("lands on tl-2, an extra of this seat, then lands; nothing is typed"), said
+
+
+@pytest.mark.integration
+async def test_the_persons_add_entry_to_a_scaled_seat_says_where_it_landed(agent, tmp_path):
+    """The RPC's own reply (`entry_add`, the person's Add entry and `ao td add`): its `to` is the extra that took it
+    and its `read_when` the scaled-seat row, not the bare record's."""
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (tmp_path / "shiftlead").mkdir()
+    (home / "repos.txt").write_text(f"{tmp_path / 'shiftlead'}\n")
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        own, (tl2, _) = await _seat(agent, person, tmp_path, own_live=False, live_extras=1)
+        _set(_rec(agent, tl2), "idle")
+        got = await person.call(
+            "entry_add",
+            repo="shiftlead",
+            type="debt",
+            text="the parser drops a line",
+            teams=[{"team": "beta", "seat": own}],
+        )
+        assert got["to"] == tl2, got
+        assert got["read_when"].startswith("lands on tl-2, an extra of this seat"), got["read_when"]
+
+
+def test_seat_choice_crosses_the_link_in_the_readers_form():
+    """`seat_choice` is an address map whose values carry `seat` (§4.4a *Every address crosses in the reader's
+    form*): both ids are rewritten, the `extras` words left alone."""
+    from sessionorc import naming
+
+    reply = {"seat_choice": {"ao-tl-2": {"seat": "ao-tl", "extras": {"fill": "tl-2"}}}}
+    out = naming.readdress(reply, lambda a: f"{a}@home")
+    assert out == {"seat_choice": {"ao-tl-2@home": {"seat": "ao-tl@home", "extras": {"fill": "tl-2"}}}}

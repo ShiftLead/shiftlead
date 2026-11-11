@@ -638,14 +638,14 @@ class InboxMixin:
         choice = ((sent or {}).get("seat_choice") or {}).get(addr) or {}
         words = choice.get("extras") or None
         own = str(choice.get("seat") or "")
-        if own and (addr == own or "fill" in (words or {})):
-            addr = own
-        s = self._graph().get(addr)
-        down = s is not None and s.host != self.host and not (self.links.get(s.host) or {}).get("up")
-        rings = s is not None and getattr(adapters.get(s.adapter), "composer", None) is not None
+        graph = self._graph()
+        d = graph.get(addr)  # the delivered record, whose facts the sentence states, as the send's own does
+        s = (graph.get(self._addr(own)) or d) if own and (addr == own or "fill" in (words or {})) else d  # reads as
+        down = d is not None and d.host != self.host and not (self.links.get(d.host) or {}).get("up")
+        rings = d is not None and getattr(adapters.get(d.adapter), "composer", None) is not None
         # a modal limit has no reset to name (§4.3, TD-944): read off a record of this host alone
-        modal = s is not None and s.host == self.host and agent_common.limit_is_modal(s, adapters.get(s.adapter))
-        held = self._held_words(s) if s is not None else None  # §6 rule 3 *A stopped team's seats are held*
+        modal = d is not None and d.host == self.host and agent_common.limit_is_modal(d, adapters.get(d.adapter))
+        held = self._held_words(d) if d is not None else None  # §6 rule 3 *A stopped team's seats are held*
         return mail.read_when(
             s,
             "ask",
