@@ -3,8 +3,8 @@ TD-1546 slice 1): a worker line with a held extra is read **short** — its lane
 holds while every live member of the line holds a lease — at the events that change the answer, never on a timer,
 and filled by its lowest-placed held extra. A mixin `HostAgent` inherits; the tick calls `_scale_pass`.
 
-The down half (an out-of-work extra closed back to held), the shape's sampling of an extra and the wound-down
-readings are later slices.
+Its down half (slice 2): a worker extra that declared out of work is closed back to held once it is clean, its
+claims not `done` dropped *extra closed* (`_scale_down`, run by the tick's per-record pass before rule 1).
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from sessionorc import ledger as ledger_mod
 from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc import work as work_mod
-from sessionorc.agent_common import FILL_CEILING, FILL_WINDOW, LEASE_TTL, SCALE_STEP, _parse, _recent, log
+from sessionorc.agent_common import FILL_CEILING, FILL_WINDOW, LEASE_TTL, SCALE_STEP, _parse, _recent, log, on_its_own
 from sessionorc.agent_tick import _orders
 from sessionorc.models import ProgressEntry, Session, now_iso
 
@@ -70,6 +70,12 @@ def _lease(e: ProgressEntry, now: datetime) -> bool:
     except (TypeError, ValueError):
         return False
     return now - at < LEASE_TTL
+
+
+def _held_since(r: Session) -> bool:
+    """Whether the extra's newest `scale.last` already says it went back to held for this run's declaration."""
+    last, ow = _last(r), r.out_of_work or {}
+    return last.get("did") == "hold" and str(last.get("at") or "") >= str(ow.get("at") or "")
 
 
 class ScaleMixin:
@@ -309,5 +315,33 @@ class ScaleMixin:
         why = f"filled: {pickable} pickable, every {line} claimed"
         new.scale = {**new.scale, "last": {"at": now_iso(), "did": "fill", "why": why}}
         self._save(new)
+        await self._push_changes()
+        return True
+
+    async def _scale_down(self, s: Session, now: datetime) -> bool:
+        """Rule 14 down, with no idle timer (§6 rule 14, TD-1546 slice 2): a worker extra that declared out of work
+        (`ao progress none`) is closed back to held at the first tick it is clean — idle, nothing dirty or
+        unpushed, no subagent or shell live, no PR of its own open (one handed to a reader included: this rule's
+        own test, not rule 3's), no unread mail. At the close each claim not `done` is dropped *extra closed*, so
+        its entry reads as nobody's, and `scale.last` reads `{did: hold, why: "back to held: out of work"}`; the
+        record keeps its mailbox and its `scale`, never marked sat out, for the line's next fill. One `exited`
+        after declaring is held as it stands, never restarted, its claims dropped the same way. True for every
+        out-of-work worker extra, live or held, so no later rule restarts, nudges or tells it of new work."""
+        if not (_scale_line(s) and s.out_of_work) or s.superseded_by or s.suspended or s.scale.get("drop"):
+            return False
+        if s.state not in DEAD:
+            if on_its_own(s, now) or s.unread() or self._seat_prs(s, []):
+                return True  # held open, with no bound, until it is clean
+            if not await self._finished_close(s, "out_of_work"):
+                return True
+        elif _held_since(s):
+            return True
+        at = now_iso()
+        for e in s.progress:
+            if e.status == "claimed":
+                e.status, e.why, e.at = "dropped", "extra closed", at
+        s.scale = {**s.scale, "last": {"at": at, "did": "hold", "why": "back to held: out of work"}}
+        log.info("%s: an extra out of work, back to held (%s)", self._address(s), s.state)
+        self._save(s)
         await self._push_changes()
         return True

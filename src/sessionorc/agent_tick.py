@@ -782,6 +782,8 @@ class TickMixin:
                 await self._scheduled_start(s, now)
                 if await self._extra_drop(s):
                     continue  # an extra a lowered max dropped: no rule restarts or fills it (§4.9, TD-1545)
+                if await self._scale_down(s, now):
+                    continue  # an extra out of work: back to held, never restarted or told (§6 rule 14, TD-1546)
                 await self._crash_restart(s, now)
                 if await self._lost_brief(s, now):
                     continue  # replayed: the record is the closed run's, and no other rule acts on it now
