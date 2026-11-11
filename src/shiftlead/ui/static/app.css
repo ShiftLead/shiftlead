@@ -1468,3 +1468,4 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
   .setpushdev > .note { grid-column: 1; }
   .setpushdev .setpushrm { grid-column: 2; }
 }
+.mupto { display: inline-flex; align-items: center; gap: 4px; } .mupto input.input { width: 4.5em; height: 28px; }  /* the Members dialog's **up to** (§4.5a, TD-1545) */

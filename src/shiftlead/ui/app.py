@@ -3971,7 +3971,9 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
         org, _notes = org_here()
         roles = [r.name for r in repoconfig.roles(repoconfig.RepoConfig(), org.roles)]
         try:
-            v = teamrun.members_view(org, name, await call("list"), roles)
+            # a member line whose lane is in no stage draws its **up to** disabled (§4.5a *Members dialog*, TD-1545)
+            lanes = await asyncio.to_thread(teamrun.lane_refusals, rpc, org, name, host_name())
+            v = teamrun.members_view(org, name, await call("list"), roles, lanes)
         except (teams.TeamError, ValueError) as e:
             raise _team_http(e) from None
         v["roles"] = roles
@@ -3999,6 +4001,15 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     raise teams.TeamError(str(e)) from None
                 got = await asyncio.to_thread(teamrun.resize, rpc, org, name, line, n, host_name())
                 return JSONResponse({"ok": True, **got})
+            if body.get("action") == "max":
+                # **up to** (§4.5a *Members dialog*, §4.9 *Scaling with the work*, td-max, TD-1545): a setting, on
+                # every team a repo's included — `teams.<team>.max.<line>` through `teamrun.set_max`, which on a
+                # live team writes the extras held or removes the highest-placed
+                line, n = str(body.get("line") or ""), body.get("n")
+                if isinstance(n, bool) or not isinstance(n, int):
+                    raise HTTPException(400, "an up to is a whole number of sessions, 0 or more")
+                got = await asyncio.to_thread(teamrun.set_max, rpc, org, name, line, n, host_name())
+                return JSONResponse({"ok": True, **got})
             view_ = teamrun.members_view(org, name, await call("list"))
             if not view_["editable"] or org.path is None:
                 raise teams.TeamError(f"team {name} is {view_['note'] or 'not in org.yml'}")
@@ -4019,7 +4030,7 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     host=host_name(),
                 )
             else:
-                raise HTTPException(400, "action is add, remove or size")
+                raise HTTPException(400, "action is add, remove, size or max")
         except (teams.TeamError, ValueError, TypeError, AgentError, AgentUnavailable) as e:
             raise _team_http(e) from None
         return JSONResponse({"ok": True, **got})

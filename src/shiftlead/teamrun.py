@@ -2002,7 +2002,11 @@ def wait_settled(call: Call, ids: list[str], timeout: float) -> dict[str, str]:
 
 
 def members_view(
-    org: orgmod.Org, name: str, sessions: list[dict[str, Any]], roles: list[str] | None = None
+    org: orgmod.Org,
+    name: str,
+    sessions: list[dict[str, Any]],
+    roles: list[str] | None = None,
+    lane_why: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """The Members dialog's listing: the manager, the techlead seat, and each member entry as the
     definition writes it — role · name · lane · count — with the sessions holding it and their
@@ -2013,7 +2017,9 @@ def members_view(
     its `size` — the sessions the line runs — with `count` its file's, `words` as the row reads it (*2
     (file says 1)*), `down` the session its **−** winds down on a live team, and `next_start` on a team
     with nothing live whose size is above its count (*· from the next Start*, §4.9 *A team's size*,
-    TD-1165): **− / +** are live on every team, a repo's included."""
+    TD-1165): **− / +** are live on every team, a repo's included. Each member entry, the manager, the techlead
+    seat and each of `seats` carries `up_to` (`_up_to`), the **up to** field's reading (§4.5a *Members dialog*
+    **up to**, td-max, TD-1545); `lane_why` is the member lines whose lane is in no stage (`lane_refusals`)."""
     team = teams.find(org, name)
     twice = team.twice_named()
     mine = crew(name, sessions)
@@ -2027,6 +2033,9 @@ def members_view(
     def held(n: str) -> dict[str, Any]:
         s = by_name.get(n)
         return {"name": n, "id": s["id"] if s else "", "state": s.get("state") if s else "not live"}
+
+    def up_to(n: str) -> dict[str, Any]:
+        return _up_to(team, n, (lane_why or {}).get(n, ""), [held(x) for x in team.extra_names(n)])
 
     editable = bool(team.source and org.path and Path(team.source) == Path(org.path))
     repo = Path(team.source).parent.name if team.source else "the repo"
@@ -2050,6 +2059,7 @@ def members_view(
                 # since the line's name cannot tell the two apart (TD-268, TD-1165); a line sized 0 names none
                 "twice": any(n in twice for n in names),
                 "shared": [n for n in names if n in twice],
+                "up_to": up_to(m.name),
             }
         )
     out: dict[str, Any] = {
@@ -2059,13 +2069,48 @@ def members_view(
         # the reason the card's disabled Members… gives (§4.5a *Members… on a repo-defined team*, TD-229)
         "note": "" if editable else f"defined in {repo}'s .shiftlead.yml — changed by PR",
         "live": up,
-        "manager": held(team.manager.name) if team.manager.role != orgmod.PERSON else None,
-        "techlead": held(team.techlead.name) if team.techlead else None,
+        "manager": {**held(team.manager.name), "up_to": up_to(team.manager.name)}
+        if team.manager.role != orgmod.PERSON
+        else None,
+        "techlead": {**held(team.techlead.name), "up_to": up_to(team.techlead.name)} if team.techlead else None,
         "members": entries,
+        # each seat under `seats:` a row of its own carrying **up to** alone (no − / +, no Remove), disabled with
+        # its reason where it may not scale (*one pass covers the repo*, *a pool is a fallback, not capacity*)
+        "seats": [{**held(x.name), "trigger": x.trigger, "up_to": up_to(x.name)} for x in team.seats],
         "twice": twice,
         "next": {r: team.next_name(r) for r in [*(roles or []), *(m.role for m in team.members)]},
     }
     return out
+
+
+def _up_to(team: orgmod.TeamDef, name: str, lane_why: str, extras: list[dict[str, Any]]) -> dict[str, Any]:
+    """The Members dialog's **up to** field for the line or seat `name` (§4.5a *Members dialog* **up to**, §4.9
+    *Scaling with the work*): `value` the written ceiling, `0` on one stored at `0`, the default ceiling (its size
+    + 2, `default` true) where none is written and the team is on td-max, None — blank — on a team at `off`;
+    `why`, in the dialog's short words, where it may not scale (the field drawn disabled, no value); `size` the
+    sessions it runs at its size; `extras` its extras' names and states as `extra_names` gives them, the
+    highest-placed last, so a lowered field's confirm can name the live ones it winds down."""
+    why = team.scale_refusal(name) or ("its lane has no queue to read" if lane_why else "")
+    out: dict[str, Any] = {"why": why, "value": None, "default": False, "size": team._sized(name), "extras": []}
+    if why:
+        return out
+    out["extras"] = extras
+    if isinstance(team.max, dict) and name in team.max:
+        out["value"] = team.max[name]
+    elif team.max != "off":
+        out.update(value=team._sized(name) + 2, default=True)
+    return out
+
+
+def lane_refusals(call: Call, org: orgmod.Org, name: str, host: str) -> dict[str, str]:
+    """Each member line of `name` whose lane, with no flow, is in no stage (`_plan_lane_refusal`), read on one
+    plan: the dialog draws its **up to** disabled. {} where the plan cannot be read — the write says why."""
+    team = teams.find(org, name)
+    try:
+        plan = teams.plan(org, name, host or hosts.local_host().name, files=files_via(call))
+    except (teams.TeamError, ValueError, OSError):
+        return {}
+    return {m.name: why for m in team.members if (why := _plan_lane_refusal(team, plan, m.name))}
 
 
 def _names(org: orgmod.Org, name: str) -> list[str]:
