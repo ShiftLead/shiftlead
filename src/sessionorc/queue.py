@@ -1655,7 +1655,8 @@ def _wait(
         phrase = f"waits on {why}" if why else "waits on an event"
         e = open_[q]
         built = " ".join(f"#{n}" for n in e.get("built") or ())
-        if e.get("kind") == "live-check" and e.get("live") == "no" and built:  # the reading, as words (TD-1452)
+        live_gate = str(w.get("name") or "").startswith("live")  # a live check's own gate (§4.9b)
+        if e.get("kind") == "live-check" and e.get("live") == "no" and built and live_gate:  # words (TD-1452)
             phrase = f"{phrase.rstrip('.')} (not live {built})"
         return {"column": "event", "phrase": phrase, "id": q}
 

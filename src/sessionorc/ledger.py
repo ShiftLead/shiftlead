@@ -248,8 +248,8 @@ Live = Callable[[int], bool]  # a PR number → whether its squash commit is in 
 
 
 def built(value: str) -> list[int]:
-    """The builds a `**Kind:** live-check #<n>` line names (design §4.9b *A live check is a
-    grinder's once its build is live*, TD-323): the `#<n>` after the kind's word, one or several,
+    """The builds a `**Kind:** live-check #<n>` line names (design §4.9b, TD-323) — words beside the
+    entry's `event (live…)` gate, which alone holds (TD-1452): the `#<n>` after the kind's word, one or several,
     separated by spaces or commas. Anything else after the word — prose, nothing — names none, and
     the word itself is read as before."""
     m = lb.WORD_RE.search(value or "")

@@ -1814,12 +1814,9 @@ def _lifts(r: dict[str, Any]) -> dict[str, list[int]]:
     `lift/TD-n/<a reserved name>`, a draft or a fork's left out as the orders leave them out."""
     out: dict[str, list[int]] = {}
     for p in (r.get("prs") or {}).get("open") or []:
-        if (
-            isinstance(p, dict)
-            and not p.get("draft")
-            and not p.get("fork")
-            and (got := reports.lift_of(p.get("branch")))
-        ):
+        if not (isinstance(p, dict) and p.get("number")) or p.get("draft") or p.get("fork"):
+            continue
+        if got := reports.lift_of(p.get("branch")):
             out.setdefault(got[0], []).append(int(p["number"]))
     return {k: sorted(v) for k, v in out.items()}
 
