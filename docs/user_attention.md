@@ -10,6 +10,10 @@ People: paul
 
 ## Needs the user
 
+- [ ] decide 2026-11-10 (n/a) — Is TD-943's design right (how a team over an umbrella names, reads and gates a sibling repo's PR, each sibling under its own gate), and do its builds go? Context: TD-943 decision (paul). Due: 2026-11-24. Answers: Go | Not yet.
+  - **Context:** You chose Design it on 2026-11-10. The design runs with you in an interactive session; this gate holds it and its builds until the review rounds converge and you say go. gd-grind stays stopped until the builds land.
+  - **Question:** Is the design right, and do its builds go?
+  - **Recommended:** Answer only once the review rounds have converged on a shape you agreed in the session.
 - [x] decide 2026-11-10 (session `designer-ao-1`) — Should TD-1564's builds (a stopped team's seats are held until its Start, so a question no longer undoes your Stop) go ahead as written after four review rounds ended at the cap? Context: TD-1564 decision (paul). Parts: TD-1574, TD-1575. Due: 2026-11-12. Answers: Go (default) | One more round | Hold: <note>. Decided: Go (by paul) (2026-11-10). Closed: 2026-11-10 — lifted.
   - **Context:** TD-1564: when you or its stop time stop a team, its seats stay closed until its Start, so a question waiting on its fact-check seat no longer undoes your Stop. Four review rounds (a fact-check, Fable, then Sonnet each) ended at the cap. Build-changing findings from the design reviews per round: 10, 5, 4, 1 (the fact-checks apart: 1, 2, 1, 1). The last review (Sonnet, round 4) found nothing, and every build-changing fix has been read by a later review. Your steer answer (land and wait) is in.
   - **Question:** Should TD-1564's two builds go ahead as written, get one more round, or is this the wrong design (Hold, with a note)?
@@ -170,7 +174,7 @@ People: paul
   - **Context:** TD-1439, a build of TD-1434's design (PR #3015): every mode change is stamped mode_at, mode_by and mode_via and logged by the home, and Focus's Session card shows who took a session over, when and from where. Held with the design by its end-of-rounds item.
   - **Question:** Go with TD-1439 once TD-1434's end-of-rounds item is answered Go?
   - **Recommended:** Go — it is the trace the entry said needs no design, and it lands first: TD-1440 and TD-1444 read its stamp.
-- [ ] decide 2026-11-05 (n/a) — Should shiftlead design repo-qualified PRs for a team over an umbrella repo now (TD-943), or keep paired PRs? Answer as you answer guardians-devenv's line on paired PRs. Context: TD-943 decision (paul). Due: 2026-11-12. Answers: Design it | Paired PRs | Umbrella-only. Lifts: Design it | Paired PRs | Umbrella-only.
+- [x] decide 2026-11-05 (n/a) — Should shiftlead design repo-qualified PRs for a team over an umbrella repo now (TD-943), or keep paired PRs? Answer as you answer guardians-devenv's line on paired PRs. Context: TD-943 decision (paul). Due: 2026-11-12. Answers: Design it | Paired PRs | Umbrella-only. Lifts: Design it | Paired PRs | Umbrella-only. Decided: Design it (by paul) (2026-11-10). Closed: 2026-11-10 — lifted.
   - **Context:** A team works one repo, so in an umbrella over sibling repos, --pr, held: and the PR readings see only the umbrella. guardians-devenv asks the same question on its own board (its TD-028): paired PRs, umbrella-only, or ask ShiftLead for repo-qualified PRs. This item follows that answer.
   - **Question:** Design repo-qualified PRs now, or keep paired PRs or umbrella-only work?
   - **Recommended:** Paired PRs: they work today, and only a second umbrella team would show the cost. The designer drops TD-943 to Low and re-gates it.
