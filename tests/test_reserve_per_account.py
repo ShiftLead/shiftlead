@@ -14,6 +14,7 @@ from conftest import park_ticks
 from sessionorc import defs, paths
 from sessionorc import settings as settings_mod
 from sessionorc.client import AgentError, LocalClient
+from sessionorc.models import PERSON
 from shiftlead import doctor
 
 SUB = {"claude-code:paul": {"subscription"}}
@@ -226,6 +227,35 @@ async def test_a_home_that_is_no_tree_keeps_a_copy_never_overwritten(agent, hook
     await agent._migrate_reserves()
     assert yaml.safe_load(copy.read_text())["usage_gate"] == {"grind": {"week": 1}}, "never overwritten"
     assert "restore from this note's values" in notes[1]
+
+
+@pytest.mark.integration
+async def test_a_node_moves_nothing_and_the_homes_note_goes_to_the_person(agent, hookstub, monkeypatch):
+    """The migration is the home's alone (TD-1632): a node's tick leaves its replica's profile key standing; the
+    home's move tells the person."""
+    await park_ticks(agent)
+    hookstub.accounts = {"grind": "paul"}
+    notes: list[tuple[str, str]] = []
+    monkeypatch.setattr(agent, "_system_note", lambda to, text, **kw: notes.append((to, text)))
+    settings_mod.save({**settings_mod.load(), "usage_gate": {"grind": {"week": 1}}})
+    agent.mode = "node"
+    await agent._migrate_reserves()
+    assert settings_mod.load()["usage_gate"] == {"grind": {"week": 1}} and notes == [], "a node moves nothing"
+    agent.mode = "home"
+    await agent._migrate_reserves()
+    assert settings_mod.load()["usage_gate"] == {"hookstub:paul": {"week": 1}}
+    assert [to for to, _ in notes] == [PERSON]
+
+
+@pytest.mark.unit
+def test_head_is_empty_where_rev_parse_fails(tmp_path, monkeypatch):
+    """`defs.head` (TD-1632): a tree with no commit, and any failing `rev-parse` whatever it printed, has no HEAD
+    to name as the restore point."""
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    assert defs.head(tmp_path) == ""
+    failed = subprocess.CompletedProcess([], 128, stdout="HEAD\n", stderr="fatal")
+    monkeypatch.setattr(defs, "_git", lambda home, *args: failed)
+    assert defs.head(tmp_path) == ""
 
 
 @pytest.mark.integration
