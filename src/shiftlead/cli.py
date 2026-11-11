@@ -2245,7 +2245,8 @@ def _max_set_aside(t: dict[str, Any], team: orgmod.TeamDef | None, org: orgmod.O
     stage), where the plan can be made here."""
     if team is None or not isinstance(t.get("max"), dict):
         return []
-    team = replace(team, max=dict(t["max"]))
+    # the file's keys as `with_settings` reads them (a whole number each), so `ao org check` says the same
+    team = replace(team, max={str(k): v for k, v in t["max"].items() if isinstance(v, int) and not isinstance(v, bool)})
     plan = None
     if org is not None and any(m.name in team.max and not teamrun.max_refusal(team, m.name) for m in team.members):
         with contextlib.suppress(teams.TeamError, ValueError, OSError, AgentError, AgentUnavailable):

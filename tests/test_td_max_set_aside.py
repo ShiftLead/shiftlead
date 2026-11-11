@@ -4,9 +4,9 @@ work*, *What does not*; td-max, TD-1545): set aside, and said by `ao org check` 
 from __future__ import annotations
 
 import yaml
-from test_cli_teams import world  # noqa: F401 — the fixture, by name
+from test_cli_teams import HOST, world  # noqa: F401 — the fixture, by name
 
-from shiftlead import cli, teamrun
+from shiftlead import cli, teamrun, teams
 from shiftlead import org as orgmod
 
 REFUSED = {"orc-ao": 3, "mill": 2, "sweeper": 2, "hunt": 3}
@@ -33,8 +33,24 @@ def test_org_check_sets_aside_each_key_that_may_not_scale_and_says_why(world, ca
     for key, why in SAYS.items():
         assert f"warning: teams.ao-grind.max.{key} in settings.yml: {why} — set aside, no extra runs for it" in out
     assert "max.grind" not in out  # a line that may scale is no warning
-    team = orgmod.with_home_settings(orgmod.load()).teams["ao-grind"]
-    assert [team.extra_names(k) for k in ("orc-ao", "mill", "sweeper")] == [[], [], []]  # set aside: no extra
+    org = orgmod.with_home_settings(orgmod.load())
+    assert [org.teams["ao-grind"].extra_names(k) for k in ("orc-ao", "mill", "sweeper")] == [[], [], []]
+
+
+def test_an_area_lanes_key_plans_no_extra(world, monkeypatch):  # noqa: F811
+    """Review of slice 12: the lane case is set aside by the plan, not by `ceiling` — no extra launch for it."""
+    tmp_path, _ = world
+    monkeypatch.setattr(teams, "_extras", teams.EXTRAS)  # conftest stubs it: put the real one back
+    _file(tmp_path, {"grind": 4, "hunt": 3})
+    plan = teams.plan(orgmod.with_home_settings(orgmod.load()), "ao-grind", HOST)
+    held = [x.name for x in plan.extras]
+    assert not any(n.startswith("hunt") for n in held)
+    assert any(n.startswith("grind") for n in held)
+
+
+def test_a_value_that_is_no_whole_number_is_read_as_with_settings_reads_it(world):  # noqa: F811
+    team = orgmod.load().teams["ao-grind"]
+    assert "set aside" not in cli._team_setting_line("ao-grind", {"max": {"mill": "two"}}, team)
 
 
 def test_the_settings_line_says_each_key_set_aside(world, capsys):  # noqa: F811
