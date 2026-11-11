@@ -2,6 +2,7 @@
 setting — through the host agent's `set_settings`, never the file — and draws every other configured
 value with the file it lives in."""
 
+import html.parser
 import json
 import pathlib
 import re
@@ -138,10 +139,160 @@ def test_a_reserve_on_a_window_the_reading_lacks_is_a_not_reported_row_the_save_
     html = (UI / "templates" / "settings.html").read_text()
     assert re.search(r'{% if w.stale %}\s*{#-[^#]*-#}\s*<div class="setrow setstale" data-label="{{ w.label }}">', html)
     stale_row = html.split('class="setrow setstale"', 1)[1].split("</div>", 1)[0]
-    assert "<input" not in stale_row
-    js = (UI / "static" / "app.js").read_text()
-    assert '$$(".setstale", f).map((r) => [r.dataset.label, ""])' in js
-    assert 'save.disabled = !dirty && !$(".setstale", f);' in js
+    assert "<input" not in stale_row  # the Save's clear is run, not read: the next test (TD-1683)
+
+
+# a DOM just big enough for `AO.settings` over the rendered page: elements parsed from the page's own HTML,
+# `querySelector(All)` on descendant selectors of tag, #id, .class and [attr] / [attr='v'] parts
+CARD_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const tree = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+const part = (c) => {
+  const m = { tag: (c.match(/^[a-z]+/) || [""])[0], id: (c.match(/#([\\w-]+)/) || [])[1],
+    cls: [...c.matchAll(/\\.([\\w-]+)/g)].map((x) => x[1]),
+    attrs: [...c.matchAll(/\\[([\\w-]+)(?:=['"]?([^'"\\]]*)['"]?)?\\]/g)].map((x) => [x[1], x[2]]) };
+  return (e) => (!m.tag || e.tagName.toLowerCase() === m.tag) && (!m.id || e.attrs.id === m.id)
+    && m.cls.every((k) => e.cls.includes(k))
+    && m.attrs.every(([k, v]) => k in e.attrs && (v === undefined || e.attrs[k] === v));
+};
+const matches = (e, sel) => {
+  const parts = sel.trim().split(/\\s+/).map(part);
+  if (!parts.at(-1)(e)) return false;
+  let i = parts.length - 2;
+  for (let up = e.parentElement; up && i >= 0; up = up.parentElement) if (parts[i](up)) i--;
+  return i < 0;
+};
+const all = (root) => root.children.flatMap((c) => [c, ...all(c)]);
+const make = (n, parent) => {
+  const e = { tagName: n.tag.toUpperCase(), attrs: n.attrs, cls: (n.attrs.class || "").split(/\\s+/).filter(Boolean),
+    parentElement: parent, children: [], textContent: n.text || "", hidden: "hidden" in n.attrs,
+    disabled: "disabled" in n.attrs, on: {}, style: {} };
+  e.dataset = Object.fromEntries(Object.entries(n.attrs).filter(([k]) => k.startsWith("data-"))
+    .map(([k, v]) => [k.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase()), v]));
+  if ("name" in n.attrs) e.name = n.attrs.name;
+  if (e.tagName === "INPUT") {
+    e.type = n.attrs.type || "text"; e.value = n.attrs.value || ""; e.defaultValue = e.value;
+  }
+  if (e.tagName === "BUTTON") e.type = n.attrs.type || "submit";
+  e.classList = { contains: (k) => e.cls.includes(k), add: (k) => e.cls.includes(k) || e.cls.push(k),
+    remove: (k) => { e.cls = e.cls.filter((x) => x !== k); },
+    toggle: (k, on) => (on ? e.classList.add(k) : e.classList.remove(k)) };
+  e.addEventListener = (t, f) => { (e.on[t] = e.on[t] || []).push(f); };
+  e.setAttribute = (k, v) => { e.attrs[k] = String(v); }; e.getAttribute = (k) => (k in e.attrs ? e.attrs[k] : null);
+  e.removeAttribute = (k) => { delete e.attrs[k]; }; e.hasAttribute = (k) => k in e.attrs;
+  e.append = e.appendChild = e.replaceChildren = e.prepend = e.before = e.after = e.remove = noop;
+  e.querySelectorAll = (sel) => all(e).filter((x) => sel.split(",").some((s) => matches(x, s)));
+  e.querySelector = (sel) => e.querySelectorAll(sel)[0] || null;
+  e.closest = (sel) => { for (let x = e; x; x = x.parentElement) if (matches(x, sel)) return x; return null; };
+  e.children = n.children.map((c) => make(c, e));
+  if (e.tagName === "SELECT") {
+    e.options = all(e).filter((x) => x.tagName === "OPTION");
+    e.options.forEach((o) => { o.value = o.attrs.value ?? o.textContent; o.selected = "selected" in o.attrs; });
+    e.value = (e.options.find((o) => o.selected) || e.options[0] || { value: "" }).value;
+  }
+  if (e.tagName === "TEXTAREA") { e.value = e.textContent; e.defaultValue = e.value; }
+  if (e.tagName === "INPUT") e.checked = "checked" in n.attrs;
+  if (e.tagName === "FORM") {
+    e.elements = all(e).filter((x) => ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(x.tagName));
+    e.elements.forEach((x) => { if (x.name && !(x.name in e.elements)) e.elements[x.name] = x; });
+  }
+  return e;
+};
+const page = make(tree, null);
+const document = { documentElement: page, body: page, addEventListener: noop,
+  createElement: () => make({ tag: "div", attrs: {}, children: [] }, null),
+  querySelector: (s) => (matches(page, s) ? page : page.querySelector(s)),
+  querySelectorAll: (s) => page.querySelectorAll(s), getElementById: (id) => page.querySelector(`#${id}`) };
+global.window = { addEventListener: noop, navigator: { userAgent: "" } }; global.document = document;
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/settings", protocol: "http:", host: "x", reload: noop };
+const sent = [];
+global.fetch = (url, init) => {
+  sent.push({ url, body: JSON.parse(init.body) });
+  return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+};
+eval(fs.readFileSync(process.argv[2], "utf8"));
+window.AO.toast = noop;
+window.AO.settings();
+const form = page.querySelector("form.setcard[data-section='usage']"), save = form.querySelector(".setsave");
+const drawn = save.disabled;
+// the press: the browser's submit of the card, which the page's one listener takes
+page.on.submit.forEach((h) => h({ target: save, preventDefault: noop }));
+setImmediate(() => console.log(JSON.stringify({ disabled: drawn, sent })));
+"""
+
+
+class _Tree(html.parser.HTMLParser):
+    """The page's HTML as nested `{tag, attrs, children, text}`, for the probe's DOM."""
+
+    VOID = {"input", "br", "img", "meta", "link", "hr"}
+
+    def __init__(self):
+        super().__init__()
+        self.root = {"tag": "root", "attrs": {}, "children": []}
+        self.stack = [self.root]
+
+    def handle_starttag(self, tag, attrs):
+        node = {"tag": tag, "attrs": {k: v or "" for k, v in attrs}, "children": [], "text": ""}
+        self.stack[-1]["children"].append(node)
+        if tag not in self.VOID:
+            self.stack.append(node)
+
+    def handle_startendtag(self, tag, attrs):  # `<x/>` opens nothing, so it closes nothing
+        node = {"tag": tag, "attrs": {k: v or "" for k, v in attrs}, "children": [], "text": ""}
+        self.stack[-1]["children"].append(node)
+
+    def handle_endtag(self, tag):
+        while len(self.stack) > 1 and self.stack.pop()["tag"] != tag:
+            pass
+
+    def handle_data(self, data):
+        if len(self.stack) > 1:
+            self.stack[-1]["text"] += data
+
+
+@pytest.mark.unit
+def test_the_usage_cards_save_sends_a_stale_rows_clear_as_drawn():
+    """TD-1683 (#3481, TD-1680): the card as `settings.html` draws it for an account reporting only `week` with a
+    `5h` reserve left, run through `AO.settings` under node: Save is pressable on the untouched card, and its press
+    POSTs `/api/settings/usage` with the stale row's window as a clear beside the field's value."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the card's Save is JavaScript, and nothing else runs it")
+    from jinja2 import ChainableUndefined
+
+    from shiftlead.ui.app import templates
+
+    profiles = {"grind": profiles_mod.Profile(name="grind", account="paul")}
+    usage = {"grind": {"tool": "claude-code", "account": "paul", "windows": [{"label": "week", "pct": 58}]}}
+    accounts = {
+        "claude-code:paul": {"profiles": ["grind"], "billing": "subscription", "reserves": {"5h": 5, "week": 10},
+            "windows": [{"label": "week", "line": 90, "reserve": 10, "resets": None, "next": None}]},
+    }  # fmt: skip
+    cards = setmod.usage_cards(profiles, accounts, usage, NOW)
+    # the page's own template, every value but the cards left empty: the usage card is the one pressed
+    page = templates.env.overlay(undefined=ChainableUndefined).get_template("settings.html").render(usage_cards=cards)
+    start = page.index('<div class="page inboxpage setpage" id="setpage"')
+    tree = _Tree()
+    tree.feed(page[start:])
+    d = scratch_dir()
+    (d / "card.json").write_text(json.dumps(tree.root["children"][0]))
+    (d / "card_probe.js").write_text(CARD_PROBE)
+    out = subprocess.run(
+        [node, str(d / "card_probe.js"), str(UI / "static" / "app.js"), str(d / "card.json")],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert out.returncode == 0, out.stderr
+    got = json.loads(out.stdout.strip().splitlines()[-1])
+    assert got["disabled"] is False  # pressable as drawn: the stale reserve is what it saves
+    assert got["sent"] == [
+        {"url": "/api/settings/usage", "body": {"account": "claude-code:paul", "reserves": {"5h": "", "week": "10"}}}
+    ]
 
 
 @pytest.mark.unit
