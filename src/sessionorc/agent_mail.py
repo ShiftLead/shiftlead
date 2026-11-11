@@ -28,12 +28,15 @@ from sessionorc import held as held_mod
 from sessionorc import queue as queue_mod
 from sessionorc import work as work_mod
 from sessionorc.agent_common import (
+    FILL_CEILING,
+    FILL_WINDOW,
     RpcError,
     _clean,
     _clean_answer,
     _oldest_first,
     _parse,
     _prune_tallies,
+    _recent,
 )
 from sessionorc.models import (
     ASK_KINDS,
@@ -1656,10 +1659,11 @@ class MailMixin:
         seat*, §6 rule 3 *An extra seat*, TD-1547), or None where `sid` is no seat with extras, or the sender is one
         of the seat's own records. `root`, where given, is the thread read in place of `replied`'s (the tick's mover,
         which holds the ask and no reply). The held extras that may be filled are those closed, or `exited` with nothing
-        rule 1 would restart, never one a lowered `max` is dropping; the fill is refused on a gated profile
-        (*its profile is paused*) and at `scale.live` with no extra seat to close for the room (*host full*). An own
-        record unable as `stalled?`, `exited` or closed (`seat_send.routes_to_extras`) passes an `ask` to its extras
-        first (§4.9b *A seat that cannot answer is routed around*)."""
+        rule 1 would restart, never one a lowered `max` is dropping; the fill is refused once the seat's extras have
+        been filled `FILL_CEILING` times inside `FILL_WINDOW` (*its extras are at their fill ceiling*), on a gated
+        profile (*its profile is paused*) and at `scale.live` with no extra seat to close for the room (*host full*).
+        An own record unable as `stalled?`, `exited` or closed (`seat_send.routes_to_extras`) passes an `ask` to its
+        extras first (§4.9b *A seat that cannot answer is routed around*)."""
         own = records.get(sid)
         if own is None or own.seat is None or isinstance(own.scale, dict):
             return None
@@ -1675,7 +1679,18 @@ class MailMixin:
             and (r.state == "closed" or not self._crashed(r, now))
         ]
 
+        # the seat's extras' fills together, a `FILL_CEILING` group of their own (§4.9 *The bounds*): churn among
+        # extras is bounded without refusing the techlead's own fill
+        fills = sum(
+            1
+            for r in extras
+            for e in r.restarts
+            if isinstance(e, dict) and e.get("why") == "fill" and _recent(e.get("at"), now, FILL_WINDOW)
+        )
+
         def guard(extra: Session) -> str | None:
+            if fills >= FILL_CEILING:
+                return "its extras are at their fill ceiling"
             if self._profile_gated(extra.profile, now, extra.team):
                 return "its profile is paused"
             n = self._scale_full(extra, own.name, now)
