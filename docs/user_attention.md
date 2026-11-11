@@ -19,7 +19,7 @@ People: paul
   - **Context:** TD-133 is the live check of the weekly-reset start (#2873). A session cannot read or set a schedule, so only you can set it; the gate moved from the old decision form to this item (TD-1584).
   - **Question:** Run the schedule command from your own shell, or drop the check?
   - **Recommended:** Yes — I ran it, if you want ao-grind to restart at each weekly reset; a grinder then reads the reset after it.
-- [ ] decide 2026-11-11 (n/a) — On your phone, does a pinch change the columns once and survive a reload, and does a swipe on the strip walk the records? Context: TD-1301 decision (paul). Due: 2026-11-18. Answers: Works | Not right. Lifts: Works | Not right.
+- [x] decide 2026-11-11 (n/a) — On your phone, does a pinch change the columns once and survive a reload, and does a swipe on the strip walk the records? Context: TD-1301 decision (paul). Due: 2026-11-18. Answers: Works | Not right. Lifts: Works | Not right. Decided: Works (by paul) (2026-11-11). Closed: 2026-11-11 — lifted.
   - **Context:** TD-1301 is a live check of the phone Focus (TD-003): only your phone shows it. You were asked in the look m-47ff5ed1cf57 (2026-11-02); this item carries it on the board (TD-1584).
   - **Question:** On your phone, does a pinch change the columns once and survive a reload, and does a swipe on the strip walk the records?
   - **Recommended:** Works if it does; Not right and a grinder files what is wrong.
