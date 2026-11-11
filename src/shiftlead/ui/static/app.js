@@ -1197,7 +1197,7 @@
     board_done: "checking off…", board_snooze: "snoozing…", board_decide: "deciding…", board_reply: "sending…",
     board_notright: "deciding…", board_add: "writing…", ledger: "deciding…", ledger_reply: "deciding…", ledger_start: "starting…", snooze: "snoozing…", attention_snooze: "snoozing…",
     dismiss: "dismissing…", identity_ack: "dismissing…", clear_work: "dismissing…",
-    clear_mark: "dismissing…", clear_promote: "dismissing…", unmail: "deleting…", allow: "sending…", deny: "sending…",
+    clear_mark: "dismissing…", unmail: "deleting…", allow: "sending…", deny: "sending…",
     reply: "sending…", answer: "sending…", gowithit: "sending…", hand_look: "sending…", identity_log: "logging…",
     suspend: "suspending…", promote: "promoting…", ci_rerun: "re-running…", work_start: "starting…", restart: "restarting…",
     resume: "resuming…", "reopen-push": "resuming…", "resume-form": "resuming…", pause: "pausing…",
@@ -1206,13 +1206,13 @@
   const PRESS_NOT = {
     board_done: "checked off", board_snooze: "snoozed", snooze: "snoozed", attention_snooze: "snoozed",
     dismiss: "dismissed", identity_ack: "dismissed", clear_work: "dismissed",
-    clear_mark: "dismissed", clear_promote: "dismissed", unmail: "deleted", allow: "allowed", deny: "denied",
+    clear_mark: "dismissed", unmail: "deleted", allow: "allowed", deny: "denied",
     gowithit: "sent", identity_log: "logged", restart: "restarted", resume: "resumed", "reopen-push": "resumed",
   };
   // the presses that take their row away: it leaves as the request leaves (rule 3); a state or board
   // row leaves on any answer but Suspend and a decide, as it did on the answer before
   const PRESS_LEAVES = ["board_done", "board_snooze", "snooze", "attention_snooze", "dismiss", "identity_ack",
-    "clear_work", "clear_mark", "clear_promote", "unmail", "allow", "deny", "gowithit", "identity_log", "restart", "resume",
+    "clear_work", "clear_mark", "unmail", "allow", "deny", "gowithit", "identity_log", "restart", "resume",
     "reopen-push"];
   AO.pressKey = (action, boardAct) => (action === "board" ? `board_${boardAct || ""}` : action);
   AO.pressVerb = (key) => PRESS_VERBS[key] || key;
@@ -1628,7 +1628,7 @@
       if (action === "identity_log") body = { id: b.dataset.who || "" };
       // design §4.5a **Inbox row: promote** (TD-132 slice 3, TD-226 slice 3): **Promote** and a failure
       // or held row's **Dismiss**, the person's own, to `/api/person/<action>` with the repo alone
-      if (action === "promote" || action === "clear_promote") body = { repo: b.dataset.repo };
+      if (action === "promote") body = { repo: b.dataset.repo };
       // design §4.5a **Inbox row: CI not starting** (TD-687): **Re-run**, the person's own, with the account alone
       if (action === "ci_rerun") body = { owner: b.dataset.owner };
       // design §4.5a **Inbox row: team start** (§6 rule 8, TD-227): **Dismiss** is `clear_work` with the
@@ -1884,7 +1884,6 @@
       if (action === "identity_ack") say("dismissed — the agent's log keeps every alarm, a line each", true);
       if (action === "identity_log") say(`logged → ${(res.to && (res.to.name || res.to.id)) || b.dataset.to || "its controller"}: it owes you an outcome on them`, true);  // `to` is {id, name}
       if (action === "promote") say(`promoting ${res.repo} to ${String(res.sha || "").slice(0, 7)}${res.checks && res.checks !== "green" ? ` — checks read ${res.checks}, pressed through` : ""}: a note says when it is live`, true);
-      if (action === "clear_promote") say(res.which === "held" ? "the hold is ended: live stays where it is, and promoting goes on" : res.cleared && b.dataset.held ? "the failure is cleared; the rollback's hold still stands — Dismiss again to end it" : res.cleared ? "the failure is cleared: promoting goes on" : "no failure or hold stood", true);
       if (action === "ci_rerun") say(`re-run asked of ${res.asked} run${res.asked === 1 ? "" : "s"} in ${res.owner || b.dataset.owner}${res.refused ? ` — GitHub refused ${res.refused}${res.why ? `: ${res.why}` : ""}` : ""}; the row stays while they run`, !res.refused);
       if (action === "ci_rerun" && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
       if (action === "clear_work") say(res.cleared ? `dismissed — ${(res.ids || []).join(", ") || "those entries"} will not ask again; a later entry does` : "nothing was waiting any more", true);

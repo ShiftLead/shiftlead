@@ -1816,7 +1816,8 @@ def _promote_line(name: str, r: dict[str, Any]) -> str:
     """One repo's promote readings (design §4.7 `ao promote status`): *shiftlead · live 485d28b · main
     9c1e0f2, 3 ahead · checks green · auto off*, under `auto` what the home will do (*auto on · settles
     in 6 min*, TD-581), then a run in flight — *checking `<sha7>` live* while its smoke runs (TD-811) —
-    a failure, or the first precondition that stands."""
+    a failure and the commit it blocks (TD-1554), *installed by hand* for a copy at main's head no run
+    finished at, or the first precondition that stands."""
     live = str(r.get("live") or "")[:7] or f"unknown ({r.get('live_why') or 'not read'})"
     main = str(r.get("main") or "")[:7] or f"unknown ({r.get('main_why') or 'not read'})"
     ahead = r.get("ahead")
@@ -1841,11 +1842,15 @@ def _promote_line(name: str, r: dict[str, Any]) -> str:
     elif f := r.get("failed"):
         line += f"\n  FAILED {str(f.get('sha'))[:7]} at {f.get('at')}: {f.get('why')} · log {f.get('log')}"
         line += "".join(f"\n    {t}" for t in f.get("tail") or [])
-        line += "\n  nothing is promoted until it is cleared (the Inbox row's Dismiss)"
+        blocks = (promote.blocks_of(f) or "")[:7] or "unknown"
+        if not r.get("held"):  # a hold's line wins: the policy starts nothing under it, so no retry (§6 *The hold*)
+            line += f"\n  blocks {blocks}: auto retries when main moves past it; `ao promote` retries now"
+    elif r.get("by_hand"):
+        line += "\n  installed by hand — `ao promote` runs it again to tag it"
     elif u := r.get("unmet"):
         line += f"\n  not now: {u.get('text')}"
     if r.get("held") and not r.get("inflight"):
-        line += "\n  held: nothing is promoted by itself until you promote main or clear it (ao promote clear)"
+        line += "\n  held: nothing is promoted by itself; `ao promote` once main holds the cure ends it"
     return line
 
 
@@ -1854,20 +1859,8 @@ def cmd_promote(args: argparse.Namespace) -> int:
     press from a terminal, through the home's `promote` RPC — a person's own, refused to a session —
     or the readings it keeps (`promotes` on `host`). The press returns once the run is started: the
     outcome is `check`'s on a later tick, and for this repo the host agent goes away under it.
-    `--sha <commit>` and `--back` are the rollback (§6 *A rollback*, TD-226); `ao promote clear
-    [<repo>]` is Dismiss from a terminal: a failure standing, else a rollback's hold."""
-    if args.repo == "clear":
-        repo = args.target or _main_checkout(os.getcwd())
-        if not repo:
-            raise AgentError("this directory is not in a git checkout; name the repo: ao promote clear <repo>")
-        got = call_sync("clear_promote", repo=repo)
-        said = {
-            "failed": "the failure is cleared: promoting goes on",
-            "held": "the hold is cleared: auto goes on as if nothing had been held",
-        }
-        return emit(args, got, lambda: print(f"{got['repo']}: {said.get(got.get('which') or '', 'nothing stood')}"))
-    if args.target:
-        raise AgentError(f"ao promote takes one repo; {args.target!r} is extra (ao promote clear <repo> clears)")
+    `--sha <commit>` and `--back` are the rollback (§6 *A rollback*, TD-226). There is no `ao promote
+    clear` (TD-1554): a press clears a failure as it starts, and one that concludes ends a hold."""
     if args.repo == "status":
         got = call_sync("host")
         if "promotes" not in got:
@@ -5577,9 +5570,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = add("promote", help="make a repo's main live, a person's press; `ao promote status` reads (design §6)")
     p.add_argument(
-        "repo", nargs="?", help="the repo's name or its checkout's path, `status`, or `clear`. None: this directory's"
+        "repo", nargs="?", help="the repo's name or its checkout's path, or `status`. None: this directory's"
     )
-    p.add_argument("target", nargs="?", help="after `clear`: the repo whose failure or hold to clear")
     p.add_argument("--sha", help="roll back to this commit of main: its hex, seven or more (design §6 A rollback)")
     p.add_argument("--back", action="store_true", help="roll back to what was live before the last promote")
     p.set_defaults(fn=cmd_promote)

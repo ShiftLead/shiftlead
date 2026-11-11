@@ -196,16 +196,44 @@ def read_since(root: str | Path, live: str | None, main: str | None, repo: str |
     return out
 
 
-def read_ahead_since(root: str | Path, live: str | None, main: str | None) -> str | None:
+def read_ahead_since(root: str | Path, live: str | None, main: str | None, blocks: str | None = None) -> str | None:
     """`ahead_since` (§6 *Promote*, TD-581): when main first moved past the live commit — the
     committer time of the oldest commit on main's first-parent line that live does not hold (a squash
-    merge stamps it), so the cap, like the settle, survives a restart of the home. None when live is
-    main's head, either is unknown, or git cannot say."""
+    merge stamps it), so the cap, like the settle, survives a restart of the home. While a failure
+    stands whose `blocks` main's head has moved past (TD-1554), when main first moved past `blocks`
+    instead — the first commit of `blocks..main` — so a failed commit that sat ahead of live does not
+    spend the next merge's cap. None when live is main's head, either is unknown, or git cannot say."""
     if not live or not main or live == main:
         return None
-    out, _ = _git(root, "log", "--first-parent", "--format=%cI", f"{live}..{main}")
+    since = blocks if blocks and moved_past(root, blocks, main) else live
+    out, _ = _git(root, "log", "--first-parent", "--format=%cI", f"{since}..{main}")
     lines = (out or "").splitlines()
     return lines[-1].strip() if lines else None
+
+
+def moved_past(root: str | Path, blocks: str | None, main: str | None) -> bool:
+    """Main's head has moved past a failure's `blocks` (§6 *Promote*, TD-1554): `blocks` an ancestor of
+    main's head and not main's head itself (`git merge-base --is-ancestor`) — the test the reading's
+    clear and `ahead_since` use. False when either is unknown or git cannot say."""
+    if not blocks or not main or blocks == main or not SHA_RE.match(str(blocks)):
+        return False
+    try:
+        cp = subprocess.run(
+            ["git", "-C", str(root), "merge-base", "--is-ancestor", str(blocks), str(main)],
+            capture_output=True, text=True, timeout=GIT_TIMEOUT,
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return cp.returncode == 0
+
+
+def blocks_of(f: dict[str, Any] | None) -> str | None:
+    """The commit a failure blocks (§6 *Promote*, TD-1554): `failed.json`'s `blocks`, or its `sha` in one
+    written before `blocks` was."""
+    if not f:
+        return None
+    got = f.get("blocks") if "blocks" in f else f.get("sha")
+    return str(got) if got else None
 
 
 def _gh_json(root: str | Path, path: str) -> tuple[Any, str | None]:
@@ -304,10 +332,10 @@ def unmet(reading: dict[str, Any], press: bool = False, kind: str = "promote") -
     """The first of §6's three preconditions the reading does not meet, as `(name, text)`, or None.
     (1) `tree` — the checkout on main's head with a clean tree; (2) `checks` — green, which a
     person's press goes through (`press=True` skips it; the reply says what the checks read);
-    (3) `inflight` / `failed` — nothing in flight and no failure standing for the repo. Then the
-    rollback's `held`, which stops the policy and never a press (§6 *The hold*). A `rollback` is
-    asked neither (1), since the checkout's tree is not what it installs, nor `failed`, since a
-    failed promote is the first reason to go back (§6 *What stands in its way*)."""
+    (3) `inflight` / `failed` — nothing in flight, and for the policy alone no failure standing whose
+    `blocks` is main's head: a failure blocks only the commit it failed at, and never refuses a press
+    (§6 *Promote*, TD-1554). Then the rollback's `held`, which stops the policy and never a press (§6
+    *The hold*). A `rollback` is not asked (1), since the checkout's tree is not what it installs."""
     if not reading.get("main"):
         return "main", f"main cannot be read: {reading.get('main_why') or 'unknown'}"
     if kind == "promote":
@@ -322,12 +350,12 @@ def unmet(reading: dict[str, Any], press: bool = False, kind: str = "promote") -
         f = reading["inflight"]
         what = "rollback" if f.get("kind") == "rollback" else "promote"
         return "inflight", f"a {what} of {str(f.get('sha', ''))[:7]} is in flight"
-    if kind == "promote" and reading.get("failed"):
-        return "failed", f"the promote of {str(reading['failed'].get('sha', ''))[:7]} failed and is not cleared"
+    if not press and (b := blocks_of(reading.get("failed"))) and b == reading.get("main"):
+        return "failed", f"a failure blocks {b[:7]}: auto retries once main moves past it"
     if not press and (h := reading.get("held")):
         return "held", (
             f"live was rolled back to {str(h.get('sha', ''))[:7]} from {str(h.get('from') or 'unknown')[:7]}: "
-            "nothing is promoted by itself until the person promotes or clears it"
+            "nothing is promoted by itself until the person promotes"
         )
     return None
 
@@ -395,9 +423,17 @@ def failed(repo: str) -> dict[str, Any] | None:
 
 
 def last(repo: str) -> dict[str, Any] | None:
-    """`last.json` `{sha, from, at, by, kind}`: the promote that last concluded, `from` what `check` read
-    before it — where `--back` goes (§6 *Which commit*)."""
+    """`last.json` `{sha, from, at, by, kind, done}`: the run whose `check` last read its commit, `from` what
+    `check` read before it — where `--back` goes (§6 *Which commit*) — and `done`, the time it concluded,
+    set only once a run finished at its commit (§6 *The live ref*, TD-1554)."""
     return _read(repo_dir(repo) / "last.json")
+
+
+def finished(repo: str, live: str | None) -> bool:
+    """A run finished at `live` (§6 *The live ref*, TD-1554): `last.json` names it with `done` set. A
+    `last.json` without `done` (a failed run, or one written before `done` was) reads as not finished."""
+    got = last(repo) or {}
+    return bool(live) and got.get("sha") == live and bool(got.get("done"))
 
 
 def held(repo: str) -> dict[str, Any] | None:
@@ -444,6 +480,7 @@ def start(
     kind: str = "promote",
     frm: str | None = None,
     why: str | None = None,
+    main: str | None = None,
 ) -> dict[str, Any]:
     """Start `run` detached from the agent's process group (for this repo the run restarts the agent
     that started it), output to `<sha>.log`: in the checkout for a promote, in a detached worktree
@@ -453,8 +490,11 @@ def start(
     the pid after, so an agent that dies in between still finds it; `n` is how many commits it
     makes live, for the note. `smoke` is read here from the tree the run starts in and kept on the
     intent (§6 *The smoke*), so a pull of the checkout mid-run changes nothing; `why` is a failed smoke's,
-    on the rollback it starts. Returns the intent. Raises ValueError when the worktree cannot be made,
-    OSError when `run` cannot be spawned."""
+    on the rollback it starts; `main` is main's head as the press read it, which a failed person's
+    rollback blocks (§6 *Promote*, TD-1554). **Every start clears a failure standing** (TD-1554), once the
+    intent is written with the pid; the caller holds the agent's promote lock. Returns the intent. Raises
+    ValueError when the worktree cannot be made, OSError when `run` cannot be spawned — either way with
+    no intent left and a failure standing as it was."""
     d = repo_dir(repo)
     d.mkdir(parents=True, exist_ok=True)
     drop_tree(root, repo)
@@ -465,17 +505,24 @@ def start(
     intent |= _smoke_of(root, tree, sha)
     if why:
         intent["why"] = why
+    if main:
+        intent["main"] = main
     _write(d / "inflight.json", intent)
     env = {**os.environ, "SHIFTLEAD_PROMOTE_SHA": sha, "SHIFTLEAD_PROMOTE_FROM": frm or ""}
     env["SHIFTLEAD_PROMOTE_ROOT"] = str(root)
-    with open(log_path, "ab") as out:
-        p = subprocess.Popen(
-            run, shell=True, cwd=str(tree or root), stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-            start_new_session=True, env=env,
-        )  # fmt: skip
+    try:
+        with open(log_path, "ab") as out:
+            p = subprocess.Popen(
+                run, shell=True, cwd=str(tree or root), stdout=out, stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL, start_new_session=True, env=env,
+            )  # fmt: skip
+    except OSError:
+        clear(repo, "inflight")  # no intent without a run: the failure stands as it was
+        raise
     intent["pid"], intent["started"] = p.pid, proc_start(p.pid)
     _procs[p.pid] = p
     _write(d / "inflight.json", intent)
+    clear(repo, "failed")  # every start clears it (§6 *Promote*, TD-1554)
     return intent
 
 
@@ -595,15 +642,33 @@ def kill(pid: Any, started: Any = None) -> None:
                 _exits[pid] = p.wait(timeout=5)
 
 
-def fail(repo: str, intent: dict[str, Any], why: str, code: int | None = None) -> dict[str, Any]:
-    """Move the intent to `failed.json` `{sha, at, log, exit, why}`: nothing further is promoted for
-    the repo until the person clears it. `exit` is the run's, or `code` (a smoke's) when given."""
+def fail(
+    repo: str, intent: dict[str, Any], why: str, code: int | None = None, main: str | None = None
+) -> dict[str, Any]:
+    """Move the intent to `failed.json` `{sha, at, log, exit, why, by, blocks}`, and return it. A failure
+    blocks only the commit it failed at, `blocks` (§6 *Promote*, TD-1554): a promote's own `sha`; the
+    smoke's rollback's `from`, the commit the smoke failed on; a person's rollback's `main`, main's head as
+    the press read it — or, on an intent written before it carried one, `main` (main's head as the failing
+    pass reads it), else the intent's `sha`. `exit` is the run's, or `code` (a smoke's) when given."""
     out = {"sha": intent.get("sha"), "at": datetime.now(UTC).isoformat(), "log": intent.get("log")}
     run_exit = _exits.pop(intent.get("pid"), None)  # None: not ours
     out |= {"exit": run_exit if code is None else code, "why": why, "by": intent.get("by")}
+    if intent.get("kind") == "rollback" and intent.get("by") == "smoke":
+        blocks = intent.get("from")
+    elif intent.get("kind") == "rollback":
+        blocks = intent.get("main") or main
+    else:
+        blocks = intent.get("sha")
+    out["blocks"] = blocks or intent.get("sha")
     _write(repo_dir(repo) / "failed.json", out)
     clear(repo, "inflight")
     return out
+
+
+def fail_note(repo: str, f: dict[str, Any]) -> str:
+    """The `system` note a failure sends the person, beside its `fail` (§6 *Promote*, TD-1554): *promote of
+    `<repo>` `<sha7>` failed — <why>*, so the reason outlives a row the next start takes away."""
+    return f"promote of `{repo}` `{str(f.get('sha') or '')[:7]}` failed — {f.get('why') or 'no reason read'}"
 
 
 def tail(log_path: Any, lines: int = 20) -> list[str]:
@@ -785,7 +850,9 @@ def precheck_on_main(root: str | Path, repo: str, r: dict[str, Any], now: dateti
         return
     if _going(f) or _going(precheck_pr_run(repo)):
         return  # one at a time per repo: main's reading stays `unknown`, *no cadence/precheck on <sha7>*
-    if r.get("live") == sha or r.get("tree") is not None or r.get("inflight") or r.get("failed") or r.get("held"):
+    if r.get("live") == sha or r.get("tree") is not None or r.get("inflight") or r.get("held"):
+        return
+    if blocks_of(r.get("failed")) == sha:  # the policy starts nothing at a commit a failure blocks (TD-1554)
         return
     try:
         started, why = start_precheck(root, repo, sha)
@@ -855,12 +922,15 @@ def acts(r: dict[str, Any], now: datetime) -> dict[str, Any] | None:
     `check` is not answering, `{"checks": <verdict>}` while they are not green, `{"settles_in": s}`
     — the sooner of the settle's remainder and the cap's — or `{"at": "next tick"}` once either has
     run out. None when `auto` is off, main is not ahead, a run is in flight, or something else the
-    policy waits on stands (the row says that in its own words)."""
+    policy waits on stands — a hold, or a failure at main's head (the row says that in its own words);
+    a failure at an older commit leaves the clock read (TD-1554)."""
     if not r.get("auto") or not r.get("main") or r.get("live") == r.get("main") or r.get("inflight"):
         return None
     if not r.get("live") or r.get("live_why"):
         return {"waiting": "live"}
-    if r.get("failed") or r.get("held"):  # the policy promotes nothing while either stands, checks or not
+    if r.get("held"):  # the policy promotes nothing while a hold stands, checks or not
+        return None
+    if (b := blocks_of(r.get("failed"))) and b == r.get("main"):  # nor at the commit a failure blocks (TD-1554)
         return None
     u = unmet(r)
     if u is not None and u[0] != "checks":
@@ -908,6 +978,11 @@ def note_text(repo: str, intent: dict[str, Any], behind: int | None = None) -> s
         frm = str(intent.get("from") or "")[:7]
         line = str(intent.get("why") or "").split(": ", 1)[-1]
         return f"rolled back `{repo}` to `{str(intent.get('sha') or '')[:7]}`: the smoke failed on `{frm}` — {line}"
+    again = bool(intent.get("sha")) and intent.get("from") == intent.get("sha")  # a hand install's run (TD-1554)
+    if intent.get("kind") == "rollback" and again:
+        return f"rolled back `{repo}` to `{str(intent.get('sha') or '')[:7]}` again — tagged"
+    if again:
+        return f"promoted `{repo}` `{str(intent.get('sha') or '')[:7]}` again — tagged"
     if intent.get("kind") == "rollback":
         frm = str(intent.get("from") or "")[:7] or "an unread live"
         text = f"rolled back `{repo}` to `{str(intent.get('sha') or '')[:7]}` from `{frm}`"
@@ -948,7 +1023,7 @@ def _conclude(
             except OSError as e:
                 return _smoke_failed(repo, r, intent, f"smoke failed on {sha7}: {e}", None, run)
             return None, None
-        return None, _passed(repo, r, intent)
+        return None, _passed(repo, r, intent, now=now)
     try:
         at = datetime.fromisoformat(str(intent.get("at")))
     except ValueError:
@@ -957,21 +1032,33 @@ def _conclude(
     if ended and intent.get("read_at") and r.get("live_why"):  # read once: an unread pass waits for a reading
         if not past:
             return None, None
-        return fail(repo, intent, f"live still unknown after {PROMOTE_BOUND / 60:g} minutes — {r['live_why']}"), None
+        why = f"live still unknown after {PROMOTE_BOUND / 60:g} minutes — {r['live_why']}"
+        return fail(repo, intent, why, main=r.get("main")), None
     if ended:
         live = r.get("live_why") and f"live unknown — {r['live_why']}" or f"live is {str(r.get('live'))[:7]}"
-        return fail(repo, intent, f"the run ended and {live}, not {sha7}"), None
+        return fail(repo, intent, f"the run ended and {live}, not {sha7}", main=r.get("main")), None
     if past:
         kill(pid, intent.get("started"))
         read = f" (live read `{sha7}`)" if intent.get("read_at") else ""
-        return fail(repo, intent, f"still running after {PROMOTE_BOUND / 60:g} minutes: killed{read}"), None
+        why = f"still running after {PROMOTE_BOUND / 60:g} minutes: killed{read}"
+        return fail(repo, intent, why, main=r.get("main")), None
     return None, None
 
 
-def _passed(repo: str, r: dict[str, Any], intent: dict[str, Any], took: float | None = None, told: str = "") -> str:
+def _passed(
+    repo: str,
+    r: dict[str, Any],
+    intent: dict[str, Any],
+    took: float | None = None,
+    told: str = "",
+    now: datetime | None = None,
+) -> str:
     """A run concluded — on `check`'s reading, or its smoke's pass (`took`, its seconds, and `told`, what
-    its last line told beside the pass): a plain promote's hold ended, the intent and the smoke's result
-    cleared, and the note."""
+    its last line told beside the pass): `done` written into `last.json` (§6 *The live ref*, TD-1554), a
+    plain promote's hold ended, the intent and the smoke's result cleared, and the note."""
+    got = last(repo)
+    if got and got.get("sha") == intent.get("sha"):
+        _write(repo_dir(repo) / "last.json", {**got, "done": (now or datetime.now(UTC)).isoformat()})
     if intent.get("kind") != "rollback":
         clear(repo, "held")
     clear(repo, "inflight")
@@ -1016,7 +1103,7 @@ def _judge_smoke(
         took = _age(intent.get("smoke_at"), _when(res.get("at")) or now)
         last = _said(intent, res, TOLD_CAP + len(SMOKE_TOLD))  # what it told: a page over budget, a reach refused
         told = last[len(SMOKE_TOLD) :] if last.startswith(SMOKE_TOLD) else ""
-        return None, _passed(repo, r, intent, took if took is not None else 0.0, told)
+        return None, _passed(repo, r, intent, took if took is not None else 0.0, told, now)
     line = _said(intent, res) or f"it exited {code}"
     return _smoke_failed(repo, r, intent, f"smoke failed on {sha7}: {line}", code, run)
 
@@ -1032,11 +1119,12 @@ def _smoke_failed(
     _exits.pop(intent.get("smoke_pid"), None)  # a killed or vanished smoke of ours left its status
     frm, sha = intent.get("from"), intent.get("sha")
     if intent.get("kind") == "rollback" or not frm or frm == sha or not run:
-        return fail(repo, intent, why, code), None
+        return fail(repo, intent, why, code, r.get("main")), None
     try:
-        start(r["root"], repo, str(frm), run, "smoke", None, "rollback", str(sha), why)
+        start(r["root"], repo, str(frm), run, "smoke", None, "rollback", str(sha), why, r.get("main"))
     except (ValueError, OSError) as e:  # no tree, or the run cannot be spawned in it
-        return fail(repo, intent, f"{why}; its rollback could not start: {e}", code), None
+        # the promote's own failure, blocking the commit the smoke failed on (its `sha`, the rollback's `from`)
+        return fail(repo, intent, f"{why}; its rollback could not start: {e}", code, r.get("main")), None
     return None, None
 
 
@@ -1077,17 +1165,21 @@ def _last_line(intent: dict[str, Any], cap: int = 200) -> str:
 def _concluded(repo: str, intent: dict[str, Any], main: str | None, now: datetime) -> None:
     """What a run that reached its commit leaves, written once, on the first pass whose `check` reads it
     (`read_at`; before the run's end and a smoke):
-    `last.json` for every promote; a rollback writes the hold, with `by` and `why` when a failed smoke
-    started it, and a second one under a hold keeps its `from` — what the person first went back from
-    is what the row goes on naming. A plain promote ends the hold when it concludes (`_passed`)."""
+    `last.json` for every promote, without `done` (the conclusion writes it, `_passed`); a run whose `from`
+    is its own commit (a hand install's re-run, a rollback to the live commit) writes as `from` the
+    standing `last.json`'s `sha`, or that file's own `from` where the two are equal. A rollback writes the
+    hold — not one to the live commit, which keeps one standing as it is — with `by` and `why` when a
+    failed smoke started it, and a second one under a hold keeps its `from`: what the person first went
+    back from is what the row goes on naming. A plain promote ends the hold when it concludes (`_passed`)."""
     d = repo_dir(repo)
     at = now.isoformat()
     kind = intent.get("kind") or "promote"  # the Repo page's *by rollback* (TD-904)
-    _write(
-        d / "last.json",
-        {"sha": intent.get("sha"), "from": intent.get("from"), "at": at, "by": intent.get("by"), "kind": kind},
-    )
-    if intent.get("kind") == "rollback":
+    frm, again = intent.get("from"), bool(intent.get("sha")) and intent.get("from") == intent.get("sha")
+    if again:  # a run of its own commit (§6 *A copy installed by hand*): `--back` keeps the last commit a run put live
+        prev = last(repo) or {}
+        frm = prev.get("sha") if prev.get("sha") != intent.get("sha") else prev.get("from")
+    _write(d / "last.json", {"sha": intent.get("sha"), "from": frm, "at": at, "by": intent.get("by"), "kind": kind})
+    if intent.get("kind") == "rollback" and not again:  # a rollback to the live commit writes no hold
         frm = (held(repo) or {}).get("from") or intent.get("from")
         hold = {"sha": intent.get("sha"), "from": frm, "main": main, "at": at}
         if intent.get("by") == "smoke":
@@ -1129,6 +1221,9 @@ def survey(
         r: dict[str, Any] = {k: v for k, v in old.items() if k not in ("inflight", "failed", "unmet")}
         r["root"] = str(root)
         r["inflight"], r["failed"] = inflight(repo), failed(repo)
+        if r["inflight"] and r["failed"]:  # a home that died between a start's intent and its clear (TD-1554)
+            clear(repo, "failed")
+            r["failed"] = None
         first = not old
         if full or first:
             main = read_main(root, (fetched or {}).get(str(root)))
@@ -1149,19 +1244,22 @@ def survey(
             else:
                 r.setdefault("live", None)
                 r["live_why"] = why
+            blocks = blocks_of(r["failed"])
+            if r.get("live") == r.get("main") and not r.get("live_why") and moved_past(root, blocks, r.get("main")):
+                clear(repo, "failed")  # installed past the commit it blocked, by hand: nothing left to block (TD-1554)
+                r["failed"], blocks = None, None
             r["ahead"] = ahead(root, r.get("live"), r.get("main"))
-            r["ahead_since"] = read_ahead_since(root, r.get("live"), r.get("main"))
+            r["ahead_since"] = read_ahead_since(root, r.get("live"), r.get("main"), blocks)
             for k in ("live_at", "pending", "pending_more", "promoted"):
                 r.pop(k, None)
             r.update(read_since(root, r.get("live"), r.get("main"), repo))
         if r["inflight"]:
             fl, note = _conclude(repo, r, now, b["run"])
-            if note:  # a promote or rollback that succeeds clears a failure standing, as Dismiss does (§6)
+            if note:  # the start already cleared any failure: nothing else clears it (§6 *Promote*, TD-1554)
                 notes.append(note)
-                clear(repo, "failed")
-                r["failed"] = None
             elif fl:
-                r["failed"] = fl
+                notes.append(fail_note(repo, fl))  # a failure's note, once, beside its `fail`
+            r["failed"] = fl or failed(repo)  # a smoke's rollback that started cleared it
             r["inflight"] = inflight(repo)
         r["held"] = held(repo)
         if full or first:  # the checks were read this pass (TD-1038)
@@ -1176,6 +1274,16 @@ def survey(
         clock = settled(r.get("moved"), now) or waited(r.get("ahead_since"), now)
         if r["auto"] and behind and read and unmet(r) is None and clock:
             r["inflight"] = start(root, repo, r["main"], b["run"], "auto", r.get("ahead"), frm=r.get("live"))
+            r["failed"] = None  # the start cleared it (TD-1554)
+        # a copy installed by hand at main's head, no run finished there (§6 *A copy installed by hand*): its
+        # row only while nothing is in flight and no failure or hold stands, whose rows stand in its place
+        r["by_hand"] = bool(
+            read
+            and r.get("main")
+            and r.get("live") == r["main"]
+            and not (r["inflight"] or r["failed"] or r["held"])
+            and not finished(repo, r.get("live"))
+        )
         u = unmet(r)
         r["unmet"] = {"name": u[0], "text": u[1]} if u else None
         r["acts"] = acts(r, now)

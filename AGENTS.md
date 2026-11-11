@@ -98,9 +98,9 @@ a team still follows the branch checked out here at that moment.
 
 **Going back** (design §6 *A rollback*, TD-226): `ao promote shiftlead --back`, or `--sha <commit>` for a
 commit of `origin/main`, makes that commit live from a detached worktree and leaves this checkout as
-it is; the policy then promotes nothing for the repo until a Promote concludes or Dismiss
-(`ao promote clear`) ends the hold. A rollback to a commit older than `8841800` (#757) is concluded by
-code that knows no hold, so turn `auto` off first on the Settings page. **When the live copy does not
+it is; the policy then promotes nothing for the repo until a Promote concludes, which ends the hold.
+A rollback to a commit older than `8841800` (#757) is concluded by code that knows no hold, so turn
+`auto` off first on the Settings page. **When the live copy does not
 start**, so neither `ao` nor the host agent answers, go back by hand — the same tree, then the pair
 with its path. It writes no hold, and the pair restarts the host agent, so turn `auto` off first
 (`settings.yml`, or the Settings page once it answers) and on again once main holds the cure:

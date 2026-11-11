@@ -230,7 +230,14 @@ def test_the_preconditions_in_order_and_the_press_goes_through_the_checks():
     assert promote.unmet({**ok, "checks": "pending"}) == ("checks", "checks on main are pending")
     assert promote.unmet({**ok, "checks": "pending"}, press=True) is None
     assert promote.unmet({**ok, "inflight": {"sha": "abcdef12"}}, press=True)[0] == "inflight"
-    assert promote.unmet({**ok, "failed": {"sha": "abcdef12"}}, press=True)[0] == "failed"
+    # a failure blocks only its own commit, and only the policy (TD-1554): never a press
+    assert promote.unmet({**ok, "failed": {"sha": "m", "blocks": "m"}}, press=True) is None
+    assert promote.unmet({**ok, "failed": {"sha": "m", "blocks": "m"}}) == (
+        "failed",
+        "a failure blocks m: auto retries once main moves past it",
+    )
+    assert promote.unmet({**ok, "failed": {"sha": "x", "blocks": "x"}}) is None  # main moved past it
+    assert promote.unmet({**ok, "failed": {"sha": "m"}})[0] == "failed"  # one from before `blocks`: its sha
 
 
 def test_by_hand_the_pass_reads_and_starts_nothing(checkout):
@@ -338,7 +345,7 @@ def test_auto_promotes_once_and_the_outcome_is_read_from_check(checkout, monkeyp
     assert readings["repo"]["inflight"] is None and notes == []  # live is main: nothing to do
 
 
-def test_a_run_that_leaves_live_elsewhere_fails_and_stops_the_repo(checkout, monkeypatch, tmp_path):
+def test_a_run_that_leaves_live_elsewhere_fails_and_blocks_its_commit(checkout, monkeypatch, tmp_path):
     monkeypatch.setattr(promote, "PROMOTE_SETTLE", 0.0)
     (checkout / ".shiftlead.yml").write_text(
         f"promote:\n  run: echo it broke; exit 3\n  check: cat {tmp_path / 'live'}\n"
@@ -350,14 +357,19 @@ def test_a_run_that_leaves_live_elsewhere_fails_and_stops_the_repo(checkout, mon
     _wait_gone(readings["repo"]["inflight"]["pid"])
     readings, notes, _ = promote.survey([str(checkout)], readings, False, {"repo": True}, datetime.now(UTC))
     f = readings["repo"]["failed"]
-    assert notes == [] and f["why"].startswith("the run ended and live is ") and f["tail"] == ["it broke"]
-    assert f["exit"] == 3
+    sha = readings["repo"]["main"]
+    assert f["why"].startswith("the run ended and live is ") and f["tail"] == ["it broke"]
+    assert f["exit"] == 3 and f["blocks"] == sha  # a promote blocks its own commit (TD-1554)
+    assert notes == [f"promote of `repo` `{sha[:7]}` failed — {f['why']}"]  # its note, once, beside the fail
     assert readings["repo"]["unmet"]["name"] == "failed"
+    readings, notes, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
+    assert readings["repo"]["inflight"] is None and notes == []  # nothing at the blocked commit, no second note
+    assert readings["repo"]["acts"] is None
+    # main moves past it: `auto` retries at the new head, and its start clears the failure
+    new = _merge(checkout, "fix")
     readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
-    assert readings["repo"]["inflight"] is None  # nothing further until the person clears it
-    promote.clear("repo", "failed")
-    readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
-    assert readings["repo"]["inflight"] is not None
+    assert readings["repo"]["inflight"]["sha"] == new
+    assert readings["repo"]["failed"] is None and promote.failed("repo") is None
 
 
 def test_a_run_past_the_bound_is_killed_and_failed(checkout, monkeypatch, tmp_path):
@@ -448,7 +460,7 @@ async def test_an_unserved_repo_is_promoted_by_no_pass(agent, checkout, monkeypa
                 await person.call("promote", repo="repo", **kw)
 
 
-# ── slice 2: the press, Dismiss's half, and `ao promote` (§4.7, §6) ────────────────────────────
+# ── slice 2: the press and `ao promote` (§4.7, §6) ─────────────────────────────────────────────
 
 
 async def test_the_press_is_a_persons_and_refused_to_a_session(agent, checkout):
@@ -457,8 +469,6 @@ async def test_the_press_is_a_persons_and_refused_to_a_session(agent, checkout):
     async with LocalClient(caller="ao-some-worker") as worker:
         with pytest.raises(AgentError, match="a person's own act, refused to every session"):
             await worker.call("promote", repo="repo")
-        with pytest.raises(AgentError, match="a person's own"):
-            await worker.call("clear_promote", repo="repo")
 
 
 async def test_the_persons_own_shell_presses_and_the_press_is_recorded_as_the_shell(agent, checkout, monkeypatch):
@@ -477,15 +487,17 @@ async def test_the_persons_own_shell_presses_and_the_press_is_recorded_as_the_sh
         _wait_gone(agent._promotes["repo"]["inflight"]["pid"])
         shell.controllers = ["ao-repo-lead"]
         with pytest.raises(AgentError, match="refused to every session but the person's own shell"):
-            await sh.call("clear_promote", repo="repo")
+            await sh.call("promote", repo="repo")
 
 
 async def test_the_press_refuses_on_one_and_three_and_goes_through_the_checks(agent, checkout, monkeypatch):
     await park_ticks(agent)
     _register(checkout)
+    first = _git(checkout, "rev-parse", "HEAD")
+    promote._write(promote.repo_dir("repo") / "last.json", {"sha": first, "from": None, "done": "t"})
     async with LocalClient() as person:
         with pytest.raises(AgentError, match="nothing to promote"):
-            await person.call("promote", repo="repo")  # live is main already
+            await person.call("promote", repo="repo")  # live is main already, and a run finished there
         live = checkout.parent / "live"
         (checkout / ".shiftlead.yml").write_text(
             f"promote:\n  run: sleep 1; git rev-parse HEAD > {live}\n  check: cat {live}\n"
@@ -510,18 +522,20 @@ async def test_the_press_refuses_on_one_and_three_and_goes_through_the_checks(ag
             await person.call("promote", repo="repo", sha=main)
 
 
-async def test_a_failure_standing_refuses_the_press_until_dismissed(agent, checkout):
+async def test_a_press_at_the_failed_commit_is_taken_and_clears_the_failure_as_it_starts(agent, checkout):
+    """§6 *Promote* (TD-1554): a failure never refuses a press — Promote of main's head, the failed sha
+    among them — and the start clears `failed.json`; `clear_promote` is gone, answered as any unknown RPC."""
     await park_ticks(agent)
     _register(checkout)
-    _merge(checkout, "b")
-    promote.repo_dir("repo").mkdir(parents=True)
-    (promote.repo_dir("repo") / "failed.json").write_text(json.dumps({"sha": "f" * 40, "why": "it broke"}))
+    main = _merge(checkout, "b")
+    promote._write(promote.repo_dir("repo") / "failed.json", {"sha": main, "why": "it broke", "blocks": main})
     async with LocalClient() as person:
-        with pytest.raises(AgentError, match="failed and is not cleared.*precondition: failed"):
-            await person.call("promote", repo="repo")
-        assert (await person.call("clear_promote", repo="repo")) == {"repo": "repo", "cleared": True, "which": "failed"}
-        assert (await person.call("clear_promote", repo="repo"))["cleared"] is False
-        assert (await person.call("promote", repo="repo"))["repo"] == "repo"
+        got = await person.call("promote", repo="repo")
+        assert got["sha"] == main
+        assert promote.failed("repo") is None and agent._promotes["repo"]["failed"] is None
+        assert agent._promotes["repo"]["inflight"]["main"] == main
+        with pytest.raises(AgentError, match="clear_promote"):
+            await person.call("clear_promote", repo="repo")
 
 
 async def test_a_repo_without_the_block_has_no_press(agent, tmp_path):
@@ -550,9 +564,9 @@ def test_a_pid_taken_again_is_not_the_run_and_is_never_killed():
 def test_the_press_is_a_home_edit_refused_offline_at_a_node():
     from sessionorc import modes
 
-    for method in ("promote", "clear_promote"):
-        why = modes.offline_refusal(method, None, {}, host="laptop", home="kmaster")
-        assert why and "kmaster (home) is unreachable" in why
+    why = modes.offline_refusal("promote", None, {}, host="laptop", home="kmaster")
+    assert why and "kmaster (home) is unreachable" in why
+    assert "clear_promote" not in modes.HOME_EDITS  # gone with Dismiss (TD-1554)
 
 
 def test_ao_promote_status_prints_the_readings(monkeypatch, capsys):
@@ -702,6 +716,7 @@ async def test_the_commit_is_refused_by_name(agent, checkout):
     _git(checkout, "push", "-q", "origin", "td9-side")
     _git(checkout, "checkout", "-q", "main")
     _merge(checkout, "b")
+    promote._write(promote.repo_dir("repo") / "last.json", {"sha": first, "from": None, "done": "t"})
     async with LocalClient() as person:
         for bad in ("td9-side", "v1", "HEAD~1", "abc12"):
             with pytest.raises(AgentError, match="is not a commit's hex"):
@@ -716,7 +731,7 @@ async def test_the_commit_is_refused_by_name(agent, checkout):
             await person.call("promote", repo="repo", sha=_git(checkout, "rev-parse", "HEAD"))
         with pytest.raises(AgentError, match="--sha or --back, not both"):
             await person.call("promote", repo="repo", sha=first, back=True)
-        with pytest.raises(AgentError, match="no promote of repo has concluded"):
+        with pytest.raises(AgentError, match="was never read"):
             await person.call("promote", repo="repo", back=True)
 
 
@@ -756,15 +771,15 @@ async def test_a_rollback_goes_through_a_failure_and_clears_it(agent, checkout):
     promote.repo_dir("repo").mkdir(parents=True)
     (promote.repo_dir("repo") / "failed.json").write_text(json.dumps({"sha": "f" * 40, "why": "it broke"}))
     async with LocalClient() as person:
-        with pytest.raises(AgentError, match="precondition: failed"):
-            await person.call("promote", repo="repo")
         await person.call("promote", repo="repo", sha=old[:7])
+        assert promote.failed("repo") is None  # cleared as it starts (TD-1554)
+        assert agent._promotes["repo"]["inflight"]["main"] == agent._promotes["repo"]["main"]  # what it blocks
         await _settle(agent)
     r = agent._promotes["repo"]
     assert r["live"] == old and r["failed"] is None and promote.failed("repo") is None and r["held"]
 
 
-async def test_the_hold_stops_auto_until_the_person_clears_it(agent, checkout, monkeypatch):
+async def test_the_hold_stops_auto_until_a_press_concludes(agent, checkout, monkeypatch):
     await park_ticks(agent)
     monkeypatch.setattr(promote, "PROMOTE_SETTLE", 0.0)
     monkeypatch.setattr(type(agent), "_promote_auto", staticmethod(lambda: {"repo": True}))
@@ -788,14 +803,22 @@ async def test_the_hold_stops_auto_until_the_person_clears_it(agent, checkout, m
         await person.call("promote", repo="repo", sha=other)
         await _settle(agent)
         assert promote.held("repo")["sha"] == other and promote.held("repo")["from"] == first["from"]
-        # Dismiss with a failure and a hold standing clears the failure first
-        (promote.repo_dir("repo") / "failed.json").write_text(json.dumps({"sha": "f" * 40, "why": "x"}))
-        assert (await person.call("clear_promote", repo="repo"))["which"] == "failed"
-        assert (await person.call("clear_promote", repo="repo"))["which"] == "held"
-        assert (await person.call("clear_promote", repo="repo"))["which"] is None
+        # a failure beside the hold: the hold wins, and `auto` moving past `blocks` starts nothing (TD-1554)
+        f = {"sha": "f" * 40, "why": "x", "blocks": "f" * 40}
+        (promote.repo_dir("repo") / "failed.json").write_text(json.dumps(f))
         agent._promote_read_at = float("-inf")
         await agent._refresh_promotes()
-        assert agent._promotes["repo"]["inflight"]["by"] == "auto"  # auto goes on as if nothing were held
+        r = agent._promotes["repo"]
+        assert r["inflight"] is None and r["unmet"]["name"] == "held" and r["acts"] is None
+        # the press clears the failure as it starts and ends the hold when it concludes; auto goes on
+        await person.call("promote", repo="repo")
+        assert promote.failed("repo") is None
+        await _settle(agent)
+        assert promote.held("repo") is None and agent._promotes["repo"]["held"] is None
+        _merge(checkout, "d")
+        agent._promote_read_at = float("-inf")
+        await agent._refresh_promotes()
+        assert agent._promotes["repo"]["inflight"]["by"] == "auto"  # as if nothing had been held
         await _settle(agent)
 
 
@@ -862,10 +885,14 @@ def test_ao_promote_status_reads_rolled_back_and_held(monkeypatch, capsys):
     assert out.startswith(
         "shiftlead · live 4444444, rolled back from 9999999 · main 9999999, 3 ahead · checks green · auto on · held"
     )
-    calls = []
-    monkeypatch.setattr(cli, "call_sync", lambda m, **p: calls.append((m, p)) or {"repo": "shiftlead", "which": "held"})
-    assert cli.main(["promote", "clear", "shiftlead"]) == 0
-    assert calls == [("clear_promote", {"repo": "shiftlead"})] and "the hold is cleared" in capsys.readouterr().out
+    assert "`ao promote` once main holds the cure ends it" in out and "clear" not in out
+    # a failure beside the hold: the held line with the failure's reason, and no *auto retries* (TD-1554)
+    reading["failed"] = {"sha": "9" * 40, "at": "t", "why": "it broke", "log": "/l", "blocks": "9" * 40}
+    assert cli.main(["promote", "status"]) == 0
+    out = capsys.readouterr().out
+    assert "FAILED 9999999 at t: it broke" in out and "auto retries" not in out and "· held" in out
+    with pytest.raises(SystemExit):  # there is no `ao promote clear`: `clear` is a repo, and a second one is extra
+        cli.main(["promote", "clear", "shiftlead"])
 
 
 def test_ao_promote_status_reads_checking_live_and_rolled_back_by_the_smoke(monkeypatch, capsys):
@@ -1106,9 +1133,14 @@ def test_a_rollbacks_failed_smoke_stands_as_a_failure_beside_its_hold(checkout):
     readings, _ = _pass(checkout, readings)
     readings, notes = _pass(checkout, readings)
     f = readings["repo"]["failed"]
-    assert notes == [] and readings["repo"]["inflight"] is None and readings["repo"]["live"] == old
+    assert notes == [promote.fail_note("repo", f)] and readings["repo"]["inflight"] is None
+    assert readings["repo"]["live"] == old
     assert f["why"] == f"smoke failed on {old[:7]}: smoke says 1" and f["exit"] == 1
+    # a person's rollback whose intent carries no `main` (written before TD-1554) blocks main's head as the
+    # failing pass reads it
+    assert f["blocks"] == new
     assert promote.held("repo")["sha"] == old  # never rolled back: the failure stands beside the hold
+    assert promote.last("repo")["sha"] == old and "done" not in promote.last("repo")  # never finished
 
 
 def _smoke_intent(tmp_path: Path, **kw) -> dict:
@@ -1293,6 +1325,7 @@ def test_the_smokes_rollback_that_cannot_start_leaves_the_hold_beside_both_reaso
     readings, _ = _pass(checkout, readings)
     why = f"smoke failed on {main[:7]}: smoke says 3; its rollback could not start: the rollback's worktree"
     assert readings["repo"]["failed"]["why"].startswith(why) and readings["repo"]["live"] == main
+    assert readings["repo"]["failed"]["blocks"] == main  # the commit the smoke failed on (TD-1554)
     assert promote.held("repo") == hold  # neither cleared nor rewritten
 
 
@@ -1311,6 +1344,7 @@ def test_the_smokes_rollback_whose_run_cannot_be_spawned_is_a_failure_with_both_
     readings, _ = _pass(checkout, readings)
     why = f"smoke failed on {main[:7]}: smoke says 3; its rollback could not start: "
     assert readings["repo"]["failed"]["why"].startswith(why) and readings["repo"]["live"] == main
+    assert readings["repo"]["failed"]["blocks"] == main  # the commit the smoke failed on (TD-1554)
     assert promote.inflight("repo") is None and readings["repo"]["inflight"] is None
 
 
@@ -1531,9 +1565,13 @@ def test_a_run_killed_at_the_bound_after_the_reading_says_so_and_rolls_nothing_b
     later = datetime.now(UTC) + timedelta(seconds=promote.PROMOTE_BOUND + 1)
     readings, notes = _seen(checkout, readings, later)
     f = readings["repo"]["failed"]
-    assert notes == [] and f["why"] == f"still running after 20 minutes: killed (live read `{sha[:7]}`)"
+    assert (
+        notes == [promote.fail_note("repo", f)]
+        and f["why"] == f"still running after 20 minutes: killed (live read `{sha[:7]}`)"
+    )
     assert readings["repo"]["inflight"] is None  # a plain failure: no smoke rollback started
     assert (promote.held("repo") or {}).get("sha") == (old if kind == "rollback" else None)  # beside its hold
+    assert promote.last("repo")["sha"] == sha and "done" not in promote.last("repo")  # read, never finished
     _wait_gone(pid)
     assert not promote.alive(pid)
 
@@ -1552,7 +1590,9 @@ def test_live_unknown_after_the_reading_waits_and_fails_past_the_bound(checkout)
     later = datetime.now(UTC) + timedelta(seconds=promote.PROMOTE_BOUND + 1)
     readings, notes = _pass(checkout, readings, later)
     f = readings["repo"]["failed"]
-    assert notes == [] and f["why"] == f"live still unknown after 20 minutes — {r['live_why']}"
+    assert (
+        notes == [promote.fail_note("repo", f)] and f["why"] == f"live still unknown after 20 minutes — {r['live_why']}"
+    )
     assert readings["repo"]["inflight"] is None
 
 
@@ -1588,3 +1628,178 @@ def test_an_intent_with_no_start_time_is_judged_by_its_pid_alone(tmp_path, monke
         p.kill()
         p.wait()
     assert promote._conclude("repo", r, datetime.now(UTC))[1] == f"promoted `repo` `{'a' * 7}` — 1 commit"
+
+
+# ── TD-1559 (TD-1437's design after its Hold revision, TD-1554): a failure blocks only its commit ──────
+
+
+def _dated(root: Path, name: str, when: str) -> str:
+    """A merge to main committed at `when`, so `ahead_since` can tell commits apart."""
+    (root / name).write_text(name)
+    _git(root, "add", "-A")
+    env = {"PATH": os.environ["PATH"], "HOME": os.environ.get("HOME", "/tmp"), **GIT_ENV}
+    env |= {"GIT_COMMITTER_DATE": when, "GIT_AUTHOR_DATE": when}
+    subprocess.run(["git", "-C", str(root), "commit", "-q", "-m", name], check=True, env=env)
+    _git(root, "push", "-q", "origin", "main")
+    return _git(root, "rev-parse", "HEAD")
+
+
+def test_fail_picks_the_commit_it_blocks_by_the_intent():
+    m, f, s = "m" * 40, "f" * 40, "s" * 40
+    blocks = {
+        "promote": promote.fail("r", {"sha": s, "kind": "promote", "by": "auto"}, "x", main=m)["blocks"],
+        "smoke's rollback": promote.fail("r", {"sha": s, "kind": "rollback", "by": "smoke", "from": f}, "x")["blocks"],
+        "person's rollback": promote.fail("r", {"sha": s, "kind": "rollback", "by": "person", "main": m}, "x")[
+            "blocks"
+        ],
+        "one from before `main`": promote.fail("r", {"sha": s, "kind": "rollback", "by": "person"}, "x", main=f)[
+            "blocks"
+        ],
+        "with main unread too": promote.fail("r", {"sha": s, "kind": "rollback", "by": "person"}, "x")["blocks"],
+    }
+    assert blocks == {
+        "promote": s,
+        "smoke's rollback": f,
+        "person's rollback": m,
+        "one from before `main`": f,
+        "with main unread too": s,
+    }
+    assert promote.blocks_of({"sha": s}) == s  # a failed.json written before `blocks`
+    assert promote.fail_note("r", {"sha": s, "why": "it broke"}) == "promote of `r` `sssssss` failed — it broke"
+
+
+def test_a_start_that_raises_leaves_the_failure_and_no_intent(checkout, monkeypatch, tmp_path):
+    main = _merge(checkout, "b")
+    f = {"sha": "f" * 40, "why": "x", "blocks": "f" * 40}
+    promote._write(promote.repo_dir("repo") / "failed.json", f)
+    monkeypatch.setattr(promote, "make_tree", lambda root, repo, sha: tmp_path / "gone")  # Popen's cwd is missing
+    with pytest.raises(OSError):
+        promote.start(checkout, "repo", main, "true", "person", None, "rollback", None)
+    assert promote.failed("repo") == f and promote.inflight("repo") is None
+
+    def no_tree(root, repo, sha):
+        raise ValueError("no room")
+
+    monkeypatch.setattr(promote, "make_tree", no_tree)
+    with pytest.raises(ValueError):
+        promote.start(checkout, "repo", main, "true", "person", None, "rollback", None)
+    assert promote.failed("repo") == f and promote.inflight("repo") is None
+
+
+def test_a_failure_beside_an_intent_is_cleared_by_the_pass(checkout):
+    """A home that died between a start's intent and its clear restarts with both files: the pass that
+    finds them clears the failure, the intent being the newer fact."""
+    main = _merge(checkout, "b")
+    readings = _press(checkout, main)
+    promote._write(promote.repo_dir("repo") / "failed.json", {"sha": "f" * 40, "why": "x"})
+    readings, notes = _pass(checkout, readings)
+    assert promote.failed("repo") is None and readings["repo"]["failed"] is None
+    assert notes == [f"promoted `repo` `{main[:7]}` — 1 commit"]
+    assert promote.last("repo")["done"] and promote.finished("repo", main)  # a run finished at it
+
+
+def test_a_failed_commit_past_the_cap_does_not_spend_the_next_merges(checkout, monkeypatch):
+    """`ahead_since` is read from main's move past `blocks`: a failed commit that sat ahead of live past
+    `PROMOTE_MAX_WAIT` does not let the next merge skip its settle."""
+    hour_ago = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
+    x = _dated(checkout, "x", hour_ago)
+    promote._write(promote.repo_dir("repo") / "failed.json", {"sha": x, "why": "it broke", "blocks": x})
+    readings, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
+    r = readings["repo"]
+    assert r["inflight"] is None and r["unmet"]["name"] == "failed" and r["acts"] is None  # main is x
+    y = _merge(checkout, "y")
+    readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
+    r = readings["repo"]
+    assert r["inflight"] is None and r["failed"]["blocks"] == x  # the settle runs from y, not x
+    assert r["ahead_since"] == _git(checkout, "log", "-1", "--format=%cI", y)
+    assert r["acts"]["settles_in"] > 0  # the policy's clock, read with a failure at an older commit
+    later = datetime.now(UTC) + timedelta(seconds=promote.PROMOTE_SETTLE + 1)
+    readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, later)
+    assert readings["repo"]["inflight"]["sha"] == y and promote.failed("repo") is None
+
+
+def test_a_hand_install_past_the_failed_commit_clears_it_and_draws_the_by_hand_row(checkout):
+    from shiftlead.ui.inbox import promote_rows
+
+    x = _merge(checkout, "x")
+    promote._write(promote.repo_dir("repo") / "failed.json", {"sha": x, "why": "it broke", "blocks": x})
+    (checkout.parent / "live").write_text(x + "\n")  # live at the failed commit: the failure stands there
+    readings, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
+    assert readings["repo"]["failed"] and readings["repo"]["by_hand"] is False
+    z = _merge(checkout, "z")
+    (checkout.parent / "live").write_text(z + "\n")  # CLAUDE.md's pair, by hand, at main's head
+    readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
+    r = readings["repo"]
+    assert r["failed"] is None and promote.failed("repo") is None and r["by_hand"] is True
+    assert r["inflight"] is None  # `auto` never starts it: live = main is nothing for the policy
+    (row,) = promote_rows({"repo": r})
+    assert row["text"] == f"repo · live {z[:7]} = main · installed by hand — promote to tag it" and row["fyi"]
+
+
+def test_concluded_from_on_a_run_of_its_own_commit_and_no_hold_for_a_rollback_to_live():
+    now = datetime.now(UTC)
+    a, b = "a" * 40, "b" * 40
+    promote._write(promote.repo_dir("r") / "last.json", {"sha": a, "from": None, "done": "t"})
+    promote._concluded("r", {"sha": b, "from": b, "kind": "promote", "by": "person"}, b, now)
+    assert promote.last("r")["from"] == a and "done" not in promote.last("r")  # `--back` keeps a target
+    promote._concluded("r", {"sha": b, "from": b, "kind": "promote", "by": "person"}, b, now)
+    assert promote.last("r")["from"] == a  # the standing file names it already: its own `from`
+    promote._concluded("r", {"sha": a, "from": a, "kind": "rollback", "by": "person"}, b, now)
+    assert promote.held("r") is None  # a rollback to the live commit writes no hold
+    hold = {"sha": "c" * 40, "from": b, "main": b, "at": "t"}
+    promote._write(promote.repo_dir("r") / "held.json", hold)
+    promote._concluded("r", {"sha": a, "from": a, "kind": "rollback", "by": "person"}, b, now)
+    assert promote.held("r") == hold  # and keeps one standing as it is
+    assert (
+        promote.note_text("r", {"sha": a, "from": a, "kind": "rollback"})
+        == "rolled back `r` to `aaaaaaa` again — tagged"
+    )
+    assert promote.note_text("r", {"sha": a, "from": a, "ahead": 0}) == "promoted `r` `aaaaaaa` again — tagged"
+
+
+async def test_a_hand_install_is_taken_by_the_press_tagged_and_back_still_goes_somewhere(agent, checkout):
+    """§6 *A copy installed by hand*: a press at main's head no run finished at is taken and runs again; the
+    run that concludes writes `done`, and `--back` then goes to the last commit a run put live. Live at main's
+    head where a run finished is refused — unless a failure blocks it, when it is taken."""
+    await park_ticks(agent)
+    _register(checkout)
+    _rollback_block(checkout)
+    async with LocalClient() as person:
+        b = _merge(checkout, "b")
+        await _promote_to_main(agent, person, checkout)
+        assert promote.finished("repo", b)
+        c = _merge(checkout, "c")
+        (checkout.parent / "live").write_text(c + "\n")  # installed by hand
+        promote._write(promote.repo_dir("repo") / "last.json", {**promote.last("repo")})  # still names b
+        got = await person.call("promote", repo="repo")
+        assert got["sha"] == c and got["from"] == c
+        await _settle(agent)
+        assert promote.finished("repo", c) and promote.last("repo")["from"] == b
+        notes = [e.text for e in agent.person_inbox if e.from_ == "system"]
+        assert notes[-1] == f"promoted `repo` `{c[:7]}` again — tagged"
+        with pytest.raises(AgentError, match="nothing to promote"):
+            await person.call("promote", repo="repo")  # a run finished there, and no failure blocks it
+        promote._write(promote.repo_dir("repo") / "failed.json", {"sha": c, "why": "smoke", "blocks": c})
+        assert (await person.call("promote", repo="repo"))["sha"] == c  # a failure at main's head: a retry
+        await _settle(agent)
+        assert (await person.call("promote", repo="repo", back=True))["sha"] == b
+        await _settle(agent)
+    assert agent._promotes["repo"]["live"] == b
+
+
+async def test_a_legacy_last_json_reads_as_not_finished_and_a_rollback_to_the_live_commit_is_taken(agent, checkout):
+    await park_ticks(agent)
+    _register(checkout)
+    _rollback_block(checkout)
+    old = _git(checkout, "rev-parse", "HEAD")
+    _merge(checkout, "b")
+    (checkout.parent / "live").write_text(old + "\n")  # an older commit, installed by hand
+    promote._write(promote.repo_dir("repo") / "last.json", {"sha": old, "from": None, "by": "auto"})  # no `done`
+    assert not promote.finished("repo", old)
+    async with LocalClient() as person:
+        got = await person.call("promote", repo="repo", sha=old)  # live already, but no run finished there
+        assert got["kind"] == "rollback" and got["from"] == old
+        await _settle(agent)
+        assert promote.finished("repo", old) and promote.held("repo") is None  # tagged, and no hold
+        with pytest.raises(AgentError, match="is live already"):
+            await person.call("promote", repo="repo", sha=old)

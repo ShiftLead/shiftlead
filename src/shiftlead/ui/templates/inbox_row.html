@@ -1015,10 +1015,11 @@
 {# ── design §4.5a **Inbox row: promote** (§6 *Promote*, TD-132 slice 3) ──────────────────────────
    One row per repo the home promotes, every part a structured reading of the home's (`promotes` on
    `host`), never text a session wrote. **Promote** presses the `promote` RPC with main's head, a
-   person's; a refusal comes back in the agent's words. **Snooze ▾** keeps the row aside by time
-   alone. **Dismiss** is drawn on a failure row and on a held one (a rollback's hold, TD-226 slice
-   3) and clears the home's own mark — the failure first, the hold when no failure stands. In
-   flight the row is FYI and its Promote disabled. Under `auto` (TD-581) a repo main is ahead of is
+   person's; a refusal comes back in the agent's words, and a failure never refuses it: the press
+   clears it as the run starts (TD-1554). **Snooze ▾** keeps the row aside by time alone. There is
+   no Dismiss: a failure blocks only its own commit, and a held row's Promote, once it concludes, is
+   the one way the hold ends. A copy installed by hand is FYI, its Promote running main's head again
+   to tag it. In flight the row is FYI and its Promote disabled. Under `auto` (TD-581) a repo main is ahead of is
    FYI too, saying when the home will act, and its press reads **Promote now**: the same RPC, the
    settle and the wait skipped. Each control's `title` is its help paragraph's
    first sentence (§4.5a *The help text*). #}
@@ -1032,7 +1033,7 @@
 {{ subj(e) }}
 <div class="body">{{ e.text }}{% if e.live_why %} — live unknown: {{ e.live_why }}{% endif %}{% if e.checks_why %} — checks: {{ e.checks_why }}{% endif %}</div>
 {%- if e.failed %}
-<div class="body">failed: promoting {{ (e.failed.sha or '')[:7] }} — {{ e.failed.why }}{% if e.failed.exit is not none %} (exit {{ e.failed.exit }}){% endif %}. Nothing is promoted for {{ e.repo }} until this is dismissed or a press succeeds.</div>
+<div class="body">failed: promoting {{ (e.failed.sha or '')[:7] }} — {{ e.failed.why }}{% if e.failed.exit is not none %} (exit {{ e.failed.exit }}){% endif %}.{% if e.held or not e.auto %} Nothing is promoted for {{ e.repo }} until a press starts a run or a run concludes.{% endif %}</div>
 {%- if e.failed.tail %}<pre class="body mono promotelog" title="{{ e.failed.log }}">{{ e.failed.tail | join('\n') }}</pre>{% endif %}
 {%- elif e.precheck_failed %}
 {%- if e.precheck_failed.tail %}<pre class="body mono promotelog" title="{{ e.precheck_failed.log }}">{{ e.precheck_failed.tail | join('\n') }}</pre>{% endif %}
@@ -1065,7 +1066,6 @@
   </details>
   {%- endif %}
   {%- endif %}
-  {%- if e.failed or e.held %}<button class="btn sm ghost" data-act="clear_promote" data-id="person" data-repo="{{ e.repo }}" data-held="{{ '1' if e.held else '' }}" title="{{ help_title('promote-dismiss') }}">Dismiss</button>{% endif %}
 </div>
 {%- endmacro %}
 

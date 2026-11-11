@@ -656,22 +656,28 @@ def board_choices(roots: Collection[str | Path] | None = None) -> list[dict[str,
 
 def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None) -> list[dict[str, Any]]:
     """design §4.5a **Inbox row: promote** (§6 *Promote*, TD-132 slice 3): one row per repo in the
-    home's `promotes` reading, drawn only while live is not main's head or a promote failed — and
-    every part from that structured reading, never text a session wrote. Under `auto: false` a repo
-    main is ahead of is *Needs you*, counted (the press is what stands between merged and live); a
-    run **in flight** is FYI (`fyi`), uncounted, its Promote disabled; a **failure** is *Needs you*
-    whatever `auto` says. **Under `auto: true`** (TD-581) a repo main is ahead of, nothing in flight
-    and no failure or hold, is FYI too (`auto_row`), uncounted and snoozable, saying when the home
-    will act — *· auto on ·* and the reading's `acts` in its words — with **Promote now**; a
-    failure or a hold is drawn under *Needs you* in its place, and a run in flight under `auto`
-    draws nothing: the note says when it is live.
+    home's `promotes` reading, drawn only while live is not main's head, a promote failed, or live is
+    main's head installed by hand — and every part from that structured reading, never text a session
+    wrote. Under `auto: false` a repo main is ahead of is *Needs you*, counted (the press is what stands
+    between merged and live); a run **in flight** is FYI (`fyi`), uncounted, its Promote disabled; a
+    **failure** is *Needs you*, counted — under `auto` reading *· auto retries when main moves past
+    `<sha7>`* while main's head is the commit it blocks, and once main has moved past it drawn under
+    FYI, uncounted, with the policy's clock (`retry`), the policy's own to retry (§6 *Promote*,
+    TD-1554). **Under `auto: true`** (TD-581) a repo main is ahead of, nothing in flight and no
+    failure or hold, is FYI too (`auto_row`), uncounted and snoozable, saying when the home will act —
+    *· auto on ·* and the reading's `acts` in its words — with **Promote now**; a failure or a hold is
+    drawn in its place, and a run in flight under `auto` draws nothing: the note says when it is live.
+    **A copy installed by hand** (`by_hand`, §6 *A copy installed by hand*) is FYI, uncounted, whatever
+    `auto` says: *live `<sha7>` = main · installed by hand — promote to tag it*, with Promote. There is
+    no Dismiss on any promote row (TD-1554).
     Aged from when main moved (`moved`, its head's committer time). Keyed `promote:<repo>` in the
     attention store, so Snooze is by time alone and more merges do not wake a snoozed row.
 
     **After a rollback** (§6 *A rollback*, TD-226 slice 3) the row is drawn while the home's `held`
     stands, whatever `auto` says, under *Needs you*: *live `<sha7>`, rolled back from `<sha7>` <t>
     ago · main … · auto on · held* — *rolled back*, never *behind*, since a person put live there;
-    its Dismiss ends the hold when no failure stands. A hold a failed smoke wrote (`by: smoke`, §6 *The
+    its Promote, once it concludes, ends the hold; a hold's row wins over a failure beside it (no retry
+    clause, no clock: the policy starts nothing under a hold). A hold a failed smoke wrote (`by: smoke`, §6 *The
     smoke*, TD-811) reads *rolled back by the smoke from `<sha7>` <t> ago — <why>*; a run in flight
     whose `check` read its commit (`phase: smoke`) reads *checking `<sha7>` live* on the row.
 
@@ -691,27 +697,43 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
         pre = pre if pre and pre.get("sha") == r.get("main") else None  # until main's head moves
         behind = bool(r.get("main")) and r.get("live") != r.get("main")
         auto_row = bool(r.get("auto")) and behind and not (failed or held or flight or pre)
-        if not failed and not held and not pre and not auto_row and (r.get("auto") or not (flight or behind)):
+        by_hand = bool(r.get("by_hand")) and not (failed or held or flight or pre)
+        blocks = promote_mod.blocks_of(failed)
+        # a failure main's head has moved past, under `auto` and no hold: the policy's own to retry (TD-1554)
+        retry = bool(failed) and bool(r.get("auto")) and not held and blocks != r.get("main")
+        if (
+            not failed
+            and not held
+            and not pre
+            and not auto_row
+            and not by_hand
+            and (r.get("auto") or not (flight or behind))
+        ):
             continue
         live = str(r.get("live") or "")[:7]
         main = str(r.get("main") or "")[:7]
         ahead = r.get("ahead")
         checks = str(r.get("checks") or "unknown")
         text = f"{repo} · live {live or 'unknown'}"
+        if by_hand:
+            text += " = main · installed by hand — promote to tag it"
         if held:
             frm, since = str(held.get("from") or "")[:7], _age(held.get("at"), at)
             by = " by the smoke" if held.get("by") == "smoke" else ""  # §6 *The smoke*: a failed smoke put it back
             text += f", rolled back{by} from {frm or 'unknown'}" + (f" {since} ago" if since else "")
             if by and held.get("why"):
                 text += f" — {held['why']}"
-        text += f" · main {main or 'unknown'}"
-        if isinstance(ahead, int) and ahead:
-            text += f", {ahead} commit{'' if ahead == 1 else 's'} ahead"
-        text += f" · checks failed on {str(pre['sha'])[:7]}" if pre else f" · checks {checks}"
+        if not by_hand:
+            text += f" · main {main or 'unknown'}"
+            if isinstance(ahead, int) and ahead:
+                text += f", {ahead} commit{'' if ahead == 1 else 's'} ahead"
+            text += f" · checks failed on {str(pre['sha'])[:7]}" if pre else f" · checks {checks}"
         if held:
             text += f" · auto {'on' if r.get('auto') else 'off'} · held"
-        elif auto_row:
+        elif auto_row or retry:
             text += " · auto on" + (f" · {w}" if (w := promote_mod.acts_words(r.get("acts"))) else "")
+        elif failed and r.get("auto") and blocks:
+            text += f" · auto retries when main moves past {blocks[:7]}"
         when = str(
             (failed or {}).get("at") or (flight or {}).get("at") or (held or {}).get("at") or r.get("moved") or ""
         )
@@ -728,15 +750,21 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
                 "age": _age(when, at),
                 "text": text,
                 "live_why": r.get("live_why") if not live else None,
-                "checks_why": r.get("checks_why"),
+                # a copy installed by hand reads no checks: its press goes through them (§4.5a, TD-1554)
+                "checks_why": None if by_hand else r.get("checks_why"),
                 # under `auto` the checks are the row's own words (*checks pending — promotes when green*)
-                "unmet": None if auto_row and (r.get("unmet") or {}).get("name") == "checks" else r.get("unmet"),
+                "unmet": None
+                if (auto_row or by_hand) and (r.get("unmet") or {}).get("name") == "checks"
+                else r.get("unmet"),
+                "auto": bool(r.get("auto")),
                 "auto_row": auto_row,
+                "by_hand": by_hand,
+                "retry": retry,
                 "failed": failed,
                 "held": held,
                 "precheck_failed": pre,
                 "inflight": flight,
-                "fyi": (bool(flight) and not failed and not pre) or auto_row,
+                "fyi": (bool(flight) and not failed and not pre) or auto_row or by_hand or retry,
                 "find": " ".join(x for x in (repo, "promote", text, (failed or {}).get("why") or "") if x),
             }
         )

@@ -98,7 +98,7 @@ def test_absent_on_main_with_one_and_three_met_starts_one_run_with_its_file_writ
         {"live": SHA},  # live is main's head
         {"tree": "the checkout has 1 uncommitted change"},  # (1)
         {"inflight": {"sha": OTHER}},  # (3)
-        {"failed": {"sha": OTHER}},
+        {"failed": {"sha": SHA, "blocks": SHA}},  # (3) for the policy: a failure blocks main's head (TD-1554)
         {"held": {"sha": OTHER}},
         {"main": None},
     ],
@@ -108,6 +108,14 @@ def test_it_starts_nothing_unless_every_condition_holds(fake, tmp_path, why):
     promote.precheck_on_main(tmp_path, "r", r, NOW)
     assert promote.precheck_run("r") is None and r.get("prechecking") is None
     assert r["checks"] == "unknown"
+
+
+def test_a_failure_at_an_older_commit_does_not_stop_the_precheck_on_main(fake, tmp_path):
+    """§6 *Promote* (TD-1554): a failure blocks only the commit it failed at, so main's head past it is
+    prechecked as the policy would promote it."""
+    r = _reading(failed={"sha": OTHER, "blocks": OTHER})
+    promote.precheck_on_main(tmp_path, "r", r, NOW)
+    assert r["prechecking"] == SHA
 
 
 def test_one_at_a_time_per_repo_with_main_moved_and_with_the_sync_passs_run(fake, tmp_path):
