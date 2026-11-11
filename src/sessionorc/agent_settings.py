@@ -147,7 +147,58 @@ class SettingsMixin:
                 "account": key,
             }
         max_age = settings_mod.usage(whole).get("max_age", settings_mod.MAX_AGE_DEFAULT)
-        return {"profiles": out, "file": str(settings_mod.settings_file()), "max_age": max_age}
+        accounts = self._gate_accounts(whole, raw, watched, now)
+        return {
+            "profiles": out,
+            "accounts": accounts,
+            "file": str(settings_mod.settings_file()),
+            "max_age": max_age,
+        }
+
+    def _gate_accounts(
+        self, whole: dict[str, Any], raw: dict[str, Any], watched: set[str], now: datetime
+    ) -> dict[str, Any]:
+        """The `gate` reply's `accounts` (§6 *The readers*, TD-1610): `{<key>: {profiles, billing, reserves |
+        amounts, windows, labels}}` — an account for each key under `usage_gate:`, each the adapters' profiles
+        name and each a node has reported under. One with no reading carries `windows: []`, so its card can
+        take a first reserve; an orphan key no profile names carries `profiles: []`, so it can be cleared. An
+        account whose profiles disagree on billing (§4.2a) is `billing: "mixed"`, each profile's in
+        `billings`, with both its percents and its amounts. A profile with unattended sessions live makes the
+        account's rows the gate's (`_gate_windows`), projected past `max_age` as the gate reads them."""
+        doc, amounts = settings_mod.reserves(whole), settings_mod.amounts(whole)
+        keys = {str(k) for k in raw if settings_mod.account_key(k)}
+        keys |= {k for p in self._gate_profiles() if (k := self._account_key(p)) is not None}
+        keys |= set(self._usage_remote_keys.values())
+        keys |= {k for accts in self._spend_named.values() for k in accts}
+        out: dict[str, Any] = {}
+        for key in sorted(keys):
+            on = self._account_on(key)
+            names, bills = sorted(on), set(on.values())
+            billing = "metered" if bills == {"metered"} else "subscription" if len(bills) <= 1 else "mixed"
+            entry: dict[str, Any] = {"profiles": names, "billing": billing}
+            if billing == "mixed":
+                entry["billings"] = dict(sorted(on.items()))
+            if billing != "subscription":
+                written = raw.get(key) if isinstance(raw.get(key), dict) else {}
+                mine = {label: written[label] for label in amounts.get(key) or {} if label in written}
+                first = next((p for p in names if p in self._usage), names[0] if names else "")
+                entry |= {"amounts": mine, "windows": self._amount_rows(first, mine), "labels": list(spend_mod.LABELS)}
+            if billing != "metered":
+                by_label = doc.get(key) or {}
+                reading = self._usage_acct.get(key) or next((self._usage[p] for p in names if p in self._usage), {})
+                windows = reading.get("windows")
+                if live := [p for p in names if p in watched]:
+                    windows = self._gate_windows(live[0], now, whole)
+                rows = settings_mod.lines(by_label, windows, now)
+                entry |= {
+                    "reserves": by_label,
+                    "labels": [str(w.get("label")) for w in windows or [] if isinstance(w, dict)],
+                    **({"fetched": reading["fetched"]} if reading.get("fetched") else {}),
+                    **({"source": reading.get("source") or "asked"} if reading.get("fetched") else {}),
+                }
+                entry["windows"] = rows if billing == "subscription" else [*entry["windows"], *rows]
+            out[key] = entry
+        return out
 
     def _gate_profiles(self) -> dict[str, bool]:
         """The profiles the `gate` reply lists, each to whether its adapter's `profiles()` bills it

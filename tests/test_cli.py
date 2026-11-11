@@ -2276,7 +2276,7 @@ def test_ao_gate_max_age_sets_the_setting(subprocess_agent, grind_profile, capsy
         assert settings_mod.load().get("usage") is None
         assert cli.main(["gate", "--max-age", "2h", "grind", "5h=30"]) == 0
         out = capsys.readouterr().out
-        assert out.startswith("max_age 2h: ") and "grind · 5h 30" in out
+        assert out.startswith("max_age 2h: ") and "claude-code:paul (grind) · 5h 30" in out
         monkeypatch.setenv("SHIFTLEAD_SESSION", "s-nobody")
         assert cli.main(["gate", "--max-age", "off"]) != 0
         assert settings_mod.load()["usage"] == {"max_age": "2h"}
@@ -2294,14 +2294,21 @@ def test_ao_gate_sets_shows_and_is_a_persons(subprocess_agent, grind_profile, tm
 
     monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
     assert cli.main(["gate"]) == 0
-    assert "no usage gate" in capsys.readouterr().out
+    # one line per account, its profiles named (§4.7 `ao gate`, TD-1610): one with no reserve says so
+    assert capsys.readouterr().out == "claude-code:paul (grind) · no reserves\n"
     assert cli.main(["gate", "grind", "5h=30", "week=10/day"]) == 0
     out = capsys.readouterr().out
-    assert "grind · 5h 30 → no reading yet" in out and "not checked" in out  # no reading for `grind` here
+    # a profile's name resolves to its account, and the reply names the account and its profiles
+    assert "claude-code:paul (grind) · 5h 30 → no reading yet" in out and "not checked" in out
     assert cli.main(["gate"]) == 0
-    assert "grind · 5h 30 → no reading yet · week 10/day → no reading yet" in capsys.readouterr().out
+    assert "claude-code:paul (grind) · 5h 30 → no reading yet · week 10/day → no reading yet" in capsys.readouterr().out
     assert cli.main(["--json", "gate"]) == 0
-    assert json.loads(capsys.readouterr().out)["profiles"]["grind"]["reserves"] == {"5h": 30, "week": {"per_day": 10}}
+    got = json.loads(capsys.readouterr().out)
+    assert "profiles" not in got, "`ao gate --json` is the reply's accounts"
+    assert got["accounts"]["claude-code:paul"]["reserves"] == {"5h": 30, "week": {"per_day": 10}}
+    assert got["accounts"]["claude-code:paul"]["profiles"] == ["grind"]
+    assert cli.main(["gate", "claude-code:paul", "week=5/day"]) == 0  # the account by its key
+    assert "claude-code:paul (grind) · 5h 30 → no reading yet · week 5/day" in capsys.readouterr().out
     assert cli.main(["gate", "grind", "5h=", "week="]) == 0
     assert "no reserves" in capsys.readouterr().out
     assert cli.main(["--json", "new", "w", "-a", "shell", "-d", str(tmp_path), "--unattended"]) == 0
