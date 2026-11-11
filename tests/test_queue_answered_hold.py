@@ -20,7 +20,7 @@ ANSWERED = NOW - timedelta(minutes=30)
 def _q(about: str | None = "TD-001", *, mid: str = "m-1", at=ANSWERED, outcome=None, asker: str = "ao-r-designer",
        reason: str = "replied", kind: str = "ask", text: str = "Lift the hold?") -> MailEntry:  # fmt: skip
     """A question from `asker` to the person, answered at `at` (the home's `closed_at`)."""
-    e = MailEntry(id=mid, from_=f"{asker}@kmaster", to=["person"], at=(at - timedelta(hours=1)).isoformat(),
+    e = MailEntry(id=mid, from_=asker, to=["person"], at=(at - timedelta(hours=1)).isoformat(),
                   kind=kind, text=text, about=about)  # fmt: skip
     e.closed_reason, e.closed_at = reason, at.isoformat().replace("+00:00", "Z")
     e.outcome = outcome
@@ -123,13 +123,14 @@ def _asker_in(repo: str) -> Session:
     return s
 
 
-def test_a_bare_id_links_only_where_one_repo_carries_it_open(tmp_path):
-    """An asker whose record names no repo: its bare id is looked up by the one-repo rule."""
+def test_a_bare_id_with_no_repo_links_nowhere_and_a_qualified_one_links(tmp_path):
+    """An asker whose record names no repo, with no stamp and no team: the question is no repo's, so its bare id
+    links nothing even where one repo alone carries it open; a `<repo>#` ref links (§4.5 screen 6, TD-1541)."""
     nowhere = [_asker_in("")]
     a, ra = _held(tmp_path, "alpha", written=ANSWERED - timedelta(hours=2))
     b, rb = _repo(tmp_path, "beta", [_entry(2, "another", Priority="Low")])
     _, cards = _top({a: ra, b: rb}, [_q()], nowhere)
-    assert cards["alpha#TD-001"]["top"]["answered"] is not None
+    assert cards["alpha#TD-001"]["top"]["answered"] is None, "one repo alone: no repo's bare id still links none"
     c, rc = _repo(tmp_path, "gamma", [_entry(1, "gamma's own TD-001", Priority="Low")])
     _, cards = _top({a: ra, c: rc}, [_q()], nowhere)
     assert cards["alpha#TD-001"]["top"]["answered"] is None, "two repos' TD-001: no link"

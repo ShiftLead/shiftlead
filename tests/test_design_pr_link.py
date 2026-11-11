@@ -138,7 +138,10 @@ def test_a_mail_item_a_board_line_and_a_held_row_link_it_and_the_rest_do_not():
     assert design_link(mail("m5", "read it", about="#12"), idx) == {}  # an about of #n names no entry
     assert design_link(mail("m6", "TD-20 in the words only"), idx) == {}  # never the words
     assert design_link(mail("m7", "the other repo's", about="other#TD-20"), idx) == {}  # its own repo wins
-    assert design_link(mail("m8", "s's", about="TD-20"), idx, {"m8": "other"}) == {}  # the sender's repo's
+    assert design_link(mail("m8", "s's", about="TD-20", repo=None), idx, {"m8": "other"}) == {}  # the sender's repo's
+    # with no repo, a bare `about` links nothing and a qualified ref after it is the one read (TD-1541)
+    assert design_link(mail("m9", "?", about="TD-20", repo=None), idx) == {}
+    assert design_link(mail("m10", "?", about="TD-20, s#TD-30", repo=None), idx)["design_pr"] == 7
     line = {
         "row": "board",
         "id": "b1",
@@ -225,8 +228,8 @@ def test_a_bare_ref_is_looked_up_only_where_one_repo_holds_the_id():
     q["design_prs"] = {"s#TD-020": {"n": 12, "root": "", "only": False}}
     idx = card_index(q)
     assert DESIGN_KEY + "TD-020" not in idx and idx[DESIGN_KEY + "s#TD-020"] == ("12", "")
-    assert design_link(mail("m1", "?", about="TD-20"), idx) == {}
-    assert design_link(mail("m2", "?", about="TD-20"), idx, {"m2": "s"})["design_pr"] == 12
+    assert design_link(mail("m1", "?", about="TD-20", repo=None), idx) == {}
+    assert design_link(mail("m2", "?", about="TD-20", repo=None), idx, {"m2": "s"})["design_pr"] == 12
     e = lambda tid, repo: {"id": tid, "repo": repo, "design_pr": [3]}  # noqa: E731
     got = design_prs(
         {}, {}, {"s#TD-020": e("TD-20", "s"), "s#TD-021": e("TD-21", "s")}, {"b#TD-020": {"id": "TD-20", "repo": "b"}}

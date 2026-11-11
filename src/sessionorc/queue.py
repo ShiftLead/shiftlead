@@ -26,6 +26,7 @@ from sessionorc import naming, witness, workorders
 from sessionorc import rank as rank_mod
 from sessionorc import synopsis as synopsis_mod
 from sessionorc.mail import LEASE_TTL
+from sessionorc.models import PERSON as PERSON_ADDRESS
 from sessionorc.reports import branch_ref
 
 # A red PR nobody holds reads *stalled* this long after its `red_since` (§4.4 *A row's state*): the
@@ -296,11 +297,13 @@ def holder_claims(holds: Any, index: Mapping[str, tuple[str, str]]) -> dict[str,
 
 def own_refs(found: Iterable[str], repo: str | None) -> list[str]:
     """`found` (`refs`'s) with each bare `TD-n` read as `repo`'s, `<repo>#TD-n` (§4.5 screen 6 *A bare ref
-    elsewhere*, TD-1509): a row that names its repo never draws on another repo's card; no `repo` leaves them bare,
-    looked up by `card_index`'s one-repo rule."""
+    elsewhere*, TD-1509): a row that names its repo never draws on another repo's card; with no `repo` it is read as
+    no repo's (§4.5 screen 6 *A mail item's bare ref is its sender's repo's*, TD-1541) — only the refs written
+    qualified are kept, so a bare one matches no key, the one choke point every reader of a mail item's refs
+    shares."""
     found = list(found)
     if not repo:
-        return found
+        return [r for r in found if "#" in r]
     return list(dict.fromkeys(r if "#" in r else f"{repo}#{r}" for r in found))
 
 
@@ -335,46 +338,111 @@ def record_repo(repo: Any, dir: Any, roots: Iterable[str], names: Mapping[str, s
     return next((n for n, r in (names or {}).items() if _same_dir(root, r)), None) or name
 
 
-def mail_repo(q: Any, records: Mapping[str, Any], name_of: Callable[[Any], str]) -> str | None:
+def mail_repo(
+    q: Any,
+    records: Mapping[str, tuple[str, Any]],
+    name_of: Callable[[str, Any], str],
+    teams: Mapping[str, str] | None = None,
+    home: str = "",
+) -> str | None:
     """The entry's entry point of the repo helper (§4.10, §4.5 screen 6 *A mail item's bare ref is its sender's
-    repo's*, TD-1467), the one place its order is written: its stamped `repo` (a name, as the send wrote it), else its
-    orphan stamp's `repo` (TD-213: the asker's checkout then), else its sender's live record's `repo` — `records`,
-    `{bare id: root}` — each root named by `name_of`; None where all three find none, and its bare refs stay bare.
-    `item_home` reads it through `asker_repos`, `answered_hold` per question, and Telegram's link alike."""
+    repo's*, TD-1467, TD-1541), the one place its order is written: its stamped `repo` (a name, as the send wrote it),
+    else its orphan stamp's `repo` (TD-213: the asker's checkout then), named with the stamp's `host` as a pair (the
+    home's where empty), else its sender's record — `records`, `{address: (host, root)}`, each record keyed by its
+    whole address (`<id>@<host>` for another host's, the bare id for the home's, the pair's host empty for a bare
+    key) — found by `from` as written, then by its bare id only where `from` is bare or names `home`, the home's own
+    host, so an item from `x@node` whose record is gone never reads the home's `x`; an item the person sent reads its
+    first addressee the same way. Each pair named by `name_of(host, root)`. Failing those, its envelope's `team`
+    (`teams`, `team_repos`'). None where all find none: its bare refs are then read as no repo's (`own_refs`)."""
     if stamped := str(_get(q, "repo") or "").strip():
         return stamped
     orphaned = _get(q, "orphaned")
-    if isinstance(orphaned, Mapping) and (name := name_of(orphaned.get("repo"))):
+    if (
+        isinstance(orphaned, Mapping)
+        and orphaned.get("repo")
+        and (name := name_of(_home_host(orphaned.get("host"), home), orphaned.get("repo")))
+    ):
         return name
-    return name_of(records.get(naming.split_address(str(_get(q, "from_") or ""))[0])) or None
+    sender = str(_get(q, "from_") or "").strip()
+    if sender == PERSON_ADDRESS:
+        to = _get(q, "to")
+        to = to if isinstance(to, (list, tuple)) else [to]
+        sender = str(to[0] or "").strip() if to else ""
+    if sender:
+        bare, host = naming.split_address(sender)
+        got = records.get(sender)
+        if got is None and (host is None or (home and host == home)):
+            got = records.get(bare)
+        if got is not None and (name := name_of(*got)):
+            return name
+    team = str(_get(q, "team") or "").strip()
+    return (teams or {}).get(team) or None if team else None
+
+
+def _home_host(host: Any, home: str) -> str:
+    """A host as a record pair writes it: empty for the home's own (an empty one, or `home`), else as given."""
+    host = str(host or "").strip()
+    return "" if not host or (home and host == home) else host
+
+
+def record_keys(records: Iterable[Any], home: str = "") -> dict[str, tuple[str, str, str]]:
+    """`{address: (host, root, team)}` of the caller's records (§4.5 screen 6 *A mail item's bare ref is its sender's
+    repo's*, TD-1541), each keyed by its whole address: a view dict's `id` as given (the home's view writes
+    `<id>@<host>` for another host's record, the bare id for its own); a `Session`'s `id`, with `@<host>` added where
+    its `host` is set and is not `home`. The pair's host is the key's — empty for a bare key — never a view dict's own
+    `host` field; its root the record's `repo`, else its `dir`, as the send's stamp reads it. A record with no root is
+    left out."""
+    out: dict[str, tuple[str, str, str]] = {}
+    for r in records:
+        rid = str(_get(r, "id") or "").strip()
+        root = str(_get(r, "repo") or _get(r, "dir") or "")
+        if not rid or not root:
+            continue
+        if not isinstance(r, Mapping) and (h := _home_host(_get(r, "host"), home)):
+            rid = f"{naming.split_address(rid)[0]}@{h}"
+        host = naming.split_address(rid)[1] or ""
+        out.setdefault(rid, (host, root, str(_get(r, "team") or "").strip()))
+    return out
+
+
+def team_repos(keyed: Mapping[str, tuple[str, str, str]], name_of: Callable[[str, Any], str]) -> dict[str, str]:
+    """`{team: repo}`, the team step of `mail_repo`'s order (§4.5 screen 6, TD-1541): every record in `keyed`
+    (`record_keys`' shape) with a `team`, of any role, named by `name_of(host, root)` — a record whose root names
+    none skipped, one with no `team` ignored; a team whose records name exactly one repo maps to it, one naming
+    several (a seat in another repo's checkout) is left out, the safe side."""
+    seen: dict[str, set[str]] = {}
+    for host, root, team in keyed.values():
+        if team and (name := name_of(host, root)):
+            seen.setdefault(team, set()).add(name)
+    return {t: next(iter(ns)) for t, ns in seen.items() if len(ns) == 1}
 
 
 def asker_repos(
-    questions: Iterable[Any], records: Iterable[Any], roots: Mapping[str, str] | None = None
+    questions: Iterable[Any], records: Iterable[Any], roots: Mapping[str, str] | None = None, host: str = ""
 ) -> dict[str, str]:
     """`{mail id: repo}` for the person inbox's items (§4.5 screen 6 *A bare ref elsewhere*, TD-1509; *A mail item's
-    bare ref is its sender's repo's*, TD-1467): each item's repo by `mail_repo`'s order — its stamped `repo`, else its
-    orphan stamp's, else its asker's record's (`from_` looked up in `records`: live, ended or kept; `Session`s or
-    their view dicts) — a checkout's root named as the reading names it (`roots`, `{name: root}`, the repo whose
-    root it is) or else by its last component. An item with none is left out, and its bare refs stay bare."""
-    named: dict[str, str] = {}
+    bare ref is its sender's repo's*, TD-1467, TD-1541): each item's repo by `mail_repo`'s order — its stamped
+    `repo`, else its orphan stamp's, else its sender's record (`records`: live, ended or kept; `Session`s or their
+    view dicts, keyed by `record_keys` against `host`, the home's own host, which the home's callers pass and the
+    UI's need not), else its team's one repo (`team_repos`). A root is named as the readings name it (`roots`,
+    `{name: root}`), else — on the home's own host alone — by its last component; a node's path never by the name
+    it happens to end in. An item with none is left out, and its bare refs are read as no repo's."""
+    named: dict[tuple[str, str], str] = {}
 
-    def name_of(root: Any) -> str:
-        key = str(root or "")
-        if key and key not in named:
-            hit = next((n for n, r in (roots or {}).items() if _same_dir(key, r)), None)
-            named[key] = hit or _repo_name(key)
+    def name_of(h: str, root: Any) -> str:
+        key = (str(h or ""), str(root or ""))
+        if key[1] and key not in named:
+            hit = next((n for n, r in (roots or {}).items() if _same_dir(key[1], r)), None)
+            named[key] = hit or (_repo_name(key[1]) if not key[0] or key[0] == host else "")
         return named.get(key, "")
 
-    by_id: dict[str, Any] = {}
-    for r in records:
-        rid, root = _get(r, "id"), _get(r, "repo")
-        if rid and root:
-            by_id.setdefault(str(rid), root)
+    keyed = record_keys(records, host)
+    teams = team_repos(keyed, name_of)
+    pairs = {k: (h, root) for k, (h, root, _t) in keyed.items()}
     out: dict[str, str] = {}
     for q in questions:
         mid = _get(q, "id")
-        if mid and (repo := mail_repo(q, by_id, name_of)):
+        if mid and (repo := mail_repo(q, pairs, name_of, teams, host)):
             out[str(mid)] = repo
     return out
 
@@ -499,20 +567,15 @@ _GONE = ("exited", "closed")
 
 def open_refs(qids: Iterable[str], origins: Mapping[str, str] | None = None) -> dict[str, str]:
     """The open members' index an answered question links through (§4.4 *The card's status*, TD-1316): each
-    `<repo>#TD-n` to itself, `<origin path>#TD-n` to it where `origins` give the repo one (TD-1371), and the
-    bare `TD-n` to it only where exactly one open member across the repos carries it — two repos' `TD-n` link
-    to neither."""
+    `<repo>#TD-n` to itself, and `<origin path>#TD-n` to it where `origins` give the repo one (TD-1371). It has no
+    bare `TD-n` key: a mail item's bare ref is its sender's repo's or no repo's (`own_refs`, TD-1541), and a board
+    line's is its own board's (`_line_qid`)."""
     out: dict[str, str] = {}
-    bare: dict[str, set[str]] = {}
     for q in qids:
         out[q] = q
         name, _, tid = q.partition("#")
         if path := (origins or {}).get(name):
             out.setdefault(f"{path}#{tid}", q)
-        bare.setdefault(tid, set()).add(q)
-    for tid, qs in bare.items():
-        if len(qs) == 1:
-            out[tid] = next(iter(qs))
     return out
 
 
@@ -1014,6 +1077,7 @@ def reading(
     doing: Mapping[str, list[Mapping[str, Any]]] | None = None,
     questions: Iterable[Any] = (),
     archived: Mapping[str, list[dict[str, Any]]] | None = None,
+    host: str = "",
 ) -> dict[str, Any]:
     """The `queue` reading (§4.4 *The Queue*): `{cards, completed, other_work, origins, at}`.
 
@@ -1041,14 +1105,15 @@ def reading(
     entry touches, closed within `COMPLETED_WINDOW`, newest first. `other_work` is each live claim that
     names no open entry (`board:<key>`, a PR naming none), with its holder. `origins` maps each repo's name to its
     origin path, for a repo with a readable origin (`card_index`, TD-1371); `design_prs` the design PR an item about
-    each entry links (`design_prs`, TD-1531)."""
+    each entry links (`design_prs`, TD-1531). `host` is the home's own host name, against which `records` (other
+    hosts' among them, `host` set) are keyed (`asker_repos`, TD-1541)."""
     rs = _Repos(repos)
     records = list(records)
     # every record's state by id, ended ones too: an answered question's asker exited or closed is gone (TD-1316)
     states = {str(r.id): str(getattr(r, "state", "") or "") for r in records}
     names = {str(r.id): str(getattr(r, "name", "") or r.id) for r in records}
     questions = list(questions)
-    askers = asker_repos(questions, records, rs.roots)  # a question's bare `TD-n` is its asker's repo's (TD-1509)
+    askers = asker_repos(questions, records, rs.roots, host)  # a bare `TD-n` is its asker's repo's (TD-1509, TD-1541)
     recs = [r for r in records if getattr(r, "state", "") not in ("exited", "closed") and not r.superseded_by]
     open_: dict[str, dict[str, Any]] = {}
     for name, r in rs.by_name.items():

@@ -304,3 +304,44 @@ async def test_a_question_passed_up_on_a_thread_carries_the_asks_pr_and_repo(age
         assert all(e.closed_reason == "merged" for e in _copies(agent, up2["id"]))
         for sid in (w, tl, loose):
             await person.call("kill", id=sid)
+
+
+async def test_the_settle_names_by_team_by_graph_address_and_keeps_two_hosts_paths_apart(agent, tmp_path, monkeypatch):
+    """TD-1561 (§4.10 *A question the work settled closes itself*, §4.5 screen 6): a pre-stamp item whose sender is
+    gone is named by its team's one repo; a node's sender is found by its graph address and named by the node's
+    roster; a home record and a node record at one path are named apart, by `(host, root)`."""
+    from sessionorc.models import Session
+
+    alpha, beta = tmp_path / "alpha", tmp_path / "beta"
+    alpha.mkdir(), beta.mkdir()
+    _registry(tmp_path, alpha)  # the home registers alpha; the node registers beta
+
+    async def roster(host):
+        return [str(beta)] if host == "node" else []
+
+    monkeypatch.setattr(agent, "_host_roster", roster)
+    async with LocalClient() as person:
+        w = await _mk(person, alpha / ".claude" / "worktrees" / "g", "g")
+        y = await _mk(person, beta, "y")  # the home's record at beta, a path the home does not register
+        agent.sessions[w].team = "t"
+        async with LocalClient(caller=w) as c:
+            ids = [(await c.call("msg", to="person", text=f"merge {i}?", kind="ask"))["entry"]["id"] for i in range(4)]
+        team, remote, home_y, gone = ids
+        node_z = Session(id="z", name="z", kind="interactive", adapter="shell", dir=str(beta), host="node")
+        agent.remote["node"] = {"z": node_z}
+        try:
+            agent._mark(team, pr=164, repo=None, from_="ghost", team="t")
+            agent._mark(remote, pr=165, repo=None, from_="z@node")
+            agent._mark(home_y, pr=165, repo=None, from_=y)
+            agent._mark(gone, pr=164, repo=None, from_="ghost", team="u")
+            agent._repos = {str(alpha): _reading(merged=[164]), str(beta): _reading(merged=[165])}
+            await agent._settle_by_work()
+            closed = {e.id: e.closed_reason for e in agent.person_inbox if e.id in ids}
+            assert closed[team] == "merged", "its team's one repo"
+            assert closed[remote] == "merged", "a node's sender by its graph address, named by the node's roster"
+            assert closed[home_y] is None, "the home's record at the same path: the home registers none there"
+            assert closed[gone] is None, "no stamp, no record, a team naming none: the person's"
+        finally:
+            agent.remote.pop("node", None)
+            for sid in (w, y):
+                await person.call("kill", id=sid)

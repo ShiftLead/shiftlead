@@ -84,8 +84,10 @@ def item_home(
 
     A bare `TD-n` is its own repo's wherever the row names one (screen 6 *A bare ref elsewhere*, TD-1509): a board
     line's `repo_name`, a red PR's or a fork PR's `repo`, a mail item's sender's repo (`askers`, `{mail id: repo}`,
-    `asker_repos`: its stamped `repo`, else its orphan stamp's, else its sender's record's, TD-1467); a row with
-    none is looked up bare, by `card_index`'s one-repo rule.
+    `asker_repos`: its stamped `repo`, else its orphan stamp's, else its sender's record's, else its team's one
+    repo, TD-1467, TD-1541). A mail item with none is read as no repo's (`own_refs`): its bare refs match no key and
+    make no loose card, so it draws in the Inbox unless a ref it writes qualified draws it; a board line with no
+    repo is looked up bare, by `card_index`'s one-repo rule.
 
     `needs` says the item needs the person (an open `ask` or `steer` to them, an undecided Decide or Do line;
     `needs_person`, the caller's): one whose refs no open card holds draws on the completed card that holds the
@@ -149,7 +151,7 @@ def item_home(
         # a bare `TD-n` is its sender's repo's (`askers`: the entry's stamped `repo`, else its orphan stamp's, else
         # its sender's live record's, TD-1467), and its home the first of its refs an open card holds, `about`'s
         # first, the later held ones its mentions — never the first ref alone (§4.5 screen 6)
-        repo = (askers or {}).get(str(e.get("id") or ""))
+        repo = str(e.get("repo") or "").strip() or (askers or {}).get(str(e.get("id") or ""))
         words = f"{e.get('subject') or ''} {e.get('text') or ''}"
         refs, by = held_refs(e.get("about"), words, index, repo)
         named, about = named_refs(e.get("about"), words, repo)
@@ -220,7 +222,8 @@ def design_link(
     """`{design_pr, design_pr_url, synopsis}` for an item about a design (§4.5 screen 6 *An item about a design links
     the design's PR*, §4.5a *Queue card: what needs the person*, TD-1531), else {}: a mail item (`ask`, `steer`,
     `note`) by its `about`'s first ref, a board line by its `Context:`'s first, a held ledger row by its own id —
-    the ref qualified by the item's repo (a mail item's sender's, `askers` as `item_home` reads it; a board line's
+    the ref qualified by the item's repo (a mail item's sender's, `askers` as `item_home` reads it, and with none
+    only a ref written qualified, `own_refs`, TD-1541; a board line's
     `repo_name`; a ledger row's `name`) unless it names its own, and looked up in `card_index`'s `design:` keys,
     apart from any card. An item whose own `pr` is that number carries no `design_pr`; `design_pr_url` is the link where
     the entry's repo's origin says where it is (`review.pr_url`), else ''. `synopsis` is `synopsis_view` of the
@@ -239,7 +242,10 @@ def design_link(
     elif kind or e.get("kind") not in DESIGN_MAIL:
         return {}
     else:
-        got, repo = _refs(e.get("about")), str((askers or {}).get(str(e.get("id") or "")) or "")
+        # its sender's repo, else no repo's: a bare ref then drops and a qualified one reads as written (TD-1541)
+        own = str(e.get("repo") or "").strip() or (askers or {}).get(str(e.get("id") or ""))
+        got = own_refs(_refs(e.get("about")), own or None)
+        repo = ""
     if not got:
         return {}
     ref = got[0] if "#" in got[0] or not repo else f"{repo}#{got[0]}"
