@@ -10,6 +10,7 @@ import subprocess
 import sys
 
 import pytest
+import yaml
 from conftest import CHILD, FAST_TICK, kill_private_server, private_socket_name, scratch_dir, wait_for
 
 from sessionorc import link, paths, seats
@@ -2192,6 +2193,9 @@ async def test_a_nodes_metered_turns_are_ledgered_at_the_home_once_and_its_readi
         await park_ticks(node)
         assert await wait_for(lambda: node._snapshot_sent, timeout=10.0, step=0.05)
         settings.save({"usage_gate": {"api": {"day": "$5"}}})  # the node's replica, as the home would send it
+        # and the home's own, which the next dial replicates whole (it holds td-max's stamp from its start)
+        hs = home.dir / "settings.yml"
+        hs.write_text(yaml.safe_dump({**(yaml.safe_load(hs.read_text()) or {}), "usage_gate": {"api": {"day": "$5"}}}))
         async with LocalClient() as c:
             w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, profile="api")
         await node._refresh_spend_inner()  # the read, then the seeding: cursors only

@@ -112,12 +112,13 @@ async def test_set_settings_leaves_one_commit_and_a_failed_commit_leaves_the_wri
         def boom(*a, **k):
             raise OSError("disk full")
 
+        n = len(_log(home, "settings.yml"))  # with the first tracking, which holds td-max's stamp from the start
         monkeypatch.setattr(defs, "commit", boom)
         got = await person.call("set_settings", person={"open_in": "window"})
         await _committed(agent)
         assert got["person"]["open_in"] == "window", "the write stands"
     assert "window" in (home / "settings.yml").read_text()
-    assert len(_log(home, "settings.yml")) == 1, "the failed commit made none"
+    assert len(_log(home, "settings.yml")) == n, "the failed commit made none"
 
 
 async def test_a_wedged_commit_holds_no_save(agent, monkeypatch):

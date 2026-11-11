@@ -29,6 +29,7 @@ from __future__ import annotations
 import math
 import os
 import re
+from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -392,6 +393,26 @@ def parse_scale(value: Any, drop: bool = False) -> dict[str, Any]:
             if not drop:
                 raise ValueError(f"scale.migrated is a date, not {got['migrated']!r}") from None
     return out
+
+
+def migrate_scale(doc: dict[str, Any], known: Iterable[str], today: str) -> list[str] | None:
+    """td-max's one-time write (§4.9 *On by default, with default ceilings*, TD-1545): with no `scale.migrated`
+    stamp in `doc`, `max: off` for every team it knows — each key under `teams:` and each of `known`, the
+    teams a record carries — and the stamp `today`, in place, in the one document the caller saves; the teams
+    written, sorted. None where the stamp stands: a home that finds it writes nothing, so a team defined or
+    first started later is on td-max."""
+    raw = doc.get("scale")
+    if isinstance(raw, dict) and raw.get("migrated"):
+        return None
+    teams = doc.get("teams") if isinstance(doc.get("teams"), dict) else {}
+    names = sorted({str(n) for n in teams} | {str(n) for n in known if n})
+    for name in names:
+        t = teams.get(name)
+        teams[name] = {**(t if isinstance(t, dict) else {}), "max": "off"}
+    if teams:
+        doc["teams"] = teams
+    doc["scale"] = {**(raw if isinstance(raw, dict) else {}), "migrated": today}
+    return names
 
 
 def scale(doc: dict[str, Any]) -> dict[str, Any]:

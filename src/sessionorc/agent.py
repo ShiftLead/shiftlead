@@ -39,6 +39,7 @@ from sessionorc import (
     brief,
     build,
     containers,
+    defs,
     hosts,
     identity,
     ledgerboard,
@@ -966,6 +967,8 @@ class HostAgent(
         self._witness_loop = asyncio.get_running_loop()
         self._witness_begin()
         await asyncio.to_thread(self._recover_reaps)  # a reap a promote cut off (§4.1, TD-979)
+        if self.mode == "home":
+            await self._migrate_scale()  # td-max's one-time `max: off` (§4.9, TD-1545)
         # `limit`: a link's frame is one line, and a node's snapshot outgrows asyncio's 64 KiB default
         server = await asyncio.start_unix_server(self._handle_conn, sock=_bound(sock), limit=link.FRAME_LIMIT)
         log.info("listening on %s", sock)
@@ -1003,6 +1006,44 @@ class HostAgent(
             for lsock, _ in link_servers:
                 with contextlib.suppress(FileNotFoundError):
                     lsock.unlink()
+
+    async def _migrate_scale(self) -> None:
+        """td-max's one-time write, the host agent's one exception to *written only by `set_settings`* (§4.9
+        *On by default, with default ceilings*, §5, TD-1545): at the home's first start on this build, with
+        no `scale.migrated` stamp, `max: off` for every team it knows — a key under `teams:`, or a record
+        carrying `team` — and the stamp, in one write, committed to the definitions history as any settings
+        write; the held extras of each team it writes `off` are dropped in the same pass. A broken or
+        unwritable `settings.yml` is left as it is, and tried again at the next start: the start goes on."""
+        try:
+            known = [r.team for r in self.sessions.values()]
+            got = await asyncio.to_thread(self._migrate_scale_write, known)
+            if got is None:
+                return
+            written, message = got
+            off = set(written)
+            for r in list(self.sessions.values()):
+                if r.scale and r.team in off and r.state == "closed":
+                    self._forget(r.id)  # an extra a Start wrote between the install and this start (§4.9)
+        except Exception:  # noqa: BLE001 — a failed migration is a log line, never a home that does not start
+            log.exception("td-max's migration failed: it is tried again at the next start")
+            return
+        await self._commit_defs(message, ("settings.yml",))
+
+    @staticmethod
+    def _migrate_scale_write(known: list[str]) -> tuple[list[str], str] | None:
+        """`_migrate_scale`'s file half, in a thread: the teams written `off` and the history's message, or None."""
+        doc = settings_mod.read() if settings_mod.settings_file().exists() else {}
+        if doc is None:
+            log.warning("settings.yml is not a mapping: td-max's migration waits for the next start")
+            return None
+        before = copy.deepcopy(doc)
+        today = datetime.now().astimezone().date().isoformat()  # the home's local day, as the ledger's dates
+        written = settings_mod.migrate_scale(doc, known, today)
+        if written is None:
+            return None
+        settings_mod.save(doc)
+        log.info("td-max: max: off written for %d team(s), stamped scale.migrated %s", len(written), today)
+        return written, defs.settings_message(before, doc)
 
     async def _bind_links(self) -> list[tuple[Path, asyncio.AbstractServer]]:
         """The home's per-node link sockets (design §4.4a "A container node", TD-057 step 3c): one
