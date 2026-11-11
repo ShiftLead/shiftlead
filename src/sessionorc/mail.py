@@ -690,9 +690,9 @@ def message_gate(
     `message_edge`'s eight edges and nothing else, refused by naming §4.10's graph rather than
     invariant 11: messaging is not acting. An `ask` passing the question-seat edge alone is one open
     question per sender per seat: the sender counted along its `superseded_by` chain, the count read
-    in the target's inbox, since a seat's mail moves with its fills (TD-995), and in its extras' (TD-1547). A sender with no agent
-    (`agentless`, the person's own shell) sends a `note` alone on the own edge: its target could not
-    reply into it (TD-1116). Returns the refusal, or None when the message may land."""
+    in the target's inbox, since a seat's mail moves with its fills (TD-995), and in its extras' (TD-1547).
+    A sender with no agent (`agentless`, the person's own shell) sends a `note` alone on the own edge: its
+    target could not reply into it (TD-1116). Returns the refusal, or None when the message may land."""
     if sender == PERSON or target == PERSON:
         return None  # the person inbox is ungated (§4.10 "A session reaches a person")
     if sender == target:
