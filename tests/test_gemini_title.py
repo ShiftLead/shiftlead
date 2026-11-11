@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from conftest import wait_for
+from conftest import park_ticks, wait_for
 
 from sessionorc import adapters, agent_common, agent_tick
 from sessionorc import screen as screen_mod
@@ -336,6 +336,7 @@ async def test_explain_on_a_live_record_at_the_box_gives_the_rules_reason(agent,
         ex = await c.call("explain", id=s["id"])
         assert ex["match"]["rule"] == "gemini-usage-limit" and ex["match"]["modal"] is True
         assert ex["reason"] == "rule gemini-usage-limit matched, applied as scraped; held for its screen"
+        await park_ticks(agent)  # scraped once; a tick would scrape over the hand-set confidence below (TD-1677)
         # a hook within a tick outranks the rule; the poll's limited at `hook` is kept (TD-954)
         agent._last_hook[s["id"]] = datetime.now(UTC) + timedelta(seconds=5)  # within a tick however slow the call
         ex = await c.call("explain", id=s["id"])

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -32,6 +33,16 @@ def client(monkeypatch, tmp_path, hold=0.0, moves=None):
         {**g1, "tail": ["c"], "progress": []},
     ]
     replies = {"repos": {root: reading(root)}, "doing_log": {}, "list": [g1, g2], "usage": {}, "host": {}}
+    from shiftlead.ui import fanout
+
+    runs: list[fanout.Run] = []
+    real_init = fanout.Run.__init__
+
+    def init(self, *a, **k):
+        real_init(self, *a, **k)
+        runs.append(self)
+
+    monkeypatch.setattr(fanout.Run, "__init__", init)
 
     class Fake:
         def __init__(self, *a, **k):
@@ -52,7 +63,12 @@ def client(monkeypatch, tmp_path, hold=0.0, moves=None):
             await asyncio.sleep(hold)  # for the pages that join the one subscription before it pushes
             for s in pushed:
                 yield {"event": "session", "session": s}
-            await asyncio.sleep(1.6)  # one HEADS_EVERY and some: the flush's turn
+            # the flush's turn: open until the groups the last delta left due are read and sent, never a fixed
+            # sleep — a loaded suite outran 1.6 s against HEADS_EVERY's 1 s (TD-1677). The flush clears `dirty`
+            # under the lock and puts its event before releasing it
+            end = time.monotonic() + 10
+            while any(r.dirty.is_set() or r.lock.locked() for r in runs) and time.monotonic() < end:
+                await asyncio.sleep(0.02)
 
     from shiftlead.ui import app as ui
 
