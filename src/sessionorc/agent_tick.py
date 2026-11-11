@@ -367,6 +367,7 @@ class TickMixin:
         await self._schedules(snapshot_at)
         await self._work_marks(snapshot_at)
         await self._sweep_mail(snapshot_at)
+        await self._seat_move(snapshot_at)  # before routing around: a scaled seat's records first (§4.9, TD-1547)
         await self._reroute_waiting(snapshot_at)  # after the sweep: an expired ask is not moved (§4.9b, TD-1480)
         await self._stuck_pass(snapshot_at)  # after rule 3's pass, whose `unfillable` it reads (§6 rule 13)
         self._missed_pass()  # a send that did not land, read every tick (§6 rule 13, TD-1498)

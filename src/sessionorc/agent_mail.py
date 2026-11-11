@@ -394,6 +394,66 @@ class MailMixin:
         rank = {"exited": 1, "closed": 2}  # live first, then on call, then closed
         return min(leads, key=lambda r: (rank.get(r.state, 0), r.name))
 
+    async def _seat_move(self, now: datetime) -> None:
+        """Once a tick, at the home, before routing around (§4.9 *Mail to a scaled seat*, §6 rule 3 *An extra seat*,
+        TD-1547): an unread open `ask` on a scaled seat's record is chosen a record again by the send's rules
+        (`_seat_pick`, `seat_send.choose`) and moved there where that is another record of the seat — mail left on
+        an extra that is not live (held, closed, or `exited` and not restarted) to the first free live record in
+        place order, else to the own record; mail on the own record, live and busy with every live extra busy, to a
+        held extra the move fills (`_send_fill`), once one can be filled. Mail whose choice is the record it is on
+        stays — a thread or a `pr` ask a live record holds, an own record free or neither busy nor free, a fill
+        refused (*every extra busy*, *host full*, *its profile is paused*) — and is looked at again next tick. A
+        choice of the held extra the mail is on fills it in place. The move is a landing, not a send: no gate, no
+        tally; the copies say where it went (`to`). An own record that is not live keeps its mail, filled on its
+        cause."""
+        if self.mode != "home":
+            return
+        records = self._graph()
+        for own in list(records.values()):
+            if own.seat is None or isinstance(own.scale, dict) or own.superseded_by:
+                continue
+            extras = seat_send.extras_in_place(own, records.values())
+            if not extras:
+                continue
+            own_live = own.state not in seat_send.DEAD
+            for r in [own, *extras]:
+                if r.id in self._send_filling or r.id in self._evicting:
+                    continue
+                if r is own and not own_live:
+                    continue  # filled on its cause, as today
+                if r is not own and (r.state not in seat_send.DEAD or (r.state == "exited" and self._crashed(r, now))):
+                    continue  # live, or rule 1's to restart: it reads its own mail
+                for e in [x for x in r.inbox if x.kind == "ask" and x.open and not x.read_at]:
+                    moved = self._seat_move_one(records, own, r, e)
+                    if moved:
+                        break  # the records changed: the next of this record's mail is chosen next tick
+        return None
+
+    def _seat_move_one(self, records: dict[str, Session], own: Session, r: Session, e: MailEntry) -> bool:
+        """One unread ask on `r`, a record of the seat `own`, chosen again (`_seat_move`): moved to the chosen record,
+        a held extra the choice names filled. Returns whether anything changed."""
+        sender = e.from_
+        if sender in records and sender in {own.id, *(x.id for x in seat_send.extras_in_place(own, records.values()))}:
+            return False  # the seat's own mail to itself is never moved
+        root = e.root if e.root and e.root != e.id else ""  # a thread's follow-up, never the ask's own id
+        choice = self._seat_pick(records, own.id, sender, "ask", None, e.pr, root=root)
+        if choice is None or choice.to == r.id and choice.fill is None:
+            return False
+        to = records.get(choice.to)
+        if to is None:
+            return False
+        if to is not r:
+            r.inbox = [x for x in r.inbox if x is not e]
+            to.inbox.append(e)
+            self._save(r)
+            self._save(to)
+            self._mark(e.id, to=[choice.to])
+            log.info("%s: unread ask %s moved to %s (§4.9 Mail to a scaled seat)", r.id, e.id, choice.to)
+        if choice.fill is not None:
+            extra = choice.fill
+            self._send_filling[extra.id] = asyncio.create_task(self._send_fill(extra, own.name, own.id))
+        return True
+
     async def _reroute_waiting(self, now: datetime) -> None:
         """Once a tick, at the home (§4.9b *A question already waiting*, TD-1480): an open `ask` already waiting on
         an `asks` seat that cannot answer is moved by the send's rules — a general question (no `pr`, no `entry`)
@@ -1557,10 +1617,12 @@ class MailMixin:
         kind: str,
         replied: MailEntry | None,
         pr: int | None,
+        root: str | None = None,
     ) -> seat_send.Choice | None:
         """The record of a scaled seat that takes mail addressed to the seat's own record (§4.9 *Mail to a scaled
         seat*, §6 rule 3 *An extra seat*, TD-1547), or None where `sid` is no seat with extras, or the sender is one
-        of the seat's own records. The held extras that may be filled are those closed, or `exited` with nothing
+        of the seat's own records. `root`, where given, is the thread read in place of `replied`'s (the tick's mover,
+        which holds the ask and no reply). The held extras that may be filled are those closed, or `exited` with nothing
         rule 1 would restart, never one a lowered `max` is dropping; the fill is refused on a gated profile
         (*its profile is paused*) and at `scale.live` with no extra seat to close for the room (*host full*)."""
         own = records.get(sid)
@@ -1591,7 +1653,7 @@ class MailMixin:
             extras,
             kind=kind,
             now=now,
-            root=replied.root if replied is not None else "",
+            root=root if root is not None else (replied.root if replied is not None else ""),
             pr=pr,
             closes_seat_question=closes,
             away=self._away,

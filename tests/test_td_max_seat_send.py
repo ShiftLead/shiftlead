@@ -416,3 +416,91 @@ def test_a_reply_that_closes_nothing_goes_to_the_own_record_on_a_thread_an_extra
     assert got == seat_send.Choice("ao-tl")
     closing = seat_send.choose(own, [e2], kind="reply", now=NOW, root="m-0", closes_seat_question=True)
     assert closing.to == "ao-tl-2", "a reply closing the extra's own question goes to it"
+
+
+# -- the tick's mover (§4.9 *Mail to a scaled seat*: rule 3's pass reads the state each tick) ----------------------
+
+
+def _land(agent, on: str, frm: str, mid: str, text: str = "read it?") -> models.MailEntry:
+    """An unread ask already on a record of the seat, however it got there."""
+    e = models.MailEntry(id=mid, from_=frm, to=[on], at=HOOK, kind="ask", text=text, root=mid)
+    agent.sessions[on].inbox.append(e)
+    agent.sessions[frm].outbox.append(models.MailEntry.from_dict(e.to_dict()))
+    return e
+
+
+@pytest.mark.integration
+async def test_an_ask_waiting_on_a_busy_seat_moves_to_an_extra_the_tick_fills_once_one_can_be(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        own, (tl2, tl3) = await _seat(agent, person, tmp_path, own_live=True)
+        _set(_rec(agent, own), "working")
+        (w1, *_) = await _askers(person, tmp_path, 1)
+        gated = {"on": True}
+        agent._profile_gated = lambda profile, now, team="": gated["on"]
+        async with LocalClient(caller=w1) as a:
+            got = await a.call("msg", to=own, text="read #12?", kind="ask")
+        assert got["delivered"] == [own]
+        await agent._seat_move(datetime.now(UTC))
+        assert not agent._send_filling and [e.id for e in _rec(agent, own).inbox] == [got["entry"]["id"]], (
+            "still paused"
+        )
+        gated["on"] = False
+        await agent._seat_move(datetime.now(UTC))
+        await (agent._send_filling.get(tl2) or asyncio.sleep(0))
+        new = _rec(agent, tl2)
+        assert new.state not in ("exited", "closed") and [e.id for e in new.inbox] == [got["entry"]["id"]]
+        assert not [e for e in _rec(agent, own).inbox if e.id == got["entry"]["id"]], "moved, not copied"
+        sent = [e for e in _rec(agent, w1).outbox if e.id == got["entry"]["id"]]
+        assert sent and sent[0].to == [tl2], "the sender's copy says where it went"
+        assert _rec(agent, tl3).state == "closed", "one extra, the lowest-placed"
+
+
+@pytest.mark.integration
+async def test_mail_left_on_a_held_extra_moves_to_the_first_free_live_record(agent, tmp_path, blocked_replay):
+    await park_ticks(agent)
+    _, calls = blocked_replay
+    async with LocalClient() as person:
+        own, (tl2, tl3) = await _seat(agent, person, tmp_path, own_live=True, live_extras=1)
+        _set(_rec(agent, own), "working")
+        _set(_rec(agent, tl2), "idle")
+        (w1, *_) = await _askers(person, tmp_path, 1)
+        _land(agent, tl3, w1, "m-left")
+        await agent._seat_move(datetime.now(UTC))
+        assert [e.id for e in _rec(agent, tl2).inbox] == ["m-left"] and not _rec(agent, tl3).inbox
+        assert calls == [], "a free live record takes it: nothing filled"
+
+
+@pytest.mark.integration
+async def test_mail_left_on_a_held_extra_of_a_seat_on_call_lands_on_its_own_record(agent, tmp_path, blocked_replay):
+    await park_ticks(agent)
+    _, calls = blocked_replay
+    async with LocalClient() as person:
+        own, (_tl2, tl3) = await _seat(agent, person, tmp_path, own_live=False)
+        (w1, *_) = await _askers(person, tmp_path, 1)
+        _land(agent, tl3, w1, "m-left")
+        await agent._seat_move(datetime.now(UTC))
+        assert [e.id for e in _rec(agent, own).inbox] == ["m-left"] and not _rec(agent, tl3).inbox
+        assert calls == [], "the own record is filled on its cause, no extra by the mover"
+
+
+@pytest.mark.integration
+async def test_an_ask_on_a_free_own_record_or_a_thread_a_live_record_holds_stays(agent, tmp_path, blocked_replay):
+    await park_ticks(agent)
+    _, calls = blocked_replay
+    async with LocalClient() as person:
+        own, (tl2, _tl3) = await _seat(agent, person, tmp_path, own_live=True, live_extras=1)
+        _set(_rec(agent, own), "idle")
+        _set(_rec(agent, tl2), "idle")
+        (w1, *_) = await _askers(person, tmp_path, 1)
+        _land(agent, own, w1, "m-own")
+        await agent._seat_move(datetime.now(UTC))
+        assert [e.id for e in _rec(agent, own).inbox] == ["m-own"], "free: it reads its own"
+        _set(_rec(agent, own), "working")
+        e = _land(agent, own, w1, "m-thread")
+        e.root = "m-t"
+        _rec(agent, own).outbox.append(models.MailEntry(id="m-t", from_=own, to=[w1], at=HOOK, kind="ask", text="q"))
+        _rec(agent, own).inbox = [x for x in _rec(agent, own).inbox if x.id == "m-thread"]
+        await agent._seat_move(datetime.now(UTC))
+        assert [x.id for x in _rec(agent, own).inbox] == ["m-thread"], "its thread: it holds the context"
+        assert calls == []
