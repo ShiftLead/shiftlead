@@ -233,3 +233,39 @@ def test_with_no_flow_an_area_lane_is_refused_and_nothing_written(world, capsys)
     assert cli.main(["team", "max", "ao-grind", "hunt", "3"]) == 1
     assert "hunt's lane is in no stage: its lane has no queue to read" in capsys.readouterr().err
     assert "teams" not in state
+
+
+def test_a_member_line_of_two_stores_a_ceiling_at_its_size_as_zero_and_one_past_it_as_written(world, capsys):  # noqa: F811
+    """`set_max` sizes a member line by its names (#3296, TD-1591): `grind` has two, so 2 is at its size and stored
+    as `0`, and 3 is past it and stored as 3."""
+    _, state = world
+    assert cli.main(["team", "max", "ao-grind", "grind", "2"]) == 0
+    assert capsys.readouterr().out.strip() == "grind: no scaling — 2 is at or below its size 2"
+    assert _max(state) == {"grind": 0}
+    assert cli.main(["team", "max", "ao-grind", "grind", "3"]) == 0
+    assert _max(state) == {"grind": 3}
+
+
+def test_a_raise_from_off_writes_the_techlead_seat_at_zero(world, tmp_path):  # noqa: F811
+    """`scaling_names` starts with the techlead seat (#3296, TD-1592): a raise from `off` writes it at `0` beside
+    the other lines, so it does not go back to its default ceiling."""
+    doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())  # as `hunt_builds` left it
+    doc["teams"]["ao-grind"]["techlead"] = {"name": "tl-ao"}
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    _, state = world
+    assert cli.main(["team", "max", "ao-grind", "off"]) == 0
+    assert cli.main(["team", "max", "ao-grind", "hunt", "3"]) == 0
+    assert _max(state) == {"tl-ao": 0, "grind": 0, "hunt": 3}
+
+
+def test_a_pool_seat_is_refused_in_its_words(world, tmp_path, capsys):  # noqa: F811
+    """`max_refusal` names a pool (#3296, TD-1593): what `ao team max` and the dialog say."""
+    doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
+    doc["teams"]["ao-grind"]["seats"] = [
+        {"name": "qa", "role": "fact-checker", "trigger": "asks", "pool": ["paul", "org-grind"]}
+    ]
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    _, state = world
+    assert cli.main(["team", "max", "ao-grind", "qa", "3"]) == 1
+    assert "qa is a pool: a pool is a fallback, not capacity" in capsys.readouterr().err
+    assert "teams" not in state
