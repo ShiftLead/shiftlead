@@ -446,9 +446,15 @@ class TickMixin:
             mux = self._home_mux
             if mux is None:
                 return  # no link: the marks wait for the next tick that has one
-            sent = [{"id": sid, "at": at, "verb": verb} for sid, got in marks.items() for at, verb in got]
+            sent = [
+                {"id": sid, "at": at, "verb": verb}
+                for sid, got in marks.items()
+                for at, verb in got
+                if stuck_mod.missed_ok(sid, at, verb)
+            ]  # one the home would refuse never holds back the rest: deleted with them, never sent
             try:
-                await mux.request("missed", timeout=agent_common.REPORT_WRITE, marks=sent)
+                if sent:
+                    await mux.request("missed", timeout=agent_common.REPORT_WRITE, marks=sent)
             except (link.LinkError, link.LinkClosed, TimeoutError) as e:
                 log.warning("missed marks did not reach %s: %s", self.home, e)
                 return

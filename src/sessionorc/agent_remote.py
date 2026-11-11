@@ -24,6 +24,7 @@ from sessionorc import (
     shots,
 )
 from sessionorc import settings as settings_mod
+from sessionorc import stuck as stuck_mod
 from sessionorc import usage as usage_mod
 from sessionorc.agent_common import (
     ACT_TIMEOUT,
@@ -734,12 +735,9 @@ class RemoteMixin:
             raise link.LinkError("missed carries no marks")
         by: dict[str, list[tuple[str, str]]] = {}
         for m in marks:
-            got = [m.get(k) for k in ("id", "at", "verb")] if isinstance(m, dict) else []
-            if len(got) != 3 or not all(isinstance(v, str) and v and len(v) <= 200 for v in got):
-                raise link.LinkError(f"a missed mark from {host} is not an id, an at and a verb")
-            rid, at, verb = got
-            if naming.split_address(rid)[1]:
-                raise link.LinkError(f"a missed mark from {host} names {rid}, not a bare id of its own")
+            rid, at, verb = (m.get(k) for k in ("id", "at", "verb")) if isinstance(m, dict) else (None, None, None)
+            if not stuck_mod.missed_ok(rid, at, verb):
+                raise link.LinkError(f"a missed mark from {host} is not a bare id of its own, an at and a verb")
             by.setdefault(f"{rid}@{host}", []).append((at, verb))
         graph = self._graph()
         for key, got in by.items():

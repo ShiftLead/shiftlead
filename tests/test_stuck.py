@@ -822,6 +822,12 @@ async def test_a_nodes_marks_go_to_the_home_and_are_deleted_once_taken(agent, mo
     await agent._missed_pass()
     assert mux.sent == [{"method": "missed", "marks": [{"id": "ao-w", "at": "2026-11-11T10:00:00Z", "verb": "msg"}]}]
     assert not a.exists(), "taken: deleted"
+    # a mark the home would refuse (an address for an id) is never sent and never holds the rest back
+    odd = _mark(paths.home(), "ao-w@else", "msg", "2026-11-11T10:03:00Z")
+    c = _mark(paths.home(), "ao-w", "doing", "2026-11-11T10:04:00Z")
+    await agent._missed_pass()
+    assert mux.sent[-1]["marks"] == [{"id": "ao-w", "at": "2026-11-11T10:04:00Z", "verb": "doing"}]
+    assert not odd.exists() and not c.exists()
     assert not [e for e in w.inbox if e.from_ == models.SYSTEM] and not agent.person_inbox, "the home notes it"
     agent._home_mux = None
 

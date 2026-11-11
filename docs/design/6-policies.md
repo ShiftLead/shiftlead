@@ -1686,8 +1686,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        call that timed out on the restart, is read on the next (`_unavailable`'s ping decides: an agent
        that answers it is a restart, no mark; one that does not is down, a mark). A node's records hold no mail, so a node sends
        what it read to the home over its link (`missed {marks: [{id, at, verb}]}`, each id its own record's bare id, read
-       there as `id@<node>` and never another host's; a mark not three strings refuses the batch) and deletes the files once
-       the home has taken them — a link that is down, or a home that refuses, leaves them for the next tick — and the home
+       there as `id@<node>` and never another host's; a mark not three strings refuses the batch, so the node sends none
+       such and deletes it with the rest) and deletes the files once the home has taken them — a link that is down, or a
+       home that refuses, leaves them for the next tick, and a reply lost after the home took them sends them again, a
+       second note (at least once, never none) — and the home
        answers them as it answers its own. For each mark the home walks the session it names to its
        newest record by `_successor` as a send does (a seat to its current fill; a note is no cause of
        rule 3's, so an empty seat's note waits in its mailbox for the next fill a question makes, within `MAIL_RETENTION`), sends that record, where it is live or an empty seat, a `[system]` note — *the host agent was not
