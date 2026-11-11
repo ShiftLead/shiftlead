@@ -1537,13 +1537,23 @@ class MailMixin:
         """The stamp a take-up writes on its question (design §4.9b *Why it did not answer*, TD-1430): the
         first of `taken.to` walked to its newest record as a send's addressee is — a walk that writes no
         forward — and read as it stands, by `unanswered.read`."""
-        sid = taken.to[0] if taken.to else ""
+        sid = self._newest(records, taken.to[0] if taken.to else "")
+        return self._unanswered_of(records, sid, taken, now)
+
+    def _newest(self, records: dict[str, Session], sid: str) -> str:
+        """An addressee walked to its newest record as a send's is (§4.10 *to a question seat*): through each
+        `closed` record's `superseded_by` — a walk that writes no forward."""
         seen = {sid}
         while (r := records.get(sid)) is not None and r.state == "closed" and r.superseded_by:
             sid = self._successor(sid, r) or sid
             if sid in seen:
                 break
             seen.add(sid)
+        return sid
+
+    def _unanswered_of(self, records: dict[str, Session], sid: str, taken: MailEntry, now: datetime) -> dict[str, Any]:
+        """`unanswered.read` of the record `sid` (the walk's last) for the question `taken`, its inputs gathered
+        here once — for a take-up's stamp (§4.9b) and for rule 13's acting test (§6 *Stuck work*, TD-1496)."""
         at = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
         r = records.get(sid)
         if r is None:

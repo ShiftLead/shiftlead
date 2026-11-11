@@ -1359,6 +1359,8 @@ class HostAgent(
             out["notify"] = self._notify_view()
             out["push"] = self._push_view()  # the Push card's devices and key (§4.10, TD-1302); absent on a node
             out["ci_spells"] = self._ci_spells_view()  # the *CI not starting* rows' spells (§4.4, TD-687)
+            # rule 13's stuck work, for the Queue's and the Inbox's readers (§6 *Stuck work*, TD-1496)
+            out["stuck"] = {k: dict(v) for k, v in sorted((self._host_rec.get("stuck") or {}).items())}
             out["work"] = {
                 team: dict(rec["work_waiting"])
                 for team, rec in sorted((self._host_rec.get("teams") or {}).items())

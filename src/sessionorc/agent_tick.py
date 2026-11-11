@@ -43,6 +43,7 @@ from sessionorc import screen as screen_mod
 from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
+from sessionorc import stuck as stuck_mod
 from sessionorc import sync as sync_mod
 from sessionorc import synopsis as synopsis_mod
 from sessionorc import usage as usage_mod
@@ -367,9 +368,53 @@ class TickMixin:
         await self._work_marks(snapshot_at)
         await self._sweep_mail(snapshot_at)
         await self._reroute_waiting(snapshot_at)  # after the sweep: an expired ask is not moved (§4.9b, TD-1480)
+        await self._stuck_pass(snapshot_at)  # after rule 3's pass, whose `unfillable` it reads (§6 rule 13)
         self._poke_waits()  # the wake decision is re-taken every tick for a session blocked in `wait`
         self._send_first_prompts()  # before the doorbell, which a brief not yet typed holds off
         self._ring_doorbells()
+
+    async def _stuck_pass(self, now: datetime) -> None:
+        """Rule 13 (design §6 *Stuck work*, TD-1496): at the home, each tick, whether open work has a live
+        session able to act on it, kept as `stuck: {<key>: {since, reason, actor}}` on `host.json` for the work
+        none has acted on for longer than its kind's wait — recomputed whole each tick, so an entry drops the
+        tick an actor acts or the work closes. An open `ask` to a session is read here (`ask:<id>`); a decided
+        board line's entries (`board:<key>`) are kept as stored by this pass. It rings no session and presses
+        nothing; a surprise is a log line and the last reading stands."""
+        if self.mode != "home":
+            return
+        try:
+            graph = self._graph()
+            old = self._host_rec.get("stuck") or {}
+            new = {k: v for k, v in old.items() if not str(k).startswith("ask:")}
+            for e in stuck_mod.open_asks(graph):
+                opened = _parse(e.at)
+                actors = []
+                for to in e.to:
+                    sid = self._newest(graph, to)
+                    r = graph.get(sid)
+                    stamp = self._unanswered_of(graph, sid, e, now)
+                    clock = stuck_mod.ask_idle_clock(r, e.id)
+                    actors.append(
+                        stuck_mod.judge(
+                            r, sid, stamp, unfillable=self.unfillable, open_at=opened, idle_clock=clock, now=now
+                        )
+                    )
+                if (got := stuck_mod.reading(actors, now, mail.STUCK_ASK_AFTER)) is not None:
+                    new[f"ask:{e.id}"] = got
+        except Exception:  # noqa: BLE001 — a reading: the last one stands, the next tick reads again
+            log.exception("reading the stuck work failed")
+            return
+        if new == old:
+            return
+        if new:
+            self._host_rec["stuck"] = new
+        else:
+            self._host_rec.pop("stuck", None)
+        try:
+            self.host_store.save(self._host_rec)
+        except OSError:
+            log.exception("writing the home's host record failed")
+        await self._push_changes()
 
     async def _team_stop_times(self, now: datetime) -> None:
         """Design §6 *Team stop time* (TD-146): each live, unattended session carrying a team's badge
