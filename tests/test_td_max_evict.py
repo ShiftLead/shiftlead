@@ -11,8 +11,9 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from conftest import park_ticks
 
+from sessionorc.agent_common import SEAT_PR_WAIT
 from sessionorc.client import LocalClient
-from sessionorc.models import MailEntry
+from sessionorc.models import MailEntry, ProgressEntry
 
 
 async def _start(person, tmp_path, name, **kw):
@@ -122,3 +123,33 @@ async def test_a_cancelled_start_holds_no_slot(agent, tmp_path):
     with pytest.raises(asyncio.CancelledError):
         await task
     assert not any(agent._room_held)
+
+
+@pytest.mark.integration
+async def test_working_on_its_own_a_pr_waiting_or_a_suspended_or_superseded_seat_is_not_taken(agent, tmp_path):
+    """TD-1627: `_evictable`'s other clauses (§6 rule 3) — a live subagent or shell, a PR of its own within
+    `SEAT_PR_WAIT` of its idle start (one past it is taken), a suspended seat and a superseded one."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        idle = timedelta(minutes=30)
+        made = {}
+        for name in ("clean", "subagent", "shell", "pr-young", "pr-old", "suspended", "superseded"):
+            idle_for = SEAT_PR_WAIT + timedelta(minutes=5) if name == "pr-old" else idle
+            made[name] = _extra_seat(agent, await _start(person, tmp_path, name), "tl", idle_for)
+        made["subagent"].subagents, made["subagent"].subagent_at = 1, now.isoformat()
+        made["shell"].shells = [{"id": "b1", "since": now.isoformat()}]
+        made["pr-young"].progress = [ProgressEntry(ref="TD-1", pr=11)]
+        made["pr-old"].progress = [ProgressEntry(ref="TD-2", pr=12)]
+        made["suspended"].suspended = {"at": now.isoformat(), "by": "person", "why": "identity"}
+        made["superseded"].superseded_by = made["clean"].id
+        got = {name: agent._evictable(r, now, None) for name, r in made.items()}
+        assert got == {
+            "clean": True,
+            "subagent": False,
+            "shell": False,
+            "pr-young": False,
+            "pr-old": True,
+            "suspended": False,
+            "superseded": False,
+        }
