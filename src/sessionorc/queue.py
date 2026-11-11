@@ -1747,7 +1747,10 @@ def _completed(
     whose members an open entry names and whose own `Blocked by:` names no open id, dated by the
     latest `Resolved:` date of its members, its PR from that line, else *What closed*. `entries` are its
     members as the page opens the card — `qid`, `id`, `title`, `priority`, `closed` (`_closed`), `pr`, `sha`
-    (the closing commit, TD-904) and `resolved`, the `Resolved:` text — newest first, and `at` the newest `closed`."""
+    (the closing commit, TD-904) and `resolved`, the `Resolved:` text — newest first, and `at` the newest `closed`.
+    Beside `ids` and `titles`, keyed alike, `types`: each member's archived `Type:` read as `ledger.entries` reads an
+    open entry's (`ledger.entry_type`), so always an entry type — what a kept card's item starts its session with
+    (§4.5 screen 12 *Three verbs: An item on a kept card*, TD-1618)."""
     named_by_open: set[str] = set()
     for e in open_.values():
         named_by_open.update(qid(e["repo"], b) for b in e.get("blocked_ids") or [])
@@ -1808,6 +1811,8 @@ def _completed(
                 "id": min(members, key=lambda q: (int(q.partition("#")[2][3:]), q)),
                 "ids": members,
                 "titles": {q: archived[q].get("title") or "" for q in members},
+                # each member's archived `Type:`, normalised as an open entry's: what a kept card's item starts with
+                "types": {q: ledger_mod.entry_type((archived[q].get("fields") or {}).get("type")) for q in members},
                 "closed": str(when),
                 "pr": pr,
                 "entries": ents,

@@ -748,8 +748,9 @@ HELP: tuple[Help, ...] = (
         "Queue card item",
         (
             "Starts your own session about this item: it opens on the card's entry, or on this entry where the "
-            "item is one, with the item as its subject, to read first and walk through with you. Reads Open "
-            "session while yours is on the card: the press goes there and copies the item's id for you to paste."
+            "item is one (on a completed card, the archived entry the item is about), with the item as its "
+            "subject, to read first and walk through with you. Reads Open session while yours is on the card: the "
+            "press goes there and copies the item's id for you to paste."
         ),
     ),
     Help(

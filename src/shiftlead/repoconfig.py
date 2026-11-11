@@ -140,6 +140,13 @@ WORK_ITEM = (
     "I opened this session from the Queue about {item}, on the card around {id} of {repo}'s ledger ({ledger}). "
     "Read it first{read}, and walk me through its goal and what each answer leads to."
 )
+# A kept card's item's press (design §4.5 screen 12 *Three verbs: An item on a kept card*, TD-1618): `WORK_ITEM`'s
+# place and slots, the entry it starts on archived and read as the record of what was done
+WORK_ITEM_KEPT = (
+    "I opened this session from the Queue about {item}, on the completed card around {id} of {repo}'s ledger "
+    "({ledger}). {id} is archived: read it as the record of what was done, not as open work. Read the item "
+    "first{read}, and walk me through its goal and what each answer leads to."
+)
 # The header's press on a card where two or more items wait on the person (design §4.5 screen 12 *Started from the
 # header on a card with items*, TD-1338, built by TD-1340): the walk sentence, in place of `WORK_OPENING`'s
 WORK_ALL = (
@@ -322,19 +329,21 @@ def work_text(
     rest: Iterable[str] = (),
     item: str = "",
     walk: bool = False,
+    kept: bool = False,
 ) -> str:
     """`work.md` filled: the opening prompt **Start session** sends (TD-678, TD-912). `why` a key of
     `WORK_OPENING` — *yours* (`Owner: paul`), *decision* (`decision (paul)`), *card* (any other entry a
     card starts on) — `where` the page pressed on, *Inbox* or *Queue*; `mine` and `rest` the card's ids,
     *waits on me* its Decide and Do items and *the rest* its other entries, each group *none* when empty.
     `item`, pressed on a Queue card's item (TD-1246), is named by `WORK_ITEM` in the first sentence's place;
-    `walk`, the header's press on a card with two or more items (TD-1340), puts `WORK_ALL` there."""
+    `walk`, the header's press on a card with two or more items (TD-1340), puts `WORK_ALL` there. `kept`, an item
+    pressed on a kept completed card (TD-1618), puts `WORK_ITEM_KEPT` in `WORK_ITEM`'s place, its slots the same."""
     text = resources.files("shiftlead").joinpath("briefs", WORK_TEMPLATE).read_text(encoding="utf-8")
     opening = WORK_OPENING[why]
     if item:
         read = next((r for k, r in WORK_ITEM_READ.items() if item.startswith(k)), "")
         read = read or (", in the ledger" if re.fullmatch(r"(?:[\w.-]+#)?TD-\d+", item) else "")
-        opening = WORK_ITEM.replace("{read}", read).replace("{item}", item)
+        opening = (WORK_ITEM_KEPT if kept else WORK_ITEM).replace("{read}", read).replace("{item}", item)
     elif walk:
         opening = WORK_ALL
     for slot, value in (("{where}", where), ("{id}", id_), ("{repo}", repo), ("{ledger}", ledger)):

@@ -52,6 +52,16 @@ KINDS = ("for-you", "blocked", "design", "live-check", "pickable", "evaluation",
 LANE_KINDS = ("pickable", "design", "live-check")  # the kinds a lane word takes (§4.4 *In a team's lanes*)
 PRIORITIES = ("high", "medium", "low")
 TYPES = lb.TYPES  # cadence §2.11: pick order within a Priority; the first is the default
+
+
+def entry_type(raw: Any) -> str:
+    """An entry's `Type:` as the ledger reads it: its first word lower-cased, one that is no entry type, or none,
+    the first (`TYPES[0]`) — an open entry's and an archived one's alike (§4.4 *Completed cards*, TD-1618)."""
+    words = str(raw or "").split()
+    word = words[0].lower() if words else ""
+    return word if word in TYPES else TYPES[0]
+
+
 # The windows every count is kept for: the last day, week and month, rolling.
 WINDOWS = {"day": timedelta(days=1), "week": timedelta(days=7), "month": timedelta(days=30)}
 # A *for you* entry's reading for its Inbox row (§4.5 screen 6 *The ledger's entries that wait on you*,
@@ -586,7 +596,6 @@ def entries(
     for m, read in zip(heads, lb.entries(t), strict=True):
         nxt = lb.SECTION_RE.search(t, m.end())
         fields = _header(read["fields"], t[m.end() : nxt.start() if nxt else len(t)])
-        etype = (fields.get("type") or "").split()[0].lower() if (fields.get("type") or "").split() else ""
         blocked_by = list(derived[m.group(1)])
         e = {
             "id": m.group(1),
@@ -594,7 +603,7 @@ def entries(
             "priority": _word(fields.get("priority", "")),
             "owner": _word(fields.get("owner", "")),
             "kind": _word(fields.get("kind", "")),
-            "type": etype if etype in TYPES else TYPES[0],
+            "type": entry_type(fields.get("type")),
             "blocked_by": blocked_by,
             "blocked_ids": blocked_ids(read["blocked_raw"]),
             "xrepo_ids": xrepo_ids(read["blocked_raw"]),
