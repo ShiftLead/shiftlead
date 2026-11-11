@@ -78,7 +78,44 @@ def test_every_entry_has_a_body_and_not_someone_elses():
             assert "**Priority:**" in body, f"{path} {id_} has a heading but no entry under it"
             assert "**Why:**" in body, f"{path} {id_} has no **Why:**"
         for id_, body in entries(ARCHIVE):
-            assert "**Resolved:**" in body, f"an archived entry records how it was resolved: {id_}"
+            assert archived_with_its_outcome(id_, body), f"an archived entry records how it was resolved: {id_}"
+
+
+def archived_with_its_outcome(id_: str, body: str) -> bool:
+    """An archived entry says how it ended (TD-1678): a `**Resolved:**` line, or ledgerboard's other archived
+    forms (SPEC *Superseded and dropped*, v2.4) — a Status `Superseded <date> by TD-m` or `Dropped <date>`,
+    read by ledgerboard's own reader, with its why on an `archived: Superseded|Dropped — …` Log line."""
+    if "**Resolved:**" in body:
+        return True
+    (e,) = lb.entries(f"## {id_}: x{body}")
+    status = e["fields"].get("status") or ""
+    word = lb.first_word(status)
+    if word == "superseded" and not re.search(r"\bby\s+TD-\d{3,}", status):
+        return False
+    return word in ("superseded", "dropped") and bool(
+        re.search(rf"^- \d{{4}}-\d{{2}}-\d{{2}}: archived: {word.capitalize()} — \S", body, re.M)
+    )
+
+
+@pytest.mark.parametrize("how", ["resolved", "superseded", "dropped"])
+def test_ledgerboards_own_archived_forms_pass_the_body_check(how):
+    """The archive writer's three forms (`ledger.py archive`, `--superseded-by`, `--dropped`) each pass the
+    body check, so the helper's output and this test cannot drift apart again (TD-1678: #3447's precheck
+    went red on a `--superseded-by` archive); an archived entry with none of them still fails it."""
+    entry = (
+        "## TD-9001: a test entry\n\n**Priority:** low\n**Type:** debt\n**Added:** 2026-11-11\n**Status:** Open\n\n"
+        "**Why:** because.\n\n**Fix:** do it.\n\n**Done when:** done.\n"
+    )
+    how_args = {"resolved": {"pr": 1, "pointer": "tests"}, "superseded": {"superseded_by": "TD-9002"},
+                "dropped": {"dropped": True}}[how]  # fmt: skip
+    done = lb.edit_entry(entry, "archive", today="2026-11-11", why="the reason", **how_args)
+    id_, body = re.match(r"## (TD-\d+):[^\n]*(.*)", done, re.S).groups()
+    assert archived_with_its_outcome(id_, body), done
+    assert ("**Resolved:**" in body) == (how == "resolved")
+    bare = re.sub(r"^- [^\n]*archived:[^\n]*\n?", "", body, flags=re.M).replace("**Resolved:**", "**Gone:**")
+    assert not archived_with_its_outcome(id_, bare), bare
+    open_body = entry.split(":", 1)[1].split("\n", 1)[1]
+    assert not archived_with_its_outcome("TD-9001", open_body)
 
 
 def test_no_two_entries_share_a_body():
