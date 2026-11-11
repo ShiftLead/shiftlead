@@ -14,7 +14,7 @@ and 3,120 findings, dated 2026-11-03 to 2026-11-11.
 
 ## How the findings were labelled
 
-Seven Sonnet 5.5 agents each read about 480 findings and gave each one four labels, by reading the row and
+Seven Sonnet 5.5 agents each read about 440 findings of their own, and one record they all shared, and gave each one four labels, by reading the row and
 the rows of the same design that cite it, not by keyword:
 
 - **kind**, what was wrong: `wording`, `naming`, `xref` (a stale or wrong pointer), `test` (a missing test),
@@ -69,7 +69,7 @@ test or bookkeeping. Of the 2,266 findings the reviewers labelled minor, 661 (29
 | the PR review | 40 | 1% |
 | unsure | 28 | 1% |
 
-- 468 findings (15%) are `design-only` or `live`: what a design review alone buys. 231 of them are a wrong
+- 468 findings (15%) are `design-only` or `live`: what a design review alone buys. 271 of them are a wrong
   mechanism and 67 a contradiction.
 - 1,200 of the 1,273 unspecified findings are `builder`: the builder would have had to decide.
 - The 510 mechanical findings are 225 stale pointers, 153 bookkeeping and 78 false claims a grep would show.
@@ -130,7 +130,7 @@ TD-1453, both about which claim on an entry or a PR counts, and a deferrable fin
 Per review, Fable raises more of the findings only a design review catches (1.3 against 0.8). Per token the
 two are close: 88k tokens for each such finding from Fable, 102k from Sonnet, and 21k against 19k for each
 substantive one. Paul's note the same day: a Fable review costs far more than a Sonnet one. If Fable's price per token is
-more than about 1.15 times Sonnet's, Sonnet is the cheaper design reviewer on this data. The comparison is confounded: the two alternate on the same text, so whichever reads first takes
+more than about 1.16 times Sonnet's, Sonnet is the cheaper design reviewer on this data. The comparison is confounded: the two alternate on the same text, so whichever reads first takes
 the findings both would have raised. What Fable finds that Sonnet would not is not measured here.
 
 ## What the cost side shows, and does not
@@ -152,8 +152,8 @@ Offered for the discussion, not decided:
 
 1. **A script before round 1** for pointers, ids, paths and the entry's bookkeeping: a sixth of the findings,
    no model.
-2. **A lower cap for in-repo designs.** Rounds 3 and 4 cost 155k and 218k reviewer tokens for each
-   build-changing finding against round 1's 33k, and from round 2 on a quarter or more of what they find is
+2. **A lower cap for in-repo designs.** Rounds 3 and 4 cost roughly 155k and 218k reviewer tokens for each
+   build-changing finding against round 1's 33k (the first pass's figures, not in `tables.py`), and from round 2 on a quarter or more of what they find is
    the last round's fixes.
 3. **A narrower *minor*:** only the deferrable kinds, which a builder can take as notes at almost no risk.
 4. **Who settles an unspecified detail** is the open question: 41% of the findings, more than nine in ten of
