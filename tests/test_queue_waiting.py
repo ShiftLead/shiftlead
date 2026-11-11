@@ -36,6 +36,7 @@ def _read(tmp: Path, entries: list[str], **marks: dict[str, Any]) -> dict[str, d
 
 
 HELD = {"held": {"at": NOW.isoformat()}}
+LIVE_WAIT = {"waiting": {"on": "event", "until": "", "name": "live", "why": "The build is live."}}
 
 
 def test_blocked_only_by_the_persons_entry_is_up_next_and_beside_an_open_id_it_waits_on_that_id(tmp_path):
@@ -76,7 +77,7 @@ def test_the_wait_columns_order_top_entry_then_earliest_date_then_event_then_the
         _entry(70, "a typo'd id", Priority="High", Blocked_by="TD-999"),
         _entry(71, "another repo's", Priority="High", Blocked_by="nowhere#TD-1"),
     ], TD_020={"settling": True}, TD_030={"settling": True}, TD_032={"settling": True},
-       TD_040={"settling": True}, TD_041={"waiting": {"on": "event", "until": "", "name": "live", "why": "The build is live."}}, TD_011=_w("until", "2026-10-20"),
+       TD_040={"settling": True}, TD_041=LIVE_WAIT, TD_011=_w("until", "2026-10-20"),
        TD_021=_w("until", "2026-10-25"), TD_022=_w("until", "2026-10-22"), TD_023=_w("event", why="x"),
        TD_031=_w("event", why="the reset"))  # fmt: skip
     wait = {k: c["wait"] for k, c in cards.items()}
