@@ -223,6 +223,34 @@ def _bare(address: str) -> str:
     return naming.split_address(address)[0]
 
 
+def extras_of(records: Iterable[Session]) -> dict[str, str]:
+    """Each extra seat's bare id → its seat's own (§4.9 *A scaled seat holds its review stage*, TD-1547): a
+    record carrying `seat` whose `scale.line` names a seat answers for that seat's name wherever a reader is
+    matched by name. The seat's id is the extra's with its name swapped for the line's (`ao-<scope>-<name>`)."""
+    out: dict[str, str] = {}
+    for r in records:
+        line = r.scale.get("line") if r.seat is not None and isinstance(r.scale, dict) else None
+        if line and r.name and r.name != line and r.id.endswith(r.name):
+            out[r.id] = r.id[: -len(r.name)] + str(line)
+    return out
+
+
+def as_seat(address: str, extras: dict[str, str] | None) -> str:
+    """A bare address read as the seat it answers for: an extra's its seat's id, any other as it is."""
+    base = _bare(address)
+    return (extras or {}).get(base, base)
+
+
+def seat_address(address: str, extras: dict[str, str] | None) -> str:
+    """An address read as its seat's, its host kept (an extra runs on its seat's host): `ao-x-tl-2@laptop` →
+    `ao-x-tl@laptop`; an address that is no extra's is returned as it is."""
+    base, host = naming.split_address(address)
+    seat = (extras or {}).get(base)
+    if seat is None:
+        return address
+    return f"{seat}@{host}" if host else seat
+
+
 def addressed(addr: str, readers: list[str]) -> str | None:
     """Which of a chain's `readers` — each the seat's name as the definition gives it (§4.9c) — a
     mail address names: the session id `ao-<scope>-<name>`, on this host or `@<host>`, or the name
@@ -233,7 +261,9 @@ def addressed(addr: str, readers: list[str]) -> str | None:
     return max(fits, key=len) if fits else None
 
 
-def read_by(s: Session, pr: int, files: Iterable[str] | None = None) -> str | None:
+def read_by(
+    s: Session, pr: int, files: Iterable[str] | None = None, extras: dict[str, str] | None = None
+) -> str | None:
     """Who read the PR, from the record's own mail (§6 rule 11), or None when it was not read.
 
     The older `{reader, held}`: the sender of a `reply` on the thread of an `ask` of this record's
@@ -252,7 +282,11 @@ def read_by(s: Session, pr: int, files: Iterable[str] | None = None) -> str | No
     The reply is the read whatever it says. Mail is pruned, so the reply rule 10 kept on the PR's
     `checks` entry (`read_by`, one sender) counts as well: for the older form as the read, and for a
     chain as the read of the one link its sender matches — so once mail is pruned a chain keeps one
-    link's read and no more (a second slot is not kept)."""
+    link's read and no more (a second slot is not kept).
+
+    `extras` (`extras_of`) reads an extra seat's address as its seat's on both sides — the ask's addressees
+    and the reply's sender — so a reply from an extra of the asked seat is the seat's read (§4.9 *A scaled
+    seat holds its review stage*, TD-1547); the read is returned as the record that replied."""
     review = s.review or {}
     kept = next((c.get("read_by") for c in s.checks if c.get("pr") == pr), None)
     if not isinstance(review.get("chain"), list):
@@ -260,10 +294,10 @@ def read_by(s: Session, pr: int, files: Iterable[str] | None = None) -> str | No
         named: dict[str, set[str]] = {}
         for e in s.outbox:
             if e.kind == "ask" and e.pr == pr:
-                named.setdefault(e.root or e.id, set()).update(_bare(x) for x in e.to)
+                named.setdefault(e.root or e.id, set()).update(as_seat(x, extras) for x in e.to)
         for r in s.inbox:
             to = named.get(r.root or "") if r.kind == "reply" else None
-            if to is None or _bare(r.from_) not in to:
+            if to is None or as_seat(r.from_, extras) not in to:
                 continue
             if reader != "person" or r.from_ == PERSON:
                 return r.from_
@@ -277,7 +311,7 @@ def read_by(s: Session, pr: int, files: Iterable[str] | None = None) -> str | No
     for e in s.outbox:
         if e.kind == "ask" and e.pr == pr:
             threads.setdefault(e.root or e.id, set()).update(
-                r for x in e.to if (r := addressed(_bare(x), readers)) is not None
+                r for x in e.to if (r := addressed(as_seat(x, extras), readers)) is not None
             )
     read: dict[str, str] = {}  # a link's reader → who replied for it
     for r in s.inbox:
@@ -286,13 +320,13 @@ def read_by(s: Session, pr: int, files: Iterable[str] | None = None) -> str | No
             continue
         if r.from_ == PERSON:
             return PERSON  # the PR became the person's, the rest of its chain with it
-        who = addressed(_bare(r.from_), readers)
+        who = addressed(as_seat(r.from_, extras), readers)
         if who is None or who not in to:
             continue
         if r.verdict == "merged":
             return r.from_  # the last reader holding the PR merged it
         read.setdefault(who, r.from_)
-    if kept and (who := addressed(_bare(str(kept)), readers)) is not None:
+    if kept and (who := addressed(as_seat(str(kept), extras), readers)) is not None:
         read.setdefault(who, str(kept))
     if holding and all(str(x.get("reader") or "") in read for x in holding):
         return read[str(holding[-1].get("reader") or "")]

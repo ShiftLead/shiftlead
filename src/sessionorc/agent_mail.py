@@ -22,6 +22,7 @@ from sessionorc import (
     mail,
     unanswered,
 )
+from sessionorc import held as held_mod
 from sessionorc import queue as queue_mod
 from sessionorc import work as work_mod
 from sessionorc.agent_common import (
@@ -2042,9 +2043,12 @@ class MailMixin:
             raise RpcError(f"pr is a PR's number, not {pr!r}") from None
         s = self._find(self._addr(id))
         asks = [e for e in s.outbox if e.kind == "ask" and e.pr == pr]
+        # an extra seat answers for its seat (§4.9 *A scaled seat holds its review stage*, TD-1547): each
+        # addressee reads as its seat, so `ao pr held` matches an ask the extra holds to the seat's link
+        extras = held_mod.extras_of(self._graph().values())
         if not mail.is_person(caller) and not self._is_self(s, caller):
-            me = self._addr(caller)
-            if not any(self._addr(x) == me for e in asks for x in e.to):
+            me = held_mod.seat_address(self._addr(caller), extras)
+            if not any(held_mod.seat_address(self._addr(x), extras) == me for e in asks for x in e.to):
                 raise RpcError(
                     f"{me} cannot read {id}'s reads of PR #{pr}: its author, a reader it asked, or a person "
                     f"reads them (design §4.9c)"
@@ -2067,7 +2071,7 @@ class MailMixin:
             reads.append(
                 {
                     "id": e.id,
-                    "to": list(e.to),
+                    "to": [held_mod.seat_address(x, extras) for x in e.to],
                     "at": e.at,
                     "open": now_at.open,
                     "verdict": last.verdict if last else None,

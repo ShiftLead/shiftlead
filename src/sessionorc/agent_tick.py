@@ -1610,11 +1610,14 @@ class TickMixin:
         if not self._cadence_member(s) or not s.checks:
             return
         dirty = False
+        extras: dict[str, str] | None = None  # an extra seat answers for its seat (§4.9, TD-1547): built once, if read
         for pr in [int(c["pr"]) for c in s.checks]:
             c = cadence_mod.entry_of(s.checks, pr)
             if c is None:
                 continue
-            if not c.get("read_by") and (who := cadence_mod.read_by(s, pr)):
+            if not c.get("read_by"):
+                extras = held_mod.extras_of(self._graph().values()) if extras is None else extras
+            if not c.get("read_by") and (who := cadence_mod.read_by(s, pr, extras)):
                 c["read_by"], dirty = who, True
             if not cadence_mod.untold(c):
                 continue
@@ -1829,6 +1832,7 @@ class TickMixin:
                     if pr not in crossed and (addr, s.created, pr) not in self._held_settled:
                         due.append((self._held_tried.get((addr, pr), 0.0), s, pr))
             due.sort(key=lambda d: (d[0], d[2]))
+            extras = held_mod.extras_of(self._graph().values())  # an extra seat answers for its seat (§4.9, TD-1547)
             for _, s, pr in due[: held_mod.READS]:
                 addr = self._address(s)
                 self._held_tried[(addr, pr)] = time.monotonic()
@@ -1842,7 +1846,8 @@ class TickMixin:
                 # mail is pruned: past half its retention the reply that would clear a PR may be
                 # gone (a restarted home, a first promote), and that is no reading, never a crossing
                 old = mail.MAIL_RETENTION is not None and now - merged > mail.MAIL_RETENTION / 2
-                if not paths or merged <= _parse(s.created) or held_mod.read_by(s, pr, files) or old:
+                read = held_mod.read_by(s, pr, files, extras)
+                if not paths or merged <= _parse(s.created) or read or old:
                     self._held_settled.add((addr, s.created, pr))
                     self._held_tried.pop((addr, pr), None)
                     continue
