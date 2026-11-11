@@ -2646,8 +2646,9 @@ teams:
     none: every profile key's value is removed and named in the note, an entry already under the
     account staying as it is and named in the note too, since a set on it is refused until the file is
     fixed), and of them **the one whose line is lowest on the window's last day** (a flat `r`, `100 − r`; a
-    per-day `d`, `100 − d`; a tie, the per-day one, then the first profile by name; a metered account,
-    the smallest amount) — an order
+    per-day `d`, `100 − d`; a tie, the per-day one, then the entry already under the account, then the
+    first profile by name; a metered account, the smallest amount, money before tokens, which no reading
+    converts) — an order
     that needs no reading; one whose unit does not fit is removed and named. A merged line can rise for
     a profile only where a flat reserve is kept over its per-day one: its line `100 − d × days_left`
     is below the kept `100 − r` while `d × days_left > r`, for `days_left` from 1 to the window's
