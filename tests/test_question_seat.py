@@ -415,3 +415,41 @@ async def test_a_sessions_own_ledger_request_waits_on_its_unable_seat(agent, tmp
         assert not any(e.id == got["id"] for e in agent.person_inbox)
         for sid in (seat, asker):
             await person.call("kill", id=sid)
+
+
+def test_an_entry_request_resolves_only_to_the_techlead_seat_able_or_not():
+    """TD-1565 (§4.9b *An entry is a techlead seat's*): a general question takes the able seat first, but an
+    `entry` request considers the techlead seat alone, unable or not — never a fact-check seat."""
+
+    def rec(n: str, state: str, tags: bool) -> models.Session:
+        s = models.Session(id=f"ao-{n}", name=n, kind="claude", adapter="claude-code", dir="/w", state=state)
+        s.seat = {"trigger": "asks", **({"tags": True} if tags else {})}
+        s.supervised = s.unattended = True
+        return s
+
+    tl, fc = rec("tl", "limited", True), rec("fc", "idle", False)
+    tl.limited_reset = None  # its reset unknown: unable
+    one = agent_mail.MailMixin._one_seat
+    assert one("t", [tl, fc]) is fc, "a general question takes the able seat"
+    assert one("t", [tl, fc], entry=True) is tl, "an entry waits on the techlead seat"
+    assert one("t", [fc], entry=True) is fc, "a team with no techlead seat keeps its one seat"
+
+
+async def test_a_sessions_ledger_request_lands_on_the_unable_techlead_seat_not_the_fact_check_seat(agent, tmp_path):
+    """TD-1565: `ao td add --repo` while the team's techlead seat is unable and its fact-check seat is able."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        tl = await mk("tl", team="ss-grind", project="S", seat={"trigger": "asks", "tags": True})
+        fc = await mk("fc", team="ss-grind", project="S", seat={"trigger": "asks"})
+        asker = await mk("asker", team="cm-grind", project="C")
+        for sid in (tl, fc):
+            agent.sessions[sid].repo = "/src/samscrape"
+        agent.sessions[asker].repo = "/src/contractmatch"
+        agent.sessions[tl].state, agent.sessions[tl].limited_reset = "limited", None
+        async with LocalClient(caller=asker) as a:
+            got = await a.call("entry_add", repo="samscrape", type="debt", text="parse the new feed")
+            asked = await a.call("msg", repo="samscrape", text="which feed is it?")
+        assert got["to"] == tl and _ask_in(agent.sessions[tl], got["id"]).entry["repo"] == "samscrape"
+        assert asked["entry"]["to"] == [fc], "a general question still takes the able seat"
+        for sid in (tl, fc, asker):
+            await person.call("kill", id=sid)

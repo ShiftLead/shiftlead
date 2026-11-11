@@ -1850,7 +1850,8 @@ def test_a_fact_checker_seat_starts_on_the_built_in_brief_filled_by_an_ask(world
     prompt = made["prompt"]
     assert prompt.startswith("You are a **fact-checker**")
     for rule in (
-        "`ao inbox --unread --json`",
+        "`ao inbox --json` — every open ask, not the unread alone",
+        "**An ask that is not a fact-check**",
         "**Answer only an open ask.**",
         "closed (`expired`)",
         "`git show <sha>:<path>` and `git diff origin/<default>...<sha>`",
