@@ -664,7 +664,7 @@ class MailMixin:
         if edge != "question seat":
             return None  # one open question per sender is the question-seat edge's alone (§4.10)
         mine = {k for k in records if sender in mail.chain(records, k, self._successor)}
-        first = next((x for x in r.inbox if x.kind == "ask" and x.open and x.from_ in mine), None)
+        first = mail.open_question(records, mine, target, thread=moved.root)  # over the seat's records (§4.9, TD-1547)
         if first is not None:
             return f"your question {first.id} to it is still open"
         return None

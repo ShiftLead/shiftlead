@@ -690,9 +690,9 @@ def message_gate(
     `message_edge`'s eight edges and nothing else, refused by naming §4.10's graph rather than
     invariant 11: messaging is not acting. An `ask` passing the question-seat edge alone is one open
     question per sender per seat: the sender counted along its `superseded_by` chain, the count read
-    in the target's inbox, since a seat's mail moves with its fills (TD-995). A sender with no agent
-    (`agentless`, the person's own shell) sends a `note` alone on the own edge: its target could not
-    reply into it (TD-1116). Returns the refusal, or None when the message may land."""
+    in the target's inbox, since a seat's mail moves with its fills (TD-995), and in its extras' (TD-1547).
+    A sender with no agent (`agentless`, the person's own shell) sends a `note` alone on the own edge: its
+    target could not reply into it (TD-1116). Returns the refusal, or None when the message may land."""
     if sender == PERSON or target == PERSON:
         return None  # the person inbox is ungated (§4.10 "A session reaches a person")
     if sender == target:
@@ -723,12 +723,48 @@ def message_gate(
         )
     if edge == "question seat" and kind == "ask":
         mine = {k for k in records if sender in chain(records, k, successor)}
-        first = next((e for e in records[target].inbox if e.kind == "ask" and e.open and e.from_ in mine), None)
+        first = open_question(records, mine, target)  # over the seat's records, its extras' too (§4.9, TD-1547)
         if first is not None:
             return (
                 f"{sender} cannot ask {target} again: its question {first.id} is still open — a reply, "
                 f"its lapse or the person's close frees it (design §4.10 *to a question seat*)"
             )
+    return None
+
+
+def seat_records(records: Mapping[str, Session], target: str) -> list[str]:
+    """The records that are one seat with `target` (§4.9 *Mail to a scaled seat*, TD-1547): a seat's own record
+    and its extras — each carrying `seat`, the extras' `scale.line` naming the seat — of its team and repo, so
+    *one open question per sender per seat* is counted over them; `target` alone for a record that is no seat."""
+    r = records.get(target)
+    if r is None or r.seat is None:
+        return [target]
+    line = r.scale.get("line") if isinstance(r.scale, dict) else None
+    name = str(line or r.name)
+
+    def of(x: Session) -> bool:
+        if x.seat is None or x.team != r.team or x.repo != r.repo:
+            return False
+        own = x.scale.get("line") if isinstance(x.scale, dict) else None
+        return own == name if own else x.name == name
+
+    return [target, *(k for k, x in records.items() if k != target and of(x))]
+
+
+def open_question(
+    records: Mapping[str, Session], mine: set[str], target: str, thread: str | None = None
+) -> MailEntry | None:
+    """The first open `ask` from one of `mine` in the inbox of any record of `target`'s seat (`seat_records`) —
+    one on `thread` never counted: a moved ask's copy keeps its original's root, and the original, still open
+    until the copy lands, may sit on another record of the same seat."""
+    for k in seat_records(records, target):
+        inbox = records[k].inbox
+        first = next(
+            (e for e in inbox if e.kind == "ask" and e.open and e.from_ in mine and (not thread or e.root != thread)),
+            None,
+        )
+        if first is not None:
+            return first
     return None
 
 
