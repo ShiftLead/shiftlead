@@ -49,6 +49,9 @@ from sessionorc.models import (
 
 log = logging.getLogger(__name__)
 
+# design §4.9b *What it does* (TD-1576): the refusal of an `ask --pr` to a fact-check seat
+FACT_CHECK_NO_PR = "a fact-check seat reads no PR as its reader (§4.9b): ask the reader your flow names"
+
 # a node's registered checkouts, read for the send's `repo` stamp (§4.10, TD-1467): kept this long once read, waited
 # on no longer than this at a send, and asked again no sooner than this after a node that did not answer
 ROSTER_KEEP = timedelta(minutes=10)
@@ -230,6 +233,7 @@ class MailMixin:
                 if team and repo:
                     raise RpcError("--team or --repo, not both: each is the whole address (design §4.10)")
                 to = [self._address(await self._question_seat(team=team, repo=repo))]
+            self._no_pr_to_a_fact_check_seat(kind, pr, to)
             said = await self._checks_at_ask(sender, kind, pr)
             to, routed = self._route_around(sender, to, kind, pr, reply_to, thread)
             if routed and pr is not None:
@@ -276,6 +280,19 @@ class MailMixin:
         if key:
             self._remember_nonce(key, (result, None))
         return result
+
+    def _no_pr_to_a_fact_check_seat(self, kind: str, pr: Any, to: Any) -> None:
+        """An `ask` carrying `pr` to a fact-check seat is refused at send, whoever sends it, the person
+        included (design §4.9b *What it does*, TD-1576): the seat is no reader and answers no
+        `--verdict`. Read before the checks and the route-around, so nothing lands and no forge is read;
+        a name with no record, and the `pr` shape, are left to `_msg`'s own refusals."""
+        if kind != "ask" or pr is None:
+            return
+        names = [to] if isinstance(to, str) else list(to or [])
+        for x in dict.fromkeys(str(n) for n in names if n and str(n).strip()):
+            s = self._graph().get(self._addr(x))
+            if s is not None and s.role == "fact-checker":
+                raise RpcError(FACT_CHECK_NO_PR)
 
     def _route_around(
         self, sender: str, to: Any, kind: str, pr: Any, reply_to: str | None, thread: str | None

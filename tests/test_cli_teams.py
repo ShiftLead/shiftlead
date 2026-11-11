@@ -1850,7 +1850,7 @@ def test_a_fact_checker_seat_starts_on_the_built_in_brief_filled_by_an_ask(world
     prompt = made["prompt"]
     assert prompt.startswith("You are a **fact-checker**")
     for rule in (
-        "`ao inbox --json` — every open ask, not the unread alone",
+        "`ao inbox` (text) — every open ask, not the unread alone",
         "**An ask that is not a fact-check**",
         "**Answer only an open ask.**",
         "closed (`expired`)",
@@ -1859,8 +1859,10 @@ def test_a_fact_checker_seat_starts_on_the_built_in_brief_filled_by_an_ask(world
         "the verdict is `BLOCK`, with that as its one finding",
         "**Re-derive each claim**",
         "post nothing on the PR",
-        "run no `ao` command but `ao inbox` and `ao msg`",
-        '`ao msg --reply-to <the ask\'s id> "…"`',
+        "run no `ao` command but `ao inbox` and `ao reply`",
+        "`ao reply <id> '…'`",
+        "carries entry",
+        "asks nobody a question",
         "`cadence-review: SHIP|BLOCK · <adapter>/<model> · docs · <n> findings`",
         "`$AGENT_MODEL_FILE`",
         "else `$AGENT_MODEL`, used unchanged",
@@ -1869,7 +1871,7 @@ def test_a_fact_checker_seat_starts_on_the_built_in_brief_filled_by_an_ask(world
         "**You declare nothing**",
     ):
         assert rule in prompt, rule
-    assert "ao --skill" not in prompt and "ao doing" not in prompt  # its `ao` is `inbox` and `msg` alone
+    assert "ao --skill" not in prompt and "ao doing" not in prompt  # its `ao` is `inbox` and `reply` alone
     for slot in ("{repo}", "{flow}", "{stage}", "{techlead}", "{lane}"):
         assert slot not in prompt, slot
 
