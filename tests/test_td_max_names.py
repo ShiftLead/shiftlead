@@ -53,11 +53,14 @@ def test_a_max_at_or_below_the_size_and_off_are_no_scaling():
 
 
 def test_the_size_is_the_floor_the_extras_go_past():
-    team = _team(size={"grinder-ao": 2})
+    team = _team()
     team.members[0] = orgmod.MemberDef(role="grinder", name="grinder-ao", count=3, size=2)
     assert team.extra_names("grinder-ao") == ["grinder-ao-3", "grinder-ao-4"]  # size + 2, past the size
     bare = orgmod.TeamDef(name="t", members=[orgmod.MemberDef(role="grinder", name="grind", count=1, size=1)])
     assert bare.extra_names("grind") == ["grind-2", "grind-3"]  # a `count: 1` line's bare name, then -2
+    # a line sized 0 runs none at its size, and its default ceiling's extras are its first two names
+    none = orgmod.TeamDef(name="t", members=[orgmod.MemberDef(role="grinder", name="grind", count=1, size=0)])
+    assert none.ceiling("grind") == 2 and none.extra_names("grind") == ["grind", "grind-2"]
 
 
 def test_what_may_not_scale_says_why_and_has_no_extras():
