@@ -86,3 +86,60 @@ def test_with_settings_merges_max_onto_a_copy():
     assert org.teams["ao-grind"].max is None  # a copy: the definition never carries it
     assert orgmod.with_settings(org, {"ao-grind": {"size": {}}}).teams["ao-grind"].max is None  # no key: defaults
     assert orgmod.with_settings(org, {"ao-grind": {"on_work": "ask"}}) is org  # nothing to merge: the org as read
+
+
+# ── the names readers read the extras (TD-1545 slice 7, §4.9 *Names, the size and the ceiling*) ──────────────
+
+
+def test_session_and_started_names_read_each_line_and_seats_extras():
+    team = _team()
+    sized = ["manager-ao-1", "techlead-ao-1", "grinder-ao-1", "grinder-ao-2", "grinder-ao-3", "designer-ao-1"]
+    assert team.session_names(extras=False) == sized
+    assert team.session_names() == sized + [
+        "techlead-ao-1-2", "techlead-ao-1-3", "grinder-ao-4", "grinder-ao-5", "designer-ao-1-2", "designer-ao-1-3",
+    ]  # fmt: skip
+    # the started names add the seats, and an `asks` seat's extras; a seat on `prs` and a pool scale not
+    started = team.started_names()
+    assert started[: len(team.session_names())] == team.session_names()
+    assert started[len(team.session_names()) :] == [
+        "fact-check-ao-1", "audit-ao-1", "qa-1", "qa-1-p2", "fact-check-ao-1-2", "fact-check-ao-1-3",
+    ]  # fmt: skip
+    assert team.started_names(extras=False) == sized + ["fact-check-ao-1", "audit-ao-1", "qa-1", "qa-1-p2"]
+    off = _team(max="off")
+    assert off.session_names() == sized and off.started_names() == off.started_names(extras=False)
+
+
+def test_the_twice_named_check_reads_an_extra_and_says_a_twice_held_line_once():
+    team = _team()
+    team.members.append(orgmod.MemberDef(role="grinder", name="grinder-ao-4"))  # the grinder line's first extra
+    assert team.twice_named() == ["grinder-ao-4"]
+    assert _team(max={"grinder-ao": 3}).twice_named() == []  # no scaling on the line: no extra to meet
+    # two lines of one name hold the same extras too: the name is said, its extras' names not again
+    twin = _team(max="off")
+    twin.members.append(orgmod.MemberDef(role="designer", name="designer-ao-1"))
+    assert twin.twice_named() == ["designer-ao-1"]
+    twin.max = None
+    assert twin.twice_named() == ["designer-ao-1"]
+
+
+def test_add_members_default_name_goes_past_the_lines_extras():
+    assert _team().next_name("grinder") == "grinder-ao-6"  # past the size 3 and the extras -4, -5
+    assert _team(max={"grinder-ao": 7}).next_name("grinder") == "grinder-ao-8"
+    assert _team(max="off").next_name("grinder") == "grinder-ao-4"
+    assert _team().next_name("designer") == "designer-ao-2"  # a line of its own: no -1-n extra is in the way
+
+
+def test_a_name_two_teams_share_only_through_an_extra_is_read_after_the_merge():
+    """The parse reads no extras (an old team's `off` is not merged yet), so it refuses only sized names;
+    `shared_names` on the merged org says the rest, and a team at `off` shares nothing through an extra."""
+    a = _team()
+    b = orgmod.TeamDef(
+        name="other", manager=orgmod.ManagerDef(role=orgmod.PERSON, name=""),
+        members=[orgmod.MemberDef(role="grinder", name="grinder-ao-5")],
+    )  # fmt: skip
+    org = orgmod.Org(teams={"ao-grind": a, "other": b})
+    assert orgmod.shared_names(org, extras=False) == []
+    orgmod._names_per_repo(org, "org.yml")  # not refused at parse
+    assert [(x, t.name, n) for x, t, n in orgmod.shared_names(org)] == [("ao-grind", "other", "grinder-ao-5")]
+    merged = orgmod.with_settings(org, {"ao-grind": {"max": "off"}})
+    assert orgmod.shared_names(merged) == []

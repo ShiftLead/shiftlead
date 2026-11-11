@@ -317,19 +317,30 @@ class TeamDef:
         """The role **Open a session** on the Add entry form starts for `type_` (`debt` | `feature`)."""
         return self.entries.get(type_, TECHLEAD_ROLE)
 
-    def session_names(self) -> list[str]:
+    def session_names(self, extras: bool = True) -> list[str]:
         """Every session name the definition names, as often as it names it: the manager (when a
         session manages), the techlead seat, then each member entry's (design §4.9 *Add
-        or remove a member from the team card*: a name the definition holds is never added again, TD-268)."""
+        or remove a member from the team card*: a name the definition holds is never added again, TD-268),
+        then the extras of the techlead seat and each member line (§4.9 *Names, the size and the ceiling*,
+        TD-1545). `extras=False` leaves them out: a reader at parse, before `with_settings` merges `max`, would
+        read a team the migration wrote `off` as on its default ceilings."""
         out = [self.manager.name] if self.manager.role != PERSON and self.manager.name else []
         if self.techlead is not None:
             out.append(self.techlead.name)
-        return out + [n for m in self.members for n in m.names()]
+        out += [n for m in self.members for n in m.names()]
+        if extras:
+            lines = [self.techlead.name] if self.techlead is not None else []
+            out += [n for line in lines + [m.name for m in self.members] for n in self.extra_names(line)]
+        return out
 
-    def started_names(self) -> list[str]:
-        """Every session name a start of the team gives — its manager, techlead, seats and members —
-        which no other team on its repo may give (design §4.9 *Names are the org's*)."""
-        return self.session_names() + [s.name for s in self.seat_records()]
+    def started_names(self, extras: bool = True) -> list[str]:
+        """Every session name a start of the team gives — its manager, techlead, seats and members, and
+        with `extras` every line's and seat's extras — which no other team on its repo may give (design §4.9
+        *Names are the org's*, *Names, the size and the ceiling*)."""
+        seats = [s.name for s in self.seat_records()]
+        if extras:
+            seats += [n for s in self.seats if not s.pool for n in self.extra_names(s.name)]
+        return self.session_names(extras) + seats
 
     def seat_records(self) -> list[SeatDef]:
         """Each record the `seats:` lines start, in order: a line, or each member of its `pool:` (§4.9b
@@ -338,26 +349,33 @@ class TeamDef:
 
     def twice_named(self) -> list[str]:
         """The names the definition holds more than once, in order — what `ao org check` and the
-        Members dialog say (TD-268)."""
+        Members dialog say (TD-268) — an extra's among them (§4.9 *Names, the size and the ceiling*, TD-1545),
+        save the extras of a line whose own name is held twice, which that name already says."""
         seen: list[str] = []
         names = self.session_names()
         for n in names:
             if names.count(n) > 1 and n not in seen:
                 seen.append(n)
-        return seen
+        lines = ([self.techlead.name] if self.techlead is not None else []) + [m.name for m in self.members]
+        echo = {e for line in lines if line in seen for e in self.extra_names(line)}
+        return [n for n in seen if n not in echo or n in self.session_names(extras=False)]
 
     def next_name(self, role: str) -> str:
         """The name **Add member** defaults to for `role` (design §4.9): the next of a counted entry
         of that role (the `count:` an add bumps), else the team's pattern for it — the last entry of
         the role, its trailing number dropped — with the first number no name of the team holds
         (`grinder-dc-1` → `grinder-dc-2`); a role the team has no entry of, the role itself while
-        free. Otherwise never a name the definition already holds (TD-268); a counted entry's next is
-        what its bump makes whatever the box says, and Add refuses it when another entry holds it."""
+        free. Otherwise never a name the definition already holds (TD-268), its extras' included (§4.9 *Names,
+        the size and the ceiling*): a counted entry's next is the first of its names past its size that none
+        holds, and Add refuses a name another entry or an extra holds."""
         taken = set(self.session_names())
         same = [m for m in self.members if m.role == role]
         counted = next((m for m in same if m.count > 1), None)
-        if counted is not None:
-            return f"{counted.name}-{len(counted.names()) + 1}"  # past its size (§4.9 *A team's size*)
+        if counted is not None:  # past its size and its extras (§4.9 *A team's size*, *Names, the size …*)
+            k = len(counted.names()) + 1
+            while f"{counted.name}-{k}" in taken:
+                k += 1
+            return f"{counted.name}-{k}"
         base = same[-1].name if same else role
         stem = re.sub(r"-\d+$", "", base)
         if not same and base not in taken:
@@ -940,7 +958,7 @@ def _pool_names(team: TeamDef, key: str) -> None:
     """A pool member's name that another record of the team holds is refused, naming its line (§4.9b
     *Where it is refused*): `qa-1` with `pool: [a, b]` makes `qa-1-p2`, which no other session or seat
     of the team may be called."""
-    others = team.session_names()
+    others = team.session_names(extras=False)  # at parse: `max` is not merged yet (`session_names`)
     for i, line in enumerate(team.seats):
         if not line.pool:
             continue
@@ -1135,16 +1153,28 @@ def _refuse_old(org: Org, team: TeamDef, key: str) -> None:
 
 def _names_per_repo(org: Org, label: str) -> None:
     """An agent's name is its repo's (design §4.9 *Names are the org's*): a session's id is
-    `ao-<repo>-<name>`, so a name two teams on one repo both start is refused, naming both."""
+    `ao-<repo>-<name>`, so a name two teams on one repo both start is refused, naming both. Read at parse,
+    before `max` is merged, so without the extras; `ao org check` reads them on the merged org."""
+    for other, team, n in shared_names(org, extras=False):
+        raise ValueError(
+            f"{label}: teams {other} and {team.name} both start a session called {n!r} on {team.repo} — "
+            f"an agent's name is its repo's; rename one (design §4.9 *Names are the org's*)"
+        )
+
+
+def shared_names(org: Org, extras: bool = True) -> list[tuple[str, TeamDef, str]]:
+    """Each name two teams on one repo both start — `(the first team's name, the second team, the name)`,
+    in definition order — with `extras` each line's and seat's extras among the names (§4.9 *Names are the
+    org's*, *Names, the size and the ceiling*): what the parse refuses without them, and `ao org check` says of
+    the merged org with them."""
     held: dict[tuple[str, str], str] = {}
+    out: list[tuple[str, TeamDef, str]] = []
     for team in org.teams.values():
-        for n in dict.fromkeys(team.started_names()):
+        for n in dict.fromkeys(team.started_names(extras)):
             other = held.setdefault((team.repo, n), team.name)
             if other != team.name:
-                raise ValueError(
-                    f"{label}: teams {other} and {team.name} both start a session called {n!r} on {team.repo} — "
-                    f"an agent's name is its repo's; rename one (design §4.9 *Names are the org's*)"
-                )
+                out.append((other, team, n))
+    return out
 
 
 def _entries_resolve(org: Org, team: TeamDef, key: str, repo_roles: Collection[str]) -> None:

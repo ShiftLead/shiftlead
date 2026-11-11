@@ -330,6 +330,12 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
                 f"place.{team}: {host} is no linked host of {here} ({', '.join(sorted(linked)) or 'none linked'}) — "
                 "name a node under `nodes:` in hosts.yml, or this host"
             )
+    for other, team, n in orgmod.shared_names(org):  # an extra's name, the parse having refused the rest
+        lack(
+            f"teams {other} and {team.name} both start a session called {n!r} on {team.repo} once their extras "
+            "are read — an agent's name is its repo's; rename one, or lower a `max` (design §4.9 *Names, the size "
+            "and the ceiling*)"
+        )
     for name in sorted(org.teams):
         team = org.teams[name]
         for twice in team.twice_named():

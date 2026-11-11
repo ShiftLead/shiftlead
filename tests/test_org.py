@@ -467,16 +467,16 @@ def test_add_appends_a_line_beside_a_counted_one_and_never_bumps_its_count(tmp_p
     """§4.9 *Add member and Remove keep the definition's share* (TD-1165): Add member writes a new member
     line, a second line of a role that has a counted one included; the `count:` is the size's (**+**)."""
     p = _members(tmp_path)
-    did = org.edit_members(p, "ao-grind", add={"role": "grinder", "name": "grinder-ao-3"})
+    did = org.edit_members(p, "ao-grind", add={"role": "grinder", "name": "grinder-ao-5"})  # past its extras
     after = p.read_text()
-    assert did == "added grinder-ao-3 (grinder)"
+    assert did == "added grinder-ao-5 (grinder)"
     assert "count: 2, name: grinder-ao, lane: [free-pick]}   # the lane" in after
     assert after == MEMBERS_YML.replace(
         "      - {role: hunter, name: hunter-ao, lane: [ui]}\n",
-        "      - {role: hunter, name: hunter-ao, lane: [ui]}\n      - {role: grinder, name: grinder-ao-3}\n",
+        "      - {role: hunter, name: hunter-ao, lane: [ui]}\n      - {role: grinder, name: grinder-ao-5}\n",
     )
     assert [m.names() for m in org.load(p).teams["ao-grind"].members] == [
-        ["grinder-ao-1", "grinder-ao-2"], ["hunter-ao"], ["grinder-ao-3"],
+        ["grinder-ao-1", "grinder-ao-2"], ["hunter-ao"], ["grinder-ao-5"],
     ]  # fmt: skip
 
 
@@ -537,8 +537,9 @@ def test_add_member_defaults_to_the_next_free_name_never_an_existing_one(tmp_pat
     the team's pattern with the first number no name of the team holds."""
     p = _members(tmp_path)
     t = org.load(p).teams["ao-grind"]
-    assert t.next_name("grinder") == "grinder-ao-3"  # a counted entry: the name its bump makes
-    assert t.next_name("hunter") == "hunter-ao-2"  # an unnumbered name: its pattern from 2
+    # past each line's extras on its default ceiling (§4.9 *Names, the size and the ceiling*, TD-1545)
+    assert t.next_name("grinder") == "grinder-ao-5"  # a counted entry: past its size and its extras -3, -4
+    assert t.next_name("hunter") == "hunter-ao-4"  # an unnumbered name: its pattern from 2, past -2, -3
     assert t.next_name("auditor") == "auditor"  # a role the team has no entry of: the role, while free
     p.write_text(MEMBERS_YML.replace("count: 2, name: grinder-ao,", "name: grinder-ao-1,"))
     t = org.load(p).teams["ao-grind"]
@@ -569,11 +570,12 @@ def test_add_member_refuses_a_name_a_sized_line_holds(tmp_path, monkeypatch):
     (tmp_path / "home" / "settings.yml").write_text("teams: {ao-grind: {size: {hunter-ao: 3}}}\n")
     p = _members(tmp_path)
     before = p.read_bytes()
-    with pytest.raises(ValueError, match="ao-grind already has hunter-ao-2$"):
-        org.edit_members(p, "ao-grind", add={"role": "hunter", "name": "hunter-ao-2"})
+    for name in ("hunter-ao-2", "hunter-ao-4"):  # a sized name, and an extra's (size + 2, TD-1545)
+        with pytest.raises(ValueError, match=f"ao-grind already has {name}$"):
+            org.edit_members(p, "ao-grind", add={"role": "hunter", "name": name})
     assert p.read_bytes() == before
     assert (
-        org.edit_members(p, "ao-grind", add={"role": "hunter", "name": "hunter-ao-4"}) == "added hunter-ao-4 (hunter)"
+        org.edit_members(p, "ao-grind", add={"role": "hunter", "name": "hunter-ao-6"}) == "added hunter-ao-6 (hunter)"
     )
 
 
