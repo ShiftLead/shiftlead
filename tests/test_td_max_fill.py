@@ -423,3 +423,37 @@ async def test_a_line_on_a_remote_host_is_read_and_its_held_extra_filled(agent, 
         await _pass(agent)
         assert filled == [("grind-3", "fill")], "the lowest-placed remote extra, once"
         assert node[made[2].id].scale["last"]["did"] == "fill"
+
+
+async def test_a_fill_keeps_the_held_extras_mail(agent, tmp_path):
+    """The fill creates the held extra with `keep_mail` (§6 rule 14 *Fill*, TD-1642): the record it replaces is
+    superseded with its mail carried (`supersedes[].mail`), so what was sent to the held seat waits for the new run."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        repo, made = await _line(agent, person, tmp_path)
+        held = made[2]
+        await _pass(agent)
+        _entries(agent, repo, "TD-3")
+        await _pass(agent)
+        got = _rec(agent, "grind-3")
+        assert got is not held and _live(agent, "grind-3"), "a new record, created over the held one"
+        assert got.supersedes[-1] == {**got.supersedes[-1], "id": held.id, "mail": True}, "the held record's mail kept"
+
+
+async def test_the_fill_ceiling_counts_only_fills_inside_the_window(agent, tmp_path):
+    """The ceiling counts the line's extras' `fill` restarts inside `FILL_WINDOW` (§6 rule 14, TD-1642): six fills
+    older than the window and six restarts for another reason hold nothing back."""
+    from sessionorc.agent_common import FILL_CEILING, FILL_WINDOW
+
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        repo, made = await _line(agent, person, tmp_path)
+        await _pass(agent)
+        now = datetime.now(UTC)
+        old = (now - FILL_WINDOW - timedelta(minutes=5)).isoformat()
+        made[3].restarts = [{"at": old, "why": "fill"}] * FILL_CEILING + [
+            {"at": now.isoformat(), "why": "crash"}
+        ] * FILL_CEILING
+        _entries(agent, repo, "TD-3")
+        await _pass(agent)
+        assert _live(agent, "grind-3"), "neither old fills nor other restarts reach the ceiling"
