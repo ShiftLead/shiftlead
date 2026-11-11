@@ -225,6 +225,10 @@ class TeamDef:
     # `teams.<team>.size` (§4.9 *A team's size*, §5): member line name → sessions, as the setting holds it,
     # a key no line names included (`ao org check` says so); each line's own is on its `MemberDef.size`
     size: dict[str, int] = field(default_factory=dict)
+    # `teams.<team>.max` (§4.9 *Scaling with the work*, td-max, §5): None where the settings carry no key (the
+    # default ceilings), `off` for none on the team, else line or seat name → ceiling as the setting holds it;
+    # `with_settings` writes it on the client's copy, no file sets it
+    max: dict[str, int] | str | None = None
     # a definition written before TD-722 (§4.9): each old key as written, `projects` or `<who>.home`
     # → its value, which `_validate` refuses by name, saying the fix
     old: dict[str, Any] = field(default_factory=dict)
@@ -263,6 +267,51 @@ class TeamDef:
         while (name := m.names(i + 1)[i]) in held:
             i += 1
         return name
+
+    def scale_refusal(self, name: str) -> str:
+        """Why the line or seat `name` may not scale, in the Members dialog's words, or "" where it may (§4.9
+        *Scaling with the work*): a member line, the `techlead:` seat and an `asks` seat may; the manager, a
+        seat on another trigger and a pooled seat may not. A `plain` role and a lane in no stage are read
+        where the roles and the flow are, not here."""
+        if self.techlead is not None and name == self.techlead.name:
+            return ""
+        if name == self.manager.name and self.manager.role != PERSON:
+            return "one lead per team"
+        for s in self.seats:
+            if s.name == name:
+                if s.pool:
+                    return "a pool is a fallback, not capacity"
+                return "" if s.trigger == "asks" else "one pass covers the repo"
+        if any(m.name == name for m in self.members):
+            return ""
+        return f"team {self.name} has no member line or seat {name!r}"
+
+    def _sized(self, name: str) -> int:
+        """The sessions a line or seat runs at its size: a member line's names, a seat's 1."""
+        line = next((m for m in self.members if m.name == name), None)
+        return len(line.names()) if line is not None else 1
+
+    def ceiling(self, name: str) -> int:
+        """The most sessions the line or seat `name` runs at once (§4.9 *Scaling with the work*): its written
+        `max`, else the default ceiling, its size + 2; 0 — no scaling — on a team at `off` and on one that may
+        not scale. A ceiling at or below the size is no scaling either, so `extra_names` gives none."""
+        if self.max == "off" or self.scale_refusal(name):
+            return 0
+        if isinstance(self.max, dict) and name in self.max:
+            return self.max[name]
+        return self._sized(name) + 2
+
+    def extra_names(self, name: str) -> list[str]:
+        """The names of the line's or seat's extras, past its size up to its ceiling (§4.9 *Scaling with the
+        work*, *Names, the size and the ceiling*): a member line's sized names past its size (`grinder-ao-4`,
+        `-5` past a size of 3), a seat's `<name>-2`, `-3`, as a `count: 1` line's are."""
+        size, top = self._sized(name), self.ceiling(name)
+        if top <= size:
+            return []
+        line = next((m for m in self.members if m.name == name), None)
+        if line is not None:
+            return line.names(top)[size:]
+        return [f"{name}-{i}" for i in range(size + 1, top + 1)]
 
     def entry_role(self, type_: str) -> str:
         """The role **Open a session** on the Add entry form starts for `type_` (`debt` | `feature`)."""
@@ -645,9 +694,9 @@ def with_settings(org: Org, teams: Mapping[str, Any] | None) -> Org:
     """`org` with each team's `teams.<team>.flow` from the home's `settings.yml` (§4.9c *A team lists
     its flows, and the person picks one*), as the agent's `settings` read gives `teams`, and its
     `teams.<team>.size` on the team and each member line it names, whatever flow is picked (§4.9 *A team's
-    size*, TD-1164). A copy: the definition is read and cached elsewhere, and a setting is never written
-    into it. A flow the team no longer lists is kept as read — `teams.current_flow` reads it as the first,
-    and says so."""
+    size*, TD-1164), and its `teams.<team>.max` on the team (§4.9 *Scaling with the work*). A copy: the
+    definition is read and cached elsewhere, and a setting is never written into it. A flow the team no
+    longer lists is kept as read — `teams.current_flow` reads it as the first, and says so."""
     picked: dict[str, dict[str, Any]] = {}
     for name, t in (teams or {}).items():
         if not isinstance(t, dict) or name not in org.teams:
@@ -660,6 +709,11 @@ def with_settings(org: Org, teams: Mapping[str, Any] | None) -> Org:
             lines = org.teams[name].members
             members = [dataclasses.replace(m, size=size[m.name]) if m.name in size else m for m in lines]
             got.update(size=size, members=members)
+        ceiling = t.get("max")  # §4.9 *Scaling with the work*: `off`, or a map as `size`'s; absent, the defaults
+        if ceiling == "off":
+            got["max"] = "off"
+        elif isinstance(ceiling, dict):
+            got["max"] = {str(k): v for k, v in ceiling.items() if isinstance(v, int) and not isinstance(v, bool)}
         if got:
             picked[name] = got
     if not picked:
