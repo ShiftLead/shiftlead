@@ -141,14 +141,15 @@ class ScaleMixin:
             got = ledger_mod.in_lanes([*led["entries"], *_orders(facts)], views, held)
             if got is None:
                 continue
-            for kind in ledger_mod.LANE_KINDS:
-                out |= {str(i) for i in got.get(kind.replace("-", "_")) or () if i not in held}
+            # a pickable entry (§6 rule 14): a design or a live check the lane's words also take is not a worker's fill
+            out |= {str(i) for i in got.get("pickable") or () if i not in held}
         return out
 
     def _scale_short(self, members: list[Session], now: datetime) -> bool:
         """Every live member of the line busy, or unable to pick (§6 rule 14): a member holding a lease is busy; one
-        `limited`, paused by the usage gate, or an extra whose start stuck (`unstuck`) with none is neither free nor
-        busy; any other live member is free, and so is a kept member rule 1 is restarting — the line is not short."""
+        `limited`, paused by the usage gate, or an extra whose start stuck (`unstuck`) and never claimed, with none,
+        is neither free nor busy; any other live member is free, and so is a kept member rule 1 is restarting — the
+        line is not short."""
         for m in members:
             if m.state in DEAD:
                 if not m.scale and self._crashed(m, now):
@@ -158,8 +159,8 @@ class ScaleMixin:
                 continue
             if m.state == "limited" or m.gated:
                 continue
-            if m.scale and _last(m).get("did") == "unstuck":
-                continue
+            if m.scale and _last(m).get("did") == "unstuck" and not _claimed(m):
+                continue  # a start that stuck cannot pick; once it has claimed it is a member like any
             return False
         return True
 
@@ -178,14 +179,18 @@ class ScaleMixin:
         await self._scale_unstick(extras, now)
         pick = self._scale_pickable(members, graph, now)
         if pick is None:
-            return  # nothing read: the memory and what was held back stand for the next reading
+            # nothing read: the memory, what was held back and a member's claim all stand for the next reading
+            self._scale_claims |= {a for m in members if (a := self._address(m)) in claims}
+            return
         was = self._scale_seen.get(key)
         self._scale_seen[key] = pick
         gained = sorted(pick - was) if was is not None else []
         claimed = any(self._address(m) in claims for m in members)
         newest = max(extras, key=lambda r: str(_last(r).get("at") or ""), default=None)
         stopped = newest is not None and _last(newest).get("did") == "stopped"
-        if not (gained or claimed or stopped or key in self._scale_held):
+        # a guard standing is read from the records, so a home's restart forgets no held-back fill
+        guarded = any(r.state not in DEAD and _last(r).get("did") == "fill" and not _claimed(r) for r in extras)
+        if not (gained or claimed or stopped or guarded or key in self._scale_held):
             return
         self._scale_held.discard(key)
         if not pick or not self._scale_short(members, now):
@@ -206,7 +211,8 @@ class ScaleMixin:
             self._scale_held.add(key)
             log.info("rule 14: %s's %s is short (%d pickable) — no fill: %s", team, line, len(pick), why)
             return
-        await self._scale_fill(held[0], line, len(pick), now)
+        if not await self._scale_fill(held[0], line, len(pick), now):
+            self._scale_held.add(key)  # the replay failed: read the line again next tick, as any held-back fill
 
     async def _scale_unstick(self, extras: list[Session], now: datetime) -> None:
         """The guard's ten minutes (§6 rule 14): a live extra filled `SCALE_STEP` ago that has not claimed is a start
@@ -291,7 +297,7 @@ class ScaleMixin:
             return None
         return len(live)
 
-    async def _scale_fill(self, extra: Session, line: str, pickable: int, now: datetime) -> None:
+    async def _scale_fill(self, extra: Session, line: str, pickable: int, now: datetime) -> bool:
         """The fill (§6 rule 14): the held extra created from its launch record with `keep_mail`, as rule 3 fills a
         seat — a `fill` in its `restarts`, counted toward the line's extras' own `FILL_CEILING` — the record keeping
         `scale` and its `last` saying why."""
@@ -299,8 +305,9 @@ class ScaleMixin:
         await self._replay(extra, "fill", keep_mail=True)
         new = self.sessions.get(extra.id) if extra.host == self.host else self.remote.get(extra.host, {}).get(extra.id)
         if new is None or new is extra or not isinstance(new.scale, dict):
-            return  # the replay failed, and its `restarts` entry says so: the next event reads the line again
+            return False  # the replay failed, and its `restarts` entry says so
         why = f"filled: {pickable} pickable, every {line} claimed"
         new.scale = {**new.scale, "last": {"at": now_iso(), "did": "fill", "why": why}}
         self._save(new)
         await self._push_changes()
+        return True

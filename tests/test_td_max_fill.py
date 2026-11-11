@@ -75,7 +75,8 @@ async def test_an_entry_becoming_pickable_with_every_member_leased_fills_exactly
         assert got.scale["last"]["did"] == "fill"
         assert got.scale["last"]["why"] == "filled: 2 pickable, every grind claimed"
         assert got.restarts[-1]["why"] == "fill"
-        await _pass(agent)  # the filled extra holds no lease: free, so the line is not short
+        _entries(agent, repo, "TD-5")  # an event: the filled extra holds no lease, free, so the line is not short
+        await _pass(agent)
         assert not _live(agent, "grind-4")
 
 
@@ -263,3 +264,84 @@ async def test_the_tick_runs_the_pass(agent, monkeypatch):
     monkeypatch.setattr(agent, "_scale_pass", took)
     await agent.tick()
     assert len(seen) == 1
+
+
+async def test_an_unstuck_extra_that_claimed_is_free_between_items(agent, tmp_path):
+    """Review of slice 1: `unstuck` passes over a start that stuck only until it claims."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        repo, _ = await _line(agent, person, tmp_path)
+        await _pass(agent)
+        _entries(agent, repo, "TD-3")
+        await _pass(agent)
+        e = _rec(agent, "grind-3")
+        e.scale = {**e.scale, "last": {"at": datetime.now(UTC).isoformat(), "did": "unstuck", "why": "x"}}
+        e.progress = [ProgressEntry(ref="TD-3", status="done")]  # it claimed, finished and sits between items
+        _entries(agent, repo, "TD-6")
+        await _pass(agent)
+        assert not _live(agent, "grind-4"), "an extra between items is free: the line is not short"
+
+
+async def test_a_design_or_live_check_in_the_lane_is_no_pickable_entry(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        repo, _ = await _line(agent, person, tmp_path)
+        await _pass(agent)
+        agent._repos[str(repo)]["ledger"]["entries"] += [
+            {**_e("TD-7"), "for_page": "design"},
+            {**_e("TD-8"), "for_page": "live-check"},
+        ]
+        await _pass(agent)
+        assert not _live(agent, "grind-3")
+
+
+async def test_a_failed_fill_is_read_again_next_tick(agent, tmp_path, monkeypatch):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        repo, _ = await _line(agent, person, tmp_path)
+        await _pass(agent)
+        real = agent._replay
+
+        async def failed(*a, **k):
+            return None  # the replay made nothing
+
+        monkeypatch.setattr(agent, "_replay", failed)
+        _entries(agent, repo, "TD-3")
+        await _pass(agent)
+        assert not _live(agent, "grind-3")
+        monkeypatch.setattr(agent, "_replay", real)
+        await _pass(agent)  # no new event: the failed fill was held back, and is read again
+        assert _live(agent, "grind-3")
+
+
+async def test_a_claim_while_the_ledger_cannot_be_read_waits_for_the_reading(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        repo, made = await _line(agent, person, tmp_path, ids=("TD-1", "TD-2", "TD-3", "TD-4"))
+        made[1].progress = []
+        await _pass(agent)
+        await person.call("progress", id=made[1].id, ref="TD-2")
+        good = agent._repos[str(repo)]["ledger"]
+        agent._repos[str(repo)]["ledger"] = {"error": "unreadable"}
+        await _pass(agent)
+        assert not _live(agent, "grind-3")
+        agent._repos[str(repo)]["ledger"] = good
+        await _pass(agent)  # the claim was kept for the reading
+        assert _live(agent, "grind-3")
+
+
+async def test_a_standing_guard_survives_a_homes_restart(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        repo, _ = await _line(agent, person, tmp_path, ids=("TD-1", "TD-2", "TD-3", "TD-4"))
+        await _pass(agent)
+        _entries(agent, repo, "TD-5")
+        await _pass(agent)
+        e = _rec(agent, "grind-3")
+        e.state = "limited"  # it cannot pick: the line is still short, and its guard stands
+        agent._scale_init()  # the home restarted: its memory is gone
+        await _pass(agent)
+        assert not _live(agent, "grind-4")
+        e.progress = [ProgressEntry(ref="TD-3")]  # the guard lifts with its claim
+        await _pass(agent)  # no new entry and no claim event: the guard read from the records brings it back
+        assert _live(agent, "grind-4")
