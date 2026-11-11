@@ -604,3 +604,36 @@ async def test_a_profile_with_no_copy_reads_its_accounts_reading_at_the_gate(age
         assert agent.sessions[sh["id"]].profile == "pg" and not agent._profile_gated("pg", now)
         for x in (s, sh):
             await person.call("kill", id=x["id"])
+
+
+class _ListsProfiles:
+    """An adapter with no `account_for`: its profiles say their accounts (TD-1631)."""
+
+    def profiles(self):
+        return [{"name": "pa", "account": "paul"}, {"name": "pb"}, "not a dict"]
+
+
+class _RaisingAccountFor:
+    def account_for(self, profile):
+        raise RuntimeError("the account lookup broke")
+
+
+def test_account_of_reads_profiles_for_an_adapter_with_no_account_for(monkeypatch):
+    """`_account_of` (#3361) falls back to the `profiles()` entry of the profile's name: its `account`, else the
+    profile's own name; a profile it does not list, and the `""` profile, are unresolved (TD-1631)."""
+    from sessionorc import adapters, agent_spend
+
+    monkeypatch.setattr(adapters, "get", lambda name: _ListsProfiles())
+    assert agent_spend._account_of("stub", "pa") == "paul"
+    assert agent_spend._account_of("stub", "pb") == "pb"
+    assert agent_spend._account_of("stub", "pc") is None
+    assert agent_spend._account_of("stub", "") is None
+
+
+def test_account_of_answers_none_when_an_adapters_lookup_raises(monkeypatch):
+    """An adapter whose `account_for` raises answers nothing rather than stopping the tick's migration and the
+    reserve gate (#3361, TD-1631)."""
+    from sessionorc import adapters, agent_spend
+
+    monkeypatch.setattr(adapters, "get", lambda name: _RaisingAccountFor())
+    assert agent_spend._account_of("stub", "pa") is None
