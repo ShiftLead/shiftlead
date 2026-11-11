@@ -738,3 +738,31 @@ def test_seat_choice_crosses_the_link_in_the_readers_form():
     reply = {"seat_choice": {"ao-tl-2": {"seat": "ao-tl", "extras": {"fill": "tl-2"}}}}
     out = naming.readdress(reply, lambda a: f"{a}@home")
     assert out == {"seat_choice": {"ao-tl-2@home": {"seat": "ao-tl@home", "extras": {"fill": "tl-2"}}}}
+
+
+@pytest.mark.integration
+async def test_a_seats_extras_at_their_fill_ceiling_fill_no_more(agent, tmp_path, blocked_replay):
+    """A seat's extras' fills count toward a `FILL_CEILING` of their own (§4.9 *The bounds*, TD-1547): six fills of
+    its extras inside `FILL_WINDOW` and the send fills none, the ask waiting on the own record and saying why; the
+    seat's own record's fills do not count, and fills older than the window fall out."""
+    from sessionorc.agent_common import FILL_CEILING, FILL_WINDOW
+
+    await park_ticks(agent)
+    _, calls = blocked_replay
+    async with LocalClient() as person:
+        own, (tl2, tl3) = await _seat(agent, person, tmp_path, own_live=True)
+        w1, w2, _ = await _askers(person, tmp_path)
+        async with LocalClient(caller=w1) as a:
+            await a.call("msg", to=own, text="read #11?", kind="ask")
+        _set(_rec(agent, own), "working")
+        now = datetime.now(UTC)
+        recent = (now - timedelta(minutes=5)).isoformat().replace("+00:00", "Z")
+        old = (now - FILL_WINDOW - timedelta(minutes=5)).isoformat().replace("+00:00", "Z")
+        _rec(agent, own).restarts = [{"at": recent, "why": "fill"}] * FILL_CEILING  # the seat's own: not counted
+        _rec(agent, tl3).restarts = [{"at": old, "why": "fill"}] * FILL_CEILING  # out of the window
+        _rec(agent, tl2).restarts = [{"at": recent, "why": "fill"}] * (FILL_CEILING - 1)
+        _rec(agent, tl3).restarts.append({"at": recent, "why": "fill"})  # the sixth, on another extra
+        async with LocalClient(caller=w2) as b:
+            got = await b.call("msg", to=own, text="read #12?", kind="ask")
+        assert got["delivered"] == [own] and calls == [], "no fill: the ask waits on the own record"
+        assert got["read_when"][own].startswith("waits on tl: its extras are at their fill ceiling"), got["read_when"]
