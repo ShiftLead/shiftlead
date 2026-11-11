@@ -2636,10 +2636,11 @@ teams:
     or written) for a key holding no `:` — never on a node, whose replica the home sends whole (§4.4a),
     nor in a CLI's or a page's read; a tick with none does nothing more, so the walk is its whole cost.
     Each such key — a profile's, the per-profile file's or one written by hand since; `""` the default
-    profile — moves to its profile's account, resolved through the adapter the profile names
-    (`profiles()`, asked only then). Per window label the account keeps one reserve from among its
-    profiles' and any entry already under the account: those whose unit fits the account's billing,
-    and of them **the one whose line is lowest on the window's last day** (a flat `r`, `100 − r`; a
+    profile — moves to its profile's account, resolved by asking each adapter's `account_for(key)`, which only the
+    adapter the profile names answers (and which reads `""` as the default profile), asked only then. Per window label the account keeps one reserve from among its
+    profiles' and any entry already under the account: those whose unit fits the account's billing (an account whose profiles disagree on billing keeps
+    none: every value is removed and named in the note, since a set on it is refused until the file is
+    fixed), and of them **the one whose line is lowest on the window's last day** (a flat `r`, `100 − r`; a
     per-day `d`, `100 − d`; a tie, the per-day one, then the first profile by name; a metered account,
     the smallest amount) — an order
     that needs no reading; one whose unit does not fit is removed and named. A merged line can rise for
@@ -2649,19 +2650,22 @@ teams:
     load, edit and save with no wait between them, as `set_settings` makes one, then pushed to the
     nodes and committed in the home's definition files as every settings write is (§4.4a; `_commit_defs`, §4.9); before it, the file
     as it stands is committed in the home's definition files — *settings.yml before TD-1581's migration*,
-    no commit where it is committed already — so the commit that holds it as it stood is the tree's
-    last change to `settings.yml` (read with git); on a home whose definitions are no git tree, it is
-    copied beside it as `settings.yml.before-TD-1581`, never overwritten. One
+    awaited through `_commit_defs` (its lock, the one committer, §4.9), no commit where it is committed
+    already — and the migration goes on only when `settings.yml` is then clean against the tree's head,
+    which is the commit that holds it as it stood (a failed commit leaves it dirty, and the tick moves
+    nothing, to try again next tick); on a home whose definitions are no git tree, it is copied beside
+    it as `settings.yml.before-TD-1581` the first time, never overwritten, and a later move's restore
+    point is its note's values. One
     `system` note tells the person what moved — *usage reserves are now per account: claude-code:paul
     takes week 5 (from grind-ask; grind had 1, grind-fable 3, grind-sonnet 5)* — with that commit (or
     the copy) to restore from, since a node not yet on this build and a rollback past it read
     `usage_gate:` by profile and so find no reserve and gate nothing until it is restored. A key whose
     profile no adapter here resolves (a profile only a node defines) is removed too, named in the note
     with its value, to be set again by account. So no key without a `:` stays past a tick.
-  - **Names.** A profile name holding a `:` or a `.` is named by `ao doctor`'s profiles check and its
-    reserve is refused, since its key would read as an account and a `.` breaks the settings writer's
-    dotted paths (`usage_gate.<account>.<label>`); `ao gate <x>` reads `<x>` as an account when it holds a
-    `:`, else as a profile.
+  - **Names.** A profile whose account part — its `account`, else its name — holds a `:` is named by
+    `ao doctor`'s profiles check and its reserve is refused, since its key would not split into adapter
+    and account; a `.` is allowed (an email-style account), the commit message's dotted path being words
+    only. `ao gate <x>` reads `<x>` as an account when it holds a `:`, else as a profile.
   **The line is computed from a reserve, never typed as a percentage.** The setting is a
   **reserve** per window label, of two shapes: a flat percent — `30` — whose line is `100 −
   reserve`; or a percent **per day** — `{per_day: 10}` — whose line is `100 − per_day × days_left`,
