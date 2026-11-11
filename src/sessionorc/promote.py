@@ -1422,7 +1422,11 @@ def survey(
             and finished(repo, live)
             and _on_main(root, live, r.get("main"))
         ):
-            told, landed = keep_live_ref(root, repo, live)
+            try:
+                told, landed = keep_live_ref(root, repo, live)
+            except OSError:  # one repo's files, never the pass: the next full pass reads again
+                log.exception("promote/live on %s: the lease could not be kept", repo)
+                told, landed = [], False
             notes.extend(told)
             if landed:
                 moved.append(str(root))

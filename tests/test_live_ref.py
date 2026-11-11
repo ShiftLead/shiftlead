@@ -271,6 +271,18 @@ def test_a_failed_smoke_tags_nothing_and_its_rollback_finds_the_tag_at_the_lease
     assert _refs(checkout)[TAG] == frm and promote.live_ref("repo") == frm  # nothing pushed
 
 
+@pytest.mark.unit
+def test_a_lease_file_that_cannot_be_written_never_stops_the_pass(checkout, monkeypatch):  # noqa: F811
+    _finish("repo", _head(checkout))
+
+    def boom(*a, **k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(promote, "keep_live_ref", boom)
+    readings, _, _, moved = _survey(checkout)
+    assert moved == [] and readings["repo"]["live"] == _head(checkout)
+
+
 # ── the sweep after it ────────────────────────────────────────────────────────────────────────────
 
 
