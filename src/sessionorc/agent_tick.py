@@ -2669,7 +2669,12 @@ class TickMixin:
         mail waiting for a fill. The missing ones are never written here: an extra's launch record is the one the
         line's next kept member would get, which only a definition gives, so they wait for the person's next Start
         or Apply (§4.9 *An extra*)."""
-        for r in self._extras_past(team, records):
+        try:
+            past = self._extras_past(team, records)
+        except Exception:  # noqa: BLE001 — a reading's surprise is a log line, never the team's start
+            log.exception("%s: %s's start could not read the held extras past the max", team, why)
+            return
+        for r in past:
             if r.unread():
                 log.info("%s: %s's start keeps the held extra past the max — its mail waits", self._address(r), why)
                 continue

@@ -81,3 +81,17 @@ async def test_off_reads_every_held_extra_as_surplus_and_no_key_none(agent, tmp_
     live, node, gone = _held("grinder-ao-8", "grinder-ao"), _held("grinder-ao-9", "grinder-ao"), _held("x-2", "x")
     live.state, live.host, node.host, gone.host, gone.superseded_by = "idle", agent.host, "laptop", agent.host, "y"
     assert agent._extras_past("g", [live, node, gone]) == []
+
+
+async def test_a_reading_that_raises_never_stops_the_start(agent, tmp_path, monkeypatch):
+    """Review of #3369: the settings read is outside each removal's own guard, so it is guarded on its own."""
+    await park_ticks(agent)
+    monkeypatch.setattr(agent, "_replay", _Replays())
+
+    def boom(*a):
+        raise ValueError("bad settings")
+
+    monkeypatch.setattr(agent, "_extras_past", boom)
+    recs = _team(agent)
+    await _settled(agent, tmp_path, *recs)
+    assert await agent._schedule_start("g", recs, datetime.now(UTC), "2026-11-11T10:00:00Z") == "started"
