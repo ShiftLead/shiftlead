@@ -34,7 +34,7 @@ from sessionorc.models import (
 )
 from sessionorc.reports import branch_ref
 from shiftlead import profiles as profiles_mod
-from shiftlead import repoconfig
+from shiftlead import repoconfig, teamrun
 from shiftlead.ending import (
     NO_CLOSER,
     closer_words,
@@ -612,6 +612,10 @@ def view(
     pool = str((s.get("seat") or {}).get("pool") or "").strip() if isinstance(s.get("seat"), dict) else ""
     if d["pool_rank"] > 1 and pool and not d["seat"]:
         d["role_label"] = f"{d['role_label'] or role} · backup for {pool}"
+    # §4.9 *What the person sees* (td-max, TD-1548): a live extra's badge says its place among its line's extras,
+    # *grinder · extra 1 of 3*, so it is told apart from the line its size keeps; a held one draws no card
+    if state not in DEAD and (k := teamrun.extra_badge(s, fleet or [])):
+        d["role_label"] = f"{d['role_label'] or role} · {k}"
     # §4.8 *A role says when to message it* (TD-171): the definition's line, drawn as text — the
     # composer's first line and the Message control's `title`; "" for a role without one
     # design §6 / §4.5a: when this session stops, from the same formatter `ao status -v` uses, in

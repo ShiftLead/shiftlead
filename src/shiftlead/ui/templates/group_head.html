@@ -29,6 +29,9 @@
     (`ao team flow <team> --apply`), the members it would change in the mark's title. Read when the
     page was drawn, not per delta #}
 {% if g.team and g.flow %}<a class="badge flowchip" href="/settings#team-{{ g.team }}" title="{{ g.flow_strip or g.flow }} — the flow this team runs (design §4.9c); pick it on Settings">flow: {{ g.flow }}</a>{% endif %}
+{#- design §4.5a team card **td-max** mark (§4.9 *What the person sees*, TD-1548): display only, while the team's
+    `max` is not `off` and a line or seat of it may scale — the ceilings are the Members dialog's **up to** #}
+{% if g.team and g.td_max %}<span class="badge tdmax" title="this team grows past its size with the work, each line or seat up to its ceiling (design §4.9 Scaling with the work) · up to in Members…">td-max</span>{% endif %}
 {#- …and on any live team, a seat its definition names that the run has no record of (§4.9c, TD-399): the
     mark reads *definition changed* where such seats are all that differ or the team runs no flow #}
 {% if g.team and g.flow_changed and g.live %}{% if g.definition_changed %}<span class="meta flowchanged" title="{% for d in g.flow_changed %}{{ d.line }}{% if not loop.last %}&#10;{% endif %}{% endfor %}">definition changed</span><button class="btn sm ghost" data-flow-apply="{{ g.team }}" title="apply the definition to the running team, as ao team flow {{ g.team }} --apply: each seat it names that the run lacks is started; a member whose profile differs is relaunched with the definition's, taken at its next restart; a member renamed is relaunched under its new name, one removed is sat out" data-confirm="Apply the definition to {{ g.team }}? {{ g.flow_changed | map(attribute='line') | join('; ') }}.">Apply</button>{% else %}<span class="meta flowchanged" title="{% for d in g.flow_changed %}{{ d.line }}{% if not loop.last %}&#10;{% endif %}{% endfor %}">flow changed</span><button class="btn sm ghost" data-flow-apply="{{ g.team }}" title="apply {{ g.flow }} to the running team, as ao team flow {{ g.team }} --apply: the members whose lane, reader, stage brief or profile differ are relaunched — a profile taken at the member's next restart — one the flow has no stage for sits out, one it needs is started" data-confirm="Apply {{ g.flow }} to {{ g.team }}? {{ g.flow_changed | map(attribute='line') | join('; ') }}.">Apply</button>{% endif %}{% endif %}
@@ -95,6 +98,11 @@
 {% if g.team and (g.counts or g.unseen_n) %}<span class="meta counts foldonly">· {{ g.counts | join(' · ') }}{% if g.unseen_n %}{{ ' · ' if g.counts }}<span class="unseen-n">{{ g.unseen_n }} unseen</span>{% endif %}</span>{% endif %}
 {#- under the header, while the definition cannot follow its flow, the reason and the flows it could (§4.9c) #}
 {% for line in g.flow_lines %}<div class="meta flowcannot">{{ line }}</div>{% endfor %}
+{#- design §4.5a team card **td-max** members line (§4.9 *What the person sees*, TD-1548): on a live team, each line
+    or seat that scales as its range and its extras (*grinder-ao 3–6 +1*, *techlead-ao-1 1–3 +2 idle*) and its
+    newest fill or stop (*+1 at 14:02: …*, *+0: host full, 30 live*), so a team grown past its size says by how
+    much and why; display only #}
+{% for x in g.scaling %}<div class="meta scaleline" title="{{ x.name }} runs {{ x.size }} at its size and up to {{ x.max }} with the work; {{ x.live }} extra{{ '' if x.live == 1 else 's' }} live (design §4.9 Scaling with the work)">{{ x.range }}{% if x.last %} · {{ x.last }}{% endif %}</div>{% endfor %}
 {#- design §4.5a team card **over its line** note (§6 *Balance*, TD-239): the home's mark in its own numbers,
     amber, display only — the line is moved on the Settings page #}
 {% if g.balance_note %}<div class="meta overline" title="its members take no new claim until it clears · Settings">{{ g.balance_note }}</div>{% endif %}

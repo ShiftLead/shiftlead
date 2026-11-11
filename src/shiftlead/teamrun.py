@@ -568,6 +568,10 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | Non
                     for s in t.seats
                 ],
                 "members": sum(len(m.names()) for m in t.members),
+                # td-max (§4.9 *What the person sees*, TD-1548): the header's mark, and each line or seat that
+                # scales as its range, its extras and its newest fill or stop
+                "td_max": td_max_on(t),
+                "scaling": scale_lines(t, crew),
                 # each line its size sets to other than its count (§4.9 *A team's size*, TD-1164)
                 "sizes": size_words(t.size, t),
                 # the definition's roles in its order, each with the names that hold it — the team's
@@ -2034,8 +2038,14 @@ def members_view(
         s = by_name.get(n)
         return {"name": n, "id": s["id"] if s else "", "state": s.get("state") if s else "not live"}
 
+    scaled = {x["name"]: x for x in scale_lines(team, sessions)}
+
     def up_to(n: str) -> dict[str, Any]:
-        return _up_to(team, n, (lane_why or {}).get(n, ""), [held(x) for x in team.extra_names(n)])
+        got = _up_to(team, n, (lane_why or {}).get(n, ""), [held(x) for x in team.extra_names(n)])
+        # the line read as its range and extras, its newest fill or stop beside it (§4.9 *What the person sees*)
+        if n in scaled and not got["why"]:
+            got.update(range=scaled[n]["range"], last=scaled[n]["last"])
+        return got
 
     editable = bool(team.source and org.path and Path(team.source) == Path(org.path))
     repo = Path(team.source).parent.name if team.source else "the repo"
@@ -2428,6 +2438,106 @@ def scaling_names(team: orgmod.TeamDef) -> list[str]:
     names = [team.techlead.name] if team.techlead is not None else []
     names += [m.name for m in team.members] + [x.name for x in team.seats]
     return [n for n in dict.fromkeys(names) if not team.scale_refusal(n)]
+
+
+def _extra_of(s: Mapping[str, Any]) -> str:
+    """The line or seat a record is an extra of (its `scale.line`), or ''."""
+    sc = s.get("scale")
+    return str(sc.get("line") or "") if isinstance(sc, Mapping) else ""
+
+
+def _clock(at: Any) -> str:
+    """An ISO instant in the host's clock, *14:02*, with the day once it is not today (*Mon 14:02*), as the
+    card's stops note reads one; '' where it does not parse."""
+    try:
+        t = datetime.fromisoformat(str(at).replace("Z", "+00:00")).astimezone()
+    except ValueError:
+        return ""
+    return f"{'' if t.date() == datetime.now().astimezone().date() else t.strftime('%a ')}{t:%H:%M}"
+
+
+def scale_last_words(last: Mapping[str, Any] | None) -> str:
+    """A `scale.last` as the team card, the Members dialog and `ao team list` draw it (§4.9 *What the person
+    sees*): `did: fill` *+1 at 14:02: <why>*, `did: stopped` *+0: <why>*; '' for any other."""
+    if not isinstance(last, Mapping):
+        return ""
+    why = str(last.get("why") or "").strip()
+    if last.get("did") == "fill":
+        at = _clock(last.get("at"))
+        return f"+1{f' at {at}' if at else ''}" + (f": {why}" if why else "")
+    if last.get("did") == "stopped":
+        return "+0" + (f": {why}" if why else "")
+    return ""
+
+
+def scale_lines(team: orgmod.TeamDef, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Each line or seat of `team` that scales, in the definition's order (§4.9 *What the person sees*, td-max,
+    TD-1548): its `name`, `size`, ceiling `max`, `live` extras, the live ones `idle` (a seat's alone), `range`
+    as the card's members line, the Members dialog and `ao team list` read it — *grinder-ao 3–6 +1*,
+    *techlead-ao-1 1–3 +2 idle* — and `last`, the newest `fill` or `stopped` among its extras' `scale.last` in
+    `scale_last_words`' words. A line or seat whose ceiling is at or below its size (stored at `0`, or a team at
+    `off`) scales not, and is left out: it is drawn plain."""
+    mine = [s for s in crew(team.name, sessions) if not s.get("superseded_by")]
+    seats = {x.name for x in team.seats} | ({team.techlead.name} if team.techlead is not None else set())
+    out = []
+    for name in scaling_names(team):
+        if not team.extra_names(name):
+            continue
+        extras = [s for s in mine if _extra_of(s) == name]
+        up = [s for s in extras if s.get("state") not in DEAD]
+        idle = sum(1 for s in up if s.get("state") == "idle") if name in seats else 0
+        size, top = team._sized(name), team.ceiling(name)
+        words = f"{name} {size}–{top}"
+        if up:
+            words += f" +{len(up)}" + (" idle" if idle == len(up) else f", {idle} idle" if idle else "")
+        lasts = [
+            x
+            for s in extras
+            if isinstance(s.get("scale"), Mapping)
+            and isinstance(x := s["scale"].get("last"), Mapping)
+            and x.get("did") in ("fill", "stopped")
+        ]
+        newest = max(lasts, key=lambda x: str(x.get("at") or ""), default=None)
+        out.append(
+            {
+                "name": name,
+                "size": size,
+                "max": top,
+                "live": len(up),
+                "idle": idle,
+                "range": words,
+                "last": scale_last_words(newest),
+            }
+        )
+    return out
+
+
+def td_max_on(team: orgmod.TeamDef) -> bool:
+    """Whether the team card's header carries **td-max** (§4.9 *What the person sees*): the team's `max` is not
+    `off` and a line or seat of it may scale (its ceiling above its size)."""
+    return team.max != "off" and any(team.extra_names(n) for n in scaling_names(team))
+
+
+def extra_badge(s: Mapping[str, Any], fleet: list[dict[str, Any]]) -> str:
+    """A live extra's place in its role badge, *extra k of n* (§4.9 *What the person sees*): k its place among
+    its line's extras by the number its name carries, n how many extras the line has, held ones among them
+    (records of the same team carrying the same `scale.line`, not superseded); '' for a record that is no extra."""
+    line = _extra_of(s)
+    if not line:
+        return ""
+    team = s.get("team")
+    sibs = {str(x.get("id")): x for x in fleet if x.get("team") == team and _extra_of(x) == line}
+    sibs[str(s.get("id"))] = dict(s)
+    alike = [x for x in sibs.values() if not x.get("superseded_by")]
+
+    def place(x: Mapping[str, Any]) -> tuple[int, str]:
+        n = str(x.get("name") or "")
+        k = n[len(line) + 1 :] if n.startswith(f"{line}-") else ""
+        return (int(k) if k.isdigit() else 1 << 30, n)
+
+    alike.sort(key=place)
+    k = next((i for i, x in enumerate(alike, 1) if str(x.get("id")) == str(s.get("id"))), 0)
+    return f"extra {k} of {len(alike)}"
 
 
 def set_max(call: Call, org: orgmod.Org, name: str, line: str, n: int | str, host: str = "") -> dict[str, Any]:
