@@ -167,3 +167,30 @@ def test_the_rollup_never_counts_a_held_extra_on_call():
     live_extra = {"id": "c", "state": "idle", "seat": {"trigger": "asks"}, "scale": {"line": "techlead-ao"}}
     groups = [{"team": "ao-grind", "live": True, "members": [seat, extra, live_extra]}]
     assert [m["id"] for _, m in ui_org.rollup_counted(groups)] == ["a", "c"]
+
+
+def test_an_attended_line_writes_no_extra_and_a_failed_read_is_said(world, extras_on, monkeypatch, capsys):  # noqa: F811
+    tmp_path, state = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["members"][1]["unattended"] = False
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    assert sorted(held(state)) == ["grind-3", "grind-4"]  # a line a person watches is no tick's to fill
+    state["calls"].clear()
+    state["sessions"].clear()
+    real = cli.call_sync
+
+    def failing(method, **params):
+        if method == "name_check" and params["name"] == "grind-3":
+            raise cli.AgentError("home gone")
+        return real(method, **params)
+
+    monkeypatch.setattr(cli, "call_sync", failing)
+    assert cli.main(["team", "start", "ao-grind"]) == 0  # the team started: the extras are said, never a failure
+    assert held(state) == {}
+    assert "no extras written — the home could not be read: home gone" in capsys.readouterr().err
+
+
+def test_a_held_seat_extra_is_never_on_call():
+    assert teamrun.on_call({"seat": {"trigger": "asks"}, "state": "closed"})
+    assert not teamrun.on_call({"seat": {"trigger": "asks"}, "state": "closed", "scale": {"line": "tl"}})

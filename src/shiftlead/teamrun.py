@@ -174,7 +174,8 @@ def on_call(s: dict[str, Any]) -> bool:
     """A seat with nobody in it (§4.9b, §6 rule 3): a record carrying `seat` that is `exited` or
     `closed`. Its id and its grants survive the close, so whoever fills it is the controller a
     session names now (design §4.5a New session **Controllers**, TD-269)."""
-    return bool(s.get("seat")) and s.get("state") in ("exited", "closed")
+    # a held extra is capacity its seat stands for, never a seat on call (§4.9 *Scaling with the work*)
+    return bool(s.get("seat")) and s.get("state") in ("exited", "closed") and not s.get("scale")
 
 
 # A Start's and an Apply's line for a manager on call, written held (§6 rule 3, TD-410): the card's words
@@ -799,20 +800,25 @@ def write_extras(
     if not plan.extras:
         return [], []
     on = {"host": plan.host} if plan.host else {}
-    records = call("list")
     verdicts: dict[str, Any] = {}
     written: list[dict[str, Any]] = []
     notes: list[str] = []
-    for x in plan.extras:
-        rec = _current(x.name, records)
-        if rec is not None and rec.get("scale"):
-            continue  # already this line's extra, held or filled: the reconcile's, not the start's
-        v = call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir), **on)
-        if v.get("verdict") in ("live", "suspended"):
-            notes.append(f"{x.name}: not written as an extra of {x.scale} — {v.get('holder') or x.name} holds the name")
-            continue
-        verdicts[x.name] = v
-    keeps, notes_kept = keep_mail_for(call, verdicts, caller, concluded=False)
+    try:  # the team's sessions exist by now: a read that fails writes no extra and is said, never a failed start
+        records = call("list")
+        for x in plan.extras:
+            rec = _current(x.name, records)
+            if rec is not None and rec.get("scale"):
+                continue  # already this line's extra, held or filled: the reconcile's, not the start's
+            v = call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir), **on)
+            if v.get("verdict") in ("live", "suspended"):
+                notes.append(
+                    f"{x.name}: not written as an extra of {x.scale} — {v.get('holder') or x.name} holds the name"
+                )
+                continue
+            verdicts[x.name] = v
+        keeps, notes_kept = keep_mail_for(call, verdicts, caller, concluded=False)
+    except Exception as e:  # noqa: BLE001 — whatever the transport raised, the answer is the same
+        return [], [f"no extras written — the home could not be read: {e}"]
     notes += notes_kept
     for x in plan.extras:
         if x.name not in verdicts:
