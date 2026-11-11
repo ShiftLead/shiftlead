@@ -14,7 +14,7 @@ from typing import Any
 
 from sessionorc import board, defs, gitinfo, paths
 from sessionorc import settings as settings_mod
-from shiftlead import flowdefs, repoconfig, teams
+from shiftlead import flowdefs, repoconfig, teamrun, teams
 from shiftlead import org as orgmod
 
 GIT_TIMEOUT = 5.0
@@ -248,6 +248,15 @@ def team_lacks(
     return out
 
 
+def max_warnings(team: orgmod.TeamDef, plan: teams.Plan | None = None) -> list[str]:
+    """Each `teams.<team>.max` key in `settings.yml` naming what may not scale, set aside and said (§4.9 *Scaling
+    with the work*, *What does not*; `teamrun.set_aside_max`): a warning, as an ignored `size` key is."""
+    return [
+        f"teams.{team.name}.max.{key} in settings.yml: {why} — set aside, no extra runs for it"
+        for key, why in teamrun.set_aside_max(team, plan)
+    ]
+
+
 def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
     org: orgmod.Org,
     notes: Collection[str],
@@ -279,8 +288,9 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
     warning, which does not fail it: a registered checkout off its default branch or holding
     changes, a `place:` naming a team no registered repo defines, a repo a linked host's registry
     holds that this one's does not (or a linked registry that could not be read; `repos_of` asks),
-    and, per team under a flow, each key it writes that the flow would fill with the same value
-    (`teams.flow_redundant`).
+    per team under a flow, each key it writes that the flow would fill with the same value
+    (`teams.flow_redundant`), and each `teams.<team>.max` key naming what may not scale, set aside
+    (`max_warnings`, §4.9 *Scaling with the work*).
 
     `stand_in` (`ao org check --root <dir>`, §4.7, TD-942) maps a registry entry, as written, to the
     directory read in its place — the same mapping `with_repos` was given: the root loop tests `<dir>`
@@ -350,13 +360,16 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
                 f"(its lines: {lines}) — ignored"
             )
         if name in org.unlanded:
+            warnings.extend(max_warnings(team))
             continue  # said above, in the landing's own words
         try:
-            teams.plan(org, name, here, files=files)
+            plan = teams.plan(org, name, here, files=files)
         except (teams.TeamError, ValueError, OSError) as e:
             lack(str(e).strip('"'))
+            warnings.extend(max_warnings(team))
         else:
             warnings.extend(teams.flow_redundant(org, team, here, here, files))
+            warnings.extend(max_warnings(team, plan))
         for root, at in stand_in.items():
             host = org.landed.get(name, ("", ""))[0]
             if team.repo == Path(root).expanduser().resolve().name and host and host != here:

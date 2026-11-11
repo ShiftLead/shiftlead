@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Callable, Mapping
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from datetime import time as dt_time
 from importlib import resources
@@ -2215,7 +2216,9 @@ def _defined_team(args: argparse.Namespace, org: orgmod.Org | None = None) -> st
 ON_WORK_WORDS = {"ask": "ask me", "start": "start the team", "off": "do nothing"}
 
 
-def _team_setting_line(name: str, t: dict[str, Any], team: orgmod.TeamDef | None = None) -> str:
+def _team_setting_line(
+    name: str, t: dict[str, Any], team: orgmod.TeamDef | None = None, org: orgmod.Org | None = None
+) -> str:
     until = stop_note({"run_until": t.get("until")}).replace("stops", "members stop") if t.get("until") else ""
     if t.get("passed"):
         until += " (passed)"
@@ -2231,7 +2234,25 @@ def _team_setting_line(name: str, t: dict[str, Any], team: orgmod.TeamDef | None
         parts.append(f"when work appears: {ON_WORK_WORDS.get(t['on_work'], t['on_work'])}")
     if words := teamrun.size_words(t.get("size"), team):  # §4.9 *A team's size*: a line its size differs on
         parts.append("size " + ", ".join(words))
+    parts += [f"max.{key} set aside: {why}" for key, why in _max_set_aside(t, team, org)]
     return f"{name}: " + " · ".join(parts)
+
+
+def _max_set_aside(t: dict[str, Any], team: orgmod.TeamDef | None, org: orgmod.Org | None) -> list[tuple[str, str]]:
+    """The settings line's half of `teamrun.set_aside_max` (§4.9 *Scaling with the work*, *What does not*): the
+    file's `max` keys, read against the definition — none without one, as `size_words` says the number alone.
+    With the org, a key on a member line the name allows is read against the team's plan too (a lane in no
+    stage), where the plan can be made here."""
+    if team is None or not isinstance(t.get("max"), dict):
+        return []
+    # the file's keys as `with_settings` reads them (a whole number each), so `ao org check` says the same
+    team = replace(team, max={str(k): v for k, v in t["max"].items() if isinstance(v, int) and not isinstance(v, bool)})
+    plan = None
+    if org is not None and any(m.name in team.max and not teamrun.max_refusal(team, m.name) for m in team.members):
+        with contextlib.suppress(teams.TeamError, ValueError, OSError, AgentError, AgentUnavailable):
+            org = replace(org, teams={**org.teams, team.name: team})
+            plan = teams.plan(org, team.name, hosts.local_host().name, files=teamrun.files_via(call_sync))
+    return teamrun.set_aside_max(team, plan)
 
 
 def _schedule_words(t: dict[str, Any]) -> str:
@@ -2310,7 +2331,8 @@ def cmd_team_until(args: argparse.Namespace) -> int:
     `teams.<team>.until` through `set_settings` — a person's own. The tick gives it to every live
     member and seat; `--clear` takes it back from the members that carry it."""
     try:
-        name = _defined_team(args)
+        org = _org_here()
+        name = _defined_team(args, org)
     except ValueError as e:
         return fail(args, str(e), 1)
     if not args.clear and not args.when:
@@ -2318,19 +2340,20 @@ def cmd_team_until(args: argparse.Namespace) -> int:
     when = None if args.clear else stop_time(args.when)
     got = call_sync("set_settings", teams={name: {"until": when}})
     t = (got.get("teams") or {}).get(name) or {}
-    return emit(args, got, lambda: print(_team_setting_line(name, t)))
+    return emit(args, got, lambda: print(_team_setting_line(name, t, org.teams.get(name), org)))
 
 
 def cmd_team_reserve(args: argparse.Namespace) -> int:
     """`ao team reserve <team> <n>` (design §4.7, §6 *Usage gate*, TD-146): the team's reserve
     priority, a flat percent added to its profile's reserve for the team's sessions; `0` clears it."""
     try:
-        name = _defined_team(args)
+        org = _org_here()
+        name = _defined_team(args, org)
     except ValueError as e:
         return fail(args, str(e), 1)
     got = call_sync("set_settings", teams={name: {"reserve": args.n or None}})
     t = (got.get("teams") or {}).get(name) or {}
-    return emit(args, got, lambda: print(_team_setting_line(name, t)))
+    return emit(args, got, lambda: print(_team_setting_line(name, t, org.teams.get(name), org)))
 
 
 def cmd_team_on_work(args: argparse.Namespace) -> int:
@@ -2338,12 +2361,13 @@ def cmd_team_on_work(args: argparse.Namespace) -> int:
     when the team has wound down and its lanes gain work — the Inbox row, the start itself, or
     nothing — written to `teams.<team>.on_work` through `set_settings`, a person's own."""
     try:
-        name = _defined_team(args)
+        org = _org_here()
+        name = _defined_team(args, org)
     except ValueError as e:
         return fail(args, str(e), 1)
     got = call_sync("set_settings", teams={name: {"on_work": args.what}})
     t = (got.get("teams") or {}).get(name) or {}
-    return emit(args, got, lambda: print(_team_setting_line(name, t)))
+    return emit(args, got, lambda: print(_team_setting_line(name, t, org.teams.get(name), org)))
 
 
 def cmd_team_size(args: argparse.Namespace) -> int:
@@ -2784,11 +2808,11 @@ def cmd_settings(args: argparse.Namespace) -> int:
         if not got.get("usage_gate"):
             print("  none — the gate pauses nothing")
         print("teams:")
-        defined: dict[str, orgmod.TeamDef] = {}
+        here: orgmod.Org | None = None
         with contextlib.suppress(ValueError, OSError, AgentError, AgentUnavailable):  # *file says* needs the org
-            defined = _org_notes()[0].teams
+            here = _org_notes()[0]
         for name, t in (got.get("teams") or {}).items():
-            print("  " + _team_setting_line(name, t, defined.get(name)))
+            print("  " + _team_setting_line(name, t, here.teams.get(name) if here else None, here))
         if not got.get("teams"):
             print("  none")
         print("repos:")
