@@ -224,6 +224,10 @@ class IdentityMixin:
         if verdict.alarm is not None:
             if rpc == "hook" and hook_session:
                 self._id_log_late_hook(peer, hook_session)
+            elif ch.kind == "unknown":
+                # which signal made it unknown (§4.8a): a peer gone before the read (`unreadable`), another
+                # pid namespace or uid, or a detached cgroup — the alarm line alone says only *unknown* (TD-1589)
+                log.info("%s from peer %s judged unknown: %s", rpc, peer, ch.signal or "no signal")
             self._id_alarm(verdict.alarm, verdict.about)
         if self.identity_mode != "enforce":
             return None

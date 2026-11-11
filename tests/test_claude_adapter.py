@@ -1190,9 +1190,11 @@ def test_usage_for_by_profile_name_and_why_when_there_is_no_reading(tmp_path, mo
             "reason": "ok",
         }
     with um.patch.object(ClaudeCodeAdapter, "usage", return_value=None):
-        assert ad.usage_for("default") == {"reason": "error"}
+        assert ad.usage_for("default") == {"reason": "error", "detail": "a body of no known shape"}
     for refused, want in (
         (UsageRefused("rate_limited", 90.0), {"reason": "rate_limited", "retry_after": 90.0}),
+        # the cause rides beside the reason, for the core's log line (TD-1589)
+        (UsageRefused("error", detail="HTTP 503 x"), {"reason": "error", "retry_after": None, "detail": "HTTP 503 x"}),
         (UsageRefused("rate_limited"), {"reason": "rate_limited", "retry_after": None}),
         (UsageRefused("no_credentials"), {"reason": "no_credentials", "retry_after": None}),
     ):
@@ -1214,20 +1216,33 @@ def test_a_429_is_read_as_rate_limited_with_its_retry_after(tmp_path, monkeypatc
     ad = ClaudeCodeAdapter()
     prof = profiles.get(None)
     with um.patch.object(ClaudeCodeAdapter, "_creds", return_value={"accessToken": "t"}):
-        for err, reason, after in (
-            (urllib.error.HTTPError("u", 429, "rate_limit_error", {"Retry-After": "120"}, None), "rate_limited", 120.0),
-            (urllib.error.HTTPError("u", 429, "rate_limit_error", {}, None), "rate_limited", None),
+        for err, reason, after, cause in (
+            (
+                urllib.error.HTTPError("u", 429, "rate_limit_error", {"Retry-After": "120"}, None),
+                "rate_limited",
+                120.0,
+                "HTTP 429 rate_limit_error",
+            ),
+            (
+                urllib.error.HTTPError("u", 429, "rate_limit_error", {}, None),
+                "rate_limited",
+                None,
+                "HTTP 429 rate_limit_error",
+            ),
             (
                 urllib.error.HTTPError("u", 429, "x", {"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"}, None),
                 "rate_limited",
                 None,
-            ),  # noqa: E501
-            (urllib.error.HTTPError("u", 500, "boom", {}, None), "error", None),
-            (OSError("no route to host"), "error", None),
+                "HTTP 429 x",
+            ),
+            # TD-1589: an `error` carries its cause, the status or the exception, for the log
+            (urllib.error.HTTPError("u", 500, "boom", {}, None), "error", None, "HTTP 500 boom"),
+            (OSError("no route to host"), "error", None, "OSError: no route to host"),
+            (TimeoutError(), "error", None, "TimeoutError"),
         ):
             with um.patch("urllib.request.urlopen", side_effect=err), pytest.raises(UsageRefused) as e:
                 ad.usage(prof)
-            assert (e.value.reason, e.value.retry_after) == (reason, after)
+            assert (e.value.reason, e.value.retry_after, e.value.detail) == (reason, after, cause)
     # and no credentials never reaches the network at all
     with um.patch.object(ClaudeCodeAdapter, "_creds", return_value=None), pytest.raises(UsageRefused) as e:
         ad.usage(prof)

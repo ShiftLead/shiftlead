@@ -314,6 +314,20 @@ async def test_a_peer_in_another_namespace_is_refused_under_enforce_and_alarmed_
     assert [(x["channel"], x["count"]) for x in agent.identity_alarms] == [("unknown", 2)]  # one alarm, counted
 
 
+async def test_an_unknown_verdict_logs_the_signal_that_made_it(agent, monkeypatch, caplog):
+    """TD-1589: a member's `usage_report` was refused as *unknown* 88 times in ten days, and the alarm
+    line said only *unknown*. The log now names the signal (§4.8a): a peer gone before its read is
+    `unreadable`, never confused with another namespace or a detached cgroup."""
+    agent._id_detached = ""
+    monkeypatch.setattr(agent, "proc", FakeProc(list(BASE)))  # pid 4242 is not there: exited before the read
+    agent._id_panes = list(PANES)
+    agent.identity_mode = "enforce"
+    req = {"id": 1, "method": "usage_report", "params": {"windows": []}, "caller": "ao-x"}
+    with caplog.at_level("INFO", logger="shiftlead.agent"):
+        assert (await agent._identify(dict(req), 4242))["error"] == identity.MISMATCH
+    assert "usage_report from peer 4242 judged unknown: unreadable" in caplog.text
+
+
 async def test_a_served_connection_carries_its_peers_uid_to_the_classification(agent, monkeypatch):
     """TD-1122: the uid of TD-1093 reaches `classify` over a real connection — `_handle_conn` and
     `_serve_wait` pass `_peer_args`, `_dispatch` hands `peer_uid` to `_identify`, and `_id_channel`

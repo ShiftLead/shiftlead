@@ -147,7 +147,8 @@ class Adapter(Protocol):
     #                                                      (TD-087): {"reason": "rate_limited", "retry_after":
     #                                                      <seconds or None>} / {"reason": "no_credentials"} /
     #                                                      {"reason": "no_profile"} / {"reason": "error"} — a
-    #                                                      word the core keys on, never prose. None is still
+    #                                                      word the core keys on, never prose; `detail`, when
+    #                                                      present, is its cause for the log (TD-1589). None is still
     #                                                      legal and means the same as "error". Never gates
     #                                                      anything (design §4.3 `usage()`, keyed by the profile
     #                                                      *name* because this package cannot build a Profile)
