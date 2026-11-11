@@ -134,6 +134,25 @@ def test_a_sync_prs_row_says_sync_and_its_reason_green_or_red():
     assert red_pr_rows({root: reading(root, orders=[sync])}, [rec("g1", root)], now()) == []  # serviced: a lane's
 
 
+@pytest.mark.parametrize("checks", ["green", "pending"])
+def test_a_lift_prs_row_says_lift_its_gate_and_its_age(checks):
+    """TD-1578, §4.5a *Inbox row: red PR*: a live check's lift PR is an order whatever its checks (§4.4 *A live
+    check's lift PR is the team's at once*); its row says *lift*, its age since `lift_since` and the gate it
+    lifts, never *conflicting* — the order as `workorders.pr_order` makes it from the reading."""
+    from sessionorc import workorders
+    from shiftlead.ui.app import red_pr_rows
+
+    root = "/r/samscrape"
+    since = _iso(now() - timedelta(hours=2))
+    pr = {"number": 1900, "title": "TD-77: lift event (live)", "branch": "lift/TD-77/live", "url": "https://x/1900", "author": "eye", "checks": checks, "failing": [], "conflicting": False, "lift": True, "lift_since": since}  # fmt: skip
+    lift = workorders.pr_order(pr)
+    assert lift["lift"] and lift["red_since"] is None
+    (row,) = red_pr_rows({root: reading(root, orders=[lift])}, [], now())
+    assert row["at"] == since and row["age"].startswith("2h")
+    assert row["text"] == f"samscrape #1900 · lift {row['age']} · lifts TD-77 event (live) · eye"
+    assert red_pr_rows({root: reading(root, orders=[lift])}, [rec("g1", root)], now()) == []  # serviced: a lane's
+
+
 def fake(repos, fleet):
     class Fake:
         def __init__(self, *a, **k):
