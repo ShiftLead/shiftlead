@@ -80,3 +80,19 @@ def test_on_a_live_team_the_extras_follow_at_the_next_start(world, capsys):  # n
     capsys.readouterr()
     assert cli.main(["team", "max", "ao-grind", "grind", "4"]) == 0
     assert capsys.readouterr().out.strip() == "grind: up to 4 · the extras follow at the next Start"
+
+
+def test_a_seat_scales_from_a_size_of_one(world, tmp_path, capsys):  # noqa: F811
+    """#3296's review: the techlead seat and an `asks` seat are sized 1 — 3 writes two extras, 1 none."""
+    import yaml
+
+    doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
+    doc["teams"]["ao-grind"]["techlead"] = {"name": "tl-ao"}
+    doc["teams"]["ao-grind"]["seats"] = [{"name": "fc-ao", "role": "auditor", "trigger": "asks"}]
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    _, state = world
+    assert cli.main(["team", "max", "ao-grind", "tl-ao", "3"]) == 0
+    assert cli.main(["team", "max", "ao-grind", "fc-ao", "1"]) == 0
+    assert _max(state) == {"tl-ao": 3, "fc-ao": 0}
+    team = orgmod.with_home_settings(orgmod.load()).teams["ao-grind"]
+    assert team.extra_names("tl-ao") == ["tl-ao-2", "tl-ao-3"] and team.extra_names("fc-ao") == []

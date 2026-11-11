@@ -2298,7 +2298,7 @@ def max_refusal(team: orgmod.TeamDef, name: str) -> str:
     why = team.scale_refusal(name)
     if not why:
         return ""
-    if name == team.manager.name:
+    if name == team.manager.name and team.manager.role != orgmod.PERSON:  # a person lead is no line: its own words
         return f"{name} is the manager: {why}"
     seat = next((x for x in team.seats if x.name == name), None)
     if seat is not None and seat.pool:
