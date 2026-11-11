@@ -768,6 +768,13 @@ def resume_form_url(rec: dict[str, Any], why: str = "") -> str:
     return "/new?" + urlencode({k: v for k, v in q.items() if v})
 
 
+def entry_values(repo: str, type_: str, priority: str, ledger: str) -> str:
+    """The Add entry session's values block (design §4.3 *The shared text goes in the system prompt, the per-start text
+    after it*, TD-1664): what differs between two Add entry starts, typed in the composer ahead of the person's words,
+    since its start context (`entry.md` filled with `repoconfig.ADDED_ENTRY`) is the same text for every one."""
+    return f"Add entry values — repo: {repo}, Type: {type_}, Priority: {priority}, ledger: {ledger}"
+
+
 def ledger_start_form(root: str, name: str, ref: str, team: str, role: str, manager: str, prompt: str, why: str) -> str:
     """Where **Start session** lands when it cannot be silent (§4.5a *Inbox row: ledger entry*, TD-678):
     New session filled in as the press would have started it — the repo, a new worktree `td-<n>` under
@@ -3249,11 +3256,14 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         in its team as a person's own session is (§4.9 *A person in the team*) with the role `entries:`
         names for the Type — `plain` with no badge where no team services the repo — at the prompt: no
         opening prompt and no brief.
-        `entry.md`'s lines, filled, are the session's **start context** (§4.3, TD-283 part 2): it holds
-        them from its start with no turn run for them, and Focus draws them in the Session card's **told at start** row.
-        Answers `{id, text}`: the composer's text — the person's words alone — which the page keeps in
-        the browser as that session's draft; nothing is typed into the pane, and the record holds the
-        lines, never the words."""
+        `entry.md`'s lines, filled with `ADDED_ENTRY`'s constant phrases, are the session's **start context** (§4.3,
+        TD-283 part 2): the same text for every Add entry start, so it is read from the prompt cache (§4.3 *The shared
+        text goes in the system prompt, the per-start text after it*, TD-1664); it holds them from its start with no
+        turn run for them, and Focus draws them in the Session card's **told at start** row.
+        Answers `{id, text}`: the composer's text — the values block (`entry_values`), then a blank line and the
+        person's words when there are any — which the page keeps in the browser as that session's draft and the
+        person may edit before sending; nothing is typed into the pane, and the record holds the lines, never the
+        values or the words."""
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         if not isinstance(body, dict):
             raise HTTPException(400, "send {repo, type, words}")
@@ -3302,12 +3312,18 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             controllers=[plan["manager"]] if plan["manager"] else [],
             project=project,
             team=team,  # the badge, as the New session form's Team pick sets it; none without a team
-            start_context=repoconfig.entry_text(plan["repo"], plan["type"], priority, plan["ledger"]),
+            start_context=repoconfig.entry_text(*(repoconfig.ADDED_ENTRY[s] for s in repoconfig.ENTRY_SLOTS)),
             **({"host": away} if away else {}),  # routed to the team's host, as New session's Host pick is
             **_draft_of(body),
         )
-        text = str(body.get("words") or "").strip()  # the composer is the person's (§4.5a **Open a session**)
-        return {"ok": True, "id": s["id"], "name": s.get("name") or plan["name"], "text": text}
+        words = str(body.get("words") or "").strip()  # the composer is the person's (§4.5a **Open a session**)
+        text = entry_values(plan["repo"], plan["type"], priority, plan["ledger"])
+        return {
+            "ok": True,
+            "id": s["id"],
+            "name": s.get("name") or plan["name"],
+            "text": f"{text}\n\n{words}" if words else text,
+        }
 
     @app.post("/api/rank/move")
     async def api_rank_move(request: Request):
