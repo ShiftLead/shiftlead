@@ -451,21 +451,27 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      where td-max's extra fill and mover are built), and nothing else starts it; the hold is tested before
      the gate and the ceiling, so a held seat takes no word of `unfillable` and is never routed around (§4.9b):
      its questions land and wait. Its `seat_due` stands, the mail waits in its mailbox, and every pass over the
-     seat, due or not, writes **`seat_held: {at, by, team}`** on its record while it holds (home-owned, `by` the
-     helper's word, `at` when the hold began, written once, pushed to a node's seat as its other home-owned
-     marks are) and clears it once it does not; the send reads the helper itself where the mark is not yet
+     seat, due or not — every pass that reaches the seat's cause, a suspended seat and one its flow sat out
+     keeping their own words — writes **`seat_held: {at, by, team}`** on its record while it holds (home-owned,
+     `by` and `at` the helper's, `at` the last end it read, rewritten when either changes, pushed to a node's
+     seat as its other home-owned marks are) and clears it once it does not; the send reads the helper itself where the mark is not yet
      written, so the first sender after a Stop is told too (`read_when`, §4.10). Bounds run as ever: an `ask`
      waiting on a held seat lapses at its bound and a `steer` takes its default, as on any closed seat. The
-     next **Start** lifts it: `create` replaces each closed record in place with a fresh one carrying no end
-     and no `seat_held`, and its members and its `asks` seat start live (or `scheduled`, a start time's, which
-     is not `DEAD`), so the team has someone live, and a held seat is filled on its standing cause on the next
-     pass, its mail intact. A team stopped by its stop time is not started again by its schedule (rule 8 never
-     starts a stopped team), so its seats hold until the person's Start. A seat whose team's last end was
+     next **Start** lifts it: `create` replaces each closed record in place with a fresh one carrying no
+     `seat_held`, its members and its `asks` seat started live (or `scheduled`, a start time's, which is not
+     `DEAD`) and a seat rule 8's start replays held carrying the start's own closer (`{by: start, why: held}`),
+     which `_how_stopped` reads as neither word — so a team with members has someone live, a team of seats
+     alone reads no word, and a held seat is filled on its standing cause on the next pass, its mail intact.
+     A team stopped by its stop time is not started again by its schedule (rule 8 never starts a stopped
+     team), so its seats hold until the person's Start; a wound-down team is started by rule 8 for lane news
+     under `start`, which lifts the hold as a Start does, but **never for a held seat's questions alone** (a
+     mark with no lane ids starts nothing). A person's Restart or Open of one record of the team makes its crew
+     live, which lifts the hold on its other seats too: they fill on their causes, as the person's act says. A seat whose team's last end was
      another's — a crash the restart rules gave up on, a kill by a session, members that finished and were
      closed, or none but rule 3's own closes (a team of seats alone between questions) — is filled as above,
      as TD-1128 made it (*whatever its team*, §4.10 *A team or a repo as the address*): running out of work is
-     no word against running, and a question is work (§4.9a). A person's Close of a team's last live record
-     is a Stop like any other, so a team of seats alone whose idle seat the person closed holds until a
+     no word against running, and a question is work (§4.9a). A person's Close of a team's last live record, or of one member within `FINISHED_SETTLE` of the rest
+     finishing, is a Stop like any other, so a team of seats alone whose idle seat the person closed holds until a
      Start. So a Stop the home undoes is no longer possible, and cross-repo filing keeps its seat-only and
      wound-down teams.
   4. **The idle nudge.** A supervised member that has been hook-confirmed `idle` for `IDLE_NUDGE`
@@ -1013,11 +1019,15 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      mark is written, under `ask` and `start`, for a team whose lanes gained nothing where a held seat has
      questions: `members` empty, `seats_held` alone, `at` the first tick that read a question waiting, `repo`
      the seat record's, no `WORK_SETTLE`; under `off` nothing is written and the seat's card says it alone.
-     **Telegram** tells such a mark as it tells the row: for `until`, once, when `seats_held` is first written
-     (*<team> · stopped at its stop time · n questions wait on <seat name>*), never again for a rising count;
-     for `person`, never. **Dismiss** clears the row's entries and leaves its held part, which no press but
-     the Start, or the questions closing, takes away: the questions still wait, so a dismissed count would
-     only come back on the next tick.
+     A row with lane ids keeps its section and its telling by `stopped.by` as above; a **held-only** mark (no
+     lane ids) reads the held seat's word, `seat_held.by` — never `stopped.by`, which counts rule 3's own seat
+     closes and so can read `other` where the hold reads `person`, and which a wound-down team's mark lacks:
+     under *Later*, uncounted and never told, for `person`; under *Needs you*, counted, and told once on
+     **Telegram** when `seats_held` is first written (*<team> · stopped at its stop time · n questions wait on
+     <seat name>*), never again for a rising count, for `until`. A held-only mark never starts the team, under
+     any `on_work`. **Dismiss** clears a row's entries and leaves its held part, which no press but the Start,
+     or the questions closing, takes away: the questions still wait, so a dismissed count would only come back
+     on the next tick — and a held-only row draws **Start** and **Snooze** alone, no Dismiss.
 
      **A team with no record** carrying its badge (defined and never started, or every record
      Forgotten) has no lane on any record. The home reads no definition, so it cannot read that
