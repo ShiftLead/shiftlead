@@ -386,7 +386,8 @@ def parse_scale(value: Any, drop: bool = False) -> dict[str, Any]:
     if "migrated" in got:
         try:
             m = got["migrated"]
-            out["migrated"] = str(m.isoformat() if hasattr(m, "isoformat") else datetime.fromisoformat(str(m)).date())
+            m = m if hasattr(m, "isoformat") else datetime.fromisoformat(str(m))
+            out["migrated"] = (m.date() if isinstance(m, datetime) else m).isoformat()  # a day, whatever was written
         except ValueError:
             if not drop:
                 raise ValueError(f"scale.migrated is a date, not {got['migrated']!r}") from None

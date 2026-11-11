@@ -52,6 +52,7 @@ def test_scale_live_and_its_migration_stamp():
         "migrated": "2026-11-11",
     }
     assert s.parse_scale({"migrated": "2026-11-11"}) == {"migrated": "2026-11-11"}
+    assert s.parse_scale({"migrated": "2026-11-11 10:00:00"}) == {"migrated": "2026-11-11"}
     with pytest.raises(ValueError, match="1 or more"):
         s.parse_scale({"live": {"kmaster": 0}})
     with pytest.raises(ValueError, match="unknown key"):
