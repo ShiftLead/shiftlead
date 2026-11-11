@@ -23,7 +23,7 @@ People: paul
   - **Context:** TD-1301 is a live check of the phone Focus (TD-003): only your phone shows it. You were asked in the look m-47ff5ed1cf57 (2026-11-02); this item carries it on the board (TD-1584).
   - **Question:** On your phone, does a pinch change the columns once and survive a reload, and does a swipe on the strip walk the records?
   - **Recommended:** Works if it does; Not right and a grinder files what is wrong.
-- [ ] decide 2026-11-11 (n/a) — On your phone, does the key bar answer a Claude Code menu by digit and by the drag pad? Context: TD-1300 decision (paul). Due: 2026-11-18. Answers: Works | Not right. Lifts: Works | Not right.
+- [x] decide 2026-11-11 (n/a) — On your phone, does the key bar answer a Claude Code menu by digit and by the drag pad? Context: TD-1300 decision (paul). Due: 2026-11-18. Answers: Works | Not right. Lifts: Works | Not right. Decided: Works (by paul) (2026-11-11). Closed: 2026-11-11 — lifted.
   - **Context:** TD-1300 is a live check of the phone Focus (TD-003): only your phone shows it. You were asked in the look m-47ff5ed1cf57 (2026-11-02); this item carries it on the board (TD-1584).
   - **Question:** On your phone, does the key bar answer a Claude Code menu by digit and by the drag pad?
   - **Recommended:** Works if it does; Not right and a grinder files what is wrong.
