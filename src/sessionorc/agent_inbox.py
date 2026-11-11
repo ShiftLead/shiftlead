@@ -30,6 +30,7 @@ from sessionorc import ledger as ledger_mod
 from sessionorc import queue as queue_mod
 from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
+from sessionorc import work as work_mod
 from sessionorc.agent_common import (
     ENTRY_PRIORITIES,
     ENTRY_TYPES,
@@ -431,6 +432,16 @@ class InboxMixin:
         r = self._graph().get(self._seat_followed(seat))
         return r is None or seat_able(r, datetime.now(UTC), self.unfillable)
 
+    def _seat_id_takes(self, seat: str) -> bool:
+        """Whether a team's techlead seat id is a target for a blank Team pick (§4.10 *A team or a repo as the
+        address*, §6 rule 3 *A stopped team's seats are held*, TD-1564): able (`_seat_id_able`) **and** not held —
+        a held seat is the address of its own team, never a target across teams."""
+        if not self._seat_id_able(seat):
+            return False
+        graph = self._graph()
+        r = graph.get(self._seat_followed(seat))
+        return r is None or not work_mod.held_for(r, list(graph.values()))
+
     async def rpc_entry_add(
         self,
         repo: str = "",
@@ -504,9 +515,9 @@ class InboxMixin:
                     names = ", ".join(str(t["team"]).strip() for t in servicing)
                     raise RpcError(f"{pick} does not service {name}: its teams are {names} (design §4.10)")
                 pick = str(to["team"]).strip()
-            else:  # a blank pick: the first team whose techlead seat is able, else the first with a seat (TD-1443)
+            else:  # a blank pick: the first team whose techlead seat is able and not held, else the first with a seat
                 seated = [t for t in servicing if str(t.get("seat") or "").strip()]
-                to = next((t for t in seated if self._seat_id_able(str(t["seat"]).strip())), None)
+                to = next((t for t in seated if self._seat_id_takes(str(t["seat"]).strip())), None)
                 to = to or (seated or servicing)[0]
                 order = [{"team": str(t["team"]).strip(), "seat": str(t["seat"]).strip()} for t in seated]
             team = str(to["team"]).strip()
@@ -625,8 +636,17 @@ class InboxMixin:
         rings = s is not None and getattr(adapters.get(s.adapter), "composer", None) is not None
         # a modal limit has no reset to name (§4.3, TD-944): read off a record of this host alone
         modal = s is not None and s.host == self.host and agent_common.limit_is_modal(s, adapters.get(s.adapter))
+        held = self._held_words(s) if s is not None else None  # §6 rule 3 *A stopped team's seats are held*
         return mail.read_when(
-            s, "ask", datetime.now(UTC), seat=s is None, unreachable=down, rings=rings, lapses=False, modal_limit=modal
+            s,
+            "ask",
+            datetime.now(UTC),
+            seat=s is None,
+            unreachable=down,
+            rings=rings,
+            lapses=False,
+            modal_limit=modal,
+            held=held,
         )
 
     async def rpc_board_reply(
