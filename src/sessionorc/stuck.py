@@ -231,7 +231,9 @@ def carried(reading: Mapping[str, Any]) -> set[str]:
 
 def claim_at(r: Session, ref: str) -> datetime | None:
     """A holder's claim instant on `ref`: its latest declared `claimed` entry's `at`."""
-    return _latest(*(p.at for p in r.progress if p.ref == ref and p.status == "claimed" and p.source == "declared"))
+    return _latest(
+        *(p.at for p in r.progress if p.ref == ref and p.status == "claimed" and (p.source or "declared") == "declared")
+    )
 
 
 def holders(ref: str, records: Mapping[str, Session], now: datetime) -> list[str]:
@@ -267,11 +269,11 @@ def _has_lane_ids(mark: Any) -> bool:
 
 def team_reason(team: str, records: Iterable[Session], mark: Any, key: str) -> dict[str, Any] | None:
     """A team read whole for a work order (§6 rule 13 *The work it reads*): none of its crew live and the team
-    wound down (`work.team_wound_down`) or stopped (`work.team_stopped`, by the person or its stop time) — its reason `{state: team, team, held}`
-    from its `work_waiting` (rule 8): `held` as rule 8 writes it; none for a mark with no `held` (*waits for your
-    Start*); `{why: wound_down}` where the team wound down with the line in its members' `lane_seen`; `{why:
-    stopped}` for no mark otherwise (*is not running*). A held-only mark (no lane ids) reads as no mark. None for a
-    team that is not read whole: its members are read each by its own state."""
+    wound down (`work.team_wound_down`) or stopped (`work.team_stopped`, by the person or its stop time) — its
+    reason `{state: team, team, held}` from its `work_waiting` (rule 8): `held` as rule 8 writes it; none for a
+    mark with no `held` (*waits for your Start*); `{why: wound_down}` where the team wound down with the line in
+    its members' `lane_seen`; `{why: stopped}` for no mark otherwise (*is not running*). A held-only mark (no lane
+    ids) reads as no mark. None for a team that is not read whole: its members are read each by its own state."""
     mine = [r for r in records if not r.superseded_by]
     if any(r.state not in work.DEAD for r in work.crew(mine)):
         return None
@@ -290,12 +292,16 @@ def team_reason(team: str, records: Iterable[Session], mark: Any, key: str) -> d
     return out
 
 
-def lane_records(root: str, entry: Mapping[str, Any], records: Mapping[str, Session]) -> list[str]:
+def lane_records(
+    root: str, entry: Mapping[str, Any], records: Mapping[str, Session], teams: Iterable[str] = ()
+) -> list[str]:
     """The addresses of the records whose lane takes a work order (§6 rule 13 *The work it reads*), as `ao repo`
     reads the lanes: the repo's records no newer one supersedes, with a lane `ledger.lane_matches` takes it in —
-    never a seat (which has no lane) nor a member its flow sat out (`work.sat_out`) — by team, then id."""
+    never a seat (which has no lane) nor a member its flow sat out (`work.sat_out`) — by team in `teams` order
+    (a team not in it after, by name), then id."""
+    rank = {t: i for i, t in enumerate(teams)}
     out = [
-        (r.team or "", addr)
+        (rank.get(r.team or "", len(rank)), r.team or "", addr)
         for addr, r in records.items()
         if r.repo == root
         and r.lane
@@ -304,7 +310,7 @@ def lane_records(root: str, entry: Mapping[str, Any], records: Mapping[str, Sess
         and not work.sat_out(r)
         and ledger_mod.lane_matches(list(r.lane), dict(entry), r.team)
     ]
-    return [addr for _, addr in sorted(out)]
+    return [addr for *_, addr in sorted(out)]
 
 
 def no_lane(open_at: datetime, now: datetime, wait: timedelta) -> dict[str, Any] | None:

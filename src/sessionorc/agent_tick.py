@@ -460,8 +460,6 @@ class TickMixin:
                 key = o["id"]
                 held = stuck_mod.holders(key, peers, now)
                 held_at = max((t for a in held if (t := stuck_mod.claim_at(peers[a], key))), default=None)
-                if held and held_at is None:
-                    held_at = now
                 entry = stuck_mod.opened(kept["open"].get(key), name, held_at, now)
                 open_new[key] = entry
                 at = _parse(entry["at"])
@@ -492,7 +490,7 @@ class TickMixin:
 
         if held:
             return stuck_mod.reading([one(a) for a in held], now, mail.STUCK_ORDER_AFTER)
-        lanes = stuck_mod.lane_records(root, order["entry"], graph)
+        lanes = stuck_mod.lane_records(root, order["entry"], graph, teams)
         if not lanes:
             return stuck_mod.no_lane(at, now, mail.STUCK_ORDER_AFTER)
         actors: list[stuck_mod.Actor] = []

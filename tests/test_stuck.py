@@ -377,7 +377,8 @@ async def test_an_unread_or_fallback_repo_keeps_its_lines_and_a_repo_off_the_ros
     stored = {"since": "2026-11-11T09:00:00Z", "reason": {"state": "limited"}, "repo": "fx"}
     opened = {"at": "2026-11-11T08:00:00Z", "repo": "fx", "holder": True}
     other = {**stored, "repo": "other"}
-    home._host_rec["stuck"] = {KEY: stored, gone: stored, arch: stored, "board:o1": other, "board:x": {**stored, "repo": "left"}}
+    left = {**stored, "repo": "left"}
+    home._host_rec["stuck"] = {KEY: stored, gone: stored, arch: stored, "board:o1": other, "board:x": left}
     home._host_rec["stuck_open"] = {KEY: opened, gone: opened, arch: opened, "board:o1": {**opened, "repo": "other"}}
     put(home, member("w", state="working", progress=[claimed(KEY, NOW)]))
     home._repos = {}  # a restart before the first pass, or a raised one: no reading
@@ -398,3 +399,16 @@ async def test_an_unread_or_fallback_repo_keeps_its_lines_and_a_repo_off_the_ros
     assert KEY not in home._host_rec["stuck"] and gone not in home._host_rec["stuck"], "dropped on a good read"
     assert set(home._host_rec["stuck"]) == {"board:o1"} and set(home._host_rec["stuck_open"]) == {KEY, "board:o1"}
     assert all(k.startswith(("ask:", "board:")) for k in home._host_rec["stuck"])
+
+
+@pytest.mark.unit
+def test_lane_records_go_by_teams_order_then_id_and_a_blank_source_claim_is_clocked():
+    a, z = member("a", team="zeta"), member("b", team="alpha")
+    seat = rec("rv", repo=ROOT, lane=["free-pick"], seat={"trigger": "asks"})
+    out = member("x", closed_for={"why": "sit_out"})
+    records = {r.id: r for r in (a, z, seat, out)}
+    entry = workorders.entry({"id": KEY, "text": LINE})
+    assert stuck.lane_records(ROOT, entry, records, ["zeta", "alpha"]) == ["ao-a", "ao-b"], "the teams' order"
+    assert stuck.lane_records(ROOT, entry, records) == ["ao-b", "ao-a"], "by name where no order is known"
+    w = member("w", progress=[models.ProgressEntry(ref=KEY, status="claimed", at=_z(NOW), source="")])
+    assert stuck.claim_at(w, KEY) == NOW, "a claim lease_holders counts is clocked from its own at"
