@@ -403,13 +403,13 @@ class MailMixin:
             for e in list(seat.inbox):
                 if not e.open or e.kind != "ask" or e.to != [key]:
                     continue
-                # an entry on a seat that cannot file it moves to its techlead seat; else (none, or a count refused
-                # the landing) the rules below
+                # an entry on a seat that cannot file it moves to its techlead seat, or waits on a count; with no
+                # techlead seat in its team, the rules below
                 if (
                     e.entry is not None
                     and not files
                     and not e.outcome
-                    and self._move_entry(e, key, seat, records, stamp, touched)
+                    and self._move_entry(e, key, seat, records, now, stamp, touched)
                 ):
                     continue
                 blank = e.handed_entry and isinstance(e.entry, dict) and not e.entry.get("picked") and not e.outcome
@@ -482,15 +482,16 @@ class MailMixin:
             await self._push_changes()
 
     def _move_entry(
-        self, e: MailEntry, key: str, seat: Session, records: dict[str, Session], stamp: str,
+        self, e: MailEntry, key: str, seat: Session, records: dict[str, Session], now: datetime, stamp: str,
         touched: dict[str, Session],
     ) -> bool:  # fmt: skip
         """An `entry` envelope — a session's ledger request or a handed entry — waiting on an `asks` seat that is
         not a techlead seat (§4.9b *An entry is a techlead seat's*, TD-1565): it cannot be filed there, so it is
-        landed on its team's techlead seat (`tags`), live first, then on call, then closed, **able or not** — an
-        unable techlead seat is where an entry waits — carrying `routed`, its `entry`, `handed` mark and bound
-        kept, the original closed `rerouted` on every copy. No techlead seat, or the landing refused by a count,
-        and it stays, its copies saying why. Returns whether it moved."""
+        landed on its team's techlead seat (`tags`) — an able one first, then the pool's order, then live, on call,
+        closed — **able or not**, an unable techlead seat being where an entry waits; carrying `routed`, its
+        `entry`, `handed` mark and bound kept, the original closed `rerouted` on every copy. The landing refused by
+        a count, it stays, its copies saying *waits on <name>: …*. Returns False only where its team has no
+        techlead seat to land on, for the rules after it; True where it moved or waits on a count."""
         leads = [
             r
             for r in records.values()
@@ -505,7 +506,15 @@ class MailMixin:
         if not leads:
             return False
         rank = {"exited": 1, "closed": 2}  # live first, then on call, then closed
-        lead = min(leads, key=lambda r: (rank.get(r.state, 0), r.name))
+        lead = min(
+            leads,
+            key=lambda r: (
+                seat_able(r, now, self.unfillable) is not None,
+                pool_rank(r.seat),
+                rank.get(r.state, 0),
+                r.name,
+            ),
+        )
         target = self._address(lead)
         sender = e.from_
         me = records.get(sender) if sender != PERSON else None
@@ -531,7 +540,7 @@ class MailMixin:
             line = f"waits on {lead.name or target}: {refusal}"
             if e.waits != line:
                 self._mark(e.id, waits=line)
-            return False
+            return True
         self._mark(e.id, waits=None)
         self._close_entry(e.id, "rerouted", stamp)
         records[target].inbox.append(self._copy(moved))
