@@ -587,7 +587,7 @@ class RemoteMixin:
                 if held.seat and not params.get("seat"):  # a Resume's carried seat, as the replica took it (TD-1435)
                     made["seat"] = dict(held.seat)
                 if held.scale and not params.get("scale"):  # and its carried extra mark (§4.9 td-max)
-                    made["scale"] = dict(held.scale)
+                    made["scale"] = {"line": held.scale.get("line")}  # its line alone, never a run's `drop`
                 self._write_launch(f"{held.id}@{host}", held, {k: v for k, v in made.items() if v is not None})
             if method == "create" and person:
                 self._lift_by_person(host, str(reply["record"].get("id") or ""))

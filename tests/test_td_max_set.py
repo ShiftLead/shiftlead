@@ -105,6 +105,13 @@ def _removes(state, monkeypatch):
     real = cli.call_sync
 
     def call(method, **params):
+        if method == "relaunch" and params.get("drop_extra"):  # the home's `drop_extra` (TD-1545): the mark
+            state["calls"].append((method, params))
+            if (why := state.get("refuse", {}).get(params["id"])) is not None:
+                raise cli.AgentError(why)
+            s = next(s for s in state["sessions"] if s["id"] == params["id"])
+            s["scale"] = {**s["scale"], "drop": "now"}
+            return s
         if method != "remove":
             return real(method, **params)
         state["calls"].append((method, params))
@@ -131,7 +138,7 @@ def test_on_a_live_team_a_raise_writes_the_new_extras_held_at_once(world, extras
     assert got["grind-3"]["controllers"] == ["ao-shiftlead-orc-ao"]  # under the live manager
 
 
-def test_on_a_live_team_a_lowered_max_removes_held_extras_and_says_a_live_one(world, extras_on, monkeypatch, capsys):  # noqa: F811
+def test_a_lowered_max_on_a_live_team_drops_held_extras_and_winds_down_live_ones(world, extras_on, monkeypatch, capsys):  # noqa: F811, E501
     _, state = world
     _removes(state, monkeypatch)
     assert cli.main(["team", "max", "ao-grind", "grind", "4"]) == 0
@@ -143,8 +150,29 @@ def test_on_a_live_team_a_lowered_max_removes_held_extras_and_says_a_live_one(wo
     out = capsys.readouterr().out
     assert [p["id"] for m, p in state["calls"] if m == "remove"] == ["ao-shiftlead-grind-4", "ao-shiftlead-hunt-2"]
     assert "grind-4: the held extra of grind removed — the max no longer holds it" in out
-    assert "grind-3: a live extra of grind the max no longer holds — left to its run" in out
+    assert "grind-3: a live extra of grind the max no longer holds — wound down, dropped once closed" in out
+    drops = [p for m, p in state["calls"] if m == "relaunch"]
+    assert drops == [{"id": "ao-shiftlead-grind-3", "drop_extra": True}]  # never a sit-out, never a kill
+    assert not any(m in ("kill", "send") for m, _ in state["calls"])
     assert not creates(state)
+    # said again: an extra already marked is said, never wound down twice
+    assert cli.main(["team", "max", "ao-grind", "off"]) == 0
+    assert "grind-3: a live extra of grind the max no longer holds — dropped once closed" in capsys.readouterr().out
+    assert len([m for m, _ in state["calls"] if m == "relaunch"]) == 1
+
+
+def test_a_live_extra_whose_wind_down_is_refused_is_said_and_the_setting_stands(world, extras_on, monkeypatch, capsys):  # noqa: F811
+    _, state = world
+    _removes(state, monkeypatch)
+    assert cli.main(["team", "max", "ao-grind", "grind", "3"]) == 0
+    started(state)
+    state["sessions"] += [_held("grind-3", "grind", "working")]
+    state["refuse"] = {"ao-shiftlead-grind-3": "grind-3: the wrap-up could not be sent (pending), so it is not dropped"}
+    capsys.readouterr()
+    assert cli.main(["team", "max", "ao-grind", "grind", "2"]) == 0
+    out = capsys.readouterr().out
+    assert "grind-3: a live extra of grind the max no longer holds was not wound down — grind-3: the wrap-up" in out
+    assert _max(state) == {"grind": 0}
 
 
 def test_on_after_off_on_a_live_team_writes_the_default_extras(world, extras_on, monkeypatch, capsys):  # noqa: F811

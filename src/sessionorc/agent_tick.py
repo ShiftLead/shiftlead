@@ -773,6 +773,8 @@ class TickMixin:
         for s in records:
             try:
                 await self._scheduled_start(s, now)
+                if await self._extra_drop(s):
+                    continue  # an extra a lowered max dropped: no rule restarts or fills it (§4.9, TD-1545)
                 await self._crash_restart(s, now)
                 if await self._lost_brief(s, now):
                     continue  # replayed: the record is the closed run's, and no other rule acts on it now
@@ -1170,6 +1172,41 @@ class TickMixin:
         log.info("%s: sat out by its team's flow — %s", self._address(s), s.state)
         self._save(s)
         await self._push_changes()
+
+    async def _extra_drop(self, s: Session) -> bool:
+        """An extra a lowered `max` dropped (§4.9 *Scaling with the work*, TD-1545; `relaunch`'s `drop_extra`):
+        a record carrying `scale.drop` is closed with rule 9's close once it is settled — a working one finishes
+        what it holds first, and one left with work stays open until it reads pushed — its claims in progress
+        dropped *extra closed*, as rule 14's close drops them, and the record forgotten. One with unread mail is
+        closed and kept, the mark standing, until the mail is read or a Start's reconcile says it; one that exited
+        with work left (git not known clean) is kept as it stands, for a person to read. True for every record
+        carrying the mark: run before rules 1 and 2, so no rule restarts, replays or fills it. This home's records
+        alone (`_drop_extra` refuses a node's)."""
+        if not isinstance(s.scale, dict) or not s.scale.get("drop") or s.host != self.host or s.superseded_by:
+            return False
+        git = s.git or {}
+        clean = all(isinstance(git.get(k), int) and git[k] == 0 for k in ("dirty", "unpushed"))
+        if s.state == "exited" and not clean:
+            return True
+        if s.state not in ("exited", "closed") and not await self._finished_close(s, "extra_dropped"):
+            return True
+        at = now_iso()
+        dropped = [e for e in s.progress if e.status == "claimed"]
+        for e in dropped:
+            e.status, e.why, e.at = "dropped", "extra closed", at
+        if s.unread():
+            if dropped:
+                self._save(s)
+                await self._push_changes()
+            return True
+        try:  # Forget's own road: the dead pane kept from re-adoption as a person's Forget keeps it
+            await self.rpc_remove(s.id)
+        except Exception as e:  # noqa: BLE001 — tried again next tick; a suspended record is a person's
+            log.warning("%s: the dropped extra was not forgotten: %s", self._address(s), e)
+            self._save(s)
+            return True
+        log.info("%s: an extra past its line's max, closed and forgotten", self._address(s))
+        return True
 
     async def _brief_restart(self, s: Session, now: datetime) -> None:
         """Rule 7's second telling (design §6, TD-217 slice 4): a member whose record carries

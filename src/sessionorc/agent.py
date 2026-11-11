@@ -1617,7 +1617,7 @@ class HostAgent(
                 and holder.scale
             ):
                 # an extra stays an extra when it is resumed, as a seat stays a seat (§4.9 *Scaling with the work*)
-                scale = extra = dict(holder.scale)
+                scale = extra = {"line": holder.scale.get("line")}  # its line alone: a `drop` mark is that run's
             succeeding = self._check_succeeds(succeeds, name, caller, resume, keep_mail, starting) if succeeds else None
             if keep_mail:
                 self._check_keep_mail(holder, caller, resume)
@@ -2742,6 +2742,7 @@ class HostAgent(
         launch: dict[str, Any] | None = None,
         sit_out: bool = False,
         dropped: bool = False,
+        drop_extra: bool = False,
         caller: Any = None,
     ) -> dict[str, Any]:
         """A person's Apply, one member (design §4.9c *Switching*, TD-309 slice 5): the client composed
@@ -2777,12 +2778,22 @@ class HostAgent(
         rule 3's fill) creates under it, succeeding this record (`create`'s `succeeds`). **`dropped:
         true`** beside `sit_out` is a removal from the definition: it lifts the sit-out's seat refusal,
         since a seat the definition drops is marked as any member is, and rule 3 never fills a sat-out
-        seat; it is marked on `sit_out`."""
+        seat; it is marked on `sit_out`.
+
+        **`drop_extra: true`** (design §4.9 *Scaling with the work*, td-max, TD-1545) is an extra's removal past a
+        lowered `max`, never a sit-out: on a record carrying `scale`, a live one is sent the wrap-up (never
+        killed) and marked `scale.drop: <at>`; the tick closes it once it is settled, drops its claims in
+        progress *extra closed* and forgets the record (`_extra_drop`). An extra already closed is marked alone,
+        and the next tick forgets it."""
         agent_common.person_only(caller, "relaunch a session", "§4.9c", self._graph())
         if self.mode != "home":
             raise RpcError("relaunch runs at the home (design §4.9c): this host is a node")
         s = self._find(id)
         rule = "(design §4.9c *Switching*)"
+        if drop_extra:
+            if launch is not None or sit_out or dropped:
+                raise RpcError("drop_extra takes nothing else: an extra is dropped, never composed or sat out (§4.9)")
+            return await self._drop_extra(s, caller=caller)
         if sit_out:
             return await self._sit_out(s, launch, rule, dropped=bool(dropped), caller=caller)
         if dropped:
@@ -2921,6 +2932,36 @@ class HostAgent(
         self._save(s)
         await self._push_changes()
         log.info("%s sat out by the person's Apply: the wrap-up sent", self._address(s))
+        return self._view(s)
+
+    async def _drop_extra(self, s: Session, caller: Any = None) -> dict[str, Any]:
+        """`relaunch`'s `drop_extra` form (§4.9 *Scaling with the work*, TD-1545): refused, touching nothing, on a
+        record carrying no `scale`, an interactive one and a superseded one, and when the wrap-up cannot be sent;
+        said again of a record already marked, it does nothing more. A record of a node is refused: the tick's
+        forget is the home's own records' (accepted until an extra runs on a node)."""
+        rule = "(design §4.9 *Scaling with the work*)"
+        if not isinstance(s.scale, dict):
+            raise RpcError(f"{s.name} is no extra: only a record carrying scale is dropped this way {rule}")
+        if not s.unattended:
+            raise RpcError(f"{s.name} is interactive: a team act never stops a person's session {rule}")
+        if s.superseded_by:
+            raise RpcError(f"{s.name} was resumed as {s.superseded_by}: that is the record to drop {rule}")
+        if s.host != self.host:
+            raise RpcError(f"{s.name} runs on {s.host}: an extra is dropped at the host it runs on {rule}")
+        if s.scale.get("drop"):
+            return self._view(s)
+        if s.state not in ("exited", "closed") and adapters.has_agent(s.adapter):
+            try:
+                await self.rpc_send(s.id, WRAPUP_PROMPT, wrapup=True, caller=caller)
+            except Exception as e:  # noqa: BLE001 — said to the person who pressed, nothing marked
+                raise RpcError(
+                    f"{s.name}: the wrap-up could not be sent ({str(e) or type(e).__name__}), "
+                    f"so it is not dropped {rule}"
+                ) from None
+        s.scale = {**s.scale, "drop": now_iso()}
+        self._save(s)
+        await self._push_changes()
+        log.info("%s: an extra past its line's max — the wrap-up sent, dropped once closed", self._address(s))
         return self._view(s)
 
     def _restart_check(self, s: Session, now: datetime) -> dict[str, Any]:
