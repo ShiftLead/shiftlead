@@ -64,3 +64,22 @@ async def test_a_broken_settings_file_is_left_for_the_next_start(agent):
     settings_mod.settings_file().write_text("- not a mapping\n")
     agent._migrate_scale()
     assert settings_mod.settings_file().read_text() == "- not a mapping\n"
+
+
+@pytest.mark.integration
+async def test_the_write_is_committed_to_the_homes_definitions_history(agent):
+    import subprocess
+
+    from sessionorc import defs, paths
+
+    await park_ticks(agent)
+    home = paths.home()
+    settings_mod.settings_file().unlink(missing_ok=True)  # the fixture's start stamped it before the tree
+    defs.init(home)
+    settings_mod.save({"teams": {"named": {"on_work": "ask"}}})
+    defs.commit("by hand", home=home, files=("settings.yml",))
+    await agent._migrate_scale_committed()
+    log = subprocess.run(
+        ["git", "-C", str(home), "log", "--format=%s", "--", "settings.yml"], capture_output=True, text=True
+    ).stdout.splitlines()
+    assert log[0].startswith("settings: ") and "teams.named.max none → 'off'" in log[0], log
