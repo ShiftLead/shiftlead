@@ -164,7 +164,7 @@ def home(tmp_path, monkeypatch):
     monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x-w1")
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "cfg"))
     # in this process the report is sent inline: a fork of the test runner is no status line's
-    monkeypatch.setattr(hook_mod, "aside", lambda fn, wait=hook_mod.REPORT_TIMEOUT: fn())
+    monkeypatch.setattr(hook_mod, "aside", lambda fn, wait=hook_mod.REPORT_TIMEOUT: fn(hook_mod.REPORT_WAIT))
     yield h
     for f in sorted(h.rglob("*"), reverse=True):
         f.unlink() if not f.is_dir() else f.rmdir()
@@ -239,14 +239,18 @@ def test_a_lagging_agent_still_finds_the_reporter_alive_and_the_line_does_not_wa
     restart) read the caller's /proc entry after the reporter had given up and exited, and refused
     the report as *unknown* (`unreadable`). The report goes from a child that waits `REPORT_WAIT`, so
     the reader finds it alive, and the status line itself is back within its own second."""
-    agent = FakeAgent(home / "agent.sock", lag=2.0)
+    agent = FakeAgent(home / "agent.sock", lag=3.0)
     plain = tmp_path / "plain"
     plain.mkdir()
     p = {**payload(), "workspace": {"project_dir": str(plain)}}
     code = "import sys; from shiftlead.adapters.claude_code import hook; sys.argv[1:] = ['--statusline']; hook.main()"
     t0 = time.monotonic()
-    subprocess.run([sys.executable, "-c", code], input=json.dumps(p), text=True, check=True, timeout=10)
-    assert time.monotonic() - t0 < 1.9  # the line returned before the agent answered
+    # pipes captured: `run` returns at their end too, so a child that kept one would hold it past the lag
+    done = subprocess.run(
+        [sys.executable, "-c", code], input=json.dumps(p), capture_output=True, text=True, check=True, timeout=10
+    )
+    assert time.monotonic() - t0 < 2.6  # the line returned before the agent answered
+    assert done.stdout == ""  # no line of the person's here, and nothing of the child's
     end = time.monotonic() + 8
     while time.monotonic() < end and not hook_mod.last_report_file("ao-x-w1").exists():
         time.sleep(0.05)
