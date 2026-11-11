@@ -752,13 +752,17 @@ def seat_records(records: Mapping[str, Session], target: str) -> list[str]:
 
 
 def open_question(
-    records: Mapping[str, Session], mine: set[str], target: str, but: str | None = None
+    records: Mapping[str, Session], mine: set[str], target: str, thread: str | None = None
 ) -> MailEntry | None:
     """The first open `ask` from one of `mine` in the inbox of any record of `target`'s seat (`seat_records`) —
-    `but` an entry's id never counted (a moved ask, which may sit on another record of the same seat)."""
+    one on `thread` never counted: a moved ask's copy keeps its original's root, and the original, still open
+    until the copy lands, may sit on another record of the same seat."""
     for k in seat_records(records, target):
         inbox = records[k].inbox
-        first = next((e for e in inbox if e.kind == "ask" and e.open and e.from_ in mine and e.id != but), None)
+        first = next(
+            (e for e in inbox if e.kind == "ask" and e.open and e.from_ in mine and (not thread or e.root != thread)),
+            None,
+        )
         if first is not None:
             return first
     return None

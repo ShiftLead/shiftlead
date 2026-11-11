@@ -60,8 +60,14 @@ def test_another_seats_extra_and_a_same_named_seat_of_another_team_are_not_the_s
     assert mail.message_gate(g, "ao-a", "ao-tl", kind="ask") is None
 
 
-def test_a_moved_ask_does_not_block_itself():
+def test_a_moved_ask_does_not_block_itself_and_another_open_ask_still_does():
+    """The moved copy has an id of its own and its original's root; the original stays open until the copy lands."""
     g = _graph()
     _open_ask(g, "ao-tl")
-    assert mail.open_question(g, {"ao-a"}, "ao-tl-2", but="m-1") is None
+    g["ao-tl"].inbox[0].root = "m-1"
+    assert mail.open_question(g, {"ao-a"}, "ao-tl-2", thread="m-1") is None
     assert mail.open_question(g, {"ao-a"}, "ao-tl-2").id == "m-1"
+    _open_ask(g, "ao-tl-3", mid="m-9")
+    g["ao-tl-3"].inbox[0].root = "m-9"
+    assert mail.open_question(g, {"ao-a"}, "ao-tl-2", thread="m-1").id == "m-9"
+
