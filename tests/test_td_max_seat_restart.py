@@ -115,3 +115,32 @@ async def test_an_exited_extra_seat_with_nothing_waiting_is_closed_held_at_the_t
         assert rec.state == "closed" and replays == []
         assert rec.closer["by"] == "tick" and rec.closer["why"] == "extra_held"
         assert rec.scale["line"] == "tl" and rec.scale["last"]["did"] == "hold"
+
+
+async def test_each_guard_of_the_hold_leaves_an_exited_extra_as_it_stands(agent, tmp_path, replays):
+    """Every guard `_extra_seat_hold` reads, alone, keeps the extra `exited` (TD-1656): superseded, being dropped by
+    a lowered max, just restarted, suspended, gated, killed (no pane) and another host's record; with all of them
+    cleared, the same record is closed held — so each guard is what kept it."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid, rec = await _seat_extra(person, agent, tmp_path)
+        now = datetime.now(UTC)
+        recent = (now - timedelta(seconds=5)).isoformat().replace("+00:00", "Z")
+        guards = [
+            ("superseded_by", "ao-x-tl-3", None),
+            ("scale", {**rec.scale, "drop": "2026-11-11T08:00:00Z"}, rec.scale),
+            ("restarts", [{"at": recent, "why": "crash"}], []),
+            ("suspended", {"at": "2026-11-11T08:00:00Z", "why": "x"}, None),
+            ("gated", {"at": "2026-11-11T08:00:00Z"}, None),
+            ("pane", False, True),
+            ("host", "elsewhere", rec.host),
+        ]
+        for attr, value, clear in guards:
+            setattr(rec, attr, value)
+            await agent._extra_seat_hold(rec, now)
+            assert rec.state == "exited", f"{attr} set: left to the road that holds it"
+            setattr(rec, attr, clear)
+        assert agent._just_restarted(rec, now) is False
+        await agent._extra_seat_hold(rec, now)
+        assert rec.state == "closed" and rec.closer["why"] == "extra_held", "every guard cleared: held"
+        assert replays == []
