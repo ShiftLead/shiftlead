@@ -1756,9 +1756,12 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      declared (a seat's extra counts as a seat does, never declaring), and one with held extras is not kept running by them. A filled extra is otherwise a member:
      rules 1, 2, 4, 5 and 7 apply to it (rule 1's restart replays the record and is no start of the crew; an
      extra `exited` after declaring out of work is closed held, never restarted), rule 8 and a schedule's start never replay it (`_work_replays` skips a
-     record carrying `scale`) — every start of the team (`ao team start`, Apply's *starts*, rule 8's and a
-     schedule's) first reconciles its held extras to the merged `max`, writing the missing and removing the
-     surplus, so a `max` changed while the team was down is read at its next run — and a team that winds down or stops closes it with the rest, held for the next
+     record carrying `scale`) — every start of the team first reconciles its held extras to the merged `max`: a
+     person's (`ao team start`, Apply's *starts*) writes the missing and removes the surplus; rule 8's and a
+     schedule's, which read no definition, only remove the held extras the merged `max` no longer holds (every one
+     at `off` or `0`, one whose name's number is past its line's written ceiling; one with unread mail kept), and a
+     missing extra waits for the person's next Start or Apply, since its launch record is the one the line's next
+     kept member would get (§4.9 *An extra*) — so a `max` changed while the team was down is read at its next run — and a team that winds down or stops closes it with the rest, held for the next
      run. Each fill and close writes **`scale.last: {at, did: fill | hold | stopped | unstuck, why}`** on the extra's
      record (*filled: 4 pickable, every grinder claimed*; *back to held: out of work*; *stopped: host full, 30
      live*), which the team card's *td-max* line reads (§4.9).
