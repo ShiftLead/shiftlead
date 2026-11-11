@@ -830,6 +830,25 @@ def test_focus_watches_an_unattended_session(client, subprocess_agent, tmp_path)
     client.post(f"/api/sessions/{sid}/kill")
 
 
+def test_hand_back_is_drawn_only_where_someone_is_handed_the_session():
+    """TD-1681, design §4.5 *A taken-over member*, §4.5a *Focus (interactive, with controllers or a team)*: a
+    session the person started in a team (`by_person`, no controllers) was taken from nobody, so it reads
+    *Switch to unattended* in more ▾; a member the person took over (a team start's, `supervised` and never
+    `by_person`) and a lead's member the person resumed (`by_person` once resumed, the lead in `controllers`) both
+    still read Hand back on the acts line's slot."""
+    from shiftlead.ui.app import view
+
+    base = {"id": "a", "kind": "agent", "state": "idle", "unattended": False}
+    own = view({**base, "team": "ao-grind", "role": "designer", "controllers": [], "by_person": True})
+    assert (own["mode_act"], own["mode_place"]) == ("Switch to unattended", "menu")
+    taken = view({**base, "team": "ao-grind", "supervised": True, "by_person": False})
+    assert (taken["mode_act"], taken["mode_place"]) == ("Hand back", "slot")
+    resumed = view({**base, "team": "ao-grind", "controllers": ["ao-x-lead"], "by_person": True})
+    assert (resumed["mode_act"], resumed["mode_place"]) == ("Hand back", "slot")
+    # a record from before `by_person` reads as a member, as it did
+    assert view({**base, "team": "ao-grind"})["mode_act"] == "Hand back"
+
+
 def test_hand_back_clears_a_stop_time_that_passed_while_the_person_held_it(client, subprocess_agent, tmp_path):
     """TD-096, design §4.5a **Hand back**: a stop time that fell due while the session was
     interactive is not a deadline any more — nothing acted on it, and handing back must not have the

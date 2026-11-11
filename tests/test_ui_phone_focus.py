@@ -592,13 +592,15 @@ def test_resume_confirm_is_set_on_an_ended_member_whatever_mode_it_ended_in(tmp_
 
 def test_a_member_resumed_unsupervised_keeps_hand_back_and_is_not_woken_by_mail(tmp_path, monkeypatch):
     """TD-1494: a member the person resumed (attended, `by_person` after) still offers Hand back on its card, and
-    while interactive its mail does not wake it — which is what the confirm says."""
+    while interactive its mail does not wake it — which is what the confirm says. A member a lead started unsupervised
+    carries the lead in `controllers` from its create (§4.8), which is what keeps Hand back once it reads `by_person`
+    (TD-1681: a team alone, with `by_person`, is the person's own start)."""
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     from sessionorc.mail import mail_wakes
     from sessionorc.models import Session
     from shiftlead.ui.app import view
 
-    v = view(_ended(team="t", state="idle", pane=True, unattended=False, by_person=True))
+    v = view(_ended(team="t", controllers=["ao-x-lead"], state="idle", pane=True, unattended=False, by_person=True))
     assert v["mode_act"] == "Hand back" and v["resume_confirm"] == ""
     s = Session(id="ao-x-w", name="w", kind="interactive", adapter="claude-code", dir="/w", state="idle")  # type: ignore[arg-type]
     s.unattended = False
