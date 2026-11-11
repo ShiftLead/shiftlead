@@ -1717,7 +1717,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      is not `done` or `dropped` (a waiting claim included, §4.8 *A claim is a lease*); a member between items,
      holding no lease, idle or not, is free and picks, so the line is not short; a member `limited` or paused by
      the usage gate with no lease is neither free nor busy — it cannot pick — so a line whose members are each
-     busy or so held is short (the gate, below, still holds back an extra on the gated profile). A kept member
+     busy or so held is short (the gate, below, still holds back an extra on the gated profile); so is an
+     extra whose start stuck — its newest `scale.last` reads `unstuck` and its `progress` holds no claim — which
+     cannot pick until it claims, so the guard's lifting lets the line's next event fill another. A kept member
      rule 1 is restarting (`exited`, its restart due) counts as free — it picks on its return — so a crash
      never reads as a short line. Short, the home **fills** the
      line's lowest-placed held extra: `create` from its launch record with `keep_mail`, as rule 3 fills a seat,
