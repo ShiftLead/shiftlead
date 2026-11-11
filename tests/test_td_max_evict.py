@@ -95,3 +95,30 @@ async def test_two_starts_at_the_cap_in_one_moment_take_two_different_seats(agen
                 other.call("create", name="y", dir=str(tmp_path / "y")),
             )
         assert [s.state for s in seats] == ["idle", "closed", "closed"]  # the two longest idle, one each
+
+
+@pytest.mark.integration
+async def test_a_start_that_replaces_its_names_record_takes_its_slot_and_closes_nothing(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        a = _extra_seat(agent, await _start(person, tmp_path, "tl-2"), "tl", timedelta(minutes=5))
+        b = _extra_seat(agent, await _start(person, tmp_path, "tl-3"), "tl", timedelta(minutes=50))
+        agent._machine_cap = 2
+        # a start replacing tl-2's record (a scheduled one it starts, its name's holder): that slot is the
+        # start's, so the host is not over, and the record it replaces is never the one closed for it
+        held = await agent._evict_for_room("tl-2", None, {a.id})
+        assert a.state == b.state == "idle" and "last" not in a.scale and "last" not in b.scale
+        held.clear()
+
+
+@pytest.mark.integration
+async def test_a_cancelled_start_holds_no_slot(agent, tmp_path):
+    await park_ticks(agent)
+    agent._machine_cap = 1
+    async with agent._evict_lock:  # the reading waits on the lock, and is cancelled there
+        task = asyncio.create_task(agent._evict_for_room("x", None, set()))
+        await asyncio.sleep(0)
+        task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert not any(agent._room_held)

@@ -1369,10 +1369,13 @@ class HostAgent(
     async def rpc_get(self, id: str) -> dict[str, Any]:
         return self._view(self._find(id), bookkeeping=True)  # one record: its tallies and wakes ride along
 
-    def _live_here(self) -> list[Session]:
-        """This host's records that hold a slot under `scale.live`: every one not `exited` or `closed`."""
+    def _live_here(self, replaced: frozenset[str] | set[str] = frozenset()) -> list[Session]:
+        """This host's records that hold a slot under `scale.live`: every one not `exited` or `closed`, but the
+        records a start replaces (`replaced`: its name's holder, a scheduled record it starts), whose slot is its."""
         return [
-            r for r in self.sessions.values() if (r.host or self.host) == self.host and r.state not in work_mod.DEAD
+            r
+            for r in self.sessions.values()
+            if (r.host or self.host) == self.host and r.state not in work_mod.DEAD and r.id not in replaced
         ]
 
     def _evictable(self, r: Session, now: datetime, own_seat: str | None) -> bool:
@@ -1394,7 +1397,7 @@ class HostAgent(
                     return False
         return True
 
-    async def _evict_for_room(self, name: str, own_seat: str | None) -> set[str]:
+    async def _evict_for_room(self, name: str, own_seat: str | None, replaced: set[str]) -> set[str]:
         """A start at the host cap (§4.9 *Scaling with the work*, TD-1545): when this host's live count is at or
         above `scale.live`, the longest-idle clean extra seat (`_evictable`) is closed back to held before the
         start, its `scale.last` saying why; with none, the start goes on — it is never refused for want of
@@ -1408,26 +1411,31 @@ class HostAgent(
             return held
         if not cap:
             return held
-        async with self._evict_lock:
-            self._room_held = [h for h in self._room_held if h]  # a registered or failed start's is empty
-            live = len(self._live_here()) + len(self._room_held)
-            self._room_held.append(held)
-            held.add(name)
-            if live < cap:
-                return held
-            now = datetime.now(UTC)
-            room = [r for r in self._live_here() if self._evictable(r, now, own_seat)]
-            if not room:
-                log.info("%s starts at the host cap (%d live, cap %d): no extra seat to close", name, live, cap)
-                return held
-            r = min(room, key=lambda r: (idle_from(r) or now, r.id))
-            r.scale = {**r.scale, "last": {"at": now_iso(), "did": "hold", "why": f"host full, room for {name}"}}
-            self._save(r)
-            log.info("%s: an extra seat closed back to held for %s at the host cap (%d)", r.id, name, cap)
-            try:
-                await self.rpc_close(r.id, closer={"by": "tick", "why": "host_full"})
-            except Exception as e:  # noqa: BLE001 — the start is never refused for want of room
-                log.warning("%s: the cap's close failed: %s", r.id, e)
+        try:
+            async with self._evict_lock:
+                self._room_held = [h for h in self._room_held if h]  # a registered or failed start's is empty
+                live = len(self._live_here(replaced)) + len(self._room_held)
+                self._room_held.append(held)
+                held.add(name)
+                if live < cap:
+                    return held
+                now = datetime.now(UTC)
+                room = [r for r in self._live_here(replaced) if self._evictable(r, now, own_seat)]
+                if not room:
+                    log.info("%s starts at the host cap (%d live, cap %d): no extra seat to close", name, live, cap)
+                    return held
+                r = min(room, key=lambda r: (idle_from(r) or now, r.id))
+                try:
+                    await self.rpc_close(r.id, closer={"by": "tick", "why": "host_full"})
+                except Exception as e:  # noqa: BLE001 — the start is never refused for want of room
+                    log.warning("%s: the cap's close failed: %s", r.id, e)
+                    return held
+                r.scale = {**r.scale, "last": {"at": now_iso(), "did": "hold", "why": f"host full, room for {name}"}}
+                self._save(r)
+                log.info("%s: an extra seat closed back to held for %s at the host cap (%d)", r.id, name, cap)
+        except BaseException:
+            held.clear()  # a cancelled or failed reading holds no slot
+            raise
         return held
 
     async def rpc_create(
@@ -1712,7 +1720,8 @@ class HostAgent(
                     raise RpcError(f"{holder.id} is {holder.state}: the seat is already there, nothing to write")
                 return await self._schedule(locals(), holder, directory, repo, name, None, state="closed")
             # the slot is held from the eviction's reading until the record is registered (§4.9 *The host cap*)
-            room = await self._evict_for_room(name, scale.get("line") if seat and isinstance(scale, dict) else None)
+            replaced = {r.id for r in (holder, starting) if isinstance(r, Session)}
+            room = await self._evict_for_room(name, scale.get("line") if isinstance(scale, dict) else None, replaced)
             locks.callback(room.clear)
             try:
                 spec = ad.launch(
