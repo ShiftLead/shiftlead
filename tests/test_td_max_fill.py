@@ -186,7 +186,7 @@ async def test_a_closed_extra_holds_no_guard(agent, tmp_path):
         assert _live(agent, "grind-3"), "held again, it is the lowest-placed and fills"
 
 
-@pytest.mark.parametrize("guard", ["balance", "gated", "unstaffed", "wind-down", "ceiling"])
+@pytest.mark.parametrize("guard", ["balance", "gated", "unstaffed", "wind-down", "finished", "ceiling"])
 async def test_each_guard_holds_a_fill_back(agent, tmp_path, monkeypatch, guard):
     await park_ticks(agent)
     async with LocalClient() as person:
@@ -202,6 +202,8 @@ async def test_each_guard_holds_a_fill_back(agent, tmp_path, monkeypatch, guard)
                 m.state, m.out_of_work = "closed", {"at": "2026-11-11T00:00:00Z", "why": "none"}
         elif guard == "wind-down":
             made[0].wrapup_at = "2026-11-11T00:00:00Z"
+        elif guard == "finished":  # the tick read the team finished, no `wrapup_at` yet (TD-1640)
+            agent._finished_first[TEAM] = datetime.now(UTC)
         else:
             now = datetime.now(UTC).isoformat()
             made[3].restarts = [{"at": now, "why": "fill"}] * 6
@@ -344,4 +346,31 @@ async def test_a_standing_guard_survives_a_homes_restart(agent, tmp_path):
         assert not _live(agent, "grind-4")
         e.progress = [ProgressEntry(ref="TD-3")]  # the guard lifts with its claim
         await _pass(agent)  # no new entry and no claim event: the guard read from the records brings it back
+        assert _live(agent, "grind-4")
+
+
+async def test_a_held_extra_a_lowered_max_is_dropping_is_passed_over_for_the_next(agent, tmp_path):
+    """The fill's pick (#3383, TD-1639): a held extra marked `scale.drop` is never refilled; the next one fills."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        repo, made = await _line(agent, person, tmp_path)
+        made[2].scale = {**made[2].scale, "drop": "now"}
+        await _pass(agent)
+        _entries(agent, repo, "TD-3")
+        await _pass(agent)
+        assert not _live(agent, "grind-3") and _live(agent, "grind-4")
+
+
+async def test_a_crashed_extra_rule_1_restarts_is_not_filled(agent, tmp_path):
+    """The fill's pick (#3383, TD-1639): an extra exited with a crash rule 1 restarts is no held extra to fill, so
+    filling it would start it twice; the next one fills."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        repo, made = await _line(agent, person, tmp_path)
+        await _pass(agent)
+        made[2].state, made[2].pane = "exited", True
+        assert agent._crashed(made[2], datetime.now(UTC))
+        _entries(agent, repo, "TD-3")
+        await _pass(agent)
+        assert _rec(agent, "grind-3").state == "exited" and not _rec(agent, "grind-3").restarts
         assert _live(agent, "grind-4")
