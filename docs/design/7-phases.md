@@ -47,7 +47,8 @@ The plan, re-baselined against what runs. Each phase states what is built and wh
    (TD-069 step 3); the Attention tab is struck (§4.5 screen 7).
 5. **Second adapter.** Gemini CLI, hook-fed with its terminal title as the check (§4.3 *The second
    adapter*, TD-112; designed, built by TD-785 and TD-786), and the adapter conformance suite every
-   adapter passes (§4.3, TD-784, built first). Publish to PyPI, write the
+   adapter passes (§4.3, TD-784, built first); a third, Grok Build, hook-fed (§4.3 *The third adapter*,
+   TD-1550; designed, built by TD-1637). Publish to PyPI, write the
    adapter-author guide. **Not started**, except that `ao --skill` and `ao team --skill` are
    built; what remains of TD-019 here is offering to install the skill from the New session
    flow.

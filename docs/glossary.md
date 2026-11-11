@@ -155,8 +155,9 @@ not mix:
   (design §4.9b *The sweep*, TD-1061).
 - **fact-checker** — a role for a seat with the `asks` trigger: reads a doc-only PR it is asked
   about by refs and replies with a `cadence-review:` line and its findings, editing and posting
-  nothing. Its first seat runs on a Gemini profile, beside the author's own check, as a trial. —
-  *proposed* 2026-10-29 (design §4.9b *The fact-check*, TD-857).
+  nothing. Its first seat runs on a Gemini profile, beside the author's own check, as a trial; a second, on a
+  Grok Build profile, is a trial of its own beside it. — *proposed* 2026-10-29 (design §4.9b *The
+  fact-check*, TD-857; the second seat *A second model on trial*, TD-1550).
 - **grinder** — a role: resolves each entry it picks from its lane to a merged PR. — *proposed*.
 - **hunter** — a role: finds problems and files them with evidence, never fixes them. —
   *proposed*.
