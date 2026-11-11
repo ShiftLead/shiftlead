@@ -1964,11 +1964,11 @@ def test_exit_three_says_restarted_when_one_answers_and_never_tells_a_session_to
     assert climod._run(args) == 3
     assert "shiftlead-agent serve" not in capsys.readouterr().err
 
-    # (b) nothing answers, and the caller is a session: told to stop, in its skill's own words
+    # (b) nothing answers, and the caller is a session: told it did not land (a read here, so no mark)
     monkeypatch.setattr(climod, "_agent_answers", lambda: False)
     assert climod._run(args) == 3
     err = capsys.readouterr().err
-    assert "stop here; a session never starts one" in err and "shiftlead-agent serve" not in err
+    assert "the host agent is down — nothing was done: end your turn" in err and "shiftlead-agent serve" not in err
 
     # (c) nothing answers, and the caller is a person: the hint is theirs, and only theirs — with the
     # ancestry probe stubbed, since this suite may itself be running inside an shiftlead pane
@@ -1981,13 +1981,60 @@ def test_exit_three_says_restarted_when_one_answers_and_never_tells_a_session_to
     monkeypatch.setattr(climod, "_session_by_ancestry", lambda: "ao-x-1")
     assert climod._run(args) == 3
     err = capsys.readouterr().err
-    assert "stop here; a session never starts one" in err and "shiftlead-agent serve" not in err
+    assert "the host agent is down — nothing was done: end your turn" in err and "shiftlead-agent serve" not in err
 
     # --json says which it was without prose, for a caller that parses (TD-030)
     monkeypatch.setattr(climod, "_agent_answers", lambda: True)
     assert climod._run(argparse.Namespace(json=True, fn=boom, id=None)) == 3
     got = json.loads(capsys.readouterr().out)
     assert got["restarted"] is True and got["error"] == "host agent closed the connection"
+
+
+def test_a_filing_verb_against_a_stopped_host_agent_leaves_a_missed_mark(monkeypatch, capsys, tmp_path):
+    """§6 rule 13 *A send that did not land* (TD-1498): a session's filing verb that finds no host agent says it
+    did not land, carries `missed` under `--json`, exits 3 and leaves `{at, verb}` in its own file under
+    `$SHIFTLEAD_HOME/missed/` — the verb alone, never its arguments; a read (`ao inbox`, `ao rank --list`) says
+    *nothing was done*, carries no `missed` and leaves no mark, nor does a restart under the command."""
+    from sessionorc.client import AgentUnavailable
+    from shiftlead import cli as climod
+
+    def boom(args):
+        raise AgentUnavailable("no host agent")
+
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x-1")
+    monkeypatch.setattr(climod, "_agent_answers", lambda: False)
+    missed = tmp_path / "missed"
+
+    def run(json_=False, **kw):
+        return climod._run(argparse.Namespace(json=json_, fn=boom, id=None, **kw))
+
+    assert run(cmd="msg", text="the secret words", to=["ao-tl"]) == 3
+    assert "this did not land: end your turn and run it again when you are rung" in capsys.readouterr().err
+    (mark,) = list(missed.iterdir())
+    assert mark.name.startswith("ao-x-1-") and mark.suffix == ".json"
+    got = json.loads(mark.read_text())
+    assert set(got) == {"at", "verb"} and got["verb"] == "msg", "the verb alone"
+    assert "secret" not in mark.read_text()
+    mark.unlink()
+    assert run(json_=True, cmd="td", action="add") == 3
+    assert json.loads(capsys.readouterr().out)["missed"] is True
+    assert [json.loads(f.read_text())["verb"] for f in missed.iterdir()] == ["td add"]
+    for f in missed.iterdir():
+        f.unlink()
+    for kw in ({"cmd": "inbox"}, {"cmd": "rank", "list": True}):
+        assert run(json_=True, **kw) == 3
+        out = json.loads(capsys.readouterr().out)
+        assert "missed" not in out and "nothing was done" in out["hint"], kw
+    assert not list(missed.iterdir()), "a read leaves no mark"
+    monkeypatch.setattr(climod, "_agent_answers", lambda: True)
+    assert run(cmd="progress") == 3 and not list(missed.iterdir()), "a restart under the command: no mark"
+    assert [climod._missed_verb(argparse.Namespace(cmd="td", action=a)) for a in ("reserve", "next", "show")] == [
+        "td reserve",
+        "td reserve",
+        None,
+    ]
+    assert climod._missed_verb(argparse.Namespace(cmd="rank", list=False)) == "rank"
 
 
 def test_a_session_is_found_by_its_ancestors_environment_when_its_own_is_gone(tmp_path):

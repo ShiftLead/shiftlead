@@ -369,6 +369,7 @@ class TickMixin:
         await self._sweep_mail(snapshot_at)
         await self._reroute_waiting(snapshot_at)  # after the sweep: an expired ask is not moved (§4.9b, TD-1480)
         await self._stuck_pass(snapshot_at)  # after rule 3's pass, whose `unfillable` it reads (§6 rule 13)
+        self._missed_pass()  # a send that did not land, read every tick (§6 rule 13, TD-1498)
         self._poke_waits()  # the wake decision is re-taken every tick for a session blocked in `wait`
         self._send_first_prompts()  # before the doorbell, which a brief not yet typed holds off
         self._ring_doorbells()
@@ -429,6 +430,58 @@ class TickMixin:
         except OSError:
             log.exception("writing the home's host record failed")
         await self._push_changes()
+
+    def _missed_pass(self) -> None:
+        """Rule 13's *A send that did not land* (design §6, TD-1498): the missed marks a session's `ao` left in this
+        home's `$SHIFTLEAD_HOME/missed/` while no host agent answered, read every tick (empty, it costs nothing).
+        Each mark's session is walked to its newest record (`_newest`, a seat to its fill); a live record or an
+        empty seat is sent one `[system]` note naming each of its marks, which rings it as mail does (an empty
+        seat's waits for its next fill); a walk that ends on no live record (none, an ended non-seat, or an empty
+        seat) also tells the person. The files read are deleted; one that fails to parse is left for the next
+        tick. At the home alone: a node's marks are TD-1498's next slice."""
+        if self.mode != "home":
+            return
+        d = paths.home() / "missed"
+        try:
+            files = sorted(f for f in d.glob("*.json") if not f.name.startswith("."))
+        except OSError:
+            return
+        marks: dict[str, list[tuple[str, str]]] = {}
+        read: dict[str, list[Path]] = {}
+        for f in files:
+            try:
+                got = json.loads(f.read_text())
+                at, verb = str(got["at"]), str(got["verb"])
+            except (OSError, ValueError, KeyError, TypeError):
+                continue  # half a file, or none: left for the next tick
+            sid = f.stem.rpartition("-")[0]
+            if not sid:
+                continue
+            marks.setdefault(sid, []).append((at, verb))
+            read.setdefault(sid, []).append(f)
+        if not marks:
+            return
+        graph = self._graph()
+        for sid, got in marks.items():
+            newest = self._newest(graph, sid)
+            r = graph.get(newest)
+            live = r is not None and r.state not in mail._NOT_LIVE
+            empty_seat = r is not None and not live and r.seat is not None and r.state in stuck_mod.ENDED
+            if live or empty_seat:
+                lines = [f"the host agent was not answering when you ran `ao {verb}` at {at}" for at, verb in got]
+                tail = (
+                    ": it may not have landed — check `ao inbox --sent` or `ao status`, and run it again if it did not"
+                )
+                self._system_note(newest, "\n".join(lines) + tail, team=r.team or None)
+            if not live:
+                name = (r.name if r is not None else "") or sid
+                for at, _verb in got:
+                    self._system_note(
+                        PERSON, f"a send from {name} at {at} did not land and no session is left to run it again"
+                    )
+            for f in read[sid]:  # each session's files once its note is sent: a raise later sends none twice
+                with contextlib.suppress(OSError):
+                    f.unlink()
 
     def _stuck_orders(
         self,

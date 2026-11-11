@@ -729,3 +729,58 @@ async def test_an_ask_to_a_seat_limited_with_a_near_reset_serves_waiting_until(a
         seat.limited_reset = _z(later + WAIT + timedelta(minutes=5))
         await agent._stuck_pass(later)
         assert "waiting_until" not in (await agent.rpc_host())["stuck"][f"ask:{mid}"], "further than the ask's wait"
+
+
+# -- a send that did not land (TD-1498) --------------------------------------------------------------------------
+
+
+def _mark(home_dir, sid: str, verb: str, at: str):
+    d = home_dir / "missed"
+    d.mkdir(exist_ok=True)
+    f = d / f"{sid}-{at.replace('-', '').replace(':', '')}.json"
+    f.write_text(f'{{"at": "{at}", "verb": "{verb}"}}')
+    return f
+
+
+@pytest.mark.integration
+async def test_a_missed_mark_brings_its_session_a_note_and_is_deleted(agent):
+    from sessionorc import paths
+
+    await park_ticks(agent)
+    home = paths.home()
+    w = rec("w", state="idle")
+    put(agent, w)
+    a = _mark(home, "ao-w", "msg", "2026-11-11T10:00:00Z")
+    b = _mark(home, "ao-w", "td add", "2026-11-11T10:01:00Z")
+    bad = home / "missed" / "ao-w-broken.json"
+    bad.write_text('{"at": "2026-11')  # half a file: left for the next tick
+    agent._missed_pass()
+    (note,) = [e for e in w.inbox if e.from_ == models.SYSTEM]
+    assert "when you ran `ao msg` at 2026-11-11T10:00:00Z" in note.text
+    assert "`ao td add` at 2026-11-11T10:01:00Z" in note.text and "run it again if it did not" in note.text
+    assert not a.exists() and not b.exists() and bad.exists()
+    assert not [e for e in agent.person_inbox if "did not land" in e.text], "a live session: the person is not told"
+    c = _mark(home, "ao-w", "progress", "2026-11-11T10:05:00Z")  # written between two later ticks
+    await agent.tick()  # the tick itself reads it
+    # the tick reaps the record, which has no pane: the miss is told to the person instead, as it ended
+    now_w = agent._graph()["ao-w"]
+    told = [*now_w.inbox, *agent.person_inbox]
+    assert not c.exists() and any("10:05:00Z" in e.text for e in told), "the tick itself read the mark"
+    bad.unlink()
+
+
+@pytest.mark.integration
+async def test_a_mark_for_an_empty_seat_waits_in_its_mailbox_and_tells_the_person(agent):
+    from sessionorc import paths
+
+    await park_ticks(agent)
+    seat = rec("rv", state="exited", seat={"trigger": "asks"})
+    put(agent, seat)
+    _mark(paths.home(), "ao-rv", "msg", "2026-11-11T10:00:00Z")
+    _mark(paths.home(), "ao-gone", "doing", "2026-11-11T10:02:00Z")
+    agent._missed_pass()
+    assert [e for e in seat.inbox if e.from_ == models.SYSTEM], "the empty seat's note waits for its fill"
+    told = [e.text for e in agent.person_inbox if "did not land" in e.text]
+    assert "a send from rv at 2026-11-11T10:00:00Z did not land and no session is left to run it again" in told
+    assert any("ao-gone at 2026-11-11T10:02:00Z" in t for t in told), "no record at all: the person"
+    assert not list((paths.home() / "missed").glob("*.json"))

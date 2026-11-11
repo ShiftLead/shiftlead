@@ -15,7 +15,7 @@ Print this text again with `ao --skill`.
 2. `ao status --json` — every session on this host. Parse ids and states from the JSON, never
    from prose, a card, or a screen.
 3. Put `--json` on every call: it prints only the RPC result, or `{"error": …}` with exit 1
-   (exit 3: the host agent is down — stop, do not start one; *restarted under this command* means it is up again: run it again).
+   (exit 3: the host agent is down — never start one; *restarted under this command* means it is up again: run it again. An `ao` that exited 3, or printed *command not found* (exit 127), did not land: after a filing verb (`msg`, `td add`, `td reserve`, `progress`, `doing`, `finding`, `rank` with a move), end your turn and run it again when you are rung — its miss leaves a mark the host agent answers with a note once it is back; after any other, run it again on your next turn, as its message says; never go on as if it had — §6 rule 13 *A send that did not land*).
 
 ## States (design §4.2)
 

@@ -23,7 +23,7 @@ from typing import Any
 from sessionorc import agent_ids as ids_mod
 from sessionorc import board as board_mod
 from sessionorc import client as clientmod
-from sessionorc import hosts, naming, promote, reports, workorders
+from sessionorc import hosts, naming, paths, promote, reports, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import mail as mailmod
 from sessionorc import seams as seams_mod
@@ -6185,17 +6185,57 @@ def _unavailable(args: argparse.Namespace, e: AgentUnavailable) -> int:
     So the CLI **asks again** rather than reading the exception's words: one `ping`, now. An agent
     that answers was restarting, and the honest sentence is *run it again* — the state a person
     acts on is the state now, not the one a call failed in. One that does not answer is down, and
-    only then is there anything to start. **The hint is never printed to a session** whichever it
-    is: a session is told to stop, in its skill's own words. The exit code is 3 either way, because
+    only then is there anything to start. **The start hint is never printed to a session** whichever it
+    is: a session is told what it ran did not land (§6 rule 13 *A send that did not land*, TD-1498) — after a
+    filing verb, *end your turn and run it again when you are rung*, with `missed` and a missed mark the host
+    agent answers once it is back; after a read, *nothing was done*. The exit code is 3 either way, because
     what the caller could not do, it could not do."""
     session = os.environ.get("SHIFTLEAD_SESSION") or _session_by_ancestry()
     if _agent_answers():
         prose = "error: the host agent restarted under this command — run it again"
         return fail(args, str(e), 3, prose=prose, restarted=True)
     if session:
-        # `ao --skill`'s Never list, in its own words: a session never starts a host agent
-        return fail(args, str(e), 3, hint="the host agent is down — stop here; a session never starts one")
+        # a session never starts a host agent (`ao --skill`); it is told what it ran did not land (§6 rule 13
+        # *A send that did not land*): a filing verb leaves a missed mark the host agent answers once it is back
+        if (verb := _missed_verb(args)) is not None:
+            _write_missed(session, verb)
+            hint = "the host agent is down — this did not land: end your turn and run it again when you are rung"
+            return fail(args, str(e), 3, hint=hint, missed=True)
+        return fail(args, str(e), 3, hint="the host agent is down — nothing was done: end your turn and run it again")
     return fail(args, str(e), 3, hint="start it with: shiftlead-agent serve")
+
+
+# The verbs a session files with (design §6 rule 13 *A send that did not land*, §4.7): a miss of one of these
+# leaves a missed mark. `rank` only with a move (`--list` is a read); `board edit` asks no host agent.
+MISSED_VERBS = ("msg", "progress", "doing", "finding")
+
+
+def _missed_verb(args: argparse.Namespace) -> str | None:
+    """The verb a missed mark names for this command line — `msg`, `td add`, `td reserve`, `progress`, `doing`,
+    `finding`, `rank` — or None for any other (a read), which writes no mark."""
+    cmd = getattr(args, "cmd", None)
+    if cmd in MISSED_VERBS:
+        return str(cmd)
+    if cmd == "td":
+        return {"add": "td add", "reserve": "td reserve", "next": "td reserve"}.get(getattr(args, "action", None))
+    if cmd == "rank" and not getattr(args, "list", False):
+        return "rank"
+    return None
+
+
+def _write_missed(session: str, verb: str, now: datetime | None = None) -> None:
+    """A missed mark (design §6 rule 13 *A send that did not land*): `{at, verb}` in
+    `$SHIFTLEAD_HOME/missed/<session id>-<at>.json`, one file per miss, written to a temporary name and renamed so
+    no read meets half a file — the verb alone, never its arguments. A failed write is silent: exit 3 says the
+    rest."""
+    at = (now or datetime.now(UTC)).astimezone(UTC)
+    with contextlib.suppress(OSError):
+        d = paths.home() / "missed"
+        d.mkdir(parents=True, exist_ok=True)
+        final = d / f"{session}-{at.strftime('%Y%m%dT%H%M%S%fZ')}.json"
+        tmp = d / f".{final.name}.{os.getpid()}.tmp"
+        tmp.write_text(json.dumps({"at": at.isoformat().replace("+00:00", "Z"), "verb": verb}))
+        os.replace(tmp, final)
 
 
 ANCESTRY_HOPS = 64  # the host agent's own bound on a `ppid` walk (design §4.8a)
