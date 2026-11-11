@@ -391,3 +391,67 @@ async def test_the_gate_reply_lists_each_account_its_profiles_an_orphan_and_a_no
     split = got["hookstub:split"]
     assert split["billing"] == "mixed" and split["billings"] == {"api": "metered", "pc": "subscription"}
     assert {"day", "week", "month"} <= set(split["labels"]), "a mixed account keeps its spend labels"
+
+
+@pytest.mark.integration
+async def test_a_nodes_spend_and_usage_calls_put_their_profiles_on_the_account(agent, hookstub):
+    """`_account_on`'s node sources (§6 *The profiles on an account*, TD-1629): a profile a node's spend call named
+    under the account is metered, one its usage call named is a subscription — each counts toward the account's
+    one billing, so a disagreement with the home's profiles is refused."""
+    await park_ticks(agent)
+    hookstub.accounts = {"pa": "paul"}
+    hookstub.billing = {"api": {"billing": "metered", "prices": {"m": 1.0}}}
+    hookstub.accounts["api"] = "key"
+    agent._spend_named["node1"] = {"hookstub:paul": {"napi"}}
+    agent._usage_remote_keys[("node1", "np")] = "hookstub:key"
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match=r"profiles disagree on billing \(napi metered, pa subscription\)"):
+            await person.call("set_settings", account="hookstub:paul", reserves={"5h": 30})
+        with pytest.raises(AgentError, match=r"profiles disagree on billing \(api metered, np subscription\)"):
+            await person.call("set_settings", account="hookstub:key", reserves={"day": "$5"})
+    assert not settings_mod.load().get("usage_gate")
+
+
+@pytest.mark.integration
+async def test_a_profile_only_a_record_runs_under_is_on_its_account(agent, hookstub, tmp_path):
+    """A profile no adapter lists but a record here runs under is on the account it resolves to (TD-1629): the
+    account takes a reserve by its key, naming that profile, where it would be one this home has not seen."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        s = await person.call("create", name="pr", dir=str(tmp_path), adapter="hookstub", profile="pr")
+        got = await person.call("set_settings", account="hookstub:pr", reserves={"5h": 30})
+        assert (got["account"], got["profiles"]) == ("hookstub:pr", ["pr"])
+        await person.call("kill", id=s["id"])
+        await person.call("remove", id=s["id"])
+
+
+@pytest.mark.integration
+async def test_a_profile_its_adapter_answers_for_but_does_not_list_takes_a_set(agent, hookstub, monkeypatch):
+    """The default insertion (TD-1629): an adapter whose `profiles()` lists nothing still answers `account_for`, so a
+    set by that profile's name puts it on its account rather than refusing the account as unseen."""
+    await park_ticks(agent)
+    hookstub.accounts = {"pa": "paul"}
+    monkeypatch.setattr(hookstub, "profiles", lambda: [])
+    async with LocalClient() as person:
+        got = await person.call("set_settings", profile="pa", reserves={"5h": 30})
+    assert (got["account"], got["profiles"]) == ("hookstub:paul", ["pa"])
+    assert settings_mod.load()["usage_gate"] == {"hookstub:paul": {"5h": 30}}
+
+
+@pytest.mark.integration
+async def test_a_metered_accounts_prices_are_pooled_and_a_profiles_reading_checks_the_labels(agent, hookstub):
+    """A metered account's prices are the first of its profiles' that has any (§6 *One billing*), so a set by the
+    profile with none still takes money; and with no account reading, a profile's own reading checks a set's
+    labels (TD-1629)."""
+    await park_ticks(agent)
+    hookstub.accounts = {"api": "key", "api2": "key", "pa": "paul", "pb": "paul"}
+    hookstub.billing = {
+        "api": {"billing": "metered", "prices": {}},
+        "api2": {"billing": "metered", "prices": {"m": 1.0}},
+    }
+    async with LocalClient() as person:
+        got = await person.call("set_settings", profile="api", reserves={"day": "$5"})
+        assert got["reserves"] == {"day": "$5"}
+        agent._usage["pb"] = {"windows": [{"label": "5h", "pct": 10}], "reason": "ok"}
+        with pytest.raises(AgentError, match="reports no window week: its windows are 5h"):
+            await person.call("set_settings", account="hookstub:paul", reserves={"week": 30})
