@@ -147,6 +147,9 @@ SEAT_ASK_LINGER = timedelta(minutes=15)
 # how long rule 3 leaves an idle seat open on a PR of its own that no reader holds (§6 rule 3, TD-366):
 # its fact-check or CI runs in the background and wakes it; past this the seat is closed as before
 SEAT_PR_WAIT = timedelta(hours=2)
+# §6 rule 14 *Scale with the work* (td-max, TD-1546): how long a worker line's last filled extra holds the line's
+# one guard with no claim — past it the fill is a start that stuck (`did: unstuck`), never a reason to wait
+SCALE_STEP = timedelta(minutes=10)
 # how long a background shell task reads as the session working on its own (§4.2 *A background shell
 # task*, TD-766): a shell sends no heartbeat, and the waits it holds — CI, a deploy — run long
 SHELL_WAIT = timedelta(hours=2)

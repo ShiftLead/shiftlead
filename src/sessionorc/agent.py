@@ -132,6 +132,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     RESTART_WINDOW,  # noqa: F401
     RESUME_MIN,  # noqa: F401
     ROUND_LINE_CAP,  # noqa: F401
+    SCALE_STEP,  # noqa: F401
     SCHEDULE_LATE,  # noqa: F401
     SEAT_ASK_LINGER,  # noqa: F401
     SEAT_IDLE_GRACE,  # noqa: F401
@@ -235,6 +236,7 @@ from sessionorc.agent_notify import NotifyMixin
 from sessionorc.agent_promote import PromoteMixin
 from sessionorc.agent_rank import RankMixin
 from sessionorc.agent_remote import RemoteMixin
+from sessionorc.agent_scale import ScaleMixin
 from sessionorc.agent_serve import ServeMixin
 from sessionorc.agent_settings import SettingsMixin
 from sessionorc.agent_shape import ShapeMixin
@@ -483,6 +485,7 @@ class HostAgent(
     SyncMixin,
     SpendMixin,
     ShapeMixin,
+    ScaleMixin,
     IdsMixin,
     RankMixin,
     AttentionMixin,
@@ -895,6 +898,7 @@ class HostAgent(
         self._queue_read: dict[str, Any] | None = None
         self._rank_init()  # the rank's intents and their flush (§4.4 *A move lands*, TD-769)
         self._shape_init()  # the teams' shape, sampled once a minute (§4.4 *Team shape*, TD-834)
+        self._scale_init()  # rule 14's readings of the worker lines that scale (§6 rule 14, TD-1546)
         # The home's own `host` record (§6 *Balance*, TD-239): a team's balance mark, kept in `host.json`.
         self.host_store = HostStore()
         self._host_rec: dict[str, Any] = self.host_store.load()
@@ -3955,6 +3959,7 @@ class HostAgent(
             # (§4.9a; `restart_wanted` since TD-083), and a controller must not act on a stale one
             s.out_of_work = s.restart_wanted = None
             s.lane_seen = None  # rule 6's memory goes with the declaration it was about (TD-195)
+            self._scale_claimed(s)  # rule 14: a member's claim reads its line at the next tick (TD-1546)
             if s.balance_refused and not self._balance_of(s):
                 s.balance_refused = None  # the line cleared and the member claimed: nothing left to ring
         if applied and status == "dropped" and entry.source == "declared" and mail.as_person(caller, self._graph()):
