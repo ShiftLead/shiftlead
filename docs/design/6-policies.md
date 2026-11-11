@@ -445,7 +445,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the newest end and those within `FINISHED_SETTLE` of it are read as rule 8 reads a stopped team's
      (`_how_stopped`: the person's Stop, Close, Kill or a Wind down left undeclared is `person`; the team's stop
      time is `until`), and the seat is held where they say `person` or `until` — one helper,
-     `work.seats_held_by(records) -> {by, at} | None`. It reads ends, not whether the team wound down, so a
+     `work.seats_held_by(records) -> {by, at} | None`; and one predicate over it, `work.held_for(r, records)` — a
+     record that is a seat (`seat` set), supervised, unattended, neither suspended nor sat out, whose team's
+     `seats_held_by` gives a word — the single test for the fill's hold, `stop_held`, `seats_held` and the
+     reply line (§4.10). It reads ends, not whether the team wound down, so a
      person's Close of the seat of a team whose members had all declared out of work holds it too, and a seat
      rule 3 closed twenty minutes after a Wind down does not turn the team's word into the tick's. A held seat
      is filled for no cause (`asks`, `prs`, `every`, `swept`, `tag`, `team`; a scaled seat's extras with it,
@@ -1018,8 +1021,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      A question's end on a stopped team still waits in the mailbox for the person's Start, as
      above, while the team's lanes are read. So does a question to a held seat (rule 3 *A stopped team's seats
      are held*, TD-1564: its team's last end the person's or the stop time's, whether the team reads stopped
-     or wound down): the team's mark carries **`seats_held: {<seat id>: n}`**, keyed only by a held seat with
-     `n` at least 1, `n` the seat's `asks_waiting(home=…)`, the count rule 3's `asks` cause reads (a key of its
+     or wound down): the team's mark carries **`seats_held: {<seat id>: n}`**, keyed only by a seat
+     `work.held_for` holds this pass (never the stored `stop_held`, a pass behind) with `n` at least 1, beside
+     **`seats_held_by`** (`person` or `until`, the helper's word) and **`seats_held_at`** (the instant its first
+     key was written, dropped with its last, kept through Dismiss), `n` the seat's `asks_waiting(home=…)`, the count rule 3's `asks` cause reads (a key of its
      own: the mark's `held` is rule 8's bound that held a start back, and the strip that drops `held` unless a
      start is due leaves `seats_held` standing). `seats_held` is recomputed and attached on **every** return of
      the mark's reading — lane news, a question's end, a ledger the pass could not read (the old mark kept),
@@ -1031,9 +1036,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      team card's note add *· n questions wait on <seat name>* per key. It makes the row no more pressing than
      the team's word does: `stopped.by` is read over the same ends as the hold (`work.stopped_by` leaves rule
      3's own seat closes out as `seats_held_by` does — one filter, TD-1564), so the two agree; a wound-down
-     team's mark, which carries no `stopped`, reads the held seat's `stop_held.by`. For `person` the row is
-     under *Later*, uncounted and never told; for `until` under *Needs you*, counted, and told once on
-     **Telegram** per mark, at its first `seats_held` key, whatever `on_work` says (*<team> · stopped at its
+     team's mark, which carries no `stopped`, reads its own `seats_held_by` — the row, the note and Telegram
+     read the mark alone. For `person` the row is under *Later*, uncounted and never told; for `until` under
+     *Needs you*, counted, and its questions told once on **Telegram** — for any mark carrying `seats_held`,
+     with lane ids or without, whatever `on_work` says and whatever bound `held` names — on a notify row of
+     their own, `held:<team>`, apart from the lanes' `work:<team>`, whose `began` is `seats_held_at` (*<team> · stopped at its
      stop time · n questions wait on <seat name>*, *n* the total and the seats joined by *and* where several
      are held), never again for a rising count or a second seat. A held-only mark never starts the team, under
      any `on_work` — neither the tick's start nor the row's Start through `work_start` with no lane ids, which
