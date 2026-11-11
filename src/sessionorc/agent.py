@@ -1617,7 +1617,7 @@ class HostAgent(
                 and holder.scale
             ):
                 # an extra stays an extra when it is resumed, as a seat stays a seat (§4.9 *Scaling with the work*)
-                scale = extra = dict(holder.scale)
+                scale = extra = {"line": holder.scale.get("line")}  # its line alone: a `drop` mark is that run's
             succeeding = self._check_succeeds(succeeds, name, caller, resume, keep_mail, starting) if succeeds else None
             if keep_mail:
                 self._check_keep_mail(holder, caller, resume)

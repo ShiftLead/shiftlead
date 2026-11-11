@@ -100,3 +100,25 @@ async def test_drop_extra_is_refused_touching_nothing(agent, tmp_path):
         for x in (sid, plain):
             with contextlib.suppress(Exception):
                 await person.call("kill", id=x)
+
+
+@pytest.mark.integration
+async def test_a_dropped_extra_is_never_restarted_by_rule_1_or_2(agent, tmp_path):
+    """Review of slice 13: rule 2's `restart_wanted`, and an exit the wrap-up never reached, restart nothing."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid, rec = await _extra(person, agent, tmp_path)
+        rec.restart_wanted = {"at": "2026-11-11T08:00:00Z", "why": "context bound"}
+        await person.call("relaunch", id=sid, drop_extra=True)
+        _idle(rec)
+        await agent._keep_running(datetime.now(UTC))
+        assert sid not in agent.sessions and rec.restarts == []  # dropped, never replayed
+        other, ex = await _extra(person, agent, tmp_path, "grind-4")
+        await person.call("relaunch", id=other, drop_extra=True)
+        ex.state, ex.pane, ex.exit_code, ex.wrapup_at = "exited", True, 1, None  # crashed before the wrap-up
+        ex.git = {"dirty": 2, "unpushed": 0}
+        await agent._keep_running(datetime.now(UTC) + timedelta(seconds=1))
+        assert agent.sessions.get(other) is ex and ex.state == "exited" and ex.restarts == []  # work left: kept
+        ex.git = {"dirty": 0, "unpushed": 0}
+        await agent._keep_running(datetime.now(UTC) + timedelta(seconds=2))
+        assert other not in agent.sessions and ex.restarts == []
