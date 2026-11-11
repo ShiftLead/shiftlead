@@ -65,6 +65,7 @@
       ]
     }
   ],
+  "life": {"start": 0, "turn": [1, 2], "end": 13, "composer": "../../../fixtures/screens/plain-prompt.txt"},
   "status_lines": [
     {"file": "captured/statusline.jsonl", "windows": [0, 2, 2, 2, 2, 2, 2, 0]}
   ],

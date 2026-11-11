@@ -141,6 +141,12 @@
    ]
   }
  ],
+ "life": {
+  "start": 0,
+  "turn": [1, 2],
+  "end": null,
+  "composer": "panes/idle-empty.txt"
+ },
  "transcripts": [
   {
    "file": "transcripts/walk-limit.jsonl",

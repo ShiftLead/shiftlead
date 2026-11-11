@@ -5,6 +5,7 @@ optional method is tested; an undeclared one is absent."""
 
 from __future__ import annotations
 
+import inspect
 import json
 
 import pytest
@@ -63,6 +64,14 @@ def test_there_are_agent_adapters_and_each_ships_fixtures_and_a_harness():
 @pytest.mark.parametrize("name", AGENTS)
 def test_the_declared_methods_are_there_and_the_rest_absent(name):
     check_declaration(adapters.get(name))
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_the_constructor_takes_binary(name):
+    """Every agent adapter is built with the tool it runs (§4.3's Protocol block, TD-1647): a seat's life
+    builds it with `binary` set to the stub's wrapper."""
+    params = inspect.signature(type(adapters.get(name))).parameters
+    assert "binary" in params, f"{name}'s constructor takes no `binary`"
 
 
 def test_shell_declares_no_permission_channel():
