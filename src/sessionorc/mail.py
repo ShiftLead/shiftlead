@@ -972,6 +972,7 @@ def read_when(
     cache: bool = False,
     modal_limit: bool = False,
     held: dict[str, Any] | None = None,
+    extras: dict[str, Any] | None = None,
 ) -> str:
     """**When it is read** (design §4.10 *When it is read: the sentence the sender sees*, TD-158,
     built by TD-168): one sentence saying when a message of `kind` to `s` will be read — the first
@@ -993,7 +994,13 @@ def read_when(
     the screen*: `agent_common.limit_is_modal` on a record of its own host). `held` is the home's word that the
     record is a seat held by its team's stop (§6 rule 3 *A stopped team's seats are held*, TD-1564): `{by, team,
     wound}`, computed by the caller from `work.held_for` over the team's records, never from the stored mark — first
-    among the seat-on-call rows, below `unreachable`. Advice, never a refusal."""
+    among the seat-on-call rows, below `unreachable`. `extras` is the send's choice for a scaled seat (§4.9 *Mail to
+    a scaled seat*, TD-1547), made by the host agent over the seat's extras' records and whether one can be filled
+    (`seat_send.choose`, which reads what this module cannot: a live subagent or shell): `{fill: <extra>}` with `s`
+    the seat's own record, the lowest-placed held extra the send fills; `{waits: <why>}` with `s` the own record, no
+    extra can be filled (*every extra busy*, *host full, <n> live*, *its profile is paused*); `{lands: True}` with
+    `s` the extra that took it, whose own sentence follows. They apply to an `ask` (an `entry` envelope is one)
+    alone. Advice, never a refusal."""
     ask = kind == "ask"
     tail = f" — an ask takes the default bound of {_hours(bound or ASK_BOUND)}" if ask and lapses else ""
     if s is not None and not mail_wakes(s):
@@ -1001,6 +1008,27 @@ def read_when(
             "lands in its inbox and wakes nothing: a person's session is never rung (invariant 5)"
             " — the card's unread chip shows it" + tail
         )
+    if ask and extras and extras.get("fill"):
+        return f"fills {extras['fill']}, an extra of this seat, and lands there: it reads it first" + tail
+    if ask and extras and extras.get("waits") and s is not None:
+        return f"waits on {s.name}: {extras['waits']} — it moves to an extra once one fills" + tail
+    if ask and extras and extras.get("lands") and s is not None:
+        rest = read_when(
+            s,
+            kind,
+            now,
+            person=person,
+            seat=seat,
+            bound=bound,
+            unreachable=unreachable,
+            rings=rings,
+            refills=refills,
+            lapses=lapses,
+            cache=cache,
+            modal_limit=modal_limit,
+            held=held,
+        )
+        return f"lands on {s.name}, an extra of this seat, then {rest}"
     state = s.state if s is not None else "exited"
     if state == "unreachable" or unreachable:
         # before the seat and exited rows: a down host's record reads *unreachable* on its card

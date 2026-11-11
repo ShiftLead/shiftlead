@@ -477,6 +477,7 @@ async def test_a_seats_extra_is_never_a_teams_question_seat(agent, tmp_path):
         try:
             async with LocalClient(caller=asker) as a:
                 got = await a.call("msg", team="beta", text="may beta take an entry?")
-                assert got["delivered"] == [seat]
+                # resolved to the seat, whose free live extra then takes it (§4.9 *Mail to a scaled seat*, TD-1547)
+                assert got["seated"] == {seat: extra} and got["delivered"] == [extra]
         finally:
             await park_ticks(agent)

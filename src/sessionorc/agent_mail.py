@@ -20,6 +20,7 @@ from sessionorc import (
     agent_common,
     hosts,
     mail,
+    seat_send,
     unanswered,
 )
 from sessionorc import held as held_mod
@@ -1223,6 +1224,28 @@ class MailMixin:
             return resolved
 
         named = follow(named)
+        # -- a scaled seat is one seat (§4.9 *Mail to a scaled seat*, TD-1547): the send picks its record, and
+        # from here to the landing no `await` falls, so the choice and the delivery are one step --------------
+        seated: dict[str, str] = {}  # the seat's own id the sender wrote → the record of the seat that takes it
+        seat_words: dict[str, dict[str, Any]] = {}  # the delivered record → `read_when`'s `extras`
+        seat_of: dict[str, str] = {}  # the delivered record → the seat's own id, which `read_when` is keyed by
+        to_fill: list[tuple[Session, str]] = []
+        if not routed:
+            picked_to: list[str] = []
+            for sid in named:
+                choice = self._seat_pick(records, sid, sender, kind, replied, pr)
+                if choice is None:
+                    picked_to.append(sid)
+                    continue
+                picked_to.append(choice.to)
+                if choice.to != sid:
+                    seated[sid] = choice.to
+                seat_of[choice.to] = sid
+                if choice.words:
+                    seat_words[choice.to] = choice.words
+                if choice.fill is not None:
+                    to_fill.append((choice.fill, records[sid].name))
+            named = list(dict.fromkeys(picked_to))
         # -- the gate, per addressee, all or nothing ------------------------------------------------
         for sid in named:
             if sid not in records and sid != PERSON:
@@ -1398,6 +1421,9 @@ class MailMixin:
         if me is not None:
             me.outbox.append(self._copy(entry))
             touched.append(me)
+        for extra, seat_name in to_fill:
+            # marked before the first `await`, so a racing send takes it as filled and fills no second (TD-1547)
+            self._send_filling[extra.id] = asyncio.create_task(self._send_fill(extra, seat_name))
         if counts:
             for r in touched:
                 r.threads.setdefault(root, Tally()).count += 1
@@ -1476,13 +1502,15 @@ class MailMixin:
         with contextlib.suppress(TypeError, ValueError):
             span = _parse(entry.bound) - _parse(entry.at) if entry.bound else None
         read_when = {
-            sid: mail.read_when(
-                records[sid],
+            seat_of.get(sid, sid): mail.read_when(
+                # a seat's fill or wait reads as the seat's own record; mail an extra took, as that extra (TD-1547)
+                records[seat_of[sid]] if sid in seat_of and "lands" not in seat_words.get(sid, {}) else records[sid],
                 entry.kind,
                 now,
                 person=sender == PERSON,
                 bound=span,
                 unreachable=sid in away,
+                extras=seat_words.get(sid),
                 **self._read_when_kwargs(records[sid], now, records),
                 # a reply that closes a question the seat itself sent fills a seat on call — the person's
                 # or a session's, on a handed entry's thread or on its own (§4.9b *an answer waiting*,
@@ -1511,12 +1539,84 @@ class MailMixin:
             "copies": landed,
             "copies_failed": failed,
             "forwarded": forwarded,
+            "seated": seated,  # §4.9 *Mail to a scaled seat* (TD-1547): the seat's own id → the record that took it
             "closed": replied.id if closes and replied is not None else None,
             "answered_for_you": fyi_id,  # the FYI filed to the person for a reply with a source (§4.9b)
             "warnings": warnings,  # §4.10 *A subject on every entry*: said on a line, never refused
             # advice, not a refusal: the id comes back either way (design §4.10)
             "advice": advice,
         }
+
+    def _seat_pick(
+        self,
+        records: dict[str, Session],
+        sid: str,
+        sender: str,
+        kind: str,
+        replied: MailEntry | None,
+        pr: int | None,
+    ) -> seat_send.Choice | None:
+        """The record of a scaled seat that takes mail addressed to the seat's own record (§4.9 *Mail to a scaled
+        seat*, §6 rule 3 *An extra seat*, TD-1547), or None where `sid` is no seat with extras, or the sender is one
+        of the seat's own records. The held extras that may be filled are those closed, or `exited` with nothing
+        rule 1 would restart, never one a lowered `max` is dropping; the fill is refused on a gated profile
+        (*its profile is paused*) and at `scale.live` with no extra seat to close for the room (*host full*)."""
+        own = records.get(sid)
+        if own is None or own.seat is None or isinstance(own.scale, dict):
+            return None
+        extras = seat_send.extras_in_place(own, records.values())
+        if not extras or sender in {own.id, *(r.id for r in extras)}:
+            return None
+        now = datetime.now(UTC)
+        held = [
+            r
+            for r in extras
+            if r.state in ("closed", "exited")
+            and not r.scale.get("drop")
+            and (r.state == "closed" or not self._crashed(r, now))
+        ]
+
+        def guard(extra: Session) -> str | None:
+            if self._profile_gated(extra.profile, now, extra.team):
+                return "its profile is paused"
+            n = self._scale_full(extra, own.name, now)
+            return f"host full, {n} live" if n is not None else None
+
+        ids = {own.id, *(r.id for r in extras)}
+        closes = kind == "reply" and replied is not None and replied.open and replied.from_ in ids
+        return seat_send.choose(
+            own,
+            extras,
+            kind=kind,
+            now=now,
+            root=replied.root if replied is not None else "",
+            pr=pr,
+            closes_seat_question=closes,
+            away=self._away,
+            filling=self._send_filling,
+            evicting=self._evicting,
+            held=held,
+            guard=guard,
+        )
+
+    async def _send_fill(self, extra: Session, seat: str) -> None:
+        """The send's fill (§6 rule 3 *An extra seat*, TD-1547): the held extra created from its launch record with
+        `keep_mail`, as rule 3 fills a seat — the mail just landed on it moves to the new record — a `fill` in its
+        `restarts`, its `scale.last` saying why. Run as a task the send starts, so the send never waits for the
+        pane; the extra counts as filling (free, `seat_send.choose`) until its record stands or the replay fails."""
+        try:
+            await self._replay(extra, "fill", keep_mail=True, mark={"for": "send"})
+            here = (extra.host or self.host) == self.host
+            new = self.sessions.get(extra.id) if here else self.remote.get(extra.host, {}).get(extra.id)
+            if new is not None and new is not extra and isinstance(new.scale, dict):
+                why = f"an ask at the send: {seat} busy"
+                new.scale = {**new.scale, "last": {"at": now_iso(), "did": "fill", "why": why}}
+                self._save(new)
+                await self._push_changes()
+        except Exception as e:  # noqa: BLE001 — the mail is landed either way; the replay's entry says what failed
+            log.warning("%s: the send's fill failed: %s", extra.id, e)
+        finally:
+            self._send_filling.pop(extra.id, None)
 
     def _away(self, r: Session) -> bool:
         """Whether a record's host is not this one and its link is down (§4.4a *When the recipient's host is
