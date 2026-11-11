@@ -175,7 +175,9 @@ def usage_cards(
     it has reported) — its badge listing the profiles on it, a row per window label its reading reports, each
     with the account's reserve as the field takes it, the line it makes today, and what the page's preview
     needs to draw a new line before the press lands (`resets`). An account with no reading yet draws the
-    labels it has reserves for, and says the labels are not checked; one absent from `usage_gate:` shows
+    labels it has reserves for, and says the labels are not checked; one with a reading draws a reserve on a
+    label the reading lacks as a `stale` row, *not reported*, which holds no field and which the card's Save
+    clears (TD-1680); one absent from `usage_gate:` shows
     empty fields. A **metered** account's card (§4.2a) carries the home's three windows, each taking an
     amount (`$5`, `20M tok`), with the account's spend beside it. An account whose profiles disagree on
     billing (`mixed`) takes no reserve and says so."""
@@ -240,11 +242,14 @@ def usage_cards(
                     "age": reading_age(w, read, now),
                 }
             )
-        for label, r in reserves.items():  # a reserve on a label no reading has shown yet
-            if not any(x["label"] == label for x in card["rows"]):
-                card["rows"].append(
-                    {"label": label, "value": reserve_text(r), "line": "no reading yet", "resets": "", "pct": None}
-                )
+        reported = [str(w["label"]) for w in windows]
+        for label, r in reserves.items():  # a reserve on a label the reading does not show
+            if label in reported:
+                continue
+            row = {"label": label, "value": reserve_text(r), "line": "no reading yet", "resets": "", "pct": None}
+            if windows:  # a reading that lacks the window: no field, and the card's Save clears it (TD-1680)
+                row |= {"line": f"not reported: {key} reports {', '.join(reported)}", "stale": True}
+            card["rows"].append(row)
         cards.append(card | {"badge": badge, "unchecked": not windows})
     return cards
 

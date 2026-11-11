@@ -107,6 +107,44 @@ def test_usage_cards_are_one_per_account_and_draw_each_reported_window():
 
 
 @pytest.mark.unit
+def test_a_reserve_on_a_window_the_reading_lacks_is_a_not_reported_row_the_save_clears():
+    """An account whose reading reports only `week` but whose `usage_gate:` still holds `5h` (TD-1680): the 5h
+    row says the window is not reported, not *no reading yet*, holds no field, and the card's Save sends it as a
+    clear beside the fields; an account with no reading keeps *no reading yet*."""
+    profiles = {"grind": profiles_mod.Profile(name="grind", account="paul")}
+    usage = {"grind": {"tool": "claude-code", "account": "paul", "windows": [{"label": "week", "pct": 58}]}}
+    accounts = {
+        "claude-code:paul": {"profiles": ["grind"], "billing": "subscription", "reserves": {"5h": 5, "week": 10},
+            "windows": [{"label": "week", "line": 90, "reserve": 10, "resets": None, "next": None}]},
+    }  # fmt: skip
+    (card,) = setmod.usage_cards(profiles, accounts, usage, NOW)
+    week, stale = card["rows"]
+    assert (week["label"], week["value"], week.get("stale")) == ("week", "10", None)
+    assert stale == {
+        "label": "5h",
+        "value": "5",
+        "line": "not reported: claude-code:paul reports week",
+        "resets": "",
+        "pct": None,
+        "stale": True,
+    }
+    assert not card["unchecked"]
+    (cold,) = setmod.usage_cards(profiles, accounts, {}, NOW)
+    assert [(r["label"], r["line"], r.get("stale")) for r in cold["rows"]] == [
+        ("5h", "no reading yet", None),
+        ("week", "no reading yet", None),
+    ]
+    # the row has no field; the card's Save sends it as a clear, and can be pressed as drawn to send it
+    html = (UI / "templates" / "settings.html").read_text()
+    assert re.search(r'{% if w.stale %}\s*{#-[^#]*-#}\s*<div class="setrow setstale" data-label="{{ w.label }}">', html)
+    stale_row = html.split('class="setrow setstale"', 1)[1].split("</div>", 1)[0]
+    assert "<input" not in stale_row
+    js = (UI / "static" / "app.js").read_text()
+    assert '$$(".setstale", f).map((r) => [r.dataset.label, ""])' in js
+    assert 'save.disabled = !dirty && !$(".setstale", f);' in js
+
+
+@pytest.mark.unit
 def test_a_usage_cards_rows_say_how_old_the_reading_is():
     """design §4.5a *Settings page: Usage*, *The reading's age* (TD-230, TD-233 slice 1): beside each
     window's reading, its age and source as the chip's hover gives them; past three hours, or past
