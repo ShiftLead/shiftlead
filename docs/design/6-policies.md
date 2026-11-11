@@ -2631,7 +2631,9 @@ teams:
   - **A team's reserve priority stays the team's** (below): the one way to make some sessions on an
     account stop sooner.
   - **The migration** — the host agent's second write of `settings.yml` outside `set_settings` (§5),
-    beside the td-max one (§4.9 *On by default*), which it leaves as it is. Once per tick, before the gate's pass, the home walks `usage_gate:` of the
+    beside the td-max one (§4.9 *On by default*), which it leaves as it is. Once per tick, first in the
+    home's part of the tick, before any pass that reads a reserve (the detached usage refresh may read
+    one tick stale), the home walks `usage_gate:` of the
     file as `settings.read()` gives it (a dict; a missing or unparseable file, None, is never migrated
     or written) for a key holding no `:` — never on a node, whose replica the home sends whole (§4.4a),
     nor in a CLI's or a page's read; a tick with none does nothing more, so the walk is its whole cost.
@@ -2651,9 +2653,14 @@ teams:
     nodes and committed in the home's definition files as every settings write is (§4.4a; `_commit_defs`, §4.9); before it, the file
     as it stands is committed in the home's definition files — *settings.yml before TD-1581's migration*,
     awaited through `_commit_defs` (its lock, the one committer, §4.9), no commit where it is committed
-    already — and the migration goes on only when `settings.yml` is then clean against the tree's head,
+    already — and the migration goes on only when `settings.yml` is then clean against the tree's head (`defs.clean`,
+    a pure read in a thread: tracked, and no difference from HEAD),
     which is the commit that holds it as it stood (a failed commit leaves it dirty, and the tick moves
-    nothing, to try again next tick); on a home whose definitions are no git tree, it is copied beside
+    nothing, to try again next tick, logging the cause once, and after a day of such ticks one note to
+    the person names it; a `set_settings` landing between the steps is either read by the load or
+    leaves the file dirty for a tick, so no lock is added; the tick's own *edited by hand* commit
+    shares `_commit_defs`' lock, so the pre-commit may find the file committed already, under that
+    message); on a home whose definitions are no git tree, it is copied beside
     it as `settings.yml.before-TD-1581` the first time, never overwritten, and a later move's restore
     point is its note's values. One
     `system` note tells the person what moved — *usage reserves are now per account: claude-code:paul
