@@ -55,8 +55,8 @@ never its prose (design §6 rule 6), so the ledger's entries carry them first:
 - **`**Blocked by:**`** — *pickable* is derived from it and never written: an entry with none, or
   whose every blocker is archived, is pickable. `decision (paul)` there keeps the entry from every
   lane until the person decides.
-- **`**Kind:**`** — `build`, or none, is a `free-pick` lane's (and a `live-check` once its build is
-  live); `design-first` is a designer's.
+- **`**Kind:**`** — `build`, or none, is a `free-pick` lane's (and a `live-check` once its `event (live…)`
+  gate lifts, its build live); `design-first` is a designer's.
 - **`**Owner:**`** — the word a lane's `owner:` matches (*What a lane takes*, step 3). `paul` is the
   person's owner word (`PERSON_OWNER` in `sessionorc/ledger.py`, as agent-cadence's seeded ledger's
   `Fields:` line declares it), and keeps an entry from every lane that carries an `owner:` word. **To keep an
