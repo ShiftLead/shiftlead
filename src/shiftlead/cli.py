@@ -2840,10 +2840,18 @@ def cmd_settings(args: argparse.Namespace) -> int:
     def prose() -> None:
         print(got["file"])
         print("usage_gate:")
-        for prof, v in (got.get("usage_gate") or {}).items():
-            rows = v["windows"] or [{"label": k, "reserve": r, "unread": True} for k, r in v["reserves"].items()]
-            print("  " + _gate_line(prof, rows))
-        if not got.get("usage_gate"):
+        lines: list[str] = []
+        if isinstance(got.get("usage_accounts"), dict):  # by account (§4.7 `ao gate`, TD-1610)
+            for key, v in got["usage_accounts"].items():
+                if v.get("reserves") or v.get("amounts"):
+                    lines.append(_gate_account_line(key, v))
+        else:
+            for prof, v in (got.get("usage_gate") or {}).items():
+                rows = v["windows"] or [{"label": k, "reserve": r, "unread": True} for k, r in v["reserves"].items()]
+                lines.append(_gate_line(prof, rows))
+        for line in lines:
+            print("  " + line)
+        if not lines:
             print("  none — the gate pauses nothing")
         print("teams:")
         here: orgmod.Org | None = None

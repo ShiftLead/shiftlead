@@ -2309,6 +2309,8 @@ def test_ao_gate_sets_shows_and_is_a_persons(subprocess_agent, grind_profile, tm
     assert got["accounts"]["claude-code:paul"]["profiles"] == ["grind"]
     assert cli.main(["gate", "claude-code:paul", "week=5/day"]) == 0  # the account by its key
     assert "claude-code:paul (grind) · 5h 30 → no reading yet · week 5/day" in capsys.readouterr().out
+    assert cli.main(["settings"]) == 0  # `ao settings` prints the gate by account too
+    assert "usage_gate:\n  claude-code:paul (grind) · 5h 30 → no reading yet · week 5/day" in capsys.readouterr().out
     assert cli.main(["gate", "grind", "5h=", "week="]) == 0
     assert "no reserves" in capsys.readouterr().out
     assert cli.main(["--json", "new", "w", "-a", "shell", "-d", str(tmp_path), "--unattended"]) == 0

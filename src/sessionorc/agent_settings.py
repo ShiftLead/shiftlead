@@ -233,7 +233,8 @@ class SettingsMixin:
         that is not a list of strings is taken as absent."""
         agent_common.person_only(caller, "read the settings", "§5 settings.yml", self._graph())
         doc, now = settings_mod.load(), datetime.now(UTC)
-        gate = (await self.rpc_gate())["profiles"]
+        reply = await self.rpc_gate()
+        gate = reply["profiles"]
         teams = {
             name: {
                 **t,
@@ -245,6 +246,7 @@ class SettingsMixin:
         out = {
             "file": str(settings_mod.settings_file()),
             "usage_gate": gate,
+            "usage_accounts": reply["accounts"],  # `ao settings` prints by account (TD-1610)
             "teams": teams,
             "repos": settings_mod.repos(doc),
             "usage": {"max_age": settings_mod.usage(doc).get("max_age", settings_mod.MAX_AGE_DEFAULT)},
