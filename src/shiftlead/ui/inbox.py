@@ -1292,9 +1292,13 @@ def stuck_onto_holders(out: dict[str, list[dict[str, Any]]], waiting_on: Callabl
                 continue
             lines.setdefault(aid, []).append(it)
             if moved:
-                # the line's own row stays where it was, under *Waiting on them*, in no number
+                # the line's own row stays where it was, under *Waiting on them*, in no number — but a handed entry
+                # that came back `blocked` was a need before it was stuck, and stays one (TD-1497 slice 4)
                 row = {k: v for k, v in r.items() if k not in ("stuck", "standing")}
-                back.append(row if row.get("handed_row") else {**row, "waiting_on": waiting_on(row)})
+                if row.get("handed_row") and _outcome_of(row).get("state") == "blocked":
+                    kept.append(row)
+                else:
+                    back.append(row if row.get("handed_row") else {**row, "waiting_on": waiting_on(row)})
         out[sec] = kept
     if back:  # in `inbox_sections`' order for *Waiting on them*
         out["waiting"] = sorted(

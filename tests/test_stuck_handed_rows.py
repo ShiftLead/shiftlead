@@ -139,4 +139,67 @@ def test_the_handed_row_draws_its_stuck_line_and_open(tmp_path, monkeypatch):
     (r,) = secs["needs"]
     html = ui.templates.get_template("queue_mail.html").render(e={**r, "want": "do"}, section="needs", origin="")
     assert "stuckline" in html and 'href="/focus/g7"' in html
+    assert 'title="Opens the session the stuck work waits on, in Focus."' in html, "§4.5a's help: stuck-open"
     assert "blocked on something only a person can move" not in html, "stuck, not blocked"
+
+
+@pytest.mark.unit
+def test_a_blocked_handed_entry_stays_a_need_when_its_holder_row_takes_the_stuck_line():
+    blocked = handed(outcome={"state": "blocked", "text": "needs a key", "at": "2026-10-20T11:00:00Z"})
+    _, secs = sections(reading(about="TD-21"), entries=[blocked], states=[state()], held_on="s#TD-020")
+    assert not secs["waiting"] and secs["count"] == 2
+    r = next(x for x in secs["needs"] if x.get("handed_row"))
+    assert not r.get("stuck"), "its words are the holder row's line"
+    h = next(x for x in secs["needs"] if x.get("row") == "limited")
+    assert h["stuck_lines"][0]["id"] == "ask:m-9"
+
+
+@pytest.mark.unit
+def test_a_blocked_handed_entry_at_waiting_still_says_it_is_blocked(tmp_path, monkeypatch):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    from shiftlead.ui import app as ui
+
+    until = (NOW + timedelta(minutes=20)).isoformat()
+    blocked = handed(outcome={"state": "blocked", "text": "needs a key", "at": "2026-10-20T11:00:00Z"})
+    _, secs = sections(reading(about="TD-21", waiting_until=until), entries=[blocked])
+    (r,) = secs["needs"]
+    assert r["stuck"]["waiting_until"] == until
+    html = ui.templates.get_template("queue_mail.html").render(e={**r, "want": "do"}, section="needs", origin="")
+    assert "blocked on something only a person can move" in html
+
+
+@pytest.mark.unit
+def test_a_stuck_row_counts_under_session_states_on_the_rail_server_and_script_alike():
+    """§4.5 screen 6 *The rail*, *Kinds* (TD-1497): a stuck row of its own is a *session state*; a handed entry moved
+    while stuck keeps its own kind, *questions*."""
+    import json
+    import shutil
+    import subprocess
+
+    from conftest import scratch_dir
+    from test_ui_inbox import RAIL_PROBE, UI
+
+    from shiftlead.ui.inbox import rail_counts, rail_picks, rail_rows
+
+    # both drawn in the Inbox (a row on a Queue card is on no rail line): the handed entry names no entry
+    two = {**reading(about="", repo="db"), **reading(mid="m-1", about="", repo="db")}
+    _, secs = sections(two, entries=[handed(subject="draft it", text="draft it")])
+    moved = next(r for r in secs["needs"] if r.get("handed_row"))
+    assert moved["home"] == "inbox" and moved.get("stuck")
+    rows = rail_rows(secs, [])
+    assert sorted(r["kind"] for r in rows) == ["questions", "states"]
+    counts = rail_counts(rows, rail_picks({"kind": "states"}))
+    assert counts["kinds"]["states"] == {"shown": 1, "all": 1} and counts["kinds"]["questions"]["shown"] == 0
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the script's count is JavaScript, and nothing else runs it")
+    tmp = scratch_dir()
+    (tmp / "probe.js").write_text(RAIL_PROBE)
+    (tmp / "cases.json").write_text(json.dumps({"rows": rows, "picks": ["?kind=states", ""]}))
+    out = subprocess.run(
+        [node, str(tmp / "probe.js"), str(UI / "static" / "app.js"), str(tmp / "cases.json")],
+        capture_output=True, text=True, timeout=30,
+    )  # fmt: skip
+    assert out.returncode == 0, out.stderr
+    js = json.loads(out.stdout)["counts"]
+    assert js == [rail_counts(rows, rail_picks({"kind": "states"})), rail_counts(rows, rail_picks({}))]

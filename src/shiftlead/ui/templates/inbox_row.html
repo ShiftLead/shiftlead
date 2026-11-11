@@ -327,11 +327,11 @@
 <div class="row gap wrap stuckline"><span class="badge kindmark k-stuck">stuck</span><span class="st">{{ e.stuck.text }}</span>
   {%- if e.stuck.waiting_until %}<span class="st" title="every reason names when it ends, within the wait (design §6 rule 13)">· waiting</span>{% endif %}
   <span class="grow"></span>
-  {%- if e.stuck.open %}<a class="btn sm primary" href="/focus/{{ e.stuck.open }}" title="Focus on {{ e.stuck.name }}: the session the work waits on">Open</a>{% endif %}
+  {%- if e.stuck.open %}<a class="btn sm primary" href="/focus/{{ e.stuck.open }}" title="{{ help_title('stuck-open') }}">Open</a>{% endif %}
 </div>
 {%- endif %}
 <div class="row gap wrap mfoot">
-  {%- if section == 'needs' and not e.stuck %}
+  {%- if section == 'needs' and not (e.stuck and not e.stuck.waiting_until) %}
   <span class="st">blocked on something only a person can move — {{ e.holder_name }}'s questions come as rows of their own</span>
   {%- elif e.holder_state in ('exited', 'closed') %}
   <span class="st">handed · {{ e.holder_name }} {{ e.holder_state }} before reporting — the seat is filled again to finish it</span>
@@ -971,7 +971,7 @@
 <div class="row gap wrap stuckline"><span class="badge kindmark k-stuck">stuck</span><span class="st">{{ e.stuck.text }}</span>
   {%- if e.stuck.waiting_until %}<span class="st" title="every reason names when it ends, within the wait (design §6 rule 13)">· waiting</span>{% endif %}
   <span class="grow"></span>
-  {%- if e.stuck.open %}<a class="btn sm primary" href="/focus/{{ e.stuck.open }}" title="Focus on {{ e.stuck.name }}: the session the work waits on">Open</a>{% endif %}
+  {%- if e.stuck.open %}<a class="btn sm primary" href="/focus/{{ e.stuck.open }}" title="{{ help_title('stuck-open') }}">Open</a>{% endif %}
 </div>
 {%- endif %}
 {%- if e.stale_line %}
@@ -1216,7 +1216,7 @@
 <div class="row gap wrap mfoot">
   {%- if e.waiting_until %}<span class="st" title="every reason names when it ends, within the wait (design §6 rule 13)">waiting{% if e.until_words %}: its reason ends in {{ e.until_words }}{% endif %}</span>{% endif %}
   <span class="grow"></span>
-  {%- if e.open %}<a class="btn sm primary" href="/focus/{{ e.open }}" title="Focus on {{ e.name }}: the session the work waits on">Open</a>{% endif %}
+  {%- if e.open %}<a class="btn sm primary" href="/focus/{{ e.open }}" title="{{ help_title('stuck-open') }}">Open</a>{% endif %}
 </div>
 {%- endmacro %}
 
