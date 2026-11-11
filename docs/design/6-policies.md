@@ -2598,44 +2598,55 @@ teams:
   adapter's (§4.3); the gate knows none of them by name.
   **A reserve is the account's** (TD-1581; Paul, 2026-11-10: *one reserve per account, and no profile
   keeps a reserve of its own*). A quota is one number per account, so its reserve is too.
-  - **The key.** `usage_gate:` is keyed by the account's usage key, `<adapter>:<account>` as
-    `_usage_key` gives it (the adapter's `account_for`: the profile's `account`, else its name; a profile
-    no adapter resolves is its own account, `<adapter>:<profile>`). A key is an **account key** when it
-    is `<adapter>:<rest>` with `<adapter>` a name `adapters.names()` gives, whether or not a profile on
-    this host names the account yet (a node's, or one set before its first profile), and is read as one.
-    Every profile on the account reads that one entry, so one change moves the line for every
-    unattended session on the account; a metered account's **amount** is the account's too, the window's
-    `pct` the account's spend over it (§4.2a).
+  - **The key.** `usage_gate:` is keyed by the account's usage key, `<adapter>:<account>` — the profile's
+    `adapter` and its `account`, else its name, as `_usage_key` gives it from the adapter's
+    `account_for`, which answers only for a profile naming that adapter. **A key holding a `:` is an
+    account key**, read as one whether or not any profile here names it (a node's account, one set
+    before its first profile, one whose adapter this host lacks); a key holding none is a profile's,
+    which no reader reads (*The migration*, below). Every profile on the account reads the one entry, so
+    one change moves the line for every unattended session on the account; a metered account's
+    **amount** is the account's too, the window's `pct` the account's spend over it (§4.2a).
+  - **The profiles on an account** come from the adapters, as `account_for` does: an adapter's optional
+    `profiles()` (§4.3) lists the profiles naming it, each `{name, account, billing}`, read from
+    `profiles.yml`; with node usage and spend calls, which name a node's profiles and their key (§4.4
+    *Usage*), it is the host agent's one list of accounts and their profiles.
   - **The readers.** Every reader of `usage_gate:` reads by account, none by profile: `_gate_reserves`,
     which resolves a profile to its account and returns the account's reserves or amounts and which the
     gate's pass, the projection notes, `_profile_over` (every restart, fill and wake that asks whether a
     profile is over its line) and the usage-only check ask; the spend readers of amounts (the metered
-    reading's `pct` and the spend mark, `agent_spend.py`); and the `gate` RPC, whose reply is
-    **`{accounts: {<key>: {profiles, billing, reserves | amounts, windows}}}`** — the profiles on the
-    account (the home's `profiles.yml`'s and a node's that its usage or spend calls named), its billing,
-    its reserves or amounts, and its reading's windows with their lines — what `ao gate` and the Settings
-    page draw.
-  - **One billing.** An account has one billing (§4.2a), so its reserve is a percent or an amount. An
-    account whose profiles disagree (a file written before this rule) is named by `ao doctor`'s
-    profiles check and on its Settings card, `set_settings` refuses a reserve on it naming the
+    reading's `pct` and the spend mark); and the `gate` RPC, whose reply is **`{accounts: {<key>:
+    {profiles, billing, reserves | amounts, windows}}}`**, an account for each key under `usage_gate:`,
+    each account the adapters' profiles name and each a node has reported under — one with no reading
+    yet carries `windows: []`, so its card can take a first reserve, and an orphan key no profile names
+    is listed with `profiles: []`, so it can be cleared. A label is checked against the account's
+    reading's labels where there is one, and accepted unchecked where there is none.
+  - **One billing.** An account has one billing (§4.2a), so its reserve is a percent or an amount, and
+    its metered card posts `{account, reserves}` as a subscription card does, the unit telling them
+    apart. An account whose profiles disagree (a file written before this rule) is named by `ao
+    doctor`'s profiles check and on its Settings card, `set_settings` refuses a reserve on it naming the
     profiles and their billing, and until the file is fixed its entry is read only by the profiles whose
     billing fits the entry's unit. An account no home profile names takes its billing, prices and
-    labels from the node `spend` and usage calls made under its key (§4.4 *Usage*); with none, a set is
-    refused naming the account as one this home has not seen.
+    labels from the node calls made under its key; with none and no profile, a set is refused naming
+    the account as one this home has not seen.
   - **A team's reserve priority stays the team's** (below): the one way to make some sessions on an
     account stop sooner.
-  - **The per-profile file migrates once**, by the home's host agent at its start (never a node, whose
-    replica the home sends whole, §4.4a, nor a CLI's or a page's read of the file): when `usage_gate:`
-    holds a key that is no account key, each such key is a profile, resolved to its account by the
-    adapters that know it; per window label the account keeps one reserve from among its profiles' and
-    any entry already written under the account — the largest per-day reserve where any is per day,
-    else the largest flat one (a metered account: the smallest amount) — an order that needs no reading,
-    so among reserves of one shape no line moves up. The profile keys are removed in the same write,
-    through `set_settings`'s writer, and one `system` note tells the person what moved — *usage
-    reserves are now per account: claude-code:paul takes week 5 (from grind-ask; grind had 1,
-    grind-fable 3, grind-sonnet 5)* — once. A profile key no adapter on the home resolves (a profile only a
-    node defines) is removed too and named in the note with its value, to be set again with `ao gate
-    <account>`, so no key that is no account key is left and the next start migrates nothing.
+  - **The migration.** The home's tick, on each read of `settings.yml` (never a node's, whose replica
+    the home sends whole, §4.4a, nor a CLI's or a page's), moves every key holding no `:` — a profile's,
+    the per-profile file's or one written by hand since — to its profile's account, resolved through
+    the adapter the profile names; per window label the account keeps one reserve from among its
+    profiles' and any entry already under the account: **the one whose line is lowest on the window's
+    last day** (a flat `r`, `100 − r`; a per-day `d`, `100 − d`; a tie, the per-day one; a metered
+    account, the smallest amount), an order that needs no reading. A merged line can still rise for a
+    profile at some moment (a flat 30 kept over a `5/day` lifts that profile's early-week line from 65%
+    to 70%), so the note names each profile whose line rises. The keys move in one write through
+    `set_settings`'s writer, after the file as it stood is copied beside it as
+    `settings.yml.before-TD-1581` (once; a later move overwrites nothing), and one `system` note tells
+    the person what moved — *usage reserves are now per account: claude-code:paul takes week 5 (from
+    grind-ask; grind had 1, grind-fable 3, grind-sonnet 5)* — with the copy's path, since a node not yet
+    on this build and a rollback past it read `usage_gate:` by profile and so find no reserve and gate
+    nothing until it is restored. A key whose profile no adapter here resolves (a profile only a node
+    defines) is removed too, named in the note with its value, to be set again by account. So no key
+    without a `:` stays past a tick, and a tick with none moves nothing and says nothing.
   **The line is computed from a reserve, never typed as a percentage.** The setting is a
   **reserve** per window label, of two shapes: a flat percent — `30` — whose line is `100 −
   reserve`; or a percent **per day** — `{per_day: 10}` — whose line is `100 − per_day × days_left`,
