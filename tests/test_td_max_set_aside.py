@@ -126,3 +126,39 @@ def test_org_check_says_a_key_set_aside_on_a_team_whose_plan_fails(world, monkey
     got = orgcheck.check(org, [], HOST, [], [])
     assert "brief gone" in got["lacks"]
     assert MILL in got["warnings"]
+
+
+HUNT = "max.hunt set aside: hunt's lane is in no stage: its lane has no queue to read"
+
+
+@pytest.mark.parametrize(
+    "argv", [["team", "until", "ao-grind", "+8h"], ["team", "reserve", "ao-grind", "5"]], ids=["until", "reserve"]
+)
+def test_until_and_reserve_say_a_key_set_aside_by_the_plan(world, capsys, argv):  # noqa: F811
+    """TD-1622: `ao team until` and `ao team reserve` pass the org, so the lane case (read from the plan) is said
+    as `ao team on-work` says it (#3349)."""
+    tmp_path, state = world
+    _file(tmp_path, {"grind": 4, "hunt": 3})
+    state["teams"] = {"ao-grind": {"max": {"grind": 4, "hunt": 3}}}
+    assert cli.main(argv) == 0
+    line = capsys.readouterr().out.strip()
+    assert line.startswith("ao-grind: ") and HUNT in line
+
+
+def test_the_settings_list_says_a_key_set_aside_by_the_plan(world, capsys, monkeypatch):  # noqa: F811
+    """TD-1622: the settings list's team line passes the org too (#3349)."""
+    tmp_path, state = world
+    _file(tmp_path, {"grind": 4, "hunt": 3})
+    fake = cli.call_sync
+    teams_now = {"ao-grind": {"max": {"grind": 4, "hunt": 3}}}
+
+    def call(method, **params):
+        if method == "settings":
+            return {"file": str(tmp_path / "home" / "settings.yml"), "teams": teams_now, "repos": {}}
+        return fake(method, **params)
+
+    monkeypatch.setattr(cli, "call_sync", call)
+    assert cli.main(["settings"]) == 0
+    out = capsys.readouterr().out
+    line = next(x.strip() for x in out.splitlines() if x.strip().startswith("ao-grind: "))
+    assert HUNT in line
