@@ -10,7 +10,7 @@ People: paul
 
 ## Needs the user
 
-- [ ] decide 2026-11-10 (session `ao-shiftlead-reserve` on kmaster) — Should the usage reserve be set once per account (claude-code:paul; each Gemini key is its own account) instead of once per profile, and should a profile keep a reserve of its own as an override? Context: TD-1581 decision (paul). Due: 2026-11-13. Answers: Per account, no override (default) | Per account, a profile may override | Hold: <note>. Lifts: Per account, no override | Per account, a profile may override.
+- [x] decide 2026-11-10 (session `ao-shiftlead-reserve` on kmaster) — Should the usage reserve be set once per account (claude-code:paul; each Gemini key is its own account) instead of once per profile, and should a profile keep a reserve of its own as an override? Context: TD-1581 decision (paul). Due: 2026-11-13. Answers: Per account, no override (default) | Per account, a profile may override | Hold: <note>. Lifts: Per account, no override | Per account, a profile may override. Decided: Per account, no override (by paul) (2026-11-10). Closed: 2026-11-10 — lifted.
   - **Context:** TD-1581: your raise of the week reserve at the end of last week missed grind, the profile the grinders, techlead and designer run on. It stayed at 1, so its line stayed at 99% while grind-sonnet, grind-fable and grind-ask went up. Four Claude profiles share one account and one week reading, but each has its own reserve.
   - **Question:** Should a reserve be set per account (one line for every profile on it), and may a profile still override it?
   - **Recommended:** Per account, no override — Per account, no override: one number per quota is the thing you actually set; a team that should stop sooner already has its team reserve priority.
