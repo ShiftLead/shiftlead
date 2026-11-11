@@ -1039,6 +1039,7 @@ def stuck_rows(
             more = int(actor.get("more") or 0)
         except (TypeError, ValueError):
             more = 0
+        base = why  # the reason as the cut compares it, before its `+n`
         if more > 0:
             why += f" (+{more})"
         age = _age(since, at)
@@ -1061,6 +1062,7 @@ def stuck_rows(
                 },
                 "work_words": what,
                 "reason_words": why,
+                "reason_base": base,
                 "head": f"stuck {age}: {what}" if age else f"stuck: {what}",
                 "subject": kind_subject("stuck", what),
                 "team": "",
@@ -1078,11 +1080,13 @@ def stuck_cut(rows: list[dict[str, Any]]) -> None:
     """§6 rule 13 *What the person sees*: several stuck rows on one surface (one card, or the Inbox) with the same
     actor and reason draw the first by its `since` in full and the rest with the reason cut to *— <actor>, as on
     <first work>*, so one parked seat reads once. Chosen per surface at render (after `item_home`), never stored;
-    rewrites `text` in place."""
+    rewrites `text` in place. The reason is its words (`reason_base`, before the `+n`), so two causes of one state
+    never cut against each other; the caller passes one section's rows, so a row at *waiting* never cuts a counted
+    one."""
     first: dict[tuple[str, str, str], dict[str, Any]] = {}
     for r in sorted((r for r in rows if r.get("row") == "stuck"), key=lambda r: str(r.get("at") or "")):
         surface = str(r.get("on_card") or "") if r.get("home") == "queue" else ""
-        k = (surface, str((r.get("actor") or {}).get("id") or ""), str(r.get("reason_state") or ""))
+        k = (surface, str((r.get("actor") or {}).get("id") or ""), str(r.get("reason_base") or ""))
         if k not in first:
             first[k] = r
             continue
@@ -2471,7 +2475,8 @@ def inbox_sections(
             for e in rows
         ]
     # several stuck rows with one actor and reason on one surface read once (§6 rule 13, TD-1497)
-    stuck_cut([e for rows in out.values() for e in rows])
+    for rows in out.values():  # per section: a *waiting* row never cuts a counted one
+        stuck_cut(rows)
     queue_n = sum(1 for e in out["needs"] if e["home"] == "queue")
     return {**out, "count": len(out["needs"]), "fyi_n": len(out["fyi"]), "overdue_n": overdue, "queue_n": queue_n}
 

@@ -167,6 +167,25 @@ def test_two_stuck_asks_with_one_actor_and_reason_on_one_card_cut_the_second():
 
 
 @pytest.mark.unit
+def test_the_cut_compares_the_reasons_words_and_never_crosses_a_section():
+    # one actor, one state, two causes: each drawn in full
+    stuck = {
+        **reading("m-1", reason={"state": "unfillable", "why": "profile gated"}),
+        **reading("m-2", about="TD-20", reason={"state": "unfillable", "why": "fill ceiling"}),
+    }
+    stuck["ask:m-2"]["since"] = at(1)
+    _, secs, _v = sections(stuck)
+    assert all("as on" not in r["text"] for r in secs["needs"])
+    # one at *waiting* (earlier) and one counted: the counted one keeps its words
+    stuck = {**reading("m-1"), **reading("m-2", about="TD-20")}
+    stuck["ask:m-1"]["waiting_until"] = (NOW + timedelta(minutes=20)).isoformat()
+    stuck["ask:m-2"]["since"] = at(1)
+    _, secs, _v = sections(stuck)
+    (n,) = secs["needs"]
+    assert n["id"] == "ask:m-2" and "as on" not in n["text"] and [r["id"] for r in secs["waiting"]] == ["ask:m-1"]
+
+
+@pytest.mark.unit
 def test_ao_card_prints_the_stuck_item_with_its_key_and_kind_stuck():
     q = queue()
     secs = inbox_sections([], now=NOW, states=stuck_rows(reading(), now=NOW), cards=card_index(q))
