@@ -27,6 +27,7 @@ are whatever the adapter reports, and nothing here knows one by name.
 from __future__ import annotations
 
 import math
+import os
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -354,9 +355,79 @@ def weights(doc: dict[str, Any]) -> dict[str, Any]:
     return {**WEIGHTS, **mine}
 
 
+# -- scale (§5 `scale`, §4.9 *The bounds*, td-max TD-1545) -------------------------------------------
+
+SCALE_KEYS = ("live", "migrated")
+SESSION_GB = 0.5  # §4.9 *The bounds*: what one live session is taken to need
+
+
+def parse_scale(value: Any, drop: bool = False) -> dict[str, Any]:
+    """`scale: {live: {<host>: <n ≥ 1>}, migrated: <date>}` (§5): `live`, a host's cap on every live session
+    there; `migrated`, the home's stamp of the one-time `max: off` write. Raises on anything else — or, with
+    `drop` (the reader's side), leaves the key out."""
+    if drop and not isinstance(value, dict):
+        return {}
+    got = _fields(value, SCALE_KEYS, "scale", drop)
+    out: dict[str, Any] = {}
+    if "live" in got:
+        raw = got["live"]
+        if not isinstance(raw, dict):
+            if not drop:
+                raise ValueError(f"scale.live is a mapping of host names to numbers of sessions, not {raw!r}")
+        else:
+            live: dict[str, int] = {}
+            for host, n in raw.items():
+                if not str(host or "").strip() or isinstance(n, bool) or not isinstance(n, int) or n < 1:
+                    if drop:
+                        continue
+                    raise ValueError(f"scale.live.{host} is a whole number of live sessions, 1 or more, not {n!r}")
+                live[str(host)] = n
+            out["live"] = live
+    if "migrated" in got:
+        try:
+            m = got["migrated"]
+            m = m if hasattr(m, "isoformat") else datetime.fromisoformat(str(m))
+            out["migrated"] = (m.date() if isinstance(m, datetime) else m).isoformat()  # a day, whatever was written
+        except ValueError:
+            if not drop:
+                raise ValueError(f"scale.migrated is a date, not {got['migrated']!r}") from None
+    return out
+
+
+def scale(doc: dict[str, Any]) -> dict[str, Any]:
+    """The `scale:` key as kept, each field that is not valid dropped."""
+    return parse_scale(doc.get("scale"), drop=True)
+
+
+def default_live_cap(memory_bytes: int | None, cores: int | None) -> int | None:
+    """A host's cap on its live sessions when `scale.live` names none (§4.9 *The bounds*): half its memory at
+    `SESSION_GB` a session, capped at twice its cores — 30 for 30 GB and 16 cores. None where neither is read."""
+    caps = []
+    if memory_bytes:
+        caps.append(int(memory_bytes / 2 / (SESSION_GB * (1 << 30))))
+    if cores:
+        caps.append(2 * cores)
+    return max(1, min(caps)) if caps else None
+
+
+def machine_live_cap() -> int | None:
+    """This machine's default cap (`default_live_cap`), read from its memory and cores; None where unreadable."""
+    try:
+        mem = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+    except (ValueError, OSError, AttributeError):
+        mem = None
+    return default_live_cap(mem, os.cpu_count())
+
+
+def live_cap(doc: dict[str, Any], host: str, default: int | None = None) -> int | None:
+    """The most live sessions of every kind `host` runs (§5 `scale.live`): the setting's, else `default` — the
+    host's own machine cap, read by its host agent at its start."""
+    return scale(doc).get("live", {}).get(host, default)
+
+
 # -- teams, repos, person (§5, TD-146)-------------------------------------------------------------
 
-TEAM_KEYS = ("schedule", "until", "reserve", "balance", "on_work", "flow", "size")
+TEAM_KEYS = ("schedule", "until", "reserve", "balance", "on_work", "flow", "size", "max")
 # a team's `schedule` (§6 *Schedule*, TD-133): the start, and the profile and window whose reset it is
 SCHEDULE_KEYS = frozenset({"start", "profile", "window"})
 ON_WORK = (
@@ -470,7 +541,8 @@ def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
     `on_work` (§6 rule 8: `ask`, `start` or `off`) and `flow` (§4.9c: the name of the flow the team
     runs now — the client checks it against the team's `flows:`; the agent reads no definition) and
     `size` (§4.9 *A team's size*: `{<member line>: <n ≥ 0>}`, the whole map replaced; the client names the
-    lines)."""
+    lines), and `max` (§4.9 *Scaling with the work*, td-max: a map validated as `size`'s, keyed by a member line's
+    or a seat's name, or the string `off`, none for the team; `off` as one name's value is refused)."""
 
     def schedule(v: Any) -> dict[str, str]:
         # §6 *Schedule* (TD-133): `{start: reset, profile, window}` — the one start designed is at a window's
@@ -519,6 +591,21 @@ def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
             out[str(line)] = n
         return out
 
+    def ceiling(v: Any) -> str | dict[str, int]:
+        # §4.9 *Scaling with the work* (TD-1545): `off` for the whole team, or `size`'s map; `off` per name refused
+        if v == "off" or (drop and v is False):  # a hand-written `max: off` as YAML reads it (`_off`)
+            return "off"
+        if isinstance(v, dict) and not drop and (off := [str(k) for k, n in v.items() if n == "off"]):
+            raise ValueError(
+                f"max.{off[0]}: off is the whole team's (ao team max <team> off), never one line's; "
+                "0 is no scaling for a line (§4.9 *Scaling with the work*)"
+            )
+        if not isinstance(v, dict):
+            raise ValueError(
+                f"max is off or a mapping of line and seat names to numbers (§4.9 *Scaling with the work*), not {v!r}"
+            )
+        return {k: n for k, n in size(v).items()}
+
     value = _fields(value, TEAM_KEYS, "a team's settings", drop)
     checks = {
         "schedule": schedule,
@@ -528,6 +615,7 @@ def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
         "on_work": on_work,
         "flow": flow,
         "size": size,
+        "max": ceiling,
     }
     return _each(value, checks, drop)
 
