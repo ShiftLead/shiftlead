@@ -2414,10 +2414,33 @@ def _lane_refusal(call: Call, org: orgmod.Org, name: str, line: str, host: str) 
         plan = teams.plan(org, name, host or hosts.local_host().name, files=files_via(call))
     except (teams.TeamError, ValueError, OSError):
         return ""
-    lanes = [x.lane for x in plan.members if x.name in teams.find(org, name).line(line).names()]
+    return _plan_lane_refusal(teams.find(org, name), plan, line)
+
+
+def _plan_lane_refusal(team: orgmod.TeamDef, plan: teams.Plan, line: str) -> str:
+    """`_lane_refusal` on a plan already made: the member line `line`'s compiled lane, with no flow, in no stage."""
+    if not any(m.name == line for m in team.members):
+        return ""
+    lanes = [x.lane for x in plan.members if x.name in team.line(line).names()]
     if plan.flow is None and lanes and lane_stage(lanes[-1]) is None:
         return f"{line}'s lane is in no stage: its lane has no queue to read"
     return ""
+
+
+def set_aside_max(team: orgmod.TeamDef, plan: teams.Plan | None = None) -> list[tuple[str, str]]:
+    """Each `teams.<team>.max` key already in `settings.yml` that names what may not scale, with its reason in
+    `max_refusal`'s words (§4.9 *Scaling with the work*, *What does not*): set aside — `ceiling` reads it as no
+    scaling and no extra is written for it — and said by `ao org check` and the team's settings line. `plan`
+    (the team's, when the caller made one) adds a worker line whose lane is in no stage; without it that case
+    is the next Start's to say. A team at `off` or with no `max` key sets nothing aside."""
+    if not isinstance(team.max, dict):
+        return []
+    out: list[tuple[str, str]] = []
+    for key in team.max:
+        why = max_refusal(team, key) or (_plan_lane_refusal(team, plan, key) if plan is not None else "")
+        if why:
+            out.append((key, why))
+    return out
 
 
 def _reconcile_live(
