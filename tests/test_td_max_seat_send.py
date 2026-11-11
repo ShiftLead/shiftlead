@@ -766,3 +766,34 @@ async def test_a_seats_extras_at_their_fill_ceiling_fill_no_more(agent, tmp_path
             got = await b.call("msg", to=own, text="read #12?", kind="ask")
         assert got["delivered"] == [own] and calls == [], "no fill: the ask waits on the own record"
         assert got["read_when"][own].startswith("waits on tl: its extras are at their fill ceiling"), got["read_when"]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("claim", ["the window", "the own record"])
+async def test_a_seats_extras_under_their_fill_ceiling_still_fill(agent, tmp_path, blocked_replay, claim):
+    """TD-1679: each of the ceiling's two exclusions decided by a case of its own — the extras' fills one under
+    `FILL_CEILING` inside `FILL_WINDOW`, beside `FILL_CEILING` fills older than the window (*the window*), or beside
+    the seat's own record at `FILL_CEILING` recent fills (*the own record*): the send still fills an extra, so a
+    count that read the old fills, or the own record's, fails here."""
+    from sessionorc.agent_common import FILL_CEILING, FILL_WINDOW
+
+    await park_ticks(agent)
+    _, calls = blocked_replay
+    async with LocalClient() as person:
+        own, (tl2, tl3) = await _seat(agent, person, tmp_path, own_live=True)
+        w1, w2, _ = await _askers(person, tmp_path)
+        async with LocalClient(caller=w1) as a:
+            await a.call("msg", to=own, text="read #11?", kind="ask")
+        _set(_rec(agent, own), "working")
+        now = datetime.now(UTC)
+        recent = (now - timedelta(minutes=5)).isoformat().replace("+00:00", "Z")
+        old = (now - FILL_WINDOW - timedelta(minutes=5)).isoformat().replace("+00:00", "Z")
+        _rec(agent, tl3).restarts = [{"at": recent, "why": "fill"}] * (FILL_CEILING - 1)  # one under, in the window
+        if claim == "the window":
+            _rec(agent, tl2).restarts = [{"at": old, "why": "fill"}] * FILL_CEILING
+        else:
+            _rec(agent, own).restarts = [{"at": recent, "why": "fill"}] * FILL_CEILING
+        async with LocalClient(caller=w2) as b:
+            got = await b.call("msg", to=own, text="read #12?", kind="ask")
+        assert got["delivered"] == [tl2], got.get("read_when")
+        assert calls == [(tl2, "fill", {"keep_mail": True, "mark": {"for": "send"}})]
