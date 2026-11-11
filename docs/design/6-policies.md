@@ -2578,7 +2578,7 @@ teams:
   that asks whether a profile is over its line asks that reader, so a profile paused on a
   projection is not restarted or filled the next tick. A window with no age at all (never
   confirmed, on a reading with none) and a metered profile's spend are read as they are. **When the
-  projection reaches the line** — the profile's, less a team's reserve priority as ever — **the gate
+  projection reaches the line** — the account's, less a team's reserve priority as ever — **the gate
   pauses as it pauses on a reading**, the mark saying which it was — *paused · usage (projected
   week 96% ≥ 95%, last read 6h ago)* — and one `system` note tells the person, FYI, *pausing on a
   projection: no reading of Claude · paul for 6h*, once per account while a pause on a projection
@@ -2597,28 +2597,45 @@ teams:
   profile with nothing unattended live is never projected. The windows and their labels are the
   adapter's (§4.3); the gate knows none of them by name.
   **A reserve is the account's** (TD-1581; Paul, 2026-11-10: *one reserve per account, and no profile
-  keeps a reserve of its own*). A quota is one number per account, so its reserve is too: `usage_gate:`
-  is keyed by the account's usage key, `<adapter>:<account>` as `_usage_key` gives it (the adapter's
-  `account_for`: the profile's `account`, else its name; a profile no adapter resolves is its own
-  account, `<adapter>:<profile>`), and every profile on the account reads that one entry, so one change
-  moves the line for every unattended session on the account. One reader, `_gate_reserves`, resolves a
-  profile to its account and returns the account's reserves, and every reader of a line asks it —
-  the gate's pass, the projection notes, `_profile_over` (every restart, fill and wake that asks
-  whether a profile is over its line), the usage-only check and the `gate` RPC alike; none reads
-  `usage_gate:` by profile. An account has one billing (§4.2a), so its reserve is a percent or an amount,
-  never both. **A team's reserve priority stays the team's** (below): the one way to make some sessions
-  on an account stop sooner. **The per-profile file migrates once**, at the home's first read of a
-  `settings.yml` holding a key that is no account key (none of the `<adapter>:<account>` keys any
-  adapter's `account_for` gives for the home's `profiles.yml`, nor a node's declared profile): each
-  such key is a profile, resolved to its account, and per window label the account keeps the reserve
-  of its profiles' whose **line is lowest** at the migration's instant (the largest reserve: no line
-  moves up), the account's own entry, where one is already written, counting among them; the profile
-  keys are removed in the same write, through `set_settings`'s writer, and one `system` note tells the
-  person what moved — *usage reserves are now per account: claude-code:paul takes week 10/day (from
-  grind; grind-fable had 3, grind-ask 5, grind-sonnet 5), 5h 30 (from grind)* — once. A key that
-  resolves to no profile the home knows is kept as written and named in that note, and read by no
-  profile, until the person removes it. A node's replica is migrated by the home's write (§4.4a,
-  the whole file sent).
+  keeps a reserve of its own*). A quota is one number per account, so its reserve is too.
+  - **The key.** `usage_gate:` is keyed by the account's usage key, `<adapter>:<account>` as
+    `_usage_key` gives it (the adapter's `account_for`: the profile's `account`, else its name; a profile
+    no adapter resolves is its own account, `<adapter>:<profile>`). A key is an **account key** when it
+    is `<adapter>:<rest>` with `<adapter>` a name `adapters.names()` gives, whether or not a profile on
+    this host names the account yet (a node's, or one set before its first profile), and is read as one.
+    Every profile on the account reads that one entry, so one change moves the line for every
+    unattended session on the account; a metered account's **amount** is the account's too, the window's
+    `pct` the account's spend over it (§4.2a).
+  - **The readers.** Every reader of `usage_gate:` reads by account, none by profile: `_gate_reserves`,
+    which resolves a profile to its account and returns the account's reserves or amounts and which the
+    gate's pass, the projection notes, `_profile_over` (every restart, fill and wake that asks whether a
+    profile is over its line) and the usage-only check ask; the spend readers of amounts (the metered
+    reading's `pct` and the spend mark, `agent_spend.py`); and the `gate` RPC, whose reply is
+    **`{accounts: {<key>: {profiles, billing, reserves | amounts, windows}}}`** — the profiles on the
+    account (the home's `profiles.yml`'s and a node's that its usage or spend calls named), its billing,
+    its reserves or amounts, and its reading's windows with their lines — what `ao gate` and the Settings
+    page draw.
+  - **One billing.** An account has one billing (§4.2a), so its reserve is a percent or an amount. An
+    account whose profiles disagree (a file written before this rule) is named by `ao doctor`'s
+    profiles check and on its Settings card, `set_settings` refuses a reserve on it naming the
+    profiles and their billing, and until the file is fixed its entry is read only by the profiles whose
+    billing fits the entry's unit. An account no home profile names takes its billing, prices and
+    labels from the node `spend` and usage calls made under its key (§4.4 *Usage*); with none, a set is
+    refused naming the account as one this home has not seen.
+  - **A team's reserve priority stays the team's** (below): the one way to make some sessions on an
+    account stop sooner.
+  - **The per-profile file migrates once**, by the home's host agent at its start (never a node, whose
+    replica the home sends whole, §4.4a, nor a CLI's or a page's read of the file): when `usage_gate:`
+    holds a key that is no account key, each such key is a profile, resolved to its account by the
+    adapters that know it; per window label the account keeps one reserve from among its profiles' and
+    any entry already written under the account — the largest per-day reserve where any is per day,
+    else the largest flat one (a metered account: the smallest amount) — an order that needs no reading,
+    so among reserves of one shape no line moves up. The profile keys are removed in the same write,
+    through `set_settings`'s writer, and one `system` note tells the person what moved — *usage
+    reserves are now per account: claude-code:paul takes week 5 (from grind-ask; grind had 1,
+    grind-fable 3, grind-sonnet 5)* — once. A profile key no adapter on the home resolves (a profile only a
+    node defines) is removed too and named in the note with its value, to be set again with `ao gate
+    <account>`, so no key that is no account key is left and the next start migrates nothing.
   **The line is computed from a reserve, never typed as a percentage.** The setting is a
   **reserve** per window label, of two shapes: a flat percent — `30` — whose line is `100 −
   reserve`; or a percent **per day** — `{per_day: 10}` — whose line is `100 − per_day × days_left`,
@@ -2676,7 +2693,7 @@ teams:
   profile has prices (`{day: "$5", week: "$20"}`) or in tokens where it has none (`{day: "2M
   tok"}`), read against the **account's** spend (§4.2a): the amount is the window's **100**, `pct`
   is spend over amount, and the line is `100 − <team priority>` — the amount itself for the
-  profile's plain sessions, nine tenths of it for a team carrying a reserve priority of 10, so a
+  account's plain sessions, nine tenths of it for a team carrying a reserve priority of 10, so a
   team's priority means one thing on both billings. The pause is the same pause, sent when the
   account's spend reaches the line, and lifted when the window rolls (`next` is the boundary;
   nothing else moves a spent window back, and the resume keeps `RESUME_MIN` as any does — a pause
