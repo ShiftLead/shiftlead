@@ -799,7 +799,7 @@ def undeclared(call: Call, org: orgmod.Org, plan: teams.Plan, host: str) -> str 
 
 
 def write_extras(
-    call: Call, plan: teams.Plan, controllers: list[str], caller: str | None
+    call: Call, plan: teams.Plan, controllers: list[str], caller: str | None, wind_down: bool = False
 ) -> tuple[list[dict[str, Any]], list[str]]:
     """The Start's reconcile of the held extras to the merged `max` (§4.9 *Scaling with the work*, §6 rule 14,
     TD-1545), after the team's sessions: each of the plan's extras written `create(held=True)` with its launch
@@ -810,7 +810,9 @@ def write_extras(
     a member's is (`keep_mail_for`); a name another live record holds is left to it and said. A held extra the
     plan no longer reads — a `max` lowered, its line renamed or removed — is removed (`remove`); a live one,
     or one with unread mail, is said and left. A refused create or removal is said, and the start stands: an extra is
-    capacity, never the team. Returns `(records written, notes)`."""
+    capacity, never the team. `wind_down` (`set_max`'s lowered ceiling on a live team) drops a live surplus extra
+    as well: the home sends it the wrap-up and forgets it once closed (`relaunch` `drop_extra`), never a
+    sit-out. Returns `(records written, notes)`."""
     on = {"host": plan.host} if plan.host else {}
     verdicts: dict[str, Any] = {}
     written: list[dict[str, Any]] = []
@@ -847,6 +849,20 @@ def write_extras(
             notes.append(f"{x.name}: the extra of {x.scale} was not written — {e}")
     for r in surplus:
         line = (r.get("scale") or {}).get("line") or "its line"
+        if r.get("state") not in DEAD and r.get("scale", {}).get("drop"):
+            notes.append(f"{r.get('name')}: a live extra of {line} the max no longer holds — dropped once closed")
+            continue
+        if r.get("state") not in DEAD and wind_down:
+            try:
+                call("relaunch", id=r["id"], drop_extra=True)
+                notes.append(
+                    f"{r.get('name')}: a live extra of {line} the max no longer holds — wound down, dropped once closed"
+                )
+            except AgentError as e:
+                notes.append(
+                    f"{r.get('name')}: a live extra of {line} the max no longer holds was not wound down — {e}"
+                )
+            continue
         if r.get("state") not in DEAD:
             notes.append(f"{r.get('name')}: a live extra of {line} the max no longer holds — left to its run")
             continue
@@ -2377,7 +2393,8 @@ def set_max(call: Call, org: orgmod.Org, name: str, line: str, n: int | str, hos
     and writes every other line or seat that may scale at `0`, so one raise turns on one line. `off` (`line` "")
     writes the team's `max: off`, replacing any written ceilings; `on` removes the whole `max` key, every line then
     on its default ceiling (size + 2). On a live team the extras follow at once (`_reconcile_live`): the new ones
-    written held, a held one past the ceiling removed, a live one past it said and left to its run; on a team
+    written held, a held one past the ceiling removed, a live one past it wound down and dropped once closed
+    (`relaunch` `drop_extra`, never a sit-out); on a team
     with nothing live the setting is all, read by its next Start's reconcile. `host` is where the team's
     checkout is read for the plan."""
     team = teams.find(org, name)
@@ -2448,7 +2465,8 @@ def _reconcile_live(
 ) -> dict[str, Any]:
     """`set_max`'s live half (§4.9 *Scaling with the work*, TD-1545): on a team with a live session, the Start's
     reconcile (`write_extras`) run at once on the plan the written setting gives — the new extras written held
-    under the live manager, a held one past the ceiling removed, a live one said — each said on `out`'s text and
+    under the live manager, a held one past the ceiling removed, a live one wound down and dropped once closed —
+    each said on `out`'s text and
     the records written in `extras`; on a team with nothing live the setting is all. A plan
     that cannot be made (a brief gone) is said, the setting standing."""
     mine = crew(name, call("list"))
@@ -2462,7 +2480,7 @@ def _reconcile_live(
         out["text"] += f" · the extras follow at the next Start — the team's plan could not be read: {e}"
         return out
     lead = next((s for s in live(mine) if plan.manager_id in (s.get("name"), s.get("id"))), None)
-    written, notes = write_extras(call, plan, [str(lead["id"])] if lead else [], None)
+    written, notes = write_extras(call, plan, [str(lead["id"])] if lead else [], None, wind_down=True)
     out["extras"] = [str(r.get("id")) for r in written]
     if written:
         out["text"] += f" · {', '.join(str(r.get('name')) for r in written)}: written held"
