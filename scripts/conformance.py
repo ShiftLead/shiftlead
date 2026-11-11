@@ -488,6 +488,7 @@ def run_smoke(args: argparse.Namespace, entry: dict[str, Any], start_env: dict[s
         got = seat_run.watch(lambda: call("get", id=sid), lambda: (call("inbox") or {}).get("entries") or [], ask_id)
         if got.step == "needs-you":
             print(f"pending: {json.dumps((got.record or {}).get('pending'))}")
+        if not got.ok:  # what the tool shows, on any failure: a needs-you's dialog, or a launch that never hooked
             print(f"pane ({sid}, capture-pane -e):\n{seat_run.capture_pane(sock, sid)}")
         if not got.ok:
             return failed(got.step, got.said)
