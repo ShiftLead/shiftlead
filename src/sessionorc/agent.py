@@ -58,6 +58,7 @@ from sessionorc import seats as seats_mod
 from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
 from sessionorc import spend as spend_mod
+from sessionorc import stuck as stuck_mod
 from sessionorc import work as work_mod
 from sessionorc.agent_attention import AttentionMixin
 from sessionorc.agent_ci import CiMixin
@@ -1355,7 +1356,10 @@ class HostAgent(
         each live session waits on (`waiting: {<sender>: [{id, ref, bound}]}`, `work.waiting_of`
         over the person inbox, §4.9a *Waiting is read, never declared*, TD-274) — references and
         bounds, never the questions' text — which a session's `ao team status` cannot read for
-        itself, since nobody reads the person inbox but a person."""
+        itself, since nobody reads the person inbox but a person; and rule 13's stuck work (`stuck`, §6 *Stuck
+        work*, TD-1496) with its `waiting_until` where this tick read one, each `ask:<id>` entry with its `work`
+        (`stuck.ask_works`, TD-1497: its sender's id and name, its addressees' names, its `about`, the refs its
+        subject and text name and its envelope's `repo` — computed here, never stored, and never the text)."""
         out = {"host": self.host, "home": self.home, "mode": self.mode, "home_reachable": self.home_reachable()}
         out["built_from"], out["started_at"] = dict(self.build), self.started_at
         if self.mode == "home":
@@ -1373,6 +1377,13 @@ class HostAgent(
                 k: {**v, **({"waiting_until": w} if (w := self._stuck_until.get(k)) else {})}
                 for k, v in sorted((self._host_rec.get("stuck") or {}).items())
             }
+            # …and an `ask:` entry's work, read off the open asks at serve time (the UI reads no session's mailbox):
+            # who asked whom, its `about`, the refs its words name and its sender's repo — never its words (TD-1497)
+            if any(k.startswith("ask:") for k in out["stuck"]):
+                works = stuck_mod.ask_works(self._graph())
+                for k, v in out["stuck"].items():
+                    if k.startswith("ask:") and (w := works.get(k[4:])) is not None:
+                        v["work"] = w
             out["work"] = {
                 team: dict(rec["work_waiting"])
                 for team, rec in sorted((self._host_rec.get("teams") or {}).items())

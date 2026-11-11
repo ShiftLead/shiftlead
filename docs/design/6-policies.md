@@ -1641,7 +1641,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        ref (`item_home`), the board line's `Context:` (`item_home`'s home for it, a `Context:` naming a PR
        included, TD-1538) — as a **Do** item
        (screen 12 *Three wants*), else in the Inbox under *Needs you* (`item_home` gains a branch for a
-       stuck row, whose refs are its work's). It reads *stuck <age>: <the
+       stuck row, whose refs are its work's; the home serves an `ask:` entry's work with it, `work: {from, from_name,
+       to_names, about, refs, repo}` on `host` — its sender, its addressees' names, its `about`, the refs its subject
+       and text name and its envelope's `repo`, never its text — read off the open asks at serve time and never
+       stored, since the page reads no session's mailbox, TD-1497). It reads *stuck <age>: <the
        work> — <reason>* (*stuck 1h 10m: grinder-ao-2's ask to techlead-ao-1 — techlead-ao-1 is at its
        usage cap: resets 08:00Z — it is rung after*; *stuck 1h: the One more round on TD-1437 — ao-grind
        is held by its daily start cap: 3 idle starts today*). Where the person already sees the work as

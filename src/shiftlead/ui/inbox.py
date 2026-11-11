@@ -30,10 +30,12 @@ from sessionorc import promote as promote_mod
 from sessionorc import queue as queue_mod
 from sessionorc import settings as settings_mod
 from sessionorc import shots as shots_mod
+from sessionorc import unanswered as unanswered_mod
 from sessionorc import workorders as workorders_mod
-from sessionorc.agent_common import HELD_MAIL, WRAPUP_GRACE, fill_ceiling, fill_lapses
+from sessionorc.agent_common import HELD_MAIL, STALL_AFTER, WRAPUP_GRACE, fill_ceiling, fill_lapses
 from sessionorc.client import call_sync
 from sessionorc.models import (
+    PERSON,
     normalize_ref,
 )
 from sessionorc.work import manager_of, wound_down
@@ -976,6 +978,117 @@ def ci_not_run_rows(spells: Mapping[str, Any] | None, now: datetime | None = Non
             }
         )
     return out
+
+
+def _stuck_reason(reason: Mapping[str, Any], name: str, at: datetime) -> str:
+    """A stuck row's *<reason>* (§6 rule 13 *Stuck work*, §4.5a *Queue card / Inbox: stuck row*): rule 13's own words
+    for `stalled`, `idle`, `unfillable` (its `why` as is) and `no_lane`; any other state the actor's `unanswered`
+    stamp, in `unanswered.words`' fixed words, its closing stop dropped (the row's sentence goes on)."""
+    s = reason.get("state")
+    if s == "stalled":
+        mins = int(STALL_AFTER.total_seconds() // 60)
+        return f"{name} is stalled? — a request held past {mins}m with nothing new on its screen"
+    if s == "idle":
+        since = f" since {unanswered_mod.clock(reason['since'], at)}" if reason.get("since") else ""
+        return f"{name} has been idle{since} with it open"
+    if s == "unfillable":
+        return str(reason.get("why") or f"{name} cannot be filled")
+    if s == "no_lane":
+        return "no lane takes it"
+    return unanswered_mod.words({**reason, "name": reason.get("name") or name}, at).rstrip(".")
+
+
+def stuck_rows(
+    stuck: Mapping[str, Any] | None,
+    now: datetime | None = None,
+    records: Iterable[Mapping[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """design §4.5a **Queue card / Inbox: stuck row** (§6 rule 13 *Stuck work*, TD-1470, built by TD-1497 slice 1):
+    one row per `ask:<id>` entry of the home's `stuck` reading (`host`'s, with each ask's `work`, `stuck.ask_works`),
+    *stuck <age>: <the work> — <reason>*, the age from its `since`, the work *<sender>'s ask to <addressees>*,
+    the reason `_stuck_reason`'s, `+n` where `more` actors are not acting either. Keyed by its stuck key (`id`,
+    `sid`). One whose reading carries `waiting_until` is drawn at *waiting* (`inbox_sections`: under *Waiting on
+    them*, in no number); the rest are needs, counted. Where it is drawn is `item_home`'s `stuck` branch, from
+    its work's `about`, `refs` and `repo`. **Open** (`open`) is the actor's Focus, none for a `gone` actor or one
+    whose record is not among `records` (the page's; with none given, not checked).
+
+    Left for slice 2: a `board:` entry (a decided line's own row moves rather than a second row being drawn), a
+    `needs_you` reason (a line under the actor's own pending row, never a row), and the stuck line under a stopped
+    holder's state row. A malformed host record costs rows, never the page."""
+    at = now or datetime.now(UTC)
+    out: list[dict[str, Any]] = []
+    if not isinstance(stuck, Mapping):
+        return out
+    ids = None if records is None else {str(r.get("id") or "") for r in records if isinstance(r, Mapping)}
+    for key, v in sorted(stuck.items()):
+        if not isinstance(key, str) or not key.startswith("ask:") or not isinstance(v, Mapping):
+            continue
+        reason, actor, work = v.get("reason"), v.get("actor"), v.get("work")
+        if not isinstance(reason, Mapping) or not isinstance(actor, Mapping) or not isinstance(work, Mapping):
+            continue  # an ask with no `work` closed since the tick read it: the next reading drops it
+        if reason.get("state") == "needs_you":
+            continue  # its words are a line under the actor's own pending row (slice 2)
+        since = str(v.get("since") or "")
+        aid = str(actor.get("id") or "")
+        name = str(actor.get("name") or aid)
+        frm = str(work.get("from") or "")
+        to = ", ".join(str(n) for n in work.get("to_names") or () if n) or name
+        what = f"your ask to {to}" if frm == PERSON else f"{work.get('from_name') or frm}'s ask to {to}"
+        why = _stuck_reason(reason, name, at)
+        try:
+            more = int(actor.get("more") or 0)
+        except (TypeError, ValueError):
+            more = 0
+        if more > 0:
+            why += f" (+{more})"
+        age = _age(since, at)
+        until = str(v.get("waiting_until") or "")
+        refs = [str(r) for r in work.get("refs") or () if isinstance(r, str)]
+        out.append(
+            {
+                "row": "stuck",
+                "kind": "stuck",  # the row's own kind, as `ao card` prints it (§4.7)
+                "id": key,
+                "sid": key,
+                "name": name,
+                "actor": {"id": aid, "name": name, "host": str(actor.get("host") or "")},
+                "reason_state": str(reason.get("state") or ""),
+                "open": aid if aid and reason.get("state") != "gone" and (ids is None or aid in ids) else "",
+                "work": {
+                    "about": str(work.get("about") or ""),
+                    "refs": refs,
+                    "repo": str(work.get("repo") or ""),
+                },
+                "work_words": what,
+                "reason_words": why,
+                "head": f"stuck {age}: {what}" if age else f"stuck: {what}",
+                "subject": kind_subject("stuck", what),
+                "team": "",
+                "at": since,
+                "age": age,
+                "text": f"stuck {age}: {what} — {why}" if age else f"stuck: {what} — {why}",
+                **({"waiting_until": until, "until_words": _left(until, at)} if until else {}),
+                "find": " ".join(x for x in (name, "stuck", what, why) if x),
+            }
+        )
+    return out
+
+
+def stuck_cut(rows: list[dict[str, Any]]) -> None:
+    """§6 rule 13 *What the person sees*: several stuck rows on one surface (one card, or the Inbox) with the same
+    actor and reason draw the first by its `since` in full and the rest with the reason cut to *— <actor>, as on
+    <first work>*, so one parked seat reads once. Chosen per surface at render (after `item_home`), never stored;
+    rewrites `text` in place."""
+    first: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for r in sorted((r for r in rows if r.get("row") == "stuck"), key=lambda r: str(r.get("at") or "")):
+        surface = str(r.get("on_card") or "") if r.get("home") == "queue" else ""
+        k = (surface, str((r.get("actor") or {}).get("id") or ""), str(r.get("reason_state") or ""))
+        if k not in first:
+            first[k] = r
+            continue
+        lead = str(r.get("head") or "")
+        r["text"] = f"{lead} — {r.get('name')}, as on {first[k].get('work_words')}"
+        r["find"] = " ".join(x for x in (str(r.get("name") or ""), "stuck", r["text"]) if x)
 
 
 def ci_not_run_kinds(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -2280,6 +2393,9 @@ def inbox_sections(
             # a stopped team's row the person stopped, and a team with no record's (§6 rule 8, TD-781):
             # *Later*'s, never counted
             out["later"].append(r)
+        elif r.get("row") == "stuck" and r.get("waiting_until"):
+            # stuck work whose every reason names its end within the wait (§6 rule 13, TD-1497): *waiting*, uncounted
+            out["waiting"].append(r)
         else:
             out["needs"].append(r)
     # The outcome `note` that settles a question is an ordinary entry in its own right, and is
@@ -2354,6 +2470,8 @@ def inbox_sections(
             }
             for e in rows
         ]
+    # several stuck rows with one actor and reason on one surface read once (§6 rule 13, TD-1497)
+    stuck_cut([e for rows in out.values() for e in rows])
     queue_n = sum(1 for e in out["needs"] if e["home"] == "queue")
     return {**out, "count": len(out["needs"]), "fyi_n": len(out["fyi"]), "overdue_n": overdue, "queue_n": queue_n}
 
