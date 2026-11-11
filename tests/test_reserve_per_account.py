@@ -414,6 +414,42 @@ async def test_the_gate_reply_lists_each_account_its_profiles_an_orphan_and_a_no
 
 
 @pytest.mark.integration
+async def test_the_gate_reply_reads_a_watched_profile_a_mixed_accounts_rows_a_fetch_and_a_spend_only_key(
+    agent, hookstub, monkeypatch
+):
+    """`_gate_accounts`' other branches (#3370, TD-1635): a profile with unattended sessions live takes the gate's
+    windows (`_gate_windows`), not the raw reading; a reading's `fetched` is carried with its `source`, `asked` by
+    default; a mixed account's `windows` hold its amount rows and its percent rows; and an account only a node's
+    spend report names is listed."""
+    from datetime import UTC, datetime
+
+    await park_ticks(agent)
+    hookstub.accounts = {"pa": "paul", "api": "split", "pc": "split"}
+    hookstub.billing = {"api": {"billing": "metered", "prices": {"m": 1.0}}}
+    whole = settings_mod.load()
+    whole["usage_gate"] = {"hookstub:paul": {"5h": 30}, "hookstub:split": {"5h": 30, "day": "$5"}}
+    settings_mod.save(whole)
+    whole = settings_mod.load()
+    fetched = "2026-11-11T10:00:00Z"
+    agent._usage_acct["hookstub:paul"] = {"windows": [{"label": "5h", "pct": 10}], "fetched": fetched}
+    agent._usage_acct["hookstub:split"] = {
+        "windows": [{"label": "5h", "pct": 20}],
+        "fetched": fetched,
+        "source": "pushed",
+    }
+    agent._spend_named["node1"] = {"hookstub:spentonly": {"nx"}}
+    monkeypatch.setattr(agent, "_gate_windows", lambda profile, now, whole: [{"label": "5h", "pct": 77}])
+    got = agent._gate_accounts(whole, whole["usage_gate"], {"pa"}, datetime.now(UTC))
+    paul = got["hookstub:paul"]
+    assert [w["pct"] for w in paul["windows"]] == [77], "a watched profile's rows are the gate's, not the reading's"
+    assert (paul["fetched"], paul["source"]) == (fetched, "asked")
+    split = got["hookstub:split"]
+    assert split["billing"] == "mixed" and (split["fetched"], split["source"]) == (fetched, "pushed")
+    assert [(w["label"], bool(w.get("metered"))) for w in split["windows"]] == [("day", True), ("5h", False)]
+    assert "hookstub:spentonly" in got, "an account only a spend report names is listed"
+
+
+@pytest.mark.integration
 async def test_a_nodes_spend_and_usage_calls_put_their_profiles_on_the_account(agent, hookstub):
     """`_account_on`'s node sources (§6 *The profiles on an account*, TD-1629): a profile a node's spend call named
     under the account is metered, one its usage call named is a subscription — each counts toward the account's
