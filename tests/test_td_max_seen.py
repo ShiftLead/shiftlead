@@ -125,4 +125,5 @@ def test_ao_team_list_says_each_scaling_line_on_a_live_team(monkeypatch, capsys)
     monkeypatch.setattr(teamrun, "flow_view", lambda *a, **kw: {})
     assert cli.main(["team", "list"]) == 0
     out = capsys.readouterr().out
-    assert "td-max: techlead-ao-1 1–3 +2 idle; grinder-ao 3–6 +1 (+1 at 14:02: 4 pickable, every grinder claimed)" in out
+    said = "td-max: techlead-ao-1 1–3 +2 idle; grinder-ao 3–6 +1 (+1 at 14:02: 4 pickable, every grinder claimed)"
+    assert said in out
