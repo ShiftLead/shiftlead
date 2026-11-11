@@ -1,0 +1,67 @@
+"""*One open question per sender per seat* is counted over the seat's records (design §4.9 *Mail to a scaled
+seat*, TD-1547): an open ask from the sender on the seat's own record or on any extra of it refuses a second ask
+to either, while each record's mailbox depth stays its own; an extra of another seat, or of another team, is
+not the same seat."""
+
+from __future__ import annotations
+
+import pytest
+
+from sessionorc import mail, models
+from sessionorc.models import MailEntry
+
+pytestmark = pytest.mark.unit
+
+
+def _rec(sid: str, name: str, team: str = "beta", project: str = "B", **kw) -> models.Session:
+    s = models.Session(id=sid, name=name, kind="claude", adapter="claude-code", dir=f"/{name}", team=team)
+    s.project, s.repo = project, "/r"
+    for k, v in kw.items():
+        setattr(s, k, v)
+    return s
+
+
+def _graph() -> dict[str, models.Session]:
+    recs = [
+        _rec("ao-tl", "tl", seat={"trigger": "asks"}),
+        _rec("ao-tl-2", "tl-2", seat={"trigger": "asks"}, scale={"line": "tl"}),
+        _rec("ao-tl-3", "tl-3", seat={"trigger": "asks"}, scale={"line": "tl"}),
+        _rec("ao-fc-2", "fc-2", seat={"trigger": "asks"}, scale={"line": "fc"}),  # another seat's extra
+        _rec("ao-tl-x", "tl", team="gamma", seat={"trigger": "asks"}),  # a seat of the same name, another team
+        _rec("ao-a", "a", team="alpha", project="A"),
+    ]
+    return {r.id: r for r in recs}
+
+
+def _open_ask(g, on: str, mid: str = "m-1") -> None:
+    g[on].inbox.append(MailEntry(id=mid, from_="ao-a", to=[on], at="2026-11-11T00:00:00Z", kind="ask", text="q"))
+
+
+def test_seat_records_are_the_seat_and_its_extras_of_its_team():
+    g = _graph()
+    assert mail.seat_records(g, "ao-tl") == ["ao-tl", "ao-tl-2", "ao-tl-3"]
+    assert sorted(mail.seat_records(g, "ao-tl-2")) == ["ao-tl", "ao-tl-2", "ao-tl-3"]
+    assert mail.seat_records(g, "ao-a") == ["ao-a"], "no seat: itself alone"
+
+
+@pytest.mark.parametrize("on, to", [("ao-tl-2", "ao-tl"), ("ao-tl", "ao-tl-3"), ("ao-tl-2", "ao-tl-2")])
+def test_an_open_ask_on_any_record_of_the_seat_refuses_a_second(on, to):
+    g = _graph()
+    assert mail.message_gate(g, "ao-a", to, kind="ask") is None
+    _open_ask(g, on)
+    refused = mail.message_gate(g, "ao-a", to, kind="ask")
+    assert refused and "m-1 is still open" in refused
+
+
+def test_another_seats_extra_and_a_same_named_seat_of_another_team_are_not_the_seat():
+    g = _graph()
+    _open_ask(g, "ao-fc-2")
+    _open_ask(g, "ao-tl-x", mid="m-2")
+    assert mail.message_gate(g, "ao-a", "ao-tl", kind="ask") is None
+
+
+def test_a_moved_ask_does_not_block_itself():
+    g = _graph()
+    _open_ask(g, "ao-tl")
+    assert mail.open_question(g, {"ao-a"}, "ao-tl-2", but="m-1") is None
+    assert mail.open_question(g, {"ao-a"}, "ao-tl-2").id == "m-1"
