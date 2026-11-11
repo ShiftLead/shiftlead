@@ -592,7 +592,7 @@ def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
 
     def ceiling(v: Any) -> str | dict[str, int]:
         # §4.9 *Scaling with the work* (TD-1545): `off` for the whole team, or `size`'s map; `off` per name refused
-        if v == "off":
+        if v == "off" or (drop and v is False):  # a hand-written `max: off` as YAML reads it (`_off`)
             return "off"
         if isinstance(v, dict) and not drop and (off := [str(k) for k, n in v.items() if n == "off"]):
             raise ValueError(

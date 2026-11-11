@@ -6,6 +6,7 @@ sessions, its default the machine's (half its memory at 0.5 GB a session, capped
 from datetime import date
 
 import pytest
+import yaml
 
 from sessionorc import settings as s
 
@@ -39,6 +40,10 @@ def test_the_reader_drops_a_bad_name_and_keeps_the_rest():
     doc = {"teams": {"ao-grind": {"size": {"grinder-ao": 3}, "max": {"grinder-ao": "off", "techlead-ao-1": 3}}}}
     assert s.teams(doc) == {"ao-grind": {"size": {"grinder-ao": 3}, "max": {"techlead-ao-1": 3}}}
     assert s.teams({"teams": {"t": {"max": "sometimes", "size": {"w": 1}}}}) == {"t": {"size": {"w": 1}}}
+    hand = yaml.safe_load("teams:\n  t:\n    max: off\n")  # YAML reads a bare off as False
+    assert s.teams(hand) == {"t": {"max": "off"}}
+    with pytest.raises(ValueError, match="max is off or a mapping"):
+        s.parse_team({"max": False})  # the RPC's side keeps refusing a boolean
 
 
 def test_scale_live_and_its_migration_stamp():
