@@ -10,8 +10,6 @@ import pytest
 from sessionorc import mail, models
 from sessionorc.models import MailEntry
 
-pytestmark = pytest.mark.unit
-
 
 def _rec(sid: str, name: str, team: str = "beta", project: str = "B", **kw) -> models.Session:
     s = models.Session(id=sid, name=name, kind="claude", adapter="claude-code", dir=f"/{name}", team=team)
@@ -38,6 +36,7 @@ def _open_ask(g, on: str, mid: str = "m-1") -> None:
     g[on].inbox.append(MailEntry(id=mid, from_="ao-a", to=[on], at="2026-11-11T00:00:00Z", kind="ask", text="q"))
 
 
+@pytest.mark.unit
 def test_seat_records_are_the_seat_and_its_extras_of_its_team():
     g = _graph()
     assert mail.seat_records(g, "ao-tl") == ["ao-tl", "ao-tl-2", "ao-tl-3"]
@@ -45,6 +44,7 @@ def test_seat_records_are_the_seat_and_its_extras_of_its_team():
     assert mail.seat_records(g, "ao-a") == ["ao-a"], "no seat: itself alone"
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize("on, to", [("ao-tl-2", "ao-tl"), ("ao-tl", "ao-tl-3"), ("ao-tl-2", "ao-tl-2")])
 def test_an_open_ask_on_any_record_of_the_seat_refuses_a_second(on, to):
     g = _graph()
@@ -54,6 +54,7 @@ def test_an_open_ask_on_any_record_of_the_seat_refuses_a_second(on, to):
     assert refused and "m-1 is still open" in refused
 
 
+@pytest.mark.unit
 def test_another_seats_extra_and_a_same_named_seat_of_another_team_are_not_the_seat():
     g = _graph()
     _open_ask(g, "ao-fc-2")
@@ -63,6 +64,7 @@ def test_another_seats_extra_and_a_same_named_seat_of_another_team_are_not_the_s
     assert mail.message_gate(g, "ao-a", "ao-tl", kind="ask") is None
 
 
+@pytest.mark.unit
 def test_a_moved_ask_does_not_block_itself_and_another_open_ask_still_does():
     """The moved copy has an id of its own and its original's root; the original stays open until the copy lands."""
     g = _graph()
