@@ -440,9 +440,10 @@ def want_of(e: Mapping[str, Any], sec: str) -> str:
         return "do" if e.get("why") == "yours" else "decide"
     if row in ("red_pr", "fork_pr"):
         return "do"
+    if stuck_line(e):
+        # a stuck decided line or handed entry moved to the Do group (§6 rule 13 *What the person sees*, TD-1497)
+        return "do"
     if row == "board":
-        if stuck_line(e):
-            return "do"  # a stuck decided line moved to the Do group (§6 rule 13 *What the person sees*, TD-1497)
         kind = str(e.get("kind") or "").lower()
         return "read" if kind in ("watch", "fyi") else ("do" if kind == "act" else "decide")
     if sec == "steering" or e.get("kind") in ("ask", "steer"):
@@ -451,11 +452,14 @@ def want_of(e: Mapping[str, Any], sec: str) -> str:
 
 
 def stuck_line(e: Mapping[str, Any]) -> bool:
-    """A decided line's row moved while stuck (§6 rule 13 *What the person sees*, TD-1497 slice 2): a board row
-    carrying `stuck` outside *Waiting on them* — drawn as the stuck row (its Open, no Start session, kind *stuck*
-    in `ao card`), never a second row."""
+    """A decided line's row moved while stuck (§6 rule 13 *What the person sees*, TD-1497 slice 2), or a handed
+    entry's (slice 4): a board or handed row carrying `stuck` outside *Waiting on them* — drawn as the stuck row (its
+    Open, no Start session, kind *stuck* in `ao card`), never a second row."""
+    st = e.get("stuck")
     return (
-        e.get("row") == "board" and isinstance(e.get("stuck"), Mapping) and not e.get("stuck", {}).get("waiting_until")
+        (e.get("row") == "board" or bool(e.get("handed_row")))
+        and isinstance(st, Mapping)
+        and not st.get("waiting_until")
     )
 
 
@@ -726,7 +730,8 @@ def _cut_item(m: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(row, Mapping):
         if row.get("row") not in NOT_MAIL:
             # a state row's stuck lines are the home's words, never mail's (TD-1497 slice 3): kept as a stuck row is
-            out["row"] = _keep(row, (*MAIL_KEEP, "stuck_lines"))
+            # …and so are a stuck handed entry's (slice 4)
+            out["row"] = _keep(row, (*MAIL_KEEP, "stuck_lines", "stuck", "handed_row"))
         elif row.get("answered"):
             out["row"] = {**row, "answered": _keep(row["answered"], HELD_ANSWERED_KEEP)}
     return out
