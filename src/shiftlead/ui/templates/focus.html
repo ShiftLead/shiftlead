@@ -117,7 +117,8 @@
       {# design §4.5a Focus header **mode toggle** (TD-096, *Focus watches*): named for what it does —
          Take over an unattended session (read-only until then) is the next act here, and **Hand back**
          takes the same slot once a member is held, a bordered plain button (TD-964, TD-1408); *Switch to
-         unattended*, on a session with no team and no controllers, alone sits in more ▾; an ended record
+         unattended*, on a session with no team and no controllers or the person's own start in a team
+         (TD-1681), alone sits in more ▾; an ended record
          draws neither (`mode_place`). #}
       {% if s.agent %}<button class="btn sm{% if s.unattended %} {{ 'link' if s.own and s.ready_ok else 'next' }}{% endif %}{% if s.mode_place != 'slot' %} hidden{% endif %}" id="fmodeact" data-act="mode" data-via="focus" data-id="{{ s.id }}"{% if s.mode_confirm %} data-confirm="{{ s.mode_confirm }}"{% endif %}
               data-unattended="{{ 1 if s.unattended else 0 }}"
