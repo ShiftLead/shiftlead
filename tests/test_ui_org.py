@@ -663,6 +663,14 @@ def test_the_usage_chip_prints_the_line_its_reserve_makes_and_ranks_by_the_gap()
         "gone": None,
     }
     assert with_lines(usage, None) == usage and with_lines(None, gate) == {}
+    # by account (TD-1610): each profile on it reads the account's rows; a mixed account draws no line
+    accounts = {"accounts": {
+        "claude-code:paul": {"profiles": ["grind", "paul"], "billing": "subscription",
+            "windows": [{"label": "week", "line": 60}]},
+        "claude-code:split": {"profiles": ["gone"], "billing": "mixed", "windows": [{"label": "week", "line": 1}]},
+    }}  # fmt: skip
+    got = with_lines(usage, accounts | gate)
+    assert got["grind"]["lines"] == got["paul"]["lines"] == [{"label": "week", "line": 60}] and got["gone"] is None
 
 
 def test_the_usage_chip_shows_the_gates_projection():
@@ -685,14 +693,15 @@ def test_the_usage_chip_is_one_per_account_and_names_the_tool_and_the_account():
     """design §4.5a **usage** chip, §4.2a (TD-122). Four profiles split by role on one login drew
     four chips named by profile — *grind · week 21% / 40% · stale +1* — where the person knows the
     quota as *Claude, paul*. The readings are grouped by account: one chip, `<tool> · <account>`,
-    the lowest line among the profiles sharing it, and each profile with its line and sessions on
-    hover. A reading from an agent that names no account stays its profile's own chip."""
+    the account's one line (§6 *A reserve is the account's*, TD-1610: every profile on it carries the
+    same), and each profile with its sessions on hover. A reading from an agent that names no account
+    stays its profile's own chip."""
     from shiftlead.ui.app import usage_accounts, usage_chip
 
     reading = {"windows": [{"label": "week", "pct": 24, "resets": "r"}], "fetched": "f", "reason": "ok",
                "account": "paul", "tool": "Claude"}  # fmt: skip
     usage = {
-        "grind": {**reading, "lines": [{"label": "week", "line": 70, "reserve": 30}]},
+        "grind": {**reading, "lines": [{"label": "week", "line": 60, "reserve": 40}]},
         "grind-sonnet": {**reading, "lines": [{"label": "week", "line": 60, "reserve": 40}]},
         "default": reading,
         "old": {"windows": [{"label": "5h", "pct": 3}], "fetched": "f"},  # an agent before TD-122
@@ -715,15 +724,14 @@ def test_the_usage_chip_is_one_per_account_and_names_the_tool_and_the_account():
     ]
     c = usage_chip("Claude · paul", acc)
     assert c["text"] == "Claude · paul · week 24% / 60%"
+    assert "line 60% (reserve 40%; line moves ?; resets r)" in c["title"]  # the account's reserve and line, once
     assert c["title"].endswith(
-        "\n\nprofiles on this account:\ngrind [week line 70% (reserve 30%; line moves ?)]: grinder-ao-1, grinder-ao-2"
-        "\ngrind-sonnet [week line 60% (reserve 40%; line moves ?)]\ndefault: paul"
+        "\n\nprofiles on this account:\ngrind: grinder-ao-1, grinder-ao-2\ngrind-sonnet\ndefault: paul"
     )
     assert "grind" not in c["text"]  # never a profile's name in the chip
-    # a per-day reserve on a fractional line: the days left are whole in the page as in `app.js`
+    # the hover names each profile and its sessions, never a profile's own line (TD-1610)
     assert usage_chip("Claude · paul", USAGE_CASES["shared"])["title"].endswith(
-        "grind [week line 70.5% (reserve 10% a day, 2 days left; line moves n1),"
-        " 5h line 50% (reserve ?; line moves ?)]: grinder-ao-1, grinder-ao-2\ndefault"
+        "profiles on this account:\ngrind: grinder-ao-1, grinder-ao-2\ndefault"
     )
     assert usage_chip("old", got["old"])["text"] == "old · 5h 3%"
     assert usage_accounts(None) == {}
@@ -1468,17 +1476,12 @@ def test_a_metered_accounts_chip_reads_spend_over_its_amount():
     acc = usage_accounts({"api2": a, "api": b})["Claude · key"]
     chip = usage_chip("Claude · key", acc)
     assert chip["text"] == "Claude · key · day $4.10 / $5"
-    # the hover names each profile's own amount (TD-151): the chip alone hid which profile had which
-    assert chip["title"].endswith("\n\nprofiles on this account:\napi2 [day amount $10]\napi [day amount $5]")
-    # what is not a number is not an amount, as in `amountSays` (the review of #900)
-    odd = [{"label": "day", "amount": {"value": v, "unit": "tok"}} for v in (float("inf"), float("nan"))]
-    assert usage_chip("k", USAGE_CASES["metered"] | {"profiles": [{"name": "api", "amounts": odd}]})["title"].endswith(
-        "profiles on this account:\napi"
-    )
+    # the amount is the account's (TD-1610): the hover names the profiles, never a profile's own amount
+    assert chip["title"].endswith("\n\nprofiles on this account:\napi2\napi")
     bare = usage_accounts({"p": {"reason": "ok", "windows": [day | {"amount": None}]}})
     assert "amounts" not in bare["p"]["profiles"][0]
     shared = usage_chip("Claude · key", USAGE_CASES["metered_shared"])["title"]
-    assert shared.endswith(":\napi [day amount $5, week amount 2M tok]: w1\napi2 [day amount $10]")
+    assert shared.endswith(":\napi: w1\napi2")
     # the turns and the pace (TD-151): *day $3.20 / $5 · 412 turns · $0.40/h · at this pace $5 by 12:30*,
     # the clock time the home's local one, its weekday in front when it is not today; a junk field draws nothing
     paced = usage_chip("Claude · key", USAGE_CASES["metered_paced"], USAGE_NOW)["title"].split("\n")
