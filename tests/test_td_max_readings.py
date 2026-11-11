@@ -64,10 +64,11 @@ async def test_a_question_to_a_closed_extra_waits_for_its_fill(agent, tmp_path):
         lead, w = await mk("lead", unattended=True), await mk("w", unattended=True, scale=EXTRA)
         await person.call("set_controllers", id=w, add=[lead])
         async with LocalClient(caller=lead) as ld:
-            await ld.call("msg", to=w, text="status?", kind="ask")
+            ask = (await ld.call("msg", to=w, text="status?", kind="ask"))["entry"]
         await person.call("close", id=w)
         await agent._sweep_mail(datetime.now(UTC))
-        assert (await person.call("get", id=lead))["mail"]["expired"] == [], "an extra held is an empty seat"
+        mail = (await person.call("get", id=lead))["mail"]
+        assert mail["expired"] == [] and mail["addressee_exited"] == [ask["id"]], "an extra held is an empty seat"
         await person.call("kill", id=lead)
 
 
