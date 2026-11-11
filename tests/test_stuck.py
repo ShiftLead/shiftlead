@@ -233,8 +233,13 @@ def claimed(ref: str, at: datetime) -> models.ProgressEntry:
 
 
 @pytest.fixture
-def home(agent, monkeypatch):
-    """A parked home with one repo `fx` on the roster and its records in `agent.sessions`."""
+async def home(agent, monkeypatch):
+    """A parked home with one repo `fx` on the roster and its records in `agent.sessions`.
+
+    Parked before the state is set (TD-1666): `park_ticks` drains a repos pass a tick started, and one that
+    lands after the fixture set `_repos` replaced `fx`'s board with its own reading of a checkout that is not
+    there, so the pass read no board line and the test's `stuck` or `stuck_open` was missing."""
+    await park_ticks(agent)
     monkeypatch.setattr(hosts.Host, "repos", lambda self: [ROOT, "/repos/other"])
     agent._repos = {ROOT: board()}
     agent._host_rec.pop("stuck", None)
@@ -291,7 +296,6 @@ def test_team_reason_reads_a_team_none_of_whose_crew_is_live():
 
 @pytest.mark.integration
 async def test_an_idle_claimant_reads_its_own_idle_start_while_the_clock_keeps_its_claim(home):
-    await park_ticks(home)
     claim = NOW - timedelta(minutes=30)
     w = member("w", since=_z(NOW - timedelta(minutes=10)), progress=[claimed(KEY, claim)])
     put(home, w)
@@ -312,7 +316,6 @@ async def test_an_idle_claimant_reads_its_own_idle_start_while_the_clock_keeps_i
 
 @pytest.mark.integration
 async def test_two_holders_are_both_actors_and_a_seat_holding_the_lease_is_one(home):
-    await park_ticks(home)
     claim = NOW - timedelta(minutes=90)
     a = member("a", state="working", progress=[claimed(KEY, claim)])
     rv = rec("rv", state="limited", repo=ROOT, seat={"trigger": "asks"}, progress=[claimed(KEY, claim)])
@@ -332,7 +335,6 @@ async def test_two_holders_are_both_actors_and_a_seat_holding_the_lease_is_one(h
 
 @pytest.mark.integration
 async def test_a_released_line_is_clocked_from_the_release_and_goes_back_to_its_lanes(home):
-    await park_ticks(home)
     w = member("w", progress=[claimed(KEY, NOW - timedelta(hours=3))])
     other = member("o", state="limited")
     put(home, w, other)
@@ -356,7 +358,6 @@ async def test_a_released_line_is_clocked_from_the_release_and_goes_back_to_its_
 
 @pytest.mark.integration
 async def test_a_team_held_at_day_reads_that_reason_and_a_line_no_lane_takes_reads_no_lane(home):
-    await park_ticks(home)
     done = {"at": _z(NOW - timedelta(hours=4))}
     put(home, member("a", "exited", out_of_work=done), member("b", "exited", out_of_work=done))
     home._host_rec.setdefault("teams", {})["beta"] = {
@@ -375,7 +376,6 @@ async def test_a_team_held_at_day_reads_that_reason_and_a_line_no_lane_takes_rea
 
 @pytest.mark.integration
 async def test_an_unread_or_fallback_repo_keeps_its_lines_and_a_repo_off_the_roster_drops_them(home):
-    await park_ticks(home)
     gone = workorders.key("act 2026-11-11 (n/a) — **Gone.** Due: 2026-11-11.")
     arch = workorders.key("act 2026-11-11 (n/a) — **Archived.** Due: 2026-11-11.")
     stored = {"since": "2026-11-11T09:00:00Z", "reason": {"state": "limited"}, "repo": "fx"}
@@ -513,7 +513,6 @@ def test_waiting_until_is_the_earliest_instant_when_every_actor_names_one():
 
 @pytest.mark.integration
 async def test_a_line_the_person_is_asked_about_is_muted_and_clocked_from_the_answer(home):
-    await park_ticks(home)
     w = member("w", state="limited")
     put(home, w)
     home._host_rec["stuck_open"] = {KEY: {"at": _z(NOW - timedelta(hours=3)), "repo": "fx"}}
@@ -540,7 +539,6 @@ async def test_a_line_the_person_is_asked_about_is_muted_and_clocked_from_the_an
 
 @pytest.mark.integration
 async def test_waiting_until_is_served_beside_the_stuck_row_and_never_stored(home):
-    await park_ticks(home)
     reset = NOW + timedelta(minutes=10)
     put(home, member("w", state="limited", limited_reset=_z(reset)))
     home._host_rec["stuck_open"] = {KEY: {"at": _z(NOW - timedelta(hours=3)), "repo": "fx"}}
@@ -570,7 +568,6 @@ def _muted_home(home, w: models.Session) -> datetime:
     ids=["a-steer-from-anyone", "a-paused-steer", "lower-case-ref"],
 )
 async def test_the_tick_mutes_on_a_steer_and_a_paused_steer(home, kw):
-    await park_ticks(home)
     start = _muted_home(home, member("w", state="limited"))
     home.person_inbox.append(person_ask("m-k", **kw))
     try:
@@ -588,7 +585,6 @@ async def test_the_tick_mutes_on_a_steer_and_a_paused_steer(home, kw):
     ids=["no-envelope-repo", "a-look-with-a-reviewer", "snoozed"],
 )
 async def test_the_tick_mutes_nothing_for_these(home, kw):
-    await park_ticks(home)
     _muted_home(home, member("w", state="limited"))
     home.person_inbox.append(person_ask("m-k", **kw))
     try:
@@ -600,7 +596,6 @@ async def test_the_tick_mutes_nothing_for_these(home, kw):
 
 @pytest.mark.integration
 async def test_an_unreadable_snooze_mutes_and_a_snooze_clocks_the_line_until_it_ends(home):
-    await park_ticks(home)
     _muted_home(home, member("w", state="limited"))
     q = person_ask("m-k", snoozed_until="not a time")
     home.person_inbox.append(q)
@@ -624,7 +619,6 @@ async def test_an_unreadable_snooze_mutes_and_a_snooze_clocks_the_line_until_it_
 @pytest.mark.integration
 @pytest.mark.parametrize("reason", ["withdrawn", "expired"])
 async def test_a_withdrawn_ask_or_a_lapsed_steer_clocks_the_line_from_its_close(home, reason):
-    await park_ticks(home)
     _muted_home(home, member("w", state="limited"))
     q = person_ask("m-k", kind="steer" if reason == "expired" else "ask")
     home.person_inbox.append(q)
@@ -642,7 +636,6 @@ async def test_a_withdrawn_ask_or_a_lapsed_steer_clocks_the_line_from_its_close(
 
 @pytest.mark.integration
 async def test_an_answer_while_unread_is_clocked_from_the_first_good_read_and_a_drop_with_it_moves_at_once(home):
-    await park_ticks(home)
     claim = NOW - timedelta(hours=1)
     w = member("w", state="limited", progress=[claimed(KEY, claim)])
     put(home, w)
@@ -669,7 +662,6 @@ async def test_an_answer_while_unread_is_clocked_from_the_first_good_read_and_a_
 
 @pytest.mark.integration
 async def test_a_registry_name_unlike_its_directory_mutes_that_repos_line(home):
-    await park_ticks(home)
     home._repos = {ROOT: {**board(), "name": "reg-name"}}
     _muted_home(home, member("w", state="limited"))
     home.person_inbox.append(person_ask("m-k", repo="reg-name"))
@@ -687,7 +679,6 @@ async def test_a_registry_name_unlike_its_directory_mutes_that_repos_line(home):
 
 @pytest.mark.integration
 async def test_a_team_held_early_waits_and_its_flip_is_pushed(home):
-    await park_ticks(home)
     done = {"at": _z(NOW)}
     put(home, member("a", "exited", out_of_work=done, lane_seen={"ids": []}))
     started = NOW - timedelta(minutes=20)
