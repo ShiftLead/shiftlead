@@ -23,7 +23,7 @@
 - **The settings a person moves** (the ADR [settings
   audit](../decisions/2026-09-25-settings-audit.md)): **`settings.yml`**, beside `hosts.yml` in the shiftlead home **of the home** — home-
   owned, one file for the org — read by the home's agent on every tick (`sessionorc.settings`),
-  written **only by its `set_settings` RPC**, a person's own (save the host agent's one-time td-max write of `max: off` and `scale.migrated`, §4.9 *On by default*), refused to a session as `inbox_pause`
+  written **only by its `set_settings` RPC**, a person's own (save the host agent's two migrations: its one-time td-max write of `max: off` and `scale.migrated`, §4.9 *On by default*, and its move of a per-profile `usage_gate:` key to its account, §6 *A reserve is the account's*, TD-1581), refused to a session as `inbox_pause`
   is; `ao gate`, `ao schedule`, `ao team until` (§4.7) and the Settings page (§4.5 screen 8) all
   write through it. Nobody edits it by hand while the agent runs, though a hand edit is read on the
   next tick; it carries no comments, and a write rewrites it whole. **The line it draws**: a

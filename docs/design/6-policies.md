@@ -2630,7 +2630,8 @@ teams:
     the account as one this home has not seen.
   - **A team's reserve priority stays the team's** (below): the one way to make some sessions on an
     account stop sooner.
-  - **The migration.** Once per tick, before the gate's pass, the home walks `usage_gate:` of the
+  - **The migration** — the host agent's second write of `settings.yml` outside `set_settings` (§5),
+    beside the td-max one (§4.9 *On by default*), which it leaves as it is. Once per tick, before the gate's pass, the home walks `usage_gate:` of the
     file as `settings.read()` gives it (a dict; a missing or unparseable file, None, is never migrated
     or written) for a key holding no `:` — never on a node, whose replica the home sends whole (§4.4a),
     nor in a CLI's or a page's read; a tick with none does nothing more, so the walk is its whole cost.
@@ -2639,15 +2640,18 @@ teams:
     (`profiles()`, asked only then). Per window label the account keeps one reserve from among its
     profiles' and any entry already under the account: those whose unit fits the account's billing,
     and of them **the one whose line is lowest on the window's last day** (a flat `r`, `100 − r`; a
-    per-day `d`, `100 − d`; a tie, the per-day one; a metered account, the smallest amount) — an order
+    per-day `d`, `100 − d`; a tie, the per-day one, then the first profile by name; a metered account,
+    the smallest amount) — an order
     that needs no reading; one whose unit does not fit is removed and named. A merged line can rise for
     a profile only where a flat reserve is kept over its per-day one: its line `100 − d × days_left`
     is below the kept `100 − r` while `d × days_left > r`, for `days_left` from 1 to the window's
     length in days, so the note names each such profile. The profiles resolved first, the write is one
     load, edit and save with no wait between them, as `set_settings` makes one, then pushed to the
-    nodes and committed in the home's definition files as every settings write is (§4.4a; `rpc_commit_defs`, §4.9); before it, the file
-    as it stands is committed in the home's definition files — *settings.yml before TD-1581's migration* — or, on a
-    home whose definitions are no git tree, copied beside it as `settings.yml.before-TD-1581`, never overwritten. One
+    nodes and committed in the home's definition files as every settings write is (§4.4a; `_commit_defs`, §4.9); before it, the file
+    as it stands is committed in the home's definition files — *settings.yml before TD-1581's migration*,
+    no commit where it is committed already — so the commit that holds it as it stood is the tree's
+    last change to `settings.yml` (read with git); on a home whose definitions are no git tree, it is
+    copied beside it as `settings.yml.before-TD-1581`, never overwritten. One
     `system` note tells the person what moved — *usage reserves are now per account: claude-code:paul
     takes week 5 (from grind-ask; grind had 1, grind-fable 3, grind-sonnet 5)* — with that commit (or
     the copy) to restore from, since a node not yet on this build and a rollback past it read
