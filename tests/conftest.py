@@ -87,6 +87,16 @@ def _no_real_gate_sweep(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(gatesweep, "sweep", lambda *a, **k: (None, "tests run no gate sweep"))
 
 
+@pytest.fixture(autouse=True)
+def _no_extras_unless_asked(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A team with no `max` key is on td-max's default ceilings (§4.9 *Scaling with the work*, TD-1545), so
+    every Start would write two held extras per line and seat beside the sessions a test counts. A test
+    writes none: a test of the extras puts back `teams.EXTRAS`, the real function."""
+    from shiftlead import teams
+
+    monkeypatch.setattr(teams, "_extras", lambda *a, **k: [])
+
+
 CHILD = HERE / "_agent_child.py"
 FAST_TICK = 0.3
 

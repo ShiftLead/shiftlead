@@ -681,7 +681,8 @@ def rollup_counted(
     with its group's team (`NO_TEAM` for one in no team): every session the page draws that has not ended,
     whatever its team's state, an `exited` member of a live team (a person's own in it too), and a seat on
     call, whose record stays exited or closed — never a stopped team's or a no-team session's exited
-    record, never a `closed` one that is no seat, never a command run (`kind: command`). `groups` is
+    record, never a `closed` one that is no seat, never a held extra (`scale`, closed or exited: capacity,
+    TD-1545), never a command run (`kind: command`). `groups` is
     `team_groups`' list or `org_layout`'s items, whose headings and repo lines hold no session (TD-1204);
     on the flat page (`None`) the sessions are `views`, none of them in a team."""
     pairs = [
@@ -697,6 +698,8 @@ def rollup_counted(
         if m.get("kind") == "command":
             continue
         state = m.get("state")
+        if m.get("scale") and state in DEAD:
+            continue  # a held extra is capacity, never on call (§4.9 *Scaling with the work*, TD-1545)
         if m.get("seat") or state not in DEAD or (state == "exited" and team != NO_TEAM and g.get("live")):
             out.append((team, m))
     return out

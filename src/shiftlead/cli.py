@@ -1020,6 +1020,9 @@ def cmd_team_start(args: argparse.Namespace) -> int:
             print(line)
         for rec in result["sessions"]:
             print(_team_line(rec, args.name, p))
+        if extras := result.get("extras"):  # td-max's held extras (§4.9 *Scaling with the work*, TD-1545)
+            names = ", ".join(str(r.get("name") or r.get("id")) for r in extras)
+            print(f"{names}: written held as extras — filled when their line or seat is short")
         for warning in result.get("unrepeatable", []):
             print(f"{warning} (TD-042: a brief describes the job, not the run)", file=sys.stderr)
         for note in result.get("notes", []):
