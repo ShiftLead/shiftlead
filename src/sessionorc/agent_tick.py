@@ -873,11 +873,10 @@ class TickMixin:
         """An extra of a seat (§4.9 *Scaling with the work*): a record carrying both `seat` and `scale`."""
         return s.seat is not None and isinstance(s.scale, dict)
 
-    @staticmethod
-    def _owes_reading(s: Session) -> bool:
-        """Whether an extra seat holds what it was filled for (§6 rule 1, TD-1547): unread mail, or an `ask`
-        in its inbox not yet answered (a reader's `pr` ask among them)."""
-        return bool(s.unread() or any(e.kind == "ask" and e.open for e in s.inbox))
+    def _owes_reading(self, s: Session) -> bool:
+        """Whether an extra seat holds what it was filled for (§6 rule 1, TD-1547): unread mail, or an open
+        question addressed to it (`asks_waiting`: a copy or one it passed up is not; a reader's `pr` ask is)."""
+        return bool(s.unread() or s.asks_waiting(home=self.host))
 
     def _crashed(self, s: Session, now: datetime) -> bool:
         """Rule 1's test: a supervised, unattended member that is not a seat — an extra seat excepted while it

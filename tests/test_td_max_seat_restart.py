@@ -71,6 +71,12 @@ async def test_an_exited_extra_seat_holding_an_ask_is_restarted_by_rule_1(agent,
         # unread mail of any kind owes a reading too
         rec.inbox = [_ask(sid, kind="note")]
         assert agent._crashed(rec, now)
+        # a copy of an ask is not addressed to it: read, it owes nothing
+        copy = _ask(sid, mid="m-2", read=True)
+        copy.to = ["ao-x-other"]
+        rec.inbox = [copy]
+        assert not agent._crashed(rec, now)
+        rec.inbox = [_ask(sid, kind="note")]
         # gated, or a kill (no pane), is not restarted
         rec.gated = {"at": "x"}
         assert not agent._crashed(rec, now)
