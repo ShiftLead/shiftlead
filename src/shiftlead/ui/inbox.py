@@ -782,7 +782,8 @@ def red_pr_rows(
     keyed `red_pr:<repo>:<n>` in the attention store. Every part from the home's reading; it leaves
     when the order does — green, closed, or held by a live record. A sync PR's order (TD-684) has the
     row green or red, *`<repo>` #<n> · sync · <its reason> · <author>*, and leaves when it merges,
-    closes or is held."""
+    closes or is held. A live check's lift PR's order (TD-1450) has it whatever its checks, *`<repo>` #<n> ·
+    lift 2h · lifts TD-n event (live) · <author>*, aged from `lift_since` (TD-1578)."""
     at = now or datetime.now(UTC)
     out: list[dict[str, Any]] = []
     for root, r in sorted((repos or {}).items()):
@@ -797,6 +798,11 @@ def red_pr_rows(
                 # a sync PR the home did not merge, green or red, its reason in place of the checks (TD-684)
                 since = str(e.get("sync_since") or "")
                 parts = [f"{repo} #{n}", "sync", str(e.get("reason") or ""), str(e.get("author") or "")]
+            elif e.get("lift"):
+                # a live check's lift PR, an order whatever its checks: its gate in their place (TD-1578)
+                since = str(e.get("lift_since") or "")
+                lifts = f"lifts {e['entry']} {e.get('gate') or ''}".strip() if e.get("entry") else ""
+                parts = [f"{repo} #{n}", f"lift {_age(since, at)}".strip(), lifts, str(e.get("author") or "")]
             else:
                 since = str(e.get("red_since") or "")
                 word = "red" if e.get("checks") == "red" else "conflicting"
