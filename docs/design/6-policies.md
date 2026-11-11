@@ -1523,7 +1523,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        choice of the first actor and its reason. A
        member the person took over is not the person's own: it reads `taken_over`. And a **holder waiting
        on the person** — an `ask` or `steer` open in the person inbox whose `from` is the holder's record
-       id and whose `about`, read by `reference_of`, is the `TD-n` the line's `Context:` names (a line whose
+       id and whose `about`, read by `reference_of` (an `about` that is no bare `TD-n` matches nothing), is the `TD-n` the line's `Context:` names (a line whose
        `Context:` names no entry has no such question, and its holder stays an actor) — is no actor while
        it is open; where every holder waits so, the line is not read, whatever its lanes hold: its `stuck`
        entry drops (the question is on the person's card already) and its `stuck_open` entry is kept and
@@ -1571,7 +1571,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        later of the `read_at` of the copy in the walk's last record's mailbox (stamped when `ao inbox`
        printed it, and carried onto a fill's copy, so bounded below by that record's `created`) and that
        record's `created`, or, unread there, that record's `since`; for an order, the
-       `stuck_open` entry's `at` (the claim or the release, which moves the clock for an
+       `stuck_open` entry's `at` (the claim, the release or the answer, which moves the clock for an
        idle holder alone) — in every case the later of that and its `subagent_at` or `shells_at`, so one
        whose shell has just ended gets its grace; and a **`stalled`** actor, whose `since` (the start of
        its turn) says nothing of the stall, gives the instant nothing new began — the later of the two
@@ -1626,7 +1626,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        Inbox's *Needs you*, with the stuck words as a line under it, never a second row (`ao card` prints it as the stuck row, its id the `stuck` key and its kind *stuck*); it goes back
        under *Waiting on them* the tick an actor acts; while the line's item carries `applying` (§4.4 *A
        press is drawn as it lands*) the row reads as the mark says and the stuck row makes no *needs you*,
-       its `stuck_open` entry untouched until the press's re-read; a handed entry's row under *Waiting on
+       its `stuck_open` entry still moved by claims, releases and answers (*The clock*), only its draw held until the press's re-read; a handed entry's row under *Waiting on
        them* (screen 6) moves the same way, to *Needs you* or its named entry's Do group. Where a stopped
        holder's state row (TD-1453) draws the same actor **on the same surface** (one card, or both in the Inbox), the
        stuck words are a line under it alone, and the work's own row stays where it was, in no number: one
