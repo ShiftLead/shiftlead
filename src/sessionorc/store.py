@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import paths
+from sessionorc import stuck as stuck_mod
 from sessionorc.models import MailEntry, Session
 
 
@@ -189,8 +190,9 @@ class RepoStore:
 
 class HostStore:
     """The home's own `host` record (design §6 *Balance*, TD-239), `{teams: {<team>: {...}},
-    last_tick?, ci_spells?}` — `last_tick` the agent's newest tick (§4.5 row 5 (b), TD-490), `ci_spells`
-    the *CI not starting* rows' spells by owner (§4.4, TD-687) — written whole each
+    last_tick?, ci_spells?, stuck?, stuck_open?}` — `last_tick` the agent's newest tick (§4.5 row 5 (b), TD-490),
+    `ci_spells` the *CI not starting* rows' spells by owner (§4.4, TD-687), `stuck` and `stuck_open` rule 13's
+    stuck work and its board lines' clocks (§6 *Stuck work*, TD-1496), each shape-checked — written whole each
     time it changes. A missing or unreadable file is an empty record, never a crash: the
     next tick writes what stands."""
 
@@ -212,6 +214,12 @@ class HostStore:
         spells = raw.get("ci_spells") if isinstance(raw, dict) else None
         if isinstance(spells, dict) and (kept := {str(k): v for k, v in spells.items() if isinstance(v, dict)}):
             rec["ci_spells"] = kept
+        # rule 13's stuck work and its board lines' clocks (§6 *Stuck work*, TD-1496): an entry that fails its
+        # shape is dropped, never a crash
+        for name, ok in (("stuck", stuck_mod.shape_ok), ("stuck_open", stuck_mod.open_shape_ok)):
+            got = raw.get(name) if isinstance(raw, dict) else None
+            if isinstance(got, dict) and (kept := {str(k): v for k, v in got.items() if ok(str(k), v)}):
+                rec[name] = kept
         return rec
 
     def save(self, record: dict[str, Any]) -> None:

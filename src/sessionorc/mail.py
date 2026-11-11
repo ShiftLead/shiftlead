@@ -59,6 +59,11 @@ ASK_BOUND = timedelta(hours=24)  # an `ask`'s default bound, wall-clock on the h
 # how long a question seat may stay unable before a question is routed around it (§4.9b *A seat that
 # cannot answer is routed around*, TD-1443): `TECHLEAD_WAIT`'s figure, which the briefs and the design name
 ROUTE_AROUND_AFTER = timedelta(minutes=30)
+# how long open work may have no live session able to act on it before the home calls it stuck (§6 rule 13
+# *Stuck work*, TD-1496): an open `ask` to a session (twice `ROUTE_AROUND_AFTER`, so routing went first), and a
+# decided board line waiting on a session
+STUCK_ASK_AFTER = timedelta(minutes=60)
+STUCK_ORDER_AFTER = timedelta(minutes=60)
 DEFAULT_CAP = 200  # characters of a `steer`'s `default`, cleaned and capped as a `doing` line is (§4.8)
 RULES = "rules"  # the answerer of an *Answered for you* FYI the person's `permissions:` rules filed (§4.9b, TD-641)
 SOURCE_CAP = 200  # characters of a reply's `source` (§4.9b): one line, where the answer is written down
