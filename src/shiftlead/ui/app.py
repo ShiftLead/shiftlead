@@ -280,6 +280,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _shot_on_origin,  # noqa: F401
     _shot_seen,  # noqa: F401
     _stuck_reason,  # noqa: F401
+    _stuck_team_words,  # noqa: F401
+    _stuck_text,  # noqa: F401
     _subject_of,  # noqa: F401
     _team_wound,  # noqa: F401
     _trail_rows,  # noqa: F401
@@ -302,6 +304,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     board_text,  # noqa: F401
     board_waiting_on,  # noqa: F401
     board_waits,  # noqa: F401
+    board_work_words,  # noqa: F401
     cadence_marks,  # noqa: F401
     ci_not_run_kinds,
     ci_not_run_rows,
@@ -346,6 +349,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     state_kind,  # noqa: F401
     state_rows,  # noqa: F401
     stuck_cut,  # noqa: F401
+    stuck_onto_boards,  # noqa: F401
     stuck_rows,
     unclosed_mark,  # noqa: F401
     with_standings,
