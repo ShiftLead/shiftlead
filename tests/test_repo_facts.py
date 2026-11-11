@@ -1414,3 +1414,17 @@ def test_a_lift_branch_is_stamped_lift_since_at_its_first_reading_and_kept(tmp_p
     assert {p["number"]: p.get("lift_since") for p in second["open"]}[5] == t0.isoformat()
     assert reports.lift_of("lift/TD-1450/live-td31") == ("TD-1450", "event (live-td31)")
     assert reports.lift_of("lift/TD-1450/decision-paul") is None and reports.lift_of(None) is None
+
+
+def test_a_live_check_with_an_open_part_or_an_unreserved_live_name_is_on_no_list():
+    """`_repo_list`'s live-check line (#3320, TD-1596): a live check whose only blockers are its reserved
+    `event (live…)` gates is on it, unless an open entry is `Part of:` it; and `event (live-foo)` is no name
+    §4.9b reserves, so a check it gates is on no list."""
+    from shiftlead import cli as cli_mod
+
+    def e(blocked, parts=()):
+        return {"for_page": "live-check", "pickable": "no", "blocked_by": blocked, "parts_open": list(parts)}
+
+    assert cli_mod._repo_list(e(["event (live)", "event (live-2)", "event (live-td7)"])) == "live-check"
+    assert cli_mod._repo_list(e(["event (live)"], parts=["TD-031"])) == ""
+    assert cli_mod._repo_list(e(["event (live-foo)"])) == ""
