@@ -107,6 +107,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     MODE_VIAS,
     MODEL_EVERY,  # noqa: F401
     MODEL_FILE,  # noqa: F401
+    MOVE_FILL_BACKOFF,  # noqa: F401
     NODE_ACTS,  # noqa: F401
     NODE_READS,  # noqa: F401
     NOTICE_LAG,  # noqa: F401
