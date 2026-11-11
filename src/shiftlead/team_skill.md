@@ -272,10 +272,13 @@ sync-PR work orders and the PR and Doing facets read that repo alone. An umbrell
 in sibling repos with their own remotes (agent-cadence's `docs/nested-repos.txt`) gives each member
 its own worktree or link of each sibling, as `hydrate_worktree.sh` sets them up — and **none of
 the siblings' PRs is seen**: a sibling's PR number given to `--pr` is read as the umbrella's PR of
-that number. Until ShiftLead reads them (TD-943), such a team lands a sibling change as **paired
-PRs**, written into its briefs: the sibling PR carries the change and its review, then an umbrella
-PR moves the ledger entry and links the sibling PR by its URL, and the umbrella PR is the one
-`--pr` names and the flow reads. The siblings have no gate there but the review the brief asks for.
+that number. ShiftLead does not read them, by design (§4.9 *Teams*: what spans repos is a project
+heading over teams, never one team): a sibling that needs its own gate — its own tests, its own
+`held:` — becomes a cadence repo with a team of its own under the umbrella's project. Where a
+sibling stays without one, a team lands a sibling change as **paired PRs**, written into its
+briefs: the sibling PR carries the change and its review, then an umbrella PR moves the ledger
+entry and links the sibling PR by its URL, and the umbrella PR is the one `--pr` names and the
+flow reads. The siblings have no gate there but the review the brief asks for.
 
 ## 4. Say what the roles are
 
