@@ -108,6 +108,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     MODE_VIAS,
     MODEL_EVERY,  # noqa: F401
     MODEL_FILE,  # noqa: F401
+    MOVE_FILL_BACKOFF,  # noqa: F401
     NODE_ACTS,  # noqa: F401
     NODE_READS,  # noqa: F401
     NOTICE_LAG,  # noqa: F401
@@ -953,6 +954,7 @@ class HostAgent(
         # one step*, TD-1547); and each held extra a send is filling, until its record stands (`_send_fill`)
         self._evicting: set[str] = set()
         self._send_filling: dict[str, asyncio.Task[None]] = {}
+        self._move_filled: dict[str, float] = {}  # the tick's mover's last fill of each extra (monotonic, TD-1547)
         self._room_held: list[
             set[str]
         ] = []  # each start between the cap's reading and its record; emptied once registered
