@@ -143,11 +143,15 @@ def stages(records: Collection[Any], manager: Any = None) -> list[dict[str, Any]
 
 
 def stage_of(record: Any, team_stages: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """The stage a record is a member of: a worker by its lane, a seat by the reader name a link gives."""
+    """The stage a record is a member of: a worker by its lane, a seat by the reader name a link gives — an extra
+    seat by the seat its `scale.line` names, so a seat's extras are sampled in its review stage (§4.9 *A scaled seat
+    holds its review stage*, TD-1547)."""
     if _f(record, "adapter") == "shell":
         return None
     if _f(record, "seat") is not None:
-        return next((s for s in team_stages if s["kind"] == "review" and s["reader"] == _f(record, "name")), None)
+        scale = _f(record, "scale")
+        name = (scale.get("line") if isinstance(scale, dict) else None) or _f(record, "name")
+        return next((s for s in team_stages if s["kind"] == "review" and s["reader"] == name), None)
     st = lane_stage(_f(record, "lane") or ())
     return next((s for s in team_stages if s["kind"] == "lane" and s["name"] == st), None)
 

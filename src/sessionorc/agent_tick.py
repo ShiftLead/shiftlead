@@ -3191,7 +3191,8 @@ class TickMixin:
 
     def _nudge_line(self, s: Session) -> str | None:
         if s.seat is not None:
-            n = s.asks_waiting(home=self.host) if s.seat_due else 0
+            # an extra seat has no `seat_due` (rule 3's cause passes it over, TD-1547): its waiting asks are named
+            n = s.asks_waiting(home=self.host) if s.seat_due or s.scale else 0
             # an entry the person handed the seat owes its outcome, read or not: named apart from the questions (TD-218)
             h = s.asks_waiting(home=self.host, handed_only=True) if n else 0
             parts = [f"you have {n - h} questions waiting — run `ao inbox`"] if n > h else []
@@ -3439,7 +3440,8 @@ class TickMixin:
             await self._stop_held(s, None)  # (b)
             return  # a seat the definition dropped (TD-706): `_sit_out_close` ends it, and nothing fills it
         filled, seen, count = s.seat_filled, s.lane_seen, s.seat_count
-        due = self._seat_due(s, now, records)
+        # an extra seat has no cause of its own (§6 rule 3 *An extra seat*, TD-1547): the send and the mover fill it
+        due = None if s.scale else self._seat_due(s, now, records)
         if due != s.seat_due or s.seat_filled != filled or s.lane_seen != seen or s.seat_count != count:
             s.seat_due = due
             self._save(s)
@@ -3463,6 +3465,10 @@ class TickMixin:
             await self._push_changes()
         if held:
             return  # filled for no cause until its team's Start: no `unfillable` word, never routed around
+        if s.scale:
+            # the cause pass never fills an extra seat and the `asks` linger never closes one: the send and the
+            # mover fill it, and only the eviction closes it, when a start needs its slot (§6 rule 3, TD-1547)
+            return
         if s.state in ("exited", "closed"):
             self._unfillable_word(s, now)  # due or not, a question asks whether rule 3 would fill it (TD-1443)
         if s.state in ("exited", "closed") and s.seat_due:
@@ -3760,7 +3766,12 @@ class TickMixin:
             return
         mine = set(self._ctl(s))
         fellows = [
-            r for r in records if r.seat and not r.superseded_by and (r is s or (mine and mine & set(self._ctl(r))))
+            r
+            for r in records
+            if r.seat
+            and not r.superseded_by
+            and not r.scale  # a seat's extras are a group of their own (§6 rule 3 *An extra seat*, TD-1547)
+            and (r is s or (mine and mine & set(self._ctl(r))))
         ]
         fills = [
             e
