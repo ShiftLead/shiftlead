@@ -702,6 +702,8 @@ class RemoteMixin:
                 return None
             if method == "answered_by_rule":
                 return await self._take_answered_by_rule(host, params)
+            if method == "missed":
+                return await self._take_missed(host, params)
             if method == "forward":
                 return await self._forwarded(host, params)
             if method == "cancel":
@@ -721,6 +723,29 @@ class RemoteMixin:
                 log.warning("link from %s: down — %s", host, why)
                 with contextlib.suppress(Exception):
                     await self._push_changes()  # its cards go `unreachable` now, not at the next tick
+
+    async def _take_missed(self, host: str, params: dict[str, Any]) -> dict[str, Any]:
+        """A node's missed marks (§6 rule 13 *A send that did not land*, TD-1498): `marks`, each `{id, at, verb}`
+        naming one of the node's sessions by its bare id, noted here — mail's one writer (§9 invariant 15) — as the
+        home's own marks are (`_missed_note`), each id read as the link's host's (`id@host`), never another's. A
+        mark that is not three short strings is refused whole, and the node keeps its files."""
+        marks = params.get("marks")
+        if not isinstance(marks, list):
+            raise link.LinkError("missed carries no marks")
+        by: dict[str, list[tuple[str, str]]] = {}
+        for m in marks:
+            got = [m.get(k) for k in ("id", "at", "verb")] if isinstance(m, dict) else []
+            if len(got) != 3 or not all(isinstance(v, str) and v and len(v) <= 200 for v in got):
+                raise link.LinkError(f"a missed mark from {host} is not an id, an at and a verb")
+            rid, at, verb = got
+            if naming.split_address(rid)[1]:
+                raise link.LinkError(f"a missed mark from {host} names {rid}, not a bare id of its own")
+            by.setdefault(f"{rid}@{host}", []).append((at, verb))
+        graph = self._graph()
+        for key, got in by.items():
+            self._missed_note(graph, key, got)
+        await self._push_changes()
+        return {"noted": sum(len(g) for g in by.values())}
 
     async def _take_answered_by_rule(self, host: str, params: dict[str, Any]) -> dict[str, Any]:
         """A prompt one of a node's members had answered by the person's rule (design §4.9b, TD-641):
