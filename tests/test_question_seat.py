@@ -445,6 +445,7 @@ def test_an_entry_request_resolves_only_to_the_techlead_seat_able_or_not():
 
 async def test_a_sessions_ledger_request_lands_on_the_unable_techlead_seat_not_the_fact_check_seat(agent, tmp_path):
     """TD-1565: `ao td add --repo` while the team's techlead seat is unable and its fact-check seat is able."""
+    await park_ticks(agent)  # a tick would read `tl`'s real pane over the hand-set `limited` (TD-1608)
     async with LocalClient() as person:
         mk = _mk(person, tmp_path)
         tl = await mk("tl", team="ss-grind", project="S", seat={"trigger": "asks", "tags": True})
