@@ -242,7 +242,7 @@ def test_the_preconditions_in_order_and_the_press_goes_through_the_checks():
 
 def test_by_hand_the_pass_reads_and_starts_nothing(checkout):
     _merge(checkout, "b")
-    readings, notes, bad = promote.survey([str(checkout)], {}, True, {}, datetime.now(UTC))
+    readings, notes, bad, _ = promote.survey([str(checkout)], {}, True, {}, datetime.now(UTC))
     r = readings["repo"]
     assert (r["ahead"], r["checks"], r["auto"], r["inflight"], r["unmet"], notes, bad) == (
         1,
@@ -262,19 +262,19 @@ def test_the_pass_keeps_the_checks_precheck_on_the_reading(checkout, monkeypatch
     and the precheck on main read; nothing is started here, so main's own precheck is stubbed."""
     monkeypatch.setattr(promote, "read_checks", lambda root, sha, keep=True: ("green", "", None, pre))
     monkeypatch.setattr(promote, "precheck_on_main", lambda *a, **kw: None)
-    readings, _, _ = promote.survey([str(checkout)], {}, True, {}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], {}, True, {}, datetime.now(UTC))
     assert "precheck" in readings["repo"] and readings["repo"]["precheck"] == pre
 
 
 def test_the_pass_reads_live_at_and_the_pending_commits_for_the_build_chip(checkout):
     """§6 *Promote* (TD-539, TD-904): beside the three readings, `live_at` — live's committer time — and
     `pending`, every one of main's commits past live, newest first (`pending_more` 0: the chip cuts); empty at main."""
-    readings, _, _ = promote.survey([str(checkout)], {}, True, {}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], {}, True, {}, datetime.now(UTC))
     r = readings["repo"]
     assert r["live_at"] == _git(checkout, "log", "-1", "--format=%cI", r["live"])
     assert (r["pending"], r["pending_more"]) == ([], 0)
     shas = [_merge(checkout, n) for n in ("b", "c", "d")]
-    readings, _, _ = promote.survey([str(checkout)], readings, True, {}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], readings, True, {}, datetime.now(UTC))
     r = readings["repo"]
     assert r["ahead"] == 3 and r["pending"] == [
         {"sha": s, "subject": n} for s, n in zip(shas[::-1], "dcb", strict=True)
@@ -292,10 +292,10 @@ def test_the_pass_reads_live_at_and_the_pending_commits_for_the_build_chip(check
 
 def test_auto_waits_for_main_to_settle(checkout, monkeypatch):
     _merge(checkout, "b")
-    readings, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
     assert readings["repo"]["inflight"] is None  # main moved a moment ago
     later = datetime.now(UTC) + timedelta(seconds=promote.PROMOTE_SETTLE + 1)
-    readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, later)
+    readings, _, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, later)
     assert readings["repo"]["inflight"]["by"] == "auto"
 
 
@@ -304,23 +304,23 @@ def test_auto_waits_for_a_reading_of_live(checkout, monkeypatch, tmp_path):
     monkeypatch.setattr(promote, "PROMOTE_SETTLE", 0.0)
     (tmp_path / "live").unlink()  # `check` fails: live is unknown, with why
     main = _merge(checkout, "b")
-    readings, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
     r = readings["repo"]
     assert r["live"] is None and r["live_why"] and r["inflight"] is None
     assert r["unmet"] is None and promote.unmet(r, press=True) is None  # nothing refuses the person's press
     (tmp_path / "live").write_text(_git(checkout, "rev-parse", "HEAD~1") + "\n")  # a reading lands
-    readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
     assert readings["repo"]["inflight"]["sha"] == main
 
 
 def test_auto_waits_while_check_stops_answering_though_a_last_reading_is_kept(checkout, monkeypatch, tmp_path):
     monkeypatch.setattr(promote, "PROMOTE_SETTLE", 0.0)
-    readings, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
     first = readings["repo"]["live"]
     assert first and readings["repo"]["inflight"] is None  # live is main: nothing to do
     (tmp_path / "live").unlink()  # `check` stops answering
     _merge(checkout, "b")
-    readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
     r = readings["repo"]
     assert r["live"] == first and r["live_why"] and r["inflight"] is None
 
@@ -329,19 +329,19 @@ def test_auto_promotes_once_and_the_outcome_is_read_from_check(checkout, monkeyp
     monkeypatch.setattr(promote, "PROMOTE_SETTLE", 0.0)
     _merge(checkout, "b")
     main = _merge(checkout, "c")
-    readings, notes, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
+    readings, notes, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
     intent = readings["repo"]["inflight"]
     assert intent["sha"] == main and intent["ahead"] == 2 and notes == []
     assert json.loads((promote.repo_dir("repo") / "inflight.json").read_text())["pid"] == intent["pid"]
     _wait_gone(intent["pid"])
-    readings, notes, _ = promote.survey([str(checkout)], readings, False, {"repo": True}, datetime.now(UTC))
+    readings, notes, _, _ = promote.survey([str(checkout)], readings, False, {"repo": True}, datetime.now(UTC))
     assert notes == [f"promoted `repo` `{main[:7]}` — 2 commits"]
     assert readings["repo"]["inflight"] is None and readings["repo"]["live"] == main
     assert not (promote.repo_dir("repo") / "inflight.json").exists()
     assert (promote.repo_dir("repo") / f"{main}.log").exists()
     with pytest.raises(ChildProcessError):  # reaped: no zombie left behind
         os.waitpid(intent["pid"], os.WNOHANG)
-    readings, notes, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
+    readings, notes, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
     assert readings["repo"]["inflight"] is None and notes == []  # live is main: nothing to do
 
 
@@ -353,21 +353,21 @@ def test_a_run_that_leaves_live_elsewhere_fails_and_blocks_its_commit(checkout, 
     _git(checkout, "add", "-A")
     _git(checkout, "commit", "-q", "-m", "block")
     _git(checkout, "push", "-q", "origin", "main")
-    readings, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
     _wait_gone(readings["repo"]["inflight"]["pid"])
-    readings, notes, _ = promote.survey([str(checkout)], readings, False, {"repo": True}, datetime.now(UTC))
+    readings, notes, _, _ = promote.survey([str(checkout)], readings, False, {"repo": True}, datetime.now(UTC))
     f = readings["repo"]["failed"]
     sha = readings["repo"]["main"]
     assert f["why"].startswith("the run ended and live is ") and f["tail"] == ["it broke"]
     assert f["exit"] == 3 and f["blocks"] == sha  # a promote blocks its own commit (TD-1554)
     assert notes == [f"promote of `repo` `{sha[:7]}` failed — {f['why']}"]  # its note, once, beside the fail
     assert readings["repo"]["unmet"]["name"] == "failed"
-    readings, notes, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
+    readings, notes, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
     assert readings["repo"]["inflight"] is None and notes == []  # nothing at the blocked commit, no second note
     assert readings["repo"]["acts"] is None
     # main moves past it: `auto` retries at the new head, and its start clears the failure
     new = _merge(checkout, "fix")
-    readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
     assert readings["repo"]["inflight"]["sha"] == new
     assert readings["repo"]["failed"] is None and promote.failed("repo") is None
 
@@ -378,11 +378,11 @@ def test_a_run_past_the_bound_is_killed_and_failed(checkout, monkeypatch, tmp_pa
     _git(checkout, "add", "-A")
     _git(checkout, "commit", "-q", "-m", "block")
     _git(checkout, "push", "-q", "origin", "main")
-    readings, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
     pid = readings["repo"]["inflight"]["pid"]
     assert promote.alive(pid)
     later = datetime.now(UTC) + timedelta(seconds=promote.PROMOTE_BOUND + 1)
-    readings, _, _ = promote.survey([str(checkout)], readings, False, {"repo": True}, later)
+    readings, _, _, _ = promote.survey([str(checkout)], readings, False, {"repo": True}, later)
     assert readings["repo"]["failed"]["why"] == "still running after 20 minutes: killed"
     _wait_gone(pid)
     assert not promote.alive(pid)
@@ -392,7 +392,7 @@ def test_a_malformed_block_is_skipped_never_fatal(checkout, tmp_path):
     other = tmp_path / "other"
     other.mkdir()
     (other / ".shiftlead.yml").write_text("promote: {run: x}\n")
-    readings, _, bad = promote.survey(
+    readings, _, bad, _ = promote.survey(
         [str(other), str(checkout), str(tmp_path / "gone")], {}, True, {}, datetime.now(UTC)
     )
     assert list(readings) == ["repo"] and list(bad) == [str(other)]
@@ -936,18 +936,18 @@ def test_ahead_since_is_when_main_first_moved_past_live_kept_and_cleared(checkou
     """§6 *Promote* (TD-581): `ahead_since`, the time main first moved past the live commit — the
     oldest of main's commits live does not hold — kept while live stays behind, cleared at main."""
     t0 = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=1)
-    readings, _, _ = promote.survey([str(checkout)], {}, True, {}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], {}, True, {}, datetime.now(UTC))
     assert readings["repo"]["ahead_since"] is None  # live is main
     _merge_at(checkout, "b", t0)
-    readings, _, _ = promote.survey([str(checkout)], readings, True, {}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], readings, True, {}, datetime.now(UTC))
     assert datetime.fromisoformat(readings["repo"]["ahead_since"]) == t0
     main = _merge_at(checkout, "c", t0 + timedelta(minutes=20))
-    readings, _, _ = promote.survey([str(checkout)], readings, True, {}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], readings, True, {}, datetime.now(UTC))
     r = readings["repo"]
     assert datetime.fromisoformat(r["ahead_since"]) == t0 and r["ahead"] == 2  # kept: still the first
     assert datetime.fromisoformat(r["moved"]) == t0 + timedelta(minutes=20)
     (tmp_path / "live").write_text(main + "\n")  # live catches up
-    readings, _, _ = promote.survey([str(checkout)], readings, True, {}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], readings, True, {}, datetime.now(UTC))
     assert readings["repo"]["ahead_since"] is None
     assert promote.read_ahead_since(checkout, None, main) is None
 
@@ -958,13 +958,13 @@ def test_auto_promotes_a_busy_main_at_the_max_wait_and_the_settle_holds_the_tick
     now = datetime.now(UTC).replace(microsecond=0)
     _merge_at(checkout, "b", now - timedelta(seconds=promote.PROMOTE_MAX_WAIT - 60))
     _merge_at(checkout, "c", now - timedelta(minutes=4))
-    readings, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, now)
+    readings, _, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, now)
     r = readings["repo"]
     assert r["inflight"] is None  # neither clock has run out: the settle batches the burst
     assert r["acts"] == {"settles_in": 60}  # the cap's remainder, sooner than the settle's six minutes
     assert promote.acts_words(r["acts"]) == "settles in 1 min"
     later = now + timedelta(seconds=61)
-    readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, later)
+    readings, _, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, later)
     r = readings["repo"]
     assert r["inflight"]["by"] == "auto" and r["inflight"]["sha"] == r["main"]
     assert r["acts"] is None  # a run in flight: the row is the note's now
@@ -1054,12 +1054,12 @@ def _pass(checkout: Path, readings: dict, now: datetime | None = None) -> tuple[
     f = readings["repo"]["inflight"]
     if f:
         _wait_gone(f["smoke_pid"] if f.get("phase") == "smoke" else f["pid"])
-    readings, notes, _ = promote.survey([str(checkout)], readings, False, {}, now or datetime.now(UTC))
+    readings, notes, _, _ = promote.survey([str(checkout)], readings, False, {}, now or datetime.now(UTC))
     return readings, notes
 
 
 def _press(checkout: Path, sha: str, kind: str = "promote", frm: str | None = None) -> dict:
-    readings, _, _ = promote.survey([str(checkout)], {}, True, {}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], {}, True, {}, datetime.now(UTC))
     run = promote.block(checkout)["run"]
     readings["repo"]["inflight"] = promote.start(checkout, "repo", sha, run, "person", 1, kind, frm)
     return readings
@@ -1285,10 +1285,10 @@ def test_a_smoke_past_its_bound_is_killed(checkout):
     readings, _ = _pass(checkout, readings)
     pid = readings["repo"]["inflight"]["smoke_pid"]
     past_run = datetime.now(UTC) + timedelta(seconds=promote.SMOKE_BOUND - 5)
-    readings, _, _ = promote.survey([str(checkout)], readings, False, {}, past_run)
+    readings, _, _, _ = promote.survey([str(checkout)], readings, False, {}, past_run)
     assert readings["repo"]["inflight"]["phase"] == "smoke" and promote.alive(pid)  # past no bound yet
     later = datetime.now(UTC) + timedelta(seconds=promote.SMOKE_BOUND + 1)
-    readings, _, _ = promote.survey([str(checkout)], readings, False, {}, later)
+    readings, _, _, _ = promote.survey([str(checkout)], readings, False, {}, later)
     assert (
         readings["repo"]["failed"]["why"]
         == f"smoke failed on {main[:7]}: the smoke was still running after 10 minutes: killed"
@@ -1413,10 +1413,10 @@ def test_an_agent_restarted_mid_smoke_reads_its_result(checkout):
     intent["smoke_at"] = at.isoformat()
     (d / "inflight.json").write_text(json.dumps(intent))
     (checkout.parent / "live").write_text(main + "\n")
-    readings, _, _ = promote.survey([str(checkout)], {}, False, {}, at)
+    readings, _, _, _ = promote.survey([str(checkout)], {}, False, {}, at)
     assert readings["repo"]["inflight"]["phase"] == "smoke"  # no result yet, the smoke not ours: in the bound
     (d / "smoke.json").write_text(json.dumps({"sha": main, "exit": 0, "at": (at + timedelta(seconds=48)).isoformat()}))
-    readings, notes, _ = promote.survey([str(checkout)], readings, False, {}, at)
+    readings, notes, _, _ = promote.survey([str(checkout)], readings, False, {}, at)
     assert notes == [f"promoted `repo` `{main[:7]}` — 1 commit · smoke passed in 48 s"]
 
 
@@ -1439,7 +1439,7 @@ def test_what_a_passing_smoke_told_rides_the_note(checkout):
         (checkout.parent / "live").write_text(main + "\n")
         result = {"sha": main, "exit": 0, "at": (at + timedelta(seconds=48)).isoformat()}
         (d / "smoke.json").write_text(json.dumps(result))
-        _, notes, _ = promote.survey([str(checkout)], {}, False, {}, at)
+        _, notes, _, _ = promote.survey([str(checkout)], {}, False, {}, at)
         assert notes == [f"promoted `repo` `{main[:7]}` — 1 commit · smoke passed in 48 s{note}"]
 
 
@@ -1481,7 +1481,7 @@ def _live_reads(checkout: Path, sha: str) -> None:
 
 def _seen(checkout: Path, readings: dict, now: datetime | None = None) -> tuple[dict, list[str]]:
     """One watch pass with the run still going: `_pass` without the wait."""
-    readings, notes, _ = promote.survey([str(checkout)], readings, False, {}, now or datetime.now(UTC))
+    readings, notes, _, _ = promote.survey([str(checkout)], readings, False, {}, now or datetime.now(UTC))
     return readings, notes
 
 
@@ -1704,17 +1704,17 @@ def test_a_failed_commit_past_the_cap_does_not_spend_the_next_merges(checkout, m
     hour_ago = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
     x = _dated(checkout, "x", hour_ago)
     promote._write(promote.repo_dir("repo") / "failed.json", {"sha": x, "why": "it broke", "blocks": x})
-    readings, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
     r = readings["repo"]
     assert r["inflight"] is None and r["unmet"]["name"] == "failed" and r["acts"] is None  # main is x
     y = _merge(checkout, "y")
-    readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
     r = readings["repo"]
     assert r["inflight"] is None and r["failed"]["blocks"] == x  # the settle runs from y, not x
     assert r["ahead_since"] == _git(checkout, "log", "-1", "--format=%cI", y)
     assert r["acts"]["settles_in"] > 0  # the policy's clock, read with a failure at an older commit
     later = datetime.now(UTC) + timedelta(seconds=promote.PROMOTE_SETTLE + 1)
-    readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, later)
+    readings, _, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, later)
     assert readings["repo"]["inflight"]["sha"] == y and promote.failed("repo") is None
 
 
@@ -1735,11 +1735,11 @@ def test_a_hand_install_past_the_failed_commit_clears_it_and_draws_the_by_hand_r
     x = _merge(checkout, "x")
     promote._write(promote.repo_dir("repo") / "failed.json", {"sha": x, "why": "it broke", "blocks": x})
     (checkout.parent / "live").write_text(x + "\n")  # live at the failed commit: the failure stands there
-    readings, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, datetime.now(UTC))
     assert readings["repo"]["failed"] and readings["repo"]["by_hand"] is False
     z = _merge(checkout, "z")
     (checkout.parent / "live").write_text(z + "\n")  # CLAUDE.md's pair, by hand, at main's head
-    readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, datetime.now(UTC))
     r = readings["repo"]
     assert r["failed"] is None and promote.failed("repo") is None and r["by_hand"] is True
     assert r["inflight"] is None  # `auto` never starts it: live = main is nothing for the policy

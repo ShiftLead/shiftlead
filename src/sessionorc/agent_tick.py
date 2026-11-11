@@ -1675,35 +1675,46 @@ class TickMixin:
                 if not gatesweep_mod.due(self._swept_on.get(root), today):
                     continue
                 self._swept_on[root] = today
-                ok, why = await asyncio.to_thread(gatesweep_mod.eligible, root)
-                if not ok:
-                    if (root, str(why)) not in self._sweep_quiet:
-                        self._sweep_quiet.add((root, str(why)))
-                        log.info("%s: no gate sweep — %s", root, why)
-                    continue
-                self._sweep_quiet = {(r, w) for r, w in self._sweep_quiet if r != root}
-                others = [r for r in roots if r != root and Path(r).is_dir()]
+                self._sweeping.add(root)
                 try:
-                    host = await self._host_log_args(root)
-                except Exception:  # noqa: BLE001 — one root's bad origin is that root's host-log `error`, not the pass's
-                    log.warning("the host-log arguments for %s could not be read", root, exc_info=True)
-                    host = {"repo": None, "visibility": "public", "host_file": witness.host_file()}
-                got, why = await asyncio.to_thread(
-                    lambda r=root, o=others, h=host: gatesweep_mod.sweep(
-                        r,
-                        o,
-                        today_utc=today,
-                        today_local=date.today(),  # noqa: DTZ011 — a board's date is the person's
-                        by=by,
-                        host=h,
-                    )
-                )
-                if got is None:
-                    log.warning("%s: the gate sweep gave no reading — %s", root, why)
-                    continue
-                log.info("%s: gate sweep — %s", root, gatesweep_mod.summary(got))
+                    await self._sweep_root(root, roots, today, by)
+                finally:
+                    self._sweeping.discard(root)
+                    if root in self._resweep:  # its live ref moved while it ran: due again on the next tick
+                        self._resweep.discard(root)
+                        self._swept_on.pop(root, None)
         except Exception:  # noqa: BLE001 — a detached task: log it, and tomorrow's pass tries again
             log.exception("the gate sweep pass failed")
+
+    async def _sweep_root(self, root: str, roots: list[str], today: date, by: str) -> None:
+        """One root's run of the event runner (`_sweep_pass`)."""
+        ok, why = await asyncio.to_thread(gatesweep_mod.eligible, root)
+        if not ok:
+            if (root, str(why)) not in self._sweep_quiet:
+                self._sweep_quiet.add((root, str(why)))
+                log.info("%s: no gate sweep — %s", root, why)
+            return
+        self._sweep_quiet = {(r, w) for r, w in self._sweep_quiet if r != root}
+        others = [r for r in roots if r != root and Path(r).is_dir()]
+        try:
+            host = await self._host_log_args(root)
+        except Exception:  # noqa: BLE001 — one root's bad origin is that root's host-log `error`, not the pass's
+            log.warning("the host-log arguments for %s could not be read", root, exc_info=True)
+            host = {"repo": None, "visibility": "public", "host_file": witness.host_file()}
+        got, why = await asyncio.to_thread(
+            lambda r=root, o=others, h=host: gatesweep_mod.sweep(
+                r,
+                o,
+                today_utc=today,
+                today_local=date.today(),  # noqa: DTZ011 — a board's date is the person's
+                by=by,
+                host=h,
+            )
+        )
+        if got is None:
+            log.warning("%s: the gate sweep gave no reading — %s", root, why)
+            return
+        log.info("%s: gate sweep — %s", root, gatesweep_mod.summary(got))
 
     async def _host_log_args(self, root: str) -> dict[str, Any]:
         """What the event runner hands `hostlog.py check` for `root`'s host-log gates (§4.4 *The check*, TD-1388):

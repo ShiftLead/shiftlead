@@ -16,6 +16,7 @@ one that concludes writes `held.json`, and the policy starts nothing for the rep
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -33,6 +34,8 @@ from typing import Any
 import yaml
 
 from sessionorc import build, cadence, gitinfo, ledgerboard, paths, reports
+
+log = logging.getLogger(__name__)
 
 PROMOTE_EVERY = 300.0  # seconds between full readings: the reports' cadence (§6)
 PROMOTE_WATCH = 15.0  # seconds between `check` reads while a run is in flight
@@ -1189,6 +1192,144 @@ def _concluded(repo: str, intent: dict[str, Any], main: str | None, now: datetim
         _write(d / "held.json", hold)
 
 
+# ── the live ref: `promote/live` on the repo's origin at the live commit (design §6 *The live ref*, TD-1437) ──
+LIVE_TAG = "refs/tags/promote/live"
+LIVE_BRANCH = "refs/heads/promote/live"
+
+
+def live_ref(repo: str) -> str | None:
+    """`promotes.<repo>.live_ref`: the sha the home last pushed or adopted as the tag (the push's lease),
+    read from its file at every read, never held from the home's start; None when none is stored."""
+    try:
+        sha = (repo_dir(repo) / "live_ref").read_text(encoding="utf-8").strip().lower()
+    except OSError:
+        return None
+    return sha if SHA_RE.match(sha) else None
+
+
+def _set_live_ref(repo: str, sha: str | None) -> None:
+    f = repo_dir(repo) / "live_ref"
+    if sha is None:
+        with suppress(FileNotFoundError):
+            f.unlink()
+        return
+    f.parent.mkdir(parents=True, exist_ok=True)
+    tmp = f.with_suffix(".tmp")
+    tmp.write_text(sha + "\n", encoding="utf-8")
+    tmp.replace(f)
+
+
+def live_ref_noted(repo: str) -> dict[str, str]:
+    """`live_ref_noted`: each ref's last note, `{ref: sha}`, at most one line per ref (§6 *The live ref*)."""
+    try:
+        text = (repo_dir(repo) / "live_ref_noted").read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    out: dict[str, str] = {}
+    for line in text.splitlines():
+        ref, _, sha = line.strip().partition(" ")
+        if ref in (LIVE_TAG, LIVE_BRANCH) and SHA_RE.match(sha.strip()):
+            out[ref] = sha.strip()
+    return out
+
+
+def _set_noted(repo: str, noted: dict[str, str]) -> None:
+    f = repo_dir(repo) / "live_ref_noted"
+    if not noted:
+        with suppress(FileNotFoundError):
+            f.unlink()
+        return
+    f.parent.mkdir(parents=True, exist_ok=True)
+    tmp = f.with_suffix(".tmp")
+    tmp.write_text("".join(f"{ref} {noted[ref]}\n" for ref in (LIVE_BRANCH, LIVE_TAG) if ref in noted), "utf-8")
+    tmp.replace(f)
+
+
+def branch_note(repo: str) -> str:
+    return f"a branch promote/live on {repo} shadows the home's live tag: delete it (`git push origin :{LIVE_BRANCH}`)"
+
+
+def tag_note(repo: str) -> str:
+    return (
+        f"the promote/live tag on {repo} was moved by someone else: delete it "
+        f"(`git push origin :{LIVE_TAG}`) and the home pushes it again"
+    )
+
+
+def read_live_refs(root: str | Path) -> dict[str, str] | None:
+    """The tag and a branch of its name on origin, `{ref: sha}`, by one `git ls-remote --refs` (an annotated
+    tag's own object, its peeled `^{}` line left out); None when the read failed — no reading, so nothing
+    is found absent."""
+    out, why = _git(root, "ls-remote", "--refs", "origin", LIVE_TAG, LIVE_BRANCH)
+    if out is None:
+        log.warning("promote/live on %s: the read failed — %s", root, why)
+        return None
+    refs: dict[str, str] = {}
+    for line in out.splitlines():
+        sha, _, ref = line.strip().partition("\t")
+        if ref in (LIVE_TAG, LIVE_BRANCH) and SHA_RE.match(sha.lower()):
+            refs[ref] = sha.lower()
+    return refs
+
+
+def keep_live_ref(root: str | Path, repo: str, live: str) -> tuple[list[str], bool]:
+    """Keep `promote/live` on `root`'s origin at `live`, a commit a run finished at (§6 *The live ref*):
+    read the tag and a branch of its name, then act by what is found — `(notes, moved)`, `notes` the
+    person's `system` notes, each once per ref and sha it was found at, and `moved` whether a push landed
+    or an adoption changed the lease, which makes the repo's gates due for a sweep. A failed read keeps
+    the lease and the noted lines; a push refused for its lease, or failing, changes nothing and is
+    retried on the next full pass. Called in the pass's thread, under the promote lock."""
+    refs = read_live_refs(root)
+    if refs is None:
+        return [], False
+    lease, noted = live_ref(repo), live_ref_noted(repo)
+    was = dict(noted)
+    notes: list[str] = []
+    moved = False
+    for ref in (LIVE_BRANCH, LIVE_TAG):  # a noted ref not at its noted sha: its line is cleared
+        if ref in noted and refs.get(ref) != noted[ref] and not (ref == LIVE_TAG and LIVE_BRANCH in refs):
+            del noted[ref]
+    branch = refs.get(LIVE_BRANCH)
+    tag = refs.get(LIVE_TAG)
+    if branch:  # it may shadow the tag: the lease kept, nothing pushed, the tag's line neither read nor cleared
+        if noted.get(LIVE_BRANCH) != branch:
+            noted[LIVE_BRANCH] = branch
+            notes.append(branch_note(repo))
+    elif tag == live:
+        if lease != live:  # a push that landed before its lease was written, or the tag put here by hand
+            _set_live_ref(repo, live)
+            moved = True
+    elif tag is None or tag == lease:
+        target = f"{LIVE_TAG}:{tag or ''}"  # empty: onto the absent tag
+        _, why = _git(root, "push", f"--force-with-lease={target}", "origin", f"{live}:{LIVE_TAG}")
+        if why:
+            log.warning("promote/live on %s: the push to %s failed — %s", repo, live[:7], why)
+        else:
+            _set_live_ref(repo, live)
+            noted.pop(LIVE_TAG, None)  # the push moved the tag
+            moved = True
+            log.info("promote/live on %s: pushed at %s", repo, live[:7])
+    else:  # someone else's: at another commit with no lease, or at neither the lease nor live
+        if lease is not None:
+            _set_live_ref(repo, None)
+        if noted.get(LIVE_TAG) != tag:
+            noted[LIVE_TAG] = tag
+            notes.append(tag_note(repo))
+    if noted != was:
+        _set_noted(repo, noted)
+    return notes, moved
+
+
+def _on_main(root: str | Path, live: str, main: str | None) -> bool:
+    """Whether `origin/main` (its sha as read, `main`) holds `live`."""
+    if not main:
+        return False
+    if live == main:
+        return True
+    _, why = _git(root, "merge-base", "--is-ancestor", live, main)
+    return not why
+
+
 def survey(
     roots: list[str],
     prev: dict[str, dict[str, Any]],
@@ -1197,18 +1338,22 @@ def survey(
     now: datetime,
     fetched: dict[str, str] | None = None,
     emit: Callable[[str, str, str, datetime], None] | None = None,
-) -> tuple[dict[str, dict[str, Any]], list[str], dict[str, str]]:
+) -> tuple[dict[str, dict[str, Any]], list[str], dict[str, str], list[str]]:
     """One pass, in a thread: every registered checkout whose `.shiftlead.yml` carries `promote:`,
-    keyed by the repo's name — `(readings, notes, bad)`. `full` takes all three readings (the
+    keyed by the repo's name — `(readings, notes, bad, moved)`. `full` takes all three readings (the
     reports' cadence); otherwise only `check`, and only for a repo with a run in flight. A run in
     flight is concluded, and under `auto: true` one is started when live ≠ main, the three
     preconditions hold and main has settled or been ahead for `PROMOTE_MAX_WAIT`. `notes` are the
     *promoted …* lines for the person inbox; `bad` names each checkout whose block could not be
     used, with why. `fetched` holds the pull's fetch of main for each root it fetched this pass
-    (`pulls`), which `read_main` reuses. `emit` is the witness log's `precheck-fail` writer (`witness_main`)."""
+    (`pulls`), which `read_main` reuses. `emit` is the witness log's `precheck-fail` writer (`witness_main`).
+    A full pass, and the watch pass that concludes a run, keeps `promote/live` at a live commit a run finished
+    at (`keep_live_ref`, §6 *The live ref*); `moved` names each root whose push landed or whose adoption
+    changed the lease, which the caller makes due for a gate sweep."""
     readings: dict[str, dict[str, Any]] = {}
     notes: list[str] = []
     bad: dict[str, str] = {}
+    moved: list[str] = []
     stamp = now.isoformat()
     for root in roots:
         repo = Path(root).name
@@ -1255,6 +1400,7 @@ def survey(
             for k in ("live_at", "pending", "pending_more", "promoted"):
                 r.pop(k, None)
             r.update(read_since(root, r.get("live"), r.get("main"), repo))
+        concluding = bool(r["inflight"])
         if r["inflight"]:
             fl, note = _conclude(repo, r, now, b["run"])
             if note:  # the start already cleared any failure: nothing else clears it (§6 *Promote*, TD-1554)
@@ -1264,6 +1410,23 @@ def survey(
             r["failed"] = fl or failed(repo)  # a smoke's rollback that started cleared it
             r["inflight"] = inflight(repo)
         r["held"] = held(repo)
+        concluding = concluding and not r["inflight"]
+        live = r.get("live")
+        # the live ref (§6 *The live ref*, TD-1437): only at a commit a run finished at, on `origin/main`, nothing in
+        # flight — read before a concluding pass starts the next `auto` run
+        if (
+            (full or first or concluding)
+            and live
+            and not r.get("live_why")
+            and not r["inflight"]
+            and finished(repo, live)
+            and _on_main(root, live, r.get("main"))
+        ):
+            told, landed = keep_live_ref(root, repo, live)
+            notes.extend(told)
+            if landed:
+                moved.append(str(root))
+        r["live_ref"] = live_ref(repo)  # a copy for `ao promote status` (§4.7)
         if full or first:  # the checks were read this pass (TD-1038)
             precheck_on_main(root, repo, r, now)
             precheck_pr_bound(root, repo, now)
@@ -1292,7 +1455,7 @@ def survey(
         if r["failed"]:
             r["failed"] = {**r["failed"], "tail": tail(r["failed"].get("log"))}
         readings[repo] = r
-    return readings, notes, bad
+    return readings, notes, bad, moved
 
 
 # ── the pull: the main checkout follows origin (design §6 *Pull*, TD-263) ──────────────────────

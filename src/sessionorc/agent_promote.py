@@ -44,7 +44,7 @@ class PromoteMixin:
                     self._pulls, fetched = await asyncio.to_thread(
                         promote_mod.pulls, roots, pull_on, occupied, datetime.now(UTC)
                     )
-                readings, notes, bad = await asyncio.to_thread(
+                readings, notes, bad, moved = await asyncio.to_thread(
                     promote_mod.survey,
                     roots,
                     dict(self._promotes),
@@ -60,6 +60,7 @@ class PromoteMixin:
                 if self._promote_bad.get(root) != why:
                     log.warning("promote: skipping %s: %s", root, why)
             self._promote_bad = bad
+            self._live_ref_moved(moved)
             self._promotes = readings
             self._promotes_read = True
             for text in notes:
@@ -71,6 +72,16 @@ class PromoteMixin:
                 self._sync_task = asyncio.create_task(self._sync_pass())
         except Exception:  # noqa: BLE001 — a detached task: log it, and the next tick tries again
             log.exception("the promote pass failed")
+
+    def _live_ref_moved(self, roots: list[str]) -> None:
+        """A repo whose `promote/live` push landed, or whose adoption changed the lease (§6 *The live ref*,
+        TD-1437): its gates are due for a sweep on the next tick — its last-swept day cleared, or, while its
+        sweep runs, kept in `_resweep` and cleared when that run ends."""
+        for root in roots:
+            if root in self._sweeping:
+                self._resweep.add(root)
+            else:
+                self._swept_on.pop(root, None)
 
     @staticmethod
     def _promote_auto() -> dict[str, bool]:
@@ -142,7 +153,10 @@ class PromoteMixin:
         if sha or back:
             return await self._rollback(repo, sha, back, by)
         async with self._promote_lock:
-            readings, notes, bad = await asyncio.to_thread(promote_mod.survey, [root], {}, True, {}, datetime.now(UTC))
+            readings, notes, bad, moved = await asyncio.to_thread(
+                promote_mod.survey, [root], {}, True, {}, datetime.now(UTC)
+            )
+            self._live_ref_moved(moved)
             # a run that reached its commit just now is concluded by this reading: its note is filed
             # here, or the person inbox would never hear of that promote (techlead's read of #666)
             for text in notes:
@@ -193,7 +207,10 @@ class PromoteMixin:
         root = self._promote_root(repo)
         name = Path(root).name
         async with self._promote_lock:
-            readings, notes, bad = await asyncio.to_thread(promote_mod.survey, [root], {}, True, {}, datetime.now(UTC))
+            readings, notes, bad, moved = await asyncio.to_thread(
+                promote_mod.survey, [root], {}, True, {}, datetime.now(UTC)
+            )
+            self._live_ref_moved(moved)
             for text in notes:
                 log.info("promote: %s", text)
                 self._system_note(PERSON, text)
