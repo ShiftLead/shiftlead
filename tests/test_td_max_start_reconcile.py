@@ -134,4 +134,4 @@ async def test_one_failed_removal_never_stops_a_schedules_start(agent, tmp_path,
     await _settled(agent, tmp_path, *recs)
     assert await agent._schedule_start("g", recs, datetime.now(UTC), "2026-11-11T10:00:00Z") == "started"
     assert gone == ["ao-t-techlead-ao-2"]
-    assert replays.calls
+    assert sorted(c[0] for c in replays.calls) == ["grinder-ao-1", "manager-ao"]
