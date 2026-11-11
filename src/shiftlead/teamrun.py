@@ -2291,6 +2291,67 @@ def resize(
     return out
 
 
+def max_refusal(team: orgmod.TeamDef, name: str) -> str:
+    """Why `name` takes no **up to**, in the words `ao team max` and the dialog say (§4.7, §4.9 *Scaling with the
+    work*): *lead-ao-1 is the manager: one lead per team*, *sweeper is on swept: one pass covers the repo*, a pool,
+    a name the definition does not give; "" where it may scale."""
+    why = team.scale_refusal(name)
+    if not why:
+        return ""
+    if name == team.manager.name:
+        return f"{name} is the manager: {why}"
+    seat = next((x for x in team.seats if x.name == name), None)
+    if seat is not None and seat.pool:
+        return f"{name} is a pool: {why}"
+    if seat is not None:
+        return f"{name} is on {seat.trigger}: {why}"
+    return why
+
+
+def scaling_names(team: orgmod.TeamDef) -> list[str]:
+    """The techlead seat, each member line and each seat that may scale, in the definition's order (§4.9
+    *Scaling with the work*): what a raise from `off` writes at `0` beside the one it raises."""
+    names = [team.techlead.name] if team.techlead is not None else []
+    names += [m.name for m in team.members] + [x.name for x in team.seats]
+    return [n for n in dict.fromkeys(names) if not team.scale_refusal(n)]
+
+
+def set_max(call: Call, org: orgmod.Org, name: str, line: str, n: int | str) -> dict[str, Any]:
+    """`teams.<team>.max` written through `set_settings` (a person's own, refused to a session) — `ao team max`, and
+    the Members dialog's **up to** (§4.7, §4.9 *Scaling with the work*, td-max, TD-1545). `n` a whole number: the
+    line's or seat's ceiling, refused where it may not scale (`max_refusal`) and below 0; one at or below its size
+    is stored as `0`, no scaling at any size; on a team written `off` it replaces the `off` with that one ceiling
+    and writes every other line or seat that may scale at `0`, so one raise turns on one line. `off` (`line` "")
+    writes the team's `max: off`, replacing any written ceilings; `on` removes the whole `max` key, every line then
+    on its default ceiling (size + 2). The extras of a live team follow at its next Start (the Start's reconcile);
+    writing or removing them at once is the next slice's."""
+    team = teams.find(org, name)
+    if n in ("off", "on"):
+        got = call("set_settings", teams={name: {"max": "off" if n == "off" else None}})
+        words = "off — no line or seat runs extras" if n == "off" else "on — each line and seat on its default ceiling"
+        return {"team": name, "max": (got.get("teams") or {}).get(name, {}).get("max"), "text": f"{name}: {words}"}
+    if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+        raise teams.TeamError(f"{line}: an up to is a whole number of sessions, 0 or more, not {n!r}")
+    if why := max_refusal(team, line):
+        raise teams.TeamError(why)
+    size = len(team.line(line).names()) if any(m.name == line for m in team.members) else 1
+    stored = n if n > size else 0  # at or below the size: no scaling at any size, and nothing clears the key
+    if team.max == "off":
+        ceilings = {x: 0 for x in scaling_names(team)}
+    else:
+        ceilings = dict(team.max) if isinstance(team.max, dict) else {}
+    ceilings[line] = stored
+    got = call("set_settings", teams={name: {"max": ceilings}})
+    said = f"{line}: up to {stored}" if stored else f"{line}: no scaling — {n} is at or below its size {size}"
+    up = live(crew(name, call("list")))
+    return {
+        "team": name,
+        "line": line,
+        "max": (got.get("teams") or {}).get(name, {}).get("max"),
+        "text": said + (" · the extras follow at the next Start" if up else ""),
+    }
+
+
 def remove_member(call: Call, path: Path, name: str, *, index: int, role: str, host: str = "") -> dict[str, Any]:
     """**Remove** (design §4.9): the entry's whole line deleted, whatever its count or size (*Add member and
     Remove keep the definition's share*, TD-1165), and each session it held takes the sit-out form a removal

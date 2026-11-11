@@ -2332,6 +2332,27 @@ def cmd_team_size(args: argparse.Namespace) -> int:
     return emit(args, got, lambda: print(got["text"]))
 
 
+def cmd_team_max(args: argparse.Namespace) -> int:
+    """`ao team max <team> <name> <n>` and `ao team max <team> off|on` (design §4.7, §4.9 *Scaling with the work*,
+    TD-1545): the line's or seat's ceiling written to `teams.<team>.max.<name>`, or the team's `max: off`, or the
+    whole key removed, through `set_settings` (`teamrun.set_max`) — a person's own, refused to a session."""
+    if os.environ.get("SHIFTLEAD_SESSION"):
+        return fail(args, "ao team max writes a person's setting: refused to a session (design §4.7)", 1)
+    if args.line in ("off", "on") and args.n is None:
+        line, n = "", args.line
+    elif args.n is None:
+        return fail(args, "ao team max <team> <name> <n>, or ao team max <team> off|on", 2)
+    else:
+        line, n = args.line, args.n
+    try:
+        org = _org_here()
+        name = _defined_team(args, org)
+        got = teamrun.set_max(call_sync, org, name, line, n)
+    except (ValueError, teams.TeamError, AgentError) as e:
+        return fail(args, str(e), 1)
+    return emit(args, got, lambda: print(got["text"]))
+
+
 def cmd_team_add(args: argparse.Namespace) -> int:
     """`ao team add <team> <line> [--keep]` (design §4.7, §4.9 *A member started from the form*, TD-1166): the
     member line's next member started for this run alone — never replayed after it, and no file or setting
@@ -5396,6 +5417,12 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("line", help="the member line's name: (its role where it writes none)")
     q.add_argument("n", type=int, help="a whole number from 0; on a live team, members started or wound down to match")
     q.set_defaults(fn=cmd_team_size)
+
+    q = add_team("max", help="how many sessions a line or seat may run with the work (§4.9 Scaling with the work)")
+    q.add_argument("name")
+    q.add_argument("line", help="the member line's or asks seat's name, or off | on for the whole team")
+    q.add_argument("n", type=int, nargs="?", help="its ceiling; at or below its size: no scaling")
+    q.set_defaults(fn=cmd_team_max)
 
     q = add_team(
         "add", help="start a member line's next member for this run alone (§4.9 A member started from the form)"
