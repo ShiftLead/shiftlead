@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import http.client
 import http.server
 import json
 import re
@@ -124,21 +125,25 @@ def make_handler(upstream: str, rec: Recorder) -> type[http.server.BaseHTTPReque
             with resp:
                 self.send_response(resp.status)
                 for k, v in resp.headers.items():
-                    if k.lower() not in HOP:
+                    if k.lower() not in HOP and k.lower() not in ("server", "date"):  # send_response wrote its own
                         self.send_header(k, v)
                 self.end_headers()
                 got = bytearray()
-                while True:
-                    chunk = resp.read1(CHUNK) if hasattr(resp, "read1") else resp.read(CHUNK)
-                    if not chunk:
-                        break
-                    got += chunk
-                    try:
-                        self.wfile.write(chunk)
-                        self.wfile.flush()
-                    except (BrokenPipeError, ConnectionResetError):
-                        break  # the client went away; what came is still recorded
-                rec.write(n, "response", decode(bytes(got), resp.headers.get("content-encoding")))
+                try:
+                    while True:
+                        chunk = resp.read1(CHUNK) if hasattr(resp, "read1") else resp.read(CHUNK)
+                        if not chunk:
+                            break
+                        got += chunk
+                        try:
+                            self.wfile.write(chunk)
+                            self.wfile.flush()
+                        except (BrokenPipeError, ConnectionResetError):
+                            break  # the client went away; what came is still recorded
+                except (OSError, http.client.HTTPException) as e:  # the upstream broke mid-stream
+                    sys.stderr.write(f"cache_capture: upstream broke after {len(got)} bytes: {e!r}\n")
+                finally:
+                    rec.write(n, "response", decode(bytes(got), resp.headers.get("content-encoding")))
 
         do_GET = do_POST = do_PUT = do_PATCH = do_DELETE = _forward
 
@@ -176,7 +181,7 @@ def usage_of(text: str) -> dict[str, Any] | None:
             continue
         u = ev.get("message", {}).get("usage") if ev.get("type") == "message_start" else ev.get("usage")
         if isinstance(u, dict):
-            usage = {**(usage or {}), **u}
+            usage = {**(usage or {}), **{k: v for k, v in u.items() if v is not None}}
     return usage
 
 
@@ -234,7 +239,7 @@ def show(files: list[Path], provider: str = "anthropic") -> str:
             continue
         out.append(f"{f}:")
         out.extend(layout(req if isinstance(req, dict) else {"body": req}, row))
-    if reqs:
+    if reqs and reqs[0].name.endswith("-request.json"):
         first = reqs[0]
         resp = first.with_name(first.name.replace("-request.json", "-response.txt"))
         usage = usage_of(resp.read_text(encoding="utf-8")) if resp.exists() else None

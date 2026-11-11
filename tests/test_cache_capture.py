@@ -177,3 +177,6 @@ def test_usage_of_merges_a_streams_message_delta_over_its_message_start():
         "output_tokens": 7,
     }
     assert cc.usage_of("not json, no events") is None
+    # a null in a later event never overwrites a figure an earlier one gave
+    nulled = SSE_BODY + 'data: {"type":"message_delta","usage":{"cache_creation_input_tokens":null}}\n\n'
+    assert cc.usage_of(nulled)["cache_creation_input_tokens"] == 27500
