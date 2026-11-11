@@ -1219,11 +1219,17 @@ def stuck_onto_holders(out: dict[str, list[dict[str, Any]]], waiting_on: Callabl
     A row at *waiting* (its `waiting_until`) is left as it is: it is in no number already. The holder row's
     `stuck_lines` are its lines, oldest first, the rest of one reason cut to *— <actor>, as on <first work>*.
     Rewrites `out` in place; its rows are the caller's copies."""
-    holders: dict[str, dict[str, Any]] = {}
-    for rows in out.values():
-        for r in rows:
+    holders: dict[str, dict[str, Any]] = {}  # a session's stopped holder's row, its pending one first
+    pending: dict[str, dict[str, Any]] = {}  # …and its pending row alone, for a `needs_you` line
+    for sec in ("needs", "steering", "waiting"):  # drawn live: a snoozed row never takes a need from its count
+        for r in out[sec]:
             if r.get("row") in HOLDER_ROWS and not r.get("handed_row") and r.get("sid"):
-                holders.setdefault(str(r["sid"]), r)
+                sid = str(r["sid"])
+                if r.get("row") in NEEDS_YOU_ROWS:
+                    pending.setdefault(sid, r)
+                    holders[sid] = holders[sid] if holders.get(sid, {}).get("row") in NEEDS_YOU_ROWS else r
+                else:
+                    holders.setdefault(sid, r)
     lines: dict[str, list[dict[str, Any]]] = {}
     back: list[dict[str, Any]] = []
     for sec, rows in out.items():
@@ -1233,16 +1239,16 @@ def stuck_onto_holders(out: dict[str, list[dict[str, Any]]], waiting_on: Callabl
         for r in rows:
             moved = r.get("row") == "board" and isinstance(r.get("stuck"), dict)
             it = r if r.get("row") == "stuck" else r["stuck"] if moved else None
-            if it is None or it.get("waiting_until"):
+            if it is None:
                 kept.append(r)
                 continue
             aid = str((it.get("actor") or {}).get("id") or "")
-            h = holders.get(aid) if aid else None
             if r.get("under_pending"):
-                if h is not None and h.get("row") in NEEDS_YOU_ROWS:
+                if aid in pending:
                     lines.setdefault(aid, []).append(it)
-                continue  # never a row of its own
-            if h is None:
+                continue  # never a row of its own, at *waiting* too
+            h = holders.get(aid) if aid else None
+            if it.get("waiting_until") or h is None:
                 kept.append(r)
                 continue
             same = h.get("home") == r.get("home") and (h.get("home") != "queue" or h.get("on_card") == r.get("on_card"))
@@ -1259,7 +1265,10 @@ def stuck_onto_holders(out: dict[str, list[dict[str, Any]]], waiting_on: Callabl
                 row = {k: v for k, v in r.items() if k not in ("stuck", "standing")}
                 back.append({**row, "waiting_on": waiting_on(row)})
         out[sec] = kept
-    out["waiting"].extend(back)
+    if back:  # in `inbox_sections`' order for *Waiting on them*
+        out["waiting"] = sorted(
+            [*out["waiting"], *back], key=lambda e: str(e.get("closed_at") or e.get("answered_at") or e.get("at") or "")
+        )
     for aid, its in lines.items():
         first: dict[str, Mapping[str, Any]] = {}
         drawn: list[dict[str, Any]] = []
@@ -1271,7 +1280,8 @@ def stuck_onto_holders(out: dict[str, list[dict[str, Any]]], waiting_on: Callabl
             else:
                 first[base] = it
             drawn.append({"id": str(it.get("id") or ""), "text": text})
-        holders[aid]["stuck_lines"] = drawn
+        # a session's pending row is its holder's row where it has one, so every line meets one row
+        (pending.get(aid) or holders[aid])["stuck_lines"] = drawn
 
 
 def stuck_cut(rows: list[dict[str, Any]]) -> None:

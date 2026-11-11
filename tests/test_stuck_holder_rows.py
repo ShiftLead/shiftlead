@@ -27,14 +27,14 @@ def state(row="limited", sid="g7", name="techlead-1", text="the profile is at it
             "team": "", "at": "", "age": ""}  # fmt: skip
 
 
-def sections(stuck, states=(), boards=(), held_on=None):
+def sections(stuck, states=(), boards=(), held_on=None, snoozed=None):
     """`held_on`: the card row the actor's claim draws its holder row on (`holder:<sid>`), else the Inbox."""
     q = queue()
     index = card_index(q)
     if held_on:
         index = {**index, "holder:g7": index[held_on], "holder:g1": index[held_on]}
     rows = [*states, *stuck_rows(stuck, now=NOW)]
-    secs = inbox_sections([], now=NOW, states=rows, boards=list(boards), cards=index)
+    secs = inbox_sections([], now=NOW, states=rows, boards=list(boards), cards=index, attention_snoozed=snoozed or {})
     return q, secs
 
 
@@ -131,3 +131,22 @@ def test_the_holder_row_draws_its_stuck_lines(tmp_path, monkeypatch):
     (r,) = every(secs)
     html = ui.templates.get_template("queue_mail.html").render(e={**r, "want": "do"}, section="needs", origin="")
     assert "stuckline" in html and "stuck 1h 30m: grinder-2&#39;s ask to techlead-1" in html
+
+
+@pytest.mark.unit
+def test_a_snoozed_holder_row_takes_no_line_and_the_stuck_row_keeps_its_count():
+    later = "2099-01-01T00:00:00Z"
+    _, secs = sections(reading(about="", repo="db"), states=[state()], snoozed={"g7|limited": later})
+    (r,) = secs["needs"]
+    assert r["row"] == "stuck" and secs["count"] == 1 and not secs["snoozed"][0].get("stuck_lines")
+
+
+@pytest.mark.unit
+def test_a_needs_you_line_meets_its_pending_row_beside_a_stopped_one_and_never_a_row_at_waiting():
+    ny = reading(about="", repo="db", reason={"state": "needs_you", "name": "techlead-1"})
+    _, secs = sections(ny, states=[state("limited"), state("question")])
+    q = next(r for r in secs["needs"] if r["row"] == "question")
+    assert len(q["stuck_lines"]) == 1 and not any(r["row"] == "stuck" for r in every(secs))
+    ny["ask:m-9"]["waiting_until"] = "2099-01-01T00:00:00Z"
+    _, secs = sections(ny)
+    assert not every(secs), "at waiting too: never a row of its own"
