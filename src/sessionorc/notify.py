@@ -80,6 +80,14 @@ def work_line(team: str, n: int, finished: list[str] | None = None, stopped: boo
     return f"{PREFIX} · {team}{who} and has work: {n} entr{'y' if n == 1 else 'ies'}"
 
 
+def held_line(team: str, n: int, seats: list[str]) -> str:
+    """The questions waiting on a team's seats held by its stop time (§6 rule 8 *A team that stopped*, TD-1564):
+    *shiftlead · ao-grind · stopped at its stop time · 2 questions wait on techlead and fact-check* — *stopped*
+    whatever the team reads, since it says who ended the team; `n` the total, the seats joined by *and*."""
+    waits = f"{n} question waits" if n == 1 else f"{n} questions wait"
+    return f"{PREFIX} · {team} · stopped at its stop time · {waits} on {' and '.join(seats)}"
+
+
 def ci_line(owner: str, n: int) -> str:
     """An account whose CI never starts (§4.4 *CI that never started is the person's*, TD-687), its owner a
     GitHub login and the count of PRs and default branches waiting: *shiftlead · GitHub Actions does not

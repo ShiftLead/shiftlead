@@ -118,6 +118,17 @@ def _stamped(mark: dict[str, Any], stopped: dict[str, str] | None) -> dict[str, 
     return {**bare, "stopped": stopped} if stopped else bare
 
 
+# a `work_waiting` mark's held part (§6 rule 8 *A team that stopped*, TD-1564): the questions on its held seats
+HELD_KEYS = ("seats_held", "seats_held_by", "seats_held_at")
+
+
+def _lane_ids(mark: dict[str, Any]) -> bool:
+    """Whether a `work_waiting` mark names any reference under its `members` — lane news or a question's end; a
+    held-only mark names none."""
+    members = mark.get("members")
+    return isinstance(members, dict) and any(isinstance(ids, list) and ids for ids in members.values())
+
+
 def _asked(questions: list[Any], members: dict[str, list[str]] | None = None) -> dict[str, list[str]]:
     """A `work_waiting` mark's members with each question's reference under the name that asked it
     (§6 rule 8 *A question's end is work*, TD-274): `members` (a lane's new ids) copied, or none."""
@@ -2209,7 +2220,8 @@ class TickMixin:
                 fresh = await self._work_baselines(by_team.get(team) or []) if on_work != "off" else set()
                 new = self._work_mark(team, old, by_team.get(team) or [], on_work, now, firsts, fresh)
                 starts = rec.get("work_started")
-                if new is not None and on_work == "start" and not new.get("stopped"):  # a stopped team: never
+                # a stopped team: never; a held-only mark (questions on a held seat alone) starts no team (TD-1564)
+                if new is not None and on_work == "start" and not new.get("stopped") and _lane_ids(new):
                     new = await self._work_start(team, new, rec, by_team.get(team) or [], settings.get(team) or {}, now)
                 elif isinstance(new, dict) and "held" in new:
                     new = {k: v for k, v in new.items() if k != "held"}  # `ask` again: no start to hold back
@@ -2247,7 +2259,47 @@ class TickMixin:
         firsts: dict[tuple[str, str], datetime],
         fresh: set[str] | frozenset[str] = frozenset(),
     ) -> dict[str, Any] | None:
-        """One team's `work_waiting` as it reads now (`_work_marks`), or None. Its repo is the ledger's
+        """One team's `work_waiting` as it reads now (`_work_marks`), or None: its lanes' reading (`_work_lanes`)
+        with the questions waiting on its held seats attached on every return (§6 rule 8 *A team that stopped*,
+        TD-1564) — `seats_held: {<seat address>: n}` for each seat `work.held_for` holds this pass with `n`, its
+        `asks_waiting`, at least 1, beside `seats_held_by` (`seats_held_by`'s word) and `seats_held_at` (when the
+        first key was written, kept while one stands). Where the lanes give none and a held seat has questions, a
+        **held-only** mark: `members` empty, `repo` the seat record's, `at` the standing mark's else now, stamped as
+        any mark. Under `off`, nothing."""
+        if on_work == "off":
+            return None
+        mark = self._work_lanes(team, old, records, on_work, now, firsts, fresh)
+        held: dict[str, int] = {}
+        first: Session | None = None
+        word = work_mod.seats_held_by(records)
+        for r in sorted(records, key=lambda r: (r.name, r.id)) if word else ():
+            if work_mod.held_for(r, records) and (n := r.asks_waiting(home=self.host)) >= 1:
+                held[self._address(r)] = n
+                first = first or r
+        base = {k: v for k, v in mark.items() if k not in HELD_KEYS} if isinstance(mark, dict) else None
+        if not held or word is None or first is None:
+            # a mark that held nothing but the questions (held-only, or one Dismiss left) goes with them
+            return base if base and (_lane_ids(base) or base.get("questions")) else None
+        if base is None:
+            at = old.get("at") if isinstance(old, dict) and old.get("at") else now_iso()
+            wound = work_mod.team_wound_down(records) is not None
+            base = _stamped(
+                {"at": at, "repo": first.repo, "members": {}}, None if wound else work_mod.team_stopped(records)
+            )
+        since = old.get("seats_held_at") if isinstance(old, dict) and old.get("seats_held") else None
+        return {**base, "seats_held": held, "seats_held_by": word["by"], "seats_held_at": since or now_iso()}
+
+    def _work_lanes(
+        self,
+        team: str,
+        old: Any,
+        records: list[Session],
+        on_work: str,
+        now: datetime,
+        firsts: dict[tuple[str, str], datetime],
+        fresh: set[str] | frozenset[str] = frozenset(),
+    ) -> dict[str, Any] | None:
+        """The lanes' and questions' part of one team's `work_waiting` (`_work_mark`), or None. Its repo is the ledger's
         — a registry root, since two repos may hold one id — and a team whose members' news is in two
         repos is written for the first registry root in order; the other's waits for the next
         wind-down. A crew member's ledger that cannot be read keeps what stands: *could not look*
@@ -2301,7 +2353,10 @@ class TickMixin:
         )
         if now - newest < agent_common.WORK_SETTLE:
             return _stamped(old, stopped) if isinstance(old, dict) else None  # still settling: what stands, stands
-        at = old.get("at") if isinstance(old, dict) and old.get("at") else now_iso()
+        # news coming to a mark holding no lane ids and no questions (held-only, or one Dismiss left) is aged from
+        # itself, never from the held part's instant (§6 rule 8, TD-1564)
+        stands = isinstance(old, dict) and old.get("at") and (_lane_ids(old) or old.get("questions"))
+        at = old.get("at") if stands else now_iso()
         if questions:  # the questions' references and repo are the mark's own, the lanes' news beside them
             members = _asked(questions, members)
             return {"at": at, "repo": old.get("repo") or repo, "members": members, "questions": questions}

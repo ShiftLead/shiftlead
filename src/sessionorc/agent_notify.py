@@ -157,6 +157,17 @@ class NotifyMixin:
             mark = rec.get("work_waiting") if isinstance(rec, dict) else None
             if not isinstance(mark, dict):
                 continue
+            held = mark.get("seats_held")
+            if isinstance(held, dict) and held and mark.get("seats_held_by") == "until":
+                # the questions on seats its stop time held (§6 rule 8, TD-1564): a row of their own, with lane ids
+                # or without, whatever `on_work` and its bound — told once from `seats_held_at`, never again for a
+                # rising count or a second seat; its link and snooze the team-start row's. A person's stop: never.
+                k = f"work:{team}"
+                seats = [(graph[a].name or a) if a in graph else a for a in held]
+                n = sum(v for v in held.values() if isinstance(v, int))
+                rows[f"held:{team}"] = _Row(
+                    str(mark.get("seats_held_at") or ""), notify.held_line(team, n, seats), k, f"{k}|work"
+                )
             stopped = mark.get("stopped") if isinstance(mark.get("stopped"), dict) else None
             if stopped is not None:
                 # a stopped team is never started, so its row is told under `ask` and `start` alike — unless the
