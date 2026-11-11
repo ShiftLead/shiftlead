@@ -667,3 +667,40 @@ async def test_an_extra_whose_counts_refuse_the_ask_leaves_it_to_the_road_around
             got = await a.call("msg", to=own, text="read #12?", kind="ask")
         assert got["routed"]["seat"] == own and got["entry"]["to"] == [mail.PERSON], "never refused: routed on"
         assert not _rec(agent, tl2).inbox
+
+
+@pytest.mark.integration
+async def test_a_handed_entrys_sentence_reads_the_scaled_seat_rows_as_the_send_does(agent, tmp_path, blocked_replay):
+    """An `entry` envelope to a scaled seat (§4.10's two scaled-seat rows, TD-1547): the handed entry writes its own
+    sentence with no bound (`_entry_read_when`), and reads the send's choice (`seat_choice`) — a fill as the seat's
+    own record with *fills <extra>* — never the bare record's; one a free live extra took reads *lands on <extra>*
+    (below)."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        own, (tl2, tl3) = await _seat(agent, person, tmp_path, own_live=True)
+        w1, w2, _ = await _askers(person, tmp_path)
+        async with LocalClient(caller=w1) as a:
+            first = await a.call("msg", to=own, text="read #11?", kind="ask")
+        assert first["seat_choice"] == {own: {"seat": own, "extras": None}}
+        _set(_rec(agent, own), "working")
+        async with LocalClient(caller=w2) as b:
+            got = await b.call("msg", to=own, text="file an entry: x", kind="ask")
+        assert got["seat_choice"] == {tl2: {"seat": own, "extras": {"fill": "tl-2"}}}
+        said = agent._entry_read_when(tl2, got)
+        assert said.startswith("fills tl-2, an extra of this seat, and lands there: it reads it first"), said
+        assert "lapse" not in said, "a handed entry has no bound"
+        assert not agent._entry_read_when(tl2).startswith("fills tl-2"), "without the send's choice: the record's own"
+
+
+@pytest.mark.integration
+async def test_a_handed_entry_a_live_extra_took_reads_lands_on_it(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        own, (tl2, _) = await _seat(agent, person, tmp_path, own_live=False, live_extras=1)
+        _set(_rec(agent, tl2), "idle")
+        (w1, *_) = await _askers(person, tmp_path, 1)
+        async with LocalClient(caller=w1) as a:
+            got = await a.call("msg", to=own, text="file an entry: y", kind="ask")
+        assert got["delivered"] == [tl2]
+        said = agent._entry_read_when(tl2, got)
+        assert said.startswith("lands on tl-2, an extra of this seat, then lands; nothing is typed"), said

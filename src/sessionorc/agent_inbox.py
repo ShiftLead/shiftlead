@@ -195,7 +195,7 @@ class InboxMixin:
         # the press, witnessed inside the person-only RPC (§4.4, TD-1386): its repo the sender's checkout's
         sender = self._graph().get(str(e.from_ or ""))
         await self._witness_press_of("send-to-reviewer", e.id, getattr(sender, "dir", None))
-        return {"id": PERSON, "msg": e.id, "handed": mid, "to": to, "read_when": self._entry_read_when(to)}
+        return {"id": PERSON, "msg": e.id, "handed": mid, "to": to, "read_when": self._entry_read_when(to, sent)}
 
     async def rpc_inbox_dismiss(self, msg: list[str] | str, caller: Any = None) -> dict[str, Any]:
         """**Dismiss** and **Dismiss all** (design §4.10 *The Inbox is a queue*, TD-079): the one
@@ -550,7 +550,7 @@ class InboxMixin:
             "repo": name,
             "type": kind,
             "priority": rank,
-            "read_when": self._entry_read_when(seat),
+            "read_when": self._entry_read_when(seat, sent),
         }
 
     def _entry_session(self, caller: Any, repo: Any, draft: Any) -> Session | None:
@@ -626,12 +626,21 @@ class InboxMixin:
             "repo": name,
             "type": kind,
             "priority": rank,
-            "read_when": self._entry_read_when(to),
+            "read_when": self._entry_read_when(to, sent),
         }
 
-    def _entry_read_when(self, seat: str) -> str:
-        """*When it is read* for a handed entry (§4.10): an `ask`'s sentence without a bound."""
-        s = self._graph().get(self._addr(seat))
+    def _entry_read_when(self, seat: str, sent: dict[str, Any] | None = None) -> str:
+        """*When it is read* for a handed entry (§4.10): an `ask`'s sentence without a bound. `seat` is the record
+        the send delivered to; `sent` the send's reply, whose `seat_choice` names a scaled seat's choice (§4.9 *Mail
+        to a scaled seat*, TD-1547): a fill, or mail its own record took, reads as the seat's own record, with
+        §4.10's scaled-seat rows (`extras`), as the send's own sentence does."""
+        addr = self._addr(seat)
+        choice = ((sent or {}).get("seat_choice") or {}).get(addr) or {}
+        words = choice.get("extras") or None
+        own = str(choice.get("seat") or "")
+        if own and (addr == own or "fill" in (words or {})):
+            addr = own
+        s = self._graph().get(addr)
         down = s is not None and s.host != self.host and not (self.links.get(s.host) or {}).get("up")
         rings = s is not None and getattr(adapters.get(s.adapter), "composer", None) is not None
         # a modal limit has no reset to name (§4.3, TD-944): read off a record of this host alone
@@ -647,6 +656,7 @@ class InboxMixin:
             lapses=False,
             modal_limit=modal,
             held=held,
+            extras=words,
         )
 
     async def rpc_board_reply(
