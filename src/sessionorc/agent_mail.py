@@ -1571,22 +1571,30 @@ class MailMixin:
     def _unanswered_of(self, records: dict[str, Session], sid: str, taken: MailEntry, now: datetime) -> dict[str, Any]:
         """`unanswered.read` of the record `sid` (the walk's last) for the question `taken`, its inputs gathered
         here once — for a take-up's stamp (§4.9b) and for rule 13's acting test (§6 *Stuck work*, TD-1496)."""
+        return self._unanswered_at(records, sid, now, question_at=taken.at, kind=taken.kind, skip=taken.id)
+
+    def _unanswered_at(
+        self, records: dict[str, Session], sid: str, now: datetime, *, question_at: str, kind: str, skip: str | None
+    ) -> dict[str, Any]:
+        """`unanswered.read` of the record `sid` for work opened at `question_at`: a question's (`_unanswered_of`)
+        or, for rule 13's work order, the line's open time (§6 *Stuck work*), whose `skip` is None (no ask of the
+        record's own is the work)."""
         at = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
         r = records.get(sid)
         if r is None:
-            return unanswered.read(None, sid, question_at=taken.at, at=at)
+            return unanswered.read(None, sid, question_at=question_at, at=at)
         over = self._profile_over(r.profile, now, r.team)  # the fill's own reading (§6 rule 3), unguarded as it is
         kw = self._read_when_kwargs(r, now, records)
-        tail = mail.read_when(r, taken.kind, now, person=False, lapses=False, unreachable=self._away(r), **kw)
+        tail = mail.read_when(r, kind, now, person=False, lapses=False, unreachable=self._away(r), **kw)
         return unanswered.read(
             r,
             sid,
-            question_at=taken.at,
+            question_at=question_at,
             at=at,
             unreachable=self._away(r),
             over=over,
             modal=kw["modal_limit"],
-            waiting=len([i for i in r.asks_ids(home=self.host) if i != taken.id]),
+            waiting=len([i for i in r.asks_ids(home=self.host) if i != skip]),
             tail=tail,
             agent=adapters.has_agent(r.adapter),
             names={k: v.name for k, v in records.items() if v.name},

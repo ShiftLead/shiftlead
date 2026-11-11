@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from conftest import park_ticks
 
-from sessionorc import mail, models, stuck
+from sessionorc import hosts, mail, models, stuck, workorders
 from sessionorc.client import LocalClient
 from sessionorc.store import HostStore
 
@@ -190,8 +190,10 @@ async def test_the_pass_keeps_a_stuck_ask_and_drops_it_the_tick_its_seat_acts(ag
 
 
 @pytest.mark.integration
-async def test_the_pass_reads_no_steer_and_keeps_a_board_entry_as_stored(agent, tmp_path):
+async def test_the_pass_reads_no_steer_and_keeps_a_board_entry_as_stored(agent, tmp_path, monkeypatch):
     await park_ticks(agent)
+    monkeypatch.setattr(hosts.Host, "repos", lambda self: ["/repos/shiftlead"])
+    agent._repos = {}  # its repo not yet read: its board entry stands as stored
     board = {"since": "2026-11-11T10:00:00Z", "reason": {"state": "no_lane"}, "repo": "shiftlead"}
     agent._host_rec["stuck"] = {"board:abc": board}
     async with LocalClient() as person:
@@ -201,3 +203,212 @@ async def test_the_pass_reads_no_steer_and_keeps_a_board_entry_as_stored(agent, 
         agent.sessions[rv].state = "limited"
         await agent._stuck_pass(datetime.now(UTC) + timedelta(hours=3))
         assert agent._host_rec["stuck"] == {"board:abc": board}
+
+
+# -- a decided board line waiting on a session (TD-1496 slice 2) -------------------------------------------------
+
+ROOT = "/repos/fx"
+LINE = "decide 2026-11-11 (n/a) — **Keep it?** Context: TD-7. Due: 2026-11-11. Decided: keep (2026-11-11)."
+KEY = workorders.key(LINE)
+OWAIT = mail.STUCK_ORDER_AFTER
+
+
+def board(*, case: str | None = "current", lines: tuple[str, ...] = (LINE,), carried: tuple[str, ...] = ()) -> dict:
+    items = [{"key": workorders.key(t), "text": t, "decided": {"text": "keep"}, "kind": "decide"} for t in lines]
+    b = {"fetch_case": case, "items": items, "carried": [{"key": k} for k in carried]}
+    return {"name": "fx", "root": ROOT, "boards": {"boards": [b]}}
+
+
+def member(n: str, state: str = "idle", **kw) -> models.Session:
+    s = rec(n, state, repo=ROOT, lane=["free-pick"], **kw)
+    return s
+
+
+def claimed(ref: str, at: datetime) -> models.ProgressEntry:
+    return models.ProgressEntry(ref=ref, status="claimed", at=_z(at))
+
+
+@pytest.fixture
+def home(agent, monkeypatch):
+    """A parked home with one repo `fx` on the roster and its records in `agent.sessions`."""
+    monkeypatch.setattr(hosts.Host, "repos", lambda self: [ROOT, "/repos/other"])
+    agent._repos = {ROOT: board()}
+    agent._host_rec.pop("stuck", None)
+    agent._host_rec.pop("stuck_open", None)
+    return agent
+
+
+def put(agent, *records: models.Session) -> None:
+    for r in records:
+        r.host = agent.host  # this home's own records, never unreachable
+    agent.sessions.clear()
+    agent.sessions.update({r.id: r for r in records})
+
+
+@pytest.mark.unit
+def test_board_read_and_opened_follow_the_clock():
+    assert stuck.board_read(None) == "unread" and stuck.board_read({"boards": {"error": "x"}}) == "unread"
+    assert stuck.board_read(board(case="skipped")) == "fallback" and stuck.board_read(board(case=None)) == "fallback"
+    assert stuck.board_read(board(case="behind")) == "good"
+    first = stuck.opened(None, "fx", None, NOW)
+    assert first == {"at": _z(NOW), "repo": "fx"}, "first read: that tick"
+    claim = stuck.opened(first, "fx", NOW + timedelta(minutes=5), NOW + timedelta(minutes=6))
+    assert claim["at"] == _z(NOW + timedelta(minutes=5)) and claim["holder"] is True
+    back = stuck.opened(claim, "fx", NOW - timedelta(hours=3), NOW + timedelta(minutes=7))
+    assert back["at"] == claim["at"], "a later re-claim never moves at back"
+    rel = stuck.opened(claim, "fx", None, NOW + timedelta(minutes=30))
+    assert rel["at"] == _z(NOW + timedelta(minutes=30)) and "holder" not in rel, "the release, once"
+    assert stuck.opened(rel, "fx", None, NOW + timedelta(hours=1)) == rel, "the next tick moves nothing"
+    assert stuck.opened({**first, "asked": True}, "fx", None, NOW)["asked"] is True
+
+
+@pytest.mark.unit
+def test_team_reason_reads_a_team_none_of_whose_crew_is_live():
+    done = {"at": _z(NOW)}
+    a = member("a", "exited", out_of_work=done, lane_seen={"ids": [KEY]})
+    b = member("b", "exited", out_of_work=done)
+    by_person = member("p", "closed", closer={"by": "person", "at": _z(NOW)})
+    assert stuck.team_reason("beta", [by_person], None, KEY)["held"] == {"why": "stopped"}, "a person's Stop"
+    assert stuck.team_reason("beta", [a, b], None, KEY) == {
+        "state": "team",
+        "team": "beta",
+        "held": {"why": "wound_down"},
+    }, "wound down with the line seen and unpicked"
+    assert stuck.team_reason("beta", [a, b], None, "board:zz")["held"] == {"why": "stopped"}, "not running"
+    mark = {"members": {"a": [KEY]}, "held": {"why": "day", "count": 3}}
+    assert stuck.team_reason("beta", [a, b], mark, KEY)["held"] == {"why": "day", "count": 3}
+    assert "held" not in stuck.team_reason("beta", [a, b], {"members": {"a": [KEY]}}, KEY), "waits for your Start"
+    held_only = {"members": {}, "seats_held": {"ao-rv": 1}}
+    assert stuck.team_reason("beta", [a, b], held_only, KEY)["held"] == {"why": "wound_down"}, "a held-only mark"
+    crashed = member("c", "exited", ended={"why": "crash"})
+    assert stuck.team_reason("beta", [crashed], None, KEY) is None, "crashed out: each member's own state"
+    assert stuck.team_reason("beta", [a, member("live")], None, KEY) is None, "a live member: read each"
+
+
+@pytest.mark.integration
+async def test_an_idle_claimant_reads_its_own_idle_start_while_the_clock_keeps_its_claim(home):
+    await park_ticks(home)
+    claim = NOW - timedelta(minutes=30)
+    w = member("w", since=_z(NOW - timedelta(minutes=10)), progress=[claimed(KEY, claim)])
+    put(home, w)
+    home._host_rec["stuck_open"] = {KEY: {"at": _z(NOW - timedelta(hours=2)), "repo": "fx"}}
+    await home._stuck_pass(NOW)
+    assert home._host_rec["stuck_open"][KEY] == {"at": _z(claim), "repo": "fx", "holder": True}
+    assert "stuck" not in home._host_rec
+    later = claim + OWAIT + timedelta(minutes=1)
+    await home._stuck_pass(later)
+    row = home._host_rec["stuck"][KEY]
+    assert row["since"] == _z(claim) and row["repo"] == "fx", "clocked from the claim"
+    assert row["reason"] == {"state": "idle", "since": w.since}, "the words name its own idle start"
+    assert row["actor"]["id"] == "ao-w"
+    w.state = "working"
+    await home._stuck_pass(later)
+    assert "stuck" not in home._host_rec, "dropped the tick an actor acts"
+
+
+@pytest.mark.integration
+async def test_two_holders_are_both_actors_and_a_seat_holding_the_lease_is_one(home):
+    await park_ticks(home)
+    claim = NOW - timedelta(minutes=90)
+    a = member("a", state="working", progress=[claimed(KEY, claim)])
+    rv = rec("rv", state="limited", repo=ROOT, seat={"trigger": "asks"}, progress=[claimed(KEY, claim)])
+    put(home, a, rv)
+    home._host_rec["stuck_open"] = {KEY: {"at": _z(NOW - timedelta(hours=2)), "repo": "fx"}}
+    await home._stuck_pass(NOW)
+    assert "stuck" not in home._host_rec, "one of two holders acting: not stuck"
+    a.state = "limited"
+    await home._stuck_pass(NOW)
+    row = home._host_rec["stuck"][KEY]
+    assert row["actor"]["more"] == 1 and {row["actor"]["id"]} <= {"ao-a", "ao-rv"}
+    a.progress = []
+    await home._stuck_pass(NOW)
+    assert home._host_rec["stuck_open"][KEY]["holder"] is True, "one of two dropping is no release"
+    assert home._host_rec["stuck"][KEY]["actor"]["id"] == "ao-rv", "the seat holding the lease is the actor"
+
+
+@pytest.mark.integration
+async def test_a_released_line_is_clocked_from_the_release_and_goes_back_to_its_lanes(home):
+    await park_ticks(home)
+    w = member("w", progress=[claimed(KEY, NOW - timedelta(hours=3))])
+    other = member("o", state="limited")
+    put(home, w, other)
+    home._host_rec["stuck_open"] = {KEY: {"at": _z(NOW - timedelta(hours=4)), "repo": "fx"}}
+    await home._stuck_pass(NOW)
+    assert home._host_rec["stuck"][KEY]["actor"]["id"] == "ao-w", "the holder is the only actor"
+    w.progress = [models.ProgressEntry(ref=KEY, status="dropped", at=_z(NOW))]
+    rel = NOW + timedelta(minutes=1)
+    await home._stuck_pass(rel)
+    assert home._host_rec["stuck_open"][KEY] == {"at": _z(rel), "repo": "fx"}, "the release, its tick's instant"
+    assert "stuck" not in home._host_rec, "not stuck at once after the release"
+    await home._stuck_pass(rel + OWAIT + timedelta(minutes=1))
+    assert home._host_rec["stuck_open"][KEY]["at"] == _z(rel), "moved once"
+    row = home._host_rec["stuck"][KEY]
+    assert row["since"] == _z(rel) and row["actor"]["more"] == 1, "its lanes' records are its actors after"
+    w.state = "exited"
+    other.progress = [claimed(KEY, NOW - timedelta(hours=20))]
+    await home._stuck_pass(rel + OWAIT + timedelta(minutes=2))
+    assert "holder" not in home._host_rec["stuck_open"][KEY], "a lease past LEASE_TTL holds nothing"
+
+
+@pytest.mark.integration
+async def test_a_team_held_at_day_reads_that_reason_and_a_line_no_lane_takes_reads_no_lane(home):
+    await park_ticks(home)
+    done = {"at": _z(NOW - timedelta(hours=4))}
+    put(home, member("a", "exited", out_of_work=done), member("b", "exited", out_of_work=done))
+    home._host_rec.setdefault("teams", {})["beta"] = {
+        "work_waiting": {"members": {"a": [KEY]}, "held": {"why": "day", "count": 3}}
+    }
+    await home._stuck_pass(NOW)
+    await home._stuck_pass(NOW + OWAIT + timedelta(minutes=1))
+    row = home._host_rec["stuck"][KEY]
+    assert row["reason"] == {"state": "team", "team": "beta", "held": {"why": "day", "count": 3}}
+    assert "actor" not in row, "a team's names no actor"
+    home._host_rec["teams"].pop("beta")
+    put(home, rec("solo", repo="/repos/other", lane=["free-pick"]))
+    await home._stuck_pass(NOW + OWAIT + timedelta(minutes=2))
+    assert home._host_rec["stuck"][KEY]["reason"] == {"state": "no_lane"}
+
+
+@pytest.mark.integration
+async def test_an_unread_or_fallback_repo_keeps_its_lines_and_a_repo_off_the_roster_drops_them(home):
+    await park_ticks(home)
+    gone = workorders.key("act 2026-11-11 (n/a) — **Gone.** Due: 2026-11-11.")
+    arch = workorders.key("act 2026-11-11 (n/a) — **Archived.** Due: 2026-11-11.")
+    stored = {"since": "2026-11-11T09:00:00Z", "reason": {"state": "limited"}, "repo": "fx"}
+    opened = {"at": "2026-11-11T08:00:00Z", "repo": "fx", "holder": True}
+    other = {**stored, "repo": "other"}
+    left = {**stored, "repo": "left"}
+    home._host_rec["stuck"] = {KEY: stored, gone: stored, arch: stored, "board:o1": other, "board:x": left}
+    home._host_rec["stuck_open"] = {KEY: opened, gone: opened, arch: opened, "board:o1": {**opened, "repo": "other"}}
+    put(home, member("w", state="working", progress=[claimed(KEY, NOW)]))
+    home._repos = {}  # a restart before the first pass, or a raised one: no reading
+    await home._stuck_pass(NOW)
+    assert home._host_rec["stuck"][KEY] == stored, "kept exactly as stored though its claimant works"
+    assert "board:x" not in home._host_rec["stuck"], "a repo that left the roster drops its entries"
+    home._repos = {ROOT: {**board(), "boards": {"error": "unreadable", "boards": []}}}
+    await home._stuck_pass(NOW)
+    assert home._host_rec["stuck_open"][KEY] == opened, "an errored board keeps the clock"
+    home._repos = {ROOT: board(case="skipped", lines=(LINE,), carried=(arch,))}
+    await home._stuck_pass(NOW)
+    assert gone in home._host_rec["stuck"], "a fallback read never closes a line absent from it"
+    assert arch not in home._host_rec["stuck"] and arch not in home._host_rec["stuck_open"], "archived: closed"
+    assert home._host_rec["stuck"][KEY] == stored, "nor reads one, nor opens one"
+    assert home._host_rec["stuck"]["board:o1"] == other, "the unread repo's entry is kept as stored"
+    home._repos = {ROOT: board()}
+    await home._stuck_pass(NOW)
+    assert KEY not in home._host_rec["stuck"] and gone not in home._host_rec["stuck"], "dropped on a good read"
+    assert set(home._host_rec["stuck"]) == {"board:o1"} and set(home._host_rec["stuck_open"]) == {KEY, "board:o1"}
+    assert all(k.startswith(("ask:", "board:")) for k in home._host_rec["stuck"])
+
+
+@pytest.mark.unit
+def test_lane_records_go_by_teams_order_then_id_and_a_blank_source_claim_is_clocked():
+    a, z = member("a", team="zeta"), member("b", team="alpha")
+    seat = rec("rv", repo=ROOT, lane=["free-pick"], seat={"trigger": "asks"})
+    out = member("x", closed_for={"why": "sit_out"})
+    records = {r.id: r for r in (a, z, seat, out)}
+    entry = workorders.entry({"id": KEY, "text": LINE})
+    assert stuck.lane_records(ROOT, entry, records, ["zeta", "alpha"]) == ["ao-a", "ao-b"], "the teams' order"
+    assert stuck.lane_records(ROOT, entry, records) == ["ao-b", "ao-a"], "by name where no order is known"
+    w = member("w", progress=[models.ProgressEntry(ref=KEY, status="claimed", at=_z(NOW), source="")])
+    assert stuck.claim_at(w, KEY) == NOW, "a claim lease_holders counts is clocked from its own at"
