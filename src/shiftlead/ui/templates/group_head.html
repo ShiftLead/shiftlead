@@ -58,7 +58,9 @@
 {#- design §4.5a team card **starts** note (§6 *Schedule*, TD-133): display only, the rule is set by ao schedule or Settings #}
 {% if g.starts_note %}<span class="meta startsnote" title="the home starts this team again at its usage window's reset (design §6 Schedule) · ao schedule">· {{ g.starts_note }}</span>{% endif %}
 {#- design §4.5a team card **work waiting** note (§6 rule 8, TD-227): display only, beside *wound down* or *stopped* (TD-781) — the press is Start, here or on the Inbox row #}
-{% if g.work_note %}<span class="meta workwaiting" title="{{ g.work_note.title }}">· {{ g.work_note.n }} entr{{ 'y' if g.work_note.n == 1 else 'ies' }} waiting since <span title="{{ g.work_note.at }}">{{ g.work_note.age ~ ' ago' if g.work_note.age else g.work_note.at }}</span></span>
+{% if g.work_note %}{% if g.work_note.n %}<span class="meta workwaiting" title="{{ g.work_note.title }}">· {{ g.work_note.n }} entr{{ 'y' if g.work_note.n == 1 else 'ies' }} waiting since <span title="{{ g.work_note.at }}">{{ g.work_note.age ~ ' ago' if g.work_note.age else g.work_note.at }}</span></span>{% endif %}
+{#- …and each held seat's questions (§6 rule 3 *A stopped team's seats are held*, TD-1564): they wait for the Start #}
+{%- for sh in g.work_note.seats %}<span class="meta workwaiting heldseat" title="its team is stopped: these questions wait in {{ sh.name }}'s mailbox until the team's Start (design §6 rule 3)">· {{ sh.words }}</span>{% endfor %}
 {#- …and a defined team with no record, what its lanes hold (§6 rule 8 *A team with no record*, TD-781) #}
 {% elif g.lanes_hold %}<span class="meta lanesheld" title="{{ g.lanes_line }}">· its lanes hold {{ g.lanes_hold }} entr{{ 'y' if g.lanes_hold == 1 else 'ies' }}</span>{% endif %}{% endif %}
 {# Start, or Wind down / Stop now, on the team's own card (design §4.5a, 2026-09-16 and 2026-09-18): the

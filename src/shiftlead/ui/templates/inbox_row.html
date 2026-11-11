@@ -1195,7 +1195,9 @@
   {%- else %} {% if e.stopped %}stopped{{ e.stopped_words }}{% else %}wound down{% endif %}{% if e.wound_down %} <span class="localtime" data-at="{{ e.wound_down }}" title="{{ e.wound_down }}">{{ e.wound_down }}</span>{% endif %}{% endif %} ·
   {%- for q in e.questions %} {{ q.name }}'s {{ q.kind }} about {% if e.repo %}<a class="mono" href="/repo/{{ e.repo }}#{{ q.ref }}">{{ q.ref }}</a>{% else %}<span class="mono">{{ q.ref }}</span>{% endif %} {{ 'lapsed to its default' if q.how == 'lapsed' else 'was answered' }}{{ ';' if not loop.last or e.n }}{% endfor %}
   {%- if e.n %} {{ e.lanes or 'its lanes' }} {{ 'hold' if e.row == 'lanes' else 'gained' }} {{ e.n }} entr{{ 'y' if e.n == 1 else 'ies' }}:
-  {%- for i in e.ids %} {% if e.repo %}<a class="mono" href="/repo/{{ e.repo }}#{{ i }}">{{ i }}</a>{% else %}<span class="mono">{{ i }}</span>{% endif %}{{ ',' if not loop.last }}{% endfor %}{% if e.more %} and {{ e.more }} more{% endif %}{% endif %}</div>
+  {%- for i in e.ids %} {% if e.repo %}<a class="mono" href="/repo/{{ e.repo }}#{{ i }}">{{ i }}</a>{% else %}<span class="mono">{{ i }}</span>{% endif %}{{ ',' if not loop.last }}{% endfor %}{% if e.more %} and {{ e.more }} more{% endif %}{% endif %}
+  {#- each held seat's questions (§6 rule 3 *A stopped team's seats are held*, TD-1564), after the entries #}
+  {%- for sh in e.seats_held %}{{ ' ·' if e.n or e.questions or not loop.first }} {{ sh.words }}{% endfor %}</div>
 {%- if e.held %}
 <div class="st">not started: {{ e.held }}</div>
 {%- endif %}
@@ -1215,7 +1217,7 @@
     </div>
   </details>
   {%- endif %}
-  {%- if e.row == 'work' %}
+  {%- if e.row == 'work' and not e.held_only %}
   <button class="btn sm ghost" data-act="clear_work" data-id="person" data-team="{{ e.team }}" title="{{ help_title('work-dismiss') }}">Dismiss</button>
   {%- endif %}
 </div>

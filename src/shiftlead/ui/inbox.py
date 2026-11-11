@@ -988,6 +988,26 @@ def work_ids(mark: Mapping[str, Any]) -> list[str]:
     return list(dict.fromkeys(str(i) for ids in members.values() if isinstance(ids, list) for i in ids))
 
 
+def work_seats_held(mark: Mapping[str, Any], records: Iterable[Mapping[str, Any]] = ()) -> list[dict[str, Any]]:
+    """A mark's held part (§6 rule 8, `seats_held`, TD-1564): each seat a stopped team's hold keeps questions on,
+    `{id, name, n, words}` in the mark's order — *n questions wait on <seat name>*, the name the page's record for
+    that id gives, the id itself where it holds none. Never the mark's `held`, rule 8's start bound."""
+    got = mark.get("seats_held") if isinstance(mark.get("seats_held"), Mapping) else {}
+    names = {str(r.get("id")): str(r.get("name") or "") for r in records if isinstance(r, Mapping) and r.get("id")}
+    out = []
+    for sid, n in got.items():
+        try:
+            n = int(n)
+        except (TypeError, ValueError):
+            continue
+        if n < 1:
+            continue
+        name = names.get(str(sid)) or str(sid)
+        words = f"{n} question{'' if n == 1 else 's'} wait{'s' if n == 1 else ''} on {name}"
+        out.append({"id": str(sid), "name": name, "n": n, "words": words})
+    return out
+
+
 def work_questions(mark: Mapping[str, Any]) -> list[dict[str, str]]:
     """A mark's question ends (§6 rule 8 *A question's end is work*, TD-274), each `{name, kind, ref,
     how, words}`: *designer-ao-1's steer about TD-222 lapsed to its default*, *… ask about TD-222 was
@@ -1075,15 +1095,20 @@ def work_rows(
         asked = work_questions(mark)
         refs = {q["ref"] for q in asked}
         ids = [i for i in work_ids(mark) if i not in refs]
-        if not ids and not asked:
+        # questions waiting on a held seat (TD-1564): a clause after the entries, and alone a held-only row
+        seats = work_seats_held(mark, records)
+        if not ids and not asked and not seats:
             continue
+        held_only = bool(seats) and not ids and not asked
         stopped = mark.get("stopped") if isinstance(mark.get("stopped"), Mapping) else None
         by = str(stopped.get("by") or "other") if stopped else ""
         # a stopped team's instant is its stop's, never the card's *wound down* (TD-781)
         down = (str(stopped.get("at") or "") or None) if stopped else (wound or {}).get(team)
         repo = Path(str(mark.get("repo") or "")).name
         held = work_held(mark.get("held"), at)
-        if stopped and not held and on_work(str(team)) == "start":
+        if held_only and on_work(str(team)) == "start":
+            held = "questions alone start no team"  # a held-only mark never reaches the start (§6 rule 8, TD-1564)
+        elif stopped and not held and on_work(str(team)) == "start":
             held = "a stopped team is started by Start"  # rule 8 never starts it (§6, TD-781)
         n = len(ids)
         finished = work_finished(str(team), mark, records) if wound is not None and not down and not stopped else []
@@ -1092,6 +1117,7 @@ def work_rows(
         if n > WORK_IDS:
             said += f" and {n - WORK_IDS} more"
         said = "; ".join([*(q["words"] for q in asked), *([said] if said else [])])
+        said = " · ".join([*([said] if said else []), *(s["words"] for s in seats)])
         who = ", ".join(f"{f['name']} finished" + (f" {f['at']}" if f["at"] else "") for f in finished) or (
             "stopped" + STOPPED_BY.get(by, "") if stopped else "wound down"
         )
@@ -1115,12 +1141,15 @@ def work_rows(
                 "more": max(0, n - WORK_IDS),
                 "n": n,
                 "questions": asked,
+                "seats_held": seats,
+                "held_only": held_only,  # Start and Snooze ▾ alone: nothing stored to Dismiss (TD-1564)
                 "held": held,
                 "running": bool(finished),
                 "finished": finished,
                 "stopped": by,
                 "stopped_words": STOPPED_BY.get(by, ""),
-                "later": by == "person",  # under Later, uncounted and never told (§6 rule 8, TD-781)
+                # under Later, uncounted and never told (§6 rule 8, TD-781); a held-only row by its `seats_held_by`
+                "later": (mark.get("seats_held_by") == "person") if held_only else by == "person",
                 "lanes": lanes,
                 "text": f"{team} · {who} · {said}" + (f" · not started: {held}" if held else ""),
                 "find": " ".join(x for x in (str(team), "team start", who, said, held) if x),
@@ -1200,10 +1229,17 @@ def work_finished(team: str, mark: Mapping[str, Any], records: Iterable[Mapping[
     return [{"name": str(m), "at": closed.get(str(m), "")} for m in members]
 
 
-def work_note(mark: Any, now: datetime | None = None) -> dict[str, Any] | None:
+def work_note(
+    mark: Any, now: datetime | None = None, records: Iterable[Mapping[str, Any]] = ()
+) -> dict[str, Any] | None:
     """design §4.5a team card **work waiting** note (§6 rule 8): *n entries waiting since <t>* beside
-    *wound down <t>*, its tooltip the ids by member — `{n, at, age, title}`, or None for no mark."""
-    if not isinstance(mark, Mapping) or not (ids := work_ids(mark)):
+    *wound down <t>*, its tooltip the ids by member, and *· n questions wait on <seat name>* for each seat the
+    mark's `seats_held` names (TD-1564; `records` the page's, to name the seat) — `{n, at, age, title, seats}`,
+    `n` 0 for a held-only mark, which draws its held clauses alone; None for no mark, or one with neither."""
+    if not isinstance(mark, Mapping):
+        return None
+    ids, seats = work_ids(mark), work_seats_held(mark, records)
+    if not ids and not seats:
         return None
     members = mark.get("members") if isinstance(mark.get("members"), Mapping) else {}
     by = "; ".join(f"{m}: {', '.join(str(i) for i in got)}" for m, got in members.items() if isinstance(got, list))
@@ -1214,6 +1250,7 @@ def work_note(mark: Any, now: datetime | None = None) -> dict[str, Any] | None:
         "at": str(mark.get("at") or ""),
         "age": _age(mark.get("at"), now or datetime.now(UTC)),
         "title": by,
+        "seats": seats,
     }
 
 

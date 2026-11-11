@@ -267,6 +267,25 @@ def _held_words(s: Mapping[str, Any], fleet: Collection[Mapping[str, Any]]) -> d
     return {"by": mark.get("by"), "team": team, "wound": wound}
 
 
+def stop_held_line(s: Mapping[str, Any], fleet: Collection[Mapping[str, Any]]) -> str:
+    """§4.5a card **held** line (§6 rule 3 *A stopped team's seats are held*, TD-1564): on a seat whose view carries
+    `stop_held`, *held: team stopped (by you | at its stop time) — n questions wait for Start*, `n` the view's
+    `asks_waiting` as the home's `seats_held` counts it, *held: team stopped — waits for Start* with none waiting,
+    and *wound down* in place of *stopped* where the team reads so (`_held_words`); "" without the mark."""
+    words = _held_words(s, fleet)
+    if words is None:
+        return ""
+    how = "wound down" if words["wound"] else "stopped"
+    try:
+        n = int(s.get("asks_waiting") or 0)
+    except (TypeError, ValueError):
+        n = 0
+    if n < 1:
+        return f"held: team {how} — waits for Start"
+    by = {"person": " (by you)", "until": " (at its stop time)"}.get(str(words.get("by") or ""), "")
+    return f"held: team {how}{by} — {n} question{'' if n == 1 else 's'} wait{'s' if n == 1 else ''} for Start"
+
+
 def view(
     s: dict[str, Any],
     fleet: list[dict[str, Any]] | None = None,
@@ -604,6 +623,8 @@ def view(
     # questions go meanwhile; display only, gone once it is able. The why on hover.
     d["routed_to"] = mail.seat_routed_to_line(s.get("seat_routed_to") if s.get("seat_unable") else None)
     d["routed_why"] = str(s.get("seat_unable") or "")
+    # §4.5a card **held** line (§6 rule 3, TD-1564): a seat its team's stop holds says what waits for its Start
+    d["stop_held_line"] = stop_held_line(s, fleet or ())
     d["brief_unsent"] = brief_unsent(s)  # §4.5a **brief not sent** (TD-339): the slot's and Focus's mark
     d["grants_all"] = list(GRANTS)
     # §4.3 *A record with no agent* (TD-665, built by TD-666): what is typed at it is a command line,

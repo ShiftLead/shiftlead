@@ -112,6 +112,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     shells_of,  # noqa: F401
     state_counts,  # noqa: F401
     state_icons,  # noqa: F401
+    stop_held_line,  # noqa: F401
     subagent_held,  # noqa: F401
     suspended_note,  # noqa: F401
     swept_words,  # noqa: F401
@@ -351,6 +352,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     work_note,  # noqa: F401
     work_questions,  # noqa: F401
     work_rows,  # noqa: F401
+    work_seats_held,  # noqa: F401
     work_started,  # noqa: F401
 )
 from .org import (  # re-exported: routes, templates and tests read these from the app (TD-196)
@@ -454,6 +456,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     LOCAL_ID,  # noqa: F401
     PRIORITY_RANK,  # noqa: F401
     _parts,  # noqa: F401
+    _seats_held,  # noqa: F401
     _stopped,  # noqa: F401
     _tid,  # noqa: F401
     compact_in,  # noqa: F401
