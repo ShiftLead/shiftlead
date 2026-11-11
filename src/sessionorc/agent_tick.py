@@ -3139,7 +3139,8 @@ class TickMixin:
 
     def _nudge_line(self, s: Session) -> str | None:
         if s.seat is not None:
-            n = s.asks_waiting(home=self.host) if s.seat_due else 0
+            # an extra seat has no `seat_due` (rule 3's cause passes it over, TD-1547): its waiting asks are named
+            n = s.asks_waiting(home=self.host) if s.seat_due or s.scale else 0
             # an entry the person handed the seat owes its outcome, read or not: named apart from the questions (TD-218)
             h = s.asks_waiting(home=self.host, handed_only=True) if n else 0
             parts = [f"you have {n - h} questions waiting — run `ao inbox`"] if n > h else []

@@ -121,9 +121,22 @@ async def test_the_shape_samples_a_live_extra_seat_in_its_seats_stage_and_adds_i
     held.state = "closed"
     _ask(tl, 1, pr=9, at=NOW - timedelta(hours=1))
     _ask(extra, 1, pr=10, at=NOW - timedelta(hours=3))
+    _ask(held, 1, pr=11, at=NOW - timedelta(minutes=30))  # left on a held extra: still the seat's queue
+    gone = rec("tl-4", "techlead", seat={"trigger": "asks"}, controllers=[mgr.id], scale={"line": "tl"})
+    gone.state, gone.superseded_by = "closed", "ao-x-tl-9"
+    _ask(gone, 1, pr=12, at=NOW - timedelta(hours=9))  # a superseded record's mail is its successor's
     assert agent._shape_pass(NOW) is True
     day = agent._shape["days"][NOW.astimezone().date().isoformat()]["grind"]
     assert day["records"][extra.id]["minutes"] == {"idle_with_work": 1}  # sampled in the review stage
     assert held.id not in day["records"]  # a held extra, with no pane, is not sampled
     review = day["queues"]["review"]
-    assert review["depth_sum"] == 2 and review["past_bound"] == 1  # both records' asks; the extra's 3h one past 2h
+    assert review["depth_sum"] == 3 and review["past_bound"] == 1  # three records' asks; the extra's 3h one past 2h
+    assert review["oldest_max"] == 3 * 3600  # the oldest of the union, the extra's
+
+
+async def test_an_idle_extra_seat_is_nudged_for_the_asks_waiting_on_it(agent):
+    await park_ticks(agent)
+    extra = _seat(agent, "tl-2", state="idle", line="tl", confidence="hook")
+    assert agent._nudge_line(extra) is None
+    _ask(extra)
+    assert "1 questions waiting" in (agent._nudge_line(extra) or "")  # no `seat_due`, and still named
