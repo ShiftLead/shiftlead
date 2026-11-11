@@ -1609,6 +1609,15 @@ class HostAgent(
                 # conversation, never a record of another name that held it — so the record and the launch
                 # record below carry it, as `supervised` is carried; a `seat` the call gives wins
                 seat = dict(holder.seat)
+            if (
+                scale is None
+                and resume
+                and isinstance(holder, Session)
+                and holder.adapter_id == resume
+                and holder.scale
+            ):
+                # an extra stays an extra when it is resumed, as a seat stays a seat (§4.9 *Scaling with the work*)
+                scale = extra = dict(holder.scale)
             succeeding = self._check_succeeds(succeeds, name, caller, resume, keep_mail, starting) if succeeds else None
             if keep_mail:
                 self._check_keep_mail(holder, caller, resume)
