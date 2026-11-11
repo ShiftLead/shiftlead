@@ -120,9 +120,9 @@ def test_an_idle_actors_words_name_its_idle_start_and_more_actors_read_plus_n():
 
 
 @pytest.mark.unit
-def test_a_needs_you_reason_a_board_entry_and_a_malformed_reading_draw_no_row():
+def test_a_needs_you_reason_and_a_malformed_reading_draw_no_row():
     assert stuck_rows(reading(reason={"state": "needs_you", "name": "techlead-1"}), now=NOW) == []
-    board = {"board:k": {"since": at(2), "reason": {"state": "no_lane"}, "repo": "s"}}
+    board = {"board:k": {"since": at(2), "reason": {"state": "no_lane"}}}  # a `board:` entry with no repo
     assert stuck_rows(board, now=NOW) == []
     no_work = reading()
     del no_work["ask:m-9"]["work"]

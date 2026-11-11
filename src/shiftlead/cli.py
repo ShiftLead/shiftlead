@@ -4801,7 +4801,10 @@ def _card_item_lines(x: Mapping[str, Any], cut: bool) -> list[str]:
     row = x.get("row") if isinstance(x.get("row"), Mapping) else {}
     which = str(row.get("row") or "")
     mail = which not in CARD_NOT_MAIL
-    kind = {"red_pr": "red PR", "fork_pr": "fork PR"}.get(which) or str(row.get("kind") or "")
+    # a decided line moved while stuck prints as the stuck row: its id the `stuck` key (the line's own), kind *stuck*
+    st = row.get("stuck") if which == "board" and isinstance(row.get("stuck"), Mapping) else None
+    stuck = st if st is not None and not st.get("waiting_until") else None
+    kind = "stuck" if stuck else {"red_pr": "red PR", "fork_pr": "fork PR"}.get(which) or str(row.get("kind") or "")
     head = [str(x.get("item") or row.get("id") or "")]
     if kind:
         head.append(kind)
@@ -4825,6 +4828,8 @@ def _card_item_lines(x: Mapping[str, Any], cut: bool) -> list[str]:
         card = row.get("card") if isinstance(row.get("card"), Mapping) else {}
         body += [str(card.get(k) or "") for k in ("sentence", "leads", "context")]
         body += [str(row.get("detail") or ""), *_answer_lines(row.get("answers"), row.get("default"))]
+        if st is not None:  # the stuck words, a line under the decided line's own (§6 rule 13, TD-1497)
+            body.append(str(st.get("text") or ""))
     elif which == "ledger":
         body += [str(row.get(k) or "") for k in ("title", "ask", "detail")]
         body += _answer_lines(row.get("answers"), row.get("default"), row.get("consequences"))

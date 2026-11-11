@@ -441,11 +441,22 @@ def want_of(e: Mapping[str, Any], sec: str) -> str:
     if row in ("red_pr", "fork_pr"):
         return "do"
     if row == "board":
+        if stuck_line(e):
+            return "do"  # a stuck decided line moved to the Do group (§6 rule 13 *What the person sees*, TD-1497)
         kind = str(e.get("kind") or "").lower()
         return "read" if kind in ("watch", "fyi") else ("do" if kind == "act" else "decide")
     if sec == "steering" or e.get("kind") in ("ask", "steer"):
         return "decide"
     return "do"
+
+
+def stuck_line(e: Mapping[str, Any]) -> bool:
+    """A decided line's row moved while stuck (§6 rule 13 *What the person sees*, TD-1497 slice 2): a board row
+    carrying `stuck` outside *Waiting on them* — drawn as the stuck row (its Open, no Start session, kind *stuck*
+    in `ao card`), never a second row."""
+    return (
+        e.get("row") == "board" and isinstance(e.get("stuck"), Mapping) and not e.get("stuck", {}).get("waiting_until")
+    )
 
 
 def item_ref(e: Mapping[str, Any]) -> str:
@@ -563,7 +574,7 @@ def attach(
             # a press landing (TD-1508) or an answer acted on (TD-1316): no need of the person
             want, kind = "answered", ""
         # starts no session (TD-1246, TD-1292, TD-1468, TD-1497)
-        pr_row = e.get("row") in ("red_pr", "fork_pr", "stuck", *HOLDER_ROWS)
+        pr_row = e.get("row") in ("red_pr", "fork_pr", "stuck", *HOLDER_ROWS) or stuck_line(e)
         go = (
             start(card, ref, str(e.get("on_row") or ""))
             if start is not None and want in (*WANTS, "with_you") and not pr_row
@@ -593,7 +604,8 @@ def attach(
                 # a stopped holder's state row: its own controls, no Start session and outside the header's count
                 **({"holder": True} if e.get("row") in HOLDER_ROWS else {}),
                 # a stuck row drawn as an item of its own: its Open alone, no Start session, outside that count
-                **({"stuck": True} if e.get("row") == "stuck" else {}),
+                # …and a decided line moved there while stuck, drawn as the stuck row (TD-1497 slice 2)
+                **({"stuck": True} if e.get("row") == "stuck" or stuck_line(e) else {}),
                 "running": sec == "steering",
                 "on_row": e["on_row"],
                 # the design PR it links, *· design #n* (TD-1531), and its synopsis (TD-1536)
@@ -809,7 +821,7 @@ def _item_kind(e: Mapping[str, Any], sec: str) -> str:
     """An attached item's kind: its want where that is Decide or Do — *stuck* for a stuck row (§4.7, TD-1497) —; ''
     for what waits on nobody (Read)."""
     want = want_of(e, sec)
-    if want in WANTS and e.get("row") == "stuck":
+    if want in WANTS and (e.get("row") == "stuck" or stuck_line(e)):
         return "stuck"
     return want if want in WANTS else ""
 
