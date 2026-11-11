@@ -1041,22 +1041,27 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the standing mark's where one stands, else the first tick that read a question waiting; stamped as any
      mark is (`_stamped`), so a stopped team's carries `stopped` and a wound-down team's does not. It is written
      under `ask` and `start`; under `off` nothing is written and the seat's card says it alone. The row and the
-     team card's note add *· n questions wait on <seat name>* per key. It makes the row no more pressing than
+     team card's note add *· n questions wait on <seat name>* per key, the name resolved from the records
+     the page or the graph holds (the seat's id where none is found; `work_note` is given the records). It makes the row no more pressing than
      the team's word does: `stopped.by` is read over the same ends as the hold (`work.stopped_by` leaves rule
-     3's own seat closes out as `seats_held_by` does — one filter, TD-1564), so the two agree; a wound-down
-     team's mark, which carries no `stopped`, reads its own `seats_held_by` — the row, the note and Telegram
-     read the mark alone. For `person` the row is under *Later*, uncounted and never told; for `until` under
-     *Needs you*, counted, and its questions told once on **Telegram** — for any mark carrying `seats_held`,
+     3's own seat closes out as `seats_held_by` does — one filter, TD-1564), so the two agree; a row with lane ids
+     sits as it does without `seats_held` — by `stopped.by`, a wound-down one under *Needs you* — and only a
+     **held-only** row reads the mark's own `seats_held_by` (a wound-down team's mark carries no `stopped`): for
+     `person` under *Later*, uncounted and never told; for `until` under *Needs you*, counted. The questions of
+     an `until` hold are told once on **Telegram** — for any mark carrying `seats_held`,
      with lane ids or without, whatever `on_work` says and whatever bound `held` names — on a notify row of
      their own, `held:<team>`, apart from the lanes' `work:<team>`, whose `began` is `seats_held_at`, its link
      and its snooze the team-start row's (`work:<team>`, `work:<team>|work`), so a snooze before the telling
      holds it (*<team> · stopped at its
-     stop time · n questions wait on <seat name>*, *n* the total and the seats joined by *and* where several
+     stop time · n questions wait on <seat name>* — *stopped* whatever the team reads, as the `held` stamp's
+     words, since it says who ended the team; *n* the total and the seats joined by *and* where several
      are held), never again for a rising count or a second seat. A held-only mark never starts the team, under
-     any `on_work` — neither the tick's start nor the row's Start through `work_start` with no lane ids, which
-     answers `started: false` before it refuses a stopped mark and before it takes the mark away — and under `start` its row ends *· not started: questions alone start no team*.
+     any `on_work` — neither the tick's start nor `work_start` with no lane ids, which answers `started: false` before it
+     refuses a stopped mark and before it takes the mark away (the row's **Start** for a team with nobody live
+     is the team card's Start, run by the client, which starts the team and lifts the hold; only `work_start`,
+     the runs-on path, is guarded) — and under `start` its row ends *· not started: questions alone start no team*.
      **Dismiss** clears a row's entries and leaves its held part — the mark becomes `{at, repo, members: {},
-     seats_held}` with `stopped` kept where it stood and `questions` dropped — which no press but the Start, or the
+     seats_held, seats_held_by, seats_held_at}` with `stopped` kept where it stood and `questions` dropped — which no press but the Start, or the
      questions closing, takes away (`clear_work` on a held-only mark answers `cleared: false` and leaves it) —
      the questions still wait, so a dismissed count would only come back on the next tick; a held-only row
      draws **Start** and **Snooze** alone, no Dismiss.
