@@ -363,31 +363,15 @@ def _amount_says(a: Any) -> str:
 
 
 def _usage_profiles(u: dict[str, Any]) -> str:
-    """The profiles sharing an account, for its chip's hover (§4.5a **usage**, TD-122): each with
-    the lines its reserves make — each with its reserve, the days left and when it next moves — a
-    metered one with its own amount per window (TD-151), and the live sessions running under it."""
+    """The profiles sharing an account, for its chip's hover (§4.5a **usage**, TD-122): each with the live
+    sessions running under it. The reserve, its line and an amount are the account's (§6 *A reserve is the
+    account's*, TD-1610), so the window rows above carry them, never a profile's line."""
     parts = []
     for p in u.get("profiles") or []:
         if not isinstance(p, dict):
             continue
-        lines = [
-            f"{r.get('label')} line {r['line']:g}% ({_reserve_why(r)})"
-            for r in p.get("lines") or []
-            if isinstance(r, dict) and isinstance(r.get("line"), int | float) and not isinstance(r.get("line"), bool)
-        ]
-        # a metered profile's own amounts (TD-151): the chip prints the smallest, the hover each
-        lines += [
-            f"{a.get('label')} amount {said}"
-            for a in p.get("amounts") or []
-            if isinstance(a, dict) and (said := _amount_says(a.get("amount")))
-        ]
         names = [str(x) for x in p.get("sessions") or []]
-        part = str(p.get("name"))
-        if lines:
-            part += f" [{', '.join(lines)}]"
-        if names:
-            part += f": {', '.join(names)}"
-        parts.append(part)
+        parts.append(str(p.get("name")) + (f": {', '.join(names)}" if names else ""))
     # one profile per line under its heading: a hover that lists is a list (TD-270)
     return "profiles on this account:\n" + "\n".join(parts) if parts else ""
 
@@ -396,10 +380,11 @@ def usage_accounts(usage: Any, sessions: Any = None) -> dict[str, Any]:
     """The host agent's per-profile readings as **one per account** (design §4.2a, §4.5a **usage**,
     TD-122), keyed by the chip's name — `<tool> · <account>`, *Claude · paul* — which is what the
     person knows the quota by; never a profile's name, which said nothing (TD-071 item 8). Every
-    profile of an account carries the same reading, so the first one's stands for it; the chip's
-    `lines` are the lowest line per window among its profiles, and `profiles` lists each with its
-    own lines and the live sessions running under it, for the hover. A reading from an agent
-    before TD-122 names no account and stays its profile's own chip."""
+    profile of an account carries the same reading, so the first one's stands for it, and the same
+    reserve (§6 *A reserve is the account's*, TD-1610), so the chip's `lines` are the account's one
+    line per window — the first profile's that carries them; `profiles` lists each with the live sessions
+    running under it, for the hover. A reading from an agent before TD-122 names no account and stays
+    its profile's own chip."""
     live: dict[str, list[str]] = {}
     for s in sessions or []:
         if isinstance(s, dict) and s.get("state") not in ("exited", "closed"):
@@ -413,8 +398,8 @@ def usage_accounts(usage: Any, sessions: Any = None) -> dict[str, Any]:
         if acc is None:
             acc = out[name] = {**{k: v for k, v in u.items() if k != "lines"}, "lines": [], "profiles": []}
         else:
-            # a metered account's spend is one sum and each profile's amount its own: the chip reads
-            # each window over the smallest amount, which is the highest `pct` (§4.5a **usage**)
+            # a metered account's spend is one sum: the chip reads each window at its highest `pct` among
+            # the copies, the freshest count of one spend over the account's one amount (§4.5a **usage**)
             theirs = {w.get("label"): w for w in u.get("windows") or [] if isinstance(w, dict) and w.get("spent")}
             acc["windows"] = [
                 theirs[w.get("label")]
@@ -424,25 +409,14 @@ def usage_accounts(usage: Any, sessions: Any = None) -> dict[str, Any]:
                 else w
                 for w in acc.get("windows") or []
             ]
-        lines = [r for r in u.get("lines") or [] if isinstance(r, dict)]
-        # a metered profile's amounts are its own, as a reserve is (§4.2a): kept for the hover
-        amounts = [
-            {"label": w.get("label"), "amount": w["amount"]}
-            for w in u.get("windows") or []
-            if isinstance(w, dict) and isinstance(w.get("spent"), dict) and isinstance(w.get("amount"), dict)
+        acc["profiles"].append({"name": prof, "sessions": live.get(prof, [])})
+        lines = [
+            r
+            for r in u.get("lines") or []
+            if isinstance(r, dict) and isinstance(r.get("line"), int | float) and not isinstance(r.get("line"), bool)
         ]
-        acc["profiles"].append(
-            {"name": prof, "lines": lines, "sessions": live.get(prof, [])} | ({"amounts": amounts} if amounts else {})
-        )
-        for row in lines:
-            ln = row.get("line")
-            if not isinstance(ln, int | float) or isinstance(ln, bool):
-                continue
-            have = next((i for i, r in enumerate(acc["lines"]) if r.get("label") == row.get("label")), None)
-            if have is None:
-                acc["lines"].append(row)
-            elif ln < acc["lines"][have]["line"]:
-                acc["lines"][have] = row
+        if lines and not acc["lines"]:
+            acc["lines"] = lines  # the account's one line per window (TD-1610)
     return out
 
 
@@ -626,11 +600,18 @@ def usage_chip(prof: str, u: Any, now: datetime | None = None) -> dict[str, Any]
 
 
 def with_lines(usage: Any, gate: Any) -> dict[str, Any]:
-    """The host agent's `usage` with each profile's rows of its `gate` reading attached as `lines`
-    (§6, TD-100), which is what the chip reads its line from — on the page's render and on each
+    """The host agent's `usage` with each profile's rows of its account's `gate` reading attached as `lines`
+    (§6, TD-100, TD-1610), which is what the chip reads its line from — on the page's render and on each
     pushed `usage` event alike. A gate that could not be read (an older agent, no `settings.yml`)
     leaves every chip as it was: a number with no line."""
     profiles = gate.get("profiles") if isinstance(gate, dict) else None
+    if isinstance(gate, dict) and isinstance(gate.get("accounts"), dict):
+        # by account (§6 *The readers*, TD-1610): each profile on an account reads the account's rows, one on
+        # a mixed account none; a profile no account lists keeps its own entry, as before
+        accts = [a for a in gate["accounts"].values() if isinstance(a, dict)]
+        mixed = {str(p) for a in accts if a.get("billing") == "mixed" for p in a.get("profiles") or []}
+        own = {k: v for k, v in (profiles or {}).items() if k not in mixed} if isinstance(profiles, dict) else {}
+        profiles = own | {str(p): a for a in accts if a.get("billing") != "mixed" for p in a.get("profiles") or []}
     out: dict[str, Any] = {}
     for prof, u in (usage or {}).items():
         g = profiles.get(prof) if isinstance(profiles, dict) else None

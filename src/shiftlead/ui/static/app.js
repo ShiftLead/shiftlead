@@ -2471,7 +2471,7 @@
     return `${w.label} ${w.pct}%${pr !== null ? `, projected ${pr}%` : ""} / line ${row.line}% (${reserveWhy(row)}; resets ${w.resets || "?"})`;
   }
   // A line's reserve, the days left a per-day reserve counts, and when the line next moves — the
-  // account's lowest line and each profile's own alike (TD-100, TD-122).
+  // account's one line (TD-100, TD-1610).
   function reserveWhy(row) {
     const r = row.reserve, ln = row.line;
     let why;
@@ -2481,23 +2481,14 @@
     } else why = r == null ? "reserve ?" : `reserve ${r}%`;
     return `${why}; line moves ${row.next || "?"}`;
   }
-  // The profiles sharing the account, each with its lines (reserve, days left, next move) and live
-  // sessions, for the hover (TD-122).
+  // The profiles sharing the account, each with its live sessions, for the hover (TD-122): the reserve and
+  // its line are the account's (TD-1610), on the window rows above — `_usage_profiles` in common.py.
   function usageProfiles(u) {
     const parts = [];
     for (const p of Array.isArray(u.profiles) ? u.profiles : []) {
       if (!p || typeof p !== "object") continue;
-      const lines = (Array.isArray(p.lines) ? p.lines : []).filter((r) => r && typeof r === "object" && typeof r.line === "number").map((r) => `${r.label} line ${r.line}% (${reserveWhy(r)})`);
-      // a metered profile's own amounts (TD-151): the chip prints the smallest, the hover each
-      for (const a of Array.isArray(p.amounts) ? p.amounts : []) {
-        const said = a && typeof a === "object" ? amountSays(a.amount) : "";
-        if (said) lines.push(`${a.label} amount ${said}`);
-      }
       const names = (Array.isArray(p.sessions) ? p.sessions : []).map(String);
-      let part = String(p.name);
-      if (lines.length) part += ` [${lines.join(", ")}]`;
-      if (names.length) part += `: ${names.join(", ")}`;
-      parts.push(part);
+      parts.push(names.length ? `${String(p.name)}: ${names.join(", ")}` : String(p.name));
     }
     return parts.length ? `profiles on this account:\n${parts.join("\n")}` : "";  // one per line (TD-270)
   }
