@@ -200,6 +200,7 @@ Fix them upstream in agent-cadence and bump the pin (`agent-cadence bump`, a rev
 | How a Queue card asks for the person's attention (Decide, Do, Read), what they do about it (Answer, Start session, ⋯), the Waiting group, and the one-sentence writing rule | [docs/decisions/2026-10-19-queue-card.md](docs/decisions/2026-10-19-queue-card.md) |
 | Whether ShiftLead should require agent-cadence, and where the person's own briefs, start prompts and preferences live | [docs/decisions/2026-10-25-shiftlead-requires-dev-cadence.md](docs/decisions/2026-10-25-shiftlead-requires-dev-cadence.md) |
 | Why a part names its parent in `Part of:`, how a Queue card draws parts and blockers, and the order the ledgerboard, agent-cadence and shiftlead changes land in | [docs/decisions/2026-10-27-part-of.md](docs/decisions/2026-10-27-part-of.md) |
+| What the design review rounds find (3,120 findings labelled by kind, origin, where else each would be caught, and subsystem), with the data and the script that rebuilds its tables | [docs/decisions/2026-11-11-design-review-findings.md](docs/decisions/2026-11-11-design-review-findings.md) |
 | A design in plain words, for the person (one page per design, linked from its Queue card) | [docs/synopses/](docs/synopses/README.md), one `TD-<design>.md` per design |
 | Mockup sources and regeneration | [docs/mockups/README.md](docs/mockups/README.md) |
 | Working cadence (sessions, reviews, TD flow) | `cadence.md` in the pinned agent-cadence (`agent-cadence path cadence.md`; edit it in agent-cadence, never here) |
