@@ -25,7 +25,7 @@ from sessionorc.mail import as_person, self_decide_refusal
 # **`identity_log`** likewise (review of PR #318): the message it sends is mail *from the person*,
 # its `handed` debt and its trail entry are the home's, and the graph it reads a controller from
 # is the home's — served at a node, all four would be written to the node's own store.
-# **`promote`** and **`clear_promote`** (§6 *Promote*, TD-132): the run starts in the home's checkout
+# **`promote`** (§6 *Promote*, TD-132): the run starts in the home's checkout
 # and its intent file is the home's, so a press at a node goes to the home or nowhere.
 # **`entry_add`** (§4.10 *An entry handed to a seat*, TD-218): mail from the person with a debt, as
 # `identity_log`'s — the home's mailbox, the home's mark.
@@ -66,7 +66,6 @@ HOME_EDITS = frozenset(
         "suspend",
         "identity_log",
         "promote",
-        "clear_promote",
         "set_settings",
         "set_reach",
         "entry_add",

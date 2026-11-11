@@ -179,11 +179,14 @@ def test_live_at_main_draws_the_line_at_the_top_and_live_older_at_the_foot(tmp_p
     assert "not yet live (3)" in foot and foot.index("TD-1") < foot.index('class="rrow livediv"')
 
 
-def test_a_hold_says_so_and_offers_the_inbox_rows_dismiss(tmp_path, monkeypatch):
+def test_a_hold_says_so_and_offers_the_inbox_rows_promote(tmp_path, monkeypatch):
+    """§4.5a *Repo page, Merged: live divider*: while the repo holds, *held: rolled back to <sha>* and the
+    Inbox row's **Promote**, whose press ends the hold when it concludes — no Dismiss (TD-1554)."""
     held = {"sha": "b" * 40, "from": "c" * 40, "at": NOW.isoformat()}
     week = page(tmp_path, monkeypatch, lambda root: {"samscrape": promo(root, held=held)}, list(ROWS))
     assert "held: rolled back to bbbbbbb" in week
-    assert 'data-act="clear_promote" data-id="person" data-repo="samscrape" data-held="1"' in week
+    assert 'data-act="promote" data-id="person" data-repo="samscrape"' in week
+    assert "clear_promote" not in week and "Dismiss" not in week
 
 
 def test_an_unknown_live_or_no_block_draws_no_line(tmp_path, monkeypatch):

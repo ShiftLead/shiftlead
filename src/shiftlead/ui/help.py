@@ -453,7 +453,8 @@ HELP: tuple[Help, ...] = (
             "note says when it is live. Press it when what is merged should be what runs, and on a held row "
             "once main holds the cure: a press that concludes ends the hold. It never goes back to an older "
             "commit — that is `ao promote --sha` or `--back` — and it is refused, in words, while a run is "
-            "in flight, a failure stands, or the checkout is not clean on main."
+            "in flight or the checkout is not clean on main; a failed promote never stops it — the press runs "
+            "again, and clears the failure."
         ),
     ),
     Help(
@@ -464,8 +465,8 @@ HELP: tuple[Help, ...] = (
             "Makes main's head live now while `auto` is on, without waiting for the home's own clock: the same "
             "press as Promote, the settle and the thirty-minute wait skipped. Press it when what is merged "
             "should run before the time the row names. It goes through checks that are not green, as your press "
-            "does, and it is refused, in words, while a run is in flight, a failure stands, or the checkout is "
-            "not clean on main."
+            "does, and it is refused, in words, while a run is in flight or the checkout is not clean on main; a "
+            "failed promote never stops it — the press runs again, and clears the failure."
         ),
     ),
     Help(
@@ -475,19 +476,8 @@ HELP: tuple[Help, ...] = (
         (
             "Sets this row aside until the time you pick: +1 day, +1 week or a date. Press it when you "
             "promote in batches and want to be left alone until then. It changes nothing at the home: more "
-            "merges meanwhile do not bring the row back, and a snoozed failure or hold still stops the "
-            "policy."
-        ),
-    ),
-    Help(
-        "promote-dismiss",
-        "Dismiss",
-        "Inbox row: promote",
-        (
-            "Clears the home's own mark on this repo: a failed promote first, and a rollback's hold when no "
-            "failure stands. Press it once you have read the failure, or when what a rollback went back from "
-            "may go live again. It moves nothing live: once neither stands, promoting goes on — under `auto`, "
-            "to main's head at the next pass."
+            "merges meanwhile do not bring the row back; a snoozed hold still stops the policy, and a snoozed "
+            "failure still holds back its own commit."
         ),
     ),
     Help(
@@ -916,7 +906,6 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "promote",
             "promote-now",
             "promote-snooze",
-            "promote-dismiss",
             "work-start",
             "work-snooze",
             "work-dismiss",

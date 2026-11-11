@@ -89,7 +89,7 @@
   {% if d.unknown %}<div class="meta" title="{{ help_title('live-divider') }}">live unknown — {{ d.unknown }}</div>{% endif %}
   {% if c.sent is none %}<div class="rrow meta">reading {{ c.word }}…</div>{% endif %}
   {#- §4.5a *Repo page, Merged: live divider* (TD-904): the closes not yet live above one line, the rest below it #}
-  {%- macro livediv(d, w, folded) %}<div class="rrow livediv{% if folded %} folded{% endif %}" data-list="completed-{{ w }}" title="{{ help_title('live-divider') }}"><span class="mono">{{ d.text }}</span>{% if d.held %}<span class="meta">· held: {{ d.held }}</span><span class="grow"></span><button class="btn sm ghost" data-act="clear_promote" data-id="person" data-repo="{{ d.repo }}" data-held="1" title="{{ help_title('promote-dismiss') }}">Dismiss</button>{% endif %}</div>{% endmacro %}
+  {%- macro livediv(d, w, folded) %}<div class="rrow livediv{% if folded %} folded{% endif %}" data-list="completed-{{ w }}" title="{{ help_title('live-divider') }}"><span class="mono">{{ d.text }}</span>{% if d.held %}<span class="meta">· held: {{ d.held }}</span><span class="grow"></span><button class="btn sm primary" data-act="promote" data-id="person" data-repo="{{ d.repo }}" title="{{ help_title('promote') }}">Promote</button>{% endif %}</div>{% endmacro %}
   {%- if d.text and c.sent is not none %}{% if d.n %}<div class="rrow meta livewords">not yet live ({{ d.n }})</div>{% else %}{{ livediv(d, w, false) }}{% endif %}{% endif %}
   {% for e in c.sent or [] %}
     {%- if d.text and d.n and loop.index0 == d.n %}{{ livediv(d, w, loop.index > 8) }}{% endif %}

@@ -166,7 +166,6 @@ PERSON_ONLY = frozenset(
         "set_reach",
         "commit_defs",
         "promote",
-        "clear_promote",
         "clear_work",
         "work_start",
         "clear_mark",

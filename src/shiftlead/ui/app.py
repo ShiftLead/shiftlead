@@ -5263,11 +5263,11 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 raise HTTPException(400, "a state row's snooze names the session and the row kind")
             got = await call("attention_snooze", id=sid, kind=kind, until=str(body.get("until") or "").strip() or None)
             return JSONResponse({"ok": True, **got})
-        if action in ("promote", "clear_promote"):
+        if action == "promote":
             # design §4.5a **Inbox row: promote** (§6 *Promote*, TD-132 slice 3): **Promote** presses
-            # the `promote` RPC with main's head, **Dismiss** on a failure row `clear_promote`. Both
-            # are the person's own and the agent refuses them to a session; a refusal — the tree, a
-            # run in flight, a failure standing — comes back in its words and is drawn in place.
+            # the `promote` RPC with main's head, the person's own, which the agent refuses to a session;
+            # a refusal — the tree, a run in flight — comes back in its words and is drawn in place. There
+            # is no Dismiss (TD-1554): a failure never refuses the press, which clears it as it starts.
             repo = str(body.get("repo") or "").strip()
             if not repo:
                 raise HTTPException(400, f"{action} names the repo")

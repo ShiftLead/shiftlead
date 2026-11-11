@@ -1,7 +1,8 @@
 """TD-132 slice 3, design §4.5a *Inbox row: promote* (§6 *Promote*): the row drawn from the home's
 `promotes` reading alone — counted under `auto: false` while main is ahead and on a failure, FYI while
 a run is in flight, and under `auto: true` FYI while main is ahead (TD-581) — its Snooze by time in the attention
-store, and Promote and Dismiss through `/api/person/<action>`."""
+store, and Promote through `/api/person/<action>`. There is no Dismiss (TD-1554): a failure blocks only its own
+commit, and a copy installed by hand at main's head is an FYI row offering Promote to tag it."""
 
 from __future__ import annotations
 
@@ -65,12 +66,87 @@ def test_under_auto_a_failure_is_needs_you_in_place_of_the_fyi_row():
         (r,) = promote_rows({"shiftlead": reading(auto=auto, failed=failed)})
         assert not r["fyi"] and not r["auto_row"] and r["failed"]["why"] == "it broke"
         assert inbox_sections([], states=[r])["count"] == 1
+        # under `auto`, while main's head is the failed commit, the retry clause (TD-1554)
+        assert r["text"].endswith(" · auto retries when main moves past 9999999") is auto
+
+
+def test_a_failure_main_moved_past_is_fyi_with_the_policys_clock_and_a_hold_wins():
+    """§4.5a *Inbox row: promote* (TD-1554): a failure blocks only its commit. Once main's head is another
+    commit the row is drawn under FYI, uncounted, with the policy's clock under `auto`; with `auto` off it
+    is the plain failure, counted, no retry clause; beside a hold the held row wins, counted, no clock."""
+    from shiftlead.ui.app import templates
+
+    failed = {"sha": "8" * 40, "at": "2026-09-27T10:30:00+00:00", "why": "it broke", "log": "/l", "exit": 3}
+    failed |= {"blocks": "8" * 40, "tail": ["boom"]}
+    (r,) = promote_rows({"shiftlead": reading(auto=True, failed=failed, acts={"settles_in": 360})})
+    assert r["fyi"] and r["retry"] and inbox_sections([], states=[r])["count"] == 0
+    assert r["text"] == (
+        "shiftlead · live 4444444 · main 9999999, 3 commits ahead · checks green · auto on · settles in 6 min"
+    )
+    html = templates.get_template("inbox_rows.html").render(rows=[r], section="fyi")
+    assert "failed: promoting 8888888 — it broke (exit 3)." in html and "Nothing is promoted" not in html
+    (r,) = promote_rows({"shiftlead": reading(failed=failed)})
+    assert not r["fyi"] and "auto" not in r["text"] and inbox_sections([], states=[r])["count"] == 1
+    html = templates.get_template("inbox_rows.html").render(rows=[r], section="needs")
+    assert "Nothing is promoted for shiftlead until a press starts a run or a run concludes." in html
+    held = {"sha": LIVE, "from": "7" * 40, "main": MAIN, "at": "2026-09-27T09:00:00+00:00"}
+    (r,) = promote_rows({"shiftlead": reading(auto=True, failed=failed, held=held, acts={"settles_in": 360})})
+    assert not r["fyi"] and not r["retry"] and r["text"].endswith(" · auto on · held")
+    assert "settles" not in r["text"] and "retries" not in r["text"] and inbox_sections([], states=[r])["count"] == 1
+    html = templates.get_template("inbox_rows.html").render(rows=[r], section="needs")
+    assert "failed: promoting 8888888 — it broke (exit 3)" in html and "boom" in html
+
+
+def test_a_copy_installed_by_hand_is_an_fyi_row_offering_promote_to_tag_it():
+    """§4.5a *Inbox row: promote* (§6 *A copy installed by hand*, TD-1554): live at main's head that no run
+    finished at, nothing in flight and no failure or hold, is drawn under FYI, uncounted, whatever `auto`
+    says, with Promote; a failure, a hold or a run in flight stands in its place."""
+    from shiftlead.ui.app import templates
+
+    for auto in (True, False):
+        (r,) = promote_rows({"shiftlead": reading(auto=auto, live=MAIN, ahead=0, by_hand=True)})
+        assert r["text"] == "shiftlead · live 9999999 = main · installed by hand — promote to tag it"
+        assert r["fyi"] and r["by_hand"] and inbox_sections([], states=[r])["count"] == 0
+        # the press goes through the checks: the row reads none of them
+        (r,) = promote_rows(
+            {
+                "shiftlead": reading(
+                    auto=auto, live=MAIN, ahead=0, by_hand=True, checks="unknown", checks_why="no gh",
+                    unmet={"name": "checks", "text": "checks on main are unknown"},
+                )
+            }
+        )  # fmt: skip
+        assert r["checks_why"] is None and r["unmet"] is None
+        html = templates.get_template("inbox_rows.html").render(rows=[r], section="fyi")
+        assert 'data-act="promote" data-id="person" data-repo="shiftlead" title=' in html
+    # its Snooze ▾ sets it aside, as the retry row's does (review of #3265)
+    until = (datetime.now(UTC) + timedelta(days=1)).isoformat()
+    for kw in (
+        {"live": MAIN, "ahead": 0, "by_hand": True},
+        {"auto": True, "failed": {"sha": "8" * 40, "blocks": "8" * 40}},
+    ):
+        s = inbox_sections(
+            [],
+            states=promote_rows({"shiftlead": reading(**kw)}),
+            attention_snoozed={"promote:shiftlead|promote": until},
+        )
+        assert s["fyi"] == [] and [e["row"] for e in s["snoozed"]] == ["promote"]
+    # a precheck failed on main's head keeps a failure past its commit under *Needs you*
+    pre = {"sha": MAIN, "log": "/p", "tail": []}
+    (r,) = promote_rows(
+        {"shiftlead": reading(auto=True, failed={"sha": "8" * 40, "blocks": "8" * 40}, precheck_failed=pre)}
+    )
+    assert not r["fyi"] and not r["retry"]
+    flight = {"sha": MAIN, "at": "2026-09-27T10:05:00+00:00", "by": "person", "log": "/l"}
+    (r,) = promote_rows({"shiftlead": reading(live=MAIN, ahead=0, by_hand=True, inflight=flight)})
+    assert "installed by hand" not in r["text"]
 
 
 def test_a_held_row_is_counted_whatever_auto_says_and_reads_rolled_back():
     """§4.5a *After a rollback* (§6 *The hold*, TD-226 slice 3): drawn while the home's `held` stands,
     under auto too and with live behind main, under *Needs you*, reading *rolled back from*, never
-    *behind*; Dismiss is drawn on it, each control titled by its help paragraph."""
+    *behind*; its Promote is the one way the hold ends, and no Dismiss is drawn (TD-1554), each control
+    titled by its help paragraph."""
     from shiftlead.ui.app import templates
     from shiftlead.ui.help import first_sentence
 
@@ -87,13 +163,9 @@ def test_a_held_row_is_counted_whatever_auto_says_and_reads_rolled_back():
     (r,) = promote_rows({"shiftlead": reading(auto=True, live=MAIN, ahead=0, held=held)}, now)
     assert "rolled back from 7777777" in r["text"]
     html = templates.get_template("inbox_rows.html").render(rows=[r], section="needs")
-    assert 'data-act="clear_promote"' in html and 'data-act="promote"' in html
-    for key in ("promote", "promote-snooze", "promote-dismiss"):
+    assert 'data-act="clear_promote"' not in html and 'data-act="promote"' in html and "Dismiss" not in html
+    for key in ("promote", "promote-snooze"):
         assert f'title="{first_sentence(key)}"'.replace("'", "&#39;") in html, key
-    # neither failed nor held: no Dismiss
-    (r,) = promote_rows({"shiftlead": reading()}, now)
-    html = templates.get_template("inbox_rows.html").render(rows=[r], section="needs")
-    assert 'data-act="clear_promote"' not in html
 
 
 def test_the_smoke_reads_checking_live_and_a_smoke_hold_reads_rolled_back_by_the_smoke():
@@ -212,7 +284,6 @@ def page(tmp_path, monkeypatch):
             "checks": "green",
             "checks_why": None,
         },
-        "clear_promote": {"repo": "shiftlead", "cleared": True},
     }
 
     class FakeClient:
@@ -242,16 +313,14 @@ def test_the_inbox_draws_the_row_with_promote_and_snooze_and_counts_it(page):
         failed={"sha": MAIN, "at": "t", "why": "it broke", "log": "/l", "exit": 3, "tail": ["boom"]}
     )
     html = c.get("/inbox").text
-    assert "failed: promoting 9999999 — it broke (exit 3)" in html and 'data-act="clear_promote"' in html
+    assert "failed: promoting 9999999 — it broke (exit 3)" in html and 'data-act="clear_promote"' not in html
 
 
-def test_promote_and_dismiss_go_to_the_rpcs_with_the_repo(page):
+def test_promote_goes_to_the_rpc_with_the_repo_and_dismiss_is_gone(page):
     c, calls, _ = page
     assert c.post("/api/person/promote", json={"repo": "shiftlead"}).json()["sha"] == MAIN
-    assert c.post("/api/person/clear_promote", json={"repo": "shiftlead"}).json()["cleared"] is True
-    assert [(m, p) for m, p in calls if m in ("promote", "clear_promote")] == [
-        ("promote", {"repo": "shiftlead"}), ("clear_promote", {"repo": "shiftlead"}),
-    ]  # fmt: skip
+    assert [(m, p) for m, p in calls if m == "promote"] == [("promote", {"repo": "shiftlead"})]
+    assert c.post("/api/person/clear_promote", json={"repo": "shiftlead"}).status_code != 200
     assert c.post("/api/person/promote", json={}).status_code == 400
 
 
