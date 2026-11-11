@@ -1525,24 +1525,27 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        is asked about** — one whose `Context:` is a bare `TD-n` (a PR, a repo-qualified ref or no entry has
        no such question) that an open `ask` or `steer` in the person inbox is about, from any sender in the
        line's repo — is not read while one is open, whatever holds it or its lanes hold. The open questions
-       are `work.waiting_of` (open only, `about` by `reference_of`, an entry with no sender skipped) over
-       the person inbox's entries whose envelope
-       `repo` (§4.10 *An envelope carries its sender's `repo`*, TD-1467), a registry name, resolves by
-       `queue.repo_roots` over the tick's repo readings to the root the line was read from (the line's
-       `repo` is that root's basename, which a registry name need not be) — the entries filtered by repo before the call, since `waiting_of`'s values carry no `repo` — with its
-       sender keys dropped: the set of its values' `ref`s, by `normalize_ref`. One with no
-       `repo` (sent before the stamp, or from a record that resolves to none) mutes nothing, since entry
-       numbers are each repo's own; no sender is matched, so a replayed holder, a node's address and a
-       lapsed lease change nothing. Its `stuck` entry drops (an `ask` is on the person's card
-       already, the entry's card the stuck row would be drawn on, one need for one entry — §4.9a *Waiting
-       is read, never declared*; a snoozed `ask` among them, since a snooze affects the Inbox page only and the card still draws it,
-       §4.10 *Snooze*; a paused `steer` is a counted need under *Needs you* while paused, §4.10 *Pause*;
-       a running `steer`, drawn under *Steering* and uncounted, is no need, but its bound ends it and its
-       default then moves the work, however long a bound its sender chose) and its `stuck_open` entry is kept and still moved (*The clock*: a claim,
-       a release), with `asked` set. That is so on purpose for any question about the entry, a design
-       question on a build's parent among them, however long it stands: a narrower match would need the
-       sender or the topic. It is read again the tick none is open — answered, lapsed, withdrawn or any other close; a snooze
-       or a Pause is no close — that tick's instant its open time (below).
+       are `work.waiting_of` (open only, `about` by `reference_of`, an entry with no sender skipped) called
+       on the person inbox's entries filtered first by repo, since its values carry none: an entry counts
+       whose envelope `repo` (§4.10 *An envelope carries its sender's `repo`*, TD-1467), a registry name,
+       resolves by `queue.repo_roots` over the tick's repo readings to the root the line was read from
+       (the line's `repo` is that root's basename, which a registry name need not be), and an entry with
+       no `repo` (sent before the stamp, or from a record that resolves to none) counts for no line, since
+       entry numbers are each repo's own. The result's sender keys are dropped: the questions are the set
+       of its values' `ref`s, by `normalize_ref`. No sender is matched, so a replayed holder, a node's
+       address and a lapsed lease change nothing. A question the person **snoozed** (`snoozed_until`
+       ahead of the tick) counts for no line: the Inbox moves it to its *Snoozed* fold, on no card and in
+       no count (§4.5 screen 6, §4.10 *Snooze*), so a stuck row is the one need left to draw.
+       While one counts, the line's `stuck` entry drops and its `stuck_open` entry is kept and still moved
+       (*The clock*: a claim, a release), with `asked` set. An open `ask` and a paused `steer` (§4.10
+       *Pause*: under *Needs you*, counted) are on the person's card already, the entry's card the stuck
+       row would be drawn on — one need for one entry (§4.9a *Waiting is read, never declared*). A running
+       `steer` (under *Steering*, uncounted) is no need; it mutes because its bound ends it and its default
+       then moves the work, however long a bound its sender chose. That is so on purpose for any question
+       about the entry, a design question on a build's parent among them, however long it stands: a
+       narrower match would need the sender or the topic. The line is read again the tick none counts —
+       answered, lapsed, withdrawn or any other close, or snoozed; a Pause is no close — that tick's
+       instant its open time (below); a snooze's end counts the question again.
      - **The clock.** The work's **open time** is the ask's `at`, or the first tick the home read the line
        decided (below). The home keeps a board line's moving
        parts on `host.json` as **`stuck_open`** (below; shape-checked by
