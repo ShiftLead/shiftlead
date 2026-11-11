@@ -783,6 +783,7 @@ class TickMixin:
                 if await self._extra_drop(s):
                     continue  # an extra a lowered max dropped: no rule restarts or fills it (§4.9, TD-1545)
                 await self._crash_restart(s, now)
+                await self._extra_seat_hold(s, now)  # an extra seat's exit rule 1 did not restart (TD-1547)
                 if await self._lost_brief(s, now):
                     continue  # replayed: the record is the closed run's, and no other rule acts on it now
                 await self._wanted_restart(s, now)
@@ -867,15 +868,27 @@ class TickMixin:
         if dirty:
             await self._push_changes()
 
+    @staticmethod
+    def _extra_seat(s: Session) -> bool:
+        """An extra of a seat (§4.9 *Scaling with the work*): a record carrying both `seat` and `scale`."""
+        return s.seat is not None and isinstance(s.scale, dict)
+
+    @staticmethod
+    def _owes_reading(s: Session) -> bool:
+        """Whether an extra seat holds what it was filled for (§6 rule 1, TD-1547): unread mail, or an `ask`
+        in its inbox not yet answered (a reader's `pr` ask among them)."""
+        return bool(s.unread() or any(e.kind == "ask" and e.open for e in s.inbox))
+
     def _crashed(self, s: Session, now: datetime) -> bool:
-        """Rule 1's test: a supervised, unattended member that is not a seat, `exited` by a
+        """Rule 1's test: a supervised, unattended member that is not a seat — an extra seat excepted while it
+        holds unread mail or an unanswered ask (`_owes_reading`, §4.9, TD-1547) — `exited` by a
         **natural exit** — `pane` true, the tool left on its own; a kill takes the pane and is a
         person's or a controller's act, never undone — with no declaration, no wrap-up asked, no
         stop time passed, not gated, not suspended, and not already at its ceiling or superseded."""
         return bool(
             s.supervised
             and s.unattended
-            and s.seat is None
+            and (s.seat is None or (self._extra_seat(s) and self._owes_reading(s)))
             and s.state == "exited"
             and s.pane
             and not s.out_of_work
@@ -941,6 +954,30 @@ class TickMixin:
             return
         log.info("%s exited on its own with nothing declared: restarting it (%d in the window)", s.id, len(recent) + 1)
         await self._replay(s, "crash", keep_mail=True)
+
+    async def _extra_seat_hold(self, s: Session, now: datetime) -> None:
+        """An extra seat's natural exit with nothing waiting on it (§6 rule 1, §4.9 *Scaling with the work*,
+        TD-1547): closed back to held — rule 1 restarts it only while it owes a reading (`_owes_reading`) — its
+        `scale.last` saying why. One whose git is not known clean is left as it stands, for a person to read,
+        as `_extra_drop` leaves one; one gated, suspended or at its ceiling is left to the road that holds it.
+        This home's records alone, as `_extra_drop`'s."""
+        if not self._extra_seat(s) or s.state != "exited" or not s.pane or s.host != self.host:
+            return
+        if s.superseded_by or s.scale.get("drop") or self._owes_reading(s) or self._just_restarted(s, now):
+            return
+        if s.gated or s.suspended or s.restart_ceiling:
+            return
+        git = s.git or {}
+        if not all(isinstance(git.get(k), int) and git[k] == 0 for k in ("dirty", "unpushed")):
+            return
+        try:
+            await self.rpc_close(s.id, closer={"by": "tick", "why": "extra_held"})
+        except Exception as e:  # noqa: BLE001 — tried again next tick
+            log.warning("%s: the exited extra seat was not closed held: %s", self._address(s), e)
+            return
+        s.scale = {**s.scale, "last": {"at": now_iso(), "did": "hold", "why": "exited, nothing waiting on it"}}
+        self._save(s)
+        log.info("%s: an extra seat exited with nothing waiting on it, closed back to held", self._address(s))
 
     async def _lost_brief(self, s: Session, now: datetime) -> bool:
         """A lost brief (design §4.1 *A launch whose hook never comes is recovered*, §6 rule 1, TD-717,
