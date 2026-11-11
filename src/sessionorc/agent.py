@@ -952,6 +952,7 @@ class HostAgent(
         # one step*, TD-1547); and each held extra a send is filling, until its record stands (`_send_fill`)
         self._evicting: set[str] = set()
         self._send_filling: dict[str, asyncio.Task[None]] = {}
+        self._move_filled: dict[str, float] = {}  # the tick's mover's last fill of each extra (monotonic, TD-1547)
         self._room_held: list[
             set[str]
         ] = []  # each start between the cap's reading and its record; emptied once registered

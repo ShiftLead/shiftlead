@@ -504,3 +504,35 @@ async def test_an_ask_on_a_free_own_record_or_a_thread_a_live_record_holds_stays
         await agent._seat_move(datetime.now(UTC))
         assert [x.id for x in _rec(agent, own).inbox] == ["m-thread"], "its thread: it holds the context"
         assert calls == []
+
+
+@pytest.mark.integration
+async def test_the_mover_fills_for_a_pr_ask_once_and_not_again_after_a_failed_fill(agent, tmp_path, monkeypatch):
+    """A reader's `pr` ask on the busy own record is not its own reason to stay; a fill that fails puts it back,
+    and the mover does not fill that extra again within `MOVE_FILL_BACKOFF`. An `entry` envelope is never moved."""
+    await park_ticks(agent)
+    calls: list[str] = []
+
+    async def failing(s, why, **kw):
+        calls.append(s.id)
+        raise RuntimeError("no launch record")
+
+    monkeypatch.setattr(agent, "_replay", failing)
+    async with LocalClient() as person:
+        own, (tl2, _tl3) = await _seat(agent, person, tmp_path, own_live=True)
+        _set(_rec(agent, own), "working")
+        (w1, *_) = await _askers(person, tmp_path, 1)
+        env = _land(agent, own, w1, "m-env")
+        env.entry = {"title": "x"}
+        await agent._seat_move(datetime.now(UTC))
+        assert calls == [] and not agent._send_filling, "an entry envelope is never moved or filled for"
+        e = _land(agent, own, w1, "m-pr")
+        e.pr = 12
+        await agent._seat_move(datetime.now(UTC))
+        await (agent._send_filling.get(tl2) or asyncio.sleep(0))
+        assert calls == [tl2], "the pr ask filled the lowest-placed held extra"
+        assert {x.id for x in _rec(agent, own).inbox} == {"m-pr", "m-env"}, "the failed fill put it back"
+        await agent._seat_move(datetime.now(UTC))
+        await asyncio.sleep(0)
+        assert calls == [tl2], "not filled again at once"
+        assert "m-env" in {x.id for x in _rec(agent, own).inbox}, "an entry envelope stays"

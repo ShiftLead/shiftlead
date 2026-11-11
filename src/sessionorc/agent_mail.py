@@ -9,6 +9,7 @@ import asyncio
 import contextlib
 import logging
 import secrets
+import time
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -409,6 +410,7 @@ class MailMixin:
         if self.mode != "home":
             return
         records = self._graph()
+        changed = False
         for own in list(records.values()):
             if own.seat is None or isinstance(own.scale, dict) or own.superseded_by:
                 continue
@@ -423,11 +425,13 @@ class MailMixin:
                     continue  # filled on its cause, as today
                 if r is not own and (r.state not in seat_send.DEAD or (r.state == "exited" and self._crashed(r, now))):
                     continue  # live, or rule 1's to restart: it reads its own mail
-                for e in [x for x in r.inbox if x.kind == "ask" and x.open and not x.read_at]:
-                    moved = self._seat_move_one(records, own, r, e)
-                    if moved:
+                # an `entry` envelope is a techlead seat's, routed by its own rules (§4.9b), never moved here
+                for e in [x for x in r.inbox if x.kind == "ask" and x.open and not x.read_at and not x.entry]:
+                    if self._seat_move_one(records, own, r, e):
+                        changed = True
                         break  # the records changed: the next of this record's mail is chosen next tick
-        return None
+        if changed:
+            await self._push_changes()
 
     def _seat_move_one(self, records: dict[str, Session], own: Session, r: Session, e: MailEntry) -> bool:
         """One unread ask on `r`, a record of the seat `own`, chosen again (`_seat_move`): moved to the chosen record,
@@ -436,9 +440,13 @@ class MailMixin:
         if sender in records and sender in {own.id, *(x.id for x in seat_send.extras_in_place(own, records.values()))}:
             return False  # the seat's own mail to itself is never moved
         root = e.root if e.root and e.root != e.id else ""  # a thread's follow-up, never the ask's own id
-        choice = self._seat_pick(records, own.id, sender, "ask", None, e.pr, root=root)
-        if choice is None or choice.to == r.id and choice.fill is None:
+        choice = self._seat_pick(records, own.id, sender, "ask", None, e.pr, root=root, skip=e.id)
+        if choice is None or (choice.to == r.id and choice.fill is None):
             return False
+        if choice.fill is not None:
+            last = self._move_filled.get(choice.fill.id)
+            if last is not None and time.monotonic() - last < agent_common.MOVE_FILL_BACKOFF.total_seconds():
+                return False  # filled by the mover a moment ago and the mail came back: a fill that fails waits
         to = records.get(choice.to)
         if to is None:
             return False
@@ -447,10 +455,12 @@ class MailMixin:
             to.inbox.append(e)
             self._save(r)
             self._save(to)
-            self._mark(e.id, to=[choice.to])
+            seat_ids = {own.id, *(x.id for x in seat_send.extras_in_place(own, records.values()))}
+            self._mark(e.id, to=[*(x for x in e.to if x not in seat_ids), choice.to])  # other addressees kept
             log.info("%s: unread ask %s moved to %s (§4.9 Mail to a scaled seat)", r.id, e.id, choice.to)
         if choice.fill is not None:
             extra = choice.fill
+            self._move_filled[extra.id] = time.monotonic()
             self._send_filling[extra.id] = asyncio.create_task(self._send_fill(extra, own.name, own.id))
         return True
 
@@ -1618,6 +1628,7 @@ class MailMixin:
         replied: MailEntry | None,
         pr: int | None,
         root: str | None = None,
+        skip: str = "",
     ) -> seat_send.Choice | None:
         """The record of a scaled seat that takes mail addressed to the seat's own record (§4.9 *Mail to a scaled
         seat*, §6 rule 3 *An extra seat*, TD-1547), or None where `sid` is no seat with extras, or the sender is one
@@ -1661,6 +1672,7 @@ class MailMixin:
             evicting=self._evicting,
             held=held,
             guard=guard,
+            skip=skip,
         )
 
     async def _send_fill(self, extra: Session, seat: str, own_id: str) -> None:

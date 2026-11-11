@@ -140,6 +140,7 @@ RESTART_SETTLE = timedelta(seconds=60)
 # filled, idle for a moment before its prompt lands, is not closed on the tick that filled it.
 FILL_CEILING = 6
 FILL_WINDOW = timedelta(hours=1)
+MOVE_FILL_BACKOFF = timedelta(minutes=10)  # the tick's mover fills one extra again no sooner (§4.9, TD-1547)
 SEAT_IDLE_GRACE = timedelta(minutes=2)
 # how long a seat whose trigger is `asks` (the techlead, the fact-checker) stays open idle with nothing
 # waiting, so a trickle of asks is one fill rather than one each (§6 rule 3, TD-1422)

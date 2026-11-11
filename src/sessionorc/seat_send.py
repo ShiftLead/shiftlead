@@ -107,6 +107,7 @@ def choose(
     evicting: Iterable[str] = (),
     held: list[Session] | None = None,
     guard: Callable[[Session], str | None] = lambda r: None,
+    skip: str = "",
 ) -> Choice:
     """The record of the seat `own` (its extras `extras`, in place order) that takes mail of `kind`, in the order
     §4.9 *Mail to a scaled seat* gives:
@@ -123,7 +124,9 @@ def choose(
        in place order) unless `guard` says why not (*host full, <n> live*, *its profile is paused*) or there is
        none (*every extra busy*) — then the own record, where it waits;
     7. the own record live and neither busy nor free (`limited`, `unreachable`, paused, wrapping up, `stalled?`):
-       the own record, no extra filled."""
+       the own record, no extra filled.
+
+    `skip` is the id of the ask being chosen again (the tick's mover): it is never its own reason to stay."""
     filling, evicting = set(filling), set(evicting)
     seat = [own, *extras]
 
@@ -139,7 +142,7 @@ def choose(
                 return Choice(r.id, words={"lands": True} if ask and r is not own else None)
     if ask and pr is not None:
         for r in seat:
-            if live(r) and any(e.kind == "ask" and e.pr == pr for e in r.inbox):
+            if live(r) and any(e.kind == "ask" and e.pr == pr and e.id != skip for e in r.inbox):
                 return Choice(r.id, words={"lands": True} if r is not own else None)
     for r in seat:
         if r.id in evicting:
