@@ -642,6 +642,21 @@ def is_sync_order(pr: dict[str, Any]) -> bool:
     return bool(pr.get("sync")) and bool(pr.get("sync_since")) and not waits
 
 
+def is_lift_order(pr: dict[str, Any]) -> bool:
+    """A live check's lift PR (design §4.4 *A live check's lift PR is the team's at once*, TD-1437): its
+    head branch `lift/TD-n/<live, live-<digits> or live-td<digits>>` (the reading's `lift`, stamped
+    `lift_since`), not a draft and not a fork. Whatever its checks, red and pending included: its taker
+    runs its precheck and re-runs the check (§4.9b)."""
+    lift = bool(pr.get("lift")) and bool(pr.get("lift_since")) and reports.lift_of(pr.get("branch")) is not None
+    return lift and not pr.get("draft") and not pr.get("fork")
+
+
+def lift_context(pr: dict[str, Any]) -> str:
+    """A lift order's words beside its URL: the gate it lifts on its entry, `lifts TD-n event (live)`."""
+    tid, gate = reports.lift_of(pr.get("branch")) or ("", "")
+    return f"lifts {tid} {gate}" if tid else ""
+
+
 def sync_reason(pr: dict[str, Any]) -> str:
     """Why a sync PR waits on someone, in its order's words: the failing checks, *conflicting*,
     *draft*, else *green: review and merge it* — or, where the home judged it (§6 *Sync*), its verdict's `why`."""
@@ -659,25 +674,34 @@ def pr_note(pr: dict[str, Any]) -> str:
         return (
             f"sync PR #{pr['number']} has been open since {pr.get('sync_since')}: {sync_reason(pr)} — fix it or say why"
         )
+    if is_lift_order(pr):
+        since = pr.get("lift_since")
+        return f"lift PR #{pr['number']} has been open since {since}: {lift_context(pr)} — take it or say why"
     why = ", ".join(pr.get("failing") or []) or ("conflicting with its base" if pr.get("conflicting") else "red")
     return f"PR #{pr['number']} has been red since {pr.get('red_since')}: {why} — fix it or say why"
 
 
-def pr_order(pr: dict[str, Any]) -> dict[str, Any]:
+def pr_order(pr: dict[str, Any], priorities: dict[str, str] | None = None) -> dict[str, Any]:
     """A red PR nobody holds as the lanes and the pages read an entry: `pr:<n>`, the PR's title, High,
     pickable, its `Context` the URL and the failing checks. `pr_order` marks it, and every `free-pick`
     lane takes it: the grinders' pick list (§4.9b *No anchor seat*, TD-757). A sync PR's (TD-684) is marked `sync`, with
-    `sync_since` and its `reason` (`sync_reason`), which is its `Context` beside the URL."""
+    `sync_since` and its `reason` (`sync_reason`), which is its `Context` beside the URL. A lift PR's
+    (TD-1450) is marked `lift`, with `lift_since`, its `entry` and `gate`; its priority is its entry's, from
+    `priorities` (the repo's ledger, by id, lower-case as the reading keeps it), High where it is not there,
+    and its `Context` the URL and the gate."""
     failing = list(pr.get("failing") or [])
     sync = is_sync_order(pr)
-    why = sync_reason(pr) if sync else ""
+    lift = not sync and is_lift_order(pr)
+    why = sync_reason(pr) if sync else lift_context(pr) if lift else ""
+    tid, gate = (reports.lift_of(pr.get("branch")) or ("", "")) if lift else ("", "")
+    priority = str((priorities or {}).get(tid) or "high").capitalize() if lift else "High"
     red = [", ".join(failing), "conflicting" * bool(pr.get("conflicting"))]
     red += ["CI never ran"] if pr.get("checks") == "not_run" else []  # ordered by its conflict alone (TD-686)
-    context = " · ".join(filter(None, [str(pr.get("url") or ""), *([why] if sync else red)]))
+    context = " · ".join(filter(None, [str(pr.get("url") or ""), *([why] if sync or lift else red)]))
     return {
         "id": f"{PR_PREFIX}{pr['number']}",
         "title": str(pr.get("title") or ""),
-        "priority": "High",
+        "priority": priority,
         "owner": "",
         "kind": "",
         "type": "debt",
@@ -697,6 +721,7 @@ def pr_order(pr: dict[str, Any]) -> dict[str, Any]:
         "refs": [],
         "text": "",
         **({"sync": True, "sync_since": pr.get("sync_since"), "reason": why} if sync else {}),
+        **({"lift": True, "lift_since": pr.get("lift_since"), "entry": tid, "gate": gate} if lift else {}),
     }
 
 
@@ -706,6 +731,7 @@ def red_prs(
     now: datetime,
     told: dict[str, dict[str, str]],
     after: timedelta,
+    priorities: dict[str, str] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, dict[str, str]], list[tuple[str, dict[str, Any]]]]:
     """A repo's red PRs read against its live records: the `pr:<n>` orders, the memory of whom was
     told (`{n: {red_since, at}}`, one per red spell), and the notes to send now `(record id, pr)`.
@@ -717,6 +743,10 @@ def red_prs(
     A sync PR (`is_sync_order`, TD-684) is an order from the first reading, with no `after`: unheld,
     at once, whatever its checks but *pending*; its idle holders are told and passed over as a red
     PR's, keyed on `sync_since` in place of `red_since`. Sync orders come first in the list.
+
+    A live check's lift PR (`is_lift_order`, TD-1450) is one the same way, keyed on `lift_since`, whatever
+    its checks, pending included; its priority its entry's in `priorities` (`pr_order`). A PR with none of
+    the three stamps is skipped.
 
     A draft (the reading's `draft`) that `is_sync_order` does not order is no order and no note, however
     long it is red (design §4.4 *A draft is no work order*, TD-745); its spell's memory is kept, so a PR
@@ -731,7 +761,8 @@ def red_prs(
         if not isinstance(pr, dict) or not isinstance(pr.get("number"), int):
             continue
         sync = is_sync_order(pr)
-        since = pr.get("sync_since") if sync else pr.get("red_since")
+        lift = not sync and is_lift_order(pr)
+        since = pr.get("sync_since") if sync else pr.get("lift_since") if lift else pr.get("red_since")
         if not since:
             continue
         try:
@@ -750,13 +781,13 @@ def red_prs(
         if pr.get("fork") and not sync:
             continue  # a fork's PR is no order and no note: its precheck is the person's (TD-1285)
         holders = [r for r in records if holds_pr(r, pr)]
-        if not holders and sync:
-            orders.append(pr_order(pr))
+        if not holders and (sync or lift):
+            orders.append(pr_order(pr, priorities))
             continue
         if now - red_since < after:
             continue
         if not holders:
-            orders.append(pr_order(pr))
+            orders.append(pr_order(pr, priorities))
             continue
         if any(r.state != "idle" for r in holders):
             continue
@@ -764,7 +795,7 @@ def red_prs(
             kept[key] = {"red_since": since, "at": now.isoformat()}
             notes.extend((r.id, pr) for r in holders)
         elif now - datetime.fromisoformat(was["at"]) >= after:
-            orders.append(pr_order(pr))
+            orders.append(pr_order(pr, priorities))
     orders.sort(key=lambda o: not o.get("sync"))  # a sync order first (a stable sort)
     return orders, kept, notes
 

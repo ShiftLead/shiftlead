@@ -1368,3 +1368,22 @@ def test_the_repo_reading_keeps_completed_from_the_history_and_the_prs(repo, mon
     assert (c["id"], c["pr"], c["author"], c["branch"]) == ("TD-001", 7, "eyecantell", "td001")
     again = TickMixin._read_repos([root], {root: full}, set())[root]
     assert again["completed"] == full["completed"]
+
+
+def test_a_lift_branch_is_stamped_lift_since_at_its_first_reading_and_kept(tmp_path, monkeypatch):
+    """TD-1450, design §4.4 *A live check's lift PR is the team's at once*: an open PR on
+    `lift/TD-n/<live, live-<digits>, live-td<digits>>` carries `lift` and `lift_since`, the first reading
+    that saw it, kept while it stays open; any other branch carries neither."""
+    t0 = datetime.now(UTC)
+    names = {5: "lift/TD-1450/live", 6: "lift/TD-1450/live-2", 7: "lift/TD-9/live-td31", 8: "lift/TD-9/livefoo",
+             9: "lift/TD-9/until", 10: "b10"}  # fmt: skip
+    prs = [_pr(n, "open", t0, headRefName=b) for n, b in names.items()]
+    _fake_gh(monkeypatch, prs, [])
+    first = reports.pr_reading(tmp_path, t0)
+    by = {p["number"]: p for p in first["open"]}
+    assert all((by[n]["lift"], by[n]["lift_since"]) == (True, t0.isoformat()) for n in (5, 6, 7))
+    assert all("lift" not in by[n] and "lift_since" not in by[n] for n in (8, 9, 10))
+    second = reports.pr_reading(tmp_path, t0 + timedelta(hours=2), old=first)
+    assert {p["number"]: p.get("lift_since") for p in second["open"]}[5] == t0.isoformat()
+    assert reports.lift_of("lift/TD-1450/live-td31") == ("TD-1450", "event (live-td31)")
+    assert reports.lift_of("lift/TD-1450/decision-paul") is None and reports.lift_of(None) is None

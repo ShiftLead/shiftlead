@@ -704,3 +704,48 @@ async def test_a_red_pr_rows_snooze_is_kept_by_repo_and_number(agent):
     async with LocalClient() as person:
         got = await person.call("attention_snooze", id="red_pr:samscrape:802", kind="red_pr", until="2030-01-01")
     assert got["row"] == "red_pr:samscrape:802|red_pr" and agent.attention_snoozed[got["row"]] == "2030-01-01"
+
+
+def _lift(n=1900, name="live", since=T0, checks="green", **kw):
+    pr = {"number": n, "title": f"lift TD-1450 event ({name})", "url": f"https://github.com/o/r/pull/{n}"}
+    return {**pr, "branch": f"lift/TD-1450/{name}", "author": "a", "checks": checks, "failing": [], "lift": True,
+            "lift_since": since.isoformat(), **kw}  # fmt: skip
+
+
+@pytest.mark.unit
+def test_a_lift_pr_is_an_order_from_its_first_reading_whatever_its_checks():
+    """TD-1450, design §4.4 *A live check's lift PR is the team's at once*: a `lift/TD-n/live` PR (and
+    `live-2`, `live-td5`) is a `pr:` order at once, pending and not_run included, its priority its entry's,
+    its `Context` the URL and the gate; a draft, a fork and `livefoo` are not."""
+    prio = {"TD-1450": "medium"}
+    for name in ("live", "live-2", "live-td5"):
+        for checks in ("green", "pending", "not_run", "red"):
+            (o,) = workorders.red_prs([_lift(name=name, checks=checks)], [], T0, {}, HOUR, prio)[0]
+            assert (o["id"], o["lift"], o["entry"], o["gate"]) == ("pr:1900", True, "TD-1450", f"event ({name})")
+            assert o["context"] == f"https://github.com/o/r/pull/1900 · lifts TD-1450 event ({name})", name
+            assert o["priority"] == "Medium" and o["pickable"] == "yes" and o["lift_since"] == T0.isoformat()
+            assert "sync" not in o
+    # an entry the ledger does not hold is High, as every other order
+    (o,) = workorders.red_prs([_lift()], [], T0, {}, HOUR)[0]
+    assert o["priority"] == "High"
+    for pr in (_lift(name="livefoo"), _lift(draft=True), _lift(fork=True), _lift(branch="lift/TD-1450/until")):
+        assert workorders.red_prs([pr], [], T0 + 3 * HOUR, {}, HOUR, prio)[0] == [], pr
+    # not stamped by the reading: no order
+    assert workorders.red_prs([_lift(lift=False)], [], T0 + 3 * HOUR, {}, HOUR)[0] == []
+    # a red draft lift is a red draft: no order, as any draft
+    red_draft = _lift(draft=True, checks="red", red_since=T0.isoformat())
+    assert workorders.red_prs([red_draft], [], T0 + 3 * HOUR, {}, HOUR)[0] == []
+
+
+@pytest.mark.unit
+def test_a_held_lift_pr_is_no_order_and_its_idle_holder_is_told_then_passed_over_on_lift_since():
+    working = _rec(state="working", progress=[ProgressEntry(ref="pr:1900")])
+    assert workorders.red_prs([_lift()], [working], T0 + 3 * HOUR, {}, HOUR) == ([], {}, [])
+    holder = _rec(progress=[ProgressEntry(ref="pr:1900")])
+    orders, told, notes = workorders.red_prs([_lift()], [holder], T0 + HOUR, {}, HOUR)
+    assert orders == [] and [(sid, p["number"]) for sid, p in notes] == [("ao-g1", 1900)]
+    assert told == {"1900": {"red_since": T0.isoformat(), "at": (T0 + HOUR).isoformat()}}
+    note = workorders.pr_note(notes[0][1])
+    assert note.startswith("lift PR #1900 has been open since") and "lifts TD-1450 event (live)" in note
+    orders, kept, notes = workorders.red_prs([_lift()], [holder], T0 + 2 * HOUR, told, HOUR)
+    assert [o["id"] for o in orders] == ["pr:1900"] and orders[0]["lift"] and notes == []
