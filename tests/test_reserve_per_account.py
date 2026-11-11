@@ -1,5 +1,5 @@
 """One usage reserve per account (design §6 *Usage gate*: *A reserve is the account's*, *The migration*;
-TD-1581, TD-1609 slice 2): `usage_gate:` is keyed by the account's usage key, every reader reads by
+TD-1581, TD-1609 slices 2 and 3): `usage_gate:` is keyed by the account's usage key, every reader reads by
 account, and the home's tick moves a key holding no `:` — a profile's — to its account."""
 
 from __future__ import annotations
@@ -13,7 +13,8 @@ from conftest import park_ticks
 
 from sessionorc import defs, paths
 from sessionorc import settings as settings_mod
-from sessionorc.client import LocalClient
+from sessionorc.client import AgentError, LocalClient
+from shiftlead import doctor
 
 SUB = {"claude-code:paul": {"subscription"}}
 
@@ -268,3 +269,94 @@ def test_a_key_written_since_the_resolution_waits_and_an_empty_one_is_named():
     assert got == {"claude-code:paul": {"week": 5}, "new": {"week": 9}}, "a key not resolved is the next tick's"
     assert said == ["bare had no reserve: its key is removed", "claude-code:paul takes week 5 (from grind)"]
     assert _move({"new": {"week": 9}}, {})[1] is None
+
+
+@pytest.mark.integration
+async def test_a_set_by_account_moves_every_profile_on_it_and_names_them(agent, hookstub):
+    await park_ticks(agent)
+    hookstub.accounts = {"pa": "paul", "pb": "paul", "pc": "other"}
+    async with LocalClient() as person:
+        got = await person.call("set_settings", account="hookstub:paul", reserves={"5h": 30})
+        assert (got["account"], got["profiles"], got["unchecked"]) == ("hookstub:paul", ["pa", "pb"], True)
+        whole = settings_mod.load()
+        assert agent._gate_reserves(whole, "pa") == agent._gate_reserves(whole, "pb") == {"5h": 30}
+        assert agent._gate_reserves(whole, "pc") is None
+        got = await person.call("set_settings", profile="pb", reserves={"5h": 10})
+        assert (got["account"], got["profiles"]) == ("hookstub:paul", ["pa", "pb"])
+        with pytest.raises(AgentError, match="a profile or an account"):
+            await person.call("set_settings", profile="pa", account="hookstub:paul", reserves={"5h": 1})
+        with pytest.raises(AgentError, match="is not a usage key"):
+            await person.call("set_settings", account="paul", reserves={"5h": 1})
+    assert settings_mod.load()["usage_gate"] == {"hookstub:paul": {"5h": 10}}
+
+
+@pytest.mark.integration
+async def test_an_account_this_home_has_not_seen_is_refused_and_a_nodes_is_checked(agent, hookstub):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="hookstub:nodeacct is one this home has not seen"):
+            await person.call("set_settings", account="hookstub:nodeacct", reserves={"5h": 30})
+        # a node has reported under it: its reading's labels check the set
+        agent._usage_acct["hookstub:nodeacct"] = {"windows": [{"label": "5h", "pct": 10}]}
+        with pytest.raises(AgentError, match="reports no window week"):
+            await person.call("set_settings", account="hookstub:nodeacct", reserves={"week": 30})
+        got = await person.call("set_settings", account="hookstub:nodeacct", reserves={"5h": 30})
+    assert (got["profiles"], got["unchecked"]) == ([], False)
+    assert settings_mod.reserves(settings_mod.load()) == {"hookstub:nodeacct": {"5h": 30}}
+
+
+@pytest.mark.integration
+async def test_an_account_whose_profiles_disagree_on_billing_takes_no_reserve(agent, hookstub):
+    await park_ticks(agent)
+    hookstub.accounts = {"pa": "paul", "api": "paul"}
+    hookstub.billing = {"api": {"billing": "metered", "prices": {"m": 1.0}}}
+    async with LocalClient() as person:
+        for where in ({"profile": "pa"}, {"profile": "api"}, {"account": "hookstub:paul"}):
+            with pytest.raises(AgentError, match=r"profiles disagree on billing \(api metered, pa subscription\)"):
+                await person.call("set_settings", reserves={"5h": 30}, **where)
+    assert not settings_mod.load().get("usage_gate")
+
+
+@pytest.mark.integration
+async def test_a_metered_account_takes_an_amount_and_refuses_a_percent(agent, hookstub):
+    await park_ticks(agent)
+    hookstub.accounts = {"api": "key", "api2": "key"}
+    hookstub.billing = {p: {"billing": "metered", "prices": {"m": 1.0}} for p in ("api", "api2")}
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="account hookstub:key is metered, so its reserve is an amount"):
+            await person.call("set_settings", account="hookstub:key", reserves={"day": 30})
+        got = await person.call("set_settings", account="hookstub:key", reserves={"day": "$5"})
+    assert (got["metered"], got["profiles"], got["reserves"]) == (True, ["api", "api2"], {"day": "$5"})
+    assert settings_mod.amounts(settings_mod.load())["hookstub:key"]["day"]["unit"] == "$"
+
+
+@pytest.mark.integration
+async def test_an_account_part_holding_a_colon_is_refused_and_a_dotted_one_works(agent, hookstub):
+    await park_ticks(agent)
+    hookstub.accounts = {"pa": "a:b", "pe": "paul@example.com"}
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="profile pa: the account part of hookstub:a:b holds a ':'"):
+            await person.call("set_settings", profile="pa", reserves={"5h": 30})
+        with pytest.raises(AgentError, match="holds a ':'"):
+            await person.call("set_settings", account="hookstub:a:b", reserves={"5h": 30})
+        got = await person.call("set_settings", profile="pe", reserves={"5h": 30})
+    assert got["account"] == "hookstub:paul@example.com"
+    assert settings_mod.load()["usage_gate"] == {"hookstub:paul@example.com": {"5h": 30}}
+
+
+@pytest.mark.unit
+def test_doctors_profiles_check_names_a_colon_account_and_a_split_billing():
+    rows = [
+        {"adapter": "claude-code", "profile": "grind", "account": "paul", "credentials": True},
+        {"adapter": "claude-code", "profile": "api", "account": "paul", "metered": True, "key": True},
+        {"adapter": "claude-code", "profile": "odd", "account": "a:b", "credentials": True},
+        {"adapter": "claude-code", "profile": "mail", "account": "paul@example.com", "credentials": True},
+        {"adapter": "gemini", "profile": "g", "account": "paul", "metered": True, "key": True},
+    ]
+    named = [r["text"] for r in doctor.profiles(rows) if r["verdict"] == doctor.WARNING]
+    assert named == [
+        "profile odd — its account a:b holds a ':', so its usage key does not split and its reserve is refused: "
+        "rename it in profiles.yml (a '.' is allowed)",
+        "account claude-code:paul — its profiles disagree on billing (api metered, grind subscription): an account "
+        "has one billing, so its reserve is refused until profiles.yml agrees",
+    ]

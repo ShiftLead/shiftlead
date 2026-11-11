@@ -295,7 +295,37 @@ def profiles(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         else:
             why = f": {u['error']}" if u.get("error") else ""
             out.append(_row("profiles", LACKING, f"profile {name} — usage endpoint error{why}", profile=row))
-    return out or [_row("profiles", OK, "profiles — none defined")]
+    return (out + _accounts(rows)) or [_row("profiles", OK, "profiles — none defined")]
+
+
+def _accounts(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """What the profiles' accounts break (§6 *A reserve is the account's*, TD-1581): an account part — the
+    profile's `account`, else its name — holding a `:`, whose usage key does not split into adapter and
+    account, so its reserve is refused; and an account whose profiles disagree on billing (§4.2a *An account
+    has one billing*), no load error, whose reserve is refused until profiles.yml agrees."""
+    out: list[dict[str, Any]] = []
+    billing: dict[str, dict[str, str]] = {}
+    for row in rows:
+        if "profile" not in row:
+            continue
+        name, account = str(row["profile"]), str(row.get("account") or row["profile"])
+        if ":" in account:
+            text = (
+                f"profile {name} — its account {account} holds a ':', so its usage key does not split and its "
+                "reserve is refused: rename it in profiles.yml (a '.' is allowed)"
+            )
+            out.append(_row("profiles", WARNING, text, profile=row))
+        key = f"{row.get('adapter')}:{account}"
+        billing.setdefault(key, {})[name] = "metered" if row.get("metered") else "subscription"
+    for key, profs in sorted(billing.items()):
+        if len(set(profs.values())) > 1:
+            each = ", ".join(f"{p} {b}" for p, b in sorted(profs.items()))
+            text = (
+                f"account {key} — its profiles disagree on billing ({each}): an account has one billing, so its "
+                "reserve is refused until profiles.yml agrees"
+            )
+            out.append(_row("profiles", WARNING, text, account=key, profiles=sorted(profs)))
+    return out
 
 
 def nodes(
