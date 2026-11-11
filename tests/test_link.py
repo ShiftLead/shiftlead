@@ -2192,6 +2192,9 @@ async def test_a_nodes_metered_turns_are_ledgered_at_the_home_once_and_its_readi
         assert await wait_for(node.home_reachable, timeout=10.0, step=0.05), node.home_link
         await park_ticks(node)
         assert await wait_for(lambda: node._snapshot_sent, timeout=10.0, step=0.05)
+        # the dial's own push of the home's settings lands after the snapshot's reply: wait for it (it carries
+        # td-max's stamp, which only the home writes), or it replaces the replica written below (TD-1579)
+        assert await wait_for(lambda: ((settings.read() or {}).get("scale") or {}).get("migrated"), timeout=10.0)
         settings.save({"usage_gate": {"api": {"day": "$5"}}})  # the node's replica, as the home would send it
         # and the home's own, which the next dial replicates whole (it holds td-max's stamp from its start)
         hs = home.dir / "settings.yml"
