@@ -1425,7 +1425,9 @@ class InboxMixin:
         of the team's `work_waiting` are added to each named member's `lane_seen`, so those entries
         do not ask again and a later one does, and the mark is removed. A person's own, refused to a
         session as `set_settings` is, and the home's alone (`modes.HOME_EDITS`). `{team, cleared,
-        ids}`: `cleared` false when no work was waiting."""
+        ids}`: `cleared` false when no work was waiting. A mark's **held part** (`seats_held`, §6 rule 8 *A team
+        that stopped*, TD-1564) stays: a held-only mark answers `cleared: false` and is left, and a mixed one
+        becomes `{at, repo, members: {}, seats_held, seats_held_by, seats_held_at}`, `stopped` kept where it stood."""
         agent_common.person_only(caller, "clear a team's waiting work", "§6 rule 8", self._graph())
         if self.mode != "home":
             raise RpcError("clear_work runs at the home (design §6 rule 8): this host is a node")
@@ -1438,6 +1440,11 @@ class InboxMixin:
         if not isinstance(mark, dict):
             return {"team": team, "cleared": False, "ids": []}
         named = mark.get("members") if isinstance(mark.get("members"), dict) else {}
+        kept = mark.get("seats_held")
+        if kept and not any(isinstance(v, list) and v for v in named.values()):
+            # a held-only mark (§6 rule 8 *A team that stopped*, TD-1564): its questions still wait, so a dismissed
+            # count would only come back on the next tick — no press but the Start, or the questions closing, clears it
+            return {"team": team, "cleared": False, "ids": []}
         # a question ends once (§6 rule 8 *A question's end is work*, TD-274): its reference is not
         # lane news, and is not written to `lane_seen`
         asked = {(str(q.get("name")), str(q.get("ref"))) for q in mark.get("questions") or [] if isinstance(q, dict)}
@@ -1449,7 +1456,11 @@ class InboxMixin:
             if add := [str(i) for i in ids if str(i) not in held and (r.name, str(i)) not in asked]:
                 r.lane_seen = {**r.lane_seen, "at": now_iso(), "ids": [*held, *add]}
                 self._save(r)
-        rec.pop("work_waiting", None)
+        if kept:  # Dismiss leaves the held part, `stopped` with it where it stood, its questions dropped (TD-1564)
+            keys = ("at", "repo", "stopped", "seats_held", "seats_held_by", "seats_held_at")
+            rec["work_waiting"] = {**{k: mark[k] for k in keys if k in mark}, "members": {}}
+        else:
+            rec.pop("work_waiting", None)
         if not rec:
             teams.pop(team, None)
         try:
@@ -1480,6 +1491,10 @@ class InboxMixin:
         rec = teams.get(team) or {}
         mark = rec.get("work_waiting")
         if not isinstance(mark, dict):
+            return {"team": team, "started": False, "ids": [], "held": None}
+        if not any(isinstance(v, list) and v for v in (mark.get("members") or {}).values()):
+            # a held-only mark (§6 rule 8, TD-1564): questions alone start no team, and the mark stays — asked
+            # before a stopped mark is refused and before the mark is taken away
             return {"team": team, "started": False, "ids": [], "held": None}
         if mark.get("stopped"):
             raise RpcError(
