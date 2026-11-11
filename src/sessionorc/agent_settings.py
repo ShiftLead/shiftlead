@@ -670,10 +670,12 @@ class SettingsMixin:
             )
         names = sorted(on)
         if set(on.values()) == {"metered"}:
-            bills = [b for p in ([prof] if account is None else names) if (b := self._billing_of(p)) is not None]
+            # the account's prices are its profiles', pooled, on either path (§6 *One billing*)
+            bills = [b for p in dict.fromkeys([prof, *names]) if (b := self._billing_of(p)) is not None]
             prices = next((b.get("prices") for b in bills if b.get("prices")), None) or {}
-            out = self._amounts_change(doc, prof if account is None else (names or [""])[0], key, reserves, prices, who)
-            return out | {"profiles": names}
+            rows_of = prof if account is None else (names or [""])[0]  # whose reading the rows read
+            out = self._amounts_change(doc, rows_of, key, reserves, prices, who)
+            return out | {"profile": prof, "profiles": names}
         reading = self._usage_acct.get(key) or next((self._usage[p] for p in [prof, *names] if p in self._usage), {})
         windows = reading.get("windows")
         reported = [str(w.get("label")) for w in windows or []]
@@ -720,7 +722,10 @@ class SettingsMixin:
             except Exception as e:  # noqa: BLE001 — an adapter's list never stops the write
                 log.warning("profiles() on %s failed: %s", name, e)
         records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
-        for prof in sorted({r.profile for r in records if adapters.has_agent(r.adapter)} - set(out)):
+        # "" is the default profile, which a listed name already counts
+        for prof in sorted(
+            {r.profile for r in records if adapters.has_agent(r.adapter)} - set(out) - ({""} if out else set())
+        ):
             if self._account_key(prof) == key:
                 out[prof] = "metered" if self._is_metered(prof) else "subscription"
         for accts in self._spend_named.values():
