@@ -807,8 +807,8 @@ def write_extras(
     changed while the team was down), its mail kept; a filled one is left to its run; a closed record the
     plan now reads as an extra — a size lowered while the team was down — is superseded as one, mail kept, as
     a member's is (`keep_mail_for`); a name another live record holds is left to it and said. A held extra the
-    plan no longer reads — a `max` lowered, its line renamed or removed — is removed (`remove`), and a live
-    one is said and left to its run. A refused create or removal is said, and the start stands: an extra is
+    plan no longer reads — a `max` lowered, its line renamed or removed — is removed (`remove`); a live one,
+    or one with unread mail, is said and left. A refused create or removal is said, and the start stands: an extra is
     capacity, never the team. Returns `(records written, notes)`."""
     on = {"host": plan.host} if plan.host else {}
     verdicts: dict[str, Any] = {}
@@ -848,6 +848,9 @@ def write_extras(
         line = (r.get("scale") or {}).get("line") or "its line"
         if r.get("state") not in DEAD:
             notes.append(f"{r.get('name')}: a live extra of {line} the max no longer holds — left to its run")
+            continue
+        if n := int(r.get("unread") or 0):  # its mail waits for a fill: never dropped with the record
+            notes.append(f"{r.get('name')}: the held extra of {line} kept — {n} unread message(s) wait for it")
             continue
         try:
             call("remove", id=r["id"])
@@ -1207,10 +1210,18 @@ def _pairing(
     """`renames`, with the newcomers an applied orphan already holds (its `relaunch` mark's `name`), each
     by name with the orphan that holds it."""
     mine = crew(plan.team, sessions)
-    # a name the plan reads as an extra is no orphan: a size lowered on a line that scales gives the record
-    # `scale` at the Start's reconcile (`write_extras`), never a sit-out (§4.9 *Scaling with the work*, TD-1545)
-    names = {x.name for x in plan.launches} | set(plan.sit_out) | {x.name for x in plan.extras}
-    gone = [n for n in dict.fromkeys(str(r.get("name") or "") for r in mine) if n and n not in names]
+    # a closed record of a name the plan reads as an extra is no orphan: a size lowered on a line that scales
+    # gives it `scale` at the Start's reconcile (`write_extras`), never a sit-out (§4.9 *Scaling with the work*,
+    # TD-1545)
+    names = {x.name for x in plan.launches} | set(plan.sit_out)
+    extras = {x.name for x in plan.extras}  # a live one is the −'s to turn, so it still reads removed here
+    gone = [
+        n
+        for n in dict.fromkeys(str(r.get("name") or "") for r in mine)
+        if n
+        and n not in names
+        and not (n in extras and all(r.get("state") in DEAD for r in mine if r.get("name") == n))
+    ]
     orphans = [
         r
         for n in gone

@@ -172,6 +172,29 @@ def test_max_off_removes_every_held_extra_and_a_refused_removal_is_said(world, e
     assert "hunt-2: the held extra of hunt was not removed — suspended" in capsys.readouterr().err
 
 
+def test_a_held_extra_with_mail_waiting_is_kept(world, extras_on, removes, capsys):  # noqa: F811
+    tmp_path, state = world
+    settings(tmp_path, {"ao-grind": {"max": "off"}})
+    state["sessions"] += [{**extra("hunt-2", "hunt"), "unread": 2}]
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    assert removed(state) == []
+    assert "hunt-2: the held extra of hunt kept — 2 unread message(s) wait for it" in capsys.readouterr().err
+
+
+def test_a_live_member_past_a_lowered_size_still_reads_removed(world, extras_on):  # noqa: F811
+    """On a live team the record past the size is the −'s to turn into an extra: until then Apply reads it as
+    the definition's removal, as before td-max."""
+    tmp_path, state = world
+    assert cli.main(["team", "start", "ao-grind"]) == 0  # the team live, so no newcomer pairs with grind-3
+    state["sessions"][:] = [s for s in state["sessions"] if s["name"] in ("orc-ao", "grind-1", "grind-2", "hunt")]
+    state["sessions"].append(
+        {"id": "ao-shiftlead-grind-3", "name": "grind-3", "state": "idle", "team": "ao-grind", "role": "grinder"}
+    )
+    plan = teams.plan(orgmod_with_settings(tmp_path), "ao-grind", "kmaster")
+    _, removals = teamrun.renames(plan, state["sessions"])
+    assert [r["name"] for r in removals] == ["grind-3"]
+
+
 def test_a_size_lowered_while_down_makes_the_record_past_it_an_extra(world, extras_on, removes):  # noqa: F811
     """A kept member's closed record past a size lowered while the team was down is no member the definition
     dropped: the Start supersedes it as the line's extra, its mail kept, and marks nothing sat out."""
