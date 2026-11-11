@@ -9,7 +9,7 @@ import pytest
 from test_review import _no_gh, _own  # noqa: F401 — the fixture, by name
 
 from sessionorc import cadence, held
-from sessionorc.client import LocalClient
+from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import PERSON, MailEntry, Session
 
 SEAT, EXTRA = "ao-x-techlead-ao-1", "ao-x-techlead-ao-1-2"
@@ -48,6 +48,23 @@ def test_extras_of_maps_an_extra_seat_to_its_seat_and_nothing_else():
     assert held.extras_of([*GRAPH, worker_extra, plain]) == {EXTRA: SEAT}
     assert held.as_seat(f"{EXTRA}@laptop", {EXTRA: SEAT}) == SEAT
     assert held.as_seat("ao-x-other", {EXTRA: SEAT}) == "ao-x-other"
+    # the host is kept where the address is read whole (`pr_reads`)
+    assert held.seat_address(f"{EXTRA}@laptop", {EXTRA: SEAT}) == f"{SEAT}@laptop"
+    assert held.seat_address(EXTRA, {EXTRA: SEAT}) == SEAT
+    assert held.seat_address("ao-x-other@laptop", {EXTRA: SEAT}) == "ao-x-other@laptop"
+
+
+@pytest.mark.unit
+def test_an_extra_of_another_seat_is_no_read_and_a_remote_extras_reply_is():
+    other = _seat("ao-x-ui-reader-ao-1-2", "ui-reader-ao-1-2", {"line": "ui-reader-ao-1"})
+    extras = held.extras_of([*GRAPH, other])
+    s = _author({"reader": "techlead", "held": ["src/**"], "bound": "2h"})
+    _ask(s, SEAT)
+    _reply(s, other.id)
+    assert held.read_by(s, 845, extras=extras) is None, "another seat's extra answers for that seat alone"
+    assert cadence.read_by(s, 845, extras) is None
+    _reply(s, f"{EXTRA}@laptop")
+    assert held.read_by(s, 845, extras=extras) == f"{EXTRA}@laptop"
 
 
 @pytest.mark.unit
@@ -112,12 +129,20 @@ async def test_pr_reads_names_an_extras_ask_as_its_seats_and_lets_either_read_it
         w = await mk("w", team="t", unattended=True, review={"reader": "techlead"})
         tl = await mk("tl", team="t", unattended=True)
         extra = await mk("tl-2", team="t", unattended=True, seat={"trigger": "asks"}, scale={"line": "tl"})
-        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc, LocalClient(caller=extra) as xc:
+        stranger = await mk("o", team="t", unattended=True)
+        async with (
+            LocalClient(caller=w) as wc,
+            LocalClient(caller=tl) as tc,
+            LocalClient(caller=extra) as xc,
+            LocalClient(caller=stranger) as oc,
+        ):
             asked = (await wc.call("msg", to=extra, text="#12: the core", kind="ask", pr=12))["entry"]
             await xc.call("msg", reply_to=asked["id"], kind="reply", text="merged #12", verdict="merged")
             got = await wc.call("pr_reads", id=w, pr=12)
             assert [(a["to"], a["verdict"]) for a in got["asks"]] == [([tl], "merged")]
             assert (await tc.call("pr_reads", id=w, pr=12)) == got, "the seat reads its extra's ask"
             assert (await xc.call("pr_reads", id=w, pr=12)) == got
-        for sid in (w, tl, extra):
+            with pytest.raises(AgentError, match="cannot read .* reads of PR #12"):
+                await oc.call("pr_reads", id=w, pr=12)
+        for sid in (w, tl, extra, stranger):
             await person.call("kill", id=sid)

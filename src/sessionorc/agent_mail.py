@@ -2047,8 +2047,8 @@ class MailMixin:
         # addressee reads as its seat, so `ao pr held` matches an ask the extra holds to the seat's link
         extras = held_mod.extras_of(self._graph().values())
         if not mail.is_person(caller) and not self._is_self(s, caller):
-            me = held_mod.as_seat(self._addr(caller), extras)
-            if not any(held_mod.as_seat(self._addr(x), extras) == me for e in asks for x in e.to):
+            me = held_mod.seat_address(self._addr(caller), extras)
+            if not any(held_mod.seat_address(self._addr(x), extras) == me for e in asks for x in e.to):
                 raise RpcError(
                     f"{me} cannot read {id}'s reads of PR #{pr}: its author, a reader it asked, or a person "
                     f"reads them (design §4.9c)"
@@ -2071,7 +2071,7 @@ class MailMixin:
             reads.append(
                 {
                     "id": e.id,
-                    "to": [extras.get(held_mod.as_seat(x, None), x) for x in e.to],
+                    "to": [held_mod.seat_address(x, extras) for x in e.to],
                     "at": e.at,
                     "open": now_at.open,
                     "verdict": last.verdict if last else None,

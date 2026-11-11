@@ -241,6 +241,16 @@ def as_seat(address: str, extras: dict[str, str] | None) -> str:
     return (extras or {}).get(base, base)
 
 
+def seat_address(address: str, extras: dict[str, str] | None) -> str:
+    """An address read as its seat's, its host kept (an extra runs on its seat's host): `ao-x-tl-2@laptop` →
+    `ao-x-tl@laptop`; an address that is no extra's is returned as it is."""
+    base, host = naming.split_address(address)
+    seat = (extras or {}).get(base)
+    if seat is None:
+        return address
+    return f"{seat}@{host}" if host else seat
+
+
 def addressed(addr: str, readers: list[str]) -> str | None:
     """Which of a chain's `readers` — each the seat's name as the definition gives it (§4.9c) — a
     mail address names: the session id `ao-<scope>-<name>`, on this host or `@<host>`, or the name
