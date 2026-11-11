@@ -7,8 +7,13 @@ import gzip
 import http.server
 import importlib.util
 import json
+import socket
+import struct
 import threading
+import time
+import urllib.error
 import urllib.request
+import zlib
 from pathlib import Path
 
 import pytest
@@ -38,6 +43,7 @@ SSE_BODY = (
     'event: message_delta\ndata: {"type":"message_delta","usage":{"output_tokens":7}}\n\n'
 )
 SECRET = "sk-ant-not-a-real-key"
+LIMITED = {"type": "error", "error": {"type": "rate_limit_error", "message": "slow down"}}
 
 
 class Upstream(http.server.BaseHTTPRequestHandler):
@@ -52,19 +58,48 @@ class Upstream(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("content-length") or 0))
         Upstream.seen.append({"path": self.path, "body": body, "key": self.headers.get("x-api-key")})
+        raw = json.dumps(JSON_BODY).encode()
+        status, extra = 200, {}
         if self.path == "/v1/sse":
             data, ctype, enc = SSE_BODY.encode(), "text/event-stream", None
         elif self.path == "/v1/gz":
-            data, ctype, enc = gzip.compress(json.dumps(JSON_BODY).encode()), "application/json", "gzip"
+            data, ctype, enc = gzip.compress(raw), "application/json", "gzip"
+        elif self.path == "/v1/deflate":
+            data, ctype, enc = zlib.compress(raw), "application/json", "deflate"
+        elif self.path == "/v1/rawdeflate":
+            c = zlib.compressobj(wbits=-zlib.MAX_WBITS)
+            data, ctype, enc = c.compress(raw) + c.flush(), "application/json", "deflate"
+        elif self.path == "/v1/429":
+            data, ctype, enc = json.dumps(LIMITED).encode(), "application/json", None
+            status, extra = 429, {"retry-after": "7"}
+        elif self.path == "/v1/slow":
+            self._slow()
+            return
         else:
-            data, ctype, enc = json.dumps(JSON_BODY).encode(), "application/json", None
-        self.send_response(200)
+            data, ctype, enc = raw, "application/json", None
+        self.send_response(status)
+        for k, v in extra.items():
+            self.send_header(k, v)
         self.send_header("content-type", ctype)
         if enc:
             self.send_header("content-encoding", enc)
         self.send_header("content-length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
+
+    def _slow(self):
+        """An event stream that keeps coming, a chunk every 50 ms for up to 10 s: long enough for a client to go."""
+        self.protocol_version = "HTTP/1.0"
+        self.send_response(200)
+        self.send_header("content-type", "text/event-stream")
+        self.end_headers()
+        try:
+            for i in range(200):
+                self.wfile.write(f"data: {i}\n\n".encode())
+                self.wfile.flush()
+                time.sleep(0.05)
+        except OSError:
+            pass
 
 
 @pytest.fixture
@@ -111,6 +146,80 @@ def test_the_proxy_passes_each_response_through_and_writes_the_decoded_bodies_an
     for p in out.iterdir():
         text = p.read_text()
         assert SECRET not in text and "x-api-key" not in text.lower() and "content-type" not in text.lower()
+
+
+def test_a_gzip_encoded_request_is_recorded_decoded_and_forwarded_as_it_came(proxy):
+    base, out = proxy
+    request = {"model": "m", "messages": [{"role": "user", "content": "hi"}]}
+    gz = gzip.compress(json.dumps(request).encode())
+    req = urllib.request.Request(
+        base + "/v1/json", data=gz, headers={"content-type": "application/json", "content-encoding": "gzip"}
+    )
+    with urllib.request.urlopen(req, timeout=10) as r:  # noqa: S310 — a local stub
+        r.read()
+    assert Upstream.seen[0]["body"] == gz  # the upstream got the bytes the client sent
+    assert json.loads((out / "0001-request.json").read_text()) == request  # the file holds them decoded
+
+
+def test_an_upstream_error_status_reaches_the_client_as_it_came_and_its_body_is_recorded(proxy):
+    base, out = proxy
+    with pytest.raises(urllib.error.HTTPError) as e:
+        _post(base + "/v1/429", {"model": "m"})
+    assert e.value.code == 429
+    assert e.value.headers.get("retry-after") == "7"
+    assert json.loads(e.value.read()) == LIMITED
+    assert json.loads((out / "0001-response.txt").read_text()) == LIMITED
+
+
+def test_an_upstream_that_does_not_answer_is_a_502(tmp_path):
+    with socket.socket() as s:  # a port that was free a moment ago and is closed now
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    srv = cc.serve(0, tmp_path / "cap", f"http://127.0.0.1:{port}")
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        with pytest.raises(urllib.error.HTTPError) as e:
+            _post(f"http://127.0.0.1:{srv.server_address[1]}/v1/json", {"model": "m"})
+        assert e.value.code == 502
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+@pytest.mark.parametrize("path", ["/v1/deflate", "/v1/rawdeflate"], ids=["zlib", "raw"])
+def test_a_deflate_response_is_passed_through_and_recorded_decoded(proxy, path):
+    base, out = proxy
+    got, headers = _post(base + path, {"model": "m"})
+    assert headers.get("content-encoding") == "deflate"
+    assert got != json.dumps(JSON_BODY).encode()  # the client gets it still encoded
+    assert json.loads((out / "0001-response.txt").read_text()) == JSON_BODY
+
+
+def test_the_client_response_carries_one_date_and_one_server_header(proxy):
+    base, _ = proxy
+    req = urllib.request.Request(base + "/v1/json", data=b"{}", headers={"content-type": "application/json"})
+    with urllib.request.urlopen(req, timeout=10) as r:  # noqa: S310 — a local stub
+        r.read()
+        assert len(r.headers.get_all("Date") or []) == 1
+        assert len(r.headers.get_all("Server") or []) == 1
+
+
+def test_a_client_that_goes_away_mid_stream_ends_the_forward_quietly_and_what_came_is_recorded(proxy, capsys):
+    base, out = proxy
+    host, port = base.removeprefix("http://").split(":")
+    c = socket.create_connection((host, int(port)), timeout=10)
+    c.sendall(b"POST /v1/slow HTTP/1.0\r\ncontent-length: 2\r\n\r\n{}")
+    assert b"data: 0" in c.recv(4096) or b"data: 0" in c.recv(4096)
+    c.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))  # close with a reset
+    c.close()
+    resp = out / "0001-response.txt"
+    deadline = time.monotonic() + 10
+    while not (resp.exists() and resp.stat().st_size) and time.monotonic() < deadline:  # written, not just made
+        time.sleep(0.05)
+    assert resp.read_text().startswith("data: 0\n\n")
+    assert "data: 199" not in resp.read_text()  # the forward stopped when the client went
+    # a client gone is not the upstream breaking: nothing says it did
+    assert "upstream broke" not in capsys.readouterr().err
 
 
 FIXTURE_REQUEST = {
