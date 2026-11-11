@@ -26,6 +26,7 @@ from sessionorc.models import Session
 STATES = (
     "gone",
     "suspended",
+    "held",
     "fills_exhausted",
     "restart_ceiling",
     "unreachable",
@@ -98,6 +99,11 @@ def read(
     ceiling = r.restart_ceiling if isinstance(r.restart_ceiling, dict) else None
     if r.suspended:
         return {**out, "state": "suspended", "since": r.suspended.get("at")}
+    if seat and isinstance(r.stop_held, Mapping):
+        # held by its team's stop (§6 rule 3 *A stopped team's seats are held*, TD-1564): the hold before the ceiling
+        mark = r.stop_held
+        held = {"state": "held", "since": mark.get("at"), "team": mark.get("team") or r.team}
+        return {k: v for k, v in {**out, **held, "stopped_by": mark.get("by")}.items() if v is not None}
     if ceiling is not None:
         fill = ceiling.get("why") == "fill"
         out.update(state="fills_exhausted" if fill else "restart_ceiling", since=ceiling.get("at"))
@@ -151,6 +157,7 @@ def read(
 # what each state's sentence names, without which `words` says the plain line
 _NEEDS = {
     "suspended": ("since",),
+    "held": ("since", "team", "stopped_by"),
     "fills_exhausted": ("since",),
     "restart_ceiling": ("since",),
     "scheduled": ("start_at",),
@@ -191,6 +198,10 @@ def words(stamp: Mapping[str, Any], now: datetime | None = None) -> str:
         return f"{name} is no longer a session; nobody holds this question."
     if s == "suspended":
         return f"{name} is suspended since {t('since')} — your own resume of that conversation, or Forget, ends it."
+    if s == "held":
+        # *stopped*, never *wound down*: the stamp keeps who ended the team, not its later reading (§4.9b, TD-1564)
+        who = "by you" if stamp.get("stopped_by") == "person" else "at its stop time"
+        return f"{name} waits for its team's Start: {stamp.get('team')} was stopped ({who})."
     if s == "fills_exhausted":
         if stamp.get("held"):
             text = (
