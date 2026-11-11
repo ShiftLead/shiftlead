@@ -17,6 +17,18 @@ from shiftlead.ui import org as ui_org
 pytestmark = pytest.mark.unit
 
 
+@pytest.fixture(autouse=True)
+def hunt_builds(request):
+    """The fixture's hunter runs an area lane (`ui`), which takes no extra (§4.9 *What scales*): these tests scale
+    it as a build line, `free-pick`, and the area lane's refusal is tested on its own."""
+    if "world" not in request.fixturenames or "area_lane" in request.node.name:
+        return
+    tmp_path, _ = request.getfixturevalue("world")
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["members"][1]["lane"] = "free-pick"
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+
+
 @pytest.fixture
 def extras_on(monkeypatch):
     monkeypatch.setattr(teams, "_extras", teams.EXTRAS)  # conftest stubs it: put the real one back
@@ -303,3 +315,9 @@ def test_an_attended_line_writes_no_extra_and_a_failed_read_is_said(world, extra
 def test_a_held_seat_extra_is_never_on_call():
     assert teamrun.on_call({"seat": {"trigger": "asks"}, "state": "closed"})
     assert not teamrun.on_call({"seat": {"trigger": "asks"}, "state": "closed", "scale": {"line": "tl"}})
+
+
+def test_with_no_flow_an_area_lane_writes_no_extra(world, extras_on):  # noqa: F811
+    tmp_path, state = world
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    assert sorted(held(state)) == ["grind-3", "grind-4"]  # hunt's `ui` lane has no queue to read
