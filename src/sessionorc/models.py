@@ -166,6 +166,7 @@ HOME_OWNED = frozenset(
         "relaunch",
         "sit_out",
         "seat",
+        "scale",
         "seat_due",
         "seat_count",
         "seat_filled",
@@ -1407,6 +1408,11 @@ class Session:
     # restart never acts on one (§6 rule 1, and rule 3 — the seat policy, TD-103 slice 3 — is what
     # fills one). The home's.
     seat: dict[str, Any] | None = None
+    # An extra of its team's line or seat (design §4.9 *Scaling with the work*, td-max, TD-1545): `{line}`, the
+    # member line's or the seat's name, set at create and carried by the launch record and every replay as
+    # `seat` is; the tick adds `last`, its newest fill or close and why (§6 rule 14). Never replayed by rule 8,
+    # never run-only, never counted by the size. The home's.
+    scale: dict[str, Any] | None = None
     # What the tick makes of a seat's trigger (§6 rule 3, TD-103 slice 3). `seat_due` is `{at, by}`,
     # set only once the trigger is met — `by` is what met it: `asks` (a question waiting, cleared
     # again if none is by the fill), `prs` (n merged to the seat's repo since this record was

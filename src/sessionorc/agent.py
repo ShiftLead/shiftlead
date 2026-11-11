@@ -189,6 +189,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     _reported,  # noqa: F401
     _restart_reading,  # noqa: F401
     _review,  # noqa: F401
+    _scale,  # noqa: F401
     _slices,  # noqa: F401
     _source,  # noqa: F401
     _start_time,  # noqa: F401
@@ -1349,6 +1350,7 @@ class HostAgent(
         supervised: bool = False,
         run_only: bool | None = None,  # None, not False: a launch record keeps it only where it was set
         seat: dict[str, Any] | None = None,
+        scale: dict[str, Any] | None = None,
         review: dict[str, Any] | None = None,
         context_bound: int | None = None,
         start_at: str | None = None,
@@ -1380,8 +1382,12 @@ class HostAgent(
 
         `held` (design §6 rule 3 *A Start writes the seat and never fills it*, TD-410): a seat's record
         written alone, `closed` with no pane, so rule 3 fills it only for a cause — a manager on call at
-        every Start, and a seat replayed by rule 8. Refused without `seat` and `unattended`, and beside
-        `start_at` or a resume; with `keep_mail` the held record takes the mail as a fill does.
+        every Start, and a seat replayed by rule 8 — and an extra's (`scale`, §4.9 *Scaling with the work*,
+        TD-1545), held until rule 3 or 14 fills it. Refused without `seat` or `scale`, without `unattended`, and
+        beside `start_at` or a resume; with `keep_mail` the held record takes the mail as a fill does.
+
+        `scale` (§4.9 *Scaling with the work*, td-max): `{line}`, the record an extra of that member line or
+        seat, kept on the record and in the launch record, so every replay carries it as `seat` is carried.
 
         `start_at` (design §6 *Start time*, TD-152): an instant ahead; the create makes the
         **record** now — the name taken, the worktree made, the launch record written, the slot held
@@ -1421,12 +1427,13 @@ class HostAgent(
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
         grants, references = _grants(capabilities or []), _lane(lane or [])  # validate before anything starts
-        reading, bound = _review(review), _context_bound(context_bound)
+        reading, bound, extra = _review(review), _context_bound(context_bound), _scale(scale)
+        scale = extra  # the launch record keeps the mark as the record does (`launch_params(locals())`)
         starts = _start_time(start_at, unattended, run_until)
-        if held and (not (seat and unattended) or starts or resume):
+        if held and (not ((seat or extra) and unattended) or starts or resume):
             raise RpcError(
-                "held writes a seat's record alone, closed, for rule 3 to fill: it takes a seat and unattended, "
-                "and no start_at or resume (design §6 rule 3)"
+                "held writes a seat's or an extra's record alone, closed, for rule 3 or 14 to fill: it takes a seat "
+                "or a scale, and unattended, and no start_at or resume (design §6 rule 3, §4.9 Scaling with the work)"
             )
         # the scheduled record this create starts (the tick's replay, §6 *Start time*), if it is one
         starting = self.sessions.get(str(start_of)) if start_of else None
@@ -1679,6 +1686,7 @@ class HostAgent(
                 or any(r.supervised for r in self.sessions.values() if resume and r.adapter_id == resume),
                 run_only=bool(run_only),
                 seat=dict(seat) if seat else None,
+                scale=extra,
                 review=reading,
                 context_bound=bound,
                 start_context=start_context,
@@ -1785,6 +1793,7 @@ class HostAgent(
             supervised=True,  # it is started by the tick's replay, as any supervised record is restarted
             by_person=None if self.mode == "node" else False,  # supervised: a team's (§4.10, TD-1069)
             seat=dict(given["seat"]) if given.get("seat") else None,
+            scale=given["extra"],
             review=given["reading"],
             context_bound=given["bound"],
             start_context=given.get("start_context"),

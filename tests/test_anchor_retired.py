@@ -120,10 +120,10 @@ async def test_a_held_create_writes_the_seat_closed_with_no_pane_and_never_over_
     await park_ticks(agent)
     seat = {"trigger": "asks"}
     async with LocalClient() as person:
-        with pytest.raises(AgentError, match="held writes a seat's record alone"):
+        with pytest.raises(AgentError, match="held writes a seat's or an extra's record alone"):
             await person.call("create", **_shell(tmp_path, "t-lead", held=True))
         for bad in ({"unattended": False}, {"resume": "abc"}):
-            with pytest.raises(AgentError, match="held writes a seat's record alone"):
+            with pytest.raises(AgentError, match="held writes a seat's or an extra's record alone"):
                 await person.call("create", **_shell(tmp_path, "t-lead", held=True, seat=seat, **bad))
         sid = (await person.call("create", **_shell(tmp_path, "t-lead", held=True, seat=seat)))["id"]
         rec = agent.sessions[sid]
