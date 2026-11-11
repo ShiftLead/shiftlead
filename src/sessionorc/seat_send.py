@@ -60,8 +60,16 @@ def extras_in_place(own: Session, records: Iterable[Session]) -> list[Session]:
 def routes_to_extras(r: Session, why: str | None) -> bool:
     """Whether a seat's own record, unable for `why` (`seat_unable`), passes its asks to its extras first (§4.9b *A seat
     that cannot answer is routed around*, TD-1547): unable as `stalled?`, `exited` or closed; never `limited` or
-    paused by the usage gate, whose profile the extras share."""
-    return why is not None and r.state in ("stalled?", "exited", "closed") and not r.gated and why != "profile gated"
+    paused by the usage gate, whose profile the extras share. Nor where the seat is kept from running by a choice
+    — `suspended` (only a person lifts it), `sat out` (its team dropped it) or `not supervised` (rule 3 fills no
+    such seat): an extra filled from its launch record would run what was stopped. A fill or restart ceiling is the
+    own record's: the extras' fills count in a group of their own, and rule 1 bounds their restarts."""
+    if why is None or r.state not in ("stalled?", "exited", "closed") or r.gated:
+        return False
+    return why not in KEPT_FROM_RUNNING
+
+
+KEPT_FROM_RUNNING = ("profile gated", "suspended", "sat out", "not supervised")
 
 
 def stopping(r: Session, now: datetime) -> bool:

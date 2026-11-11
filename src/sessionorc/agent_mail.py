@@ -321,11 +321,19 @@ class MailMixin:
         why = seat_unable(seat, now, self.unfillable)
         if why is None:
             return to, None
+        at = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
         if seat_send.routes_to_extras(seat, why):  # a free live extra, else a held one the mail fills (TD-1547)
             choice = self._seat_pick(records, seat.id, sender, kind, None, pr)
-            if choice is not None and choice.to != seat.id:
-                return to, None  # the send's own choice of record lands it there
-        at = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+            probe = MailEntry(id="m-probe", from_=sender, to=[], at=at, kind="ask", text="", pr=pr)
+            if (
+                choice is not None
+                and choice.to != seat.id
+                and self._landing_refusal(records, str(sender), choice.to, probe) is None
+            ):
+                # the send's own choice of record lands it there; should that choice differ by the landing (the
+                # extra turned busy across the send's awaits), the ask waits on the own record and the tick's
+                # `_reroute_waiting` moves it, so nothing is lost
+                return to, None
         nxt = None
         if pr is None:  # the entry the send would land, so a member's counts are read before it is chosen
             probe = MailEntry(id="m-probe", from_=sender, to=[], at=at, kind="ask", text="")

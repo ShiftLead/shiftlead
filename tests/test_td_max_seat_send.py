@@ -546,8 +546,10 @@ def test_routes_to_extras_reads_stalled_exited_and_closed_never_limited_or_gated
     stalled = _r("ao-tl", "tl", "stalled?")
     assert seat_send.routes_to_extras(stalled, "stalled?")
     assert not seat_send.routes_to_extras(stalled, None), "able: nothing is routed"
-    assert seat_send.routes_to_extras(_r("ao-tl", "tl", "closed"), "sat out")
+    assert seat_send.routes_to_extras(_r("ao-tl", "tl", "closed"), "fill ceiling")
     assert seat_send.routes_to_extras(_r("ao-tl", "tl", "exited"), "restart ceiling")
+    for kept in ("suspended", "sat out", "not supervised"):
+        assert not seat_send.routes_to_extras(_r("ao-tl", "tl", "closed"), kept), f"{kept}: no extra runs it either"
     assert not seat_send.routes_to_extras(_r("ao-tl", "tl", "exited"), "profile gated"), "its extras share the profile"
     assert not seat_send.routes_to_extras(_r("ao-tl", "tl", "limited"), "limited")
     paused = _r("ao-tl", "tl", "closed", gated={"next": None})
@@ -586,14 +588,14 @@ async def test_an_ask_to_a_seat_unable_as_closed_fills_its_extra_and_is_not_rout
     _, calls = blocked_replay
     async with LocalClient() as person:
         own, (tl2, tl3) = await _seat(agent, person, tmp_path, own_live=False)
-        agent.unfillable = {own: "sat out"}  # rule 3 would not fill it: unable (§4.9b)
+        agent.unfillable = {own: "fill ceiling"}  # rule 3 would not fill it: unable (§4.9b)
         (w1, *_) = await _askers(person, tmp_path, 1)
         async with LocalClient(caller=w1) as a:
             got = await a.call("msg", to=own, text="read #12?", kind="ask")
         assert "routed" not in got and got["delivered"] == [tl2] and got["seated"] == {own: tl2}
         assert [c[0] for c in calls] == [tl2] and _rec(agent, tl3).state == "closed"
         view = next(x for x in agent._views() if x["id"] == own)
-        assert view["seat_unable"] == "sat out" and view["seat_routed_to"] == "tl-2", "its extras first"
+        assert view["seat_unable"] == "fill ceiling" and view["seat_routed_to"] == "tl-2", "its extras first"
         mate = await _mk(person, tmp_path, "w9", team="beta")  # a reader's `ask` carrying `pr` is a teammate's
         async with LocalClient(caller=mate) as b:
             pr = await b.call("msg", to=own, text="read #13?", kind="ask", pr=13)
@@ -631,3 +633,37 @@ async def test_the_mover_takes_an_ask_off_a_stalled_own_record_to_an_extra(agent
         r.stalled_ticks = 2
         await agent._seat_move(datetime.now(UTC))
         assert not r.inbox and [x.id for x in _rec(agent, tl2).inbox] == [e.id] and tl2 in agent._send_filling
+
+
+@pytest.mark.integration
+async def test_a_suspended_seat_fills_no_extra_and_is_routed_as_before(agent, tmp_path, blocked_replay):
+    await park_ticks(agent)
+    _, calls = blocked_replay
+    async with LocalClient() as person:
+        own, (tl2, _) = await _seat(agent, person, tmp_path, own_live=False)
+        agent.unfillable = {own: "suspended"}  # only a person lifts it: no extra runs in its place
+        (w1, *_) = await _askers(person, tmp_path, 1)
+        async with LocalClient(caller=w1) as a:
+            got = await a.call("msg", to=own, text="read #12?", kind="ask")
+        assert got["routed"]["why"] == "suspended" and got["entry"]["to"] == [mail.PERSON]
+        assert calls == [] and _rec(agent, tl2).state == "closed"
+
+
+@pytest.mark.integration
+async def test_an_extra_whose_counts_refuse_the_ask_leaves_it_to_the_road_around(agent, tmp_path, monkeypatch):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        own, (tl2, _) = await _seat(agent, person, tmp_path, own_live=False, live_extras=1)
+        _set(_rec(agent, tl2), "idle")
+        agent.unfillable = {own: "fill ceiling"}
+        real = agent._landing_refusal
+        monkeypatch.setattr(
+            agent,
+            "_landing_refusal",
+            lambda rec, frm, to, e: "its mailbox is full" if to == tl2 else real(rec, frm, to, e),
+        )
+        (w1, *_) = await _askers(person, tmp_path, 1)
+        async with LocalClient(caller=w1) as a:
+            got = await a.call("msg", to=own, text="read #12?", kind="ask")
+        assert got["routed"]["seat"] == own and got["entry"]["to"] == [mail.PERSON], "never refused: routed on"
+        assert not _rec(agent, tl2).inbox
