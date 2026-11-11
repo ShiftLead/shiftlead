@@ -321,3 +321,18 @@ def test_with_no_flow_an_area_lane_writes_no_extra(world, extras_on):  # noqa: F
     tmp_path, state = world
     assert cli.main(["team", "start", "ao-grind"]) == 0
     assert sorted(held(state)) == ["grind-3", "grind-4"]  # hunt's `ui` lane has no queue to read
+
+
+def test_a_held_extra_of_a_seat_is_not_drawn_on_call():
+    """TD-1585, design §4.9 *Scaling with the work* (*An extra*): a seat's held extra, closed or exited with
+    its `scale`, is no seat on call on its card (`cards.view`), while the seat itself is."""
+    from shiftlead.ui.cards import view
+
+    def rec(sid, state, **kw):
+        return {"id": sid, "name": sid, "kind": "interactive", "adapter": "claude-code", "dir": "/w", "state": state,
+                "pane": False, "tail": [], "since": "2026-11-11T08:00:00Z", "confidence": "hook", **kw}  # fmt: skip
+
+    seats = {"ao-tl": "comes on the next question", "ao-tl-2": "comes on the next question"}
+    for state in ("closed", "exited"):
+        assert view(rec("ao-tl", state), seats=seats)["seat"], state
+        assert not view(rec("ao-tl-2", state, scale={"line": "techlead-ao"}), seats=seats)["seat"], state
