@@ -187,11 +187,13 @@ def usage_cards(
     cards = []
     for key in sorted({*in_file, *(k for k, v in accounts.items() if isinstance(v, dict))}):
         a = accounts.get(key) if isinstance(accounts.get(key), dict) else {}
-        names = sorted(in_file.get(key) or [str(n) for n in a.get("profiles") or []])
+        names = sorted({*(in_file.get(key) or []), *(str(n) for n in a.get("profiles") or [])})
         mine = [profiles[n] for n in names if n in profiles]
         bills = {p.billing for p in mine}
         billing = str(a.get("billing") or ("mixed" if len(bills) > 1 else next(iter(bills), "subscription")))
-        reading = next((usage[n] for n in names if isinstance(usage.get(n), dict)), None)
+        # the account's one reading: the freshest of its profiles' copies
+        got = [usage[n] for n in names if isinstance(usage.get(n), dict)]
+        reading = max(got, key=lambda u: str(u.get("fetched") or ""), default=None)
         tool = str((reading or {}).get("tool") or key.split(":", 1)[0])
         windows = [w for w in (reading or {}).get("windows") or [] if isinstance(w, dict) and w.get("label")]
         rows_by = {str(r.get("label")): r for r in a.get("windows") or [] if isinstance(r, dict)}
