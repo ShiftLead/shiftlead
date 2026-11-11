@@ -700,7 +700,8 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
         by_hand = bool(r.get("by_hand")) and not (failed or held or flight or pre)
         blocks = promote_mod.blocks_of(failed)
         # a failure main's head has moved past, under `auto` and no hold: the policy's own to retry (TD-1554)
-        retry = bool(failed) and bool(r.get("auto")) and not held and blocks != r.get("main")
+        # a precheck failed on main's head stays under *Needs you* whatever else stands (§4.5a)
+        retry = bool(failed) and bool(r.get("auto")) and not held and not pre and blocks != r.get("main")
         if (
             not failed
             and not held
@@ -2217,9 +2218,10 @@ def inbox_sections(
     hidden_lines = list(snoozed or ())  # `snoozed` is taken by an entry's own below
     for r in states:
         raw = snoozed_rows.get(f"{r.get('sid') or ''}|{r.get('row') or ''}")
-        if r.get("fyi") and not (r.get("auto_row") and _iso(raw) and _iso(raw) > at):
+        snoozable = r.get("auto_row") or r.get("by_hand") or r.get("retry")  # FYI rows with Snooze ▾ (TD-1559)
+        if r.get("fyi") and not (snoozable and _iso(raw) and _iso(raw) > at):
             # a promote in flight, or one `auto` will make (§4.5a *Inbox row: promote*): FYI, uncounted;
-            # the `auto` row has Snooze ▾, so a snoozed one is set aside as any row is
+            # the `auto`, retry and installed-by-hand rows have Snooze ▾, so a snoozed one is set aside as any row is
             out["fyi"].append(r)
             continue
         if isinstance(raw, str) and raw.startswith("dismissed:"):

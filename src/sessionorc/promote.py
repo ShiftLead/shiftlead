@@ -205,7 +205,9 @@ def read_ahead_since(root: str | Path, live: str | None, main: str | None, block
     spend the next merge's cap. None when live is main's head, either is unknown, or git cannot say."""
     if not live or not main or live == main:
         return None
-    since = blocks if blocks and moved_past(root, blocks, main) else live
+    # only a `blocks` live has not reached: a hand install past it leaves `live..main` the later move
+    ahead_of_live = blocks and blocks != live and not moved_past(root, blocks, live)
+    since = blocks if ahead_of_live and moved_past(root, blocks, main) else live
     out, _ = _git(root, "log", "--first-parent", "--format=%cI", f"{since}..{main}")
     lines = (out or "").splitlines()
     return lines[-1].strip() if lines else None

@@ -1718,6 +1718,17 @@ def test_a_failed_commit_past_the_cap_does_not_spend_the_next_merges(checkout, m
     assert readings["repo"]["inflight"]["sha"] == y and promote.failed("repo") is None
 
 
+def test_ahead_since_reads_live_when_a_hand_install_passed_the_failed_commit(checkout):
+    """Review of #3265: a failure at x, a hand install of z past it, main past z — the cap runs from main's move
+    past live, not past x."""
+    old = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
+    x = _dated(checkout, "x", old)
+    z = _dated(checkout, "z", (datetime.now(UTC) - timedelta(hours=1)).isoformat())
+    m = _merge(checkout, "m")
+    assert promote.read_ahead_since(checkout, z, m, x) == _git(checkout, "log", "-1", "--format=%cI", m)
+    assert promote.read_ahead_since(checkout, x, m, x) == _git(checkout, "log", "-1", "--format=%cI", z)
+
+
 def test_a_hand_install_past_the_failed_commit_clears_it_and_draws_the_by_hand_row(checkout):
     from shiftlead.ui.inbox import promote_rows
 

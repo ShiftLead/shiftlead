@@ -119,6 +119,24 @@ def test_a_copy_installed_by_hand_is_an_fyi_row_offering_promote_to_tag_it():
         assert r["checks_why"] is None and r["unmet"] is None
         html = templates.get_template("inbox_rows.html").render(rows=[r], section="fyi")
         assert 'data-act="promote" data-id="person" data-repo="shiftlead" title=' in html
+    # its Snooze ▾ sets it aside, as the retry row's does (review of #3265)
+    until = (datetime.now(UTC) + timedelta(days=1)).isoformat()
+    for kw in (
+        {"live": MAIN, "ahead": 0, "by_hand": True},
+        {"auto": True, "failed": {"sha": "8" * 40, "blocks": "8" * 40}},
+    ):
+        s = inbox_sections(
+            [],
+            states=promote_rows({"shiftlead": reading(**kw)}),
+            attention_snoozed={"promote:shiftlead|promote": until},
+        )
+        assert s["fyi"] == [] and [e["row"] for e in s["snoozed"]] == ["promote"]
+    # a precheck failed on main's head keeps a failure past its commit under *Needs you*
+    pre = {"sha": MAIN, "log": "/p", "tail": []}
+    (r,) = promote_rows(
+        {"shiftlead": reading(auto=True, failed={"sha": "8" * 40, "blocks": "8" * 40}, precheck_failed=pre)}
+    )
+    assert not r["fyi"] and not r["retry"]
     flight = {"sha": MAIN, "at": "2026-09-27T10:05:00+00:00", "by": "person", "log": "/l"}
     (r,) = promote_rows({"shiftlead": reading(live=MAIN, ahead=0, by_hand=True, inflight=flight)})
     assert "installed by hand" not in r["text"]
