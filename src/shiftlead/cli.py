@@ -4801,8 +4801,10 @@ def _card_item_lines(x: Mapping[str, Any], cut: bool) -> list[str]:
     row = x.get("row") if isinstance(x.get("row"), Mapping) else {}
     which = str(row.get("row") or "")
     mail = which not in CARD_NOT_MAIL
-    # a decided line moved while stuck prints as the stuck row: its id the `stuck` key (the line's own), kind *stuck*
-    st = row.get("stuck") if which == "board" and isinstance(row.get("stuck"), Mapping) else None
+    # a decided line moved while stuck prints as the stuck row: its id the `stuck` key (the line's own), kind *stuck*;
+    # a handed entry's the same, its id its own (TD-1497 slice 4)
+    moves = which == "board" or bool(row.get("handed_row"))
+    st = row.get("stuck") if moves and isinstance(row.get("stuck"), Mapping) else None
     stuck = st if st is not None and not st.get("waiting_until") else None
     kind = "stuck" if stuck else {"red_pr": "red PR", "fork_pr": "fork PR"}.get(which) or str(row.get("kind") or "")
     head = [str(x.get("item") or row.get("id") or "")]
@@ -4844,6 +4846,8 @@ def _card_item_lines(x: Mapping[str, Any], cut: bool) -> list[str]:
         else:
             body += [str(row.get("subject") or ""), str(row.get("text") or "")]
             body += _answer_lines(row.get("answers"), row.get("default"))
+    if row.get("handed_row") and st is not None:  # the home's words, kept where mail's are cut (TD-1497 slice 4)
+        body.append(str(st.get("text") or ""))
     # a holder's or a pending row's stuck lines: work it is the actor of, under its own row (§6 rule 13, TD-1497)
     body += [str(ln.get("text") or "") for ln in row.get("stuck_lines") or () if isinstance(ln, Mapping)]
     lines = ["  " + " · ".join(h for h in head if h)]

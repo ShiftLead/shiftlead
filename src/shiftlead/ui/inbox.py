@@ -1196,6 +1196,36 @@ def stuck_onto_boards(
     return kept, out_boards
 
 
+def stuck_onto_handed(
+    states: list[dict[str, Any]], handed: Collection[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """§6 rule 13 *What the person sees* (TD-1497 slice 4): a stuck handed entry is drawn on its own row, as a
+    decided line is (`stuck_onto_boards`) — each `ask:<id>` stuck row whose ask is an entry the person handed a seat
+    (`handed`, from `handed_rows`, by its `id`) is taken out of `states` and laid on that row as `stuck`: its
+    sentence, **Open**, reason and `waiting_until`. `inbox_sections` then moves the row from *Waiting on them* to
+    *Needs you* while it is a need. A `needs_you` actor's row is left a state (`stuck_onto_holders` lays its words
+    under the actor's pending row). Copies: the page's cached rows are never written."""
+    at_ = {f"ask:{e.get('id')}": i for i, e in enumerate(handed) if e.get("id")}
+    out_handed = list(handed)
+    kept: list[dict[str, Any]] = []
+    for r in states:
+        i = at_.get(str(r.get("id") or "")) if r.get("row") == "stuck" and not r.get("under_pending") else None
+        if i is None:
+            kept.append(r)
+            continue
+        out_handed[i] = {
+            **out_handed[i],
+            "stuck": {
+                k: r[k]
+                for k in ("id", "text", "work_words", "head", "open", "name", "actor", "reason_base", "at")
+                if k in r
+            }
+            | {"reason_words": r.get("reason_words") or ""}
+            | ({"waiting_until": r["waiting_until"]} if r.get("waiting_until") else {}),
+        }
+    return kept, out_handed
+
+
 def _holder_where(h: Mapping[str, Any]) -> str:
     """Where a holder's state row is drawn, as a stuck row on another surface names it (§6 rule 13): *on <TD-n>*,
     the claim its card draws it on, or *in the Inbox*."""
@@ -1237,7 +1267,8 @@ def stuck_onto_holders(out: dict[str, list[dict[str, Any]]], waiting_on: Callabl
             continue
         kept: list[dict[str, Any]] = []
         for r in rows:
-            moved = r.get("row") == "board" and isinstance(r.get("stuck"), dict)
+            # a decided line's or a handed entry's row moved while stuck (TD-1497 slices 2, 4)
+            moved = (r.get("row") == "board" or bool(r.get("handed_row"))) and isinstance(r.get("stuck"), dict)
             it = r if r.get("row") == "stuck" else r["stuck"] if moved else None
             if it is None:
                 kept.append(r)
@@ -1261,9 +1292,13 @@ def stuck_onto_holders(out: dict[str, list[dict[str, Any]]], waiting_on: Callabl
                 continue
             lines.setdefault(aid, []).append(it)
             if moved:
-                # the line's own row stays where it was, under *Waiting on them*, in no number
+                # the line's own row stays where it was, under *Waiting on them*, in no number — but a handed entry
+                # that came back `blocked` was a need before it was stuck, and stays one (TD-1497 slice 4)
                 row = {k: v for k, v in r.items() if k not in ("stuck", "standing")}
-                back.append({**row, "waiting_on": waiting_on(row)})
+                if row.get("handed_row") and _outcome_of(row).get("state") == "blocked":
+                    kept.append(row)
+                else:
+                    back.append(row if row.get("handed_row") else {**row, "waiting_on": waiting_on(row)})
         out[sec] = kept
     if back:  # in `inbox_sections`' order for *Waiting on them*
         out["waiting"] = sorted(
@@ -1296,7 +1331,8 @@ def stuck_cut(rows: list[dict[str, Any]]) -> None:
     found = [
         (r, r if r.get("row") == "stuck" else r["stuck"])
         for r in rows
-        if r.get("row") == "stuck" or (r.get("row") == "board" and isinstance(r.get("stuck"), dict))
+        if r.get("row") == "stuck"
+        or ((r.get("row") == "board" or r.get("handed_row")) and isinstance(r.get("stuck"), dict))
     ]
     for r, it in sorted(found, key=lambda p: str(p[1].get("at") or "")):
         surface = str(r.get("on_card") or "") if r.get("home") == "queue" else ""
@@ -2593,6 +2629,8 @@ def inbox_sections(
     out: dict[str, list[dict[str, Any]]] = {k: [] for k in INBOX_SECTIONS}
     # a stuck decided line is drawn on its own row (§6 rule 13 *What the person sees*, TD-1497 slice 2)
     states, boards = stuck_onto_boards(list(states), boards)
+    # …and a stuck handed entry on its own row the same way (TD-1497 slice 4)
+    states, handed = stuck_onto_handed(states, handed)
     snoozed_rows = attention_snoozed or {}
     hidden_lines = list(snoozed or ())  # `snoozed` is taken by an entry's own below
     for r in states:
@@ -2652,7 +2690,10 @@ def inbox_sections(
         else:
             out["fyi"].append(e)
     for e in handed:
-        out["needs" if _outcome_of(e).get("state") == "blocked" else "waiting"].append(e)
+        st = e.get("stuck") if isinstance(e.get("stuck"), Mapping) else None
+        # blocked, or stuck and a need (§6 rule 13, TD-1497 slice 4): its row moves to *Needs you*, counted
+        need = _outcome_of(e).get("state") == "blocked" or (st is not None and not st.get("waiting_until"))
+        out["needs" if need else "waiting"].append(e)
     out["fyi"].extend(_trail_rows(trail or (), at))
     # the teams a *team start* row names (§6 rule 8): a decided line pickable by one says so (TD-384)
     starting = {str(x.get("team") or "") for x in states if x.get("row") == "work"}
@@ -2747,7 +2788,8 @@ _FIND_EDGE = ",.;:!?()[]{}\"'“”‘’<>"
 def rail_kind(e: Mapping[str, Any]) -> str:
     """A row's coarse kind (§4.5 screen 6 *The rail*): *questions* (an `ask`, a passed-up one
     too), *steering* (a `steer`, a passed-up one too: its row is under *Steering*, §4.5a *Inbox row:
-    passed up*, TD-1352), *session states* (every state row, alarms included), *board items*,
+    passed up*, TD-1352), *session states* (every state row, alarms and a stuck row of its own included,
+    TD-1497), *board items*,
     *notes* (a `note`, a `system` note, a reply, answered-for-you, an outcome), *trail*."""
     row = e.get("row")
     if row == "board":

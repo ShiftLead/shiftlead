@@ -351,6 +351,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     state_rows,  # noqa: F401
     stuck_cut,  # noqa: F401
     stuck_onto_boards,  # noqa: F401
+    stuck_onto_handed,  # noqa: F401
     stuck_onto_holders,  # noqa: F401
     stuck_rows,
     unclosed_mark,  # noqa: F401

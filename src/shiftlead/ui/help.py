@@ -547,6 +547,16 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "stuck-open",
+        "Open",
+        "Queue card / Inbox: stuck row",
+        (
+            "Opens the session the stuck work waits on, in Focus. Press it to see why that session is not acting — at "
+            "its usage cap, stalled, or idle with the work open — and to act there. It answers nothing and hands "
+            "the work to no other session: the row goes once a session acts on the work."
+        ),
+    ),
+    Help(
         "on-work",
         "when work appears",
         "Settings page: Teams",
@@ -914,6 +924,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "ci-open",
             "ci-rerun",
             "ci-snooze",
+            "stuck-open",
             "board-answers",
             "board-go-with-it",
             "restart",
