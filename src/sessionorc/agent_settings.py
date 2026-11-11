@@ -94,63 +94,21 @@ class SettingsMixin:
         return dict(self._usage)
 
     async def rpc_gate(self) -> dict[str, Any]:
-        """The usage gate as it stands (design §4.7 `ao gate`, §6, TD-100): every profile with a
-        reserve in this host's `settings.yml`, each reserve, and the line it makes now against the
-        profile's last reading — `{profiles: {profile: {reserves, windows, labels}}}`, `labels`
-        being what the adapter reported (empty with no reading yet). A read: never gated.
-
-        A profile with unattended sessions live is read as the gate reads it (`_gate_windows`): a
-        window past `usage.max_age` carries its projection (`projected`) or `unknown: "rate"`, and
-        `max_age` is the setting as kept (TD-233 slice 4). An idle profile's rows are its reading."""
+        """The usage gate as it stands (design §4.7 `ao gate`, §6 *The readers*, TD-100, TD-1610): `{accounts:
+        {<key>: {profiles, billing, reserves | amounts, windows, labels}}, file, max_age}`, an account for each
+        key under this host's `settings.yml` `usage_gate:` and each the profiles here or a node name
+        (`_gate_accounts`); `max_age` is `usage.max_age` as kept (TD-233 slice 4). A read: never gated."""
         now = datetime.now(UTC)
         whole = settings_mod.load()
-        doc, amounts = settings_mod.reserves(whole), settings_mod.amounts(whole)
         raw = whole.get("usage_gate") if isinstance(whole.get("usage_gate"), dict) else {}
         watched = {
             s.profile
             for s in self.sessions.values()
             if s.unattended and s.state not in ("exited", "closed", "scheduled")
         }
-        out: dict[str, Any] = {}
-        # until TD-1610 changes the reply's shape with its readers, each profile the adapters list (and
-        # each a record here runs under) carries its account's entry, and one whose account has none is
-        # omitted (§6 *A reserve is the account's*, TD-1581)
-        for prof, metered in sorted(self._gate_profiles().items()):
-            if (key := self._account_key(prof)) is None:
-                continue
-            if metered or self._is_metered(prof):
-                # a metered profile's amounts (§6 *Usage gate*, TD-151 slice 5), as written, with the spend
-                if not (by_label := amounts.get(key)):
-                    continue
-                written = raw.get(key) if isinstance(raw.get(key), dict) else {}
-                mine = {label: written[label] for label in by_label if label in written}
-                out[prof] = {
-                    "reserves": mine,
-                    "windows": self._amount_rows(prof, mine),
-                    "labels": list(spend_mod.LABELS),
-                    "metered": True,
-                    "account": key,
-                }
-                continue
-            if not (by_label := doc.get(key)):
-                continue
-            reading = self._gate_reading(prof)  # its account's when it holds no copy (TD-456)
-            windows = reading.get("windows")
-            if prof in watched:
-                windows = self._gate_windows(prof, now, whole)
-            out[prof] = {
-                "reserves": by_label,
-                "windows": settings_mod.lines(by_label, windows, now),
-                "labels": [str(w.get("label")) for w in windows or []],
-                **({"fetched": reading["fetched"]} if reading.get("fetched") else {}),
-                **({"source": reading.get("source") or "asked"} if reading.get("fetched") else {}),
-                "account": key,
-            }
         max_age = settings_mod.usage(whole).get("max_age", settings_mod.MAX_AGE_DEFAULT)
-        accounts = self._gate_accounts(whole, raw, watched, now)
         return {
-            "profiles": out,
-            "accounts": accounts,
+            "accounts": self._gate_accounts(whole, raw, watched, now),
             "file": str(settings_mod.settings_file()),
             "max_age": max_age,
         }
@@ -170,9 +128,19 @@ class SettingsMixin:
         keys |= {k for p in self._gate_profiles() if (k := self._account_key(p)) is not None}
         keys |= set(self._usage_remote_keys.values())
         keys |= {k for accts in self._spend_named.values() for k in accts}
+        records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
+        # the unnamed default profile a record runs under (§6 *The profiles on an account*): `_account_on`
+        # counts it as the listed name it stands for, but a reading and a chip are keyed `""`, so the
+        # reply lists it on the account it resolves to, where its reading and its chip's line are found
+        bare = (
+            self._account_key("") if any(r.profile == "" and adapters.has_agent(r.adapter) for r in records) else None
+        )
         out: dict[str, Any] = {}
         for key in sorted(keys):
             on = self._account_on(key)
+            if key == bare and "" not in on:
+                same = next(iter(on.values()), None)
+                on[""] = same or ("metered" if self._is_metered("") else "subscription")
             names, bills = sorted(on), set(on.values())
             if not bills and amounts.get(key) and not doc.get(key):
                 bills = {"metered"}  # an orphan key holding only amounts reads as what it holds
@@ -231,11 +199,12 @@ class SettingsMixin:
 
     async def rpc_settings(self, caller: Any = None, profiles: Any = None) -> dict[str, Any]:
         """`ao settings` and the Settings page's read (design §5, §4.7, TD-146): the home's
-        `settings.yml`, each key as its reader keeps it, with what it makes today — each profile's
-        lines against its last reading (as `gate` answers), each team's stop time with whether it
-        has passed and its reserve priority. `migrate` names a `ui.yml` still on disk, which is no
-        longer read. **A person's own**, refused to a session as `set_settings` is: `person:` is
-        theirs, and what a session needs of the gate `gate` answers. `profiles`, the profile names the
+        `settings.yml`, each key as its reader keeps it, with what it makes today — each account's
+        lines against its last reading (`usage_accounts`, as `gate` answers its `accounts`), each
+        team's stop time with whether it has passed and its reserve priority. `migrate` names a
+        `ui.yml` still on disk, which is no longer read. **A person's own**, refused to a session as
+        `set_settings` is: `person:` is theirs, and what a session needs of the gate `gate` answers.
+        `profiles`, the profile names the
         Settings page read from `profiles.yml` (this agent reads no profile list), adds `labels`: each
         name to the window labels of the reading the gate judges it by, in the reading's order — the
         ones a schedule's window is checked against (§4.5a *Settings page: Teams*, TD-1346); a value
@@ -243,7 +212,6 @@ class SettingsMixin:
         agent_common.person_only(caller, "read the settings", "§5 settings.yml", self._graph())
         doc, now = settings_mod.load(), datetime.now(UTC)
         reply = await self.rpc_gate()
-        gate = reply["profiles"]
         teams = {
             name: {
                 **t,
@@ -254,7 +222,6 @@ class SettingsMixin:
         }
         out = {
             "file": str(settings_mod.settings_file()),
-            "usage_gate": gate,
             "usage_accounts": reply["accounts"],  # `ao settings` prints by account (TD-1610)
             "teams": teams,
             "repos": settings_mod.repos(doc),

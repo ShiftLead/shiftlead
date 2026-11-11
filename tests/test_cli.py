@@ -2286,6 +2286,12 @@ def test_ao_gate_max_age_sets_the_setting(subprocess_agent, grind_profile, capsy
     assert "usage" not in settings_mod.load() and not settings_mod.load().get("usage_gate")
 
 
+def _no_bare(out: str) -> str:
+    """`out` without the unnamed default profile in an account's names: a record an earlier test left on the
+    shared agent under profile `""` lists it on the account it resolves to (TD-1610), as `(default), `."""
+    return out.replace("((default), ", "(")
+
+
 def test_ao_gate_sets_shows_and_is_a_persons(subprocess_agent, grind_profile, tmp_path, capsys, monkeypatch):
     """`ao gate` end to end: the reserves land in settings.yml through `set_settings`, `ao gate`
     shows them, a session's `ao gate` is refused by the host agent, and `ao new --unattended`
@@ -2295,26 +2301,26 @@ def test_ao_gate_sets_shows_and_is_a_persons(subprocess_agent, grind_profile, tm
     monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
     assert cli.main(["gate"]) == 0
     # one line per account, its profiles named (§4.7 `ao gate`, TD-1610): one with no reserve says so
-    assert capsys.readouterr().out == "claude-code:paul (grind) · no reserves\n"
+    assert _no_bare(capsys.readouterr().out) == "claude-code:paul (grind) · no reserves\n"
     assert cli.main(["gate", "grind", "5h=30", "week=10/day"]) == 0
-    out = capsys.readouterr().out
+    out = _no_bare(capsys.readouterr().out)
     # a profile's name resolves to its account, and the reply names the account and its profiles
     assert "claude-code:paul (grind) · 5h 30 → no reading yet" in out and "not checked" in out
     assert cli.main(["gate"]) == 0
-    assert "claude-code:paul (grind) · 5h 30 → no reading yet · week 10/day → no reading yet" in capsys.readouterr().out
+    assert "claude-code:paul (grind) · 5h 30 → no reading yet · week 10/day → no reading yet" in _no_bare(capsys.readouterr().out)
     assert cli.main(["--json", "gate"]) == 0
-    got = json.loads(capsys.readouterr().out)
+    got = json.loads(_no_bare(capsys.readouterr().out))
     assert "profiles" not in got, "`ao gate --json` is the reply's accounts"
     assert got["accounts"]["claude-code:paul"]["reserves"] == {"5h": 30, "week": {"per_day": 10}}
-    assert got["accounts"]["claude-code:paul"]["profiles"] == ["grind"]
+    assert set(got["accounts"]["claude-code:paul"]["profiles"]) - {""} == {"grind"}
     assert cli.main(["gate", "claude-code:paul", "week=5/day"]) == 0  # the account by its key
-    assert "claude-code:paul (grind) · 5h 30 → no reading yet · week 5/day" in capsys.readouterr().out
+    assert "claude-code:paul (grind) · 5h 30 → no reading yet · week 5/day" in _no_bare(capsys.readouterr().out)
     assert cli.main(["settings"]) == 0  # `ao settings` prints the gate by account too
-    assert "usage_gate:\n  claude-code:paul (grind) · 5h 30 → no reading yet · week 5/day" in capsys.readouterr().out
+    assert "usage_gate:\n  claude-code:paul (grind) · 5h 30 → no reading yet · week 5/day" in _no_bare(capsys.readouterr().out)
     assert cli.main(["gate", "grind", "5h=", "week="]) == 0
-    assert "no reserves" in capsys.readouterr().out
+    assert "no reserves" in _no_bare(capsys.readouterr().out)
     assert cli.main(["--json", "new", "w", "-a", "shell", "-d", str(tmp_path), "--unattended"]) == 0
-    rec = json.loads(capsys.readouterr().out)
+    rec = json.loads(_no_bare(capsys.readouterr().out))
     assert (rec["pause_prompt"], rec["resume_prompt"]) == (teams.PAUSE_PROMPT, teams.RESUME_PROMPT)
     monkeypatch.setenv("SHIFTLEAD_SESSION", rec["id"])
     assert cli.main(["gate", "grind", "5h=30"]) != 0

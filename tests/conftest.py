@@ -375,6 +375,11 @@ async def derived(agent, check, timeout: float = 10.0):
 PASS_DRAIN = 30.0  # seconds `park_ticks` waits for a tick's detached passes to land
 
 
+def gate_on(gate: dict, prof: str) -> dict | None:
+    """The `gate` reply's account the profile `prof` is on (design §6 *The readers*, TD-1610), None if none."""
+    return next((a for a in gate["accounts"].values() if prof in a["profiles"]), None)
+
+
 async def park_ticks(agent) -> None:
     """Stop the fixture's tick loop for the rest of the test, so a test that must own the clock
     **owns** it: every tick after this is one the test takes by hand with `await agent.tick()`.
