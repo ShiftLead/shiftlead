@@ -421,6 +421,7 @@ from .pty_bridge import (
     watch_clients,
 )
 from .queue import (
+    WANTS,
     WINDOW_LABEL,
     WINDOW_WORD,
     apply_picks,
@@ -3369,18 +3370,34 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         )
         ref = str(entry["id"]) if entry is not None else ref  # the ledger's own spelling: a card's is `TD-009`
         cards: list[dict[str, Any]] = []
+        completed: list[dict[str, Any]] = []  # their ids and `types`: a kept card's item's road (TD-1618)
         origins: dict[str, str] = {}
         pr_refs: dict[str, str] = {}  # the entry each PR names, for a PR-only item (TD-1468)
         holds: list[Any] = []  # the live claims, for a stopped holder's row (TD-1468): the index the page drew
         with contextlib.suppress(HTTPException):  # an older home serves no `queue`: the prompt names the entry
-            got = (await call("queue", omit=["completed"])) or {}
+            got = (await call("queue", omit=["completed.entries", "completed.titles"])) or {}
             cards = [c for c in got.get("cards") or [] if isinstance(c, dict)]
+            completed = [c for c in got.get("completed") or [] if isinstance(c, dict)]
             origins = got.get("origins") or {}
             pr_refs = got.get("pr_refs") or {}
             holds = got.get("holds") or []
         records = await call("list")
-        if card_id:  # a Queue card: the entry is the card's `start` now, not *for you*
+        reading = {"cards": cards, "completed": completed, "origins": origins, "pr_refs": pr_refs, "holds": holds}
+        kept = None  # a kept card's press (§4.5 screen 12 *Three verbs: An item on a kept card*, TD-1618)
+        if card_id:
             card = next((c for c in cards if c.get("id") == card_id), None)
+            kept = next((c for c in completed if c.get("id") == card_id), None) if card is None else None
+            if kept is None and card is None and entry is None:
+                kept = {}  # found nowhere while `id` is no open entry: the kept path, and its refusal
+        if kept is not None:
+            ref, type_, waits = await kept_start(h, records, reading, kept, card_id, item, repo, ref)
+            card, entry = kept, {"id": ref, "type": type_}
+            met = card_session(kept, records, on=qid(repo, ref))
+            if met["own"]:  # the person's own session by claim, name or lane: never a second one
+                return {"ok": True, "focus": met["own"]}
+            if met["other"]:
+                raise HTTPException(409, f"held by {met['other']} — nothing was started")
+        elif card_id:  # a Queue card: the entry is the card's `start` now, not *for you*
             if card is None or entry is None:
                 raise HTTPException(409, f"the card around {card_id} is no longer open — nothing was started")
             here_q = qid(repo, ref)
@@ -3403,11 +3420,13 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if entry is None or entry.get("for_page") != "for-you":
                 raise HTTPException(409, f"{ref} no longer waits on you in {repo}'s ledger — nothing was started")
             card = next((c for c in cards if qid(repo, ref) in sum(card_entries(c), [])), None)
-        mine, rest = card_entries(card) if card is not None else ([qid(repo, ref)], [])
+        mine, rest = card_entries(card) if card is not None and kept is None else ([qid(repo, ref)], [])
         walk = False  # the header's press on a card where two or more items count (TD-1340)
-        if card is not None:  # every Decide and Do item, by its id (§4.5 screen 12 *Started from an item*)
+        if kept is not None:  # every Decide and Do item of the kept card by its id; the rest none (TD-1618)
+            mine, rest = waits, []
+        elif card is not None:  # every Decide and Do item, by its id (§4.5 screen 12 *Started from an item*)
             with contextlib.suppress(Exception):  # unread, *waits on me* is the card's ledger entries
-                index = card_index({"cards": cards, "origins": origins, "pr_refs": pr_refs, "holds": holds})
+                index = card_index(reading)
                 got = (await card_mail(h, records, index))[1]
                 wants = card_wants((got.get("cards") or {}).get(str(card.get("id"))), "", False)
                 mine = waits_on_me(mine, wants)
@@ -3440,7 +3459,9 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return {"ok": True, "focus": holder["id"]}
         type_ = str(entry.get("type") or "")
         type_ = type_ if type_ in orgmod.ENTRY_TYPES else orgmod.ENTRY_TYPES[0]
-        if str(entry.get("owner") or "").lower() == ledger_mod.PERSON_OWNER:
+        if kept is not None:  # an archived entry: neither the person's nor held by their decision
+            why_key = "card"
+        elif str(entry.get("owner") or "").lower() == ledger_mod.PERSON_OWNER:
             why_key = "yours"
         elif ledger_mod.decided_by(entry, ledger_mod.PERSON_OWNER) or not card_id:
             why_key = "decision"
@@ -3465,6 +3486,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             rest=rest,
             item=item,
             walk=walk,
+            kept=kept is not None,
         )
         t = org.teams.get(team) if team else None
         if t is not None:
@@ -4136,11 +4158,59 @@ async def card_mail(
             sections,
             lambda e, sec: drawn(e, sec, choices) if drawn else "",
             later,
-            (lambda c, item: item_start(by_id[c], item, fleet) if c in by_id else {}) if by_id else None,
+            (lambda c, item, on_row: item_start(by_id[c], item, fleet, on_row) if c in by_id else {})
+            if by_id
+            else None,
             (lambda c, item: _with_you(by_id.get(c), item)) if by_id else None,
             raw=raw,
         )
     return sections, mail
+
+
+async def kept_start(
+    h: Any,
+    records: list[dict[str, Any]],
+    reading: Mapping[str, Any],
+    card: Mapping[str, Any],
+    card_id: str,
+    item: str,
+    repo: str,
+    ref: str,
+) -> tuple[str, str, list[str]]:
+    """The kept path's checks on `/api/ledger/start` (§4.5 screen 12 *Three verbs: An item on a kept card*,
+    TD-1618), made at the press: the card is kept — an open item that needs the person is attached to it, by the
+    `queue` reading's completed cards (`reading`, their ids and `types`) and the card's mail read as the page reads
+    it — `item` is one of its Decide or Do items, and `ref` is that item's `on_row`. Every failure, a mail read that
+    raises among them, is the one 409 *the item is no longer open on the card around TD-n*. Answers the archived
+    entry's `TD-NNN` (the card's `qid` spelling), its type from the card's `types` (the first entry type where
+    `types` lacks it), and *waits on me*: every Decide and Do item of the card by its id."""
+    nope = HTTPException(409, f"the item is no longer open on the card around {card_id} — nothing was started")
+    if not card or not item:
+        raise nope
+    try:
+        got = (await card_mail(h, records, card_index(reading)))[1]
+    except Exception as e:  # a kept press never starts unchecked
+        raise nope from e
+    wants = card_wants((got.get("cards") or {}).get(card_id), "", False)
+    items = [m for w in WANTS for m in wants.get(w) or () if not (m.get("red") or m.get("fork") or m.get("holder"))]
+    pressed = next((m for m in items if str(m.get("item") or "") == item), None)
+
+    def norm(q: Any) -> str:  # a `qid`, however the card spells it: `TD-3` and `TD-003` are one entry
+        name, _, tid = str(q or "").partition("#")
+        return qid(name, tid) if TD_REF.fullmatch(tid) else str(q or "")
+
+    here = qid(repo, ref) if TD_REF.fullmatch(ref) else ""
+    if (
+        not here
+        or pressed is None
+        or norm(pressed.get("on_row")) != here
+        or here not in map(norm, card.get("ids") or ())
+    ):
+        raise nope
+    types = {norm(k): v for k, v in (card.get("types") or {}).items()}
+    type_ = str(types.get(here) or "")
+    type_ = type_ if type_ in orgmod.ENTRY_TYPES else orgmod.ENTRY_TYPES[0]
+    return here.partition("#")[2], type_, waits_on_me([], wants)
 
 
 def _with_you(card: Any, item: str) -> str | None:
@@ -4208,7 +4278,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     fleet,
                     card_index(got),
                     lambda e, sec, choices: Markup(one.render(e=e, section=sec, origin=origin, board_choices=choices)),
-                    got.get("cards") or (),
+                    # a kept card's items start sessions too (TD-1618): its id must be in `by_id`
+                    [*(got.get("cards") or ()), *(got.get("completed") or ())],
                 )
                 tabs = tab_counts(sections)
         # the filter row (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): carried in the URL,

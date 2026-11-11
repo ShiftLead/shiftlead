@@ -392,14 +392,14 @@ def test_attach_hands_each_decide_and_do_item_its_start_but_a_red_pr():
          "on_row": "s#TD-020"},
         {"id": "m-2", "kind": "note", "home": "queue", "on_card": "s#TD-020", "on_row": "s#TD-020"},
     ]  # fmt: skip
-    asked: list[tuple[str, str]] = []
+    asked: list[tuple[str, str, str]] = []
 
-    def start(cid: str, item: str) -> dict:
-        asked.append((cid, item))
+    def start(cid: str, item: str, on_row: str) -> dict:
+        asked.append((cid, item, on_row))
         return {"item": item}
 
     attach({"needs": es[:2], "fyi": es[2:]}, lambda e, sec: seen.append(e) or "", (), start)
-    assert asked == [("s#TD-020", "m-1")], "a red PR and a Read item ask nothing"
+    assert asked == [("s#TD-020", "m-1", "s#TD-020")], "a red PR and a Read item ask nothing; the item's row rides"
     assert [e["start"] for e in seen] == [{"item": "m-1"}, {}, {}]
     seen.clear()
     attach({"needs": es[:1]}, lambda e, sec: seen.append(e) or "")

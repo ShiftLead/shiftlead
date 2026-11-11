@@ -140,7 +140,7 @@ def _world(tmp_path, inbox, asks=()):
         {"needs": [item, *asks]},
         lambda e, sec: drawn.append(e) or Markup(f'<div class="mailrow">{e.get("id")}</div>'),
         (),
-        lambda c, i: item_start(card, i, FLEET),
+        lambda c, i, on_row: item_start(card, i, FLEET, on_row),
         lambda c, i: _with_you(card, i),
     )
     return queue_view(reading, NOW, got, fleet=FLEET), drawn
