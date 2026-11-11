@@ -4,10 +4,23 @@ setting's write — a ceiling, `0` at or below the size, `off` and `on` — and 
 from __future__ import annotations
 
 import pytest
-from test_cli_teams import creates, started, world  # noqa: F401 — the fixture, by name
+import yaml
+from test_cli_teams import creates, org_doc, started, world  # noqa: F401 — the fixture, by name
 
 from shiftlead import cli
 from shiftlead import org as orgmod
+
+
+@pytest.fixture(autouse=True)
+def hunt_builds(request):
+    """The fixture's hunter runs an area lane (`ui`), which takes no extra (§4.9 *What scales*): these tests scale
+    it as a build line, `free-pick`, and the area lane's refusal is tested on its own."""
+    if "world" not in request.fixturenames or "area_lane" in request.node.name:
+        return
+    tmp_path, _ = request.getfixturevalue("world")
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["members"][1]["lane"] = "free-pick"
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
 
 
 @pytest.fixture
@@ -185,3 +198,10 @@ def test_a_plan_that_cannot_be_read_is_said_and_the_setting_stands(world, extras
     assert cli.main(["team", "max", "ao-grind", "grind", "4"]) == 0
     assert "the team's plan could not be read: brief gone" in capsys.readouterr().out
     assert _max(state) == {"grind": 4}
+
+
+def test_with_no_flow_an_area_lane_is_refused_and_nothing_written(world, capsys):  # noqa: F811
+    _, state = world
+    assert cli.main(["team", "max", "ao-grind", "hunt", "3"]) == 1
+    assert "hunt's lane is in no stage: its lane has no queue to read" in capsys.readouterr().err
+    assert "teams" not in state

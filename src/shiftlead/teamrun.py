@@ -29,6 +29,7 @@ from sessionorc import seams as seams_mod
 from sessionorc.agent_common import ORPHAN_AFTER
 from sessionorc.client import AgentError
 from sessionorc.gitinfo import work_left
+from sessionorc.shape import lane_stage
 from sessionorc.work import (
     closed_finished,
     finished,
@@ -2387,7 +2388,7 @@ def set_max(call: Call, org: orgmod.Org, name: str, line: str, n: int | str, hos
         return _reconcile_live(call, org, name, got, host, out)
     if isinstance(n, bool) or not isinstance(n, int) or n < 0:
         raise teams.TeamError(f"{line}: an up to is a whole number of sessions, 0 or more, not {n!r}")
-    if why := max_refusal(team, line):
+    if why := max_refusal(team, line) or _lane_refusal(call, org, name, line, host):
         raise teams.TeamError(why)
     size = len(team.line(line).names()) if any(m.name == line for m in team.members) else 1
     stored = n if n > size else 0  # at or below the size: no scaling at any size, and nothing clears the key
@@ -2400,6 +2401,23 @@ def set_max(call: Call, org: orgmod.Org, name: str, line: str, n: int | str, hos
     said = f"{line}: up to {stored}" if stored else f"{line}: no scaling — {n} is at or below its size {size}"
     out = {"team": name, "line": line, "max": (got.get("teams") or {}).get(name, {}).get("max"), "text": said}
     return _reconcile_live(call, org, name, got, host, out)
+
+
+def _lane_refusal(call: Call, org: orgmod.Org, name: str, line: str, host: str) -> str:
+    """A worker line whose lane is in no stage takes no **up to** (§4.9 *Scaling with the work*): with no flow,
+    its compiled lane gives no stage (`shape.lane_stage`, a hunter's area lane) — *hunt's lane is in no stage:
+    its lane has no queue to read*. "" for a seat, under a flow (which sits out a line in no stage, so it
+    writes no extra), and where the plan cannot be read: the setting is written and the next Start says why."""
+    if not any(m.name == line for m in teams.find(org, name).members):
+        return ""
+    try:
+        plan = teams.plan(org, name, host or hosts.local_host().name, files=files_via(call))
+    except (teams.TeamError, ValueError, OSError):
+        return ""
+    lanes = [x.lane for x in plan.members if x.name in teams.find(org, name).line(line).names()]
+    if plan.flow is None and lanes and lane_stage(lanes[-1]) is None:
+        return f"{line}'s lane is in no stage: its lane has no queue to read"
+    return ""
 
 
 def _reconcile_live(

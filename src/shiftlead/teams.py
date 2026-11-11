@@ -34,6 +34,7 @@ from sessionorc.models import REVIEW_BOUND
 # home sends it too (a sit-out, §4.9c). The UI imports it from here, so the card, the CLI and the home send
 # the same words — one code path, not two.
 from sessionorc.models import WRAPUP_PROMPT as WRAPUP_PROMPT
+from sessionorc.shape import lane_stage
 from shiftlead import flowdefs, profiles, repoconfig
 from shiftlead import org as orgmod
 
@@ -1043,8 +1044,9 @@ def _extras(team: orgmod.TeamDef, p: Plan, under: Compiled | None, seen: set[str
     that may scale, one per name `TeamDef.extra_names` gives past its size, each the launch its line's last
     kept member runs — its profile, lane, brief and reader under the current flow — renamed, unattended, and
     marked `scale: {line}`; a seat's extra carries its trigger alone, `{trigger: asks}`, never `tags` or a
-    `pool`. A line the flow sits out, or whose role is no stage of it, writes none (its lane has no queue), and
-    so does one whose members run attended (`unattended: false`): an extra is the tick's to fill."""
+    `pool`. A line the flow sits out, or whose role is no stage of it, writes none (its lane has no queue), as
+    does, with no flow, one whose lane gives no stage (`shape.lane_stage`: a hunter's area lane), and so does
+    one whose members run attended (`unattended: false`): an extra is the tick's to fill."""
     bases: list[tuple[str, Launch]] = []
     if team.techlead is not None and p.techlead is not None:
         bases.append((team.techlead.name, p.techlead))
@@ -1054,6 +1056,8 @@ def _extras(team: orgmod.TeamDef, p: Plan, under: Compiled | None, seen: set[str
         if under is not None and under.flow.stage_of(m.role) is None:
             continue  # sat out, or a lane in no stage: *its lane has no queue to read*
         line = [x for x in p.members if x.name in m.names()]
+        if line and under is None and lane_stage(line[-1].lane) is None:
+            continue  # with no flow, a lane in no stage (a hunter's area lane): *its lane has no queue to read*
         if line and line[-1].unattended:  # a line a person watches is no tick's to fill
             bases.append((m.name, line[-1]))
     out: list[Launch] = []
