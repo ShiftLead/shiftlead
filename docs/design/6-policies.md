@@ -456,7 +456,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the gate and the ceiling, so a held seat takes no word of `unfillable` and is never routed around (§4.9b):
      its questions land and wait. Its `seat_due` stands, the mail waits in its mailbox, and every pass over the
      seat, due or not — every pass that reaches the seat's cause, a suspended seat and one its flow sat out
-     keeping their own words — writes **`stop_held: {at, by, team}`** on its record while it holds (home-owned,
+     keeping their own words, and a pass that returns there or at `superseded_by` clearing any `stop_held` it
+     finds (a node seat whose link is down keeps it, as it keeps its other marks) — writes **`stop_held: {at, by, team}`** on its record while it holds (home-owned,
      `by` and `at` the helper's, `at` the last end it read, rewritten when either changes, pushed to a node's
      seat as its other home-owned marks are) and clears it once it does not; the send never reads the mark but the helper itself, over the graph's
      records of the seat's team, so the first sender after a Stop is told too and none is told of a hold a
@@ -990,9 +991,12 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      over the team's **current** crew records (not superseded, not sat out, not run-only):
      - A record's **end** is its `ended.at` where `ended` stands, else `closer.at`, else
        `closed_at` (a record closed before those fields existed). A Close that tidies an exited
-       card later does not move it. `at` is the newest end among those records.
-     - `by` is read from **the team's ending** alone: the records whose end falls within
-       `FINISHED_SETTLE` of `at`. A member the person closed a day earlier, while the team ran
+       card later does not move it. `at` is the newest end among those records, rule 3's own seat
+       closes included, so a team of seats alone keeps its instant.
+     - `by` is read from **the team's ending** alone: leaving out rule 3's own seat closes (the end
+       `record_end` reads is a `closer` with `why: seat`, TD-1564, the filter rule 3's hold reads), the
+       records whose end falls within `FINISHED_SETTLE` of the newest end that remains (`other` where none
+       remains). A member the person closed a day earlier, while the team ran
        on, does not decide how the team stopped. It is `person` where one of those records was
        ended by the person:
        - its `ended.by`, or for a record with no `ended` its `closer.by`, names the person (Stop
@@ -1040,7 +1044,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      read the mark alone. For `person` the row is under *Later*, uncounted and never told; for `until` under
      *Needs you*, counted, and its questions told once on **Telegram** — for any mark carrying `seats_held`,
      with lane ids or without, whatever `on_work` says and whatever bound `held` names — on a notify row of
-     their own, `held:<team>`, apart from the lanes' `work:<team>`, whose `began` is `seats_held_at` (*<team> · stopped at its
+     their own, `held:<team>`, apart from the lanes' `work:<team>`, whose `began` is `seats_held_at`, its link
+     and its snooze the team-start row's (`work:<team>`, `work:<team>|work`), so a snooze before the telling
+     holds it (*<team> · stopped at its
      stop time · n questions wait on <seat name>*, *n* the total and the seats joined by *and* where several
      are held), never again for a rising count or a second seat. A held-only mark never starts the team, under
      any `on_work` — neither the tick's start nor the row's Start through `work_start` with no lane ids, which
@@ -1493,7 +1499,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        until <resets>* (with no `resets`, *until its usage reading resets*); `until` *<team> is held until <instant>*; `early` *<team> started at <last> and
        waits to start again*; `balance` *<team> is over its balance line on <repo>*; `link` *<team> waits
        for <hosts> to answer*; `nothing` *<team> has no record left to start*. A `work_waiting` with no
-       `held` (`on_work: ask`) reads *<team> waits for your Start*; none at all (`on_work: off`, a
+       `held` (`on_work: ask`) reads *<team> waits for your Start* — a held-only mark (`seats_held` and no
+       lane ids, TD-1564) reads as no mark here, since it names no lane work; none at all (`on_work: off`, a
        team stopped), *<team> is not running*; none where the team wound down with the line in its
        members' `lane_seen` (rule 8 writes no mark for a seen id), *<team> wound down with it seen and
        unpicked* (its cure the team's Start). Its members are the team's records that no newer record
