@@ -6,6 +6,7 @@ gated profile, an unstaffed line, a wind-down and the host cap hold a fill back,
 
 from __future__ import annotations
 
+import dataclasses
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -374,3 +375,51 @@ async def test_a_crashed_extra_rule_1_restarts_is_not_filled(agent, tmp_path):
         await _pass(agent)
         assert _rec(agent, "grind-3").state == "exited" and not _rec(agent, "grind-3").restarts
         assert _live(agent, "grind-4")
+
+
+async def test_a_node_runs_no_pass_and_records_no_claim(agent, tmp_path):
+    """The home alone fills (#3383, TD-1641): a node's host agent reads no line and keeps no claim event, so an
+    extra the home owns is never filled from a node."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        repo, made = await _line(agent, person, tmp_path, ids=("TD-1", "TD-2", "TD-3", "TD-4"))
+        made[1].progress = []
+        await _pass(agent)  # the home's baseline: grind-2 is free, nothing pickable is new
+        agent.mode = "node"
+        agent._scale_claimed(made[1])
+        assert not agent._scale_claims, "a claim off the home is no event of rule 14's"
+        _entries(agent, repo, "TD-5")
+        made[1].progress = [ProgressEntry(ref="TD-2")]
+        await _pass(agent)
+        assert not _live(agent, "grind-3"), "a node runs no pass"
+        agent.mode = "home"
+        agent._scale_claimed(made[1])
+        assert agent._scale_claims, "the home keeps it"
+        await _pass(agent)
+        assert _live(agent, "grind-3"), "the event the node passed over is the home's to read"
+
+
+async def test_a_line_on_a_remote_host_is_read_and_its_held_extra_filled(agent, tmp_path, monkeypatch):
+    """The pass reads `agent.remote` beside its own records (#3383, TD-1641): a line whose members and extras run
+    on a node is read at the home, and its held extra there filled."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        repo, made = await _line(agent, person, tmp_path)
+        node = agent.remote.setdefault("laptop", {})
+        for r in made:
+            del agent.sessions[r.id]
+            r.host = "laptop"
+            node[r.id] = r
+        filled = []
+
+        async def replay(s, why, **kw):
+            filled.append((s.name, why))
+            node[s.id] = dataclasses.replace(s, state="idle")
+
+        monkeypatch.setattr(agent, "_replay", replay)
+        await _pass(agent)
+        assert not filled, "the first reading is a baseline"
+        _entries(agent, repo, "TD-3")
+        await _pass(agent)
+        assert filled == [("grind-3", "fill")], "the lowest-placed remote extra, once"
+        assert node[made[2].id].scale["last"]["did"] == "fill"
