@@ -191,6 +191,19 @@ def seats_held_by(records: Iterable[Session]) -> dict[str, str] | None:
     return word
 
 
+def held_words(r: Session, records: Iterable[Session]) -> dict[str, Any] | None:
+    """What `mail.read_when` is told of a held seat (§4.10 *When it is read*, §6 rule 3 *A stopped team's seats are
+    held*): `{by, team, wound}` where `held_for` holds — `by` `seats_held_by`'s, `wound` whether the team reads wound
+    down (`team_wound_down`) — else None. Read from the team's records, never from the stored `stop_held`."""
+    if not (r.seat and r.team):
+        return None  # never held: no scan of the team's records
+    mine = [x for x in records if x.team == r.team]
+    if not held_for(r, mine):
+        return None
+    word = seats_held_by(mine) or {}
+    return {"by": word.get("by"), "team": r.team, "wound": team_wound_down(mine) is not None}
+
+
 def held_for(r: Session, records: Iterable[Session]) -> bool:
     """Whether a record is a **held** seat (§6 rule 3 *A stopped team's seats are held*): a seat (`seat` set),
     supervised, unattended, neither suspended nor sat out, carrying a `team`, whose team's `seats_held_by` gives a

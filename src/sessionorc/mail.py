@@ -930,6 +930,7 @@ def read_when(
     lapses: bool = True,
     cache: bool = False,
     modal_limit: bool = False,
+    held: dict[str, Any] | None = None,
 ) -> str:
     """**When it is read** (design §4.10 *When it is read: the sentence the sender sees*, TD-158,
     built by TD-168): one sentence saying when a message of `kind` to `s` will be read — the first
@@ -948,7 +949,10 @@ def read_when(
     a restart instead (§4.10 *A lapsed cache is started again, not rung*, TD-467:
     `agent_common.cache_restarts` on a record of its own host). `modal_limit` is the home's word that a
     `limited` record's cap is a modal rule's, a dialog with no reset (§4.3 *The limit dialog is read off
-    the screen*: `agent_common.limit_is_modal` on a record of its own host). Advice, never a refusal."""
+    the screen*: `agent_common.limit_is_modal` on a record of its own host). `held` is the home's word that the
+    record is a seat held by its team's stop (§6 rule 3 *A stopped team's seats are held*, TD-1564): `{by, team,
+    wound}`, computed by the caller from `work.held_for` over the team's records, never from the stored mark — first
+    among the seat-on-call rows, below `unreachable`. Advice, never a refusal."""
     ask = kind == "ask"
     tail = f" — an ask takes the default bound of {_hours(bound or ASK_BOUND)}" if ask and lapses else ""
     if s is not None and not mail_wakes(s):
@@ -961,6 +965,14 @@ def read_when(
         # before the seat and exited rows: a down host's record reads *unreachable* on its card
         # whatever its last state, so the sentence under that card must too (techlead, PR #583)
         return "lands at the home; its host cannot be reached, so it is delivered when the link is back" + tail
+    if held:
+        word = "wound down" if held.get("wound") else "stopped"
+        by = "by you" if held.get("by") == "person" else "at its stop time"
+        line = (
+            f"waits in the seat's mailbox: its team {held.get('team') or ''} is {word} ({by}),"
+            " and the seat is filled at its next Start"
+        )
+        return line + (" — Start the team to have it read" if person else " — `ao msg person` if it cannot wait") + tail
     on_call = (seat or (s is not None and bool(s.seat))) and state in ("exited", "closed")
     if on_call:
         if ask or refills:

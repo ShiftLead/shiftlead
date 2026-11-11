@@ -89,13 +89,14 @@ class ServeMixin:
         rings = getattr(adapters.get(s.adapter), "composer", None) is not None
         cache = s.host == self.host and agent_common.cache_restarts(s, now)  # a lapsed cache (TD-467)
         modal = s.host == self.host and agent_common.limit_is_modal(s, adapters.get(s.adapter))  # §4.3, TD-944
+        held = self._held_words(s, graph)  # §6 rule 3 *A stopped team's seats are held* (TD-1564)
         v["read_when"] = {
-            k: mail.read_when(s, k, now, unreachable=down, rings=rings, cache=cache, modal_limit=modal)
+            k: mail.read_when(s, k, now, unreachable=down, rings=rings, cache=cache, modal_limit=modal, held=held)
             for k in ("ask", "note")
         }
         # the Reply composer's line for a person's answer on a handed entry's thread (TD-218)
         v["read_when"]["refill"] = mail.read_when(
-            s, "reply", now, unreachable=down, rings=rings, refills=True, modal_limit=modal
+            s, "reply", now, unreachable=down, rings=rings, refills=True, modal_limit=modal, held=held
         )
         v.update(self._held_mail(s, v))
         # §4.9b *A seat that cannot answer is routed around* (TD-1443): why an `asks` seat cannot answer and

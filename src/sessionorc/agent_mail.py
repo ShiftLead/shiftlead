@@ -399,6 +399,9 @@ class MailMixin:
             if not mail.asks_seat(seat) or seat.superseded_by:
                 continue
             why = seat_unable(seat, now, self.unfillable)
+            # a held seat is able (§4.9b): only a blank pick's handed entry leaves it, for another team (TD-1564)
+            # read once, and only for a seat holding a blank pick's entry: every other seat costs no scan
+            held: bool | None = None
             files = (seat.seat or {}).get("tags") is True  # a techlead seat: the one that files an entry (TD-1565)
             for e in list(seat.inbox):
                 if not e.open or e.kind != "ask" or e.to != [key]:
@@ -415,6 +418,11 @@ class MailMixin:
                 blank = e.handed_entry and isinstance(e.entry, dict) and not e.entry.get("picked") and not e.outcome
                 if (e.entry is not None or e.handed) and not blank:
                     continue  # the person's pick, a session's own ledger request and a settled entry stay
+                if blank and why is None and held is None:
+                    held = work_mod.held_for(seat, records.values())
+                if blank and why is None and held:
+                    self._move_handed(e, key, seat, "its team is stopped", stamp, touched)
+                    continue
                 if why is None:
                     if e.waits:  # able again: it waits for nothing but its answer
                         self._mark(e.id, waits=None)
@@ -563,7 +571,7 @@ class MailMixin:
             if not isinstance(t, dict) or not str(t.get("seat") or "").strip():
                 continue
             target = self._seat_followed(str(t["seat"]).strip())
-            if target == key or not self._seat_id_able(target):
+            if target == key or not self._seat_id_takes(target):  # able and not held (§6 rule 3, TD-1564)
                 continue
             r = records.get(target)
             if r is None:
@@ -1457,7 +1465,7 @@ class MailMixin:
                 person=sender == PERSON,
                 bound=span,
                 unreachable=sid in away,
-                **self._read_when_kwargs(records[sid], now),
+                **self._read_when_kwargs(records[sid], now, records),
                 # a reply that closes a question the seat itself sent fills a seat on call — the person's
                 # or a session's, on a handed entry's thread or on its own (§4.9b *an answer waiting*,
                 # TD-1051; review of #760: an outcome note or a seat's FYI on the thread refills nothing)
@@ -1497,10 +1505,26 @@ class MailMixin:
         unreachable*): what a send says of an addressee, and what the take-up's stamp reads (§4.9b)."""
         return r.host != self.host and not (self.links.get(r.host) or {}).get("up")
 
-    def _read_when_kwargs(self, r: Session, now: datetime) -> dict[str, bool]:
-        """The record's own facts `mail.read_when` reads, as the send computes them."""
+    def _held_words(self, r: Session, records: Any = None) -> dict[str, Any] | None:
+        """`mail.read_when`'s `held` for a record (§4.10, §6 rule 3 *A stopped team's seats are held*, TD-1564): at
+        the home, `work.held_words` over the graph's records of its team, never the stored mark, so the first send
+        after a Stop is told and none after a Restart; at a node, which holds neither the team's other records nor
+        its wound-down reading, the pushed `stop_held` of a seat of its own, saying *stopped*."""
+        if self.mode == "node":
+            mark = r.stop_held if isinstance(r.stop_held, dict) else None
+            return {"by": mark.get("by"), "team": mark.get("team") or r.team, "wound": False} if mark else None
+        if records is None:
+            records = self._graph().values()
+        elif isinstance(records, dict):
+            records = records.values()
+        return work_mod.held_words(r, list(records))
+
+    def _read_when_kwargs(self, r: Session, now: datetime, records: Any = None) -> dict[str, Any]:
+        """The record's own facts `mail.read_when` reads, as the send computes them; `held` read over `records`
+        (the graph where none are given)."""
         adapter = adapters.get(r.adapter)
         return {
+            "held": self._held_words(r, records),
             "rings": getattr(adapter, "composer", None) is not None,
             # a lapsed cache is restarted, not rung (§4.10, TD-467): the home's own records alone
             "cache": r.host == self.host and agent_common.cache_restarts(r, now),
@@ -1524,7 +1548,7 @@ class MailMixin:
         if r is None:
             return unanswered.read(None, sid, question_at=taken.at, at=at)
         over = self._profile_over(r.profile, now, r.team)  # the fill's own reading (§6 rule 3), unguarded as it is
-        kw = self._read_when_kwargs(r, now)
+        kw = self._read_when_kwargs(r, now, records)
         tail = mail.read_when(r, taken.kind, now, person=False, lapses=False, unreachable=self._away(r), **kw)
         return unanswered.read(
             r,
