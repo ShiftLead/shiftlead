@@ -3717,10 +3717,11 @@ class TickMixin:
         records of that repo — an unheld one is a `pr:<n>` order under the reading's `pr_orders`, an
         idle holder is told once per red spell (a `system` note, outside the wake budget), and `after`
         that, still idle, no longer holds it. A sync PR is an order from the first reading that sees
-        it, first in the list (§4.4 *A sync PR is the team's at once*, TD-684). It keeps the first ask
-        of each open PR the mail holds, `asked`, and lists the held PRs nobody asked, `unasked` (§4.4 *A
-        held PR nobody asked is marked, never ordered*, TD-789). A change is saved and pushed as a
-        `repos` event."""
+        it, first in the list (§4.4 *A sync PR is the team's at once*, TD-684), and so is a live check's
+        lift PR, at its entry's priority (§4.4 *A live check's lift PR is the team's at once*, TD-1450). It
+        keeps the first ask of each open PR the mail holds, `asked`, and lists the held PRs nobody
+        asked, `unasked` (§4.4 *A held PR nobody asked is marked, never ordered*, TD-789). A change
+        is saved and pushed as a `repos` event."""
         graph = self._graph()
         records = [r for r in graph.values() if r.repo]
         found = held_mod.asks(graph, self.person_inbox, self._repos)
@@ -3737,7 +3738,11 @@ class TickMixin:
                 if seams_mod.unserved(r):  # no order in an unserved repo (§5 *The seams*, TD-1011)
                     orders, told, notes = [], old.get("told") or {}, []
                 else:
-                    orders, told, notes = workorders.red_prs(prs, mine, now, old.get("told") or {}, ORPHAN_AFTER)
+                    # a lift order's priority is its entry's (§4.4 *A live check's lift PR*, TD-1450)
+                    entries = (r.get("ledger") or {}).get("entries") or []
+                    prio = {e["id"]: e.get("priority") or "" for e in entries if isinstance(e, dict) and e.get("id")}
+                    told_was = old.get("told") or {}
+                    orders, told, notes = workorders.red_prs(prs, mine, now, told_was, ORPHAN_AFTER, prio)
                 by_id = {x.id: x for x in mine}
                 for sid, pr in notes:
                     rec = by_id[sid]  # addressed as mail is: a node's record as `<id>@<host>`

@@ -1669,8 +1669,10 @@ def _repo_line(r: dict[str, Any]) -> str:
         # a red PR nobody holds is a work order too (§4.4, TD-613), counted pickable as a decided line is
         reds = teamrun.pr_orders(r)
         syncs = [e for e in reds if e.get("sync")]  # a sync PR's order, counted apart (TD-684)
-        n = len(reds) - len(syncs)
+        lifts = [e for e in reds if e.get("lift")]  # and a live check's lift PR (TD-1450)
+        n = len(reds) - len(syncs) - len(lifts)
         decided += f", {len(syncs)} sync PR{'' if len(syncs) == 1 else 's'} to land" if syncs else ""
+        decided += f", {len(lifts)} lift PR{'' if len(lifts) == 1 else 's'} to take" if lifts else ""
         decided += f", {n} red PR{'' if n == 1 else 's'} nobody holds" if n else ""
         orders = [*orders, *reds]
         # an entry the settle clock withholds is counted not pickable, its page kind unchanged (§4.7, TD-710),
@@ -2046,7 +2048,10 @@ def cmd_repo(args: argparse.Namespace) -> int:
                     continue
                 why = ", ".join(e.get("failing") or []) or ("conflicting" if e.get("conflicting") else "red")
                 said = f" · red since {e.get('red_since') or '?'}: {why}"
-                print(f"  {'pickable':<12} {e['id']}  {'High':<6}  {'grinders':<11}  {e.get('title') or ''}{said}")
+                if e.get("lift"):  # a live check's lift PR, at its entry's priority (§4.4, TD-1450)
+                    said = f" · lift since {e.get('lift_since') or '?'}: lifts {e.get('entry')} {e.get('gate')}"
+                prio = str(e.get("priority") or "High")
+                print(f"  {'pickable':<12} {e['id']}  {prio:<6}  {'grinders':<11}  {e.get('title') or ''}{said}")
             for kind in ("pickable", "design", "live-check"):
                 ids = [e for e in (r.get("ledger") or {}).get("entries") or [] if _repo_list(e) == kind]
                 # the pick order is the rank (design §4.4 *The Queue*, §4.8 *Choosing in a free-pick lane*,

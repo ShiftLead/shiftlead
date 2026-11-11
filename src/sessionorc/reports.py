@@ -373,6 +373,18 @@ OPEN_PR_FIELDS = (
 SYNC_BRANCH = "cadence-sync-"
 SYNC_LOCK = cadence.LOCK
 SYNC_PIN = cadence.PIN
+# a live check's lift PR (design §4.4 *A live check's lift PR is the team's at once*, TD-1437): the event
+# runner's branch for one of the gates §4.9b reserves to a live check — `live`, `live-<digits>`, `live-td<digits>`
+LIFT_RE = re.compile(r"lift/(TD-\d+)/(live(?:-\d+|-td\d+)?)")
+
+
+def lift_of(branch: str | None) -> tuple[str, str] | None:
+    """A lift PR's entry and gate, `("TD-n", "event (live…)")`, read from its head branch, or None for
+    any other branch (`lift/TD-n/livefoo`, an `until` lift, a decision's)."""
+    m = LIFT_RE.fullmatch(branch or "")
+    return (m[1], f"event ({m[2]})") if m else None
+
+
 JOB_URL = re.compile(r"/actions/runs/(\d+)/job/(\d+)")  # an Actions job's check run (`detailsUrl`, TD-686)
 NOT_STARTED = "The job was not started because"  # GitHub's annotation on a job it never ran (TD-686)
 GITHUB_ORIGIN = re.compile(r"(^|[@/])github\.com[:/]")  # a remote on GitHub, ssh or https (TD-686)
@@ -1032,7 +1044,8 @@ def pr_reading(
     `old` (the last reading) by number and dropped the reading it is neither (TD-613); `fork`, whether
     its head is another repository's; and on a `cadence-sync-*` branch `sync`, whether it is a sync PR
     (`_sync_flag`), and for one `sync_since`, the first reading that saw it open, kept as `red_since`
-    is (TD-684). In a repo whose `origin` is GitHub, a red PR whose failing items all are Actions jobs
+    is (TD-684); on a live check's lift branch (`lift_of`) `lift` and `lift_since`, kept the same way
+    (TD-1450). In a repo whose `origin` is GitHub, a red PR whose failing items all are Actions jobs
     that never started reads `checks: not_run` with `not_run: {reason, kind, runs}`, and every red one
     keeps its jobs' verdicts as `jobs` (`classify_failing`, TD-686). `held` is the repo's held key
     (`held.repo_key`): each open PR but a sync PR carries `held`, the paths of it the key names, read
@@ -1084,6 +1097,8 @@ def pr_reading(
             # one waiting on CI that never started counts from the reading it conflicts (TD-686)
             waits = p["checks"] == "not_run" and not p["conflicting"]
             p["sync_since"] = (not waits and was.get("sync_since")) or now.isoformat()
+        if lift_of(p["branch"]):  # a live check's lift: the team's from this reading, whatever its checks (TD-1450)
+            p["lift"], p["lift_since"] = True, was.get("lift_since") or now.isoformat()
     _held_flags(directory, open_, olds, held, timeout)
     day = since.date().isoformat()
     prs = _gh_prs(directory, ["--state", "all", "--search", f"updated:>={day}", "--limit", str(limit)], timeout)
