@@ -271,6 +271,12 @@ class TickMixin:
 
     async def tick(self) -> None:
         snapshot_at = datetime.now(UTC)
+        if self.mode == "home":
+            # first in the home's part of the tick, before any pass reads a reserve (§6 *The migration*)
+            try:
+                await self._migrate_reserves()
+            except Exception:  # noqa: BLE001 — a failed move is a log line and the next tick's retry
+                log.exception("the usage reserve migration failed: the next tick tries again")
         panes = await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX)
         self._id_note_panes(panes)
         self._id_flush()

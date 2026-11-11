@@ -2109,6 +2109,8 @@ async def test_the_homes_settings_reach_a_node_on_each_write_and_on_the_next_dia
     from sessionorc import settings
 
     replica = tmp_path / "laptop" / "settings.yml"
+    # a reserve is the account's (TD-1581): the default profile's, the built-in one naming claude-code, at both ends
+    KEY = "claude-code:default"  # noqa: N806
 
     def held(path, *keys):
         v = settings.load(path)
@@ -2120,7 +2122,7 @@ async def test_the_homes_settings_reach_a_node_on_each_write_and_on_the_next_dia
         assert await wait_for(node.home_reachable, timeout=10.0, step=0.05), node.home_link
         async with LocalClient(sock=home.dir / "agent.sock") as person:
             await person.call("set_settings", profile="", reserves={"5h": 30})
-        assert await wait_for(lambda: held(replica, "usage_gate", "", "5h") == 30, timeout=10.0, step=0.05)
+        assert await wait_for(lambda: held(replica, "usage_gate", KEY, "5h") == 30, timeout=10.0, step=0.05)
         # the reserve the home set pauses the node's session on the node's own tick
         async with LocalClient() as c:
             w = await c.call(
@@ -2144,16 +2146,16 @@ async def test_the_homes_settings_reach_a_node_on_each_write_and_on_the_next_dia
                 await at_node.call("set_settings", teams={"ao-grind": {"reserve": 20}})
         async with LocalClient(sock=home.dir / "agent.sock") as person:
             await person.call("set_settings", profile="", reserves={"5h": 40})
-        assert held(replica, "usage_gate", "", "5h") == 30  # the last frame stays in force offline
+        assert held(replica, "usage_gate", KEY, "5h") == 30  # the last frame stays in force offline
         home.write_hosts(["laptop"])
-        assert await wait_for(lambda: held(replica, "usage_gate", "", "5h") == 40, timeout=20.0, step=0.1)
+        assert await wait_for(lambda: held(replica, "usage_gate", KEY, "5h") == 40, timeout=20.0, step=0.1)
         # a home file that cannot be read is not settings: nothing is sent, and the node keeps its replica
         (home.dir / "settings.yml").write_text("usage_gate: {broken\n")
         node._home_mux.close("a blip")
         assert await wait_for(lambda: not node.home_reachable(), timeout=10.0, step=0.05)
         assert await wait_for(node.home_reachable, timeout=20.0, step=0.1)
         await asyncio.sleep(1.0)  # the frame, had one been sent, lands just after the snapshot
-        assert held(replica, "usage_gate", "", "5h") == 40
+        assert held(replica, "usage_gate", KEY, "5h") == 40
         async with LocalClient() as c:
             await c.call("kill", id=w["id"])
 
@@ -2195,10 +2197,12 @@ async def test_a_nodes_metered_turns_are_ledgered_at_the_home_once_and_its_readi
         # the dial's own push of the home's settings lands after the snapshot's reply: wait for it (it carries
         # td-max's stamp, which only the home writes), or it replaces the replica written below (TD-1579)
         assert await wait_for(lambda: ((settings.read() or {}).get("scale") or {}).get("migrated"), timeout=10.0)
-        settings.save({"usage_gate": {"api": {"day": "$5"}}})  # the node's replica, as the home would send it
+        settings.save({"usage_gate": {"hookstub:key": {"day": "$5"}}})  # the node's replica, as the home would send it
         # and the home's own, which the next dial replicates whole (it holds td-max's stamp from its start)
         hs = home.dir / "settings.yml"
-        hs.write_text(yaml.safe_dump({**(yaml.safe_load(hs.read_text()) or {}), "usage_gate": {"api": {"day": "$5"}}}))
+        hs.write_text(
+            yaml.safe_dump({**(yaml.safe_load(hs.read_text()) or {}), "usage_gate": {"hookstub:key": {"day": "$5"}}})
+        )
         async with LocalClient() as c:
             w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, profile="api")
         await node._refresh_spend_inner()  # the read, then the seeding: cursors only

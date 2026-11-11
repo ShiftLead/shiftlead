@@ -3,10 +3,11 @@
 `settings.yml` sits beside `hosts.yml` in the shiftlead home of each session host. The host agent
 reads it on every tick and writes it only through its `set_settings` RPC — a person's own — so a
 change takes effect on the next tick with no restart; a hand edit is read the same way. Its first
-key is the usage gate's reserves, per profile, per window label as the adapter names them (§4.3):
+key is the usage gate's reserves, per account — `<adapter>:<account>`, the usage key (§6 *A reserve is the
+account's*, TD-1581) — per window label as the adapter names them (§4.3):
 
     usage_gate:
-      grind: {"5h": 30, wk: {per_day: 10}}
+      claude-code:paul: {"5h": 30, wk: {per_day: 10}}
 
 Nine keys (§5 *The settings a person moves*, TD-146, TD-233, TD-319, TD-641, TD-647, TD-830): `usage_gate`, `usage`
 (`max_age`), `teams`, `repos`, `person`, `notify` (`telegram`), `spend` (`weights`), `permissions` (hand-edited: the
@@ -82,15 +83,23 @@ def ui_yml() -> Path:
     return paths.home() / "ui.yml"
 
 
+def account_key(key: Any) -> bool:
+    """Whether a `usage_gate:` key is an account's, `<adapter>:<account>` (§6 *A reserve is the account's*,
+    TD-1581): one holding a `:`, whether or not a profile here names it. A key holding none is a profile's,
+    which no reader reads; the home's migration moves it to its account."""
+    return ":" in str(key)
+
+
 def reserves(doc: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """`usage_gate` as `{profile: {label: reserve}}`, every entry that is not a valid reserve
-    dropped (a hand edit can put anything there, and a malformed one must gate nothing)."""
+    """`usage_gate` as `{account: {label: reserve}}`, the account keys alone (`account_key`), every entry
+    that is not a valid reserve dropped (a hand edit can put anything there, and a malformed one must
+    gate nothing)."""
     gate = doc.get("usage_gate")
     out: dict[str, dict[str, Any]] = {}
     if not isinstance(gate, dict):
         return out
     for prof, by_label in gate.items():
-        if not isinstance(by_label, dict):
+        if not isinstance(by_label, dict) or not account_key(prof):
             continue
         good = {}
         for label, r in by_label.items():
@@ -104,15 +113,16 @@ def reserves(doc: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 def amounts(doc: dict[str, Any]) -> dict[str, dict[str, dict[str, Any]]]:
-    """A metered profile's reserves under `usage_gate` (§6 *Usage gate*, TD-151): `{profile: {label:
-    {value, unit}}}` from every entry written as an amount — `"$5"`, `"2M tok"` — and nothing else;
-    `reserves` reads the percents and drops these, so each reader sees only its own billing's kind."""
+    """A metered account's reserves under `usage_gate` (§6 *Usage gate*, TD-151, TD-1581): `{account:
+    {label: {value, unit}}}` from every entry written as an amount — `"$5"`, `"2M tok"` — and nothing else,
+    the account keys alone (`account_key`); `reserves` reads the percents and drops these, so each reader
+    sees only its own billing's kind."""
     gate = doc.get("usage_gate")
     out: dict[str, dict[str, dict[str, Any]]] = {}
     if not isinstance(gate, dict):
         return out
     for prof, by_label in gate.items():
-        if not isinstance(by_label, dict):
+        if not isinstance(by_label, dict) or not account_key(prof):
             continue
         good = {}
         for label, r in by_label.items():
@@ -413,6 +423,126 @@ def migrate_scale(doc: dict[str, Any], known: Iterable[str], today: str) -> list
         doc["teams"] = teams
     doc["scale"] = {**(raw if isinstance(raw, dict) else {}), "migrated": today}
     return names
+
+
+def _who(prof: str) -> str:
+    return prof or "the default profile"
+
+
+def _word(value: Any) -> str:
+    """A reserve or an entry as the migration's note says it: `5`, `10/day`, `$5`, `week 5, 5h 30`."""
+    if isinstance(value, dict) and set(value) == {"per_day"}:
+        return f"{value['per_day']}/day"
+    if isinstance(value, dict):
+        return ", ".join(f"{label} {_word(v)}" for label, v in sorted(value.items(), key=lambda kv: str(kv[0])))
+    return str(value)
+
+
+def _fit(value: Any, metered: bool) -> Any:
+    """`value` as the account keeps it when its unit fits the account's billing — an amount's text for a
+    metered account, a parsed percent for a subscription — else None."""
+    try:
+        if metered:
+            parse_amount(value)
+            return value.strip()
+        return parse_reserve(value)
+    except ValueError:
+        return None
+
+
+def _rank(value: Any, metered: bool) -> tuple[Any, ...]:
+    """The order the migration keeps a reserve by (§6 *The migration*): the line lowest on the window's last
+    day first — a flat `r` is `100 − r`, a per-day `d` is `100 − d` — a per-day one first on a tie; for a
+    metered account the smallest amount, money before tokens, which no reading converts."""
+    if metered:
+        amount = parse_amount(value)
+        return (amount["unit"] != "$", amount["value"])
+    if isinstance(value, dict):
+        return (100 - value["per_day"], 0)
+    return (100 - value, 1)
+
+
+def migrate_reserves(
+    doc: dict[str, Any], accounts: dict[str, str | None], billing: dict[str, set[str]]
+) -> list[str] | None:
+    """The per-profile `usage_gate:` moved to its accounts in place (§6 *A reserve is the account's*, *The
+    migration*, TD-1581): each key holding no `:` to `accounts[key]`, its profile's account key, or removed
+    where that is None (a profile no adapter here resolves). Per window label the account keeps one reserve
+    from its profiles' and its own entry's whose unit fits its billing (`billing[account]`, the billings of
+    its profiles; two of them is a disagreement, and then no value moves, its own entry staying), the one
+    `_rank` puts first, ties to the account's own entry, then the first profile by name; one that does not
+    fit is removed. What the person's note says, one sentence a move — each profile's value, each removed,
+    and each profile whose line may rise, a flat reserve kept over its per-day one (whose line
+    `100 − d × days_left` is below the flat `100 − r` once `d × days_left > r`: every such profile is named,
+    since the core knows no window's length). None where no key lacks a `:`: nothing to do."""
+    gate = doc.get("usage_gate")
+    if not isinstance(gate, dict):
+        return None
+    legacy = [k for k in gate if not account_key(k)]
+    if not legacy:
+        return None
+    said: list[str] = []
+    profiles: dict[str, dict[str, Any]] = {}
+    by_acct: dict[str, list[str]] = {}
+    for k in legacy:
+        value, name = gate.pop(k), "" if k is None else str(k)
+        acct = accounts.get(name)
+        if acct is None:
+            said.append(f"{_who(name)} had {_word(value)}: no adapter here resolves it, so it is removed")
+            continue
+        profiles[name] = value if isinstance(value, dict) else {}
+        by_acct.setdefault(acct, []).append(name)
+    for acct, names in sorted(by_acct.items()):
+        names.sort()
+        own = gate.get(acct) if isinstance(gate.get(acct), dict) else None
+        kinds = billing.get(acct) or {"subscription"}
+        if len(kinds) > 1:
+            had = "; ".join(f"{_who(p)} had {_word(profiles[p])}" for p in names)
+            stays = f"; its own entry ({_word(own)}) stays as it is" if own else ""
+            said.append(f"{acct}'s profiles disagree on billing, so no reserve moved to it: {had}{stays}")
+            continue
+        metered = kinds == {"metered"}
+        kept = dict(own or {})
+        labels = sorted({str(label) for p in names for label in profiles[p]} | {str(label) for label in kept})
+        for label in labels:
+            cands: list[tuple[str | None, Any]] = [(None, kept[label])] if label in kept else []  # None: its own
+            cands += [(p, profiles[p][label]) for p in names if label in profiles[p]]
+            fits, gone = [], []
+            for src, value in cands:
+                got = _fit(value, metered)
+                (gone if got is None else fits).append((src, value if got is None else got))
+            for src, value in gone:
+                whose = f"{_who(src)}'s" if src is not None else f"{acct}'s own"
+                said.append(f"{whose} {label} {_word(value)} does not fit its billing, so it is removed")
+            if not fits:
+                kept.pop(label, None)
+                continue
+            src, value = min(fits, key=lambda c: (*_rank(c[1], metered), c[0] is not None, c[0] or ""))
+            if src is None and len(fits) == 1:
+                continue  # the account's own, alone: nothing moved on this label
+            kept[label] = value
+            others = ", ".join(
+                f"{_who(p) if p is not None else 'its own entry'} had {_word(v)}"
+                for p, v in fits
+                if (p, v) != (src, value)
+            )
+            said.append(
+                f"{acct} takes {label} {_word(value)} (from {_who(src) if src is not None else 'its own entry'}"
+                + (f"; {others}" if others else "")
+                + ")"
+            )
+            if not metered and not isinstance(value, dict):
+                rising = [_who(p) for p, v in fits if p is not None and isinstance(v, dict)]
+                if rising:
+                    said.append(
+                        f"the {label} line of {', '.join(rising)} may rise: a flat {value} is kept over "
+                        "a per-day reserve, whose line falls below it near the window's start"
+                    )
+        if kept:
+            gate[acct] = kept
+        else:
+            gate.pop(acct, None)
+    return said
 
 
 def scale(doc: dict[str, Any]) -> dict[str, Any]:

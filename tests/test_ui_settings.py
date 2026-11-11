@@ -271,7 +271,21 @@ def test_the_page_draws_every_section_and_the_tab(client, subprocess_agent):
     assert org.index('id="personinbox"') < org.index('id="settingstab"')
 
 
-def test_a_save_writes_settings_yml_through_set_settings(client, subprocess_agent):
+@pytest.fixture
+def grind_profile(subprocess_agent):
+    """A `grind` profile in the agent's `profiles.yml`, so its reserve has an account to be kept under
+    (§6 *A reserve is the account's*, TD-1581: `claude-code:paul`); removed after, the agent being shared."""
+    from sessionorc import paths
+
+    f = paths.home() / "profiles.yml"
+    f.write_text("profiles:\n  grind: {account: paul}\n")
+    try:
+        yield
+    finally:
+        f.unlink(missing_ok=True)
+
+
+def test_a_save_writes_settings_yml_through_set_settings(client, subprocess_agent, grind_profile):
     """Each section's write goes through `set_settings` (§5): a reserve in `ao gate`'s forms, the
     promote switch, the person's editor and terminal — the refusals in the same words, and a team the
     org does not define refused, naming the defined ones."""

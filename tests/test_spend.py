@@ -197,9 +197,9 @@ def test_an_amount_is_money_or_tokens_and_the_percents_do_not_read_it(tmp_path):
     for bad in ("$0", "5", 30, "2M", "$x", None):
         with pytest.raises(ValueError):
             settings.parse_amount(bad)
-    doc = {"usage_gate": {"api": {"day": "$5", "week": "nope"}, "grind": {"5h": 30}}}
-    assert settings.amounts(doc) == {"api": {"day": {"value": 5.0, "unit": "$"}}}
-    assert settings.reserves(doc) == {"grind": {"5h": 30}}
+    doc = {"usage_gate": {"cc:api": {"day": "$5", "week": "nope"}, "cc:grind": {"5h": 30}, "grind": {"5h": 40}}}
+    assert settings.amounts(doc) == {"cc:api": {"day": {"value": 5.0, "unit": "$"}}}
+    assert settings.reserves(doc) == {"cc:grind": {"5h": 30}}  # a profile's key is read by no reader (TD-1581)
 
 
 def test_prune_keeps_thirteen_months():
@@ -210,7 +210,7 @@ def test_prune_keeps_thirteen_months():
 
 @pytest.mark.integration
 async def test_a_metered_accounts_spend_is_summed_noted_and_gated(agent, hookstub, tmp_path, monkeypatch):
-    """Two profiles on one key share one spend and keep their own amounts; the note at eight tenths
+    """Two profiles on one key share one spend and its one amount (TD-1581); the note at eight tenths
     is filed once; the unattended session pauses at its amount; the interactive one is never
     `limited`; the metered profiles are never polled; the ledger is on disk for a restart."""
     await park_ticks(agent)
@@ -219,7 +219,7 @@ async def test_a_metered_accounts_spend_is_summed_noted_and_gated(agent, hookstu
     hookstub.billing = {p: {"billing": "metered", "prices": {"input": 1.0}} for p in ("api", "api2")}
     hookstub.accounts = {"api": "key", "api2": "key"}
     hookstub.usage_asked = []
-    settings.save({"usage_gate": {"api": {"day": "$5"}, "api2": {"day": "$10"}}})
+    settings.save({"usage_gate": {"hookstub:key": {"day": "$5"}}})
     now = datetime.now(UTC).replace(microsecond=0)
     at = now.isoformat().replace("+00:00", "Z")
     hookstub.spend_turns = [_t("u0", at, 0, source="t1", inp=1_000_000)]
@@ -236,7 +236,7 @@ async def test_a_metered_accounts_spend_is_summed_noted_and_gated(agent, hookstu
         await agent._refresh_spend_inner()
         await agent._refresh_spend_inner()
         api, api2 = agent._usage["api"]["windows"][0], agent._usage["api2"]["windows"][0]
-        assert (api["label"], api["spent"]["cost"], api["pct"], api2["pct"]) == ("day", 4.1, 82, 41)
+        assert (api["label"], api["spent"]["cost"], api["pct"], api2["pct"]) == ("day", 4.1, 82, 82)
         assert agent._usage["api"]["account"] == "key" and notes == ["api · day $4.10 of $5"]
         hookstub.spend_turns.append(_t("u2", at, 2, source="t1", inp=900_000))
         await agent._refresh_spend_inner()
@@ -260,7 +260,7 @@ async def test_a_metered_accounts_spend_is_summed_noted_and_gated(agent, hookstu
         assert g and (g["label"], g["pct"], g["line"]) == ("day", 100, 100)
         await agent._refresh_usage_inner()
         assert agent.sessions[i["id"]].state != "limited" and hookstub.usage_asked == []
-        assert agent._usage["api2"]["windows"][0]["pct"] == 50, "the poll leaves a summed reading alone"
+        assert agent._usage["api2"]["windows"][0]["pct"] == 100, "the poll leaves a summed reading alone"
         # a restart of the home: the gate runs before the detached spend pass, and a pause made at an
         # amount stands, with nothing typed (the techlead's read of #681). A moment later, never an
         # hour: the day is the home's local one, and within an hour of midnight an hour on is the
@@ -371,7 +371,7 @@ async def test_the_home_takes_a_nodes_spend_and_pushes_its_sums_when_its_reading
     are ledgered under the node's host; a node is pushed `usage {account, sums}` only when a named
     profile's `pct` or a window's reset moved, never on every tick."""
     await park_ticks(agent)
-    settings.save({"usage_gate": {"api": {"day": "$10"}}})
+    settings.save({"usage_gate": {"hookstub:key": {"day": "$10"}}})
     sent: list[dict] = []
 
     class Mux:
@@ -436,14 +436,17 @@ async def test_set_settings_and_gate_take_a_metered_profiles_amounts(agent, hook
             await person.call("set_settings", profile="api", reserves={"5h": "$5"})
         with pytest.raises(AgentError, match="declares no prices"):
             await person.call("set_settings", profile="toks", reserves={"day": "$5"})
+        with pytest.raises(AgentError, match="named by no adapter here and runs no session"):
+            await person.call("set_settings", profile="grind", reserves={"5h": "$5"})
+        hookstub.accounts = {"grind": "sub"}
         with pytest.raises(AgentError, match="billed by subscription, so its reserve is a percent"):
             await person.call("set_settings", profile="grind", reserves={"5h": "$5"})
         await person.call("set_settings", profile="api", reserves={"week": None})
-        assert settings.load()["usage_gate"]["api"] == {"day": "$5"}
+        assert settings.load()["usage_gate"]["hookstub:api"] == {"day": "$5"}  # the account's key (TD-1581)
         agent._usage["api"] = spend_mod.reading(
             spend_mod.sums({"days": {datetime.now().astimezone().date().isoformat(): {"cost": 3.2}}},
                            datetime.now().astimezone()),
-            settings.amounts(settings.load())["api"], "now",
+            settings.amounts(settings.load())["hookstub:api"], "now",
         )  # fmt: skip
         gate = (await person.call("gate"))["profiles"]["api"]
     assert gate["metered"] and gate["reserves"] == {"day": "$5"}
@@ -459,7 +462,7 @@ async def test_a_metered_profile_only_a_node_defines_takes_an_amount_at_the_home
     await park_ticks(agent)
     hookstub.billing = {}
     async with LocalClient() as person:
-        with pytest.raises(AgentError, match="billed by subscription"):
+        with pytest.raises(AgentError, match="named by no adapter here and runs no session"):
             await person.call("set_settings", profile="lap", reserves={"day": "$5"})
         head = {"account": "hookstub:k", "profile": "lap", "turns": [], "cursors": {}}
         await agent._take_spend("laptop", head | {"prices": {}})

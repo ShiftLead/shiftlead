@@ -61,6 +61,19 @@ def clean(path: Path) -> bool:
         return False
 
 
+def head(home: Path | None = None) -> str:
+    """The home tree's HEAD commit, or `""` where it has none or is no tree: the restore point the reserve
+    migration's note names (§6 *The migration*, TD-1581). A pure read, blocking."""
+    home = home or paths.home()
+    if not is_tree(home):
+        return ""
+    try:
+        cp = _git(home, "rev-parse", "--verify", "-q", "HEAD")
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return cp.stdout.strip() if cp.returncode == 0 else ""
+
+
 def init(home: Path | None = None) -> bool:
     """Make the home a work tree that tracks the three files (`ao service install`, at the home and
     never on a node), and commit what it holds as the first entry. False when it already is one."""
