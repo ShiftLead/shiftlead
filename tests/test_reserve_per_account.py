@@ -374,6 +374,7 @@ async def test_the_gate_reply_lists_each_account_its_profiles_an_orphan_and_a_no
         await person.call("set_settings", account="hookstub:paul", reserves={"5h": 30})
         whole = settings_mod.load()
         whole["usage_gate"]["hookstub:gone"] = {"week": 5}
+        whole["usage_gate"]["hookstub:spent"] = {"day": "$5"}
         settings_mod.save(whole)
         agent._usage_acct["hookstub:nodeacct"] = {"windows": [{"label": "5h", "pct": 10}]}
         agent._usage_remote_keys[("node1", "np")] = "hookstub:nodeacct"
@@ -383,7 +384,10 @@ async def test_the_gate_reply_lists_each_account_its_profiles_an_orphan_and_a_no
     assert paul["windows"] == [], "no reading: no rows, the card still takes a reserve"
     gone = got["hookstub:gone"]
     assert (gone["profiles"], gone["reserves"]) == ([], {"week": 5}), "an orphan key is listed so it can be cleared"
+    spent = got["hookstub:spent"]
+    assert spent["billing"] == "metered" and "day" in spent["amounts"], "an orphan of amounts reads as metered"
     node = got["hookstub:nodeacct"]
     assert node["profiles"] == ["np"] and node["labels"] == ["5h"]
     split = got["hookstub:split"]
     assert split["billing"] == "mixed" and split["billings"] == {"api": "metered", "pc": "subscription"}
+    assert {"day", "week", "month"} <= set(split["labels"]), "a mixed account keeps its spend labels"

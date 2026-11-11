@@ -161,7 +161,7 @@ class SettingsMixin:
         """The `gate` reply's `accounts` (§6 *The readers*, TD-1610): `{<key>: {profiles, billing, reserves |
         amounts, windows, labels}}` — an account for each key under `usage_gate:`, each the adapters' profiles
         name and each a node has reported under. One with no reading carries `windows: []`, so its card can
-        take a first reserve; an orphan key no profile names carries `profiles: []`, so it can be cleared. An
+        take a first reserve; an orphan key no profile names carries `profiles: []`, so it is seen. An
         account whose profiles disagree on billing (§4.2a) is `billing: "mixed"`, each profile's in
         `billings`, with both its percents and its amounts. A profile with unattended sessions live makes the
         account's rows the gate's (`_gate_windows`), projected past `max_age` as the gate reads them."""
@@ -174,6 +174,8 @@ class SettingsMixin:
         for key in sorted(keys):
             on = self._account_on(key)
             names, bills = sorted(on), set(on.values())
+            if not bills and amounts.get(key) and not doc.get(key):
+                bills = {"metered"}  # an orphan key holding only amounts reads as what it holds
             billing = "metered" if bills == {"metered"} else "subscription" if len(bills) <= 1 else "mixed"
             entry: dict[str, Any] = {"profiles": names, "billing": billing}
             if billing == "mixed":
@@ -192,7 +194,14 @@ class SettingsMixin:
                 rows = settings_mod.lines(by_label, windows, now)
                 entry |= {
                     "reserves": by_label,
-                    "labels": [str(w.get("label")) for w in windows or [] if isinstance(w, dict)],
+                    "labels": [
+                        *(entry.get("labels") or []),  # a mixed account's spend labels first
+                        *(
+                            label
+                            for w in windows or []
+                            if isinstance(w, dict) and (label := str(w.get("label"))) not in (entry.get("labels") or [])
+                        ),
+                    ],
                     **({"fetched": reading["fetched"]} if reading.get("fetched") else {}),
                     **({"source": reading.get("source") or "asked"} if reading.get("fetched") else {}),
                 }
