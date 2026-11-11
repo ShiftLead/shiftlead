@@ -28,6 +28,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+from sessionorc import held as held_mod
 from sessionorc import naming
 from sessionorc.models import PERSON, Session
 
@@ -472,15 +473,18 @@ def clause(checks: list[dict[str, Any]]) -> str:
     )
 
 
-def read_by(s: Session, pr: int) -> str | None:
+def read_by(s: Session, pr: int, extras: dict[str, str] | None = None) -> str | None:
     """Who read the PR, as the home alone knows it (§4.9b *The reader*): the sender of a `reply` on
     the thread of an `ask` of this record's that carries `pr`, when that sender was one the ask
     named and is not the person. None otherwise — the `review` row is then *recorded*, the
-    script's own word for a comment that was posted, and never *verified*."""
+    script's own word for a comment that was posted, and never *verified*. `extras` (`held.extras_of`)
+    reads an extra seat as its seat, so an extra's reply to an ask of its seat is a read (§4.9, TD-1547)."""
     asks = {e.root or e.id: e for e in s.outbox if e.kind == "ask" and e.pr == pr}
     for r in s.inbox:
         ask = asks.get(r.root) if r.kind == "reply" else None
-        if ask is not None and r.from_ != PERSON and _bare(r.from_) in {_bare(x) for x in ask.to}:
+        if ask is None or r.from_ == PERSON:
+            continue
+        if held_mod.as_seat(r.from_, extras) in {held_mod.as_seat(x, extras) for x in ask.to}:
             return r.from_
     return None
 

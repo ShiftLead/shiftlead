@@ -1614,7 +1614,7 @@ class TickMixin:
             c = cadence_mod.entry_of(s.checks, pr)
             if c is None:
                 continue
-            if not c.get("read_by") and (who := cadence_mod.read_by(s, pr)):
+            if not c.get("read_by") and (who := cadence_mod.read_by(s, pr, held_mod.extras_of(self._graph().values()))):
                 c["read_by"], dirty = who, True
             if not cadence_mod.untold(c):
                 continue
@@ -1842,7 +1842,8 @@ class TickMixin:
                 # mail is pruned: past half its retention the reply that would clear a PR may be
                 # gone (a restarted home, a first promote), and that is no reading, never a crossing
                 old = mail.MAIL_RETENTION is not None and now - merged > mail.MAIL_RETENTION / 2
-                if not paths or merged <= _parse(s.created) or held_mod.read_by(s, pr, files) or old:
+                read = held_mod.read_by(s, pr, files, held_mod.extras_of(records))
+                if not paths or merged <= _parse(s.created) or read or old:
                     self._held_settled.add((addr, s.created, pr))
                     self._held_tried.pop((addr, pr), None)
                     continue
