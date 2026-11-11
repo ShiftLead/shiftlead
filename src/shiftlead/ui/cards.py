@@ -246,6 +246,25 @@ def record_editor(s: dict[str, Any]) -> tuple[dict[str, str] | None, str]:
     return (editor_link(str(s.get("dir") or ""), reach) if here or reach else None), reach
 
 
+def _held_words(s: Mapping[str, Any], fleet: Collection[Mapping[str, Any]]) -> dict[str, Any] | None:
+    """What the seat card's composer sentence tells `mail.read_when` of a held seat (§4.10 *When it is read*, the
+    held row; §6 rule 3 *A stopped team's seats are held*, TD-1564): the view's `stop_held` — `{by, team}`, display
+    only — with the team's wound-down reading (`work.wound_down` over its crew's records, a person's own and its seats
+    left out, as the team's card reads it); None where the record carries no `stop_held`."""
+    mark = s.get("stop_held")
+    if not isinstance(mark, Mapping):
+        return None
+    team = str(mark.get("team") or s.get("team") or "")
+    mine = {
+        str(r.get("id")): dict(r)
+        for r in (*fleet, s)
+        if isinstance(r, Mapping) and team and r.get("team") == team and r.get("unattended") is not False
+    }
+    seats = {str(r.get("name") or "") for r in mine.values() if r.get("seat")}
+    wound = bool(mine) and work.wound_down(list(mine.values()), seats) is not None
+    return {"by": mark.get("by"), "team": team, "wound": wound}
+
+
 def view(
     s: dict[str, Any],
     fleet: list[dict[str, Any]] | None = None,
@@ -314,7 +333,8 @@ def view(
     # the seat's from here (`mail.read_when` is the one function either way)
     rw = s.get("read_when") if isinstance(s.get("read_when"), dict) else {}
     if d["seat"]:
-        rw = {k: mail.read_when(None, k, now, seat=True) for k in ("ask", "note")}
+        held = _held_words(s, fleet or ())
+        rw = {k: mail.read_when(None, k, now, seat=True, held=held) for k in ("ask", "note")}
     d["read_when"] = {k: str(rw.get(k) or "") for k in ("ask", "note")}
     d["age"] = _age(s.get("since"), now)
     # a seat's *last came* is when it came — the record's `created`, the fill (§6 rule 3) — not

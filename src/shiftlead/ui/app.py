@@ -78,6 +78,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     _count,  # noqa: F401
     _declared,  # noqa: F401
     _first_line,  # noqa: F401
+    _held_words,  # noqa: F401
     _middle,  # noqa: F401
     alarm_note,  # noqa: F401
     alarm_to_view,  # noqa: F401
