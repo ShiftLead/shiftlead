@@ -671,6 +671,17 @@ def test_the_usage_chip_prints_the_line_its_reserve_makes_and_ranks_by_the_gap()
     }}  # fmt: skip
     got = with_lines(usage, accounts | gate)
     assert got["grind"]["lines"] == got["paul"]["lines"] == [{"label": "week", "line": 60}] and got["gone"] is None
+    # a profile no account lists keeps its own entry; one on a mixed account draws no line even so
+    usage2 = {"solo": {"windows": []}, "sx": {"windows": []}}
+    accounts["accounts"]["claude-code:split"]["profiles"] = ["sx"]
+    own = {
+        "profiles": {
+            "solo": {"windows": [{"label": "5h", "line": 50}]},
+            "sx": {"windows": [{"label": "5h", "line": 9}]},
+        }
+    }
+    got = with_lines(usage2, accounts | own)
+    assert got["solo"]["lines"] == [{"label": "5h", "line": 50}] and "lines" not in got["sx"]
 
 
 def test_the_usage_chip_shows_the_gates_projection():
