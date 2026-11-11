@@ -4368,7 +4368,9 @@
     const v = u.value === null || u.value === undefined ? "" : String(u.value);
     const dis = u.why ? ` disabled title="${esc(u.why)}"` : ` title="${u.default ? "the default ceiling, its size + 2" : "the most sessions this line runs at once"} — a setting, the definition untouched; at or below its size, no scaling"`;
     return ` <label class="mupto meta">up to <input class="input sm" type="number" min="0" step="1" data-mupto="${esc(name)}" value="${esc(v)}"${dis} aria-label="up to, ${esc(name)}"></label>`
-      + (u.why ? ` <span class="meta">${esc(u.why)}</span>` : "");
+      + (u.why ? ` <span class="meta">${esc(u.why)}</span>` : "")
+      // the line read as its range and extras, its newest fill or stop beside it (§4.9 *What the person sees*, TD-1548)
+      + (u.range ? ` <span class="meta mrange">${esc(u.range)}${u.last ? ` · ${esc(u.last)}` : ""}</span>` : "");
   };
   // a lowered **up to**'s confirm names each live extra it winds down (the highest-placed past the new ceiling);
   // "" where it winds none down — a stopped team, a raise, or no live extra past it — and asks nothing
@@ -4392,7 +4394,8 @@
       + `<button class="btn sm ghost" type="button" data-msize="${e.index}" data-step="1"${twin} title="one session more on this line — a setting, the definition untouched" aria-label="one more ${esc(e.name || e.role)}">+</button>`
       + (e.next_start ? ` <span class="meta">· from the next Start</span>` : "")
       + AO.membersUpTo(e.name || e.role, e.up_to);
-    return `<div class="row gap wrap"><span>${esc(e.role)} · ${esc(e.name || e.role)} · ${esc((e.lane || []).join(", ") || "—")} ·</span>${size}<span class="meta">${held}</span>${rm}</div>`;
+    const sep = held && (e.up_to || {}).range ? "· " : "";  // the line's range before its sessions (TD-1548)
+    return `<div class="row gap wrap"><span>${esc(e.role)} · ${esc(e.name || e.role)} · ${esc((e.lane || []).join(", ") || "—")} ·</span>${size}<span class="meta">${sep}${held}</span>${rm}</div>`;
   };
   async function openMembers(team) {
     const dlg = $("#membersdlg"); if (!dlg) return;

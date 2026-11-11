@@ -1244,6 +1244,11 @@ def cmd_team_list(args: argparse.Namespace) -> int:
                         print(f"{'':<{w}}  {line}")
                 if unread:  # a node's checkout this host cannot read: not judged here
                     print(f"{'':<{w}}  flows not read from here: {unread}")
+            if r.get("td_max"):  # *td-max: grinder-ao 3–6 +1 (+1 at 14:02: …)* (§4.9 *What the person sees*)
+                # each scaling line's range on a live team, as the card's members line; *on* where nothing is live
+                scaling = r.get("scaling") if r["live"] else None
+                lines = [x["range"] + (f" ({x['last']})" if x["last"] else "") for x in scaling or []]
+                print(f"{'':<{w}}  td-max: {'; '.join(lines) or 'on'}")
             if r.get("sizes"):  # *size: grinder-ao 2 (file says 1)* (§4.9 *A team's size*)
                 print(f"{'':<{w}}  size: {', '.join(r['sizes'])}")
             if r.get("differences"):  # …a seat the run lacks, under a flow or none (§4.9c, TD-399), a rename (TD-703)

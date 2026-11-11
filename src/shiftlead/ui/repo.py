@@ -838,6 +838,10 @@ def team_groups(
                 "source_repo": Path(row["source"]).parent.name if row.get("source") and not row.get("in_org") else "",
                 "def_manager": row.get("manager"),  # the definition's word, for a card with no sessions yet
                 "def_members": row.get("members"),
+                # td-max (§4.5a team card **td-max** mark, §4.9 *What the person sees*, TD-1548): the mark, and on a
+                # live team each line or seat that scales as its range, extras and newest fill or stop
+                "td_max": bool(row.get("td_max")),
+                "scaling": list(row.get("scaling") or []) if live else [],
                 "def_techlead": row.get("techlead"),  # the seat's name (§4.9b), when the definition has one
                 # every seat the definition names, once each: a stopped team's rollup row stubs those with no
                 # counted card (§4.5a *Sessions: rollup*, TD-1204), never a person-held manager

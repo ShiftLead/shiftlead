@@ -280,6 +280,7 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .helppanel .defline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 .5em; }  /* the team's **Definition** line (§4.5a ***i*** mark, TD-418) */
 .helppanel .notconcluded { margin: 0 0 .5em; white-space: normal; }  /* *not concluded:* under it */
 .ghead .stopsnote { flex-basis: 100%; }  /* **stops** (§4.5a, TD-337): the team's stop time, its own line */
+.ghead .scaleline { flex-basis: 100%; }  /* the **td-max** members line (§4.5a, §4.9 *What the person sees*, TD-1548): a scaling line or seat, its own line */
 .ghead .flowcannot { flex-basis: 100%; white-space: normal; color: var(--needs-fg); }  /* *cannot be followed* (§4.5a, §4.9c): its own line */
 .ghead .flowchip { text-decoration: none; cursor: pointer; }  /* the **flow chip** (§4.5a, TD-418): its press the team's Settings card */
 .ghead .flowchanged { color: var(--needs-fg); }  /* *flow changed* beside its Apply (§4.5a, TD-309) */
