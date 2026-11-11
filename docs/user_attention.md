@@ -10,6 +10,7 @@ People: paul
 
 ## Needs the user
 
+- [ ] act 2026-11-11 (n/a) — Stop the stray agentorc-agent serve on kmaster (pid 976328, up 61 days, from ~/agentorc/.claude/worktrees/tdgrind-ao-1, its home /tmp/ao_manual_test deleted): it may be a second caller of the usage endpoint on your login (TD-1589); no session may signal a process it did not start. Context: TD-1589. Due: 2026-11-12.
 - [ ] decide 2026-11-11 (n/a) — Will you run ao schedule ao-grind reset --profile grind --window week from your own shell, so ao-grind starts at each weekly reset and the next Thursday reset is read as TD-133's check? Context: TD-133 decision (paul). Due: 2026-11-18. Answers: Yes — I ran it | No — drop the check. Lifts: Yes | No.
   - **Context:** TD-133 is the live check of the weekly-reset start (#2873). A session cannot read or set a schedule, so only you can set it; the gate moved from the old decision form to this item (TD-1584).
   - **Question:** Run the schedule command from your own shell, or drop the check?
