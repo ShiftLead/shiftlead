@@ -155,6 +155,7 @@ HOME_OWNED = frozenset(
         "restarts",
         "restart_ceiling",
         "fill_lapsed",
+        "stop_held",
         "closed_for",
         "finished_sent_at",
         "restart_blocked",
@@ -1365,6 +1366,12 @@ class Session:
     # entry in `restarts`, and read by the next trip, which holds (`held: true`) when every fill it counts
     # postdates the lapse. The home's (§4.4a).
     fill_lapsed: dict[str, Any] | None = None
+    # `{at, by, team}` while a seat is **held** by its team's stop (§6 rule 3 *A stopped team's seats are held*,
+    # TD-1564): `by` (`person` or `until`) and `at` are `work.seats_held_by`'s, written by the tick's every pass
+    # over the seat and cleared once it does not hold. Never `seat_held`, the anchor seat's retired mark. A
+    # `create` at a Start writes a fresh record without it. Display and the lapse stamp read it; the fill, the
+    # send and the reply line read `work.held_for` itself. The home's (§4.4a).
+    stop_held: dict[str, Any] | None = None
     # The tick's mark after its own close for a restart, `{why, closed_at}`: the rule (`wanted`, rule 2's,
     # or `brief`, rule 7's) and the `closed_at` that close wrote. Any close the home runs clears it, and
     # a close it never hears of as an act (a person's at the node) writes a new `closed_at` that no

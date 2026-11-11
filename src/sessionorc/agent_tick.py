@@ -3206,9 +3206,11 @@ class TickMixin:
         if s.seat and s.suspended:
             self.unfillable[s.id] = "suspended"
         if not (s.seat and s.supervised and s.unattended) or s.superseded_by or s.suspended:
+            await self._stop_held(s, None)  # (a) keeps its own words: no hold on it (§6 rule 3, TD-1564)
             return
         if s.sit_out or work_mod.sat_out(s):
             self.unfillable[s.id] = "sat out"
+            await self._stop_held(s, None)  # (b)
             return  # a seat the definition dropped (TD-706): `_sit_out_close` ends it, and nothing fills it
         filled, seen, count = s.seat_filled, s.lane_seen, s.seat_count
         due = self._seat_due(s, now, records)
@@ -3216,6 +3218,11 @@ class TickMixin:
             s.seat_due = due
             self._save(s)
             await self._push_changes()
+        # *A stopped team's seats are held* (§6 rule 3, TD-1564): read every pass, due or not, before the
+        # link-down return, which keeps the mark as it keeps its others
+        held = work_mod.held_for(s, records)
+        word = work_mod.seats_held_by([r for r in records if r.team == s.team]) if held else None
+        await self._stop_held(s, {"at": word["at"], "by": word["by"], "team": s.team} if word else None)
         if s.host != self.host and s.host not in self._link_muxes:
             return  # its link is down: left as it is, looked at again next tick (§4.4a)
         mark = s.restart_ceiling
@@ -3228,6 +3235,8 @@ class TickMixin:
             s.fill_lapsed = {"at": now.replace(microsecond=0).isoformat().replace("+00:00", "Z")}
             self._save(s)
             await self._push_changes()
+        if held:
+            return  # filled for no cause until its team's Start: no `unfillable` word, never routed around
         if s.state in ("exited", "closed"):
             self._unfillable_word(s, now)  # due or not, a question asks whether rule 3 would fill it (TD-1443)
         if s.state in ("exited", "closed") and s.seat_due:
@@ -3250,6 +3259,19 @@ class TickMixin:
                 await self.rpc_close(s.id, closer=closer)
             else:
                 await self._route_act("close", {"id": s.id, "closer": closer}, None, s.host)
+
+    async def _stop_held(self, s: Session, mark: dict[str, Any] | None) -> None:
+        """Write a seat's `stop_held` (§6 rule 3 *A stopped team's seats are held*, TD-1564) where it changed: the
+        mark while it holds, None once it does not — saved and pushed as the seat's other home-owned marks are."""
+        if s.stop_held == mark or (not s.stop_held and not mark):
+            return
+        if mark:
+            log.info("%s: held — team %s stopped (%s, %s); filled at its Start", s.id, s.team, mark["by"], mark["at"])
+        else:
+            log.info("%s: no longer held by its team's stop", s.id)
+        s.stop_held = mark
+        self._save(s)
+        await self._push_changes()
 
     @staticmethod
     def _seat_done(s: Session) -> bool:

@@ -134,20 +134,73 @@ def _how_stopped(r: Session) -> str | None:
     return "person" if mine else "until" if clock else None
 
 
-def stopped_by(records: Iterable[Session]) -> dict[str, str]:
-    """How a team stopped (§6 rule 8 *A team that stopped*): `{by, at}` over its **current** crew records (not
-    superseded, not sat out, not run-only, §4.9 *A member started from the form*). `at` is the newest end among
-    them (`record_end`), and `by` is read from the records whose end falls within `FINISHED_SETTLE` of it alone —
-    the team's ending, not a member a person closed a day earlier: `person` where one was ended by the person,
-    else `until` where one was ended by the stop time, else `other`."""
-    current = [r for r in crew(records) if not r.superseded_by and not sat_out(r) and not r.run_only]
-    ends = [(r, at) for r in current if (at := _instant(record_end(r))) is not None]
+def _seat_close(r: Session) -> bool:
+    """Whether a record's end is rule 3's own close of a seat between questions (§6 rule 3 *A stopped team's seats
+    are held*, TD-1564): no `ended`, and `closer.why` `seat`."""
+    return not isinstance(r.ended, Mapping) and isinstance(r.closer, Mapping) and r.closer.get("why") == "seat"
+
+
+def _current(records: Iterable[Session]) -> list[Session]:
+    """A team's current crew records (§6 rule 8 *A team that stopped*): not superseded, not sat out, not run-only
+    (§4.9 *A member started from the form*)."""
+    return [r for r in crew(records) if not r.superseded_by and not sat_out(r) and not r.run_only]
+
+
+def _last_word(current: Iterable[Session]) -> dict[str, Any] | None:
+    """The team's word on its last end, rule 3's seat closes left out (§6 rule 3 *A stopped team's seats are
+    held*): over the records whose end `record_end` reads, the newest end and those within `FINISHED_SETTLE` of it
+    read by `_how_stopped` — `{by: person|until|other, at}`, `at` the newest end that remains; None where none
+    remains. One reading for `stopped_by`'s `by` and `seats_held_by`, so a team's word and its seats' hold agree."""
+    ends = [(r, at) for r in current if not _seat_close(r) and (at := _instant(record_end(r))) is not None]
     if not ends:
-        return {"by": "other", "at": ""}
+        return None
     last = max(at for _, at in ends)
     words = {_how_stopped(r) for r, at in ends if last - at <= FINISHED_SETTLE}
     by = "person" if "person" in words else "until" if "until" in words else "other"
     return {"by": by, "at": last.isoformat()}
+
+
+def stopped_by(records: Iterable[Session]) -> dict[str, str]:
+    """How a team stopped (§6 rule 8 *A team that stopped*): `{by, at}` over its **current** crew records (not
+    superseded, not sat out, not run-only, §4.9 *A member started from the form*). `at` is the newest end among
+    them all (`record_end`), rule 3's seat closes included, so a team of seats alone keeps a non-blank `at`; `by`
+    is `_last_word`'s — rule 3's seat closes left out, read from the records whose end falls within
+    `FINISHED_SETTLE` of the newest end that remains — the team's ending, not a member a person closed a day
+    earlier, nor the tick closing an idle seat after it: `person` where one was ended by the person, else `until`
+    where one was ended by the stop time, else `other` (and where no end remains)."""
+    current = _current(records)
+    ends = [at for r in current if (at := _instant(record_end(r))) is not None]
+    if not ends:
+        return {"by": "other", "at": ""}
+    word = _last_word(current)
+    return {"by": word["by"] if word else "other", "at": max(ends).isoformat()}
+
+
+def seats_held_by(records: Iterable[Session]) -> dict[str, str] | None:
+    """Whether one team's seats are **held** (§6 rule 3 *A stopped team's seats are held*, TD-1564): None while
+    any of its crew is live (not `DEAD`; `scheduled` is live); else `_last_word` over its current crew records,
+    `{by, at}` where it says `person` or `until`, `at` the last end it read — else None (a crash given up, a kill by
+    a session, members that finished and were closed, or none but rule 3's own seat closes). It reads ends, never
+    whether the team wound down."""
+    mine = crew(records)
+    if not mine or any(r.state not in DEAD for r in mine):
+        return None
+    word = _last_word(_current(mine))
+    if word is None or word["by"] not in ("person", "until"):
+        return None
+    return word
+
+
+def held_for(r: Session, records: Iterable[Session]) -> bool:
+    """Whether a record is a **held** seat (§6 rule 3 *A stopped team's seats are held*): a seat (`seat` set),
+    supervised, unattended, neither suspended nor sat out, carrying a `team`, whose team's `seats_held_by` gives a
+    word. `records` may hold every team's: the team's own are read. The single test for the fill's hold,
+    `stop_held`, `seats_held` and the reply line (§4.10)."""
+    if not (r.seat and r.supervised and r.unattended and r.team) or r.superseded_by or r.suspended:
+        return False
+    if r.sit_out or sat_out(r):
+        return False
+    return seats_held_by([x for x in records if x.team == r.team]) is not None
 
 
 def finished_alone(records: Iterable[Session]) -> list[Session]:
