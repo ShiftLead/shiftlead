@@ -2221,6 +2221,7 @@ class TickMixin:
         at = now_iso()
         about = {"start": at, "of": len(replays)}
         log.info("schedule: starting %s at the reset %s (%d records)", team, due, len(replays))
+        await self._reconcile_extras(team, records, "a schedule")
         for r in replays:
             try:
                 await self._replay(r, "schedule", mark=dict(about), keep_mail=True, held=bool(r.seat and r.unattended))
@@ -2628,6 +2629,7 @@ class TickMixin:
         rec["work_started"] = [*started, at]
         about = {"ids": ids, "start": at, "of": len(replays)}
         log.info("rule 8: starting %s again for %s (%d records)", team, ids, len(replays))
+        await self._reconcile_extras(team, records, "rule 8")
         for r in replays:
             try:
                 # every record's mail kept, as a fill's and a Restart's is: a lapse note or an answer
@@ -2638,6 +2640,49 @@ class TickMixin:
             except Exception:  # noqa: BLE001 — one record's failure is never the team's start
                 log.exception("%s: rule 8's replay failed", self._address(r))
         return None
+
+    def _extras_past(self, team: str, records: list[Session]) -> list[Session]:
+        """The held extras of `team` its merged `max` no longer holds, read from `settings.yml` and the records alone
+        (§4.9 *Scaling with the work*, §6 rule 14; TD-1545): every one on a team at `off`, every one of a line or seat
+        stored at `0`, and one whose name's number (`grind-6`, `fc-ao-3`) is past its line's written ceiling. A line
+        with no key is on its default, which only the definition reads, so nothing of it is read as surplus here.
+        This home's records alone, none superseded."""
+        ceiling = (settings_mod.teams(settings_mod.load()).get(team) or {}).get("max")
+        if ceiling is None:
+            return []
+        out = []
+        for r in records:
+            if not work_mod.held_extra(r) or r.host != self.host or r.superseded_by:
+                continue
+            line = str(r.scale.get("line") or "")
+            top = 0 if ceiling == "off" else ceiling.get(line) if isinstance(ceiling, dict) else None
+            if top is None:
+                continue
+            k = r.name[len(line) + 1 :] if line and r.name.startswith(f"{line}-") else ""
+            if top == 0 or (k.isdigit() and int(k) > top):
+                out.append(r)
+        return out
+
+    async def _reconcile_extras(self, team: str, records: list[Session], why: str) -> None:
+        """Rule 8's and a schedule's start first drop the held extras the merged `max` no longer holds (§6 rule 14,
+        TD-1545): each forgotten, as a Start's reconcile removes one; one with unread mail is said and left, its
+        mail waiting for a fill. The missing ones are never written here: an extra's launch record is the one the
+        line's next kept member would get, which only a definition gives, so they wait for the person's next Start
+        or Apply (§4.9 *An extra*)."""
+        try:
+            past = self._extras_past(team, records)
+        except Exception:  # noqa: BLE001 — a reading's surprise is a log line, never the team's start
+            log.exception("%s: %s's start could not read the held extras past the max", team, why)
+            return
+        for r in past:
+            if r.unread():
+                log.info("%s: %s's start keeps the held extra past the max — its mail waits", self._address(r), why)
+                continue
+            try:
+                await self.rpc_remove(r.id)
+                log.info("%s: %s's start removed the held extra past the max", self._address(r), why)
+            except Exception as e:  # noqa: BLE001 — one record's removal is never the team's start
+                log.warning("%s: the held extra past the max was not removed: %s", self._address(r), e)
 
     def _work_replays(self, records: list[Session], now: datetime) -> list[Session]:
         """What a start by rule 8 replays: the team's crew records that ended — the wound-down reading
