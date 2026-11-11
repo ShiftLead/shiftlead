@@ -260,11 +260,11 @@ def test_the_pass_starts_it_with_auto_off_and_the_auto_row_says_prechecking(chec
         "read_checks",
         lambda root, s, keep=True: ("unknown", f"no cadence/precheck on {s[:7]}", None, "absent"),
     )
-    readings, _, _ = promote.survey([str(root)], {}, True, {}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(root)], {}, True, {}, datetime.now(UTC))
     r = readings[root.name]
     assert (r["checks"], r["prechecking"], promote.precheck_run(root.name)["sha"]) == ("pending", sha, sha)
     assert _ran(fake) == [sha]
-    readings, _, _ = promote.survey([str(root)], readings, True, {root.name: True}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(root)], readings, True, {root.name: True}, datetime.now(UTC))
     r = readings[root.name]
     assert r["acts"] == {"prechecking": sha[:7]} and _ran(fake) == [sha]
     assert promote.acts_words(r["acts"]) == f"prechecking {sha[:7]} — promotes when green"
@@ -313,7 +313,7 @@ def test_a_pass_that_read_no_checks_keeps_prechecking_and_runs_no_precheck(check
         "read_checks",
         lambda root, s, keep=True: ("unknown", f"no cadence/precheck on {s[:7]}", None, "absent"),
     )
-    readings, _, _ = promote.survey([str(root)], {}, True, {}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(root)], {}, True, {}, datetime.now(UTC))
     assert readings[root.name]["prechecking"] == sha and _ran(fake) == [sha]
 
     def never(*a, **kw):
@@ -321,7 +321,7 @@ def test_a_pass_that_read_no_checks_keeps_prechecking_and_runs_no_precheck(check
 
     monkeypatch.setattr(promote, "precheck_on_main", never)
     monkeypatch.setattr(promote, "precheck_pr_bound", never)
-    readings, _, _ = promote.survey([str(root)], readings, False, {root.name: True}, datetime.now(UTC))
+    readings, _, _, _ = promote.survey([str(root)], readings, False, {root.name: True}, datetime.now(UTC))
     r = readings[root.name]
     assert r["prechecking"] == sha and r["precheck"] == "absent" and _ran(fake) == [sha]
 

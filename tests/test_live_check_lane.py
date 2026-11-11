@@ -192,7 +192,7 @@ async def test_the_promote_reading_turns_unknown_into_known(agent, monkeypatch):
 
     assert HostAgent(tmux=agent.tmux)._promotes_read is False  # a start knows no live commit
     agent._promotes_read, agent._promote_read_at = False, float("-inf")
-    monkeypatch.setattr(promote_mod, "survey", lambda *a, **k: ({}, [], {}))
+    monkeypatch.setattr(promote_mod, "survey", lambda *a, **k: ({}, [], {}, []))
     monkeypatch.setattr(promote_mod, "pulls", lambda *a, **k: ({}, None))
     await agent._refresh_promotes()
     assert agent._promotes_read is True

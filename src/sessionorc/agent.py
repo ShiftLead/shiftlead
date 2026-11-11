@@ -749,6 +749,10 @@ class HostAgent(
         # `(root, why)` lines it logged while their condition lasts, each logged once
         self._sweep_task: asyncio.Task[None] | None = None
         self._swept_on: dict[str, date] = {}
+        # a root whose sweep is running, and one whose live ref moved while it ran (§6 *The live ref*, TD-1437):
+        # its day is cleared when that run ends, so the moved gate is read on the next tick
+        self._sweeping: set[str] = set()
+        self._resweep: set[str] = set()
         self._sweep_quiet: set[tuple[str, str]] = set()
         # and each root's forge visibility, read once per agent start for its host-log gates (TD-1388): kept in
         # memory, never in the saved repo facts; a failed read is not kept, so the next due reading tries again
