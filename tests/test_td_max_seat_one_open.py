@@ -70,4 +70,3 @@ def test_a_moved_ask_does_not_block_itself_and_another_open_ask_still_does():
     _open_ask(g, "ao-tl-3", mid="m-9")
     g["ao-tl-3"].inbox[0].root = "m-9"
     assert mail.open_question(g, {"ao-a"}, "ao-tl-2", thread="m-1").id == "m-9"
-
