@@ -441,7 +441,7 @@ def want_of(e: Mapping[str, Any], sec: str) -> str:
     if row in ("red_pr", "fork_pr"):
         return "do"
     if row == "board":
-        if isinstance(e.get("stuck"), Mapping):
+        if stuck_line(e):
             return "do"  # a stuck decided line moved to the Do group (§6 rule 13 *What the person sees*, TD-1497)
         kind = str(e.get("kind") or "").lower()
         return "read" if kind in ("watch", "fyi") else ("do" if kind == "act" else "decide")

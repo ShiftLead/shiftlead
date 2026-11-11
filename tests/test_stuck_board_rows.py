@@ -181,3 +181,39 @@ def test_ao_card_prints_the_moved_line_with_its_key_and_kind_stuck():
     text = "\n".join(cli._card_text(v))
     assert "  board:k1 · stuck · on s#TD-21 · board of s" in text
     assert "    stuck 1h 30m: the Go on TD-21 — grinder-1 is at its usage cap" in text
+
+
+@pytest.mark.unit
+def test_a_stale_line_at_waiting_is_no_stuck_item_and_ao_card_prints_its_own_kind():
+    until = (NOW + timedelta(minutes=20)).isoformat()
+    q = queue()
+    secs = inbox_sections(
+        [], now=NOW, states=stuck_rows(stuck(waiting_until=until), now=NOW),
+        boards=[line(stale=True)], cards=card_index(q),
+    )  # fmt: skip
+    (r,) = secs["needs"]  # past its wait days: where it would be unanswered, as before
+    got = attach(secs, drawn, raw=True, start=lambda c, i, r="": {"item": i} if i else {})
+    v = card_view(q, got, "TD-21", NOW, [], words=False)
+    (m,) = v["wants"]["decide"]
+    assert m["kind"] == "decide" and not m.get("stuck"), "at waiting: never the stuck item"
+    text = "\n".join(cli._card_text(v))
+    assert "  board:k1 · decide · " in text and "stuck 1h 30m: the Go on TD-21" in text
+
+
+@pytest.mark.unit
+def test_a_moved_line_homed_on_no_card_is_an_inbox_needs_you_row_counted():
+    _, secs, _v = sections(stuck(), boards=[line(refs=())])
+    (r,) = secs["needs"]
+    assert r["key"] == "board:k1" and r["home"] == "inbox" and secs["count"] == 1 and secs["queue_n"] == 0
+    assert r["stuck"]["text"].startswith("stuck 1h 30m: the Go on s's board — ")
+
+
+@pytest.mark.unit
+def test_a_link_hold_names_every_down_host_or_its_one_host():
+    for held, hosts in (
+        ({"why": "link", "hosts": ["a", "b", "c"]}, "a, b and c"),
+        ({"why": "link", "host": "n9"}, "n9"),
+    ):
+        reason = {"state": "team", "team": "t", "held": held}
+        (r,) = stuck_rows(stuck(reason=reason, actor=False), now=NOW)
+        assert r["text"].endswith(f"— t waits for {hosts} to answer")
