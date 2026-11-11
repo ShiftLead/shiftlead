@@ -966,6 +966,8 @@ class HostAgent(
         self._witness_loop = asyncio.get_running_loop()
         self._witness_begin()
         await asyncio.to_thread(self._recover_reaps)  # a reap a promote cut off (§4.1, TD-979)
+        if self.mode == "home":
+            await asyncio.to_thread(self._migrate_scale)  # td-max's one-time `max: off` (§4.9, TD-1545)
         # `limit`: a link's frame is one line, and a node's snapshot outgrows asyncio's 64 KiB default
         server = await asyncio.start_unix_server(self._handle_conn, sock=_bound(sock), limit=link.FRAME_LIMIT)
         log.info("listening on %s", sock)
@@ -1003,6 +1005,27 @@ class HostAgent(
             for lsock, _ in link_servers:
                 with contextlib.suppress(FileNotFoundError):
                     lsock.unlink()
+
+    def _migrate_scale(self) -> None:
+        """td-max's one-time write, the host agent's one exception to *written only by `set_settings`* (§4.9
+        *On by default, with default ceilings*, §5, TD-1545): at the home's first start on this build, with
+        no `scale.migrated` stamp, `max: off` for every team it knows — a key under `teams:`, or a record
+        carrying `team` — and the stamp, in one write; the held extras of each team it writes `off` are
+        dropped in the same pass. A broken `settings.yml` is left as it is, and tried again at the next start."""
+        doc = settings_mod.read() if settings_mod.settings_file().exists() else {}
+        if doc is None:
+            log.warning("settings.yml is not a mapping: td-max's migration waits for the next start")
+            return
+        today = datetime.now().astimezone().date().isoformat()  # the home's local day, as the ledger's dates
+        written = settings_mod.migrate_scale(doc, (r.team for r in self.sessions.values()), today)
+        if written is None:
+            return
+        settings_mod.save(doc)
+        log.info("td-max: max: off written for %d team(s), stamped scale.migrated %s", len(written), today)
+        off = set(written)
+        for r in list(self.sessions.values()):
+            if r.scale and r.team in off and r.state == "closed":
+                self._forget(r.id)  # an extra a Start wrote between the install and this start (§4.9)
 
     async def _bind_links(self) -> list[tuple[Path, asyncio.AbstractServer]]:
         """The home's per-node link sockets (design §4.4a "A container node", TD-057 step 3c): one
