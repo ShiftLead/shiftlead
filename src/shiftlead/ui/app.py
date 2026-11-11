@@ -264,6 +264,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _gh_user_type_read,  # noqa: F401
     _held_answered,  # noqa: F401
     _hold_inputs,  # noqa: F401
+    _holder_where,  # noqa: F401
     _needs_key,  # noqa: F401
     _next_due,  # noqa: F401
     _order_teams,  # noqa: F401
@@ -350,6 +351,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     state_rows,  # noqa: F401
     stuck_cut,  # noqa: F401
     stuck_onto_boards,  # noqa: F401
+    stuck_onto_holders,  # noqa: F401
     stuck_rows,
     unclosed_mark,  # noqa: F401
     with_standings,

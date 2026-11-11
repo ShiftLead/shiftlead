@@ -4844,6 +4844,8 @@ def _card_item_lines(x: Mapping[str, Any], cut: bool) -> list[str]:
         else:
             body += [str(row.get("subject") or ""), str(row.get("text") or "")]
             body += _answer_lines(row.get("answers"), row.get("default"))
+    # a holder's or a pending row's stuck lines: work it is the actor of, under its own row (§6 rule 13, TD-1497)
+    body += [str(ln.get("text") or "") for ln in row.get("stuck_lines") or () if isinstance(ln, Mapping)]
     lines = ["  " + " · ".join(h for h in head if h)]
     for b in body:
         lines += ["    " + ln if ln.strip() else "" for ln in b.strip("\n").splitlines()] if b.strip() else []

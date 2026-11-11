@@ -120,8 +120,10 @@ def test_an_idle_actors_words_name_its_idle_start_and_more_actors_read_plus_n():
 
 
 @pytest.mark.unit
-def test_a_needs_you_reason_and_a_malformed_reading_draw_no_row():
-    assert stuck_rows(reading(reason={"state": "needs_you", "name": "techlead-1"}), now=NOW) == []
+def test_a_needs_you_reason_is_a_line_for_its_pending_row_and_a_malformed_reading_draws_no_row():
+    # its words go under the actor's own pending row (`stuck_onto_holders`, TD-1497 slice 3)
+    (r,) = stuck_rows(reading(reason={"state": "needs_you", "name": "techlead-1"}), now=NOW)
+    assert r["under_pending"] is True
     board = {"board:k": {"since": at(2), "reason": {"state": "no_lane"}}}  # a `board:` entry with no repo
     assert stuck_rows(board, now=NOW) == []
     no_work = reading()

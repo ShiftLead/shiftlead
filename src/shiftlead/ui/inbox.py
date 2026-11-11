@@ -46,7 +46,7 @@ from . import render as rendermod
 from . import uiconf
 from .cards import MODE_VIA_WORDS, _clock, _first_line, alarm_note, alarm_to_view, fill_words, subagent_held
 from .common import _age, _countdown, _instant, _iso, _left, editor_file_link, host_name, templates
-from .queue import asker_repos, design_link, item_home
+from .queue import HOLDER_ROWS, asker_repos, design_link, item_home
 
 # -- the Inbox page (design §4.5 screen 6, §4.5a **Inbox page**, §4.10; TD-069 step 1) -------------
 
@@ -1055,8 +1055,10 @@ def stuck_rows(
     a team read whole (its name the team's, no **Open**); `stuck_onto_boards` lays it on the line's own row where the
     page holds one, which is then drawn in its place.
 
-    Left for later slices: a `needs_you` reason (a line under the actor's own pending row, never a row), and the
-    stuck line under a stopped holder's state row. A malformed host record costs rows, never the page."""
+    A `needs_you` reason (TD-1497 slice 3) is a row carrying `under_pending`: `stuck_onto_holders` lays its words
+    as a line under the actor's own pending row and drops it, never a row of its own; the same function lays the
+    words of a stopped holder's actor under that holder's state row. A malformed host record costs rows, never the
+    page."""
     at = now or datetime.now(UTC)
     out: list[dict[str, Any]] = []
     if not isinstance(stuck, Mapping):
@@ -1080,8 +1082,6 @@ def stuck_rows(
                 actor = {"id": "", "name": str(reason.get("team") or "")}
         if not isinstance(reason, Mapping) or not isinstance(actor, Mapping) or not isinstance(work, Mapping):
             continue  # an ask with no `work` closed since the tick read it: the next reading drops it
-        if reason.get("state") == "needs_you":
-            continue  # its words are a line under the actor's own pending row (a later slice)
         since = str(v.get("since") or "")
         aid = str(actor.get("id") or "")
         name = str(actor.get("name") or aid)
@@ -1129,6 +1129,8 @@ def stuck_rows(
                 **({"waiting_until": until, "until_words": _left(until, at)} if until else {}),
                 "find": " ".join(x for x in (name, "stuck", what, why) if x),
                 **({"board_repo": repo} if board else {}),
+                # its words are a line under the actor's own pending row, never a row (`stuck_onto_holders`)
+                **({"under_pending": True} if reason.get("state") == "needs_you" else {}),
             }
         )
     return out
@@ -1169,6 +1171,12 @@ def stuck_onto_boards(
             continue
         b = out_boards[i]
         what = board_work_words(b)
+        if r.get("under_pending"):
+            # a `needs_you` actor's words go under its own pending row, never onto the line (`stuck_onto_holders`):
+            # the row stays a state, its work named by the line
+            head = f"stuck {r.get('age')}: {what}" if r.get("age") else f"stuck: {what}"
+            kept.append({**r, "work_words": what, "head": head, "text": _stuck_text(r, what)})
+            continue
         out_boards[i] = {
             **b,
             "stuck": {
@@ -1181,10 +1189,99 @@ def stuck_onto_boards(
                 "actor": r.get("actor") or {},
                 "reason_base": r.get("reason_base") or "",
                 "at": r.get("at") or "",
+                "reason_words": r.get("reason_words") or "",
                 **({"waiting_until": r["waiting_until"]} if r.get("waiting_until") else {}),
             },
         }
     return kept, out_boards
+
+
+def _holder_where(h: Mapping[str, Any]) -> str:
+    """Where a holder's state row is drawn, as a stuck row on another surface names it (§6 rule 13): *on <TD-n>*,
+    the claim its card draws it on, or *in the Inbox*."""
+    if h.get("home") == "queue":
+        return f"on {h.get('on_row') or 'its card'}"
+    return "in the Inbox"
+
+
+def stuck_onto_holders(out: dict[str, list[dict[str, Any]]], waiting_on: Callable[[Mapping[str, Any]], Any]) -> None:
+    """§6 rule 13 *What the person sees* (TD-1497 slice 3), after `item_home`: one counted item for one cause.
+
+    - A `needs_you` actor's stuck words (a row carrying `under_pending`) are a line under its own pending row — its
+      `permission`, `question` or `needs` state row, on a card as a holder row or in the Inbox — never a row: the
+      row is dropped, and with no such row on the page (the record gone since the reading) it is drawn nowhere.
+    - A stuck row, or a decided line's row moved while stuck (`stuck_onto_boards`), whose actor's stopped-holder state
+      row (`HOLDER_ROWS`) is drawn **on the same surface** (both in the Inbox, or both on one card) is a line under
+      that holder row alone: the stuck row is dropped, and the decided line's row goes back under *Waiting on them*
+      (`waiting_on` its words), in no number. On two surfaces each row is drawn, the stuck words ending *— its holder
+      row is on <TD-n>* or *— its holder row is in the Inbox* (`holder_where`, which `stuck_cut` keeps).
+
+    A row at *waiting* (its `waiting_until`) is left as it is: it is in no number already. The holder row's
+    `stuck_lines` are its lines, oldest first, the rest of one reason cut to *— <actor>, as on <first work>*.
+    Rewrites `out` in place; its rows are the caller's copies."""
+    holders: dict[str, dict[str, Any]] = {}  # a session's stopped holder's row, its pending one first
+    pending: dict[str, dict[str, Any]] = {}  # …and its pending row alone, for a `needs_you` line
+    for sec in ("needs", "steering", "waiting"):  # drawn live: a snoozed row never takes a need from its count
+        for r in out[sec]:
+            if r.get("row") in HOLDER_ROWS and not r.get("handed_row") and r.get("sid"):
+                sid = str(r["sid"])
+                if r.get("row") in NEEDS_YOU_ROWS:
+                    pending.setdefault(sid, r)
+                    holders[sid] = holders[sid] if holders.get(sid, {}).get("row") in NEEDS_YOU_ROWS else r
+                else:
+                    holders.setdefault(sid, r)
+    lines: dict[str, list[dict[str, Any]]] = {}
+    back: list[dict[str, Any]] = []
+    for sec, rows in out.items():
+        if sec == "snoozed":
+            continue
+        kept: list[dict[str, Any]] = []
+        for r in rows:
+            moved = r.get("row") == "board" and isinstance(r.get("stuck"), dict)
+            it = r if r.get("row") == "stuck" else r["stuck"] if moved else None
+            if it is None:
+                kept.append(r)
+                continue
+            aid = str((it.get("actor") or {}).get("id") or "")
+            if r.get("under_pending"):
+                if aid in pending:
+                    lines.setdefault(aid, []).append(it)
+                continue  # never a row of its own, at *waiting* too
+            h = holders.get(aid) if aid else None
+            if it.get("waiting_until") or h is None:
+                kept.append(r)
+                continue
+            same = h.get("home") == r.get("home") and (h.get("home") != "queue" or h.get("on_card") == r.get("on_card"))
+            if not same:
+                it["holder_where"] = _holder_where(h)
+                it["text"] = f"{it.get('text')} — its holder row is {it['holder_where']}"
+                if it is r:
+                    r["find"] = " ".join(x for x in (str(r.get("name") or ""), "stuck", r["text"]) if x)
+                kept.append(r)
+                continue
+            lines.setdefault(aid, []).append(it)
+            if moved:
+                # the line's own row stays where it was, under *Waiting on them*, in no number
+                row = {k: v for k, v in r.items() if k not in ("stuck", "standing")}
+                back.append({**row, "waiting_on": waiting_on(row)})
+        out[sec] = kept
+    if back:  # in `inbox_sections`' order for *Waiting on them*
+        out["waiting"] = sorted(
+            [*out["waiting"], *back], key=lambda e: str(e.get("closed_at") or e.get("answered_at") or e.get("at") or "")
+        )
+    for aid, its in lines.items():
+        first: dict[str, Mapping[str, Any]] = {}
+        drawn: list[dict[str, Any]] = []
+        for it in sorted(its, key=lambda x: str(x.get("at") or "")):
+            base = str(it.get("reason_base") or "")
+            text = str(it.get("text") or "")
+            if base in first:
+                text = f"{it.get('head')} — {it.get('name')}, as on {first[base].get('work_words')}"
+            else:
+                first[base] = it
+            drawn.append({"id": str(it.get("id") or ""), "text": text})
+        # a session's pending row is its holder's row where it has one, so every line meets one row
+        (pending.get(aid) or holders[aid])["stuck_lines"] = drawn
 
 
 def stuck_cut(rows: list[dict[str, Any]]) -> None:
@@ -1209,6 +1306,8 @@ def stuck_cut(rows: list[dict[str, Any]]) -> None:
             continue
         lead = str(it.get("head") or "")
         it["text"] = f"{lead} — {it.get('name')}, as on {first[k].get('work_words')}"
+        if it.get("holder_where"):  # on two surfaces, the stuck words still say where the holder's row is
+            it["text"] += f" — its holder row is {it['holder_where']}"
         if it is r:
             r["find"] = " ".join(x for x in (str(r.get("name") or ""), "stuck", r["text"]) if x)
 
@@ -2601,6 +2700,8 @@ def inbox_sections(
             }
             for e in rows
         ]
+    # a stuck row and its actor's own pending or stopped holder's row: one counted item for one cause (TD-1497)
+    stuck_onto_holders(out, lambda r: board_waiting_on(r, fleet, at, starting))
     # several stuck rows with one actor and reason on one surface read once (§6 rule 13, TD-1497)
     for rows in out.values():  # per section: a *waiting* row never cuts a counted one
         stuck_cut(rows)
