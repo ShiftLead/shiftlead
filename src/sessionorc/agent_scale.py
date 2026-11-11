@@ -325,17 +325,23 @@ class ScaleMixin:
         own test, not rule 3's), no unread mail. At the close each claim not `done` is dropped *extra closed*, so
         its entry reads as nobody's, and `scale.last` reads `{did: hold, why: "back to held: out of work"}`; the
         record keeps its mailbox and its `scale`, never marked sat out, for the line's next fill. One `exited`
-        after declaring is held as it stands, never restarted, its claims dropped the same way. True for every
-        out-of-work worker extra, live or held, so no later rule restarts, nudges or tells it of new work."""
+        after declaring is held as it stands, never restarted: its claims are dropped the same way once its git
+        reads clean, and one exited with work left is kept as it stands, claims and all, for a person to read,
+        as `_extra_drop` keeps one. True when the record is held (closed or exited), so no later rule of the pass
+        reaches it; a live one held open by its work goes through the rest of the pass as any member does."""
         if not (_scale_line(s) and s.out_of_work) or s.superseded_by or s.suspended or s.scale.get("drop"):
             return False
         if s.state not in DEAD:
             if on_its_own(s, now) or s.unread() or self._seat_prs(s, []):
-                return True  # held open, with no bound, until it is clean
+                return False  # held open, with no bound, until it is clean
             if not await self._finished_close(s, "out_of_work"):
-                return True
+                return False
         elif _held_since(s):
             return True
+        else:
+            git = s.git or {}
+            if not all(isinstance(git.get(k), int) and git[k] == 0 for k in ("dirty", "unpushed")):
+                return True  # exited with work left, or not known: kept as it stands, for a person
         at = now_iso()
         for e in s.progress:
             if e.status == "claimed":

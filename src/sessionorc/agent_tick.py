@@ -783,7 +783,7 @@ class TickMixin:
                 if await self._extra_drop(s):
                     continue  # an extra a lowered max dropped: no rule restarts or fills it (§4.9, TD-1545)
                 if await self._scale_down(s, now):
-                    continue  # an extra out of work: back to held, never restarted or told (§6 rule 14, TD-1546)
+                    continue  # an extra out of work, back to held: never restarted (§6 rule 14, TD-1546)
                 await self._crash_restart(s, now)
                 if await self._lost_brief(s, now):
                     continue  # replayed: the record is the closed run's, and no other rule acts on it now
@@ -1905,6 +1905,8 @@ class TickMixin:
         where the history cannot be read, the reading at this tick, the log saying which."""
         if not (s.supervised and s.out_of_work) or s.seat is not None or s.superseded_by:
             return
+        if s.scale is not None:
+            return  # an extra is never told: out of work, it closes, and new work fills a held one (rule 14)
         facts = self._repos.get(s.repo or "") or {}
         led = facts.get("ledger") or {}
         if "error" in led or not isinstance(led.get("entries"), list) or seams_mod.unserved(facts):

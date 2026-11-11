@@ -1757,7 +1757,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      extra as they pass over a seat, so a team winds down when its kept members and its live worker extras have
      declared (a seat's extra counts as a seat does, never declaring), and one with held extras is not kept running by them. A filled extra is otherwise a member:
      rules 1, 2, 4, 5 and 7 apply to it (rule 1's restart replays the record and is no start of the crew; an
-     extra `exited` after declaring out of work is closed held, never restarted), rule 8 and a schedule's start never replay it (`_work_replays` skips a
+     extra `exited` after declaring out of work is closed held, never restarted — one exited with work left kept as it stands, its claims with it, for a person to read), rule 8 and a schedule's start never replay it (`_work_replays` skips a
      record carrying `scale`) — every start of the team first reconciles its held extras to the merged `max`: a
      person's (`ao team start`, Apply's *starts*) writes the missing and removes the surplus; rule 8's and a
      schedule's, which read no definition, only remove the held extras the merged `max` no longer holds (every one

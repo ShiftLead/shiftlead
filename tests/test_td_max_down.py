@@ -76,13 +76,13 @@ async def test_an_open_pr_of_its_own_or_unread_mail_holds_it_open(agent, tmp_pat
         _idle(rec)
         _out(rec)
         now = datetime.now(UTC)
-        for k in range(3):  # no bound: tick after tick
-            assert await agent._scale_down(rec, now + timedelta(hours=k * 3)) is True
+        for k in range(3):  # no bound: tick after tick, and the rest of the pass reaches it
+            assert await agent._scale_down(rec, now + timedelta(hours=k * 3)) is False
             assert rec.state == "idle"
         # the PR merged: the claim reads done, and the reader's reply waits unread
         rec.progress[0].status = "done"
         rec.inbox.append(MailEntry(id="m-1", from_=SYSTEM, to=[sid], at=now_iso(), kind="reply", text="merged"))
-        assert await agent._scale_down(rec, now) is True
+        assert await agent._scale_down(rec, now) is False
         assert rec.state == "idle", "the reply reaches the live record holding the work's context"
         rec.inbox[-1].read_at = now_iso()
         assert await agent._scale_down(rec, now) is True
@@ -96,7 +96,7 @@ async def test_an_extra_exited_after_declaring_is_held_and_never_restarted(agent
         sid, rec = await _rec(person, agent, tmp_path, "grind-3")
         rec.progress = [ProgressEntry(ref="TD-9", status="claimed")]
         _out(rec)
-        rec.state, rec.pane = "exited", True
+        rec.state, rec.pane, rec.git = "exited", True, {"dirty": 0, "unpushed": 0}
         now = datetime.now(UTC)
         await agent._keep_running(now)
         assert agent.sessions.get(sid) is rec and not rec.superseded_by and not rec.restarts, "never restarted"
@@ -116,3 +116,44 @@ async def test_a_held_extra_with_no_declaration_is_left_to_the_fill(agent, tmp_p
         rec.scale = {**rec.scale, "drop": True}
         _out(rec)
         assert await agent._scale_down(rec, datetime.now(UTC)) is False, "a dropped extra is _extra_drop's"
+
+
+async def test_a_live_subagent_holds_it_open(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        _, rec = await _rec(person, agent, tmp_path, "grind-3")
+        _idle(rec)
+        _out(rec)
+        rec.subagents, rec.subagent_at = 1, now_iso()
+        assert await agent._scale_down(rec, datetime.now(UTC)) is False and rec.state == "idle"
+        rec.subagents = 0
+        assert await agent._scale_down(rec, datetime.now(UTC)) is True and rec.state == "closed"
+
+
+async def test_an_extra_exited_with_work_left_is_kept_as_it_stands(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid, rec = await _rec(person, agent, tmp_path, "grind-3")
+        rec.progress = [ProgressEntry(ref="TD-9", status="claimed")]
+        _out(rec)
+        rec.state, rec.pane, rec.git = "exited", True, {"dirty": 2, "unpushed": 0}
+        await agent._keep_running(datetime.now(UTC))
+        assert agent.sessions.get(sid) is rec and not rec.restarts, "never restarted"
+        assert rec.progress[0].status == "claimed" and "last" not in rec.scale, "a person's to read"
+
+
+async def test_rule_6_never_tells_an_extra_of_new_work(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        _, rec = await _rec(person, agent, tmp_path, "grind-3")
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        rec.repo, rec.lane = str(repo), ["free-pick"]
+        agent._repos[str(repo)] = {"name": "r", "root": str(repo), "ledger": {"entries": []}}
+        _idle(rec)
+        _out(rec)
+        await agent._lane_news(rec, datetime.now(UTC))
+        assert rec.lane_seen is None
+        rec.scale = None  # the same record as a kept member: rule 6 writes its baseline
+        await agent._lane_news(rec, datetime.now(UTC))
+        assert rec.lane_seen is not None
