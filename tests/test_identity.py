@@ -340,6 +340,8 @@ async def test_an_unknown_verdicts_method_is_bounded_and_each_signal_is_logged(a
         await agent._identify({"id": 1, "method": long, "params": {}, "caller": "ao-x"}, 4242)
     judged = [r.getMessage() for r in caplog.records if "judged unknown" in r.getMessage()]
     assert judged == [f"{'m' * 60} from peer 4242 judged unknown: unreadable"]
+    alarmed = [r.getMessage() for r in caplog.records if r.getMessage().startswith("identity alarm")]
+    assert alarmed == [f"identity alarm (enforce): unknown claimed 'ao-x' on {'m' * 60}"], "bounded too (TD-1644)"
     caplog.clear()
     monkeypatch.setattr(agent, "proc", _ns(FakeProc([*BASE, P(390, 1, 390), P(400, 390, 400)]), p400=BOX_NS))
     with caplog.at_level("INFO", logger="shiftlead.agent"):
