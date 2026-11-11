@@ -139,8 +139,7 @@ class SettingsMixin:
         for key in sorted(keys):
             on = self._account_on(key)
             if key == bare and "" not in on:
-                same = next(iter(on.values()), None)
-                on[""] = same or ("metered" if self._is_metered("") else "subscription")
+                on[""] = "metered" if self._is_metered("") else "subscription"  # as `_account_on` bills a record's
             names, bills = sorted(on), set(on.values())
             if not bills and amounts.get(key) and not doc.get(key):
                 bills = {"metered"}  # an orphan key holding only amounts reads as what it holds

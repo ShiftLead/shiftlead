@@ -6,7 +6,7 @@ project by pauses nothing and is said once a day."""
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from conftest import park_ticks
+from conftest import gate_on, park_ticks
 from test_usage_gate import _iso, _worker
 
 from sessionorc import settings, usage
@@ -96,7 +96,7 @@ async def test_a_projection_pauses_says_so_once_and_a_fresh_reading_under_the_li
         g = rec.gated
         assert g and g["pct"] == 100.0 and g["line"] == 95 and g["projected"]["from"] == 88
         assert agent._profile_gated("", now)  # the same reader: no restart into the pause
-        gate = (await person.call("gate"))["profiles"][""]
+        gate = gate_on(await person.call("gate"), "")
         assert gate["windows"][0]["projected"] and (await person.call("gate"))["max_age"] == "1h"
         saves = []
         real_save = agent.store.save

@@ -394,7 +394,7 @@ async def test_set_settings_is_a_persons_and_checks_the_labels(agent, tmp_path):
         async with LocalClient(caller=sid) as itself:
             with pytest.raises(AgentError, match="a person's own"):
                 await itself.call("set_settings", profile="", reserves={"wk": 10})
-            assert not (gate_on(await itself.call("gate"), "") or {}).get("reserves")  # a read: never gated
+            assert gate_on(await itself.call("gate"), "")["reserves"] == {}  # a read: never gated
         with pytest.raises(AgentError, match="reports no window week: its windows are 5h, wk"):
             await person.call("set_settings", profile="", reserves={"week": 10})
         with pytest.raises(AgentError, match="whole percent"):
@@ -592,7 +592,8 @@ async def test_a_profile_with_no_copy_reads_its_accounts_reading_at_the_gate(age
         # `pg` on `other` carries none (TD-1581)
         monkeypatch.setattr(hookstub, "accounts", {"pa": "paul", "pg": "other"})
         assert not agent._profile_gated("pg", now)
-        assert not (gate_on(await person.call("gate"), "pg") or {}).get("reserves")
+        acct = gate_on(await person.call("gate"), "pg")
+        assert acct is not None and acct["reserves"] == {}
         # the profile's own tool is read, never another's account of the same name: a record under
         # `pg` names its adapter, and a shell polls no usage
         monkeypatch.setattr(hookstub, "accounts", {"pa": "paul", "pg": "paul"})

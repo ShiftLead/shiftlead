@@ -2307,20 +2307,22 @@ def test_ao_gate_sets_shows_and_is_a_persons(subprocess_agent, grind_profile, tm
     # a profile's name resolves to its account, and the reply names the account and its profiles
     assert "claude-code:paul (grind) · 5h 30 → no reading yet" in out and "not checked" in out
     assert cli.main(["gate"]) == 0
-    assert "claude-code:paul (grind) · 5h 30 → no reading yet · week 10/day → no reading yet" in _no_bare(capsys.readouterr().out)
+    out = _no_bare(capsys.readouterr().out)
+    assert "claude-code:paul (grind) · 5h 30 → no reading yet · week 10/day → no reading yet" in out
     assert cli.main(["--json", "gate"]) == 0
-    got = json.loads(_no_bare(capsys.readouterr().out))
+    got = json.loads(capsys.readouterr().out)
     assert "profiles" not in got, "`ao gate --json` is the reply's accounts"
     assert got["accounts"]["claude-code:paul"]["reserves"] == {"5h": 30, "week": {"per_day": 10}}
     assert set(got["accounts"]["claude-code:paul"]["profiles"]) - {""} == {"grind"}
     assert cli.main(["gate", "claude-code:paul", "week=5/day"]) == 0  # the account by its key
     assert "claude-code:paul (grind) · 5h 30 → no reading yet · week 5/day" in _no_bare(capsys.readouterr().out)
     assert cli.main(["settings"]) == 0  # `ao settings` prints the gate by account too
-    assert "usage_gate:\n  claude-code:paul (grind) · 5h 30 → no reading yet · week 5/day" in _no_bare(capsys.readouterr().out)
+    out = _no_bare(capsys.readouterr().out)
+    assert "usage_gate:\n  claude-code:paul (grind) · 5h 30 → no reading yet · week 5/day" in out
     assert cli.main(["gate", "grind", "5h=", "week="]) == 0
     assert "no reserves" in _no_bare(capsys.readouterr().out)
     assert cli.main(["--json", "new", "w", "-a", "shell", "-d", str(tmp_path), "--unattended"]) == 0
-    rec = json.loads(_no_bare(capsys.readouterr().out))
+    rec = json.loads(capsys.readouterr().out)
     assert (rec["pause_prompt"], rec["resume_prompt"]) == (teams.PAUSE_PROMPT, teams.RESUME_PROMPT)
     monkeypatch.setenv("SHIFTLEAD_SESSION", rec["id"])
     assert cli.main(["gate", "grind", "5h=30"]) != 0
