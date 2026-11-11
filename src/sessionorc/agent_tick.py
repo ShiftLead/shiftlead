@@ -1223,15 +1223,18 @@ class TickMixin:
         stop, and an extra seat's natural exit with nothing waiting on it (rule 1 restarts it only while it owes a
         reading, `_owes_reading`). Mail left on it is the mover's (`_seat_move`). Left as it stands: one rule 1
         restarts (`_crashed`), one whose git is not known clean (for a person to read, as `_extra_drop` and
-        `_scale_down` leave one), and one held by another road — gated or its profile paused (rule 1 restarts it
-        once the pause ends), suspended, a restart wanted, being dropped, superseded, just restarted. A worker
+        `_scale_down` leave one), and one held by another road — gated, suspended, being dropped, superseded, just
+        restarted, and a natural exit (pane kept) with a restart wanted (rule 2's) or its profile paused (rule 1's
+        once the pause ends); a kill waits on neither, since no rule replays it. A worker
         extra that declared out of work is rule 14's (`_scale_down`, before this). This home's records alone."""
         if not isinstance(s.scale, dict) or s.state != "exited" or s.host != self.host:
             return
         if s.superseded_by or s.scale.get("drop") or self._just_restarted(s, now) or self._crashed(s, now):
             return
-        if s.gated or s.suspended or s.restart_wanted or self._profile_gated(s.profile, now, s.team):
+        if s.gated or s.suspended:
             return
+        if s.pane and (s.restart_wanted or self._profile_gated(s.profile, now, s.team)):
+            return  # a natural exit rule 2, or rule 1 after the pause, may still replay; a kill neither
         git = s.git or {}
         if not all(isinstance(git.get(k), int) and git[k] == 0 for k in ("dirty", "unpushed")):
             return
@@ -1239,8 +1242,10 @@ class TickMixin:
             why = "killed"
         elif s.restart_ceiling:
             why = "exited past its restart ceiling"
-        elif s.wrapup_at or s.wrapup_sent_at or s.out_of_work:
+        elif s.wrapup_at or s.wrapup_sent_at:
             why = "exited after a wrap-up"
+        elif s.out_of_work:
+            why = "exited after declaring out of work"
         elif s.run_until and now >= _parse(s.run_until):
             why = "stopped"
         else:

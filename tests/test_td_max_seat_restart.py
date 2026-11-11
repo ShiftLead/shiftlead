@@ -208,3 +208,39 @@ async def test_a_worker_extra_rule_1_restarts_is_not_held(agent, tmp_path, repla
         monkeypatch.setattr(agent, "_profile_gated", lambda *a, **k: True)
         await agent._extra_hold(rec, now)
         assert rec.state == "exited", "its profile paused: rule 1 restarts it once the pause ends"
+
+
+@pytest.mark.parametrize(
+    "attr, value, why",
+    [
+        ("wrapup_at", "2026-11-11T08:00:00Z", "exited after a wrap-up"),
+        ("run_until", "2026-11-11T08:00:00Z", "stopped"),
+        (None, None, "exited, nothing waiting on it"),
+    ],
+)
+async def test_each_road_names_itself_in_scale_last(agent, tmp_path, replays, attr, value, why):
+    """A wrap-up's exit, a stop and an extra seat's natural exit with nothing owed are each closed held, `scale.last`
+    naming the road; an unread ask keeps the stopped and wrapped-up ones held too, never restarted."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid, rec = await _seat_extra(person, agent, tmp_path)
+        if attr:
+            setattr(rec, attr, value)
+            rec.inbox.append(_ask(sid))
+        now = datetime.now(UTC)
+        assert not agent._crashed(rec, now)
+        await agent._extra_hold(rec, now)
+        assert rec.state == "closed" and rec.scale["last"]["why"] == why
+        assert replays == []
+
+
+async def test_a_killed_extra_waits_on_no_pause(agent, tmp_path, replays, monkeypatch):
+    """A kill is replayed by no rule, so a restart wanted or a paused profile does not keep a killed extra exited."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid, rec = await _seat_extra(person, agent, tmp_path)
+        rec.pane = False
+        rec.restart_wanted = {"at": "2026-11-11T08:00:00Z", "why": "x"}
+        monkeypatch.setattr(agent, "_profile_gated", lambda *a, **k: True)
+        await agent._extra_hold(rec, datetime.now(UTC))
+        assert rec.state == "closed" and rec.scale["last"]["why"] == "killed"
