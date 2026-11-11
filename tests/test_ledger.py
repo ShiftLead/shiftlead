@@ -90,14 +90,15 @@ def archived_with_its_outcome(id_: str, body: str) -> bool:
     (e,) = lb.entries(f"## {id_}: x{body}")
     status = e["fields"].get("status") or ""
     word = lb.first_word(status)
-    if word == "superseded" and not re.search(r"\bby\s+TD-\d{3,}", status):
+    # the successor as ledgerboard reads it: `TD-m`, or another repo's `<repo>#TD-m`
+    if word == "superseded" and not re.search(rf"\bby[ \t]+{lb.LOG_ID}(?![\w#/-]|\.\w)", status, re.I):
         return False
     return word in ("superseded", "dropped") and bool(
         re.search(rf"^- \d{{4}}-\d{{2}}-\d{{2}}: archived: {word.capitalize()} — \S", body, re.M)
     )
 
 
-@pytest.mark.parametrize("how", ["resolved", "superseded", "dropped"])
+@pytest.mark.parametrize("how", ["resolved", "superseded", "superseded-elsewhere", "dropped"])
 def test_ledgerboards_own_archived_forms_pass_the_body_check(how):
     """The archive writer's three forms (`ledger.py archive`, `--superseded-by`, `--dropped`) each pass the
     body check, so the helper's output and this test cannot drift apart again (TD-1678: #3447's precheck
@@ -106,8 +107,12 @@ def test_ledgerboards_own_archived_forms_pass_the_body_check(how):
         "## TD-9001: a test entry\n\n**Priority:** low\n**Type:** debt\n**Added:** 2026-11-11\n**Status:** Open\n\n"
         "**Why:** because.\n\n**Fix:** do it.\n\n**Done when:** done.\n"
     )
-    how_args = {"resolved": {"pr": 1, "pointer": "tests"}, "superseded": {"superseded_by": "TD-9002"},
-                "dropped": {"dropped": True}}[how]  # fmt: skip
+    how_args = {
+        "resolved": {"pr": 1, "pointer": "tests"},
+        "superseded": {"superseded_by": "TD-9002"},
+        "superseded-elsewhere": {"superseded_by": "other#TD-9002"},
+        "dropped": {"dropped": True},
+    }[how]
     done = lb.edit_entry(entry, "archive", today="2026-11-11", why="the reason", **how_args)
     id_, body = re.match(r"## (TD-\d+):[^\n]*(.*)", done, re.S).groups()
     assert archived_with_its_outcome(id_, body), done
