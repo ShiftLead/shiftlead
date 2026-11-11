@@ -675,7 +675,7 @@ def _prune_tallies(r: Session) -> None:
 LAUNCH_KEYS = (
     "name", "dir", "adapter", "profile", "repo", "worktree", "argv", "unattended", "prompt", "capabilities",
     "lane", "role", "ledger", "team", "project", "run_until", "wrapup_prompt", "pause_prompt", "resume_prompt",
-    "seat", "review", "context_bound", "prompt_from", "start_context", "run_only",
+    "seat", "review", "context_bound", "prompt_from", "start_context", "run_only", "scale",
 )  # fmt: skip
 
 
@@ -823,6 +823,18 @@ def _review(review: Any) -> dict[str, Any] | None:
         return normalize_review(review)
     except ValueError as e:
         raise RpcError(str(e)) from None
+
+
+def _scale(scale: Any) -> dict[str, Any] | None:
+    """An extra's mark as the create is handed it (design §4.9 *Scaling with the work*, td-max, TD-1545):
+    `{line}`, the member line's or the seat's name it is an extra of, or None. The tick's `last` is its own,
+    never a create's, so a mark carrying anything else is refused."""
+    if scale is None:
+        return None
+    line = scale.get("line") if isinstance(scale, dict) else None
+    if not isinstance(scale, dict) or set(scale) != {"line"} or not isinstance(line, str) or not line.strip():
+        raise RpcError(f"scale is {{line: <the line's or seat's name>}} (§4.9 Scaling with the work), not {scale!r}")
+    return {"line": line.strip()}
 
 
 def _context_bound(bound: Any) -> int | None:
