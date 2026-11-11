@@ -552,7 +552,7 @@ HELP: tuple[Help, ...] = (
         "Queue card / Inbox: stuck row",
         (
             "Opens the session the stuck work waits on, in Focus. Press it to see why that session is not acting — at "
-            "its usage cap, stalled, or waiting on you in its pane — and to act there. It answers nothing and hands "
+            "its usage cap, stalled, or idle with the work open — and to act there. It answers nothing and hands "
             "the work to no other session: the row goes once a session acts on the work."
         ),
     ),

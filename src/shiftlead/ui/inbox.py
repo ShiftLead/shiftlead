@@ -2788,7 +2788,8 @@ _FIND_EDGE = ",.;:!?()[]{}\"'“”‘’<>"
 def rail_kind(e: Mapping[str, Any]) -> str:
     """A row's coarse kind (§4.5 screen 6 *The rail*): *questions* (an `ask`, a passed-up one
     too), *steering* (a `steer`, a passed-up one too: its row is under *Steering*, §4.5a *Inbox row:
-    passed up*, TD-1352), *session states* (every state row, alarms included), *board items*,
+    passed up*, TD-1352), *session states* (every state row, alarms and a stuck row of its own included,
+    TD-1497), *board items*,
     *notes* (a `note`, a `system` note, a reply, answered-for-you, an outcome), *trail*."""
     row = e.get("row")
     if row == "board":
