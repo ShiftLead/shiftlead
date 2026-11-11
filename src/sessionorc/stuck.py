@@ -124,8 +124,9 @@ class Actor:
 def comes_back(reason: Mapping[str, Any] | None, r: Session | None = None) -> datetime | None:
     """The instant a not-acting actor's reason names for its own end (§6 rule 13 *A reason that names its own end
     waits*), read from the actor's own reading: `scheduled`'s `start_at`, `limited`'s `limited_reset` on the record,
-    `gated`'s `gate.resets`; a team's held `until` (its instant), `early` (its last start plus `WORK_EARLY`) and
-    `usage` with a `resets`. None for any other reason, `usage` with no `resets` among them: that is a need."""
+    `gated`'s `gate.resets`; a team's held `early` (its last start plus `WORK_EARLY`) and `usage` with a `resets`.
+    None for any other reason, `usage` with no `resets` and `until` among them: that is a need — rule 8 holds a team
+    `until` only once its stop time has passed, and it holds until the person clears it or starts the team."""
     reason = reason or {}
     state = reason.get("state")
     if state == "scheduled":
@@ -137,8 +138,6 @@ def comes_back(reason: Mapping[str, Any] | None, r: Session | None = None) -> da
     held = reason.get("held") if state == "team" else None
     if not isinstance(held, Mapping):
         return None
-    if held.get("why") == "until":
-        return _when(held.get("until"))
     if held.get("why") == "early":
         start = _when(held.get("started"))
         return start + agent_common.WORK_EARLY if start is not None else None

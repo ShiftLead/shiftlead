@@ -507,7 +507,9 @@ def test_waiting_until_is_the_earliest_instant_when_every_actor_names_one():
     early = {"state": "team", "team": "beta", "held": {"why": "early", "started": _z(started)}}
     assert stuck.comes_back(early) == started + timedelta(minutes=30)
     assert stuck.comes_back({"state": "team", "held": {"why": "usage", "profile": "p"}}) is None, "usage, no resets"
-    assert stuck.comes_back({"state": "team", "held": {"why": "until", "until": _z(soon)}}) == soon
+    # rule 8 writes `until` only once the team's stop time has passed: its instant is behind, and the person clears it
+    for at in (NOW - timedelta(minutes=5), soon):
+        assert stuck.comes_back({"state": "team", "held": {"why": "until", "until": _z(at)}}) is None, "until: a need"
     assert stuck.comes_back({"state": "idle"}) is None
 
 

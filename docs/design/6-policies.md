@@ -1626,8 +1626,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      - **A reason that names its own end waits.** (A person's own live session, passed over above, is
        neither acting nor a reason here, nor in `more`.) Where **every** actor not acting has a reason that
        carries an instant when it comes back — `scheduled`'s `start_at`, `limited`'s `limited_reset` on
-       the record, `gated`'s `gate.resets` (the `unanswered` stamp's, from the profile's usage row), a team held `until` (its instant), `early` (its last start
-       plus `WORK_EARLY`) or `usage` with a `resets` (one without is a need) — and the **earliest** of them
+       the record, `gated`'s `gate.resets` (the `unanswered` stamp's, from the profile's usage row), a team held `early` (its last start
+       plus `WORK_EARLY`) or `usage` with a `resets` (one without is a need; a team held `until` is one too, its stop time
+       already passed and held until the person clears it or starts the team) — and the **earliest** of them
        (any one actor is enough) is ahead of now by no more than the kind's wait, the stuck work is drawn
        at *waiting* (§4.4 *The card's status*; on the card under *Waiting on them*, in no number), its
        words the same; one actor whose reason carries no instant makes it a need, as does the earliest
