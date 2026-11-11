@@ -157,3 +157,31 @@ def test_a_seat_scales_from_a_size_of_one(world, tmp_path, capsys):  # noqa: F81
     assert _max(state) == {"tl-ao": 3, "fc-ao": 0}
     team = orgmod.with_home_settings(orgmod.load()).teams["ao-grind"]
     assert team.extra_names("tl-ao") == ["tl-ao-2", "tl-ao-3"] and team.extra_names("fc-ao") == []
+
+
+def test_on_a_live_team_a_lowered_ceiling_removes_the_held_extra_past_it(world, extras_on, monkeypatch, capsys):  # noqa: F811
+    _, state = world
+    _removes(state, monkeypatch)
+    assert cli.main(["team", "max", "ao-grind", "grind", "4"]) == 0
+    started(state)
+    state["sessions"][:] = [s for s in state["sessions"] if s["name"] in ("orc-ao", "grind-1", "grind-2", "hunt")]
+    state["sessions"] += [_held("grind-3", "grind"), _held("grind-4", "grind")]
+    assert cli.main(["team", "max", "ao-grind", "grind", "3"]) == 0
+    assert [p["id"] for m, p in state["calls"] if m == "remove"] == ["ao-shiftlead-grind-4"]
+    assert "grind-3" in {p["name"] for p in creates(state)}  # the one it keeps written again: its launch record now
+
+
+def test_a_plan_that_cannot_be_read_is_said_and_the_setting_stands(world, extras_on, monkeypatch, capsys):  # noqa: F811
+    from shiftlead import teams
+
+    _, state = world
+    started(state)
+    capsys.readouterr()
+
+    def broken(*a, **k):
+        raise teams.TeamError("brief gone")
+
+    monkeypatch.setattr(teams, "plan", broken)
+    assert cli.main(["team", "max", "ao-grind", "grind", "4"]) == 0
+    assert "the team's plan could not be read: brief gone" in capsys.readouterr().out
+    assert _max(state) == {"grind": 4}

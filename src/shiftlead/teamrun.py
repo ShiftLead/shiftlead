@@ -2417,7 +2417,7 @@ def _reconcile_live(
     merged = orgmod.with_settings(replace(org, teams={**org.teams, name: base}), got.get("teams"))
     try:
         plan = teams.plan(merged, name, host or hosts.local_host().name, files=files_via(call))
-    except teams.TeamError as e:
+    except (teams.TeamError, ValueError, OSError) as e:  # the setting is written: said, never a failed write
         out["text"] += f" · the extras follow at the next Start — the team's plan could not be read: {e}"
         return out
     lead = next((s for s in live(mine) if plan.manager_id in (s.get("name"), s.get("id"))), None)
