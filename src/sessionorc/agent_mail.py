@@ -304,7 +304,9 @@ class MailMixin:
         first to the first able member after it in pool order whose counts take it (`_pool_next`, §4.9b *A seat
         as an ordered pool*, TD-1476); with none, it goes to its team's techlead seat when that is able and is
         neither the seat itself nor the sender, else to the person; a reader's `ask` (carrying `pr`) is never
-        re-seated and goes to the person. `routed` is `{seat, name, why, at}` of the unable seat, None where
+        re-seated and goes to the person. A seat with td-max extras, unable as `stalled?`, `exited` or closed, sends
+        it to them first, a reader's `ask` too (§4.9b, TD-1547): the send's choice of record (`_seat_pick`) lands it,
+        and nothing is routed. `routed` is `{seat, name, why, at}` of the unable seat, None where
         nothing moved: an able seat, a superseded one (its mail follows the chain), a reply or a thread, any kind
         but `ask`, the person's own send, or an address that is not exactly one seat."""
         if kind != "ask" or sender == PERSON or reply_to or thread:
@@ -319,6 +321,10 @@ class MailMixin:
         why = seat_unable(seat, now, self.unfillable)
         if why is None:
             return to, None
+        if seat_send.routes_to_extras(seat, why):  # a free live extra, else a held one the mail fills (TD-1547)
+            choice = self._seat_pick(records, seat.id, sender, kind, None, pr)
+            if choice is not None and choice.to != seat.id:
+                return to, None  # the send's own choice of record lands it there
         at = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
         nxt = None
         if pr is None:  # the entry the send would land, so a member's counts are read before it is chosen
@@ -406,7 +412,8 @@ class MailMixin:
         refused (*every extra busy*, *host full*, *its profile is paused*) — and is looked at again next tick. A
         choice of the held extra the mail is on fills it in place. The move is a landing, not a send: no gate, no
         tally; the copies say where it went (`to`). An own record that is not live keeps its mail, filled on its
-        cause."""
+        cause — unless it cannot answer as `stalled?`, `exited` or closed, when its asks go to its extras first, a
+        reader's `ask` among them (§4.9b *A seat that cannot answer is routed around*), before `_reroute_waiting`."""
         if self.mode != "home":
             return
         records = self._graph()
@@ -418,10 +425,11 @@ class MailMixin:
             if not extras:
                 continue
             own_live = own.state not in seat_send.DEAD
+            own_unable = mail.asks_seat(own) and seat_send.routes_to_extras(own, seat_unable(own, now, self.unfillable))
             for r in [own, *extras]:
                 if r.id in self._send_filling or r.id in self._evicting:
                     continue
-                if r is own and not own_live:
+                if r is own and not own_live and not own_unable:
                     continue  # filled on its cause, as today
                 if r is not own and (r.state not in seat_send.DEAD or (r.state == "exited" and self._crashed(r, now))):
                     continue  # live, or rule 1's to restart: it reads its own mail
@@ -770,6 +778,9 @@ class MailMixin:
         if why is None:
             return {"seat_unable": None, "seat_routed_to": None}
         records = records if records is not None else self._graph()
+        pick = self._seat_pick(records, s.id, "", "ask", None, None) if seat_send.routes_to_extras(s, why) else None
+        if pick is not None and pick.to != s.id and (x := records.get(pick.to)) is not None:
+            return {"seat_unable": why, "seat_routed_to": x.name or self._address(x)}  # its extras first (TD-1547)
         member = self._pool_next(s, records, now)  # a pool's next able member first (TD-1476), the counts unread
         if member is not None:
             return {"seat_unable": why, "seat_routed_to": member.name or self._address(member)}
@@ -1635,7 +1646,9 @@ class MailMixin:
         of the seat's own records. `root`, where given, is the thread read in place of `replied`'s (the tick's mover,
         which holds the ask and no reply). The held extras that may be filled are those closed, or `exited` with nothing
         rule 1 would restart, never one a lowered `max` is dropping; the fill is refused on a gated profile
-        (*its profile is paused*) and at `scale.live` with no extra seat to close for the room (*host full*)."""
+        (*its profile is paused*) and at `scale.live` with no extra seat to close for the room (*host full*). An own
+        record unable as `stalled?`, `exited` or closed (`seat_send.routes_to_extras`) passes an `ask` to its extras
+        first (§4.9b *A seat that cannot answer is routed around*)."""
         own = records.get(sid)
         if own is None or own.seat is None or isinstance(own.scale, dict):
             return None
@@ -1659,6 +1672,7 @@ class MailMixin:
 
         ids = {own.id, *(r.id for r in extras)}
         closes = kind == "reply" and replied is not None and replied.open and replied.from_ in ids
+        unable = mail.asks_seat(own) and seat_send.routes_to_extras(own, seat_unable(own, now, self.unfillable))
         return seat_send.choose(
             own,
             extras,
@@ -1673,6 +1687,7 @@ class MailMixin:
             held=held,
             guard=guard,
             skip=skip,
+            unable=unable,
         )
 
     async def _send_fill(self, extra: Session, seat: str, own_id: str) -> None:

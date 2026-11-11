@@ -536,3 +536,98 @@ async def test_the_mover_fills_for_a_pr_ask_once_and_not_again_after_a_failed_fi
         await asyncio.sleep(0)
         assert calls == [tl2], "not filled again at once"
         assert "m-env" in {x.id for x in _rec(agent, own).inbox}, "an entry envelope stays"
+
+
+# -- routing around an unable seat reads its extras first (§4.9b *A seat that cannot answer is routed around*) -------
+
+
+@pytest.mark.unit
+def test_routes_to_extras_reads_stalled_exited_and_closed_never_limited_or_gated():
+    stalled = _r("ao-tl", "tl", "stalled?")
+    assert seat_send.routes_to_extras(stalled, "stalled?")
+    assert not seat_send.routes_to_extras(stalled, None), "able: nothing is routed"
+    assert seat_send.routes_to_extras(_r("ao-tl", "tl", "closed"), "sat out")
+    assert seat_send.routes_to_extras(_r("ao-tl", "tl", "exited"), "restart ceiling")
+    assert not seat_send.routes_to_extras(_r("ao-tl", "tl", "exited"), "profile gated"), "its extras share the profile"
+    assert not seat_send.routes_to_extras(_r("ao-tl", "tl", "limited"), "limited")
+    paused = _r("ao-tl", "tl", "closed", gated={"next": None})
+    assert not seat_send.routes_to_extras(paused, "paused by the usage gate")
+
+
+@pytest.mark.unit
+def test_an_unable_own_record_passes_an_ask_to_a_free_extra_else_fills_a_held_one():
+    own = _r("ao-tl", "tl", "stalled?")
+    e2 = _r("ao-tl-2", "tl-2", "closed", scale={"line": "tl"})
+    e3 = _r("ao-tl-3", "tl-3", "closed", scale={"line": "tl"})
+    got = seat_send.choose(own, [e2, e3], kind="ask", now=NOW, held=[e2, e3], unable=True)
+    assert got.to == "ao-tl-2" and got.fill is e2, "a stalled own record, not busy: the held extra is filled"
+    own.state = "closed"
+    assert seat_send.choose(own, [e2, e3], kind="ask", now=NOW, held=[e2, e3], unable=True).fill is e2
+    assert seat_send.choose(own, [e2, e3], kind="ask", now=NOW, held=[e2, e3]) == seat_send.Choice("ao-tl"), (
+        "able, on call: filled on its cause as before"
+    )
+    e3.state = "idle"
+    assert seat_send.choose(own, [e2, e3], kind="ask", now=NOW, held=[e2], unable=True).to == "ao-tl-3"
+    e3.state = "closed"
+    refused = seat_send.choose(own, [e2, e3], kind="ask", now=NOW, held=[e2], unable=True, guard=lambda r: "host full")
+    assert refused == seat_send.Choice("ao-tl", words={"waits": "host full"}), "the road around takes over"
+    # a thread or a PR ask the unable own record holds keeps nothing there
+    own.state = "stalled?"
+    own.outbox = [models.MailEntry(id="m-1", from_="ao-tl", to=["w"], at=HOOK, kind="reply", text="x", root="m-0")]
+    own.inbox = [models.MailEntry(id="m-2", from_="w", to=["ao-tl"], at=HOOK, kind="ask", text="x", pr=7)]
+    assert seat_send.choose(own, [e2], kind="ask", now=NOW, root="m-0", held=[e2], unable=True).fill is e2
+    assert seat_send.choose(own, [e2], kind="ask", now=NOW, pr=7, held=[e2], unable=True).fill is e2
+    assert seat_send.choose(own, [e2], kind="note", now=NOW, held=[e2], unable=True).to == "ao-tl", "a note stays"
+
+
+@pytest.mark.integration
+async def test_an_ask_to_a_seat_unable_as_closed_fills_its_extra_and_is_not_routed(agent, tmp_path, blocked_replay):
+    await park_ticks(agent)
+    _, calls = blocked_replay
+    async with LocalClient() as person:
+        own, (tl2, tl3) = await _seat(agent, person, tmp_path, own_live=False)
+        agent.unfillable = {own: "sat out"}  # rule 3 would not fill it: unable (§4.9b)
+        (w1, *_) = await _askers(person, tmp_path, 1)
+        async with LocalClient(caller=w1) as a:
+            got = await a.call("msg", to=own, text="read #12?", kind="ask")
+        assert "routed" not in got and got["delivered"] == [tl2] and got["seated"] == {own: tl2}
+        assert [c[0] for c in calls] == [tl2] and _rec(agent, tl3).state == "closed"
+        view = next(x for x in agent._views() if x["id"] == own)
+        assert view["seat_unable"] == "sat out" and view["seat_routed_to"] == "tl-2", "its extras first"
+        mate = await _mk(person, tmp_path, "w9", team="beta")  # a reader's `ask` carrying `pr` is a teammate's
+        async with LocalClient(caller=mate) as b:
+            pr = await b.call("msg", to=own, text="read #13?", kind="ask", pr=13)
+        assert "routed" not in pr and pr["delivered"] == [tl2], "a reader's ask may go to an extra, the same reader"
+
+
+@pytest.mark.integration
+async def test_a_limited_seat_passes_its_extras_over_and_is_routed_as_before(agent, tmp_path, blocked_replay):
+    await park_ticks(agent)
+    _, calls = blocked_replay
+    async with LocalClient() as person:
+        own, (tl2, _) = await _seat(agent, person, tmp_path, own_live=True)
+        _set(_rec(agent, own), "limited")  # no reset known: unable, but the extras share its profile
+        (w1, *_) = await _askers(person, tmp_path, 1)
+        async with LocalClient(caller=w1) as a:
+            got = await a.call("msg", to=own, text="read #12?", kind="ask")
+        assert got["routed"]["seat"] == own and got["entry"]["to"] == [mail.PERSON]
+        assert calls == [] and _rec(agent, tl2).state == "closed"
+
+
+@pytest.mark.integration
+async def test_the_mover_takes_an_ask_off_a_stalled_own_record_to_an_extra(agent, tmp_path, blocked_replay):
+    await park_ticks(agent)
+    _, calls = blocked_replay
+    async with LocalClient() as person:
+        own, (tl2, _) = await _seat(agent, person, tmp_path, own_live=True)
+        (w1, *_) = await _askers(person, tmp_path, 1)
+        e = _land(agent, own, w1, "m-stuck", "read #9?")
+        r = _rec(agent, own)
+        _set(r, "working")
+        r.set_state("stalled?", confidence="scraped")
+        r.stalled_ticks = 1
+        await agent._seat_move(datetime.now(UTC))
+        assert [x.id for x in r.inbox] == ["m-stuck"] and calls == [], "one tick of stall: it keeps the ask"
+        r.stalled_ticks = 2
+        await agent._seat_move(datetime.now(UTC))
+        assert not r.inbox and [x.id for x in _rec(agent, tl2).inbox] == [e.id] and tl2 in agent._send_filling
