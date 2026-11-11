@@ -248,7 +248,9 @@ class IdentityMixin:
 
     def _id_alarm(self, entry: dict[str, Any], about: str | None) -> None:
         at = now_iso()
-        log.warning("identity alarm (%s): %s claimed %r on %s", self.identity_mode, *entry.values())
+        # the method is the caller's word, so the line bounds it as the judged-unknown line does (TD-1644)
+        channel, claimed, rpc = entry["channel"], entry["claimed"], entry["rpc"]
+        log.warning("identity alarm (%s): %s claimed %r on %s", self.identity_mode, channel, claimed, rpc[:60])
         # Each alarm carries the mode it was raised under (review of PR #318): the list is the
         # raising host's, and a report the home composes for a node's record must say the node's
         # mode — *observe* records what *enforce* would have refused — never the home's.
