@@ -933,6 +933,13 @@ class HostAgent(
         self._promote_bad: dict[str, str] = {}
         self._promote_task: asyncio.Task[None] | None = None
         self._promote_lock = asyncio.Lock()
+        # The host cap (§4.9 *Scaling with the work*, TD-1545): the machine's default, read once at the start,
+        # under `scale.live.<host>`; one eviction at a time, so two starts at the cap take two seats or one
+        self._machine_cap = settings_mod.machine_live_cap()
+        self._evict_lock = asyncio.Lock()
+        self._room_held: list[
+            set[str]
+        ] = []  # each start between the cap's reading and its record; emptied once registered
         self._setup_seen: object = None  # `profiles.yml`'s mtime the setup notes last read (§4.3, TD-875)
         self._setup_read_at = float("-inf")  # monotonic: the setup notes' last read
         self._pulls: dict[str, dict[str, Any]] = {}  # the pull's readings by repo (design §6 *Pull*)
@@ -1362,6 +1369,67 @@ class HostAgent(
     async def rpc_get(self, id: str) -> dict[str, Any]:
         return self._view(self._find(id), bookkeeping=True)  # one record: its tallies and wakes ride along
 
+    def _live_here(self) -> list[Session]:
+        """This host's records that hold a slot under `scale.live`: every one not `exited` or `closed`."""
+        return [
+            r for r in self.sessions.values() if (r.host or self.host) == self.host and r.state not in work_mod.DEAD
+        ]
+
+    def _evictable(self, r: Session, now: datetime, own_seat: str | None) -> bool:
+        """An extra seat the cap may close back to held (§4.9 *Scaling with the work*, §6 rule 3): idle at the
+        composer, its git known clean, no live subagent or shell, no PR of its own waiting within
+        `SEAT_PR_WAIT`, no unread mail, and never an extra of `own_seat`, the starting extra's seat."""
+        if not (isinstance(r.scale, dict) and r.seat and r.state == "idle") or r.suspended or r.superseded_by:
+            return False
+        if own_seat is not None and r.scale.get("line") == own_seat:
+            return False  # two idle extras of one seat never trade places
+        git = r.git or {}
+        if not all(isinstance(git.get(k), int) and git[k] == 0 for k in ("dirty", "unpushed")):
+            return False
+        if on_its_own(r, now) or r.unread():
+            return False
+        if self._seat_prs(r, list(self.sessions.values())):
+            with contextlib.suppress(ValueError, TypeError):
+                if now - _parse(r.since) < SEAT_PR_WAIT:
+                    return False
+        return True
+
+    async def _evict_for_room(self, name: str, own_seat: str | None) -> set[str]:
+        """A start at the host cap (§4.9 *Scaling with the work*, TD-1545): when this host's live count is at or
+        above `scale.live`, the longest-idle clean extra seat (`_evictable`) is closed back to held before the
+        start, its `scale.last` saying why; with none, the start goes on — it is never refused for want of
+        room. Serialized by `_evict_lock`, and a start not yet registered counts as live: the set returned
+        holds its slot in `_room_held` until the caller clears it, so two starts at the cap in one moment
+        take two seats, or one and none."""
+        held: set[str] = set()
+        try:
+            cap = settings_mod.live_cap(settings_mod.load(), self.host, self._machine_cap)
+        except Exception:  # noqa: BLE001 — an unreadable settings file caps nothing; the start goes on
+            return held
+        if not cap:
+            return held
+        async with self._evict_lock:
+            self._room_held = [h for h in self._room_held if h]  # a registered or failed start's is empty
+            live = len(self._live_here()) + len(self._room_held)
+            self._room_held.append(held)
+            held.add(name)
+            if live < cap:
+                return held
+            now = datetime.now(UTC)
+            room = [r for r in self._live_here() if self._evictable(r, now, own_seat)]
+            if not room:
+                log.info("%s starts at the host cap (%d live, cap %d): no extra seat to close", name, live, cap)
+                return held
+            r = min(room, key=lambda r: (idle_from(r) or now, r.id))
+            r.scale = {**r.scale, "last": {"at": now_iso(), "did": "hold", "why": f"host full, room for {name}"}}
+            self._save(r)
+            log.info("%s: an extra seat closed back to held for %s at the host cap (%d)", r.id, name, cap)
+            try:
+                await self.rpc_close(r.id, closer={"by": "tick", "why": "host_full"})
+            except Exception as e:  # noqa: BLE001 — the start is never refused for want of room
+                log.warning("%s: the cap's close failed: %s", r.id, e)
+        return held
+
     async def rpc_create(
         self,
         *,
@@ -1643,6 +1711,9 @@ class HostAgent(
                     # record written over it would take its name and kill its pane (review of TD-386)
                     raise RpcError(f"{holder.id} is {holder.state}: the seat is already there, nothing to write")
                 return await self._schedule(locals(), holder, directory, repo, name, None, state="closed")
+            # the slot is held from the eviction's reading until the record is registered (§4.9 *The host cap*)
+            room = await self._evict_for_room(name, scale.get("line") if seat and isinstance(scale, dict) else None)
+            locks.callback(room.clear)
             try:
                 spec = ad.launch(
                     profile=profile,
@@ -1761,6 +1832,7 @@ class HostAgent(
                 dropped = None if kept else self._address(holder)
             s.worktree_made = made or _inherits_made(s, holder)
             self.sessions[sid] = s
+            room.clear()  # counted live now, as a record
             self.store.save(s)
             if dropped and self.mode != "node":
                 # a create that does not carry the mail replaces it in place, so nobody is left to report
