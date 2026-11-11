@@ -5,8 +5,10 @@ minute passed, and runs the status line the launch's layer displaced."""
 
 from __future__ import annotations
 
+import contextlib
 import io
 import json
+import os
 import socket
 import struct
 import subprocess
@@ -129,6 +131,7 @@ class FakeAgent:
         self.got: list[dict] = []
         self.lag = lag
         self.alive: list[bool] = []
+        self.groups: list[int] = []
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.bind(str(path))
         self.sock.listen(8)
@@ -143,6 +146,9 @@ class FakeAgent:
             with conn:
                 if self.lag:
                     pid = struct.unpack("3i", conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))[0]
+                    # the caller's process group, field 5 of its stat, after the `(comm)` that may hold spaces
+                    with contextlib.suppress(OSError, IndexError, ValueError):
+                        self.groups.append(int(Path(f"/proc/{pid}/stat").read_text().rpartition(")")[2].split()[2]))
                     time.sleep(self.lag)
                     self.alive.append(Path(f"/proc/{pid}").exists())
                 buf = b""
@@ -257,3 +263,41 @@ def test_a_lagging_agent_still_finds_the_reporter_alive_and_the_line_does_not_wa
     assert agent.alive == [True]  # read after its lag, the caller was still there
     assert [r["method"] for r in agent.got] == ["usage_report"]
     assert hook_mod.last_report_file("ao-x-w1").exists()  # and, answered, the child remembered it
+
+
+@pytest.mark.integration
+def test_the_reporter_leaves_the_status_lines_group_and_holds_none_of_its_pipes(home, tmp_path):
+    """TD-1682: the tool cancels a still-running status line by its process group, and waits on the
+    pipes it handed it (design §4.4 *A report*). The reporter child leaves the group (`setpgid`), so a
+    redraw's cancel does not kill it while the home lags, and closes every inherited pipe above the
+    three it re-points (`closerange`), so the tool is not held until the home answers."""
+    agent = FakeAgent(home / "agent.sock", lag=3.0)
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    p = {**payload(), "workspace": {"project_dir": str(plain)}}
+    code = "import sys; from shiftlead.adapters.claude_code import hook; sys.argv[1:] = ['--statusline']; hook.main()"
+    extra_r, extra_w = os.pipe()  # a pipe above fd 2, as a tool might hand its status line
+    t0 = time.monotonic()
+    try:
+        line = subprocess.Popen(
+            [sys.executable, "-c", code],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            pass_fds=(extra_w,),
+            process_group=0,  # the status line leads its own group, as the tool starts it
+        )
+        os.close(extra_w)
+        line.communicate(json.dumps(p).encode(), timeout=10)
+        with os.fdopen(extra_r, "rb") as r:
+            extra_r = -1
+            assert r.read() == b""  # EOF: nobody holds the write end any more
+        assert time.monotonic() - t0 < 2.6  # ... and that came before the home's lag ended
+    finally:
+        if extra_r >= 0:
+            os.close(extra_r)
+    end = time.monotonic() + 8
+    while time.monotonic() < end and not hook_mod.last_report_file("ao-x-w1").exists():
+        time.sleep(0.05)
+    assert [r["method"] for r in agent.got] == ["usage_report"]
+    assert agent.groups and agent.groups[0] != line.pid  # the reporter was in a group of its own, not the line's
