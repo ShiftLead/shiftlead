@@ -58,6 +58,21 @@ any = ["^\\s*(❯\\s*)?\\d\\.\\s*(Claude account with subscription|Anthropic Con
 pending = { kind = "question", text = "Claude Code wants a login: choose a method (answer in the terminal)" }
 
 [[rules]]
+# The one-time Bypass Permissions warning (TD-1685): a launch with `--dangerously-skip-permissions`
+# (`permission_prompts: skip`) on a config home that never accepted it stops here before any hook, and the
+# record read `working` for ten minutes (the seat smoke on `~/.claude-conformance`, v2.1.322,
+# tests/fixtures/screens/bypass-permissions.txt). Accepting writes the tool's own settings, so it is the
+# person's: the core never answers it (§9 invariant 6). Keyed, like the first-run rules, on whole lines
+# anchored at both ends — the heading and the dialog's own two options — so prose quoting them is quiet.
+id = "bypass-permissions"
+state = "needs-you"
+priority = 85
+region = 15
+all = ["^\\s*WARNING: Claude Code running in Bypass Permissions mode\\s*$"]
+any = ["^\\s*(❯\\s*)?(\\d+\\.\\s*)?Yes, I accept\\s*$", "^\\s*(❯\\s*)?(\\d+\\.\\s*)?No, exit\\s*$"]
+pending = { kind = "question", text = "Claude Code's Bypass Permissions warning: accept or exit (answer in the terminal)" }
+
+[[rules]]
 # The tool's own limit message (the ADR's three usage-limit screens), before TD-001's poll sees it.
 id = "usage-limit"
 state = "limited"

@@ -69,6 +69,7 @@ def test_a_rules_modal_reaches_its_match(tmp_path):
         ("held-peer-message", "held-peer-message", "needs-you"),
         ("first-run-theme", "first-run-theme", "needs-you"),
         ("first-run-login", "first-run-login", "needs-you"),
+        ("bypass-permissions", "bypass-permissions", "needs-you"),
     ],
 )
 def test_claude_code_rules_on_the_spike_screens(name, rule, state):
@@ -88,6 +89,7 @@ def test_claude_code_rules_on_the_spike_screens(name, rule, state):
         "held-peer-message",
         "first-run-theme",
         "first-run-login",
+        "bypass-permissions",
     ],
 )
 def test_rules_fire_within_the_ticks_tail(name):
@@ -232,3 +234,27 @@ def test_claude_codes_first_run_screens_need_a_person_and_prose_about_them_does_
         for i in range(max(1, len(lines) - 14)):
             got = m.explain(lines[i : i + 15])
             assert not (got and got.rule.startswith("first-run-")), f"{rel} line {i + 1}"
+
+
+def test_the_bypass_permissions_warning_needs_a_person_and_prose_about_it_does_not():
+    """TD-1685: an unattended launch under `--dangerously-skip-permissions` on a config home that never
+    accepted it stops at the tool's one-time warning before any hook, and read `working`. The rule keys on
+    the heading and the dialog's own options as whole lines (v2.1.322), so prose quoting them is quiet."""
+    m = Manifest.load(RULES_FILE)
+    got = m.explain(screen("bypass-permissions")[-15:])
+    assert got is not None and (got.rule, got.state) == ("bypass-permissions", "needs-you")
+    assert got.pending is not None and got.pending.kind == "question" and "terminal" in got.pending.text
+    # the cursor moved to the other option
+    assert m.explain(["  WARNING: Claude Code running in Bypass Permissions mode", "    No, exit", "  ❯ Yes, I accept"])
+    quiet = [
+        ["  WARNING: Claude Code running in Bypass Permissions mode"],  # the heading alone
+        ["  ❯ No, exit", "    Yes, I accept"],  # the options alone
+        ["- the *WARNING: Claude Code running in Bypass Permissions mode* dialog — No, exit / Yes, I accept"],
+    ]
+    for lines in quiet:
+        assert m.explain(lines) is None, lines
+    for rel, text in _sources():
+        lines = text.splitlines()
+        for i in range(max(1, len(lines) - 14)):
+            got = m.explain(lines[i : i + 15])
+            assert not (got and got.rule == "bypass-permissions"), f"{rel} line {i + 1}"
