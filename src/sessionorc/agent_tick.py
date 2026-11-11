@@ -447,7 +447,7 @@ class TickMixin:
         except OSError:
             return
         marks: dict[str, list[tuple[str, str]]] = {}
-        read = []
+        read: dict[str, list[Path]] = {}
         for f in files:
             try:
                 got = json.loads(f.read_text())
@@ -458,7 +458,7 @@ class TickMixin:
             if not sid:
                 continue
             marks.setdefault(sid, []).append((at, verb))
-            read.append(f)
+            read.setdefault(sid, []).append(f)
         if not marks:
             return
         graph = self._graph()
@@ -479,9 +479,9 @@ class TickMixin:
                     self._system_note(
                         PERSON, f"a send from {name} at {at} did not land and no session is left to run it again"
                     )
-        for f in read:
-            with contextlib.suppress(OSError):
-                f.unlink()
+            for f in read[sid]:  # each session's files once its note is sent: a raise later sends none twice
+                with contextlib.suppress(OSError):
+                    f.unlink()
 
     def _stuck_orders(
         self,

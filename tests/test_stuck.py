@@ -761,8 +761,11 @@ async def test_a_missed_mark_brings_its_session_a_note_and_is_deleted(agent):
     assert not a.exists() and not b.exists() and bad.exists()
     assert not [e for e in agent.person_inbox if "did not land" in e.text], "a live session: the person is not told"
     c = _mark(home, "ao-w", "progress", "2026-11-11T10:05:00Z")  # written between two later ticks
-    agent._missed_pass()
-    assert not c.exists() and len([e for e in w.inbox if e.from_ == models.SYSTEM]) == 2
+    await agent.tick()  # the tick itself reads it
+    # the tick reaps the record, which has no pane: the miss is told to the person instead, as it ended
+    now_w = agent._graph()["ao-w"]
+    told = [*now_w.inbox, *agent.person_inbox]
+    assert not c.exists() and any("10:05:00Z" in e.text for e in told), "the tick itself read the mark"
     bad.unlink()
 
 

@@ -6185,8 +6185,10 @@ def _unavailable(args: argparse.Namespace, e: AgentUnavailable) -> int:
     So the CLI **asks again** rather than reading the exception's words: one `ping`, now. An agent
     that answers was restarting, and the honest sentence is *run it again* — the state a person
     acts on is the state now, not the one a call failed in. One that does not answer is down, and
-    only then is there anything to start. **The hint is never printed to a session** whichever it
-    is: a session is told to stop, in its skill's own words. The exit code is 3 either way, because
+    only then is there anything to start. **The start hint is never printed to a session** whichever it
+    is: a session is told what it ran did not land (§6 rule 13 *A send that did not land*, TD-1498) — after a
+    filing verb, *end your turn and run it again when you are rung*, with `missed` and a missed mark the host
+    agent answers once it is back; after a read, *nothing was done*. The exit code is 3 either way, because
     what the caller could not do, it could not do."""
     session = os.environ.get("SHIFTLEAD_SESSION") or _session_by_ancestry()
     if _agent_answers():
