@@ -457,3 +457,83 @@ async def test_the_fill_ceiling_counts_only_fills_inside_the_window(agent, tmp_p
         _entries(agent, repo, "TD-3")
         await _pass(agent)
         assert _live(agent, "grind-3"), "neither old fills nor other restarts reach the ceiling"
+
+
+async def test_an_unserved_repos_pickable_entries_fill_nothing(agent, tmp_path):
+    """An unserved repo's lane reads empty (§5 *The seams*, §6 rule 14; TD-1643): an entry becoming pickable there is
+    no event, and the line is not filled."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        repo, _ = await _line(agent, person, tmp_path)
+        agent._repos[str(repo)]["seams"] = {"serve": {"ok": False, "lacks": [{"key": "sync", "words": "not synced"}]}}
+        await _pass(agent)
+        _entries(agent, repo, "TD-3", "TD-4")
+        await _pass(agent)
+        assert not _live(agent, "grind-3")
+
+
+async def test_a_work_order_in_the_lane_makes_the_line_short(agent, tmp_path):
+    """The lane's pickable entries include its repo's work orders (§6 rule 14, `_orders`; TD-1643): a decided board
+    line becoming an order, every member leased, fills an extra."""
+    from sessionorc import workorders
+
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        repo, _ = await _line(agent, person, tmp_path)
+        await _pass(agent)
+        order = workorders.entry({"id": "board:0123abcd", "title": "Keep the backup?", "decided": {"text": "keep"}})
+        agent._repos[str(repo)]["work_orders"] = {"orders": [order]}
+        await _pass(agent)
+        assert _live(agent, "grind-3")
+        assert _rec(agent, "grind-3").scale["last"]["why"] == "filled: 1 pickable, every grind claimed"
+
+
+async def test_a_derived_claim_is_a_lease(agent, tmp_path):
+    """A derived claim holds a lease whatever its age (§6 rule 14, §4.8 *A claim is a lease*; TD-1643): members whose
+    claims the tick derived, older than `LEASE_TTL`, are busy, so the line is short and fills."""
+    from sessionorc.agent_common import LEASE_TTL
+
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        repo, made = await _line(agent, person, tmp_path)
+        old = (datetime.now(UTC) - LEASE_TTL - timedelta(hours=1)).isoformat()
+        for m, ref in zip(made[:2], ("TD-1", "TD-2"), strict=True):
+            m.progress = [ProgressEntry(ref=ref, at=old, source="derived", branch=f"{ref.lower()}-x")]
+        await _pass(agent)
+        _entries(agent, repo, "TD-3")
+        await _pass(agent)
+        assert _live(agent, "grind-3"), "every member holds a derived lease: the line is short"
+
+
+async def test_a_line_with_no_extra_left_forgets_its_memory(agent, tmp_path):
+    """Rule 14's memory is per line with an extra (TD-1643): once a line's last extra record is gone, its last
+    reading and its held-back mark go with it."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        repo, made = await _line(agent, person, tmp_path)
+        await _pass(agent)
+        made[3].restarts = [{"at": datetime.now(UTC).isoformat(), "why": "fill"}] * 6  # the ceiling holds it back
+        _entries(agent, repo, "TD-3")
+        await _pass(agent)
+        key = (TEAM, LINE)
+        assert key in agent._scale_seen and key in agent._scale_held
+        for extra in made[2:]:
+            del agent.sessions[extra.id]
+        await _pass(agent)
+        assert key not in agent._scale_seen, "the line's last reading goes with its last extra"
+        assert key not in agent._scale_held, "and so does its held-back mark"
+
+
+async def test_a_filled_extra_that_claimed_is_never_marked_unstuck(agent, tmp_path):
+    """The guard's ten minutes lift only a start that has not claimed (§6 rule 14; TD-1643): an extra filled past
+    `SCALE_STEP` ago that claimed keeps its `fill`."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        repo, _ = await _line(agent, person, tmp_path)
+        await _pass(agent)
+        _entries(agent, repo, "TD-3")
+        await _pass(agent)
+        first = _rec(agent, "grind-3")
+        await person.call("progress", id=first.id, ref="TD-3")
+        await _pass(agent, datetime.now(UTC) + SCALE_STEP + timedelta(seconds=30))
+        assert first.scale["last"]["did"] == "fill", "it claimed: its start did not stick"
