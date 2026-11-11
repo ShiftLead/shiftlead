@@ -440,16 +440,20 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      **stopped** (rule 8 *A team that stopped*: nobody of its crew live, not wound down, `work.team_stopped`) by
      `person` or `until` — the person's Stop, Wind down left undeclared, Close or Kill, or the team's stop time —
      is **held**: this rule fills it for no cause (`asks`, `prs`, `every`, `swept`, `tag`, `team`; a scaled
-     seat's extras with it), and nothing else starts it. Its `seat_due` stands, the mail waits in its mailbox,
+     seat's extras with it, where td-max's extra fill and mover are built), and nothing else starts it. Its `seat_due` stands, the mail waits in its mailbox,
      and the tick writes **`seat_held: {at, by, team}`** on the seat's record (home-owned, `by` the stop's word,
-     `at` when the hold began, written once and kept while it holds, cleared at the fill), which the cards,
-     `read_when` and the team-start row read. The next **Start** lifts it: the team's records then read live
-     (or, for a team of seats alone, the Start's own on-call records carry no end, so its stop reads `other`),
-     and the seat is filled on its standing cause on the next pass, its mail intact. A seat whose team stopped
+     `at` when the hold began, written once and kept while it holds, cleared at the fill and wherever the team
+     no longer reads stopped by `person` or `until`; never carried to a record that replaces it), which the cards,
+     `read_when` and the team-start row read. The next **Start** lifts it: `create` replaces each closed record
+     in place with a fresh one, carrying no end, and its members and its `asks` seat start live, so the team
+     reads live (a manager on call or a pool's later member, created held, has no end, so it reads `other`),
+     and a held seat is filled on its standing cause on the next pass, its mail intact. A seat whose team stopped
      `other` — a crash the restart rules gave up on, a kill by a session, or a team of seats alone, which
-     reads stopped between questions because rule 3 closes its only records — is filled as above, as TD-1128
+     reads stopped between questions because rule 3 closes its only records (its `closer` the tick's) — is filled as above, as TD-1128
      made it (*whatever its team*, §4.10 *A team or a repo as the address*), and so is a seat of a team that
-     wound down: running out of work is no word against running, and a question is work (§4.9a). So a Stop
+     wound down: running out of work is no word against running, and a question is work (§4.9a). A person's
+     Close of a team's last live record is a Stop like any other: a team of seats alone whose idle seat the
+     person closed reads stopped by `person`, and its seat holds until a Start. So a Stop
      the home undoes is no longer possible, and cross-repo filing keeps its seat-only and wound-down teams.
   4. **The idle nudge.** A supervised member that has been hook-confirmed `idle` for `IDLE_NUDGE`
      (twenty minutes) with **open work on its record** — a `lane` reference with no `done` or
@@ -987,11 +991,12 @@ block. A policy is agent code and needs no grant; a session doing the same work 
 
      A question's end on a stopped team still waits in the mailbox for the person's Start, as
      above, while the team's lanes are read. So does a question to a stopped team's seat, held by rule 3
-     (*A stopped team's seats are held*, TD-1564): the mark carries **`held: {<seat id>: n}`**, the open
-     questions waiting on each held seat, and the row and the team card's note add *· n questions wait on
+     (*A stopped team's seats are held*, TD-1564): the mark carries **`seats_held: {<seat id>: n}`**, the open
+     questions waiting on each held seat (a key of its own: the mark's `held` is rule 8's bound that held a
+     start back, and the strip that drops `held` unless a start is due leaves `seats_held` standing), and the row and the team card's note add *· n questions wait on
      <seat name>*; it makes the row no more pressing than its stop does — the person's Stop's row stays
      under *Later* — and the mark is written for a stopped team whose lanes gained nothing where a held seat
-     has questions, so the questions are never waiting in silence.
+     has questions — `members` empty, `seats_held` alone — so the questions are never waiting in silence.
 
      **A team with no record** carrying its badge (defined and never started, or every record
      Forgotten) has no lane on any record. The home reads no definition, so it cannot read that
