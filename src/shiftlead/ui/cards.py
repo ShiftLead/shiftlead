@@ -639,7 +639,10 @@ def view(
     d["permission_channel"] = s.get("permission_channel") is not False
     # The Focus header's mode toggle, under the name of what it does (design §4.5a, TD-096): Take
     # over an unattended session; hand an interactive one back where there is someone to hand it
-    # to — its `controllers` as written, or a team — and otherwise just switch it.
+    # to — its `controllers` as written, or a team it did not get from the person's own start — and
+    # otherwise just switch it (TD-1681): a session the person started in a team was taken from nobody.
+    # A lead's member the person resumed keeps its `controllers`, and a team start's member stays
+    # `supervised` through a Resume, so `by_person` false, which is how both still read Hand back.
     if not d["agent"]:
         # §4.5a *A record with no agent*: no mode toggle anywhere — a shell is the person's and stays
         # interactive (`set_mode` to unattended is refused for one)
@@ -651,7 +654,8 @@ def view(
             "and gives you the keyboard — its controllers and the policies leave it alone until you hand it back"
         )
     else:
-        d["mode_act"] = "Hand back" if s.get("controllers") or s.get("team") else "Switch to unattended"
+        handed = s.get("controllers") or (s.get("team") and not s.get("by_person"))
+        d["mode_act"] = "Hand back" if handed else "Switch to unattended"
         d["mode_title"] = (
             "switch this session to unattended: the terminal goes read-only, and its manager and the policies "
             "pick it up again. A stop time that passed while you held it is cleared; one still ahead stays"
