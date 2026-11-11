@@ -342,6 +342,12 @@ class TeamDef:
             seats += [n for s in self.seats if not s.pool for n in self.extra_names(s.name)]
         return self.session_names(extras) + seats
 
+    def held_names(self) -> list[str]:
+        """`session_names` and an `asks` seat's extras: the names a member line may never take (design §4.9
+        *Names, the size and the ceiling*) — what the twice-named check, Add member's default and its duplicate
+        check read. A seat's own name is the seat's, read where seats are."""
+        return self.session_names() + [n for s in self.seats if not s.pool for n in self.extra_names(s.name)]
+
     def seat_records(self) -> list[SeatDef]:
         """Each record the `seats:` lines start, in order: a line, or each member of its `pool:` (§4.9b
         *A seat as an ordered pool*) — what every reader that knows a seat by its name reads."""
@@ -350,14 +356,17 @@ class TeamDef:
     def twice_named(self) -> list[str]:
         """The names the definition holds more than once, in order — what `ao org check` and the
         Members dialog say (TD-268) — an extra's among them (§4.9 *Names, the size and the ceiling*, TD-1545),
-        save the extras of a line whose own name is held twice, which that name already says."""
+        save the extras of a line one of whose sized names is held twice, which that name already says."""
         seen: list[str] = []
-        names = self.session_names()
+        names = self.held_names()
         for n in names:
             if names.count(n) > 1 and n not in seen:
                 seen.append(n)
-        lines = ([self.techlead.name] if self.techlead is not None else []) + [m.name for m in self.members]
-        echo = {e for line in lines if line in seen for e in self.extra_names(line)}
+        sized = {
+            **({self.techlead.name: [self.techlead.name]} if self.techlead is not None else {}),
+            **{m.name: m.names() for m in self.members},
+        }
+        echo = {e for line, own in sized.items() if set(own) & set(seen) for e in self.extra_names(line)}
         return [n for n in seen if n not in echo or n in self.session_names(extras=False)]
 
     def next_name(self, role: str) -> str:
@@ -368,7 +377,7 @@ class TeamDef:
         free. Otherwise never a name the definition already holds (TD-268), its extras' included (§4.9 *Names,
         the size and the ceiling*): a counted entry's next is the first of its names past its size that none
         holds, and Add refuses a name another entry or an extra holds."""
-        taken = set(self.session_names())
+        taken = set(self.held_names())
         same = [m for m in self.members if m.role == role]
         counted = next((m for m in same if m.count > 1), None)
         if counted is not None:  # past its size and its extras (§4.9 *A team's size*, *Names, the size …*)
@@ -1294,7 +1303,7 @@ def edit_members(
         if not want:
             raise ValueError("a member needs a role")
         try:  # the names the line's sizes give, not its counts alone (§4.9 *A team's size*, TD-1165)
-            held = with_home_settings(load(path)).teams[team].session_names()
+            held = with_home_settings(load(path)).teams[team].held_names()
         except Exception:  # an unreadable file is refused by the re-parse below, in its words
             held = []
         entry = {"role": want}

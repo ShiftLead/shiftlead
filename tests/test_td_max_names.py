@@ -143,3 +143,17 @@ def test_a_name_two_teams_share_only_through_an_extra_is_read_after_the_merge():
     assert [(x, t.name, n) for x, t, n in orgmod.shared_names(org)] == [("ao-grind", "other", "grinder-ao-5")]
     merged = orgmod.with_settings(org, {"ao-grind": {"max": "off"}})
     assert orgmod.shared_names(merged) == []
+
+
+def test_a_counted_line_held_twice_is_said_by_its_sized_names_and_a_seats_extra_is_held():
+    """#3293's review: two `count: 2` lines of one name are said by `g-1`, `g-2` and not again by their extras
+    `g-3`, `g-4`; and an `asks` seat's extra is a name a member line may not take."""
+    twin = orgmod.TeamDef(
+        name="t", manager=orgmod.ManagerDef(role=orgmod.PERSON, name=""),
+        members=[orgmod.MemberDef(role="grinder", name="g", count=2) for _ in range(2)],
+    )  # fmt: skip
+    assert twin.twice_named() == ["g-1", "g-2"]
+    team = _team()
+    team.members.append(orgmod.MemberDef(role="checker", name="fact-check-ao-1-2"))
+    assert team.twice_named() == ["fact-check-ao-1-2"]
+    assert "fact-check-ao-1-3" in team.held_names() and "fact-check-ao-1-2" not in _team(max="off").held_names()
