@@ -1337,6 +1337,25 @@ def test_a_review_stage_of_any_seat_is_staffed_by_one_seat_on_asks(tmp_path):
     assert why(held_sets={"core": ["x"]}) == ["nothing held: no path set ui in shiftlead"]
 
 
+@pytest.mark.unit
+def test_a_review_stage_naming_the_fact_checker_is_not_followable(tmp_path):
+    # §4.9c *A review stage names any seat role* but `fact-checker` (TD-1576): its seat answers no
+    # --verdict, so the stage says that alone — no seat-count, pool or held reason beside it
+    flow = flowdefs.Flow(
+        name="fc-flow",
+        place="repo",
+        dir=tmp_path,
+        stages=[
+            flowdefs.Stage(name="build", role="grinder", lane=["td"]),
+            flowdefs.Stage(name="fc", role="fact-checker"),
+        ],
+    )
+    for seats in ([("fact-checker", "asks")], [], [("fact-checker", "asks", True, "fc")] * 2):
+        assert flowdefs.unfollowable(flow, {"grinder"}, techlead=True, held=(), seats=seats) == [
+            "fact-checker is no reader — a review stage's seat answers with --verdict"
+        ], seats
+
+
 def test_the_compile_writes_the_chain_in_the_flows_order(world, tmp_path):  # noqa: F811
     # §4.9c *The record carries the chain*: one link per review stage, its seat's name and its set's
     # paths; a flow whose review is the techlead on every held path keeps the older shape

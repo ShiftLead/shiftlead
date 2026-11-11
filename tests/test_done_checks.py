@@ -435,6 +435,34 @@ async def test_the_persons_ask_and_an_ask_with_no_pr_are_not_read(worker, agent,
     assert read == [842, 842]
 
 
+async def test_an_ask_with_a_pr_to_a_fact_check_seat_is_refused_at_send(worker, agent, tmp_path, monkeypatch):
+    """TD-1576 (design §4.9b *What it does*): an `ask` carrying `pr` addressed to a record whose role is
+    `fact-checker` is refused at send — a session's, the person's, and one to the seat while it is unable
+    (limited) — before the green read and the route-around: nothing lands, nothing reaches the person
+    inbox, no forge is read. An ask with no `pr` to the seat is not refused by it."""
+    w, sid, rec, views = worker
+    read: list[int] = []
+    monkeypatch.setattr(reports, "pr_view", lambda root, pr, timeout=30.0: read.append(pr) or _view(_run("test")))
+    (tmp_path / "fc").mkdir()  # one directory each: the anchor rule (§9 invariant 2)
+    made = {"dir": str(tmp_path / "fc"), "adapter": "agentshell", "argv": ["bash", "--norc"], "role": "fact-checker"}
+    async with LocalClient() as person:
+        fc = (await person.call("create", name="fc", **made))["id"]
+        seat = agent.sessions[fc]
+        refusal = "a fact-check seat reads no PR as its reader"
+        with pytest.raises(AgentError, match=refusal):
+            await w.call("msg", to=[fc], text="read #842", kind="ask", pr=842)
+        with pytest.raises(AgentError, match=refusal):
+            await person.call("msg", to=fc, text="read #842", kind="ask", pr=842)
+        seat.state = "limited"
+        with pytest.raises(AgentError, match=refusal):
+            await w.call("msg", to=[fc, fc, ""], text="read #842", kind="ask", pr=842)
+        assert read == [] and agent.person_inbox == []
+        assert seat.inbox == [] and rec.outbox == []
+        got = await person.call("msg", to=[fc], text="fact-check PR #842 at abc1234: the count", kind="ask")
+        assert [e.id for e in seat.inbox] == [got["entry"]["id"]], "an ask with no pr is not refused by it"
+        await person.call("kill", id=fc)
+
+
 # -- CI that never started (TD-686 slice 2, design §4.4 *A `done`'s read*) ------------------------------
 
 NEVER = {

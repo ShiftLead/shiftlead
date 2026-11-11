@@ -977,7 +977,9 @@ def test_the_skill_and_the_presets_say_waiting_on_mail_is_ending_the_turn():
         text = p.read_text()
         assert "never wait for input" not in text, p.name  # read as *never be idle*
         if "Nobody is driving you" in text:
-            assert "mail it, then end the turn" in text, p.name
+            # the fact-checker's alone asks nobody a question, so it mails none (design §4.10, TD-1576)
+            said = "asks nobody a question" if p.name == "fact-checker.md" else "mail it, then end the turn"
+            assert said in text, p.name
 
 
 def test_the_grinder_preset_says_a_board_line_is_named_with_its_due_date():
@@ -1313,6 +1315,93 @@ def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
     assert f"reply → {peer}" in capsys.readouterr().out
     for sid in (lead, worker, peer):
         call_sync("kill", id=sid)
+
+
+def test_reply_sends_what_msg_reply_to_sends_and_takes_exactly_two_words(monkeypatch, capsys):
+    """TD-1576 (design §4.7): `ao reply <id> '<text>'` is `ao msg --reply-to <id> "<text>"` with no option
+    word — the same `msg` envelope, every field — `--json` taken as on any command, a text led by `-` after
+    `--`, and a third word refused with the usage line and nothing sent."""
+    sent = []
+
+    def fake(method, **params):
+        if method == "msg":
+            sent.append(params)
+        return {"entry": {"id": "m-2", "kind": params.get("kind")}, "delivered": ["ao-x"]}
+
+    monkeypatch.setattr(cli, "call_sync", fake)
+    assert cli.main(["msg", "--reply-to", "m-1", "SHIP, no findings"]) == 0
+    assert cli.main(["reply", "m-1", "SHIP, no findings"]) == 0
+    assert len(sent) == 2 and sent[0] == sent[1]
+    assert (sent[1]["reply_to"], sent[1]["text"], sent[1]["kind"], sent[1]["to"]) == (
+        "m-1",
+        "SHIP, no findings",
+        "reply",
+        None,
+    )
+    assert "reply → ao-x" in capsys.readouterr().out
+    assert cli.main(["--json", "reply", "m-1", "t"]) == 0
+    assert json.loads(capsys.readouterr().out)["entry"]["id"] == "m-2"
+    assert cli.main(["reply", "m-1", "--", "-not an option"]) == 0
+    assert sent[-1]["text"] == "-not an option"
+    n = len(sent)
+    with pytest.raises(SystemExit) as e:
+        cli.main(["reply", "m-1", "two", "words"])
+    assert e.value.code == 2 and "unrecognized arguments: words" in capsys.readouterr().err
+    assert len(sent) == n, "nothing sent"
+    assert cli._parse(["reply", "m-1", "t"]).fn is cli.cmd_reply
+
+
+def test_reply_meets_the_refusals_msg_reply_to_meets(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-1576 (design §4.7): `ao reply` reads nothing first — a reply to a `--pr` ask prints the home's
+    `--verdict` refusal, and one to an entry not in the caller's inbox is refused as `--reply-to`'s is."""
+    for n in ("w", "tl"):
+        (tmp_path / n).mkdir()  # one directory each: the anchor rule (§9 invariant 2)
+    w = call_sync("create", name="w", dir=str(tmp_path / "w"), adapter="agentshell", argv=["bash", "--norc"], team="t")
+    w = w["id"]
+    tl = call_sync(
+        "create", name="tl", dir=str(tmp_path / "tl"), adapter="agentshell", argv=["bash", "--norc"], team="t"
+    )
+    tl = tl["id"]
+    monkeypatch.setenv("SHIFTLEAD_SESSION", w)
+    assert cli.main(["--json", "msg", "--kind", "ask", "--pr", "12", tl, "#12 is green"]) == 0
+    asked = json.loads(capsys.readouterr().out)["entry"]["id"]
+    assert cli.main(["--json", "msg", "--kind", "ask", tl, "which test?"]) == 0
+    plain = json.loads(capsys.readouterr().out)["entry"]["id"]
+    monkeypatch.setenv("SHIFTLEAD_SESSION", tl)
+    assert cli.main(["reply", asked, "merged #12"]) == 1
+    assert "--verdict" in capsys.readouterr().err
+    assert cli.main(["msg", "--reply-to", "m-nope", "x"]) == 1
+    refused = capsys.readouterr().err
+    assert cli.main(["reply", "m-nope", "x"]) == 1
+    assert capsys.readouterr().err == refused
+    assert cli.main(["--json", "reply", plain, "the flake one"]) == 0
+    got = json.loads(capsys.readouterr().out)
+    assert got["entry"]["kind"] == "reply" and got["delivered"] == [w] and got["closed"] == plain
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
+    for sid in (w, tl):
+        call_sync("kill", id=sid)
+
+
+def test_inbox_text_says_an_ask_carries_an_entry_first_under_its_head(monkeypatch, capsys):
+    """TD-1576 (design §4.7): an `ask` whose `entry` is not null, open or closed, prints *carries entry: …*
+    as the first indented line under its head, before the text; a note with an entry, and `--json`, do not."""
+    base = {"from_role": "other", "from": "ao-w", "at": "2026-11-11T00:00:00Z", "kind": "ask"}
+    entries = [
+        {**base, "id": "m-1", "text": "file this", "entry": {"title": "x"}},
+        {**base, "id": "m-2", "text": "closed one", "entry": {"title": "y"}, "closed_reason": "answered"},
+        {**base, "id": "m-3", "text": "plain ask", "entry": None},
+        {**base, "id": "m-4", "kind": "note", "text": "a note", "entry": {"title": "z"}},
+    ]
+    got = {"id": "ao-seat", "entries": entries, "unread": 0}
+    monkeypatch.setattr(cli, "call_sync", lambda method, **kw: got)
+    assert cli.main(["inbox"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    for mid, text in (("m-1", "file this"), ("m-2", "closed one")):
+        at = next(i for i, x in enumerate(lines) if f" · {mid} · " in x)
+        assert lines[at + 1] == f"  {cli.CARRIES_ENTRY}" and lines[at + 2] == f"  {text}", mid
+    assert sum(cli.CARRIES_ENTRY in x for x in lines) == 2
+    assert cli.main(["--json", "inbox"]) == 0
+    assert "carries entry" not in capsys.readouterr().out
 
 
 def test_msg_subject_and_the_inbox_head_line_that_shows_it(subprocess_agent, tmp_path, capsys, monkeypatch):

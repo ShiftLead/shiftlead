@@ -33,6 +33,7 @@ PACKAGE_REF = "package:"
 # The role of the team's `techlead:` seat (§4.9b): a review stage of any other seat role is staffed by
 # a `seats:` entry of that role on `asks` (§4.9c *A review stage any seat may hold*, TD-315)
 REVIEW_ROLE = "techlead"
+FACT_CHECKER_ROLE = "fact-checker"  # a seat that answers no --verdict, so no review stage's reader (§4.9c, TD-1576)
 REF_RE = re.compile(r"(?i)[a-z]{2,6}-\d{1,4}|#?\d{1,6}")
 
 
@@ -367,7 +368,9 @@ def unfollowable(
     for st in flow.stages:
         if st.review:
             had = len(out)  # a stage with no reader says that alone, as before
-            if st.role == REVIEW_ROLE:
+            if st.role == FACT_CHECKER_ROLE:  # §4.9c (TD-1576): it answers no --verdict, so it reads no PR
+                out.append(f"{FACT_CHECKER_ROLE} is no reader — a review stage's seat answers with --verdict")
+            elif st.role == REVIEW_ROLE:
                 if not techlead:
                     out.append("no techlead seat — add `techlead:` to the team")
             elif (asks := sum(1 for r, t, _p, _n in lines if r == st.role and t == "asks")) > 1:

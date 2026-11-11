@@ -112,3 +112,27 @@ def test_no_built_in_merges_outside_step_5s_line():
     for name, text in built_ins():
         if "{merge}" in text and name != "team_skill.md":
             assert "typed whole as one command" in text, name
+
+
+# design §4.3 *The untrusted-flags guard* (TD-1576): the commands the fact-checker's brief names carry
+# no option word off a Gemini tool's safe list and no path-like word, and a text is one single-quoted word
+FC_PREFIXES = ("ao ", "git ", "gh ", "head ", "echo ")
+FC_SAFE = {"-1", "-n", "--"}
+FC_PATHLIKE = ("/", "./", "../", "http://", "https://")
+FC_SUFFIXES = (".sh", ".bash", ".zsh", ".ps1", ".bat", ".cmd", ".exe")
+
+
+def test_the_fact_checker_briefs_road_carries_no_word_the_guard_stops_on():
+    import shlex
+
+    text = resources.files("shiftlead").joinpath("briefs", "fact-checker.md").read_text(encoding="utf-8")
+    spans = [s for s in re.findall(r"`([^`]+)`", text) if s.startswith(FC_PREFIXES)]
+    assert any(s.startswith("ao reply ") for s in spans) and any(s.startswith("git show ") for s in spans)
+    bad = []
+    for span in spans:
+        for w in shlex.split(span):
+            if (w.startswith("-") and w not in FC_SAFE) or w.startswith(FC_PATHLIKE) or w.endswith(FC_SUFFIXES):
+                bad.append((span, w))
+        if span.startswith(("ao reply", "ao msg person")) and "'" in span and span.count("'") != 2:
+            bad.append((span, "a text is one single-quoted word holding no '"))
+    assert bad == []

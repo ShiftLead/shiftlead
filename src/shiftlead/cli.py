@@ -4134,6 +4134,17 @@ def end_the_turn_line(args: argparse.Namespace) -> None:
         print(END_THE_TURN, file=sys.stderr if getattr(args, "json", False) else sys.stdout)
 
 
+def cmd_reply(args: argparse.Namespace) -> int:
+    """`ao reply <id> '<text>'` (design §4.7, TD-1576): `ao msg --reply-to <id> "<text>"` with no option
+    word, a brief's road past a Gemini seat's untrusted-flags guard (§4.3). The same send through
+    `cmd_msg`, every other `msg` option at its default, so it is refused where that send is refused and
+    prints what it prints; what needs an option (`--pick`, `--answer`, `--verdict`) stays `ao msg`'s."""
+    msg = argparse.Namespace(**args.msg_defaults)
+    msg.json, msg.cmd = args.json, "msg"
+    msg.reply_to, msg.words = args.reply_to, [args.text]
+    return cmd_msg(msg)
+
+
 def _offered(reply_to: str) -> list[str] | None:
     """The suggested answers on one entry of **the caller's own inbox** (design §4.10 *Suggested
     answers*, TD-070), or None when it holds no such entry. `--pick <n>` reads them here rather
@@ -4531,6 +4542,10 @@ def _withdraw(args: argparse.Namespace, words: list[str]) -> int:
     return emit(args, got, lambda: print(f"{got['msg']} withdrawn: the person meets it in FYI"))
 
 
+# design §4.7 (TD-1576): the first line under an `ask` that carries an `entry`, true in any reader's inbox
+CARRIES_ENTRY = "carries entry: a request to file a ledger entry, a techlead seat's to file"
+
+
 def cmd_inbox(args: argparse.Namespace) -> int:
     """`ao inbox [--unread]` (design §4.10): this session's own mailbox — reading it is what marks
     an entry read, and the host agent does that, never this command. With no `SHIFTLEAD_SESSION`
@@ -4569,6 +4584,8 @@ def cmd_inbox(args: argparse.Namespace) -> int:
             reply = f" re {e['reply_to']}" if e.get("reply_to") else ""
             head = f"[{e['from_role']}] {e['from']} · {e['id']} · {e['kind']}{reply}{_subj(e)} · {e['at']}{about}"
             print(f"\n{head} · {_inbox_status(e)}")
+            if e["kind"] == "ask" and e.get("entry") is not None:  # what a seat's brief branches on (§4.7, TD-1576)
+                print(f"  {CARRIES_ENTRY}")
             if st := standing.get(e["id"]):
                 print(f"  {st['text']}")
             for line in str(e["text"]).splitlines() or [""]:
@@ -5997,6 +6014,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="a reply answered from the record: where it is written down (one line); the person is told (§4.9b)",
     )
     p.set_defaults(fn=cmd_msg)
+    # design §4.7 (TD-1576): every `msg` option's default, for `ao reply`'s send through `cmd_msg`
+    msg_defaults = {a.dest: a.default for a in p._actions if a.default is not argparse.SUPPRESS and a.dest != "help"}
+
+    p = add("reply", help="reply to an entry in your inbox, with no option word: ao msg --reply-to's send (§4.7)")
+    # dest `reply_to`, never `id`: `_run` resolves a string `args.id` as a session name
+    p.add_argument("reply_to", metavar="id", help="the entry this answers (the reply goes to its sender)")
+    p.add_argument("text", help="the reply's text, one quoted word (a text led by - goes after --)")
+    p.set_defaults(fn=cmd_reply, msg_defaults=msg_defaults)
 
     p = add("inbox", help="read your inbox; with no session, the person inbox (design §4.10)")
     p.add_argument("--unread", action="store_true", help="only entries not yet read")

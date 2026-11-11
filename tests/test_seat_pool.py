@@ -218,16 +218,16 @@ def test_a_review_stage_held_only_by_a_pooled_seat_is_not_followable(tmp_path, m
         dir=tmp_path,
         stages=[
             flowdefs.Stage(name="build", role="grinder", lane=["td"]),
-            flowdefs.Stage(name="qa", role="fact-checker"),
+            flowdefs.Stage(name="qa", role="auditor"),
         ],
     )
 
     def why(seats):
         return flowdefs.unfollowable(flow, {"grinder"}, techlead=True, held=("src/**",), seats=seats)
 
-    assert why([("fact-checker", "asks", False, "qa")]) == []
-    assert why([("fact-checker", "asks")]) == [], "a pair reads unpooled, as the tests that omit it pass"
-    assert why([("fact-checker", "asks", True, "qa")]) == ["qa is a pool: a review stage has one reader"]
+    assert why([("auditor", "asks", False, "qa")]) == []
+    assert why([("auditor", "asks")]) == [], "a pair reads unpooled, as the tests that omit it pass"
+    assert why([("auditor", "asks", True, "qa")]) == ["qa is a pool: a review stage has one reader"]
 
 
 @pytest.mark.integration
