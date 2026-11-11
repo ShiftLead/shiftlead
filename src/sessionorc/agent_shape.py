@@ -153,8 +153,18 @@ class ShapeMixin:
             else:
                 held_by = [r for r in crew if r.seat is not None and r.name == st["reader"]]
                 held_by.sort(key=lambda r: (r.state not in DEAD, str(r.created or "")))
-                w = held_by[-1].prs_waiting(home=self.host) if held_by else None
-                q.update({"n": w["n"] if w else 0, "oldest": w["oldest"] if w else None})
+                # the seat's queue is the union of its records' — its own and its extras' (§4.9 *A scaled seat
+                # holds its review stage*, TD-1547): an ask waits on one record, so the counts add
+                extras = [
+                    r
+                    for r in crew
+                    if r.seat is not None
+                    and not r.superseded_by
+                    and isinstance(r.scale, dict)
+                    and r.scale.get("line") == st["reader"]
+                ]
+                ws = [w for r in [*held_by[-1:], *extras] if (w := r.prs_waiting(home=self.host))]
+                q.update({"n": sum(w["n"] for w in ws), "oldest": min((w["oldest"] for w in ws), default=None)})
             queues.append(q)
         bounds = [d for r in live if (d := balance_mod.span((r.review or {}).get("bound")))]
         bound: timedelta = min(bounds) if bounds else balance_mod.REVIEW_BOUND
