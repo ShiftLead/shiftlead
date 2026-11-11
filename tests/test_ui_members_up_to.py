@@ -16,6 +16,9 @@ from conftest import scratch_dir
 from test_ui_members_size import LEAD, UI, _node, _set
 from test_ui_teams import badged, client, org_doc, world  # noqa: F401 — the fixtures, by name
 
+from shiftlead import org as orgmod
+from shiftlead import teamrun
+
 pytestmark = pytest.mark.unit
 
 
@@ -135,3 +138,33 @@ console.log(JSON.stringify({
         " once it closes."
     )
     assert w["up"] == "" and w["stopped"] == ""
+
+
+def test_an_area_lanes_up_to_reads_disabled_with_its_reason(world, client):  # noqa: F811
+    """TD-1633: the members read takes `lane_refusals` (#3366) — an area lane's line is in no stage."""
+    tmp_path, _ = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["members"].append({"role": "hunter", "name": "hunt", "lane": "ui"})
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    ups = {e["name"]: e["up_to"] for e in client.get("/api/teams/ao-grind/members").json()["members"]}
+    assert (ups["hunt"]["why"], ups["hunt"]["value"]) == ("its lane has no queue to read", None)
+    assert ups["grind"]["why"] == "" and ups["grind"]["value"] == 4
+
+
+def test_a_true_up_to_is_refused_at_the_endpoint(world, client):  # noqa: F811
+    """TD-1633: `true` is an int to Python; the endpoint refuses it in its own words before `set_max` reads it."""
+    _seated(world[0])
+    r = _max(client, "grind", True)
+    assert (r.status_code, r.json()["detail"]) == (400, "an up to is a whole number of sessions, 0 or more")
+
+
+@pytest.mark.parametrize("err", [teamrun.teams.TeamError("brief gone"), OSError("unreadable"), ValueError("bad")])
+def test_lane_refusals_reads_nothing_where_the_plan_cannot_be_made(world, monkeypatch, err):  # noqa: F811
+    """TD-1633: an unreadable plan refuses no line, so the members read still answers (the write says why)."""
+
+    def refused(*a, **k):
+        raise err
+
+    monkeypatch.setattr(teamrun.teams, "plan", refused)
+    org = orgmod.load()
+    assert teamrun.lane_refusals(lambda *a, **k: None, org, "ao-grind", "") == {}
