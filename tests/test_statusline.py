@@ -8,7 +8,11 @@ from __future__ import annotations
 import io
 import json
 import socket
+import struct
+import subprocess
+import sys
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -117,10 +121,14 @@ def test_report_due_on_a_change_or_a_minute_and_fresh_on_new_work():
 
 
 class FakeAgent:
-    """A socket that answers every request with `{taken: true}` and keeps what it was sent."""
+    """A socket that answers every request with `{taken: true}` and keeps what it was sent; `lag`, a
+    host agent whose loop is behind: it reads the request that long after the connection, and keeps
+    whether the caller's pid was still there to be read (`alive`)."""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, lag: float = 0.0):
         self.got: list[dict] = []
+        self.lag = lag
+        self.alive: list[bool] = []
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.bind(str(path))
         self.sock.listen(8)
@@ -133,6 +141,10 @@ class FakeAgent:
             except OSError:
                 return
             with conn:
+                if self.lag:
+                    pid = struct.unpack("3i", conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))[0]
+                    time.sleep(self.lag)
+                    self.alive.append(Path(f"/proc/{pid}").exists())
                 buf = b""
                 while not buf.endswith(b"\n"):
                     chunk = conn.recv(65536)
@@ -151,6 +163,8 @@ def home(tmp_path, monkeypatch):
     monkeypatch.setenv("SHIFTLEAD_HOME", str(h))
     monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x-w1")
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "cfg"))
+    # in this process the report is sent inline: a fork of the test runner is no status line's
+    monkeypatch.setattr(hook_mod, "aside", lambda fn, wait=hook_mod.REPORT_TIMEOUT: fn(hook_mod.REPORT_WAIT))
     yield h
     for f in sorted(h.rglob("*"), reverse=True):
         f.unlink() if not f.is_dir() else f.rmdir()
@@ -217,3 +231,29 @@ def test_the_command_keeps_the_reported_context_window_once_per_change(home, tmp
     p["context_window"] = {**cw, "current_usage": {**use, "input_tokens": 9}}
     run_statusline(monkeypatch, capsys, p, now=R5 + 60)
     assert json.loads(context_file("u1").read_text())["tokens"] == 100_009
+
+
+@pytest.mark.integration
+def test_a_lagging_agent_still_finds_the_reporter_alive_and_the_line_does_not_wait(home, tmp_path):
+    """TD-1589: a host agent whose loop lags past the status line's second (the minutes after a
+    restart) read the caller's /proc entry after the reporter had given up and exited, and refused
+    the report as *unknown* (`unreadable`). The report goes from a child that waits `REPORT_WAIT`, so
+    the reader finds it alive, and the status line itself is back within its own second."""
+    agent = FakeAgent(home / "agent.sock", lag=3.0)
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    p = {**payload(), "workspace": {"project_dir": str(plain)}}
+    code = "import sys; from shiftlead.adapters.claude_code import hook; sys.argv[1:] = ['--statusline']; hook.main()"
+    t0 = time.monotonic()
+    # pipes captured: `run` returns at their end too, so a child that kept one would hold it past the lag
+    done = subprocess.run(
+        [sys.executable, "-c", code], input=json.dumps(p), capture_output=True, text=True, check=True, timeout=10
+    )
+    assert time.monotonic() - t0 < 2.6  # the line returned before the agent answered
+    assert done.stdout == ""  # no line of the person's here, and nothing of the child's
+    end = time.monotonic() + 8
+    while time.monotonic() < end and not hook_mod.last_report_file("ao-x-w1").exists():
+        time.sleep(0.05)
+    assert agent.alive == [True]  # read after its lag, the caller was still there
+    assert [r["method"] for r in agent.got] == ["usage_report"]
+    assert hook_mod.last_report_file("ao-x-w1").exists()  # and, answered, the child remembered it

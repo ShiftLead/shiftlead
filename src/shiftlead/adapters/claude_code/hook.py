@@ -298,9 +298,13 @@ def call_agent(params: dict[str, Any], timeout: float | None, method: str = "hoo
     return resp.get("result")
 
 
-# The status line's report (design §4.4 *A report*): sent with this timeout and never queued, since
-# the tool cancels a status line still running when the next is due and a late report reads as new.
+# The status line's report (design §4.4 *A report*): the status line waits this long for it, and the
+# child that sends it waits `REPORT_WAIT` in all, never queued, since a report hours late reads as new.
 REPORT_TIMEOUT = 1.0
+# A host agent slow to answer — in the minutes after a restart its loop lags by seconds — must still
+# find the reporter alive when it reads the caller's /proc entry (§4.8a), or it judges the report
+# *unknown* (`unreadable`) and refuses it (TD-1589); a hook waits as long, a bound on each step.
+REPORT_WAIT = 5.0
 # The status line it displaced gets this long; the tool cancels ours past its own bound anyway.
 CHAINED_TIMEOUT = 5.0
 
@@ -331,7 +335,7 @@ def report_due(rep: dict[str, Any], last: dict[str, Any] | None, now: float) -> 
     return {"windows": rep["windows"], "fresh": fresh}
 
 
-def report_usage(session: str, payload: dict[str, Any], now: float) -> None:
+def report_usage(session: str, payload: dict[str, Any], now: float, timeout: float = REPORT_WAIT) -> None:
     """Send the payload's limits as `usage_report` when one is owed, and remember what was sent.
     Nothing is remembered when the host agent was not reached, so the next redraw tries again."""
     rep = usage_report(payload)
@@ -345,11 +349,44 @@ def report_usage(session: str, payload: dict[str, Any], now: float) -> None:
     params = report_due(rep, last, now)
     if params is None:
         return
-    call_agent(params, timeout=REPORT_TIMEOUT, method="usage_report", caller=session)
+    call_agent(params, timeout=timeout, method="usage_report", caller=session)
     f.parent.mkdir(parents=True, exist_ok=True)
     tmp = f.with_name(f"{f.stem}.{os.getpid()}.tmp")  # two status lines of one session may overlap
     tmp.write_text(json.dumps({**rep, "sent": now}), encoding="utf-8")
     tmp.replace(f)
+
+
+def aside(fn: Any, wait: float = REPORT_TIMEOUT) -> None:
+    """Run `fn` in a child, waiting at most `wait` for it (design §4.4 *A report*, TD-1589). A home that
+    answers in time is answered while this process — the child's parent, its link to the pane — still
+    runs; one that lags finds the child alive past this process's exit, out of the status line's
+    process group (so the tool's cancel of the group does not reach it) and holding none of its pipes
+    (so the tool does not wait for it). `fn` takes the bound it may wait: `REPORT_WAIT` in the child,
+    and `wait` where there is no fork and it runs here."""
+    try:
+        pid = os.fork()
+    except (AttributeError, OSError):
+        fn(wait)
+        return
+    if pid == 0:  # the child: never returns
+        try:
+            with contextlib.suppress(OSError):
+                os.setpgid(0, 0)
+            null = os.open(os.devnull, os.O_RDWR)
+            for fd in (0, 1, 2):
+                os.dup2(null, fd)
+            os.closerange(3, 1024)  # any other pipe the tool handed the status line
+            fn(REPORT_WAIT)
+        finally:
+            os._exit(0)
+    end = time.monotonic() + wait
+    while time.monotonic() < end:
+        try:
+            if os.waitpid(pid, os.WNOHANG)[0]:
+                return
+        except ChildProcessError:
+            return
+        time.sleep(0.01)
 
 
 def keep_context(payload: dict[str, Any], now: float) -> None:
@@ -428,8 +465,14 @@ def statusline() -> int:
             sys.stdout.write(out)
             sys.stdout.flush()
     if session := os.environ.get("SHIFTLEAD_SESSION"):
+        now = time.time()
+
+        def report(timeout: float) -> None:
+            with contextlib.suppress(Exception):
+                report_usage(session, payload, now, timeout)
+
         with contextlib.suppress(Exception):
-            report_usage(session, payload, time.time())
+            aside(report)
         with contextlib.suppress(Exception):
             keep_context(payload, time.time())
     return 0
