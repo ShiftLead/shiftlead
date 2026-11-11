@@ -10,6 +10,22 @@ People: paul
 
 ## Needs the user
 
+- [ ] decide 2026-11-11 (n/a) — Will you run ao schedule ao-grind reset --profile grind --window week from your own shell, so ao-grind starts at each weekly reset and the next Thursday reset is read as TD-133's check? Context: TD-133 decision (paul). Due: 2026-11-18. Answers: Yes — I ran it | No — drop the check. Lifts: Yes | No.
+  - **Context:** TD-133 is the live check of the weekly-reset start (#2873). A session cannot read or set a schedule, so only you can set it; the gate moved from the old decision form to this item (TD-1584).
+  - **Question:** Run the schedule command from your own shell, or drop the check?
+  - **Recommended:** Yes — I ran it, if you want ao-grind to restart at each weekly reset; a grinder then reads the reset after it.
+- [ ] decide 2026-11-11 (n/a) — On your phone, does a pinch change the columns once and survive a reload, and does a swipe on the strip walk the records? Context: TD-1301 decision (paul). Due: 2026-11-18. Answers: Works | Not right. Lifts: Works | Not right.
+  - **Context:** TD-1301 is a live check of the phone Focus (TD-003): only your phone shows it. You were asked in the look m-47ff5ed1cf57 (2026-11-02); this item carries it on the board (TD-1584).
+  - **Question:** On your phone, does a pinch change the columns once and survive a reload, and does a swipe on the strip walk the records?
+  - **Recommended:** Works if it does; Not right and a grinder files what is wrong.
+- [ ] decide 2026-11-11 (n/a) — On your phone, does the key bar answer a Claude Code menu by digit and by the drag pad? Context: TD-1300 decision (paul). Due: 2026-11-18. Answers: Works | Not right. Lifts: Works | Not right.
+  - **Context:** TD-1300 is a live check of the phone Focus (TD-003): only your phone shows it. You were asked in the look m-47ff5ed1cf57 (2026-11-02); this item carries it on the board (TD-1584).
+  - **Question:** On your phone, does the key bar answer a Claude Code menu by digit and by the drag pad?
+  - **Recommended:** Works if it does; Not right and a grinder files what is wrong.
+- [ ] decide 2026-11-11 (n/a) — Open Focus from your phone's home screen: does the one screen (strip, Watching line, input bar, ⋯ sheet) work? Context: TD-1299 decision (paul). Due: 2026-11-18. Answers: Works | Not right. Lifts: Works | Not right.
+  - **Context:** TD-1299 is a live check of the phone Focus (TD-003): only your phone shows it. You were asked in the look m-47ff5ed1cf57 (2026-11-02); this item carries it on the board (TD-1584).
+  - **Question:** Open Focus from your phone's home screen: does the one screen (strip, Watching line, input bar, ⋯ sheet) work?
+  - **Recommended:** Works if it does; Not right and a grinder files what is wrong.
 - [ ] decide 2026-11-11 (session `designer-ao-1`) — Should TD-1470's builds (a home check that raises a stuck row on an open question or a decided board line no live session can act on) go ahead as your Hold revised them, with no PRs, after TD-1571's four rounds, the last of which raised nothing build-changing? Context: TD-1470 decision (paul). Parts: TD-1496, TD-1497, TD-1498. Due: 2026-11-14. Answers: Go (default) | One more round | Hold: <note>.
   - **Context:** TD-1470 designs a home check that tells you when open work has no live session able to act on it. Your Hold (2026-11-10) asked to drop PRs; TD-1571 did, in PR #3330, and its four review rounds (Fable, then Sonnet, each with a fact-check) ended at the cap, the last review raising nothing build-changing.
   - **Question:** Go with the builds as revised: the check reads an open question to a session and a decided board line only; a line you are already asked about is not read; PRs come back with TD-1572.
