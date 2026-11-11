@@ -42,6 +42,7 @@ async def test_a_start_at_the_cap_closes_the_longest_idle_clean_extra_seat(agent
         assert b.state == "closed" and a.state == "idle"  # the longest idle went back to held
         assert b.scale["line"] == "tl" and b.scale["last"]["did"] == "hold"
         assert b.scale["last"]["why"] == "host full, room for mine"
+        assert {k: b.closer[k] for k in ("by", "why")} == {"by": "tick", "why": "host_full"}, "why it closed (TD-1628)"
         assert "last" not in a.scale
 
 
