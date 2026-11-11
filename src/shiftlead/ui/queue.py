@@ -882,6 +882,12 @@ def card_session(card: Mapping[str, Any], fleet: Iterable[Mapping[str, Any]] | N
     }
 
 
+def _norm_qid(q: Any) -> str:
+    """A `<repo>#TD-n` as a `qid`, padded (`TD-3` and `TD-003` one entry); anything else as written."""
+    name, _, tid = str(q or "").partition("#")
+    return qid(name, tid) if re.fullmatch(r"TD-\d+", tid) else str(q or "")
+
+
 def item_start(
     card: Mapping[str, Any], item: str, fleet: Iterable[Mapping[str, Any]] | None, on_row: str = ""
 ) -> dict[str, Any]:
@@ -896,7 +902,8 @@ def item_start(
         return {}
     if not card.get("start"):  # a completed card: the archived entry the item is tied to
         cid = str(card.get("id") or "")
-        if not cid or cid.startswith(LOOSE) or not on_row or on_row not in map(str, card.get("ids") or ()):
+        ids = {_norm_qid(q) for q in card.get("ids") or ()}
+        if not cid or cid.startswith(LOOSE) or not on_row or _norm_qid(on_row) not in ids:
             return {}
         on = on_row
     else:

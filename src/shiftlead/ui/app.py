@@ -3386,7 +3386,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         kept = None  # a kept card's press (§4.5 screen 12 *Three verbs: An item on a kept card*, TD-1618)
         if card_id:
             card = next((c for c in cards if c.get("id") == card_id), None)
-            kept = next((c for c in completed if c.get("id") == card_id), None)
+            kept = next((c for c in completed if c.get("id") == card_id), None) if card is None else None
             if kept is None and card is None and entry is None:
                 kept = {}  # found nowhere while `id` is no open entry: the kept path, and its refusal
         if kept is not None:

@@ -275,3 +275,9 @@ def test_today_an_open_cards_press_is_unchanged(tmp_path, monkeypatch):
     repo, c, created = _start_world(tmp_path, monkeypatch, fleet=[MANAGER], queue=q)
     r = c.post("/api/ledger/start", json={"repo": "samscrape", "id": "TD-009", "card": "samscrape#TD-020"})
     assert r.status_code == 200 and created[0]["name"] == "td-9", r.text
+
+
+def test_the_button_compares_the_items_row_with_the_cards_ids_as_qids():
+    """The review of #3373: the button and the road read one spelling, so an unpadded id draws as the press starts."""
+    c = _completed(ids=["samscrape#TD-30", "samscrape#TD-31"])
+    assert item_start(c, "m-41", [], "samscrape#TD-031")["ref"] == "TD-031"
