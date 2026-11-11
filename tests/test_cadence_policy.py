@@ -347,6 +347,21 @@ async def test_a_nodes_member_gets_the_clause_and_no_line(agent, monkeypatch):
     assert cadence.clause(rec.checks) == "PR #842 fails the cadence check: review, ledger"
 
 
+async def test_an_extra_seats_reply_is_recorded_as_the_read_by_the_tick(agent):
+    """`_cadence_line` passes the extras map (TD-1547, TD-1658): the reply of an extra of the seat the ask named
+    is the PR's read, and the tick writes its sender as `read_by`."""
+    extra = Session(id="ao-x-tl-2", name="tl-2", kind="agent", adapter="shell", dir="")
+    extra.seat, extra.scale = {"trigger": "asks"}, {"line": "tl"}
+    agent.sessions[extra.id] = extra
+    rec = Session(id="ao-x-w", name="w", kind="agent", adapter="shell", dir="", host="laptop")
+    rec.supervised, rec.unattended, rec.state, rec.confidence = True, True, "idle", "hook"
+    rec.checks = [{"pr": 842, "at": "t", "sha": "aaa", **PASS}]
+    rec.outbox.append(MailEntry(id="m-1", from_=rec.id, to=["ao-x-tl"], at="t", kind="ask", text="read", pr=842))
+    rec.inbox.append(MailEntry(id="m-r", from_="ao-x-tl-2", to=[rec.id], at="t", kind="reply", text="ok", root="m-1"))
+    await agent._cadence_line(rec, datetime.now(UTC))
+    assert rec.checks[0]["read_by"] == "ao-x-tl-2"
+
+
 def test_the_rows_mark_and_its_dismiss():
     told = {"pr": 842, "at": "t1", "sha": "aaa", **FAIL, "told": "t1", "row": "t2"}
     fine = {"pr": 843, "at": "t1", "sha": "bbb", **PASS}

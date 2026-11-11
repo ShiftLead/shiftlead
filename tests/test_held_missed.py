@@ -254,6 +254,21 @@ async def test_a_held_pr_the_seat_replied_on_is_no_crossing(agent, monkeypatch):
     assert gh.asked == [845], "settled: read once"
 
 
+async def test_a_held_pr_an_extra_of_the_seat_replied_on_is_no_crossing(agent, monkeypatch):
+    """The tick passes the extras map (TD-1547, TD-1658): an extra seat's reply on the ask to its seat is the
+    seat's read, so the merged held PR is no crossing."""
+    gh, s = _Gh(monkeypatch), _member(agent)
+    extra = Session(id="ao-x-tl-2", name="tl-2", kind="agent", adapter="shell", dir="", created=CREATED)
+    extra.seat, extra.scale = {"trigger": "asks"}, {"line": "tl"}
+    agent.sessions[extra.id] = extra
+    _done(s, 845)
+    gh.prs[845] = (HELD, MERGED)
+    _ask(s, "ao-x-tl")
+    _reply(s, "ao-x-tl-2")
+    await agent._held_pass([s], LATER)
+    assert s.held_missed == [] and _fyi(agent) == [] and gh.asked == [845]
+
+
 async def test_a_chain_pr_merged_after_the_first_readers_pass_alone_is_a_crossing(agent, monkeypatch):
     """TD-349, at the home: rule 11 reads the PR's files against each link, so a chain PR the first
     reader passed and the second never answered is a crossing after the grace; the second's `merged`
