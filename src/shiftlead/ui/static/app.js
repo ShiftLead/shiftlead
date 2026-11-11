@@ -4369,6 +4369,25 @@
     if (!e.down) return "";
     return `${team}: ${e.name || e.role} ${e.size} → ${e.size - 1}? It winds down ${e.down} — Wrap up's prompt, never a kill; its card stays until Forget.`;
   };
+  // **up to** (§4.5a *Members dialog* **up to**, §4.9 *Scaling with the work*, td-max, TD-1545): a number field on
+  // each member line and each seat, the line's ceiling — the default's (size + 2) where none is written, blank on a
+  // team at `off`, `0` on one stored at `0` — drawn disabled with its reason where it may not scale
+  AO.membersUpTo = function (name, u) {
+    if (!u) return "";
+    const v = u.value === null || u.value === undefined ? "" : String(u.value);
+    const dis = u.why ? ` disabled title="${esc(u.why)}"` : ` title="${u.default ? "the default ceiling, its size + 2" : "the most sessions this line runs at once"} — a setting, the definition untouched; at or below its size, no scaling"`;
+    return ` <label class="mupto meta">up to <input class="input sm" type="number" min="0" step="1" data-mupto="${esc(name)}" value="${esc(v)}"${dis} aria-label="up to, ${esc(name)}"></label>`
+      + (u.why ? ` <span class="meta">${esc(u.why)}</span>` : "");
+  };
+  // a lowered **up to**'s confirm names each live extra it winds down (the highest-placed past the new ceiling);
+  // "" where it winds none down — a stopped team, a raise, or no live extra past it — and asks nothing
+  AO.membersMaxConfirm = function (name, u, n, team, live) {
+    if (!live || !u) return "";
+    const keep = Math.max(n - (u.size || 0), 0);
+    const down = (u.extras || []).slice(keep).filter((x) => x.id && !["exited", "closed", "not live"].includes(x.state)).map((x) => x.name);
+    if (!down.length) return "";
+    return `${team}: ${name} up to ${n}? It winds down ${down.join(", ")} — Wrap up's prompt, never a kill; its record is dropped once it closes.`;
+  };
   // a member line's row: role · name · lane, then − size + (*2 (file says 1)*), *· from the next Start* on a
   // stopped team whose size is above its count, the sessions holding it, and Remove (disabled on a repo's team)
   AO.membersRow = function (e, v) {
@@ -4380,7 +4399,8 @@
     const size = `<button class="btn sm ghost" type="button" data-msize="${e.index}" data-step="-1"${twin || (e.size > 0 ? "" : " disabled")} title="one session fewer on this line — a setting, the definition untouched" aria-label="one fewer ${esc(e.name || e.role)}">−</button>`
       + ` <span class="msize">${esc(e.words || String(e.size))}</span> `
       + `<button class="btn sm ghost" type="button" data-msize="${e.index}" data-step="1"${twin} title="one session more on this line — a setting, the definition untouched" aria-label="one more ${esc(e.name || e.role)}">+</button>`
-      + (e.next_start ? ` <span class="meta">· from the next Start</span>` : "");
+      + (e.next_start ? ` <span class="meta">· from the next Start</span>` : "")
+      + AO.membersUpTo(e.name || e.role, e.up_to);
     return `<div class="row gap wrap"><span>${esc(e.role)} · ${esc(e.name || e.role)} · ${esc((e.lane || []).join(", ") || "—")} ·</span>${size}<span class="meta">${held}</span>${rm}</div>`;
   };
   async function openMembers(team) {
@@ -4396,9 +4416,11 @@
       $("#membersnote").textContent = v.live ? "live: + starts the line's next member under the manager and − winds one down; Add member and Remove edit the definition" : "stopped: an edit is the definition or the size only — the next Start brings it";
       const who = (h) => h ? `${esc(h.name)} · ${esc(h.state)}` : "";
       const rows = [];
-      if (v.manager) rows.push(`<div class="row gap"><span class="meta">manager</span> ${who(v.manager)}</div>`);
-      if (v.techlead) rows.push(`<div class="row gap"><span class="meta">techlead seat</span> ${who(v.techlead)}</div>`);
+      if (v.manager) rows.push(`<div class="row gap wrap"><span class="meta">manager</span> ${who(v.manager)}${AO.membersUpTo(v.manager.name, v.manager.up_to)}</div>`);
+      if (v.techlead) rows.push(`<div class="row gap wrap"><span class="meta">techlead seat</span> ${who(v.techlead)}${AO.membersUpTo(v.techlead.name, v.techlead.up_to)}</div>`);
       v.members.forEach((e) => rows.push(AO.membersRow(e, v)));
+      // each seat under `seats:` a row of its own carrying **up to** alone: no − / +, no Remove
+      (v.seats || []).forEach((x) => rows.push(`<div class="row gap wrap"><span class="meta">seat · ${esc(x.trigger || "")}</span> ${who(x)}${AO.membersUpTo(x.name, x.up_to)}</div>`));
       // a definition that already names one session twice says so (TD-268): Remove on either line keeps the session
       if ((v.twice || []).length) rows.push(`<div class="row gap"><span class="meta">named twice: ${v.twice.map(esc).join(", ")} — Remove one line; the session runs on</span></div>`);
       $("#memberslist").innerHTML = rows.join("");
@@ -4415,6 +4437,25 @@
       sel.onchange = fill; fill();
     }
     say(""); await load();
+    // **up to**: a number written on change (Enter or leaving the field), never per keystroke
+    // Enter in the field writes it, never the dialog's form submitting (which would close the dialog): the blur
+    // fires its change
+    $("#memberslist").onkeydown = (ev) => {
+      if (ev.key === "Enter" && ev.target.closest && ev.target.closest("[data-mupto]")) { ev.preventDefault(); ev.target.blur(); }
+    };
+    $("#memberslist").onchange = async (ev) => {
+      const f = ev.target.closest && ev.target.closest("[data-mupto]"); if (!f || f.disabled) return;
+      const line = f.dataset.mupto, n = Number(f.value);
+      if (f.value === "" || !Number.isInteger(n) || n < 0) { say("an up to is a whole number of sessions, 0 or more"); return load(); }
+      const all = [v.manager, v.techlead, ...(v.seats || [])].filter(Boolean).map((h) => [h.name, h.up_to]).concat(v.members.map((e) => [e.name || e.role, e.up_to]));
+      const u = (all.find(([k]) => k === line) || [])[1];
+      const ask = AO.membersMaxConfirm(line, u, n, team, v.live);
+      if (ask && !confirm(ask)) return load();
+      const r = await fetch(`/api/teams/${encodeURIComponent(team)}/members`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "max", line, n }) });
+      const got = await r.json();
+      if (!r.ok) { say(got.detail || "refused"); return load(); }
+      say(""); AO.toast(got.text, true); return load();
+    };
     $("#memberslist").onclick = async (ev) => {
       const z = ev.target.closest("[data-msize]");
       if (z) {
