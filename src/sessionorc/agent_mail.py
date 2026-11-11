@@ -509,7 +509,7 @@ class MailMixin:
         lead = min(
             leads,
             key=lambda r: (
-                seat_able(r, now, self.unfillable) is not None,
+                not seat_able(r, now, self.unfillable),
                 pool_rank(r.seat),
                 rank.get(r.state, 0),
                 r.name,

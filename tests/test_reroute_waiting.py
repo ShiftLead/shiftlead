@@ -192,3 +192,27 @@ async def test_an_entry_request_found_on_a_fact_check_seat_moves_to_the_techlead
         await _move(agent)
         assert next(e for e in agent.sessions[tl].inbox if e.id == m.id).open, "it waits on the techlead seat"
         assert not any(e.root == got["entry"]["root"] for e in agent.person_inbox)
+
+
+async def test_an_entry_moved_off_a_fact_check_seat_takes_the_able_techlead_seat_first(agent, tmp_path):
+    """TD-1565, the techlead's read of #3263: with two techlead seats in the team, the first unable and the second
+    able, the entry lands on the able one, whatever the name order."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        tl, rv, w = await _team(agent, tmp_path, person)
+        d = tmp_path / "tl2"
+        d.mkdir()
+        tl2 = (
+            await person.call(
+                "create", name="tl2", dir=str(d), adapter="agentshell", argv=["bash", "--norc"], unattended=True,
+                team="beta", seat={"trigger": "asks", "tags": True},
+            )
+        )["id"]  # fmt: skip
+        async with LocalClient(caller=w) as c:
+            got = await c.call("msg", to=rv, text="file: the feed parser drops rows", kind="ask")
+        mid = got["entry"]["id"]
+        agent._mark(mid, entry={"repo": "beta", "type": "debt", "team": "beta", "picked": False}, bound=None)
+        _limited(agent, tl)  # "tl" sorts before "tl2": the able order must win over the name
+        await _move(agent)
+        assert any(e.root == got["entry"]["root"] and e.id != mid for e in agent.sessions[tl2].inbox)
+        assert not any(e.root == got["entry"]["root"] and e.id != mid for e in agent.sessions[tl].inbox)
