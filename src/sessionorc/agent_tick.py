@@ -362,6 +362,7 @@ class TickMixin:
         await self._work_worked(snapshot_at)  # before any replay this tick supersedes a claim (TD-1462)
         await self._keep_running(snapshot_at)
         await self._finished_pass(snapshot_at)
+        await self._scale_pass(snapshot_at)  # rule 14 up, after rule 9's reading of who winds down (TD-1546)
         await self._schedules(snapshot_at)
         await self._work_marks(snapshot_at)
         await self._sweep_mail(snapshot_at)
