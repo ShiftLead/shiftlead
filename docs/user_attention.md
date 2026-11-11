@@ -27,7 +27,7 @@ People: paul
   - **Context:** TD-1300 is a live check of the phone Focus (TD-003): only your phone shows it. You were asked in the look m-47ff5ed1cf57 (2026-11-02); this item carries it on the board (TD-1584).
   - **Question:** On your phone, does the key bar answer a Claude Code menu by digit and by the drag pad?
   - **Recommended:** Works if it does; Not right and a grinder files what is wrong.
-- [ ] decide 2026-11-11 (n/a) — Open Focus from your phone's home screen: does the one screen (strip, Watching line, input bar, ⋯ sheet) work? Context: TD-1299 decision (paul). Due: 2026-11-18. Answers: Works | Not right. Lifts: Works | Not right.
+- [x] decide 2026-11-11 (n/a) — Open Focus from your phone's home screen: does the one screen (strip, Watching line, input bar, ⋯ sheet) work? Context: TD-1299 decision (paul). Due: 2026-11-18. Answers: Works | Not right. Lifts: Works | Not right. Decided: Works (by paul) (2026-11-11). Closed: 2026-11-11 — lifted.
   - **Context:** TD-1299 is a live check of the phone Focus (TD-003): only your phone shows it. You were asked in the look m-47ff5ed1cf57 (2026-11-02); this item carries it on the board (TD-1584).
   - **Question:** Open Focus from your phone's home screen: does the one screen (strip, Watching line, input bar, ⋯ sheet) work?
   - **Recommended:** Works if it does; Not right and a grinder files what is wrong.
