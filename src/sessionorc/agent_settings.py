@@ -331,6 +331,7 @@ class SettingsMixin:
         self,
         profile: str = "",
         reserves: dict[str, Any] | None = None,
+        account: str | None = None,
         teams: dict[str, Any] | None = None,
         repos: dict[str, Any] | None = None,
         person: dict[str, Any] | None = None,
@@ -352,7 +353,12 @@ class SettingsMixin:
         - `profile` + `reserves`: a window label to a flat percent, to `{per_day: N}`, or to None,
           which clears that window's reserve. A label the profile's adapter does not report is
           refused, with the reported ones named — except before the profile has any reading, when
-          nothing can be checked and the reply says `unchecked`.
+          nothing can be checked and the reply says `unchecked`. The reserve is the profile's account's
+          (§6 *A reserve is the account's*, TD-1581): it writes `usage_gate.<adapter>:<account>`, and the
+          reply names the account and its profiles.
+        - `account` + `reserves`: the same, the account's usage key named (`<adapter>:<account>`), for an
+          account a node alone names, or one set before its first profile; one this home has not seen —
+          no profile here names it, no node has reported under it — is refused.
         - `teams`: `{team: {schedule?, until?, reserve?, balance?, on_work?, flow?, size?} | None}` — a field set to
           None is cleared, a team set to None removed. The team's name is the client's to check
           against the org's definitions; the agent takes the key. A stop time already past is refused, as `ao until`'s.
@@ -386,7 +392,7 @@ class SettingsMixin:
         before_teams = settings_mod.teams(doc)
         out: dict[str, Any] = {}
         if reserves is not None:
-            out.update(self._reserves_change(doc, str(profile or ""), reserves))
+            out.update(self._reserves_change(doc, str(profile or ""), reserves, account))
         now = datetime.now(UTC)
         for key, value, parse, known in (
             ("teams", teams, settings_mod.parse_team, settings_mod.TEAM_KEYS),
@@ -617,31 +623,70 @@ class SettingsMixin:
             log.exception("committing the home's definitions failed")
             return False
 
-    def _reserves_change(self, doc: dict[str, Any], prof: str, reserves: Any) -> dict[str, Any]:
-        """`set_settings`'s usage-gate half, laid onto `doc` in place (the caller writes the file)."""
+    def _reserves_change(self, doc: dict[str, Any], prof: str, reserves: Any, account: Any = None) -> dict[str, Any]:
+        """`set_settings`'s usage-gate half, laid onto `doc` in place (the caller writes the file): the
+        reserves of `account`, or of the account `prof` runs under (§6 *A reserve is the account's*,
+        TD-1581). Its billing, prices and labels are its profiles' (`_account_on`), one billing (§4.2a);
+        an account whose profiles disagree, or whose name holds a `:` (*Names*), is refused."""
         if not isinstance(reserves, dict) or not reserves:
             raise RpcError("set_settings needs reserves: {label: percent | {per_day: N} | null}")
-        key = self._account_key(prof)
-        if key is None:
+        if account is not None:
+            if prof:
+                raise RpcError("set_settings takes a profile or an account for its reserves, not both")
+            key = str(account).strip()
+            if not settings_mod.account_key(key) or not all(key.split(":", 1)):
+                raise RpcError(
+                    f"account {key!r} is not a usage key: <adapter>:<account>, as `ao gate` names it "
+                    "(design §6 Usage gate)"
+                )
+            who = f"account {key}"
+        else:
+            key = self._account_key(prof)
+            if key is None:
+                raise RpcError(
+                    f"profile {prof or '(default)'} is named by no adapter here and runs no session, so its "
+                    "account is not known: a reserve is the account's (design §6 Usage gate)"
+                )
+            who = f"profile {prof or '(default)'}"
+        if ":" in key.split(":", 1)[1]:
             raise RpcError(
-                f"profile {prof or '(default)'} is named by no adapter here and runs no session, so its account "
-                "is not known: a reserve is the account's (design §6 Usage gate)"
+                f"{who}: the account part of {key} holds a ':', so its key does not split into adapter and "
+                "account: rename the account in profiles.yml (its `account`, else the profile's name; a '.' is "
+                "allowed) (design §6 Usage gate, Names)"
             )
-        billing = self._billing_of(prof)
-        if billing is not None:
-            return self._amounts_change(doc, prof, key, reserves, billing.get("prices") or {})
-        windows = (self._usage.get(prof) or {}).get("windows")
+        on = self._account_on(key)
+        if account is None and prof not in on and (prof or not on):  # "" is the default, listed by its name
+            on[prof] = "metered" if self._billing_of(prof) is not None else "subscription"
+        if len(set(on.values())) > 1:
+            each = ", ".join(f"{p or '(default)'} {b}" for p, b in sorted(on.items()))
+            raise RpcError(
+                f"{key}'s profiles disagree on billing ({each}): an account has one billing, so its reserve is "
+                "refused until profiles.yml agrees (design §4.2a, §6 Usage gate)"
+            )
+        if not on and key not in self._usage_acct:
+            raise RpcError(
+                f"account {key} is one this home has not seen: no profile here names it and no node has "
+                "reported under it (design §6 Usage gate)"
+            )
+        names = sorted(on)
+        if set(on.values()) == {"metered"}:
+            bills = [b for p in ([prof] if account is None else names) if (b := self._billing_of(p)) is not None]
+            prices = next((b.get("prices") for b in bills if b.get("prices")), None) or {}
+            out = self._amounts_change(doc, prof if account is None else (names or [""])[0], key, reserves, prices, who)
+            return out | {"profiles": names}
+        reading = self._usage_acct.get(key) or next((self._usage[p] for p in [prof, *names] if p in self._usage), {})
+        windows = reading.get("windows")
         reported = [str(w.get("label")) for w in windows or []]
         if windows is not None and (unknown := sorted(set(map(str, reserves)) - set(reported))):
             raise RpcError(
-                f"profile {prof or '(default)'} reports no window {', '.join(unknown)}: "
-                f"its windows are {', '.join(reported) or 'none'} (design §4.7)"
+                f"{who} reports no window {', '.join(unknown)}: its windows are {', '.join(reported) or 'none'} "
+                "(design §4.7)"
             )
         parsed: dict[str, Any] = {}
         for label, value in reserves.items():
             if isinstance(value, str):
                 raise RpcError(
-                    f"{label}: profile {prof or '(default)'} is billed by subscription, so its reserve is a percent "
+                    f"{label}: {who} is billed by subscription, so its reserve is a percent "
                     f"(30, 10/day), not an amount like {value!r} (design §6 Usage gate)"
                 )
             try:
@@ -650,26 +695,59 @@ class SettingsMixin:
                 raise RpcError(f"{label}: {e}") from None
         self._lay_gate(doc, key, parsed)
         mine = (doc["usage_gate"] or {}).get(key) or {}
-        log.info("usage gate for account %s (profile %s) set to %s", key, prof or "(default)", mine or "no reserves")
+        log.info("usage gate for account %s (%s) set to %s", key, who, mine or "no reserves")
         return {
             "profile": prof,
             "account": key,
+            "profiles": names,
             "reserves": mine,
             "windows": settings_mod.lines(mine, windows, datetime.now(UTC)),
             "unchecked": windows is None,
         }
 
+    def _account_on(self, key: str) -> dict[str, str]:
+        """The profiles on the account `key`, each to its billing (§6 *The profiles on an account*): those
+        its adapter's `profiles()` lists on it, those a record here or on a node runs under that resolve to
+        it, and those a node's usage or spend call named under it (a node's spend is metered)."""
+        out: dict[str, str] = {}
+        name, account = key.split(":", 1)
+        if adapters.has_agent(name):
+            try:
+                listed = getattr(adapters.get(name), "profiles", None)
+                for p in (listed() if listed else None) or ():
+                    if isinstance(p, dict) and str(p.get("account") or p.get("name")) == account:
+                        out[str(p.get("name"))] = str(p.get("billing") or "subscription")
+            except Exception as e:  # noqa: BLE001 — an adapter's list never stops the write
+                log.warning("profiles() on %s failed: %s", name, e)
+        records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
+        for prof in sorted({r.profile for r in records if adapters.has_agent(r.adapter)} - set(out)):
+            if self._account_key(prof) == key:
+                out[prof] = "metered" if self._is_metered(prof) else "subscription"
+        for accts in self._spend_named.values():
+            for prof in accts.get(key) or ():
+                out.setdefault(prof, "metered")
+        for (_node, prof), k in self._usage_remote_keys.items():
+            if k == key:
+                out.setdefault(prof, "subscription")
+        return out
+
     def _amounts_change(
-        self, doc: dict[str, Any], prof: str, key: str, reserves: dict[str, Any], prices: dict[str, Any]
+        self,
+        doc: dict[str, Any],
+        prof: str,
+        key: str,
+        reserves: dict[str, Any],
+        prices: dict[str, Any],
+        who: str = "",
     ) -> dict[str, Any]:
         """A metered profile's half (§6 *Usage gate*, TD-151 slice 5): an amount per window of the
         home's three — `$5` where the profile has prices, `2M tok` either way — or None to clear it;
         a percent refused by naming the billing, as is money on a profile with no prices, which would
         make no line."""
-        who = prof or "(default)"
+        who = who or f"profile {prof or '(default)'}"
         if unknown := sorted(set(map(str, reserves)) - set(spend_mod.LABELS)):
             raise RpcError(
-                f"profile {who} is metered: its windows are {', '.join(spend_mod.LABELS)}, "
+                f"{who} is metered: its windows are {', '.join(spend_mod.LABELS)}, "
                 f"not {', '.join(unknown)} (design §4.2a)"
             )
         parsed: dict[str, Any] = {}
@@ -679,7 +757,7 @@ class SettingsMixin:
                 continue
             if not isinstance(value, str):
                 raise RpcError(
-                    f"{label}: profile {who} is metered, so its reserve is an amount ($5, 20M tok), "
+                    f"{label}: {who} is metered, so its reserve is an amount ($5, 20M tok), "
                     f"not a percent like {value!r} (design §6 Usage gate)"
                 )
             try:
@@ -688,13 +766,13 @@ class SettingsMixin:
                 raise RpcError(f"{label}: {e}") from None
             if amount["unit"] == "$" and not prices:
                 raise RpcError(
-                    f"{label}: profile {who} declares no prices, so its spend is tokens: an amount like 20M tok, "
+                    f"{label}: {who} declares no prices, so its spend is tokens: an amount like 20M tok, "
                     f"not {value!r} (design §4.2a)"
                 )
             parsed[str(label)] = value.strip()
         self._lay_gate(doc, key, parsed)
         mine = (doc["usage_gate"] or {}).get(key) or {}
-        log.info("usage gate for metered account %s (profile %s) set to %s", key, who, mine or "no amounts")
+        log.info("usage gate for metered account %s (%s) set to %s", key, who, mine or "no amounts")
         return {
             "profile": prof,
             "account": key,
