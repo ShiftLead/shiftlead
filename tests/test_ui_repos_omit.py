@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -186,7 +187,9 @@ def test_a_page_draws_from_the_omitted_reading_what_it_drew_from_the_whole_one(t
         r = c.get(path)
         assert r.status_code == 200
         pages.append(r.text)
-    assert pages[0] == pages[1]
+    # the two renders are a moment apart: an age in seconds (*read 0s ago*) may cross a second between them
+    first, second = (re.sub(r"\b\d+s ago", "Ns ago", p) for p in pages)
+    assert first == second
     # the page drew the parts of the reading an omit could have cost it
     drawn = {
         "/": "#7 merged",
