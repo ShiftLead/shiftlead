@@ -47,7 +47,7 @@ spend:                                        # §4.4 *Spend per seat* (TD-818):
             claude-opus-4: {input: 5, output: 25, cache_read: 0.5, cache_write: 10},
             claude-sonnet-4: {input: 3, output: 15, cache_read: 0.3, cache_write: 6},
             claude-haiku-4: {input: 1, output: 5, cache_read: 0.1, cache_write: 2}}   # $ per million tokens per kind, by model prefix (longest wins); a model none matches is drawn unweighed
-usage: {max_age: 1h}                          # §6 *A reading the gate can no longer trust* (read by the gate, set by set_settings, ao gate --max-age and the Settings page's field): past it the gate projects; `off` never. A key of its own: every key under usage_gate is a profile's name
+usage: {max_age: 1h}                          # §6 *A reading the gate can no longer trust* (read by the gate, set by set_settings, ao gate --max-age and the Settings page's field): past it the gate projects; `off` never. A key of its own: every key under usage_gate is an account's usage key, `<adapter>:<account>`
 teams:                                        # per team, by the name org.yml or a repo's teams: defines
   ao-grind:
     schedule: {start: reset, profile: grind, window: week}   # §6 *Schedule* (TD-133)

@@ -2743,8 +2743,8 @@ teams:
   amount the home files one `system` note to the person inbox — *grind-api · day $4.10 of $5* — an
   FYI, uncounted, once per window; the fraction is fixed, not a setting. A metered profile with no
   reserve has no line and pauses nothing, as a subscription window without one does; the chip
-  still shows its spend. Two profiles on one key with different amounts pause at different spends
-  of the same bill, as two profiles on one login keep different lines against one number.
+  still shows its spend. Every profile on one account pauses at the same spend of the same bill, the amount
+  being the account's as its reserve is (*A reserve is the account's*, TD-1581).
   **Credential lapse** (Not built — phase 3): adapter `credentials_ok()` false → don't start;
   running workers get a send when fresh credentials land (tdgrind's `.nudged` marker). **Stall**
   (Not built — phase 3): `working` with no output past `stall_after` → flag `stalled?`, send one
