@@ -87,3 +87,33 @@ async def test_a_resume_of_an_extra_keeps_its_scale(agent, hookstub, tmp_path):
         given = await person.call("get", id=new["id"])
         assert given["scale"] == EXTRA
         await person.call("kill", id=new["id"])
+
+
+class _Node:
+    """A node's link that takes a Resume's create and answers with the replica it made: the node's own
+    `rpc_create` carried the extra's `scale` from the record it replaced, though the params name none."""
+
+    def __init__(self, record: dict):
+        self.record, self.acts = record, []
+
+    async def request(self, method, timeout=None, **params):
+        self.acts.append((params["rpc"], params["params"]))
+        return {"record": self.record}
+
+
+async def test_a_nodes_replica_of_a_resumed_extra_keeps_its_scale_in_the_homes_launch_record(agent):
+    """TD-1586: the home writes a node session's launch record (§6), from the params and what the node
+    made of them; a Resume names no `scale`, so the replica's carried mark goes in, or a replay would
+    bring the extra back a plain member (#3281, design §4.9 *An extra*)."""
+    from test_link import record
+
+    await park_ticks(agent)
+    agent._link_muxes["laptop"] = node = _Node(record(name="g-4", supervised=True, unattended=True, scale=EXTRA))
+    try:
+        await agent._route_act("create", {"name": "g-4", "dir": "/tmp/x", "resume": "cc-extra"}, None, "laptop")
+        assert "scale" not in node.acts[-1][1], "the Resume sent no scale: the node carried it"
+        assert agent.remote["laptop"]["ao-x-w"].scale == EXTRA
+        made = json.loads((paths.launch_dir() / "ao-x-w@laptop.json").read_text())
+        assert made["scale"] == EXTRA, "the launch record carries the replica's scale"
+    finally:
+        del agent._link_muxes["laptop"]
