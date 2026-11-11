@@ -37,7 +37,7 @@ def wound_down(sessions: list[dict[str, Any]], seats: Collection[str] = ()) -> s
     seen = [
         d if isinstance(d := s.get("out_of_work"), dict) else {}
         for s in sessions
-        if s.get("name") not in seats and not closed_finished(s) and not sat_out(s)
+        if s.get("name") not in seats and not closed_finished(s) and not sat_out(s) and not held_extra(s)
     ]
     if not seen or not all(d.get("at") for d in seen):
         return None
@@ -61,6 +61,13 @@ def sat_out(record: Any) -> bool:
     return isinstance(mark, Mapping) and mark.get("why") in ("sit_out", "run_ended")
 
 
+def held_extra(record: Any) -> bool:
+    """Whether a record is an extra not live (design §4.9 *Scaling with the work*, td-max, TD-1545): it
+    carries `scale` and is closed or exited — held, an extra's one non-live state. The wound-down and finished
+    readings pass over it as over a seat; a live extra of a worker line counts as a member."""
+    return bool(_f(record, "scale")) and _f(record, "state") in DEAD
+
+
 def crew(records: Iterable[Session]) -> list[Session]:
     """A team's own records: its unattended ones (§4.9 *A person in the team*) — a person's session
     in the team keeps nothing live and never winds it down. Every record the home holds, as the card
@@ -75,7 +82,10 @@ def team_wound_down(records: Iterable[Session]) -> str | None:
     if any(r.state not in DEAD for r in mine):
         return None
     seats = {r.name for r in mine if r.seat is not None}
-    said = [{"name": r.name, "out_of_work": r.out_of_work, "closed_for": r.closed_for} for r in mine]
+    said = [
+        {"name": r.name, "out_of_work": r.out_of_work, "closed_for": r.closed_for, "scale": r.scale, "state": r.state}
+        for r in mine
+    ]
     return wound_down(said, seats)
 
 
@@ -156,6 +166,7 @@ def finished_alone(records: Iterable[Session]) -> list[Session]:
         r
         for r in mine
         if r.seat is None
+        and r.scale is None  # an extra is filled by rules 3 and 14, never replayed by rule 8 (§4.9 td-max)
         and not (r.state == "exited" and r.pane is False)
         and r is not manager
         and r.state in DEAD
@@ -343,8 +354,8 @@ def finished(
     restart = False
     why: list[str] = []
     for r in mine:
-        if sat_out(r):
-            continue  # the flow sat it out (§4.9c): passed over whatever it declared
+        if sat_out(r) or held_extra(r):
+            continue  # the flow sat it out (§4.9c), or an extra held (§4.9 td-max): passed over whatever it declared
         name, state = str(_f(r, "name") or _f(r, "id")), str(_f(r, "state"))
         live = state not in DEAD
         # an idle record whose own subagent runs is working on its own, not idle (§4.2, TD-734)

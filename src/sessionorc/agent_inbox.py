@@ -1307,7 +1307,8 @@ class InboxMixin:
                     self._lapse_or_expire(e, stamp)
                 elif e.kind == "steer":
                     continue  # the sender goes on: nothing the addressee does closes it early
-                elif r.state == "closed" and r.seat is None:
+                elif r.state == "closed" and r.seat is None and r.scale is None:
+                    # a held extra is an empty seat as a seat is (§4.9 *Scaling with the work*): its mail waits
                     self._close_entry(e.id, "expired", stamp)
                 elif r.state in ("exited", "closed") and r.id not in e.pending:
                     # a closed seat is an empty one (§6 rule 3): its question waits for the fill as
