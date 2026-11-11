@@ -24,6 +24,7 @@ import shutil
 import stat
 import sys
 import uuid
+from collections.abc import Mapping
 from pathlib import Path
 
 from sessionorc import identity, paths
@@ -403,6 +404,14 @@ class GeminiAdapter:
         return out
 
     # -- account ---------------------------------------------------------------------------------
+
+    def default_home(self, env: Mapping[str, str]) -> Path:
+        """The home a launch uses for a profile naming no `config_dir` (design §4.3's Protocol block, TD-1648):
+        `$GEMINI_CLI_HOME`, else `~`, the parent of `.gemini/` — the variable read from `env` and ignored where
+        `env` holds `SHIFTLEAD_SESSION`, a session's being its own launch's. What the walk and the seat smoke
+        refuse."""
+        own = None if "SHIFTLEAD_SESSION" in env else env.get("GEMINI_CLI_HOME")
+        return Path(own or "~").expanduser()
 
     def credentials_ok(self, profile: Profile) -> bool | None:
         """Whether the home can start without the auth picker (design §4.3): its `settings.json` names

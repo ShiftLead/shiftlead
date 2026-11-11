@@ -85,10 +85,66 @@ def test_a_config_dir_shared_or_the_tools_default_is_refused(tmp_path, monkeypat
         f"  a: {{config_dir: {tmp_path / 'x'}}}\n"
         f"  b: {{config_dir: {tmp_path / 'x'}}}\n",
     )
-    with pytest.raises(cw.Refused, match="the tool's default home"):
+    with pytest.raises(cw.Refused, match="a tool's default home"):
         cw.scratch_profile("claude-code", "mine", live)
     with pytest.raises(cw.Refused, match="shares it with b"):
         cw.scratch_profile("claude-code", "a", live)
+
+
+def test_the_refused_homes_are_every_agent_adapters_default_in_and_out_of_the_environment(tmp_path):
+    """`default_home(env)` and `default_home({})` for every agent adapter (TD-1648): Claude Code's `~/.claude`
+    stays refused when `$CLAUDE_CONFIG_DIR` points elsewhere, and Gemini CLI's `~` is refused beside it."""
+    cw = _load()
+    elsewhere = tmp_path / "cc"
+    got = cw.refused_homes({"CLAUDE_CONFIG_DIR": str(elsewhere)})
+    assert elsewhere.resolve() in got
+    assert Path("~/.claude").expanduser().resolve() in got and Path("~").expanduser().resolve() in got
+    # inside a session the variable is the session's own launch's: only the unset-variable defaults are refused
+    inside = cw.refused_homes({"CLAUDE_CONFIG_DIR": str(elsewhere), "SHIFTLEAD_SESSION": "ao-x-y"})
+    assert elsewhere.resolve() not in inside and Path("~/.claude").expanduser().resolve() in inside
+
+
+def test_a_gemini_profile_on_the_tools_own_home_is_refused(tmp_path):
+    cw = _load()
+    live = _profiles(tmp_path, "profiles:\n  g: {adapter: gemini, account: g, config_dir: '~'}\n")
+    for smoke in (False, True):
+        with pytest.raises(cw.Refused, match="a tool's default home"):
+            cw.scratch_profile("gemini", "g", live, env={}, smoke=smoke)
+
+
+def test_the_seat_smoke_keeps_the_profiles_own_prompts_and_takes_a_shared_home(tmp_path):
+    """The smoke differs from the walk: the profile's own `permission_prompts` (a seat's `skip`), and a
+    `config_dir` shared with other profiles is not refused, since a seat runs in the home its profile names."""
+    cw = _load()
+    live = _profiles(
+        tmp_path,
+        "profiles:\n"
+        f"  a: {{adapter: gemini, account: g, config_dir: {tmp_path / 'x'}, permission_prompts: skip}}\n"
+        f"  b: {{adapter: gemini, account: g, config_dir: {tmp_path / 'x'}}}\n",
+    )
+    got = cw.scratch_profile("gemini", "a", live, env={}, smoke=True)
+    assert got["permission_prompts"] == "skip" and got["config_dir"] == str(tmp_path / "x")
+    assert "permission_prompts" not in cw.scratch_profile("gemini", "b", live, env={}, smoke=True)
+    with pytest.raises(cw.Refused, match="shares it with b"):
+        cw.scratch_profile("gemini", "a", live, env={})
+
+
+def test_the_smokes_options_are_refused_on_the_walk_and_capture_on_the_smoke(monkeypatch, capsys):
+    cw = _load()
+    monkeypatch.delenv("CI", raising=False)
+    assert cw.main(["claude-code", "--profile", "p", "--brief", "x.md"]) == 2
+    assert cw.main(["claude-code", "--profile", "p", "--smoke", "--capture"]) == 2
+    monkeypatch.setenv("CI", "1")
+    assert cw.main(["claude-code", "--profile", "p", "--smoke"]) == 2  # never in CI
+    err = capsys.readouterr().err
+    assert "the seat smoke's" in err and "--capture is the walk's" in err and "CI is set" in err
+
+
+def test_the_smokes_last_line_names_the_step_and_the_version():
+    cw = _load()
+    assert cw.smoke_line(True, "", "", "0.66.0") == "seat smoke: passed · 0.66.0"
+    line = cw.smoke_line(False, "needs-you", "permission:\n  Allow   --reply-to?", "0.66.0")
+    assert line == "seat smoke: failed — needs-you: permission: Allow --reply-to? · 0.66.0"
 
 
 def test_the_agent_env_names_the_capture_and_no_tool_home(tmp_path):
