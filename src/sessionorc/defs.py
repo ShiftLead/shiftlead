@@ -46,6 +46,21 @@ def is_tree(home: Path | None = None) -> bool:
     return ((home or paths.home()) / ".git").exists()
 
 
+def clean(path: Path) -> bool:
+    """Whether the file `path` in the home's tree is tracked and no different from HEAD (§6 *A reserve is
+    the account's*, TD-1581: the migration moves a reserve only once the file as it stood is committed,
+    HEAD being its restore point). A pure read, blocking: the tick runs it in a thread. False for an
+    untracked or modified file, and for a home that is no tree."""
+    home = path.parent
+    if not is_tree(home):
+        return False
+    try:
+        tracked = _git(home, "ls-files", "--error-unmatch", "--", path.name)
+        return tracked.returncode == 0 and _git(home, "diff", "--quiet", "HEAD", "--", path.name).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def init(home: Path | None = None) -> bool:
     """Make the home a work tree that tracks the three files (`ao service install`, at the home and
     never on a node), and commit what it holds as the first entry. False when it already is one."""

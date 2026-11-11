@@ -84,6 +84,24 @@ def test_a_half_written_file_waits_until_it_parses(tmp_path):
     assert "org.yml" not in _tracked(home)
 
 
+def test_clean_reads_an_untracked_or_modified_settings_file_as_dirty(tmp_path):
+    """TD-1609, §6 *A reserve is the account's*: the migration moves a reserve only once `settings.yml` is
+    tracked and no different from HEAD, its restore point."""
+    home = tmp_path / "home"
+    home.mkdir()
+    s = home / "settings.yml"
+    assert defs.clean(s) is False, "no tree"
+    (home / "org.yml").write_text("teams: {}\n")
+    defs.init(home)
+    s.write_text("usage_gate: {grind: {week: 5}}\n")
+    assert defs.clean(s) is False, "untracked"
+    assert defs.commit("edited by hand", home=home) is True
+    assert defs.clean(s) is True
+    s.write_text("usage_gate: {grind: {week: 6}}\n")
+    assert defs.clean(s) is False, "modified"
+    assert defs.commit("edited by hand", home=home) is True and defs.clean(s) is True
+
+
 def test_a_home_that_is_no_work_tree_commits_nothing(tmp_path):
     (tmp_path / "settings.yml").write_text("a: 1\n")
     assert defs.commit("settings: a 1 → 2", home=tmp_path) is False

@@ -138,7 +138,12 @@ class Adapter(Protocol):
     #   account_for(profile: str) -> str | None           the account the profile runs under (§4.2a, TD-122):
     #                                                      usage is polled, cached and backed off once per
     #                                                      `(adapter, account)`; None, or no method, keys on
-    #                                                      the profile itself
+    #                                                      the profile itself; it answers only for a profile
+    #                                                      naming this adapter (TD-1581)
+    #   profiles() -> list[dict]                          optional (TD-1581): the profiles naming this adapter,
+    #                                                      each {name, account, billing}, from profiles.yml —
+    #                                                      how the core knows an account's profiles (§6 *A
+    #                                                      reserve is the account's*)
     #   usage_for(profile: str) -> dict | None            {"windows": [{"label", "pct", "resets"}, ...],
     #                                                      "fetched", "reason": "ok"} — every quota window this
     #                                                      account has, the labels the adapter's and printed by

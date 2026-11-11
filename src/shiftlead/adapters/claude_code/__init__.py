@@ -981,12 +981,13 @@ class ClaudeCodeAdapter:
     def account_for(self, profile: str) -> str | None:
         """The account a profile runs under (§4.2a, TD-122): the core polls usage once per
         account, since one login has one quota however many profiles share it. A profile that
-        names no account is its own; an unknown profile says nothing."""
-        try:
-            prof = profiles_mod.get(profile or None)
-        except (KeyError, ValueError):
-            return None
-        return prof.account or prof.name
+        names no account is its own; an unknown profile, or one naming another adapter, says nothing
+        (TD-1581: only the adapter a profile names answers for it)."""
+        return profiles_mod.account_of(profile, self.name)
+
+    def profiles(self) -> list[dict]:
+        """The profiles naming this adapter, each `{name, account, billing}` (§4.3, TD-1581)."""
+        return profiles_mod.for_adapter(self.name)
 
     def spend(self, profile: str, cursors: dict[str, int] | None = None) -> dict:
         """Spend per turn for any profile (design §4.3 *Spend per turn*, TD-151 slice 2; a subscription's

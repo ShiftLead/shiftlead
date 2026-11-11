@@ -158,6 +158,32 @@ def load(path: Path | None = None) -> tuple[dict[str, Profile], str]:
     return out, default
 
 
+def account_of(name: str | None, adapter: str, path: Path | None = None) -> str | None:
+    """The account the profile `name` runs under (§4.2a, TD-122) — its `account`, else its name — asked
+    of `adapter`, which answers only for a profile naming it (§6 *A reserve is the account's*, TD-1581):
+    None for a profile of another adapter, an unknown one, or an unreadable file. `""` or None is the
+    default profile."""
+    try:
+        prof = get(name or None, path)
+    except (KeyError, ValueError, OSError, yaml.YAMLError):
+        return None
+    return (prof.account or prof.name) if prof.adapter == adapter else None
+
+
+def for_adapter(adapter: str, path: Path | None = None) -> list[dict[str, str]]:
+    """The profiles naming `adapter`, each `{name, account, billing}` (§4.3 `profiles()`, TD-1581): how
+    the core, which reads no profile list, knows an account's profiles. An unreadable file lists none."""
+    try:
+        profiles, _ = load(path)
+    except (ValueError, OSError, yaml.YAMLError):
+        return []
+    return [
+        {"name": p.name, "account": p.account or p.name, "billing": p.billing}
+        for p in profiles.values()
+        if p.adapter == adapter
+    ]
+
+
 def get(name: str | None, path: Path | None = None) -> Profile:
     profiles, default = load(path)
     key = name or default

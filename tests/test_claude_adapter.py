@@ -399,6 +399,23 @@ def test_launch_argv_and_env(tmp_path, monkeypatch):
         ad.launch(profile="nope", resume=None, prompt=None, unattended=False, cwd=tmp_path)
     # the account a profile runs under, for the once-per-account usage poll (§4.2a, TD-122)
     assert (ad.account_for("grind"), ad.account_for(""), ad.account_for("nope")) == ("grind", "paul", None)
+    # only the adapter a profile names answers for it, and `profiles()` lists its own (TD-1581, TD-1609)
+    with (tmp_path / "home" / "profiles.yml").open("a") as f:
+        f.write(
+            "  gem: {adapter: gemini, account: g}\n"
+            "  key: {account: paul@example.com, billing: metered, config_dir: /tmp/cc-key}\n"
+        )
+    assert (ad.account_for("gem"), ad.account_for("key")) == (None, "paul@example.com")
+    assert ad.profiles() == [
+        {"name": "paul", "account": "paul", "billing": "subscription"},
+        {"name": "grind", "account": "grind", "billing": "subscription"},
+        {"name": "key", "account": "paul@example.com", "billing": "metered"},
+    ]
+    from shiftlead.adapters.gemini import GeminiAdapter
+
+    gem = GeminiAdapter()
+    assert (gem.account_for("gem"), gem.account_for("grind"), gem.account_for("")) == ("g", None, None)
+    assert gem.profiles() == [{"name": "gem", "account": "g", "billing": "subscription"}]
     assert ad.label == "Claude"
 
 

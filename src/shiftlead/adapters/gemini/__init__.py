@@ -492,11 +492,12 @@ class GeminiAdapter:
         return [(str(MACHINE_LAYER), layer_text(hook))]
 
     def account_for(self, profile: str) -> str | None:
-        try:
-            prof = profiles_mod.get(profile or None)
-        except (KeyError, ValueError):
-            return None
-        return prof.account or prof.name
+        """The account a profile naming this adapter runs under (§4.2a); None for any other (TD-1581)."""
+        return profiles_mod.account_of(profile, NAME)
+
+    def profiles(self) -> list[dict]:
+        """The profiles naming this adapter, each `{name, account, billing}` (§4.3, TD-1581)."""
+        return profiles_mod.for_adapter(NAME)
 
     def billing_for(self, profile: str) -> dict | None:
         """How the profile is billed (design §4.2a, TD-151): `{billing, prices}` as `profiles.yml` declares
