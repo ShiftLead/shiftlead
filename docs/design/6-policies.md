@@ -1526,19 +1526,21 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        no such question) that an open `ask` or `steer` in the person inbox is about, from any sender in the
        line's repo — is not read while one is open, whatever holds it or its lanes hold. The open questions
        are `work.waiting_of` over the person inbox (open only, `about` by `reference_of`, an entry with
-       no sender skipped) with its sender keys dropped: the set of its values' `ref`s, by `normalize_ref`, of entries whose envelope
+       no sender skipped), less any the person snoozed (`snoozed_until` ahead of the tick: the *Snoozed*
+       fold counts nothing, §4.10), with its sender keys dropped: the set of its values' `ref`s, by `normalize_ref`, of entries whose envelope
        `repo` (§4.10 *An envelope carries its sender's `repo`*, TD-1467), a registry name, resolves by
        `queue.repo_roots` over the tick's repo readings to the root the line was read from (the line's
        `repo` is that root's basename, which a registry name need not be) — one with no
        `repo` (sent before the stamp, or from a record that resolves to none) mutes nothing, since entry
        numbers are each repo's own; no sender is matched, so a replayed holder, a node's address and a
-       lapsed lease change nothing. Its `stuck` entry drops (the question is on the person's card
+       lapsed lease change nothing. Its `stuck` entry drops (an `ask` is on the person's card
        already, the entry's card the stuck row would be drawn on, one need for one entry — §4.9a *Waiting
-       is read, never declared*) and its `stuck_open` entry is kept and still moved (*The clock*: a claim,
+       is read, never declared*; a running `steer`, drawn under *Steering* and uncounted, is no need, but
+       its bound ends it and its default then moves the work, however long a bound its sender chose) and its `stuck_open` entry is kept and still moved (*The clock*: a claim,
        a release), with `asked` set. That is so on purpose for any question about the entry, a design
        question on a build's parent among them, however long it stands: a narrower match would need the
-       sender or the topic. It is read again the tick none is open, that tick's instant its open time
-       (below).
+       sender or the topic. It is read again the tick none is open — answered, lapsed, withdrawn or any other close, or snoozed —
+       that tick's instant its open time (below); a snooze's end sets `asked` again.
      - **The clock.** The work's **open time** is the ask's `at`, or the first tick the home read the line
        decided (below). The home keeps a board line's moving
        parts on `host.json` as **`stuck_open`** (below; shape-checked by
@@ -1556,7 +1558,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        open and cleared on the answer's tick; a tick that is a release and an answer moves `at` once, to its instant, and clears
        both; a line first read while such a question is open is written with `asked` set and `at` that
        first tick's instant; each moves on its own tick, `applying` or not, only the draw waiting for the
-       press's re-read (`stuck_open: {<key>: {at, repo, holder?, asked?}}`);
+       press's re-read; a release or an answer in a repo not read that tick is clocked from its first good read (`stuck_open: {<key>: {at, repo, holder?, asked?}}`);
        the entry dropped when the line closes or is no longer
        decided as a reading that holds it says — a repo
        whose board reading is absent (not yet read, or its read raised), errored, or fell back to the
