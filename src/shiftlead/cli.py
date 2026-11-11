@@ -1493,6 +1493,28 @@ def _gate_read(reading: Any) -> str:
     return f" · read {age} ago ({GATE_SOURCE.get(source, source)})"
 
 
+def _account_name(key: str, profiles: Any) -> str:
+    """*claude-code:paul (grind, grind-ask)*: an account's usage key and the profiles on it (§4.7 `ao gate`)."""
+    names = [p or "(default)" for p in profiles or []]
+    return f"{key} ({', '.join(names)})" if names else key
+
+
+def _gate_account_line(key: str, v: dict[str, Any]) -> str:
+    """One account of the `gate` reply's `accounts` (§4.7 `ao gate`, TD-1610): its key, its profiles, then each
+    window's reserve and line; an account whose profiles disagree on billing says so (§4.2a)."""
+    written = {**(v.get("reserves") or {}), **(v.get("amounts") or {})}
+    rows = v.get("windows") or [{"label": k, "reserve": r, "unread": True} for k, r in written.items()]
+    line = _gate_line(
+        _account_name(key, v.get("profiles")), rows, "" if v.get("billing") == "metered" else _gate_read(v)
+    )
+    if not written:
+        line += " · no reserves"
+    if v.get("billing") == "mixed":
+        each = ", ".join(f"{p or '(default)'} {b}" for p, b in (v.get("billings") or {}).items())
+        line += f" · its profiles disagree on billing ({each}): fix profiles.yml to set a reserve"
+    return line
+
+
 def _gate_line(prof: str, windows: list[dict[str, Any]], read: str = "") -> str:
     """*grind · 5h 30 → line 70% · read 6h ago (asked) · week 10/day → line 60% (4 days left, moves
     Thu 07:00) · read 6h ago (asked)* (design §4.7). A row with `unread` set is a reserve on a
@@ -2142,10 +2164,11 @@ def cmd_repo(args: argparse.Namespace) -> int:
 
 
 def cmd_gate(args: argparse.Namespace) -> int:
-    """`ao gate` / `ao gate <profile> <label>=<reserve>…` (design §4.7, §6 *Usage gate*, TD-100):
-    print every profile's reserves and the lines they make now, or set them through `set_settings` —
-    a person's own, which the host agent refuses to a session. `-` names the unnamed default
-    profile; `label=` alone clears that window's reserve. `--max-age` sets `usage.max_age` (TD-233):
+    """`ao gate` / `ao gate <account> <label>=<reserve>…` (design §4.7, §6 *Usage gate*, TD-100, TD-1610):
+    print every account's reserves, the profiles on it and the lines they make now, or set them through
+    `set_settings {account, reserves}` — a person's own, which the host agent refuses to a session. A name
+    holding a `:` is an account's usage key, else a profile's, resolved to its account; `-` names the
+    unnamed default profile; `label=` alone clears that window's reserve. `--max-age` sets `usage.max_age` (TD-233):
     an age, `off`, or `default` to clear it back to the hour."""
     age: dict[str, Any] = {}
     if args.max_age is not None:
@@ -2155,6 +2178,15 @@ def cmd_gate(args: argparse.Namespace) -> int:
             return emit(args, set_age, lambda: print(_max_age_said(set_age["usage"]["max_age"])))
     if not args.profile:
         got = call_sync("gate")
+        if isinstance(got.get("accounts"), dict):  # by account (§6 *A reserve is the account's*, TD-1610)
+
+            def by_account() -> None:
+                if not got["accounts"]:
+                    print(f"no usage gate: no accounts and no reserves in {got['file']}")
+                for key, v in got["accounts"].items():
+                    print(_gate_account_line(key, v))
+
+            return emit(args, {k: v for k, v in got.items() if k != "profiles"}, by_account)
         try:  # each reading's age (TD-233 slice 1): `gate` carries the lines, `usage` the time
             usage = call_sync("usage")
         except AgentError:
@@ -2173,7 +2205,10 @@ def cmd_gate(args: argparse.Namespace) -> int:
 
         return emit(args, got, prose)
     if not args.reserves:
-        raise AgentError("ao gate <profile> <label>=<reserve>…, e.g. ao gate grind 5h=30 week=10/day")
+        raise AgentError(
+            "ao gate <account> <label>=<reserve>…, e.g. ao gate claude-code:paul 5h=30 week=10/day "
+            "(a profile's name resolves to its account)"
+        )
     reserves: dict[str, Any] = {}
     for item in args.reserves:
         label, eq, value = item.partition("=")
@@ -2181,19 +2216,22 @@ def cmd_gate(args: argparse.Namespace) -> int:
             raise AgentError(f"{item!r}: a reserve is <label>=<reserve>, e.g. 5h=30 or week=10/day")
         reserves[label] = _reserve(value)
     prof = "" if args.profile == "-" else args.profile
+    # an account's usage key holds a `:`, a profile's name none (§6 *Names*)
+    where = {"account": prof} if ":" in prof else {"profile": prof}
     # one write with the reserves: `set_settings` checks every key before it writes any
-    got = call_sync("set_settings", profile=prof, reserves=reserves, **age)
+    got = call_sync("set_settings", reserves=reserves, **where, **age)
 
     def said() -> None:
         if "usage" in got:
             print(_max_age_said(got["usage"]["max_age"]))
+        name = _account_name(got["account"], got.get("profiles")) if got.get("account") else prof or "(default)"
         if not got["reserves"]:
-            print(f"{prof or '(default)'}: no reserves — the gate pauses nothing on this profile")
+            print(f"{name}: no reserves — the gate pauses nothing on this account")
         else:
             rows = got["windows"] or [{"label": k, "reserve": r, "unread": True} for k, r in got["reserves"].items()]
-            print(_gate_line(prof, rows))
+            print(_gate_line(name, rows))
         if got.get("unchecked"):
-            print("  (the profile has no usage reading yet, so the labels were not checked)")
+            print("  (the account has no usage reading yet, so the labels were not checked)")
 
     return emit(args, got, said)
 
@@ -2802,10 +2840,18 @@ def cmd_settings(args: argparse.Namespace) -> int:
     def prose() -> None:
         print(got["file"])
         print("usage_gate:")
-        for prof, v in (got.get("usage_gate") or {}).items():
-            rows = v["windows"] or [{"label": k, "reserve": r, "unread": True} for k, r in v["reserves"].items()]
-            print("  " + _gate_line(prof, rows))
-        if not got.get("usage_gate"):
+        lines: list[str] = []
+        if isinstance(got.get("usage_accounts"), dict):  # by account (§4.7 `ao gate`, TD-1610)
+            for key, v in got["usage_accounts"].items():
+                if v.get("reserves") or v.get("amounts"):
+                    lines.append(_gate_account_line(key, v))
+        else:
+            for prof, v in (got.get("usage_gate") or {}).items():
+                rows = v["windows"] or [{"label": k, "reserve": r, "unread": True} for k, r in v["reserves"].items()]
+                lines.append(_gate_line(prof, rows))
+        for line in lines:
+            print("  " + line)
+        if not lines:
             print("  none — the gate pauses nothing")
         print("teams:")
         here: orgmod.Org | None = None
@@ -5688,8 +5734,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--window", help="the window's label as the profile's adapter reports it: 5h, week")
     p.set_defaults(fn=cmd_schedule)
 
-    p = add("gate", help="show or set the usage gate's reserves per profile (design §6, TD-100)")
-    p.add_argument("profile", nargs="?", help="the profile; `-` for the unnamed default. None: show every profile")
+    p = add("gate", help="show or set the usage gate's reserves per account (design §6, TD-100, TD-1610)")
+    p.add_argument(
+        "profile",
+        nargs="?",
+        metavar="account",
+        help="the account (claude-code:paul), or a profile on it; `-` the unnamed default. None: every account",
+    )
     p.add_argument("reserves", nargs="*", help="<label>=<reserve>: 5h=30, week=10/day; week= clears it")
     p.add_argument(
         "--max-age",

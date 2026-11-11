@@ -156,7 +156,7 @@ def commit(message: str, *, home: Path | None = None, files: tuple[str, ...] = D
 
 
 def changes(before: object, after: object, prefix: str = "") -> list[str]:
-    """What a settings write changed, as a commit message reads it: `usage_gate.grind.week 30 → 20`,
+    """What a settings write changed, as a commit message reads it: `usage_gate.claude-code:paul.week 30 → 20`,
     a key added or removed with `none` on its missing side."""
     if before is None and isinstance(after, dict):
         before = {}  # a mapping added or removed is told leaf by leaf
