@@ -440,7 +440,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      record carries a `team`; a seat with none, the director's among them, is never held) is **held** while its
      team has **nobody of its crew live** (`work.crew`, every record `DEAD`) and **its last end was the person's
      or the stop time's**: among the team's current crew records (not superseded, not sat out, not run-only),
-     leaving out rule 3's own closes of a seat (`closer.why` `seat`, the tick closing a seat between questions),
+     leaving out a record whose end is rule 3's own close of a seat (the end `record_end` reads: no `ended`, and
+     `closer.why` `seat`, the tick closing a seat between questions),
      the newest end and those within `FINISHED_SETTLE` of it are read as rule 8 reads a stopped team's
      (`_how_stopped`: the person's Stop, Close, Kill or a Wind down left undeclared is `person`; the team's stop
      time is `until`), and the seat is held where they say `person` or `until` — one helper,
@@ -463,7 +464,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      `DEAD`) and a seat rule 8's start, or the schedule's (`_schedule_start`), replays held carrying the start's
      own closer (`{by: start, why: held}`),
      which `_how_stopped` reads as neither word — so a team with members has someone live, a team of seats
-     alone reads no word, and a held seat is filled on its standing cause on the next pass, its mail intact.
+     alone reads no word, and a held seat is filled on its standing cause on the next pass, its mail intact — a seat the person
+     killed, `exited` rather than closed, keeps its mail through the Start as a closed one does (the Start's
+     `keep_mail` asks for a held holder in either state).
      A team stopped by its stop time is not started again by its schedule (`_schedule_start` starts only a team
      that reads wound down), so its seats hold until the person's Start, while one that wound down by its stop
      time is started by the schedule at a reset, which lifts the hold; a wound-down team is started by rule 8 for lane news
@@ -1033,7 +1036,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      stop time · n questions wait on <seat name>*, *n* the total and the seats joined by *and* where several
      are held), never again for a rising count or a second seat. A held-only mark never starts the team, under
      any `on_work` — neither the tick's start nor the row's Start through `work_start` with no lane ids, which
-     answers `started: false` — and under `start` its row ends *· not started: questions alone start no team*.
+     answers `started: false` before it refuses a stopped mark and before it takes the mark away — and under `start` its row ends *· not started: questions alone start no team*.
      **Dismiss** clears a row's entries and leaves its held part, which no press but the Start, or the
      questions closing, takes away (`clear_work` on a held-only mark answers `cleared: false` and leaves it) —
      the questions still wait, so a dismissed count would only come back on the next tick; a held-only row
