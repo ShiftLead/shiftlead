@@ -1452,7 +1452,15 @@ block. A policy is agent code and needs no grant; a session doing the same work 
          stopped, is read whole, by its `work_waiting` (rule 8) — one whose members ended otherwise (a
          crash, a restart ceiling) keeps each member's own state as its reason, the cure's name — where two teams' lanes
          take it, each team's, the reason the first's in `teams` order. A line no team's lane takes reads
-         *no lane takes it* once past the wait. A claimant is its only actor once one holds it. Wait:
+         *no lane takes it* once past the wait. A **holder** is its only actor while one holds it: a record
+         holding a lease on `board:<key>` as the lanes read one (§4.8 *A claim is a lease*, `_leased`: a
+         declared `claimed` entry on that ref, the record not `exited`, `closed` or `scheduled`, its `at` inside
+         `LEASE_TTL`), whatever its kind, a seat among them; a claim that is no lease (a drop, a `done`, the
+         holder's exit, a restart whose next run has not taken it up, a lapsed lease) holds nothing, and the
+         line is back with its lanes' records — as the lanes read it, so a `done` before the close PR
+         merges leaves the line to the lanes until it closes. An idle holder waiting on its PR's review or
+         merge reads stuck past the wait like any (the close PR's precheck runs in its background shell,
+         which is acting, §4.2 *Working on its own*); a PR is never this rule's work (below). Wait:
          **`STUCK_ORDER_AFTER`**, sixty minutes.
 
        An open PR is not work this rule reads (Paul's Hold on TD-1470, 2026-11-10: *drop PRs from this
@@ -1511,15 +1519,24 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        and no member — `by_person`, §4.4 *The card's status*, TD-1281): the person is already there; beside
        other actors, a person's own session is passed over: not in the acting test, nor `since`, nor the
        choice of the first actor and its reason. A
-       member the person took over is not the person's own: it reads `taken_over`.
+       member the person took over is not the person's own: it reads `taken_over`. And a **holder waiting
+       on the person** — an open `ask` or `steer` of its record's to the person whose `about` is the line's
+       `Context:` entry (`MailEntry.about`, a `TD-n`; a line whose `Context:` names no entry has none) —
+       is no actor while it is open, and the line, with no other actor, is not read: its `stuck_open`
+       entry stays as stored and its `stuck` entry drops (the question is on the person's card already); it
+       is read again the tick the question closes or lapses.
      - **The clock.** The work's **open time** is the ask's `at`, or the first tick the home read the line
        decided (below). The home keeps a board line's moving
-       parts on `host.json` as **`stuck_open: {<key>: {at, repo}}`** (shape-checked by
+       parts on `host.json` as **`stuck_open`** (below; shape-checked by
        `HostStore.load` as
        `stuck` is, an entry that fails it dropped), so a home restart keeps them: a line's `at` is the
        first tick it was among `workorders.orders()`'s work orders (every open decided line that is
-       not `fyi`), moved to a claimant's claim `at` when one takes it
-       and to the release when it lets it go (its drop's own `at`: the drop's ref is the line's `board:<key>`),
+       not `fyi`), and from then the **latest** of its stored `at` (so it never moves back), the holder's
+       claim `at` while one holds it, and the release: the first tick that reads no holder where the tick
+       before read one — a drop, a `done`, an exit, a restart or a lapsed lease alike, the tick's own
+       instant — marked by **`held`**, the holder's record id, written on each tick one holds it and cleared
+       on the release tick, so a restart keeps it and each release moves `at` once (`stuck_open: {<key>:
+       {at, repo, held?}}`);
        the entry dropped when the line closes or is no longer
        decided as a reading that holds it says — a repo
        whose board reading is absent (not yet read, or its read raised), errored, or fell back to the
@@ -1589,7 +1606,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      - **What the person sees.** A stuck work's **stuck row** is a need of the person's (§4.4 *The card's
        status*: it makes its card *needs you*), drawn once (§4.5 screen 6 *One place for each thing
        that needs the person*): on the card of the entry its work names — the question's first held
-       ref (`item_home`), the board line's `Context:` — as a **Do** item
+       ref (`item_home`), the board line's `Context:` (`item_home`'s home for it, a `Context:` naming a PR
+       included, TD-1538) — as a **Do** item
        (screen 12 *Three wants*), else in the Inbox under *Needs you* (`item_home` gains a branch for a
        stuck row, whose refs are its work's). It reads *stuck <age>: <the
        work> — <reason>* (*stuck 1h 10m: grinder-ao-2's ask to techlead-ao-1 — techlead-ao-1 is at its
@@ -1597,7 +1615,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        is held by its daily start cap: 3 idle starts today*). Where the person already sees the work as
        a row — a decided line, drawn under *Waiting on them* while it waits on its session — that row
        **moves** while it is stuck and a need (at *waiting* it stays under *Waiting on them*, the stuck
-       words its line, uncounted): to the card's Do group, or, its `Context:` naming no entry, under the
+       words its line, uncounted): to the card's Do group, or, its `Context:` homed on no card (`item_home`, TD-1538), under the
        Inbox's *Needs you*, with the stuck words as a line under it, never a second row (`ao card` prints it as the stuck row, its id the `stuck` key and its kind *stuck*); it goes back
        under *Waiting on them* the tick an actor acts; while the line's item carries `applying` (§4.4 *A
        press is drawn as it lands*) the row reads as the mark says and the stuck row makes no *needs you*,
