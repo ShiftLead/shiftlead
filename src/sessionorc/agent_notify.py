@@ -109,7 +109,12 @@ class NotifyMixin:
             if at := _restart_at(s):
                 k = f"{sid}|restart"
                 rows[k] = _Row(at, notify.restart_line(s.name or sid, s.team or ""), k, k)
-        askers = queue_mod.asker_repos(self.person_inbox, graph.values(), queue_mod.repo_roots(self._repos))
+        # keyed by whole address against the home's host; an entry the person handed a session reads its first
+        # addressee's repo, as the Inbox's rows read it (TD-1541)
+        handed = [e for r in graph.values() for e in r.inbox if e.handed_entry]
+        askers = queue_mod.asker_repos(
+            [*self.person_inbox, *handed], graph.values(), queue_mod.repo_roots(self._repos), self.host
+        )
         for e in self.person_inbox:
             if e.from_ == PERSON:
                 continue

@@ -264,7 +264,7 @@ async def test_a_question_on_an_open_card_is_linked_to_its_card(agent, sent, tmp
     to its loose card, `/queue?card=loose%3A…&item=…` with no `row=` (TD-1468)."""
     _on()
     t0 = datetime.now(UTC)
-    s = _session(agent, tmp_path, state="idle", since=_z(t0))
+    s = _session(agent, tmp_path, state="idle", since=_z(t0), repo=str(tmp_path / "s"))
     on_card = MailEntry(id="m-c1", from_=s.id, to=["person"], at=_z(t0), kind="ask", text="which?", about="TD-021")
     by_text = MailEntry(id="m-c2", from_=s.id, to=["person"], at=_z(t0), kind="ask", text="TD-20, again?")
     nowhere = MailEntry(id="m-c3", from_=s.id, to=["person"], at=_z(t0), kind="ask", text="x", about="TD-099")
@@ -275,7 +275,7 @@ async def test_a_question_on_an_open_card_is_linked_to_its_card(agent, sent, tmp
         await _pass(agent, t0 + timedelta(seconds=61))
         links = sorted(t.split("\n")[1] for _, t in sent)
         assert links == [
-            "http://kmaster:8765/queue?card=loose%3ATD-099&item=m-c3",
+            "http://kmaster:8765/queue?card=loose%3As%23TD-099&item=m-c3",
             "http://kmaster:8765/queue?card=s%23TD-020&row=s%23TD-020&item=m-c2",
             "http://kmaster:8765/queue?card=s%23TD-020&row=s%23TD-021&item=m-c1",
         ]
@@ -287,26 +287,31 @@ async def test_a_question_on_an_open_card_is_linked_to_its_card(agent, sent, tmp
 
 async def test_a_questions_bare_ref_is_its_askers_repos_on_telegram(agent, sent, tmp_path):
     """TD-1509 (§4.5 screen 6 *A bare ref elsewhere*): a question about bare TD-051 from a session of repo `a` is
-    never linked to `b`'s TD-051 card though `b` alone holds one; from a session that names no repo, it is."""
+    never linked to `b`'s TD-051 card though `b` alone holds one; one stamped `b`'s is, and one with no repo found
+    (its record's root names none) is no repo's, the Inbox's (TD-1541)."""
     _on()
     t0 = datetime.now(UTC)
     s = _session(agent, tmp_path, state="idle", since=_z(t0), repo=str(tmp_path / "a"))
     bare = _session(agent, tmp_path, sid="ao-x-v", name="grinder-x-2", state="idle", since=_z(t0))
     mine = MailEntry(id="m-r1", from_=s.id, to=["person"], at=_z(t0), kind="ask", text="done?", about="TD-051")
-    other = MailEntry(id="m-r2", from_=bare.id, to=["person"], at=_z(t0), kind="ask", text="done?", about="TD-051")
-    agent.person_inbox.extend([mine, other])
+    other = MailEntry(
+        id="m-r2", from_=bare.id, to=["person"], at=_z(t0), kind="ask", text="done?", about="TD-051", repo="b"
+    )
+    none = MailEntry(id="m-r3", from_="gone@node", to=["person"], at=_z(t0), kind="ask", text="?", about="TD-051")
+    agent.person_inbox.extend([mine, other, none])
     top = {"qid": "b#TD-051"}
     agent._queue = {"cards": [{"id": "b#TD-051", "top": top, "rows": [top]}], "completed": []}
     try:
         await _pass(agent, t0 + timedelta(seconds=61))
         links = sorted(t.split("\n")[1] for _, t in sent)
         assert links == [  # a's on its loose card, never b's (TD-1468)
+            "http://kmaster:8765/inbox/m-r3",
             "http://kmaster:8765/queue?card=b%23TD-051&row=b%23TD-051&item=m-r2",
             "http://kmaster:8765/queue?card=loose%3Aa%23TD-051&item=m-r1",
         ]
     finally:
         agent._queue = None
-        agent.person_inbox[:] = [e for e in agent.person_inbox if e.id not in ("m-r1", "m-r2")]
+        agent.person_inbox[:] = [e for e in agent.person_inbox if e.id not in ("m-r1", "m-r2", "m-r3")]
         agent.sessions.pop(s.id, None)
         agent.sessions.pop(bare.id, None)
 
@@ -316,7 +321,7 @@ async def test_a_blocked_outcome_on_an_open_card_is_linked_to_it_and_a_reviewers
     and linked to it; an item set aside with a reviewer (`snoozed_for`) stays the Inbox's, so its message page."""
     _on()
     t0 = datetime.now(UTC)
-    s = _session(agent, tmp_path, state="idle", since=_z(t0))
+    s = _session(agent, tmp_path, state="idle", since=_z(t0), repo=str(tmp_path / "s"))
     blocked = {"state": "blocked", "at": _z(t0), "text": "stuck"}
     mine = MailEntry(
         id="m-b1", from_=s.id, to=["person"], at=_z(t0), kind="note", text="x", about="TD-021", outcome=blocked
@@ -357,11 +362,12 @@ def test_mail_card_reads_about_first_then_the_words():
     from sessionorc import queue as q
 
     index = q.card_index({"cards": [{"id": "s#TD-020", "top": {"qid": "s#TD-020"}, "rows": [{"qid": "s#TD-021"}]}]})
-    assert q.mail_card("TD-21", "about TD-20", index) == ("s#TD-020", "s#TD-021")
-    assert q.mail_card("", "about TD-20 and TD-21", index) == ("s#TD-020", "s#TD-020")
+    assert q.mail_card("TD-21", "about TD-20", index, "s") == ("s#TD-020", "s#TD-021")
+    assert q.mail_card("", "about TD-20 and TD-21", index, "s") == ("s#TD-020", "s#TD-020")
+    assert q.mail_card("TD-21", "about TD-20", index) is None  # no repo: its bare refs match no key (TD-1541)
     assert q.mail_card("board:abc", "nothing", index) is None and q.mail_card("TD-99", "TD-98", index) is None
     # its home is the first of its refs a card holds, not its first ref alone (§4.5 screen 6, TD-1467)
-    assert q.mail_card("TD-99", "TD-20", index) == ("s#TD-020", "s#TD-020")
+    assert q.mail_card("TD-99", "TD-20", index, "s") == ("s#TD-020", "s#TD-020")
     assert q.mail_card("TD-20", "", {}) is None  # a home that serves no Queue
 
 

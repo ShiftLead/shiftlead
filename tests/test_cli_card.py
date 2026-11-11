@@ -253,9 +253,9 @@ def test_the_text_form_holds_the_header_rows_wants_and_mentions():
     # each want headed by its count, each item's first line its id, kind, sender, on and tied by
     assert "\ndecide 2\n" in text and "\ndo 2\n" in text and "\nanswered 1\n" in text
     assert "  board:k1 · decide · on s#TD-21 · board of s · tied by context: s#TD-021 · due 2026-10-16\n" in text
-    assert "  m1 · ask · from g1 · 2026-10-16 19:00 · on s#TD-21 · tied by words: TD-021\n" in text
-    assert "  s#5 · red PR · on s#TD-20 · tied by pr: TD-020\n    TD-20 slice\n" in text
-    assert "  fork PR s#6 · fork PR · on s#TD-20 · tied by title: TD-020\n" in text
+    assert "  m1 · ask · from g1 · 2026-10-16 19:00 · on s#TD-21 · tied by words: s#TD-021\n" in text
+    assert "  s#5 · red PR · on s#TD-20 · tied by pr: s#TD-020\n    TD-20 slice\n" in text
+    assert "  fork PR s#6 · fork PR · on s#TD-20 · tied by title: s#TD-020\n" in text
     # a board line's card text, its detail and its answers with the default marked
     assert (
         "    Pick one.\n    decide · Context: TD-21\n    the recommended one is B\n    - A\n    - B (default)\n" in text
@@ -284,7 +284,7 @@ def test_the_text_form_opens_every_fold_and_cuts_mail_on_the_ui_road():
     assert "    s#TD-9  medium  done #70 · 2026-10-16 (grinder-1, #70) — the first step." in text
     cut = "\n".join(cli._card_text(card_view(q, got, "TD-20", NOW, [], words=False)))
     assert (
-        "  m1 · ask · from g1 · 2026-10-16 19:00 · on s#TD-21 · tied by words: TD-021 · its words are the person's to read\n"
+        "  m1 · ask · from g1 · 2026-10-16 19:00 · on s#TD-21 · tied by words: s#TD-021 · its words are the person's to read\n"
         in cut
     )
     assert "SECRET" not in cut

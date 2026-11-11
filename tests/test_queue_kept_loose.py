@@ -61,7 +61,7 @@ def test_an_open_ask_about_an_archived_entry_draws_on_its_kept_card_and_a_note_s
     secs, v = view([ask, note])
     (a,) = [e for e in secs["needs"] if e["id"] == "m1"]
     assert (a["home"], a["on_card"], a["on_row"]) == ("queue", "s#TD-3", "s#TD-3")
-    assert a["tied"] == {"by": "about", "ref": "TD-003"}
+    assert a["tied"] == {"by": "about", "ref": "s#TD-003"}
     assert secs["queue_n"] == 1 and secs["count"] == 1  # the Queue tab's; both tabs add up to what waits
     (n,) = [e for e in secs["fyi"] if e["id"] == "m2"]
     assert n["home"] == "inbox"
@@ -93,15 +93,20 @@ def test_a_steer_and_a_decide_line_about_an_archived_entry_are_kept_a_watch_line
 def test_an_ask_naming_an_entry_no_card_holds_draws_on_its_loose_card():
     ask = mail("m4", "is other#TD-9 done?")
     again = mail("m5", "and now?", about="other#TD-9")
-    bare = mail("m6", "TD-99, again?")  # found nowhere, no repo for its sender: keyed bare
+    bare = mail("m6", "TD-99, again?")  # found nowhere: keyed by its sender's repo
     secs, v = view([ask, again, bare])
     homes = {e["id"]: (e["on_card"], e["on_row"], e["tied"]) for e in secs["needs"]}
     assert homes["m4"] == ("loose:other#TD-009", "other#TD-009", {"by": "words", "ref": "other#TD-009"})
     assert homes["m5"][0] == "loose:other#TD-009"  # two items about one entry share one card
-    assert homes["m6"][0] == "loose:TD-099"
+    assert homes["m6"][0] == "loose:s#TD-099"
     assert secs["queue_n"] == 3 and secs["count"] == 3
+    # with no repo found, a bare ref matches no key and makes no loose card: the Inbox (TD-1541)
+    secs, v = view([mail("m6", "TD-99, again?", repo=None), mail("m9", "or other#TD-9?", repo=None)])
+    homes = {e["id"]: e["on_card"] or e["home"] for e in secs["needs"]}
+    assert homes == {"m6": "inbox", "m9": "loose:other#TD-009"}, "its qualified ref still draws"
+    secs, v = view([ask, again, bare])
     loose = {c["id"]: c for c in v["loose"]}
-    assert set(loose) == {"loose:other#TD-009", "loose:TD-099"}
+    assert set(loose) == {"loose:other#TD-009", "loose:s#TD-099"}
     one = loose["loose:other#TD-009"]
     assert one["status"] == "needs you" and one["wants"]["n"]["decide"] == 2 and one["top"]["id"] == ""
     assert one["top"]["title"] == "is other#TD-9 done?" and one["repos"] == ["other"] and one["ids"] == []
@@ -115,13 +120,13 @@ def test_the_needs_you_switch_keeps_kept_and_loose_cards_and_a_chip_keeps_a_loos
     entries = [mail("m1", "merge?", about="TD-3"), mail("m4", "is other#TD-9 done?"), mail("m6", "TD-99?")]
     _, v = view(entries, picks={"filter": "needs-you"})
     on = lambda cs: [c["id"] for c in cs if not c["off"]]  # noqa: E731
-    assert on(v["kept"]) == ["s#TD-3"] and on(v["loose"]) == ["loose:TD-099", "loose:other#TD-009"]
+    assert on(v["kept"]) == ["s#TD-3"] and sorted(on(v["loose"])) == ["loose:other#TD-009", "loose:s#TD-099"]
     assert all(ln["off"] for ln in v["completed"]["lines"]) and all(o["off"] for o in v["other"])
     assert v["summary"]["needs"] == 4  # TD-30, the kept card and the two loose
     _, v = view(entries, picks={"team": "ot"}, teams={"ot": "other"})
     assert on(v["loose"]) == ["loose:other#TD-009"] and on(v["kept"]) == []  # the bare one: no chip's
     _, v = view(entries, picks={"find": "TD-99"})
-    assert on(v["loose"]) == ["loose:TD-099"]  # a loose card answers the find
+    assert on(v["loose"]) == ["loose:s#TD-099"]  # a loose card answers the find
 
 
 def test_kept_or_loose_and_mail_card_read_alike():
@@ -131,8 +136,9 @@ def test_kept_or_loose_and_mail_card_read_alike():
     assert kept_or_loose(["x#TD-001"], idx) == ("loose:x#TD-001", "x#TD-001", "x#TD-001")
     assert kept_or_loose([], idx) is None and kept_or_loose(["x#TD-001"], {}) is None
     assert mail_card("TD-3", "merge?", idx) is None  # needs nobody: the Inbox
-    assert mail_card("TD-3", "merge?", idx, needs=True) == ("s#TD-3", "s#TD-3")
-    assert mail_card("TD-21", "which?", idx, needs=True) == ("s#TD-20", "s#TD-21")  # an open card first
+    assert mail_card("TD-3", "merge?", idx, "s", needs=True) == ("s#TD-3", "s#TD-3")
+    assert mail_card("TD-21", "which?", idx, "s", needs=True) == ("s#TD-20", "s#TD-21")  # an open card first
+    assert mail_card("TD-3", "merge?", idx, needs=True) is None  # no repo: its bare ref matches no key (TD-1541)
 
 
 def test_a_loose_cards_address_is_percent_encoded_with_no_row():
@@ -226,7 +232,7 @@ def test_a_merge_ask_carrying_only_a_pr_draws_on_the_card_of_the_entry_its_pr_na
     assert a["tied"] == {"by": "pr", "ref": "s#TD-021"}
     assert not v["loose"]  # none on `loose:s#164`
     # with no repo (none stamped, no orphan stamp, no record) it has no repo to search: the Inbox
-    secs, v = pr_view([mail("m2", "merge it?", pr=164)], {"s#164": "s#TD-021"})
+    secs, v = pr_view([mail("m2", "merge it?", pr=164, repo=None)], {"s#164": "s#TD-021"})
     assert secs["needs"][0]["home"] == "inbox" and not v["loose"]
 
 

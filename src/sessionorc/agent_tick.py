@@ -3785,7 +3785,7 @@ class TickMixin:
             else:
                 got = queue_mod.reading(
                     applied, graph, now, waiting=waiting, doing=doing, questions=list(self.person_inbox),
-                    archived=self._archived,
+                    archived=self._archived, host=self.host,
                 )  # fmt: skip
                 self._queue_read = got
         except Exception:  # noqa: BLE001 — the Queue is a reading: the last one stands, the next tick tries again

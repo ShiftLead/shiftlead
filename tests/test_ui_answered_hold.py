@@ -37,7 +37,7 @@ def _ask(about="TD-60", **kw) -> dict:
     """The person inbox's answered `ask` about the entry, as `person_inbox` hands it (`_owing` applied)."""
     e = {
         "id": "m-1",
-        "from": "ao-r-designer@kmaster",
+        "from": "ao-r-designer",
         "to": ["person"],
         "kind": "ask",
         "text": "Lift the hold on TD-60?",
@@ -75,13 +75,14 @@ def test_ledger_for_you_carries_answered_while_the_question_owes(tmp_path):
 
 
 def test_a_bare_id_carried_by_two_repos_links_to_neither(tmp_path):
-    """An asker whose record names no repo: its bare id is looked up by the one-repo rule (TD-1509)."""
+    """An asker whose record names no repo: its question is no repo's, and its bare id links nothing, one repo
+    or two (TD-1509, TD-1541)."""
     repos, nowhere = _repos(tmp_path, "r", "s"), [{**FLEET[0], "repo": ""}]
     assert all(r["answered"] is None for r in _rows(repos, [_ask()], nowhere))
     # the Repo page passes one repo, and every repo's facts for the link's index
     one = {k: v for k, v in repos.items() if v["name"] == "r"}
     assert _rows(one, [_ask()], nowhere, every=repos)[0]["answered"] is None
-    assert _rows(one, [_ask()], nowhere)[0]["answered"] is not None, "one repo alone: the bare id links"
+    assert _rows(one, [_ask()], nowhere)[0]["answered"] is None, "one repo alone: no repo's bare id links none"
     assert _rows(one, [_ask(about="r#TD-60")], nowhere, every=repos)[0]["answered"] is not None
     by = {r["name"]: r["answered"] for r in _rows(repos, [_ask()])}  # FLEET's asker works in r
     assert by["r"] is not None and by["s"] is None, "an asker in r: r's TD-60, never s's"

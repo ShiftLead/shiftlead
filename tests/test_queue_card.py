@@ -24,14 +24,14 @@ SECRETS = ("SECRET-ASK", "SECRET-MENTION", "SECRET-HELD", "SECRET-OUTCOME", "SEC
 
 def test_item_home_says_how_each_item_found_its_entry():
     idx = card_index(queue(repo2=True))
-    assert item_home(mail("m1", "TD-20 too", about="TD-21"), idx)["tied"] == {"by": "about", "ref": "TD-021"}
-    assert item_home(mail("m2", "TD-20: split it?"), idx)["tied"] == {"by": "words", "ref": "TD-020"}
+    assert item_home(mail("m1", "TD-20 too", about="TD-21"), idx)["tied"] == {"by": "about", "ref": "s#TD-021"}
+    assert item_home(mail("m2", "TD-20: split it?"), idx)["tied"] == {"by": "words", "ref": "s#TD-020"}
     board = {"row": "board", "id": "b", "text": "Pick. Context: TD-30 · the design. Due: 2026-10-17"}
     assert item_home(board, idx)["tied"] == {"by": "context", "ref": "TD-030"}
     # a bare ref on another repo's board is that repo's: qualified with the line's own repo
     assert item_home({**board, "repo_name": "s"}, idx)["tied"] == {"by": "context", "ref": "s#TD-030"}
-    red = {"row": "red_pr", "id": "red_pr:s:5", "title": "slice 2", "branch": "TD-10-thing"}
-    assert item_home(red, idx)["tied"] == {"by": "pr", "ref": "TD-010"}
+    red = {"row": "red_pr", "id": "red_pr:s:5", "repo": "s", "title": "slice 2", "branch": "TD-10-thing"}
+    assert item_home(red, idx)["tied"] == {"by": "pr", "ref": "s#TD-010"}
     fork = {"row": "fork_pr", "id": "fork_pr:s:6", "title": "fix TD-20", "repo": "s", "pr": 6}
     assert item_home(fork, idx)["tied"] == {"by": "title", "ref": "s#TD-020"}  # its own repo's (TD-1509)
     assert item_home(mail("m3", "about nothing"), idx)["tied"] is None
@@ -40,7 +40,7 @@ def test_item_home_says_how_each_item_found_its_entry():
     assert ledger_home({"name": "s", "id": "TD-99"}, idx)["tied"] is None
     # the Inbox's rows carry it (its payload is these rows)
     secs = inbox_sections([mail("m1", "TD-21: which?")], now=NOW, cards=idx)
-    assert secs["needs"][0]["tied"] == {"by": "words", "ref": "TD-021"}
+    assert secs["needs"][0]["tied"] == {"by": "words", "ref": "s#TD-021"}
 
 
 def fixture() -> tuple[dict, dict]:
@@ -59,8 +59,8 @@ def fixture() -> tuple[dict, dict]:
                "text": "**Pick** one. Context: TD-21. Due: 2026-10-16"}]  # fmt: skip
     secs = inbox_sections(entries, now=NOW, boards=boards, cards=idx)
     secs["needs"] += [
-        {"row": "red_pr", "id": "red_pr:s:5", "repo": "s", "pr": 5, "title": "TD-20 slice", **item_home({"row": "red_pr", "title": "TD-20 slice"}, idx)},
-        {"row": "fork_pr", "id": "fork_pr:s:6", "repo": "s", "pr": 6, "title": "fix TD-20", **item_home({"row": "fork_pr", "title": "fix TD-20"}, idx)},
+        {"row": "red_pr", "id": "red_pr:s:5", "repo": "s", "pr": 5, "title": "TD-20 slice", **item_home({"row": "red_pr", "repo": "s", "title": "TD-20 slice"}, idx)},
+        {"row": "fork_pr", "id": "fork_pr:s:6", "repo": "s", "pr": 6, "title": "fix TD-20", **item_home({"row": "fork_pr", "repo": "s", "title": "fix TD-20"}, idx)},
     ]  # fmt: skip
     held = {"asker": "g1", "name": "grinder-1", "kind": "ask", "words": "SECRET-HELD", "age": "1h", "mid": "m-8",
             "outcome": {"text": "SECRET-OUTCOME"}, "until": ""}  # fmt: skip
@@ -73,7 +73,7 @@ def test_attach_raw_carries_each_items_row_tied_and_repo_and_keeps_the_page_unch
     q, got = fixture()
     items = {m["id"]: m for sec in got["cards"]["s#TD-20"].values() for m in sec}
     assert items["m1"]["row"]["text"].startswith("TD-21:") and "html" not in items["m1"]["row"]
-    assert items["m1"]["tied"] == {"by": "words", "ref": "TD-021"} and items["m1"]["repo"] == ""
+    assert items["m1"]["tied"] == {"by": "words", "ref": "s#TD-021"} and items["m1"]["repo"] == ""
     assert items["b1"]["repo"] == "s" and items["b1"]["tied"] == {"by": "context", "ref": "s#TD-021"}
     assert items["red_pr:s:5"]["repo"] == "s" and items["red_pr:s:5"]["tied"]["by"] == "pr"
     assert items["fork_pr:s:6"]["repo"] == "s" and items["fork_pr:s:6"]["tied"]["by"] == "title"

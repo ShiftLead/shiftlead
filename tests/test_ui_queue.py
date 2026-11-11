@@ -336,6 +336,11 @@ def test_a_resolved_line_is_drawn_without_its_marks():
 
 
 def mail(mid: str, text: str, kind: str = "ask", **kw) -> dict:
+    """A mail item from g1, stamped with the fixture's repo `s` (§4.10 *An envelope carries its sender's `repo`*);
+    `repo=None` writes one with none, read as no repo's (TD-1541)."""
+    kw.setdefault("repo", "s")
+    if kw["repo"] is None:
+        kw.pop("repo")
     return {"id": mid, "from": "g1", "to": ["person"], "kind": kind, "text": text, "at": at(1), "state": "open", **kw}
 
 
@@ -349,7 +354,7 @@ def test_an_item_is_drawn_where_its_entry_is():
         "on_card": "s#TD-20",
         "on_row": "s#TD-20",
         "mentions": ["s#TD-30"],
-        "tied": {"by": "words", "ref": "TD-020"},
+        "tied": {"by": "words", "ref": "s#TD-020"},
     }
     # an entry on a completed card, or on none, a state row and mail about nothing: the Inbox's
     for e in (mail("m3", "TD-1 is done"), mail("m4", "TD-99?"), mail("m5", "no id"), {"row": "state", "id": "x"}):
@@ -358,7 +363,7 @@ def test_an_item_is_drawn_where_its_entry_is():
     assert item_home(board, idx)["on_row"] == "s#TD-30"
     secs = inbox_sections([], now=NOW, boards=[{**board, "due": "2026-10-16"}], cards=idx)
     assert secs["needs"][0]["row"] == "board" and secs["needs"][0]["on_row"] == "s#TD-30"  # its kind kept
-    red = {"row": "red_pr", "id": "red_pr:s:5", "title": "TD-10 slice 2: the thing"}
+    red = {"row": "red_pr", "id": "red_pr:s:5", "repo": "s", "title": "TD-10 slice 2: the thing"}
     assert item_home(red, idx)["on_row"] == "s#TD-10"
     # a bare id two repos hold resolves to neither; the repo's form still does
     two = card_index(queue(repo2=True) | {"cards": [*queue()["cards"], card(row("db", "TD-20", "same id"))]})
@@ -369,7 +374,7 @@ def test_a_mail_items_bare_ref_is_its_senders_repos_and_its_home_the_first_held_
     """TD-1467 (§4.5 screen 6 *A mail item's bare ref is its sender's repo's*): agent-cadence's grinder's *TD-221:
     merge #164?* with `about: TD-221` draws on agent-cadence's card though shiftlead holds a TD-221 too, or holds it
     only archived; a mail item whose `about` names an entry no card holds draws on the first held one its words
-    name; an item the helper finds no repo for is read bare, as before."""
+    name; an item the helper finds no repo for is read as no repo's, its bare refs matching no key (TD-1541)."""
     from sessionorc.queue import asker_repos
 
     ac, sl = row("agent-cadence", "TD-221", "a cadence entry"), row("shiftlead", "TD-221", "a shiftlead entry")
@@ -379,19 +384,20 @@ def test_a_mail_items_bare_ref_is_its_senders_repos_and_its_home_the_first_held_
     assert askers == {"m1": "agent-cadence"}, "the send's stamp is the item's repo"
     assert item_home(ask, both, askers)["on_card"] == "agent-cadence#TD-221"
     assert item_home(ask, both, askers)["tied"] == {"by": "about", "ref": "agent-cadence#TD-221"}
-    assert item_home(ask, both)["home"] == "inbox", "read bare, the id two repos hold is neither's"
+    assert item_home({**ask, "repo": None}, both)["home"] == "inbox", "no repo's: its bare id matches no key"
     only = card_index({"cards": [card(ac)]})  # shiftlead's TD-221 archived: on no open card
     assert item_home(ask, only, askers)["on_card"] == "agent-cadence#TD-221"
     shift = {"m1": "shiftlead"}  # the same words from shiftlead's sender never draw on agent-cadence's card
-    assert item_home(ask, only, shift)["home"] == "inbox"
+    assert item_home({**ask, "repo": None}, only, shift)["home"] == "inbox"
     # its home is the first of its refs a card holds: `about` names one no card holds, its words a held one
     idx = card_index(queue())
     got = item_home(mail("m2", "TD-20 waits on this", about="TD-99"), idx)
-    assert got["on_card"] == "s#TD-20" and got["tied"] == {"by": "words", "ref": "TD-020"}
+    assert got["on_card"] == "s#TD-20" and got["tied"] == {"by": "words", "ref": "s#TD-020"}
     got = item_home(mail("m3", "TD-30 and TD-21", about="TD-99, TD-21"), idx)
     assert got["on_row"] == "s#TD-21" and got["tied"]["by"] == "about" and got["mentions"] == ["s#TD-30"]
-    # no repo found for it: read bare by the one-repo rule, as before
-    assert item_home(mail("m4", "x", about="TD-21"), idx, asker_repos([mail("m4", "x")], []))["on_row"] == "s#TD-21"
+    # no repo found for it: read as no repo's, its bare ref matching no key (TD-1541)
+    m4 = mail("m4", "x", about="TD-21", repo=None)
+    assert item_home(m4, idx, asker_repos([m4], []))["home"] == "inbox"
 
 
 def test_a_board_line_naming_a_held_entry_is_on_its_own_repos_card_in_the_entrys_place():
@@ -456,18 +462,18 @@ def test_a_bare_ref_on_a_red_pr_a_fork_pr_or_a_question_is_its_own_repos():
     index = {"b#TD-051": ("b#TD-051", "b#TD-051"), "TD-051": ("b#TD-051", "b#TD-051")}
     red = {"row": "red_pr", "id": "red_pr:a:5", "repo": "a", "title": "TD-051: the fix", "branch": "td051-fix"}
     fork = {"row": "fork_pr", "id": "fork_pr:a:6", "repo": "a", "title": "fix TD-51", "pr": 6}
-    ask = mail("m-a", "is TD-051 done?", about="TD-051")
+    ask = mail("m-a", "is TD-051 done?", about="TD-051", repo=None)
     askers = {"m-a": "a"}
     assert item_home(red, index)["home"] == "inbox"
     assert item_home(fork, index)["home"] == "inbox"
     assert item_home(ask, index, askers)["home"] == "inbox"
     assert item_home({**ask, "about": None}, index, askers)["home"] == "inbox", "its words read alike"
-    # B's own rows are on B's card, and a row naming no repo falls back to the bare lookup
+    # B's own rows are on B's card, and a row naming no repo is no repo's: its bare ref matches no key (TD-1541)
     assert item_home({**red, "repo": "b"}, index)["on_row"] == "b#TD-051"
     assert item_home({**fork, "repo": "b"}, index)["on_row"] == "b#TD-051"
     assert item_home(ask, index, {"m-a": "b"})["on_row"] == "b#TD-051"
-    assert item_home({**red, "repo": ""}, index)["on_row"] == "b#TD-051"
-    assert item_home(ask, index)["on_row"] == "b#TD-051"
+    assert item_home({**red, "repo": ""}, index)["home"] == "inbox"
+    assert item_home(ask, index)["home"] == "inbox"
     # the Inbox's rows read the asker's repo from its record, `from` → the record's `repo` root
     fleet = [{"id": "g1", "repo": "/home/k/a"}]
     secs = inbox_sections([ask], now=NOW, cards=index, fleet=fleet)
@@ -484,7 +490,7 @@ def test_the_inbox_names_an_askers_repo_as_the_reading_names_it():
     through `roots` (`repo_roots`), as the Queue's reading names it — without them the directory's name misses the
     card; a question from the person has no asker record, and its bare ref stays bare."""
     index = {"b#TD-051": ("b#TD-051", "b#TD-051"), "TD-051": ("b#TD-051", "b#TD-051")}
-    ask = mail("m-a", "is TD-051 done?", about="TD-051")
+    ask = mail("m-a", "is TD-051 done?", about="TD-051", repo=None)
     repos = {"/home/k/b-checkout": {"name": "b", "root": "/home/k/b-checkout"}, "/home/k/a": {"root": "/home/k/a"}}
     roots = repo_roots(repos)
     assert roots == {"b": "/home/k/b-checkout", "a": "/home/k/a"}

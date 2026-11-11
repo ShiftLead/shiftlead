@@ -250,8 +250,14 @@ async def test_a_snooze_of_a_fork_pr_row_is_accepted_and_sets_it_aside(agent):
 def test_the_queue_places_a_fork_row_by_its_title_as_a_do_item_with_no_ref_and_no_start():
     from shiftlead.ui.queue import attach, item_home, item_ref, want_of
 
-    e = {"row": "fork_pr", "id": "fork_pr:s:901", "title": "TD-10 slice 2: a stranger's fix", "branch": "td-30"}
-    idx = {"TD-010": ("s#TD-10", "s#TD-10"), "TD-030": ("s#TD-30", "s#TD-30")}
+    e = {
+        "row": "fork_pr",
+        "id": "fork_pr:s:901",
+        "repo": "s",
+        "title": "TD-10 slice 2: a stranger's fix",
+        "branch": "td-30",
+    }
+    idx = {"s#TD-010": ("s#TD-10", "s#TD-10"), "s#TD-030": ("s#TD-30", "s#TD-30")}
     got = item_home(e, idx)
     assert (got["home"], got["on_row"]) == ("queue", "s#TD-10"), "its title alone, never a stranger's branch"
     assert want_of(e, "needs") == "do" and item_ref(e) == ""
