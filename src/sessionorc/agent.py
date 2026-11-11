@@ -1428,6 +1428,7 @@ class HostAgent(
             raise RpcError(f"not a directory: {directory}")
         grants, references = _grants(capabilities or []), _lane(lane or [])  # validate before anything starts
         reading, bound, extra = _review(review), _context_bound(context_bound), _scale(scale)
+        scale = extra  # the launch record keeps the mark as the record does (`launch_params(locals())`)
         starts = _start_time(start_at, unattended, run_until)
         if held and (not ((seat or extra) and unattended) or starts or resume):
             raise RpcError(

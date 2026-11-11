@@ -35,7 +35,7 @@ async def test_a_held_create_writes_an_extra_closed_with_its_mark_on_the_record_
             await person.call("create", **_shell(tmp_path, "g-4", held=True, scale={"line": "g"}, unattended=False))
         with pytest.raises(AgentError, match="scale is"):
             await person.call("create", **_shell(tmp_path, "g-4", held=True, scale={"line": ""}))
-        sid = (await person.call("create", **_shell(tmp_path, "g-4", held=True, scale={"line": "g"})))["id"]
+        sid = (await person.call("create", **_shell(tmp_path, "g-4", held=True, scale={"line": " g "})))["id"]
         rec = agent.sessions[sid]
         assert rec.state == "closed" and rec.closer == {"by": "start", "why": "held"}
         assert rec.scale == {"line": "g"} and rec.seat is None
