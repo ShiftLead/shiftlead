@@ -2368,20 +2368,23 @@ def scaling_names(team: orgmod.TeamDef) -> list[str]:
     return [n for n in dict.fromkeys(names) if not team.scale_refusal(n)]
 
 
-def set_max(call: Call, org: orgmod.Org, name: str, line: str, n: int | str) -> dict[str, Any]:
+def set_max(call: Call, org: orgmod.Org, name: str, line: str, n: int | str, host: str = "") -> dict[str, Any]:
     """`teams.<team>.max` written through `set_settings` (a person's own, refused to a session) — `ao team max`, and
     the Members dialog's **up to** (§4.7, §4.9 *Scaling with the work*, td-max, TD-1545). `n` a whole number: the
     line's or seat's ceiling, refused where it may not scale (`max_refusal`) and below 0; one at or below its size
     is stored as `0`, no scaling at any size; on a team written `off` it replaces the `off` with that one ceiling
     and writes every other line or seat that may scale at `0`, so one raise turns on one line. `off` (`line` "")
     writes the team's `max: off`, replacing any written ceilings; `on` removes the whole `max` key, every line then
-    on its default ceiling (size + 2). The extras of a live team follow at its next Start (the Start's reconcile);
-    writing or removing them at once is the next slice's."""
+    on its default ceiling (size + 2). On a live team the extras follow at once (`_reconcile_live`): the new ones
+    written held, a held one past the ceiling removed, a live one past it said and left to its run; on a team
+    with nothing live the setting is all, read by its next Start's reconcile. `host` is where the team's
+    checkout is read for the plan."""
     team = teams.find(org, name)
     if n in ("off", "on"):
         got = call("set_settings", teams={name: {"max": "off" if n == "off" else None}})
         words = "off — no line or seat runs extras" if n == "off" else "on — each line and seat on its default ceiling"
-        return {"team": name, "max": (got.get("teams") or {}).get(name, {}).get("max"), "text": f"{name}: {words}"}
+        out = {"team": name, "max": (got.get("teams") or {}).get(name, {}).get("max"), "text": f"{name}: {words}"}
+        return _reconcile_live(call, org, name, got, host, out)
     if isinstance(n, bool) or not isinstance(n, int) or n < 0:
         raise teams.TeamError(f"{line}: an up to is a whole number of sessions, 0 or more, not {n!r}")
     if why := max_refusal(team, line):
@@ -2395,13 +2398,35 @@ def set_max(call: Call, org: orgmod.Org, name: str, line: str, n: int | str) -> 
     ceilings[line] = stored
     got = call("set_settings", teams={name: {"max": ceilings}})
     said = f"{line}: up to {stored}" if stored else f"{line}: no scaling — {n} is at or below its size {size}"
-    up = live(crew(name, call("list")))
-    return {
-        "team": name,
-        "line": line,
-        "max": (got.get("teams") or {}).get(name, {}).get("max"),
-        "text": said + (" · the extras follow at the next Start" if up else ""),
-    }
+    out = {"team": name, "line": line, "max": (got.get("teams") or {}).get(name, {}).get("max"), "text": said}
+    return _reconcile_live(call, org, name, got, host, out)
+
+
+def _reconcile_live(
+    call: Call, org: orgmod.Org, name: str, got: dict[str, Any], host: str, out: dict[str, Any]
+) -> dict[str, Any]:
+    """`set_max`'s live half (§4.9 *Scaling with the work*, TD-1545): on a team with a live session, the Start's
+    reconcile (`write_extras`) run at once on the plan the written setting gives — the new extras written held
+    under the live manager, a held one past the ceiling removed, a live one said — each said on `out`'s text and
+    the records written in `extras`; on a team with nothing live the setting is all. A plan
+    that cannot be made (a brief gone) is said, the setting standing."""
+    mine = crew(name, call("list"))
+    if not live(mine):
+        return out  # the setting is all: the next Start's reconcile reads it
+    base = replace(org.teams[name], max=None)  # the written key alone: `on` removes it, which a merge never unsets
+    merged = orgmod.with_settings(replace(org, teams={**org.teams, name: base}), got.get("teams"))
+    try:
+        plan = teams.plan(merged, name, host or hosts.local_host().name, files=files_via(call))
+    except (teams.TeamError, ValueError, OSError) as e:  # the setting is written: said, never a failed write
+        out["text"] += f" · the extras follow at the next Start — the team's plan could not be read: {e}"
+        return out
+    lead = next((s for s in live(mine) if plan.manager_id in (s.get("name"), s.get("id"))), None)
+    written, notes = write_extras(call, plan, [str(lead["id"])] if lead else [], None)
+    out["extras"] = [str(r.get("id")) for r in written]
+    if written:
+        out["text"] += f" · {', '.join(str(r.get('name')) for r in written)}: written held"
+    out["text"] += "".join(f"\n{n}" for n in notes)
+    return out
 
 
 def remove_member(call: Call, path: Path, name: str, *, index: int, role: str, host: str = "") -> dict[str, Any]:

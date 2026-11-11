@@ -2380,7 +2380,7 @@ def cmd_team_max(args: argparse.Namespace) -> int:
     try:
         org = _org_here()
         name = _defined_team(args, org)
-        got = teamrun.set_max(call_sync, org, name, line, n)
+        got = teamrun.set_max(call_sync, org, name, line, n, hosts.local_host().name)
     except (ValueError, teams.TeamError, AgentError) as e:
         return fail(args, str(e), 1)
     return emit(args, got, lambda: print(got["text"]))
