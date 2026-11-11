@@ -45,7 +45,7 @@ async def test_the_home_writes_it_once_and_drops_the_held_extras_of_a_team_writt
             await person.call("create", **_shell(tmp_path, "g-4", team="started", held=True, scale={"line": "g"}))
         )["id"]
         await agent.rpc_kill(id=member)
-        agent._migrate_scale()
+        await agent._migrate_scale()
         doc = settings_mod.load()
         assert doc["teams"]["named"] == {"on_work": "ask", "max": "off"}
         assert doc["teams"]["started"] == {"max": "off"}  # known by a record carrying it
@@ -54,7 +54,7 @@ async def test_the_home_writes_it_once_and_drops_the_held_extras_of_a_team_writt
         assert member in agent.sessions, "a member's record is never the migration's"
         # a second start finds the stamp: a team written later stays on td-max
         settings_mod.save({**doc, "teams": {**doc["teams"], "later": {"on_work": "ask"}}})
-        agent._migrate_scale()
+        await agent._migrate_scale()
         assert "max" not in settings_mod.load()["teams"]["later"]
 
 
@@ -62,7 +62,7 @@ async def test_the_home_writes_it_once_and_drops_the_held_extras_of_a_team_writt
 async def test_a_broken_settings_file_is_left_for_the_next_start(agent):
     await park_ticks(agent)
     settings_mod.settings_file().write_text("- not a mapping\n")
-    agent._migrate_scale()
+    await agent._migrate_scale()
     assert settings_mod.settings_file().read_text() == "- not a mapping\n"
 
 
@@ -78,8 +78,21 @@ async def test_the_write_is_committed_to_the_homes_definitions_history(agent):
     defs.init(home)
     settings_mod.save({"teams": {"named": {"on_work": "ask"}}})
     defs.commit("by hand", home=home, files=("settings.yml",))
-    await agent._migrate_scale_committed()
+    await agent._migrate_scale()
     log = subprocess.run(
         ["git", "-C", str(home), "log", "--format=%s", "--", "settings.yml"], capture_output=True, text=True
     ).stdout.splitlines()
     assert log[0].startswith("settings: ") and "teams.named.max none → 'off'" in log[0], log
+
+
+@pytest.mark.integration
+async def test_an_unwritable_settings_file_leaves_the_start_going(agent, monkeypatch):
+    await park_ticks(agent)
+    settings_mod.settings_file().unlink(missing_ok=True)
+
+    def boom(*a, **k):
+        raise OSError("read-only file system")
+
+    monkeypatch.setattr(settings_mod, "save", boom)
+    await agent._migrate_scale()  # logged, never raised: the home starts and tries again next time
+    assert not settings_mod.settings_file().exists()
