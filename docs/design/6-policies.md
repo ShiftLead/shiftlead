@@ -1525,9 +1525,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        is asked about** — one whose `Context:` is a bare `TD-n` (a PR, a repo-qualified ref or no entry has
        no such question) that an open `ask` or `steer` in the person inbox is about, from any sender in the
        line's repo — is not read while one is open, whatever holds it or its lanes hold. The open questions
-       are `work.waiting_of` over the person inbox (open only, `about` by `reference_of`) with its
-       sender keys dropped: the set of its values' `ref`s, by `normalize_ref`, of entries whose envelope
-       `repo` (§4.10 *An envelope carries its sender's `repo`*, TD-1467) is the line's `repo` — one with no
+       are `work.waiting_of` over the person inbox (open only, `about` by `reference_of`, an entry with
+       no sender skipped) with its sender keys dropped: the set of its values' `ref`s, by `normalize_ref`, of entries whose envelope
+       `repo` (§4.10 *An envelope carries its sender's `repo`*, TD-1467), a registry name, resolves by
+       `queue.repo_roots` over the tick's repo readings to the root the line was read from (the line's
+       `repo` is that root's basename, which a registry name need not be) — one with no
        `repo` (sent before the stamp, or from a record that resolves to none) mutes nothing, since entry
        numbers are each repo's own; no sender is matched, so a replayed holder, a node's address and a
        lapsed lease change nothing. Its `stuck` entry drops (the question is on the person's card
@@ -1551,7 +1553,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        ticks from the next, so a restart keeps them and each moves `at` once: **`holder`**, `true` on each
        tick the line has a holder (which holder, under a `--force`, does not matter: a change of holder is no
        release) and cleared on the release tick, and **`asked`**, `true` on each tick such a question is
-       open and cleared on the answer's tick; a tick that is both moves `at` once, to its instant, and clears
+       open and cleared on the answer's tick; a tick that is a release and an answer moves `at` once, to its instant, and clears
        both; a line first read while such a question is open is written with `asked` set and `at` that
        first tick's instant; each moves on its own tick, `applying` or not, only the draw waiting for the
        press's re-read (`stuck_open: {<key>: {at, repo, holder?, asked?}}`);
