@@ -1045,7 +1045,7 @@ class TickMixin:
                 if await self._scale_down(s, now):
                     continue  # an extra out of work, back to held: never restarted (§6 rule 14, TD-1546)
                 await self._crash_restart(s, now)
-                await self._extra_seat_hold(s, now)  # an extra seat's exit rule 1 did not restart (TD-1547)
+                await self._extra_hold(s, now)  # an extra's exit no rule restarts: held (TD-1547)
                 if await self._lost_brief(s, now):
                     continue  # replayed: the record is the closed run's, and no other rule acts on it now
                 await self._wanted_restart(s, now)
@@ -1216,29 +1216,43 @@ class TickMixin:
         log.info("%s exited on its own with nothing declared: restarting it (%d in the window)", s.id, len(recent) + 1)
         await self._replay(s, "crash", keep_mail=True)
 
-    async def _extra_seat_hold(self, s: Session, now: datetime) -> None:
-        """An extra seat's natural exit with nothing waiting on it (§6 rule 1, §4.9 *Scaling with the work*,
-        TD-1547): closed back to held — rule 1 restarts it only while it owes a reading (`_owes_reading`) — its
-        `scale.last` saying why. One whose git is not known clean is left as it stands, for a person to read,
-        as `_extra_drop` leaves one; one gated, suspended or at its ceiling is left to the road that holds it.
-        This home's records alone, as `_extra_drop`'s."""
-        if not self._extra_seat(s) or s.state != "exited" or not s.pane or s.host != self.host:
+    async def _extra_hold(self, s: Session, now: datetime) -> None:
+        """Held is an extra's one non-live state (§4.9 *Scaling with the work*, §6 rule 1, TD-1547): an extra — a
+        seat's or a line's — whose run ended by a road no rule restarts is closed back to held by the next tick, its
+        `scale.last` saying which: a kill (no pane), a natural exit past `RESTART_CEILING`, a wrap-up's exit or a
+        stop, and an extra seat's natural exit with nothing waiting on it (rule 1 restarts it only while it owes a
+        reading, `_owes_reading`). Mail left on it is the mover's (`_seat_move`). Left as it stands: one rule 1
+        restarts (`_crashed`), one whose git is not known clean (for a person to read, as `_extra_drop` and
+        `_scale_down` leave one), and one held by another road — gated or its profile paused (rule 1 restarts it
+        once the pause ends), suspended, a restart wanted, being dropped, superseded, just restarted. A worker
+        extra that declared out of work is rule 14's (`_scale_down`, before this). This home's records alone."""
+        if not isinstance(s.scale, dict) or s.state != "exited" or s.host != self.host:
             return
-        if s.superseded_by or s.scale.get("drop") or self._owes_reading(s) or self._just_restarted(s, now):
+        if s.superseded_by or s.scale.get("drop") or self._just_restarted(s, now) or self._crashed(s, now):
             return
-        if s.gated or s.suspended or s.restart_ceiling:
+        if s.gated or s.suspended or s.restart_wanted or self._profile_gated(s.profile, now, s.team):
             return
         git = s.git or {}
         if not all(isinstance(git.get(k), int) and git[k] == 0 for k in ("dirty", "unpushed")):
             return
+        if not s.pane:
+            why = "killed"
+        elif s.restart_ceiling:
+            why = "exited past its restart ceiling"
+        elif s.wrapup_at or s.wrapup_sent_at or s.out_of_work:
+            why = "exited after a wrap-up"
+        elif s.run_until and now >= _parse(s.run_until):
+            why = "stopped"
+        else:
+            why = "exited, nothing waiting on it"
         try:
             await self.rpc_close(s.id, closer={"by": "tick", "why": "extra_held"})
         except Exception as e:  # noqa: BLE001 — tried again next tick
-            log.warning("%s: the exited extra seat was not closed held: %s", self._address(s), e)
+            log.warning("%s: the exited extra was not closed held: %s", self._address(s), e)
             return
-        s.scale = {**s.scale, "last": {"at": now_iso(), "did": "hold", "why": "exited, nothing waiting on it"}}
+        s.scale = {**s.scale, "last": {"at": now_iso(), "did": "hold", "why": why}}
         self._save(s)
-        log.info("%s: an extra seat exited with nothing waiting on it, closed back to held", self._address(s))
+        log.info("%s: an extra %s, closed back to held", self._address(s), why)
 
     async def _lost_brief(self, s: Session, now: datetime) -> bool:
         """A lost brief (design §4.1 *A launch whose hook never comes is recovered*, §6 rule 1, TD-717,
