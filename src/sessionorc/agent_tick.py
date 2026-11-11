@@ -379,14 +379,17 @@ class TickMixin:
         none has acted on for longer than its kind's wait — recomputed whole each tick, so an entry drops the
         tick an actor acts or the work closes. Two kinds: an open `ask` to a session (`ask:<id>`) and a decided
         board line waiting on a session (`board:<key>`, `_stuck_orders`, its clock kept as `stuck_open`). It rings
-        no session and presses nothing; a surprise is a log line and the last reading stands."""
+        no session and presses nothing; a surprise is a log line and the last reading stands. Where every actor
+        not acting names when its reason ends, soon enough, the work's `waiting_until` is kept in memory beside it
+        (`_stuck_until`), recomputed each tick and served with the reading, never stored."""
         if self.mode != "home":
             return
+        until: dict[str, str] = {}
         try:
             graph = self._graph()
             old = self._host_rec.get("stuck") or {}
             old_open = self._host_rec.get("stuck_open") or {}
-            new, new_open = self._stuck_orders(graph, old, old_open, now)
+            new, new_open = self._stuck_orders(graph, old, old_open, now, until)
             for e in stuck_mod.open_asks(graph):
                 opened = _parse(e.at)
                 actors, walked = [], set()
@@ -405,9 +408,12 @@ class TickMixin:
                     )
                 if (got := stuck_mod.reading(actors, now, mail.STUCK_ASK_AFTER)) is not None:
                     new[f"ask:{e.id}"] = got
+                    if (w := stuck_mod.waiting_until(actors, now, mail.STUCK_ASK_AFTER)) is not None:
+                        until[f"ask:{e.id}"] = stuck_mod.iso(w)
         except Exception:  # noqa: BLE001 — a reading: the last one stands, the next tick reads again
             log.exception("reading the stuck work failed")
             return
+        self._stuck_until = {k: v for k, v in until.items() if k in new}
         if new == old and new_open == old_open:
             return
         for k, v in (("stuck", new), ("stuck_open", new_open)):
@@ -422,7 +428,12 @@ class TickMixin:
         await self._push_changes()
 
     def _stuck_orders(
-        self, graph: dict[str, Session], old: dict[str, Any], old_open: dict[str, Any], now: datetime
+        self,
+        graph: dict[str, Session],
+        old: dict[str, Any],
+        old_open: dict[str, Any],
+        now: datetime,
+        until: dict[str, str] | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Rule 13's decided board lines (design §6 *Stuck work*, TD-1496): the `board:` entries of `stuck` and
         `stuck_open` this tick. A repo read against origin is read whole: each open work order's `stuck_open`
@@ -430,7 +441,9 @@ class TickMixin:
         records, a team none of whose crew is live read whole by its `work_waiting`, *no lane takes it* where
         none does; a line no longer among its orders drops. A repo whose board fell back to the checkout closes
         only the lines it carries closed; one unread (no reading yet, or an errored board) keeps its entries
-        exactly as stored; a repo that left the roster drops its entries."""
+        exactly as stored; a repo that left the roster drops its entries. A line whose `Context:` entry the person
+        is asked about (`stuck.asked_refs`) is not read: its `stuck_open` is still moved, with `asked` set, and it
+        has no `stuck` entry. `until` gains each stuck line's `waiting_until`."""
         try:
             roster = {Path(p).name for p in hosts.local_host().repos()}
         except Exception:  # noqa: BLE001 — a roster that cannot be read drops nothing
@@ -442,6 +455,7 @@ class TickMixin:
         }
         kept = {m: {k: v for k, v in d.items() if roster is None or v.get("repo") in roster} for m, d in mine.items()}
         readings = {str(v.get("name") or Path(root).name): (root, v) for root, v in self._repos.items()}
+        roots = queue_mod.repo_roots(self._repos)
         stuck_new: dict[str, Any] = {}
         open_new: dict[str, Any] = {}
         for name in sorted({*readings, *(v["repo"] for d in kept.values() for v in d.values())}):
@@ -456,16 +470,23 @@ class TickMixin:
                 continue
             teams = self._host_rec.get("teams") or {}
             peers = {a: r for a, r in graph.items() if r.repo == root}
+            asked = stuck_mod.asked_refs(self.person_inbox, root, roots, now)
             for o in stuck_mod.orders(reading):
                 key = o["id"]
                 held = stuck_mod.holders(key, peers, now)
                 held_at = max((t for a in held if (t := stuck_mod.claim_at(peers[a], key))), default=None)
-                entry = stuck_mod.opened(kept["open"].get(key), name, held_at, now)
+                muted = stuck_mod.asked_about(o, asked)
+                entry = stuck_mod.opened(kept["open"].get(key), name, held_at, now, asked=muted)
                 open_new[key] = entry
+                if muted:
+                    continue  # on the person's card already, as the question about its entry (§6 rule 13)
                 at = _parse(entry["at"])
                 got = self._stuck_order(graph, teams, root, o, held, at, now)
                 if got is not None:
-                    stuck_new[key] = {**got, "repo": name}
+                    reading_, actors = got
+                    stuck_new[key] = {**reading_, "repo": name}
+                    if until is not None and (w := stuck_mod.waiting_until(actors, now, mail.STUCK_ORDER_AFTER)):
+                        until[key] = stuck_mod.iso(w)
         return stuck_new, open_new
 
     def _stuck_order(
@@ -477,9 +498,10 @@ class TickMixin:
         held: list[str],
         at: datetime,
         now: datetime,
-    ) -> dict[str, Any] | None:
-        """One work order's `stuck` reading (§6 rule 13): its holders while one holds it, else its lanes' records
-        by team — a team none of whose crew is live read whole (`stuck.team_reason`) — or *no lane takes it*."""
+    ) -> tuple[dict[str, Any], list[stuck_mod.Actor]] | None:
+        """One work order's `stuck` reading (§6 rule 13), with the actors it was read from: its holders while one
+        holds it, else its lanes' records by team — a team none of whose crew is live read whole
+        (`stuck.team_reason`) — or *no lane takes it* (no actors). None while it is not stuck."""
         key = order["id"]
 
         def one(sid: str) -> stuck_mod.Actor:
@@ -488,11 +510,16 @@ class TickMixin:
                 graph.get(sid), sid, stamp, unfillable=self.unfillable, open_at=at, idle_clock=at, now=now
             )
 
+        def read(actors: list[stuck_mod.Actor]) -> tuple[dict[str, Any], list[stuck_mod.Actor]] | None:
+            got = stuck_mod.reading(actors, now, mail.STUCK_ORDER_AFTER)
+            return (got, actors) if got is not None else None
+
         if held:
-            return stuck_mod.reading([one(a) for a in held], now, mail.STUCK_ORDER_AFTER)
+            return read([one(a) for a in held])
         lanes = stuck_mod.lane_records(root, order["entry"], graph, teams)
         if not lanes:
-            return stuck_mod.no_lane(at, now, mail.STUCK_ORDER_AFTER)
+            got = stuck_mod.no_lane(at, now, mail.STUCK_ORDER_AFTER)
+            return (got, []) if got is not None else None
         actors: list[stuck_mod.Actor] = []
         done: set[str] = set()
         for sid in lanes:
@@ -504,12 +531,16 @@ class TickMixin:
                 members = [r for r in graph.values() if r.team == team]
                 mark = (teams.get(team) or {}).get("work_waiting")
                 if (reason := stuck_mod.team_reason(team, members, mark, key)) is not None:
-                    actors.append(stuck_mod.Actor(team, "", team, reason=reason, since=at, team=True))
+                    actors.append(
+                        stuck_mod.Actor(
+                            team, "", team, reason=reason, since=at, team=True, until=stuck_mod.comes_back(reason)
+                        )
+                    )
                     continue
                 actors.extend(one(a) for a in lanes if (graph[a].team or "") == team)
             else:
                 actors.append(one(sid))
-        return stuck_mod.reading(actors, now, mail.STUCK_ORDER_AFTER)
+        return read(actors)
 
     async def _team_stop_times(self, now: datetime) -> None:
         """Design §6 *Team stop time* (TD-146): each live, unattended session carrying a team's badge

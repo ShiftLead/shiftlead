@@ -10,6 +10,7 @@ import pytest
 from conftest import park_ticks
 
 from sessionorc import hosts, mail, models, stuck, workorders
+from sessionorc import ledgerboard as lb
 from sessionorc.client import LocalClient
 from sessionorc.store import HostStore
 
@@ -214,7 +215,10 @@ OWAIT = mail.STUCK_ORDER_AFTER
 
 
 def board(*, case: str | None = "current", lines: tuple[str, ...] = (LINE,), carried: tuple[str, ...] = ()) -> dict:
-    items = [{"key": workorders.key(t), "text": t, "decided": {"text": "keep"}, "kind": "decide"} for t in lines]
+    items = [
+        {"key": workorders.key(t), "text": t, "decided": {"text": "keep"}, "kind": "decide", "refs": lb.item_refs(t)}
+        for t in lines
+    ]
     b = {"fetch_case": case, "items": items, "carried": [{"key": k} for k in carried]}
     return {"name": "fx", "root": ROOT, "boards": {"boards": [b]}}
 
@@ -259,7 +263,7 @@ def test_board_read_and_opened_follow_the_clock():
     rel = stuck.opened(claim, "fx", None, NOW + timedelta(minutes=30))
     assert rel["at"] == _z(NOW + timedelta(minutes=30)) and "holder" not in rel, "the release, once"
     assert stuck.opened(rel, "fx", None, NOW + timedelta(hours=1)) == rel, "the next tick moves nothing"
-    assert stuck.opened({**first, "asked": True}, "fx", None, NOW)["asked"] is True
+    assert stuck.opened({**first, "asked": True}, "fx", None, NOW, asked=True)["asked"] is True
 
 
 @pytest.mark.unit
@@ -412,3 +416,137 @@ def test_lane_records_go_by_teams_order_then_id_and_a_blank_source_claim_is_cloc
     assert stuck.lane_records(ROOT, entry, records) == ["ao-b", "ao-a"], "by name where no order is known"
     w = member("w", progress=[models.ProgressEntry(ref=KEY, status="claimed", at=_z(NOW), source="")])
     assert stuck.claim_at(w, KEY) == NOW, "a claim lease_holders counts is clocked from its own at"
+
+
+# -- the person's question mutes a line, and a reason that names its own end waits (TD-1496 slice 3) -------------
+
+
+def person_ask(mid: str = "m-p", about: str = "TD-7", repo: str | None = "fx", kind: str = "ask", **kw):
+    e = models.MailEntry(id=mid, from_="ao-w", to=[models.PERSON], at=_z(NOW), kind=kind, text="q", about=about)
+    e.repo = repo
+    for k, v in kw.items():
+        setattr(e, k, v)
+    return e
+
+
+@pytest.mark.unit
+def test_opened_sets_asked_and_moves_at_once_on_the_answer():
+    first = stuck.opened(None, "fx", None, NOW, asked=True)
+    assert first == {"at": _z(NOW), "repo": "fx", "asked": True}, "first read with a question open: that tick"
+    still = stuck.opened(first, "fx", None, NOW + timedelta(hours=2), asked=True)
+    assert still == first, "while it counts nothing moves"
+    later = NOW + timedelta(hours=3)
+    answered = stuck.opened(still, "fx", None, later)
+    assert answered == {"at": _z(later), "repo": "fx"}, "the answer: its tick, asked cleared"
+    assert stuck.opened(answered, "fx", None, later + timedelta(hours=1)) == answered, "once"
+    both = {"at": _z(NOW), "repo": "fx", "holder": True, "asked": True}
+    once = stuck.opened(both, "fx", None, later)
+    assert once == {"at": _z(later), "repo": "fx"}, "a release and an answer on one tick move at once, clear both"
+    assert stuck.open_shape_ok(KEY, both), "a restart keeps both markers"
+
+
+@pytest.mark.unit
+def test_in_snoozed_fold_answers_as_the_inbox_draws_it():
+    from shiftlead.ui.inbox import inbox_sections
+
+    cases = {
+        "m-ahead": {"snoozed_until": _z(NOW + timedelta(hours=1))},
+        "m-past": {"snoozed_until": _z(NOW - timedelta(hours=1))},
+        "m-bad": {"snoozed_until": "not a time"},
+        "m-look": {"snoozed_for": "m-handed"},
+        "m-none": {},
+        "m-steer": {"kind": "steer", "snoozed_until": _z(NOW + timedelta(hours=1))},
+    }
+    entries = [person_ask(mid, **kw) for mid, kw in cases.items()]
+    drawn = {e["id"] for e in inbox_sections([e.to_dict() for e in entries], now=NOW)["snoozed"]}
+    assert {e.id for e in entries if stuck.in_snoozed_fold(e, NOW)} == drawn == {"m-ahead", "m-look", "m-steer"}
+
+
+@pytest.mark.unit
+def test_asked_refs_filters_by_repo_and_the_snoozed_fold():
+    roots = {"fx": ROOT, "other": "/repos/other", "reg-name": "/repos/fx-dir"}
+    box = [
+        person_ask("m-1", about="td-7"),
+        person_ask("m-2", about="TD-8", repo=None),  # no envelope repo: counts for no line
+        person_ask("m-3", about="TD-9", repo="other"),
+        person_ask("m-4", about="TD-10", snoozed_until=_z(NOW + timedelta(hours=1))),
+        person_ask("m-5", about="TD-11", snoozed_for="m-h"),
+        person_ask("m-6", about="TD-12", kind="steer", paused_at=_z(NOW)),
+        person_ask("m-7", about="TD-13", closed_reason="replied"),
+        person_ask("m-8", about="fx#TD-14"),  # a repo-qualified about is no bare TD-n
+        person_ask("m-9", about="TD-15", repo="nowhere"),
+    ]
+    assert stuck.asked_refs(box, ROOT, roots, NOW) == {"TD-007", "TD-012"}
+    assert stuck.asked_refs([person_ask(repo="reg-name")], "/repos/fx-dir", roots, NOW) == {"TD-007"}, (
+        "a registry name that differs from its directory's"
+    )
+    order = {"entry": {"refs": ["TD-7"]}}
+    assert stuck.asked_about(order, {"TD-007"}), "td-7 and TD-7 are one entry"
+    for refs in (["fx#TD-7"], ["PR #7"], []):
+        assert not stuck.asked_about({"entry": {"refs": refs}}, {"TD-007"}), refs
+    assert not stuck.asked_about(order, {"TD-008"}), "an ask about another entry"
+
+
+@pytest.mark.unit
+def test_waiting_until_is_the_earliest_instant_when_every_actor_names_one():
+    def a(until=None, **kw):
+        return stuck.Actor("ao-x", "", "x", until=until, **kw)
+
+    soon, later = NOW + timedelta(minutes=10), NOW + timedelta(minutes=40)
+    assert stuck.waiting_until([a(later), a(soon)], NOW, WAIT) == soon
+    assert stuck.waiting_until([a(soon), a()], NOW, WAIT) is None, "one with no instant is a need"
+    assert stuck.waiting_until([a(soon), a(own=True)], NOW, WAIT) == soon, "a person's own session passed over"
+    assert stuck.waiting_until([a(NOW + WAIT + timedelta(minutes=1))], NOW, WAIT) is None, "further than the wait"
+    assert stuck.waiting_until([a(NOW - timedelta(minutes=1))], NOW, WAIT) is None, "the instant passed"
+    lim = rec("lim", "limited", limited_reset=_z(soon))
+    assert stuck.comes_back({"state": "limited"}, lim) == soon
+    assert stuck.comes_back({"state": "limited"}, rec("l2", "limited")) is None, "no reset known"
+    assert stuck.comes_back({"state": "scheduled", "start_at": _z(soon)}) == soon
+    assert stuck.comes_back({"state": "gated", "gate": {"profile": "p", "resets": _z(soon)}}) == soon
+    started = NOW - timedelta(minutes=20)
+    early = {"state": "team", "team": "beta", "held": {"why": "early", "started": _z(started)}}
+    assert stuck.comes_back(early) == started + timedelta(minutes=30)
+    assert stuck.comes_back({"state": "team", "held": {"why": "usage", "profile": "p"}}) is None, "usage, no resets"
+    assert stuck.comes_back({"state": "team", "held": {"why": "until", "until": _z(soon)}}) == soon
+    assert stuck.comes_back({"state": "idle"}) is None
+
+
+@pytest.mark.integration
+async def test_a_line_the_person_is_asked_about_is_muted_and_clocked_from_the_answer(home):
+    await park_ticks(home)
+    w = member("w", state="limited")
+    put(home, w)
+    home._host_rec["stuck_open"] = {KEY: {"at": _z(NOW - timedelta(hours=3)), "repo": "fx"}}
+    await home._stuck_pass(NOW)
+    assert KEY in home._host_rec["stuck"], "stuck before the question"
+    q = person_ask("m-q", about="TD-7")
+    home.person_inbox.append(q)
+    await home._stuck_pass(NOW)
+    assert "stuck" not in home._host_rec, "the person's question mutes the line"
+    assert home._host_rec["stuck_open"][KEY] == {"at": _z(NOW - timedelta(hours=3)), "repo": "fx", "asked": True}
+    later = NOW + timedelta(hours=2)
+    q.closed_reason = "replied"
+    await home._stuck_pass(later)
+    assert home._host_rec["stuck_open"][KEY] == {"at": _z(later), "repo": "fx"}, "clocked from the answer"
+    assert "stuck" not in home._host_rec, "not stuck at once"
+    await home._stuck_pass(later + OWAIT + timedelta(minutes=1))
+    assert home._host_rec["stuck"][KEY]["since"] == _z(later), "one wait after the answer"
+    home.person_inbox.append(person_ask("m-s", about="TD-7", snoozed_until=_z(later + timedelta(days=1))))
+    home.person_inbox.append(person_ask("m-o", about="TD-7", repo="other"))
+    await home._stuck_pass(later + OWAIT + timedelta(minutes=2))
+    assert KEY in home._host_rec["stuck"], "a snoozed ask, and one from another repo, mute nothing"
+    home.person_inbox[:] = [e for e in home.person_inbox if e.id not in ("m-q", "m-s", "m-o")]
+
+
+@pytest.mark.integration
+async def test_waiting_until_is_served_beside_the_stuck_row_and_never_stored(home):
+    await park_ticks(home)
+    reset = NOW + timedelta(minutes=10)
+    put(home, member("w", state="limited", limited_reset=_z(reset)))
+    home._host_rec["stuck_open"] = {KEY: {"at": _z(NOW - timedelta(hours=3)), "repo": "fx"}}
+    await home._stuck_pass(NOW)
+    assert "waiting_until" not in home._host_rec["stuck"][KEY], "never stored"
+    assert (await home.rpc_host())["stuck"][KEY]["waiting_until"] == _z(reset), "served with the reading"
+    home.sessions["ao-w"].limited_reset = None
+    await home._stuck_pass(NOW)
+    assert "waiting_until" not in (await home.rpc_host())["stuck"][KEY], "no reset known: a need"

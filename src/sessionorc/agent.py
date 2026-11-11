@@ -595,6 +595,10 @@ class HostAgent(
         # routed around*, TD-1443): `{record_id: why}`, written each tick by `_seat_pass` and `_fill`, read by
         # `seat_able`. In memory only; empty before the first tick, which reads as fillable.
         self.unfillable: dict[str, str] = {}
+        # Rule 13's `waiting_until` for each stuck work whose every not-acting actor names when its reason ends
+        # (§6 *A reason that names its own end waits*): `{key: instant}`, written each tick by `_stuck_pass`,
+        # served beside `stuck`. In memory only, never stored.
+        self._stuck_until: dict[str, str] = {}
         # The container supervisor (§4.4a "The home supervises it", step 3c.3): per container node,
         # what the tick is doing about a down link — `{doing, since, attempts, next}` — and the one
         # action in flight. `container_runner` is the seam the suite replaces.
@@ -1360,7 +1364,11 @@ class HostAgent(
             out["push"] = self._push_view()  # the Push card's devices and key (§4.10, TD-1302); absent on a node
             out["ci_spells"] = self._ci_spells_view()  # the *CI not starting* rows' spells (§4.4, TD-687)
             # rule 13's stuck work, for the Queue's and the Inbox's readers (§6 *Stuck work*, TD-1496)
-            out["stuck"] = {k: dict(v) for k, v in sorted((self._host_rec.get("stuck") or {}).items())}
+            # with its `waiting_until` where this tick read one (never stored)
+            out["stuck"] = {
+                k: {**v, **({"waiting_until": w} if (w := self._stuck_until.get(k)) else {})}
+                for k, v in sorted((self._host_rec.get("stuck") or {}).items())
+            }
             out["work"] = {
                 team: dict(rec["work_waiting"])
                 for team, rec in sorted((self._host_rec.get("teams") or {}).items())
