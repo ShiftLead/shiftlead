@@ -74,7 +74,7 @@ People: paul
     - It names you as its owner. Owner is about to stop holding an entry (TD-1375), so TD-1374 gated it with decision (paul), and this item is how you release it.
   - **Question:** Will you run one attended Claude Code launch in a fresh worktree of a repo whose main checkout is trusted, to see whether the trust dialog still appears?
   - **Recommended:** only you can know: Yes lifts the gate and the entry goes ahead; Not yet keeps it waiting on you.
-- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — Once the review rounds converge and the three parts are built, will you use Focus on your phone for a real session and say whether it is the phone view you want? Context: TD-003 decision (paul). Due: 2026-11-19. Answers: Yes | Not yet. Lifts: Yes.
+- [x] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — Once the review rounds converge and the three parts are built, will you use Focus on your phone for a real session and say whether it is the phone view you want? Context: TD-003 decision (paul). Due: 2026-11-19. Answers: Yes | Not yet. Lifts: Yes. Decided: Yes (by paul) (2026-11-11). Closed: 2026-11-11 — lifted.
   - **Context:** The ledger entry is: Phone layout: Focus as one screen — the terminal, the strip, the key bar and the input bar, everything else in sheets.
     - It names you as its owner. Owner is about to stop holding an entry (TD-1375), so TD-1374 gated it with decision (paul), and this item is how you release it.
   - **Question:** Once the review rounds converge and the three parts are built, will you use Focus on your phone for a real session and say whether it is the phone view you want?
