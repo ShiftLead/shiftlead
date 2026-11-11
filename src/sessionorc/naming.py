@@ -81,7 +81,9 @@ def qualify(address: str, *, local: str) -> str:
 ADDRESS_KEYS = frozenset(
     {"id", "from", "to", "about", "controllers", "copies", "copies_failed", "delivered", "wake_budget_spent", "holder"}
 )
-ADDRESS_MAPS = frozenset({"forwarded", "seated"})  # id → id (`seated`: a scaled seat → its record, TD-1547)
+# id → id (`seated`: a scaled seat → its record, TD-1547); `seat_choice` is id → {seat: id, extras}, its values read
+# with `seat` an address key
+ADDRESS_MAPS = frozenset({"forwarded", "seated", "seat_choice"})
 
 
 def is_address(value: Any) -> bool:
@@ -106,7 +108,12 @@ def readdress(obj: Any, fn: Callable[[str], str], *, keys: frozenset[str] = ADDR
             else:
                 out[k] = readdress(v, fn, keys=keys)
         elif k in ADDRESS_MAPS and isinstance(v, dict):
-            out[k] = {(fn(a) if is_address(a) else a): (fn(b) if is_address(b) else b) for a, b in v.items()}
+            out[k] = {
+                (fn(a) if is_address(a) else a): (
+                    fn(b) if is_address(b) else readdress(b, fn, keys=keys | {"seat"}) if isinstance(b, dict) else b
+                )
+                for a, b in v.items()
+            }
         else:
             out[k] = readdress(v, fn, keys=keys)
     return out

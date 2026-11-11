@@ -1631,6 +1631,9 @@ class MailMixin:
             "copies_failed": failed,
             "forwarded": forwarded,
             "seated": seated,  # §4.9 *Mail to a scaled seat* (TD-1547): the seat's own id → the record that took it
+            # the delivered record → the seat it stands for and the choice's `read_when` words, so a caller that writes
+            # its own sentence (a handed entry's, with no bound) reads §4.10's scaled-seat rows as the send does
+            "seat_choice": {to: {"seat": own, "extras": seat_words.get(to)} for to, own in seat_of.items()},
             "closed": replied.id if closes and replied is not None else None,
             "answered_for_you": fyi_id,  # the FYI filed to the person for a reply with a source (§4.9b)
             "warnings": warnings,  # §4.10 *A subject on every entry*: said on a line, never refused
