@@ -1452,10 +1452,12 @@ block. A policy is agent code and needs no grant; a session doing the same work 
          stopped, is read whole, by its `work_waiting` (rule 8) — one whose members ended otherwise (a
          crash, a restart ceiling) keeps each member's own state as its reason, the cure's name — where two teams' lanes
          take it, each team's, the reason the first's in `teams` order. A line no team's lane takes reads
-         *no lane takes it* once past the wait. A **holder** is its only actor while one holds it: a record
-         holding a lease on `board:<key>` as the lanes read one (§4.8 *A claim is a lease*, `_leased`: a
-         declared `claimed` entry on that ref, the record not `exited`, `closed` or `scheduled`, its `at` inside
-         `LEASE_TTL`), whatever its kind, a seat among them; a claim that is no lease (a drop, a `done`, the
+         *no lane takes it* once past the wait. While the line has a **holder**, its holders are its only
+         actors: each record that `mail.lease_holders(f"board:{key}", records, now)` returns over the
+         records of the board reading's repo (as the lanes' peers are read) — a declared `claimed` entry on
+         that ref, the record not `exited`, `closed` or `scheduled` (`mail._NOT_LIVE`), its `at` inside
+         `LEASE_TTL` (§4.8 *A claim is a lease*), whatever its kind, a seat among them; two (a `--force`
+         over a lease) are both actors, and its claim `at` is that `claimed` entry's. A claim that is no lease (a drop, a `done`, the
          holder's exit, a restart whose next run has not taken it up, a lapsed lease) holds nothing, and the
          line is back with its lanes' records — as the lanes read it, so a `done` before the close PR
          merges leaves the line to the lanes until it closes. An idle holder waiting on its PR's review or
@@ -1520,11 +1522,13 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        other actors, a person's own session is passed over: not in the acting test, nor `since`, nor the
        choice of the first actor and its reason. A
        member the person took over is not the person's own: it reads `taken_over`. And a **holder waiting
-       on the person** — an open `ask` or `steer` of its record's to the person whose `about` is the line's
-       `Context:` entry (`MailEntry.about`, a `TD-n`; a line whose `Context:` names no entry has none) —
-       is no actor while it is open, and the line, with no other actor, is not read: its `stuck_open`
-       entry stays as stored and its `stuck` entry drops (the question is on the person's card already); it
-       is read again the tick the question closes or lapses.
+       on the person** — an `ask` or `steer` open in the person inbox whose `from` is the holder's record
+       id and whose `about`, read by `reference_of`, is the `TD-n` the line's `Context:` names (a line whose
+       `Context:` names no entry has no such question, and its holder stays an actor) — is no actor while
+       it is open; where every holder waits so, the line is not read, whatever its lanes hold: its `stuck`
+       entry drops (the question is on the person's card already) and its `stuck_open` entry is kept and
+       still moved by its holders (*The clock*: a claim, a release), with `asked` set; it is read again
+       the tick no holder waits so, that tick's instant its open time (below).
      - **The clock.** The work's **open time** is the ask's `at`, or the first tick the home read the line
        decided (below). The home keeps a board line's moving
        parts on `host.json` as **`stuck_open`** (below; shape-checked by
@@ -1532,11 +1536,14 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        `stuck` is, an entry that fails it dropped), so a home restart keeps them: a line's `at` is the
        first tick it was among `workorders.orders()`'s work orders (every open decided line that is
        not `fyi`), and from then the **latest** of its stored `at` (so it never moves back), the holder's
-       claim `at` while one holds it, and the release: the first tick that reads no holder where the tick
-       before read one — a drop, a `done`, an exit, a restart or a lapsed lease alike, the tick's own
-       instant — marked by **`held`**, the holder's record id, written on each tick one holds it and cleared
-       on the release tick, so a restart keeps it and each release moves `at` once (`stuck_open: {<key>:
-       {at, repo, held?}}`);
+       claim `at` (the latest among its holders) while one holds it, the release — the first tick that
+       reads no holder where the tick before read one: a drop, a `done`, an exit, a restart or a lapsed
+       lease alike, the tick's own instant — and the answer — the first tick that reads no holder waiting
+       on the person where the tick before read every one waiting, the tick's own instant. Two markers
+       tell those ticks from the next, so a restart keeps them and each moves `at` once: **`holder`**, the
+       first holder's record id, written on each tick one holds the line and cleared on the release tick,
+       and **`asked`**, `true` on each tick every holder waits on the person and cleared on the answer's
+       tick (`stuck_open: {<key>: {at, repo, holder?, asked?}}`);
        the entry dropped when the line closes or is no longer
        decided as a reading that holds it says — a repo
        whose board reading is absent (not yet read, or its read raised), errored, or fell back to the
