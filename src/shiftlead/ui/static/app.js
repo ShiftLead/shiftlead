@@ -4487,7 +4487,7 @@
   // slice 3): one form from the Repo page and the team card's Repo facet, the repo fixed by the press.
   // **Hand to the techlead** (slice 4) sends the words to `entry_add` and toasts the message's id, a
   // link to its page. **Open a session** starts an interactive session in a new worktree and goes to its Focus with the
-  // composer holding `entry.md`'s lines and the words — kept here as that session's draft until sent
+  // composer holding the values block and the words (`entry.md`'s lines are its start context, TD-1664) — kept here as that session's draft until sent
   // (`AO.draftKey`); nothing is typed into the pane. The page writes no file.
   AO.draftKey = (sid) => `ao.draft.${sid}`;
   let entryAttach = null;

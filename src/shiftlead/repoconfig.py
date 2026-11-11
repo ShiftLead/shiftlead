@@ -188,6 +188,15 @@ HANDED_ENTRY = {
     "{ledger}": "that repo's ledger, a file or a directory of one file per entry (`.shiftlead.yml`'s `ledger:`, by "
     "default `docs/ledger` where it is a directory, else `docs/technical_debt.md`)",
 }
+# The Add entry reader's constants (design §4.3 *The shared text goes in the system prompt, the per-start text after
+# it*, TD-1664): every Add entry start's `entry.md` is filled with these, so its context file is the same text for
+# each and is read from the prompt cache; the values themselves open the composer (`ui/app.py` `entry_values`).
+ADDED_ENTRY = {
+    "{repo}": "the repo in your first message's values",
+    "{type}": "the Type in your first message's values",
+    "{priority}": "the Priority in your first message's values",
+    "{ledger}": "the ledger in your first message's values",
+}
 
 
 # The layout slots (design §5 *The seams*, TD-588, TD-1011): what a built-in brief names of a repo's layout,

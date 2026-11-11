@@ -390,11 +390,11 @@ def test_entry_rules_are_written_once_and_read_both_ways():
     the techlead's brief takes the same text through `{entry}`, the slots said in words since the repo
     and type ride on the handed message — and no other preset carries it."""
     filled = repoconfig.entry_text("shiftlead", "feature", "high", "docs/technical_debt.md")
-    assert "ledger of shiftlead: docs/technical_debt.md, with Type feature and Priority high" in filled
+    assert "its repo is shiftlead, its ledger docs/technical_debt.md, its Type feature and its Priority high" in filled
     # the priority is the pick's (TD-851): written, and no longer among what the person is asked
-    assert "`**Priority:** high`" in filled and "Never ask the person a priority" in filled
+    assert "`**Priority:**` followed by high" in filled and "Never ask the person a priority they picked" in filled
     assert "do not settle: which of two readings" in filled and "settle: a priority" not in filled
-    assert "`**Type:** feature`" in filled and "open PR" in filled and "Summary row" not in filled
+    assert "`**Type:**` followed by feature" in filled and "open PR" in filled and "Summary row" not in filled
     # a split ledger has no summary table; the entry is filed by the helper, never typed (§4.4, TD-1360)
     assert "ledger.py new --id TD-n" in filled and "ledger.py fmt" not in filled
     assert not any(slot in filled for slot in repoconfig.ENTRY_SLOTS)
@@ -405,6 +405,13 @@ def test_entry_rules_are_written_once_and_read_both_ways():
     text, made = tl.compose([])
     assert "{entry}" not in text and "## An entry handed to you" in text
     assert repoconfig.entry_text(*(repoconfig.HANDED_ENTRY[s] for s in repoconfig.ENTRY_SLOTS)) in text
+    # both readers' constants read as instructions where a slot follows a header (TD-1664)
+    handed = repoconfig.entry_text(*(repoconfig.HANDED_ENTRY[s] for s in repoconfig.ENTRY_SLOTS))
+    assert "`**Priority:**` followed by the `priority` its `entry` carries" in handed
+    added = repoconfig.entry_text(*(repoconfig.ADDED_ENTRY[s] for s in repoconfig.ENTRY_SLOTS))
+    assert "`**Type:**` followed by the Type in your first message's values" in added
+    assert "it has no values block, or a value is missing or unreadable, ask the person" in added
+    assert added.count("first message's values") >= 4 and not any(s in added for s in repoconfig.ENTRY_SLOTS)
     # a replay fills it after the repo's brief and the path's two slots (§4.9c)
     assert list(made["slots"])[:4] == ["{repo}", "{flow}", "{stage}", "{entry}"]
     for name in ("grinder", "hunter", "manager", "auditor"):

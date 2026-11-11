@@ -162,7 +162,8 @@ def test_a_machine_nodes_team_reads_its_role_reader_and_ledger_there(tmp_path, m
     assert r.status_code == 200, r.text
     (kw,) = created
     assert (kw["host"], kw["dir"], kw["role"], kw["ledger"]) == ("node1", NODE_DIR, "designer", "docs/node-ledger.md")
-    assert "docs/node-ledger.md" in kw["start_context"]
+    # the node's ledger reaches the session in the composer's values block, never its start context (TD-1664)
+    assert r.json()["text"].endswith(", ledger: docs/node-ledger.md") and "node-ledger" not in kw["start_context"]
     assert any(m == "host_files" for m, _ in calls), "the ledger was read on the node"
     (cfg,) = readers
     assert cfg is not None and cfg.ledger == "docs/node-ledger.md", "the reader is given the node's config"

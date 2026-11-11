@@ -104,13 +104,16 @@ def test_open_a_session_starts_the_types_role_interactive_in_a_new_worktree_with
     assert kw["project"] == "sam"  # the repo's project, as New session's badge (§4.9, TD-1043)
     assert kw["controllers"] == ["ao-samscrape-manager-sam"]
     assert kw["context_bound"] is None  # a person's own session takes no default bound (§4.8, TD-249)
-    # entry.md's lines, filled, are the session's start context (§4.3, TD-283 part 2): the create carries them
-    assert kw["start_context"].startswith(
-        "The person asked for a new entry in the ledger of samscrape: docs/technical_debt.md, with Type feature"
-    )
-    assert "Their first message is their words for it." in kw["start_context"] and words not in kw["start_context"]
-    # …and the composer holds the person's words and nothing else
-    assert r.json()["text"] == words and r.json()["id"] == "ao-samscrape-entry-2"
+    # entry.md's lines, filled with the Add entry reader's constants, are the session's start context (§4.3, TD-283
+    # part 2, TD-1664): the create carries them, and none of this start's values
+    from shiftlead import repoconfig
+
+    assert kw["start_context"] == repoconfig.entry_text(*(repoconfig.ADDED_ENTRY[s] for s in repoconfig.ENTRY_SLOTS))
+    assert "its repo is the repo in your first message's values" in kw["start_context"]
+    assert "samscrape" not in kw["start_context"] and words not in kw["start_context"]
+    # …and the composer holds the values block, then the person's words
+    values = "Add entry values — repo: samscrape, Type: feature, Priority: medium, ledger: docs/technical_debt.md"
+    assert r.json()["text"] == f"{values}\n\n{words}" and r.json()["id"] == "ao-samscrape-entry-2"
 
 
 def test_a_repo_no_team_services_starts_plain_with_no_badge(tmp_path, monkeypatch):
@@ -127,8 +130,11 @@ def test_a_repo_no_team_services_starts_plain_with_no_badge(tmp_path, monkeypatc
     # with **What** empty the composer is empty, and the session is told the same
     from shiftlead import repoconfig
 
-    assert r.json()["text"] == ""
-    assert kw["start_context"] == repoconfig.entry_text("samscrape", "debt", "medium", "docs/technical_debt.md")
+    assert (
+        r.json()["text"]
+        == "Add entry values — repo: samscrape, Type: debt, Priority: medium, ledger: docs/technical_debt.md"
+    )
+    assert kw["start_context"] == repoconfig.entry_text(*(repoconfig.ADDED_ENTRY[s] for s in repoconfig.ENTRY_SLOTS))
 
 
 def test_two_open_a_session_starts_of_different_teams_on_one_project_may_mail_each_other(tmp_path, monkeypatch):
@@ -167,6 +173,41 @@ def test_two_open_a_session_starts_of_different_teams_on_one_project_may_mail_ea
     }
     assert mail.message_edge(records, "ao-0", "ao-1", kind="note") == "project"
     assert mail.message_edge(records, "ao-1", "ao-0", kind="note") == "project"
+
+
+def test_two_add_entry_starts_share_their_start_context_and_each_composer_holds_its_own_values(tmp_path, monkeypatch):
+    """TD-1664, design §4.3 *The shared text goes in the system prompt, the per-start text after it*: two **Open a
+    session** starts with different repos, Types and Priorities hand `create` the same `start_context`, so the second
+    reads the first's system prompt from the cache; what differs between them, and the person's words, is in each
+    one's composer text."""
+    world(tmp_path)
+    other = tmp_path / "samweb"
+    other.mkdir()
+    subprocess.run(["git", "init", "-q", str(other)], check=True)
+    home = tmp_path / "home"
+    (tmp_path / "repos.txt").write_text(f"{tmp_path / 'samscrape'}\n{other}\n")
+    doc = yaml.safe_load((home / "org.yml").read_text())
+    doc["projects"]["sam"]["repos"]["samweb"] = {"kmaster": str(other)}
+    (home / "org.yml").write_text(yaml.safe_dump(doc))
+    created: list[dict] = []
+    c = client(monkeypatch, tmp_path, fake([], created=created))
+    a = c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt", "priority": "high", "words": "fix it"})
+    b = c.post("/api/entry/session", json={"repo": "samweb", "type": "feature", "priority": "low", "words": ""})
+    assert a.status_code == 200 and b.status_code == 200, (a.text, b.text)
+    assert created[0]["start_context"] == created[1]["start_context"]
+    assert a.json()["text"] == (
+        "Add entry values — repo: samscrape, Type: debt, Priority: high, ledger: docs/technical_debt.md\n\nfix it"
+    )
+    assert b.json()["text"].startswith("Add entry values — repo: samweb, Type: feature, Priority: low, ledger: ")
+    assert "\n" not in b.json()["text"]  # no words: the block alone
+
+
+def test_entry_values_is_one_labelled_line():
+    from shiftlead.ui.app import entry_values
+
+    assert entry_values("r", "debt", "low", "docs/ledger") == (
+        "Add entry values — repo: r, Type: debt, Priority: low, ledger: docs/ledger"
+    )
 
 
 def test_a_bad_type_or_an_unknown_repo_is_refused_and_nothing_starts(tmp_path, monkeypatch):
@@ -575,7 +616,7 @@ def test_the_form_draws_priority_beside_type_with_medium_selected_and_both_ways_
     r = c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt", "priority": "High", "words": ""})
     assert r.status_code == 200, r.text
     (kw,) = created
-    assert kw["start_context"] == repoconfig.entry_text("samscrape", "debt", "high", "docs/technical_debt.md")
-    assert "with Type debt and Priority high" in kw["start_context"]
+    assert kw["start_context"] == repoconfig.entry_text(*(repoconfig.ADDED_ENTRY[s] for s in repoconfig.ENTRY_SLOTS))
+    assert r.json()["text"].startswith("Add entry values — repo: samscrape, Type: debt, Priority: high,")
     bad = c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt", "priority": "urgent"})
     assert bad.status_code == 400 and "not 'urgent'" in bad.json()["detail"] and len(created) == 1
