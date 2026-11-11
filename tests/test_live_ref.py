@@ -307,3 +307,50 @@ async def test_a_moved_ref_makes_the_repo_due_also_while_its_sweep_runs(agent, m
     await agent._sweep_pass(today)
     assert seen == [True]
     assert "/r" not in agent._swept_on and not agent._resweep and not agent._sweeping
+
+
+def _survey_moves(monkeypatch, root: str, raise_after: bool) -> None:
+    """A survey that reports `root` moved; with `raise_after` it also names the root bad, so a press stops on
+    the refusal just after the call that marks the gates due (TD-1587)."""
+
+    def survey(roots, prev, full, auto, now, fetched=None, emit=None):
+        return {}, [], ({root: "stubbed survey"} if raise_after else {}), [root]
+
+    monkeypatch.setattr(promote, "survey", survey)
+
+
+@pytest.mark.integration
+async def test_the_promote_pass_makes_a_moved_repo_due(agent, checkout, monkeypatch):  # noqa: F811
+    """`_refresh_promotes` hands the survey's `moved` to `_live_ref_moved` (§6 *The live ref*, TD-1437)."""
+    from conftest import park_ticks
+    from test_promote import _register
+
+    await park_ticks(agent)
+    _register(checkout)
+    root = str(checkout)
+    agent._swept_on[root] = date.today()
+    _survey_moves(monkeypatch, root, raise_after=False)
+    agent._promote_read_at = float("-inf")
+    await agent._refresh_promotes()
+    assert root not in agent._swept_on
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("rollback", [False, True], ids=["press", "rollback"])
+async def test_a_press_and_a_rollback_make_a_moved_repo_due(agent, checkout, monkeypatch, rollback):  # noqa: F811
+    """`rpc_promote` and `_rollback` each hand their fresh survey's `moved` to `_live_ref_moved` before
+    anything can refuse the press (§6 *The live ref*, TD-1437)."""
+    from conftest import park_ticks
+    from test_promote import _register
+
+    from sessionorc.client import AgentError, LocalClient
+
+    await park_ticks(agent)
+    _register(checkout)
+    root = str(checkout)
+    agent._swept_on[root] = date.today()
+    _survey_moves(monkeypatch, root, raise_after=True)
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="stubbed survey"):
+            await person.call("promote", repo="repo", **({"sha": _head(checkout)} if rollback else {}))
+    assert root not in agent._swept_on
