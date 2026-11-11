@@ -725,7 +725,8 @@ def _cut_item(m: Mapping[str, Any]) -> dict[str, Any]:
     row = out.get("row")
     if isinstance(row, Mapping):
         if row.get("row") not in NOT_MAIL:
-            out["row"] = _keep(row, MAIL_KEEP)
+            # a state row's stuck lines are the home's words, never mail's (TD-1497 slice 3): kept as a stuck row is
+            out["row"] = _keep(row, (*MAIL_KEEP, "stuck_lines"))
         elif row.get("answered"):
             out["row"] = {**row, "answered": _keep(row["answered"], HELD_ANSWERED_KEEP)}
     return out

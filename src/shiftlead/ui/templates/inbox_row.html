@@ -704,6 +704,12 @@
 {{ doing_line(e) }}
 {#- on its Queue card, a holder's row carries the card's **routed around** line (§4.5a, §4.9b, TD-1443, TD-1468) #}
 {%- if drawn_on_queue and e.routed_to %}<div class="meta routed" title="cannot answer now: {{ e.routed_why }} (design §4.9b)">{{ e.routed_to }}</div>{% endif %}
+{#- §4.5a **Queue card / Inbox: stuck row** (§6 rule 13, TD-1497 slice 3): the stuck words of work this session is
+    the actor of, a line under its own pending or stopped holder's row (after its *routed around* line), never a row
+    of their own — one counted item for one cause; **Open** is this row's own -#}
+{%- for l in e.stuck_lines or () %}
+<div class="row gap wrap stuckline"><span class="badge kindmark k-stuck">stuck</span><span class="st">{{ l.text }}</span></div>
+{%- endfor %}
 {%- if section == 'snoozed' %}<div class="row">{{ snoozed_says(e) }}<span class="st">&nbsp;— the state itself is untouched</span></div>{% endif %}
 <div class="row gap wrap mfoot">
   {%- if e.row == 'permission' %}
