@@ -16,7 +16,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sessionorc import agent_common, mail
+from sessionorc import agent_common, mail, work, workorders
+from sessionorc import ledger as ledger_mod
 from sessionorc.models import PERSON, MailEntry, Session
 
 ENDED = ("exited", "closed")
@@ -86,6 +87,7 @@ class Actor:
     reason: dict[str, Any] | None = None
     since: datetime | None = None
     own: bool = False
+    team: bool = False  # a team read whole (a work order's): its reason is the team's, and it names no actor
 
 
 def judge(
@@ -159,8 +161,10 @@ def reading(actors: Iterable[Actor], now: datetime, wait: timedelta) -> dict[str
     if now - since <= wait:
         return None
     first = others[0]
-    actor = {"id": first.id, "host": first.host, "name": first.name, "more": len(others) - 1}
-    return {"since": iso(since), "reason": dict(first.reason or {}), "actor": actor}
+    got: dict[str, Any] = {"since": iso(since), "reason": dict(first.reason or {})}
+    if not first.team:
+        got["actor"] = {"id": first.id, "host": first.host, "name": first.name, "more": len(others) - 1}
+    return got
 
 
 def shape_ok(key: str, value: Any) -> bool:
@@ -190,3 +194,119 @@ def open_shape_ok(key: str, value: Any) -> bool:
         if not isinstance(value["asked"], bool):
             return False
     return True
+
+
+# -- a decided board line waiting on a session (§6 rule 13 *The work it reads*, *The clock*) ---------------------
+
+
+def board_read(reading: Any) -> str:
+    """How a repo's board was read this tick (§6 rule 13 *The clock*): `good` — read against origin; `fallback` —
+    a board read of the checkout (`fetch_case` *skipped*, or none at all: the board pass's plain read), which may
+    only close a line; `unread` — no reading yet, or its board read errored, so its lines stand as stored. A repo
+    with no board reads `good`: it has no line."""
+    bds = reading.get("boards") if isinstance(reading, Mapping) else None
+    if not isinstance(bds, Mapping) or "error" in bds or not isinstance(bds.get("boards"), list):
+        return "unread"
+    if any(not isinstance(b, Mapping) or b.get("fetch_case") in (None, "skipped") for b in bds["boards"]):
+        return "fallback"
+    return "good"
+
+
+def orders(reading: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """The work orders of a repo reading's boards (`workorders.orders`: every open decided line that is not
+    `fyi`), each `{id, entry}` — `entry` the line as the lanes read it (`workorders.entry`)."""
+    return [{"id": o["id"], "entry": workorders.entry(o)} for o in workorders.orders(reading.get("boards") or {})]
+
+
+def carried(reading: Mapping[str, Any]) -> set[str]:
+    """The keys of the closed decided lines a reading's boards carry (`workorders.carried`): what a fallback read
+    may close."""
+    out: set[str] = set()
+    for b in (reading.get("boards") or {}).get("boards") or ():
+        for c in (b.get("carried") or ()) if isinstance(b, Mapping) else ():
+            if isinstance(c, Mapping) and c.get("key"):
+                out.add(str(c["key"]))
+    return out
+
+
+def claim_at(r: Session, ref: str) -> datetime | None:
+    """A holder's claim instant on `ref`: its latest declared `claimed` entry's `at`."""
+    return _latest(*(p.at for p in r.progress if p.ref == ref and p.status == "claimed" and p.source == "declared"))
+
+
+def holders(ref: str, records: Mapping[str, Session], now: datetime) -> list[str]:
+    """The addresses of the records `mail.lease_holders` reads holding `ref` (§4.8 *A claim is a lease*), in the
+    order given — a seat among them, whatever its kind."""
+    rows = [
+        {"id": addr, "state": r.state, "progress": [p.to_dict() for p in r.progress]} for addr, r in records.items()
+    ]
+    return [str(h["id"]) for h in mail.lease_holders(ref, rows, now)]
+
+
+def opened(prev: Mapping[str, Any] | None, repo: str, held_at: datetime | None, now: datetime) -> dict[str, Any]:
+    """A line's `stuck_open` entry this tick (§6 rule 13 *The clock*): `at` the first tick it was read decided, and
+    from then the latest of the stored `at` (never moving back), its holders' latest claim while one holds it
+    (`held_at`; `holder` set), and the release — the first tick reading no holder where `holder` was set, the
+    tick's own instant, `holder` cleared then. `asked` is kept as stored."""
+    at = _when((prev or {}).get("at")) or now
+    out: dict[str, Any] = {"repo": repo}
+    if held_at is not None:
+        at = max(at, held_at)
+        out["holder"] = True
+    elif (prev or {}).get("holder"):
+        at = max(at, now)  # the release: a drop, a `done`, an exit, a restart or a lapsed lease alike
+    if (prev or {}).get("asked"):
+        out["asked"] = True
+    return {"at": iso(at), **out}
+
+
+def _has_lane_ids(mark: Any) -> bool:
+    members = mark.get("members") if isinstance(mark, Mapping) else None
+    return isinstance(members, Mapping) and any(isinstance(ids, list) and ids for ids in members.values())
+
+
+def team_reason(team: str, records: Iterable[Session], mark: Any, key: str) -> dict[str, Any] | None:
+    """A team read whole for a work order (§6 rule 13 *The work it reads*): none of its crew live and the team
+    wound down (`work.team_wound_down`) or stopped (`work.team_stopped`, by the person or its stop time) — its reason `{state: team, team, held}`
+    from its `work_waiting` (rule 8): `held` as rule 8 writes it; none for a mark with no `held` (*waits for your
+    Start*); `{why: wound_down}` where the team wound down with the line in its members' `lane_seen`; `{why:
+    stopped}` for no mark otherwise (*is not running*). A held-only mark (no lane ids) reads as no mark. None for a
+    team that is not read whole: its members are read each by its own state."""
+    mine = [r for r in records if not r.superseded_by]
+    if any(r.state not in work.DEAD for r in work.crew(mine)):
+        return None
+    wound = work.team_wound_down(mine) is not None
+    # stopped by the person or its stop time; a crew that ended otherwise (`by: other` — a crash, a restart
+    # ceiling) keeps each member's own state as its reason, the cure's name
+    if not wound and (work.team_stopped(mine) or {}).get("by") not in ("person", "until"):
+        return None
+    out: dict[str, Any] = {"state": "team", "team": team}
+    if _has_lane_ids(mark):
+        if isinstance(mark.get("held"), Mapping):
+            out["held"] = dict(mark["held"])
+        return out
+    seen = any(key in ((r.lane_seen or {}).get("ids") or ()) for r in mine)
+    out["held"] = {"why": "wound_down" if wound and seen else "stopped"}
+    return out
+
+
+def lane_records(root: str, entry: Mapping[str, Any], records: Mapping[str, Session]) -> list[str]:
+    """The addresses of the records whose lane takes a work order (§6 rule 13 *The work it reads*), as `ao repo`
+    reads the lanes: the repo's records no newer one supersedes, with a lane `ledger.lane_matches` takes it in —
+    never a seat (which has no lane) nor a member its flow sat out (`work.sat_out`) — by team, then id."""
+    out = [
+        (r.team or "", addr)
+        for addr, r in records.items()
+        if r.repo == root
+        and r.lane
+        and r.seat is None
+        and not r.superseded_by
+        and not work.sat_out(r)
+        and ledger_mod.lane_matches(list(r.lane), dict(entry), r.team)
+    ]
+    return [addr for _, addr in sorted(out)]
+
+
+def no_lane(open_at: datetime, now: datetime, wait: timedelta) -> dict[str, Any] | None:
+    """A line no lane takes (§6 rule 13): `{since, reason: {state: no_lane}}` once past the wait, else None."""
+    return {"since": iso(open_at), "reason": {"state": "no_lane"}} if now - open_at > wait else None
