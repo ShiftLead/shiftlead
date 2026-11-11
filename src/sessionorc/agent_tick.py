@@ -388,9 +388,12 @@ class TickMixin:
             new = {k: v for k, v in old.items() if not str(k).startswith("ask:")}
             for e in stuck_mod.open_asks(graph):
                 opened = _parse(e.at)
-                actors = []
+                actors, walked = [], set()
                 for to in e.to:
                     sid = self._newest(graph, to)
+                    if sid in walked:
+                        continue  # two addressees that walk to one record are one actor
+                    walked.add(sid)
                     r = graph.get(sid)
                     stamp = self._unanswered_of(graph, sid, e, now)
                     clock = stuck_mod.ask_idle_clock(r, e.id)

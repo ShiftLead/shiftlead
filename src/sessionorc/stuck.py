@@ -67,7 +67,7 @@ def fillable_seat(r: Session, unfillable: Mapping[str, str]) -> bool | str:
     """For a supervised, unattended seat whose record is not live (§6 rule 13 *Acting*, `seat_unable`'s exited or
     closed branch): True where rule 3 fills it — no `unfillable` word this tick and not held (`stop_held`) —, the
     word where `unfillable` holds one; False for any other record."""
-    if r.seat is None or not (r.supervised and r.unattended) or r.state not in ENDED:
+    if not r.seat or not (r.supervised and r.unattended) or r.state not in ENDED:
         return False
     if why := unfillable.get(r.id):
         return str(why)
@@ -102,7 +102,7 @@ def judge(
     gone), `idle_clock` what an `idle` actor gives for this work (an ask: its copy's `read_at`; an order: its
     `stuck_open` `at`), `open_at` the work's open time, which floors every figure."""
     if r is None:
-        return Actor(address, "", address, reason=dict(stamp), since=open_at)
+        return Actor(address, "", address, reason={k: v for k, v in stamp.items() if k != "at"}, since=open_at)
     a = Actor(address, r.host or "", r.name or address)
     if persons_own(r):
         a.own = True
@@ -130,7 +130,8 @@ def judge(
         a.reason = {"state": "idle", **({"since": iso(start)} if start else {})}
         figure = _latest(idle_clock, r.subagent_at, r.shells_at)
     else:
-        a.reason, figure = dict(stamp), agent_common.idle_from(r)
+        # the stamp without its read instant, so a reason that stands is the same reason every tick (no rewrite)
+        a.reason, figure = {k: v for k, v in stamp.items() if k != "at"}, agent_common.idle_from(r)
     a.since = max(figure, open_at) if figure is not None else open_at
     return a
 

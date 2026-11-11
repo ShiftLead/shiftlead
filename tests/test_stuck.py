@@ -178,6 +178,12 @@ async def test_the_pass_keeps_a_stuck_ask_and_drops_it_the_tick_its_seat_acts(ag
         assert row["reason"]["state"] == "limited" and row["actor"]["id"] == rv and row["actor"]["more"] == 0
         assert HostStore(agent.host_store.path).load()["stuck"][f"ask:{mid}"]["since"] == row["since"], "on disk"
         assert (await agent.rpc_host())["stuck"][f"ask:{mid}"]["reason"]["state"] == "limited", "served"
+        saves = []
+        real = agent.host_store.save
+        agent.host_store.save = lambda rec: saves.append(rec) or real(rec)
+        await agent._stuck_pass(later + timedelta(minutes=5))
+        assert not saves, "a reason that stands is not rewritten each tick"
+        assert "at" not in agent._host_rec["stuck"][f"ask:{mid}"]["reason"]
         seat.state = "working"
         await agent._stuck_pass(later)
         assert "stuck" not in agent._host_rec, "dropped the tick an actor acts"
