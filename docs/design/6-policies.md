@@ -1533,9 +1533,13 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        no `repo` (sent before the stamp, or from a record that resolves to none) counts for no line, since
        entry numbers are each repo's own. The result's sender keys are dropped: the questions are the set
        of its values' `ref`s, by `normalize_ref`. No sender is matched, so a replayed holder, a node's
-       address and a lapsed lease change nothing. A question the person **snoozed** (`snoozed_until`
-       ahead of the tick) counts for no line: the Inbox moves it to its *Snoozed* fold, on no card and in
-       no count (§4.5 screen 6, §4.10 *Snooze*), so a stuck row is the one need left to draw.
+       address and a lapsed lease change nothing. An open `ask` the Inbox draws in its *Snoozed* fold counts for no
+       line — one the person **snoozed** (`snoozed_until` ahead of the tick; an unreadable one is read as
+       not snoozed, as the Inbox reads it) or a look handed to a reviewer (`snoozed_for` set, §4.5a **Send
+       to reviewer**, whose handed `ask` is itself work this rule reads) — since that fold is on no Queue
+       card and in no Inbox count (§4.5 screen 6, §4.10 *Snooze*), so a stuck row is the one need left to
+       draw; the fold's end (the time, a *now* press, the look's debt closing) counts it again. This filter
+       is rule 13's own: `host.waiting` and a session's *waiting* mark read `waiting_of` unfiltered.
        While one counts, the line's `stuck` entry drops and its `stuck_open` entry is kept and still moved
        (*The clock*: a claim, a release), with `asked` set. An open `ask` and a paused `steer` (§4.10
        *Pause*: under *Needs you*, counted) are on the person's card already, the entry's card the stuck
@@ -1555,13 +1559,13 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        not `fyi`), and from then the **latest** of its stored `at` (so it never moves back), the holder's
        claim `at` (the latest among its holders) while one holds it, the release — the first tick that
        reads no holder where the tick before read one: a drop, a `done`, an exit, a restart or a lapsed
-       lease alike, the tick's own instant — and the answer — the first tick that reads no open question
+       lease alike, the tick's own instant — and the answer — the first tick that reads no question that counts
        about the line's entry (above) where `asked` is set, the tick's own instant. Two markers tell those
        ticks from the next, so a restart keeps them and each moves `at` once: **`holder`**, `true` on each
        tick the line has a holder (which holder, under a `--force`, does not matter: a change of holder is no
-       release) and cleared on the release tick, and **`asked`**, `true` on each tick such a question is
+       release) and cleared on the release tick, and **`asked`**, `true` on each tick such a question counts, and
        open and cleared on the answer's tick; a tick that is a release and an answer moves `at` once, to its instant, and clears
-       both; a line first read while such a question is open is written with `asked` set and `at` that
+       both; a line first read while such a question counts is written with `asked` set and `at` that
        first tick's instant; each moves on its own tick, `applying` or not, only the draw waiting for the
        press's re-read; a release or an answer in a repo not read that tick is clocked from its first good read (`stuck_open: {<key>: {at, repo, holder?, asked?}}`);
        the entry dropped when the line closes or is no longer
