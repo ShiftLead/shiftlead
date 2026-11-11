@@ -1,6 +1,7 @@
 """A live check is a grinder's once its build is live (design §4.9b, TD-323 slice 1): the build's PRs
-on the `Kind:` line, the home's `live` reading of them against the promote's live commit, and
-`free-pick` taking a live check that reads `live: yes`. Unknown is never live."""
+on the `Kind:` line and the home's `live` reading of them against the promote's live commit, read as
+words; since TD-1452 the reading holds nothing — the entry's `event (live…)` gate alone keeps it out of
+`free-pick`. Unknown is never live."""
 
 from __future__ import annotations
 
@@ -19,8 +20,14 @@ def _git(root, *args: str) -> str:
     return subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True, text=True, env=env).stdout
 
 
-def _ledger(kind: str, owner: str = "grinder") -> str:
-    return f"# L\n\n## TD-001: a check\n\n**Priority:** High\n**Owner:** {owner}\n**Kind:** {kind}\n**Status:** Built\n"
+GATE = "**Blocked by:** event (live)\n\n**Event (live):** The build is live.\ncheck: pr-merged r#1\n"
+
+
+def _ledger(kind: str, owner: str = "grinder", gate: bool = False) -> str:
+    return (
+        f"# L\n\n## TD-001: a check\n\n**Priority:** High\n**Owner:** {owner}\n**Kind:** {kind}\n**Status:** Built\n"
+        + (GATE if gate else "")
+    )
 
 
 @pytest.mark.parametrize(
@@ -40,12 +47,12 @@ def test_the_kind_line_names_its_builds_after_the_word(value, want):
     assert built(value) == want
 
 
-def test_a_live_check_reads_live_only_when_every_build_named_is_live():
+def test_a_live_check_reads_live_only_when_every_build_named_is_live_and_the_reading_holds_nothing():
     def live(n: int) -> bool:
         return n in (5, 6)
 
-    def one(kind: str, owner: str = "grinder", with_live=live) -> dict:
-        (e,) = entries(_ledger(kind, owner), live=with_live)
+    def one(kind: str, owner: str = "grinder", with_live=live, gate: bool = False) -> dict:
+        (e,) = entries(_ledger(kind, owner, gate), live=with_live)
         return e
 
     yes = one("live-check #5 #6")
@@ -60,7 +67,11 @@ def test_a_live_check_reads_live_only_when_every_build_named_is_live():
         one("live-check — after a promote"),  # prose, no build
         one("live-check #5", with_live=None),  # no reading
     ):
-        assert no["live"] == "no" and not lane_matches(["free-pick"], no) and kind_of(no) == "live-check"
+        # the reading is words: an ungated live check is the lane's whatever it reads (§4.9b, TD-1452)
+        assert no["live"] == "no" and lane_matches(["free-pick"], no) and kind_of(no) == "live-check"
+    for gated in (one("live-check #5 #7", gate=True), one("live-check #5 #6", gate=True)):
+        # its gate alone holds it, live or not
+        assert gated["pickable"] == "no" and not lane_matches(["free-pick"], gated) and kind_of(gated) == "live-check"
     (b,) = entries(_ledger("build"), live=live)
     assert "live" not in b and "built" not in b and lane_matches(["free-pick"], b), "a build is as it was"
 
@@ -114,9 +125,9 @@ def test_the_repo_facts_carry_live_from_the_promote_reading(tmp_path, monkeypatc
 def test_an_unknown_live_commit_keeps_each_live_checks_last_reading(tmp_path):
     """TD-516, §6 rule 6 *Unknown is not* not live: before the promote's first reading since a start
     (`_read_repos` given `live=None`), a live check keeps the `live` its checkout's last reading gave
-    it, so a lane's `lane_seen` neither loses it nor is told it again when the survey lands; a
-    known reading (`{}` — no live commit for the repo) still reads `no`, and a live check the last
-    reading did not hold reads `no` until the promote is known."""
+    it, for its words; a known reading (`{}` — no live commit for the repo) still reads `no`, and a live
+    check the last reading did not hold reads `no` until the promote is known. Since TD-1452 the reading
+    holds nothing: a lane's news follows the entry's `event (live)` gate, never the reading."""
     from sessionorc import work
     from sessionorc.agent_tick import TickMixin
     from sessionorc.models import Session
@@ -148,11 +159,12 @@ def test_an_unknown_live_commit_keeps_each_live_checks_last_reading(tmp_path):
     restarted = TickMixin._read_repos([r], before, {r}, None, None)  # `_promotes` empty: unknown
     assert live_of(restarted) == {"TD-001": "yes", "TD-002": "no"}
     seen, new = work.reread(seat, restarted[r]["ledger"]["entries"])
-    assert seen is seat.lane_seen and new == [], "nothing pruned, nothing new"
+    assert new == ["TD-002"], "an ungated live check is the lane's at once, whatever its reading (TD-1452)"
+    seat.lane_seen = {**seen, "ids": [*seen["ids"], *new]}  # told: the caller writes it into the memory
     surveyed = TickMixin._read_repos([r], restarted, {r}, None, {"r": sha})  # the survey lands
     assert live_of(surveyed) == {"TD-001": "yes", "TD-002": "yes"}
     seen, new = work.reread(seat, surveyed[r]["ledger"]["entries"])
-    assert new == ["TD-002"], "the one entry the lane gained is told, once; TD-001 is not"
+    assert new == [], "the reading turning yes tells nothing: it holds nothing"
     # a build the seat saw as a build turns live check, then goes live: told once (TD-407's case, kept)
     grinder = Session(
         id="ao-r-g", name="g", kind="interactive", adapter="shell", dir=r, lane=["free-pick", "owner:grinder"],
@@ -162,12 +174,11 @@ def test_an_unknown_live_commit_keeps_each_live_checks_last_reading(tmp_path):
     (root / "docs" / "technical_debt.md").write_text(text + build)
     as_build = TickMixin._read_repos([r], surveyed, {r}, None, {"r": sha})
     assert work.reread(grinder, as_build[r]["ledger"]["entries"]) == (grinder.lane_seen, [])
-    (root / "docs" / "technical_debt.md").write_text(
-        text + build.replace("build\n**Status:** Open", "live-check #6\n**Status:** Built")
-    )
+    check = build.replace("build\n**Status:** Open", "live-check #6\n**Status:** Built")
+    (root / "docs" / "technical_debt.md").write_text(text + check + GATE)
     unknown = TickMixin._read_repos([r], as_build, {r}, None, None)  # a restart before the build is live
     seen, new = work.reread(grinder, unknown[r]["ledger"]["entries"])
-    assert new == [] and seen["ids"] == [], "a live check not yet live leaves the lane: pruned, as before"
+    assert new == [] and seen["ids"] == [], "a live check behind its gate leaves the lane: pruned"
     grinder.lane_seen = seen
     (root / "f6").write_text("6")
     _git(root, "add", "-A")
@@ -175,7 +186,10 @@ def test_an_unknown_live_commit_keeps_each_live_checks_last_reading(tmp_path):
     _git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
     sha6 = _git(root, "rev-parse", "HEAD").strip()
     went_live = TickMixin._read_repos([r], unknown, {r}, None, {"r": sha6})
-    assert work.reread(grinder, went_live[r]["ledger"]["entries"])[1] == ["TD-003"], "live now: news, once"
+    assert work.reread(grinder, went_live[r]["ledger"]["entries"])[1] == [], "live, its gate standing: no news"
+    (root / "docs" / "technical_debt.md").write_text(text + check)  # the gate lifted
+    lifted = TickMixin._read_repos([r], went_live, {r}, None, {"r": sha6})
+    assert work.reread(grinder, lifted[r]["ledger"]["entries"])[1] == ["TD-003"], "lifted: news, once"
     # known with no live commit for the repo is *not live*, as before
     assert live_of(TickMixin._read_repos([r], before, {r}, None, {})) == {
         "TD-001": "no",

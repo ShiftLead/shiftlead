@@ -106,8 +106,8 @@ async def test_a_wound_down_teams_lane_news_waits_the_settle_then_is_written(age
 
 async def test_a_build_seen_then_made_a_live_check_is_work_once_live(agent, tmp_path, monkeypatch):
     """TD-411 (§6 rule 8, TD-407): both members saw TD-005 as a build and declared; merged, it reads as
-    a live check not yet live, which leaves their `lane_seen` (rule 6 prunes a gone member's memory);
-    at the promote it is in their lanes again, so the wound-down team has work waiting after the
+    a live check behind its `event (live)` gate, which leaves their `lane_seen` (rule 6 prunes a gone
+    member's memory); once the gate lifts it is in their lanes again, so the wound-down team has work waiting after the
     settle — what ao-grind missed for three hours over TD-400."""
     await park_ticks(agent)
     monkeypatch.setattr(agent, "_replay", lambda *a, **k: None)
@@ -115,7 +115,9 @@ async def test_a_build_seen_then_made_a_live_check_is_work_once_live(agent, tmp_
     repo = str(tmp_path)
 
     def check(live: str) -> dict:
-        return {**_e("TD-005"), "kind": "live-check", "built": [7], "live": live}
+        # not live behind its `event (live)` gate; live with it lifted — the gate holds (TD-1452)
+        gate = {"pickable": "no", "blocked_by": ["event (live)"]} if live == "no" else {}
+        return {**_e("TD-005"), "kind": "live-check", "built": [7], "live": live, **gate}
 
     agent._repos[repo] = {"name": "r", "root": repo, "ledger": {"entries": [_e("TD-001"), _e("TD-005")]}}
     recs = _team(

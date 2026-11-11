@@ -36,6 +36,7 @@ def _read(tmp: Path, entries: list[str], **marks: dict[str, Any]) -> dict[str, d
 
 
 HELD = {"held": {"at": NOW.isoformat()}}
+LIVE_WAIT = {"waiting": {"on": "event", "until": "", "name": "live", "why": "The build is live."}}
 
 
 def test_blocked_only_by_the_persons_entry_is_up_next_and_beside_an_open_id_it_waits_on_that_id(tmp_path):
@@ -58,31 +59,34 @@ def test_the_wait_columns_order_top_entry_then_earliest_date_then_event_then_the
         # the top entry's own gate comes first, though a row's date is earlier
         _entry(10, "top waits", Priority="High", Blocked_by="until 2026-10-30"),
         _entry(11, "row waits sooner", Priority="High", Blocked_by="TD-010"),
-        # a top entry with none: the earliest date of the rows
-        _entry(20, "a live check", Priority="High", Kind="live-check #5"),
+        # a top entry with none (settling): the earliest date of the rows
+        _entry(20, "settling", Priority="High"),
         _entry(21, "later", Priority="High", Blocked_by="TD-020"),
         _entry(22, "sooner", Priority="High", Blocked_by="TD-020"),
         _entry(23, "an event", Priority="High", Blocked_by="TD-020"),
-        # no date: an event before settling and a build not yet live
-        _entry(30, "a live check", Priority="High", Kind="live-check #6"),
+        # no date: an event before settling
+        _entry(30, "settling too", Priority="High"),
         _entry(31, "an event", Priority="High", Blocked_by="TD-030"),
         _entry(32, "settling", Priority="High", Blocked_by="TD-030"),
-        # settling before not live
-        _entry(40, "a live check", Priority="High", Kind="live-check #7"),
-        _entry(41, "settling", Priority="High", Blocked_by="TD-040"),
-        _entry(50, "a live check alone", Priority="High", Kind="live-check #8 #9"),
+        # a live check's `event (live)` is an event, before settling, its reading as words (TD-1452)
+        _entry(40, "settling", Priority="High"),
+        _entry(41, "a live check", Priority="High", Kind="live-check #7", Blocked_by="TD-040"),
+        _entry(50, "a live check alone", Priority="High", Kind="live-check #8 #9", Blocked_by="event (live)")
+        + _ev("live", "The build is live."),
         _entry(60, "another's decision", Priority="High", Blocked_by="decision (techlead)"),
         _entry(70, "a typo'd id", Priority="High", Blocked_by="TD-999"),
         _entry(71, "another repo's", Priority="High", Blocked_by="nowhere#TD-1"),
-    ], TD_032={"settling": True}, TD_041={"settling": True}, TD_011=_w("until", "2026-10-20"),
+    ], TD_020={"settling": True}, TD_030={"settling": True}, TD_032={"settling": True},
+       TD_040={"settling": True}, TD_041=LIVE_WAIT, TD_011=_w("until", "2026-10-20"),
        TD_021=_w("until", "2026-10-25"), TD_022=_w("until", "2026-10-22"), TD_023=_w("event", why="x"),
        TD_031=_w("event", why="the reset"))  # fmt: skip
     wait = {k: c["wait"] for k, c in cards.items()}
     assert wait["r#TD-010"] == {"column": "Oct 30", "phrase": "waits until Oct 30", "id": "r#TD-010"}
     assert wait["r#TD-020"] == {"column": "Oct 22", "phrase": "waits until Oct 22", "id": "r#TD-022"}
     assert wait["r#TD-030"] == {"column": "event", "phrase": "waits on the reset", "id": "r#TD-031"}
-    assert wait["r#TD-040"] == {"column": "settling", "phrase": "settling", "id": "r#TD-041"}
-    assert wait["r#TD-050"] == {"column": "not live", "phrase": "not live #8 #9", "id": "r#TD-050"}
+    live = "waits on The build is live (not live"
+    assert wait["r#TD-040"] == {"column": "event", "phrase": f"{live} #7)", "id": "r#TD-041"}
+    assert wait["r#TD-050"] == {"column": "event", "phrase": f"{live} #8 #9)", "id": "r#TD-050"}
     assert wait["r#TD-060"] == {"column": "blocked", "phrase": "blocked: decision (techlead)", "id": "r#TD-060"}
     assert wait["r#TD-070"] == {"column": "blocked", "phrase": "blocked: TD-999 unresolved", "id": "r#TD-070"}
     assert wait["r#TD-071"]["phrase"] == "blocked: nowhere#TD-1 unresolved"

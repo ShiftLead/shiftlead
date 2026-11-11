@@ -574,26 +574,39 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
 
 
 def test_ao_repo_marks_a_live_check_and_lists_the_ones_that_wait(repo, monkeypatch, capsys):
-    """TD-323 slice 2 (design §4.9b): a live check whose build is live is among the pickable lines,
-    marked *live check* with its build's PR, in the pick order; one whose build is not live is a
-    `live-check` line saying it waits; one the person judges (*for you*) is on neither, nor one blocked
-    by a decision alone, which is counted under *live check* and listed nowhere (§4.7, TD-418)."""
+    """TD-323 slice 2, TD-1452 (design §4.9b, §4.7): a live check nothing blocks is among the pickable
+    lines, marked *live check* with its build's PR, in the pick order, whatever its reading (*not live #n*
+    as words after a rollback); one whose only blockers are its `event (live…)` gates is a `live-check`
+    line with its waiting mark, *not live #n* while the reading says so and *lift #n open* for each open
+    lift PR (a draft's or a fork's left out); one the person judges (*for you*) is on neither, nor one
+    blocked by a decision alone, which is counted under *live check* and listed nowhere (TD-418)."""
     from shiftlead import cli
 
+    wait = {"on": "event", "until": "", "name": "live", "why": "The build is live."}
+
     def e(i, page, prio, live, built, owner="grinder", blocked=()):
+        gated = bool(blocked) and all(b.startswith("event (live") for b in blocked)
         return {"id": i, "title": f"check {i}", "for_page": page, "priority": prio, "owner": owner,
                 "kind": "live-check", "live": live, "built": built, "blocked_by": list(blocked),
-                "pickable": "no" if blocked else "yes"}  # fmt: skip
+                "pickable": "no" if blocked else "yes", **({"waiting": wait} if gated else {})}  # fmt: skip
 
     entries = [
         {"id": "TD-010", "title": "a build", "for_page": "pickable", "priority": "medium", "kind": "build"},
         e("TD-020", "live-check", "high", "yes", [1051]),
-        e("TD-021", "live-check", "low", "no", []),
-        e("TD-022", "live-check", "high", "no", [7, 8]),
+        e("TD-021", "live-check", "low", "no", [], blocked=["event (live)"]),
+        e("TD-022", "live-check", "high", "no", [7, 8], blocked=["event (live-2)"]),
         e("TD-023", "for-you", "high", "no", [9], owner="paul"),
         e("TD-024", "live-check", "high", "yes", [9], owner="anchor", blocked=["decision (anchor)"]),
+        e("TD-025", "live-check", "low", "no", [12]),  # lifted, then rolled back below its build
+        e("TD-026", "live-check", "low", "yes", [13], blocked=["event (live)", "until 2099-01-01"]),
     ]
-    reading = {str(repo): {"name": "r", "root": str(repo), "prs": {"open": []}, "ledger": {"entries": entries}}}
+
+    def pr(n, branch, **kw):
+        return {"number": n, "title": f"lift {n}", "branch": branch, "author": "x", "created": "", **kw}
+
+    prs = [pr(41, "lift/TD-022/live-2"), pr(43, "lift/TD-022/live"), pr(44, "lift/TD-021/live", draft=True)]
+    prs += [pr(45, "lift/TD-021/live", fork=True), pr(46, "lift/TD-021/livefoo"), pr(47, "lift/TD-021/until")]
+    reading = {str(repo): {"name": "r", "root": str(repo), "prs": {"open": prs}, "ledger": {"entries": entries}}}
     monkeypatch.setattr(
         cli,
         "call_sync",
@@ -604,10 +617,12 @@ def test_ao_repo_marks_a_live_check_and_lists_the_ones_that_wait(repo, monkeypat
     out = capsys.readouterr().out
     assert "pickable     TD-020  High    grinder      live check #1051: check TD-020" in out
     assert out.index("pickable     TD-020") < out.index("pickable     TD-010")
-    assert "live-check   TD-022  High    grinder      waits for its build to be live (#7 #8): check TD-022" in out
-    assert "live-check   TD-021  Low     grinder      waits for its build to be live (no PR on its Kind: line)" in out
+    said = "grinder waits: The build is live.  live check, not live"
+    assert f"live-check   TD-022  High    {said} #7 #8, lift #41 #43 open: check TD-022" in out
+    assert f"live-check   TD-021  Low     {said} (no PR on its Kind: line): check TD-021" in out
     assert out.index("live-check   TD-022") < out.index("live-check   TD-021") and "TD-023" not in out
-    assert "TD-024" not in out
+    assert "pickable     TD-025  Low     grinder      live check, not live #12: check TD-025" in out
+    assert "TD-024" not in out and "TD-026" not in out, "a decision, or a gate besides its live ones: no list"
     assert "a build" in out and "live check #" not in out.split("TD-010")[1].split("\n")[0]
 
 
@@ -1059,14 +1074,15 @@ def test_ao_repo_splits_its_first_line_by_the_teams_lanes_and_names_who_is_out_o
 
 def _own_counts():
     """A ledger and a team for each member's own count (TD-418, built by TD-428): grinder builds, one
-    held; a live check whose build is live and one whose build is not; a checker's build; a designer's
+    held; a live check whose build is live and one behind its `event (live)` gate; a checker's build; a designer's
     design-first entry."""
 
     def e(i, owner, kind="build", **kw):
         return {"id": i, "title": i, "for_page": "pickable", "owner": owner, "kind": kind, "pickable": "yes", **kw}
 
     entries = [e("TD-355", "grinder"), e("TD-358", "grinder"), e("TD-360", "grinder", "live-check", live="yes")]
-    entries += [e("TD-361", "grinder", "live-check", live="no"), e("TD-370", "checker")]
+    gate = {"pickable": "no", "blocked_by": ["event (live)"], "waiting": {"on": "event", "name": "live"}}
+    entries += [{**e("TD-361", "grinder", "live-check", live="no"), **gate}, e("TD-370", "checker")]
     entries += [{**e("TD-300", "designer", "design-first"), "for_page": "design"}]
     grind = ["free-pick", "owner:grinder"]
     out = {"at": "2026-10-09T09:00:00Z", "why": "nothing pickable"}
@@ -1084,7 +1100,7 @@ def _own_counts():
 def test_in_lanes_gives_each_member_its_own_count_and_reads_out_of_work_from_it():
     """§4.4 *A member's own count* (TD-418, built by TD-428): each record with a lane gets what
     `lane_matches` takes for its own lane that `held` does not hold — a held entry left out, a live
-    check whose build is live counted by a `free-pick` lane and one not live by none, an `owner:` word
+    check whose gate is lifted counted by a `free-pick` lane and one behind its gate by none, an `owner:` word
     narrowing each lane to its own — and `k`, the live records carrying the identical lane, word order
     aside; `out_of_work` is a declared member whose count is above 0, an ended one among them; no lane,
     no row."""

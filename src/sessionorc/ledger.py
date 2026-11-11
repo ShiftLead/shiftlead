@@ -248,8 +248,8 @@ Live = Callable[[int], bool]  # a PR number → whether its squash commit is in 
 
 
 def built(value: str) -> list[int]:
-    """The builds a `**Kind:** live-check #<n>` line names (design §4.9b *A live check is a
-    grinder's once its build is live*, TD-323): the `#<n>` after the kind's word, one or several,
+    """The builds a `**Kind:** live-check #<n>` line names (design §4.9b, TD-323) — words beside the
+    entry's `event (live…)` gate, which alone holds (TD-1452): the `#<n>` after the kind's word, one or several,
     separated by spaces or commas. Anything else after the word — prose, nothing — names none, and
     the word itself is read as before."""
     m = lb.WORD_RE.search(value or "")
@@ -340,15 +340,17 @@ def flags(entries: list[dict[str, Any]]) -> list[str]:
 
 
 def _buildlike(entry: dict[str, Any]) -> bool:
-    """`free-pick`'s kinds: `build` or unwritten, and a live check that reads `live: yes` (§4.9b)."""
-    return entry.get("kind") in ("", "build") or (entry.get("kind") == "live-check" and entry.get("live") == "yes")
+    """`free-pick`'s kinds: `build` or unwritten, and a live check (§4.9b). A live check whose build is not
+    live is held by its `event (live…)` gate alone, never by its `live` reading (§4.9b *The `Kind:` line
+    names the build; it holds nothing*, TD-1452): the reading is words, and the gate keeps it from pickable."""
+    return entry.get("kind") in ("", "build", "live-check")
 
 
 def lane_matches(lane: list[str], entry: dict[str, Any], team: str | None = None) -> bool:
     """Whether an entry belongs to a lane (design §6 rule 6, TD-195), by its header and never its
     prose. A word: `design-first` is a pickable entry with `Kind: design-first`; `free-pick` a
-    pickable one whose kind is `build` or unwritten (TD-228), or a live check whose build is live
-    (§4.9b, TD-323), so a live check not yet live, an evaluation and a decision match no lane; a
+    pickable one whose kind is `build` or unwritten (TD-228), or a pickable live check — its `event (live…)`
+    gates lifted, whatever its `live` reading says (§4.9b, TD-1452) — so an evaluation and a decision match no lane; a
     reference, or any other word, matches nothing until a role gives it a meaning here. **An
     `owner:<word>` narrows the rest** (TD-214, TD-227): with one or more, the entry's `Owner:` must
     be one named or absent, so `[free-pick, owner:grinder]` leaves the designer's entries out; it

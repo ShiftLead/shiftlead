@@ -38,7 +38,6 @@ from sessionorc import conventions as conventions_mod
 from sessionorc import gatesweep as gatesweep_mod
 from sessionorc import held as held_mod
 from sessionorc import ledger as ledger_mod
-from sessionorc import promote as promote_mod
 from sessionorc import queue as queue_mod
 from sessionorc import screen as screen_mod
 from sessionorc import seams as seams_mod
@@ -1975,24 +1974,14 @@ class TickMixin:
         """The ledger's entries as `origin/<default>` held them before `at`, what was read, and its tip read as
         the checkout's reading is (`(None, why, None)` where the history cannot be read) — rule 6's first write
         at a declaration (TD-227) and rule 8's baseline at a record's end (TD-781). Blocking: git is read."""
-        name = Path(root).name
-        commit = self._live_commits().get(name)
         resolve = ledger_mod.Registry(hosts.local_host().repos())
-        # a live check stood in the lane at `at` when its build was live then (§4.9b, §6 rule 6): known when
-        # the promote that made today's live commit live concluded before it, so the ledger then is read
-        # against that commit; unknown, it is read without, and a check live now is told once as new
-        was = promote_mod.last(name) or {}
-        try:
-            before = bool(commit) and was.get("sha") == commit and _parse(str(was.get("at"))) <= at
-        except (ValueError, TypeError):
-            before = False
-        live = ledger_mod.LiveReader(root, commit)
-        then, why = ledger_mod.entries_before(root, rel, at, resolve=resolve, live=live if before else None)
+        # a live check stood in the lane at `at` when its `event (live…)` gates were lifted then: the gate
+        # alone holds, its `live` reading never (§4.9b *The `Kind:` line names the build; it holds nothing*,
+        # TD-1452), so neither read needs the live commit
+        then, why = ledger_mod.entries_before(root, rel, at, resolve=resolve)
         if then is None:
             return then, why, None
-        # the tip read as the checkout's reading is, with its live checks' `live`, or a live one would read
-        # as the checkout's own and be seen untold
-        tip = ledger_mod.entries_before(root, rel, None, resolve=resolve, live=live)[0]
+        tip = ledger_mod.entries_before(root, rel, None, resolve=resolve)[0]
         # both marked by the settle clock as it stands, so an entry still settling is not seen now and is told
         # once it settles (§4.4, TD-710); `then` as the clock stood at `at`, so one settling then is told when
         # it settles
