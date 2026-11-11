@@ -413,8 +413,11 @@ class TickMixin:
         except Exception:  # noqa: BLE001 — a reading: the last one stands, the next tick reads again
             log.exception("reading the stuck work failed")
             return
-        self._stuck_until = {k: v for k, v in until.items() if k in new}
+        until = {k: v for k, v in until.items() if k in new}
+        flipped, self._stuck_until = until != self._stuck_until, until
         if new == old and new_open == old_open:
+            if flipped:
+                await self._push_changes()  # a row between need and *waiting* is served anew, though nothing is stored
             return
         for k, v in (("stuck", new), ("stuck_open", new_open)):
             if v:
@@ -454,7 +457,9 @@ class TickMixin:
             for m, d in (("stuck", old), ("open", old_open))
         }
         kept = {m: {k: v for k, v in d.items() if roster is None or v.get("repo") in roster} for m, d in mine.items()}
-        readings = {str(v.get("name") or Path(root).name): (root, v) for root, v in self._repos.items()}
+        # by the root's own name (`root.name`), as each entry's `repo` and the roster read it — never the reading's
+        # registry name, which need not be its directory's
+        readings = {Path(root).name: (root, v) for root, v in self._repos.items()}
         roots = queue_mod.repo_roots(self._repos)
         stuck_new: dict[str, Any] = {}
         open_new: dict[str, Any] = {}
@@ -470,7 +475,7 @@ class TickMixin:
                 continue
             teams = self._host_rec.get("teams") or {}
             peers = {a: r for a, r in graph.items() if r.repo == root}
-            asked = stuck_mod.asked_refs(self.person_inbox, root, roots, now)
+            asked = stuck_mod.asked_refs(self.person_inbox, str(reading.get("root") or root), roots, now)
             for o in stuck_mod.orders(reading):
                 key = o["id"]
                 held = stuck_mod.holders(key, peers, now)

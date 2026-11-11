@@ -342,10 +342,10 @@ def asked_refs(person_inbox: Iterable[MailEntry], root: str, roots: Mapping[str,
 
 
 def asked_about(order: Mapping[str, Any], asked: set[str]) -> bool:
-    """Whether a work order's line is one the person is asked about: a bare `TD-n` its `Context:` names (its
-    `refs`; a PR, a repo-qualified ref or no `Context:` has no such question) among `asked`."""
-    refs = (order.get("entry") or {}).get("refs") or ()
-    return any(_BARE_TD.fullmatch(str(r)) and normalize_ref(str(r)) in asked for r in refs)
+    """Whether a work order's line is one the person is asked about: its `Context:` (its `refs`) a bare `TD-n`
+    among `asked` — a PR, a repo-qualified ref, more than one ref or no `Context:` has no such question."""
+    refs = [str(r) for r in (order.get("entry") or {}).get("refs") or ()]
+    return len(refs) == 1 and bool(_BARE_TD.fullmatch(refs[0])) and normalize_ref(refs[0]) in asked
 
 
 def _has_lane_ids(mark: Any) -> bool:

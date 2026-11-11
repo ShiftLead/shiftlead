@@ -482,7 +482,7 @@ def test_asked_refs_filters_by_repo_and_the_snoozed_fold():
     )
     order = {"entry": {"refs": ["TD-7"]}}
     assert stuck.asked_about(order, {"TD-007"}), "td-7 and TD-7 are one entry"
-    for refs in (["fx#TD-7"], ["PR #7"], []):
+    for refs in (["fx#TD-7"], ["PR #7"], [], ["TD-7", "PR #9"]):
         assert not stuck.asked_about({"entry": {"refs": refs}}, {"TD-007"}), refs
     assert not stuck.asked_about(order, {"TD-008"}), "an ask about another entry"
 
@@ -550,3 +550,182 @@ async def test_waiting_until_is_served_beside_the_stuck_row_and_never_stored(hom
     home.sessions["ao-w"].limited_reset = None
     await home._stuck_pass(NOW)
     assert "waiting_until" not in (await home.rpc_host())["stuck"][KEY], "no reset known: a need"
+
+
+def _muted_home(home, w: models.Session) -> datetime:
+    put(home, w)
+    start = NOW - timedelta(hours=3)
+    home._host_rec["stuck_open"] = {KEY: {"at": _z(start), "repo": "fx"}}
+    return start
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "kw",
+    [
+        {"kind": "steer", "from_": "ao-someone-else"},
+        {"kind": "steer", "paused_at": _z(NOW)},
+        {"about": "td-7"},
+    ],
+    ids=["a-steer-from-anyone", "a-paused-steer", "lower-case-ref"],
+)
+async def test_the_tick_mutes_on_a_steer_and_a_paused_steer(home, kw):
+    await park_ticks(home)
+    start = _muted_home(home, member("w", state="limited"))
+    home.person_inbox.append(person_ask("m-k", **kw))
+    try:
+        await home._stuck_pass(NOW)
+        assert "stuck" not in home._host_rec
+        assert home._host_rec["stuck_open"][KEY] == {"at": _z(start), "repo": "fx", "asked": True}
+    finally:
+        home.person_inbox[:] = [e for e in home.person_inbox if e.id != "m-k"]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "kw",
+    [{"repo": None}, {"snoozed_for": "m-h"}, {"snoozed_until": _z(NOW + timedelta(hours=1))}],
+    ids=["no-envelope-repo", "a-look-with-a-reviewer", "snoozed"],
+)
+async def test_the_tick_mutes_nothing_for_these(home, kw):
+    await park_ticks(home)
+    _muted_home(home, member("w", state="limited"))
+    home.person_inbox.append(person_ask("m-k", **kw))
+    try:
+        await home._stuck_pass(NOW)
+        assert KEY in home._host_rec["stuck"] and "asked" not in home._host_rec["stuck_open"][KEY]
+    finally:
+        home.person_inbox[:] = [e for e in home.person_inbox if e.id != "m-k"]
+
+
+@pytest.mark.integration
+async def test_an_unreadable_snooze_mutes_and_a_snooze_clocks_the_line_until_it_ends(home):
+    await park_ticks(home)
+    _muted_home(home, member("w", state="limited"))
+    q = person_ask("m-k", snoozed_until="not a time")
+    home.person_inbox.append(q)
+    try:
+        await home._stuck_pass(NOW)
+        assert "stuck" not in home._host_rec, "an unreadable snooze is read as not snoozed: it mutes"
+        t1 = NOW + timedelta(minutes=5)
+        q.snoozed_until = _z(t1 + timedelta(hours=4))
+        await home._stuck_pass(t1)
+        assert home._host_rec["stuck_open"][KEY] == {"at": _z(t1), "repo": "fx"}, "the snooze clocks it from then"
+        assert "stuck" not in home._host_rec, "not stuck at once"
+        await home._stuck_pass(t1 + OWAIT + timedelta(minutes=1))
+        assert home._host_rec["stuck"][KEY]["since"] == _z(t1), "stuck one wait after the snooze"
+        q.snoozed_until = None  # a *now* press ends it
+        await home._stuck_pass(t1 + OWAIT + timedelta(minutes=2))
+        assert "stuck" not in home._host_rec and home._host_rec["stuck_open"][KEY]["asked"] is True, "muted again"
+    finally:
+        home.person_inbox[:] = [e for e in home.person_inbox if e.id != "m-k"]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("reason", ["withdrawn", "expired"])
+async def test_a_withdrawn_ask_or_a_lapsed_steer_clocks_the_line_from_its_close(home, reason):
+    await park_ticks(home)
+    _muted_home(home, member("w", state="limited"))
+    q = person_ask("m-k", kind="steer" if reason == "expired" else "ask")
+    home.person_inbox.append(q)
+    try:
+        await home._stuck_pass(NOW)
+        q.closed_reason = reason
+        t1 = NOW + timedelta(minutes=20)
+        await home._stuck_pass(t1)
+        assert home._host_rec["stuck_open"][KEY] == {"at": _z(t1), "repo": "fx"} and "stuck" not in home._host_rec
+        await home._stuck_pass(t1 + OWAIT + timedelta(minutes=1))
+        assert home._host_rec["stuck"][KEY]["since"] == _z(t1)
+    finally:
+        home.person_inbox[:] = [e for e in home.person_inbox if e.id != "m-k"]
+
+
+@pytest.mark.integration
+async def test_an_answer_while_unread_is_clocked_from_the_first_good_read_and_a_drop_with_it_moves_at_once(home):
+    await park_ticks(home)
+    claim = NOW - timedelta(hours=1)
+    w = member("w", state="limited", progress=[claimed(KEY, claim)])
+    put(home, w)
+    stored = {"at": _z(claim), "repo": "fx", "holder": True, "asked": True}
+    home._host_rec["stuck_open"] = {KEY: dict(stored)}  # a restart with both markers set
+    q = person_ask("m-k")
+    home.person_inbox.append(q)
+    try:
+        await home._stuck_pass(NOW)
+        assert home._host_rec["stuck_open"][KEY] == stored, "both markers kept, at unmoved"
+        q.closed_reason = "replied"
+        w.progress = []  # the holder drops on the answer's tick
+        good = home._repos
+        home._repos = {}
+        await home._stuck_pass(NOW + timedelta(minutes=5))
+        assert home._host_rec["stuck_open"][KEY] == stored, "unread: as stored"
+        home._repos = good
+        t2 = NOW + timedelta(minutes=10)
+        await home._stuck_pass(t2)
+        assert home._host_rec["stuck_open"][KEY] == {"at": _z(t2), "repo": "fx"}, "once, at the first good read"
+    finally:
+        home.person_inbox[:] = [e for e in home.person_inbox if e.id != "m-k"]
+
+
+@pytest.mark.integration
+async def test_a_registry_name_unlike_its_directory_mutes_that_repos_line(home):
+    await park_ticks(home)
+    home._repos = {ROOT: {**board(), "name": "reg-name"}}
+    _muted_home(home, member("w", state="limited"))
+    home.person_inbox.append(person_ask("m-k", repo="reg-name"))
+    try:
+        await home._stuck_pass(NOW)
+        assert "stuck" not in home._host_rec and home._host_rec["stuck_open"][KEY]["asked"] is True
+        assert home._host_rec["stuck_open"][KEY]["repo"] == "fx", "the entry names the root's own name"
+        home.person_inbox[:] = [e for e in home.person_inbox if e.id != "m-k"]
+        await home._stuck_pass(NOW + timedelta(minutes=1))  # the answer: clocked from here
+        await home._stuck_pass(NOW + OWAIT + timedelta(minutes=2))
+        assert home._host_rec["stuck"][KEY]["repo"] == "fx", "read, not dropped as off the roster"
+    finally:
+        home.person_inbox[:] = [e for e in home.person_inbox if e.id != "m-k"]
+
+
+@pytest.mark.integration
+async def test_a_team_held_early_waits_and_its_flip_is_pushed(home):
+    await park_ticks(home)
+    done = {"at": _z(NOW)}
+    put(home, member("a", "exited", out_of_work=done, lane_seen={"ids": []}))
+    started = NOW - timedelta(minutes=20)
+    mark = {"members": {"a": [KEY]}, "held": {"why": "early", "started": _z(started)}}
+    home._host_rec["teams"] = {"beta": {"work_waiting": mark}}
+    home._host_rec["stuck_open"] = {KEY: {"at": _z(NOW - timedelta(hours=3)), "repo": "fx"}}
+    try:
+        await home._stuck_pass(NOW)
+        assert home._host_rec["stuck"][KEY]["reason"]["held"]["why"] == "early"
+        assert (await home.rpc_host())["stuck"][KEY]["waiting_until"] == _z(started + timedelta(minutes=30))
+        pushes = []
+        real = home._push_changes
+
+        async def counted():
+            pushes.append(1)
+            await real()
+
+        home._push_changes = counted
+        await home._stuck_pass(started + timedelta(minutes=31))  # its instant passed: a need again, nothing stored
+        assert "waiting_until" not in (await home.rpc_host())["stuck"][KEY] and pushes == [1], "the flip is pushed"
+    finally:
+        home._host_rec.pop("teams", None)
+        home.__dict__.pop("_push_changes", None)
+
+
+@pytest.mark.integration
+async def test_an_ask_to_a_seat_limited_with_a_near_reset_serves_waiting_until(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        rv, w = await _seat_and_worker(person, tmp_path)
+        async with LocalClient(caller=w) as c:
+            got = await c.call("msg", to=rv, text="which test?", kind="ask", about="TD-9")
+        mid = got["entry"]["id"]
+        later = (datetime.now(UTC) + WAIT + timedelta(minutes=1)).replace(microsecond=0)
+        seat = agent.sessions[rv]
+        seat.state, seat.limited_reset = "limited", _z(later + timedelta(minutes=10))
+        await agent._stuck_pass(later)
+        assert (await agent.rpc_host())["stuck"][f"ask:{mid}"]["waiting_until"] == seat.limited_reset
+        seat.limited_reset = _z(later + WAIT + timedelta(minutes=5))
+        await agent._stuck_pass(later)
+        assert "waiting_until" not in (await agent.rpc_host())["stuck"][f"ask:{mid}"], "further than the ask's wait"
