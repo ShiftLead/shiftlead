@@ -32,9 +32,9 @@
   such value lives here, under six keys:
 
 ```yaml
-usage_gate:                                   # §6 *Usage gate* — per profile, per window label as the adapter names it
-  grind: {"5h": 30, week: {per_day: 10}}      # line 70% on the session window; 100 − 10 × days left on the weekly
-  grind-api: {day: "$5", week: "$20"}        # a metered profile's reserve is an amount (§4.2a): the window's 100; "2M tok" without prices
+usage_gate:                                   # §6 *Usage gate* — per account (its usage key, §4.2a; TD-1581), per window label as the adapter names it
+  "claude-code:paul": {"5h": 30, week: {per_day: 10}}   # every profile on the account reads it: line 70% on the session window; 100 − 10 × days left on the weekly
+  "claude-code:grind-api": {day: "$5", week: "$20"}     # a metered account's reserve is an amount (§4.2a): the window's 100; "2M tok" without prices
 settle: {design-first: 5m}                    # §4.4 *A new entry settles before it is pickable* (TD-707): per Kind, how long a new ledger entry waits, holdable, before a lane may take it; a Kind not listed 0; a repo's .shiftlead.yml settle: wins key by key; set_settings and the Settings page's field
 spend:                                        # §4.4 *Spend per seat* (TD-818): what a turn with no cost of its own is weighed at; read by the seat pass, set by set_settings and the Settings page
   weights: {as_of: "2026-10-17",              # the date the defaults were taken from the API's list prices; shown beside them
@@ -89,7 +89,7 @@ reach:                                        # §4.5b *The setting*: the person
 ```
 
   `spend.weights` holds the API's list prices of 2026-10-17 as its default, a key per model family Claude Code reports, its current generation, and a longer key per older generation still served — the values above, the design's own, `as_of` the date they were taken (a newer price is the person's settings change, never a build-time correction), `cache_write` at twice `input` (the one-hour write a Claude Code session makes, §4.2a) and Haiku's `cache_read` at a tenth of its input; Haiku's dearer rate past a 100k prompt is not modelled, so its figure there reads low; the person's own values replace them whole per key, and a key with a kind missing weighs that kind at its `input`, the safe side, as `prices:` does (§4.2a). The figure is *API-equivalent* (§4.4 *Spend per seat*), and a weight changed applies from then on: a written row is not re-weighed.
-  A metered profile's reserve under `usage_gate:` is an amount per window (§6 *Usage gate*) — `grind-api: {day: "$5", week: "$20"}` or `{day: "2M tok"}` — read against the account's spend (§4.2a), where a subscription profile's is a percent; the unit says which, and one that does not fit the profile's billing is refused, naming it. A profile absent under `usage_gate:` has no line on any window; a team absent under `teams:` has
+  `usage_gate:` is keyed by **account**, the usage key `<adapter>:<account>` the reading is kept under (§4.2a, §6 *A reserve is the account's*, TD-1581), never by profile. A metered account's reserve is an amount per window (§6 *Usage gate*) — `"claude-code:grind-api": {day: "$5", week: "$20"}` or `{day: "2M tok"}` — read against the account's spend (§4.2a), where a subscription account's is a percent; the unit says which, and one that does not fit the account's billing is refused, naming it. An account absent under `usage_gate:` has no line on any window; a team absent under `teams:` has
   no schedule, no stop time and no priority, and starts the team, or the member, when work appears (`on_work: start`); a repo absent under `repos:` promotes by hand, is pulled (§6 *Pull*: `pull: false` is the opt-out), and has its mechanical sync PRs merged at the home (§6 *Sync*: `sync: {auto: false}` is the opt-out).
   **Nodes** (§4.4a *Settings, replicated*): the home sends the whole file to every node whose link
   is up after each write, and to a node on its `hello`; the node writes its replica and its gate
@@ -163,7 +163,7 @@ unattended:                           # read by nothing yet (below)
   workers: 3
   brief: ~/.tdgrind/{name}-prompt.md
   window: {weekday: "20:00-06:00", weekend: all}
-  # no usage gate here: its reserves are the person's, per profile, in settings.yml (TD-100)
+  # no usage gate here: its reserves are the person's, per account, in settings.yml (TD-100, TD-1581)
   wrapup_minutes: 15
   creds_min_hours: 0.25
 roles:                                # §4.8 presets; every key optional, built-ins apply otherwise

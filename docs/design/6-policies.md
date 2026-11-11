@@ -2558,10 +2558,10 @@ teams:
   the two, and a Clear leaves it alone. A stop time in the past is refused when set, as `ao until`'s
   is. **Run window** (Not built — phase 3, the tdgrind port): start missing workers inside the
   window; wrap-up-then-kill outside, by setting a stop time.
-  **Usage gate** (per profile): pause every unattended session on a profile when **any** of its
+  **Usage gate** (per account's reserve, applied to each profile's sessions): pause every unattended session on a profile when **any** of its
   reported windows reaches that window's **line**, and resume them when every window is back under
   its line — the windows being the **account's** reading (reported or asked, §4.4 *Usage*), the one
-  poll every profile on that account shares (§4.2a), read against this profile's own lines — a
+  poll every profile on that account shares (§4.2a), read against its account's lines (*A reserve is the account's*, below) — a
   profile no live session runs under, which keeps no copy of the reading, reads its account's, so a
   start under a wound-down team's profile is gated by the reading a person's session keeps fresh,
   and `ao gate` prints it with its age and source; a fetch failure never pauses — the last good
@@ -2596,6 +2596,29 @@ teams:
   it has been so for `max_age`, since a session at work reports the new window within a minute. A
   profile with nothing unattended live is never projected. The windows and their labels are the
   adapter's (§4.3); the gate knows none of them by name.
+  **A reserve is the account's** (TD-1581; Paul, 2026-11-10: *one reserve per account, and no profile
+  keeps a reserve of its own*). A quota is one number per account, so its reserve is too: `usage_gate:`
+  is keyed by the account's usage key, `<adapter>:<account>` as `_usage_key` gives it (the adapter's
+  `account_for`: the profile's `account`, else its name; a profile no adapter resolves is its own
+  account, `<adapter>:<profile>`), and every profile on the account reads that one entry, so one change
+  moves the line for every unattended session on the account. One reader, `_gate_reserves`, resolves a
+  profile to its account and returns the account's reserves, and every reader of a line asks it —
+  the gate's pass, the projection notes, `_profile_over` (every restart, fill and wake that asks
+  whether a profile is over its line), the usage-only check and the `gate` RPC alike; none reads
+  `usage_gate:` by profile. An account has one billing (§4.2a), so its reserve is a percent or an amount,
+  never both. **A team's reserve priority stays the team's** (below): the one way to make some sessions
+  on an account stop sooner. **The per-profile file migrates once**, at the home's first read of a
+  `settings.yml` holding a key that is no account key (none of the `<adapter>:<account>` keys any
+  adapter's `account_for` gives for the home's `profiles.yml`, nor a node's declared profile): each
+  such key is a profile, resolved to its account, and per window label the account keeps the reserve
+  of its profiles' whose **line is lowest** at the migration's instant (the largest reserve: no line
+  moves up), the account's own entry, where one is already written, counting among them; the profile
+  keys are removed in the same write, through `set_settings`'s writer, and one `system` note tells the
+  person what moved — *usage reserves are now per account: claude-code:paul takes week 10/day (from
+  grind; grind-fable had 3, grind-ask 5, grind-sonnet 5), 5h 30 (from grind)* — once. A key that
+  resolves to no profile the home knows is kept as written and named in that note, and read by no
+  profile, until the person removes it. A node's replica is migrated by the home's write (§4.4a,
+  the whole file sent).
   **The line is computed from a reserve, never typed as a percentage.** The setting is a
   **reserve** per window label, of two shapes: a flat percent — `30` — whose line is `100 −
   reserve`; or a percent **per day** — `{per_day: 10}` — whose line is `100 − per_day × days_left`,
@@ -2607,11 +2630,11 @@ teams:
   moves to 70%, and one paused on the last day resumes at the reset, when the window empties. A
   window with no reserve has no line and pauses nothing; the tool's own 100% shows `limited`. **A
   team's reserve priority** (§5 `teams.<team>.reserve`, the Settings page, `ao team reserve`) is a
-  flat percent added to the profile's reserve for the sessions carrying that team's badge on every
+  flat percent added to the account's reserve for the sessions carrying that team's badge on every
   window that has one (it lowers a line and never makes one), the mark carrying `team_extra: {team,
-  n}`: with grind at 30 on the session window and ao-grind at 10, ao-grind's sessions pause at 60%
-  and the profile's others at 70%, so two teams on one profile pause at different lines; the chip
-  still shows the profile's line, and a session paused under its team's line says *paused · usage
+  n}`: with claude-code:paul at 30 on the session window and ao-grind at 10, ao-grind's sessions pause at 60%
+  and the account's others at 70%, so two teams on one account pause at different lines; the chip
+  still shows the account's line, and a session paused under its team's line says *paused · usage
   (ao-grind +10)*.
   **A pause is a send, not a kill** (the PAUSE flag of this section's last bullet): the host agent
   submits the record's `pause_prompt` once — *pause: finish the step in hand, commit and push what
@@ -2645,7 +2668,7 @@ teams:
   window's wrap-up-then-kill is **not** used here: a pause that killed would need a start, and a
   start is a person's act, a schedule's (off by default) or rule 8's where the person set it.
   Interactive sessions are never paused and carry no line: at 100% they show `limited`. The
-  reserves are the person's, per profile, in the host's `settings.yml` (§5), read on every tick and
+  reserves are the person's, per account, in the host's `settings.yml` (§5), read on every tick and
   changed by `ao gate` (§4.7) or the Settings page; the top bar's chip shows the line beside the
   number (§4.5a). A one-day change to a reserve is by hand — the reserve down, and back after the
   reset; an override that expires on its own is rejected for now (TD-101). **A metered profile**
