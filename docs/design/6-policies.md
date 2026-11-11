@@ -2558,10 +2558,10 @@ teams:
   the two, and a Clear leaves it alone. A stop time in the past is refused when set, as `ao until`'s
   is. **Run window** (Not built — phase 3, the tdgrind port): start missing workers inside the
   window; wrap-up-then-kill outside, by setting a stop time.
-  **Usage gate** (per profile): pause every unattended session on a profile when **any** of its
+  **Usage gate** (per account's reserve, applied to each profile's sessions): pause every unattended session on a profile when **any** of its
   reported windows reaches that window's **line**, and resume them when every window is back under
   its line — the windows being the **account's** reading (reported or asked, §4.4 *Usage*), the one
-  poll every profile on that account shares (§4.2a), read against this profile's own lines — a
+  poll every profile on that account shares (§4.2a), read against its account's lines (*A reserve is the account's*, below) — a
   profile no live session runs under, which keeps no copy of the reading, reads its account's, so a
   start under a wound-down team's profile is gated by the reading a person's session keeps fresh,
   and `ao gate` prints it with its age and source; a fetch failure never pauses — the last good
@@ -2578,7 +2578,7 @@ teams:
   that asks whether a profile is over its line asks that reader, so a profile paused on a
   projection is not restarted or filled the next tick. A window with no age at all (never
   confirmed, on a reading with none) and a metered profile's spend are read as they are. **When the
-  projection reaches the line** — the profile's, less a team's reserve priority as ever — **the gate
+  projection reaches the line** — the account's, less a team's reserve priority as ever — **the gate
   pauses as it pauses on a reading**, the mark saying which it was — *paused · usage (projected
   week 96% ≥ 95%, last read 6h ago)* — and one `system` note tells the person, FYI, *pausing on a
   projection: no reading of Claude · paul for 6h*, once per account while a pause on a projection
@@ -2596,6 +2596,88 @@ teams:
   it has been so for `max_age`, since a session at work reports the new window within a minute. A
   profile with nothing unattended live is never projected. The windows and their labels are the
   adapter's (§4.3); the gate knows none of them by name.
+  **A reserve is the account's** (TD-1581; Paul, 2026-11-10: *one reserve per account, and no profile
+  keeps a reserve of its own*). A quota is one number per account, so its reserve is too.
+  - **The key.** `usage_gate:` is keyed by the account's usage key, `<adapter>:<account>` — the profile's
+    `adapter` and its `account`, else its name, as `_usage_key` gives it from the adapter's
+    `account_for`, which answers only for a profile naming that adapter. **A key holding a `:` is an
+    account key**, read as one whether or not any profile here names it (a node's account, one set
+    before its first profile, one whose adapter this host lacks); a key holding none is a profile's,
+    which no reader reads (*The migration*, below). Every profile on the account reads the one entry, so
+    one change moves the line for every unattended session on the account; a metered account's
+    **amount** is the account's too, the window's `pct` the account's spend over it (§4.2a).
+  - **The profiles on an account** come from the adapters, as `account_for` does: an adapter's optional
+    `profiles()` (§4.3) lists the profiles naming it, each `{name, account, billing}`, read from
+    `profiles.yml`; with node usage and spend calls, which name a node's profiles and their key (§4.4
+    *Usage*), it is the host agent's one list of accounts and their profiles.
+  - **The readers.** Every reader of `usage_gate:` reads by account, none by profile: `_gate_reserves`,
+    which resolves a profile to its account and returns the account's reserves or amounts and which the
+    gate's pass, the projection notes, `_profile_over` (every restart, fill and wake that asks whether a
+    profile is over its line) and the usage-only check ask; the spend readers of amounts (the metered
+    reading's `pct` and the spend mark); and the `gate` RPC, whose reply is **`{accounts: {<key>:
+    {profiles, billing, reserves | amounts, windows}}}`**, an account for each key under `usage_gate:`,
+    each account the adapters' profiles name and each a node has reported under — one with no reading
+    yet carries `windows: []`, so its card can take a first reserve, and an orphan key no profile names
+    is listed with `profiles: []`, so it can be cleared. A label is checked against the account's
+    reading's labels where there is one, and accepted unchecked where there is none.
+  - **One billing.** An account has one billing (§4.2a), so its reserve is a percent or an amount, and
+    its metered card posts `{account, reserves}` as a subscription card does, the unit telling them
+    apart. An account whose profiles disagree (a file written before this rule) is named by `ao
+    doctor`'s profiles check and on its Settings card, `set_settings` refuses a reserve on it naming the
+    profiles and their billing, and until the file is fixed its entry is read only by the profiles whose
+    billing fits the entry's unit. An account no home profile names takes its billing, prices and
+    labels from the node calls made under its key; with none and no profile, a set is refused naming
+    the account as one this home has not seen.
+  - **A team's reserve priority stays the team's** (below): the one way to make some sessions on an
+    account stop sooner.
+  - **The migration** — the host agent's second write of `settings.yml` outside `set_settings` (§5),
+    beside the td-max one (§4.9 *On by default*), which it leaves as it is. Once per tick, first in the
+    home's part of the tick, before any pass that reads a reserve (the detached usage refresh may read
+    one tick stale), the home walks `usage_gate:` of the
+    file as `settings.read()` gives it (a dict; a missing or unparseable file, None, is never migrated
+    or written) for a key holding no `:` — never on a node, whose replica the home sends whole (§4.4a),
+    nor in a CLI's or a page's read; a tick with none does nothing more, so the walk is its whole cost.
+    Each such key — a profile's, the per-profile file's or one written by hand since; `""` the default
+    profile — moves to its profile's account, resolved by asking each adapter's `account_for(key)`, which only the
+    adapter the profile names answers (and which reads `""` as the default profile), or, for an adapter
+    with no `account_for`, by its `profiles()` (the key `<adapter>:<profile>`, as `_usage_key` keys it;
+    a `""` key there is unresolved), asked only then. Per window label the account keeps one reserve from among its
+    profiles' and any entry already under the account: those whose unit fits the account's billing (an account whose profiles disagree on billing keeps
+    none: every profile key's value is removed and named in the note, an entry already under the
+    account staying as it is and named in the note too, since a set on it is refused until the file is
+    fixed), and of them **the one whose line is lowest on the window's last day** (a flat `r`, `100 − r`; a
+    per-day `d`, `100 − d`; a tie, the per-day one, then the first profile by name; a metered account,
+    the smallest amount) — an order
+    that needs no reading; one whose unit does not fit is removed and named. A merged line can rise for
+    a profile only where a flat reserve is kept over its per-day one: its line `100 − d × days_left`
+    is below the kept `100 − r` while `d × days_left > r`, for `days_left` from 1 to the window's
+    length in days, so the note names each such profile. The profiles resolved first, the write is one
+    load, edit and save with no wait between them, as `set_settings` makes one, then pushed to the
+    nodes and committed in the home's definition files as every settings write is (§4.4a; `_commit_defs`, §4.9); before it, the file
+    as it stands is committed in the home's definition files — *settings.yml before TD-1581's migration*,
+    awaited through `_commit_defs` (its lock, the one committer, §4.9), no commit where it is committed
+    already — and the migration goes on only when `settings.yml` is then clean against the tree's head (`defs.clean`,
+    a pure read in a thread: tracked, and no difference from HEAD),
+    which is the commit that holds it as it stood (a failed commit leaves it dirty, and the tick moves
+    nothing, to try again next tick, logging once (in memory, so a restart logs again) that `settings.yml` is not clean against HEAD
+    after the pre-commit, the cause being `defs.commit`'s own warning in the host agent's log, and
+    after a day of such ticks one note to the person says so (the day counted in memory from the first
+    failed tick, reset by a clean tick or a restart); a `set_settings` landing between the steps is either read by the load or
+    leaves the file dirty for a tick, so no lock is added; the tick's own *edited by hand* commit
+    shares `_commit_defs`' lock, so the pre-commit may find the file committed already, under that
+    message); on a home whose definitions are no git tree, it is copied beside
+    it as `settings.yml.before-TD-1581` the first time, never overwritten, and a later move's restore
+    point is its note's values. One
+    `system` note tells the person what moved — *usage reserves are now per account: claude-code:paul
+    takes week 5 (from grind-ask; grind had 1, grind-fable 3, grind-sonnet 5)* — with that commit (or
+    the copy) to restore from, since a node not yet on this build and a rollback past it read
+    `usage_gate:` by profile and so find no reserve and gate nothing until it is restored. A key whose
+    profile no adapter here resolves (a profile only a node defines) is removed too, named in the note
+    with its value, to be set again by account. So no key without a `:` stays past a tick.
+  - **Names.** A profile whose name or account part — its `account`, else its name — holds a `:` is named by
+    `ao doctor`'s profiles check and its reserve is refused, since its key would not split into adapter
+    and account; a `.` is allowed (an email-style account), the commit message's dotted path being words
+    only. `ao gate <x>` reads `<x>` as an account when it holds a `:`, else as a profile.
   **The line is computed from a reserve, never typed as a percentage.** The setting is a
   **reserve** per window label, of two shapes: a flat percent — `30` — whose line is `100 −
   reserve`; or a percent **per day** — `{per_day: 10}` — whose line is `100 − per_day × days_left`,
@@ -2607,11 +2689,11 @@ teams:
   moves to 70%, and one paused on the last day resumes at the reset, when the window empties. A
   window with no reserve has no line and pauses nothing; the tool's own 100% shows `limited`. **A
   team's reserve priority** (§5 `teams.<team>.reserve`, the Settings page, `ao team reserve`) is a
-  flat percent added to the profile's reserve for the sessions carrying that team's badge on every
+  flat percent added to the account's reserve for the sessions carrying that team's badge on every
   window that has one (it lowers a line and never makes one), the mark carrying `team_extra: {team,
-  n}`: with grind at 30 on the session window and ao-grind at 10, ao-grind's sessions pause at 60%
-  and the profile's others at 70%, so two teams on one profile pause at different lines; the chip
-  still shows the profile's line, and a session paused under its team's line says *paused · usage
+  n}`: with claude-code:paul at 30 on the session window and ao-grind at 10, ao-grind's sessions pause at 60%
+  and the account's others at 70%, so two teams on one account pause at different lines; the chip
+  still shows the account's line, and a session paused under its team's line says *paused · usage
   (ao-grind +10)*.
   **A pause is a send, not a kill** (the PAUSE flag of this section's last bullet): the host agent
   submits the record's `pause_prompt` once — *pause: finish the step in hand, commit and push what
@@ -2645,7 +2727,7 @@ teams:
   window's wrap-up-then-kill is **not** used here: a pause that killed would need a start, and a
   start is a person's act, a schedule's (off by default) or rule 8's where the person set it.
   Interactive sessions are never paused and carry no line: at 100% they show `limited`. The
-  reserves are the person's, per profile, in the host's `settings.yml` (§5), read on every tick and
+  reserves are the person's, per account, in the host's `settings.yml` (§5), read on every tick and
   changed by `ao gate` (§4.7) or the Settings page; the top bar's chip shows the line beside the
   number (§4.5a). A one-day change to a reserve is by hand — the reserve down, and back after the
   reset; an override that expires on its own is rejected for now (TD-101). **A metered profile**
@@ -2653,7 +2735,7 @@ teams:
   profile has prices (`{day: "$5", week: "$20"}`) or in tokens where it has none (`{day: "2M
   tok"}`), read against the **account's** spend (§4.2a): the amount is the window's **100**, `pct`
   is spend over amount, and the line is `100 − <team priority>` — the amount itself for the
-  profile's plain sessions, nine tenths of it for a team carrying a reserve priority of 10, so a
+  account's plain sessions, nine tenths of it for a team carrying a reserve priority of 10, so a
   team's priority means one thing on both billings. The pause is the same pause, sent when the
   account's spend reaches the line, and lifted when the window rolls (`next` is the boundary;
   nothing else moves a spent window back, and the resume keeps `RESUME_MIN` as any does — a pause
@@ -2661,8 +2743,8 @@ teams:
   amount the home files one `system` note to the person inbox — *grind-api · day $4.10 of $5* — an
   FYI, uncounted, once per window; the fraction is fixed, not a setting. A metered profile with no
   reserve has no line and pauses nothing, as a subscription window without one does; the chip
-  still shows its spend. Two profiles on one key with different amounts pause at different spends
-  of the same bill, as two profiles on one login keep different lines against one number.
+  still shows its spend. Every profile on one account pauses at the same spend of the same bill, the amount
+  being the account's as its reserve is (*A reserve is the account's*, TD-1581).
   **Credential lapse** (Not built — phase 3): adapter `credentials_ok()` false → don't start;
   running workers get a send when fresh credentials land (tdgrind's `.nudged` marker). **Stall**
   (Not built — phase 3): `working` with no output past `stall_after` → flag `stalled?`, send one
