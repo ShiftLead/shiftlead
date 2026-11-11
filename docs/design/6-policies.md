@@ -455,9 +455,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      where td-max's extra fill and mover are built), and nothing else starts it; the hold is tested before
      the gate and the ceiling, so a held seat takes no word of `unfillable` and is never routed around (§4.9b):
      its questions land and wait. Its `seat_due` stands, the mail waits in its mailbox, and every pass over the
-     seat, due or not — every pass that reaches the seat's cause, a suspended seat and one its flow sat out
-     keeping their own words, and a pass that returns there or at `superseded_by` clearing any `stop_held` it
-     finds (a node seat whose link is down keeps it, as it keeps its other marks) — writes **`stop_held: {at, by, team}`** on its record while it holds (home-owned,
+     seat, due or not — `_seat_pass`'s returns in its own order: (a) a record that is not a supervised,
+     unattended seat, a superseded one or a suspended one, and (b) one its flow sat out, each clearing any
+     `stop_held` it finds and keeping its own words; the write comes after them and before (c) the return
+     for a node seat whose link is down, which keeps the mark as it keeps its other marks — writes **`stop_held: {at, by, team}`** on its record while it holds (home-owned,
      `by` and `at` the helper's, `at` the last end it read, rewritten when either changes, pushed to a node's
      seat as its other home-owned marks are) and clears it once it does not; the send never reads the mark but the helper itself, over the graph's
      records of the seat's team, so the first sender after a Stop is told too and none is told of a hold a
@@ -891,7 +892,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      needs no such write, since the records it makes begin with no `lane_seen` and rule 6 writes
      theirs at their next declaration. A person's Start, a schedule's, or Dismiss clears
      `work_waiting` — Dismiss all but a held part, `seats_held`, which stays until the Start or the questions
-     close (*A team that stopped*, below, TD-1564). The note on the team card (§4.5a *work waiting* note) says which of the two
+     close (*A team that stopped*, below, TD-1564); lane news that comes to a mark holding no lane ids and no
+     `questions` (a held-only one, or one Dismiss left) takes the tick's own instant as its `at`, so its row is
+     aged, and told, from the news, never from the held part's instant (which is `seats_held_at`). The note on the team card (§4.5a *work waiting* note) says which of the two
      happened: *3 entries waiting since 14:02* or *started 14:12 for TD-213 and 2 more*. **With no
      key the home starts the team** (Paul's decision, 2026-10-08, TD-457): `ask` and `off` are written
      only by `set_settings`, which a session cannot call. Not on a node yet, as rule 4 is not; a team with
@@ -996,8 +999,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      - `by` is read from **the team's ending** alone: leaving out rule 3's own seat closes (the end
        `record_end` reads is a `closer` with `why: seat`, TD-1564, the filter rule 3's hold reads), the
        records whose end falls within `FINISHED_SETTLE` of the newest end that remains (`other` where none
-       remains). A member the person closed a day earlier, while the team ran
-       on, does not decide how the team stopped. It is `person` where one of those records was
+       remains). A member the person closed a day earlier, while other members ran
+       on and ended later, does not decide how the team stopped; where the team ran on only on its seats
+       after that Close, rule 3's closes are left out and that Close is its ending — the person's (TD-1564). It is `person` where one of those records was
        ended by the person:
        - its `ended.by`, or for a record with no `ended` its `closer.by`, names the person (Stop
          now, a Close, a Kill); or
