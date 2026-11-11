@@ -2178,32 +2178,14 @@ def cmd_gate(args: argparse.Namespace) -> int:
             return emit(args, set_age, lambda: print(_max_age_said(set_age["usage"]["max_age"])))
     if not args.profile:
         got = call_sync("gate")
-        if isinstance(got.get("accounts"), dict):  # by account (§6 *A reserve is the account's*, TD-1610)
 
-            def by_account() -> None:
-                if not got["accounts"]:
-                    print(f"no usage gate: no accounts and no reserves in {got['file']}")
-                for key, v in got["accounts"].items():
-                    print(_gate_account_line(key, v))
+        def by_account() -> None:  # by account (§6 *A reserve is the account's*, TD-1610)
+            if not got["accounts"]:
+                print(f"no usage gate: no accounts and no reserves in {got['file']}")
+            for key, v in got["accounts"].items():
+                print(_gate_account_line(key, v))
 
-            return emit(args, {k: v for k, v in got.items() if k != "profiles"}, by_account)
-        try:  # each reading's age (TD-233 slice 1): `gate` carries the lines, `usage` the time
-            usage = call_sync("usage")
-        except AgentError:
-            usage = {}
-        for prof, v in got["profiles"].items():
-            reading = usage.get(prof) if isinstance(usage, dict) else None
-            if isinstance(reading, dict) and not v.get("metered"):
-                v["fetched"], v["source"] = reading.get("fetched"), reading.get("source") or "asked"
-
-        def prose() -> None:
-            if not got["profiles"]:
-                print(f"no usage gate: no reserves in {got['file']}")
-            for prof, v in got["profiles"].items():
-                rows = v["windows"] or [{"label": k, "reserve": r, "unread": True} for k, r in v["reserves"].items()]
-                print(_gate_line(prof, rows, "" if v.get("metered") else _gate_read(v)))
-
-        return emit(args, got, prose)
+        return emit(args, got, by_account)
     if not args.reserves:
         raise AgentError(
             "ao gate <account> <label>=<reserve>…, e.g. ao gate claude-code:paul 5h=30 week=10/day "
@@ -2841,14 +2823,9 @@ def cmd_settings(args: argparse.Namespace) -> int:
         print(got["file"])
         print("usage_gate:")
         lines: list[str] = []
-        if isinstance(got.get("usage_accounts"), dict):  # by account (§4.7 `ao gate`, TD-1610)
-            for key, v in got["usage_accounts"].items():
-                if v.get("reserves") or v.get("amounts"):
-                    lines.append(_gate_account_line(key, v))
-        else:
-            for prof, v in (got.get("usage_gate") or {}).items():
-                rows = v["windows"] or [{"label": k, "reserve": r, "unread": True} for k, r in v["reserves"].items()]
-                lines.append(_gate_line(prof, rows))
+        for key, v in (got.get("usage_accounts") or {}).items():  # by account (§4.7 `ao gate`, TD-1610)
+            if v.get("reserves") or v.get("amounts"):
+                lines.append(_gate_account_line(key, v))
         for line in lines:
             print("  " + line)
         if not lines:

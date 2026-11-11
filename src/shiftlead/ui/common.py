@@ -604,14 +604,12 @@ def with_lines(usage: Any, gate: Any) -> dict[str, Any]:
     (§6, TD-100, TD-1610), which is what the chip reads its line from — on the page's render and on each
     pushed `usage` event alike. A gate that could not be read (an older agent, no `settings.yml`)
     leaves every chip as it was: a number with no line."""
-    profiles = gate.get("profiles") if isinstance(gate, dict) else None
+    profiles: dict[str, Any] | None = None
     if isinstance(gate, dict) and isinstance(gate.get("accounts"), dict):
         # by account (§6 *The readers*, TD-1610): each profile on an account reads the account's rows, one on
-        # a mixed account none; a profile no account lists keeps its own entry, as before
+        # a mixed account none
         accts = [a for a in gate["accounts"].values() if isinstance(a, dict)]
-        mixed = {str(p) for a in accts if a.get("billing") == "mixed" for p in a.get("profiles") or []}
-        own = {k: v for k, v in (profiles or {}).items() if k not in mixed} if isinstance(profiles, dict) else {}
-        profiles = own | {str(p): a for a in accts if a.get("billing") != "mixed" for p in a.get("profiles") or []}
+        profiles = {str(p): a for a in accts if a.get("billing") != "mixed" for p in a.get("profiles") or []}
     out: dict[str, Any] = {}
     for prof, u in (usage or {}).items():
         g = profiles.get(prof) if isinstance(profiles, dict) else None

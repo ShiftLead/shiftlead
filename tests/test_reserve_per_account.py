@@ -118,9 +118,9 @@ async def test_two_profiles_on_one_account_read_one_line_and_a_set_moves_both(ag
         await person.call("set_settings", profile="pb", reserves={"5h": 10})
         whole = settings_mod.load()
         assert agent._gate_reserves(whole, "pa") == {"5h": 10}, "a change on one profile moves the account's line"
-        # the gate's reply keeps its shape until TD-1610: each profile with its account's reserves
-        gate = (await person.call("gate"))["profiles"]
-    assert gate["pa"]["reserves"] == gate["pb"]["reserves"] == {"5h": 10} and gate["pb"]["account"] == "hookstub:paul"
+        # the gate's reply is by account (TD-1610): both profiles are on the one entry
+        gate = (await person.call("gate"))["accounts"]
+    assert gate["hookstub:paul"]["reserves"] == {"5h": 10} and {"pa", "pb"} <= set(gate["hookstub:paul"]["profiles"])
 
 
 def _git_log(home) -> list[str]:

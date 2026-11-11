@@ -654,34 +654,28 @@ def test_the_usage_chip_prints_the_line_its_reserve_makes_and_ranks_by_the_gap()
     # 85% of a 100% line is 15 points off it: not near, where 85% with no line at all is
     assert got["flat_far"]["text"] == "grind · week 85% / 100%" and got["flat_far"]["near"] is False
     assert got["no_line_made"]["text"] == "grind · week 85%" and got["no_line_made"]["near"] is True
-    # the page's join of the two reads: a profile the gate has no reserves for is left as it was
-    usage = {"grind": {"windows": [], "reason": "ok"}, "paul": {"windows": []}, "gone": None}
-    gate = {"profiles": {"grind": {"windows": [{"label": "week", "line": 70}]}}}
+    # the page's join of the two reads, by account (TD-1610): each profile on an account reads the account's
+    # rows, the unnamed default `""` too where the reply lists it; one no account lists is left as it was
+    usage = {"grind": {"windows": [], "reason": "ok"}, "": {"windows": []}, "paul": {"windows": []}, "gone": None}
+    gate = {"accounts": {
+        "claude-code:paul": {"profiles": ["", "grind"], "billing": "subscription",
+            "windows": [{"label": "week", "line": 70}]},
+    }}  # fmt: skip
     assert with_lines(usage, gate) == {
         "grind": {"windows": [], "reason": "ok", "lines": [{"label": "week", "line": 70}]},
+        "": {"windows": [], "lines": [{"label": "week", "line": 70}]},
         "paul": {"windows": []},
         "gone": None,
     }
     assert with_lines(usage, None) == usage and with_lines(None, gate) == {}
-    # by account (TD-1610): each profile on it reads the account's rows; a mixed account draws no line
-    accounts = {"accounts": {
-        "claude-code:paul": {"profiles": ["grind", "paul"], "billing": "subscription",
-            "windows": [{"label": "week", "line": 60}]},
-        "claude-code:split": {"profiles": ["gone"], "billing": "mixed", "windows": [{"label": "week", "line": 1}]},
-    }}  # fmt: skip
-    got = with_lines(usage, accounts | gate)
-    assert got["grind"]["lines"] == got["paul"]["lines"] == [{"label": "week", "line": 60}] and got["gone"] is None
-    # a profile no account lists keeps its own entry; one on a mixed account draws no line even so
-    usage2 = {"solo": {"windows": []}, "sx": {"windows": []}}
-    accounts["accounts"]["claude-code:split"]["profiles"] = ["sx"]
-    own = {
-        "profiles": {
-            "solo": {"windows": [{"label": "5h", "line": 50}]},
-            "sx": {"windows": [{"label": "5h", "line": 9}]},
-        }
-    }
-    got = with_lines(usage2, accounts | own)
-    assert got["solo"]["lines"] == [{"label": "5h", "line": 50}] and "lines" not in got["sx"]
+    # the per-profile reply is gone (TD-1610 slice 4): a `profiles` key beside the accounts is not read
+    assert with_lines(usage, gate | {"profiles": {"paul": {"windows": [{"label": "5h", "line": 1}]}}}) == with_lines(
+        usage, gate
+    )
+    # a mixed account draws no line
+    usage2 = {"sx": {"windows": []}}
+    split = {"accounts": {"claude-code:split": {"profiles": ["sx"], "billing": "mixed", "windows": [{"line": 9}]}}}
+    assert "lines" not in with_lines(usage2, split)["sx"]
 
 
 def test_the_usage_chip_shows_the_gates_projection():

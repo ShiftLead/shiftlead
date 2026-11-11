@@ -2621,7 +2621,9 @@ teams:
     {profiles, billing, reserves | amounts, windows}}}`**, an account for each key under `usage_gate:`,
     each account the adapters' profiles name and each a node has reported under — one with no reading
     yet carries `windows: []`, so its card can take a first reserve, and an orphan key no profile names
-    is listed with `profiles: []`, so it can be cleared. A label is checked against the account's
+    is listed with `profiles: []`, so it can be cleared. The unnamed default profile, `""`, which a record
+    here runs under when it names none, is listed on the account it resolves to, since a reading and a
+    chip are keyed by it. No reply carries a per-profile copy of the gate. A label is checked against the account's
     reading's labels where there is one, and accepted unchecked where there is none.
   - **One billing.** An account has one billing (§4.2a), so its reserve is a percent or an amount, and
     its metered card posts `{account, reserves}` as a subscription card does, the unit telling them

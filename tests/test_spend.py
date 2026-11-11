@@ -7,7 +7,7 @@ import json
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
-from conftest import park_ticks
+from conftest import gate_on, park_ticks
 
 from sessionorc import settings
 from sessionorc import spend as spend_mod
@@ -448,8 +448,8 @@ async def test_set_settings_and_gate_take_a_metered_profiles_amounts(agent, hook
                            datetime.now().astimezone()),
             settings.amounts(settings.load())["hookstub:api"], "now",
         )  # fmt: skip
-        gate = (await person.call("gate"))["profiles"]["api"]
-    assert gate["metered"] and gate["reserves"] == {"day": "$5"}
+        gate = gate_on(await person.call("gate"), "api")
+    assert gate["billing"] == "metered" and gate["amounts"] == {"day": "$5"}
     assert _gate_line("api", gate["windows"]) == "api · day $5 → spent $3.20 (64%)"
     assert _reserve(" $5 ") == "$5" and _reserve("2M tok") == "2M tok" and _reserve("30") == 30
 

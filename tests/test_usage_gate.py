@@ -5,7 +5,7 @@ gate holds off while it stands."""
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from conftest import park_ticks, wait_for
+from conftest import gate_on, park_ticks, wait_for
 
 from sessionorc import settings
 from sessionorc.agent import RESUME_MIN
@@ -141,7 +141,7 @@ async def test_a_teams_reserve_priority_pauses_its_sessions_first(agent, tmp_pat
         assert agent.sessions[plain].gated is None, "65% is under the profile's 70% line"
         g = agent.sessions[teamed].gated
         assert g and g["line"] == 60 and g["team_extra"] == {"team": "ao-grind", "n": 10}
-        assert (await person.call("gate"))["profiles"][""]["windows"][0]["line"] == 70  # the chip: the profile's
+        assert gate_on(await person.call("gate"), "")["windows"][0]["line"] == 70  # the chip: the account's
         for s in (plain, teamed):
             await person.call("kill", id=s)
             await person.call("remove", id=s)
@@ -394,14 +394,14 @@ async def test_set_settings_is_a_persons_and_checks_the_labels(agent, tmp_path):
         async with LocalClient(caller=sid) as itself:
             with pytest.raises(AgentError, match="a person's own"):
                 await itself.call("set_settings", profile="", reserves={"wk": 10})
-            assert (await itself.call("gate"))["profiles"] == {}  # a read: never gated
+            assert gate_on(await itself.call("gate"), "")["reserves"] == {}  # a read: never gated
         with pytest.raises(AgentError, match="reports no window week: its windows are 5h, wk"):
             await person.call("set_settings", profile="", reserves={"week": 10})
         with pytest.raises(AgentError, match="whole percent"):
             await person.call("set_settings", profile="", reserves={"wk": 130})
         await person.call("set_settings", profile="", reserves={"5h": 30, "wk": {"per_day": 10}})
         gate = await person.call("gate")
-        prof = gate["profiles"][""]
+        prof = gate_on(gate, "")
         assert prof["reserves"] == {"5h": 30, "wk": {"per_day": 10}} and prof["labels"] == ["5h", "wk"]
         assert [(w["label"], w["line"]) for w in prof["windows"]] == [("5h", 70), ("wk", None)]
         await person.call("kill", id=sid)
@@ -585,14 +585,15 @@ async def test_a_profile_with_no_copy_reads_its_accounts_reading_at_the_gate(age
         assert "pg" not in agent._usage
         assert agent._profile_over("pg", now)["label"] == "5h"
         assert agent._profile_gated("pg", now)
-        got = (await person.call("gate"))["profiles"]["pg"]
+        got = gate_on(await person.call("gate"), "pg")
         assert got["windows"][0]["pct"] == 95 and got["windows"][0]["line"] == 70
         assert got["fetched"] == fetched and got["source"] == "reported"
         # an account nobody reads is still no reading, and no gate; and its reserve is its own, so
         # `pg` on `other` carries none (TD-1581)
         monkeypatch.setattr(hookstub, "accounts", {"pa": "paul", "pg": "other"})
         assert not agent._profile_gated("pg", now)
-        assert "pg" not in (await person.call("gate"))["profiles"]
+        acct = gate_on(await person.call("gate"), "pg")
+        assert acct is not None and acct["reserves"] == {}
         # the profile's own tool is read, never another's account of the same name: a record under
         # `pg` names its adapter, and a shell polls no usage
         monkeypatch.setattr(hookstub, "accounts", {"pa": "paul", "pg": "paul"})
