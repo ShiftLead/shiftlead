@@ -1534,11 +1534,12 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        entry numbers are each repo's own. The result's sender keys are dropped: the questions are the set
        of its values' `ref`s, by `normalize_ref`. No sender is matched, so a replayed holder, a node's
        address and a lapsed lease change nothing. An open `ask` the Inbox draws in its *Snoozed* fold counts for no
-       line — one the person **snoozed** (`snoozed_until` ahead of the tick; an unreadable one is read as
+       line (a `steer` is never snoozed, having Pause; one in the fold all the same counts for none) — one the person **snoozed** (`snoozed_until` ahead of the tick; an unreadable one is read as
        not snoozed, as the Inbox reads it) or a look handed to a reviewer (`snoozed_for` set, §4.5a **Send
        to reviewer**, whose handed `ask` is itself work this rule reads) — since that fold is on no Queue
        card and in no Inbox count (§4.5 screen 6, §4.10 *Snooze*), so a stuck row is the one need left to
-       draw; the fold's end (the time, a *now* press, the look's debt closing) counts it again. This filter
+       draw; the fold's end (the time, a *now* press, the look's debt closing) counts it again. It is filtered out of
+       the entries with the repo filter, before `waiting_of`, whose values carry no snooze. This filter
        is rule 13's own: `host.waiting` and a session's *waiting* mark read `waiting_of` unfiltered.
        While one counts, the line's `stuck` entry drops and its `stuck_open` entry is kept and still moved
        (*The clock*: a claim, a release), with `asked` set. An open `ask` and a paused `steer` (§4.10
