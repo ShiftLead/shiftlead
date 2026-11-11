@@ -2226,6 +2226,16 @@ async def test_usage_says_why_it_has_no_reading_backs_off_and_keeps_the_last_one
             agent._usage_acct[K] = agent._usage_reading(K, {"reason": "error", "detail": "HTTP 503 Unavailable"})
         assert f"usage for account {K}: rate_limited (was error) — HTTP 429 x" in caplog.text
         assert f"usage for account {K}: error (was rate_limited) — HTTP 503 Unavailable" in caplog.text
+        # an adapter that raises on a change of reason logs its exception as the cause (TD-1605), bounded to 200
+        # characters with its type's name (TD-1607)
+        with caplog.at_level("INFO", logger="shiftlead.agent"):
+            agent._usage_acct[K] = agent._usage_reading(K, {"reason": "rate_limited"})
+            agent._usage_acct[K] = agent._usage_reading(K, RuntimeError("boom"))
+            agent._usage_acct[K] = agent._usage_reading(K, {"reason": "rate_limited"})
+            agent._usage_acct[K] = agent._usage_reading(K, RuntimeError("x" * 500))
+        assert f"usage for account {K}: error (was rate_limited) — RuntimeError: boom" in caplog.text
+        long = f"usage for account {K}: error (was rate_limited) — RuntimeError: " + "x" * 186
+        assert long + "\n" in caplog.text or caplog.text.endswith(long), "the cause is cut at 200 characters"
 
         # a good reading replaces it and clears the reason; a window it does not name is kept (TD-233)
         good = agent._usage_reading(K, {"windows": [], "fetched": "t2", "reason": "ok"})

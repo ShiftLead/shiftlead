@@ -1258,6 +1258,9 @@ def test_a_429_is_read_as_rate_limited_with_its_retry_after(tmp_path, monkeypatc
             (urllib.error.HTTPError("u", 500, "boom", {}, None), "error", None, "HTTP 500 boom"),
             (OSError("no route to host"), "error", None, "OSError: no route to host"),
             (TimeoutError(), "error", None, "TimeoutError"),
+            # TD-1607: a long reason or message is cut at 200 characters, so a long body never floods the journal
+            (urllib.error.HTTPError("u", 500, "r" * 500, {}, None), "error", None, ("HTTP 500 " + "r" * 500)[:200]),
+            (OSError("m" * 500), "error", None, ("OSError: " + "m" * 500)[:200]),
         ):
             with um.patch("urllib.request.urlopen", side_effect=err), pytest.raises(UsageRefused) as e:
                 ad.usage(prof)
