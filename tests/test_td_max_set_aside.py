@@ -3,6 +3,7 @@ work*, *What does not*; td-max, TD-1545): set aside, and said by `ao org check` 
 
 from __future__ import annotations
 
+import pytest
 import yaml
 from test_cli_teams import HOST, world  # noqa: F401 — the fixture, by name
 
@@ -104,10 +105,11 @@ MILL = (
 )
 
 
-def test_org_check_says_a_key_set_aside_on_an_unlanded_team(world):  # noqa: F811
+def test_org_check_says_a_key_set_aside_on_an_unlanded_team(world, monkeypatch):  # noqa: F811
     """TD-1621: an unlanded team skips its plan, and its set-aside keys are still said (#3349)."""
     tmp_path, _ = world
     org = _org_with_mill(tmp_path)
+    monkeypatch.setattr(teams, "plan", lambda *a, **k: pytest.fail("an unlanded team is planned"))
     org.unlanded["ao-grind"] = "place.ao-grind: the node could not be asked"
     assert MILL in orgcheck.check(org, [], HOST, [], [])["warnings"]
 
