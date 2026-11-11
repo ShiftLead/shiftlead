@@ -559,3 +559,20 @@ def test_a_role_directory_only_the_branch_holds_is_read_at_dir(world, capsys):
     assert not [x for x in plain["lacks"] if "role scout" in x]
     code, got = check_at(capsys, wt)
     assert code == 1 and [x for x in got["lacks"] if x.startswith("role scout (")], got
+
+
+def test_a_name_two_teams_share_through_an_extra_is_lacking_until_one_is_off(world, capsys):
+    """§4.9 *Names, the size and the ceiling* (TD-1545): alpha's `alpha-grind` runs `hunter` with the default
+    ceiling, so its extras are `hunter-2` and `-3`; the org file's `span` on alpha naming `hunter-2` parses (the
+    parse reads no extras), and the check says the two once the extras are read — until `alpha-grind` is off."""
+    tmp_path, home, org = world
+    org["teams"]["span"]["members"] = [{"role": "hunter", "name": "hunter-2"}]
+    (home / "org.yml").write_text(yaml.safe_dump(org))
+    code, got = check(capsys)
+    assert code == 1
+    assert [x for x in got["lacks"] if "extras" in x] == [
+        "teams span and alpha-grind both start a session called 'hunter-2' on alpha once their extras are read — "
+        "an agent's name is its repo's; rename one, or lower a `max` (design §4.9 *Names, the size and the ceiling*)"
+    ]
+    (home / "settings.yml").write_text("teams: {alpha-grind: {max: 'off'}}\n")
+    assert check(capsys) == (0, {"ok": True, "lacks": [], "warnings": []})

@@ -72,10 +72,12 @@ def test_the_size_reaches_the_definition_and_its_names(world, tmp_path):  # noqa
     assert team.size == {"grind": 3, "hunt": 0, "nope": 2}
     assert orgmod.with_settings(orgmod.load(), {"ao-grind": {"size": {}}}).teams["ao-grind"].members == raw.members
     assert [m.names() for m in team.members] == [["grind-1", "grind-2", "grind-3"], []]
-    assert team.session_names() == ["orc-ao", "grind-1", "grind-2", "grind-3"]
+    assert team.session_names(extras=False) == ["orc-ao", "grind-1", "grind-2", "grind-3"]
+    # each line's extras past its size up to size + 2 (§4.9 *Names, the size and the ceiling*, TD-1545)
+    assert team.session_names()[4:] == ["grind-4", "grind-5", "hunt", "hunt-2"]
     assert team.staffed() == {"grinder"} and raw.staffed() == {"grinder", "hunter"}
     assert team.unsized() == ["nope"]
-    assert team.next_name("grinder") == "grind-4"  # past the size, never a name the size gives
+    assert team.next_name("grinder") == "grind-6"  # past the size and its extras, never a name either gives
 
 
 def test_plan_starts_each_line_at_its_size(world, tmp_path):  # noqa: F811

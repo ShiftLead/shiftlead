@@ -70,7 +70,7 @@ def test_an_anchor_key_on_a_team_is_refused_as_retired(tmp_path, monkeypatch, va
 def test_anchor_false_on_a_team_is_read_and_passed_over(tmp_path, monkeypatch):
     org = _org(tmp_path, monkeypatch, {"t": _team(anchor=False), "u": _team("-u")})
     for name, sfx in (("t", ""), ("u", "-u")):
-        assert org.teams[name].session_names() == [f"lead{sfx}", f"tl{sfx}", f"g{sfx}"]
+        assert org.teams[name].session_names(extras=False) == [f"lead{sfx}", f"tl{sfx}", f"g{sfx}"]
         assert not hasattr(org.teams[name], "anchor")
 
 

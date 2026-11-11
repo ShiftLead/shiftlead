@@ -1928,15 +1928,19 @@ def test_every_unattended_member_carries_the_usage_gates_two_texts(world):
 # ── Members… (design §4.9 *Add or remove a member from the team card*, TD-163, built by TD-172) ──
 
 
-def _flow_org(tmp_path):
-    """The world's org, its member entries one line each — the shape the card can edit."""
+def _flow_org(tmp_path, *, off: bool = False):
+    """The world's org, its member entries one line each — the shape the card can edit. `off`: the team
+    written `max: off`, so `grind-3` is no extra's name and Add member may write it (§4.9 *Names, the size and
+    the ceiling*)."""
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(org_doc(tmp_path), default_flow_style=None))
+    if off:
+        (tmp_path / "home" / "settings.yml").write_text("teams: {ao-grind: {max: 'off'}}\n")
     return tmp_path / "home" / "org.yml"
 
 
 def test_members_on_a_stopped_team_edit_the_definition_only(world):
     tmp_path, state = world
-    path = _flow_org(tmp_path)
+    path = _flow_org(tmp_path, off=True)
     v = teamrun.members_view(orgmod.load(path), "ao-grind", [])
     assert v["editable"] and not v["live"] and [e["role"] for e in v["members"]] == ["grinder", "hunter"]
     assert v["members"][0]["sessions"][1] == {"name": "grind-2", "id": "", "state": "not live"}
@@ -1980,7 +1984,7 @@ def test_a_live_add_reads_the_flow_the_person_picked(world):
 
 def test_members_on_a_live_team_start_one_under_the_manager_and_wind_one_down(world):
     tmp_path, state = world
-    path = _flow_org(tmp_path)
+    path = _flow_org(tmp_path, off=True)
     started(state)
     got = teamrun.add_member(cli.call_sync, path, "ao-grind", HOST, role="grinder", member="grind-3")
     (made,) = got["created"]
@@ -2027,7 +2031,8 @@ def test_members_default_to_a_free_name_and_remove_of_a_duplicate_keeps_the_live
     tmp_path, state = world
     path = _flow_org(tmp_path)
     v = teamrun.members_view(orgmod.load(path), "ao-grind", [], ["grinder", "auditor"])
-    assert v["next"] == {"grinder": "grind-3", "auditor": "auditor", "hunter": "hunt-2"} and v["twice"] == []
+    # past each line's extras on its default ceiling (§4.9 *Names, the size and the ceiling*): grind-3, -4; hunt-2, -3
+    assert v["next"] == {"grinder": "grind-5", "auditor": "auditor", "hunter": "hunt-4"} and v["twice"] == []
     started(state)
     with pytest.raises(ValueError, match="ao-grind already has hunt$"):
         teamrun.add_member(cli.call_sync, path, "ao-grind", HOST, role="hunter", member="hunt")
@@ -2048,7 +2053,7 @@ def test_members_default_to_a_free_name_and_remove_of_a_duplicate_keeps_the_live
 
 def test_members_refuse_a_repo_defined_team_and_a_held_name(world):
     tmp_path, state = world
-    path = _flow_org(tmp_path)
+    path = _flow_org(tmp_path, off=True)
     started(state)
     state["verdicts"]["grind-3"] = {"name": "grind-3", "verdict": "live", "holder": "ao-x"}
     with pytest.raises(teams.TeamError, match="grind-3 is held by a live session, so nothing was created"):
