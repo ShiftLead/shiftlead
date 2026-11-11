@@ -328,6 +328,32 @@ async def test_an_unknown_verdict_logs_the_signal_that_made_it(agent, monkeypatc
     assert "usage_report from peer 4242 judged unknown: unreadable" in caplog.text
 
 
+async def test_an_unknown_verdicts_method_is_bounded_and_each_signal_is_logged(agent, monkeypatch, caplog):
+    """#3332's log line (TD-1606): the method is the caller's word, so at most 60 of its characters are logged;
+    and each signal §4.8a names is the one logged — another pid namespace, a detached cgroup."""
+    agent._id_detached = ""
+    monkeypatch.setattr(agent, "proc", FakeProc(list(BASE)))  # 4242 is gone before the read
+    agent._id_panes = list(PANES)
+    agent.identity_mode = "enforce"
+    long = "m" * 200
+    with caplog.at_level("INFO", logger="shiftlead.agent"):
+        await agent._identify({"id": 1, "method": long, "params": {}, "caller": "ao-x"}, 4242)
+    judged = [r.getMessage() for r in caplog.records if "judged unknown" in r.getMessage()]
+    assert judged == [f"{'m' * 60} from peer 4242 judged unknown: unreadable"]
+    caplog.clear()
+    monkeypatch.setattr(agent, "proc", _ns(FakeProc([*BASE, P(390, 1, 390), P(400, 390, 400)]), p400=BOX_NS))
+    with caplog.at_level("INFO", logger="shiftlead.agent"):
+        await agent._identify({"id": 2, "method": "usage_report", "params": {}, "caller": "ao-x"}, 400)
+    assert "usage_report from peer 400 judged unknown: namespace" in caplog.text
+    caplog.clear()
+    svc = "/user.slice/user-1000.slice/user@1000.service/app.slice/shiftlead-agent.service"
+    agent._id_detached = svc
+    monkeypatch.setattr(agent, "proc", FakeProc([*BASE, P(400, 1, 400, 0)], cgroups={400: svc}))
+    with caplog.at_level("INFO", logger="shiftlead.agent"):
+        await agent._identify({"id": 3, "method": "usage_report", "params": {}, "caller": "ao-x"}, 400)
+    assert "usage_report from peer 400 judged unknown: cgroup" in caplog.text
+
+
 async def test_a_served_connection_carries_its_peers_uid_to_the_classification(agent, monkeypatch):
     """TD-1122: the uid of TD-1093 reaches `classify` over a real connection — `_handle_conn` and
     `_serve_wait` pass `_peer_args`, `_dispatch` hands `peer_uid` to `_identify`, and `_id_channel`
