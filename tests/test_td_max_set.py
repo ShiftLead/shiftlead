@@ -10,6 +10,13 @@ from shiftlead import cli
 from shiftlead import org as orgmod
 
 
+@pytest.fixture
+def extras_on(monkeypatch):
+    from shiftlead import teams
+
+    monkeypatch.setattr(teams, "_extras", teams.EXTRAS)  # conftest stubs it: put the real one back
+
+
 def _max(state):
     return state["teams"]["ao-grind"].get("max")
 
@@ -74,12 +81,66 @@ def test_a_session_is_refused(world, monkeypatch, capsys):  # noqa: F811
     assert "refused to a session" in capsys.readouterr().err and "teams" not in state
 
 
-def test_on_a_live_team_the_extras_follow_at_the_next_start(world, capsys):  # noqa: F811
+def test_on_a_team_with_nothing_live_the_setting_is_all(world, extras_on, capsys):  # noqa: F811
     _, state = world
+    assert cli.main(["team", "max", "ao-grind", "grind", "4"]) == 0
+    assert capsys.readouterr().out.strip() == "grind: up to 4"
+    assert not creates(state)
+
+
+def _removes(state, monkeypatch):
+    real = cli.call_sync
+
+    def call(method, **params):
+        if method != "remove":
+            return real(method, **params)
+        state["calls"].append((method, params))
+        state["sessions"][:] = [s for s in state["sessions"] if s["id"] != params["id"]]
+
+    monkeypatch.setattr(cli, "call_sync", call)
+
+
+def _held(name, line, st="closed"):
+    return {"id": f"ao-shiftlead-{name}", "name": name, "state": st, "team": "ao-grind", "scale": {"line": line}}
+
+
+def test_on_a_live_team_a_raise_writes_the_new_extras_held_at_once(world, extras_on, monkeypatch, capsys):  # noqa: F811
+    _, state = world
+    _removes(state, monkeypatch)
+    assert cli.main(["team", "max", "ao-grind", "off"]) == 0
     started(state)
     capsys.readouterr()
     assert cli.main(["team", "max", "ao-grind", "grind", "4"]) == 0
-    assert capsys.readouterr().out.strip() == "grind: up to 4 · the extras follow at the next Start"
+    assert capsys.readouterr().out.strip() == "grind: up to 4 · grind-3, grind-4: written held"
+    got = {p["name"]: p for p in creates(state)}
+    assert sorted(got) == ["grind-3", "grind-4"]
+    assert got["grind-3"]["held"] is True and got["grind-3"]["scale"] == {"line": "grind"}
+    assert got["grind-3"]["controllers"] == ["ao-shiftlead-orc-ao"]  # under the live manager
+
+
+def test_on_a_live_team_a_lowered_max_removes_held_extras_and_says_a_live_one(world, extras_on, monkeypatch, capsys):  # noqa: F811
+    _, state = world
+    _removes(state, monkeypatch)
+    assert cli.main(["team", "max", "ao-grind", "grind", "4"]) == 0
+    started(state)
+    state["sessions"][:] = [s for s in state["sessions"] if s["name"] in ("orc-ao", "grind-1", "grind-2", "hunt")]
+    state["sessions"] += [_held("grind-3", "grind", "idle"), _held("grind-4", "grind"), _held("hunt-2", "hunt")]
+    capsys.readouterr()
+    assert cli.main(["team", "max", "ao-grind", "off"]) == 0
+    out = capsys.readouterr().out
+    assert [p["id"] for m, p in state["calls"] if m == "remove"] == ["ao-shiftlead-grind-4", "ao-shiftlead-hunt-2"]
+    assert "grind-4: the held extra of grind removed — the max no longer holds it" in out
+    assert "grind-3: a live extra of grind the max no longer holds — left to its run" in out
+    assert not creates(state)
+
+
+def test_on_after_off_on_a_live_team_writes_the_default_extras(world, extras_on, monkeypatch, capsys):  # noqa: F811
+    _, state = world
+    _removes(state, monkeypatch)
+    assert cli.main(["team", "max", "ao-grind", "off"]) == 0
+    started(state)
+    assert cli.main(["team", "max", "ao-grind", "on"]) == 0
+    assert sorted(p["name"] for p in creates(state)) == ["grind-3", "grind-4", "hunt-2", "hunt-3"]
 
 
 def test_a_seat_scales_from_a_size_of_one(world, tmp_path, capsys):  # noqa: F811
