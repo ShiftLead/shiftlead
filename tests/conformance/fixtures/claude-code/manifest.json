@@ -1,5 +1,6 @@
 {
   "panes": [
+    {"file": "../../../fixtures/screens/bypass-permissions.txt", "state": "needs-you"},
     {"file": "../../../fixtures/screens/first-run-login.txt", "state": "needs-you"},
     {"file": "../../../fixtures/screens/first-run-theme.txt", "state": "needs-you"},
     {"file": "../../../fixtures/screens/held-peer-message.txt", "state": "needs-you"},
