@@ -1522,14 +1522,21 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        other actors, a person's own session is passed over: not in the acting test, nor `since`, nor the
        choice of the first actor and its reason. A
        member the person took over is not the person's own: it reads `taken_over`. And a **line the person
-       is asked about** — one whose `Context:` names a `TD-n` that an open `ask` or `steer` in the person
-       inbox is about, from any sender (`work.waiting_of` over the person inbox: open only, its `about` by
-       `reference_of`, so one that is no bare `TD-n` names nothing) — is not read while one is open,
-       whatever holds it or its lanes hold: its `stuck` entry drops (the question is on the person's card
-       already, a need of its own) and its `stuck_open` entry is kept and still moved (*The clock*: a
-       claim, a release), with `asked` set; a line whose `Context:` names no entry has no such question.
-       It is read again the tick none is open, that tick's instant its open time (below). Matching by the
-       entry and not the sender keeps a replayed holder, a node's address and a lapsed lease out of it.
+       is asked about** — one whose `Context:` is a bare `TD-n` (a PR, a repo-qualified ref or no entry has
+       no such question) that an open `ask` or `steer` in the person inbox is about, from any sender in the
+       line's repo — is not read while one is open, whatever holds it or its lanes hold. The open questions
+       are `work.waiting_of` over the person inbox (open only, `about` by `reference_of`) with its
+       sender keys dropped: the set of its values' `ref`s, by `normalize_ref`, of entries whose envelope
+       `repo` (§4.10 *An envelope carries its sender's `repo`*, TD-1467) is the line's `repo` — one with no
+       `repo` (sent before the stamp, or from a record that resolves to none) mutes nothing, since entry
+       numbers are each repo's own; no sender is matched, so a replayed holder, a node's address and a
+       lapsed lease change nothing. Its `stuck` entry drops (the question is on the person's card
+       already, the entry's card the stuck row would be drawn on, one need for one entry — §4.9a *Waiting
+       is read, never declared*) and its `stuck_open` entry is kept and still moved (*The clock*: a claim,
+       a release), with `asked` set. That is so on purpose for any question about the entry, a design
+       question on a build's parent among them, however long it stands: a narrower match would need the
+       sender or the topic. It is read again the tick none is open, that tick's instant its open time
+       (below).
      - **The clock.** The work's **open time** is the ask's `at`, or the first tick the home read the line
        decided (below). The home keeps a board line's moving
        parts on `host.json` as **`stuck_open`** (below; shape-checked by
@@ -1545,7 +1552,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        tick the line has a holder (which holder, under a `--force`, does not matter: a change of holder is no
        release) and cleared on the release tick, and **`asked`**, `true` on each tick such a question is
        open and cleared on the answer's tick; a tick that is both moves `at` once, to its instant, and clears
-       both (`stuck_open: {<key>: {at, repo, holder?, asked?}}`);
+       both; a line first read while such a question is open is written with `asked` set and `at` that
+       first tick's instant; each moves on its own tick, `applying` or not, only the draw waiting for the
+       press's re-read (`stuck_open: {<key>: {at, repo, holder?, asked?}}`);
        the entry dropped when the line closes or is no longer
        decided as a reading that holds it says — a repo
        whose board reading is absent (not yet read, or its read raised), errored, or fell back to the
