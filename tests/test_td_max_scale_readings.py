@@ -30,7 +30,7 @@ async def test_the_shape_samples_a_live_extra_in_its_lines_stage_and_never_a_hel
     day = _today(agent)
     classes = {k: next(iter(v["minutes"])) for k, v in day["records"].items()}
     assert classes == {g1.id: "idle_with_work", live.id: "on_claim"}, (
-        "the live extra is its line's; the held one no one's"
+        "the live extra is its line's; a closed one no one's"
     )
     assert day["records"][live.id]["stage"] == day["records"][g1.id]["stage"]
 
@@ -55,8 +55,13 @@ def test_a_live_extra_out_of_work_with_its_pr_at_the_reader_reads_waiting_on_it(
 def test_a_team_winds_down_when_its_kept_members_and_live_extras_have_declared():
     kept = _member("g-1", out_of_work=OUT)
     live = _member("g-4", out_of_work=OUT, scale=EXTRA)
-    never = _member("g-5", "closed", scale=EXTRA)  # held, never filled: declared nothing
+    # held, never filled, exited with its pane and nothing declared: a member would read crashed
+    never = _member("g-5", "exited", scale=EXTRA, pane=True)
     got = work.finished([_manager(), kept, live, never])
     assert got is not None and got["why"] == [] and got["at"] == OUT["at"]
+    # and once the live ones have closed, the team reads wound down, the held extra passed over
+    down = [_manager("closed", out_of_work=OUT), _member("g-1", "closed", out_of_work=OUT)]
+    down += [_member("g-4", "closed", out_of_work=OUT, scale=EXTRA), never]
+    assert work.team_wound_down(down) == OUT["at"]
     undeclared = _member("g-6", scale=EXTRA)  # a live extra that has not declared keeps it running
     assert work.finished([_manager(), kept, live, never, undeclared])["why"] == ["g-6 idle, not declared"]
