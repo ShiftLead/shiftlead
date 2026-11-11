@@ -2238,7 +2238,21 @@ def test_ao_gate_prints_a_projection_and_a_window_with_no_rate():
     assert _max_age_said("90m").startswith("max_age 90m: ")
 
 
-def test_ao_gate_max_age_sets_the_setting(subprocess_agent, capsys, monkeypatch):
+@pytest.fixture
+def grind_profile(subprocess_agent):
+    """A `grind` profile in the agent's `profiles.yml`, so its reserve has an account to be kept under
+    (§6 *A reserve is the account's*, TD-1581: `claude-code:paul`); removed after, the agent being shared."""
+    from sessionorc import paths
+
+    f = paths.home() / "profiles.yml"
+    f.write_text("profiles:\n  grind: {account: paul}\n")
+    try:
+        yield
+    finally:
+        f.unlink(missing_ok=True)
+
+
+def test_ao_gate_max_age_sets_the_setting(subprocess_agent, grind_profile, capsys, monkeypatch):
     """`ao gate --max-age` (design §4.7, §5 `usage.max_age`, TD-233): an age or `off` lands in
     settings.yml through `set_settings`, `default` clears it back to the hour, a bad age is the
     host agent's refusal, and a session is refused as for the reserves."""
@@ -2272,7 +2286,7 @@ def test_ao_gate_max_age_sets_the_setting(subprocess_agent, capsys, monkeypatch)
     assert "usage" not in settings_mod.load() and not settings_mod.load().get("usage_gate")
 
 
-def test_ao_gate_sets_shows_and_is_a_persons(subprocess_agent, tmp_path, capsys, monkeypatch):
+def test_ao_gate_sets_shows_and_is_a_persons(subprocess_agent, grind_profile, tmp_path, capsys, monkeypatch):
     """`ao gate` end to end: the reserves land in settings.yml through `set_settings`, `ao gate`
     shows them, a session's `ao gate` is refused by the host agent, and `ao new --unattended`
     carries the pause and resume texts onto the record."""

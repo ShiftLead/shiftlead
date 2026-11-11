@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import shutil
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -16,6 +18,7 @@ from typing import Any
 from sessionorc import (
     adapters,
     agent_common,
+    agent_spend,
     defs,
     gitinfo,
     hosts,
@@ -33,6 +36,7 @@ from sessionorc.agent_common import (
     log,
 )
 from sessionorc.models import (
+    PERSON,
     Session,
     now_iso,
 )
@@ -100,14 +104,36 @@ class SettingsMixin:
         `max_age` is the setting as kept (TD-233 slice 4). An idle profile's rows are its reading."""
         now = datetime.now(UTC)
         whole = settings_mod.load()
-        doc = settings_mod.reserves(whole)
+        doc, amounts = settings_mod.reserves(whole), settings_mod.amounts(whole)
+        raw = whole.get("usage_gate") if isinstance(whole.get("usage_gate"), dict) else {}
         watched = {
             s.profile
             for s in self.sessions.values()
             if s.unattended and s.state not in ("exited", "closed", "scheduled")
         }
         out: dict[str, Any] = {}
-        for prof, by_label in sorted(doc.items()):
+        # until TD-1610 changes the reply's shape with its readers, each profile the adapters list (and
+        # each a record here runs under) carries its account's entry, and one whose account has none is
+        # omitted (§6 *A reserve is the account's*, TD-1581)
+        for prof, metered in sorted(self._gate_profiles().items()):
+            if (key := self._account_key(prof)) is None:
+                continue
+            if metered or self._is_metered(prof):
+                # a metered profile's amounts (§6 *Usage gate*, TD-151 slice 5), as written, with the spend
+                if not (by_label := amounts.get(key)):
+                    continue
+                written = raw.get(key) if isinstance(raw.get(key), dict) else {}
+                mine = {label: written[label] for label in by_label if label in written}
+                out[prof] = {
+                    "reserves": mine,
+                    "windows": self._amount_rows(prof, mine),
+                    "labels": list(spend_mod.LABELS),
+                    "metered": True,
+                    "account": key,
+                }
+                continue
+            if not (by_label := doc.get(key)):
+                continue
             reading = self._gate_reading(prof)  # its account's when it holds no copy (TD-456)
             windows = reading.get("windows")
             if prof in watched:
@@ -118,19 +144,30 @@ class SettingsMixin:
                 "labels": [str(w.get("label")) for w in windows or []],
                 **({"fetched": reading["fetched"]} if reading.get("fetched") else {}),
                 **({"source": reading.get("source") or "asked"} if reading.get("fetched") else {}),
-            }
-        # a metered profile's amounts (§6 *Usage gate*, TD-151 slice 5), as written, with the spend
-        for prof, by_label in sorted(settings_mod.amounts(whole).items()):
-            written = ((whole.get("usage_gate") or {}).get(prof)) or {}
-            mine = {label: written[label] for label in by_label if label in written}
-            out[prof] = {
-                "reserves": mine,
-                "windows": self._amount_rows(prof, mine),
-                "labels": list(spend_mod.LABELS),
-                "metered": True,
+                "account": key,
             }
         max_age = settings_mod.usage(whole).get("max_age", settings_mod.MAX_AGE_DEFAULT)
         return {"profiles": out, "file": str(settings_mod.settings_file()), "max_age": max_age}
+
+    def _gate_profiles(self) -> dict[str, bool]:
+        """The profiles the `gate` reply lists, each to whether its adapter's `profiles()` bills it
+        `metered`: every profile an adapter here lists (§4.3) and every one a record runs under."""
+        out: dict[str, bool] = {}
+        for name in adapters.names():
+            if not adapters.has_agent(name):
+                continue
+            try:
+                listed = getattr(adapters.get(name), "profiles", None)
+                for p in (listed() if listed else None) or ():
+                    if isinstance(p, dict) and isinstance(p.get("name"), str):
+                        out[p["name"]] = out.get(p["name"], False) or p.get("billing") == "metered"
+            except Exception as e:  # noqa: BLE001 — an adapter's list never stops the read
+                log.warning("profiles() on %s failed: %s", name, e)
+        records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
+        for r in records:
+            if adapters.has_agent(r.adapter):
+                out.setdefault(r.profile, False)
+        return out
 
     async def rpc_settings(self, caller: Any = None, profiles: Any = None) -> dict[str, Any]:
         """`ao settings` and the Settings page's read (design §5, §4.7, TD-146): the home's
@@ -584,9 +621,15 @@ class SettingsMixin:
         """`set_settings`'s usage-gate half, laid onto `doc` in place (the caller writes the file)."""
         if not isinstance(reserves, dict) or not reserves:
             raise RpcError("set_settings needs reserves: {label: percent | {per_day: N} | null}")
+        key = self._account_key(prof)
+        if key is None:
+            raise RpcError(
+                f"profile {prof or '(default)'} is named by no adapter here and runs no session, so its account "
+                "is not known: a reserve is the account's (design §6 Usage gate)"
+            )
         billing = self._billing_of(prof)
         if billing is not None:
-            return self._amounts_change(doc, prof, reserves, billing.get("prices") or {})
+            return self._amounts_change(doc, prof, key, reserves, billing.get("prices") or {})
         windows = (self._usage.get(prof) or {}).get("windows")
         reported = [str(w.get("label")) for w in windows or []]
         if windows is not None and (unknown := sorted(set(map(str, reserves)) - set(reported))):
@@ -605,18 +648,19 @@ class SettingsMixin:
                 parsed[str(label)] = None if value is None else settings_mod.parse_reserve(value)
             except ValueError as e:
                 raise RpcError(f"{label}: {e}") from None
-        self._lay_gate(doc, prof, parsed)
-        mine = (doc["usage_gate"] or {}).get(prof) or {}
-        log.info("usage gate for profile %s set to %s", prof or "(default)", mine or "no reserves")
+        self._lay_gate(doc, key, parsed)
+        mine = (doc["usage_gate"] or {}).get(key) or {}
+        log.info("usage gate for account %s (profile %s) set to %s", key, prof or "(default)", mine or "no reserves")
         return {
             "profile": prof,
+            "account": key,
             "reserves": mine,
             "windows": settings_mod.lines(mine, windows, datetime.now(UTC)),
             "unchecked": windows is None,
         }
 
     def _amounts_change(
-        self, doc: dict[str, Any], prof: str, reserves: dict[str, Any], prices: dict[str, Any]
+        self, doc: dict[str, Any], prof: str, key: str, reserves: dict[str, Any], prices: dict[str, Any]
     ) -> dict[str, Any]:
         """A metered profile's half (§6 *Usage gate*, TD-151 slice 5): an amount per window of the
         home's three — `$5` where the profile has prices, `2M tok` either way — or None to clear it;
@@ -648,10 +692,16 @@ class SettingsMixin:
                     f"not {value!r} (design §4.2a)"
                 )
             parsed[str(label)] = value.strip()
-        self._lay_gate(doc, prof, parsed)
-        mine = (doc["usage_gate"] or {}).get(prof) or {}
-        log.info("usage gate for metered profile %s set to %s", who, mine or "no amounts")
-        return {"profile": prof, "reserves": mine, "windows": self._amount_rows(prof, mine), "metered": True}
+        self._lay_gate(doc, key, parsed)
+        mine = (doc["usage_gate"] or {}).get(key) or {}
+        log.info("usage gate for metered account %s (profile %s) set to %s", key, who, mine or "no amounts")
+        return {
+            "profile": prof,
+            "account": key,
+            "reserves": mine,
+            "windows": self._amount_rows(prof, mine),
+            "metered": True,
+        }
 
     def _amount_rows(self, prof: str, mine: dict[str, Any]) -> list[dict[str, Any]]:
         """A metered profile's rows for `gate` and `set_settings`' reply: each window with an amount,
@@ -671,21 +721,118 @@ class SettingsMixin:
             rows.append(row)
         return rows
 
-    def _lay_gate(self, doc: dict[str, Any], prof: str, parsed: dict[str, Any]) -> None:
-        """`parsed` laid onto `doc`'s `usage_gate.<prof>` in place: None clears a window, a profile
-        with none left leaves the key."""
+    def _lay_gate(self, doc: dict[str, Any], key: str, parsed: dict[str, Any]) -> None:
+        """`parsed` laid onto `doc`'s `usage_gate.<key>` in place, `key` the account's (TD-1581): None
+        clears a window, an account with none left leaves the key."""
         gate = doc.get("usage_gate") if isinstance(doc.get("usage_gate"), dict) else {}
-        mine = dict(gate.get(prof) or {}) if isinstance(gate.get(prof), dict) else {}
+        mine = dict(gate.get(key) or {}) if isinstance(gate.get(key), dict) else {}
         for label, value in parsed.items():
             if value is None:
                 mine.pop(label, None)
             else:
                 mine[label] = value
         if mine:
-            gate[prof] = mine
+            gate[key] = mine
         else:
-            gate.pop(prof, None)
+            gate.pop(key, None)
         doc["usage_gate"] = gate
+
+    async def _migrate_reserves(self) -> None:
+        """The reserves moved from profiles to accounts (§6 *A reserve is the account's*, *The migration*,
+        TD-1581), the host agent's second write of `settings.yml` outside `set_settings` beside td-max's
+        `_migrate_scale`: once per tick, first in the home's part of it, every `usage_gate:` key holding no
+        `:` moved by `settings.migrate_reserves`. A tick that finds none does nothing more. The file as it
+        stands is committed first, and the move goes on only once it is clean against HEAD, its restore
+        point (a failed commit moves nothing this tick: logged once, and after a day of such ticks the
+        person told once); a home that is no tree copies it to `settings.yml.before-TD-1581` instead,
+        never overwritten. Then one load, edit and save with no wait between, pushed to the nodes and
+        committed as a `set_settings` write is, and one `system` note says what moved."""
+        if self.mode != "home":
+            return
+        path = settings_mod.settings_file()
+        doc = settings_mod.read() if path.exists() else None
+        gate = doc.get("usage_gate") if isinstance(doc, dict) else None
+        if not isinstance(gate, dict) or all(settings_mod.account_key(k) for k in gate):
+            self._reserves_unclean = None
+            return
+        names = ["" if k is None else str(k) for k in gate if not settings_mod.account_key(k)]
+        accounts, billing = await asyncio.to_thread(self._reserve_accounts, names)
+        restore = ""
+        if defs.is_tree(path.parent):
+            await self._commit_defs("settings.yml before TD-1581's migration", ("settings.yml",))
+            if not await asyncio.to_thread(defs.clean, path):
+                self._reserves_not_clean()
+                return
+            head = await asyncio.to_thread(defs.head, path.parent)
+            restore = f"restore from the home's commit {head[:12]}" if head else ""
+        else:
+            copy_path = path.with_name("settings.yml.before-TD-1581")
+            if not copy_path.exists():
+                await asyncio.to_thread(shutil.copyfile, path, copy_path)
+                restore = f"restore from {copy_path}"
+            else:
+                restore = "restore from this note's values"
+        self._reserves_unclean = None
+        # one load, edit and save with no await between: a `set_settings` is either read by it or
+        # lands after it (§6 *The migration*)
+        doc = settings_mod.read()
+        if doc is None:
+            return
+        before = copy.deepcopy(doc)
+        said = settings_mod.migrate_reserves(doc, accounts, billing)
+        if said is None:
+            return
+        settings_mod.save(doc)
+        log.info("usage reserves moved to their accounts: %s", "; ".join(said))
+        await self._push_settings()
+        await self._commit_defs(defs.settings_message(before, doc), ("settings.yml",))
+        text = "Usage reserves are now per account: " + "; ".join(said) + "."
+        self._system_note(PERSON, text + (f" To go back, {restore}." if restore else ""))
+
+    def _reserve_accounts(self, names: list[str]) -> tuple[dict[str, str | None], dict[str, set[str]]]:
+        """The migration's resolution, in a thread: each profile key to its account key — only the adapter
+        the profile names answers (`_account_of`); None where none does — and each such account to the
+        billings of the profiles its adapter's `profiles()` lists on it."""
+        accounts: dict[str, str | None] = {}
+        billing: dict[str, set[str]] = {}
+        agents = [n for n in adapters.names() if adapters.has_agent(n)]
+        for prof in names:
+            accounts[prof] = next(
+                (f"{n}:{a}" for n in agents if (a := agent_spend._account_of(n, prof)) is not None), None
+            )
+        for key in {k for k in accounts.values() if k}:
+            name, account = key.split(":", 1)
+            try:
+                listed = getattr(adapters.get(name), "profiles", None)
+                profs = (listed() if listed else None) or []
+            except Exception:  # noqa: BLE001 — an adapter's list never stops the tick
+                profs = []
+            billing[key] = {
+                str(p.get("billing") or "subscription")
+                for p in profs
+                if isinstance(p, dict) and str(p.get("account") or p.get("name")) == account
+            }
+        return accounts, billing
+
+    def _reserves_not_clean(self) -> None:
+        """A pre-commit that left `settings.yml` dirty against HEAD: logged once, the person told once after
+        a day of such ticks (the day in memory, from the first, reset by a clean tick or a restart)."""
+        now = time.monotonic()
+        since, logged, told = self._reserves_unclean or (now, False, False)
+        if not logged:
+            log.warning(
+                "settings.yml is not clean against HEAD after the pre-commit (defs.commit's warning says why): "
+                "the reserve migration waits for the next tick"
+            )
+        if not told and now - since >= 86400:
+            self._system_note(
+                PERSON,
+                "Usage reserves are still per profile: for a day the home could not commit settings.yml as it "
+                "stood before moving them to their accounts (the host agent's log says why), so the gate reads "
+                "no reserve for those profiles until it can.",
+            )
+            told = True
+        self._reserves_unclean = (since, True, told)
 
     @staticmethod
     def _person_change(current: Any, change: Any) -> dict[str, Any]:

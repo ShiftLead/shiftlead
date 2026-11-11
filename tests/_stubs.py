@@ -54,12 +54,25 @@ class HookFedStub:
         return {"turns": turns, "cursors": cursors, "reason": "ok"}
 
     def account_for(self, profile):
-        return self.accounts.get(profile)
+        """A profile the test names (in `accounts` or `billing`) is the stub's, its account its own name
+        where `accounts` gives none, as a real adapter answers for a profile of `profiles.yml` (§4.3)."""
+        return self.accounts.get(profile) or (profile if profile in self.billing else None)
 
     billing: dict = {}  # set by a test: profile → {billing, prices}; one it does not name is a subscription
 
     def billing_for(self, profile):
         return self.billing.get(profile)
+
+    def profiles(self):
+        """The profiles the test names, each `{name, account, billing}` (§4.3 `profiles()`, TD-1581)."""
+        return [
+            {
+                "name": n,
+                "account": self.account_for(n),
+                "billing": (self.billing.get(n) or {}).get("billing") or "subscription",
+            }
+            for n in sorted({*self.accounts, *self.billing})
+        ]
 
     external = []  # set by a test: `ExternalSession`s the stub sees outside shiftlead (TD-010 a)
 

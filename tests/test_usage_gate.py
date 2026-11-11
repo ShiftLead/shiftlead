@@ -53,9 +53,11 @@ def test_reserves_drop_whatever_is_not_one(tmp_path):
     """A hand edit can put anything in the file; a malformed entry gates nothing."""
     f = tmp_path / "settings.yml"
     f.write_text(
-        'usage_gate:\n  grind: {"5h": 30, wk: {per_day: 10}, bad: 130, worse: {per_hour: 1}, t: true}\n  x: 5\n'
+        'usage_gate:\n  "cc:paul": {"5h": 30, wk: {per_day: 10}, bad: 130, worse: {per_hour: 1}, t: true}\n  x: 5\n'
+        '  grind: {"5h": 30}\n'
     )
-    assert settings.reserves(settings.load(f)) == {"grind": {"5h": 30, "wk": {"per_day": 10}}}
+    # a profile's key (no `:`) is read by no reader: the migration moves it to its account (TD-1581)
+    assert settings.reserves(settings.load(f)) == {"cc:paul": {"5h": 30, "wk": {"per_day": 10}}}
     f.write_text("{not yaml")
     assert settings.load(f) == {}
     assert settings.load(tmp_path / "missing.yml") == {}
@@ -586,10 +588,11 @@ async def test_a_profile_with_no_copy_reads_its_accounts_reading_at_the_gate(age
         got = (await person.call("gate"))["profiles"]["pg"]
         assert got["windows"][0]["pct"] == 95 and got["windows"][0]["line"] == 70
         assert got["fetched"] == fetched and got["source"] == "reported"
-        # an account nobody reads is still no reading, and no gate
+        # an account nobody reads is still no reading, and no gate; and its reserve is its own, so
+        # `pg` on `other` carries none (TD-1581)
         monkeypatch.setattr(hookstub, "accounts", {"pa": "paul", "pg": "other"})
         assert not agent._profile_gated("pg", now)
-        assert "fetched" not in (await person.call("gate"))["profiles"]["pg"]
+        assert "pg" not in (await person.call("gate"))["profiles"]
         # the profile's own tool is read, never another's account of the same name: a record under
         # `pg` names its adapter, and a shell polls no usage
         monkeypatch.setattr(hookstub, "accounts", {"pa": "paul", "pg": "paul"})

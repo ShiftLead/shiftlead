@@ -2651,7 +2651,8 @@ teams:
     that needs no reading; one whose unit does not fit is removed and named. A merged line can rise for
     a profile only where a flat reserve is kept over its per-day one: its line `100 − d × days_left`
     is below the kept `100 − r` while `d × days_left > r`, for `days_left` from 1 to the window's
-    length in days, so the note names each such profile. The profiles resolved first, the write is one
+    length in days; the core knows no window's length, so the note names each profile whose per-day
+    reserve a flat one is kept over as one whose line may rise. The profiles resolved first, the write is one
     load, edit and save with no wait between them, as `set_settings` makes one, then pushed to the
     nodes and committed in the home's definition files as every settings write is (§4.4a; `_commit_defs`, §4.9); before it, the file
     as it stands is committed in the home's definition files — *settings.yml before TD-1581's migration*,

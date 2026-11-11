@@ -836,6 +836,9 @@ class HostAgent(
         self._spend_reason: dict[str, str] = {}
         self._metered: set[str] = set()
         self._billing_seen: dict[str, tuple[float, bool]] = {}  # profile → (monotonic, metered), for the gate
+        # the reserve migration's failed pre-commit (§6 *The migration*, TD-1581): since when, in memory —
+        # reset by a clean tick or a restart — and whether it was logged and the person told
+        self._reserves_unclean: tuple[float, bool, bool] | None = None
         self._metered_shown: set[str] = set()
         self._spend_task: asyncio.Task[None] | None = None
         # The seat ledger (§4.4 *Spend per seat*, TD-830): `seat_spend.json`, every profile's turns
@@ -1012,7 +1015,7 @@ class HostAgent(
                     lsock.unlink()
 
     async def _migrate_scale(self) -> None:
-        """td-max's one-time write, the host agent's one exception to *written only by `set_settings`* (§4.9
+        """td-max's one-time write, one of the host agent's two exceptions to *written only by `set_settings`* (§4.9
         *On by default, with default ceilings*, §5, TD-1545): at the home's first start on this build, with
         no `scale.migrated` stamp, `max: off` for every team it knows — a key under `teams:`, or a record
         carrying `team` — and the stamp, in one write, committed to the definitions history as any settings

@@ -66,6 +66,27 @@ def _metered_of(pairs: set[tuple[str, str]]) -> dict[tuple[str, str], dict[str, 
     return out
 
 
+def _account_of(name: str, profile: str) -> str | None:
+    """The account adapter `name` says `profile` runs under, or None where it does not answer for it:
+    its `account_for`, else — for an adapter with none — the `profiles()` entry of that name (a `""` key
+    there unresolved). An adapter's lookup that raises answers nothing."""
+    try:
+        ad = adapters.get(name)
+        fn = getattr(ad, "account_for", None)
+        if fn is not None:
+            got = fn(profile)
+            return str(got) if got else None
+        listed = getattr(ad, "profiles", None)
+        if listed is None or not profile:
+            return None
+        for p in listed() or ():
+            if isinstance(p, dict) and p.get("name") == profile:
+                return str(p.get("account") or profile)
+    except Exception:  # noqa: BLE001 — an adapter's lookup never stops the tick
+        return None
+    return None
+
+
 class SpendMixin:
     async def _refresh_spend(self) -> None:
         """One pass, detached from the tick as the usage poll is (it reads transcripts)."""
@@ -105,8 +126,8 @@ class SpendMixin:
         for key, g in groups.items():
             acct = self._spend.get(key) or {}
             window_sums = node_sums[key] if self.mode == "node" else spend_mod.sums(acct, now)
-            for prof in g["profiles"]:
-                reading = spend_mod.reading(window_sums, amounts.get(prof) or {}, now_iso(), now)
+            for prof in sorted(g["profiles"]):
+                reading = spend_mod.reading(window_sums, amounts.get(key) or {}, now_iso(), now)  # the account's
                 reading |= {"account": g["account"], "tool": g["tool"]}
                 if why := self._spend_reason.get(prof):
                     reading["reason"] = why  # the chip's *spend unknown* (§4.3); the sum so far still stands
@@ -273,16 +294,16 @@ class SpendMixin:
         named.add(prof)
         self._spend_node_prices[prof] = prices  # a profile only a node defines is still metered here
         window_sums = spend_mod.sums(acct, now)
-        self._spend_told[(host, key)] = self._spend_mark(window_sums, named)
+        self._spend_told[(host, key)] = self._spend_mark(key, window_sums, named)
         h = (acct.get("hosts") or {}).get(host) or {}
         return {"cursors": _offsets(h), "seeded": prof in (h.get("seeded") or []), "sums": window_sums}
 
-    def _spend_mark(self, window_sums: dict[str, Any], profiles: set[str]) -> str:
-        """What a node's readings of an account would show: each named profile's `pct` per window
-        from the amounts (the node's replica is this file) and each window's reset. A push goes when
-        it changes — a whole point, or a roll (§4.4a)."""
-        amounts = settings_mod.amounts(settings_mod.load())
-        marks = {p: spend_mod.reading(window_sums, amounts.get(p) or {}, "")["windows"] for p in sorted(profiles)}
+    def _spend_mark(self, key: str, window_sums: dict[str, Any], profiles: set[str]) -> str:
+        """What a node's readings of the account `key` would show: each named profile's `pct` per window
+        from the account's amounts (the node's replica is this file) and each window's reset. A push goes
+        when it changes — a whole point, or a roll (§4.4a)."""
+        mine = settings_mod.amounts(settings_mod.load()).get(key) or {}
+        marks = {p: spend_mod.reading(window_sums, mine, "")["windows"] for p in sorted(profiles)}
         return json.dumps({p: [(w["pct"], w["resets"]) for w in ws] for p, ws in marks.items()}, sort_keys=True)
 
     async def _push_spend_usage(self, now: datetime) -> None:
@@ -300,7 +321,7 @@ class SpendMixin:
                 window_sums = spend_mod.sums(self._spend[key], now)
                 for prof in sorted(profiles):
                     self._spend_notes(
-                        self._spend[key], prof, spend_mod.reading(window_sums, amounts.get(prof) or {}, "")
+                        self._spend[key], prof, spend_mod.reading(window_sums, amounts.get(key) or {}, "")
                     )
         for host, accounts in list(self._spend_named.items()):
             mux = self._link_muxes.get(host)
@@ -309,7 +330,7 @@ class SpendMixin:
             for key, profiles in list(accounts.items()):
                 acct = self._spend.get(key) or {}
                 window_sums = spend_mod.sums(acct, now)
-                mark = self._spend_mark(window_sums, profiles)
+                mark = self._spend_mark(key, window_sums, profiles)
                 if self._spend_told.get((host, key)) == mark:
                     continue
                 try:
@@ -324,14 +345,15 @@ class SpendMixin:
 
     def _spend_notes(self, acct: dict[str, Any], prof: str, reading: dict[str, Any]) -> None:
         """At eight tenths of an amount, one `system` note to the person inbox — *grind-api · day
-        $4.10 of $5* — an FYI, uncounted, once per window (§6 *Usage gate*); the window is known by
-        its `resets`, so the next day's crossing files the next note."""
+        $4.10 of $5* — an FYI, uncounted, once per window of the account, whose amount it is (§6 *Usage
+        gate*, TD-1581), named by the first of its profiles read past it; the window is known by its
+        `resets`, so the next day's crossing files the next note."""
         noted = acct.setdefault("noted", {})
         for w in reading["windows"]:
             pct, amount = w.get("pct"), w.get("amount")
             if not amount or not isinstance(pct, int) or pct < spend_mod.NOTE_AT:
                 continue
-            k = f"{prof} {w['label']}"
+            k = str(w["label"])
             if noted.get(k) == w["resets"]:
                 continue
             noted[k] = w["resets"]
@@ -579,15 +601,37 @@ class SpendMixin:
         self._billing_seen[profile] = (time.monotonic(), metered)
         return metered
 
+    def _account_key(self, profile: str) -> str | None:
+        """The usage key `<adapter>:<account>` of `profile`'s account (§6 *A reserve is the account's*,
+        TD-1581), the key its reserve is kept under: asked of each adapter's `account_for` — only the
+        adapter the profile names answers — the adapters of records under it first, then every other;
+        an adapter with no `account_for` by its `profiles()`. A profile no adapter resolves keys as
+        `_usage_key` keys it, `<adapter>:<profile>`, by the adapter of a record under it; else by the key
+        a node's `spend` call named it under (a profile only a node defines, §4.4a); with neither, None."""
+        records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
+        mine = list(dict.fromkeys(r.adapter for r in records if r.profile == profile and adapters.has_agent(r.adapter)))
+        for name in dict.fromkeys([*mine, *(n for n in adapters.names() if adapters.has_agent(n))]):
+            if (account := _account_of(name, profile)) is not None:
+                return f"{name}:{account}"
+        if mine:
+            return f"{mine[0]}:{profile or 'default'}"
+        named = sorted(k for accts in self._spend_named.values() for k, profs in accts.items() if profile in profs)
+        return named[0] if named else None
+
     def _gate_reserves(self, whole: dict[str, Any], profile: str) -> dict[str, Any] | None:
-        """The reserves the gate reads for `profile`: a subscription profile's percents, or — for a
-        metered one — a line at the amount itself on each window that has one (§6 *Usage gate*:
-        the amount is the window's 100, and a team's priority lowers it), since its `pct` is
-        already the spend over the amount. Keyed on the profile's billing, never on the reading."""
+        """The reserves the gate reads for `profile`, its account's (§6 *A reserve is the account's*,
+        `_account_key`): a subscription profile's percents, or — for a metered one — a line at the
+        amount itself on each window that has one (§6 *Usage gate*: the amount is the window's 100,
+        and a team's priority lowers it), since its `pct` is already the spend over the amount.
+        Keyed on the profile's billing, never on the reading, so an account whose profiles disagree
+        on billing is read only by the profiles whose billing fits its entry's unit."""
+        key = self._account_key(profile)
+        if key is None:
+            return None
         if self._is_metered(profile):
-            by_label = settings_mod.amounts(whole).get(profile)
+            by_label = settings_mod.amounts(whole).get(key)
             return {label: 0 for label in by_label} if by_label else None
-        return settings_mod.reserves(whole).get(profile)
+        return settings_mod.reserves(whole).get(key)
 
     def _billing_of(self, profile: str) -> dict[str, Any] | None:
         """`{billing, prices}` when `profile` is billed `metered`, else None — asked of the adapter of
