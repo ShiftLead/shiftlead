@@ -4706,7 +4706,8 @@ NO_UI_CARD = (
 )
 UI_CARD_WAIT = 30.0  # seconds: a cold card reads the queue, the inbox, the board and the ledger
 MAIL_WORDS_CUT = "its words are the person's to read"
-CARD_NOT_MAIL = ("board", "ledger", "red_pr", "fork_pr")  # `shiftlead.ui.queue.NOT_MAIL`, which needs the [ui] extra
+# `shiftlead.ui.queue.NOT_MAIL`, which needs the [ui] extra
+CARD_NOT_MAIL = ("board", "ledger", "red_pr", "fork_pr", "stuck")
 
 
 class _CardRefusal(Exception):
@@ -4829,6 +4830,8 @@ def _card_item_lines(x: Mapping[str, Any], cut: bool) -> list[str]:
         body += _answer_lines(row.get("answers"), row.get("default"), row.get("consequences"))
     elif which in ("red_pr", "fork_pr"):
         body += [str(row.get("title") or ""), str(row.get("text") or "")]
+    elif which == "stuck":  # the home's words, never mail's: *stuck <age>: <the work> — <reason>* (TD-1497)
+        body.append(str(row.get("text") or ""))
     elif not cut:
         if row.get("handed_row"):
             entry = row.get("entry") if isinstance(row.get("entry"), Mapping) else {}

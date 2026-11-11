@@ -1172,6 +1172,28 @@
 </div>
 {%- endmacro %}
 
+{# ── design §4.5a **Queue card / Inbox: stuck row** (§6 rule 13 *Stuck work*, TD-1470, built by TD-1497) ──
+   Work open past its wait with no live session able to act on it: *stuck <age>: <the work> — <reason>*, the
+   reason the actor's in `unanswered.words`' fixed words or rule 13's own (`inbox.stuck_rows`). A Do item on the
+   card of the entry its work names, else a row under the Inbox's *Needs you*; at *waiting* under *Waiting on
+   them*, uncounted. Its one control is **Open**, the actor's Focus — none for a `gone` actor or a record the
+   page does not hold. No Answer, Start session, ⋯ or Snooze. #}
+{% macro stuck_row(e, section) -%}
+<div class="row gap wrap mhead">
+  <span class="ref" title="{{ e.actor.id if e.actor else '' }}: the first session that is not acting on it">{{ e.name }}</span>
+  <span class="badge kindmark k-stuck">stuck</span>
+  <span class="grow"></span>
+  {%- if e.at %} <span class="st age" data-since="{{ e.at }}" title="stuck since">{{ e.age or '' }}</span>{% endif %}
+</div>
+{{ subj(e) }}
+<div class="body">{{ e.text }}</div>
+<div class="row gap wrap mfoot">
+  {%- if e.waiting_until %}<span class="st" title="every reason names when it ends, within the wait (design §6 rule 13)">waiting{% if e.until_words %}: its reason ends in {{ e.until_words }}{% endif %}</span>{% endif %}
+  <span class="grow"></span>
+  {%- if e.open %}<a class="btn sm primary" href="/focus/{{ e.open }}" title="Focus on {{ e.name }}: the session the work waits on">Open</a>{% endif %}
+</div>
+{%- endmacro %}
+
 {# ── design §4.5a **Inbox row: team start** (§6 rule 8, TD-227 slice 3) ─────────────────────────
    One row per wound-down or stopped team whose lanes gained work, every part a structured reading of the
    home's (`work_waiting`, `work` on `host`): the team, when it wound down, the ids — each a link
@@ -1364,6 +1386,7 @@
 {%- elif e.row == 'red_pr' %}{{ red_pr_row(e, section) }}
 {%- elif e.row == 'fork_pr' %}{{ fork_pr_row(e, section) }}
 {%- elif e.row == 'ci_not_run' %}{{ ci_not_run_row(e, section) }}
+{%- elif e.row == 'stuck' %}{{ stuck_row(e, section) }}
 {%- elif e.row in ('alarm', 'alarm_host') %}{{ alarm(e, section) }}{% else %}{{ state(e, section) }}{% endif %}
 <div class="st rowerr" role="alert" hidden></div>
 </div>

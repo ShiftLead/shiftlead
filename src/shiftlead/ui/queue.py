@@ -98,6 +98,10 @@ def item_home(
     pr`) — with no `repo` it stays in the Inbox; one naming neither stays in the Inbox, and so does every row where
     `index` is empty (a home that serves no Queue).
 
+    A stuck row (§6 rule 13 *What the person sees*, TD-1497) is homed by its work's refs (`work.about`, then
+    `work.refs`, a bare one `work.repo`'s), on the card of the first an open card holds, `tied.by: stuck`; one whose
+    refs no open card holds stays in the Inbox — never a kept or a loose card.
+
     A board line whose `Context:` names no entry but a PR (`context_pr`: `PR #n`, `#n`) ties by that PR (TD-1552,
     `tied.by: pr`): the entry the PR names in its `repo_name`'s PRs stands in for one the `Context:` would name — on
     its open card whatever `needs` is; where it needs the person and no open card holds it, `pr_card`'s rest. Tied,
@@ -131,6 +135,23 @@ def item_home(
         refs, by = own_refs(_refs(f"{e.get('branch') or ''} {e.get('title') or ''}"), e.get("repo")), "pr"
     elif kind == "fork_pr":  # by its title alone: a fork's branch is a stranger's name (TD-1292)
         refs, by = own_refs(_refs(str(e.get("title") or "")), e.get("repo")), "title"
+    elif kind == "stuck":
+        # a stuck row (§6 rule 13 *What the person sees*, TD-1497): its refs are its work's — the ask's `about`, then
+        # the refs its subject and text name, a bare one its sender's repo's as a mail item's — on the card of the
+        # first an open card holds, a Do item; else the Inbox's *Needs you*: never a kept or a loose card
+        w = e.get("work") if isinstance(e.get("work"), Mapping) else {}
+        repo = str(w.get("repo") or "").strip() or None
+        held, _ = held_refs(w.get("about"), " ".join(str(r) for r in w.get("refs") or ()), index, repo)
+        if not held:
+            return inbox
+        card, row = index[held[0]][:2]
+        return {
+            "home": "queue",
+            "on_card": card,
+            "on_row": row,
+            "mentions": [],
+            "tied": {"by": "stuck", "ref": held[0]},
+        }
     elif kind in HOLDER_ROWS and not e.get("handed_row"):
         # a stopped holder's state row: on the card of the claim it draws on (`holder_claims`, TD-1468), else the
         # Inbox's — a seat holding no entry an open card holds
@@ -448,8 +469,14 @@ def items_n(wants: Mapping[str, Any]) -> int:
     on a card with items*, TD-1338, built by TD-1340): every Decide and Do item but a red PR or a fork's PR, one
     whose entry another session holds included, and every item *with you in <name>*; an item *answered — waiting
     on <asker>* is outside them, in `wants['answered']`. With one the item's button is the header's; with two or
-    more the header draws its own beside them, and its press walks them all."""
-    n = sum(1 for w in WANTS for m in wants.get(w) or () if not (m.get("red") or m.get("fork") or m.get("holder")))
+    more the header draws its own beside them, and its press walks them all. A stopped holder's
+    state row and a stuck row are outside them (TD-1468, TD-1497)."""
+    n = sum(
+        1
+        for w in WANTS
+        for m in wants.get(w) or ()
+        if not (m.get("red") or m.get("fork") or m.get("holder") or m.get("stuck"))
+    )
     return n + len(wants.get("with_you") or ())
 
 
@@ -535,7 +562,8 @@ def attach(
         elif e.get("row") == "ledger" and (e.get("applying") or e.get("answered")) and want in WANTS:
             # a press landing (TD-1508) or an answer acted on (TD-1316): no need of the person
             want, kind = "answered", ""
-        pr_row = e.get("row") in ("red_pr", "fork_pr", *HOLDER_ROWS)  # starts no session (TD-1246, TD-1292, TD-1468)
+        # starts no session (TD-1246, TD-1292, TD-1468, TD-1497)
+        pr_row = e.get("row") in ("red_pr", "fork_pr", "stuck", *HOLDER_ROWS)
         go = (
             start(card, ref, str(e.get("on_row") or ""))
             if start is not None and want in (*WANTS, "with_you") and not pr_row
@@ -564,6 +592,8 @@ def attach(
                 "fork": e.get("row") == "fork_pr",  # a fork's PR: no Start session, as a red PR's (TD-1292)
                 # a stopped holder's state row: its own controls, no Start session and outside the header's count
                 **({"holder": True} if e.get("row") in HOLDER_ROWS else {}),
+                # a stuck row drawn as an item of its own: its Open alone, no Start session, outside that count
+                **({"stuck": True} if e.get("row") == "stuck" else {}),
                 "running": sec == "steering",
                 "on_row": e["on_row"],
                 # the design PR it links, *· design #n* (TD-1531), and its synopsis (TD-1536)
@@ -651,7 +681,7 @@ def card_wants(got: Mapping[str, list[Any]] | None, top: str, one_repo: bool) ->
 
 # what `card_view` keeps of a mail item's row, a ledger row's `answered` and a queue row's `answered` where it
 # serves no mail's words (`ao card` under a pane, §4.7, TD-1411): ids, kinds, names and times, never the words
-NOT_MAIL = ("board", "ledger", "red_pr", "fork_pr")
+NOT_MAIL = ("board", "ledger", "red_pr", "fork_pr", "stuck")  # a stuck row's words are the home's, not mail's
 MAIL_KEEP = ("id", "kind", "from", "from_name", "at")
 HELD_ANSWERED_KEEP = ("asker", "name", "kind", "age", "mid", "until", "board")
 ROW_ANSWERED_KEEP = ("mid", "asker", "name", "kind", "until", "closed_at")
@@ -776,8 +806,11 @@ def card_view(
 
 
 def _item_kind(e: Mapping[str, Any], sec: str) -> str:
-    """An attached item's kind: its want where that is Decide or Do; '' for what waits on nobody (Read)."""
+    """An attached item's kind: its want where that is Decide or Do — *stuck* for a stuck row (§4.7, TD-1497) —; ''
+    for what waits on nobody (Read)."""
     want = want_of(e, sec)
+    if want in WANTS and e.get("row") == "stuck":
+        return "stuck"
     return want if want in WANTS else ""
 
 

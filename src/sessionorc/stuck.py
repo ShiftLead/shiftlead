@@ -65,6 +65,35 @@ def open_asks(records: Mapping[str, Session]) -> list[MailEntry]:
     return out
 
 
+def ask_works(records: Mapping[str, Session]) -> dict[str, dict[str, Any]]:
+    """The work of each open ask (`open_asks`), as `rpc_host` serves it beside an `ask:<id>` stuck entry (§6 rule
+    13 *What the person sees*, TD-1497): `{ask id: {from, from_name, to_names, about, refs, repo}}` — its sender's
+    id and name, its addressees' names (an id where no record holds it), its `about`, `refs` the entries its
+    subject and text name (`queue.refs`, bare as written: a bare `TD-n` is `repo`'s, read by the page as a mail
+    item's is) and `repo` its envelope's. Never its subject or text, which are the person's to read on their own
+    rows. Computed at serve time, never stored."""
+    # the Queue's ref reader, imported here: `queue` reaches this module through `rank` and `store`
+    from sessionorc import queue as queue_mod
+
+    def name(sid: str) -> str:
+        if sid == PERSON:
+            return PERSON
+        r = records.get(sid)
+        return str(r.name or sid) if r is not None else sid
+
+    return {
+        e.id: {
+            "from": e.from_,
+            "from_name": name(e.from_),
+            "to_names": [name(t) for t in e.to],
+            "about": e.about or "",
+            "refs": queue_mod.refs(f"{e.subject or ''} {e.text or ''}"),
+            "repo": e.repo or "",
+        }
+        for e in open_asks(records)
+    }
+
+
 def fillable_seat(r: Session, unfillable: Mapping[str, str]) -> bool | str:
     """For a supervised, unattended seat whose record is not live (§6 rule 13 *Acting*, `seat_unable`'s exited or
     closed branch): True where rule 3 fills it — no `unfillable` word this tick and not held (`stop_held`) —, the
