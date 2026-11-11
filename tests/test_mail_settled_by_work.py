@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from conftest import park_ticks
 
 from sessionorc import held, mail
 from sessionorc.client import LocalClient
@@ -151,6 +152,7 @@ def test_the_inbox_row_draws_the_words():
 
 
 async def test_a_merged_pr_closes_its_ask_on_the_tick_and_a_closed_one_does_not(agent, tmp_path):
+    await park_ticks(agent)  # a tick's repo read would land over the hand-set `_repos` (TD-1626)
     alpha = tmp_path / "alpha"
     alpha.mkdir()
     _registry(tmp_path, alpha)
@@ -186,6 +188,7 @@ async def test_a_merged_pr_closes_its_ask_on_the_tick_and_a_closed_one_does_not(
 
 
 async def test_an_ask_about_another_repos_pr_is_not_closed_by_this_repos_merge(agent, tmp_path):
+    await park_ticks(agent)  # a tick's repo read would land over the hand-set `_repos` (TD-1626)
     alpha = tmp_path / "alpha"
     alpha.mkdir()
     _registry(tmp_path, alpha)
@@ -201,6 +204,7 @@ async def test_an_ask_about_another_repos_pr_is_not_closed_by_this_repos_merge(a
 
 
 async def test_a_steer_closed_merged_applies_no_default(agent, tmp_path):
+    await park_ticks(agent)  # a tick's repo read would land over the hand-set `_repos` (TD-1626)
     alpha = tmp_path / "alpha"
     alpha.mkdir()
     _registry(tmp_path, alpha)
@@ -217,6 +221,7 @@ async def test_a_steer_closed_merged_applies_no_default(agent, tmp_path):
 
 
 async def test_an_orphaned_ask_settles_by_its_archive_and_one_asked_after_stays_open(agent, tmp_path):
+    await park_ticks(agent)  # a tick's repo read would land over the hand-set `_repos` (TD-1626)
     alpha = tmp_path / "alpha"
     alpha.mkdir()
     _registry(tmp_path, alpha)
@@ -252,6 +257,7 @@ async def test_an_orphaned_ask_settles_by_its_archive_and_one_asked_after_stays_
 
 
 async def test_the_unstamped_order_a_live_askers_record_and_neither(agent, tmp_path):
+    await park_ticks(agent)  # a tick's repo read would land over the hand-set `_repos` (TD-1626)
     alpha = tmp_path / "alpha"
     alpha.mkdir()
     _registry(tmp_path, alpha)
@@ -273,6 +279,7 @@ async def test_the_unstamped_order_a_live_askers_record_and_neither(agent, tmp_p
 
 
 async def test_a_question_passed_up_on_a_thread_carries_the_asks_pr_and_repo(agent, tmp_path):
+    await park_ticks(agent)  # a tick's repo read would land over the hand-set `_repos` (TD-1626)
     alpha = tmp_path / "alpha"
     alpha.mkdir()
     _registry(tmp_path, alpha)
@@ -310,6 +317,7 @@ async def test_the_settle_names_by_team_by_graph_address_and_keeps_two_hosts_pat
     """TD-1561 (§4.10 *A question the work settled closes itself*, §4.5 screen 6): a pre-stamp item whose sender is
     gone is named by its team's one repo; a node's sender is found by its graph address and named by the node's
     roster; a home record and a node record at one path are named apart, by `(host, root)`."""
+    await park_ticks(agent)  # a tick's repo read would land over the hand-set `_repos` (TD-1626)
     from sessionorc.models import Session
 
     alpha, beta = tmp_path / "alpha", tmp_path / "beta"
