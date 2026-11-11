@@ -95,3 +95,43 @@ async def test_a_reading_that_raises_never_stops_the_start(agent, tmp_path, monk
     recs = _team(agent)
     await _settled(agent, tmp_path, *recs)
     assert await agent._schedule_start("g", recs, datetime.now(UTC), "2026-11-11T10:00:00Z") == "started"
+
+
+def _removes_but(agent, monkeypatch, refused: str) -> list[str]:
+    """`rpc_remove` that raises for `refused` and records every other id it removes."""
+    gone: list[str] = []
+
+    async def remove(id, caller=None):
+        if id == refused:
+            raise RuntimeError("refused")
+        gone.append(id)
+
+    monkeypatch.setattr(agent, "rpc_remove", remove)
+    return gone
+
+
+async def test_one_failed_removal_never_stops_rule_8s_start(agent, tmp_path, monkeypatch):
+    """TD-1634: one record's failed removal is a log line — the next extra is still removed and the replays run."""
+    await park_ticks(agent)
+    settings_mod.save({"teams": {"g": {"on_work": "start", "max": {"grinder-ao": 5, "techlead-ao": 0}}}})
+    replays = _Replays()
+    monkeypatch.setattr(agent, "_replay", replays)
+    gone = _removes_but(agent, monkeypatch, "ao-t-grinder-ao-6")
+    later = await _settled(agent, tmp_path, *_team(agent))
+    await agent._work_marks(later)
+    assert gone == ["ao-t-techlead-ao-2"]
+    assert sorted(c[0] for c in replays.calls) == ["grinder-ao-1", "manager-ao"]
+
+
+async def test_one_failed_removal_never_stops_a_schedules_start(agent, tmp_path, monkeypatch):
+    """TD-1634: the same guard on a schedule's start."""
+    await park_ticks(agent)
+    settings_mod.save({"teams": {"g": {"max": {"grinder-ao": 5, "techlead-ao": 0}}}})
+    replays = _Replays()
+    monkeypatch.setattr(agent, "_replay", replays)
+    gone = _removes_but(agent, monkeypatch, "ao-t-grinder-ao-6")
+    recs = _team(agent)
+    await _settled(agent, tmp_path, *recs)
+    assert await agent._schedule_start("g", recs, datetime.now(UTC), "2026-11-11T10:00:00Z") == "started"
+    assert gone == ["ao-t-techlead-ao-2"]
+    assert sorted(c[0] for c in replays.calls) == ["grinder-ao-1", "manager-ao"]
