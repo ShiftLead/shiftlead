@@ -2630,23 +2630,34 @@ teams:
     the account as one this home has not seen.
   - **A team's reserve priority stays the team's** (below): the one way to make some sessions on an
     account stop sooner.
-  - **The migration.** The home's tick, on each read of `settings.yml` (never a node's, whose replica
-    the home sends whole, §4.4a, nor a CLI's or a page's), moves every key holding no `:` — a profile's,
-    the per-profile file's or one written by hand since — to its profile's account, resolved through
-    the adapter the profile names; per window label the account keeps one reserve from among its
-    profiles' and any entry already under the account: **the one whose line is lowest on the window's
-    last day** (a flat `r`, `100 − r`; a per-day `d`, `100 − d`; a tie, the per-day one; a metered
-    account, the smallest amount), an order that needs no reading. A merged line can still rise for a
-    profile at some moment (a flat 30 kept over a `5/day` lifts that profile's early-week line from 65%
-    to 70%), so the note names each profile whose line rises. The keys move in one write through
-    `set_settings`'s writer, after the file as it stood is copied beside it as
-    `settings.yml.before-TD-1581` (once; a later move overwrites nothing), and one `system` note tells
-    the person what moved — *usage reserves are now per account: claude-code:paul takes week 5 (from
-    grind-ask; grind had 1, grind-fable 3, grind-sonnet 5)* — with the copy's path, since a node not yet
-    on this build and a rollback past it read `usage_gate:` by profile and so find no reserve and gate
-    nothing until it is restored. A key whose profile no adapter here resolves (a profile only a node
-    defines) is removed too, named in the note with its value, to be set again by account. So no key
-    without a `:` stays past a tick, and a tick with none moves nothing and says nothing.
+  - **The migration.** Once per tick, before the gate's pass, the home walks `usage_gate:` of the
+    file as `settings.read()` gives it (a dict; a missing or unparseable file, None, is never migrated
+    or written) for a key holding no `:` — never on a node, whose replica the home sends whole (§4.4a),
+    nor in a CLI's or a page's read; a tick with none does nothing more, so the walk is its whole cost.
+    Each such key — a profile's, the per-profile file's or one written by hand since; `""` the default
+    profile — moves to its profile's account, resolved through the adapter the profile names
+    (`profiles()`, asked only then). Per window label the account keeps one reserve from among its
+    profiles' and any entry already under the account: those whose unit fits the account's billing,
+    and of them **the one whose line is lowest on the window's last day** (a flat `r`, `100 − r`; a
+    per-day `d`, `100 − d`; a tie, the per-day one; a metered account, the smallest amount) — an order
+    that needs no reading; one whose unit does not fit is removed and named. A merged line can rise for
+    a profile only where a flat reserve is kept over its per-day one: its line `100 − d × days_left`
+    is below the kept `100 − r` while `d × days_left > r`, for `days_left` from 1 to the window's
+    length in days, so the note names each such profile. The profiles resolved first, the write is one
+    load, edit and save with no wait between them, as `set_settings` makes one, then pushed to the
+    nodes and committed in the home's definition files as every settings write is (§4.4a; `rpc_commit_defs`, §4.9); before it, the file
+    as it stands is committed in the home's definition files — *settings.yml before TD-1581's migration* — or, on a
+    home whose definitions are no git tree, copied beside it as `settings.yml.before-TD-1581`, never overwritten. One
+    `system` note tells the person what moved — *usage reserves are now per account: claude-code:paul
+    takes week 5 (from grind-ask; grind had 1, grind-fable 3, grind-sonnet 5)* — with that commit (or
+    the copy) to restore from, since a node not yet on this build and a rollback past it read
+    `usage_gate:` by profile and so find no reserve and gate nothing until it is restored. A key whose
+    profile no adapter here resolves (a profile only a node defines) is removed too, named in the note
+    with its value, to be set again by account. So no key without a `:` stays past a tick.
+  - **Names.** A profile name holding a `:` or a `.` is named by `ao doctor`'s profiles check and its
+    reserve is refused, since its key would read as an account and a `.` breaks the settings writer's
+    dotted paths (`usage_gate.<account>.<label>`); `ao gate <x>` reads `<x>` as an account when it holds a
+    `:`, else as a profile.
   **The line is computed from a reserve, never typed as a percentage.** The setting is a
   **reserve** per window label, of two shapes: a flat percent — `30` — whose line is `100 −
   reserve`; or a percent **per day** — `{per_day: 10}` — whose line is `100 − per_day × days_left`,
