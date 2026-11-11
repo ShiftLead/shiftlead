@@ -2640,11 +2640,11 @@ teams:
     Each such key — a profile's, the per-profile file's or one written by hand since; `""` the default
     profile — moves to its profile's account, resolved by asking each adapter's `account_for(key)`, which only the
     adapter the profile names answers (and which reads `""` as the default profile), or, for an adapter
-    with no `account_for`, by its `profiles()` (the key `<adapter>:<profile>`, as `_usage_key` keys it),
-    asked only then. Per window label the account keeps one reserve from among its
+    with no `account_for`, by its `profiles()` (the key `<adapter>:<profile>`, as `_usage_key` keys it;
+    a `""` key there is unresolved), asked only then. Per window label the account keeps one reserve from among its
     profiles' and any entry already under the account: those whose unit fits the account's billing (an account whose profiles disagree on billing keeps
     none: every profile key's value is removed and named in the note, an entry already under the
-    account staying as it is, since a set on it is refused until the file is
+    account staying as it is and named in the note too, since a set on it is refused until the file is
     fixed), and of them **the one whose line is lowest on the window's last day** (a flat `r`, `100 − r`; a
     per-day `d`, `100 − d`; a tie, the per-day one, then the first profile by name; a metered account,
     the smallest amount) — an order
@@ -2661,7 +2661,8 @@ teams:
     which is the commit that holds it as it stood (a failed commit leaves it dirty, and the tick moves
     nothing, to try again next tick, logging once (in memory, so a restart logs again) that `settings.yml` is not clean against HEAD
     after the pre-commit, the cause being `defs.commit`'s own warning in the host agent's log, and
-    after a day of such ticks one note to the person says so; a `set_settings` landing between the steps is either read by the load or
+    after a day of such ticks one note to the person says so (the day counted in memory from the first
+    failed tick, reset by a clean tick or a restart); a `set_settings` landing between the steps is either read by the load or
     leaves the file dirty for a tick, so no lock is added; the tick's own *edited by hand* commit
     shares `_commit_defs`' lock, so the pre-commit may find the file committed already, under that
     message); on a home whose definitions are no git tree, it is copied beside
