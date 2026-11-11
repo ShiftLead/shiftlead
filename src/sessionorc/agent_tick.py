@@ -3599,8 +3599,8 @@ class TickMixin:
             return
         if s.state in ("exited", "closed"):
             self._unfillable_word(s, now)  # due or not, a question asks whether rule 3 would fill it (TD-1443)
-        if s.state in ("exited", "closed") and s.seat_due:
-            await self._fill(s, now, records)
+        if s.state in ("exited", "closed") and s.seat_due and s.id not in self._send_filling:
+            await self._fill(s, now, records)  # a held extra a send is filling is the send's (TD-1547)
         elif s.state == "idle" and self._seat_done(s) and self._seat_has_run(s, now):
             waits = self._seat_prs(s, records)
             if waits and now - _parse(s.since) < SEAT_PR_WAIT:

@@ -81,7 +81,7 @@ def qualify(address: str, *, local: str) -> str:
 ADDRESS_KEYS = frozenset(
     {"id", "from", "to", "about", "controllers", "copies", "copies_failed", "delivered", "wake_budget_spent", "holder"}
 )
-ADDRESS_MAPS = frozenset({"forwarded"})  # id → id
+ADDRESS_MAPS = frozenset({"forwarded", "seated"})  # id → id (`seated`: a scaled seat → its record, TD-1547)
 
 
 def is_address(value: Any) -> bool:

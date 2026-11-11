@@ -948,6 +948,10 @@ class HostAgent(
         # under `scale.live.<host>`; one eviction at a time, so two starts at the cap take two seats or one
         self._machine_cap = settings_mod.machine_live_cap()
         self._evict_lock = asyncio.Lock()
+        # the record the eviction is closing, across its close's await, so no send chooses it (§4.9 *The choice is
+        # one step*, TD-1547); and each held extra a send is filling, until its record stands (`_send_fill`)
+        self._evicting: set[str] = set()
+        self._send_filling: dict[str, asyncio.Task[None]] = {}
         self._room_held: list[
             set[str]
         ] = []  # each start between the cap's reading and its record; emptied once registered
@@ -1442,11 +1446,14 @@ class HostAgent(
                     log.info("%s starts at the host cap (%d live, cap %d): no extra seat to close", name, live, cap)
                     return held
                 r = min(room, key=lambda r: (idle_from(r) or now, r.id))
+                self._evicting.add(r.id)  # no send lands on it while its close is awaited (TD-1547)
                 try:
                     await self.rpc_close(r.id, closer={"by": "tick", "why": "host_full"})
                 except Exception as e:  # noqa: BLE001 — the start is never refused for want of room
                     log.warning("%s: the cap's close failed: %s", r.id, e)
                     return held
+                finally:
+                    self._evicting.discard(r.id)
                 r.scale = {**r.scale, "last": {"at": now_iso(), "did": "hold", "why": f"host full, room for {name}"}}
                 self._save(r)
                 log.info("%s: an extra seat closed back to held for %s at the host cap (%d)", r.id, name, cap)
