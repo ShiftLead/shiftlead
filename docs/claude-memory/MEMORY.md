@@ -64,3 +64,4 @@
 - [Mockup from a static copy](mockup-from-a-static-copy.md) — edit a script-free copy of the live page in Playwright; prefix the mockup's classes, never nest links
 - [Work open asks before idle](work-open-asks-before-idle.md) — never end a turn on a list of open asks; the doorbell never rings a read ask again (TD-1435, 2026-11-06)
 - [Decided in the filing PR](decided-in-the-filing-pr.md) — a decide answered before the filing PR merges: `board_edit.py decide --expect "- [ ] decide …"`, then drop the board item; ledger.py refuses bold paragraph openers
+- [Board changes: close and add](board-changes-close-and-add.md) — a changed decide item is `done` then `add`; never restore the board file; an archiving `done` is its own commit (#3447, 2026-11-11)
