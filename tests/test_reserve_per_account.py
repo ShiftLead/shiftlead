@@ -72,6 +72,26 @@ def test_a_metered_account_keeps_the_smallest_amount_and_names_a_percent():
 
 
 @pytest.mark.unit
+def test_a_metered_account_keeps_money_before_tokens_whatever_the_number():
+    """§6 *The migration* (TD-1630): no reading converts tokens to money, so a dollar amount is kept over a token
+    one even where the token count is the smaller number."""
+    metered = {"claude-code:key": {"metered"}}
+    got, said = _move(
+        {"api": {"day": "$9"}, "api2": {"day": "3 tok"}}, dict.fromkeys(("api", "api2"), "claude-code:key"), metered
+    )
+    assert got == {"claude-code:key": {"day": "$9"}}
+    assert said == ["claude-code:key takes day $9 (from api; api2 had 3 tok)"]
+
+
+@pytest.mark.unit
+def test_a_tie_between_the_accounts_own_entry_and_a_profiles_stays_the_accounts():
+    """A profile's reserve equal to the account's own entry's (TD-1630): the account's own is kept, and named."""
+    got, said = _move({"claude-code:paul": {"week": 5}, "grind": {"week": 5}}, {"grind": "claude-code:paul"})
+    assert got == {"claude-code:paul": {"week": 5}}
+    assert said == ["claude-code:paul takes week 5 (from its own entry; grind had 5)"]
+
+
+@pytest.mark.unit
 def test_nothing_without_a_profile_key_and_the_default_profiles_key_moves():
     gate = {"claude-code:paul": {"week": 5}, "claude-code:nodeacct": {"week": 9}}
     assert _move(dict(gate), {})[1] is None
