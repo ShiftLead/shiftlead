@@ -78,7 +78,7 @@ def test_a_metered_profile_is_never_polled_for_a_quota(tmp_path, monkeypatch):
         assert ad.usage_for("api") == {"reason": "metered"}
         polled.assert_not_called()
     with um.patch.object(ClaudeCodeAdapter, "usage", return_value=None):
-        assert ad.usage_for("paul") == {"reason": "error"}  # a subscription profile is polled as ever
+        assert ad.usage_for("paul")["reason"] == "error"  # a subscription profile is polled as ever
 
 
 # ── slice 2: the adapter's spend (design §4.3 *Spend per turn*) ─────────────────────────────────

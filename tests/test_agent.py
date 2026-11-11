@@ -2162,7 +2162,7 @@ async def test_a_restart_is_refused_while_an_outcome_is_owed_and_wakes_the_lead(
 
 
 async def test_usage_says_why_it_has_no_reading_backs_off_and_keeps_the_last_one(
-    agent, hookstub, tmp_path, monkeypatch
+    agent, hookstub, tmp_path, monkeypatch, caplog
 ):
     """TD-087. Three things kept the usage chip empty and a capped session unmarked: every
     failure was one silence (`None`), a 429 was answered with another request a minute later,
@@ -2220,6 +2220,12 @@ async def test_usage_says_why_it_has_no_reading_backs_off_and_keeps_the_last_one
         assert agent._usage_acct[K]["reason"] == "error" and agent._usage_acct[K]["windows"]
         # an adapter that raises is an error too, never a crash in the poll
         assert agent._usage_reading(K, RuntimeError("boom")) is None  # already `error`: nothing new to say
+        # a change of reason is logged with the adapter's cause beside it (TD-1589)
+        with caplog.at_level("INFO", logger="shiftlead.agent"):
+            agent._usage_acct[K] = agent._usage_reading(K, {"reason": "rate_limited", "detail": "HTTP 429 x"})
+            agent._usage_acct[K] = agent._usage_reading(K, {"reason": "error", "detail": "HTTP 503 Unavailable"})
+        assert f"usage for account {K}: rate_limited (was error) — HTTP 429 x" in caplog.text
+        assert f"usage for account {K}: error (was rate_limited) — HTTP 503 Unavailable" in caplog.text
 
         # a good reading replaces it and clears the reason; a window it does not name is kept (TD-233)
         good = agent._usage_reading(K, {"windows": [], "fetched": "t2", "reason": "ok"})

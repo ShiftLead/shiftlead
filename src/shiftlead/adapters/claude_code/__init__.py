@@ -92,11 +92,24 @@ class Window:
 class UsageRefused(Exception):
     """Why the usage endpoint gave no reading (TD-087). `reason` is one of `rate_limited`,
     `no_credentials`, `no_profile` and `error` — a word the core keys on, never prose — and
-    `retry_after` is the endpoint's own `Retry-After` in seconds when it sent one."""
+    `retry_after` is the endpoint's own `Retry-After` in seconds when it sent one. `detail` is the
+    cause in a few words — the HTTP status, or the exception and its message — for the log line the
+    core writes on a change of reason (TD-1589); nothing keys on it."""
 
-    def __init__(self, reason: str, retry_after: float | None = None):
+    def __init__(self, reason: str, retry_after: float | None = None, detail: str | None = None):
         super().__init__(reason)
-        self.reason, self.retry_after = reason, retry_after
+        self.reason, self.retry_after, self.detail = reason, retry_after, detail
+
+
+def _cause(e: BaseException) -> str:
+    """A failed request's cause for the log (TD-1589): `HTTP <code> <reason>` for a status the endpoint
+    answered, else the exception's class and message, bounded so a long body never floods the journal."""
+    code = getattr(e, "code", None)
+    if isinstance(code, int):
+        why = str(getattr(e, "reason", "") or "").strip()
+        return f"HTTP {code} {why}".strip()[:200]
+    msg = str(e).strip()
+    return (f"{type(e).__name__}: {msg}" if msg else type(e).__name__)[:200]
 
 
 def _retry_after(e: Exception) -> float | None:
@@ -1050,7 +1063,8 @@ class ClaudeCodeAdapter:
         """The core-facing form of `usage()`: by profile name, as a plain dict —
         `{"windows": [{"label", "pct", "resets"}, ...], "fetched", "reason": "ok"}` (TD-001,
         TD-073), or **why there is no reading** (TD-087): `{"reason": "rate_limited",
-        "retry_after": <seconds or None>}`, `{"reason": "no_credentials"}`, `{"reason": "error"}`.
+        "retry_after": <seconds or None>}`, `{"reason": "no_credentials"}`, `{"reason": "error"}`, with
+        `detail` beside the reason when the request failed — its cause, for the log (TD-1589).
 
         A reason, never prose: *rate-limited*, *no credentials*, *no network* and *no profile*
         were one silence — every failure returned `None` — so the chip stayed empty, the journal
@@ -1069,8 +1083,9 @@ class ClaudeCodeAdapter:
         try:
             u = self.usage(prof)
         except UsageRefused as e:
-            return {"reason": e.reason, "retry_after": e.retry_after}
-        return {**asdict(u), "reason": "ok"} if u else {"reason": "error"}
+            out: dict = {"reason": e.reason, "retry_after": e.retry_after}
+            return out | {"detail": e.detail} if e.detail else out
+        return {**asdict(u), "reason": "ok"} if u else {"reason": "error", "detail": "a body of no known shape"}
 
     def usage(self, profile: Profile, timeout: float = 10.0) -> Usage | None:
         """This account's quota windows from the OAuth usage endpoint tdgrind already polls —
@@ -1104,10 +1119,10 @@ class ClaudeCodeAdapter:
                 return parse_usage(json.loads(r.read().decode()))
         except urllib.error.HTTPError as e:
             if e.code == 429:
-                raise UsageRefused("rate_limited", _retry_after(e)) from None
-            raise UsageRefused("error") from None
-        except Exception:  # noqa: BLE001
-            raise UsageRefused("error") from None
+                raise UsageRefused("rate_limited", _retry_after(e), _cause(e)) from None
+            raise UsageRefused("error", detail=_cause(e)) from None
+        except Exception as e:  # noqa: BLE001
+            raise UsageRefused("error", detail=_cause(e)) from None
 
 
 def _pid_alive(pid: int, proc_start: object) -> bool:

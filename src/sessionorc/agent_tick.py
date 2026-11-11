@@ -5064,7 +5064,9 @@ class TickMixin:
         longer (TD-233 slice 3; the doubling it replaced could not learn a window the endpoint
         never names, TD-231); any other answer, good or bad, goes back to the ordinary cadence,
         since only a 429 is the endpoint telling us to ask less often."""
-        if isinstance(r, BaseException) or not isinstance(r, dict):
+        if isinstance(r, BaseException):
+            r = {"reason": "error", "detail": f"{type(r).__name__}: {r}"[:200]}
+        elif not isinstance(r, dict):
             r = {"reason": "error"}
         reason = str(r.get("reason") or ("ok" if r.get("windows") is not None else "error"))
         if reason == "rate_limited":
@@ -5079,8 +5081,10 @@ class TickMixin:
             self._usage_wait.pop(key, None)
         was = self._usage_acct.get(key) or {}
         if was.get("reason") != reason:
-            # once per change of reason, never per poll: a 429 every five minutes is one line
-            log.info("usage for account %s: %s (was %s)", key, reason, was.get("reason") or "no reading yet")
+            # once per change of reason, never per poll: a 429 every five minutes is one line — with
+            # the adapter's cause beside it, so the next look has the status or the exception (TD-1589)
+            cause = f" — {r['detail']}" if isinstance(r.get("detail"), str) and r["detail"] else ""
+            log.info("usage for account %s: %s (was %s)%s", key, reason, was.get("reason") or "no reading yet", cause)
         if reason == "ok":
             # merged with what the account's sessions reported, by the same rule (TD-233 slice 2)
             windows = usage_mod.clean_windows(r.get("windows"))
