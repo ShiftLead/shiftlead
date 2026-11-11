@@ -800,24 +800,29 @@ def undeclared(call: Call, org: orgmod.Org, plan: teams.Plan, host: str) -> str 
 def write_extras(
     call: Call, plan: teams.Plan, controllers: list[str], caller: str | None
 ) -> tuple[list[dict[str, Any]], list[str]]:
-    """Write the plan's extras held (§4.9 *Scaling with the work*, TD-1545), after the team's sessions: each
-    `create(held=True)` with its launch record, `scale: {line}` among it, and the controllers the line's next
-    kept member gets. A name a current record already holds as an extra — held, or filled — is left as it is;
-    a name another live record holds is left to it and said; a closed record of the name is superseded with
-    its mail kept, as a member's is (`keep_mail_for`). A refused create is said, and the start stands: an
-    extra is capacity, never the team. Returns `(records written, notes)`."""
-    if not plan.extras:
-        return [], []
+    """The Start's reconcile of the held extras to the merged `max` (§4.9 *Scaling with the work*, §6 rule 14,
+    TD-1545), after the team's sessions: each of the plan's extras written `create(held=True)` with its launch
+    record, `scale: {line}` among it, and the controllers the line's next kept member gets. A held extra's
+    record is written again, so its launch record is the one the line runs now (a profile, brief, lane or flow
+    changed while the team was down), its mail kept; a filled one is left to its run; a closed record the
+    plan now reads as an extra — a size lowered while the team was down — is superseded as one, mail kept, as
+    a member's is (`keep_mail_for`); a name another live record holds is left to it and said. A held extra the
+    plan no longer reads — a `max` lowered, its line renamed or removed — is removed (`remove`), and a live
+    one is said and left to its run. A refused create or removal is said, and the start stands: an extra is
+    capacity, never the team. Returns `(records written, notes)`."""
     on = {"host": plan.host} if plan.host else {}
     verdicts: dict[str, Any] = {}
     written: list[dict[str, Any]] = []
     notes: list[str] = []
     try:  # the team's sessions exist by now: a read that fails writes no extra and is said, never a failed start
         records = call("list")
+        surplus = _surplus_extras(plan, records)
+        if not plan.extras and not surplus:
+            return [], []
         for x in plan.extras:
             rec = _current(x.name, records)
-            if rec is not None and rec.get("scale"):
-                continue  # already this line's extra, held or filled: the reconcile's, not the start's
+            if rec is not None and rec.get("scale") and rec.get("state") not in DEAD:
+                continue  # a filled extra runs on the launch record it was filled from: the next Start's
             v = call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir), **on)
             if v.get("verdict") in ("live", "suspended"):
                 notes.append(
@@ -839,7 +844,32 @@ def write_extras(
             written.append(call("create", **params))
         except AgentError as e:
             notes.append(f"{x.name}: the extra of {x.scale} was not written — {e}")
+    for r in surplus:
+        line = (r.get("scale") or {}).get("line") or "its line"
+        if r.get("state") not in DEAD:
+            notes.append(f"{r.get('name')}: a live extra of {line} the max no longer holds — left to its run")
+            continue
+        try:
+            call("remove", id=r["id"])
+            notes.append(f"{r.get('name')}: the held extra of {line} removed — the max no longer holds it")
+        except AgentError as e:
+            notes.append(f"{r.get('name')}: the held extra of {line} was not removed — {e}")
     return written, notes
+
+
+def _surplus_extras(plan: teams.Plan, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The team's current extras (records carrying `scale`) the plan no longer reads as one — past a lowered
+    `max`, or of a line the definition renamed or removed (§4.9 *Scaling with the work*, TD-1545). A name the
+    plan launches is no surplus: the Start's create supersedes it as a kept member (the +'s adopt)."""
+    keep = {x.name for x in plan.extras} | {x.name for x in plan.launches}
+    mine = crew(plan.team, records)
+    names = dict.fromkeys(str(r.get("name") or "") for r in mine if r.get("scale"))
+    out = []
+    for n in names:
+        r = _current(n, mine)
+        if n and n not in keep and r is not None and r.get("scale") and not persons(r):
+            out.append(r)
+    return out
 
 
 def start(
@@ -1177,7 +1207,9 @@ def _pairing(
     """`renames`, with the newcomers an applied orphan already holds (its `relaunch` mark's `name`), each
     by name with the orphan that holds it."""
     mine = crew(plan.team, sessions)
-    names = {x.name for x in plan.launches} | set(plan.sit_out)
+    # a name the plan reads as an extra is no orphan: a size lowered on a line that scales gives the record
+    # `scale` at the Start's reconcile (`write_extras`), never a sit-out (§4.9 *Scaling with the work*, TD-1545)
+    names = {x.name for x in plan.launches} | set(plan.sit_out) | {x.name for x in plan.extras}
     gone = [n for n in dict.fromkeys(str(r.get("name") or "") for r in mine) if n and n not in names]
     orphans = [
         r

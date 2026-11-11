@@ -85,30 +85,116 @@ def test_a_seats_extra_carries_its_trigger_alone(world, extras_on):  # noqa: F81
     assert got["techlead-ao-2"]["prompt"] == seat["prompt"] and got["techlead-ao-2"]["role"] == "techlead"
 
 
-def test_a_name_an_extra_holds_is_left_and_a_live_holder_is_said(world, extras_on, capsys):  # noqa: F811
+def test_a_filled_extra_is_left_a_held_one_rewritten_and_a_live_holder_is_said(world, extras_on, capsys):  # noqa: F811
     tmp_path, state = world
     state["sessions"].append(
         {
             "id": "ao-shiftlead-grind-3",
             "name": "grind-3",
-            "state": "closed",
+            "state": "idle",
             "team": "ao-grind",
             "scale": {"line": "grind"},
         }
     )
+    state["sessions"].append(
+        {
+            "id": "ao-shiftlead-hunt-3",
+            "name": "hunt-3",
+            "state": "closed",
+            "team": "ao-grind",
+            "scale": {"line": "hunt"},
+        }
+    )
     state["verdicts"]["grind-4"] = {"name": "grind-4", "verdict": "live", "holder": "ao-shiftlead-grind-4"}
-    state["verdicts"]["hunt-2"] = {
-        "name": "hunt-2",
-        "verdict": "supersede",
-        "holder": "ao-shiftlead-hunt-2",
-        "holder_state": "closed",
-    }
+    for n in ("hunt-2", "hunt-3"):
+        state["verdicts"][n] = {
+            "name": n,
+            "verdict": "supersede",
+            "holder": f"ao-shiftlead-{n}",
+            "holder_state": "closed",
+        }
     assert cli.main(["team", "start", "ao-grind"]) == 0
     got = held(state)
-    assert sorted(got) == ["hunt-2", "hunt-3"]  # grind-3 is held already, grind-4 is another's
-    assert got["hunt-2"].get("keep_mail") is True  # a closed record's mail is the extra's, as a member's is
-    assert "keep_mail" not in got["hunt-3"]
+    # grind-3 is filled and runs on; grind-4 is another's; the held hunt-3 is written again, so its launch record
+    # is the line's now; a closed record's mail is the extra's, as a member's is
+    assert sorted(got) == ["hunt-2", "hunt-3"]
+    assert got["hunt-2"].get("keep_mail") is True and got["hunt-3"].get("keep_mail") is True
     assert "grind-4: not written as an extra of grind — ao-shiftlead-grind-4 holds the name" in capsys.readouterr().err
+
+
+@pytest.fixture
+def removes(world, monkeypatch):  # noqa: F811
+    """`remove` on the mocked home: the record forgotten, as `rpc_remove` forgets a closed one."""
+    tmp_path, state = world
+    real = cli.call_sync
+
+    def call(method, **params):
+        if method != "remove":
+            return real(method, **params)
+        state["calls"].append((method, params))
+        if (why := state.get("refuse", {}).get(params["id"])) is not None:
+            raise cli.AgentError(why)
+        state["sessions"][:] = [s for s in state["sessions"] if s["id"] != params["id"]]
+        return None
+
+    monkeypatch.setattr(cli, "call_sync", call)
+
+
+def removed(state):
+    return [p["id"] for m, p in state["calls"] if m == "remove"]
+
+
+def extra(name, line, st="closed"):
+    return {"id": f"ao-shiftlead-{name}", "name": name, "state": st, "team": "ao-grind", "scale": {"line": line}}
+
+
+def test_a_start_removes_the_held_extras_a_lowered_max_or_a_removed_line_leaves(world, extras_on, removes, capsys):  # noqa: F811
+    tmp_path, state = world
+    settings(tmp_path, {"ao-grind": {"max": {"grind": 3, "hunt": 0}}})
+    state["sessions"] += [extra("grind-3", "grind"), extra("grind-4", "grind"), extra("hunt-2", "hunt")]
+    state["sessions"] += [extra("dig-2", "dig"), extra("hunt-3", "hunt", "idle")]
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    # past the lowered max, and the extra of a line the definition no longer has; the live one runs on
+    assert removed(state) == ["ao-shiftlead-grind-4", "ao-shiftlead-hunt-2", "ao-shiftlead-dig-2"]
+    assert sorted(held(state)) == ["grind-3"]
+    err = capsys.readouterr().err
+    assert "grind-4: the held extra of grind removed — the max no longer holds it" in err
+    assert "hunt-3: a live extra of hunt the max no longer holds — left to its run" in err
+
+
+def test_max_off_removes_every_held_extra_and_a_refused_removal_is_said(world, extras_on, removes, capsys):  # noqa: F811
+    tmp_path, state = world
+    settings(tmp_path, {"ao-grind": {"max": "off"}})
+    state["sessions"] += [extra("grind-3", "grind"), extra("hunt-2", "hunt")]
+    state["refuse"] = {"ao-shiftlead-hunt-2": "suspended"}
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    assert removed(state) == ["ao-shiftlead-grind-3", "ao-shiftlead-hunt-2"] and held(state) == {}
+    assert "hunt-2: the held extra of hunt was not removed — suspended" in capsys.readouterr().err
+
+
+def test_a_size_lowered_while_down_makes_the_record_past_it_an_extra(world, extras_on, removes):  # noqa: F811
+    """A kept member's closed record past a size lowered while the team was down is no member the definition
+    dropped: the Start supersedes it as the line's extra, its mail kept, and marks nothing sat out."""
+    tmp_path, state = world
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    for s in state["sessions"]:
+        s["state"] = "closed"
+    kept = {"id": "ao-shiftlead-grind-3", "name": "grind-3", "state": "closed", "team": "ao-grind", "role": "grinder"}
+    team = ("orc-ao", "grind-1", "grind-2", "hunt")  # the team's own records; the extras it wrote forgotten
+    state["sessions"] = [s for s in state["sessions"] if s["name"] in team] + [kept]
+    state["calls"].clear()
+    state["verdicts"]["grind-3"] = {
+        "name": "grind-3", "verdict": "supersede", "holder": "ao-shiftlead-grind-3", "holder_state": "closed"
+    }  # fmt: skip
+    doc = org_doc(tmp_path)
+    assert doc["teams"]["ao-grind"]["members"][0]["count"] == 2  # the size the record was kept under: 3 → 2
+    plan = teams.plan(orgmod_with_settings(tmp_path), "ao-grind", "kmaster")
+    assert teamrun.renames(plan, state["sessions"]) == ([], [])  # no removal: the line scales
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    assert not [p for m, p in state["calls"] if m == "relaunch"]  # nothing sat out
+    got = held(state)
+    assert got["grind-3"]["scale"] == {"line": "grind"} and got["grind-3"].get("keep_mail") is True
+    assert removed(state) == []
 
 
 def test_a_refused_extra_is_said_and_the_start_stands(world, extras_on, monkeypatch, capsys):  # noqa: F811
