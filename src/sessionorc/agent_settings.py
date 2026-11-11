@@ -379,11 +379,12 @@ class SettingsMixin:
         the file after the write (§4.4a *Settings, replicated*, TD-147).
 
         - `profile` + `reserves`: a window label to a flat percent, to `{per_day: N}`, or to None,
-          which clears that window's reserve. A label the profile's adapter does not report is
-          refused, with the reported ones named — except before the profile has any reading, when
-          nothing can be checked and the reply says `unchecked`. The reserve is the profile's account's
-          (§6 *A reserve is the account's*, TD-1581): it writes `usage_gate.<adapter>:<account>`, and the
-          reply names the account and its profiles.
+          which clears that window's reserve. A value on a label the profile's adapter does not report
+          is refused, with the reported ones named; a clear is taken on any label, so a reserve left on a
+          window the account stopped reporting can be removed (TD-1680) — and before the profile has any
+          reading, when nothing can be checked, nothing is refused and the reply says `unchecked`. The
+          reserve is the profile's account's (§6 *A reserve is the account's*, TD-1581): it writes
+          `usage_gate.<adapter>:<account>`, and the reply names the account and its profiles.
         - `account` + `reserves`: the same, the account's usage key named (`<adapter>:<account>`), for an
           account a node alone names, or one set before its first profile; one this home has not seen —
           no profile here names it, no node has reported under it — is refused.
@@ -707,10 +708,13 @@ class SettingsMixin:
         reading = self._usage_acct.get(key) or next((self._usage[p] for p in [prof, *names] if p in self._usage), {})
         windows = reading.get("windows")
         reported = [str(w.get("label")) for w in windows or []]
-        if windows is not None and (unknown := sorted(set(map(str, reserves)) - set(reported))):
+        # a value on a label the reading does not report is refused; a clear (`None`) is taken on any label, so a
+        # reserve left on a window the account stopped reporting can be removed (§4.7 `ao gate`, TD-1680)
+        setting = {str(k) for k, v in reserves.items() if v is not None}
+        if windows is not None and (unknown := sorted(setting - set(reported))):
             raise RpcError(
                 f"{who} reports no window {', '.join(unknown)}: its windows are {', '.join(reported) or 'none'} "
-                "(design §4.7)"
+                "— a clear is taken on any label (design §4.7)"
             )
         parsed: dict[str, Any] = {}
         for label, value in reserves.items():

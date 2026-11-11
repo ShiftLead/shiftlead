@@ -541,3 +541,22 @@ async def test_a_metered_accounts_prices_are_pooled_and_a_profiles_reading_check
         agent._usage["pb"] = {"windows": [{"label": "5h", "pct": 10}], "reason": "ok"}
         with pytest.raises(AgentError, match="reports no window week: its windows are 5h"):
             await person.call("set_settings", account="hookstub:paul", reserves={"week": 30})
+
+
+@pytest.mark.integration
+async def test_a_clear_is_taken_on_a_window_the_account_stopped_reporting_and_a_value_is_not(agent, hookstub):
+    """A reserve left on a window the account's reading no longer reports (TD-1680): a clear (`None`) on it is
+    taken and removes it, beside a value on a reported window; a value on it is still refused (§4.7 `ao gate`)."""
+    await park_ticks(agent)
+    hookstub.accounts = {"pa": "paul"}
+    async with LocalClient() as person:
+        await person.call("set_settings", account="hookstub:paul", reserves={"5h": 5, "week": 10})  # no reading yet
+        agent._usage["pa"] = {"windows": [{"label": "week", "pct": 10}], "reason": "ok"}
+        with pytest.raises(AgentError, match="reports no window 5h: its windows are week"):
+            await person.call("set_settings", account="hookstub:paul", reserves={"5h": 5, "week": 20})
+        assert settings_mod.load()["usage_gate"] == {"hookstub:paul": {"5h": 5, "week": 10}}
+        got = await person.call("set_settings", account="hookstub:paul", reserves={"5h": None, "week": 20})
+        assert got["reserves"] == {"week": 20} and not got["unchecked"]
+        assert settings_mod.load()["usage_gate"] == {"hookstub:paul": {"week": 20}}
+        await person.call("set_settings", profile="pa", reserves={"5h": None})  # a clear of nothing set is no error
+    assert settings_mod.load()["usage_gate"] == {"hookstub:paul": {"week": 20}}

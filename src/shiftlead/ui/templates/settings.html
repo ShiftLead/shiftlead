@@ -76,9 +76,16 @@
           {{ saverow("an amount is the window's 100 — $5, 20M tok — against the account's spend · applies on the next tick") }}
         {% else %}
           {% for w in c.rows %}
+          {% if w.stale %}
+          {#- a reserve on a window the account's reading does not report (TD-1680): no field; Save clears it -#}
+          <div class="setrow setstale" data-label="{{ w.label }}"><span class="setlabel">{{ w.label }} reserve</span>
+            <span class="mono">{{ w.value }}</span>
+            <span class="note setline">{{ w.line }} · Save removes it</span></div>
+          {% else %}
           <label class="setrow"><span class="setlabel">{{ w.label }} reserve</span>
             <input class="input setin" name="{{ w.label }}" value="{{ w.value }}" placeholder="no line" data-resets="{{ w.resets }}" data-pct="{{ w.pct if w.pct is not none else '' }}" autocomplete="off" spellcheck="false">
             <span class="note setline" data-was="{{ w.line }}">{{ w.line }}</span>{% if w.age %}<span class="note dim setage">{{ w.age }}</span>{% endif %}</label>
+          {% endif %}
           {% else %}
           <div class="note">No window reported yet: the adapter has not read this account's usage. A reserve can be set with <span class="mono">ao gate {{ c.account }}</span>, which says the labels were not checked.</div>
           {% endfor %}

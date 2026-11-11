@@ -8445,7 +8445,8 @@
       return bal;
     };
     const forms = {
-      usage: (f) => ["usage", { account: f.dataset.account, reserves: Object.fromEntries($$(".setin", f).map((i) => [i.name, i.value.trim()])) }],
+      // a reserve on a window the account no longer reports (a `.setstale` row, TD-1680) is sent as a clear
+      usage: (f) => ["usage", { account: f.dataset.account, reserves: Object.fromEntries([...$$(".setstale", f).map((r) => [r.dataset.label, ""]), ...$$(".setin", f).map((i) => [i.name, i.value.trim()])]) }],
       max_age: (f) => ["max_age", { max_age: f.elements.max_age.value.trim() }],  // **trust a reading for** (TD-233)
       settle: (f) => ["settle", { settle: f.elements.settle.value.trim() }],  // **settle** (§4.5a, TD-710)
       teams: (f) => {
@@ -8492,7 +8493,8 @@
     const state = (f) => JSON.stringify([...f.elements].filter((el) => el.name).map((el) => (el.type === "checkbox" || el.type === "radio" ? el.checked : el.value)));
     const settle = (f) => {
       const dirty = state(f) !== f.dataset.drawn, save = $(".setsave", f), cancel = $(".setcancel", f);
-      if (save) save.disabled = !dirty;
+      // a card holding a reserve on a window no longer reported (TD-1680) can be saved as drawn, to clear it
+      if (save) save.disabled = !dirty && !$(".setstale", f);
       if (cancel) cancel.hidden = !dirty;
       // **Send a test** sends the saved values, so not while the card holds others (§4.5a **You**: **Telegram**)
       const test = $(".settgtest", f); if (test) { test.disabled = dirty; test.title = dirty ? "save first: a test sends the saved values" : test.dataset.title || test.title; }
