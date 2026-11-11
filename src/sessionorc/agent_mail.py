@@ -400,7 +400,8 @@ class MailMixin:
                 continue
             why = seat_unable(seat, now, self.unfillable)
             # a held seat is able (§4.9b): only a blank pick's handed entry leaves it, for another team (TD-1564)
-            held = why is None and work_mod.held_for(seat, list(records.values()))
+            # read once, and only for a seat holding a blank pick's entry: every other seat costs no scan
+            held: bool | None = None
             files = (seat.seat or {}).get("tags") is True  # a techlead seat: the one that files an entry (TD-1565)
             for e in list(seat.inbox):
                 if not e.open or e.kind != "ask" or e.to != [key]:
@@ -417,7 +418,9 @@ class MailMixin:
                 blank = e.handed_entry and isinstance(e.entry, dict) and not e.entry.get("picked") and not e.outcome
                 if (e.entry is not None or e.handed) and not blank:
                     continue  # the person's pick, a session's own ledger request and a settled entry stay
-                if blank and held:
+                if blank and why is None and held is None:
+                    held = work_mod.held_for(seat, records.values())
+                if blank and why is None and held:
                     self._move_handed(e, key, seat, "its team is stopped", stamp, touched)
                     continue
                 if why is None:

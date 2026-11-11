@@ -195,7 +195,9 @@ def held_words(r: Session, records: Iterable[Session]) -> dict[str, Any] | None:
     """What `mail.read_when` is told of a held seat (§4.10 *When it is read*, §6 rule 3 *A stopped team's seats are
     held*): `{by, team, wound}` where `held_for` holds — `by` `seats_held_by`'s, `wound` whether the team reads wound
     down (`team_wound_down`) — else None. Read from the team's records, never from the stored `stop_held`."""
-    mine = [x for x in records if x.team == r.team] if r.team else []
+    if not (r.seat and r.team):
+        return None  # never held: no scan of the team's records
+    mine = [x for x in records if x.team == r.team]
     if not held_for(r, mine):
         return None
     word = seats_held_by(mine) or {}
