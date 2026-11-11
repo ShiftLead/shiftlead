@@ -886,7 +886,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      node forwards it and refuses it offline) — adds the ids to each member's `lane_seen`; a start
      needs no such write, since the records it makes begin with no `lane_seen` and rule 6 writes
      theirs at their next declaration. A person's Start, a schedule's, or Dismiss clears
-     `work_waiting`. The note on the team card (§4.5a *work waiting* note) says which of the two
+     `work_waiting` — Dismiss all but a held part, `seats_held`, which stays until the Start or the questions
+     close (*A team that stopped*, below, TD-1564). The note on the team card (§4.5a *work waiting* note) says which of the two
      happened: *3 entries waiting since 14:02* or *started 14:12 for TD-213 and 2 more*. **With no
      key the home starts the team** (Paul's decision, 2026-10-08, TD-457): `ask` and `off` are written
      only by `set_settings`, which a session cannot call. Not on a node yet, as rule 4 is not; a team with
@@ -935,7 +936,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      note or the `handed` answer at its first `ao inbox` and owes the outcome. A **seat's** orphaned question goes under
      `questions` alone and its name gains no `members[]` row — a seat holds no lane, and rule 3's *answer waiting*
      fills it for the answer (§4.9b, TD-1051). Dismiss clears the
-     mark; a question ends once, so nothing is added to `lane_seen` for it. A team that is *stopped*
+     mark (all but a held part, TD-1564); a question ends once, so nothing is added to `lane_seen` for it. A team that is *stopped*
      rather than wound down — a stop time, a person's Stop — is never started for it: the note
      waits in the mailbox for the person's Start, which keeps it the same way, while the team's
      lanes are read (*A team that stopped*, below). A member
@@ -1003,7 +1004,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        as `wrapup_by` is the person's. Otherwise it is `other`.
 
      It is removed as a wound-down team's is: by a crew session live again, by no id new, by `off`,
-     by Start or by Dismiss. A team whose reading turns *wound down* has its mark rewritten without
+     by Start or by Dismiss — save a held part, `seats_held`, which no id new or Dismiss removes (below). A team whose reading turns *wound down* has its mark rewritten without
      `stopped`, its ids kept, and the rule above follows.
 
      **What follows** is the same under `ask` and `start`: the Inbox row *team start*, never a
@@ -1037,7 +1038,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      are held), never again for a rising count or a second seat. A held-only mark never starts the team, under
      any `on_work` — neither the tick's start nor the row's Start through `work_start` with no lane ids, which
      answers `started: false` before it refuses a stopped mark and before it takes the mark away — and under `start` its row ends *· not started: questions alone start no team*.
-     **Dismiss** clears a row's entries and leaves its held part, which no press but the Start, or the
+     **Dismiss** clears a row's entries and leaves its held part — the mark becomes `{at, repo, members: {},
+     seats_held}` with `stopped` kept where it stood and `questions` dropped — which no press but the Start, or the
      questions closing, takes away (`clear_work` on a held-only mark answers `cleared: false` and leaves it) —
      the questions still wait, so a dismissed count would only come back on the next tick; a held-only row
      draws **Start** and **Snooze** alone, no Dismiss.
@@ -1459,8 +1461,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        TD-1564: its reason is `held`) (the `exited`/`closed` branch of `seat_unable`); this overrides
        `ended` and `not_filled`. A working session gets to its work, and a fillable seat is filled for it. Every
        other actor is **not
-       acting**, and its state is the **reason**: `gone`, `suspended`, `fills_exhausted` (*parked at its
-       fill ceiling*), `restart_ceiling`, `unreachable`, `scheduled`, `held` (a seat held by its team's stop, rule 3, TD-1564), `taken_over` (*interactive*: a
+       acting**, and its state is the **reason**: `gone`, `suspended`, `held` (a seat held by its team's stop,
+       rule 3, TD-1564), `fills_exhausted` (*parked at its
+       fill ceiling*), `restart_ceiling`, `unreachable`, `scheduled`, `taken_over` (*interactive*: a
        member the person took over, whose Hand back is the cure), `gated`, `limited`, `not_filled`,
        `ended`, each in `unanswered.words`' fixed words — a seat the exited or closed branch finds
        unfillable is this rule's own reason instead, built from `agent.unfillable[r.id]` (its words —
