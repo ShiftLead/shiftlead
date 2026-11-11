@@ -404,12 +404,14 @@ def test_launch_argv_and_env(tmp_path, monkeypatch):
         f.write(
             "  gem: {adapter: gemini, account: g}\n"
             "  key: {account: paul@example.com, billing: metered, config_dir: /tmp/cc-key}\n"
+            "  bare: {config_dir: /tmp/cc-bare}\n"  # no account: its own name is its account (§4.2a, TD-1623)
         )
     assert (ad.account_for("gem"), ad.account_for("key")) == (None, "paul@example.com")
     assert ad.profiles() == [
         {"name": "paul", "account": "paul", "billing": "subscription"},
         {"name": "grind", "account": "grind", "billing": "subscription"},
         {"name": "key", "account": "paul@example.com", "billing": "metered"},
+        {"name": "bare", "account": "bare", "billing": "subscription"},
     ]
     from shiftlead.adapters.gemini import GeminiAdapter
 
