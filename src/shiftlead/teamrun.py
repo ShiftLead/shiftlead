@@ -710,15 +710,24 @@ def keep_mail_for(
     concluded team closes first — so a lapse note or an answer left there while the name was gone
     is the successor's. Asked only where the host agent grants it, a person or one of that record's
     controllers (§4.9b, §9 invariant 9), so the start stays all or nothing; anyone else's member
-    starts empty, as §4.1 has it, and a note names it and why. Returns `(names, notes)`."""
+    starts empty, as §4.1 has it, and a note names it and why. An **exited** holder carrying `stop_held` — a
+    seat the person killed, held by its team's stop (§6 rule 3 *A stopped team's seats are held*, TD-1564) — is
+    asked too, so its waiting questions survive the Start; the verdicts carry only `holder_state`, so its mark is
+    read from the `list` rows by holder id. Returns `(names, notes)`."""
     closed = {
         n: v for n, v in verdicts.items() if v.get("verdict") == "supersede" and v.get("holder_state") == "closed"
     }
+    exited = {
+        n: v for n, v in verdicts.items() if v.get("verdict") == "supersede" and v.get("holder_state") == "exited"
+    }
     if concluded:
         closed |= {n: v for n, v in verdicts.items() if v.get("verdict") == "live"}
+    rows = list(call("list")) if exited or (closed and caller is not None) else []
+    held = {str(s.get("id")) for s in rows if isinstance(s.get("stop_held"), Mapping)}
+    closed |= {n: v for n, v in exited.items() if str(v.get("holder") or "") in held}
     if not closed or caller is None:
         return set(closed), []
-    ctl = {str(s.get("id")): s.get("controllers") or [] for s in call("list")}
+    ctl = {str(s.get("id")): s.get("controllers") or [] for s in rows}
     keeps, notes = set(), []
     for n, v in closed.items():
         holder = str(v.get("holder") or "")
