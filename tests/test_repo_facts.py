@@ -571,6 +571,17 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     row = "pickable     pr:1728  High    grinders     sync dev-cadence 517a2b5 · sync since 2026-10-14T09:00:00Z: green"
     assert row in out and out.index("pr:1728") < out.index("board:0123abcd") < out.index("pickable     pr:1573")
     assert out.count("pr:1728  High") == 1
+    # a live check's lift PR is counted once, as a lift and never as a red PR too, and its line prints its
+    # entry's priority (§4.4 *A live check's lift PR is the team's at once*, TD-1450, TD-1588)
+    lift = {"id": "pr:1900", "title": "lift TD-1450 event (live)", "for_page": "pickable", "pickable": "yes",
+            "work_order": True, "pr_order": True, "priority": "Medium", "pr": 1900, "lift": True,
+            "lift_since": "2026-10-15T09:00:00Z", "entry": "TD-1450", "gate": "event (live)"}  # fmt: skip
+    reading[str(repo)]["pr_orders"] = {"orders": [sync, red, lift], "told": {}}
+    assert cli.main(["repo"]) == 0
+    out = capsys.readouterr().out
+    assert "1 sync PR to land, 1 lift PR to take, 1 red PR nobody holds: 5 pickable" in out
+    row = "pickable     pr:1900  Medium  grinders     lift TD-1450 event (live) · lift since 2026-10-15T09:00:00Z"
+    assert f"{row}: lifts TD-1450 event (live)" in out and "pr:1900  High" not in out
 
 
 def test_ao_repo_marks_a_live_check_and_lists_the_ones_that_wait(repo, monkeypatch, capsys):

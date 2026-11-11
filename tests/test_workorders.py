@@ -749,3 +749,19 @@ def test_a_held_lift_pr_is_no_order_and_its_idle_holder_is_told_then_passed_over
     assert note.startswith("lift PR #1900 has been open since") and "lifts TD-1450 event (live)" in note
     orders, kept, notes = workorders.red_prs([_lift()], [holder], T0 + 2 * HOUR, told, HOUR)
     assert [o["id"] for o in orders] == ["pr:1900"] and orders[0]["lift"] and notes == []
+
+
+async def test_the_tick_gives_a_lift_order_its_entrys_priority_from_the_ledger(agent, tmp_path):
+    """TD-1588, design §4.4 *A live check's lift PR is the team's at once* (TD-1450): the tick's `_red_prs`
+    reads each entry's priority from the repo's ledger reading, so a lift PR whose entry is Medium is a
+    Medium order, and one whose entry the ledger does not hold is High."""
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    root = str(tmp_path / "repo")
+    entries = [{"id": "TD-1450", "priority": "medium"}, {"id": "TD-9", "priority": "low"}, "not an entry"]
+    prs = [_lift(), _lift(1901, branch="lift/TD-77/live")]
+    agent._repos[root] = {"name": "repo", "root": root, "prs": {"open": prs}, "ledger": {"entries": entries}}
+    await agent._red_prs(T0 + HOUR)
+    got = {o["id"]: o["priority"] for o in agent._repos[root]["pr_orders"]["orders"]}
+    assert got == {"pr:1900": "Medium", "pr:1901": "High"}
