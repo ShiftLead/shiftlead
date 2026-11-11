@@ -218,7 +218,7 @@ def test_a_ledger_with_no_header_lines_gives_free_pick_every_unblocked_entry():
     [
         ("", "", ["free-pick"], True),
         ("build", "grinder", ["free-pick", "owner:grinder"], True),
-        ("live-check", "", ["free-pick"], False),
+        ("live-check", "", ["free-pick"], True),  # ungated: its `live` reading holds nothing (TD-1452)
         ("evaluation", "", ["free-pick"], False),
         ("design-first", "designer", ["design-first", "owner:designer"], True),
         ("design-first", "", ["free-pick"], False),

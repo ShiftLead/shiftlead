@@ -22,7 +22,7 @@ from typing import Any
 from sessionorc import agent_ids as ids_mod
 from sessionorc import board as board_mod
 from sessionorc import client as clientmod
-from sessionorc import hosts, naming, promote, workorders
+from sessionorc import hosts, naming, promote, reports, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import mail as mailmod
 from sessionorc import seams as seams_mod
@@ -1784,28 +1784,62 @@ def _unserved_lanes(r: dict[str, Any]) -> None:
                 kinds["unserved"] = int(kinds.get("unserved") or 0) + 1
 
 
+LIVE_GATE = re.compile(r"event \(live(?:-\d+|-td\d+)?\)")  # the gates §4.9b reserves to a live check
+
+
+def _live_gate(b: str) -> bool:
+    """Whether a `Blocked by:` item is one of a live check's own gates, `event (live)`, `event (live-<digits>)`
+    or `event (live-td<digits>)` (§4.9b *A gate's name is never reused*, TD-1452)."""
+    return LIVE_GATE.fullmatch(b) is not None
+
+
 def _repo_list(e: dict[str, Any]) -> str:
     """Which of `ao repo`'s lists an entry is on (design §4.7's mapping, TD-418): the *pickable* rows
-    are the kind *pickable* and a live check nothing blocks whose build is live — the grinder's pick
-    list (§4.9b, TD-323); the *design* rows the kind *design*; the *live-check* line a live check
-    nothing blocks whose build is not live; anything else, a live check blocked by a decision among
-    it, is on no list ('')."""
+    are the kind *pickable* and a live check nothing blocks — its `event (live…)` gates lifted, whatever
+    its `live` reading says (§4.9b, TD-1452) — the grinder's pick list; the *design* rows the kind
+    *design*; the *live-check* line a live check whose only blockers are its `event (live…)` gates;
+    anything else, a live check blocked by a decision among it, is on no list ('')."""
     page = str(e.get("for_page") or "")
-    if page == "live-check" and e.get("pickable") == "yes":
-        return "pickable" if e.get("live") == "yes" else "live-check"
+    if page == "live-check":
+        blocks = [str(b) for b in e.get("blocked_by") or []]
+        if e.get("pickable") == "yes" and not blocks:
+            return "pickable"
+        return "live-check" if blocks and all(_live_gate(b) for b in blocks) and not e.get("parts_open") else ""
     return page if page in ("pickable", "design") else ""
 
 
-def _live_mark(e: dict[str, Any]) -> str:
-    """The words before a live check's title (design §4.9b, TD-323): *live check* where its build is
-    live, so a pick says it is a read and not a build, and *waits for its build to be live* where not,
-    each naming the build's PRs from its `Kind:` line."""
+def _lifts(r: dict[str, Any]) -> dict[str, list[int]]:
+    """Each live check's open lift PRs (§4.7 `ao repo`, §4.9b, TD-1452), by entry id, from the repo reading's
+    open-PR list — the list the work orders read, no new forge call: a PR whose branch is
+    `lift/TD-n/<a reserved name>`, a draft or a fork's left out as the orders leave them out."""
+    out: dict[str, list[int]] = {}
+    for p in (r.get("prs") or {}).get("open") or []:
+        if (
+            isinstance(p, dict)
+            and not p.get("draft")
+            and not p.get("fork")
+            and (got := reports.lift_of(p.get("branch")))
+        ):
+            out.setdefault(got[0], []).append(int(p["number"]))
+    return {k: sorted(v) for k, v in out.items()}
+
+
+def _live_mark(e: dict[str, Any], lifts: list[int] | None = None) -> str:
+    """The words before a live check's title (design §4.9b, TD-323, TD-1452): *live check* and the build's
+    PRs from its `Kind:` line, so a pick says it is a read and not a build; *not live #n* while the
+    reading says its build is not live — words beside the gate, which alone holds — and *lift #n open*
+    (*lift #a #b open*) while an open PR lifts its gate."""
     if e.get("kind") != "live-check":
         return ""
     prs = " ".join(f"#{n}" for n in e.get("built") or [])
-    if e.get("live") == "yes":
-        return f"live check {prs}: "
-    return f"waits for its build to be live ({prs or 'no PR on its Kind: line'}): "
+    words = (
+        f"live check {prs}".rstrip()
+        if e.get("live") == "yes"
+        else f"live check, not live {prs or '(no PR on its Kind: line)'}"
+    )
+    if lifts:
+        words += f", lift {' '.join(f'#{n}' for n in lifts)} open"
+    return f"{words}: "
 
 
 def _pick_key(e: dict[str, Any]) -> tuple[int, int, int]:
@@ -2055,6 +2089,7 @@ def cmd_repo(args: argparse.Namespace) -> int:
                     said = f" · lift since {e.get('lift_since') or '?'}: lifts {e.get('entry')} {e.get('gate')}"
                 prio = str(e.get("priority") or "High")
                 print(f"  {'pickable':<12} {e['id']}  {prio:<6}  {'grinders':<11}  {e.get('title') or ''}{said}")
+            lifts = _lifts(r)
             for kind in ("pickable", "design", "live-check"):
                 ids = [e for e in (r.get("ledger") or {}).get("entries") or [] if _repo_list(e) == kind]
                 # the pick order is the rank (design §4.4 *The Queue*, §4.8 *Choosing in a free-pick lane*,
@@ -2079,7 +2114,8 @@ def cmd_repo(args: argparse.Namespace) -> int:
                     at = f" · up next {e['place']}" if e.get("place") else ""
                     if at and e.get("lane_order_may_differ"):
                         at += " (lane order may differ)"
-                    print(f"  {kind:<12} {e['id']}  {prio:<6}  {owner:<11}  {_live_mark(e)}{e['title']}{at}")
+                    mark = _live_mark(e, lifts.get(e["id"]))
+                    print(f"  {kind:<12} {e['id']}  {prio:<6}  {owner:<11}  {mark}{e['title']}{at}")
             for h in r.get("holds", []):
                 pr = f" → #{h['pr']}" if h.get("pr") else ""
                 print(f"  holds        {h['ref']}{pr}  {h['id']}")

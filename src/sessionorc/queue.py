@@ -1586,9 +1586,7 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
         return "stalled"
 
     def waits(e: Mapping[str, Any]) -> bool:
-        if e.get("waiting") or e.get("settling"):
-            return True
-        if e.get("kind") == "live-check" and e.get("live") != "yes":
+        if e.get("waiting") or e.get("settling"):  # a live check's `event (live)` gate among them (TD-1452)
             return True
         # blocked only by open ids (a gate is the `waiting` mark's, TD-1395)
         ids = [b for b in e.get("blocked_by") or [] if not ledger_mod.is_gate(b)]
@@ -1618,11 +1616,12 @@ def _wait(
 ) -> dict[str, str] | None:
     """A card's `waits` and what it waits for (§4.4 *Waiting*, TD-918): None when it does not wait, else
     `{column, phrase, id}` read from a leaf. `waits` holds when every open member that is not the person's
-    own waits — an `until` or `event` gate in force, a live check whose build is not live, settling, blocked by open
-    ids or open parts once the person's own are set aside, blocked past the org's reach, or no lane takes it — and at
-    least one is not the person's own. The leaf is a member that waits for a reason of its own, the first
-    that applies: the top entry with a gate, the earliest `until` date, an event, settling, a
-    live check not live, past reach — ties by key; a cycle of open ids with none is read as past reach."""
+    own waits — an `until` or `event` gate in force (a live check's `event (live)` among them: its `live` reading
+    holds nothing, TD-1452), settling, blocked by open ids or open parts once the person's own are set aside, blocked
+    past the org's reach, or no lane takes it — and at least one is not the person's own. The leaf is a member that
+    waits for a reason of its own, the first that applies: the top entry with a gate, the earliest `until` date, an
+    event (a live check whose reading says `no` adds *(not live #n)*), settling, past reach — ties by key; a cycle
+    of open ids with none is read as past reach."""
     own = {q for q in members if _own(open_[q])}
     rest = [q for q in members if q not in own]
 
@@ -1632,12 +1631,9 @@ def _wait(
     def far(e: Mapping[str, Any]) -> bool:
         return bool(e.get("unreachable")) or e.get("for_page") in NO_LANE
 
-    def not_live(e: Mapping[str, Any]) -> bool:
-        return e.get("kind") == "live-check" and e.get("live") != "yes"
-
     def of_its_own(q: str) -> bool:
         e = open_[q]
-        return bool(e.get("waiting") or e.get("settling")) or not_live(e) or far(e)
+        return bool(e.get("waiting") or e.get("settling")) or far(e)
 
     if not rest or not all(of_its_own(q) or (blockers[q] | parts[q]) - own for q in rest):
         return None
@@ -1656,7 +1652,12 @@ def _wait(
             words = f"{day:%b} {day.day}"
             return {"column": words, "phrase": f"waits until {words}", "id": q}
         why = str(w.get("why") or "")  # the Event line's words (TD-1395)
-        return {"column": "event", "phrase": f"waits on {why}" if why else "waits on an event", "id": q}
+        phrase = f"waits on {why}" if why else "waits on an event"
+        e = open_[q]
+        built = " ".join(f"#{n}" for n in e.get("built") or ())
+        if e.get("kind") == "live-check" and e.get("live") == "no" and built:  # the reading, as words (TD-1452)
+            phrase = f"{phrase.rstrip('.')} (not live {built})"
+        return {"column": "event", "phrase": phrase, "id": q}
 
     leaves = sorted((q for q in rest if of_its_own(q)), key=by_key)
     if top in leaves and open_[top].get("waiting"):
@@ -1670,10 +1671,6 @@ def _wait(
     for q in leaves:
         if open_[q].get("settling"):
             return {"column": "settling", "phrase": "settling", "id": q}
-    for q in leaves:
-        if not_live(open_[q]):
-            built = " ".join(f"#{n}" for n in open_[q].get("built") or ())
-            return {"column": "not live", "phrase": f"not live {built}".strip(), "id": q}
     for q in leaves:
         e = open_[q]
         said = e.get("unreachable") if isinstance(e.get("unreachable"), str) else "no lane takes it"

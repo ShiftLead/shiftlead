@@ -40,11 +40,15 @@ LEDGER = """# Technical debt
 **Owner:** grinder
 **Kind:** live-check #5
 
-## TD-014: a check whose build is not
+## TD-014: a check whose build is not, behind its gate
 
 **Priority:** Medium
 **Owner:** grinder
 **Kind:** live-check #7
+**Blocked by:** event (live)
+
+**Event (live):** The build is live.
+check: pr-merged r#7
 
 ## TD-015: a check on the anchor's decision
 
@@ -184,8 +188,8 @@ def test_the_repo_page_board_places_each_kind_and_flags_the_other(tmp_path, monk
 
 
 def test_ao_repo_reads_the_seven_counts_and_lists_by_the_mapping(tmp_path, monkeypatch, capsys):
-    """§4.7: pickable rows are *pickable* plus a live check nothing blocks whose build is live; design
-    rows *design*; the live-check line a live check nothing blocks whose build is not live; a live
+    """§4.7: pickable rows are *pickable* plus a live check nothing blocks; design rows *design*; the
+    live-check line a live check whose only blockers are its `event (live…)` gates (TD-1452); a live
     check blocked by a decision alone is counted and listed nowhere; the *other* flag under the line."""
     from shiftlead import cli
 
@@ -213,7 +217,7 @@ def test_ao_repo_reads_the_seven_counts_and_lists_by_the_mapping(tmp_path, monke
 
 def test_a_live_check_whose_build_is_live_is_in_a_free_pick_lane():
     """§4.4 *In a team's lanes*: the lanes count *pickable*, *design* and *live check*; a live check is
-    taken by a `free-pick` lane once its build is live, and never one whose build is not."""
+    taken by a `free-pick` lane once its `event (live)` gate is lifted, and never one behind it (TD-1452)."""
     records = [{"id": "g1", "name": "g1", "lane": ["free-pick", "owner:grinder"], "state": "idle"}]
     got = ledger.in_lanes(_entries(), records)
     assert got["pickable"] == ["TD-010"] and got["live_check"] == ["TD-013"] and got["design"] == []
