@@ -677,6 +677,11 @@ def _stopped(mark: Any) -> bool:
     return isinstance(mark, Mapping) and isinstance(got := mark.get("stopped"), Mapping) and bool(got)
 
 
+def _seats_held(mark: Any) -> bool:
+    """Whether a `work_waiting` mark holds questions waiting on a held seat (§6 rule 8 `seats_held`, TD-1564)."""
+    return isinstance(mark, Mapping) and isinstance(got := mark.get("seats_held"), Mapping) and bool(got)
+
+
 def team_groups(
     views: list[dict[str, Any]],
     rows: Collection[dict[str, Any]] = (),
@@ -847,7 +852,10 @@ def team_groups(
                 "manager_why": row.get("manager_why") or "",
                 # §4.5a team card **work waiting** note (§6 rule 8, TD-227): display only, beside *wound
                 # down* or a stopped team's *stopped* (TD-781)
-                "work_note": work_note(mark) if not live and (row.get("wound_down") or _stopped(mark)) else None,
+                # …and a held seat's questions (TD-1564): a mark carrying `seats_held` is drawn, a held-only one too
+                "work_note": work_note(mark, records=views)
+                if not live and (row.get("wound_down") or _stopped(mark) or _seats_held(mark))
+                else None,
                 # …and a defined team with no crew record, what its lanes hold (*A team with no record*, TD-781):
                 # `teamrun.lanes`' distinct ids, the tooltip Start's line; nothing when empty or unread
                 "lanes_hold": (row.get("lanes_hold") or 0) if not live and not row.get("records") else 0,

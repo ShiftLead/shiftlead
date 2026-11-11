@@ -510,7 +510,8 @@ HELP: tuple[Help, ...] = (
         (
             "Marks the entries this row names as seen by the team's members, so they do not ask again. "
             "Press it when those entries are not a reason to start the team. It starts nothing and removes "
-            "no entry from the ledger, and an entry filed later raises a new row."
+            "no entry from the ledger, and an entry filed later raises a new row. Questions waiting on a "
+            "held seat stay on the row until the Start."
         ),
     ),
     Help(

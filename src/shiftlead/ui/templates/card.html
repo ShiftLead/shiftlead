@@ -25,6 +25,8 @@
     {# design §4.5a card **routed around** line (§4.9b, TD-1443): on the compact card too, a seat on call
        being the common unable one #}
     {% if s.routed_to %}<div class="meta routed" title="cannot answer now: {{ s.routed_why }} (design §4.9b)">{{ s.routed_to }}</div>{% endif %}
+    {# design §4.5a card **held** line (§6 rule 3, TD-1564): display only, while its team's stop holds the seat #}
+    {% if s.stop_held_line %}<div class="meta routed stop-held" title="its team is stopped: questions to it wait in its mailbox until the team's Start (design §6 rule 3)">{{ s.stop_held_line }}</div>{% endif %}
   </div>
   {% else %}
   <div class="sc-body">
@@ -100,6 +102,8 @@
     {% if s.others %}{% from "held_line.html" import prompt_line %}{% for e in s.others %}{{ prompt_line(s.id, e) }}{% endfor %}{% endif %}
     {# design §4.5a card **routed around** line (§4.9b, TD-1443): display only, while the seat cannot answer #}
     {% if s.routed_to %}<div class="meta routed" title="cannot answer now: {{ s.routed_why }} (design §4.9b)">{{ s.routed_to }}</div>{% endif %}
+    {# design §4.5a card **held** line (§6 rule 3, TD-1564): display only, while its team's stop holds the seat #}
+    {% if s.stop_held_line %}<div class="meta routed stop-held" title="its team is stopped: questions to it wait in its mailbox until the team's Start (design §6 rule 3)">{{ s.stop_held_line }}</div>{% endif %}
     <div class="caption meta {{ s.slot.ccls }}"{% if s.slot.ccls == 'countdown' %} data-deadline="{{ s.deadline }}"{% endif %}>{{ s.slot.caption }}</div>
   </div>
   {% endif %}
