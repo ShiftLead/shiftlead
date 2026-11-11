@@ -474,23 +474,30 @@ def migrate_reserves(
     fit is removed. What the person's note says, one sentence a move — each profile's value, each removed,
     and each profile whose line may rise, a flat reserve kept over its per-day one (whose line
     `100 − d × days_left` is below the flat `100 − r` once `d × days_left > r`: every such profile is named,
-    since the core knows no window's length). None where no key lacks a `:`: nothing to do."""
+    since the core knows no window's length). A key `accounts` does not hold — written since the caller
+    resolved — is left for the next call. None where no key it holds lacks a `:`: nothing to do."""
     gate = doc.get("usage_gate")
     if not isinstance(gate, dict):
         return None
-    legacy = [k for k in gate if not account_key(k)]
+    legacy = [k for k in gate if not account_key(k) and ("" if k is None else str(k)) in accounts]
     if not legacy:
         return None
     said: list[str] = []
     profiles: dict[str, dict[str, Any]] = {}
     by_acct: dict[str, list[str]] = {}
     for k in legacy:
-        value, name = gate.pop(k), "" if k is None else str(k)
-        acct = accounts.get(name)
+        name = "" if k is None else str(k)
+        if name not in accounts:
+            continue  # written since the caller resolved: the next tick's
+        value = gate.pop(k)
+        acct = accounts[name]
+        if not isinstance(value, dict) or not value:
+            said.append(f"{_who(name)} had no reserve: its key is removed")
+            continue
         if acct is None:
             said.append(f"{_who(name)} had {_word(value)}: no adapter here resolves it, so it is removed")
             continue
-        profiles[name] = value if isinstance(value, dict) else {}
+        profiles[name] = value
         by_acct.setdefault(acct, []).append(name)
     for acct, names in sorted(by_acct.items()):
         names.sort()

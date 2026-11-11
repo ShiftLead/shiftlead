@@ -257,3 +257,14 @@ def test_the_unclean_day_is_counted_from_the_first_failed_tick():
     assert abs(first - time.monotonic()) < 5
     SettingsMixin._reserves_not_clean(a)
     assert a._reserves_unclean[0] == first and a.notes == []
+
+
+@pytest.mark.unit
+def test_a_key_written_since_the_resolution_waits_and_an_empty_one_is_named():
+    got, said = _move(
+        {"grind": {"week": 5}, "new": {"week": 9}, "bare": {}},
+        {"grind": "claude-code:paul", "bare": "claude-code:paul"},
+    )
+    assert got == {"claude-code:paul": {"week": 5}, "new": {"week": 9}}, "a key not resolved is the next tick's"
+    assert said == ["bare had no reserve: its key is removed", "claude-code:paul takes week 5 (from grind)"]
+    assert _move({"new": {"week": 9}}, {})[1] is None
