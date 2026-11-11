@@ -57,6 +57,21 @@ def extras_in_place(own: Session, records: Iterable[Session]) -> list[Session]:
     return sorted(out, key=lambda r: place(r, name))
 
 
+def routes_to_extras(r: Session, why: str | None) -> bool:
+    """Whether a seat's own record, unable for `why` (`seat_unable`), passes its asks to its extras first (§4.9b *A seat
+    that cannot answer is routed around*, TD-1547): unable as `stalled?`, `exited` or closed; never `limited` or
+    paused by the usage gate, whose profile the extras share. Nor where the seat is kept from running by a choice
+    — `suspended` (only a person lifts it), `sat out` (its team dropped it) or `not supervised` (rule 3 fills no
+    such seat): an extra filled from its launch record would run what was stopped. A fill or restart ceiling is the
+    own record's: the extras' fills count in a group of their own, and rule 1 bounds their restarts."""
+    if why is None or r.state not in ("stalled?", "exited", "closed") or r.gated:
+        return False
+    return why not in KEPT_FROM_RUNNING
+
+
+KEPT_FROM_RUNNING = ("profile gated", "suspended", "sat out", "not supervised")
+
+
 def stopping(r: Session, now: datetime) -> bool:
     """A wrap-up under way, its run's end passed, paused by the usage gate, or suspended: live and neither busy nor
     free (§4.9 *An own record that is live but neither busy nor free*)."""
@@ -108,6 +123,7 @@ def choose(
     held: list[Session] | None = None,
     guard: Callable[[Session], str | None] = lambda r: None,
     skip: str = "",
+    unable: bool = False,
 ) -> Choice:
     """The record of the seat `own` (its extras `extras`, in place order) that takes mail of `kind`, in the order
     §4.9 *Mail to a scaled seat* gives:
@@ -126,14 +142,21 @@ def choose(
     7. the own record live and neither busy nor free (`limited`, `unreachable`, paused, wrapping up, `stalled?`):
        the own record, no extra filled.
 
-    `skip` is the id of the ask being chosen again (the tick's mover): it is never its own reason to stay."""
+    `skip` is the id of the ask being chosen again (the tick's mover): it is never its own reason to stay.
+
+    `unable`: the own record cannot answer as `stalled?`, `exited` or closed (`routes_to_extras`, §4.9b *A seat that
+    cannot answer is routed around*): an `ask` passes it over — no thread or `pr` ask it holds keeps the mail there,
+    and with no live record free the lowest-placed held extra is filled as in 6, busy or not. Where none can be,
+    the own record is returned with `waits`, and the send's road around the seat takes over."""
     filling, evicting = set(filling), set(evicting)
     seat = [own, *extras]
 
-    def live(r: Session) -> bool:
-        return r.id not in evicting and (r.state not in DEAD or r.id in filling)
-
     ask = kind == "ask"
+    passed = own.id if ask and unable else ""  # an unable own record holds no ask of the seat's
+
+    def live(r: Session) -> bool:
+        return r.id not in evicting and r.id != passed and (r.state not in DEAD or r.id in filling)
+
     if kind == "note" or (kind == "reply" and not closes_seat_question):
         return Choice(own.id)
     if root:
@@ -145,13 +168,13 @@ def choose(
             if live(r) and any(e.kind == "ask" and e.pr == pr and e.id != skip for e in r.inbox):
                 return Choice(r.id, words={"lands": True} if r is not own else None)
     for r in seat:
-        if r.id in evicting:
+        if r.id in evicting or r.id == passed:
             continue
         if r.id in filling:  # a held extra this home's send is filling now: it takes the burst, no second fill
             return Choice(r.id, words={"fill": r.name} if ask else None)
         if free(r, now, away=away(r)):
             return Choice(r.id, words={"lands": True} if ask and r is not own else None)
-    if own.state in DEAD or not ask or not busy(own, now, away=away(own)):
+    if not passed and (own.state in DEAD or not ask or not busy(own, now, away=away(own))):
         return Choice(own.id)
     pool = [r for r in held or [] if r.id not in filling and r.id not in evicting]
     if not pool:
