@@ -215,6 +215,7 @@ async def test_a_team_or_a_repo_addresses_its_question_seat(agent, tmp_path, mon
         seat = await mk("seat", team="beta", project="B", seat={"trigger": "asks", "tags": True})
         asker = await mk("asker", team="alpha", project="A")
         member = await mk("member", team="delta", project="D")
+        await park_ticks(agent)  # a tick would read the seat's live pane over the hand-set `exited` (TD-1677)
         agent.sessions[old].state, agent.sessions[old].superseded_by = "closed", seat
         agent.sessions[seat].state = "exited"  # on call: the ask fills it
         agent.sessions[seat].supervised = True  # rule 3 fills it, so `seat_able` reads it able (TD-1443)
@@ -472,12 +473,10 @@ async def test_a_seats_extra_is_never_a_teams_question_seat(agent, tmp_path):
         seat = await mk("tl", team="beta", project="B", seat={"trigger": "asks"})
         extra = await mk("tl-2", team="beta", project="B", seat={"trigger": "asks"})
         asker = await mk("asker", team="alpha", project="A")
+        await park_ticks(agent)  # a tick would read the seat's live pane over the hand-set `exited` (TD-1677)
         agent.sessions[seat].state, agent.sessions[seat].supervised = "exited", True  # on call: the ask fills it
         agent.sessions[extra].state, agent.sessions[extra].scale = "idle", {"line": "tl"}
-        try:
-            async with LocalClient(caller=asker) as a:
-                got = await a.call("msg", team="beta", text="may beta take an entry?")
-                # resolved to the seat, whose free live extra then takes it (§4.9 *Mail to a scaled seat*, TD-1547)
-                assert got["seated"] == {seat: extra} and got["delivered"] == [extra]
-        finally:
-            await park_ticks(agent)
+        async with LocalClient(caller=asker) as a:
+            got = await a.call("msg", team="beta", text="may beta take an entry?")
+            # resolved to the seat, whose free live extra then takes it (§4.9 *Mail to a scaled seat*, TD-1547)
+            assert got["seated"] == {seat: extra} and got["delivered"] == [extra]

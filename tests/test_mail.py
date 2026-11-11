@@ -9,7 +9,7 @@ import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from conftest import wait_state
+from conftest import park_ticks, wait_state
 
 from sessionorc import mail, paths
 from sessionorc.client import AgentError, LocalClient
@@ -2758,6 +2758,9 @@ async def test_a_start_under_a_closed_members_name_keeps_its_mail_only_when_aske
         mk = _mk(person, tmp_path)
         other = await mk("other", unattended=True, team="ao-grind", capabilities=["control"])
         w = await mk("w", unattended=True, team="ao-grind")
+        # the test sweeps by hand once `w` is closed; a tick's sweep before the close lapses the steer to `w` live
+        # (*go with your default*), under a loaded suite where the close outlasts the bound (TD-1677)
+        await park_ticks(agent)
         async with LocalClient(caller=w) as s:
             steer = (await s.call("msg", to="person", text="or?", kind="steer", default="x", about="TD-5", bound=0.2))[
                 "entry"

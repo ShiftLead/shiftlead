@@ -11,7 +11,15 @@ import sys
 
 import pytest
 import yaml
-from conftest import CHILD, FAST_TICK, kill_private_server, private_socket_name, scratch_dir, wait_for
+from conftest import (
+    CHILD,
+    FAST_TICK,
+    kill_private_server,
+    park_ticks,
+    private_socket_name,
+    scratch_dir,
+    wait_for,
+)
 
 from sessionorc import link, paths, seats
 from sessionorc.agent import HostAgent
@@ -864,6 +872,9 @@ async def test_a_container_nodes_session_holds_the_checkout_at_the_home_and_the_
         f"local:\n  name: {agent.host}\nnodes:\n  cm:\n    container: {{devcontainer: {checkout}}}\n  laptop: {{}}\n"
     )
     assert "cm" in containers.container_nodes()
+    # every state below is set by hand — a link, a record's state, an adapter — and a tick would read the
+    # links and the panes over them (TD-1612, TD-1677)
+    await park_ticks(agent)
     agent.links["cm"] = {"up": True, "since": "t", "why": "linked"}
     agent._take_records("cm", [record("ao-repo-w", host="cm", dir=str(checkout), kind="interactive")], whole=True)
     agent._take_records(
@@ -2170,8 +2181,6 @@ async def test_a_nodes_metered_turns_are_ledgered_at_the_home_once_and_its_readi
     import json
     from datetime import UTC, datetime
 
-    from conftest import park_ticks
-
     from sessionorc import settings
 
     at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -2239,8 +2248,6 @@ async def test_a_nodes_seat_turns_reach_the_homes_seat_ledger_once_under_its_rec
     worktree root the node read."""
     import json
     from datetime import UTC, datetime
-
-    from conftest import park_ticks
 
     at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     cwd = str(tmp_path)

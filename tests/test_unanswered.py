@@ -8,6 +8,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from conftest import park_ticks
 
 from sessionorc import client as clientmod
 from sessionorc import unanswered
@@ -285,6 +286,7 @@ async def test_a_refilled_seat_is_read_at_its_newest_record_and_counts_none_of_t
     async with LocalClient() as person:
         mk = _mk(person, tmp_path)
         w, tl, tl2 = [await mk(n, team="ao-grind", unattended=True) for n in ("w", "tl", "tl2")]
+        await park_ticks(agent)  # a tick's mail sweep would close the ask to the hand-closed `tl` (TD-1677)
         async with LocalClient(caller=w) as wc:
             q = (await wc.call("msg", to=tl, text="squash?", kind="ask"))["entry"]
             old = agent.sessions[tl]
