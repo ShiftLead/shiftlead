@@ -490,7 +490,7 @@ class InboxMixin:
         if teams is None:
             # the person's shell on a node, whose registry has no such repo and which has no `org.yml`
             # (§4.7 *Entries*, TD-1404): the seat is resolved from the records, as a session's call is
-            found_seat = await self._question_seat(team=pick, repo=name)
+            found_seat = await self._question_seat(team=pick, repo=name, entry=True)
             team = str(found_seat.team or "").strip()
             pick = team if pick else ""
             seat = self._address(found_seat)
@@ -580,7 +580,7 @@ class InboxMixin:
             raise RpcError("the entry has no words: say what it is — a title is enough")
         own = me.repo and os.path.normpath(me.repo)
         try:
-            seat = await self._question_seat(team=team, repo=repo)
+            seat = await self._question_seat(team=team, repo=repo, entry=True)
         except RpcError:
             # a repo of its own name that resolves to no one seat is its own first: the branch is the answer
             if own and Path(own).name == str(repo).strip():

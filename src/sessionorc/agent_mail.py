@@ -386,7 +386,9 @@ class MailMixin:
         mailbox depth, one open question per sender per seat) it stays, its copies saying *waits on <name>: <the
         refusal>*, and is tried again next tick (a refusing pool member is passed over, never written as a wait).
         A `steer` is left to lapse; an `entry` envelope and a person's question with no able member after it and
-        no able techlead to go to stay on their seat."""
+        no able techlead to go to stay on their seat — except an `entry` envelope on a seat that is not a techlead
+        seat (`tags`), which files no entry: it is landed on its team's techlead seat, able or not, where it then
+        waits (§4.9b *An entry is a techlead seat's*, TD-1565)."""
         if self.mode != "home":
             return
         records = self._graph()
@@ -397,8 +399,18 @@ class MailMixin:
             if not mail.asks_seat(seat) or seat.superseded_by:
                 continue
             why = seat_unable(seat, now, self.unfillable)
+            files = (seat.seat or {}).get("tags") is True  # a techlead seat: the one that files an entry (TD-1565)
             for e in list(seat.inbox):
                 if not e.open or e.kind != "ask" or e.to != [key]:
+                    continue
+                # an entry on a seat that cannot file it moves to its techlead seat, or waits on a count; with no
+                # techlead seat in its team, the rules below
+                if (
+                    e.entry is not None
+                    and not files
+                    and not e.outcome
+                    and self._move_entry(e, key, seat, records, now, stamp, touched)
+                ):
                     continue
                 blank = e.handed_entry and isinstance(e.entry, dict) and not e.entry.get("picked") and not e.outcome
                 if (e.entry is not None or e.handed) and not blank:
@@ -468,6 +480,75 @@ class MailMixin:
             self.person_store.save(self.person_inbox)
         if touched or person_changed:
             await self._push_changes()
+
+    def _move_entry(
+        self, e: MailEntry, key: str, seat: Session, records: dict[str, Session], now: datetime, stamp: str,
+        touched: dict[str, Session],
+    ) -> bool:  # fmt: skip
+        """An `entry` envelope — a session's ledger request or a handed entry — waiting on an `asks` seat that is
+        not a techlead seat (§4.9b *An entry is a techlead seat's*, TD-1565): it cannot be filed there, so it is
+        landed on its team's techlead seat (`tags`) — an able one first, then the pool's order, then live, on call,
+        closed — **able or not**, an unable techlead seat being where an entry waits; carrying `routed`, its
+        `entry`, `handed` mark and bound kept, the original closed `rerouted` on every copy. The landing refused by
+        a count, it stays, its copies saying *waits on <name>: …*. Returns False only where its team has no
+        techlead seat to land on, for the rules after it; True where it moved or waits on a count."""
+        leads = [
+            r
+            for r in records.values()
+            if r is not seat
+            and str(seat.team or "").strip()
+            and r.team == seat.team
+            and mail.asks_seat(r)
+            and (r.seat or {}).get("tags") is True
+            and not r.superseded_by
+            and _fillable(r)
+        ]
+        if not leads:
+            return False
+        rank = {"exited": 1, "closed": 2}  # live first, then on call, then closed
+        lead = min(
+            leads,
+            key=lambda r: (
+                not seat_able(r, now, self.unfillable),
+                pool_rank(r.seat),
+                rank.get(r.state, 0),
+                r.name,
+            ),
+        )
+        target = self._address(lead)
+        sender = e.from_
+        me = records.get(sender) if sender != PERSON else None
+        if sender != PERSON and me is None:
+            return False  # an asker with no record: the asker-gone path closes it
+        moved = MailEntry(
+            id="m-" + secrets.token_hex(6),
+            from_=sender,
+            to=[target],
+            at=stamp,
+            kind="ask",
+            text=e.text,
+            about=e.about,
+            reply_to=e.reply_to,
+            root=e.root,
+        )
+        moved.subject, moved.team, moved.draft, moved.handed = e.subject, e.team, e.draft, e.handed
+        moved.repo, moved.bound, moved.answers = e.repo, e.bound, list(e.answers)
+        moved.entry = dict(e.entry or {})
+        moved.routed = {"seat": seat.id, "name": seat.name, "why": "it files no entry", "at": stamp}
+        refusal = self._landing_refusal(records, sender, target, moved)
+        if refusal is not None:
+            line = f"waits on {lead.name or target}: {refusal}"
+            if e.waits != line:
+                self._mark(e.id, waits=line)
+            return True
+        self._mark(e.id, waits=None)
+        self._close_entry(e.id, "rerouted", stamp)
+        records[target].inbox.append(self._copy(moved))
+        touched[target] = records[target]
+        if me is not None:
+            me.outbox.append(self._copy(moved))
+            touched[sender] = me
+        return True
 
     def _move_handed(
         self, e: MailEntry, key: str, seat: Session, why: str, stamp: str, touched: dict[str, Session]
@@ -598,7 +679,7 @@ class MailMixin:
         lead = self._route_lead(s, records, now)
         return {"seat_unable": why, "seat_routed_to": "the techlead" if lead is not None else "you"}
 
-    async def _question_seat(self, team: str | None = None, repo: str | None = None) -> Session:
+    async def _question_seat(self, team: str | None = None, repo: str | None = None, entry: bool = False) -> Session:
         """The question seat `--team` or `--repo` names (§4.10 *A team or a repo as the address*,
         TD-1000), read from the org's records alone: a record of that team, or of a repo of that name
         (`Path(repo).name`), holding a seat whose trigger is `asks` and not superseded — live, on call,
@@ -608,7 +689,8 @@ class MailMixin:
         on call over a closed one; a repo served by two teams is refused naming them. Registries
         are read only to word a refusal. Returns the record. Given both — a ledger request's `--team`
         (§4.7 *Entries*) — the team chooses among the repo's: one with no seat record on it is refused
-        naming those that have one."""
+        naming those that have one. `entry` — a ledger request, the session's or the person's — resolves only to
+        a techlead seat where the team has one, able or not (§4.9b *An entry is a techlead seat's*, TD-1565)."""
         team, repo = str(team or "").strip(), str(repo or "").strip()
         want = repo or team
         if not want:
@@ -638,7 +720,7 @@ class MailMixin:
                     f"no team {want} has a seat record: the teams with one are {', '.join(teams) or 'none'} "
                     "(a team never started has none; design §4.10)"
                 )
-            return self._one_seat(want, [r for _a, r in mine], now, self.unfillable, able)
+            return self._one_seat(want, [r for _a, r in mine], now, self.unfillable, able, entry)
         mine = [(a, r) for a, r in seats if r.repo and Path(r.repo).name == want]
         if not mine:
             await self._no_seat_for_repo(want, records)
@@ -649,13 +731,13 @@ class MailMixin:
             if team not in by_team:
                 names = ", ".join(sorted(by_team))
                 raise RpcError(f"{team} has no seat record on {want}: the teams with one are {names} (design §4.10)")
-            return self._one_seat(team, by_team[team], now, self.unfillable, able)
+            return self._one_seat(team, by_team[team], now, self.unfillable, able, entry)
         if len(by_team) > 1:
             raise RpcError(
                 f"{want} is served by {', '.join(sorted(by_team))}: name one with --team <team> (design §4.10)"
             )
         ((name, recs),) = by_team.items()
-        return self._one_seat(name, recs, now, self.unfillable, able)
+        return self._one_seat(name, recs, now, self.unfillable, able, entry)
 
     @staticmethod
     def _one_seat(
@@ -664,11 +746,15 @@ class MailMixin:
         now: datetime | None = None,
         unfillable: dict[str, str] | None = None,
         able: Callable[[Session], bool] | None = None,
+        entry: bool = False,
     ) -> Session:
         """One team's question seat among its records (§4.10, §4.9b *A seat that cannot answer is routed
         around*): an able record (`seat_able`, or `able` where given — a pool's first member read able when any
         member is, TD-1476) first, then the techlead seat (`tags: true`) of two, then a live record over one on
-        call, and one on call over a closed one; two left is refused naming them."""
+        call, and one on call over a closed one; two left is refused naming them. An `entry` request considers
+        the techlead seats alone where there is one, able or not: no other seat files an entry (§4.9b, TD-1565)."""
+        if entry and (tagged := [r for r in recs if (r.seat or {}).get("tags") is True]):
+            recs = tagged
         if len(recs) > 1:
             when = now or datetime.now(UTC)
             fit = [r for r in recs if (able(r) if able is not None else seat_able(r, when, unfillable))]

@@ -168,3 +168,51 @@ async def test_a_readers_rerouted_ask_leaves_the_pr_asked_while_its_copy_is_out(
         async with LocalClient(caller=w) as c:
             reads = (await c.call("pr_reads", id=w, pr=12))["asks"]
         assert len(reads) == 1 and reads[0]["open"] is False and reads[0]["replied_at"]
+
+
+async def test_an_entry_request_found_on_a_fact_check_seat_moves_to_the_techlead_seat_able_or_not(agent, tmp_path):
+    """TD-1565 (§4.9b *An entry is a techlead seat's*): an `entry` envelope waiting on an `asks` seat that is not
+    the techlead seat files nowhere: the tick lands it on the team's techlead seat, even an unable one, carrying
+    its `entry` and `routed`, the original closed `rerouted`; once there it stays."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        tl, rv, w = await _team(agent, tmp_path, person)
+        async with LocalClient(caller=w) as c:
+            got = await c.call("msg", to=rv, text="file: the feed parser drops rows", kind="ask")
+        mid = got["entry"]["id"]
+        entry = {"repo": "beta", "type": "debt", "team": "beta", "priority": "medium", "picked": False}
+        agent._mark(mid, entry=entry, bound=None)  # as `_entry_request` marks a session's ledger request
+        _limited(agent, tl)
+        await _move(agent)
+        assert all(e.closed_reason == "rerouted" for e in _copies(agent, mid))
+        m = next(e for e in agent.sessions[tl].inbox if e.root == got["entry"]["root"] and e.id != mid)
+        assert m.open and m.entry == entry and m.from_ == w and m.bound is None
+        assert m.routed["seat"] == rv and m.routed["why"] == "it files no entry"
+        assert any(e.id == m.id for e in agent.sessions[w].outbox)
+        await _move(agent)
+        assert next(e for e in agent.sessions[tl].inbox if e.id == m.id).open, "it waits on the techlead seat"
+        assert not any(e.root == got["entry"]["root"] for e in agent.person_inbox)
+
+
+async def test_an_entry_moved_off_a_fact_check_seat_takes_the_able_techlead_seat_first(agent, tmp_path):
+    """TD-1565, the techlead's read of #3263: with two techlead seats in the team, the first unable and the second
+    able, the entry lands on the able one, whatever the name order."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        tl, rv, w = await _team(agent, tmp_path, person)
+        d = tmp_path / "tl2"
+        d.mkdir()
+        tl2 = (
+            await person.call(
+                "create", name="tl2", dir=str(d), adapter="agentshell", argv=["bash", "--norc"], unattended=True,
+                team="beta", seat={"trigger": "asks", "tags": True},
+            )
+        )["id"]  # fmt: skip
+        async with LocalClient(caller=w) as c:
+            got = await c.call("msg", to=rv, text="file: the feed parser drops rows", kind="ask")
+        mid = got["entry"]["id"]
+        agent._mark(mid, entry={"repo": "beta", "type": "debt", "team": "beta", "picked": False}, bound=None)
+        _limited(agent, tl)  # "tl" sorts before "tl2": the able order must win over the name
+        await _move(agent)
+        assert any(e.root == got["entry"]["root"] and e.id != mid for e in agent.sessions[tl2].inbox)
+        assert not any(e.root == got["entry"]["root"] and e.id != mid for e in agent.sessions[tl].inbox)
