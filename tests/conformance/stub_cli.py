@@ -4,6 +4,8 @@ fixtures. Run by the wrapper the case writes as the adapter's `binary`:
 
     stub_cli.py <adapter> <script> -- <the tool's own arguments>
 
+- `--version` alone prints a version line and exits, writing nothing, as a tool answers the read a seat's
+  launch makes (design §4.3 *An upgraded seat tool asks for the smoke*);
 - its argv after `--`, its `SHIFTLEAD_*` and `CADENCE_*` environment and its pid go to `launch.json` beside
   the script, where the case asserts the launch, never runs it;
 - the manifest's `life` payloads from `captured/hooks.jsonl` are handed on stdin to the hook command the
@@ -169,6 +171,9 @@ class Stub:
 def main() -> None:
     adapter, script, sep, *argv = sys.argv[1:]
     assert sep == "--", f"usage: stub_cli.py <adapter> <script> -- <argv>, not {sys.argv!r}"
+    if argv == ["--version"]:  # as a tool answers it, launching nothing: a seat's launch reads it (§4.3, TD-1726)
+        print(f"0.0.0 (stub {adapter})")
+        return
     Stub(adapter, Path(script), argv).run()
 
 
