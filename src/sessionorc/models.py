@@ -496,6 +496,10 @@ class MailEntry:
     # Written on every copy, as `read_at` and `closed_reason` are, so the asker's card and the
     # person's Inbox say the same thing.
     outcome: dict[str, Any] | None = None
+    # A handed entry's `blocked` outcome a question on its thread took up (design §4.10 *A `blocked` outcome is
+    # not the last word*, TD-1694): kept here while the entry owes again, and taken as the next outcome's `was`
+    # (this field then cleared). A replaced outcome on a question is kept as `outcome["was"]` instead.
+    was: dict[str, Any] | None = None
     # Design §4.8a *An alarm's answers* (TD-077 b): a piece of work the **person** handed to this
     # session, which owes an outcome back exactly as the session's own answered question does.
     # TD-079's debt exists only on a session's *own* question to the person — it is read from the

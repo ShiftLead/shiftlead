@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import re
 import secrets
 import time
 from collections.abc import Callable
@@ -182,6 +183,12 @@ def _roll(t: Tally, now: datetime) -> Tally:
     t.at = [x for x in t.at if _parse(x) >= cutoff]
     t.count = len(t.at)
     return t
+
+
+def _replaces(outcome: dict[str, Any], intent: str) -> bool:
+    """Does a send of `intent` (an outcome's state, or `thread`) take the place of a recorded outcome?
+    Only a `blocked` one is replaced, and not by a second `blocked` (§4.10 *Outcomes*, TD-1694)."""
+    return outcome.get("state") == "blocked" and intent in ("done", "dropped", "thread")
 
 
 class MailMixin:
@@ -708,6 +715,7 @@ class MailMixin:
                 root=e.root,
             )
             moved.subject, moved.team, moved.draft, moved.handed = e.subject, e.team, e.draft, True
+            moved.was = e.was  # a blocked outcome taken up rides the move (TD-1694)
             moved.repo = e.repo  # a landing, not a send: the repo moves with it (TD-1467)
             moved.entry = {**(e.entry or {}), "team": str(t.get("team") or "").strip(), "picked": False}
             moved.routed = {"seat": seat.id, "name": seat.name, "why": why, "at": stamp}
@@ -968,7 +976,7 @@ class MailMixin:
             )
         return e
 
-    def _owing_question(self, sender: str, mid: str) -> MailEntry:
+    def _owing_question(self, sender: str, mid: str, intent: str = "") -> MailEntry:
         """The entry `mid` settles, checked to owe an outcome from this caller (design §4.10
         *Outcomes*). Every refusal says which of the five it is, because the remedy differs:
         wait, nothing, ask again, nothing, and it is not yours.
@@ -976,7 +984,12 @@ class MailMixin:
         Two directions since TD-077 b. The caller's **own question to the person**, held in the
         person inbox — the original case — and work the person **handed** the caller, which lives
         in the caller's own inbox and is checked there first: it is the same debt and the same
-        command, and the only difference is which way the work travelled."""
+        command, and the only difference is which way the work travelled.
+
+        `intent` is what the caller sends on it: an outcome's state, or `thread` for a follow-up. A
+        recorded `blocked` outcome is not the last word (§4.10 *A `blocked` outcome is not the last
+        word*, TD-1694): a newer `done` or `dropped`, or a question on its thread, takes its place; a
+        second `blocked`, and any send on another recorded outcome, is refused as settled."""
         s = self._graph().get(self._addr(sender))
         if s is not None:
             for e in s.inbox:
@@ -986,7 +999,7 @@ class MailMixin:
                             f"{mid} was routed around while you could not answer: another seat holds it now, and "
                             "nothing is owed on it here (design §4.9b)"
                         )
-                    if e.outcome:
+                    if e.outcome and not _replaces(e.outcome, intent):
                         raise RpcError(
                             f"{mid} is settled — its outcome is recorded as {e.outcome.get('state')}. If more is "
                             "needed, ask again on the thread: --thread <id> (design §4.10 *Outcomes*)"
@@ -1003,7 +1016,7 @@ class MailMixin:
             raise RpcError(f"{mid} is a {e.kind}: only a question to the person is answered, and only one owes back")
         if e.open:
             raise RpcError(f"{mid} has not been answered yet: there is nothing to report on it (design §4.10)")
-        if e.outcome:
+        if e.outcome and not _replaces(e.outcome, intent):
             raise RpcError(
                 f"{mid} is settled — its outcome is recorded as {e.outcome.get('state')}. If more is needed, "
                 "ask again on the thread: --thread <id> (design §4.10 *Outcomes*)"
@@ -1013,6 +1026,72 @@ class MailMixin:
                 f"{mid} closed as {e.closed_reason}: nothing is owed on a question nobody answered (design §4.10)"
             )
         return e
+
+    def _chain_of(self, sender: str) -> set[str]:
+        """The records whose `superseded_by` chain reaches the caller, the caller among them — the
+        sender of a question asked before a resume is the caller still (§4.10, as `--withdraw` reads it)."""
+        records, key = self._graph(), self._addr(sender)
+        return {k for k in records if key in mail.chain(records, k, self._successor)} | {key, sender}
+
+    def _blocked_names(self, sender: str, settle: MailEntry, text: str, for_: str) -> list[str]:
+        """A `blocked` outcome is never a question's stand-in (§4.10 *Outcomes*, TD-1694): refused when
+        the caller holds an open question on the outcome's own thread, or when its text names one of the
+        caller's open questions to the person (or the rerouted original of one); else the warning lines,
+        one for each open question to the person it does not name. Nothing is written on a refusal."""
+        mine = self._chain_of(sender)
+        open_qs = [
+            e for e in self.person_inbox if e.kind in ("ask", "steer") and e.open and e.from_ in mine and not e.orphaned
+        ]
+        # a seat's question about a handed entry (`--thread`, the `onto` path) is to the person, on its root
+        on_root = [e for e in open_qs if e.root == settle.root]
+        if on_root:
+            q = on_root[0].id
+            raise RpcError(
+                f"{q} is your open question on this thread: wait for its answer; the entry's outcome stays owed "
+                "until then (design §4.10 *Outcomes*)"
+            )
+        by_id = {e.id: e for e in open_qs}
+        rerouted = {
+            e.id: e.root
+            for r in self._graph().values()
+            if r.id in mine or self._addr(r.id) in mine
+            for e in r.outbox
+            if e.closed_reason == "rerouted"
+        }
+        for named in re.findall(r"m-[0-9a-f]{12}", text):
+            hit = by_id.get(named)
+            if hit is None and named in rerouted:
+                hit = next((e for e in open_qs if e.root == rerouted[named]), None)
+            if hit is not None:
+                raise RpcError(
+                    f"{hit.id} is your open question to the person: a question that follows an answer goes on its "
+                    f"thread — withdraw it (ao msg --withdraw {hit.id}) and ask it again with --thread {for_}; a "
+                    "blocked outcome is for work that waits on something else only the person can move; if "
+                    f"{hit.id} is another matter, leave its id out (design §4.10 *Outcomes*)"
+                )
+        return [
+            f"you hold open question {e.id} to the person: if this outcome waits on it, withdraw it and ask it "
+            f"again with --thread {for_}, which takes this outcome's place"
+            for e in open_qs
+        ]
+
+    def _blocked_open(self, sender: str) -> list[str]:
+        """The caller's `blocked` outcomes nobody has answered (§4.10 *Outcomes*, TD-1694): its questions
+        to the person with no `replied`, and the handed entries it holds, whose outcome never carries one."""
+        mine = self._chain_of(sender)
+        out = [
+            e.id
+            for e in self.person_inbox
+            if e.from_ in mine and e.outcome and e.outcome.get("state") == "blocked" and not e.outcome.get("replied")
+        ]
+        out += [
+            e.id
+            for r in self._graph().values()
+            if r.id in mine or self._addr(r.id) in mine
+            for e in r.inbox
+            if e.handed and e.outcome and e.outcome.get("state") == "blocked" and e.id not in out
+        ]
+        return out
 
     def _remember_nonce(self, key: tuple[str, str], verdict: Any) -> None:
         self._nonces[key] = verdict
@@ -1264,6 +1343,7 @@ class MailMixin:
         # again on the same thread and settles the first as `asked_again`. Both name an entry the
         # **home** verifies — unlike `--about`, which is free text nobody checks.
         settle: MailEntry | None = None
+        warnings_ahead: list[str] = []  # said on the reply, never refused (§4.10 *Outcomes*, TD-1694)
         taken: MailEntry | None = None  # the caller's own open question to a session, taken to the person
         onto: MailEntry | None = None  # a handed entry whose thread a question joins, its debt left standing
         state = str(outcome or "").strip()
@@ -1286,7 +1366,9 @@ class MailMixin:
                 raise RpcError(
                     "an outcome is reported to the person who answered: ao msg person --outcome … --for <id>"
                 )
-            settle = self._owing_question(sender, str(for_))
+            settle = self._owing_question(sender, str(for_), state)
+            if state == "blocked":
+                warnings_ahead.extend(self._blocked_names(sender, settle, text, str(for_)))
         if thread:
             if kind not in ("ask", "steer"):
                 raise RpcError(
@@ -1297,7 +1379,7 @@ class MailMixin:
                 raise RpcError("--thread follows up a question put to the person: name `person` as the addressee")
             taken = self._question_to_take_up(me, str(thread))
             if taken is None:
-                owed = self._owing_question(sender, str(thread))
+                owed = self._owing_question(sender, str(thread), "thread")
                 # a question about an entry the person handed the caller goes on its thread and settles
                 # nothing: the entry is the person's, not a question of the caller's, and it still owes
                 # its outcome (§4.10 *An entry handed to a seat*, TD-218 slice 3)
@@ -1471,7 +1553,12 @@ class MailMixin:
         # §4.10 *A subject on every entry* (TD-561): a thread has one subject, so an answer, an outcome
         # and a follow-up carry their question's; mail the person reads is given one or warned, never
         # refused; mail between sessions takes a given one and derives nothing (a session reads the text)
-        warnings: list[str] = []
+        warnings: list[str] = list(warnings_ahead)
+        if PERSON in named and kind in ("ask", "steer") and not thread and sender != PERSON:
+            warnings.extend(
+                f"your blocked outcome on {b} is open: if this follows it, ask on its thread instead (--thread {b})"
+                for b in self._blocked_open(sender)
+            )
         question = replied if replied is not None else on_thread
         reads = PERSON in named or fyi
         given = str(subject).strip() if subject is not None else ""
@@ -1570,15 +1657,20 @@ class MailMixin:
             # Written on every copy, as a close is: the person's Inbox lists it under the question,
             # and the asker's own card stops saying it owes one. `by` is this entry — an ordinary
             # note of the person inbox, listed under its question and pruned as any FYI entry is.
-            self._mark(
-                settle.id,
-                outcome={
-                    "state": state or "asked_again",
-                    "text": _clean(text)[: mail.DEFAULT_CAP],
-                    "at": at,
-                    "by": mid,
-                },
-            )
+            # A `blocked` one it replaces is kept as `was`, as is one a handed entry carried while it
+            # owed again (§4.10 *A `blocked` outcome is not the last word*, TD-1694).
+            new = {"state": state or "asked_again", "text": _clean(text)[: mail.DEFAULT_CAP], "at": at, "by": mid}
+            was = settle.outcome if settle.outcome else settle.was
+            if was:
+                new["was"] = was
+            if settle.was:
+                self._mark(settle.id, outcome=new, was=None)
+            else:
+                self._mark(settle.id, outcome=new)
+        if onto is not None and onto.outcome:
+            # a question on a handed entry's thread takes its `blocked` outcome up: the entry owes again,
+            # the outcome kept as the entry's own `was` for its next outcome to take (TD-1694)
+            self._mark(onto.id, outcome=None, was=onto.outcome)
         if sender == PERSON and reply_to:
             # A person's message into a thread resets it (design §4.10): tally and `bound_hit`
             # cleared on every record holding it, so the sessions may reply to the ruling.
