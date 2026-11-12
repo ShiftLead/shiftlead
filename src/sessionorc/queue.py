@@ -1063,6 +1063,7 @@ def lay_held(queue: Mapping[str, Any], repos: Mapping[str, Mapping[str, Any]]) -
         if isinstance(top, Mapping) and members and all(q in open_ for q in members):
             out["status"] = _status([top, *(r for r in rows if isinstance(r, Mapping) and not r.get("archived"))],
                                     [open_[q] for q in members])  # fmt: skip
+            out["stalled_holder"] = stalled_holder([top, *rows])
         return out
 
     return {**queue, "cards": [card(c) for c in queue.get("cards") or ()]}
@@ -1278,7 +1279,10 @@ def reading(
     def row(q: str) -> dict[str, Any]:
         if q in open_:
             e = open_[q]
-            st, needs, mine = _state(e, held.get(q, []), prs.get(q), recs, set(waiting), now)
+            st, needs, hold = _state(e, held.get(q, []), prs.get(q), recs, set(waiting), now)
+            # the need rows' `with_you` mark is the person's own session on a row that waits on them (TD-1281); on
+            # any other row it holds, its record is the holder alone and the row carries no mark (TD-1567)
+            mine = hold if needs else None
             claim = held.get(q)
             # *with you in <name>* first; then a held entry's answered question (§4.4 *A row's state*, TD-1316)
             answered = (
@@ -1314,8 +1318,9 @@ def reading(
                 "state": st,
                 "needs": needs,
                 "pr": (prs.get(q) or {}).get("number"),
-                # the person's own session holding their entry is its holder whatever else claims it (TD-1281)
-                "holder": mine or (_holder(claim[0][0]) if claim else None),
+                # the person's own session holding their entry is its holder whatever else claims it (TD-1281,
+                # TD-1567), and a *stalled* row's the record it stands for, the first stuck one by id (TD-1567)
+                "holder": hold or (_holder(claim[0][0]) if claim and st != "stalled" else None),
                 "with_you": mine["name"] if mine else None,
                 "answered": answered,
                 "applying": applying,
@@ -1401,20 +1406,28 @@ def _state(
 ) -> tuple[str, str | None, dict[str, Any] | None]:
     """A row's one state word, the first that applies (§4.4 *A row's state*), what it needs of the person —
     `owner` (`Owner: paul`) or `decision` (`decision (paul)`) — when it waits on them, which draws no word, and
-    the person's own session where one holds such an entry: the first by id of its claims' records with
-    `unattended: false`, whose name the word *with you in <name>* carries (TD-1281). The row keeps its need."""
+    the row's holder where the word stands for one: the person's own session where one claims the entry, the
+    first by id of its claims' records with `unattended: false`, whose name *with you in <name>* carries (TD-1281;
+    on a row that needs nothing too, TD-1567), else a *stalled* row's first stuck record by id (TD-1567). The row
+    keeps its need; the caller sets the need rows' `with_you` mark from the holder only where the need is set."""
     # `Owner: paul` holds nothing (TD-1375): the gate is the need, and the Owner says it is the person's to do
     need = (
         ("owner" if str(e.get("owner") or "").lower() == PERSON else "decision")
         if ledger_mod.decided_by(dict(e), PERSON)
         else None
     )
+    own = sorted((rec for rec, _ in claims if not getattr(rec, "unattended", False)), key=lambda r: str(r.id))
     if need:
-        own = sorted((rec for rec, _ in claims if not getattr(rec, "unattended", False)), key=lambda r: str(r.id))
         if own:
             return f"with you in {own[0].name}", need, _holder(own[0])
         return "", need, None
-    return _state_word(e, claims, pr, recs, waiting, now), None, None
+    word = _state_word(e, claims, pr, recs, waiting, now, own=own[0] if own else None)
+    if own:
+        return word, None, _holder(own[0])
+    if word == "stalled":
+        stuck = sorted((rec for rec, _ in claims if _holder_stuck(rec, waiting, now)), key=lambda r: str(r.id))
+        return word, None, _holder(stuck[0]) if stuck else None
+    return word, None, None
 
 
 def _state_word(
@@ -1424,10 +1437,13 @@ def _state_word(
     recs: list[Any],
     waiting: set[str],
     now: datetime,
+    own: Any = None,
 ) -> str:
-    """The state word of a row that needs nothing of the person, the first that applies (§4.4)."""
+    """The state word of a row that needs nothing of the person, the first that applies (§4.4). `own`, the
+    person's own session claiming it (TD-1567): the row is never *stalled*, and reads *with you in <name>* where
+    it would read *held by <name>*; a red PR is *· being fixed* only while some claim's record is at work."""
     red = pr is not None and (pr.get("conflicting") or pr.get("checks") == "red" or pr.get("failing"))
-    if any(_holder_stuck(rec, waiting, now) for rec, _ in claims):
+    if own is None and any(_holder_stuck(rec, waiting, now) for rec, _ in claims):
         return "stalled"
     if red and not claims:
         since = _when(pr.get("red_since"))
@@ -1435,9 +1451,12 @@ def _state_word(
             return "stalled"
     if red:
         word = f"#{pr['number']} conflicting" if pr.get("conflicting") else f"#{pr['number']} failing"
-        return word + (" · being fixed" if claims else "")
+        fixing = any(not _holder_stuck(rec, waiting, now) for rec, _ in claims) if own is not None else bool(claims)
+        return word + (" · being fixed" if fixing else "")
     if pr is not None:
         return f"in review #{pr['number']}"
+    if own is not None:
+        return f"with you in {own.name}"
     if claims:
         return f"held by {claims[0][0].name}"
     if e.get("settling"):
@@ -1543,6 +1562,7 @@ def _card(
         "done": len(done_rows),
         "of": len(members) + len(done_rows),
         "status": _status(open_rows, [open_[q] for q in members]),
+        "stalled_holder": stalled_holder([top_row, *rows]),
         "wait": _wait(members, open_, blockers, parts, keyed, top),
         "start": _start(members, open_, keyed, top),
         "order": picked,
@@ -1573,6 +1593,15 @@ def card_entries(card: Mapping[str, Any]) -> tuple[list[str], list[str]]:
     rows.sort(key=lambda r: _key_sort(str(r.get("key") or ""), str(r.get("qid") or "")))
     mine = [str(r["qid"]) for r in rows if r.get("needs")]
     return mine, [str(r["qid"]) for r in rows if not r.get("needs")]
+
+
+def stalled_holder(rows: Iterable[Any]) -> dict[str, Any] | None:
+    """The record a card's *stalled* stands for (§4.5 screen 12 *A holder's word opens the holder*, TD-1567): the
+    holder of its first *stalled* row that has one, in the card's order — the top entry, then its rows as drawn."""
+    for r in rows:
+        if isinstance(r, Mapping) and r.get("state") == "stalled" and r.get("holder"):
+            return dict(r["holder"])
+    return None
 
 
 def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:

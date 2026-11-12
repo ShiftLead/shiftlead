@@ -85,7 +85,7 @@ def test_a_non_top_row_with_you_is_grey_on_its_spine_and_in_its_parents_meter(tm
     (shaped,) = v["in_progress"]
     assert shaped["top"]["meter"]["segs"] == [{"b": "open", "title": "TD-002: with you in p"}]
     html = templates.env.get_template("queue_row.html").module.row(shaped["rows"][0])
-    assert '<span class="qstate s-with">with you in p</span>' in html
+    assert '<a class="qstate s-with" href="/focus/p" title="open p">with you in p</a>' in html  # it opens p (TD-1724)
     assert "needsyou" not in html and "qpill" not in html, "no amber, and no holder pill beside the word"
 
 
