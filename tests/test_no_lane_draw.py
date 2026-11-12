@@ -65,11 +65,18 @@ def test_starts_clause_reads_the_starts_lanes_and_the_other_records(tmp_path):
     grinder = SimpleNamespace(dir=root, lane=GRINDER)
     rows = [
         {"repo": root, "team": "other", "lane": DESIGNER},  # another team's designer takes owner:designer
-        {"repo": root, "team": "grind", "lane": ["design-first", "owner:techlead"]},  # the team's own: replaced
+        {"repo": root, "team": "Grind", "lane": ["design-first", "owner:techlead"], "state": "closed"},  # replaced
         {"repo": root, "team": "x", "lane": ["design-first"], "superseded_by": "y"},  # superseded: never read
     ]
     gaps = teamrun.start_no_lane(lambda m, **kw: rows, readings, [grinder], "grind")
-    assert gaps == [{"repo": "ledgerboard", "id": "TD-058", "why": WHY}]
+    assert [(g["repo"], g["id"], g["why"]) for g in gaps] == [("ledgerboard", "TD-058", WHY)]
+    busy = [*rows, {"repo": root, "team": "grind", "lane": ["design-first", "owner:techlead"], "state": "working"}]
+    assert teamrun.start_no_lane(lambda m, **kw: busy, readings, [grinder], "grind") == []  # a busy seat runs on
+
+    def broken_list(m, **kw):
+        raise TimeoutError
+
+    assert teamrun.start_no_lane(broken_list, readings, [grinder], "grind") == []
     assert teamrun.no_lane_clause(gaps) == f"· no lane: TD-058 ({WHY})"
     two = SimpleNamespace(dir=other, lane=DESIGNER)
     gaps = teamrun.start_no_lane(lambda m, **kw: rows, readings, [grinder, two], "grind")
@@ -77,6 +84,10 @@ def test_starts_clause_reads_the_starts_lanes_and_the_other_records(tmp_path):
     assert clause.startswith(f"· no lane: ledgerboard: TD-058 ({WHY}); two: TD-1 (")
     assert clause.endswith("TD-5 (" + WHY + ") and 2 more")
     assert teamrun.no_lane_clause([]) == ""
+    # two repos worked, one with gaps: still named
+    quiet = {**readings, other: {"name": "two", "ledger": {"entries": []}}}
+    gaps = teamrun.start_no_lane(lambda m, **kw: rows, quiet, [grinder, two], "grind")
+    assert teamrun.no_lane_clause(gaps) == f"· no lane: ledgerboard: TD-058 ({WHY})"
     unserved = {root: {**readings[root], "seams": {"serve": {"ok": False, "lacks": [{"key": "x"}]}}}}
     assert teamrun.start_no_lane(lambda m, **kw: [], unserved, [grinder], "grind") == []
     broken = {root: {"ledger": {"error": "x", "entries": [_e("TD-058")]}}}

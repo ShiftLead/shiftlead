@@ -794,27 +794,30 @@ def lanes(call: Call, org: orgmod.Org, name: str, host: str, *, no_lane: bool = 
     out = {"line": line, "empty": all(r["n"] == 0 for r in roles.values()), "roles": roles, "ids": list(ids)}
     if no_lane:
         gaps = start_no_lane(call, readings, holders, name)
-        out |= {"no_lane": gaps, "no_lane_line": no_lane_clause(gaps)}
+        line_ = no_lane_clause(gaps)
+        out |= {"no_lane": [{k: g[k] for k in ("repo", "id", "why")} for g in gaps], "no_lane_line": line_}
     return out | ({"unserved": why} if (why := unserved(call, plan)) else {})
 
 
 NO_LANE_SHOWN = 5  # a Start's *no lane* clause names this many entries per repo, then *and n more*
 
 
-def start_no_lane(call: Call, readings: Mapping[str, Any], holders: list[Any], name: str) -> list[dict[str, str]]:
+def start_no_lane(call: Call, readings: Mapping[str, Any], holders: list[Any], name: str) -> list[dict[str, Any]]:
     """What no lane will take once the team starts (design §4.5a team card **Start**, *what no lane will take*,
     TD-1573): for each repo a role of the start works, each open entry `ledger.lane_gap` finds no lane for, read
-    against the lanes the start creates there and every other record of the repo (one `list`), the team's own
-    records aside since the start replaces them; an unserved repo, or one whose ledger cannot be read, says
-    nothing. `[{repo, id, why}]`, in ledger order per repo."""
+    against the lanes the start creates there and every other record of the repo (one `list`), the team's ended
+    records aside since the start replaces them (a live one — a busy seat it leaves running, or a concluded one
+    it closes for a member of the same lane — is read); an unserved repo, or one whose ledger cannot be read,
+    says nothing, and records that cannot be read say nothing at all. `[{repo, id, why}]`, in ledger order per
+    repo, `repo` the checkout's name, `n_repos` on each the repos read, for the clause's *<repo>:*."""
     dirs: dict[str, list[tuple[list[str], str]]] = {}
     for x in holders:
         dirs.setdefault(str(x.dir), []).append((list(x.lane), name))
     try:
         rows = [r for r in call("list") or [] if isinstance(r, Mapping)]
-    except Exception:  # noqa: BLE001 — no records read is the start's lanes alone
-        rows = []
-    out: list[dict[str, str]] = []
+    except Exception:  # noqa: BLE001 — records unread would name every other team's work: say nothing
+        return []
+    read: list[tuple[str, list[Any], list[tuple[list[str], str]]]] = []
     for d, mine in dirs.items():
         reading = readings.get(d) or {}
         led = reading.get("ledger") or {}
@@ -824,26 +827,31 @@ def start_no_lane(call: Call, readings: Mapping[str, Any], holders: list[Any], n
         others = [
             (list(r["lane"]), str(r.get("team") or ""))
             for r in in_repo(rows, d)
-            if r.get("lane") and str(r.get("team") or "") != name
+            if isinstance(r.get("lane"), list)
+            and r["lane"]
+            and not (str(r.get("team") or "").casefold() == name.casefold() and r.get("state") in DEAD)
         ]
-        repo = str(reading.get("name") or Path(d).name)
+        read.append((str(reading.get("name") or Path(d).name), entries, [*mine, *others]))
+    out: list[dict[str, Any]] = []
+    for i, (repo, entries, lanes_) in enumerate(read):
         for e in entries:
-            if isinstance(e, dict) and e.get("id") and (gap := ledger_mod.lane_gap(e, [*mine, *others])):
-                out.append({"repo": repo, "id": str(e["id"]), "why": gap[1]})
+            if isinstance(e, dict) and e.get("id") and (gap := ledger_mod.lane_gap(e, lanes_)):
+                out.append({"repo": repo, "id": str(e["id"]), "why": gap[1], "key": i, "n_repos": len(read)})
     return out
 
 
-def no_lane_clause(gaps: list[dict[str, str]]) -> str:
+def no_lane_clause(gaps: list[dict[str, Any]]) -> str:
     """Start's clause (§4.5a **Start**): *· no lane: TD-058 (<why>)*, entries joined by commas, *<repo>:* before
-    each repo's where there are two, five at most per repo, then *and n more*; '' where there is none."""
-    by_repo: dict[str, list[dict[str, str]]] = {}
+    each repo's where the start works two, five at most per repo, then *and n more*; '' where there is none."""
+    by_repo: dict[Any, list[dict[str, Any]]] = {}
     for g in gaps:
-        by_repo.setdefault(g["repo"], []).append(g)
+        by_repo.setdefault(g.get("key", g["repo"]), []).append(g)
     parts = []
-    for repo, got in by_repo.items():
+    for got in by_repo.values():
         named = ", ".join(f"{g['id']} ({g['why']})" for g in got[:NO_LANE_SHOWN])
         more = f" and {len(got) - NO_LANE_SHOWN} more" if len(got) > NO_LANE_SHOWN else ""
-        parts.append((f"{repo}: " if len(by_repo) > 1 else "") + named + more)
+        two = int(got[0].get("n_repos") or len(by_repo)) > 1
+        parts.append((f"{got[0]['repo']}: " if two else "") + named + more)
     return f"· no lane: {'; '.join(parts)}" if parts else ""
 
 
