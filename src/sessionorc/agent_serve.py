@@ -106,6 +106,7 @@ class ServeMixin:
             if self.mode == "node":
                 v["asks_waiting"] = self._asks_hints.get(s.id, 0)  # the mailbox is the home's (§4.4a)
                 v["prs_waiting"] = None  # the home's to count: a node holds no inbox (§4.4a)
+            v.update(self._taken_view(s, v, graph))
             return v
         v["asks_waiting"] = s.asks_waiting(home=self.host)  # a bare `to` here names this host's session
         v["prs_waiting"] = s.prs_waiting(home=self.host)
@@ -122,25 +123,47 @@ class ServeMixin:
                 # and nothing answered here can reach it, so the card says so and sends the person
                 # to the tool's own dialog at that host. An overlay too — the record keeps its pending.
                 v["pending"] = {**v["pending"], "host_unreachable": True}
+        v.update(self._taken_view(s, v, graph))
         return v
+
+    def _taken_view(self, s: Session, v: dict[str, Any], graph: dict[str, Session] | None) -> dict[str, Any]:
+        """The taken-over mark's reading (design §4.5 *A taken-over member is marked*, TD-1568), on the
+        view: `taken_over` (`mail.taken_over`) and, where it holds, the hover's three parts the page joins —
+        `taken_lead` (*taken over* after a flip's stamp, *held interactive from its start,* after a start's,
+        *held interactive* with none), `taken_at` (`mode_at`, none with no stamp) and `taken_tail` (*by
+        `<you | name>` — …* after a flip, *— …* otherwise; the name by `taken_name`'s rule, §4.9b). The
+        home's alone (a node's own view has no stamp, §4.4a), and none while the view's final state reads
+        `unreachable`, the host link down or the record's own: its card is drawn off and Hand back cannot
+        reach it."""
+        if self.mode == "node" or v.get("state") == "unreachable" or not mail.taken_over(s, bool(v.get("agent"))):
+            return {"taken_over": False}
+        tail = "— its mail does not wake it; Hand back returns it"
+        if not s.mode_at:
+            lead = "held interactive"
+        elif s.mode_via == "start":
+            lead = "held interactive from its start,"
+        else:
+            lead = "taken over"
+            by = s.mode_by
+            if by:
+                if by == "person":
+                    who = "you"
+                else:
+                    rec = (graph if graph is not None else self._graph()).get(by)
+                    who = (rec.name if rec is not None else None) or by
+                tail = f"by {who} {tail}"
+        return {"taken_over": True, "taken_lead": lead, "taken_at": s.mode_at or None, "taken_tail": tail}
 
     def _held_mail(self, s: Session, v: dict[str, Any]) -> dict[str, Any]:
         """The held row's reading (design §4.5 *A taken-over member*, §4.5a *Inbox row: held · mail
         waiting*, TD-1440), on the view: `unread_unrung`, the count of the record's undecided mail
         addressed to it (`mail.held_unread`), `oldest_unread_at`, the oldest of it, and `held_mail_at`,
         the row's clock — the later of that and `mode_at`, the oldest alone with no stamp. Computed only
-        at the home (which holds the inbox and `mail_decided`, §4.4a), for a live agent record that is a
-        member (`team` or `controllers`, not `by_person`) and held (`mail_wakes` false); none on every
-        other record and with no such mail, so a push scans no other inbox."""
+        at the home (which holds the inbox and `mail_decided`, §4.4a), for a record `mail.taken_over` reads
+        held (a live agent member, not `by_person`, its mail not waking it; TD-1568); none on every other
+        record and with no such mail, so a push scans no other inbox."""
         none = {"unread_unrung": None, "oldest_unread_at": None, "held_mail_at": None}
-        if (
-            self.mode == "node"
-            or not v.get("agent")
-            or s.state in ("exited", "closed")
-            or not (s.team or s.controllers)
-            or v.get("by_person")
-            or mail.mail_wakes(s)
-        ):
+        if self.mode == "node" or not mail.taken_over(s, bool(v.get("agent"))):
             return none
         got = mail.held_unread(s, self.host)
         if not got:

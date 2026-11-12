@@ -830,6 +830,11 @@ def team_groups(
                 # …and, on any team, folded or not, how many wait for a person's Close — a mark
                 # (TD-156 (b): a concluded team's idle cards were folded away and read as already closed)
                 "ready": ready,
+                # *n taken over* (§4.5a *team header: taken over count*, TD-1568): a team's members held interactive,
+                # by name, sorted — the count is its length; a team's header alone, never pressable
+                "taken": sorted(str(m.get("name") or m.get("id")) for m in members if m.get("taken_over"))
+                if team != NO_TEAM
+                else [],
                 # a definition exists, so the group's card carries Start, or Stop / Stop now (§4.5a)
                 "defined": team in defs,
                 "source": row.get("source"),

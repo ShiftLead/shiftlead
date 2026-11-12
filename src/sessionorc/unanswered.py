@@ -19,7 +19,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
-from sessionorc.mail import _NOT_LIVE, mail_wakes
+from sessionorc.mail import _NOT_LIVE, taken_over
 from sessionorc.models import Session
 
 # design §4.9b's states, in the order the first that holds is chosen
@@ -117,7 +117,7 @@ def read(
         out["state"] = "unreachable"
     elif r.state == "scheduled":
         out.update(state="scheduled", start_at=r.start_at)
-    elif live and agent and (r.team or r.controllers) and not r.by_person and not mail_wakes(r):
+    elif taken_over(r, agent):
         # held: a member taken over, its mail not waking it (§4.5 *A taken-over member*, TD-1444)
         out.update(state="taken_over", since=r.mode_at, taken_by=r.mode_by)
         if r.mode_by and r.mode_by != "person":

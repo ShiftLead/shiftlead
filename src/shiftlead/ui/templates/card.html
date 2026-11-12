@@ -5,9 +5,11 @@
    and hidden inside that group by the stylesheet — the card cannot know where it is drawn. #}
 {# `tabindex="0"`: a card is a tab stop, and the keyboard's ring is the browser's focus ring on it
    (§4.5a Sessions **keys**: the ring, TD-124) — apart from the amber *needs you* ring #}
-<div class="card sc s-{{ s.state_class }}{% if s.state == 'unreachable' %} off{% endif %}{% if s.compact %} compact{% endif %}" id="card-{{ s.id }}" tabindex="0"
+<div class="card sc s-{{ s.state_class }}{% if s.state == 'unreachable' %} off{% endif %}{% if s.compact %} compact{% endif %}{% if s.taken_over %} tko{% endif %}" id="card-{{ s.id }}" tabindex="0"
      data-id="{{ s.id }}" data-rank="{{ s.rank }}" data-state="{{ s.state }}" data-name="{{ s.name }}"
      data-kind="{{ s.kind }}" data-deadline="{{ s.deadline }}" data-team="{{ s.team or '' }}" data-pill="{{ s.pill_word }}"{% if s.unseen %} data-unseen="1"{% endif %}{% if not s.unattended %} data-mine="1"{% endif %}>
+  {# §4.5 *A taken-over member is marked* (TD-1568): the hover's parts, joined in the page and kept on its clock #}
+  {% set taken_attrs %} title="{{ s.taken_hover }}" data-taken-at="{{ s.taken_at }}" data-taken-lead="{{ s.taken_lead }}" data-taken-tail="{{ s.taken_tail }}"{% endset %}
   <div class="sbar"></div>
   {% if s.compact %}
   {# the **compact** card (design §4.5a *card: compact*, TD-176 slice 3): a member of a live team —
@@ -15,7 +17,7 @@
      state glyph), one line of its own, and the foot below. The team's summary says the rest. #}
   <div class="sc-body">
     <div class="row r1">
-      <a class="name" href="/focus/{{ s.id }}">{{ s.name }}</a>{% if not s.unattended %}<span class="mine" title="yours: an interactive session — no policy acts on it">{{ role_svg('person') }}</span>{% endif %}
+      <a class="name" href="/focus/{{ s.id }}">{{ s.name }}</a>{% if s.taken_over %}<span class="mine"{{ taken_attrs }}>{{ role_svg('person') }}</span>{% elif not s.unattended %}<span class="mine" title="yours: an interactive session — no policy acts on it">{{ role_svg('person') }}</span>{% endif %}
       <span class="grow"></span>
       <span class="pill nog s-{{ s.state_class }}{% if s.scraped %} scraped{% endif %}"
             title="{{ s.pill_title }}">{{ s.state_label }}{% import "lanecount.html" as lcm %}{{ lcm.span(s.lane_count) }}</span>
@@ -27,6 +29,8 @@
     {% if s.routed_to %}<div class="meta routed" title="cannot answer now: {{ s.routed_why }} (design §4.9b)">{{ s.routed_to }}</div>{% endif %}
     {# design §4.5a card **held** line (§6 rule 3, TD-1564): display only, while its team's stop holds the seat #}
     {% if s.stop_held_line %}<div class="meta routed stop-held" title="{{ s.stop_held_line }}: questions to it wait in its mailbox until the team's Start (design §6 rule 3)">{{ s.stop_held_line }}</div>{% endif %}
+    {# design §4.5a card **taken over** mark (TD-1568): the compact card's last line, the lead and the age #}
+    {% if s.taken_over %}<div class="meta tkoline"{{ taken_attrs }}>{{ s.taken_lead }}{% if s.taken_at %} <span class="age" data-since="{{ s.taken_at }}">{{ s.taken_age }}</span> ago{% endif %}</div>{% endif %}
   </div>
   {% else %}
   <div class="sc-body">
@@ -47,7 +51,8 @@
       {% if s.role %}<span class="badge" title="the role preset it was started under — {{ s.role }} (design §4.8): a label, nothing keys on it">{{ role_svg(s.role_icon) }}{{ s.role_label or s.role }}</span>{% endif %}
       {# design §4.5a **unattended / interactive**: a mark, not a control. *interactive* is the one
          that stands out — the person's own sessions are what a person looks for (TD-095, second pass) #}
-      {% if s.unattended %}<span class="meta mode" title="unattended: its policies act on it — switch it from more ⋯">unattended</span>
+      {% if s.taken_over %}<span class="meta mode mine"{{ taken_attrs }}>{{ role_svg('person') }}taken over</span>
+      {% elif s.unattended %}<span class="meta mode" title="unattended: its policies act on it — switch it from more ⋯">unattended</span>
       {% else %}<span class="meta mode mine" title="interactive: yours — no policy acts on it; switch it from more ⋯">{{ role_svg('person') }}interactive</span>{% endif %}
       {# design §4.5a card **team** badge (§4.9): not drawn inside that team's own group (TD-095);
          click filters the grid to that team, client-side #}
@@ -116,6 +121,11 @@
     {% set nopane = s.state == 'closed' or s.pane is sameas false %}
     {# a compact needs-you card leads with Focus: the answer is given in the team's facet (§4.5a) #}
     {% set next_act = 'focus' if s.compact and s.next_act == 'allow' else s.next_act %}
+    {# design §4.5a card **Hand back** (TD-1568): a taken-over member's foot leads with it, in place of whatever it
+       would have led with — after a `needs-you` card's own lead — the same `set_mode` as Focus's, never confirming #}
+    {% set hand_back %}<button class="btn sm tko" data-act="mode" data-via="card" data-id="{{ s.id }}" data-unattended="0" title="hand it back: its mail wakes it again and its manager and the policies pick it up">Hand back</button>{% endset %}
+    {% set needs = s.state == 'needs-you' %}
+    {% if s.taken_over and not needs %}{{ hand_back }}{% set next_act = 'handback' %}{% endif %}
     {% if next_act == 'allow' %}
       {# Allow / Deny only when the hook gave something to answer (`tool_use_id`) and the tool has a
          permission channel (§4.3, TD-785): the route 409s without either (review of PR #251) #}
@@ -123,6 +133,7 @@
       <button class="btn sm next" data-act="deny" data-id="{{ s.id }}" data-call="{{ s.pending.tool_use_id or '' }}">Deny</button>
       {# Deny's optional reason (§4.5a, TD-117): one line the session reads with the refusal #}
       <input class="denywhy" type="text" maxlength="200" data-id="{{ s.id }}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it">
+      {% if s.taken_over and needs %}{{ hand_back }}{% endif %}
     {% elif next_act == 'forget' %}
       <button class="btn sm next" data-act="remove" data-id="{{ s.id }}" title="{{ help_title('forget') }}">Forget</button>
     {% elif next_act == 'message' %}
@@ -134,6 +145,7 @@
     {# `data-focus`: while this browser holds the session popped out, it reads *Focus window* and
        raises that window (§4.5a **Focus**, TD-046) — a plain click only; a modifier is the browser's #}
     <a class="btn sm {{ 'next' if next_act in ('focus', 'details') else 'link' }}" href="/focus/{{ s.id }}" data-focus="{{ s.id }}" title="{{ 'the pane is gone: details only, no terminal' if nopane else 'open the terminal' }}">▣ {{ 'Details' if nopane else 'Focus' }}</a>
+    {% if s.taken_over and needs and next_act != 'allow' %}{{ hand_back }}{% endif %}
     {# the editor button: the person's `open_in:` (design §5 *The person's own*) — its label is the person's text, escaped #}
     {% if s.editor %}<a class="btn sm link editor" href="{{ s.editor.url }}" data-label="{{ s.editor.label }}">‹› {{ s.editor.label }}</a>{% endif %}
     <span class="grow"></span>
@@ -157,7 +169,7 @@
         {% if not s.seat %}<button data-act="remove" data-id="{{ s.id }}" title="{{ help_title('forget') }}">Forget</button>{% endif %}
         {%- else %}
         {# design §4.5a **more ▾** (TD-095): the mode's toggle, moved here from the card's badge #}
-        {% if s.agent %}<button data-act="mode" data-via="card" data-id="{{ s.id }}"{% if s.unattended %} class="on"{% endif %}{% if s.mode_confirm %} data-confirm="{{ s.mode_confirm }}"{% endif %}>Switch to {{ 'interactive' if s.unattended else 'unattended' }}</button>{% endif %}
+        {% if s.agent and not s.taken_over %}<button data-act="mode" data-via="card" data-id="{{ s.id }}"{% if s.unattended %} class="on"{% endif %}{% if s.mode_confirm %} data-confirm="{{ s.mode_confirm }}"{% endif %}>Switch to {{ 'interactive' if s.unattended else 'unattended' }}</button>{% endif %}
         {#- design §4.5a **more ▾** → **Restart** (§6 rule 2, TD-250): the Inbox row's RPC; confirms with no restart mark -#}
         {% if s.restartable %}<button data-act="restart" data-id="{{ s.id }}"{% if not s.restart_marked %} data-confirm="Restart {{ s.name }}? It is closed if still there and started again from its launch record, in its team."{% endif %} title="{{ help_title('restart') }}">Restart</button>{% endif %}
         {% if s.agent %}<button data-act="wrapup" data-id="{{ s.id }}" title="{{ help_title('wrap-up') }}">Wrap up</button>{% endif %}

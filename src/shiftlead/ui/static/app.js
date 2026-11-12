@@ -2300,8 +2300,18 @@
     if (s < 86400) return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
     return `${Math.floor(s / 86400)}d`;
   }
+  // a taken-over member's hover (§4.5 *A taken-over member is marked*, TD-1568): the lead, the age from its
+  // stamp, the tail — the server's first title, rewritten on each tick as the card's clock is
+  function takenTitles(root) {
+    $$("[data-taken-lead]", root || document).forEach((el) => {
+      const at = el.dataset.takenAt;
+      el.title = [el.dataset.takenLead, at ? `${fmtAge(at)} ago` : "", el.dataset.takenTail].filter(Boolean).join(" ");
+    });
+  }
+  AO.takenTitles = takenTitles;
   setInterval(() => {
     $$(".age[data-since]").forEach((el) => (el.textContent = fmtAge(el.dataset.since)));
+    takenTitles();
     $$(".countdown[data-deadline]").forEach((el) => {
       if (!el.dataset.deadline) return;
       const left = fmtLeft(el.dataset.deadline);
@@ -6770,6 +6780,8 @@
         const back = b.dataset.for === "fmodemenu" && shown($("#fmodeact")) && $("#fmodeact").dataset.unattended === "0";
         const lead = b.dataset.for === "fmodeact" && !!src && src.dataset.unattended === "0";
         b.classList.toggle("hidden", !(shown(src) || back) || lead);
+        // the sheet's Hand back takes the slot's warning fill, and drops it once the slot reads Take over (TD-1568)
+        if (b.dataset.for === "fmodemenu") b.classList.toggle("tko", back && $("#fmodeact").classList.contains("tko"));
         b.disabled = !!(src && src.disabled);
         const al = $(".al", b);
         if (al && src && /^fmode/.test(src.id)) al.textContent = src.textContent.trim();
@@ -7650,6 +7662,8 @@
         el.dataset.unattended = v.unattended ? "1" : "0";
       }
       const ma = $("#fmodeact"); if (ma) ma.classList.toggle("hidden", v.mode_place !== "slot");
+      // a taken-over member's Hand back is filled in the warning colour (§4.5 *A taken-over member is marked*, TD-1568)
+      if (ma) ma.classList.toggle("tko", !!v.taken_over);
       // Take over on a member confirms (§4.5 *A taken-over member*, TD-1440): set or cleared from the view, so a
       // membership or mode change while Focus is open is followed; Hand back carries none
       for (const el of [ma, $("#fwatchgo")]) {
