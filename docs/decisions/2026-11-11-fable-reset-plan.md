@@ -40,10 +40,10 @@ of the designs that ran past the cap, up to 12 rounds, did so on bought rounds a
 | Step | Who | What | Status |
 |---|---|---|---|
 | 1. The draft | Fable (the designer seat) | Writes the design against a short checklist of the situations designs here miss. Beside it, two blocks the script reads: each claim about what code does with the file and line it rests on, and each rule the design states in more than one place | proposed |
-| 2. The pre-review script | called by the author | Checks that every path, symbol, id and section the design names exists, that the claims block is filled, that the places a declared rule is stated agree, and the entry's fields and counts. No reviewer is sent a design without the script's pass line for that commit | **agreed**; the author supplies the terms (Paul's lean) |
+| 2. The pre-review script | called by the author | Checks that every path, symbol, id and section the design names exists, that the claims block is filled, that the places a declared rule is stated agree, and the entry's fields and counts. No reviewer is sent a design without the script's pass line for that commit | the script **agreed**; that the author supplies the terms proposed (Paul's lean) |
 | 3. The rounds | reviewers, as today | Each finding is raised with the situation it is about. The fact-check samples the claims block and reads the code behind it | proposed |
 | 4. The fixes | Sonnet (a second seat, `design-coord`) | Holds the design's branch from the handoff and is its only writer. Groups a round's findings by the text they touch, applies the fixes to spans with no hard finding, extends the two blocks for what a fix changes, reruns the script | proposed |
-| 5. The hard findings | Fable, asked by the Sonnet seat | A span with any finding about two actors at once, interaction with another rule, restarts, endings, timing, actors or error paths goes to Fable whole: the findings, the span and the rules they cite. Fable returns the replacement text or a decision; the Sonnet seat applies it. In doubt, the Sonnet seat sends it up; it never sends one down. The next round is not sent until every question is answered | proposed |
+| 5. The hard findings | Fable, asked by the Sonnet seat | A span with any finding about two actors at once, interaction with another rule, restarts, endings, timing, actors or error paths goes to Fable whole: the findings, the span and the rules they cite. Fable returns the replacement text or a decision; the Sonnet seat applies it. These are the reviewers' situations concurrency, interaction, restart, ends, when, who and failure. In doubt, or on *other*, the Sonnet seat sends it up; it never sends one down. The next round is not sent until every question is answered | proposed |
 | 6. The last read | Fable | Reads the whole design once after the last fix, before the closing fact-check, for coherence | proposed |
 
 **Why this shape.** The 3,120 findings divide by what was wrong:
@@ -88,10 +88,11 @@ spend that is applying fixes, and by `ao spend --entries` or an entry-linked mea
 across days. Without these the saving is an aim, not a result: it is the price difference on the tokens
 moved to Sonnet, less Fable's questions, the last read and any extra rounds.
 
-1. **Replay three past designs** with the new shape: one short, one of median length, one long (a claims
-   design such as TD-1470). Each runs from the parent of its design PR's first commit, in a worktree never
-   merged, with `docs/reviews/`, `docs/history/` and later memory files taken out of the tree, and the
-   replaying seats told not to read past that commit. The old review record is the answer key, kept outside
+1. **Replay three past designs** with the new shape: one short, one of median length, one long, chosen by
+   Paul before the checklist is written, from designs whose rounds ended after the analysis was cut
+   (commit `df866eeb8`), so the checklist was not drawn from their findings. Each runs from the parent of
+   its design PR's first commit, in a clone cut at that commit and never merged, with the seats' memory
+   directory pointed at a copy from that commit; the transcripts are searched afterwards for any ref past it. The old review record is the answer key, kept outside
    the worktree. A separate Sonnet reader scores it, not knowing which design is the new one: for each old
    finding about the problem itself (findings about the old design's own mechanism are left out), is it
    handled, left silent or handled wrongly? The replay also runs its own rounds, and what those raise is
@@ -110,9 +111,9 @@ moved to Sonnet, less Fable's questions, the last read and any extra rounds.
 Nothing records whether a PR-review finding or a fix after a merge traces to its design; that is the
 measure of what a missed flaw costs and is wanted for step 2.
 
-**What is accepted.** The reviewers still raise every finding; what changes is who fixes it. About 4% of
-all findings are detail that only a design review would catch, and those would now be fixed by Sonnet
-without Fable. Three replays test the whole package (checklist, script, second seat), not each part.
+**What is accepted.** The reviewers still raise every finding; what changes is who fixes it. About 6% of
+all findings are outside the hard situations and yet only a design review would catch them (195 of 3,120:
+123 detail, 41 false claims, 31 wording and the like), and those would now be fixed by Sonnet without Fable. Three replays test the whole package (checklist, script, second seat), not each part.
 
 ## The rest of the sharpening
 
@@ -130,14 +131,19 @@ without Fable. Three replays test the whole package (checklist, script, second s
 
 ## The two resets
 
+A reset is only ever pressed at a limit hit. Until the Fable window reaches the gate's reading, Paul sees
+the hit on the account page.
+
 - **Reset 1** is pressed at the first Fable-limit hit after the new design shape has passed its trial, so
   the doubled week is spent at the better rate: the messaging review's designs and the efficiency builds.
-  A limit hit before then is waited out, but no later than mid-December (proposed), so a slow trial does not
-  hold it until it lapses.
-- **Reset 2** goes to Paul's other projects, when the cost of a merged PR is measurably down and the target
-  repo has a team, a full lane and its decisions cleared; no later than mid-January.
+  If the trial has not passed by mid-December (proposed), the next hit is pressed anyway, on the shape as
+  it then stands.
+- **Reset 2** goes to Paul's other projects, at a limit hit once the target repo has a team, a full lane
+  and its decisions cleared; from mid-January (proposed) the next hit is pressed whatever the state.
 
 ## The order
+
+Proposed, as the trial is.
 
 1. The cost model and spend for each design. 2. The pre-review script and the two blocks it reads. 3. The
 checklist. 4. The second seat and the hand-back. 5. The three replays. 6. Real designs on the new shape.
