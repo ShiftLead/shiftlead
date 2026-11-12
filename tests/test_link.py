@@ -975,8 +975,13 @@ async def test_a_node_members_own_drop_of_a_work_order_writes_its_mark_at_the_ho
     """TD-1706 (design §6 rule 6 *save one the member itself released*): a node's member's `progress` is
     forwarded to the home, whose handler writes the `released` mark for the member's own drop of a work order
     its reading holds; another session's forwarded drop of that claim writes none."""
-    from sessionorc import workorders
+    from conftest import park_ticks
 
+    from sessionorc import workorders
+    from sessionorc.agent_tick import _order_reading
+
+    # the reading below is set by hand: a tick's repo pass would drop `/r`, which no registry lists (TD-1723)
+    await park_ticks(agent)
     agent._take_records("laptop", [record(kind="interactive", unattended=True, repo="/r")], whole=True)
     order = workorders.entry({"id": "board:aa", "title": "aa", "decided": {"text": "Go", "date": "2026-11-11"}})
     agent._repos["/r"] = {"name": "r", "root": "/r", "work_orders": {"orders": [order]}}
@@ -989,7 +994,8 @@ async def test_a_node_members_own_drop_of_a_work_order_writes_its_mark_at_the_ho
     for caller in ("ao-x-other", "ao-x-w"):
         assert "error" not in (resp := await fwd("ao-x-w", "claimed")), resp
         assert "error" not in (resp := await fwd(caller, "dropped")), resp
-        assert bool(held.released) == (caller == "ao-x-w"), caller
+        read = _order_reading(agent._repos.get("/r"), "board:aa")
+        assert bool(held.released) == (caller == "ao-x-w"), (caller, read)
     answer = {"text": "Go", "date": "2026-11-11"}
     assert held.released == {"board:aa": {"at_drop": answer, "told": answer}}
 
