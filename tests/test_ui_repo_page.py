@@ -317,6 +317,25 @@ def test_a_decided_board_line_is_first_in_pickable_with_its_answer_and_who_holds
     assert "7 pickable · 1 in grind&#39;s lanes · grinder 6" in re.findall(r"\d+ pickable · [^<\"]*", html)
 
 
+def test_a_designs_answer_is_drawn_for_its_designer_from_the_stored_order(tmp_path, monkeypatch):
+    """TD-1705 step 4 (§4.5a *Repo page: decided lines*): a decided line whose stored order the join routed to the
+    `design-first` lanes reads its fields there — *pickable by <team>* from the lanes, which take it by its `for`,
+    and *for <designer>*, the record's name — never re-derived from the board."""
+    from shiftlead.ui.app import ledger_lists
+
+    root = str(tmp_path / "samscrape")
+    routed = {**ORDER, "lane": "design-first", "design": "TD-301", "owner": "designer", "for": "ao-d1"}
+    r = {**reading(root), "work_orders": {"orders": [routed]}}
+    first = ledger_lists(r, [], {"grind": {"pickable": ["board:1a2b3c4d"]}}, NOW, {"ao-d1": "designer-1"})[0]["rows"][0]
+    assert (first["id"], first["pickable_by"], first["for_name"]) == ("board:1a2b3c4d", ["grind"], "designer-1")
+    assert ledger_lists(r, [], None, NOW)[0]["rows"][0]["for_name"] == "ao-d1"  # no name known: the address
+    assert "for_name" not in ledger_lists({**r, "work_orders": {"orders": [ORDER]}}, [], None, NOW)[0]["rows"][0]
+    fleet = [rec("g1", root, lane=["free-pick"]), {**rec("ao-d1", root, lane=["design-first"]), "name": "designer-1"}]
+    html = client(monkeypatch, tmp_path, fake({root: r}, fleet)).get("/repo/samscrape").text
+    debt = html[html.index('id="debt"') :]
+    assert "pickable by grind" in debt and "for designer-1" in debt
+
+
 def test_a_claimed_work_order_is_in_motion_with_the_lines_head_text():
     """TD-384 slice 2: the team card's TDs in motion draws a claim on `board:<key>` as any reference."""
     from shiftlead.ui.app import motion_rows

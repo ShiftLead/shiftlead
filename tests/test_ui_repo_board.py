@@ -168,6 +168,20 @@ def test_the_boards_row_and_the_queue_cards_row_are_one_partial():
     assert "{{ qrow(r, name) }}" in part
 
 
+def test_a_designs_answer_leads_the_design_column_and_a_builds_line_the_pick():
+    """TD-1705 step 4 (§4.5a *Repo page: decided lines*): a decided line whose stored order the join routed
+    (`lane: design-first`) is drawn first in the column whose stage's lane takes `design-first`; any other in the
+    pick's; with no stage taking its lane it waits in For you's fold."""
+    routed = {"id": "board:d1", "work_order": True, "lane": "design-first", "for": "ao-d1"}
+    plain = {"id": "board:b1", "work_order": True}
+    d, bu = rb.board(None, lists(), [("grind", TD)], [], "r", orders=[routed, plain])["stages"]
+    assert [o["id"] for o in d["orders"]] == ["board:d1"] and [o["id"] for o in bu["orders"]] == ["board:b1"]
+    assert d["kinds"][0] == "decided" and d["n"] == 1
+    b = rb.board(None, lists(), [("grind", BUILD_REVIEW)], [], "r", orders=[routed, plain])
+    assert [o["id"] for o in b["stages"][0]["orders"]] == ["board:b1"]
+    assert [(r["id"], w) for r, w in b["fold"]] == [("board:d1", "no lane takes it")]
+
+
 def test_a_decided_line_with_no_pick_stage_waits_in_for_yous_fold():
     design_only = [Stage("design", "designer", ["design-first", "owner:designer"]), Stage("review", "techlead")]
     b = rb.board(None, lists(), [("grind", design_only)], [], "r", orders=[{"id": "board:ab12", "work_order": True}])

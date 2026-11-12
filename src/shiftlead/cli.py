@@ -2102,7 +2102,13 @@ def cmd_repo(args: argparse.Namespace) -> int:
             for e in teamrun.work_orders(r):
                 d = e.get("decided") or {}
                 said = f" · decided {d.get('text') or '?'} {d.get('date') or ''}".rstrip()
-                print(f"  {'pickable':<12} {e['id']}  {'High':<6}  {'board':<11}  {e.get('title') or ''}{said}")
+                who = "board"
+                if e.get("lane"):
+                    # a design's answer, routed on its stored order (§6 rule 6 *save a design's answer*, TD-1705):
+                    # its design's owner, and the designer it is for where it names one
+                    who = str(e.get("owner") or "") or str(e["lane"])
+                    said += f" · answers {e.get('design') or '?'}" + (f", for {e['for']}" if e.get("for") else "")
+                print(f"  {'pickable':<12} {e['id']}  {'High':<6}  {who:<11}  {e.get('title') or ''}{said}")
             # then a red PR nobody holds (§4.7, TD-613): every free-pick lane's, so the grinders' (§4.9b
             # *No anchor seat*, TD-757)
             for e in teamrun.pr_orders(r):

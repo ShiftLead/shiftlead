@@ -606,6 +606,13 @@ def board_reading(
                 notes.append(f"the board of {name} has not been read yet")
             continue
         own = board_rows(got, repos_of)
+        # a design's answer is routed on the stored work order (§6 rule 6 *save a design's answer*, TD-1705): the
+        # row carries the join's fields, which the *pickable by* words read and never re-derive
+        stored = {str(o["id"]): o for o in teamrun.work_orders(r)}
+        for row in own:
+            o = stored.get(_board_order(row)) if row.get("decided") else None
+            if o is not None and (routed := {k: o[k] for k in workorders_mod.ROUTED if o.get(k)}):
+                row["routed"] = routed
         if got.get("error"):
             since = f" since {got['failed_at']}" if got.get("failed_at") else ""
             shown = "its rows are the last reading" if own else "no row is shown"
@@ -1985,7 +1992,9 @@ def board_waiting_on(
     line's own work order (*waiting on grinder-ao-2 — holds TD-122*, *… — holds board:1a2b3c4d*),
     else a live record the item's `session` names, else — a decided line being a work order in the
     repo's lanes (§4.4 *Board write-back*, TD-384) — *pickable by <team>* naming the teams whose
-    `free-pick` lanes take it, with each one's wound-down state when none of them is live (*· the
+    `free-pick` lanes take it (a design's answer: whose `design-first` lanes take it, then *· for <designer>*
+    where its stored order names a `for`, §6 rule 6, TD-1705), with each one's wound-down state when none of
+    them is live (*· the
     start row is in Needs you* for a team in `starting`, the teams a *team start* row names, else
     *· <team> wound down — starts on `on_work`*, or *· <team> stopped — Start it* for a team that
     stopped rather than wound down, which rule 8 never starts, §6 *A team that stopped*, TD-781), else
@@ -2002,6 +2011,8 @@ def board_waiting_on(
         teams = _order_teams(r, order, records)
         if teams:
             words = f"pickable by {', '.join(teams)}"
+            if who := str((r.get("routed") or {}).get("for") or ""):
+                words += f" · for {_record_name(who, records)}"
             if not any(teams.values()):
                 for t in teams:
                     if t in starting:
@@ -2029,18 +2040,30 @@ def _team_wound(team: str, records: Collection[Mapping[str, Any]]) -> bool:
     return wound_down(mine, {str(r.get("name") or "") for r in mine if r.get("seat")}) is not None
 
 
+def _record_name(addr: str, records: Collection[Mapping[str, Any]]) -> str:
+    """The name of the record at `addr` (its `id`, `id@host` for a node's, as `ao status` gives it), else the
+    address itself."""
+    for rec in records:
+        if isinstance(rec, Mapping) and rec.get("id") == addr:
+            return str(rec.get("name") or addr)
+    return addr
+
+
 def _order_teams(r: Mapping[str, Any], order: str, records: Collection[Mapping[str, Any]]) -> dict[str, bool]:
-    """The teams whose `free-pick` lanes take a work order (§6 rule 6, `lane_matches`), from their
-    records in the board's repo, live or ended, never one resumed as another — each `{team: live}`."""
+    """The teams whose lanes take a work order (§6 rule 6, `lane_matches`, each record's lane read with its own
+    address), from their records in the board's repo, live or ended, never one resumed as another — each
+    `{team: live}`. The order is the stored one's fields (`routed`, the join's, TD-1705): a design's answer is
+    the `design-first` lanes', its designer's alone where it names a `for`; any other is `free-pick`'s."""
     here = _resolved(str(r.get("root") or ""))
     if not here:
         return {}
-    entry = {"id": order, "work_order": True, "pickable": "yes"}
+    entry = {"id": order, "work_order": True, "pickable": "yes", **(r.get("routed") or {})}
     out: dict[str, bool] = {}
     for rec in records:
         if not isinstance(rec, Mapping) or not rec.get("team") or not rec.get("repo") or rec.get("superseded_by"):
             continue
-        if _resolved(str(rec["repo"])) != here or not ledger_mod.lane_matches(list(rec.get("lane") or ()), entry):
+        lane = list(rec.get("lane") or ())
+        if _resolved(str(rec["repo"])) != here or not ledger_mod.lane_matches(lane, entry, None, rec.get("id")):
             continue
         team = str(rec["team"])
         out[team] = out.get(team, False) or rec.get("state") not in mail_mod._NOT_LIVE
