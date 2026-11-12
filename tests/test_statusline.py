@@ -265,6 +265,17 @@ def test_a_lagging_agent_still_finds_the_reporter_alive_and_the_line_does_not_wa
     assert hook_mod.last_report_file("ao-x-w1").exists()  # and, answered, the child remembered it
 
 
+def test_the_reporter_outwaits_a_hooks_bound_and_never_overlaps_the_next_report():
+    """TD-1696: with #3479 live, a running member's report was still refused as *unknown* (`unreadable`):
+    the reporter had given up at a hook's five seconds before a lagging home read it. Its bound is
+    longer than a hook's, and its three steps (connect, send, the reply) still end before the status
+    line's next report is due, so a report is never sent after its successor (design §4.4 *A report*)."""
+    from shiftlead.adapters.claude_code import STATUSLINE_REFRESH
+
+    assert hook_mod.REPORT_WAIT > 5.0
+    assert 3 * hook_mod.REPORT_WAIT < STATUSLINE_REFRESH
+
+
 @pytest.mark.integration
 def test_the_reporter_leaves_the_status_lines_group_and_holds_none_of_its_pipes(home, tmp_path):
     """TD-1682: the tool cancels a still-running status line by its process group, and waits on the
