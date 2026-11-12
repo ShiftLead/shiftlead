@@ -123,6 +123,7 @@ NODE_OWNED = frozenset(
         "wrapup_by",
         "doorbell_failed",
         "ring_seen",
+        "tool_version",
         "first_prompt",
         "first_prompt_sent_at",
         "first_prompt_tries",
@@ -1492,6 +1493,9 @@ class Session:
     # node typed it, and the record's next `prompt` hook and the Stop after it. The home judges the ring once
     # from a report that first brings `stopped`; the next ring replaces it. Never written on one host.
     ring_seen: dict[str, str] | None = None
+    # The seat's tool version its launch read (design §4.3 *An upgraded seat tool asks for the smoke*, TD-1650): the
+    # adapter's `tool_version` at a create carrying `seat`, on the host it runs on; None where nothing was read
+    tool_version: str | None = None
     # The bell stopped (design §4.10 *A ring is answered by a read, or the bell stops*, TD-347):
     # `{at, rings}` after `mail.DOORBELL_HELD` rings in a row each answered by a turn that read none of
     # its mail. The doorbell stays silent for it until it reads (`inbox`) or a person acts toward it.

@@ -1779,6 +1779,15 @@ class HostAgent(
                 raise RpcError(str(e).strip('"')) from None
             if argv:
                 spec.argv = argv
+            # a seat's launch reads its tool's version, once, before the name is taken (§4.3 *An upgraded seat tool
+            # asks for the smoke*, TD-1650): off the loop, bounded by the adapter's read; an override's binary is
+            # not the adapter's, and a launch that is no seat's reads nothing
+            tool_version = None
+            if seat and not argv and (read := getattr(ad, "tool_version", None)):
+                try:
+                    tool_version = await asyncio.to_thread(read, {**os.environ, **spec.env})
+                except Exception as e:  # noqa: BLE001 — the launch goes on whatever the read does
+                    log.warning("create %s: tool_version: %s", name, e)
             if isinstance(holder, Session) and resume and holder.adapter_id == resume:
                 # its row ended because the person opened it, which is the word the trail wants —
                 # `_take_name` would otherwise write the ending of a record merely replaced (§4.10)
@@ -1863,6 +1872,7 @@ class HostAgent(
                 start_context=start_context,
                 first_prompt=spec.first_prompt or None,
                 model_file=model_env.get("AGENT_MODEL_FILE"),
+                tool_version=tool_version if isinstance(tool_version, str) and tool_version else None,
             )
             if self.mode != "node":
                 # started by hand (§4.10 *between the person's own sessions*, TD-1069): derived here and
