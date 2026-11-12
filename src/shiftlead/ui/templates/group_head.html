@@ -70,17 +70,26 @@
 {#- …and a defined team with no record, what its lanes hold (§6 rule 8 *A team with no record*, TD-781) #}
 {% elif g.lanes_hold %}<span class="meta lanesheld" title="{{ g.lanes_line }}">· its lanes hold {{ g.lanes_hold }} entr{{ 'y' if g.lanes_hold == 1 else 'ies' }}</span>{% endif %}{% endif %}
 {# Start, or Wind down / Stop now, on the team's own card (design §4.5a, 2026-09-16 and 2026-09-18): the
-   control sits on the thing it acts on, and only a team with a definition has either. #}
-{% if g.team and g.defined %}{% if not g.stopped %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="{{ help_title('wind-down') }}"{% if g.stays %} data-confirm="Wind down {{ g.team }}? {{ g.stays | join('; ') }}."{% endif %}>Wind down</button>
-<button class="btn sm ghost stop" data-team-act="stopnow" data-team="{{ g.team }}" title="{{ help_title('stop-now') }}"{% if g.stays %} data-confirm="Stop {{ g.team }} now? {{ g.stays | join('; ') }}."{% endif %}>Stop now</button>
-{% else %}{#- design §4.5a *flow changed — Apply* on a stopped team (§4.9 *A member renamed or removed*,
+   control sits on the thing it acts on, and only a team with a definition has either. A team whose start
+   would leave a busy seat running (`startable`, §4.9a *A busy seat is left alone*, TD-1569) draws all three,
+   whatever its *stopped* reading, Start's confirm and closes read from `startable`, never `concluded`. #}
+{% if g.team and g.defined %}{% if g.stopped or g.startable %}{#- design §4.5a *flow changed — Apply* on a stopped team (§4.9 *A member renamed or removed*,
     TD-703): its renames and removals, beside Start, since rule 8 replays its ended records -#}
 {% if g.flow_changed and not g.live %}<span class="meta flowchanged" title="{% for d in g.flow_changed %}{{ d.line }}&#10;{% endfor %}until Apply or Start, a start by the tick brings back the old names">definition changed</span><button class="btn sm ghost" data-flow-apply="{{ g.team }}" title="apply the definition to the stopped team, as ao team flow {{ g.team }} --apply: a member renamed takes its new name at its next start, one removed is marked sat out — until Apply or Start, a start by the tick brings back the old names" data-confirm="Apply the definition to {{ g.team }}? {{ g.flow_changed | map(attribute='line') | join('; ') }}.">Apply</button>{% endif %}
 {#- Start reads the definition's renames and removals as Apply does (§4.9 *A member renamed or removed*,
     TD-706): its confirm says so first -#}
 {% set moved = (g.flow_changed or []) | selectattr('act', 'in', ['rename', 'removed']) | map(attribute='line') | list %}
 {% set moved_line = ("It first applies the definition: " ~ moved | join("; ") ~ ".") if moved else "" %}
-<button class="btn sm start" data-team-act="start" data-team="{{ g.team }}" title="{{ help_title('start') }}"{% if g.concluded %} data-confirm="Start {{ g.team }}?{% if moved %} {{ moved_line }}{% endif %} It first closes {{ g.concluded.names | join(', ') }} — each idle and declared — and a session holding uncommitted or unpushed work refuses the start instead." data-closes="{{ g.concluded.names | join(', ') }}"{% elif moved %} data-confirm="Start {{ g.team }}? {{ moved_line }}"{% endif %}{% if moved %} data-moved="{{ moved_line }}"{% endif %}>Start</button>{% endif %}{% endif %}
+{%- if g.startable %}{% set closes = g.startable.closes or [] %}{% set leaves = g.startable.leaves or [] %}
+{%- else %}{% set closes = g.concluded.names if g.concluded else [] %}{% set leaves = [] %}{% endif %}
+{%- set leave_items = [] %}{% for x in leaves %}{% set _ = leave_items.append(x.name ~ " running (" ~ x.state ~ ")") %}{% endfor %}
+{%- set leave_line = ("it leaves " ~ leave_items | join(", ")) if leave_items else "" %}
+{%- set close_line = ("It first closes " ~ closes | join(", ") ~ " — each idle and declared — and a session holding uncommitted or unpushed work refuses the start instead") if closes else "" %}
+{%- set confirm_line = (close_line ~ "; " ~ leave_line ~ ".") if close_line and leave_line else ((close_line ~ ".") if close_line else ((leave_line[:1] | upper) ~ leave_line[1:] ~ "." if leave_line else "")) %}
+<button class="btn sm start" data-team-act="start" data-team="{{ g.team }}" title="{{ help_title('start') }}"{% if confirm_line %} data-confirm="Start {{ g.team }}?{% if moved %} {{ moved_line }}{% endif %} {{ confirm_line }}"{% elif moved %} data-confirm="Start {{ g.team }}? {{ moved_line }}"{% endif %}{% if closes %} data-closes="{{ closes | join(', ') }}"{% endif %}{% if leave_line %} data-leaves="{{ (leave_line[:1] | upper) ~ leave_line[1:] }}."{% endif %}{% if moved %} data-moved="{{ moved_line }}"{% endif %}>Start</button>{% endif %}
+{% if not g.stopped or g.startable %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="{{ help_title('wind-down') }}"{% if g.stays %} data-confirm="Wind down {{ g.team }}? {{ g.stays | join('; ') }}."{% endif %}>Wind down</button>
+<button class="btn sm ghost stop" data-team-act="stopnow" data-team="{{ g.team }}" title="{{ help_title('stop-now') }}"{% if g.stays %} data-confirm="Stop {{ g.team }} now? {{ g.stays | join('; ') }}."{% endif %}>Stop now</button>
+{% endif %}{% endif %}
 {# the fold (design §4.5a *team card: fold*, TD-156 (f), TD-194): any team with sessions folds, and
    the control sits beside Start or Wind down, a chevron and the count — the keyboard's and the
    screen reader's press, which a click on the header's row grows to the mouse; the client keeps

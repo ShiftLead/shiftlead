@@ -386,7 +386,7 @@ def test_a_concluded_team_is_drawn_like_a_stopped_one_with_start_alone(world, cl
     assert '<div class="meta notconcluded"' in head and "not concluded: grind-1 working</div>" in head
     # …on the *i* panel's Definition line, not the header's row (TD-418, built by TD-428)
     assert head.index('class="note secinfo helppanel"') < head.index('class="defline"') < head.index("notconcluded")
-    assert 'title="Says why this team has no Start yet:' in head
+    assert 'title="Says why this team cannot be started yet:' in head
     lead = {"tail": [], "capabilities": ["control"]}  # the manager, as the records say it: never declares
     member = {"tail": [], "controllers": ["orc-ao"]}
     fleet.sessions[0] = {**badged("orc-ao", "ao-grind", state="needs-you"), **lead}
