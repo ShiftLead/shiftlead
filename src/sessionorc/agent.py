@@ -960,6 +960,8 @@ class HostAgent(
         ] = []  # each start between the cap's reading and its record; emptied once registered
         self._setup_seen: object = None  # `profiles.yml`'s mtime the setup notes last read (§4.3, TD-875)
         self._setup_read_at = float("-inf")  # monotonic: the setup notes' last read
+        self._version_read_at = float("-inf")  # monotonic: the tool-version compare's last read (§4.3, TD-1727)
+        self._version_noted_at: datetime | None = None  # the last tool-version note, as `tool_versions.json` keeps it
         self._pulls: dict[str, dict[str, Any]] = {}  # the pull's readings by repo (design §6 *Pull*)
         # per team, the last fifty `ao doing` calls and each doer's newest five (design §4.8 *the doing log*)
         self.doing_log = DoingLogStore()
