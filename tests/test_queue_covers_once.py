@@ -146,6 +146,12 @@ def test_later_leaves_out_a_covered_member_and_the_inboxs_own_row_draws_its_hold
     _, ahead, _, _ = split_later(lf2, [line(due_now=False)], {}, [], [], ENTRIES)
     assert [h["show"] for h in ahead[0]["holds"]] == ["TD-050", "TD-052", "TD-051", "TD-053", "TD-054"]
     assert "holds" not in item_home(line(), None, entries=ENTRIES), "a snoozed line draws none"
+    # no entries read (a failed repos read gives `{}`): the ids are listed as read, never dropped (review of #3537)
+    assert [h["show"] for h in item_home(line(), {}, entries={})["holds"]] == ["TD-050", "TD-052", "TD-051"]
+    # a line with no repo is looked up bare, each ref, its later ones on other cards its mentions
+    nameless = line("x. Context: TD-050, TD-053.", parts=(), repo_name="")
+    idx = {"TD-050": ("r#TD-050", "r#TD-050"), "TD-053": ("r#TD-099", "r#TD-053")}
+    assert item_home(nameless, idx)["mentions"] == ["r#TD-053"]
     assert [h["id"] for h in item_home(line(), {}, entries=ENTRIES)["holds"]][:1] == ["r#TD-050"], "no Queue: all"
 
 

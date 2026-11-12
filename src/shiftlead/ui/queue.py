@@ -141,8 +141,9 @@ def item_home(
         # its home is the first entry it covers that an open card holds — its `Context:` refs, its `Parts:`, its
         # `decision (paul)` members `Part of` a `Context:` entry (TD-1380) — the later held ones its mentions
         refs = [r for r in named if r in index]
-        if not refs and not name and m and (first := _refs(m.group(1))) and first[0] in index:
-            refs = [first[0]]  # a line with no repo: its first ref looked up bare, by `card_index`'s one-repo rule
+        if not refs and not name and m:
+            # a line with no repo: its refs looked up bare, by `card_index`'s one-repo rule, the later its mentions
+            refs = [r for r in _refs(m.group(1)) if r in index]
         if not named and name and m and (pr := context_pr(m.group(1))) is not None:
             # a `Context:` naming no entry but a PR ties by that PR (TD-1552): the entry it names stands in for one
             # the `Context:` would name — on its open card whatever `needs` is; tied, never named
@@ -239,13 +240,13 @@ def holds_of(
     index: Mapping[str, tuple[str, ...]] | None,
 ) -> list[dict[str, Any]]:
     """A board line's *holds* line (§4.5 screen 12 *Three verbs*, TD-1380): `covers` less its home entry
-    (`home_row`, '' where it has none), open entries alone where `entries` is given, in order — each `{id, show,
+    (`home_row`, '' where it has none), open entries alone where `entries` holds any, in order — each `{id, show,
     href, repo_href, drawn}`: `show` bare where it is the line's own repo's, `repo_href` the Repo page on the id,
     `drawn` where an open card holds its row, and `href` the row's anchor where it is drawn, else `repo_href`."""
     name = str(e.get("repo_name") or "")
     out = []
     for q in covers:
-        if q == home_row or (entries is not None and q not in entries):
+        if q == home_row or (entries and q not in entries):  # no entries read (`{}` too): listed as read
             continue
         repo, _, tid = q.partition("#")
         drawn = bool(index) and q in (index or {}) and not str((index or {})[q][0]).startswith(("kept:", LOOSE))
@@ -378,7 +379,7 @@ def covered(e: Mapping[str, Any], entries: Mapping[str, Mapping[str, Any]] | Non
     member of `entries` (by `<repo>#TD-n`, each with its `repo`, `part_of` and `blocked_by` as the repo facts carry
     them) that carries `decision (<the person>)` and is directly `Part of` one of the `Context:` refs' entries — ref
     by ref in the `Context:`'s order, and by number within each. Qualified ids alone: a bare ref on a line with no
-    repo is left out (`item_home` still looks its first ref up bare). With `entries` None, no members."""
+    repo is left out (`item_home` still looks its refs up bare). With `entries` None, no members."""
     m = CONTEXT.search(str(e.get("text") or ""))
     name = str(e.get("repo_name") or "")
 
