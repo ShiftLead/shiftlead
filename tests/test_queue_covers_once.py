@@ -16,7 +16,7 @@ from markupsafe import Markup
 from test_queue import NOW
 from test_queue_item_shape import card, inbox
 
-from shiftlead.ui.queue import CONTEXT, asked_entries, attach, covered, item_home, split_later
+from shiftlead.ui.queue import CONTEXT, LOOSE, asked_entries, attach, covered, holds_of, item_home, split_later
 
 TODAY = NOW.date().isoformat()
 DESIGN = "**One more round?** Context: TD-050 decision (paul). Parts: TD-052, TD-051. Due: 2026-11-20."
@@ -188,6 +188,30 @@ def test_the_holds_press_handlers_text_sends_a_hidden_cards_link_to_the_repo_pag
     assert (
         'if (!at || at.closest(".qoff")) { e.preventDefault(); location.href = hl.dataset.repoHref; return; }' in near
     )
+
+
+# ---- holds_of's and covered's own reads (TD-1714) ----
+
+
+@pytest.mark.unit
+def test_a_covered_entry_of_another_repo_is_shown_qualified_and_the_lines_own_bare():
+    got = holds_of(line(), ["r#TD-050", "s#TD-007"], "", None, None)
+    assert [(h["show"], h["href"]) for h in got] == [("TD-050", "/repo/r#TD-050"), ("s#TD-007", "/repo/s#TD-007")]
+
+
+@pytest.mark.parametrize("card_id", ["kept:r#TD-051", f"{LOOSE}r#TD-051"])
+@pytest.mark.unit
+def test_a_covered_entry_on_a_kept_or_loose_card_is_not_drawn_and_links_the_repo_page(card_id):
+    idx = {"r#TD-051": (card_id, "r#TD-051"), "r#TD-052": ("r#TD-050", "r#TD-052")}
+    got = {h["id"]: h for h in holds_of(line(), ["r#TD-051", "r#TD-052"], "", None, idx)}
+    assert (got["r#TD-051"]["drawn"], got["r#TD-051"]["href"]) == (False, "/repo/r#TD-051"), card_id
+    assert (got["r#TD-052"]["drawn"], got["r#TD-052"]["href"]) == (True, "#r#TD-052"), "an open card's row is drawn"
+
+
+@pytest.mark.unit
+def test_a_member_whose_only_parent_field_is_part_of_raw_is_covered():
+    raw = {"r#TD-057": {"repo": "r", "part_of_raw": "TD-050", "blocked_by": ["decision (paul)"]}}
+    assert covered(line(parts=()), raw) == ["r#TD-050", "r#TD-057"]
 
 
 # ---- the Repo page's For you over a fake home ----
