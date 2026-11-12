@@ -126,7 +126,10 @@ class Stub:
         os._exit(0)
 
     def run(self) -> None:
-        (self.out / "launch.json").write_text(
+        # written beside, then renamed: the test waits for launch.json to exist and reads it at once,
+        # so it must never exist half-written (TD-1710)
+        tmp = self.out / "launch.json.tmp"
+        tmp.write_text(
             json.dumps(
                 {
                     "pid": os.getpid(),
@@ -137,6 +140,7 @@ class Stub:
             ),
             encoding="utf-8",
         )
+        os.replace(tmp, self.out / "launch.json")
         signal.signal(signal.SIGHUP, self.end)
         signal.signal(signal.SIGTERM, self.end)
         if sys.stdin.isatty():
