@@ -440,8 +440,10 @@ from .queue import (
     card_session,
     card_view,
     card_wants,
+    covered,
     design_link,
     filter_chips,
+    holds_of,
     item_start,
     items_n,
     picks_query,
@@ -453,6 +455,7 @@ from .queue import (
     split_later,
     waits_on_me,
     walk_mine,
+    want_of,
 )
 from .repo import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     COMPLETED_FOLD,  # noqa: F401
@@ -2080,22 +2083,44 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             )
             # an entry's own held row links its design and the design's synopsis, as on its card (TD-1531, TD-1536)
             fy_index = card_index(queue) if queue else None
-            fy_rows = {str(x.get("id") or ""): {**x, **design_link(x, fy_index)} for x in ledger_rows(fy)}
+            # a For you row an open undecided Decide or Do line of the horizon covers draws as its plain row: the
+            # line is its question, drawn once (§4.5 screen 11 *For you*, TD-1380); every repo's entries, so a
+            # cross-repo id is tested as on the Queue
+            fy_entries = fy.get("entries")
+            fy_asks = [
+                b
+                for b in [*boards, *(hz.get("ahead") or [])]
+                if not b.get("decided") and want_of(b, "needs") in ("decide", "do")
+            ]
+            fy_covered = {q.removeprefix(f"{name}#") for b in fy_asks for q in covered(b, fy_entries)}
+            fy_rows = {
+                str(x.get("id") or ""): {**x, **design_link(x, fy_index)}
+                for x in ledger_rows(fy)
+                if str(x.get("id") or "") not in fy_covered
+            }
             fy_ids = {str(x["id"]) for g in bd["foryou"]["groups"] for x in g["rows"]} | {
                 str(x["id"]) for x in bd["foryou"]["claimed"]
             }
             # a line not yet due that the horizon draws is placed too, with its due words (TD-1362): drawn under
             # *Not due yet* as well, it put the entry's own **Lift the hold** / **Answer…** beside its question
+            # …at the first For you row it covers, in `covered`'s order, with its *holds* line (TD-1380); a line
+            # placed nowhere draws the same line where it is drawn
             fy_boards: dict[str, list[dict[str, Any]]] = {}
+
+            def fy_holds(b: dict[str, Any], home: str = "") -> dict[str, Any]:
+                cov = covered(b, fy_entries)
+                return {**b, "covers": cov, "holds": holds_of(b, cov, home, fy_entries, None)}
+
             for sec, lines in (("needs", boards), ("coming", hz.get("ahead") or [])):
                 for b in lines:
-                    hits = (str(i).removeprefix(f"{name}#") for i in b.get("refs") or ())
+                    # a ref to another repo stays qualified and matches no For you row
+                    hits = (q.removeprefix(f"{name}#") for q in covered(b, fy_entries))
                     if hit := next((i for i in hits if i in fy_ids), None):
-                        fy_boards.setdefault(hit, []).append({**b, "fy_section": sec})
+                        fy_boards.setdefault(hit, []).append({**fy_holds(b, f"{name}#{hit}"), "fy_section": sec})
             placed = {str(b.get("id")) for bs in fy_boards.values() for b in bs}
-            boards = [b for b in boards if str(b.get("id")) not in placed]
-            if placed and hz.get("ahead"):
-                hz = {**hz, "ahead": [b for b in hz["ahead"] if str(b.get("id")) not in placed]}
+            boards = [fy_holds(b) for b in boards if str(b.get("id")) not in placed]
+            if hz.get("ahead"):
+                hz = {**hz, "ahead": [fy_holds(b) for b in hz["ahead"] if str(b.get("id")) not in placed]}
             ctx = {
                 "r": r,
                 "name": name,
@@ -4169,6 +4194,8 @@ async def card_mail(
     choices = board_choices()  # once for the request, never once a row (§4.5 *Page loads*, TD-879)
     inbox, states = await h.person_inbox(fleet, choices=choices), await h.person_states(fleet)
     hz = with_standings((await h.board_view(choices))[0], fleet)
+    # the ledger first: what a board line covers is read through its open entries (TD-1380)
+    lf = await h.ledger_view(fleet, inbox["entries"])
     sections = inbox_sections(
         inbox["entries"],
         states=states,
@@ -4180,8 +4207,9 @@ async def card_mail(
         fleet=fleet,
         cards=index,
         roots=await h.repo_roots(),
+        entries_open=lf.get("entries"),
     )
-    later = split_later(await h.ledger_view(fleet, inbox["entries"]), hz["ahead"], index, hz["hidden"])[2]
+    later = split_later(lf, hz["ahead"], index, hz["hidden"], entries=lf.get("entries"))[2]
     with timing.step("render"):  # each attached row drawn by the Inbox's own renderer
         by_id = {str(c.get("id")): c for c in cards if isinstance(c, dict)}
         mail = attach(
@@ -4953,6 +4981,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         )
         hz = with_standings(hz, fleet)
         cards = {} if agent_down else await h.queue_cards()
+        # the ledger first: what a board line covers is read through its open entries (TD-1380)
+        lf = {"n": 0, "groups": []} if agent_down else await ledger_view(fleet, got["entries"])
         sections = inbox_sections(
             got["entries"],
             states=states,
@@ -4966,12 +4996,12 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             fleet=fleet,
             cards=cards,
             roots={} if agent_down else await h.repo_roots(),
+            entries_open=lf.get("entries"),
         )
         picks = rail_picks(request.query_params)
-        lf = {"n": 0, "groups": []} if agent_down else await ledger_view(fleet, got["entries"])
         # the ledger's rows and the board's lines not yet due whose entry a Queue card holds are drawn there
         # (§4.5 screen 6 *Where a row is drawn*, TD-771): *Later* keeps the rest
-        lf, ahead, _, unshown = split_later(lf, hz["ahead"], cards, hz["hidden"], hz["due"])
+        lf, ahead, _, unshown = split_later(lf, hz["ahead"], cards, hz["hidden"], hz["due"], lf.get("entries"))
         hz = horizon_left(hz, ahead, unshown)
         return templates.TemplateResponse(
             request,
@@ -5170,8 +5200,9 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         origin = page_origin(request)
         gz = gzip_ok(request)
         cards, roots = await h.queue_cards(), await h.repo_roots()
+        opened = lf.get("entries")  # what a board line covers is read through them (TD-1380)
         lf, ahead, _, unshown = split_later(
-            lf, hz["ahead"], cards, hz["hidden"], hz["due"]
+            lf, hz["ahead"], cards, hz["hidden"], hz["due"], opened
         )  # a card's is drawn there (TD-771)
         hz = horizon_left(hz, ahead, unshown)
 
@@ -5191,6 +5222,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 fleet=fleet,
                 cards=cards,
                 roots=roots,
+                entries_open=opened,
             )
             got["board_note"] = board_note
             got["sections"] = {k: [e["id"] for e in sections[k]] for k in INBOX_SECTIONS}

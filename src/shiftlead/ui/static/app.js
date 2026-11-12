@@ -5199,6 +5199,14 @@
       if (it) reveal(it, true);
     }
     box.addEventListener("click", (e) => {
+      // a board line's *holds* link (§4.5 screen 12 *Three verbs*, TD-1380): its row's anchor, unless a pick hides
+      // that card (`qoff`) — then the Repo page on the id, the link's `data-repo-href`; TD-829's drop of the
+      // picks stands for every other `#TD-n` press
+      const hl = e.target.closest("a.holdsref[data-repo-href]");
+      if (hl && (hl.getAttribute("href") || "").startsWith("#")) {
+        const at = onCard(AO.hashId(hl.getAttribute("href")));
+        if (!at || at.closest(".qoff")) { e.preventDefault(); location.href = hl.dataset.repoHref; return; }
+      }
       const f = e.target.closest("#qfilters a.qf[data-k]");
       if (f && !(e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1)) {
         e.preventDefault();

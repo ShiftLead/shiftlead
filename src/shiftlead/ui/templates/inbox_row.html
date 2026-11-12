@@ -880,6 +880,14 @@
    hands back the board, the line and the text the reader gave, and the agent refuses the edit when
    that line no longer holds this item. **Reply** (TD-142) opens the mail composer with the line
    quoted and appends the person's words to the line itself — one commit, the line still due. #}
+{#- §4.5 screen 12 *Three verbs* (*One line is one item, however many entries it covers*, §4.5a *Queue card: what
+    needs the person*; TD-1380): the entries a board line holds beside the one it is drawn on, each a link to its row
+    — on a card, its anchor where the page draws it (`data-repo-href` the Repo page, which `app.js` follows where a
+    pick hides that card); elsewhere the Repo page on the id. None when it holds nothing more. -#}
+{% macro holds_line(e) -%}
+{%- if e.holds %}<div class="st holds" title="the entries this line holds: its answer is theirs, and none of them draws its own question">holds {% for x in e.holds %}<a class="holdsref" href="{{ x.href if mode == 'card' else x.repo_href }}" data-repo-href="{{ x.repo_href }}">{{ x.show }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+{%- endmacro %}
+
 {% macro board(e, section, origin_first=False) -%}
 {#- §4.5a **origin note** (§4.5 screen 6 *Boards are read against origin*, TD-221 slice 3): one line
     above the repo's first board row in this list saying where its board was read and what that
@@ -927,6 +935,7 @@
 {%- if card_whole(mode, e) and e.card %}
 <div class="body md sentence">{{ md(e.card.sentence, origin) }}</div>
 {%- if e.card.leads %}<div class="body md leads">{{ md(e.card.leads, origin) }}</div>{% endif %}
+{{- holds_line(e) }}
 {%- if e.card.context or e.key or e.detail %}{{ fold('cb:' ~ e.id, fold_open, 'boardcard', e) }}{% endif %}
 {%- for r in e.replies %}
 <div class="st boardreply">{{ r.by }}, {{ r.date }}: {{ md(r.text, origin, inline=True) }}</div>
@@ -934,6 +943,7 @@
 {%- elif e.lead is defined %}
 {%- if not card_whole(mode, e) %}{{ subj(e) }}{% endif %}
 <div class="body md{% if card_whole(mode, e) %} sentence{% endif %}">{{ md(e.lead, origin) }}</div>
+{{- holds_line(e) }}
 {#- §4.5a **Inbox board row: detail block** (TD-312): the reader's `detail` drawn after the rest of
     the line inside the same fold, through the same renderer — text, never a control or a field. A
     row with a block has the fold however short its line; the fold is drawn open on a row with

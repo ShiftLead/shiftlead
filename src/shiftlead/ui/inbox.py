@@ -2562,6 +2562,7 @@ def inbox_sections(
     cards: Mapping[str, tuple[str, str]] | None = None,
     snoozed: Collection[dict[str, Any]] = (),
     roots: Mapping[str, str] | None = None,
+    entries_open: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Design §4.5 screen 6: the person inbox split into the page's three sections, plus what is
     snoozed — and, from TD-069 step 2, the **session states** (`states`, from `state_rows`) joined
@@ -2624,7 +2625,10 @@ def inbox_sections(
     `on_row` it is drawn on and its `mentions` (`ui.queue.item_home`); a view rule, so the sections and the
     counts are what they were, and `queue_n` is how many counted rows the Queue draws. Without `cards`
     every row is `home: inbox`. A question's bare `TD-n` is its asker's repo's (TD-1509), named through `roots`
-    (`{name: root}`, `queue.repo_roots`) as the Queue's reading names it."""
+    (`{name: root}`, `queue.repo_roots`) as the Queue's reading names it. `entries_open` is the open entries by
+    `<repo>#TD-n` (`ledger_for_you`'s `entries`): a board line covers its `decision (paul)` members `Part of` a
+    `Context:` entry through it, and is homed and draws its *holds* line by them (`ui.queue.covered`, TD-1380);
+    without it a line covers what its text names alone."""
     at = now or datetime.now(UTC)
     out: dict[str, list[dict[str, Any]]] = {k: [] for k in INBOX_SECTIONS}
     # a stuck decided line is drawn on its own row (§6 rule 13 *What the person sees*, TD-1497 slice 2)
@@ -2736,7 +2740,13 @@ def inbox_sections(
         out[k] = [
             {
                 **e,
-                **item_home(e, cards if k != "snoozed" else None, askers, k != "snoozed" and needs_person(e, k)),
+                **item_home(
+                    e,
+                    cards if k != "snoozed" else None,
+                    askers,
+                    k != "snoozed" and needs_person(e, k),
+                    entries_open,
+                ),
                 **design_link(e, cards, askers),  # an item about a design links its PR (TD-1531)
             }
             for e in rows
@@ -3035,7 +3045,9 @@ def ledger_for_you(
     has answered carries `answered` while its asker acts on the answer (§4.4 *The card's status*, TD-1316, by
     `queue.answered_hold`) — the asker's name, the question's kind, `words` (the answer as its row says it), `age`
     (the answer's) and `outcome` (its `done`, if any) — and draws no answers. `every` is every repo's facts, the
-    bare `TD-n` link's index (the Repo page passes one repo as `repos`); `repos` where none is given."""
+    bare `TD-n` link's index (the Repo page passes one repo as `repos`); `repos` where none is given. `entries` is
+    every open entry of `every` by `<repo>#TD-n`, each `{repo, part_of, part_of_raw, blocked_by}`: what a board
+    line covers is read through it (`ui.queue.covered`, TD-1380)."""
     from .repo import PRIORITY_RANK  # repo imports this module: read at call time
 
     now = now or datetime.now(UTC)
@@ -3167,7 +3179,12 @@ def ledger_for_you(
                 }
             )
         groups.append({"repo": name, "rows": rows})
-    return {"n": sum(len(g["rows"]) for g in groups), "groups": groups}
+    # the open entries of every repo read, by `<repo>#TD-n`: what a board line covers is read through them
+    # (`ui.queue.covered`, TD-1380) — its `decision (paul)` members `Part of` a `Context:` entry
+    entries_open = {
+        q: {k: e.get(k) for k in ("repo", "part_of", "part_of_raw", "blocked_by")} for q, e in opens.items()
+    }
+    return {"n": sum(len(g["rows"]) for g in groups), "groups": groups, "entries": entries_open}
 
 
 def _hold_inputs(
