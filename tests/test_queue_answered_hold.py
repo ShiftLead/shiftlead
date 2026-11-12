@@ -272,3 +272,15 @@ def test_a_replied_blocked_outcome_holds_as_an_unreported_answer_and_ends_with_i
     # a replied one is not taken before a newer answered question: the newest holds, as any
     c = _top({root: r}, [_q(outcome=replied, at=ANSWERED - timedelta(minutes=9)), _q(mid="m-2")])[1]["r#TD-001"]
     assert c["top"]["answered"]["mid"] == "m-2"
+
+
+def test_of_two_unreplied_blocked_outcomes_the_newest_holds(tmp_path):
+    """TD-1738: `_mail_hold` keeps the newest unreplied `blocked` question, so with two on one entry the one the
+    person answered last is the hold — in either order in the mail — never the older."""
+    root, r = _held(tmp_path, written=NOW - timedelta(minutes=1))
+    older = _q(mid="m-1", at=NOW - timedelta(hours=3), outcome={**BLOCKED, "by": "m-8"})
+    newer = _q(mid="m-2", at=NOW - timedelta(hours=1), outcome=BLOCKED)
+    older.repo = newer.repo = "r"
+    for qs in ([older, newer], [newer, older]):
+        held = _top({root: r}, qs)[1]["r#TD-001"]["top"]["answered"]
+        assert held is not None and held["mid"] == "m-2" and held["outcome"] == BLOCKED, [q.id for q in qs]
