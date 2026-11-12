@@ -986,13 +986,14 @@ def cmd_team_start(args: argparse.Namespace) -> int:
     # TD-265, TD-563): the first line, and a refusal when every lane is empty unless `--anyway` — the
     # person may know better
     here = hosts.local_host().name
-    picks = teamrun.lanes(call_sync, org, args.name, here)
+    picks = teamrun.lanes(call_sync, org, args.name, here, no_lane=True)
     if picks and picks.get("unserved"):  # its lanes read empty for that reason, which --anyway does not pass (TD-1011)
         return fail(args, picks["unserved"], 1, lanes=picks)
     if picks and picks["empty"] and not args.anyway:
-        return fail(args, f"{teamrun.NOTHING_TO_PICK} ({picks['line']}) — --anyway starts it", 1, lanes=picks)
+        said = " ".join(x for x in (picks["line"], picks.get("no_lane_line")) if x)
+        return fail(args, f"{teamrun.NOTHING_TO_PICK} ({said}) — --anyway starts it", 1, lanes=picks)
     if picks and not args.json:
-        print(picks["line"])
+        print(" ".join(x for x in (picks["line"], picks.get("no_lane_line")) if x))
     try:
         p, result = teamrun.start(
             call_sync, org, args.name, here, profile=args.profile, caller=os.environ.get("SHIFTLEAD_SESSION") or None
@@ -1724,7 +1725,8 @@ def _repo_line(r: dict[str, Any]) -> str:
             f"{len(led['entries'])} open entries{decided}: "
             f"{k.get('pickable', 0) - withheld + len(orders)} pickable{picks},"
             f" {k.get('design', 0)} design{designs}, {k.get('for-you', 0)} for you,"
-            f" {k.get('live-check', 0)} live check{checks}, {k.get('blocked', 0)} blocked,"
+            f" {k.get('live-check', 0)} live check{checks}, {k.get('no-lane', 0)} no lane,"
+            f" {k.get('blocked', 0)} blocked,"
             f" {k.get('evaluation', 0)} evaluation, {k.get('other', 0)} other"
         )
         if led.get("error"):
@@ -1833,6 +1835,8 @@ def _repo_list(e: dict[str, Any]) -> str:
     *design*; the *live-check* line a live check whose only blockers are its `event (live…)` gates;
     anything else, a live check blocked by a decision among it, is on no list ('')."""
     page = str(e.get("for_page") or "")
+    if e.get("no_lane"):  # on its own *no lane:* line, never a list (§4.7, TD-1573)
+        return ""
     if page == "live-check":
         blocks = [str(b) for b in e.get("blocked_by") or []]
         if e.get("pickable") == "yes" and not blocks:
@@ -2063,6 +2067,8 @@ def cmd_repo(args: argparse.Namespace) -> int:
             led = r.get("ledger") or {}
             r["declared_teams"] = list(led.get("declared_teams") or [])
             r["needs_team"] = [e["id"] for e in led.get("entries") or [] if isinstance(e, dict) and e.get("needs_team")]
+            # what no lane of the repo's teams takes, as the home marked it (§4.4 *An entry no lane takes is marked*)
+            r["no_lane"] = [x for x in led.get("no_lane") or [] if isinstance(x, dict)]
             if r["needs_team"]:
                 seat, why = teamrun.tagging_seat(fleet, root, r["declared_teams"])
                 r["tagging_seat"] = {"seat": seat, "why": why}
@@ -2080,6 +2086,10 @@ def cmd_repo(args: argparse.Namespace) -> int:
             # an entry no page kind takes, flagged under the first line (§4.7, §4.4 *Repo facts*, TD-418)
             for flag in ledger_mod.flags((r.get("ledger") or {}).get("entries") or []):
                 print(f"  {flag}")
+            # an entry no lane takes, each with why, before *needs a team* (§4.7, §4.4 *An entry no lane takes
+            # is marked*, TD-1573)
+            for x in r.get("no_lane") or []:
+                print(f"  no lane: {x.get('id')} — {x.get('why')}")
             # an entry no team's lane takes until it names one (§4.7, §4.4 *An entry names its team*, TD-730)
             if r.get("needs_team"):
                 tag = r.get("tagging_seat") or {}
