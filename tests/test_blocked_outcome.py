@@ -282,7 +282,7 @@ def test_a_replaced_blocked_outcomes_note_reads_after_the_answer_and_before_its_
 async def test_a_replied_blocked_outcome_runs_fyis_window_from_the_reply(agent, tmp_path):
     """TD-1734 (b): a replied `blocked` outcome ages out of FYI on the retention window counted from
     `replied.at`, not from when the entry was read or closed."""
-    from datetime import UTC, datetime, timedelta
+    from datetime import UTC, datetime
 
     from sessionorc import mail
 
@@ -293,7 +293,7 @@ async def test_a_replied_blocked_outcome_runs_fyis_window_from_the_reply(agent, 
             note = (await w.call("msg", to=PERSON, text="waits on a key", outcome="blocked", for_=q["id"]))["entry"]
             await person.call("msg", to=worker, text="here", kind="reply", reply_to=note["id"])
             held = _held(agent, q["id"])
-            later = datetime.now(UTC) + timedelta(days=30)
+            later = datetime.now(UTC) + mail.MAIL_RETENTION * 2  # past the window from the read, whatever its length
             replied = later - mail.MAIL_RETENTION / 2
             held.outcome["replied"]["at"] = replied.strftime("%Y-%m-%dT%H:%M:%SZ")
             assert agent._keep(held, later, inbox=True, person=True), "inside the window from the reply"
