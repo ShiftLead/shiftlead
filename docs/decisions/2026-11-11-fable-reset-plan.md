@@ -42,7 +42,7 @@ of the designs that ran past the cap, up to 12 rounds, did so on bought rounds a
 | 1. The draft | Fable (the designer seat) | Writes the design against a short checklist of the situations designs here miss. Beside it, two blocks the script reads: each claim about what code does with the file and line it rests on, and each rule the design states in more than one place | proposed |
 | 2. The pre-review script | called by the author | Checks that every path, symbol, id and section the design names exists, that the claims block is filled, that the places a declared rule is stated agree, and the entry's fields and counts. No reviewer is sent a design without the script's pass line for that commit | **agreed**; the author supplies the terms (Paul's lean) |
 | 3. The rounds | reviewers, as today | Each finding is raised with the situation it is about. The fact-check samples the claims block and reads the code behind it | proposed |
-| 4. The fixes | Sonnet (a second seat) | Holds the design's branch from the handoff and is its only writer. Groups a round's findings by the text they touch, applies the fixes to spans with no hard finding, extends the two blocks for what a fix changes, reruns the script | proposed |
+| 4. The fixes | Sonnet (a second seat, `design-coord`) | Holds the design's branch from the handoff and is its only writer. Groups a round's findings by the text they touch, applies the fixes to spans with no hard finding, extends the two blocks for what a fix changes, reruns the script | proposed |
 | 5. The hard findings | Fable, asked by the Sonnet seat | A span with any finding about two actors at once, interaction with another rule, restarts, endings, timing, actors or error paths goes to Fable whole: the findings, the span and the rules they cite. Fable returns the replacement text or a decision; the Sonnet seat applies it. In doubt, the Sonnet seat sends it up; it never sends one down. The next round is not sent until every question is answered | proposed |
 | 6. The last read | Fable | Reads the whole design once after the last fix, before the closing fact-check, for coherence | proposed |
 
@@ -61,10 +61,22 @@ Of the false claims, two thirds (263 of 394) are found after round 1 and at leas
 had changed, since a later round's fact-check reads only what changed. A quarter of all findings follow
 from an earlier fix. Designs already get about seven fact-checks each.
 
-**Two seats, not one seat that changes model** (Paul, 2026-11-11). The Sonnet seat starts from the design's
+**Two seats, not one seat that changes model** (Paul, 2026-11-11). The second seat is `design-coord`
+(Paul's names: design-pm or design-coord; *coord* is taken here because the org already has a manager
+seat). It starts from the design's
 branch and its review record, which are files, so it needs nothing from the Fable session's context; a
 second seat is a fresh context by construction, and `ao spend` shows each seat's cost with no new measure.
 Changing model inside one session would discard the prompt cache anyway.
+
+**Where the rule lives.** The rounds are agent-cadence's (`cadence.md` §4.8), which shiftlead pins and does
+not edit. The new shape keeps what §4.8 fixes (the fact-checks, the cap, the stop rule, the review record,
+the end-of-rounds item) and changes what it leaves open: who applies a round's fixes, and what runs before
+a reviewer is sent. A repo's own AGENTS.md and briefs come before `cadence.md`, and the designer's brief
+already adds this repo's rule that a round is a Fable review then a Sonnet one. So for the trial the shape
+is written in shiftlead alone: the designer's and `design-coord`'s briefs (`docs/briefs/`, a held path),
+the team's definition and one script. The designer stays the design's author of record: it states the
+class, and files the builds when the rounds end. Only if the shape passes its trial does it go upstream to
+agent-cadence as a proposal, with shiftlead's numbers. The plan's class is therefore in-repo until then.
 
 **The checklist** is distilled from the 1,949 general questions the second pass wrote, weighted to the hard
 situations, at most fifteen questions, kept in the designer's brief (a held path). Not yet written.
@@ -89,9 +101,11 @@ moved to Sonnet, less Fable's questions, the last read and any extra rounds.
    the share of findings following from a fix; each seat's spend for each design.
 3. **What the replays can show** is only that the change is clearly bad: three designs cannot show it is
    good. Paul decides, on thresholds set before they run (proposed: stop if any replay leaves more than one
-   in ten of the key's problem findings silent or wrongly handled, or if Fable's questions, the last read
-   and extra rounds cost more than the fix loop they replace). The real designs are the test, and the shape
-   *has passed its trial* when Paul says so after the replays and the first five real designs.
+   in ten of the key's problem findings silent or wrongly handled). Cost is not a replay's stop condition:
+   one design that costs more says little. The real designs are the test. Cost is read over the first ten
+   of them together, as the total against what those designs would have cost and as how many of the ten
+   came out cheaper (Paul, 2026-11-11: six or seven of ten cheaper may still be worth it), and the shape
+   *has passed its trial* when Paul says so on those two numbers and the findings measures.
 
 Nothing records whether a PR-review finding or a fix after a merge traces to its design; that is the
 measure of what a missed flaw costs and is wanted for step 2.
