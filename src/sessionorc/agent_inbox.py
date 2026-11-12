@@ -1242,6 +1242,8 @@ class InboxMixin:
         if led is not None and led != cur.get("ledger"):
             got["ledger"] = led
             got["completed"] = ledger_mod.completed(led.get("recent"), (cur.get("prs") or {}).get("recent"))
+        if "work_orders" in got:  # joined before it is stored (§6 rule 6 *save a design's answer*, TD-1705)
+            got["work_orders"] = self._joined(root, got["work_orders"], got.get("ledger", cur.get("ledger")))
         if not got:
             return False
         self._repos[root] = {**cur, **got}
