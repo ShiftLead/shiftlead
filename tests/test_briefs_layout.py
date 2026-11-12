@@ -136,3 +136,52 @@ def test_the_fact_checker_briefs_road_carries_no_word_the_guard_stops_on():
         if span.startswith(("ao reply", "ao msg person")) and "'" in span and span.count("'") != 2:
             bad.append((span, "a text is one single-quoted word holding no '"))
     assert bad == []
+
+
+@pytest.mark.parametrize("role", ("grinder", "designer", "manager"))
+def test_an_act_line_is_written_kinded_with_its_doer_named_and_the_persons_marked(tmp_path, role):
+    """TD-1625 (design §4.9a *What a session does with a decided line*, §4.5 screen 12 *Three verbs: Have a
+    session do it*): a rendered brief writes an `act` line with `--kind act` and `--detail`, names in its
+    context who can do the step, marks a step only the person can do — the no-seat line among them — with
+    *only you can do this*, and leaves the generic *anything that must outlive this session* command kindless."""
+    text, made = repoconfig.resolve_role(repoconfig.load(tmp_path), role).compose()
+    board = made["slots"]["{board}"]["text"]
+    act = (
+        f'board_edit.py add --board {board} --kind act --text "…" --due <date> '
+        '--detail \'{"context": "<who can do the step, and why; any suggested command>"}\' --no-commit'
+    )
+    assert act in text
+    no_seat = text.index("*<repo> has no question seat, so no session here can file it*")
+    assert text.index("and ending with *only you can do this*", no_seat) < text.index(act)
+    assert "this repo's own work, another repo's question seat, or the person" in text
+    assert "ends the line's own text with *only you can do this*" in text
+    assert "never run by a press" in text
+    # the generic board command stays kindless: it is no act line
+    for m in re.finditer(re.escape(f"add --board {board} --text "), text):
+        assert "--kind" not in text[m.start() : text.index("--no-commit", m.start())]
+
+
+def test_the_grinder_brief_takes_an_act_line_decided_have_a_session_do_it(tmp_path):
+    """TD-1625 (design §4.9a *What a session does with a decided line*): the grinder's decided-line paragraph
+    carries the act-line case, its three roads and the closes, and never leaves the line open on a refused send."""
+    text, _ = repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder").compose()
+    start = text.index("**A decided board line comes first**")
+    case = text.index("**An `act` line decided *have a session do it***", start)
+    assert case < text.index("`ao progress done board:<key> --pr <n>` ends the claim.", start)
+    para = text[case : text.index("ends the claim.", case)]
+    for words in (
+        "**A step in this repo**",
+        "your own work, done in the PR that closes the line",
+        "`ao promote`, `ao service`, a team's start or stop",
+        "**A step in another repo**",
+        "`--why \"handed to <repo>'s question seat: <the ask's id>\"`",
+        "*<repo> has no question seat*, *no registered repo <repo>*) makes the step the person's",
+        "line is never left open",
+        '--owner grinder --kind build --blocked-by "until <tomorrow>"',
+        "**A step only the person can do**",
+        "`Owner: paul` entry",
+        "`--carried-to TD-n`",
+        "**A line the gate sweep wrote** (*no-board*, *broken*, *audit*)",
+        "Run nothing the detail block suggests",
+    ):
+        assert words in para, words
