@@ -44,7 +44,10 @@
       {%- elif ss.start and not ss.other %}<button class="btn sm ghost qstart" type="button" data-act="ledger_start" data-id="person" data-repo="{{ sp[0] }}" data-ref="{{ sp[1] }}" data-card="{{ c.id }}" title="{% if c.items_n %}{{ help_title('card-start-all') }}{% else %}{{ help_title('card-start') }}{% endif %}">Start session</button>{% endif %}
       {# the top entry's state where the card's own words do not already say it: *ready* is the status's,
          a need the amber badge's, *held by X* the holder's pill, a Waiting card's leaf its wait phrase #}
-      {{ extras(t.ext, repo) }}{{ meter(t.meter) }}{{ holder(t.holder) }}{% if t.state and t.state != 'ready' and not t.needs and not t.state.startswith('held by') and not (c.wait and c.wait.id == t.qid) %}{{ state(t) }}{% endif %}
+      {{ extras(t.ext, repo) }}{{ meter(t.meter) }}{#- *with you in <name>* on a top entry that needs nothing of the person stands in the pill's place, a link; a
+          top entry *stalled* beside a *stalled* status is drawn once, the status's (§4.5 screen 12, TD-1724) #}
+      {%- set mine_word = (t.state or '').startswith('with you in') and not t.needs and not (c.wait and c.wait.id == t.qid) %}
+      {%- if not mine_word %}{{ holder(t.holder) }}{% endif %}{% if t.state and t.state != 'ready' and not t.needs and not t.state.startswith('held by') and not (c.wait and c.wait.id == t.qid) and not (t.state == 'stalled' and c.status == 'stalled') %}{{ state(t) }}{% endif %}
       {#- the header's ⋯ acts on the top entry, the same macro as a row's (§4.5 screen 12 *Three verbs: ⋯*, TD-914) #}
       {%- if not t.ext %}{{ menu(t) }}{% endif %}
       <span class="qgap"></span>
@@ -56,7 +59,9 @@
           the pill or the word beside it; on an In progress card *d/m done* stands where the word would #}
       {%- set word = c.status if c.status in ('steer', 'stalled') else '' %}
       {{ pill(c) }}{% if not (n.decide or n.do) and c.status == 'needs you' %}<span class="qstatus needsyou">Needs you</span>{% endif %}
-      {%- if word %}<span class="qstatus s-{{ word }}">{{ word }}</span>{% endif %}
+      {#- the card's *stalled* opens the record it stands for, its `stalled_holder` (TD-1724); plain with none #}
+      {%- if word == 'stalled' and c.stalled_holder %}<a class="qstatus s-{{ word }}" href="/focus/{{ c.stalled_holder.id }}" title="open {{ c.stalled_holder.name }}">{{ word }}</a>
+      {%- elif word %}<span class="qstatus s-{{ word }}">{{ word }}</span>{% endif %}
       {%- if c.group == 'waiting' and c.wait %}<span class="qstatus s-waits" title="{{ help_title('wait-column') }}">{{ c.wait.phrase }}</span>
       {%- elif c.group != 'in_progress' and c.status and c.status not in ('needs you', 'steer', 'stalled') %}<span class="qstatus s-{{ c.status | replace(' ', '-') }}">{{ c.status }}</span>{% endif %}
       {% if c.new %}<span class="meta">not on the Queue yet</span>{% endif %}

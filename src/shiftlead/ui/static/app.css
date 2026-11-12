@@ -1246,6 +1246,8 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qstate.needs { color: var(--needs-fg); font-weight: 600; }
 .qstate.s-stalled { border-bottom: 1px dashed var(--ended); }
 .qstate.done { color: var(--done-fg); }
+/* a holder's word opens its Focus (§4.5 screen 12, TD-1724): its own colour and mark, and a hover changes colour only */
+a.qstate:hover, a.qstatus:hover { text-decoration: none; color: var(--link); }
 .qstate.s-pressed { color: var(--fg); }  /* a ⋯ press on its way: a state word, not dimmed (TD-1321) */
 .qcount { white-space: nowrap; }
 .qcount.qdone { color: var(--working-fg); font-weight: 600; }
