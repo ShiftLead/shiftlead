@@ -146,6 +146,12 @@ def ids_file() -> Path:
     return home() / "ids.json"
 
 
+def no_lane_noted_file() -> Path:
+    """The note to the taker of an entry no lane takes (design §4.4 *An entry no lane takes is marked*, TD-1686):
+    `{<origin>: {roots: {<checkout>: {from, marked: {<id>: {why, since}}}}, ids: [..]}}`, keyed as `ids.json` is."""
+    return home() / "no_lane_noted.json"
+
+
 def ledger_seen_file() -> Path:
     """The settle clock (design §4.4 *A new entry settles before it is pickable*, TD-707, built by TD-710):
     `{<origin>: {<id>: {at, sig, held?}}}`, keyed by origin as `ids.json` is (`sessionorc.settle`)."""
