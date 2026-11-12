@@ -2921,7 +2921,21 @@ def test_the_grinder_preset_takes_a_decided_board_line_first_with_its_four_outco
         assert f"**the answer {outcome}**" in text, outcome
     done = re.search(r"`(ao board edit done [^`]*)`", text).group(1)  # TD-588: no repo's script
     assert all(f in done for f in ("--line", "--expect", "--why"))
-    assert "the board holds no decided line nobody has claimed" in text
+    assert "the board holds no decided line your lane takes that nobody has claimed" in text
+    # TD-1705 step 5: a design's answer reaching a grinder is a Go done or a round carried, never dropped
+    assert "**A design's answer**" in text and "never dropping it as not your own" in text
+    assert "`Kind: design-first`, `Owner: designer` entry `Part of` the design" in text
+
+
+def test_designer_template_takes_a_designs_answer():
+    """TD-1705 step 5 (design §4.9a *A design's answer*): the shipped designer brief names a design's answer
+    among its work orders as its own: Go in one PR, a round or a Hold filed and carried before the round."""
+    text = (pathlib.Path(__file__).parents[1] / "src/shiftlead/briefs/designer.md").read_text()
+    assert "**A design's answer** among your work orders" in text
+    assert "close the line `--carried-to` it in a ledger PR of its own before the round" in text
+    repo = (pathlib.Path(__file__).parents[1] / "docs/briefs/designer-ao-1.md").read_text()
+    assert "**The answered item is yours**" in repo and "in a ledger PR merged before the round" in repo
+    assert "a work order `board:<key>` in every free-pick lane" not in repo
 
 
 def test_msg_addresses_a_team_or_a_repo(monkeypatch, capsys):
