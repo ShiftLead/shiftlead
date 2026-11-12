@@ -250,6 +250,11 @@ def _oldest_first(found: dict[str, MailEntry], chains: list[list[str]]) -> list[
         for e in found.values()
         if e.outcome and e.closed_by in found and e.outcome.get("by") in found
     ]
+    # a replaced outcome's note (`was`, TD-1694) goes after the answer too, and before its replacement's
+    for e in found.values():
+        was = (e.outcome or {}).get("was") or {}
+        if was.get("by") in found and e.closed_by in found:
+            settled.append([e.closed_by, was["by"], *([e.outcome["by"]] if e.outcome.get("by") in found else [])])
     for chain in [*chains, *answers, *settled]:
         for a, b in zip(chain, chain[1:], strict=False):
             if b not in succ[a]:

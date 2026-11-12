@@ -4487,7 +4487,10 @@ def _thread(args: argparse.Namespace) -> int:
             for line in str(e["text"]).splitlines() or [""]:
                 print(f"  {line}")
             if o := e.get("outcome"):
-                print(f"  outcome: {o.get('state')}")
+                marks = " · replied" if o.get("replied") else ""
+                if isinstance(o.get("was"), dict) and o["was"].get("state") == "blocked":
+                    marks += f" · was blocked: {o['was'].get('text') or ''}".rstrip()
+                print(f"  outcome: {o.get('state')}{marks}")
 
     return emit(args, got, prose)
 

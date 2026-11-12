@@ -187,3 +187,76 @@ async def test_a_handed_entrys_blocked_outcome_is_replaced_once_and_was_never_ne
             await tl.call("msg", to=PERSON, text="done: TD-9", outcome="done", for_="m-entry")
             assert handed.outcome["was"]["text"] == "second block" and "was" not in handed.outcome["was"]
         await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_the_persons_reply_on_a_blocked_outcome_is_recorded_and_ends_its_row(agent, tmp_path):
+    """§4.10 *`blocked` is not a dead end* (TD-1694): a reply to the question or to its outcome's note
+    writes `replied` on every copy, a first one only; a reply elsewhere on the thread stamps nothing; a
+    replied outcome raises no `blocked:` row."""
+    async with LocalClient() as person:
+        worker = await _mk(person, tmp_path)("w", unattended=True)
+        async with LocalClient(caller=worker) as w:
+            q = await _answered(w, person, worker)
+            note = (await w.call("msg", to=PERSON, text="waits on a key", outcome="blocked", for_=q["id"]))["entry"]
+            assert f"blocked:{q['id']}" in agent._notify_rows()
+            await person.call("msg", to=worker, text="what key?", kind="reply", reply_to=note["id"])
+            first = _held(agent, q["id"]).outcome["replied"]
+            assert first["by"] and _held(agent, q["id"]).outcome["state"] == "blocked"
+            mine = next(e for e in agent.sessions[worker].outbox if e.id == q["id"])
+            assert mine.outcome["replied"] == first, "on every copy"
+            assert f"blocked:{q['id']}" not in agent._notify_rows()
+            await person.call("msg", to=worker, text="again", kind="reply", reply_to=q["id"])
+            assert _held(agent, q["id"]).outcome["replied"] == first, "a second reply leaves the first standing"
+            # a reply to another entry on the thread stamps nothing
+            q2 = await _answered(w, person, worker, "second")
+            await w.call("msg", to=PERSON, text="waits", outcome="blocked", for_=q2["id"])
+            other = (await w.call("msg", to=PERSON, text="fyi", kind="note", about="TD-1"))["entry"]
+            await person.call("msg", to=worker, text="ok", kind="reply", reply_to=other["id"])
+            assert "replied" not in _held(agent, q2["id"]).outcome
+        await person.call("kill", id=worker)
+
+
+@pytest.mark.integration
+async def test_dismiss_tells_the_asker_of_an_unreplied_blocked_outcome_and_it_is_kept_until_then(agent, tmp_path):
+    from datetime import UTC, datetime, timedelta
+
+    async with LocalClient() as person:
+        worker = await _mk(person, tmp_path)("w", unattended=True)
+        async with LocalClient(caller=worker) as w:
+            q = await _answered(w, person, worker)
+            await w.call("msg", to=PERSON, text="waits on a key", outcome="blocked", for_=q["id"])
+            later = datetime.now(UTC) + timedelta(days=30)
+            held, mine = _held(agent, q["id"]), next(e for e in agent.sessions[worker].outbox if e.id == q["id"])
+            assert agent._keep(held, later, inbox=True, person=True) and agent._keep(mine, later, inbox=False)
+            q2 = await _answered(w, person, worker, "second")
+            note = (await w.call("msg", to=PERSON, text="waits", outcome="blocked", for_=q2["id"]))["entry"]
+            await person.call("msg", to=worker, text="here", kind="reply", reply_to=note["id"])
+            assert not agent._keep(_held(agent, q2["id"]), later, inbox=True, person=True), "replied: FYI's window"
+            before = len(agent.sessions[worker].inbox)
+            await person.call("inbox_dismiss", msg=[q["id"], q2["id"]])
+            told = [e.text for e in agent.sessions[worker].inbox[before:] if e.from_ == "system"]
+            assert told == [f"the person dismissed {q['id']}: they want nothing more on it"], "the replied one: silent"
+            assert mine.outcome["state"] == "dismissed" and mine.outcome["was"]["state"] == "blocked"
+        await person.call("kill", id=worker)
+
+
+def test_the_thread_view_says_replied_and_was_blocked(monkeypatch, capsys):
+    import argparse
+
+    from shiftlead import cli
+
+    got = {
+        "id": "m-q",
+        "root": "m-q",
+        "entries": [
+            {"id": "m-q", "from_role": "member", "from": "w", "to": ["person"], "kind": "ask", "at": "t",
+             "text": "?", "outcome": {"state": "done", "was": {"state": "blocked", "text": "a key"}}},
+            {"id": "m-r", "from_role": "member", "from": "w", "to": ["person"], "kind": "ask", "at": "t",
+             "text": "?", "outcome": {"state": "blocked", "replied": {"at": "t", "by": "m-x"}}},
+        ],
+    }  # fmt: skip
+    monkeypatch.setattr(cli, "call_sync", lambda *a, **k: got)
+    cli._thread(argparse.Namespace(unread=False, sent=False, thread="m-q", json=False))
+    out = capsys.readouterr().out
+    assert "outcome: done · was blocked: a key" in out and "outcome: blocked · replied" in out
