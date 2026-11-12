@@ -238,6 +238,10 @@ def _answer(order: dict[str, Any], ref: str) -> dict[str, Any] | None:
     return {"text": str(d.get("text") or ""), "date": d.get("date")}
 
 
+class _NoJoin(Exception):
+    """No ledger reading to join a design's answer against (`_joined`, TD-1705): the stored fields are carried."""
+
+
 NODE_CHANGES = "agent-cadence path cadence-changes.md"  # rule 12's command on a node: `ao host up`'s link (TD-1046)
 SETUP_EVERY = 3600.0  # seconds between the setup notes' reads with `profiles.yml` unchanged (TD-875)
 
@@ -2452,14 +2456,14 @@ class TickMixin:
         orders = wos["orders"]
         try:
             if not isinstance(led, dict) or "error" in led or not isinstance(led.get("entries"), list):
-                raise LookupError("no ledger reading to join against")
+                raise _NoJoin
             if not any(isinstance(o, dict) and workorders.design_of(o) for o in orders):
                 got = workorders.join(orders, [], [])  # none routed: any routed field goes
             else:
                 teams = self._teams_settings() if settings is None else settings
                 got = workorders.join(orders, led["entries"], self._designers(root, teams))
         except Exception as e:  # noqa: BLE001 — the stored fields stand; the next tick joins again
-            if not isinstance(e, LookupError):
+            if not isinstance(e, _NoJoin):
                 log.exception("joining the work orders of %s failed", root)
             was = ((self._repos.get(root) or {}).get("work_orders") or {}).get("orders") or []
             got = workorders.carry(orders, was)

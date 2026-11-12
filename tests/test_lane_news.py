@@ -1017,9 +1017,22 @@ async def test_a_designs_answer_is_joined_before_either_store_of_a_fresh_board_r
         led.update({**good, "error": "unreadable"})
         agent._repos_read_at = float("-inf")
         await agent._refresh_repos()
-        assert agent._repos[root]["work_orders"]["orders"][0]["for"] == des
+        kept = {k: agent._repos[root]["work_orders"]["orders"][0].get(k) for k in workorders.ROUTED}
+        assert kept == {"lane": "design-first", "design": "TD-9", "owner": "designer", "for": des}
         led.clear()
         led.update(good)
+
+        # a join that raises: logged, and the stored routing carried the same way
+        designers = agent._designers
+
+        def boom(*a, **kw):
+            raise KeyError("id")
+
+        monkeypatch.setattr(agent, "_designers", boom)
+        agent._repos_read_at = float("-inf")
+        await agent._refresh_repos()
+        assert agent._repos[root]["work_orders"]["orders"][0].get("for") == des
+        monkeypatch.setattr(agent, "_designers", designers)
         # a press's re-read stores its orders joined too
         agent._repos[root]["work_orders"] = {"orders": []}
         monkeypatch.setattr(
