@@ -5375,8 +5375,13 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     # **Have a session do it** (§4.5 screen 12, TD-1624): a stale press where no lane would take
                     # the work is refused here, by the function the button's draw reads
                     want = Path(board).expanduser().resolve()
-                    roots = [Path(r) for r in hosts.local_host().repos()]
-                    root = next((str(r) for r in roots if (r / workorders.board_rel(r)).resolve() == want), "")
+
+                    def board_root() -> str:
+                        roots = [Path(r) for r in hosts.local_host().repos()]
+                        return next((str(r) for r in roots if (r / workorders.board_rel(r)).resolve() == want), "")
+
+                    # a board no registered checkout holds is refused by the agent's own lookup (`_board_root`)
+                    root = await asyncio.to_thread(board_root)
                     org, _notes = await asyncio.to_thread(org_here)
                     if root and (why := await asyncio.to_thread(road_refusal, org, root, "session", host_name())):
                         raise HTTPException(409, why)

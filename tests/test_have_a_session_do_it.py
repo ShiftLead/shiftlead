@@ -86,6 +86,9 @@ def test_the_kind_is_checked_on_the_found_line_whatever_the_page_sent():
     own = ACT.replace("Due: 2026-11-06.", "Due: 2026-11-06. Answers: Yes | No.")
     assert "Decided: Yes" in board.edit_line(open_(own), own, "decide", answer="Yes", today="2026-11-07")
     assert "Decided: Go" in board.edit_line(open_(DECIDE), DECIDE, "decide", answer="Go", today="2026-11-07")
+    pair = ACT.replace("Due: 2026-11-06.", "Due: 2026-11-06. Answers: Works | Not right: <what>.")
+    got = board.edit_line(open_(pair), pair, "decide", answer="Not right: too slow", today="2026-11-07")
+    assert "Decided: Not right: too slow" in got, "the pair's filled form is the line's own answer"
 
 
 # -- the write: the board half alone -----------------------------------------------------------------------------------

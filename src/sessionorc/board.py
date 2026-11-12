@@ -158,8 +158,14 @@ def _session_check(text: str, answer: str) -> None:
     answer that is not one of the line's own `Answers:` is refused on an `act` line unless it is *have a session do
     it* on one with no `Answers:` that is not marked for the person; the fixed text on any other line is refused."""
     said = " ".join(str(answer or "").split())
-    if said in {" ".join(a.split()) for a in ledgerboard.parse_answers(text)}:
+    own = ledgerboard.parse_answers(text)
+    if said in {" ".join(a.split()) for a in own}:
         return
+    try:
+        if own and ledgerboard.fill_not_right(said, own):
+            return  # the pair's *Not right: <what>* form, filled, is one of the line's own answers too
+    except ledgerboard.Refused:
+        pass
     km = ledgerboard.KIND_RE.match(text)
     kind = km.group("kind").lower() if km else None
     if said == HAVE_A_SESSION:
