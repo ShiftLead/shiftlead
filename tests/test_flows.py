@@ -12,6 +12,7 @@ import pytest
 import yaml
 from test_cli_teams import HOST, world  # noqa: F401 — the fixture, by name
 
+from sessionorc import brief
 from shiftlead import flowdefs, repoconfig, teams
 from shiftlead import org as orgmod
 
@@ -1590,7 +1591,8 @@ def test_a_renamed_member_reads_renamed_and_a_dropped_one_removed_and_apply_hand
         ("relaunch", "ao-shiftlead-grind-2", "mill-2", None),
         ("relaunch", "ao-shiftlead-hunt", None, True),
     ]
-    assert acts[0][1]["launch"]["lane"] and "{" not in acts[0][1]["launch"]["prompt"]  # mill-1's composed launch
+    # mill-1's composed launch, every placeholder filled (a brief's literal JSON, `--detail '{"context": …}'`, is none)
+    assert acts[0][1]["launch"]["lane"] and not brief.PLACEHOLDER_RE.search(acts[0][1]["launch"]["prompt"])
     assert acts[2][1] == {"id": "ao-shiftlead-hunt", "sit_out": True, "dropped": True}
     # applied: the orphans hold their newcomers and the removal sits out, so nothing is read again
     assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
