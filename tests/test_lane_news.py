@@ -730,3 +730,195 @@ async def test_an_unserved_repos_lane_reads_empty_and_a_turn_to_unserved_is_told
         agent._turned_unserved(str(tmp_path), {}, {**facts, "seams": unserved})  # read unserved from the first
         assert len(told()) == 1
         await person.call("kill", id=sid)
+
+
+async def _as(caller, method: str, **kw):
+    """`method` called as `caller` (a session id), or as the person where it is None."""
+    async with LocalClient(caller=caller) as c:
+        return await c.call(method, **kw)
+
+
+def _line(i: str, text: str = "Go", date: str = "2026-11-11") -> dict:
+    from sessionorc import workorders
+
+    return workorders.entry({"id": i, "title": i, "decided": {"text": text, "date": date}})
+
+
+def _declare(rec) -> None:
+    rec.out_of_work, rec.lane_seen = {"at": "2026-09-27T20:00:00Z", "why": "nothing pickable"}, None
+
+
+async def _dropped_by_itself(agent, person, tmp_path, name: str, orders: list[dict], ref: str) -> str:
+    """A supervised member of `tmp_path`'s repo that claimed `ref`, dropped it itself and declared out of
+    work, the repo's reading holding `orders` (its board's decided lines and its red PRs)."""
+    sid = await _finished(agent, person, tmp_path, name, ["free-pick"], [_e("TD-001")])
+    facts = agent._repos[str(tmp_path)]
+    facts.update(
+        work_orders={"orders": [o for o in orders if o["id"].startswith("board:")], "at": "2026-09-27T19:00:00Z"},
+        prs={"open": []},
+        pr_orders={"orders": [o for o in orders if o["id"].startswith("pr:")]},
+    )
+    await _as(sid, "progress", id=sid, ref=ref, status="claimed")
+    await _as(sid, "progress", id=sid, ref=ref, status="dropped", why="the designer's")
+    _declare(agent.sessions[sid])
+    return sid
+
+
+async def test_a_work_order_the_member_dropped_itself_is_not_told_back_after_each_none(agent, tmp_path):
+    """TD-1706 (design §6 rule 6 *save one the member itself released*): a member that dropped a decided line
+    or a red PR's order itself and declared out of work is not told it on any later tick, nor after its next
+    `none`; the order is in `lane_seen`, untold, and the mark keeps the line's answer at the drop."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _dropped_by_itself(agent, person, tmp_path, "w", [_line("board:aa"), _line("pr:7")], "board:aa")
+        rec = agent.sessions[sid]
+        await _as(sid, "progress", id=sid, ref="pr:7", status="claimed")
+        await _as(sid, "progress", id=sid, ref="pr:7", status="dropped", why="not mine")
+        _declare(rec)
+        answer = {"text": "Go", "date": "2026-11-11"}
+        assert rec.released == {
+            "board:aa": {"at_drop": answer, "told": answer},
+            "pr:7": {"at_drop": None, "told": None},
+        }
+        for k in range(3):
+            await agent._lane_news(rec, now + timedelta(minutes=k))
+        assert _notes(agent, sid) == [] and set(rec.lane_seen["ids"]) == {"TD-001", "board:aa", "pr:7"}
+        _declare(rec)  # a second `none`: still no news
+        await agent._lane_news(rec, now + timedelta(minutes=5))
+        assert _notes(agent, sid) == [] and "board:aa" in rec.lane_seen["ids"]
+        await person.call("kill", id=sid)
+
+
+async def test_a_released_line_answered_again_is_told_once_per_answer(agent, tmp_path):
+    """TD-1706: a line the member dropped and the person answered again is told to it once — to a gated member
+    once its gate clears, and after an answer that came while it held another claim between two declarations —
+    and a third answer once more; the mark's `told` moves only with the note."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _dropped_by_itself(agent, person, tmp_path, "w", [_line("board:aa")], "board:aa")
+        rec = agent.sessions[sid]
+        facts = agent._repos[str(tmp_path)]
+        await agent._lane_news(rec, now)
+        assert _notes(agent, sid) == []
+        # answered again while the member holds another claim, between two declarations
+        await _as(sid, "progress", id=sid, ref="TD-001", status="claimed")
+        facts["work_orders"]["orders"] = [_line("board:aa", "One more round", "2026-11-12")]
+        await _as(sid, "progress", id=sid, ref="TD-001", status="done")
+        _declare(rec)
+        rec.gated = {"at": "2026-09-27T20:00:00Z"}
+        await agent._lane_news(rec, now + timedelta(minutes=1))
+        assert _notes(agent, sid) == [], "gated: not yet"
+        assert rec.released["board:aa"]["told"] == {"text": "Go", "date": "2026-11-11"}, "moved only with a note"
+        rec.gated = None
+        await agent._lane_news(rec, now + timedelta(minutes=2))
+        await agent._lane_news(rec, now + timedelta(minutes=3))
+        assert len(_notes(agent, sid)) == 1 and "board:aa —" in _notes(agent, sid)[0], "told once its gate cleared"
+        assert rec.released["board:aa"] == {
+            "at_drop": {"text": "Go", "date": "2026-11-11"},
+            "told": {"text": "One more round", "date": "2026-11-12"},
+        }
+        _declare(rec)
+        await agent._lane_news(rec, now + timedelta(minutes=4))
+        assert len(_notes(agent, sid)) == 1, "the answer it was told is no news after the next none"
+        facts["work_orders"]["orders"] = [_line("board:aa", "Go", "2026-11-13")]
+        _declare(rec)
+        await agent._lane_news(rec, now + timedelta(minutes=5))
+        assert len(_notes(agent, sid)) == 2 and "board:aa —" in _notes(agent, sid)[1], "a third answer, once more"
+        await person.call("kill", id=sid)
+
+
+async def test_a_siblings_claim_and_drop_of_a_released_order_is_told_once(agent, tmp_path):
+    """TD-1706: the order a member released itself is in its `lane_seen`, so a sibling that later claims and
+    drops it is told to the member as a dropped lease, once (TD-258)."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _dropped_by_itself(agent, person, tmp_path, "w", [_line("board:aa")], "board:aa")
+        rec = agent.sessions[sid]
+        await agent._lane_news(rec, now)
+        (tmp_path / "s").mkdir()
+        sib = (
+            await person.call("create", name="s", dir=str(tmp_path / "s"), adapter="shell", argv=["bash", "--norc"])
+        )["id"]
+        agent.sessions[sib].repo = str(tmp_path)
+        await _as(sib, "progress", id=sib, ref="board:aa", status="claimed")
+        await _as(sib, "progress", id=sib, ref="board:aa", status="dropped", why="no")
+        assert list(agent.sessions[sib].released) == ["board:aa"], "the sibling's own drop marks its own record"
+        await agent._lane_news(rec, now + timedelta(minutes=1))
+        await agent._lane_news(rec, now + timedelta(minutes=2))
+        notes = _notes(agent, sid)
+        assert len(notes) == 1 and "board:aa (dropped by s)" in notes[0]
+        for x in (sid, sib):
+            await person.call("kill", id=x)
+
+
+async def test_only_the_members_own_applied_drop_of_a_held_order_writes_a_mark(agent, tmp_path):
+    """TD-1706: a person's drop of the member's claim and another session's write no mark, nor a repeat drop, a
+    drop of a ledger id, or one of an order the reading does not hold; the member's claim of the order clears
+    its mark, and the order is told as before."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _finished(agent, person, tmp_path, "w", ["free-pick"], [_e("TD-001")])
+        rec = agent.sessions[sid]
+        agent._repos[str(tmp_path)].update(work_orders={"orders": [_line("board:aa")]})
+        (tmp_path / "o").mkdir()
+        other = (await person.call("create", name="o", dir=str(tmp_path / "o"), adapter="shell", argv=["bash"]))["id"]
+        for caller in (None, other):  # the person, then another session
+            await _as(sid, "progress", id=sid, ref="board:aa", status="claimed")
+            await _as(caller, "progress", id=sid, ref="board:aa", status="dropped", why="x")
+            assert not rec.released
+        for ref in ("TD-001", "board:bb"):
+            await _as(sid, "progress", id=sid, ref=ref, status="claimed")
+            await _as(sid, "progress", id=sid, ref=ref, status="dropped", why="x")
+            assert not rec.released, ref
+        await _as(sid, "progress", id=sid, ref="board:aa", status="claimed")
+        await _as(sid, "progress", id=sid, ref="board:aa", status="dropped", why="x")
+        assert list(rec.released) == ["board:aa"]
+        rec.released = None
+        await _as(sid, "progress", id=sid, ref="board:aa", status="dropped", why="again")
+        assert not rec.released, "a repeat drop is not applied"
+        rec.released = {"board:aa": {"at_drop": None, "told": None}}
+        await _as(sid, "progress", id=sid, ref="board:aa", status="claimed")
+        assert not rec.released, "claimed again: the mark goes"
+        await _as(sid, "progress", id=sid, ref="board:aa", status="done")
+        _declare(rec)
+        rec.progress = [e for e in rec.progress if e.ref != "board:aa"]
+        await agent._lane_news(rec, now)
+        news = [n for n in _notes(agent, sid) if n.startswith("your lane gained")]
+        assert len(news) == 1 and "board:aa —" in news[0], "told as before"
+        for x in (sid, other):
+            await person.call("kill", id=x)
+
+
+async def test_a_released_mark_goes_with_its_order_and_crosses_a_rename(agent, tmp_path):
+    """TD-1706: the tick's pass over every record removes a mark whose order the reading no longer holds, for
+    a member at work too; a reading that carries `error`, or none, removes none; `_carry` copies the mark."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _dropped_by_itself(agent, person, tmp_path, "w", [_line("board:aa"), _line("pr:7")], "board:aa")
+        rec = agent.sessions[sid]
+        await _as(sid, "progress", id=sid, ref="TD-001", status="claimed")  # at work
+        rec.released["pr:7"] = {"at_drop": None, "told": None}
+        facts = agent._repos[str(tmp_path)]
+        facts["work_orders"] = {"orders": [], "error": "git failed"}
+        facts["pr_orders"] = {"orders": [_line("pr:7")]}
+        agent._released_prune(rec)
+        assert set(rec.released) == {"board:aa", "pr:7"}, "a failed board reading removes nothing"
+        del facts["work_orders"]
+        agent._released_prune(rec)
+        assert set(rec.released) == {"board:aa", "pr:7"}, "nor does no reading"
+        facts["work_orders"] = {"orders": []}
+        await agent._keep_running(datetime.now(UTC))
+        assert set(rec.released) == {"pr:7"}, "the line closed: its mark goes"
+        (tmp_path / "n").mkdir()
+        new = (await person.call("create", name="n", dir=str(tmp_path / "n"), adapter="shell", argv=["bash"]))["id"]
+        agent._carry(rec, agent.sessions[new])
+        assert agent.sessions[new].released == {"pr:7": {"at_drop": None, "told": None}}
+        facts["pr_orders"] = {"orders": []}
+        agent._released_prune(rec)
+        assert rec.released is None
+        for x in (sid, new):
+            await person.call("kill", id=x)

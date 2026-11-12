@@ -971,6 +971,29 @@ async def test_a_node_session_says_its_own_word_at_the_home_and_nobody_else_says
     assert agent.remote["laptop"]["ao-x-w"].out_of_work["why"] == "nothing left"
 
 
+async def test_a_node_members_own_drop_of_a_work_order_writes_its_mark_at_the_home(agent):
+    """TD-1706 (design §6 rule 6 *save one the member itself released*): a node's member's `progress` is
+    forwarded to the home, whose handler writes the `released` mark for the member's own drop of a work order
+    its reading holds; another session's forwarded drop of that claim writes none."""
+    from sessionorc import workorders
+
+    agent._take_records("laptop", [record(kind="interactive", unattended=True, repo="/r")], whole=True)
+    order = workorders.entry({"id": "board:aa", "title": "aa", "decided": {"text": "Go", "date": "2026-11-11"}})
+    agent._repos["/r"] = {"name": "r", "root": "/r", "work_orders": {"orders": [order]}}
+
+    async def fwd(caller, status):
+        params = {"id": "ao-x-w", "ref": "board:aa", "status": status, "why": "x"}
+        return await agent._forwarded("laptop", {"rpc": "progress", "params": params, "caller": caller})
+
+    held = agent.remote["laptop"]["ao-x-w"]
+    for caller in ("ao-x-other", "ao-x-w"):
+        assert "error" not in (resp := await fwd("ao-x-w", "claimed")), resp
+        assert "error" not in (resp := await fwd(caller, "dropped")), resp
+        assert bool(held.released) == (caller == "ao-x-w"), caller
+    answer = {"text": "Go", "date": "2026-11-11"}
+    assert held.released == {"board:aa": {"at_drop": answer, "told": answer}}
+
+
 async def test_a_node_cancels_its_forwarded_call_at_the_home_by_token(agent):
     class Held(FakeMux):
         async def request(self, method, timeout=None, **params):

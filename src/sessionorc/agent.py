@@ -2081,7 +2081,7 @@ class HostAgent(
 
     def _carry(self, old: Session, new: Session) -> None:
         """The home's half of a succession across names (design §4.9, TD-706): `old`'s claims in progress
-        and its `lane_seen` copied onto `new`, so the lease and rule 6's memory hold across the name;
+        and its `lane_seen` and `released` copied onto `new`, so the lease and rule 6's memory hold across the name;
         every record of this host and every launch record whose `controllers` name the old address name
         the new one, so a renamed lead is still each member's controller (a node's own records take
         theirs at their node, routed by `_carry_controllers` from the rewritten launch record, TD-712).
@@ -2096,6 +2096,8 @@ class HostAgent(
         ]
         if old.lane_seen is not None:
             new.lane_seen = copy.deepcopy(old.lane_seen)
+        if old.released:
+            new.released = copy.deepcopy(old.released)  # rule 6's other memory, beside it (TD-1706)
         for r in self.sessions.values():
             if r is not old and a in r.controllers:
                 r.controllers = list(dict.fromkeys(b if c == a else c for c in r.controllers))
@@ -3978,6 +3980,7 @@ class HostAgent(
                 holder=holder,
             )
         claimed_at = next((e.at for e in s.progress if e.ref == entry.ref and e.status == "claimed"), None)
+        was = next((e.status for e in s.progress if e.ref == entry.ref), None)
         applied = s.report_progress(entry)
         if applied and status == "done" and entry.source == "declared" and self.mode != "node":
             try:
@@ -3989,9 +3992,21 @@ class HostAgent(
             # (§4.9a; `restart_wanted` since TD-083), and a controller must not act on a stale one
             s.out_of_work = s.restart_wanted = None
             s.lane_seen = None  # rule 6's memory goes with the declaration it was about (TD-195)
+            if s.released and entry.ref in s.released:  # taken again: its next release is a new one (TD-1706)
+                s.released = {i: m for i, m in s.released.items() if i != entry.ref} or None
             self._scale_claimed(s)  # rule 14: a member's claim reads its line at the next tick (TD-1546)
             if s.balance_refused and not self._balance_of(s):
                 s.balance_refused = None  # the line cleared and the member claimed: nothing left to ring
+        if (
+            applied
+            and status == "dropped"
+            and was != "dropped"
+            and entry.source == "declared"
+            and self._is_self(s, caller)
+        ):
+            # a work order the member let go itself is not told back to it after each `none` (§6 rule 6, TD-1706):
+            # only its own drop, never a person's or another session's of its claim, which read the same here
+            self._release(s, entry.ref)
         if applied and status == "dropped" and entry.source == "declared" and mail.as_person(caller, self._graph()):
             # §4.5a *Reports* → Drop, §4.10 (TD-150 slice 3): the session is told its lease went, by a
             # `system` note that wakes it as a person's act does — else it works on, holding nothing
