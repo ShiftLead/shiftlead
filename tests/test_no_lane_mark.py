@@ -95,6 +95,16 @@ def test_the_team_and_kind_cases_give_their_own_words():
 
 
 @pytest.mark.unit
+def test_a_tagged_entry_is_read_against_its_own_teams_lanes_alone():
+    # another team's lane would take it; its own team's lanes take no design-first (TD-1736)
+    lanes = [(DESIGNER, "db"), (GRINDER, "lb")]
+    assert ledger.lane_gap(_e("TD-1", owner="designer", team="lb"), lanes) == (
+        "kind",
+        "Team lb: no lane takes design-first",
+    )
+
+
+@pytest.mark.unit
 def test_owner_words_are_sorted_and_said_once():
     lanes = [(["design-first", "owner:zed", "owner:designer"], ""), (DESIGNER, ""), (GRINDER, "")]
     why = ledger.lane_gap(_e("TD-1"), lanes)[1]
@@ -139,6 +149,16 @@ def test_lane_kinds_subtracts_a_settling_marked_entry_once():
     led = ledger.mark_no_lane(_led(tagged, plain), [(GRINDER, "lb")])
     assert led["by_kind"]["pickable"] == 1 and led["by_kind"]["no-lane"] == 1
     assert teamrun.lane_kinds({"ledger": led})["pickable"] == 0  # the plain settling one alone, subtracted once
+
+
+@pytest.mark.unit
+def test_lane_kinds_leaves_a_marked_settling_entry_out_of_the_withheld_count():
+    # one pickable entry beside a settling one the mark moved to no-lane: it stays counted (TD-1736)
+    tagged = _e("TD-1", page="pickable", kind="build", owner="grinder", team="db", settling={"until": "x"})
+    plain = _e("TD-2", page="pickable", kind="build", owner="grinder")
+    led = ledger.mark_no_lane(_led(tagged, plain), [(GRINDER, "lb")])
+    assert led["by_kind"]["pickable"] == 1 and led["by_kind"]["no-lane"] == 1
+    assert teamrun.lane_kinds({"ledger": led})["pickable"] == 1
 
 
 # ── the Queue ────────────────────────────────────────────────────────────────────────────────────
