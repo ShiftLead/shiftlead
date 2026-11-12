@@ -191,3 +191,11 @@ def test_the_rollup_draws_the_no_lane_segment_with_its_plain_title():
         ro={"rows": [{"kind": "team", "key": "t", "segs": segs, "team": "grind"}]}, kind_bars=ui.KIND_BARS
     )
     assert '<span class="bseg k-no-lane' in html and 'title="1 no lane"' in html
+
+
+@pytest.mark.unit
+def test_a_mark_with_no_why_draws_its_id_alone_in_the_title():
+    from shiftlead.ui import org
+
+    led = {"no_lane": [{"id": "TD-1", "why": ""}, {"id": "TD-2", "why": KIND_WHY}, {"why": "no id: skipped"}]}
+    assert org.no_lane_title(led) == f"TD-1\nTD-2 — {KIND_WHY}"  # never a trailing dash (TD-1739)

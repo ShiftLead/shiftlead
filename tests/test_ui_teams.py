@@ -496,6 +496,7 @@ def test_the_start_press_reads_what_no_lane_will_take_and_every_confirm_carries_
     js = (Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
     assert 'const said = [line, noLane].filter(Boolean).join(" ");' in js
     assert '$("#startnolane").textContent = noLane;' in js
+    assert '$("#startnolane").hidden = !noLane;' in js  # shown only when a clause stands (TD-1739)
     assert '!confirm(b.dataset.confirm + (said ? `\\n\\n${said}` : ""))' in js
     assert 'teamAct(name, "start", b, false, said)' in js and 'teamAct(name, "start", b, true, said)' in js
 
