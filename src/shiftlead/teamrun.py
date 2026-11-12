@@ -744,7 +744,7 @@ def _lane_count(role: str, got: dict[str, Any]) -> str:
     return f"{role}: {count}"
 
 
-def lanes(call: Call, org: orgmod.Org, name: str, host: str) -> dict[str, Any] | None:
+def lanes(call: Call, org: orgmod.Org, name: str, host: str, *, no_lane: bool = False) -> dict[str, Any] | None:
     """What every lane the start creates holds before it (design §4.5a team card **Start**, *What the
     lanes hold, before the start*; TD-262, built by TD-265; TD-558, built by TD-563): the manager's where
     its role carries one and each member role's once — the lanes the team's records carry once it runs
@@ -756,7 +756,11 @@ def lanes(call: Call, org: orgmod.Org, name: str, host: str) -> dict[str, Any] |
     entries* from it, §6 rule 8 *A team with no record*, TD-781). `empty`
     only when every lane was read and none matched; `unserved`, the start's refusal, for a team of an
     unserved repo, whose lanes read empty (§5 *The seams*, TD-1011). None when there is nothing to
-    say: no launch has a lane, or the plan itself fails, which the start reports in its own words."""
+    say: no launch has a lane, or the plan itself fails, which the start reports in its own words.
+
+    `no_lane` (the Start press and `ao team start` alone, never the cached readers) adds **what no lane will
+    take** (TD-1573, built by TD-1687): `no_lane: [{repo, id, why}]` and `no_lane_line`, the clause after the
+    lane line, from `start_no_lane`."""
     try:
         plan = teams.plan(org, name, host, files=files_via(call))
     except (teams.TeamError, ValueError, OSError):
@@ -788,7 +792,67 @@ def lanes(call: Call, org: orgmod.Org, name: str, host: str) -> dict[str, Any] |
             roles[x.role] = {"n": None, "by_kind": {}}
     line = " · ".join(_lane_count(role, got) for role, got in roles.items())
     out = {"line": line, "empty": all(r["n"] == 0 for r in roles.values()), "roles": roles, "ids": list(ids)}
+    if no_lane:
+        gaps = start_no_lane(call, readings, holders, name)
+        line_ = no_lane_clause(gaps)
+        out |= {"no_lane": [{k: g[k] for k in ("repo", "id", "why")} for g in gaps], "no_lane_line": line_}
     return out | ({"unserved": why} if (why := unserved(call, plan)) else {})
+
+
+NO_LANE_SHOWN = 5  # a Start's *no lane* clause names this many entries per repo, then *and n more*
+
+
+def start_no_lane(call: Call, readings: Mapping[str, Any], holders: list[Any], name: str) -> list[dict[str, Any]]:
+    """What no lane will take once the team starts (design §4.5a team card **Start**, *what no lane will take*,
+    TD-1573): for each repo a role of the start works, each open entry `ledger.lane_gap` finds no lane for, read
+    against the lanes the start creates there and every other record of the repo (one `list`), the team's ended
+    records aside since the start replaces them (a live one — a busy seat it leaves running, or a concluded one
+    it closes for a member of the same lane — is read); an unserved repo, or one whose ledger cannot be read,
+    says nothing, and records that cannot be read say nothing at all. `[{repo, id, why}]`, in ledger order per
+    repo, `repo` the checkout's name, `n_repos` on each the repos read, for the clause's *<repo>:*."""
+    dirs: dict[str, list[tuple[list[str], str]]] = {}
+    for x in holders:
+        dirs.setdefault(str(x.dir), []).append((list(x.lane), name))
+    try:
+        rows = [r for r in call("list") or [] if isinstance(r, Mapping)]
+    except Exception:  # noqa: BLE001 — records unread would name every other team's work: say nothing
+        return []
+    read: list[tuple[str, list[Any], list[tuple[list[str], str]]]] = []
+    for d, mine in dirs.items():
+        reading = readings.get(d) or {}
+        led = reading.get("ledger") or {}
+        entries = led.get("entries") if "error" not in led else None
+        if not isinstance(entries, list) or seams_mod.unserved(reading):
+            continue
+        others = [
+            (list(r["lane"]), str(r.get("team") or ""))
+            for r in in_repo(rows, d)
+            if isinstance(r.get("lane"), list)
+            and r["lane"]
+            and not (str(r.get("team") or "").casefold() == name.casefold() and r.get("state") in DEAD)
+        ]
+        read.append((str(reading.get("name") or Path(d).name), entries, [*mine, *others]))
+    out: list[dict[str, Any]] = []
+    for i, (repo, entries, lanes_) in enumerate(read):
+        for e in entries:
+            if isinstance(e, dict) and e.get("id") and (gap := ledger_mod.lane_gap(e, lanes_)):
+                out.append({"repo": repo, "id": str(e["id"]), "why": gap[1], "key": i, "n_repos": len(read)})
+    return out
+
+
+def no_lane_clause(gaps: list[dict[str, Any]]) -> str:
+    """Start's clause (§4.5a **Start**): *· no lane: TD-058 (<why>)*, entries joined by commas, *<repo>:* before
+    each repo's where the start works two, five at most per repo, then *and n more*; '' where there is none."""
+    by_repo: dict[Any, list[dict[str, Any]]] = {}
+    for g in gaps:
+        by_repo.setdefault(g.get("key", g["repo"]), []).append(g)
+    parts = []
+    for got in by_repo.values():
+        named = ", ".join(f"{g['id']} ({g['why']})" for g in got[:NO_LANE_SHOWN])
+        more = f" and {len(got) - NO_LANE_SHOWN} more" if len(got) > NO_LANE_SHOWN else ""
+        two = int(got[0].get("n_repos") or len(by_repo)) > 1
+        parts.append((f"{got[0]['repo']}: " if two else "") + named + more)
+    return f"· no lane: {'; '.join(parts)}" if parts else ""
 
 
 def keep_mail_for(

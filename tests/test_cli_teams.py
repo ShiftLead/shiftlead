@@ -482,7 +482,9 @@ def test_a_team_with_a_host_is_checked_there_and_created_there(world, capsys):
     assert all(p["host"] == "devenv" for m, p in calls if m == "name_check")
     assert all(p["host"] == "devenv" and p["dir"] == checkout for p in creates(state))
     # the lane reading's, before (TD-265), and the sweep switch's (TD-1091)
+    # `list` before the start is the lanes line's read of the repo's records (TD-1687)
     order = [m for m, _ in calls if m not in ("repos", "host_files", "sweep_switch")]
+    order = order[1:] if order[:1] == ["list"] else order
     assert order[0] == "host_dir" and order.index("create") > order.index("name_check")
 
 
@@ -2617,14 +2619,19 @@ def test_a_start_says_what_the_lanes_hold_and_stops_at_empty_lanes_unless_anyway
     state["repos"] = {checkout: {"ledger": {"entries": [entry(4, "no"), entry(5, kind="design-first")]}}}
     assert cli.main(["team", "start", "ao-grind"]) == 1
     err = capsys.readouterr().err
-    assert "nothing to pick: every lane is empty, so the team" in err and "(grinder: 0 · hunter: 0)" in err
+    assert (
+        "nothing to pick: every lane is empty, so the team" in err
+        and "(grinder: 0 · hunter: 0 · no lane: TD-5 (no lane takes design-first))" in err
+    )
     assert "anchor" not in err  # no seat's lane to name (§4.9b *No anchor seat*, TD-757)
     assert "--anyway" in err and not creates(state)
     assert cli.main(["--json", "team", "start", "ao-grind"]) == 1
     got = json.loads(capsys.readouterr().out)
     assert got["error"].startswith("nothing to pick") and got["lanes"]["empty"] is True
     assert cli.main(["team", "start", "ao-grind", "--anyway"]) == 0 and creates(state)
-    assert capsys.readouterr().out.splitlines()[0] == "grinder: 0 · hunter: 0"
+    assert (
+        capsys.readouterr().out.splitlines()[0] == "grinder: 0 · hunter: 0 · no lane: TD-5 (no lane takes design-first)"
+    )
     # a ledger the home could not read: unknown, never empty — it starts
     state["calls"].clear()
     state["repos"] = {checkout: {"ledger": {"error": "no ledger", "entries": []}}}
@@ -2705,8 +2712,15 @@ def test_the_lanes_line_counts_only_the_teams_own_entries(world, capsys):
     picks = teamrun.lanes(cli.call_sync, cli._org_here(), "ao-grind", HOST)
     assert picks["roles"]["grinder"]["n"] == 2, "TD-3 and TD-4 are ops' entries, not ao-grind's"
     assert "grinder: 2 pickable" in picks["line"]
+    assert "no_lane" not in picks  # the cached readers never compute it (TD-1687)
     assert cli.main(["--json", "team", "start", "ao-grind"]) == 0
-    assert json.loads(capsys.readouterr().out)["lanes"]["roles"]["grinder"]["n"] == 2
+    got = json.loads(capsys.readouterr().out)["lanes"]
+    assert got["roles"]["grinder"]["n"] == 2
+    # a build tagged with a team no record carries is what no lane will take (§4.5a **Start**, TD-1687)
+    assert [(g["id"], g["why"]) for g in got["no_lane"]] == [("TD-3", "Team ops: no lane of ops")] + [
+        ("TD-4", "Team ops: no lane of ops")
+    ]
+    assert got["no_lane_line"] == "· no lane: TD-3 (Team ops: no lane of ops), TD-4 (Team ops: no lane of ops)"
 
 
 def _tag_seat(name, team, root, **kw):

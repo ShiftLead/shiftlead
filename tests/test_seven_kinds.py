@@ -206,7 +206,8 @@ def test_ao_repo_reads_the_seven_counts_and_lists_by_the_mapping(tmp_path, monke
     assert cli.main(["repo"]) == 0
     lines = capsys.readouterr().out.splitlines()
     assert lines[0].endswith(
-        "9 open entries: 1 pickable, 1 design, 1 for you, 3 live check, 1 blocked, 1 evaluation, 1 other · read ? ago"
+        "9 open entries: 1 pickable, 1 design, 1 for you, 3 live check, 0 no lane, 1 blocked, 1 evaluation,"
+        " 1 other · read ? ago"
     )
     assert lines[1:3] == [f"  {FLAG}", f"  {EVAL_FLAG}"]
     rows = [ln.split()[:2] for ln in lines[3:]]
