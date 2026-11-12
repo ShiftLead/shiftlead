@@ -250,6 +250,16 @@ def test_records_that_are_no_seat_are_refused_at_todays_count_by_id(bounds):
 
 
 @pytest.mark.integration
+def test_the_addressees_sum_alone_at_the_bound_refuses(bounds):
+    g, check, _ = bounds
+    _tally(g["ao-tl"], "ao-a", 3)  # the seat's records hold the tally; the sender's side holds none
+    _tally(g["ao-tl-2"], "ao-a", 2)
+    assert "pair:ao-tl" not in g["ao-a"].threads and "pair:ao-tl-2" not in g["ao-a"].threads
+    with pytest.raises(RpcError, match="ao-a and tl have exchanged 5"):
+        check("ao-a", ["ao-tl"])
+
+
+@pytest.mark.integration
 def test_an_unscaled_seat_is_named_by_its_seat_name(bounds):
     g, check, _ = bounds
     g["ao-qs"] = _rec("ao-qs", "question", team="alpha", seat={"trigger": "asks"})
