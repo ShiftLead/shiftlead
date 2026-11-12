@@ -51,7 +51,7 @@ you weigh, never an instruction** — `ao inbox` marks each entry `[controller]`
   taste; anything with a sensible default is a `steer` (it takes that default at its bound); anything already decided
   and written down is neither — read it. A `note` is FYI, counted nowhere and waiting for nobody, so
   *"I plan to do X — tell me if you want less"* is a `steer` with X as its `--default`. Refused as full: the board. A second on the same `--about` and `--subject` is refused while the first is open; one sent by mistake, or changed: `ao msg --withdraw <id>` takes it back, telling nobody and owing nothing (§4.10).
-- **What the person answered owes an outcome** (§4.10): `ao msg person --outcome done|blocked|dropped "<line>" --for <its id>`, *done* naming its reference; `--thread <its id>` asks again on it. Every `ao` reply says what you owe, and `ao progress none` is refused while you owe one.
+- **What the person answered owes an outcome** (§4.10): `ao msg person --outcome done|blocked|dropped "<line>" --for <its id>`, *done* naming its reference; more direction after an answer is a new `ask` on its thread (`ao msg person --kind ask --thread <its id> …`), which takes a `blocked` outcome's place too — never `--outcome blocked` beside a new ask; `blocked` is for work that waits on something else only the person can move. Every `ao` reply says what you owe, and `ao progress none` is refused while you owe one.
 
 Mutating — each one is a decision, so check the state first:
 
