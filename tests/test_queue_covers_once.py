@@ -175,11 +175,19 @@ def test_the_holds_line_is_drawn_after_the_body_and_links_each_row():
     assert 'class="st holds"' not in inbox({**row, "holds": []}), "a line that holds nothing else draws none"
 
 
-def test_a_holds_press_whose_card_a_pick_hides_goes_to_the_repo_page():
+def test_the_holds_press_handlers_text_sends_a_hidden_cards_link_to_the_repo_page():
+    """A source pin, not a press: no test runs the Queue's click handler (it lives inside `AO.queue`, which nothing
+    drives under node or in a browser), so this holds its text — a *holds* link whose card is missing or hidden by
+    a pick (`qoff`) cancels the anchor's own move and goes to the Repo page on the id (TD-1380, TD-1715). The
+    condition and its body are pinned whole, so an inverted test or a dropped `preventDefault` fails here."""
     js = (Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
-    at = js.index('closest("a.holdsref[data-repo-href]")')
+    at = js.index('const hl = e.target.closest("a.holdsref[data-repo-href]");')
     near = js[at : at + 400]
-    assert 'closest(".qoff")' in near and "location.href = hl.dataset.repoHref" in near
+    assert 'if (hl && (hl.getAttribute("href") || "").startsWith("#")) {' in near
+    assert 'const at = onCard(AO.hashId(hl.getAttribute("href")));' in near
+    assert (
+        'if (!at || at.closest(".qoff")) { e.preventDefault(); location.href = hl.dataset.repoHref; return; }' in near
+    )
 
 
 # ---- the Repo page's For you over a fake home ----
