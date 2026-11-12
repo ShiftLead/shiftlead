@@ -4555,21 +4555,28 @@ class TickMixin:
         an unserved repo marks nothing, and a reading with `error` is left as it is."""
         led = reading.get("ledger")
         if isinstance(led, dict):
-            lanes = [] if seams_mod.unserved(reading) else self._repo_lanes(root)
+            records = [] if seams_mod.unserved(reading) else self._repo_records(root)
+            lanes = [(list(s.lane), str(s.team or "")) for s in records if s.lane]
             reading["ledger"] = marked = ledger_mod.mark_no_lane(led, lanes)
             if not marked.get("error") and isinstance(marked.get("entries"), list):
-                self._note_no_lane(root, str(reading.get("remote") or ""), marked["entries"], bool(lanes))
+                try:
+                    self._note_no_lane(
+                        root, str(reading.get("remote") or ""), marked["entries"], records if lanes else []
+                    )
+                except Exception:  # noqa: BLE001 — a note never stops a reading from being stored
+                    log.exception("the no-lane note of %s failed", root)
 
-    def _note_no_lane(self, root: str | Path, remote: str, entries: list[Any], lanes_read: bool) -> None:
+    def _note_no_lane(self, root: str | Path, remote: str, entries: list[Any], records: list[Session]) -> None:
         """The note to the taker (design §4.4 *An entry no lane takes is marked*, *The note to the taker*,
         TD-1686): `no_lane_noted.json`'s pass over the checkout's marked entries, and an uncharged `system` note to
         the record each due id was given to (`ids.json`'s `given`), where its `by` resolves to a record the home
-        holds — ended or not, never the person. A store that cannot be kept is logged and sends nothing."""
+        holds — ended or not, never the person. `records` are the repo's (`_repo_records`), none where no lane of
+        it was read. A store that cannot be kept is logged and sends nothing."""
         here = Path(root).resolve()
         key = settle_key(str(root), remote)
         claimed = {
             tid
-            for s in self._repo_records(root)
+            for s in records
             if s.state not in ("exited", "closed")
             for p in s.progress or []
             if p.status == "claimed" and (tid := no_lane_mod.norm(p.ref))
@@ -4577,7 +4584,7 @@ class TickMixin:
         try:
             store = no_lane_mod.load()
             before = json.dumps(store, sort_keys=True)
-            due = no_lane_mod.step(store, key, str(here), entries, lanes_read, claimed, datetime.now(UTC))
+            due = no_lane_mod.step(store, key, str(here), entries, bool(records), claimed, datetime.now(UTC))
             if json.dumps(store, sort_keys=True) != before:
                 no_lane_mod.save(store)
         except OSError as e:

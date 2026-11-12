@@ -253,3 +253,14 @@ async def test_a_checkout_the_registry_drops_loses_its_clocks(agent, tmp_path, m
     agent._repos_read_at = float("-inf")
     await agent._refresh_repos()
     assert no_lane.load()[KEY]["roots"] == {"/other": {}}
+
+
+@pytest.mark.unit
+def test_only_a_ledger_id_normalises_and_a_bad_store_never_raises():
+    assert no_lane.norm("pr:12") is None and no_lane.norm("xx:12") is None and no_lane.norm("td-12") == "TD-012"
+    naive = "2026-11-12T11:00:00"  # a hand-edited stamp with no zone
+    store = {KEY: {"roots": {"/r": {"from": naive, "marked": {"TD-001": {"why": WHY, "since": naive}}},
+                             "/x": {"marked": [{"a": 1}]}}, "ids": "bad"}}  # fmt: skip
+    assert _step(store, [_m("TD-1")], T0) == ["TD-1"]
+    store2: dict = {}
+    assert _step(store2, [], T0, lanes=False) == [] and store2 == {}  # no key for an origin never read

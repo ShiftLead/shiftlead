@@ -5,8 +5,9 @@ tells the session the id was given to. Pure: the host agent's step loads, sends 
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Collection, Iterable, Mapping
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sessionorc import ledger as ledger_mod
@@ -14,14 +15,13 @@ from sessionorc import paths
 from sessionorc.store import _atomic_write
 
 NO_LANE_NOTE_AFTER = timedelta(minutes=30)  # a mark stands this long before its taker is told
+_TID = re.compile(r"TD-\d+", re.I)
 
 
 def norm(tid: Any) -> str | None:
     """An id as the ledger normalises it (`ledger._norm`), None for what is no ledger id (`board:…`, `pr:…`)."""
-    try:
-        return ledger_mod._norm(str(tid))
-    except (ValueError, TypeError):
-        return None
+    text = str(tid).strip()
+    return ledger_mod._norm(text.upper()) if _TID.fullmatch(text) else None
 
 
 def note_text(tid: str, repo: str, why: str, waits: bool) -> str:
@@ -58,9 +58,10 @@ def drop_root(store: dict[str, Any], root: str) -> bool:
 
 def _since(at: Any) -> datetime | None:
     try:
-        return datetime.fromisoformat(str(at))
+        got = datetime.fromisoformat(str(at))
     except ValueError:
         return None
+    return got if got.tzinfo else got.replace(tzinfo=UTC)  # a hand-edited stamp never raises on the compare
 
 
 def step(
@@ -79,7 +80,7 @@ def step(
     taker and sending where it resolves, since an id whose taker does not resolve is spent all the same."""
     rec = store.get(key) if isinstance(store.get(key), dict) else {}
     roots = rec.get("roots") if isinstance(rec.get("roots"), dict) else {}
-    spent = [i for i in rec.get("ids") or [] if isinstance(i, str)]
+    spent = [i for i in rec.get("ids") if isinstance(i, str)] if isinstance(rec.get("ids"), list) else []
     mine = roots.get(root) if isinstance(roots.get(root), dict) else {}
     was = mine.get("marked") if isinstance(mine.get("marked"), dict) else {}
     opened: dict[str, dict[str, Any]] = {}
@@ -116,9 +117,10 @@ def step(
             due.append(e)
     if lanes_read or root in roots:  # a checkout no lane was ever read for gets no key
         roots = {**roots, root: mine}
-    held = {i for r in roots.values() if isinstance(r, dict) for i in (r.get("marked") or {})}
+    held = {i for r in roots.values() if isinstance(r, dict) and isinstance(r.get("marked"), dict) for i in r["marked"]}
     spent = [i for i in spent if i in opened or i in held]
-    store[key] = {"roots": roots, "ids": spent}
+    if roots or spent or key in store:  # an origin no lane was ever read for gets no key
+        store[key] = {"roots": roots, "ids": spent}
     return due
 
 
