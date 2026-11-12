@@ -125,3 +125,48 @@ async def test_the_home_filters_a_nodes_sent_claim_and_its_pass_retires_one_a_no
         {"id": "ao-x-w", "progress": [_claim("TD-50").to_dict(), _claim("TD-53").to_dict()], "retire": []},
     )
     assert got == {"changed": True} and [e.ref for e in near.progress] == ["TD-52", "TD-51", "TD-53"]
+
+
+async def test_a_record_whose_save_fails_never_stops_the_retire_pass(agent, tmp_path, monkeypatch):
+    await park_ticks(agent)
+    agent._repos.update(_repos(tmp_path))
+    recs = [Session(id=f"ao-x-{n}", name=n, kind="interactive", adapter="claude-code", dir=str(tmp_path),
+                    repo=str(tmp_path), progress=[_claim("TD-50")]) for n in ("a", "b")]  # fmt: skip
+    for s in recs:
+        agent.sessions[s.id] = s
+    saved: list[str] = []
+
+    def save(s):
+        if s.id == "ao-x-a":
+            raise OSError("disk full")
+        saved.append(s.id)
+
+    monkeypatch.setattr(agent, "_save", save)
+    try:
+        agent._designs_retired_at = datetime.min.replace(tzinfo=UTC)
+        agent._retire_finished_designs(datetime.now(UTC), queue_mod.finished_designs(agent._repos))
+        assert saved == ["ao-x-b"] and all(s.progress == [] for s in recs)
+    finally:
+        for s in recs:
+            agent.sessions.pop(s.id)
+
+
+async def test_only_the_home_runs_the_retire_pass(agent, tmp_path, monkeypatch):
+    """§4.8: the retire runs at the home alone; a node's derive leaves a finished design's claim for the home."""
+    await park_ticks(agent)
+    agent._repos.update(_repos(tmp_path))
+    s = Session(id="ao-x-n", name="n", kind="interactive", adapter="claude-code", dir=str(tmp_path),
+                repo=str(tmp_path), progress=[_claim("TD-50")])  # fmt: skip
+    agent.sessions[s.id] = s
+    monkeypatch.setattr(agent, "home_reachable", lambda: True)
+    monkeypatch.setattr(reports, "holds_directory", lambda _s: set())
+    try:
+        for mode, left in (("node", ["TD-50"]), ("home", [])):
+            monkeypatch.setattr(agent, "mode", mode)
+            now = datetime.now(UTC)
+            agent._derived_at[s.id] = now  # the derive loop passes it over: only the retire pass could touch it
+            agent._designs_retired_at = datetime.min.replace(tzinfo=UTC)
+            await agent._derive_reports_inner(now)
+            assert [e.ref for e in s.progress] == left, mode
+    finally:
+        agent.sessions.pop(s.id)
