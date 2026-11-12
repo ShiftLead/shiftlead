@@ -146,7 +146,7 @@ is soft and the last three rest on few rows.
 | Situation | findings | only a design review or the live system would catch |
 |---|---|---|
 | shape: a field, format, name, where it is stored, exact words | 341 | 5% |
-| scope: what the rule covers, which callers, pages, kinds | 312 | 13% |
+| scope: what the rule covers, which callers, pages, kinds | 312 | 12% |
 | interaction: how it combines with an existing rule | 214 | 38% |
 | which: choosing among several, tie-break, order of rules | 186 | 16% |
 | when: the trigger, the clock, until when | 164 | 30% |
