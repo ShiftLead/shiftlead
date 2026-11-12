@@ -121,6 +121,10 @@ not mix:
   profile, and a **kind** (`worker`, `seat`, `manager`, `plain`) — the one fact a flow asks of it
   (design §4.9c, TD-307). Nothing keys on it at runtime (invariant 9). Built-in: `grinder`, `hunter`, `designer`, `techlead`, `auditor`, `sweeper`, `manager`,
   `plain` (`manager` was `lead` until 2026-09-20, TD-076, and `orchestrator` until 2026-09-17, TD-055 step 2; neither old name resolves, TD-107). A role may carry a display `label:` — what the badge shows; nothing keys on it. *Not:* type. — *proposed*; the `orchestrator` → `lead` rename is **decided**.
+- **form (answer)** — an offered answer with a slot for the person's words, `<head>:` alone or `<head>: <…>`:
+  `Hold: <note>` on a design's end-of-rounds item, a look's `Not right: <what>`. Drawn as **<head>…**, it opens
+  the word box begun with its head and is never sent as written; words that start with its head fill it, and
+  on a board line they decide the line even when typed into Answer… or Reply (design §4.4 *Decide*, TD-1557).
 - **look** — a message to the person that names screenshots: a builder's question about a
   merged change to a page, for the one thing its checks and the techlead could not settle. A
   `steer` with the default *Works* where the techlead leaned (under *Steering*; it lapses to
