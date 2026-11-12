@@ -660,6 +660,18 @@ def view(
             "switch this session to unattended: the terminal goes read-only, and its manager and the policies "
             "pick it up again. A stop time that passed while you held it is cleared; one still ahead stays"
         )
+    # §4.5 *A taken-over member is marked* (TD-1568): the view's mark and the hover's three parts, which the page
+    # joins — the lead, *<age> ago* from `taken_at` where it is set, the tail; the server draws the first title
+    # and age with the card's own age helper, and the page's clock keeps both. `taken_line` is the join without
+    # the tail, the compact card's last line.
+    d["taken_over"] = bool(s.get("taken_over"))
+    d["taken_lead"] = str(s.get("taken_lead") or "") if d["taken_over"] else ""
+    d["taken_at"] = str(s.get("taken_at") or "") if d["taken_over"] else ""
+    d["taken_tail"] = str(s.get("taken_tail") or "") if d["taken_over"] else ""
+    taken_age = _age(d["taken_at"], now) if d["taken_at"] else ""
+    d["taken_age"] = taken_age
+    d["taken_line"] = " ".join(x for x in (d["taken_lead"], f"{taken_age} ago" if taken_age else "") if x)
+    d["taken_hover"] = " ".join(x for x in (d["taken_line"], d["taken_tail"]) if x)
     # Take over on a member confirms first, wherever it is drawn (§4.5 *A taken-over member*, §4.5a *Focus: Take
     # over*, TD-1440): a record with a team or controllers that the person did not start by hand, since holding it
     # stops its doorbell. Empty on a non-member and on an interactive record: Hand back never confirms.
@@ -1319,7 +1331,8 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         # *last ran* for a seat with a trigger: it runs its brief rather than answering (§4.5, TD-098)
         came = "last came" if d.get("seat_when") in ("", "comes on the next question", MANAGER_WHEN) else "last ran"
         caption = came + (f" · {d['came_age']} ago" if d.get("came_age") else "")
-    elif d["ready_ok"] and d.get("agent", True):
+    elif d["ready_ok"] and d.get("agent", True) and not d.get("taken_over"):
+        # never on a taken-over member (§4.5 *A taken-over member is marked*, TD-1568): it is handed back, not closed
         caption, ccls = "ready to close ✓", "ready"
     elif kind == "doing":
         caption = "says" + (f" · {d['doing']['age']} ago" if d["doing"]["age"] else "")

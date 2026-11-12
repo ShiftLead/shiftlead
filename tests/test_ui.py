@@ -882,6 +882,15 @@ def test_hand_back_clears_a_stop_time_that_passed_while_the_person_held_it(clien
     client.post(f"/api/sessions/{sid}/mode", json={"unattended": False})
     client.post(f"/api/sessions/{sid}/mode", json={"unattended": True})
     assert rec()["run_until"]  # still ahead: it stays
+    # the card's Hand back on a taken-over member (§4.5a *card: Hand back*, TD-1568): the same press, stamped `card`
+    soon = (datetime.now(UTC) + timedelta(seconds=2)).isoformat()
+    assert client.post(f"/api/sessions/{sid}/stop", json={"until": soon}).json()["run_until"]
+    client.post(f"/api/sessions/{sid}/mode", json={"unattended": False})
+    assert wait_for(lambda: datetime.now(UTC).isoformat() > soon, timeout=5)
+    client.post(f"/api/sessions/{sid}/mode", json={"unattended": True, "via": "card"})
+    got = rec()
+    assert got["run_until"] is None and got["unattended"] is True and got["mode_via"] == "card"
+    assert got.get("pause_prompt"), "the gate's texts ride the card's press too"
     client.post(f"/api/sessions/{sid}/kill")
 
 

@@ -125,7 +125,14 @@ def test_unreachable_scheduled_gated_and_limited():
 
 def _held(**kw) -> Session:
     """A member held interactive (§4.5 *A taken-over member*): its mail does not wake it."""
-    return _rec(**{"team": "ao-grind", "state": "idle", "unattended": False, **kw})
+    return _rec(**{"team": "ao-grind", "state": "idle", "unattended": False, "by_person": False, **kw})
+
+
+def test_taken_over_reads_the_derived_by_person():
+    # TD-1568: `unanswered` reads `mail.by_person`, as the view does — a record from before the field that is
+    # interactive, not supervised and with no controllers is the person's own, never held; a supervised one is
+    assert _read(_held(by_person=None))["state"] != "taken_over"
+    assert _read(_held(by_person=None, supervised=True))["state"] == "taken_over"
 
 
 def test_taken_over_comes_after_scheduled_and_before_gated():
@@ -260,7 +267,7 @@ async def test_a_take_up_from_a_held_member_names_who_took_it_over(agent, tmp_pa
         async with LocalClient(caller=w) as wc:
             q = (await wc.call("msg", to=tl, text="rebase or merge?", kind="ask"))["entry"]
             held = agent.sessions[tl]
-            held.state, held.unattended, held.kind, held.by_person = "idle", False, "interactive", None
+            held.state, held.unattended, held.kind, held.by_person = "idle", False, "interactive", False
             held.mode_at, held.mode_by, held.mode_via = "2026-11-05T10:30:00Z", lead, "cli"
             up = await wc.call(
                 "msg", to="person", text="rebase or merge? tl did not answer", kind="ask", thread=q["id"]

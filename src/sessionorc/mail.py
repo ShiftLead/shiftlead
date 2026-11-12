@@ -359,6 +359,21 @@ def by_person(record: Session) -> bool:
     return record.kind == "interactive" and not record.unattended and not record.supervised and not record.controllers
 
 
+def taken_over(record: Session, agent: bool) -> bool:
+    """Whether a member is held: taken over and not handed back (design §4.5 *A taken-over member is
+    marked*, TD-1568). An agent record (`agent`, the caller's `adapters.has_agent`; a shell never is) not
+    ended or scheduled, a member (`team` set or `controllers` non-empty, and not `by_person`, the derived
+    reading), whose mail does not wake it (`mail_wakes` false). The one test `unanswered`'s `taken_over`
+    state, the held row (`agent_serve._held_mail`) and the view's `taken_over` read."""
+    return (
+        agent
+        and record.state not in _NOT_LIVE
+        and bool(record.team or record.controllers)
+        and not by_person(record)
+        and not mail_wakes(record)
+    )
+
+
 def own_end(record: Session) -> bool:
     """An end of the edge between the person's own sessions (§4.10, TD-1069): started by hand
     (`by_person`), interactive as invariant 5 reads one, and holding no `seat` of any trigger — so a

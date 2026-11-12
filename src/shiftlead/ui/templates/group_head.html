@@ -53,6 +53,9 @@
 {% if g.prs_waiting %}<span class="meta prswaiting" title="held PRs waiting for the {{ g.prs_waiting.by }} (design §4.9b) — read them with ao inbox on the seat">{{ g.prs_waiting.n }} PR{{ '' if g.prs_waiting.n == 1 else 's' }} waiting{% if g.prs_waiting.age %} · oldest {{ g.prs_waiting.age }}{% endif %}</span>{% endif %}
 {# *n ready to close* (TD-156 (b)): the idle sessions the checklist passes, a mark on every header #}
 {% if g.ready %}<span class="meta readymark" title="idle sessions whose ready-to-close checklist passes — Close each on its card">{{ g.ready }} ready to close</span>{% endif %}
+{# design §4.5a **team header** → *taken over* count (§4.5 *A taken-over member is marked*, TD-1568): the team's
+   members held interactive, in the warning colour; never pressable, absent at 0 and on any header but a team's #}
+{% if g.team and g.taken %}<span class="meta tkocount" title="{{ g.taken | join(', ') }} — taken over and not handed back; each card says since when">{{ g.taken | length }} taken over</span>{% endif %}
 {% if g.needs %}<span class="pill s-needs"><span class="dot"></span>{{ g.needs }} needs you</span>{% endif %}
 <span class="grow"></span>
 {% if g.team and g.concluded %}<span class="meta" title="every session still here is idle, and every member has declared its run over ({{ 'one asks for a restart' if g.concluded.restart else 'out of work' }}) — Start closes them and starts the team again">concluded{% if g.concluded_age %} {{ g.concluded_age }} ago{% endif %} · {{ 'restart wanted' if g.concluded.restart else 'out of work' }}</span>

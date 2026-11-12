@@ -120,7 +120,7 @@
          unattended*, on a session with no team and no controllers or the person's own start in a team
          (TD-1681), alone sits in more ▾; an ended record
          draws neither (`mode_place`). #}
-      {% if s.agent %}<button class="btn sm{% if s.unattended %} {{ 'link' if s.own and s.ready_ok else 'next' }}{% endif %}{% if s.mode_place != 'slot' %} hidden{% endif %}" id="fmodeact" data-act="mode" data-via="focus" data-id="{{ s.id }}"{% if s.mode_confirm %} data-confirm="{{ s.mode_confirm }}"{% endif %}
+      {% if s.agent %}<button class="btn sm{% if s.unattended %} {{ 'link' if s.own and s.ready_ok else 'next' }}{% endif %}{% if s.mode_place != 'slot' %} hidden{% endif %}{% if s.taken_over %} tko{% endif %}" id="fmodeact" data-act="mode" data-via="focus" data-id="{{ s.id }}"{% if s.mode_confirm %} data-confirm="{{ s.mode_confirm }}"{% endif %}
               data-unattended="{{ 1 if s.unattended else 0 }}"
               title="{{ s.mode_title }}">{{ s.mode_act }}</button>
       <button class="btn sm link" id="fmessage" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }}&#10;{% endif %}{{ help_title('message') }}">✉ Message</button>

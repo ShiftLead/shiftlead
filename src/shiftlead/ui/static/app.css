@@ -28,6 +28,7 @@
   --limited: #7c3aed; --limited-bg: #ede9fe; --limited-fg: #5b21b6;
   --done: #059669; --done-bg: #d1fae5; --done-fg: #065f46;
   --warn-bg: #fff7ed; --warn-line: #fdba74; --warn-fg: #7c2d12; --scraped: #d9a441;
+  --taken: #fdba74; --taken-fg: #7c2d12;  /* §4.5 *A taken-over member is marked* (TD-1568): Hand back's fill */
   --alarm: #b45309; --alarm-bg: #fef3c7; --alarm-fg: #7c2d12;  /* design §4.8a: an identity alarm's mark */
   --primary: #1c2128; --primary-fg: #fff;
   /* design §4.5 *Type scale* (TD-130, built by TD-144): six sizes and two line heights, the same in
@@ -61,6 +62,7 @@ html[data-theme="dark"] {
   --new: #3b82f6; --new-bg: #1a2c52; --new-fg: #bfdbfe; --stalled-bg: #4a1414; --stalled-fg: #fecaca;
   --limited-bg: #2e1d5c; --limited-fg: #ddd6fe; --done-bg: #0d3d2c; --done-fg: #a7f3d0;
   --warn-bg: #3a2410; --warn-line: #9a5b1c; --warn-fg: #fdba74;
+  --taken: #fdba74; --taken-fg: #3a2410;
   --alarm: #d97706; --alarm-bg: #3f2a0c; --alarm-fg: #fcd34d;
   --primary: #e6e9ee; --primary-fg: #0f1216;
   --p-high: #93c5fd; --p-medium: #3b82f6; --p-low: #1e3a8a;
@@ -487,6 +489,13 @@ details.more .menu button:disabled { opacity: .45; cursor: default; } details.mo
 .sc.s-waiting .sbar { background: var(--waiting); }
 .sc.s-stalled .sbar { background: var(--stalled); } .sc.s-limited .sbar { background: var(--limited); }
 .sc.s-needs { box-shadow: 0 0 0 2px var(--needs); }  /* ringed: what to press, seen from across the room */
+/* §4.5 *A taken-over member is marked* (TD-1568): the warning colour, every rule scoped (no bare `.tko`). The ground
+   on any state; the border unless `needs-you`, whose amber border and ring win, since the answer is the act then */
+.sc.tko { background: var(--warn-bg); }
+.sc.tko:not(.s-needs) { border-color: var(--warn-line); }
+.sc.tko .r2 .mode.mine, .sc.tko .r1 .mine, .sc.tko .tkoline { color: var(--warn-fg); }
+.meta.tkocount { color: var(--warn-fg); font-weight: 600; }  /* the team header's *n taken over* */
+.sc-foot .btn.tko, .btn.tko { background-color: var(--taken); border-color: var(--taken); color: var(--taken-fg); font-weight: 600; }
 /* the keyboard's ring (§4.5a Sessions **keys**, TD-124): the browser's focus ring, blue and offset
    outside the card, so it sits apart from the amber needs-you ring rather than replacing it */
 .sc:focus { outline: none; } .sc:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
@@ -782,6 +791,7 @@ html.phonefocus .nsheet.full.open { top: calc(var(--vvt, 0px) + env(safe-area-in
 .nsheet .act .ic { width: 38px; height: 38px; border-radius: 19px; background: var(--hover); display: grid; place-items: center; font-size: var(--t-title); }
 .nsheet .act .al { max-width: 100%; overflow: hidden; text-align: center; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .nsheet .act.next .ic { background: var(--primary); color: var(--primary-fg); }
+.nsheet .act.tko .ic { background: var(--taken); color: var(--taken-fg); }  /* the phone sheet's Hand back (TD-1568) */
 .nsheet .act:disabled { opacity: .45; cursor: default; }
 .nsheet .shrows { border-top: 1px solid var(--line); }
 .nsheet .shrow { width: 100%; height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
