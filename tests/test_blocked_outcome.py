@@ -260,3 +260,64 @@ def test_the_thread_view_says_replied_and_was_blocked(monkeypatch, capsys):
     cli._thread(argparse.Namespace(unread=False, sent=False, thread="m-q", json=False))
     out = capsys.readouterr().out
     assert "outcome: done · was blocked: a key" in out and "outcome: blocked · replied" in out
+
+
+def test_a_replaced_blocked_outcomes_note_reads_after_the_answer_and_before_its_replacement():
+    """TD-1734 (a): a thread's order puts a replaced `blocked` note (`was.by`) after the answer that closed
+    the question and before the outcome that replaced it, even where `at` and the ids alone would put it first."""
+    from sessionorc.agent_common import _oldest_first
+
+    at = "2026-11-12T10:00:00Z"
+    q = MailEntry(id="m-a", from_="w", to=[PERSON], at=at, kind="ask", text="rebase or merge?")
+    note = MailEntry(id="m-b", from_="w", to=[PERSON], at=at, kind="note", text="waits on the vendor")
+    answer = MailEntry(id="m-c", from_=PERSON, to=["w"], at=at, kind="reply", text="merge it", reply_to="m-a")
+    done = MailEntry(id="m-d", from_="w", to=[PERSON], at=at, kind="note", text="done: #12")
+    q.closed_by = "m-c"
+    q.outcome = {"state": "done", "by": "m-d", "was": {"state": "blocked", "by": "m-b", "text": "waits on the vendor"}}
+    found = {e.id: e for e in (q, note, answer, done)}
+    assert [e.id for e in _oldest_first(found, [])] == ["m-a", "m-c", "m-b", "m-d"]
+
+
+@pytest.mark.integration
+async def test_a_replied_blocked_outcome_runs_fyis_window_from_the_reply(agent, tmp_path):
+    """TD-1734 (b): a replied `blocked` outcome ages out of FYI on the retention window counted from
+    `replied.at`, not from when the entry was read or closed."""
+    from datetime import UTC, datetime, timedelta
+
+    from sessionorc import mail
+
+    async with LocalClient() as person:
+        worker = await _mk(person, tmp_path)("w", unattended=True)
+        async with LocalClient(caller=worker) as w:
+            q = await _answered(w, person, worker)
+            note = (await w.call("msg", to=PERSON, text="waits on a key", outcome="blocked", for_=q["id"]))["entry"]
+            await person.call("msg", to=worker, text="here", kind="reply", reply_to=note["id"])
+            held = _held(agent, q["id"])
+            later = datetime.now(UTC) + timedelta(days=30)
+            replied = later - mail.MAIL_RETENTION / 2
+            held.outcome["replied"]["at"] = replied.strftime("%Y-%m-%dT%H:%M:%SZ")
+            assert agent._keep(held, later, inbox=True, person=True), "inside the window from the reply"
+            assert not agent._keep(held, later + mail.MAIL_RETENTION, inbox=True, person=True)
+        await person.call("kill", id=worker)
+
+
+@pytest.mark.integration
+async def test_dismissing_a_handed_entrys_blocked_row_keeps_the_blocked_outcome_as_was(agent, tmp_path):
+    """TD-1734 (c): the person's Dismiss of a handed entry's `blocked` row writes `dismissed` with the
+    blocked outcome kept as `was`, and tells its holder."""
+    async with LocalClient() as person:
+        sid = await _mk(person, tmp_path)("tl", unattended=True)
+        handed = MailEntry(id="m-entry", from_=PERSON, to=[sid], at="2026-11-12T10:00:00Z", kind="ask", text="fix it")
+        handed.handed, handed.entry = True, {"repo": "shiftlead", "type": "debt"}
+        agent.sessions[sid].inbox.append(handed)
+        async with LocalClient(caller=sid) as tl:
+            await tl.call("msg", to=PERSON, text="waits on the person's key", outcome="blocked", for_="m-entry")
+        await person.call("inbox_dismiss", msg=["m-entry"])
+        assert handed.outcome["state"] == "dismissed"
+        assert (
+            handed.outcome["was"]["state"] == "blocked" and handed.outcome["was"]["text"] == "waits on the person's key"
+        )
+        assert "was" not in handed.outcome["was"]
+        told = [e.text for e in agent.sessions[sid].inbox if e.from_ == "system"]
+        assert "the person dismissed m-entry: no outcome is owed on it" in told
+        await person.call("kill", id=sid)
