@@ -185,9 +185,10 @@ def test_a_holds_press_whose_card_a_pick_hides_goes_to_the_repo_page():
 # ---- the Repo page's For you over a fake home ----
 
 
-def _client(tmp_path, monkeypatch, *, due: bool = True):
+def _client(tmp_path, monkeypatch, *, due: bool = True, kind: str = "decide", more: dict | None = None, extra=()):
     """Repo `r`: design TD-050 and its parts TD-051, TD-052 and TD-053 each held on `decision (paul)`, and one
-    open `decide` line whose `Context:` names TD-050 and whose `Parts:` lists TD-051 and TD-052."""
+    open `decide` line whose `Context:` names TD-050 and whose `Parts:` lists TD-051 and TD-052 (`kind` its own
+    where given, `more` its fields over these); `extra` more board items, after it."""
     from test_ui_queue import client
 
     root = tmp_path / "r"
@@ -201,20 +202,23 @@ def _client(tmp_path, monkeypatch, *, due: bool = True):
                 **({"part_of": part_of} if part_of else {})}  # fmt: skip
 
     entries = [held(50, "the design"), held(51, "build one", "TD-050"), held(52, "build two", "TD-050"),
-               held(53, "build three", "TD-050")]  # fmt: skip
+               held(53, "build three", "TD-050"),
+               # open, and on no For you row: what a line not yet due that covers no For you row holds
+               *({"for_page": "pickable", "priority": "medium", "id": f"TD-{n:03d}", "title": f"open {n}",
+                  "blocked_by": []} for n in (60, 61))]  # fmt: skip
     when = NOW.date() if due else NOW.date() + timedelta(days=7)
-    text = (f"decide 2026-11-01 — **One more round on TD-050?** Context: TD-050 decision (paul). "
+    text = (f"{kind} 2026-11-01 — **One more round on TD-050?** Context: TD-050 decision (paul). "
             f"Parts: TD-051, TD-052. Due: {when.isoformat()}.")  # fmt: skip
-    item = {"line": 3, "text": text, "kind": "decide", "decided": None, "due": when.isoformat(),
+    item = {"line": 3, "text": text, "kind": kind, "decided": None, "due": when.isoformat(),
             "answers": ["Go", "Not yet"], "default": "Go", "refs": ["TD-050"], "parts": ["TD-051", "TD-052"],
-            "key": "board:abc12345",
+            "key": "board:abc12345", **(more or {}),
             **({"overdue_days": 0, "due_tag": "due today"} if due else {"due_tag": "due in 7d"})}  # fmt: skip
     repos = {
         str(root): {
             "name": "r",
             "root": str(root),
             "ledger": {"path": "docs/technical_debt.md", "entries": entries},
-            "boards": {"today": TODAY, "boards": [{"root": str(root), "board": str(board), "items": [item]}]},
+            "boards": {"today": TODAY, "boards": [{"root": str(root), "board": str(board), "items": [item, *extra]}]},
         }
     }
 
@@ -248,3 +252,38 @@ def test_the_repo_pages_for_you_draws_the_line_once_and_the_covered_rows_plain(t
     assert "Lift the hold" not in html, "nor its Lift the hold: each is the column's plain row"
     for title in ("build one", "build two", "build three"):
         assert title in html, f"{title} stays in For you as its plain row"
+
+
+STALE = (NOW.date() - timedelta(days=10)).isoformat()
+
+
+@pytest.mark.parametrize(
+    "how",
+    [
+        # decided by another, so `ledger_for_you` still draws its rows (`person_only`; the person's own Decided hides
+        # them before For you reads a line), and stale, so the line is due rather than *Waiting on them*
+        {"more": {"decided": {"date": STALE, "text": "Go"}, "decided_by": "ao-shiftlead-techlead-ao-1"}},
+        {"kind": "watch"},  # a Read line
+    ],
+    ids=["decided", "read"],
+)
+def test_a_line_that_is_no_open_decide_or_do_hides_no_for_you_row(tmp_path, monkeypatch, how):
+    """Only an open undecided Decide or Do line is its covered rows' question (§4.5 screen 11 *For you*, TD-1380):
+    a decided line, or a Read line, leaves each row it covers drawn as itself, its own answers with it."""
+    html = _client(tmp_path, monkeypatch, **how).get("/repo/r").text
+    assert html.count('data-answer="Keep"') >= 3, "each covered row draws its own answers"
+    assert html.count('class="brow"') > 1, "and its own row, not the column's plain row"
+
+
+AHEAD = {"line": 5, "kind": "decide", "decided": None, "due": "2026-12-01", "due_tag": "due in 20d",
+         "text": "decide 2026-11-01 — **Ship TD-060?** Context: TD-060 decision (paul). Parts: TD-061.",
+         "answers": ["Go", "Not yet"], "default": "Go", "refs": ["TD-060"], "parts": ["TD-061"],
+         "key": "board:def67890"}  # fmt: skip
+
+
+def test_a_line_not_yet_due_that_covers_no_for_you_row_draws_its_holds_line(tmp_path, monkeypatch):
+    """A line the horizon draws ahead and For you places nowhere — its entries on no For you row — draws its *holds*
+    line where it is drawn, as a placed line does (TD-1380)."""
+    html = _client(tmp_path, monkeypatch, extra=[AHEAD]).get("/repo/r").text
+    holds = [re.findall(r">(TD-\d+)</a>", h) for h in re.findall(r'<div class="st holds"[^>]*>(.*?)</div>', html, re.S)]
+    assert ["TD-060", "TD-061"] in holds, holds
