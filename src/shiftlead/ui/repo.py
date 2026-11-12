@@ -781,6 +781,10 @@ def team_groups(
         # the definition's rows read the raw records; a view that disagrees about what is live (a
         # delta between the two reads) is not drawn concluded — Wind down is the safe offer then
         concluded = c if live and isinstance(c, dict) and len(c.get("names") or ()) == live else None
+        # the Start that leaves a busy seat running (§4.9a *A busy seat is left alone*, TD-1569): copied only where
+        # the row's `live` is the card's own count, as `concluded` is guarded; set, it governs the controls
+        st = row.get("startable")
+        startable = st if live and isinstance(st, dict) and row.get("live") == live else None
         # never a person's card, live or closed: Forget all is a team act (§4.9 *A person in the team*)
         dead = [m for m in crew if not m.get("seat") and m.get("state") in DEAD] if team != NO_TEAM and not live else []
         ready = sum(1 for m in members if (m.get("slot") or {}).get("ccls") == "ready" and m.get("state") == "idle")
@@ -888,7 +892,11 @@ def team_groups(
                 "concluded": concluded,
                 # a live, defined team that is not: why there is no Start, a clause per session
                 # that keeps it from the reading (§4.5a *team groups*, TD-241)
-                "not_concluded": list(row.get("not_concluded") or []) if live and concluded is None else [],
+                # …and not where a Start that leaves a busy seat running is offered (TD-1569)
+                "not_concluded": (
+                    list(row.get("not_concluded") or []) if live and concluded is None and startable is None else []
+                ),
+                "startable": startable,
                 "concluded_age": row.get("concluded_age") if concluded else "",
                 "stopped": not live or concluded is not None,
                 # a person's live sessions in the team, named apart in Wind down's and Stop now's

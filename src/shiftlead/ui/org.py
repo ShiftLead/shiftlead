@@ -791,10 +791,20 @@ def rollup_rows(items: list[dict[str, Any]], counted: Collection[str]) -> list[d
                 row["last"] = {k: d.get(k) for k in ("at", "age", "name", "text")}
             row["asked"] = summary.get("asked")
             # the card's own acts: Start, Wind down and Stop now are a defined team's (its header's buttons);
-            # a stopped team's ⋯ has Start first (§4.5a *rollup: press and menus*)
+            # a stopped team's ⋯ has Start first (§4.5a *rollup: press and menus*); a team whose start would leave a
+            # busy seat running (`startable`, §4.9a, TD-1569) offers all three, Start first where it reads stopped
             entry = ["add-entry"] if bool(facet) and _rollup_debt(facet)["ledger"] else []
-            run = (["start"] if it.get("stopped") else ["wind-down", "stop-now"]) if it.get("defined") else []
-            row["acts"] = [*run, *entry, "new-team"] if it.get("stopped") else [*entry, "new-team", *run]
+            if not it.get("defined"):
+                row["acts"] = [*entry, "new-team"]
+            elif it.get("startable"):
+                both = ["start", "wind-down", "stop-now"]
+                row["acts"] = (
+                    ["start", *entry, "new-team", *both[1:]] if it.get("stopped") else [*entry, "new-team", *both]
+                )
+            elif it.get("stopped"):
+                row["acts"] = ["start", *entry, "new-team"]
+            else:
+                row["acts"] = [*entry, "new-team", "wind-down", "stop-now"]
         elif kind == "repo":
             facet = it.get("facet")
             row.update(

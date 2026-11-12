@@ -3257,7 +3257,8 @@
       $("#starthead").textContent = `Start ${name}?`;
       $("#starttext").textContent = "Nothing to pick: every lane is empty, so the team will wind down as soon as it starts.";
       // the definition's renames and removals (§4.9, TD-706), then a concluded team's closes
-      const first = [b.dataset.moved || "", b.dataset.closes ? `It first closes ${b.dataset.closes}.` : ""].filter(Boolean);
+      // …and the busy seats it leaves running (§4.9a *A busy seat is left alone*, TD-1569)
+      const first = [b.dataset.moved || "", b.dataset.closes ? `It first closes ${b.dataset.closes}.` : "", b.dataset.leaves || ""].filter(Boolean);
       $("#startcloses").textContent = first.join(" ");
       $("#startcloses").hidden = !first.length;
       $("#startlanes").textContent = line;
@@ -3316,6 +3317,9 @@
       const shut = (o.closed || []).length ? ` (closed ${(o.closed || []).map((c) => c.name).join(", ")} first)` : "";
       AO.toast(o.text || `${name}: ${(o.sessions || []).length} session${(o.sessions || []).length === 1 ? "" : "s"} started${shut}`, true);
       (o.moved || []).forEach((l) => AO.toast(`${name}: ${l}`, true));  // the definition's renames and removals (TD-706)
+      // the busy seats the start left running (§4.9a, TD-1569): said, since the page's start returns no text
+      const left = (o.left_running || []).map((x) => `${x.name} (${x.state})`);
+      if (left.length) AO.toast(`${name}: left running: ${left.join(", ")}`, true);
       if (lanes) AO.toast(`${name}: ${lanes}`, true);  // what the lanes held at the press (TD-265)
       // The same two things `ao team start|stop` says and a request could not: a member the
       // definition starts interactive is out of its manager's reach (design §9 invariant 5), and the

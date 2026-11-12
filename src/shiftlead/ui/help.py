@@ -30,8 +30,10 @@ HELP: tuple[Help, ...] = (
             "Runs the team again from its definition: every check first, then the concluded sessions closed under the "
             "wrap-up's own safety check, then the members, each started on its brief, and the manager written closed "
             "when it is on call or started when it stands. Press it to run the team again — after a wind-down, or when "
-            "a run has concluded and you want the next. It is not a message: a running session is mailed with Message…,"
-            " and a session holding uncommitted or unpushed work refuses the start instead of being closed."
+            "a run has concluded and you want the next. A seat still busy — answering, running a command, or holding "
+            "work it has not pushed — is left running, and the start says so. It is not a message: a running session "
+            "is mailed with Message…, and a session holding uncommitted or unpushed work refuses the start instead of "
+            "being closed."
         ),
     ),
     Help(
@@ -96,7 +98,7 @@ HELP: tuple[Help, ...] = (
         "not concluded",
         "a live team's help panel, its Definition line",
         (
-            "Says why this team has no Start yet: one clause for each session that keeps it from reading "
+            "Says why this team cannot be started yet: one clause for each session that keeps it from reading "
             "concluded — one that is working, one idle that has not declared, one that crashed or wants a "
             "restart, one waiting on your answer to its question. Read it to see what to wait for, or which "
             "session to message or close, before the team can be started again. It is read from the sessions' "
