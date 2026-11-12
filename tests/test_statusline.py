@@ -276,6 +276,32 @@ def test_the_reporter_outwaits_a_hooks_bound_and_never_overlaps_the_next_report(
     assert 3 * hook_mod.REPORT_WAIT < STATUSLINE_REFRESH
 
 
+def test_the_reporter_child_hands_the_report_its_own_bound(tmp_path, monkeypatch):
+    """TD-1704: the forked child, not the status line, sends the report, and it waits `REPORT_WAIT`
+    for every step, not a hook's five seconds (TD-1696). The real `aside` runs its child's branch
+    here: the fork answers 0, the child's descriptor moves are stubbed, and its exit is caught."""
+
+    class Exited(Exception):
+        pass
+
+    def exit_(code):
+        raise Exited(code)
+
+    monkeypatch.setattr(hook_mod.os, "fork", lambda: 0)
+    monkeypatch.setattr(hook_mod.os, "setpgid", lambda *a: None)
+    monkeypatch.setattr(hook_mod.os, "open", lambda *a, **k: -1)
+    monkeypatch.setattr(hook_mod.os, "dup2", lambda *a: None)
+    monkeypatch.setattr(hook_mod.os, "closerange", lambda *a: None)
+    monkeypatch.setattr(hook_mod.os, "_exit", exit_)
+    monkeypatch.setattr(hook_mod, "last_report_file", lambda s: tmp_path / f"{s}.json")
+    waits = []
+    monkeypatch.setattr(hook_mod, "call_agent", lambda params, timeout, **k: waits.append(timeout))
+
+    with pytest.raises(Exited):
+        hook_mod.aside(lambda t: hook_mod.report_usage("ao-x-w1", payload(), time.time(), t), wait=0.5)
+    assert waits == [hook_mod.REPORT_WAIT]
+
+
 @pytest.mark.integration
 def test_the_reporter_leaves_the_status_lines_group_and_holds_none_of_its_pipes(home, tmp_path):
     """TD-1682: the tool cancels a still-running status line by its process group, and waits on the
