@@ -557,6 +557,10 @@ def want_of(e: Mapping[str, Any], sec: str) -> str:
     entry their own session holds, no want (TD-1281) — is `attach`'s, read from the card, never from the row."""
     if sec in READ_LINES:
         return "read"
+    out = e.get("outcome")
+    if isinstance(out, Mapping) and out.get("state") == "blocked":
+        # a blocked outcome rides on the ask or steer it settles, yet is never a decision (§4.10 *Outcomes*, TD-1695)
+        return "do"
     row = e.get("row")
     if row == "ledger":
         return "do" if e.get("why") == "yours" else "decide"

@@ -2490,6 +2490,31 @@ def _owing(e: dict[str, Any], record: dict[str, Any] | None, now: datetime) -> N
     e["asker_gone_quiet"] = bool(e["owes"] and e["asker_state"] in ("exited", "closed"))
     if outcome:
         e["outcome_age"] = _age(outcome.get("at"), now)
+    e.update(_blocked_words(e, now))
+
+
+def _blocked_words(e: Mapping[str, Any], now: datetime) -> dict[str, Any]:
+    """The two lines under a row's outcome (§4.5a *Inbox row: `blocked` outcome*, TD-1695): `replied_age`, the age of
+    the person's Reply on a `blocked` outcome (*you replied · <age>*), and `was_blocked`, the `blocked` outcome a newer
+    one replaced (`outcome.was`) or a handed entry keeps while it owes again (its own `was`, TD-1694) — `{text,
+    replied_age}`, drawn *was blocked: <text>* with *· you replied <age>* where it was replied to. Read as shapes."""
+    o = _outcome_of(dict(e))
+    rep = o.get("replied") if o.get("state") == "blocked" else None
+    was = o.get("was") if isinstance(o.get("was"), dict) else e.get("was")
+    was = was if isinstance(was, dict) and was.get("state") == "blocked" else None
+    was_rep = was.get("replied") if was else None
+    return {
+        "replied_age": _age(rep.get("at"), now) if isinstance(rep, dict) else "",
+        "was_blocked": (
+            {
+                "text": str(was.get("text") or ""),
+                "replied_age": _age(was_rep.get("at"), now) if isinstance(was_rep, dict) else "",
+                "replied": isinstance(was_rep, dict),
+            }
+            if was
+            else None
+        ),
+    }
 
 
 def handed_rows(
@@ -2534,6 +2559,7 @@ def handed_rows(
                 ),
                 "age": _age(e.get("at"), now),
                 "outcome_age": _age(_outcome_of(e).get("at"), now) if _outcome_of(e) else "",
+                **_blocked_words(e, now),
             }
         )
     return out
@@ -2698,6 +2724,11 @@ def inbox_sections(
     # **listed under its question** rather than beside it (§4.10 *Outcomes*) — so it is taken out
     # of the FYI list here and hung on the question's own row by `id`.
     settles = {str(_outcome_of(e)["by"]): e["id"] for e in entries if _outcome_of(e).get("by")}
+    # …and the note of a `blocked` outcome a newer one replaced (`outcome.was`, TD-1694): hidden under its question
+    # too, so the question's own row is the one need (§4.10 *Outcomes*, TD-1695)
+    settles.update(
+        {str(w["by"]): e["id"] for e in entries if isinstance(w := _outcome_of(e).get("was"), dict) and w.get("by")}
+    )
     for e in entries:
         snoozed = _iso(e.get("snoozed_until"))
         outcome = _outcome_of(e)
@@ -2713,7 +2744,9 @@ def inbox_sections(
         elif _entry_open(e) and e.get("kind") == "steer":
             out["steering"].append(e)
         elif outcome and outcome.get("state") == "blocked":
-            out["needs"].append(e)  # counted: work stopped on something only a person can move
+            # counted: work stopped on something only a person can move — until the person replies on it, when it is
+            # FYI, drawn under its question as a `done` or `dropped` one is (§4.10, TD-1695)
+            out["fyi" if outcome.get("replied") else "needs"].append(e)
         elif e.get("owes"):
             # the asker exited without reporting: only a person or its manager can find out what
             # happened, so that one is counted; the rest wait on a live session and are not
