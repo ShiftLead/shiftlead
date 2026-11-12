@@ -91,6 +91,12 @@ ENTRY_ACT = (
 )
 
 
+def _blocked_unreplied(e: MailEntry) -> bool:
+    """An entry whose outcome is `blocked` and carries no `replied` (design §4.10, TD-1694)."""
+    o = e.outcome or {}
+    return o.get("state") == "blocked" and not o.get("replied")
+
+
 class InboxMixin:
     # -- the person's own bookkeeping on their inbox (design §4.10, TD-069 step 0) ----------------
     # Each is refused to every session exactly as `inbox_delete` is, and each acts on the org's
@@ -230,6 +236,12 @@ class InboxMixin:
         for e in [x for x in self.person_inbox if x.id in wanted and x.owes]:
             self._mark(e.id, outcome={"state": "dismissed", "text": "", "at": at, "by": ""})
             self._system_note(e.from_, f"the person dismissed {e.id}: no outcome is owed on it")
+        # an unreplied `blocked` outcome is a need only the person ends: its Dismiss tells the asker and
+        # writes `dismissed` on every copy, the blocked one as `was`; a replied one goes silently (TD-1694)
+        for e in [x for x in self.person_inbox if x.id in wanted and not x.handed and _blocked_unreplied(x)]:
+            was = {k: v for k, v in e.outcome.items() if k != "was"}
+            self._mark(e.id, outcome={"state": "dismissed", "text": "", "at": at, "by": "", "was": was})
+            self._system_note(e.from_, f"the person dismissed {e.id}: they want nothing more on it")
         # work the person handed a session lives in that session's inbox, not the person's: its row
         # under *Waiting on them* is dismissed the same way — the debt ends, the holder is told
         # (§4.10 *An entry handed to a seat*, TD-218 slice 3)
@@ -242,7 +254,10 @@ class InboxMixin:
                     and e.handed
                     and (e.owes or (e.outcome or {}).get("state") == "blocked")  # a blocked row is dismissed too
                 ):
-                    self._mark(e.id, outcome={"state": "dismissed", "text": "", "at": at, "by": ""})
+                    gone: dict[str, Any] = {"state": "dismissed", "text": "", "at": at, "by": ""}
+                    if (e.outcome or {}).get("state") == "blocked":
+                        gone["was"] = {k: v for k, v in e.outcome.items() if k != "was"}  # TD-1694
+                    self._mark(e.id, outcome=gone)
                     self._system_note(addr, f"the person dismissed {e.id}: no outcome is owed on it")
                     handed.append(e.id)
         dismissed = [e.id for e in self.person_inbox if e.id in wanted]
@@ -1423,9 +1438,16 @@ class InboxMixin:
             # (design §4.10 *Outcomes*) — the follow-up `--thread` names it, and the person's
             # Inbox lists it under *Waiting on them*, so pruning it would strand both.
             return True
+        if _blocked_unreplied(e) and (e.handed or person or not inbox):
+            # a `blocked` outcome nobody answered is kept, with no age, where an owing question is: only
+            # the person's Reply or Dismiss, or its asker's newer send, ends it (§4.10, TD-1694)
+            return True
         if not inbox and e.source and _parse(e.at) + mail.SOURCED_RETENTION > now:
             return True  # a sourced reply, in its sender's outbox (§4.9b): what `inbox --sent` reads
         since = e.expired_at or e.closed_at or (e.read_at if inbox else e.at)
+        replied = (e.outcome or {}).get("replied")
+        if isinstance(replied, dict) and replied.get("at"):
+            since = replied["at"]  # a replied one runs FYI's window from the reply (TD-1694)
         if since is None and inbox and dead_since:
             # from the later of the death and the arrival: a note written to a closed record — a
             # lapse, an orphan's answer (TD-271) — waits its window for the name's next create

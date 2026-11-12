@@ -1671,6 +1671,23 @@ class MailMixin:
             # a question on a handed entry's thread takes its `blocked` outcome up: the entry owes again,
             # the outcome kept as the entry's own `was` for its next outcome to take (TD-1694)
             self._mark(onto.id, outcome=None, was={k: v for k, v in onto.outcome.items() if k != "was"})
+        if sender == PERSON and kind == "reply" and replied is not None:
+            # The person's Reply on a `blocked` outcome answers it (§4.10 *`blocked` is not a dead end*,
+            # TD-1694): stamped `replied` on every copy when the reply names the question or the outcome's
+            # reporting note, a first reply only; a handed entry's outcome is never stamped.
+            q = next(
+                (
+                    x
+                    for x in self.person_inbox
+                    if x.kind in ASK_KINDS
+                    and not x.handed
+                    and (x.outcome or {}).get("state") == "blocked"
+                    and (x.id == replied.id or (x.outcome or {}).get("by") == replied.id)
+                ),
+                None,
+            )
+            if q is not None and not q.outcome.get("replied"):
+                self._mark(q.id, outcome={**q.outcome, "replied": {"at": at, "by": mid}})
         if sender == PERSON and reply_to:
             # A person's message into a thread resets it (design §4.10): tally and `bound_hit`
             # cleared on every record holding it, so the sessions may reply to the ruling.

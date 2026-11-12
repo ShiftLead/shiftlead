@@ -128,7 +128,7 @@ class NotifyMixin:
                 at = e.passed_up or e.at
                 rows[e.id] = _Row(at, line, e.id, e.id, mail=True, until=e.snoozed_until, card=ask_card)
             outcome = e.outcome or {}
-            if outcome.get("state") == "blocked":
+            if outcome.get("state") == "blocked" and not outcome.get("replied"):  # a replied one is FYI (TD-1694)
                 line = notify.blocked_line(name, team, ref)
                 rows[f"blocked:{e.id}"] = _Row(
                     str(outcome.get("at") or ""), line, e.id, e.id, mail=True, until=e.snoozed_until, card=card
