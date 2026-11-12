@@ -34,7 +34,8 @@ its work waits on are cleared first. Until the Fable window reaches the gate's r
 on the account page.
 
 - **Reset 1** goes to shiftlead: the first hit after the new design shape has passed its trial. If the trial
-  has not passed by mid-December, the next hit is pressed anyway, on the shape as it then stands. *Proposed.*
+  has not passed by mid-December, the next hit outside a week's last two days is pressed anyway, on the
+  shape as it then stands. *Proposed.*
 - **Reset 2** goes to Paul's other projects: a hit once the target repo has a team, a full lane and its
   decisions cleared; from mid-January the next hit is pressed whatever the state. *Proposed.*
 
@@ -84,7 +85,8 @@ script.
   applies. What happens if either seat ends mid-round.
 - Routing: findings grouped by the text they touch; a span with any finding about concurrency, interaction,
   restart, ends, when, who or failure (or *other*, or in doubt) goes to Fable whole, with the rules it
-  cites; never sent down. Reviewers' tags will be wrong about one time in nine.
+  cites; never sent down. How every one of the reviewers' situation names routes, multi-node among them.
+  Reviewers' tags will be wrong about one time in nine.
 - Fable's side: a fresh session for each question or the designer's own, how large a question may be, and
   what each costs. The saving depends on this.
 - The last read: what happens when it finds something, and how it ends.
