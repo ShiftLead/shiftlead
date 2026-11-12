@@ -96,7 +96,7 @@ script.
   entries with their cost).
 - Three replays of past designs. Paul chooses them, before the checklist is written, from designs **critical
   to how shiftlead works** (so that anything new a replay finds is worth having) and whose findings the
-  checklist is not drawn from. Each runs cut off from what came after it: later commits, review records,
+  checklist is not drawn from; whether they may be among the cost model's sample. Each runs cut off from what came after it: later commits, review records,
   history and memory.
 - How a replay is scored: what text, against what, by whom, blind to what; which old findings count; the
   denominator. Replays can show only that the change is clearly bad (*proposed*: more than one in ten of
@@ -134,7 +134,7 @@ the Fable window in the gate's reading.
 ## Withdrawn
 
 - *A cap of two design rounds.* Rounds 3 and 4 each still raise, for each design that reaches them, about
-  0.8 and 0.7 findings only a design review would catch; a round costs the designer at most about $10 (an
+  0.8 and 0.7 findings only a design review would catch; a round costs the designer about $10 (an
   estimate), and a flaw that escapes costs at least a fix PR and, live, far more.
 - *Fable does the design reviews* (it costs far more for each review; Paul).
 - *Every minor finding goes to the builder* (two thirds of the findings labelled minor are substantive).
