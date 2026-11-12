@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
+from sessionorc import board as board_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc.queue import (  # noqa: F401 — the home's
     DESIGN_KEY,
@@ -403,16 +404,30 @@ def covered(e: Mapping[str, Any], entries: Mapping[str, Mapping[str, Any]] | Non
     return out
 
 
+def session_asks(e: Mapping[str, Any]) -> bool:
+    """An open `act` line decided *have a session do it* (§4.5 screen 12 *Three verbs: Have a session do it*,
+    TD-1624): unlike a decided `decide` line, whose lift has answered the entry, it still covers the entries its
+    `Context:` and `Parts:` name while it stays open, whatever its section, so their own rows do not come back."""
+    d = e.get("decided")
+    return (
+        e.get("row") == "board"
+        and str(e.get("kind") or "").lower() == "act"
+        and isinstance(d, Mapping)
+        and " ".join(str(d.get("text") or "").split()) == board_mod.HAVE_A_SESSION
+    )
+
+
 def asked_entries(
     lines: Iterable[Mapping[str, Any]], entries: Mapping[str, Mapping[str, Any]] | None = None
 ) -> set[str]:
     """The entries an open Decide or Do board line asks about (§4.5 screen 12 *Three verbs*, TD-1362): each
     `<repo>#TD-n` it covers (`covered`: its `Context:`, its `Parts:` and, with `entries`, its `decision (paul)`
     members `Part of` a `Context:` entry, TD-1364, TD-1380). Such a line is the entry's question itself, so the
-    entry's own row is not drawn beside it — nor a row it covers (`covered_by`)."""
+    entry's own row is not drawn beside it — nor a row it covers (`covered_by`). A decided line asks nothing, save
+    an open `act` line decided *have a session do it* (`session_asks`, TD-1624)."""
     out: set[str] = set()
     for e in lines or ():
-        if not isinstance(e, Mapping) or e.get("row") != "board" or e.get("decided"):
+        if not isinstance(e, Mapping) or e.get("row") != "board" or (e.get("decided") and not session_asks(e)):
             continue
         if want_of(e, "needs") not in WANTS:
             continue
@@ -427,6 +442,7 @@ def split_later(
     hidden: Any = (),
     due: Any = (),
     entries: Mapping[str, Mapping[str, Any]] | None = None,
+    waiting: Any = (),
 ) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """*Later*'s rows split by where each is drawn (§4.5 screen 6 *Where a row is drawn*, TD-771; screen 12 *What
     is attached to a card*, TD-828): the ledger's rows (`lf`, `ledger_for_you`'s groups) and the board's lines
@@ -439,9 +455,10 @@ def split_later(
     would keep is left out where an open Decide or Do line the page draws — `due` or `ahead` — asks its question
     (`asked_entries`, TD-1362): that line is drawn in its place. `entries` is the open entries by `<repo>#TD-n`
     (`ledger_entries`), which says what each line covers (`covered`, TD-1380); a line the Inbox keeps carries its
-    `covers` and `holds` as `item_home` gives them."""
+    `covers` and `holds` as `item_home` gives them. `waiting` is the horizon's *Waiting on them* rows, of which an
+    open `act` line decided *have a session do it* still asks (`session_asks`, TD-1624)."""
     groups, moved = [], []
-    asked = asked_entries([*(due or ()), *(ahead or ())], entries)
+    asked = asked_entries([*(due or ()), *(ahead or ()), *(waiting or ())], entries)
     for g in (lf or {}).get("groups") or []:
         keep = []
         for e in g.get("rows") or []:
@@ -695,7 +712,8 @@ def attach(
     strip_rows: set[str] = set()
     strip: set[str] = set()
     for e, sec in placed:
-        if e.get("row") == "board" and want_of(e, sec) in WANTS:
+        # an open `act` line decided *have a session do it* covers too, whatever its section (TD-1624)
+        if e.get("row") == "board" and (want_of(e, sec) in WANTS or session_asks(e)):
             strip_rows.add(str(e.get("on_row") or ""))
             strip |= set(e["covers"]) if "covers" in e else line_names(e)
 

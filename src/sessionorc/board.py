@@ -48,6 +48,43 @@ GIT_TIMEOUT = 20.0
 # leave a commit saying *done* over a file where the other's write undid it (review of PR #474).
 _EDIT = threading.Lock()
 
+# **Have a session do it** (TD-1543, built by TD-1624; §4.5 screen 12 *Three verbs: Have a session do it*, §4.4
+# *Decide*): the fixed answer an open `act` line's press writes, exactly as the page sends it, and the asker's mark
+# that a step is the person's alone, which the page's draw and the agent's check both read by `marked_for_person`
+HAVE_A_SESSION = "have a session do it"
+ONLY_YOU = "only you can do this"
+# where a line's own words end (§4.5 screen 12): ledgerboard's field names, `Doer:` (TD-1661's) and `Due:` in any case
+_MARK_END_RE = re.compile(r"\b(?:Context|Parts|Doer|Hide until|Answers|Lifts|Decided|Closed):|\b(?i:due):")
+WORD_FOR_WORD = "a decide records one of the item's own answers, word for word: anything else is a Reply (design §4.4)"
+NOT_ACTS_ANSWER = "have a session do it is an act line's answer: this item's answers are its own"
+MARKED = "this step is marked only you can do this: Done closes it once you have"
+
+
+def marked_for_person(text: str) -> bool:
+    """Whether a board line is marked for the person (§4.5 screen 12 *Have a session do it*, TD-1624): its words
+    after its `(session …) —` lead (from its start where it has none) and before its first field, any reply cut
+    first, its spaces collapsed, its case folded and a trailing `.` or `!` dropped, end with *only you can do this*.
+    `text` is the item's text, or its whole `- [ ]` line."""
+    t = str(text or "")
+    if (m := ledgerboard.ITEM_RE.match(t)) is not None:
+        t = m.group("text")
+    if span := ledgerboard.reply_span(t):
+        t = t[: span[0]]
+    if (h := ledgerboard.HEAD_RE.match(t)) is not None and (i := t.find(" — ", h.end())) >= 0:
+        t = t[i + 3 :]
+    if f := _MARK_END_RE.search(t):
+        t = t[: f.start()]
+    words = " ".join(t.split()).casefold().rstrip(".!").rstrip()
+    return words.endswith(ONLY_YOU)
+
+
+def session_do(text: str, answer: str) -> bool:
+    """Whether a decide of `answer` on the item `text` is **Have a session do it**'s (TD-1624): the fixed text, and
+    not one of the line's own `Answers:` (an answer the line offers is decided as any other)."""
+    said = " ".join(str(answer or "").split())
+    own = {" ".join(a.split()) for a in ledgerboard.parse_answers(text)}
+    return said == HAVE_A_SESSION and said not in own
+
 
 class Refused(Exception):
     """The edit was not made, and why, in words a person reads on the Inbox."""
@@ -103,6 +140,7 @@ def edit_line(
             raise Refused("an answer may not carry Context:, Answers:, Decided: or Closed: — say it in other words")
         if ledgerboard.parse_decided(m.group("text")) is not None:
             raise Refused("this item is already decided: Reply says more to its session, Done closes it")
+        _session_check(m.group("text"), answer)
     to = None
     if action in ("snooze", "due"):
         try:
@@ -113,6 +151,30 @@ def edit_line(
         return ledgerboard.edit_line(body, action, to=to, answer=answer, reply=reply, by=by, today=_day(today)) + end
     except ledgerboard.Refused as e:
         raise Refused(str(e)) from None
+
+
+def _session_check(text: str, answer: str) -> None:
+    """The kind check of a decide (§4.4 *Decide*, TD-1624), read from the found line whatever the page sent: an
+    answer that is not one of the line's own `Answers:` is refused on an `act` line unless it is *have a session do
+    it* on one with no `Answers:` that is not marked for the person; the fixed text on any other line is refused."""
+    said = " ".join(str(answer or "").split())
+    own = ledgerboard.parse_answers(text)
+    if said in {" ".join(a.split()) for a in own}:
+        return
+    try:
+        if own and ledgerboard.fill_not_right(said, own):
+            return  # the pair's *Not right: <what>* form, filled, is one of the line's own answers too
+    except ledgerboard.Refused:
+        pass
+    km = ledgerboard.KIND_RE.match(text)
+    kind = km.group("kind").lower() if km else None
+    if said == HAVE_A_SESSION:
+        if kind != "act" or ledgerboard.parse_answers(text):
+            raise Refused(NOT_ACTS_ANSWER)
+        if marked_for_person(text):
+            raise Refused(MARKED)
+    elif kind == "act":
+        raise Refused(WORD_FOR_WORD)
 
 
 def message(text: str, action: str, due: str | None = None, *, answer: str = "", session: str = "") -> str:
@@ -624,13 +686,17 @@ def _write_back(
     # ShiftLead's own checks first (the item word for word, a decide on a decided line, a field's name)
     edit_line(lines[at], text, action, due, reply=reply, by=by, answer=answer)
     lifts = None
+    only = False
     if action == "decide":
         by = answerer(root, "".join(lines)) or ""
         lifts = _lift_ledger(t, text)
+        # Have a session do it writes the board half alone, never the decide lift, whatever the Context names, so
+        # the line stays open (§4.4 *Decide*, TD-1624): the ledger passed with `board_only` where a gate would lift
+        only = session_do(text, answer) and lifts is not None
     plan = _plan(
         lb_board.plan_edit, str(path), action, at + 1, text,
         to=due if action in ("snooze", "due") else None, answer=answer or None, text=reply or None,
-        by=by or None, tool=TOOL, ledger=lifts,
+        by=by or None, tool=TOOL, ledger=lifts, board_only=only,
     )  # fmt: skip
     msg = message(text, action, due, answer=answer)
     _apply(plan)

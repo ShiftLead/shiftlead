@@ -221,6 +221,7 @@
       Answer… is in its ⋯; on any board item Answer…'s title is its *standing* (§4.5a *Inbox board row: standing*) -#}
   {%- if how == 'board' and e.kind == 'act' %}
   {{ board_done(e, 'btn sm answer rec') }}
+  {%- if e.session_do %}{{ board_session(e, 'btn sm answer') }}{% endif %}
   {%- elif how == 'board' %}
   {{ board_answer(e, 'btn sm ghost') }}
   {%- elif how == 'ledger' %}
@@ -236,6 +237,12 @@
     words written on its line, its *standing* its title where the page has one (§4.5 screen 12, TD-1066) -#}
 {% macro board_done(e, cls, role='') -%}
 <button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="checks the line off {{ e.repo_name or e.repo }}'s board: one edit landed on its origin by shiftlead's own pull request" data-confirm="Check this item off {{ e.repo_name or e.repo }}'s board? It lands on origin by shiftlead's own pull request.">Done</button>
+{%- endmacro %}
+{#- §4.5a **Have a session do it** (TD-1543, built by TD-1624; §4.5 screen 12 *Three verbs: Have a session do it*):
+    after an open `act` line's Done where a lane of its repo would take the work (`e.session_do`, drawn by the line's
+    kind, never from an `Answers:` field) — the `decide` write-back with the fixed text and no answers -#}
+{% macro board_session(e, cls, role='') -%}
+<button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board" data-id="person" data-board-act="decide" data-answer="have a session do it" data-answers='[]' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ help_title('board-have-a-session-do-it') }}" data-confirm="Have a session do it? &ldquo;have a session do it&rdquo; is written on {{ e.repo_name or e.repo }}'s board as your decision, and the line goes to its team as a work order.">Have a session do it</button>
 {%- endmacro %}
 {% macro board_answer(e, cls, role='') -%}
 <button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ (e.repo_name or e.repo or e.name or 'the repo') ~ "'s board" }}" title="{{ ((e.session ~ ' · ') if e.session else '') ~ e.standing.text if e.standing else help_title('card-answers') }}">Answer…</button>
@@ -1010,8 +1017,10 @@
      Done is its answer and its Answer… behind the ⋯, any other line's Done behind the ⋯ (screen 12 *Three verbs*) #}
   <span class="grow"></span>
   {%- set act = card_whole(mode, e) and e.kind == 'act' and not (waits or e.decided) %}
-  {%- call qrow.dots((['Answer…'] if act else ['Done']) + (['Open board'] if e.editor else [])) %}
+  {%- set sdo = e.session_do and not act and not (waits or e.decided) %}
+  {%- call qrow.dots((['Answer…'] if act else ['Done']) + (['Have a session do it'] if sdo else []) + (['Open board'] if e.editor else [])) %}
   {%- if act %}{{ board_answer(e, '', 'menuitem') }}{% else %}{{ board_done(e, '', 'menuitem') }}{% endif %}
+  {%- if sdo %}{{ board_session(e, '', 'menuitem') }}{% endif %}
   {%- if e.editor %}{% from "file_link.html" import file_link %}{{ file_link(e.editor, 'Open board', "open " ~ e.board ~ " at line " ~ e.line, "", role="menuitem") }}{% endif %}
   {%- endcall %}
 </div>
@@ -1044,6 +1053,7 @@
   {%- endif %}
   {%- endif %}
   <button class="btn sm" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-confirm="Check this item off {{ e.repo_name or e.repo }}'s board? It lands on origin by shiftlead's own pull request.">Done</button>
+  {%- if e.session_do and not (waits or e.decided) %}{{ board_session(e, 'btn sm') }}{% endif %}
 </div>
 {%- endif %}
 {%- endmacro %}

@@ -656,6 +656,16 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "board-have-a-session-do-it",
+        "Have a session do it",
+        "Inbox board row",
+        (
+            "Asks a session to do this step: it goes to the repo's team as a work order. The session does it, "
+            "hands it to the repo it belongs to, or, if only you can do it, gives it back to you with the exact "
+            "steps to copy. Nothing runs from the press."
+        ),
+    ),
+    Help(
         "spend-view",
         "Spend · Shape",
         "Spend page",
@@ -927,6 +937,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "stuck-open",
             "board-answers",
             "board-go-with-it",
+            "board-have-a-session-do-it",
             "restart",
             "idle-open",
             "held-mail",
