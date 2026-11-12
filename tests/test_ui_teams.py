@@ -478,6 +478,28 @@ def test_a_start_reads_the_lanes_and_every_lane_empty_asks_start_anyway(world, c
     assert "if (picks && picks.empty)" in js and "It first closes ${b.dataset.closes}." in js
 
 
+def test_the_start_press_reads_what_no_lane_will_take_and_every_confirm_carries_it(world, client):
+    """design §4.5a team card **Start**, *what no lane will take* (TD-1573, built by TD-1687): the press's read
+    names each open entry no lane of the start takes, with why; the dialog draws it under its lane line, and the
+    confirm and the toast carry it after the lane line."""
+    tmp_path, fleet = world
+    checkout = str(tmp_path / "shiftlead")
+    design = {"id": "TD-2", "pickable": "yes", "kind": "design-first", "owner": "techlead", "for_page": "design"}
+    fleet.repos = {checkout: {"name": "shiftlead", "ledger": {"entries": [design]}}}
+    got = client.get("/api/teams/ao-grind/lanes").json()
+    assert got["no_lane"] == [{"repo": "shiftlead", "id": "TD-2", "why": "no lane takes design-first"}]
+    assert got["no_lane_line"] == "· no lane: TD-2 (no lane takes design-first)" and got["empty"] is True
+    page = client.get("/").text
+    dlg = page[page.index('<dialog id="startdlg"') :]
+    dlg = dlg[: dlg.index("</dialog>")]
+    assert dlg.index('id="startlanes"') < dlg.index('id="startnolane" hidden')
+    js = (Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
+    assert 'const said = [line, noLane].filter(Boolean).join(" ");' in js
+    assert '$("#startnolane").textContent = noLane;' in js
+    assert '!confirm(b.dataset.confirm + (said ? `\\n\\n${said}` : ""))' in js
+    assert 'teamAct(name, "start", b, false, said)' in js and 'teamAct(name, "start", b, true, said)' in js
+
+
 def test_a_start_whose_grinders_lane_holds_a_live_check_opens_no_dialog_and_names_no_anchor(world, client):
     """design §4.5a team card **Start**, *What the lanes hold, before the start* (TD-558, built by
     TD-563): a live check in a grinder's lane is work, so the press starts, the line saying the count by

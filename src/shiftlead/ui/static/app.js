@@ -3252,6 +3252,9 @@
       delete b.dataset.reading;
     }
     const line = (picks && picks.line) || "";
+    // what no lane will take (§4.5a team card **Start**, TD-1573, built by TD-1687): every confirm carries it
+    const noLane = (picks && picks.no_lane_line) || "";
+    const said = [line, noLane].filter(Boolean).join(" ");
     if (picks && picks.empty) {
       const dlg = $("#startdlg");
       $("#starthead").textContent = `Start ${name}?`;
@@ -3262,13 +3265,15 @@
       $("#startcloses").textContent = first.join(" ");
       $("#startcloses").hidden = !first.length;
       $("#startlanes").textContent = line;
+      $("#startnolane").textContent = noLane;  // under the lane line
+      $("#startnolane").hidden = !noLane;
       if (dlg.open) return;
       dlg.returnValue = "";
-      dlg.addEventListener("close", () => { if (dlg.returnValue === "go") teamAct(name, "start", b, true, line); }, { once: true });
+      dlg.addEventListener("close", () => { if (dlg.returnValue === "go") teamAct(name, "start", b, true, said); }, { once: true });
       return dlg.showModal();
     }
-    if (b.dataset.confirm && !confirm(b.dataset.confirm + (line ? `\n\n${line}` : ""))) return;
-    return teamAct(name, "start", b, false, line);
+    if (b.dataset.confirm && !confirm(b.dataset.confirm + (said ? `\n\n${said}` : ""))) return;
+    return teamAct(name, "start", b, false, said);
   }
 
   // design §4.5a team card **flow changed — Apply** (§4.9c *Switching*, TD-309): `ao team flow <team>

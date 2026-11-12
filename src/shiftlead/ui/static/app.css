@@ -874,6 +874,8 @@ html.phonefocus .composer.nopen #send { min-height: 40px; border-radius: 20px; m
 .bseg.k-for-you, .legend .k-for-you { background: var(--k-foryou); } .bseg.k-other, .legend .k-other { background: var(--k-other); color: var(--k-other-fg); }
 /* the seven kinds (TD-418): *live check* its own teal, *blocked* hatched */
 .bseg.k-live-check, .legend .k-live-check { background: var(--k-live); } .bseg.k-evaluation, .legend .k-evaluation { background: var(--k-eval); }
+/* *no lane* (TD-1573, built by TD-1687): an entry no lane takes, in the warning amber, dashed */
+.bseg.k-no-lane, .legend .k-no-lane { background: var(--warn-bg); border: 1px dashed var(--warn-line); color: var(--warn-fg); box-sizing: border-box; }
 .bseg.k-blocked, .legend .k-blocked { background: repeating-linear-gradient(135deg, var(--k-blocked) 0 6px, var(--k-blocked-2) 6px 12px); }
 .rrow .flag { color: var(--needs-fg); }  /* an *other* row's flag on the Repo page (TD-418) */
 .blk.opened { background: var(--blk-opened); } .blk.closed { background: var(--blk-closed); }

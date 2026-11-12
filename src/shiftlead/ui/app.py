@@ -410,6 +410,8 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     lane_count,  # noqa: F401
     lanes_line,
     motion_rows,  # noqa: F401
+    no_lane_ids,  # noqa: F401
+    no_lane_title,  # noqa: F401
     pr_ref,  # noqa: F401
     repo_facet,  # noqa: F401
     repo_named,  # noqa: F401
@@ -4004,11 +4006,12 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
     @app.get("/api/teams/{name}/lanes")
     async def api_team_lanes(name: str):
         """What every lane the start creates holds before it (§4.5a team card **Start**, TD-265, TD-563):
-        read on the press, so the page opens its Start anyway / Cancel dialog when every lane is empty."""
+        read on the press, so the page opens its Start anyway / Cancel dialog when every lane is empty; with
+        what no lane will take (`no_lane`, `no_lane_line`, TD-1573, built by TD-1687), read for the press alone."""
         if hosts.is_node():
             raise HTTPException(409, node_org_note())
         org, _notes = org_here()
-        got = await asyncio.to_thread(teamrun.lanes, rpc, org, name, host_name())
+        got = await asyncio.to_thread(teamrun.lanes, rpc, org, name, host_name(), no_lane=True)
         return JSONResponse(got or {"line": "", "empty": False, "roles": {}})
 
     @app.post("/api/teams/{name}/start")

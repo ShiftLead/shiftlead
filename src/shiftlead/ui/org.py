@@ -51,12 +51,14 @@ LIGHT_KEYS = (
 WINDOWS = ("day", "week", "month")
 LEDGER_VIEWS = ("open", *WINDOWS)  # the Technical debt selector: the open entries, or a window
 PRIORITY_BARS = (("high", "High"), ("medium", "Medium"), ("low", "Low"))
-# the page's seven kinds in the bar's order (§4.5a *team card: Repo facet*, §4.4 *Repo facts*, TD-418)
+# the page's seven kinds and *no lane* in the bar's order (§4.5a *team card: Repo facet*, §4.4 *Repo facts*, TD-418)
 KIND_BARS = (
     ("pickable", "pickable"),
     ("design", "design"),
     ("for-you", "for you"),
     ("live-check", "live check"),
+    # an entry the home marks `no_lane` (§4.4 *An entry no lane takes is marked*, TD-1573): out of its kind's count
+    ("no-lane", "no lane"),
     ("blocked", "blocked"),
     ("evaluation", "evaluation"),
     ("other", "other"),
@@ -175,6 +177,10 @@ def lanes_line(
     if waits:
         text += f" · {len(waits)} waiting"
     text += "".join(f" · {m['name']} out of work, its lane waiting" for m in idle_waiting)
+    # what no lane takes (§4.5a *team card: Repo facet*, TD-1573, built by TD-1687): the ids the entries' marks name
+    unlaned = no_lane_ids(by_id)
+    if unlaned:
+        text += f" · {len(unlaned)} no lane: {', '.join(unlaned)}"
     return {
         "team": team,
         "pickable": n_pick,
@@ -193,6 +199,7 @@ def lanes_line(
             for m in idle_waiting
         ],
         "titles": {"pickable": pick, "design": design, "live-check": live},
+        "no_lane": unlaned,
         "text": text,
         # each record's own count (§4.5a *card: compact*, TD-428), by id: what its card draws in its pill,
         # and what its lane would take but for a wait (TD-716), drawn grey where it takes nothing else
@@ -208,6 +215,23 @@ def lanes_line(
         # a count links to its list only when the Repo page draws that list (it draws no empty one)
         "listed": {k: int(by_kind.get(k) or 0) > 0 for k in ("pickable", "design", "live-check")},
     }
+
+
+def no_lane_ids(entries: Mapping[str, Mapping[str, Any]] | None) -> list[str]:
+    """The ids of the entries the home marks `no_lane` (§4.4 *An entry no lane takes is marked*, TD-1573), in
+    the reading's order: what the lanes line's *· n no lane: <ids>* names."""
+    return [str(i) for i, e in (entries or {}).items() if isinstance(e, Mapping) and e.get("no_lane")]
+
+
+def no_lane_title(led: Mapping[str, Any]) -> str:
+    """The *no lane* segment's hover (§4.5a *team card: Repo facet*, TD-1573, built by TD-1687): each id the
+    reading marks with its `why`, in ledger order, one a line — from the reading's own `no_lane`, so a card
+    with no lanes line still lists them."""
+    return "\n".join(
+        f"{x.get('id')} — {x.get('why') or ''}".rstrip(" —")
+        for x in led.get("no_lane") or ()
+        if isinstance(x, Mapping) and x.get("id")
+    )
 
 
 def lane_count(v: Mapping[str, Any], lanes: Mapping[str, Any] | None) -> dict[str, Any] | None:
@@ -275,6 +299,8 @@ def repo_facet(
             "priority": _bars(led.get("by_priority") or {}, PRIORITY_BARS),
             # a decided board line counts *pickable* (TD-384), never in the priorities above
             "kind": _bars(teamrun.lane_kinds(r), KIND_BARS),
+            # each segment's own hover where the lanes line gives none: *no lane*'s, the marks with their whys
+            "kind_titles": {"no-lane": no_lane_title(led)},
             "lanes": lanes,
             "windows": {w: _blocks((led.get("windows") or {}).get(w)) for w in WINDOWS} if led.get("windows") else None,
             # the *closed* block's hover, per window: what Recently completed lists (§4.5a, TD-604)

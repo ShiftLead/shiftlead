@@ -31,7 +31,8 @@ HELP: tuple[Help, ...] = (
             "wrap-up's own safety check, then the members, each started on its brief, and the manager written closed "
             "when it is on call or started when it stands. Press it to run the team again — after a wind-down, or when "
             "a run has concluded and you want the next. A seat still busy — answering, running a command, or holding "
-            "work it has not pushed — is left running, and the start says so. It is not a message: a running session "
+            "work it has not pushed — is left running, and the start says so, as it says each entry no lane will take "
+            "and why. It is not a message: a running session "
             "is mailed with Message…, and a session holding uncommitted or unpushed work refuses the start instead of "
             "being closed."
         ),
@@ -799,7 +800,8 @@ HELP: tuple[Help, ...] = (
         "Repo page: Technical debt",
         (
             "Shows this repo's open work by stage: For you, one column per worker stage of the teams' flows, then "
-            "Review and Merged, each heading saying who is on that stage. Read it to see whether a stage holds more "
+            "Review and Merged, each heading saying who is on that stage, and an entry no lane takes folded under For "
+            "you with why. Read it to see whether a stage holds more "
             "work than people, or has nobody running at all. It moves nothing by itself — a card moves by its grip "
             "or ⤒ ↑ ↓ among this repo's cards in the same column — and an entry is edited in its file, never here."
         ),

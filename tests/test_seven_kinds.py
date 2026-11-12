@@ -136,6 +136,7 @@ def test_the_kind_bar_draws_the_seven_kinds_in_order_with_a_legend():
         "design",
         "for you",
         "live check",
+        "no lane",
         "blocked",
         "evaluation",
         "other",
