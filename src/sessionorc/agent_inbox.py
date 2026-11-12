@@ -391,15 +391,17 @@ class InboxMixin:
         # nothing (ledgerboard's reading of the form, TD-585)
         if said and said in offered and not ledgerboard.is_not_right_form(said):
             return said
+        if not offered and said == board_mod.HAVE_A_SESSION:
+            # **Have a session do it** (TD-1624): an `act` line's fixed answer, checked against the line's own kind
+            # where `board.edit_line` finds it on origin's head — never a kind the page sent (§4.4 *Decide*)
+            return said
         try:
             filled = ledgerboard.fill_not_right(said, offered)
         except ledgerboard.Refused as e:
             raise board_mod.Refused(str(e)) from None
         if filled:
             return filled
-        raise board_mod.Refused(
-            "a decide records one of the item's own answers, word for word: anything else is a Reply (design §4.4)"
-        )
+        raise board_mod.Refused(board_mod.WORD_FOR_WORD)
 
     @staticmethod
     def _board_root(board: str) -> tuple[Path, Path]:

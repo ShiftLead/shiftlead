@@ -28,7 +28,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from sessionorc import identity, paths
-from sessionorc.adapters import LaunchSpec, Link, MailDelivery, Transcript
+from sessionorc.adapters import LaunchSpec, Link, MailDelivery, Transcript, read_version
 from sessionorc.identity import ProcReader
 from sessionorc.models import Confidence, Pending, State
 from sessionorc.screen import Manifest, Match, painted_text
@@ -276,6 +276,11 @@ class GeminiAdapter:
             found = shutil.which("gemini") or (str(npm) if npm.is_file() else None)
             self._binary = found or "gemini"
         return self._binary
+
+    def tool_version(self, env: Mapping[str, str]) -> str | None:
+        """The tool's version at a seat's launch and in the seat smoke (design §4.3 *An upgraded seat tool asks for
+        the smoke*, TD-1650): `--version`'s first line, bounded; None where it cannot say."""
+        return read_version(self.binary, env)
 
     def launch(
         self,

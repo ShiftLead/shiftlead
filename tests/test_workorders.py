@@ -265,7 +265,8 @@ def test_every_line_has_an_id_that_a_snooze_a_reply_a_decide_and_a_close_keep_an
     edits = (
         board_mod.edit_line(OPEN, text, "snooze", "2026-10-09"),
         board_mod.edit_line(OPEN, text, "reply", reply="soon", by="paul", today="2026-10-03"),
-        board_mod.edit_line(OPEN, text, "decide", answer="now", today="2026-10-03"),
+        # an `act` line's one decide is Have a session do it's fixed text (TD-1624)
+        board_mod.edit_line(OPEN, text, "decide", answer="have a session do it", today="2026-10-03"),
         board_mod.edit_line(OPEN, text, "done") + " Closed: 2026-10-04.",
     )
     assert {workorders.ref(root, e.split("] ", 1)[1]) for e in edits} == {key}

@@ -7,6 +7,9 @@
 from __future__ import annotations
 
 import logging
+import shutil
+import subprocess
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from importlib.metadata import entry_points
 from pathlib import Path
@@ -18,6 +21,33 @@ from sessionorc.tmux import PaneInfo
 log = logging.getLogger("shiftlead.adapters")
 
 SHELLS = {"bash", "zsh", "sh", "fish", "dash", "ksh"}
+
+# how long a tool's `--version` may take (design §4.3 *An upgraded seat tool asks for the smoke*, TD-1650): one bound
+# for every adapter's `tool_version` and the seat smoke's read
+VERSION_TIMEOUT = 10
+
+
+def read_version(binary: str, env: Mapping[str, str]) -> str | None:
+    """A tool's version as `tool_version` reads it (design §4.3 *An upgraded seat tool asks for the smoke*): `binary
+    --version` run in `env`, bounded by `VERSION_TIMEOUT` — the first line of its stdout, stripped, only when it holds
+    a digit; None on any failure: a bare name `env`'s PATH cannot find, a non-zero exit, the bound, no such line."""
+    found = binary if "/" in binary else shutil.which(binary, path=env.get("PATH", ""))
+    if not found:
+        return None
+    try:
+        cp = subprocess.run(
+            [found, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=VERSION_TIMEOUT,
+            env=dict(env),
+            stdin=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+    lines = (cp.stdout or "").splitlines()
+    first = lines[0].strip() if lines else ""
+    return first if cp.returncode == 0 and any(c.isdigit() for c in first) else None
 
 
 @dataclass
@@ -176,6 +206,12 @@ class Adapter(Protocol):
     #                                                      only), layers: [{path, commands: [{command, resolves}]}
     #                                                      | {path, error}]}; or one {error} when the profiles
     #                                                      file does not parse
+    #   tool_version(env: Mapping[str, str]) -> str | None
+    #                                                      the tool's version, read off the loop at a seat's
+    #                                                      launch (design §4.3 *An upgraded seat tool asks for
+    #                                                      the smoke*, TD-1650) and by the seat smoke: as
+    #                                                      `read_version` reads the adapter's binary in `env`;
+    #                                                      never in `implements`. None, or no method: no version
     #   setup_note() -> dict | None                       what the machine needs a person for before this
     #                                                      adapter's sessions run (design §4.3, TD-875): None
     #                                                      with nothing to say; {key: None} all as wanted;

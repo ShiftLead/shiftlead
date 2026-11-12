@@ -7,9 +7,7 @@ from __future__ import annotations
 
 import contextlib
 import json
-import os
 import secrets
-import shutil
 import subprocess
 import sys
 import time
@@ -269,15 +267,3 @@ def capture_pane(sock: str, sid: str) -> str:
         ["tmux", "-L", sock, "capture-pane", "-e", "-p", "-t", f"={sid}:"], capture_output=True, text=True, timeout=5
     )
     return cp.stdout if cp.returncode == 0 else f"(capture-pane: {cp.stderr.strip()})"
-
-
-def tool_version(binary: str) -> str:
-    """The tool's `--version`, its first line, or `version unknown`."""
-    if not shutil.which(binary) and not Path(binary).is_file():
-        return "version unknown"
-    try:
-        cp = subprocess.run([binary, "--version"], capture_output=True, text=True, timeout=30, env=dict(os.environ))
-    except (OSError, subprocess.SubprocessError):
-        return "version unknown"
-    first = (cp.stdout or cp.stderr).strip().splitlines()
-    return first[0] if first else "version unknown"

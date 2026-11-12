@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import cadence, identity, paths
-from sessionorc.adapters import ExternalSession, LaunchSpec, Link, Prompt, Transcript
+from sessionorc.adapters import ExternalSession, LaunchSpec, Link, Prompt, Transcript, read_version
 from sessionorc.identity import ProcReader
 from sessionorc.models import Confidence, State
 from sessionorc.screen import Manifest, Match, painted_text
@@ -587,6 +587,11 @@ class ClaudeCodeAdapter:
         self.rules = Manifest.load(rules or RULES_FILE)  # design §4.2 scraped fallback (TD-015)
 
     # -- launch ----------------------------------------------------------------------------------
+
+    def tool_version(self, env: Mapping[str, str]) -> str | None:
+        """The tool's version at a seat's launch and in the seat smoke (design §4.3 *An upgraded seat tool asks for
+        the smoke*, TD-1650): `--version`'s first line, bounded; None where it cannot say."""
+        return read_version(self.binary, env)
 
     def launch(
         self,

@@ -244,6 +244,59 @@ class _NoJoin(Exception):
 
 NODE_CHANGES = "agent-cadence path cadence-changes.md"  # rule 12's command on a node: `ao host up`'s link (TD-1046)
 SETUP_EVERY = 3600.0  # seconds between the setup notes' reads with `profiles.yml` unchanged (TD-875)
+VERSION_EVERY = 3600.0  # seconds between the home's seat tool-version compares (§4.3 *An upgraded seat tool*, TD-1727)
+VERSION_NOTE_EVERY = 86400.0  # seconds, wall clock: at most one tool-version note to the person a day (TD-1727)
+
+
+def _versions_read(store: Path) -> tuple[datetime | None, dict[str, dict[str, dict[str, dict[str, str]]]]]:
+    """`tool_versions.json` as the version pass reads it (§4.3, TD-1727): `(noted_at, versions)`, an unreadable
+    file, or any part of it not shaped `{<adapter>: {<profile>: {<host>: {version, at}}}}`, read as empty."""
+    try:
+        got = json.loads(store.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None, {}
+    if not isinstance(got, dict):
+        return None, {}
+    try:
+        noted = datetime.fromisoformat(str(got["noted_at"])) if got.get("noted_at") else None
+        if noted is not None and noted.tzinfo is None:
+            noted = noted.replace(tzinfo=UTC)
+    except ValueError:
+        noted = None
+    versions: dict[str, dict[str, dict[str, dict[str, str]]]] = {}
+    for ad, profs in (got.get("versions") or {}).items() if isinstance(got.get("versions"), dict) else ():
+        for prof, by_host in profs.items() if isinstance(profs, dict) else ():
+            for host, v in by_host.items() if isinstance(by_host, dict) else ():
+                if isinstance(v, dict) and isinstance(v.get("version"), str):
+                    versions.setdefault(str(ad), {}).setdefault(str(prof), {})[str(host)] = {
+                        "version": v["version"],
+                        "at": str(v.get("at") or ""),
+                    }
+    return noted, versions
+
+
+def _version_line(adapter: str, profile: str, host: str, old: str, new: str, *, own: bool) -> str:
+    """One changed adapter, profile and host in the version note (§4.3 *An upgraded seat tool asks for the
+    smoke*, TD-1727): the adapter's `label` in the words, its registered name in the command — the name where
+    the home has no such adapter (a node's own); the default profile (`""`) said, never named."""
+    try:
+        label = str(adapters.get(adapter).label or adapter)
+    except Exception:  # noqa: BLE001 — an unregistered (or broken) adapter is its name; the pass never raises
+        label = adapter
+    where = "Run it:" if own else f"Run it on {host}, from a checkout there:"
+    cmd = f"`pdm run conformance {adapter} --profile {profile or '<default>'} --smoke`"
+    if profile:
+        about, default = f"on profile {profile}", ""
+    else:
+        about = "on the default profile"
+        default = (
+            " The default profile is the profile `profiles.yml` makes default on that host; the smoke walks it only"
+            " if it has a `config_dir` set aside, else it cannot be smoked."
+        )
+    return (
+        f"{label} {about} moved from {old} to {new} on {host}; its seats there run on a tool version no seat smoke"
+        f" has passed on.{default} {where} {cmd} (one prompt and one reply of the profile)."
+    )
 
 
 class TickMixin:
@@ -301,6 +354,68 @@ class TickMixin:
                 sent[name] = str(key)
         if sent != before:
             store.write_text(json.dumps(sent, indent=1), encoding="utf-8")
+
+    async def _version_notes(self) -> None:
+        """The home's compare of its seats' tool versions (design §4.3 *An upgraded seat tool asks for the smoke*,
+        TD-1727): the home's tick alone, at most every `VERSION_EVERY`; the pass never raises."""
+        if self.mode != "home" or time.monotonic() - self._version_read_at < VERSION_EVERY:
+            return
+        self._version_read_at = time.monotonic()
+        try:
+            self._compare_versions(datetime.now(UTC))
+        except Exception:  # noqa: BLE001 — a failed compare is a log line and the next hour's retry
+            log.exception("the seat tool-version pass failed")
+
+    def _compare_versions(self, now: datetime) -> None:
+        """Per adapter, seat profile and host, the newest (`created`) seat record carrying a `tool_version`,
+        its own and its nodes' (`_graph()`), against `tool_versions.json`'s last noted version: a first sight
+        is written and says nothing; the changes go to the person in one `system` note, at most one every
+        `VERSION_NOTE_EVERY` since `noted_at` (a change inside it waits, unwritten); the note is sent before
+        the file is written, by a temporary file and a rename. Nothing is run; no techlead is told."""
+        newest: dict[tuple[str, str, str], Session] = {}
+        for r in self._graph().values():
+            if not r.seat or not r.tool_version:
+                continue
+            key = (r.adapter, r.profile or "", r.host or self.host)
+            if key not in newest or r.created > newest[key].created:
+                newest[key] = r
+        if not newest:
+            return
+        store = paths.home() / "tool_versions.json"
+        noted, versions = _versions_read(store)
+        if self._version_noted_at is not None:
+            noted = self._version_noted_at
+        lapsed = noted is None or noted > now or (now - noted).total_seconds() >= VERSION_NOTE_EVERY
+        at = now.isoformat(timespec="seconds").replace("+00:00", "Z")
+        wrote, changes = False, []
+        for (ad, prof, host), r in sorted(newest.items()):
+            held = versions.get(ad, {}).get(prof, {}).get(host)
+            if held is None:
+                versions.setdefault(ad, {}).setdefault(prof, {})[host] = {"version": str(r.tool_version), "at": at}
+                wrote = True
+            elif held["version"] != r.tool_version:
+                changes.append((ad, prof, host, held["version"], str(r.tool_version)))
+        if changes and lapsed:
+            n = len(changes)
+            lead = (
+                "A seat tool changed version; the home knows of no smoke on it."
+                if n == 1
+                else f"{n} seat tools changed version; the home knows of no smoke on them."
+            )
+            lines = [_version_line(ad, p, h, old, new, own=h == self.host) for ad, p, h, old, new in changes]
+            self._system_note(PERSON, lead + "\n" + "\n".join(lines))
+            for ad, p, h, _old, new in changes:
+                versions[ad][p][h] = {"version": new, "at": at}
+            self._version_noted_at, wrote = now, True
+        if not wrote:
+            return
+        when = self._version_noted_at or noted
+        out: dict[str, Any] = {"versions": versions}
+        if when is not None:
+            out["noted_at"] = when.isoformat(timespec="seconds").replace("+00:00", "Z")
+        tmp = store.with_name(store.name + ".tmp")
+        tmp.write_text(json.dumps(out, indent=1, sort_keys=True), encoding="utf-8")
+        os.replace(tmp, store)
 
     async def tick(self) -> None:
         snapshot_at = datetime.now(UTC)
@@ -386,6 +501,7 @@ class TickMixin:
             self._seats_at = time.monotonic()
             self._seats_task = asyncio.create_task(self._refresh_seats())
         await self._setup_notes()
+        await self._version_notes()  # the home's alone (§4.3, TD-1727)
         await self._team_stop_times(snapshot_at)
         await self._carry_controllers()
         await self._enforce_stop_times(snapshot_at)

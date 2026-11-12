@@ -186,9 +186,19 @@ def test_a_board_row_names_its_repo_and_every_team_that_works_it(tmp_path):
         },
     )
     assert repo_boards(org, "kmaster") == {
-        str(ao.resolve()): {"name": "shiftlead", "label": "shiftlead", "teams": ["ao-grind", "ao-audit"]},
-        str(sam.resolve()): {"name": "samscrape", "label": "ContractMatch · samscrape", "teams": ["sam-grind"]},
-        str(solo.resolve()): {"name": "solo", "label": "solo", "teams": []},
+        str(ao.resolve()): {
+            "name": "shiftlead",
+            "label": "shiftlead",
+            "teams": ["ao-grind", "ao-audit"],
+            "session_do": False,
+        },
+        str(sam.resolve()): {
+            "name": "samscrape",
+            "label": "ContractMatch · samscrape",
+            "teams": ["sam-grind"],
+            "session_do": False,
+        },
+        str(solo.resolve()): {"name": "solo", "label": "solo", "teams": [], "session_do": False},
     }
 
 

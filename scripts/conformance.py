@@ -421,6 +421,15 @@ def smoke_line(ok: bool, step: str, said: str, version: str) -> str:
     return f"{head} · {version}"
 
 
+def smoke_version(ad: Any) -> str:
+    """The seat smoke's version (design §4.3 *An upgraded seat tool asks for the smoke*, TD-1650): its seat is
+    launched with no `seat`, so its record reads none; the smoke reads through the walked adapter's own
+    `tool_version`, in its own environment, before its first step — *version unknown* where it answers none or
+    the adapter has no such method."""
+    read = getattr(ad, "tool_version", None)
+    return (read(dict(os.environ)) if read else None) or "version unknown"
+
+
 def run_smoke(args: argparse.Namespace, entry: dict[str, Any], start_env: dict[str, str]) -> int:
     """The seat smoke (design §4.3 *The live smoke, unattended*, TD-1648): the real tool launched as an
     unattended seat is, in a scratch clone, with the role's brief; one ask as the person; a pass when a reply
@@ -430,7 +439,7 @@ def run_smoke(args: argparse.Namespace, entry: dict[str, Any], start_env: dict[s
 
     from sessionorc import adapters
 
-    version = seat_run.tool_version(adapters.get(args.adapter).binary)
+    version = smoke_version(adapters.get(args.adapter))
     home = Path(tempfile.mkdtemp(prefix="aos-", dir="/tmp"))
     sock = f"ao-smoke-{uuid.uuid4().hex[:8]}"
     agent: subprocess.Popen | None = None

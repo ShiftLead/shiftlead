@@ -141,6 +141,8 @@ async def test_a_seats_life_on_the_stub(name, agent, tmp_path, monkeypatch):
             argv = _launch(out)["argv"]
             assert not _has_skip(argv, skip), f"{profile}: a skip flag under `all`: {argv}"
             assert ("--stub-other" in argv) == (profile == "other"), argv
+            # the seat's launch read its tool's version through the adapter's own method (§4.3, TD-1726)
+            assert agent.sessions[s["id"]].tool_version == f"0.0.0 (stub {name})"
             assert all(a in argv for a in asking), f"{profile}: {asking} missing from {argv}"
             await _close(c, s["id"], out)
 

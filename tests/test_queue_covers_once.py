@@ -16,7 +16,7 @@ from markupsafe import Markup
 from test_queue import NOW
 from test_queue_item_shape import card, inbox
 
-from shiftlead.ui.queue import CONTEXT, asked_entries, attach, covered, item_home, split_later
+from shiftlead.ui.queue import CONTEXT, LOOSE, asked_entries, attach, covered, holds_of, item_home, split_later
 
 TODAY = NOW.date().isoformat()
 DESIGN = "**One more round?** Context: TD-050 decision (paul). Parts: TD-052, TD-051. Due: 2026-11-20."
@@ -175,19 +175,62 @@ def test_the_holds_line_is_drawn_after_the_body_and_links_each_row():
     assert 'class="st holds"' not in inbox({**row, "holds": []}), "a line that holds nothing else draws none"
 
 
-def test_a_holds_press_whose_card_a_pick_hides_goes_to_the_repo_page():
+def test_the_holds_press_handlers_text_sends_a_hidden_cards_link_to_the_repo_page():
+    """A source pin, not a press: no test runs the Queue's click handler (it lives inside `AO.queue`, which nothing
+    drives under node or in a browser), so this holds its text — a *holds* link whose card is missing or hidden by
+    a pick (`qoff`) cancels the anchor's own move and goes to the Repo page on the id (TD-1380, TD-1715). The
+    condition and its body are pinned whole, so an inverted test or a dropped `preventDefault` fails here."""
     js = (Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
-    at = js.index('closest("a.holdsref[data-repo-href]")')
+    at = js.index('const hl = e.target.closest("a.holdsref[data-repo-href]");')
     near = js[at : at + 400]
-    assert 'closest(".qoff")' in near and "location.href = hl.dataset.repoHref" in near
+    assert 'if (hl && (hl.getAttribute("href") || "").startsWith("#")) {' in near
+    assert 'const at = onCard(AO.hashId(hl.getAttribute("href")));' in near
+    assert (
+        'if (!at || at.closest(".qoff")) { e.preventDefault(); location.href = hl.dataset.repoHref; return; }' in near
+    )
+
+
+# ---- holds_of's and covered's own reads (TD-1714) ----
+
+
+@pytest.mark.unit
+def test_a_covered_entry_of_another_repo_is_shown_qualified_and_the_lines_own_bare():
+    got = holds_of(line(), ["r#TD-050", "s#TD-007"], "", None, None)
+    assert [(h["show"], h["href"]) for h in got] == [("TD-050", "/repo/r#TD-050"), ("s#TD-007", "/repo/s#TD-007")]
+
+
+@pytest.mark.parametrize("card_id", ["kept:r#TD-051", f"{LOOSE}r#TD-051"])
+@pytest.mark.unit
+def test_a_covered_entry_on_a_kept_or_loose_card_is_not_drawn_and_links_the_repo_page(card_id):
+    idx = {"r#TD-051": (card_id, "r#TD-051"), "r#TD-052": ("r#TD-050", "r#TD-052")}
+    got = {h["id"]: h for h in holds_of(line(), ["r#TD-051", "r#TD-052"], "", None, idx)}
+    assert (got["r#TD-051"]["drawn"], got["r#TD-051"]["href"]) == (False, "/repo/r#TD-051"), card_id
+    assert (got["r#TD-052"]["drawn"], got["r#TD-052"]["href"]) == (True, "#r#TD-052"), "an open card's row is drawn"
+
+
+@pytest.mark.unit
+def test_a_member_whose_only_parent_field_is_part_of_raw_is_covered():
+    raw = {"r#TD-057": {"repo": "r", "part_of_raw": "TD-050", "blocked_by": ["decision (paul)"]}}
+    assert covered(line(parts=()), raw) == ["r#TD-050", "r#TD-057"]
 
 
 # ---- the Repo page's For you over a fake home ----
 
 
-def _client(tmp_path, monkeypatch, *, due: bool = True):
+def _client(
+    tmp_path,
+    monkeypatch,
+    *,
+    due: bool = True,
+    kind: str = "decide",
+    more: dict | None = None,
+    extra=(),
+    queue: dict | None = None,
+):
     """Repo `r`: design TD-050 and its parts TD-051, TD-052 and TD-053 each held on `decision (paul)`, and one
-    open `decide` line whose `Context:` names TD-050 and whose `Parts:` lists TD-051 and TD-052."""
+    open `decide` line whose `Context:` names TD-050 and whose `Parts:` lists TD-051 and TD-052 (`kind` its own
+    where given, `more` its fields over these) — TD-053 is a held member by `Part of` alone; `extra` more board
+    items, after it. `queue` is the home's `queue` reading (none: a home that serves no Queue)."""
     from test_ui_queue import client
 
     root = tmp_path / "r"
@@ -201,20 +244,23 @@ def _client(tmp_path, monkeypatch, *, due: bool = True):
                 **({"part_of": part_of} if part_of else {})}  # fmt: skip
 
     entries = [held(50, "the design"), held(51, "build one", "TD-050"), held(52, "build two", "TD-050"),
-               held(53, "build three", "TD-050")]  # fmt: skip
+               held(53, "build three", "TD-050"),
+               # open, and on no For you row: what a line not yet due that covers no For you row holds
+               *({"for_page": "pickable", "priority": "medium", "id": f"TD-{n:03d}", "title": f"open {n}",
+                  "blocked_by": []} for n in (60, 61))]  # fmt: skip
     when = NOW.date() if due else NOW.date() + timedelta(days=7)
-    text = (f"decide 2026-11-01 — **One more round on TD-050?** Context: TD-050 decision (paul). "
+    text = (f"{kind} 2026-11-01 — **One more round on TD-050?** Context: TD-050 decision (paul). "
             f"Parts: TD-051, TD-052. Due: {when.isoformat()}.")  # fmt: skip
-    item = {"line": 3, "text": text, "kind": "decide", "decided": None, "due": when.isoformat(),
+    item = {"line": 3, "text": text, "kind": kind, "decided": None, "due": when.isoformat(),
             "answers": ["Go", "Not yet"], "default": "Go", "refs": ["TD-050"], "parts": ["TD-051", "TD-052"],
-            "key": "board:abc12345",
+            "key": "board:abc12345", **(more or {}),
             **({"overdue_days": 0, "due_tag": "due today"} if due else {"due_tag": "due in 7d"})}  # fmt: skip
     repos = {
         str(root): {
             "name": "r",
             "root": str(root),
             "ledger": {"path": "docs/technical_debt.md", "entries": entries},
-            "boards": {"today": TODAY, "boards": [{"root": str(root), "board": str(board), "items": [item]}]},
+            "boards": {"today": TODAY, "boards": [{"root": str(root), "board": str(board), "items": [item, *extra]}]},
         }
     }
 
@@ -231,6 +277,8 @@ def _client(tmp_path, monkeypatch, *, due: bool = True):
         async def call(self, method, **kw):
             if method == "inbox":
                 return {"entries": []}
+            if method == "queue" and queue is not None:
+                return queue
             return {"repos": repos, "list": [], "host": {"name": "kmaster"}}.get(method, {})
 
     monkeypatch.setenv("SHIFTLEAD_INBOX_BOARD_SHOW", "all")
@@ -248,3 +296,70 @@ def test_the_repo_pages_for_you_draws_the_line_once_and_the_covered_rows_plain(t
     assert "Lift the hold" not in html, "nor its Lift the hold: each is the column's plain row"
     for title in ("build one", "build two", "build three"):
         assert title in html, f"{title} stays in For you as its plain row"
+
+
+STALE = (NOW.date() - timedelta(days=10)).isoformat()
+
+
+@pytest.mark.parametrize(
+    "how",
+    [
+        # decided by another, so `ledger_for_you` still draws its rows (`person_only`; the person's own Decided hides
+        # them before For you reads a line), and stale, so the line is due rather than *Waiting on them*
+        {"more": {"decided": {"date": STALE, "text": "Go"}, "decided_by": "ao-shiftlead-techlead-ao-1"}},
+        {"kind": "watch"},  # a Read line
+    ],
+    ids=["decided", "read"],
+)
+def test_a_line_that_is_no_open_decide_or_do_hides_no_for_you_row(tmp_path, monkeypatch, how):
+    """Only an open undecided Decide or Do line is its covered rows' question (§4.5 screen 11 *For you*, TD-1380):
+    a decided line, or a Read line, leaves each row it covers drawn as itself, its own answers with it."""
+    html = _client(tmp_path, monkeypatch, **how).get("/repo/r").text
+    assert html.count('data-answer="Keep"') >= 3, "each covered row draws its own answers"
+    assert html.count('class="brow"') > 1, "and its own row, not the column's plain row"
+
+
+AHEAD = {"line": 5, "kind": "decide", "decided": None, "due": "2026-12-01", "due_tag": "due in 20d",
+         "text": "decide 2026-11-01 — **Ship TD-060?** Context: TD-060 decision (paul). Parts: TD-061.",
+         "answers": ["Go", "Not yet"], "default": "Go", "refs": ["TD-060"], "parts": ["TD-061"],
+         "key": "board:def67890"}  # fmt: skip
+
+
+def test_a_line_not_yet_due_that_covers_no_for_you_row_draws_its_holds_line(tmp_path, monkeypatch):
+    """A line the horizon draws ahead and For you places nowhere — its entries on no For you row — draws its *holds*
+    line where it is drawn, as a placed line does (TD-1380)."""
+    html = _client(tmp_path, monkeypatch, extra=[AHEAD]).get("/repo/r").text
+    holds = [re.findall(r">(TD-\d+)</a>", h) for h in re.findall(r'<div class="st holds"[^>]*>(.*?)</div>', html, re.S)]
+    assert ["TD-060", "TD-061"] in holds, holds
+
+
+# ---- the pages that call `split_later` (TD-1712): each passes the open entries, a held member by `Part of` too ----
+
+
+def _member_named(html: str) -> list[str]:
+    """The ids the not-yet-due line's *holds* line names."""
+    holds = re.search(r'<div class="st holds"[^>]*>(.*?)</div>', html, re.S)
+    return re.findall(r">(TD-\d+)</a>", holds.group(1)) if holds else []
+
+
+def test_the_inbox_page_and_its_poll_name_a_held_member_in_a_coming_lines_holds(tmp_path, monkeypatch):
+    """`/inbox` and `/api/person/inbox` hand `split_later` the open entries: the line not yet due names TD-053, the
+    member it covers by `Part of` alone, in its *holds* line — drawn by neither without them."""
+    c = _client(tmp_path, monkeypatch, due=False)
+    assert _member_named(c.get("/inbox").text) == ["TD-050", "TD-051", "TD-052", "TD-053"]
+    poll = c.get("/api/person/inbox").json()["html"]
+    assert _member_named(" ".join(str(v) for v in poll.values())) == ["TD-050", "TD-051", "TD-052", "TD-053"]
+
+
+def test_the_queue_page_strips_a_held_members_block_on_another_card(tmp_path, monkeypatch):
+    """The Queue page's cards (`card_mail`) read the open entries: the line not yet due is drawn on TD-050's card and
+    covers TD-053 on another card, which is a mention there and draws no Decide block of its own."""
+    from test_ui_queue import card, row
+
+    design = card(row("r", "TD-050", "the design"), [row("r", "TD-051", "build one", depth=1, parent="r#TD-050")])
+    other = card(row("r", "TD-053", "build three"), place=2)
+    q = {"cards": [design, other], "completed": [], "other_work": []}
+    html = _client(tmp_path, monkeypatch, due=False, queue=q).get("/queue").text
+    on = html[html.index('data-card="r#TD-053"') :]
+    assert 'data-answer="Keep"' not in on, "TD-053 draws no block of its own on its card"
+    assert "One more round on TD-050?" in on, "it is named as covered by the line on TD-050's card"
