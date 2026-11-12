@@ -1053,12 +1053,12 @@ class MailMixin:
         by_id = {e.id: e for e in open_qs}
         rerouted = {
             e.id: e.root
-            for r in self._graph().values()
-            if r.id in mine or self._addr(r.id) in mine
+            for k, r in self._graph().items()
+            if k in mine  # the graph's own key: a node's record is `id@host` (review of #3589)
             for e in r.outbox
             if e.closed_reason == "rerouted"
         }
-        for named in re.findall(r"m-[0-9a-f]{12}", text):
+        for named in re.findall(r"(?<![\w-])m-[0-9a-f]{12}(?![0-9a-f])", text):
             hit = by_id.get(named)
             if hit is None and named in rerouted:
                 hit = next((e for e in open_qs if e.root == rerouted[named]), None)
@@ -1086,8 +1086,8 @@ class MailMixin:
         ]
         out += [
             e.id
-            for r in self._graph().values()
-            if r.id in mine or self._addr(r.id) in mine
+            for k, r in self._graph().items()
+            if k in mine
             for e in r.inbox
             if e.handed and e.outcome and e.outcome.get("state") == "blocked" and e.id not in out
         ]
@@ -1662,7 +1662,7 @@ class MailMixin:
             new = {"state": state or "asked_again", "text": _clean(text)[: mail.DEFAULT_CAP], "at": at, "by": mid}
             was = settle.outcome if settle.outcome else settle.was
             if was:
-                new["was"] = was
+                new["was"] = {k: v for k, v in was.items() if k != "was"}  # one `was`, never a chain (§4.10)
             if settle.was:
                 self._mark(settle.id, outcome=new, was=None)
             else:
@@ -1670,7 +1670,7 @@ class MailMixin:
         if onto is not None and onto.outcome:
             # a question on a handed entry's thread takes its `blocked` outcome up: the entry owes again,
             # the outcome kept as the entry's own `was` for its next outcome to take (TD-1694)
-            self._mark(onto.id, outcome=None, was=onto.outcome)
+            self._mark(onto.id, outcome=None, was={k: v for k, v in onto.outcome.items() if k != "was"})
         if sender == PERSON and reply_to:
             # A person's message into a thread resets it (design §4.10): tally and `bound_hit`
             # cleared on every record holding it, so the sessions may reply to the ruling.

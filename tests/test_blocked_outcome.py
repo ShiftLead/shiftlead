@@ -139,3 +139,51 @@ async def test_a_handed_entry_waits_on_its_own_thread_and_owes_again_after_a_que
             assert handed.outcome["state"] == "done" and handed.outcome["was"]["state"] == "blocked"
             assert handed.was is None
         await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_the_first_named_id_is_refused_and_a_lead_routed_or_embedded_id_refuses_nothing(agent, tmp_path):
+    async with LocalClient() as person:
+        worker = await _mk(person, tmp_path)("w", unattended=True)
+        async with LocalClient(caller=worker) as w:
+            q = await _answered(w, person, worker)
+            a = (await w.call("msg", to=PERSON, text="first?", kind="ask"))["entry"]
+            b = (await w.call("msg", to=PERSON, text="second?", kind="ask"))["entry"]
+            with pytest.raises(AgentError, match=f"^{b['id']} is your open question") as no:
+                await w.call("msg", to=PERSON, text=f"on {b['id']} and {a['id']}", outcome="blocked", for_=q["id"])
+            assert a["id"] not in str(no.value).split(":")[0]
+            # a rerouted original whose copy went to a lead holds no question to the person
+            lead = MailEntry(id="m-abcdefabcdef", from_=worker, to=["ao-tl"], at=q["at"], kind="ask", text="?")
+            lead.root, lead.closed_reason = "m-elsewhere000", "rerouted"
+            agent.sessions[worker].outbox.append(lead)
+            for gone in (a, b):
+                await w.call("msg_withdraw", id=gone["id"])
+            # an id inside a longer hex run, or glued to a word, names nothing: it lands, warned of c
+            c = (await w.call("msg", to=PERSON, text="third?", kind="ask"))["entry"]
+            got = await w.call(
+                "msg", to=PERSON, text=f"waits on m-abcdefabcdef, x{c['id']} and {c['id']}ff", outcome="blocked",
+                for_=q["id"],
+            )  # fmt: skip
+            assert _held(agent, q["id"]).outcome["state"] == "blocked"
+            assert any(x.startswith(f"you hold open question {c['id']}") for x in got["warnings"])
+        await person.call("kill", id=worker)
+
+
+@pytest.mark.integration
+async def test_a_handed_entrys_blocked_outcome_is_replaced_once_and_was_never_nests(agent, tmp_path):
+    async with LocalClient() as person:
+        sid = await _mk(person, tmp_path)("tl", unattended=True)
+        handed = MailEntry(id="m-entry", from_=PERSON, to=[sid], at="2026-11-12T10:00:00Z", kind="ask", text="fix it")
+        handed.handed, handed.entry = True, {"repo": "shiftlead", "type": "debt"}
+        agent.sessions[sid].inbox.append(handed)
+        async with LocalClient(caller=sid) as tl:
+            await tl.call("msg", to=PERSON, text="first block", outcome="blocked", for_="m-entry")
+            with pytest.raises(AgentError, match="is settled"):
+                await tl.call("msg", to=PERSON, text="again", outcome="blocked", for_="m-entry")
+            q = (await tl.call("msg", to=PERSON, text="which?", kind="ask", thread="m-entry"))["entry"]
+            await person.call("msg", to=sid, text="that one", kind="reply", reply_to=q["id"])
+            await tl.call("msg", to=PERSON, text="second block", outcome="blocked", for_="m-entry")
+            assert handed.outcome["was"]["text"] == "first block"
+            await tl.call("msg", to=PERSON, text="done: TD-9", outcome="done", for_="m-entry")
+            assert handed.outcome["was"]["text"] == "second block" and "was" not in handed.outcome["was"]
+        await person.call("kill", id=sid)
