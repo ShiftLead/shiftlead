@@ -202,6 +202,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     _usage_checked_at,  # noqa: F401
     _usage_key,  # noqa: F401
     _Wait,  # noqa: F401
+    _without_finished_designs,  # noqa: F401
     backup_store,  # noqa: F401
     cache_lapsed,  # noqa: F401
     cache_restarts,  # noqa: F401

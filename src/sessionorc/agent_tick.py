@@ -5387,7 +5387,10 @@ class TickMixin:
             if not s.dir or s.state == "closed" or not adapters.has_agent(s.adapter):
                 continue
             if s.retire_branch_claims(designs(s)):
-                self._save(s)
+                try:
+                    self._save(s)
+                except OSError as e:  # one record's disk never stops the pass; the next one saves it again
+                    log.warning("retiring %s's finished-design claim was not saved: %s", s.id, e)
 
     async def _refresh_model(self, now: datetime) -> None:
         """The model each live agent session is running (TD-031, design §4.2a). The hook reports it
