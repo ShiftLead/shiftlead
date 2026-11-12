@@ -2,15 +2,39 @@
  "blocked": [],
  "check": [
   {
+   "field": "location",
+   "id": "TD-002",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-002: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
+  },
+  {
    "field": "area",
    "id": "TD-004",
    "kind": "undeclared-field",
    "level": "info",
    "standing": false,
    "text": "ℹ TD-004: field 'area' has no vocabulary on the preamble's Fields: line — not validated; declare it (cadence.md §2.12)"
+  },
+  {
+   "field": "status",
+   "id": "TD-001",
+   "kind": "status",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-001: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
   }
  ],
  "check_since_empty": [
+  {
+   "field": "location",
+   "id": "TD-002",
+   "kind": "retired",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-002: a new or changed Location line — the header field is retired; write the **Location:** body section, or run migrate, which moves it (SPEC *Retired words*)"
+  },
   {
    "field": "area",
    "id": "TD-004",
@@ -18,6 +42,14 @@
    "level": "error",
    "standing": false,
    "text": "⚠ TD-004: field 'area' has no vocabulary on the preamble's Fields: line — not validated; declare it (cadence.md §2.12)"
+  },
+  {
+   "field": "status",
+   "id": "TD-001",
+   "kind": "status",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-001: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
   }
  ],
  "declared": {
@@ -90,7 +122,15 @@
    "type": "debt"
   }
  ],
- "flags": [],
+ "flags": [
+  {
+   "field": "location",
+   "id": "TD-002",
+   "kind": "retired",
+   "level": "info",
+   "text": "ℹ TD-002: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
+  }
+ ],
  "pickable": [
   "TD-002",
   "TD-003",

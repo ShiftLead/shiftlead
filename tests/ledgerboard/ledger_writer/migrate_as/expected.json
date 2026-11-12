@@ -1,0 +1,42 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "migrate",
+  "entries": {
+   "TD-001": {
+    "changes": [
+     "Status Designed 2026-10-01 → Open"
+    ],
+    "listed": [
+     "stage word Designed: Kind not set"
+    ],
+    "stops": []
+   },
+   "TD-004": {
+    "changes": [
+     "Status Gone quiet → Resolved 2026-10-20"
+    ],
+    "listed": [
+     "decided: resolved"
+    ],
+    "stops": []
+   },
+   "TD-005": {
+    "changes": [
+     "Status Moved 2026-10-03 to TD-6 and TD-7 → Dropped 2026-10-03"
+    ],
+    "listed": [
+     "decided: dropped"
+    ],
+    "stops": []
+   }
+  },
+  "paths": [
+   "ledger/TD-001.md",
+   "ledger/archive/TD-004.md",
+   "ledger/archive/TD-005.md"
+  ],
+  "reblocked": {},
+  "subject": "ledger: migrate v2.7 (3 entries)"
+ }
+}

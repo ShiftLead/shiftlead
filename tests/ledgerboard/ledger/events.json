@@ -102,6 +102,54 @@
    "level": "error",
    "standing": false,
    "text": "⚠ TD-206: its event (readded) gate's host-log check has no gate added: event (readded) Log line to count from (none, or a gate lifted after the last)"
+  },
+  {
+   "field": "status",
+   "id": "TD-201",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-201: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-202",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-202: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-203",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-203: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-204",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-204: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-205",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-205: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-206",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-206: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
   }
  ],
  "check_since_empty": [
@@ -200,6 +248,54 @@
    "level": "error",
    "standing": false,
    "text": "⚠ TD-206: its event (readded) gate's host-log check has no gate added: event (readded) Log line to count from (none, or a gate lifted after the last)"
+  },
+  {
+   "field": "status",
+   "id": "TD-201",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-201: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-202",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-202: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-203",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-203: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-204",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-204: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-205",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-205: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-206",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-206: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
   }
  ],
  "declared": {},

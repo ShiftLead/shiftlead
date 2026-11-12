@@ -699,6 +699,15 @@ def _write_back(
         by=by or None, tool=TOOL, ledger=lifts, board_only=only,
     )  # fmt: skip
     msg = message(text, action, due, answer=answer)
+    if plan.info.get("left_open"):
+        # ledgerboard v2.7: a board-only decide whose lifting answer leaves a listed entry still carrying the gate
+        # writes nothing, and says which (its TD-067 *Consumers*): nothing is landed, and the press is answered
+        # with what it left open, never as a plain done (TD-1709)
+        head = _git(t, "rev-parse", "--short", f"origin/{want}").stdout.strip()
+        _reset(t, want)
+        gate = ledgerboard._item_gate(text)[1]
+        return {"commit": head, "message": msg, "line": at + 1, "text": text, "due": due,
+                "left_open": list(plan.info["left_open"]), "gate": gate}  # fmt: skip
     _apply(plan)
     also = sorted(os.path.relpath(p, t) for p in plan.changes if Path(p).resolve() != path.resolve())
     if _read_lines(path)[at] == lines[at]:

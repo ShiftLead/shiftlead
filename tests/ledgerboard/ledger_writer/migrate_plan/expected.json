@@ -1,0 +1,39 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "migrate",
+  "entries": {
+   "TD-001": {
+    "changes": [
+     "Status Designed 2026-10-01: drafted → Open",
+     "Location → body"
+    ],
+    "listed": [
+     "stage word Designed: Kind not set"
+    ],
+    "stops": []
+   },
+   "TD-002": {
+    "changes": [
+     "Added comment → Log"
+    ],
+    "listed": [],
+    "stops": []
+   },
+   "TD-004": {
+    "changes": [
+     "Status Done 2026-10-03: shipped → Resolved 2026-10-03"
+    ],
+    "listed": [],
+    "stops": []
+   }
+  },
+  "plan": {
+   "ledger/TD-001.md": "## TD-001: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n\n**Why:** a reason.\n\n**Location:** `src/a.py`\n\n**Log:**\n- 2026-10-01: drafted\n- 2026-10-01: was: Designed 2026-10-01\n",
+   "ledger/TD-002.md": "## TD-002: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-02\n**Status:** Open\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-02: seen in the review\n",
+   "ledger/archive/TD-004.md": "## TD-004: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-03\n\n**Why:** a reason.\n\n**Log:**\n- 2026-10-03: shipped\n- 2026-10-03: was: Done 2026-10-03\n"
+  },
+  "reblocked": {},
+  "subject": "ledger: migrate v2.7 (3 entries)"
+ }
+}

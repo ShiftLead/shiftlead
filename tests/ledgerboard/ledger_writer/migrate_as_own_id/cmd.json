@@ -1,0 +1,16 @@
+{
+ "argv": [
+  "migrate",
+  "--release",
+  "2.7",
+  "--as",
+  "TD-5=superseded TD-5",
+  "--closed-dates",
+  "dates.json",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-11-11",
+  "--json"
+ ]
+}

@@ -1,0 +1,17 @@
+{
+ "argv": [
+  "renumber",
+  "TD-1",
+  "--id",
+  "TD-12",
+  "--take",
+  "0123456789abcdef0123456789abcdef",
+  "--also",
+  "notes.md",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

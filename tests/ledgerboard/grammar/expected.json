@@ -1,4 +1,54 @@
 {
+ "added": {
+  "added": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": [
+     "Added comment → Log"
+    ]
+   },
+   {
+    "accepted": false,
+    "why": [
+     "Added 2026-01-01.: not a date"
+    ]
+   },
+   {
+    "accepted": false,
+    "why": [
+     "Added soon: not a date"
+    ]
+   }
+  ],
+  "date": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": [
+     "Added 2026-1-31: not a date"
+    ]
+   }
+  ],
+  "digit": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": [
+     "Added 2026-1O-09: not a date"
+    ]
+   }
+  ]
+ },
  "blocked-by": {
   "blocked-by": [
    {
@@ -480,6 +530,50 @@
    {
     "accepted": false,
     "why": "its check: the kind 'Press' is not 1 to 40 of [a-z0-9-], not starting with -"
+   }
+  ]
+ },
+ "header-block": {
+  "char": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its header block holds a line that is not a field: 'not a field' — join it to its field's line, or move it below the header block, by hand"
+   }
+  ],
+  "field-line": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "the paragraph after its heading is its header block, and '**1st:** x' is not a field — an entry with a body needs its fields first; add them by hand"
+   },
+   {
+    "accepted": false,
+    "why": "the paragraph after its heading is its header block, and '**A*b:** x' is not a field — an entry with a body needs its fields first; add them by hand"
+   }
+  ],
+  "header-block": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "the paragraph after its heading is its header block, and 'Priority: High' is not a field — an entry with a body needs its fields first; add them by hand"
+   },
+   {
+    "accepted": false,
+    "why": "the paragraph after its heading is its header block, and '**Priority** High' is not a field — an entry with a body needs its fields first; add them by hand"
    }
   ]
  },
@@ -983,6 +1077,308 @@
    }
   ]
  },
+ "log-line": {
+  "char": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "not a Log line"
+   }
+  ],
+  "date": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "not a Log line"
+   }
+  ],
+  "digit": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "not a Log line"
+   }
+  ],
+  "entry-id": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "event-name": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "gate": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "lift-gate": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "lift-suffix": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "log-archived": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "log-filed": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "log-gate-added": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "log-kept-waiting": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "log-lift-answer": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "log-lift-check": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "log-lift-date": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "log-lift-override": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "log-lift-skipped": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "log-line": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "not a Log line"
+   },
+   {
+    "accepted": false,
+    "why": "not a Log line"
+   }
+  ],
+  "log-reassigned": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "log-reopened": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "log-token": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "log-was": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "log-words": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "nonspace": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "person": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "person-part": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "repo": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "repo-part": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ]
+ },
  "rank-file": {
   "comment": [
    {
@@ -1098,6 +1494,176 @@
     "why": [
      "⚠ rank line 1: cannot read 'TD-3:0h' — write TD-NNN: <key>"
     ]
+   }
+  ]
+ },
+ "status-dropped": {
+  "date": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Dropped, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   }
+  ],
+  "digit": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Dropped, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   }
+  ],
+  "status-dropped": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Dropped, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Dropped, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Dropped, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   }
+  ]
+ },
+ "status-open": {
+  "status-open": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "an open entry's Status is Open alone — this one is Open, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   },
+   {
+    "accepted": false,
+    "why": "an open entry's Status is Open alone — this one is open, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   },
+   {
+    "accepted": false,
+    "why": "an open entry's Status is Open alone — this one is Open, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   }
+  ]
+ },
+ "status-resolved": {
+  "date": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   }
+  ],
+  "digit": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   }
+  ],
+  "status-resolved": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   }
+  ]
+ },
+ "status-superseded": {
+  "date": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   }
+  ],
+  "digit": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   }
+  ],
+  "entry-id": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   }
+  ],
+  "repo": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   }
+  ],
+  "repo-part": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   }
+  ],
+  "status-superseded": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   },
+   {
+    "accepted": false,
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
    }
   ]
  }

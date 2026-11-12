@@ -39,6 +39,12 @@
    ]
   ],
   "no board item, on a board with no People": [],
+  "set by= on one part of a shared item, decided": [
+   [
+    "tripwire-shared-decided",
+    "TD-111 lifts decision (pat) leaving a shared board item open, but the item gains a Decided: that speaks for the entries left — leave it unanswered"
+   ]
+  ],
   "set by= on one part of a shared item, left open": [],
   "set by= with the board's Decided": [],
   "the item closed with no Decided": [
@@ -47,7 +53,8 @@
     "TD-150 lifts decision (pat), and no item covering it on this repo's board gains a Decided: in the same diff"
    ]
   ],
-  "the last part of a shared item lifted, the item newly closed": []
+  "the last part of a shared item lifted, the item newly closed": [],
+  "the last part of a shared item lifted, undecided at the base": []
  },
  "uncovered": {
   "a gate already at base": {

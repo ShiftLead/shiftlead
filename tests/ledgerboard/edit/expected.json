@@ -376,7 +376,7 @@
    "refused": "a decision needs its words: one of the entry's answers, or what you typed"
   },
   {
-   "refused": "an answer may not carry Context:, Parts:, Hide until:, Answers:, Lifts:, Decided: or Closed: — say it in other words"
+   "refused": "an answer carries a field's name (Closed:) — say it in other words"
   },
   {
    "ok": "- [ ] decide 2026-01-15 (person) — Where the cache lives. Context: TD-40. Due: 2026-01-15. Answers: On disk (default) — the next run reads it back | In memory — every run starts cold | Not now. Decided: On disk (2026-01-15).\n"
@@ -386,6 +386,12 @@
   },
   {
    "ok": "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick the cache store? Context: TD-7. Due: 2026-01-20. Answers: On disk — the next run reads it back | In memory (default) | Not now.\n  - **Context:** The cache is rebuilt on every run, which takes a minute.\n    - disk: 40 MB\n    - memory: none\n  - **Question:** Where should the cache live?\n  - **Caveats:** Nobody has measured a cold start yet.\n  - **Recommended:** In memory — nothing to clean up. **Otherwise:** On disk, if cold starts hurt; Not now, if neither.\n"
+  },
+  {
+   "refused": "the detail block's recommended opens with In memory —, which the writer adds itself from the default answer's label — give the words after it"
+  },
+  {
+   "ok": "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick the cache store? Context: TD-7. Due: 2026-01-20. Answers: On disk — the next run reads it back | In memory (default) | Not now.\n  - **Context:** The cache is rebuilt on every run, which takes a minute.\n    - disk: 40 MB\n    - memory: none\n  - **Question:** Where should the cache live?\n  - **Caveats:** Nobody has measured a cold start yet.\n  - **Recommended:** In memory — In memory, since there is nothing to clean up. **Otherwise:** On disk, if cold starts hurt; Not now, if neither.\n"
   },
   {
    "ok": "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick the cache store? Context: TD-7. Due: 2026-01-20. Answers: On disk | In memory — every run starts cold | Not now.\n  - **Context:** The cache is rebuilt on every run.\n  - **Question:** Where should it live?\n  - **Recommended:** only you know how often runs restart.\n"
@@ -415,13 +421,13 @@
    "ok": "- [ ] 2026-01-15 (session `w-1` on box-1) — Wait for the mirror... Context: TD-7. Due: 2026-01-20.\n"
   },
   {
-   "refused": "a board line's text may not carry Context:, Parts:, Due:, Hide until:, Answers:, Lifts:, Decided: or Closed: — the reader would read it as the field; say it in other words"
+   "refused": "a board line's text carries a field's name (Due:) — the reader would read it as the field; say it in other words"
   },
   {
-   "refused": "the context may not carry Context:, Parts:, Due:, Hide until:, Answers:, Lifts:, Decided: or Closed: — the reader would read it as the field; say it in other words"
+   "refused": "the context carries a field's name (Due:) — the reader would read it as the field; say it in other words"
   },
   {
-   "refused": "the detail block's caveats may not carry Context:, Parts:, Due:, Hide until:, Answers:, Lifts:, Decided: or Closed: — the reader would read it as the field; say it in other words"
+   "refused": "the detail block's caveats carries a field's name (Answers:) — the reader would read it as the field; say it in other words"
   },
   {
    "refused": "a decide offers two or more answers"
@@ -487,7 +493,7 @@
    "refused": "hide_until as YYYY-MM-DD, not '2026-1-18'"
   },
   {
-   "refused": "a board line's text may not carry Context:, Parts:, Due:, Hide until:, Answers:, Lifts:, Decided: or Closed: — the reader would read it as the field; say it in other words"
+   "refused": "a board line's text carries a field's name (Hide until:) — the reader would read it as the field; say it in other words"
   },
   {
    "ok": "- [ ] decide 2026-01-15 (person) — Where the cache lives. Context: TD-40. Due: 2026-01-15. Answers: On disk (default) | Not now. Decided: On disk (by pat.lee) (2026-01-15).\n"
@@ -623,6 +629,12 @@
   },
   {
    "refused": "context: not one entry and one decision"
+  },
+  {
+   "refused": "an answer carries a field's name (Context:) — the reader would read it as the field; say it in other words"
+  },
+  {
+   "refused": "a board line's text carries a field's name (due:) — the reader would read it as the field; say it in other words"
   }
  ],
  "edit_actions": {
@@ -705,19 +717,19 @@
    "ok": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-20. — w-2, 2026-01-15: looking. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B."
   },
   "reply-naming-hide-refused": {
-   "refused": "a reply may not carry Context:, Parts:, Hide until:, Answers:, Lifts:, Decided: or Closed: — the reader would read it as the field; say it in other words"
+   "refused": "a reply carries a field's name (Hide until:) — the reader would read it as the field; say it in other words"
   },
   "reply-refused-due-on-undated": {
    "refused": "this item has no Due: date, so a reply may not carry one — the reader would take it for the item's; snooze sets its date"
   },
   "reply-refused-field": {
-   "refused": "a reply may not carry Context:, Parts:, Hide until:, Answers:, Lifts:, Decided: or Closed: — the reader would read it as the field; say it in other words"
+   "refused": "a reply carries a field's name (Decided:) — the reader would read it as the field; say it in other words"
   },
   "reply-refused-lifts": {
-   "refused": "a reply may not carry Context:, Parts:, Hide until:, Answers:, Lifts:, Decided: or Closed: — the reader would read it as the field; say it in other words"
+   "refused": "a reply carries a field's name (Lifts:) — the reader would read it as the field; say it in other words"
   },
   "reply-refused-parts": {
-   "refused": "a reply may not carry Context:, Parts:, Hide until:, Answers:, Lifts:, Decided: or Closed: — the reader would read it as the field; say it in other words"
+   "refused": "a reply carries a field's name (Parts:) — the reader would read it as the field; say it in other words"
   },
   "reply-second": {
    "ok": "- [ ] act 2026-01-05 (session s-1) — Rotate. Due: 2026-01-10. — Sam, 2026-01-12: halfway — Sam, 2026-01-15: all done"

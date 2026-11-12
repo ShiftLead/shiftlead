@@ -1,0 +1,16 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "decide",
+  "board_only": true,
+  "changes": [],
+  "entries": [],
+  "item_notes": [],
+  "left_open": [
+   "TD-8",
+   "TD-10"
+  ],
+  "line": 7,
+  "subject": null
+ }
+}

@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "reopen",
+  "refused": "⚠ TD-005: a new or changed Location line — the header field is retired; write the **Location:** body section, or run migrate, which moves it (SPEC *Retired words*)"
+ }
+}

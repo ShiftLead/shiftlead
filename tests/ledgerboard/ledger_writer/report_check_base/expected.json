@@ -4,6 +4,14 @@
   "errors": 1,
   "flags": [
    {
+    "field": "location",
+    "id": "TD-001",
+    "kind": "retired",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-001: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
+   },
+   {
     "field": null,
     "id": null,
     "kind": "archive-loss",

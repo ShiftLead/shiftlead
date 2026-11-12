@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "migrate",
+  "unusable": "--stage-kind designed: KIND is one line of text"
+ }
+}

@@ -427,6 +427,58 @@
       "context": "TD-7",
       "kind": "decide",
       "answers": [
+        "On disk — the next run reads it back",
+        "In memory",
+        "Not now"
+      ],
+      "default": 1,
+      "detail": {
+        "context": [
+          "The cache is rebuilt on every run, which takes a minute.",
+          "disk: 40 MB",
+          "memory: none"
+        ],
+        "question": "Where should the cache live?",
+        "caveats": "Nobody has measured a cold start yet",
+        "recommended": "in  MEMORY —  nothing to clean up",
+        "otherwise": "On disk, if cold starts hurt; Not now, if neither"
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Pick the cache store?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": "box-1",
+      "context": "TD-7",
+      "kind": "decide",
+      "answers": [
+        "On disk — the next run reads it back",
+        "In memory",
+        "Not now"
+      ],
+      "default": 1,
+      "detail": {
+        "context": [
+          "The cache is rebuilt on every run, which takes a minute.",
+          "disk: 40 MB",
+          "memory: none"
+        ],
+        "question": "Where should the cache live?",
+        "caveats": "Nobody has measured a cold start yet",
+        "recommended": "In memory, since there is nothing to clean up",
+        "otherwise": "On disk, if cold starts hurt; Not now, if neither"
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Pick the cache store?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": "box-1",
+      "context": "TD-7",
+      "kind": "decide",
+      "answers": [
         "On disk",
         "In memory — every run starts cold",
         "Not now"
@@ -1731,6 +1783,32 @@
         "question": "Go on its builds?",
         "recommended": "Go: the rounds ended."
       }
+    },
+    {
+      "fn": "item_line",
+      "text": "Pick the cache store?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": "box-1",
+      "context": "TD-7",
+      "kind": "decide",
+      "answers": [
+        "On disk",
+        "Not now, see Context: TD-9"
+      ],
+      "detail": {
+        "context": "The cache is rebuilt on every run.",
+        "question": "Where should it live?",
+        "recommended": "only you know."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Check the mirror, due: friday",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": "box-1",
+      "context": "TD-7"
     }
   ],
   "predicates": [

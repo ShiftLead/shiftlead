@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "migrate",
+  "unusable": "--stage-kind takes WORD=KIND, WORD one of designed, built, partly, live, in, not 'done=stage-a'"
+ }
+}

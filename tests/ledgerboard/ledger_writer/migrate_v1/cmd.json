@@ -1,0 +1,12 @@
+{
+ "argv": [
+  "migrate",
+  "--release",
+  "2.7",
+  "--ledger",
+  "technical_debt.md",
+  "--today",
+  "2026-11-11",
+  "--json"
+ ]
+}

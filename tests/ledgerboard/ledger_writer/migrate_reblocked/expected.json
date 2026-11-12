@@ -1,0 +1,72 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "migrate",
+  "entries": {
+   "TD-004": {
+    "changes": [
+     "Status OBE 2026-10-03 → Dropped 2026-10-03"
+    ],
+    "listed": [],
+    "stops": []
+   },
+   "TD-005": {
+    "changes": [
+     "Status Gone quiet → Resolved 2026-10-06"
+    ],
+    "listed": [
+     "decided: resolved"
+    ],
+    "stops": []
+   },
+   "TD-007": {
+    "changes": [
+     "Status Moved 2026-10-04 → Dropped 2026-10-04"
+    ],
+    "listed": [
+     "Moved: Dropped"
+    ],
+    "stops": []
+   },
+   "TD-009": {
+    "changes": [
+     "Status Won't fix 2026-10-05 → Dropped 2026-10-05"
+    ],
+    "listed": [
+     "date 2026-10-05 read from the Status's text"
+    ],
+    "stops": []
+   }
+  },
+  "paths": [
+   "ledger/archive/TD-004.md",
+   "ledger/archive/TD-005.md",
+   "ledger/archive/TD-007.md",
+   "ledger/archive/TD-009.md"
+  ],
+  "reblocked": {
+   "TD-001": [
+    {
+     "after": "dropped",
+     "before": "resolved",
+     "blocker": "TD-004"
+    }
+   ],
+   "TD-002": [
+    {
+     "after": "resolved",
+     "before": "unknown-status",
+     "blocker": "TD-005"
+    }
+   ],
+   "TD-003": [
+    {
+     "after": "dropped",
+     "before": "resolved",
+     "blocker": "TD-006"
+    }
+   ]
+  },
+  "subject": "ledger: migrate v2.7 (4 entries)"
+ }
+}

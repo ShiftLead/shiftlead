@@ -19,6 +19,22 @@
    "level": "info",
    "standing": false,
    "text": "ℹ TD-702: decision (Sam) was reassigned 3 times — is the decision stuck?"
+  },
+  {
+   "field": "status",
+   "id": "TD-701",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-701: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-702",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-702: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
   }
  ],
  "check_since_empty": [
@@ -37,6 +53,22 @@
    "level": "info",
    "standing": false,
    "text": "ℹ TD-702: decision (Sam) was reassigned 3 times — is the decision stuck?"
+  },
+  {
+   "field": "status",
+   "id": "TD-701",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-701: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-702",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-702: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
   }
  ],
  "declared": {},

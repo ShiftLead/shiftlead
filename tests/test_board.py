@@ -1422,9 +1422,11 @@ async def test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write
         assert "TD-20" not in origin_board(repo)
         monkeypatch.setattr(agent, "_msg", real)
         # words the board refuses refuse the press before anyone is told (review of #2162)
-        with pytest.raises(AgentError, match="may not carry Context:"):
+        with pytest.raises(AgentError, match=r"(carries a field's name \(|may not carry )Context:"):
             await me.call("ledger_decide", repo=root, id="TD-20", road="design", words="see Context: TD-1")
-        with pytest.raises(AgentError, match="may not carry Context:"):  # past the guard: an open part counts
+        with pytest.raises(
+            AgentError, match=r"(carries a field's name \(|may not carry )Context:"
+        ):  # past the guard: an open part counts
             await me.call("ledger_decide", repo=root, id="TD-26", road="design", words="see Context: TD-1")
         assert not [e for e in w.inbox if e.about == "TD-20"], "nobody was told"
         got = await me.call("ledger_decide", repo=root, id="TD-20", road="design", words=" split  it ")
@@ -1434,7 +1436,7 @@ async def test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write
         )
         notes = [e.text for e in w.inbox if e.from_ == PERSON and e.about == "TD-20"]
         assert notes and notes[0].startswith("TD-20 goes back to design — split it: stop at the step in hand")
-        with pytest.raises(AgentError, match="may not carry"):
+        with pytest.raises(AgentError, match="carries a field's name|may not carry"):
             await me.call("ledger_decide", repo=root, id="TD-24", road="done", words="Decided: x")
         got = await me.call("ledger_decide", repo=root, id="TD-24", road="done")
         assert got["decided"] == "done" and got["told"] == []

@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "new",
+  "unusable": "--field Location=… is not a header field from v2.7: give --location, which writes the **Location:** body section"
+ }
+}

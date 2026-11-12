@@ -404,11 +404,19 @@
    "subject": "ledger: set TD-111 (session w-1)"
   },
   {
+   "name": "set by= on one part of a shared item, decided",
+   "subject": "ledger: set TD-111 (session w-1)"
+  },
+  {
    "name": "a shared item said to be left open, with nothing shared",
    "subject": "ledger: set TD-150 (session w-1)"
   },
   {
    "name": "the last part of a shared item lifted, the item newly closed",
+   "subject": "ledger: set TD-112 (session w-1)"
+  },
+  {
+   "name": "the last part of a shared item lifted, undecided at the base",
    "subject": "ledger: set TD-112 (session w-1)"
   },
   {

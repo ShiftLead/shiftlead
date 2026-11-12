@@ -84,4 +84,4 @@ precheck = "T=$(mktemp -d /var/tmp/pc.XXXXXX) && trap 'rm -rf \"$T\"' EXIT && pd
 # full commit, moved by `agent-cadence bump` in a reviewed PR. Written by `sync.sh --pin`.
 [agent-cadence]
 source = "https://github.com/ShiftLead/agent-cadence"
-ref = "473deb120951bbfb06dbd8313391caf99ada38e6"
+ref = "acf46ead083c0cf426cbb439566365523ca72541"
