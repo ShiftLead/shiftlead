@@ -23,6 +23,7 @@ from sessionorc import (
     naming,
     shots,
 )
+from sessionorc import queue as queue_mod
 from sessionorc import settings as settings_mod
 from sessionorc import stuck as stuck_mod
 from sessionorc import usage as usage_mod
@@ -33,6 +34,7 @@ from sessionorc.agent_common import (
     NODE_ACTS,
     NODE_READS,
     RpcError,
+    _without_finished_designs,
     closer_of,
     launch_params,
     log,
@@ -822,6 +824,8 @@ class RemoteMixin:
             raise link.LinkError(f"bad derived report: {e}") from None
         if any(e.source == "declared" for e in (*progress, *findings)):
             raise link.LinkError("a derived report is never declared: a session declares through its own `ao`")
+        # a finished design's derived claim is never written (§4.8 *A finished design lets go of its derived claim*)
+        progress = _without_finished_designs(progress, queue_mod.finished_designs(self._repos)(s))
         applied = [s.report_progress(e) for e in progress] + [s.report_finding(e) for e in findings]
         applied += [s.note_review(e) for e in progress]  # as the home's own tick does (TD-150)
         changed = any(applied) | s.retire_branch_claims(str(r) for r in params.get("retire") or [])
