@@ -176,6 +176,14 @@ def seat_able(r: Session, now: datetime, unfillable: dict[str, str] | None = Non
 pool_rank = mail.pool_rank  # §4.9b *A seat as an ordered pool* (TD-1476): read by the card too
 
 
+def _roll(t: Tally, now: datetime) -> Tally:
+    """A pair tally's window rolled forward in place: entries older than `PAIR_WINDOW` fall out, `count` the rest."""
+    cutoff = now - mail.PAIR_WINDOW
+    t.at = [x for x in t.at if _parse(x) >= cutoff]
+    t.count = len(t.at)
+    return t
+
+
 class MailMixin:
     # -- mail (design §4.10, TD-052 step 1) ------------------------------------------------------
 
@@ -1860,22 +1868,13 @@ class MailMixin:
     def _pair(self, r: Session, other: str, now: datetime) -> Tally:
         """The pair tally `r` keeps for `other`, its window rolled forward: entries older than
         `PAIR_WINDOW` fall out, and `count` is what is left."""
-        t = r.threads.setdefault(f"pair:{other}", Tally())
-        cutoff = now - mail.PAIR_WINDOW
-        t.at = [x for x in t.at if _parse(x) >= cutoff]
-        t.count = len(t.at)
-        return t
+        return _roll(r.threads.setdefault(f"pair:{other}", Tally()), now)
 
     def _pair_peek(self, r: Session, other: str, now: datetime) -> Tally | None:
         """The pair tally `r` keeps for `other`, its window rolled forward as `_pair` rolls it, or None where
         `r` keeps none: a read that creates no key and saves nothing (§4.9 *A scaled seat's bounds*, TD-1728)."""
         t = r.threads.get(f"pair:{other}")
-        if t is None:
-            return None
-        cutoff = now - mail.PAIR_WINDOW
-        t.at = [x for x in t.at if _parse(x) >= cutoff]
-        t.count = len(t.at)
-        return t
+        return None if t is None else _roll(t, now)
 
     def _check_bounds(self, sender: str, named: list[str], root: str, now: datetime) -> None:
         """A send is refused when the sender's tally, or any named addressee's, is at the bound —
@@ -1917,7 +1916,7 @@ class MailMixin:
                 ends_a, ends_b = mail.seat_records(records, sender), mail.seat_records(records, sid)
                 mine_side = [(records[a], b) for a in ends_a for b in ends_b]
                 their_side = [(records[b], a) for b in ends_b for a in ends_a]
-                x, y = (mail.seat_name(records[k]) if records[k].seat is not None else k for k in (sender, sid))
+                x, y = [mail.seat_name(records[k]) if records[k].seat is not None else k for k in (sender, sid)]
             mine = [(r, t) for r, o in mine_side if (t := self._pair_peek(r, o, now)) is not None]
             theirs = [(r, t) for r, o in their_side if (t := self._pair_peek(r, o, now)) is not None]
             if sum(t.count for _, t in mine) >= limit or sum(t.count for _, t in theirs) >= limit:
