@@ -317,7 +317,8 @@ not mix:
 - **board** — `docs/user_attention.md`: items waiting on the person, each with a `Due:` date.
   *Not:* attention list. — *proposed*.
 - **work order** — a board line the person has decided (`Decided:` on it), listed by the repo reading
-  as `board:<key>` in the `free-pick` lanes of the repo's teams until a session closes it (design §4.4
+  as `board:<key>` in the `free-pick` lanes of the repo's teams (a design's answer, its `Context:` an open
+  design-first entry's gate, in the `design-first` lanes, §6 rule 6, TD-1590) until a session closes it (design §4.4
   *Board write-back*, TD-380). — *proposed* 2026-10-07 (the designer).
 - **ledger** — a v2 directory `docs/ledger/` of one `TD-NNN.md` per entry, as shiftlead's is since TD-1195, or a v1 file `docs/technical_debt.md` (design §4.4 *Either layout*, TD-1143): known issues and deferred work as `TD-NNN` entries. —
   *proposed*.

@@ -646,7 +646,32 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the board reading's `at` for a line and the PR reading's for a PR, was taken no later than that
      `done`: it is kept out of `lane_seen`, untold, so the line or PR the member just closed, still in a
      reading up to `REPOS_EVERY` old, is not told back to it after each `none`, and a reading taken
-     after the `done` that still holds it (the close did not land) tells it once (TD-1389). **A lane word matches by the entry's header, never its prose**: with
+     after the `done` that still holds it (the close did not land) tells it once (TD-1389); **and save one the member
+     itself released** — one its record carries a **`released`** mark for, `released: {ref: {at_drop, told}}` on the
+     **record** (home-owned, not in `lane_seen`, which a claim and a `none` clear): the `ao progress drop` handler
+     writes it only where the caller is the member itself (the caller as the home receives it, a node's forwarded
+     one included, compared with the record's address) (a person's drop of its claim writes none: both read
+     `source: declared` on the entry, so the entry cannot tell them apart and the mark does; the tick's closure of an
+     extra never passes the handler, so it writes none either), both values the order's `Decided:` text and date as the repo reading holds them
+     at the drop (`null` for a `pr:<n>`, which keeps none) — `at_drop` never changes after, and `told` is the last
+     answer told to the member. It is written only where the drop applied (not a repeat), on a `board:` or `pr:`
+     ref, and where the home's reading holds the order (a node's member's `progress` is forwarded to the home, §4.4a
+     *A node forwards; the home answers*, so the home's handler writes every mark); the mark is home-owned (`HOME_OWNED`); the member's next claim of that ref clears it, and so does a
+     reading that no longer holds the ref (the line closed), removed by the tick's pass over every record of the repo, at work or not (the
+     join's, below) — a reading that carries `error`, or none, removes no mark; it ends with the record, is carried with `lane_seen` when a record is
+     renamed — `_carry` copies it beside `lane_seen`, a restart that renames among them — and a restart that keeps
+     its name carries none. Such an order is written into
+     `lane_seen` untold, with no reading's bound — in `lane_seen`, not out as a `done` one is, so a sibling's
+     release of it can be told (below, which reads only ids `lane_seen` holds) — and a re-answer between two
+     declarations is not taken as the baseline. A drop leaves the line or the PR open on purpose and its `--why`
+     already says why the member left it, so it is not told back to the member after each `none` (TD-1590,
+     ledgerboard's grinder rung four times in ten minutes for a line it had dropped). It is told to that member
+     again once, as news, when the line's `Decided:` text or date differs from the mark's `told` (the person
+     answered again: a work order's key survives a re-decide, §4.4 *Board write-back*) — `told` then takes the new
+     answer, advanced only in the step that sends the note, after the gates and the lease test, so a gated member
+     is told once its gate clears, and a third answer is told once again — or as another's release is (below), a sibling that claims and
+     drops it; a `pr:<n>` is told again only by the latter. A restarted
+     member that keeps its name is a new record with no such mark, so the order is its news once again. **A lane word matches by the entry's header, never its prose**: with
      pickable derived (§4.4 *Repo facts*), `design-first` is a pickable entry with `Kind:
      design-first` — a decision owed to the designer is that `Kind:`, never a `decision (designer)`
      item (TD-1296), and a decision on an entry's `Blocked by:` matches no lane: the person's,
@@ -654,7 +679,63 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      pickable entry whose kind is `build` or unwritten — or `live-check`, **once its `event (live…)` gates are
      lifted** (§4.9b *A live check waits on a gate for its build to be live*, TD-1437) — and **every open
      decided line of the repo's board**, a work order `board:<key>` (§4.4 *Board write-back*),
-     which `owner:<word>` never narrows out, since a line has no owner, and **every red PR nobody holds**, a work order `pr:<n>` (§4.4 *A red PR nobody holds is a work order*, TD-613), the same: the grinders' pick list takes both first (§4.9b *No anchor seat*) — so an
+     which `owner:<word>` never narrows out, since a line has no owner — **save a design's answer** (TD-1590): a
+     decided line whose `Context:` is a design's gate, `TD-n decision (<person>)` (any person) with TD-n an open
+     `Kind: design-first` entry of the reading (the end-of-rounds item, cadence §4.8; any decide line gating a
+     design) — exactly one such gate in its `Context:` (read from the line's text, since its `refs` are bare ids); a line naming two designs' gates stays
+     `free-pick`'s, a grinder carrying each — is a work order in the **`design-first`** lanes instead, `free-pick`'s no longer, wherever the repo
+     has a **designer to reach** — a supervised member, not a seat and not a scale extra (§4.9 *Scaling with the
+     work*), of a team servicing the repo, whose `lane` takes the routed order (`lane_matches`: `design-first` in it,
+     whatever else it holds, and any `owner:<word>` naming TD-n's `Owner:`, so a design owned by `techlead` and only
+     `[design-first, owner:designer]` lanes leave the line `free-pick`'s), that is live (suspended, or with a
+     wrap-up asked, it still counts: the line waits for it as an entry in its lane does) or that rule 8 would
+     start for work (its team wound down and not stopped by the person, or it finished while its team runs on —
+     not sat out and not run-only, rule 8's crew, `work.sat_out`;
+     under `on_work: ask` the answer then waits on the Inbox's team-start row, with no `free-pick` fallback) — and
+     in `free-pick` as before where there is none. The answer is a design's next step (*Go*, *One more round*,
+     *Hold: <note>*), its designer knows the round, and a grinder that took it could only carry it to a
+     design-first entry (§4.9a *What a session does with a decided line*). It carries TD-n's `Owner:` and is
+     narrowed by a lane's `owner:<word>` as an entry is. **The design's own designer first**: of the designers to
+     reach, the one whose own `progress` names TD-n in its latest word (`claimed` or `done`, the design PR's merge
+     being a `done`; never `dropped`), the newest such word winning, is the order's `for` — and the line matches that
+     record's lane alone — rule 6 and rule 8 tell or start it and no other designer; with no such record it
+     matches every designer's lane. A designer whose record carries a `released` mark for the line (its own drop,
+     above) is not *to reach* for that line while the line's `Decided:` equals the mark's `at_drop`, so a repo whose
+     only designer dropped it sends it to `free-pick`; once the person answers again it differs, the designer is *to
+     reach* once more and stays so (`at_drop` does not move) until it drops the line again, and the line is told to
+     it once, as above, if it is then the line's `for` or the line has none. A designer that carries a mark for a line
+     that has no `for` still has a lane that takes the line, so the team card and rules 8 and 13 count it, while
+     rule 6 tells it nothing, accepted; rule 8 may start that designer's wound-down team for the line, and a
+     restart that keeps its name carries no mark, so the started designer is *to reach* and told, with no loop. The mark is read on the current record alone: a restart that keeps
+     its name carries none. **Across a restart** a superseded
+     record (one carrying `superseded_by`: rule 8's start, rule 2's, a resume) never counts: its words **on TD-n**
+     that decide `for` are read along the record's line of successors (`superseded_by`), the newest record of that
+     line standing for it, since a restart carries only `claimed` words and the `done` on TD-n stays on the ended
+     record. Once an ended record is removed (`CLOSED_KEEP` after it closed, §4.10) its words go with it and
+     `for` falls back to every designer, accepted: the line is then news to each. A designer at work on another entry is not told (rule 6 tells only a member
+     out of work) and takes the line at its next pick, work orders first (§4.8); a busy or stuck `for` holds the
+     line as long as its own entries wait, accepted, since rule 13's *stuck work* reads the line's age as any
+     work's. The join is run **every tick**, on the event loop, over the stored board orders, the ledger reading
+     and the repo's records (a node's included, as the lanes' peers are read), and writes the stored orders only
+     when a field changes (on a failed ledger reading it leaves the stored fields as they are), so `for` follows a record's `progress` within a tick, not the board's `REPOS_EVERY`; the
+     board's refresh runs the same join on its fresh orders before it stores them, in the same step, so no reader
+     ever sees a routed line unjoined (the refresh's static readers hand the orders back, and each site that stores
+     them — the tick's refresh and a press's re-read of the board — joins them first, before it stores them and before
+     the refresh's comparison of old and new). When
+     `for` changes (that record gone past rule 8's reach, its word on TD-n a `drop`, its `released` mark for the line
+     written) the line matches the lanes it now matches and is news to each, as an entry that enters a lane is
+     (`lane_seen` is the lane's memory, below). The line's lane is the repo reading's, written on its work order
+     (`lane: design-first`, `design: TD-n`, `owner` from TD-n, and `for: <record address>` where one is — `id@host`
+     for a node's record, as `_successor` addresses one — beside `refs`),
+     computed where the tick joins the board's orders to the ledger reading and the repo's records, stored on the
+     repo reading's `work_orders` by the tick's refresh (every reader reads it there, none recomputes), and read by
+     `lane_matches` beside the lane's own record address — called with none, an order with a `for` matches no
+     lane, so every caller passes the address of the record whose lane it reads, a team's count included; so the team card, `ao repo`, the Repo page's column, the
+     Inbox's *pickable by <team>* (§4.5 screen 6), rule 8 and rule 13 (whose orders are the stored ones, never re-derived from the board) read the one answer. An order with a `lane` is in no
+     team's `rest` (§4.4 *In a team's lanes*). A grinder's claim of the line, taken while it was still
+     `free-pick`'s, is a lease like any other and stands when the line leaves its lane: it does the fallback's
+     work (§4.9a), carrying *One more round* or *Hold*, never dropping it. The line is still `High` and still a work
+     order, taken first; and **every red PR nobody holds**, a work order `pr:<n>` (§4.4 *A red PR nobody holds is a work order*, TD-613), the same: the grinders' pick list takes both first (§4.9b *No anchor seat*) — so an
      evaluation, a decision and a live check whose gate stands match no lane, and a ledger
      with no header lines at all gives a `free-pick` lane everything it has unblocked; a lane of
      references gains nothing, and any other lane word matches nothing until a role gives it a
