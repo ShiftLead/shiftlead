@@ -752,6 +752,13 @@ def message_gate(
     return None
 
 
+def seat_name(r: Session) -> str:
+    """The seat a seat record is one of (§4.9 *Mail to a scaled seat*, *A scaled seat's bounds*, TD-1728): an
+    extra's `scale.line`, else the record's own `name` — what `seat_records` matches on and a refusal names."""
+    line = r.scale.get("line") if isinstance(r.scale, dict) else None
+    return str(line or r.name)
+
+
 def seat_records(records: Mapping[str, Session], target: str) -> list[str]:
     """The records that are one seat with `target` (§4.9 *Mail to a scaled seat*, TD-1547): a seat's own record
     and its extras — each carrying `seat`, the extras' `scale.line` naming the seat — of its team and repo, so
@@ -759,8 +766,7 @@ def seat_records(records: Mapping[str, Session], target: str) -> list[str]:
     r = records.get(target)
     if r is None or r.seat is None:
         return [target]
-    line = r.scale.get("line") if isinstance(r.scale, dict) else None
-    name = str(line or r.name)
+    name = seat_name(r)
 
     def of(x: Session) -> bool:
         if x.seat is None or x.team != r.team or x.repo != r.repo:
