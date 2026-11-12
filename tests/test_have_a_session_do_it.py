@@ -133,6 +133,29 @@ def test_the_press_on_a_board_with_no_ledger_writes_the_board_alone(repo):  # no
     assert origin_board(repo).splitlines()[at - 1].startswith("- [ ] ")
 
 
+def test_a_board_only_decide_ledgerboard_leaves_open_is_answered_with_what_it_left(repo, monkeypatch):  # noqa: F811
+    """TD-1709, ledgerboard v2.7 (its TD-067 *Consumers*): a board-only decide whose lifting answer leaves a listed
+    entry still carrying the gate writes nothing and reports `left_open`. The write-back lands nothing and answers
+    with those ids and the gate, never as the plain done of a press that changed nothing (TD-1349)."""
+    text = ACT.replace("Context: TD-190.", "Context: TD-190 decision (paul).")
+    at = _on_board(repo, text)
+    head = on_origin(repo, "rev-parse", "origin/main").strip()
+    real = board.lb_board.plan_edit
+
+    def left_open(*args, **kw):  # the plan v2.7 gives such a press: no subject, no change, the ids left open
+        assert kw.get("board_only") is True, "the press reaches ledgerboard as a board-only decide"
+        got = real(*args, **kw)
+        info = {"line": got.info["line"], "entries": [], "board_only": True, "left_open": ["TD-190"]}
+        return board.lb_board.Plan("decide", None, {}, info, ["left open: TD-190 still carry decision (paul)"])
+
+    monkeypatch.setattr(board.lb_board, "plan_edit", left_open)
+    got = board.write_back(repo, at, text, "decide", answer=FIXED)
+    assert got["left_open"] == ["TD-190"] and got["gate"] == "decision (paul)"
+    assert "pr" not in got and got["line"] == at
+    assert on_origin(repo, "rev-parse", "origin/main").strip() == head, "nothing landed"
+    assert origin_board(repo).splitlines()[at - 1] == f"- [ ] {text}", "the line is as it was"
+
+
 # -- the free-pick test: one function for the draw and the 409 ---------------------------------------------------------
 
 
