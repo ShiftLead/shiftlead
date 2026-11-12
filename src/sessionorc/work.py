@@ -370,6 +370,7 @@ def finished(
     seats: Collection[str] = (),
     waiting: Mapping[str, list[dict[str, Any]]] | None = None,
     home: str | None = None,
+    skip: Collection[str] | None = None,
 ) -> dict[str, Any] | None:
     """Whether a live team has finished, read from the records carrying its badge and nothing else
     (design §6 rule 9, §4.9a *A team's finished is the home's reading*, TD-241) — the one reading
@@ -408,11 +409,17 @@ def finished(
     - a live member **waiting on a reader** — a record among `records` holds, in `prs_waiting`, its
       ask for a PR it claims (`held_asks`, `home` the host a bare address names) — blocks it too,
       after the person's: *grinder-ao-1 waiting on techlead-ao-1: #2067* (§6 rule 9, TD-854).
+
+    `skip` (ids) — the busy seats a person's start leaves running (§4.9a *A busy seat is left alone*,
+    TD-1569): each is left out of the live set before it is read, so it writes no clause and is not in
+    `names`, while it still counts where others are read for it (`held_asks`, `manager_of`); a team whose
+    only live records are skipped reads None.
     """
     records = list(records)
     readers = held_asks(records, home, seats)
     mine = [r for r in records if _f(r, "unattended") is not False and not _f(r, "superseded_by")]
-    up = [r for r in mine if _f(r, "state") not in DEAD]
+    skipped = {str(x) for x in skip or ()}
+    up = [r for r in mine if _f(r, "state") not in DEAD and str(_f(r, "id")) not in skipped]
     if not up:
         return None
     manager = manager_of(mine)
@@ -420,6 +427,8 @@ def finished(
     restart = False
     why: list[str] = []
     for r in mine:
+        if str(_f(r, "id")) in skipped:
+            continue  # a busy seat the start leaves running: no clause (§4.9a, TD-1569)
         if sat_out(r) or held_extra(r):
             continue  # the flow sat it out (§4.9c), or an extra held (§4.9 td-max): passed over whatever it declared
         name, state = str(_f(r, "name") or _f(r, "id")), str(_f(r, "state"))

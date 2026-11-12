@@ -74,19 +74,17 @@ class NamesHeld(teams.TeamError):
 
     def __init__(self, team: str, holders: list[dict[str, Any]]):
         self.team, self.holders = team, holders
+        # each holder with its clause and its own cure, put there by `_close_concluded` (§4.9a *A refused start
+        # says why*, TD-1569); a holder without one keeps today's words
         names = "; ".join(
-            f"{v['name']} is suspended as {v['holder']} — a person lifts it"
+            f"{v['clause']} — {v['cure']}"
+            if v.get("clause") and v.get("cure")
+            else f"{v['name']} is suspended as {v['holder']} — a person lifts it"
             if v.get("verdict") == "suspended"
             else f"{v['name']} is {v.get('holder_state', 'running')} as {v['holder']}"
             for v in holders
         )
-        # the cure for a name held by a session that is merely there (§4.9, TD-1051): a suspension is a person's
-        cure = (
-            f": `ao team stop {team} --close` closes a settled member, or Close it on its card"
-            if any(v.get("verdict") != "suspended" for v in holders)
-            else ""
-        )
-        super().__init__(f"team {team} was not started — {names}{cure}")
+        super().__init__(f"team {team} was not started — {names}")
 
 
 class PartialStart(teams.TeamError):
@@ -421,6 +419,80 @@ def seat_names(team: orgmod.TeamDef, sessions: list[dict[str, Any]]) -> set[str]
     return set(_seat_of(team, sessions))
 
 
+def _safe_idle(s: Mapping[str, Any]) -> bool:
+    """What a start would close rather than leave running (§4.9a *A busy seat is left alone*, TD-1569): `idle`
+    with nothing running — no shell, no subagent live (§4.2 *Working on its own*) — and clean and pushed."""
+    return (
+        s.get("state") == "idle"
+        and not s.get("subagents_live")
+        and not s.get("shells_live")
+        and _unsafe_to_close(dict(s)) is None
+    )
+
+
+def state_words(s: Mapping[str, Any]) -> str:
+    """A record's state as `busy`, `leaves` and `left_running` say it (§4.9a, TD-1569): its own, or where it
+    is `idle` the reading's words for why it is not closed — *idle, subagent live*, *idle, shell live*,
+    *idle, unpushed work*."""
+    state = str(s.get("state") or "")
+    if state != "idle":
+        return state
+    if s.get("subagents_live"):
+        return "idle, subagent live"
+    if s.get("shells_live"):
+        return "idle, shell live"
+    return "idle, unpushed work" if _unsafe_to_close(dict(s)) is not None else "idle"
+
+
+def _sweep_record(team: orgmod.TeamDef, s: Mapping[str, Any]) -> bool:
+    mark = s.get("seat")
+    return s.get("name") == f"sweep-{team.name}" or (isinstance(mark, Mapping) and mark.get("by") == "settings")
+
+
+def busy_reading(
+    team: orgmod.TeamDef,
+    crew_rows: list[dict[str, Any]],
+    waiting: Waiting | None,
+    skip: Collection[str] | None = None,
+) -> dict[str, Any]:
+    """The one reading of a team's busy seats (design §4.9a *A busy seat is left alone*, TD-1569), which the
+    card's `rows`, the start and `_close_concluded` each take: `{busy, orphans, closes, why}`.
+
+    **busy** — `[{id, name, state}]`: each record `finished` treats as a seat (`seat` set, or its name in
+    `seat_names`; the on-call manager and a filled extra among them, never a standing manager nor the sweep
+    seat) that is live, not suspended, named exactly a seat name — or carrying `scale` with one once its
+    suffix is stripped — and not idle with nothing running and clean and pushed (`_safe_idle`). **orphans**
+    — the live, unsuspended records with `seat` set, no sweep mark and no mark `_pairing` passes over, whose
+    name `seat_names` does not hold. **closes** — what a start would close: `finished`'s names with the busy
+    skipped, where the team then reads concluded; **why** — that call's. A given `skip` (ids) replaces the
+    computed busy for `closes` and `why`."""
+    seats = seat_names(team, crew_rows)
+    bases = set(_seat_whens(team))
+    busy: list[dict[str, Any]] = []
+    orphans: list[dict[str, Any]] = []
+    for s in live(crew_rows):
+        if s.get("suspended") or s.get("superseded_by"):
+            continue
+        name = str(s.get("name") or "")
+        is_seat = isinstance(s.get("seat"), Mapping) or name in seats
+        if not is_seat or _sweep_record(team, s):
+            continue
+        if name not in seats and not (sat_out(s) or s.get("sit_out") or s.get("scale") or s.get("run_only")):
+            orphans.append(s)
+            continue
+        named = name in bases or (bool(s.get("scale")) and re.sub(r"-\d+$", "", name) in bases)
+        if named and not _safe_idle(s):
+            busy.append({"id": str(s["id"]), "name": name, "state": state_words(s)})
+    skipped = {b["id"] for b in busy} if skip is None else {str(x) for x in skip}
+    f = finished(crew_rows, seats, waiting, skip=skipped)
+    return {
+        "busy": busy,
+        "orphans": orphans,
+        "closes": list(f["names"]) if f and not f["why"] else [],
+        "why": list(f["why"]) if f else [],
+    }
+
+
 def seat_ids(org: orgmod.Org, sessions: list[dict[str, Any]]) -> dict[str, str]:
     """The ids among `sessions` that are a seat of the team whose badge they carry (`seat_names`,
     design §4.9b), each with what would make it come (*comes on the next question*, *runs after
@@ -543,6 +615,15 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | Non
         down = None if n_live else wound_down(mine, seat_names(t, mine))
         # the home's reading (§6 rule 9), asked once: it holds when `why` is empty
         f = finished(mine, seat_names(t, mine), waiting) if n_live else None
+        # the busy seats a person's start leaves running, and whether it may start so (§4.9a, TD-1569): no
+        # orphan, a waiting reading given, and the crew less its busy seats has nothing live or reads concluded
+        reading = busy_reading(t, mine, waiting) if n_live else None
+        busy = [{"name": b["name"], "state": b["state"]} for b in reading["busy"]] if reading else []
+        startable = (
+            {"closes": reading["closes"], "leaves": busy}
+            if reading and busy and not reading["orphans"] and waiting is not None and not reading["why"]
+            else None
+        )
         rows_out.append(
             {
                 "name": t.name,
@@ -590,6 +671,9 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | Non
                 "concluded": {k: f[k] for k in ("at", "restart", "names")} if f and not f["why"] else None,
                 # …and when it is not, what keeps it from the reading, a clause per session (TD-241)
                 "not_concluded": list(f["why"]) if f else [],
+                # …and its busy seats, and the Start that leaves them running (§4.9a, TD-1569)
+                "busy": busy,
+                "startable": startable,
             }
         )
     return rows_out
@@ -939,22 +1023,45 @@ def start(
                 raise teams.TeamError(f"team {name} was not started — {plan.host}: {e}") from e
             if not seen.get("exists"):
                 raise teams.TeamError(f"team {name} was not started — {d} does not exist on {plan.host}")
+    # the `list` `_start_moves` reads, read before the name check, and a person's start's first reading taken
+    # from it (§4.9a *A busy seat is left alone*, TD-1569): each busy seat is left running — a launch's name is
+    # neither checked, kept mail for, nor created; one with no launch (a filled extra) is only skipped
+    listed = call("list")
+    succeeds, removals = _start_moves(plan, listed)
+    team = org.teams.get(name)
+    busy: list[dict[str, Any]] = []
+    if caller is None and team is not None and live(crew(name, listed)):
+        busy = busy_reading(team, crew(name, listed), None)["busy"]
+    skip = [b["id"] for b in busy]
+    busy_ids = {b["name"]: b["id"] for b in busy if b["name"] in {x.name for x in plan.launches}}
     # §4.1's rule, asked of the agent rather than reimplemented here (`name_check`, the same verdict
     # `create` and the New session form use), for every session before any of them exists.
-    verdicts = {x.name: call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir), **on) for x in plan.launches}
+    verdicts = {
+        x.name: call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir), **on)
+        for x in plan.launches
+        if x.name not in busy_ids
+    }
     held = [v for v in verdicts.values() if v.get("verdict") in ("live", "suspended")]
     # Only when a name is held: a concluded team's declared sessions hold its members' names, so a
     # concluded team whose names are all free would be one whose definition renamed every member.
     # who asks a closed member's mail kept, decided before anything is closed or created (TD-274)
     keeps, notes = keep_mail_for(call, verdicts, caller)
-    succeeds, removals = _start_moves(plan, call("list"))
     if (succeeds or removals) and caller is not None:
         gone = ", ".join(str(r.get("name")) for r in [*succeeds.values(), *removals])
         raise teams.TeamError(
             f"team {name} was not started — its definition renamed or removed {gone}: a person's Start or Apply "
             "takes those, never a session's (design §4.9 A member renamed or removed in the definition)"
         )
-    closed = _close_concluded(call, org, name, held) if held or succeeds or removals else []
+    # a renamed or removed record still at work refuses before anything is closed, in Apply's words (TD-1569)
+    early = [
+        str(r.get("name")) for r in [*succeeds.values(), *removals] if r.get("state") not in DEAD and not _safe_idle(r)
+    ]
+    if early:
+        raise teams.TeamError(
+            f"team {name} was not started — {', '.join(early)} still running: a live team takes a rename or a "
+            "removal by Apply (design §4.9 A member renamed or removed in the definition)"
+        )
+    closed = _close_concluded(call, org, name, held, skip=skip) if held or succeeds or removals else []
     if succeeds or removals:
         succeeds, removals = _start_moves(plan, call("list"))  # read again: the closes ended some
         up = [str(r.get("name")) for r in [*succeeds.values(), *removals] if r.get("state") not in DEAD]
@@ -985,7 +1092,9 @@ def start(
     notes += plan.notes  # said, and the start goes ahead (a seat without its primer, §4.9b)
     lead_id = ""
     try:
-        if plan.lead:
+        if plan.lead and plan.lead.name in busy_ids:
+            lead_id = busy_ids[plan.lead.name]  # a busy manager on call, left running: its id is the members' lead
+        elif plan.lead:
             # A manager on call (§6 rule 3 *A Start writes the seat and never fills it*, TD-410): its
             # record written alone, closed with no pane, the launch record beside it — the tick fills
             # it the first time a reading is due, a question in the mail kept here included. Its id
@@ -998,7 +1107,7 @@ def start(
                     f"the manager started as {lead_id}, but the members' briefs name {plan.manager_id} — "
                     "a stale tmux session holds that id; its members' done lines will not reach it until a restart"
                 )
-        if plan.techlead:
+        if plan.techlead and plan.techlead.name not in busy_ids:
             # The seat is its manager's member (design §4.9b): the manager is its controller, as
             # for any member. Its id was named in every brief before it existed (`{techlead}`).
             rec = call("create", **params(plan.techlead, [lead_id] if lead_id else []))
@@ -1008,7 +1117,7 @@ def start(
                     f"the techlead started as {rec['id']}, but the briefs name {plan.techlead_id} — "
                     "a stale tmux session holds that id; tell the team, or restart it once that session is gone"
                 )
-        for x in plan.seats:
+        for x in (x for x in plan.seats if x.name not in busy_ids):
             # A seat with a trigger (§4.9b, TD-098): started with the team, as the techlead is, so it
             # runs once now and is on call after; its manager fills it again when its trigger is met.
             # a pool's later member is written held (§4.9b *The members*, TD-1476): rule 3 fills it
@@ -1032,6 +1141,8 @@ def start(
     return plan, {
         "team": name,
         "closed": closed,  # the concluded sessions closed before the creates (§4.9a, TD-099)
+        # the busy seats a person's start left running (§4.9a *A busy seat is left alone*, TD-1569)
+        "left_running": [{"name": b["name"], "state": b["state"]} for b in busy],
         "moved": moved,  # the definition's renames and removals (§4.9, TD-706): *grind-1 → mill-1*, *hunt removed*
         "manager": lead_id or None,
         "sessions": created,
@@ -1823,20 +1934,69 @@ def witness_press(call: Call, word: str, target: str, dir: str = "") -> None:
         call("witness_press", word=word, target=target, **({"dir": dir} if dir else {}))
 
 
-def _close_concluded(call: Call, org: orgmod.Org, name: str, held: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _holder_words(
+    team: str, v: dict[str, Any], rec: dict[str, Any] | None, reading: dict[str, Any] | None
+) -> tuple[str, str]:
+    """A holder's `clause` and `cure` (design §4.9a *A refused start says why*, TD-1569): the clause from the
+    reading's `why` that begins with its record's name, *finished* for an idle member or seat with none of
+    its own, else its own words; the cure its one session's — Close, what to settle first, what it waits on,
+    or Kill that one session — never a team stop."""
+    hid = str(v.get("holder") or "")
+    if v.get("verdict") == "suspended":
+        return f"{v.get('name')} is suspended as {hid}", "a person lifts it"
+    if rec is None:
+        return f"{v.get('name')} {v.get('holder_state', 'running')}", (
+            f"let it finish, or Kill that one session (`ao kill {hid}`, or Kill on its card)"
+        )
+    name, state = str(rec.get("name") or hid), str(rec.get("state") or "")
+    if persons(rec):
+        return f"your session {name}", "close it yourself"
+    if sat_out(rec) or rec.get("sit_out"):
+        return f"{name} sat out by its flow, still {state}", "let it wrap up, or Close it once idle"
+    why = list((reading or {}).get("why") or [])
+    own = next((c for c in why if c.startswith(name + " ")), None)
+    settled = own == f"{name} idle, not declared"
+    quiet = state == "idle" and not rec.get("subagents_live") and not rec.get("shells_live")
+    if own is None and rec.get("team") == team and quiet and why:
+        own, settled = f"{name} finished — the team is not concluded: {', '.join(why)}", True
+    if settled:
+        unsafe = _unsafe_to_close(rec)
+        if unsafe is None:
+            return str(own), f"Close it (`ao close {hid}`, or Close on its card)"
+        return str(own), f"settle what it holds ({unsafe}) before its Close"
+    if own is None:
+        return f"{name} {state}", f"let it finish, or Kill that one session (`ao kill {hid}`, or Kill on its card)"
+    if " waiting on " in own:
+        return own, f"it waits on {own.split(' waiting on ', 1)[1]}: answer that, or let it finish"
+    return own, f"let it finish, or Kill that one session (`ao kill {hid}`, or Kill on its card)"
+
+
+def _close_concluded(
+    call: Call, org: orgmod.Org, name: str, held: list[dict[str, Any]], skip: Collection[str] = ()
+) -> list[dict[str, Any]]:
     """A person's Start on a **concluded** team (design §4.9a, §4.5a *team groups*, TD-099): the
     names `held` are refused as on any start unless the team is concluded and every holder is one
     of its concluded sessions. Then each of those sessions is closed — all of them, not only the
     ones holding a name — under the wrap-up's own check, so one with uncommitted or unpushed work
     refuses the whole start by name, and nothing is closed until every one has passed it. Returns
-    what was closed; raises `NamesHeld` or `TeamError` before anything is closed or created."""
+    what was closed; raises `NamesHeld` or `TeamError` before anything is closed or created.
+
+    `skip`: the busy seats the start's first reading leaves running (§4.9a *A busy seat is left alone*,
+    TD-1569), read out of the team before it is judged concluded, so the first read's busy governs; a refused
+    holder carries its `clause` and `cure` (*A refused start says why*)."""
     team = org.teams.get(name)
-    mine = crew(name, call("list"))  # a person's session beside a concluded team neither blocks nor is closed
+    rows = call("list")
+    mine = crew(name, rows)  # a person's session beside a concluded team neither blocks nor is closed
     # a member waiting on the person's answer is not concluded, so a Start never closes it (TD-274)
-    done = concluded(mine, seat_names(team, mine), waiting_of_home(call, strict=True)) if team is not None else None
-    up = {str(s["id"]): s for s in live(mine)} if done else {}
+    reading = busy_reading(team, mine, waiting_of_home(call, strict=True), skip=skip) if team is not None else None
+    skipped = {str(x) for x in skip}
+    done = reading is not None and bool(reading["closes"])
+    up = {str(s["id"]): s for s in live(mine) if str(s["id"]) not in skipped} if done else {}
     still = [v for v in held if v.get("verdict") != "live" or str(v.get("holder")) not in up]
     if still:
+        by_id = {str(r.get("id")): r for r in rows}
+        for v in still:
+            v["clause"], v["cure"] = _holder_words(name, v, by_id.get(str(v.get("holder") or "")), reading)
         raise NamesHeld(name, still)
     unsafe = [f"{s.get('name') or i} has {why}" for i, s in up.items() if (why := _unsafe_to_close(s))]
     if unsafe:

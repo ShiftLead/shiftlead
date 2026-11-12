@@ -170,7 +170,11 @@ def test_a_live_name_holder_aborts_the_whole_start_and_names_it(world, capsys):
     assert cli.main(["team", "start", "ao-grind"]) == 1
     assert not creates(state)  # never half a team (§4.9): the lead was not created either
     err = capsys.readouterr().err
-    assert "was not started" in err and "hunt is working as ao-shiftlead-hunt" in err
+    # each holder with its clause and its one-session cure (§4.9a *A refused start says why*, TD-1569)
+    assert (
+        "was not started" in err
+        and "hunt working — let it finish, or Kill that one session (`ao kill ao-shiftlead-hunt`" in err
+    )
     assert cli.main(["--json", "team", "start", "ao-grind"]) == 1
     assert json.loads(capsys.readouterr().out)["holders"][0]["holder"] == "ao-shiftlead-hunt"
 
@@ -194,7 +198,9 @@ def test_a_suspended_holder_aborts_the_whole_start_too(world, capsys):
 
 
 def test_a_start_refused_by_an_idle_holder_names_the_cure(world, capsys):
-    """§4.9, TD-1080: a name held by a session merely sitting there names how to free it."""
+    """§4.9, TD-1080: a name held by a session merely sitting there names how to free it — its own one-session
+    cure, never a team stop (§4.9a *A refused start says why*, TD-1569); a holder the list does not hold reads
+    its bare state."""
     tmp_path, state = world
     state["host"] = {"host": "local"}
     state["verdicts"]["hunt"] = {
@@ -202,10 +208,8 @@ def test_a_start_refused_by_an_idle_holder_names_the_cure(world, capsys):
     }  # fmt: skip
     assert cli.main(["team", "start", "ao-grind"]) == 1
     err = capsys.readouterr().err
-    assert (
-        "hunt is idle as ao-shiftlead-hunt: `ao team stop ao-grind --close` closes a settled member, "
-        "or Close it on its card"
-    ) in err
+    assert "hunt idle — let it finish, or Kill that one session (`ao kill ao-shiftlead-hunt`" in err
+    assert "ao team stop" not in err
 
 
 def test_an_exited_holder_is_superseded_and_the_start_goes_ahead(world):
@@ -1058,7 +1062,8 @@ def test_a_member_waiting_on_the_person_keeps_its_team_from_concluded(world, cap
     state["calls"].clear()
     assert cli.main(["team", "start", "ao-grind"]) == 1
     assert not [p for m, p in state["calls"] if m in ("close", "create")]
-    assert "grind-1 is idle as ao-shiftlead-grind-1" in capsys.readouterr().err
+    err = capsys.readouterr().err  # the holder's clause and its cure (§4.9a *A refused start says why*, TD-1569)
+    assert "grind-1 waiting on the person: TD-222 — it waits on the person: TD-222" in err
     assert cli.main(["--json", "team", "status", "ao-grind"]) == 0
     got = json.loads(capsys.readouterr().out)
     assert got["waiting"] == {"grind-1": [q]} and got["finished"]["why"] == ["grind-1 waiting on the person: TD-222"]
@@ -1113,7 +1118,7 @@ def test_a_start_on_a_concluded_team_closes_its_sessions_first(world, capsys):
     concluded_team(**{"hunt": {"out_of_work": None}})
     assert cli.main(["team", "start", "ao-grind"]) == 1
     assert not closes() and not creates(state)
-    assert "hunt is idle as ao-shiftlead-hunt" in capsys.readouterr().err
+    assert "hunt idle, not declared — Close it (`ao close ao-shiftlead-hunt`" in capsys.readouterr().err
     # a suspended holder is refused as on any start (§4.8a), even when the team is concluded
     concluded_team()
     state["verdicts"]["hunt"] = {"name": "hunt", "verdict": "suspended", "holder": "ao-shiftlead-hunt"}
