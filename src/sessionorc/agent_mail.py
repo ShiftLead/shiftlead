@@ -1866,6 +1866,17 @@ class MailMixin:
         t.count = len(t.at)
         return t
 
+    def _pair_peek(self, r: Session, other: str, now: datetime) -> Tally | None:
+        """The pair tally `r` keeps for `other`, its window rolled forward as `_pair` rolls it, or None where
+        `r` keeps none: a read that creates no key and saves nothing (§4.9 *A scaled seat's bounds*, TD-1728)."""
+        t = r.threads.get(f"pair:{other}")
+        if t is None:
+            return None
+        cutoff = now - mail.PAIR_WINDOW
+        t.at = [x for x in t.at if _parse(x) >= cutoff]
+        t.count = len(t.at)
+        return t
+
     def _check_bounds(self, sender: str, named: list[str], root: str, now: datetime) -> None:
         """A send is refused when the sender's tally, or any named addressee's, is at the bound —
         never a copy recipient's — and `bound_hit` is written on every record holding the thread
@@ -1897,13 +1908,28 @@ class MailMixin:
         for sid in named:
             if sid == PERSON:
                 continue
-            mine, theirs = self._pair(me, sid, now), self._pair(records[sid], sender, now)
-            if mine.count >= limit or theirs.count >= limit:
-                mine.bound_hit = theirs.bound_hit = True
-                self._save(me)
-                self._save(records[sid])
+            # a scaled seat is one end (§4.9 *A scaled seat's bounds*, TD-1728): each side's tallies summed over
+            # the two ends' seat records; mail within one seat read on its two records' tallies alone, by id
+            if sid != sender and sender in mail.seat_records(records, sid):
+                mine_side, their_side = [(me, sid)], [(records[sid], sender)]
+                x, y = sender, sid
+            else:
+                ends_a, ends_b = mail.seat_records(records, sender), mail.seat_records(records, sid)
+                mine_side = [(records[a], b) for a in ends_a for b in ends_b]
+                their_side = [(records[b], a) for b in ends_b for a in ends_a]
+                x, y = (mail.seat_name(records[k]) if records[k].seat is not None else k for k in (sender, sid))
+            mine = [(r, t) for r, o in mine_side if (t := self._pair_peek(r, o, now)) is not None]
+            theirs = [(r, t) for r, o in their_side if (t := self._pair_peek(r, o, now)) is not None]
+            if sum(t.count for _, t in mine) >= limit or sum(t.count for _, t in theirs) >= limit:
+                marked: dict[str, Session] = {}
+                for r, t in (*mine, *theirs):
+                    if t.count > 0:
+                        t.bound_hit = True
+                        marked[r.id + "@" + r.host] = r
+                for r in marked.values():
+                    self._save(r)
                 raise RpcError(
-                    f"{sender} and {sid} have exchanged {limit} messages replying to nothing inside "
+                    f"{x} and {y} have exchanged {limit} messages replying to nothing inside "
                     f"{mail.PAIR_WINDOW}: the send is refused — write the user_attention.md line yourself "
                     f"(design §4.10)"
                 )
