@@ -9,8 +9,9 @@ question was which of their findings need a design review at all.
 and 3,120 findings, dated 2026-11-03 to 2026-11-11.
 
 **The data is kept beside this file**, in [`2026-11-11-design-review-findings/`](2026-11-11-design-review-findings/):
-`labels.csv` (one row per finding), `classify-prompt.md` (the instructions the labellers were given) and
-`tables.py`, which rebuilds every table below from the records at that commit and the labels.
+`labels.csv` (one row per finding), `classify-prompt.md` (the instructions the labellers were given),
+`patterns.csv` and `pattern-prompt.md` (the second pass, below) and `tables.py`, which rebuilds every table
+below from the records at that commit and the labels.
 
 ## How the findings were labelled
 
@@ -132,6 +133,59 @@ two are close: 88k tokens for each such finding from Fable, 102k from Sonnet, an
 substantive one. Paul's note the same day: a Fable review costs far more than a Sonnet one. If Fable's price per token is
 more than about 1.16 times Sonnet's, Sonnet is the cheaper design reviewer on this data. The comparison is confounded: the two alternate on the same text, so whichever reads first takes
 the findings both would have raised. What Fable finds that Sonnet would not is not measured here.
+
+## The pattern behind each finding (the second pass)
+
+A second run the same day, seven Sonnet 5.5 agents over the same rows with the first pass's labels given,
+named the pattern behind each finding: `patterns.csv`, its instructions `pattern-prompt.md`. Agreement on the
+shared record: 89% on `case` (20 rows), 86% on `fact` (4), 85% on `check` (8), 67% on `fixfail` (6); the last
+is soft and the last three rest on few rows.
+
+**The situation a design had not handled** (the 1,949 unspecified, wrong-mechanism and contradiction findings):
+
+| Situation | findings | only a design review or the live system would catch |
+|---|---|---|
+| shape: a field, format, name, where it is stored, exact words | 341 | 5% |
+| scope: what the rule covers, which callers, pages, kinds | 312 | 12.5% |
+| interaction: how it combines with an existing rule | 214 | 38% |
+| which: choosing among several, tie-break, order of rules | 186 | 16% |
+| when: the trigger, the clock, until when | 164 | 30% |
+| display: what a screen or command shows in a state | 132 | 6% |
+| failure: an error path | 115 | 23% |
+| ends: closed, archived, renamed, expired | 92 | 33% |
+| who: which actor does it, may do it, is told | 87 | 29% |
+| empty-first: nothing there yet, old data, migration | 86 | 14% |
+| concurrency: two actors or events at once | 67 | 61% |
+| multi-node: a node against the home, another host | 62 | 16% |
+| restart: a restart, crash, replay, promote partway | 55 | 36% |
+| proof: how it is verified | 33 | 21% |
+| other | 3 | |
+
+Two groups. Shape, scope, which and display are half the findings and the builder would meet nearly all of
+them. Concurrency, interaction, restart, ends, when and who are fewer and are where a design review finds
+what nothing else would. `patterns.csv`'s `q` column holds, for each of the 1,949, the general question the
+author should have answered, in at most twelve words: the raw material of an author's checklist.
+
+**The check a script would run** (the 510 mechanical findings):
+
+| Check | findings |
+|---|---|
+| the same statement in two places, drifted apart | 162 |
+| a path, function, flag or field that should exist | 100 |
+| a ledger entry's fields, parts or Done when out of step with the design | 96 |
+| a count or list that can be recomputed | 42 |
+| a TD id, PR number or finding id | 41 |
+| a section number, heading or anchor | 34 |
+| a format rule | 13 |
+| other | 22 |
+
+**The sort of fact a false claim got wrong** (394): what existing code does, 236 (60%); whether a function,
+file, flag or test exists, 60; what another section says, 28; how an outside tool behaves, 28; a number, 23;
+what is built or live, 18; other, 1. Only 78 of the 394 are a script's to catch; the rest need the code read.
+
+**Why an earlier fix led to a finding** (776): it opened a new case, 199; it addressed part of the finding,
+194; its own mechanism was wrong, 186; it was made in one place and another still said the old thing, 167
+(116 of them a script's to catch); it changed something that was right, 15; other, 15.
 
 ## What the cost side shows, and does not
 
