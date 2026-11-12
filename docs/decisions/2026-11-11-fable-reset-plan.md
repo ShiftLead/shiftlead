@@ -58,7 +58,9 @@ edits. Using the Fable allotment fully is the aim; spending it on work Sonnet do
 - TD-1589's wait is lifted (Paul, 2026-11-11; #3472).
 - The review analysis is kept in the repo (#3480).
 - **A pre-review script**: the mechanical sixth of the design findings (stale pointers, entry bookkeeping,
-  claims a grep shows false) is checked by a script, not a model. Open within it: whether the author calls
+  claims a grep shows false) is checked by a script, not a model. The second pass says what it checks, largest first:
+  the same statement in two places drifted apart (162), a path or symbol that should exist (100), entry
+  fields out of step (96), counts (42), ids (41), section references (34). Open within it: whether the author calls
   it with what it knows (the sections, ids and paths the design touches) or it parses the PR. Not yet filed.
 
 ## Open
@@ -75,6 +77,18 @@ edits. Using the Fable allotment fully is the aim; spending it on work Sonnet do
   the context of every later turn. `cadence.md` is about 42k. A reader that prints one heading of a
   section, or smaller files, is the candidate; what the designer and the grinders actually read each turn
   is not yet measured (TD-820 has the designer's totals).
+- **Fable drafts, Sonnet runs the rounds** (Paul's idea, 2026-11-11). Fable writes the design; a fresh Sonnet
+  session collates each round's findings and applies the fixes, and hands back to Fable only the findings
+  about concurrency, interaction with another rule, restarts, endings, timing, actors and error paths (a
+  quarter of all findings; where a design review finds what nothing else would). The reviewer names the
+  situation when it raises the finding, which is the routing key. Not tried: nothing records how Sonnet
+  does as the fixer. The measure is the share of findings that follow from a fix (25 to 29% in rounds 2 to
+  4 today) and the rounds to the stop rule, on a few designs.
+- **Claims about code are checked as they are written**, in the draft and in every fix, not only by the
+  fact-check afterwards. Two thirds of the false claims (263 of 394) surface after round 1, in text the
+  fixes wrote, and the design reviewers raised 30 in round 1 that the whole-plan fact-check had passed.
+  Designs already get about seven fact-checks each, so more of them is not the answer; only 29% of what a
+  fact-check raises is a false claim, and another 29% is a script's to catch.
 - **Who reviews.** Sonnet and Fable are within about 16% of each other in tokens for each such finding;
   what Fable finds that Sonnet would miss is not measured.
 - **Who settles a detail the design leaves open** (41% of findings; about 7% lead to something
