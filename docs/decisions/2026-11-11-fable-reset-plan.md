@@ -5,6 +5,10 @@ is *agreed* (Paul has said yes), *proposed* (on the table) or *withdrawn*. The p
 TD-1711; the entries it names were in the ledger already. Paul called the shape right on 2026-11-11.
 The evidence is [the design review findings analysis](2026-11-11-design-review-findings.md).
 
+**Review round** (2026-11-11): a Sonnet fact-check (12 findings, 7 of them changing the plan) and a Sonnet
+design review (12 build-changing, 5 minor), all applied here except one: a fact-check of only the changed
+text by a second reader, which the later rounds' fact-checks and the closing one already are.
+
 ## The facts it rests on
 
 - The account has a weekly limit over all models and a separate Fable limit. Paul holds two resets; each
@@ -35,12 +39,12 @@ designs that ran past the cap, up to 12 rounds, did so on bought rounds and held
 
 | Step | Who | What | Status |
 |---|---|---|---|
-| 1. Before drafting | a script, a Sonnet agent | The other design text that names the mechanism; the facts of the code the design touches | proposed |
-| 2. The draft | Fable (the designer seat) | Writes the design against a short checklist of the situations designs here miss, and checks every function, flag or record it names as it writes | proposed |
-| 3. The pre-review script | called by the author | Must pass before any reviewer reads. Largest first: one statement in two places drifted apart, a path or symbol that should exist, entry fields out of step, counts, ids, section references | **agreed**; who supplies the terms to look for is open |
-| 4. The rounds | reviewers, as today | Each finding is raised with the situation it is about. The fact-check reads the code behind behaviour claims, the script having taken the rest | proposed |
-| 5. The fixes | Sonnet (a second seat) | Collates a round's findings, applies the fixes, checks any code a fix names, reruns the script | proposed |
-| 6. The hard findings | Fable, asked by the Sonnet seat | Findings about two actors at once, interaction with another rule, restarts, endings, timing, actors and error paths go back to Fable as one narrow question each | proposed |
+| 1. The draft | Fable (the designer seat) | Writes the design against a short checklist of the situations designs here miss. Beside it, two blocks the script reads: each claim about what code does with the file and line it rests on, and each rule the design states in more than one place | proposed |
+| 2. The pre-review script | called by the author | Checks that every path, symbol, id and section the design names exists, that the claims block is filled, that the places a declared rule is stated agree, and the entry's fields and counts. No reviewer is sent a design without the script's pass line for that commit | **agreed**; the author supplies the terms (Paul's lean) |
+| 3. The rounds | reviewers, as today | Each finding is raised with the situation it is about. The fact-check samples the claims block and reads the code behind it | proposed |
+| 4. The fixes | Sonnet (a second seat) | Holds the design's branch from the handoff and is its only writer. Groups a round's findings by the text they touch, applies the fixes to spans with no hard finding, extends the two blocks for what a fix changes, reruns the script | proposed |
+| 5. The hard findings | Fable, asked by the Sonnet seat | A span with any finding about two actors at once, interaction with another rule, restarts, endings, timing, actors or error paths goes to Fable whole: the findings, the span and the rules they cite. Fable returns the replacement text or a decision; the Sonnet seat applies it. In doubt, the Sonnet seat sends it up; it never sends one down. The next round is not sent until every question is answered | proposed |
+| 6. The last read | Fable | Reads the whole design once after the last fix, before the closing fact-check, for coherence | proposed |
 
 **Why this shape.** The 3,120 findings divide by what was wrong:
 
@@ -49,7 +53,7 @@ designs that ran past the cap, up to 12 rounds, did so on bought rounds and held
 | wording, naming, pointers, tests, bookkeeping | 23% | 4% |
 | a false claim about what exists | 13% | 10% |
 | detail: shape, scope, which one, display, first run, another node, proof | 37% | 11% |
-| the hard situations of step 6 | 25% | 34% |
+| the hard situations of step 5 | 25% | 34% |
 | could not tell | 2% | |
 
 The builder would meet 84% of the detail group. Across the groups, 16% of findings are a script's to catch.
@@ -63,24 +67,38 @@ second seat is a fresh context by construction, and `ao spend` shows each seat's
 Changing model inside one session would discard the prompt cache anyway.
 
 **The checklist** is distilled from the 1,949 general questions the second pass wrote, weighted to the hard
-situations. Not yet written.
+situations, at most fifteen questions, kept in the designer's brief (a held path). Not yet written.
 
 ## The trial
 
-1. **Replay three past designs** with the new shape, from the commit before each design's PR, in a worktree
-   that is never merged: one short, one of median length, one long (a claims design such as TD-1470).
-   Their review records are the answer key: for each hard finding the old rounds raised, does the new
-   design handle it? That measures effectiveness, which new designs cannot, and pairing removes the spread
-   between designs (1 to 12 rounds). The cost is about three designs' tokens for output that is thrown away.
-2. **Then the next real designs** run the new shape, read against the baseline: 3.6 findings only a design
-   review would catch for each design in round 1 and 1.4 in round 2, a median of 4 rounds, 25 to 29% of
-   later findings following from a fix, and each seat's spend for each design.
-3. **What would stop it:** more hard findings left unhandled in the replays than the old rounds left, or a
-   higher share of findings following from a fix.
+**Before it:** the cost model. From a sample of five past designs' transcripts, the share of the designer's
+spend that is applying fixes, and by `ao spend --entries` or an entry-linked measure, spend for each design
+across days. Without these the saving is an aim, not a result: it is the price difference on the tokens
+moved to Sonnet, less Fable's questions, the last read and any extra rounds.
 
-Wanted for step 2: spend for each design (`ao spend --entries` lists a day's finished entries with their
-cost; whether that is a design's whole cost across days is to be checked), and whether a PR-review finding
-or a fix after a merge traces to its design, which nothing records.
+1. **Replay three past designs** with the new shape: one short, one of median length, one long (a claims
+   design such as TD-1470). Each runs from the parent of its design PR's first commit, in a worktree never
+   merged, with `docs/reviews/`, `docs/history/` and later memory files taken out of the tree, and the
+   replaying seats told not to read past that commit. The old review record is the answer key, kept outside
+   the worktree. A separate Sonnet reader scores it, not knowing which design is the new one: for each old
+   finding about the problem itself (findings about the old design's own mechanism are left out), is it
+   handled, left silent or handled wrongly? The replay also runs its own rounds, and what those raise is
+   counted, as is every fix the Sonnet seat applied to a finding the key calls hard.
+2. **Then the next real designs** run the new shape, compared like with like: only findings a design
+   review alone would catch, by round, under the same cap, set against past designs of the same subsystem;
+   the share of findings following from a fix; each seat's spend for each design.
+3. **What the replays can show** is only that the change is clearly bad: three designs cannot show it is
+   good. Paul decides, on thresholds set before they run (proposed: stop if any replay leaves more than one
+   in ten of the key's problem findings silent or wrongly handled, or if Fable's questions, the last read
+   and extra rounds cost more than the fix loop they replace). The real designs are the test, and the shape
+   *has passed its trial* when Paul says so after the replays and the first five real designs.
+
+Nothing records whether a PR-review finding or a fix after a merge traces to its design; that is the
+measure of what a missed flaw costs and is wanted for step 2.
+
+**What is accepted.** The reviewers still raise every finding; what changes is who fixes it. About 4% of
+all findings are detail that only a design review would catch, and those would now be fixed by Sonnet
+without Fable. Three replays test the whole package (checklist, script, second seat), not each part.
 
 ## The rest of the sharpening
 
@@ -100,26 +118,29 @@ or a fix after a merge traces to its design, which nothing records.
 
 - **Reset 1** is pressed at the first Fable-limit hit after the new design shape has passed its trial, so
   the doubled week is spent at the better rate: the messaging review's designs and the efficiency builds.
-  A limit hit before then is waited out; the resets lapse in March, not sooner.
+  A limit hit before then is waited out, but no later than mid-December (proposed), so a slow trial does not
+  hold it until it lapses.
 - **Reset 2** goes to Paul's other projects, when the cost of a merged PR is measurably down and the target
   repo has a team, a full lane and its decisions cleared; no later than mid-January.
 
 ## The order
 
-1. TD-1589 (through TD-1696) and the Fable reading. 2. The pre-review script. 3. The checklist. 4. The second seat and the
-hand-back. 5. The three replays. 6. Real designs on the new shape. 7. Reset 1.
+1. The cost model and spend for each design. 2. The pre-review script and the two blocks it reads. 3. The
+checklist. 4. The second seat and the hand-back. 5. The three replays. 6. Real designs on the new shape.
+7. Reset 1. Beside these and not waiting on them: TD-1589 (through TD-1696) and the Fable window in the
+gate's reading.
 
 ## Open
 
-- Whether the pre-review script is given its terms by the author or parses the PR.
 - Who reviews: Fable then Sonnet as today, or Sonnet alone. In tokens for each finding only a design review
-  would catch Fable is about 16% cheaper, and for each substantive finding about 10% dearer; what Fable
-  finds that Sonnet would miss is not measured.
-- How the Sonnet seat hands a finding back, and how the Fable seat answers without reloading the design.
-- Whether steps 1 and 2 need the Sonnet fact pack, or the write-time check is enough.
+  would catch Fable is about 16% cheaper, and for each substantive finding about 10% dearer; both figures
+  are confounded, since the two read the same text in turn and the first takes what both would find.
+- The thresholds of the trial, and the latest date for reset 1 (both proposed above; Paul's).
+- How large a question to Fable may be, and what the last read costs; the trial measures both.
 
 ## Withdrawn
 
+- *A Sonnet fact pack before drafting.* The claims block and the script cover it.
 - *A cap of two design rounds.* Rounds 3 and 4 each still raise, for each design that reaches them, about
   0.8 and 0.7 findings only a design review would catch; a round costs the designer at most about $10 (an
   estimate: the designer session's $1,770 over about 175 rounds, its other work included), and a flaw that
