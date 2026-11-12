@@ -146,7 +146,7 @@ is soft and the last three rest on few rows.
 | Situation | findings | only a design review or the live system would catch |
 |---|---|---|
 | shape: a field, format, name, where it is stored, exact words | 341 | 5% |
-| scope: what the rule covers, which callers, pages, kinds | 312 | 12% |
+| scope: what the rule covers, which callers, pages, kinds | 312 | 12.5% |
 | interaction: how it combines with an existing rule | 214 | 38% |
 | which: choosing among several, tie-break, order of rules | 186 | 16% |
 | when: the trigger, the clock, until when | 164 | 30% |
@@ -159,6 +159,7 @@ is soft and the last three rest on few rows.
 | multi-node: a node against the home, another host | 62 | 16% |
 | restart: a restart, crash, replay, promote partway | 55 | 36% |
 | proof: how it is verified | 33 | 21% |
+| other | 3 | |
 
 Two groups. Shape, scope, which and display are half the findings and the builder would meet nearly all of
 them. Concurrency, interaction, restart, ends, when and who are fewer and are where a design review finds
@@ -180,11 +181,11 @@ author should have answered, in at most twelve words: the raw material of an aut
 
 **The sort of fact a false claim got wrong** (394): what existing code does, 236 (60%); whether a function,
 file, flag or test exists, 60; what another section says, 28; how an outside tool behaves, 28; a number, 23;
-what is built or live, 18. Only 78 of the 394 are a script's to catch; the rest need the code read.
+what is built or live, 18; other, 1. Only 78 of the 394 are a script's to catch; the rest need the code read.
 
 **Why an earlier fix led to a finding** (776): it opened a new case, 199; it addressed part of the finding,
 194; its own mechanism was wrong, 186; it was made in one place and another still said the old thing, 167
-(116 of them a script's to catch); it changed something that was right, 15.
+(116 of them a script's to catch); it changed something that was right, 15; other, 15.
 
 ## What the cost side shows, and does not
 
