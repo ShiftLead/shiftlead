@@ -39,6 +39,7 @@ from sessionorc import conventions as conventions_mod
 from sessionorc import gatesweep as gatesweep_mod
 from sessionorc import held as held_mod
 from sessionorc import ledger as ledger_mod
+from sessionorc import no_lane as no_lane_mod
 from sessionorc import queue as queue_mod
 from sessionorc import screen as screen_mod
 from sessionorc import seams as seams_mod
@@ -93,7 +94,7 @@ from sessionorc.agent_common import (
     backup_store,
     log,
 )
-from sessionorc.agent_ids import settle_key
+from sessionorc.agent_ids import given_of, settle_key
 from sessionorc.agent_spend import SEAT_EVERY, _metered_of
 from sessionorc.gitinfo import UNKNOWN as GIT_UNKNOWN
 from sessionorc.gitinfo import changed_files, git_info, work_left
@@ -4497,6 +4498,8 @@ class TickMixin:
             changed = {r: v for r, v in got.items() if v != self._repos.get(r)}
             for r, v in changed.items():
                 self._turned_unserved(r, self._repos.get(r), v)
+            if gone:
+                self._drop_no_lane_roots(gone)
             for r in gone:
                 self._repos.pop(r, None)
                 self._ledger_mtime.pop(r, None)
@@ -4519,18 +4522,32 @@ class TickMixin:
         the home holds whose `repo` resolves to the checkout and that carries a lane — live or ended, never one
         superseded, a teamless one with team '' — the records `shiftlead.teamrun.in_repo` selects, written here
         since `sessionorc` never imports `shiftlead`."""
+        return [(list(s.lane), str(s.team or "")) for s in self._repo_records(root) if s.lane]
+
+    def _repo_records(self, root: str | Path) -> list[Session]:
+        """The records of a repo as `shiftlead.teamrun.in_repo` selects them: `repo` resolving to the checkout,
+        live or ended, never one superseded."""
         here = Path(root).resolve()
-        out: list[tuple[list[str], str]] = []
+        out: list[Session] = []
         for s in self._graph().values():
-            if not s.repo or s.superseded_by or not s.lane:
+            if not s.repo or s.superseded_by:
                 continue
             try:
-                if Path(s.repo).resolve() != here:
-                    continue
+                if Path(s.repo).resolve() == here:
+                    out.append(s)
             except (OSError, ValueError):
                 continue
-            out.append((list(s.lane), str(s.team or "")))
         return out
+
+    @staticmethod
+    def _drop_no_lane_roots(gone: list[str]) -> None:
+        """A checkout the registry drops loses its key in `no_lane_noted.json` (§4.4 *The note to the taker*)."""
+        try:
+            store = no_lane_mod.load()
+            if any([no_lane_mod.drop_root(store, str(Path(r).resolve())) for r in gone]):
+                no_lane_mod.save(store)
+        except OSError as e:
+            log.warning("the no-lane clocks could not be kept: %s", e)
 
     def _mark_lanes(self, root: str, reading: dict[str, Any]) -> None:
         """The no-lane mark on a repo reading about to be compared and stored (design §4.4 *An entry no lane takes
@@ -4539,7 +4556,48 @@ class TickMixin:
         led = reading.get("ledger")
         if isinstance(led, dict):
             lanes = [] if seams_mod.unserved(reading) else self._repo_lanes(root)
-            reading["ledger"] = ledger_mod.mark_no_lane(led, lanes)
+            reading["ledger"] = marked = ledger_mod.mark_no_lane(led, lanes)
+            if not marked.get("error") and isinstance(marked.get("entries"), list):
+                self._note_no_lane(root, str(reading.get("remote") or ""), marked["entries"], bool(lanes))
+
+    def _note_no_lane(self, root: str | Path, remote: str, entries: list[Any], lanes_read: bool) -> None:
+        """The note to the taker (design §4.4 *An entry no lane takes is marked*, *The note to the taker*,
+        TD-1686): `no_lane_noted.json`'s pass over the checkout's marked entries, and an uncharged `system` note to
+        the record each due id was given to (`ids.json`'s `given`), where its `by` resolves to a record the home
+        holds — ended or not, never the person. A store that cannot be kept is logged and sends nothing."""
+        here = Path(root).resolve()
+        key = settle_key(str(root), remote)
+        claimed = {
+            tid
+            for s in self._repo_records(root)
+            if s.state not in ("exited", "closed")
+            for p in s.progress or []
+            if p.status == "claimed" and (tid := no_lane_mod.norm(p.ref))
+        }
+        try:
+            store = no_lane_mod.load()
+            before = json.dumps(store, sort_keys=True)
+            due = no_lane_mod.step(store, key, str(here), entries, lanes_read, claimed, datetime.now(UTC))
+            if json.dumps(store, sort_keys=True) != before:
+                no_lane_mod.save(store)
+        except OSError as e:
+            log.warning("the no-lane clocks of %s could not be kept: %s", root, e)
+            return
+        if not due:
+            return
+        given = given_of(key)
+        by_address = {self._address(s): s for s in self._graph().values()}
+        for e in due:
+            tid = no_lane_mod.norm(e.get("id")) or str(e.get("id"))
+            by = no_lane_mod.taker(given, tid)
+            rec = by_address.get(by) if by and by != PERSON else None
+            if rec is None:
+                log.info("%s: no lane takes it, and its taker %s is no record the home holds", tid, by or "unknown")
+                continue
+            why = str((e.get("no_lane") or {}).get("why") or "")
+            text = no_lane_mod.note_text(str(e.get("id")), here.name, why, bool(e.get("waiting")))
+            self._system_note(self._address(rec), text, wake="uncharged", team=rec.team)
+            log.info("%s: told %s no lane takes it", tid, rec.id)
 
     async def _red_prs(self, now: datetime) -> None:
         """Design §4.4 *A red PR nobody holds is a work order* (TD-613): on every tick at the home, each

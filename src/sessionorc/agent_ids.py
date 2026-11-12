@@ -637,6 +637,13 @@ def _record_given(key: str, ids: list[str], by: str, take: str | None = None) ->
         _save(store)
 
 
+def given_of(key: str) -> list[dict[str, Any]]:
+    """The origin's `given` records as `ids.json` holds them (the newest `GIVEN_KEEP`), none where it holds none."""
+    with _STORE:
+        rec = _load().get(key)
+    return [g for g in (rec.get("given") if isinstance(rec, dict) else None) or [] if isinstance(g, dict)]
+
+
 def given_take(key: str, take: str, by: str) -> list[dict[str, Any]]:
     """The records of one call the home gave for the origin (`ids.json`'s `given`, TD-1484): those of the newest call
     whose `take` is `take`, or, where `take` is `last`, the newest call given to `by`; none where the record no longer
