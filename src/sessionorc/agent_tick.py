@@ -2443,27 +2443,36 @@ class TickMixin:
 
     def _joined(self, root: str, wos: Any, led: Any, settings: Mapping[str, Any] | None = None) -> Any:
         """`wos` with its orders joined (`workorders.join`, design §6 rule 6 *save a design's answer*, TD-1705), the
-        same object where no field moved; a ledger reading that carries `error`, or none, leaves the stored fields
-        as they are."""
-        if not isinstance(wos, dict) or not isinstance(led, dict) or "error" in led:
-            return wos
-        if not isinstance(led.get("entries"), list) or not wos.get("orders"):
+        same object where no field moved. Where the join cannot be made — a ledger reading that carries `error`, or
+        none, or a join that raised — the stored reading's fields are carried onto the orders by id
+        (`workorders.carry`), so a fresh board read never drops a routing the stored one holds. No order that is a
+        design's answer: nothing is read but the orders."""
+        if not isinstance(wos, dict) or not wos.get("orders"):
             return wos
         orders = wos["orders"]
-        got = workorders.join(
-            orders, led["entries"], self._designers(root, self._teams_settings() if settings is None else settings)
-        )
+        try:
+            if not isinstance(led, dict) or "error" in led or not isinstance(led.get("entries"), list):
+                raise LookupError("no ledger reading to join against")
+            if not any(isinstance(o, dict) and workorders.design_of(o) for o in orders):
+                got = workorders.join(orders, [], [])  # none routed: any routed field goes
+            else:
+                teams = self._teams_settings() if settings is None else settings
+                got = workorders.join(orders, led["entries"], self._designers(root, teams))
+        except Exception as e:  # noqa: BLE001 — the stored fields stand; the next tick joins again
+            if not isinstance(e, LookupError):
+                log.exception("joining the work orders of %s failed", root)
+            was = ((self._repos.get(root) or {}).get("work_orders") or {}).get("orders") or []
+            got = workorders.carry(orders, was)
         return wos if all(a is b for a, b in zip(got, orders, strict=True)) else {**wos, "orders": got}
 
     async def _join_orders(self) -> None:
         """The join on every tick (design §6 rule 6 *save a design's answer*, TD-1705): each stored reading's
         orders joined against the records as they are now, saved and pushed only where a field moved."""
-        settings = self._teams_settings()
         moved = []
         for root, facts in list(self._repos.items()):
             try:
                 wos = facts.get("work_orders")
-                got = self._joined(root, wos, facts.get("ledger"), settings)
+                got = self._joined(root, wos, facts.get("ledger"))
             except Exception:  # noqa: BLE001 — one repo's surprise is a log line, never the others'
                 log.exception("joining the work orders of %s failed", root)
                 continue
@@ -4358,9 +4367,8 @@ class TickMixin:
                     v.update({k: self._repos[r][k] for k in keep if k in self._repos[r]})
                 elif (arch := side["archived"].get(r)) is not None:
                     self._archived[r] = arch  # installed with the reading it was read with
-            settings = self._teams_settings()
             for r, v in got.items():  # joined before the compare and the store: no reader sees a routed line unjoined
-                v["work_orders"] = self._joined(r, v.get("work_orders"), v.get("ledger"), settings)
+                v["work_orders"] = self._joined(r, v.get("work_orders"), v.get("ledger"))
             changed = {r: v for r, v in got.items() if v != self._repos.get(r)}
             for r, v in changed.items():
                 self._turned_unserved(r, self._repos.get(r), v)

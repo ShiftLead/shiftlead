@@ -1009,6 +1009,17 @@ async def test_a_designs_answer_is_joined_before_either_store_of_a_fresh_board_r
         agent._repos_read_at = float("-inf")
         await agent._refresh_repos()
         assert len(pushed) == 1, "the same board read again is no change once joined"
+        await agent._join_orders()
+        assert len(pushed) == 1, "the tick's own join over an unchanged reading pushes nothing"
+        # a ledger read that failed: the fresh board's orders keep the stored routing, never free-pick's
+        good = dict(led)
+        led.clear()
+        led.update({**good, "error": "unreadable"})
+        agent._repos_read_at = float("-inf")
+        await agent._refresh_repos()
+        assert agent._repos[root]["work_orders"]["orders"][0]["for"] == des
+        led.clear()
+        led.update(good)
         # a press's re-read stores its orders joined too
         agent._repos[root]["work_orders"] = {"orders": []}
         monkeypatch.setattr(
@@ -1044,6 +1055,14 @@ async def test_who_is_a_designer_to_reach(agent, tmp_path):
         assert agent._designers(root, {"t": {"on_work": "off"}}) == [], "under off rule 8 starts nothing"
         rec.out_of_work = None  # ended without declaring: rule 8 would not start it
         assert agent._designers(root, {}) == []
+        # its whole team wound down (every member ended, each declared): rule 8 starts it, so it counts
+        rec.out_of_work = {"at": "2026-09-27T20:00:00Z", "why": "nothing pickable"}
+        g = agent.sessions[gri]
+        g.state, g.out_of_work = "closed", {"at": "2026-09-27T20:00:00Z", "why": "nothing pickable"}
+        assert [d["id"] for d in agent._designers(root, {})] == [des]
+        g.out_of_work = None  # the grinder ended without declaring: the team stopped, not wound down
+        assert agent._designers(root, {}) == []
+        g.state = "idle"
         rec.state = "idle"
         for sid in (gri, des):
             await person.call("kill", id=sid)

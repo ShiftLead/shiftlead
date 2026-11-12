@@ -598,6 +598,22 @@ def join(
     return out
 
 
+def carry(orders: list[dict[str, Any]], was: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """`orders` with the routed fields `was` holds for each id (`ROUTED`), where the join cannot be made (a ledger
+    reading that carries `error`, TD-1705): a fresh read of the board keeps the stored routing, an order `was` does
+    not hold keeps its own fields, and one whose fields already read so is the same object."""
+    by_id = {o["id"]: o for o in was if isinstance(o, dict) and o.get("id")}
+    out = []
+    for o in orders:
+        old = by_id.get(o.get("id")) if isinstance(o, dict) else None
+        if old is None:
+            out.append(o)
+            continue
+        want, cur = {k: old[k] for k in ROUTED if k in old}, {k: o[k] for k in ROUTED if k in o}
+        out.append(o if want == cur else {**{k: v for k, v in o.items() if k not in ROUTED}, **want})
+    return out
+
+
 def board_lines(root: str | Path, *, fetch: bool = True) -> tuple[list[str], str]:
     """The board under the checkout `root` as lines, and where they were read: origin's default
     branch after a fetch (`origin/<branch>`), else the checkout's file (`checkout`) — design §4.7
