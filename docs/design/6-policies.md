@@ -16,7 +16,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
 - **Stop time** (`run_until`): a session may carry the instant it must stop, set at start
   (`ao new --unattended --until 06:00 | +8h | <ISO>`) or after it (`ao until <session> <when>`,
   `--clear`; the Focus header's **stops** note, §4.5a), shown by `ao status -v` as *stops 06:00* in
-  the reader's own local time. At the instant, the host agent sends the wrap-up prompt **once** and
+  the reader's own local time (a session whose brief is not in yet at the instant is stopped at once, §4.3 *The repo's start hooks*). At the instant, the host agent sends the wrap-up prompt **once** and
   then kills the session when it settles or ten minutes later, whichever comes first — the same two
   steps, and the same words, as `ao team stop`. A record with no agent (§4.3, a shell or a command
   run) is killed at the instant, with no prompt typed. The wording travels on the record, since
@@ -2654,7 +2654,7 @@ teams:
   the two, and a Clear leaves it alone. A stop time in the past is refused when set, as `ao until`'s
   is. **Run window** (Not built — phase 3, the tdgrind port): start missing workers inside the
   window; wrap-up-then-kill outside, by setting a stop time.
-  **Usage gate** (per account's reserve, applied to each profile's sessions): pause every unattended session on a profile when **any** of its
+  **Usage gate** (per account's reserve, applied to each profile's sessions): pause every unattended session on a profile (a pause line waits for a brief not yet in, §4.3 *The repo's start hooks*) when **any** of its
   reported windows reaches that window's **line**, and resume them when every window is back under
   its line — the windows being the **account's** reading (reported or asked, §4.4 *Usage*), the one
   poll every profile on that account shares (§4.2a), read against its account's lines (*A reserve is the account's*, below) — a
