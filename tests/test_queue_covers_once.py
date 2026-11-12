@@ -185,10 +185,20 @@ def test_a_holds_press_whose_card_a_pick_hides_goes_to_the_repo_page():
 # ---- the Repo page's For you over a fake home ----
 
 
-def _client(tmp_path, monkeypatch, *, due: bool = True, kind: str = "decide", more: dict | None = None, extra=()):
+def _client(
+    tmp_path,
+    monkeypatch,
+    *,
+    due: bool = True,
+    kind: str = "decide",
+    more: dict | None = None,
+    extra=(),
+    queue: dict | None = None,
+):
     """Repo `r`: design TD-050 and its parts TD-051, TD-052 and TD-053 each held on `decision (paul)`, and one
     open `decide` line whose `Context:` names TD-050 and whose `Parts:` lists TD-051 and TD-052 (`kind` its own
-    where given, `more` its fields over these); `extra` more board items, after it."""
+    where given, `more` its fields over these) — TD-053 is a held member by `Part of` alone; `extra` more board
+    items, after it. `queue` is the home's `queue` reading (none: a home that serves no Queue)."""
     from test_ui_queue import client
 
     root = tmp_path / "r"
@@ -235,6 +245,8 @@ def _client(tmp_path, monkeypatch, *, due: bool = True, kind: str = "decide", mo
         async def call(self, method, **kw):
             if method == "inbox":
                 return {"entries": []}
+            if method == "queue" and queue is not None:
+                return queue
             return {"repos": repos, "list": [], "host": {"name": "kmaster"}}.get(method, {})
 
     monkeypatch.setenv("SHIFTLEAD_INBOX_BOARD_SHOW", "all")
@@ -287,3 +299,35 @@ def test_a_line_not_yet_due_that_covers_no_for_you_row_draws_its_holds_line(tmp_
     html = _client(tmp_path, monkeypatch, extra=[AHEAD]).get("/repo/r").text
     holds = [re.findall(r">(TD-\d+)</a>", h) for h in re.findall(r'<div class="st holds"[^>]*>(.*?)</div>', html, re.S)]
     assert ["TD-060", "TD-061"] in holds, holds
+
+
+# ---- the pages that call `split_later` (TD-1712): each passes the open entries, a held member by `Part of` too ----
+
+
+def _member_named(html: str) -> list[str]:
+    """The ids the not-yet-due line's *holds* line names."""
+    holds = re.search(r'<div class="st holds"[^>]*>(.*?)</div>', html, re.S)
+    return re.findall(r">(TD-\d+)</a>", holds.group(1)) if holds else []
+
+
+def test_the_inbox_page_and_its_poll_name_a_held_member_in_a_coming_lines_holds(tmp_path, monkeypatch):
+    """`/inbox` and `/api/person/inbox` hand `split_later` the open entries: the line not yet due names TD-053, the
+    member it covers by `Part of` alone, in its *holds* line — drawn by neither without them."""
+    c = _client(tmp_path, monkeypatch, due=False)
+    assert _member_named(c.get("/inbox").text) == ["TD-050", "TD-051", "TD-052", "TD-053"]
+    poll = c.get("/api/person/inbox").json()["html"]
+    assert _member_named(" ".join(str(v) for v in poll.values())) == ["TD-050", "TD-051", "TD-052", "TD-053"]
+
+
+def test_the_queue_page_strips_a_held_members_block_on_another_card(tmp_path, monkeypatch):
+    """The Queue page's cards (`card_mail`) read the open entries: the line not yet due is drawn on TD-050's card and
+    covers TD-053 on another card, which is a mention there and draws no Decide block of its own."""
+    from test_ui_queue import card, row
+
+    design = card(row("r", "TD-050", "the design"), [row("r", "TD-051", "build one", depth=1, parent="r#TD-050")])
+    other = card(row("r", "TD-053", "build three"), place=2)
+    q = {"cards": [design, other], "completed": [], "other_work": []}
+    html = _client(tmp_path, monkeypatch, due=False, queue=q).get("/queue").text
+    on = html[html.index('data-card="r#TD-053"') :]
+    assert 'data-answer="Keep"' not in on, "TD-053 draws no block of its own on its card"
+    assert "One more round on TD-050?" in on, "it is named as covered by the line on TD-050's card"
