@@ -63,10 +63,18 @@ edits. Using the Fable allotment fully is the aim; spending it on work Sonnet do
 
 ## Open
 
-- **The cap on design rounds.** A round here is a fact-check, a Fable review and a Sonnet review. A cap of
-  two was proposed and is not established: rounds 3 and 4 each still raise, for each design that reaches
-  them, about 0.8 and 0.7 original findings that only a design review would catch (round 1: 3.6, round 2:
-  1.4), and what a round costs the author is not measured.
+- **Whether better context at drafting means fewer rounds.** The rounds keep their cap and their stop rule
+  (below, *Withdrawn*). What is proposed instead is to give the author, before it drafts: the facts of the
+  code the design touches, checked by a Sonnet agent (13% of findings are a false claim about what exists);
+  the other design text that names the same mechanism, found by a script (4% are contradictions with
+  another section, 7% stale pointers); and a checklist of the questions designs here leave open, drawn
+  from the 1,273 such findings (41%). Tried on the next few designs and read against the baseline: 3.6
+  original design-only findings for each design in round 1, 1.4 in round 2, a median of 4 rounds.
+- **What each role is made to read.** The design is about 665k tokens in 30 files, and six sections are
+  36k to 101k tokens each (§4.5a 101k, §4.5 86k, §4.4 73k, §6 71k, §4.10 51k): one read of a section stays in
+  the context of every later turn. `cadence.md` is about 42k. A reader that prints one heading of a
+  section, or smaller files, is the candidate; what the designer and the grinders actually read each turn
+  is not yet measured (TD-820 has the designer's totals).
 - **Who reviews.** Sonnet and Fable are within about 16% of each other in tokens for each such finding;
   what Fable finds that Sonnet would miss is not measured.
 - **Who settles a detail the design leaves open** (41% of findings; about 7% lead to something
@@ -75,5 +83,10 @@ edits. Using the Fable allotment fully is the aim; spending it on work Sonnet do
 
 ## Withdrawn
 
+- *A cap of two design rounds.* Rounds 3 and 4 each still raise, for each design that reaches them, about
+  0.8 and 0.7 original findings that only a design review would catch. A round costs the designer at most
+  about $9 by `ao spend`'s estimate (about $1,500 over nine days across about 175 rounds, the designer's
+  other work included), and a flaw that escapes costs at least a fix PR (about $6) and, live, far more. The
+  stop rule already ends the rounds when one raises nothing build-changing.
 - *Fable does the design reviews* (it costs far more for each review; Paul, 2026-11-11).
 - *Every minor finding goes to the builder* (two thirds of the findings labelled minor are substantive).
