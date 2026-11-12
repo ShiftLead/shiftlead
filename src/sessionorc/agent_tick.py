@@ -3796,7 +3796,9 @@ class TickMixin:
         if self.mode != "home" or not team:
             return
         for r in self._graph().values():
-            if r is but or r.team != team or not r.unattended or r.superseded_by:
+            # a live seat is passed over (§4.9a *A busy seat is left alone*, TD-1569): a start that leaves one running,
+            # and rule 8's replay while one is live, write the reading
+            if r is but or r.team != team or not r.unattended or r.superseded_by or r.seat is not None:
                 continue
             if r.state not in ("exited", "closed", "scheduled"):
                 return

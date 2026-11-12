@@ -144,3 +144,17 @@ async def test_ao_team_starts_create_marks_the_start(agent, tmp_path):
         (tmp_path / "b").mkdir()
         await person.call("create", name="g10", dir=str(tmp_path / "b"), adapter="shell", unattended=True, team="h")
         assert agent._host_rec["teams"]["h"]["usage_at_start"] == {"grind": {"week": 33}}, "a create alone is no start"
+
+
+async def test_a_live_seat_is_passed_over_so_a_start_beside_it_keeps_the_reading(agent):
+    """§4.9a *A busy seat is left alone* (TD-1569): `_mark_team_start` passes over a live seat, so a person's
+    start that leaves one running, and rule 8's replay while one is live, write `usage_at_start`."""
+    await park_ticks(agent)
+    agent._usage.clear()
+    agent._usage["grind"] = {"windows": [{"label": "week", "pct": 33}]}
+    seat = _rec("techlead-g", state="working", seat={"trigger": "asks"})
+    agent.sessions[seat.id] = seat
+    agent._mark_team_start("g")
+    assert agent._host_rec["teams"]["g"]["usage_at_start"] == {"grind": {"week": 33}}
+    agent._usage.clear()
+    del agent.sessions[seat.id]

@@ -1019,6 +1019,8 @@ def cmd_team_start(args: argparse.Namespace) -> int:
             print(f"{c['id']}  closed (concluded)")
         for line in result.get("moved", []):  # the definition's renames and removals (§4.9, TD-706)
             print(line)
+        for b in result.get("left_running", []):  # a busy seat a person's start leaves alone (§4.9a, TD-1569)
+            print(f"{b['name']} left running ({b['state']})")
         for rec in result["sessions"]:
             print(_team_line(rec, args.name, p))
         if extras := result.get("extras"):  # td-max's held extras (§4.9 *Scaling with the work*, TD-1545)

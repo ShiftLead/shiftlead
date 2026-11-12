@@ -523,7 +523,10 @@ def test_a_pre_flight_failure_reports_the_agents_message_and_creates_nothing(wor
     }
     r = client.post("/api/teams/ao-grind/start")
     assert r.status_code == 400
-    assert "was not started" in r.json()["detail"] and "grind-2 is working as ao-grind-2" in r.json()["detail"]
+    assert (
+        "was not started" in r.json()["detail"]
+        and "grind-2 working — let it finish, or Kill that one session" in r.json()["detail"]
+    )
     assert not fleet.creates()
 
 
