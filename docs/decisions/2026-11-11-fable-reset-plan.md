@@ -6,7 +6,7 @@ TD-1711; the entries it names were in the ledger already. Paul called the shape 
 The evidence is [the design review findings analysis](2026-11-11-design-review-findings.md).
 
 **Review round** (2026-11-11): a Sonnet fact-check (12 findings, 7 of them changing the plan) and a Sonnet
-design review (12 build-changing, 5 minor), all applied here except one: a fact-check of only the changed
+design review (13 build-changing, 5 minor), all applied here except one: a fact-check of only the changed
 text by a second reader, which the later rounds' fact-checks and the closing one already are.
 
 ## The facts it rests on
