@@ -390,7 +390,9 @@ def test_a_red_pr_held_by_a_working_record_is_no_order_and_nobody_is_told():
     by_branch = _rec(state="working", git={"branch": "b1573"})
     by_claim = _rec("ao-a", state="working", progress=[ProgressEntry(ref="pr:1573")])
     by_pr = _rec("ao-b", state="working", progress=[ProgressEntry(ref="TD-613", pr=1573, status="done")])
-    for r in (by_branch, by_claim, by_pr):
+    # a claim whose PR is with its reader keeps it as `review_pr`, not `pr` (TD-150): it holds it (TD-1701)
+    by_review = _rec("ao-d", state="working", progress=[ProgressEntry(ref="TD-1556", review_pr=1573)])
+    for r in (by_branch, by_claim, by_pr, by_review):
         assert workorders.red_prs([_red()], [r], T0 + 3 * HOUR, {}, HOUR) == ([], {}, [])
     # a holder that is gone, closed or out of work holds nothing
     for gone in (_rec(state="exited", git={"branch": "b1573"}), _rec(git={"branch": "b1573"}, out_of_work={"at": "x"})):
