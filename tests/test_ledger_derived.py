@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -19,8 +20,10 @@ ROOT = Path(__file__).parents[1]
 
 
 def _script(cwd: Path, reg_dir: Path, *args: str) -> dict:
-    """The synced script's `--list --json`, its roster pointed at `reg_dir` alone."""
-    env = {**os.environ, "AGENT_CADENCE_REG_DIR": str(reg_dir)}
+    """The synced script's `--list --json`, its roster pointed at `reg_dir` alone, on the UTC clock: an
+    `until` is a UTC day (cadence §2.4) and the home reads it so (`ledger.entries`), while the pinned
+    script reads the local date (TD-1697), which differs from the UTC one for hours each day."""
+    env = {**os.environ, "AGENT_CADENCE_REG_DIR": str(reg_dir), "TZ": "UTC"}
     cp = subprocess.run(
         [sys.executable, str(pinned_script("ledger.py")), "--list", "--json", *args],
         cwd=cwd, env=env, capture_output=True, text=True, timeout=60, check=True,
@@ -155,6 +158,23 @@ def test_the_rule_and_another_repos_entries_through_one_registry(tmp_path):
     assert home["TD-018"]["blocked_by"] == ["other#TD-003", "nowhere#TD-001"]
     assert (home["TD-011"]["type"], home["TD-016"]["type"]) == ("feature", "debt"), "an unknown Type reads as debt"
     assert home["TD-014"]["for_page"] == "for-you", "blocked by a decision is the person's"
+
+
+@pytest.mark.parametrize("zone", ["Etc/GMT+12", "Etc/GMT-14"])
+def test_an_until_is_read_as_the_utc_day_whatever_the_local_zone(tmp_path, monkeypatch, zone):
+    """TD-1697: an `until` of today or tomorrow, UTC, read by both readers under a zone a day behind or
+    ahead of UTC for most of the day — between the two zones every hour is covered."""
+    today = datetime.now(UTC).date()
+    text = (
+        "# Technical Debt\n\n"
+        f"## TD-020: until today\n\n**Priority:** Low\n**Blocked by:** until {today}\n\n"
+        f"## TD-021: until tomorrow\n\n**Priority:** Low\n**Blocked by:** until {today + timedelta(days=1)}\n"
+    )
+    here = _repo(tmp_path / "here", text, None)
+    monkeypatch.setenv("TZ", zone)
+    home = _home(text, None, [])
+    assert (home["TD-020"]["pickable"], home["TD-021"]["pickable"]) == ("yes", "no")
+    _same(_script(here, tmp_path / "no-roster"), home)
 
 
 def test_a_name_two_checkouts_share_keeps_the_block(tmp_path):
