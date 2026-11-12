@@ -422,7 +422,7 @@ def lane_records(
         and r.seat is None
         and not r.superseded_by
         and not work.sat_out(r)
-        and ledger_mod.lane_matches(list(r.lane), dict(entry), r.team)
+        and ledger_mod.lane_matches(list(r.lane), dict(entry), r.team, addr)
     ]
     return [addr for *_, addr in sorted(out)]
 

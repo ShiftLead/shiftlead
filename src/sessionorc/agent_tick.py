@@ -2376,11 +2376,13 @@ class TickMixin:
         if "error" in led or not isinstance(led.get("entries"), list) or seams_mod.unserved(facts):
             return  # an unserved repo's lane reads empty (§5 *The seams*, TD-1011)
 
+        who = self._address(s)
+
         def matching(got: list[Any]) -> list[str]:
             return [
                 str(e["id"])
                 for e in got
-                if isinstance(e, dict) and e.get("id") and ledger_mod.lane_matches(s.lane, e, s.team)
+                if isinstance(e, dict) and e.get("id") and ledger_mod.lane_matches(s.lane, e, s.team, who)
             ]
 
         ledger_ids = matching(led["entries"])
@@ -2416,7 +2418,7 @@ class TickMixin:
             # and on: an entry merged since the declaration is told on this tick
         # the lane's memory, never the ledger's (§6 rule 6, TD-407): an id the lane no longer takes
         # leaves it, written for a gone member as for a live one, so an entry that comes back is news
-        pruned, new = work_mod.reread(s, [*led["entries"], *_orders(self._repos.get(s.repo or ""))])
+        pruned, new = work_mod.reread(s, [*led["entries"], *_orders(self._repos.get(s.repo or ""))], who=who)
         if pruned is not s.lane_seen:
             s.lane_seen = pruned
             self._save(s)
@@ -2906,7 +2908,7 @@ class TickMixin:
             ids = news.setdefault(str(r.repo), {}).setdefault(r.name, [])
             # the repo's work orders count as entries do (§6 rule 8, TD-384): a decided line starts its team
             orders = _orders(self._repos.get(r.repo or ""))
-            ids.extend(i for i in work_mod.gained(r, [*led["entries"], *orders]) if i not in ids)
+            ids.extend(i for i in work_mod.gained(r, [*led["entries"], *orders], self._address(r)) if i not in ids)
         news = {repo: {m: ids for m, ids in ms.items() if ids} for repo, ms in news.items()}
         news = {repo: ms for repo, ms in news.items() if ms}
         if not news:
@@ -2989,7 +2991,9 @@ class TickMixin:
                 return [
                     str(e["id"])
                     for e in got
-                    if isinstance(e, dict) and e.get("id") and ledger_mod.lane_matches(r.lane, e, r.team)
+                    if isinstance(e, dict)
+                    and e.get("id")
+                    and ledger_mod.lane_matches(r.lane, e, r.team, self._address(r))
                 ]
 
             orders = _orders(facts)
@@ -2999,7 +3003,7 @@ class TickMixin:
             on_tip = set(matching(tip))
             ids += [i for i in matching(led["entries"]) if i not in on_tip and i not in ids]
             r.lane_seen = {"at": now_iso(), "ids": ids, "base": True}
-            r.lane_seen = work_mod.reread(r, [*led["entries"], *orders])[0]
+            r.lane_seen = work_mod.reread(r, [*led["entries"], *orders], who=self._address(r))[0]
             self._save(r)
             done.add(r.id)
             log.info("%s: rule 8's baseline from the ledger at its end (%s)", self._address(r), why)
