@@ -275,6 +275,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _parts_text,  # noqa: F401
     _pr_parts,  # noqa: F401
     _rail_teams,  # noqa: F401
+    _record_name,  # noqa: F401
     _resolved,  # noqa: F401
     _same_ref,  # noqa: F401
     _shot_host_down,  # noqa: F401
