@@ -30,7 +30,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import gitinfo, ledgerboard, paths, reports
+from sessionorc import gitinfo, ledger, ledgerboard, paths, reports
 
 BOARD = Path("docs") / "user_attention.md"  # `board:`'s default (§5 *The seams*)
 NO_BOARD = "no board: the Inbox is the person's channel"  # the seam's fixed words (§5)
@@ -533,6 +533,85 @@ def entry(order: dict[str, Any]) -> dict[str, Any]:
         "line": order.get("line"),
         "text": order.get("text") or "",
     }
+
+
+# the fields the join writes on a stored order (§6 rule 6 *save a design's answer*, TD-1705); `owner` is `entry()`'s own
+ROUTED = ("lane", "design", "owner", "for")
+ROUTE_WORDS = ("claimed", "done")  # a designer's own word on its design that makes it the order's `for`
+_BARE_TD_RE = re.compile(r"TD-\d+")  # this repo's own entry: another repo's design is never routed here
+
+
+def design_of(order: dict[str, Any]) -> str | None:
+    """The design a decided line answers (§6 rule 6 *save a design's answer*, TD-1705): the bare `TD-n` of its
+    `Context:` where that Context names exactly one entry and exactly one gate, `decision (<any person>)` — read
+    from the line's `text` as ledgerboard reads an item's gate, since `refs` holds bare ids; else None."""
+    ref, gate = ledgerboard._item_gate(str(order.get("text") or ""))
+    if ref is None or gate is None or not gate.startswith("decision (") or not _BARE_TD_RE.fullmatch(ref):
+        return None
+    return ref
+
+
+def _routed(order: dict[str, Any], designs: dict[str, dict[str, Any]], designers: list[dict[str, Any]]) -> dict:
+    """The routed fields one order should carry (`join`): `{owner: ""}` for one that stays `free-pick`'s."""
+    d = design_of(order)
+    if d is None or d not in designs:
+        return {"owner": ""}
+    owner = str(designs[d].get("owner") or "")
+    probe = {**{k: v for k, v in order.items() if k not in ROUTED}, "lane": "design-first", "owner": owner}
+    dec = order.get("decided") if isinstance(order.get("decided"), dict) else {}
+    answer = {"text": str(dec.get("text") or ""), "date": dec.get("date")}
+    reach = [
+        x
+        for x in designers
+        if ledger.lane_matches(list(x.get("lane") or []), probe, None, x.get("id"))
+        and ((x.get("released") or {}).get(order["id"]) or {}).get("at_drop") != answer
+    ]
+    if not reach:
+        return {"owner": ""}
+    words = [(str(w[1]), x["id"]) for x in reach if (w := (x.get("words") or {}).get(d)) and w[0] in ROUTE_WORDS]
+    got = {"lane": "design-first", "design": d, "owner": owner}
+    return {**got, "for": max(words)[1]} if words else got
+
+
+def join(
+    orders: list[dict[str, Any]], entries: list[dict[str, Any]], designers: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """The board's stored orders (`entry()`'s) with a design's answer routed (design §6 rule 6 *save a design's
+    answer*, TD-1705): a decided line whose one `Context:` gate is `TD-n decision (<who>)` (`design_of`), TD-n an
+    open `Kind: design-first` entry of `entries`, goes to the `design-first` lanes where the repo has a designer to
+    reach — `designers`, each `{id, lane, released, words}` as the tick reads them: its address, its lane, its
+    `released` marks, and its newest progress word on each ref along its line of successors as `(status, at)`. One
+    whose lane takes the order and whose `released` mark for it was not written at its present answer is to reach.
+    A routed order carries `lane: "design-first"`, `design`, `owner` (the design's `Owner:`) and, where a designer
+    to reach last said `claimed` or `done` on the design, `for`: the newest such designer's address. Any other
+    order carries none of them, its `owner` `entry()`'s empty one. An order whose fields already read so is the
+    same object, so a caller that compares sees no change."""
+    designs = {str(e["id"]): e for e in entries if isinstance(e, dict) and e.get("kind") == "design-first"}
+    out = []
+    for o in orders:
+        if not isinstance(o, dict) or not o.get("id"):
+            out.append(o)
+            continue
+        want = _routed(o, designs, designers)
+        cur = {k: o[k] for k in ROUTED if k in o}
+        out.append(o if cur == want else {**{k: v for k, v in o.items() if k not in ROUTED}, **want})
+    return out
+
+
+def carry(orders: list[dict[str, Any]], was: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """`orders` with the routed fields `was` holds for each id (`ROUTED`), where the join cannot be made (a ledger
+    reading that carries `error`, TD-1705): a fresh read of the board keeps the stored routing, an order `was` does
+    not hold keeps its own fields, and one whose fields already read so is the same object."""
+    by_id = {o["id"]: o for o in was if isinstance(o, dict) and o.get("id")}
+    out = []
+    for o in orders:
+        old = by_id.get(o.get("id")) if isinstance(o, dict) else None
+        if old is None:
+            out.append(o)
+            continue
+        want, cur = {k: old[k] for k in ROUTED if k in old}, {k: o[k] for k in ROUTED if k in o}
+        out.append(o if want == cur else {**{k: v for k, v in o.items() if k not in ROUTED}, **want})
+    return out
 
 
 def board_lines(root: str | Path, *, fetch: bool = True) -> tuple[list[str], str]:

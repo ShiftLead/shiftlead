@@ -820,3 +820,101 @@ def test_in_lanes_gives_a_routed_order_to_its_for_record_alone_and_no_rest():
     assert got["rest"] == []
     # with no record at its `for` it is nobody's, and still in no rest
     assert ledger_mod.in_lanes([order], records[1:])["rest"] == []
+
+
+def _answer_line(key: str = "1a2b3c4d", ctx: str = "TD-9 decision (paul)", decided: str = "One more round") -> dict:
+    text = f"End of rounds on TD-9: go, one more round, or hold? Context: {ctx}. Due: 2026-11-11."
+    return workorders.entry(
+        {
+            "id": f"board:{key}",
+            "title": "End of rounds",
+            "text": text,
+            "decided": {"text": decided, "date": "2026-11-11"},
+        }
+    )
+
+
+def _designer(id: str, lane: list[str] | None = None, words: dict | None = None, released: dict | None = None) -> dict:
+    return {
+        "id": id,
+        "lane": lane or ["design-first", "owner:designer"],
+        "released": released or {},
+        "words": words or {},
+    }
+
+
+def test_the_join_routes_a_designs_answer_to_its_own_designer():
+    """TD-1705 (design §6 rule 6 *save a design's answer*, TD-1590's ledgerboard case): a decided line whose one
+    Context gate is an open design-first entry's `decision (paul)` goes to the design-first lanes, `for` the
+    designer whose newest word on the design is `claimed` or `done`; with no designer to reach it stays free-pick's."""
+    led = [{"id": "TD-9", "kind": "design-first", "owner": "designer"}, {"id": "TD-10", "kind": "build", "owner": ""}]
+    line = _answer_line()
+    designers = [
+        _designer("designer-ao-1", words={"TD-9": ("done", "2026-11-10T10:00:00Z")}),
+        _designer("designer-ao-2", words={"TD-9": ("claimed", "2026-11-09T10:00:00Z")}),
+        _designer(
+            "grinder-ao-1", lane=["free-pick", "owner:grinder"], words={"TD-9": ("claimed", "2026-11-11T09:00:00Z")}
+        ),
+    ]
+    [got] = workorders.join([line], led, designers)
+    assert {k: got.get(k) for k in workorders.ROUTED} == {
+        "lane": "design-first",
+        "design": "TD-9",
+        "owner": "designer",
+        "for": "designer-ao-1",
+    }, "the newest claimed-or-done designer; a grinder's word on the design is no designer's"
+    assert ledger_mod.lane_matches(["design-first"], got, None, "designer-ao-1")
+    assert not ledger_mod.lane_matches(["free-pick"], got, None, "grinder-ao-1")
+    # its newest word a drop: the other designer is its `for`; no word at all: every designer, no `for`
+    designers[0]["words"]["TD-9"] = ("dropped", "2026-11-11T10:00:00Z")
+    assert workorders.join([line], led, designers)[0]["for"] == "designer-ao-2"
+    assert "for" not in workorders.join([line], led, [_designer("designer-ao-1")])[0]
+    # no designer to reach (none, or only a grinder): free-pick's as before, `entry()`'s empty owner
+    for none in ([], designers[2:]):
+        [free] = workorders.join([line], led, none)
+        assert free is line and not any(k in free for k in ("lane", "design", "for")) and free["owner"] == ""
+    # routed then unrouted: the fields go and the owner is empty again
+    [back] = workorders.join([got], led, [])
+    assert {k: back[k] for k in workorders.ROUTED if k in back} == {"owner": ""}
+    # unchanged: the very same object, so a compare sees nothing moved
+    assert workorders.join([got], led, designers[:1])[0] is not got
+    again = workorders.join([got], led, [_designer("designer-ao-1", words={"TD-9": ("done", "2026-11-10")})])
+    assert again[0] is got
+
+
+def test_the_join_leaves_a_line_that_is_no_designs_answer_free_picks():
+    """TD-1705: a line whose Context names a build's gate, two gates, another repo's entry, an event gate or a
+    design the ledger does not hold open stays free-pick's; so does one whose design's owner no designer's lane
+    takes (`techlead`, with only `[design-first, owner:designer]` lanes)."""
+    led = [{"id": "TD-9", "kind": "design-first", "owner": "designer"}, {"id": "TD-10", "kind": "build", "owner": ""}]
+    designers = [_designer("designer-ao-1", words={"TD-9": ("done", "2026-11-10T10:00:00Z")})]
+    for ctx in (
+        "TD-10 decision (paul)",
+        "TD-9 decision (paul), TD-9 decision (bob)",
+        "other#TD-9 decision (paul)",
+        "TD-9 event (live)",
+        "TD-11 decision (paul)",
+    ):
+        [got] = workorders.join([_answer_line(ctx=ctx)], led, designers)
+        assert "lane" not in got, ctx
+    techs = [{**led[0], "owner": "techlead"}]
+    assert "lane" not in workorders.join([_answer_line()], techs, designers)[0]
+    # a lane holding both free-pick and design-first takes it
+    both = [_designer("d", lane=["free-pick", "design-first"])]
+    assert workorders.join([_answer_line()], led, both)[0]["lane"] == "design-first"
+
+
+def test_a_designer_that_released_the_line_at_its_answer_is_not_to_reach_until_it_is_answered_again():
+    """TD-1705 with TD-1706: a designer whose `released` mark for the line was written at its present answer is
+    not to reach — another designer takes it, else free-pick does — and a new answer reaches it again."""
+    led = [{"id": "TD-9", "kind": "design-first", "owner": "designer"}]
+    line = _answer_line()
+    at = {"text": "One more round", "date": "2026-11-11"}
+    mark = {line["id"]: {"at_drop": at, "told": at}}
+    one = _designer("designer-ao-1", words={"TD-9": ("done", "2026-11-10")}, released=mark)
+    two = _designer("designer-ao-2")
+    assert workorders.join([line], led, [one, two])[0].get("for") is None
+    assert workorders.join([line], led, [one, two])[0]["lane"] == "design-first", "the other designer's"
+    assert "lane" not in workorders.join([line], led, [one])[0], "the repo's only designer dropped it: free-pick's"
+    hold = {**line, "decided": {"text": "Hold", "date": "2026-11-12"}}
+    assert workorders.join([hold], led, [one])[0]["for"] == "designer-ao-1", "answered again: to reach once more"

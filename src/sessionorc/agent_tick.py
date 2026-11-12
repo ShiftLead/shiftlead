@@ -238,6 +238,10 @@ def _answer(order: dict[str, Any], ref: str) -> dict[str, Any] | None:
     return {"text": str(d.get("text") or ""), "date": d.get("date")}
 
 
+class _NoJoin(Exception):
+    """No ledger reading to join a design's answer against (`_joined`, TD-1705): the stored fields are carried."""
+
+
 NODE_CHANGES = "agent-cadence path cadence-changes.md"  # rule 12's command on a node: `ao host up`'s link (TD-1046)
 SETUP_EVERY = 3600.0  # seconds between the setup notes' reads with `profiles.yml` unchanged (TD-875)
 VERSION_EVERY = 3600.0  # seconds between the home's seat tool-version compares (§4.3 *An upgraded seat tool*, TD-1727)
@@ -1180,6 +1184,10 @@ class TickMixin:
         if self.mode != "home":
             return
         records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
+        try:
+            await self._join_orders()  # a design's answer routed against the records as they are now (TD-1705)
+        except Exception:  # noqa: BLE001 — the join's surprise is a log line; the rules run on the stored orders
+            log.exception("joining the work orders failed")
         for s in records:
             try:
                 self._released_prune(s)  # every record of the repo, at work or not (TD-1706)
@@ -2500,6 +2508,101 @@ class TickMixin:
             return
         answer = _answer(held[ref], ref)
         s.released = {**(s.released or {}), ref: {"at_drop": answer, "told": answer}}
+
+    @staticmethod
+    def _teams_settings() -> dict[str, Any]:
+        """The teams' settings for the join's `on_work` read; {} where they cannot be read (each team's default)."""
+        try:
+            return settings_mod.teams(settings_mod.load())
+        except Exception:  # noqa: BLE001 — a settings file that cannot be read is each team's default
+            log.exception("reading the teams' settings for the join failed")
+            return {}
+
+    def _designers(self, root: str, settings: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """The repo's designers to reach as `workorders.join` reads them (design §6 rule 6 *save a design's answer*,
+        TD-1705): each record of `root` (a node's included) that is a supervised member of a team, not a seat and not
+        an extra, not superseded, not sat out and not run-only, whose lane holds `design-first`, and that is live or
+        that rule 8 would start for work — its team wound down, or it finished while its team runs on, under any
+        `on_work` but `off` — as `{id, lane, released, words}`: its address, its lane, its own `released` marks, and
+        its newest progress word on each ref read along its line of successors (`superseded_by`)."""
+        graph = self._graph()
+        by_team: dict[str, list[Session]] = {}
+        for r in graph.values():
+            if r.team:
+                by_team.setdefault(r.team, []).append(r)
+        line: dict[str, list[Session]] = {}  # the current record's address → every record of its line
+        for r in graph.values():
+            cur, seen = r, set()
+            while cur.superseded_by and (key := self._from_host(cur.superseded_by, cur.host or self.host)) in graph:
+                if key in seen:
+                    break
+                seen.add(key)
+                cur = graph[key]
+            line.setdefault(self._address(cur), []).append(r)
+        out = []
+        for r in graph.values():
+            if r.repo != root or not r.team or not r.supervised or r.seat is not None or r.scale or r.superseded_by:
+                continue
+            if work_mod.sat_out(r) or r.run_only or "design-first" not in (r.lane or []):
+                continue
+            if r.state in work_mod.DEAD:
+                team = by_team.get(r.team) or []
+                if (settings.get(r.team) or {}).get("on_work", settings_mod.ON_WORK_DEFAULT) == "off":
+                    continue
+                if work_mod.team_wound_down(team) is None and r not in work_mod.finished_alone(team):
+                    continue
+            words: dict[str, tuple[str, str]] = {}
+            for p in line.get(self._address(r)) or [r]:
+                for pe in p.progress:
+                    if pe.ref not in words or str(pe.at) > words[pe.ref][1]:
+                        words[pe.ref] = (pe.status, str(pe.at))
+            out.append(
+                {"id": self._address(r), "lane": list(r.lane), "released": dict(r.released or {}), "words": words}
+            )
+        return out
+
+    def _joined(self, root: str, wos: Any, led: Any, settings: Mapping[str, Any] | None = None) -> Any:
+        """`wos` with its orders joined (`workorders.join`, design §6 rule 6 *save a design's answer*, TD-1705), the
+        same object where no field moved. Where the join cannot be made — a ledger reading that carries `error`, or
+        none, or a join that raised — the stored reading's fields are carried onto the orders by id
+        (`workorders.carry`), so a fresh board read never drops a routing the stored one holds. No order that is a
+        design's answer: nothing is read but the orders."""
+        if not isinstance(wos, dict) or not wos.get("orders"):
+            return wos
+        orders = wos["orders"]
+        try:
+            if not isinstance(led, dict) or "error" in led or not isinstance(led.get("entries"), list):
+                raise _NoJoin
+            if not any(isinstance(o, dict) and workorders.design_of(o) for o in orders):
+                got = workorders.join(orders, [], [])  # none routed: any routed field goes
+            else:
+                teams = self._teams_settings() if settings is None else settings
+                got = workorders.join(orders, led["entries"], self._designers(root, teams))
+        except Exception as e:  # noqa: BLE001 — the stored fields stand; the next tick joins again
+            if not isinstance(e, _NoJoin):
+                log.exception("joining the work orders of %s failed", root)
+            was = ((self._repos.get(root) or {}).get("work_orders") or {}).get("orders") or []
+            got = workorders.carry(orders, was)
+        return wos if all(a is b for a, b in zip(got, orders, strict=True)) else {**wos, "orders": got}
+
+    async def _join_orders(self) -> None:
+        """The join on every tick (design §6 rule 6 *save a design's answer*, TD-1705): each stored reading's
+        orders joined against the records as they are now, saved and pushed only where a field moved."""
+        moved = []
+        for root, facts in list(self._repos.items()):
+            try:
+                wos = facts.get("work_orders")
+                got = self._joined(root, wos, facts.get("ledger"))
+            except Exception:  # noqa: BLE001 — one repo's surprise is a log line, never the others'
+                log.exception("joining the work orders of %s failed", root)
+                continue
+            if got is not wos:
+                self._repos[root] = {**facts, "work_orders": got}
+                moved.append(root)
+        if moved:
+            self.repos_store.save(self._repos)
+            for root in moved:
+                await self._broadcast({"event": "repos", "root": root, "repo": self._repo_view(root)})
 
     def _released_prune(self, s: Session) -> None:
         """Rule 6's pass over every record of a repo, at work or not (TD-1706): a `released` mark whose order
@@ -4384,6 +4487,8 @@ class TickMixin:
                     v.update({k: self._repos[r][k] for k in keep if k in self._repos[r]})
                 elif (arch := side["archived"].get(r)) is not None:
                     self._archived[r] = arch  # installed with the reading it was read with
+            for r, v in got.items():  # joined before the compare and the store: no reader sees a routed line unjoined
+                v["work_orders"] = self._joined(r, v.get("work_orders"), v.get("ledger"))
             changed = {r: v for r, v in got.items() if v != self._repos.get(r)}
             for r, v in changed.items():
                 self._turned_unserved(r, self._repos.get(r), v)

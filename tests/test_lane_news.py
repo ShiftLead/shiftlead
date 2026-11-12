@@ -922,3 +922,160 @@ async def test_a_released_mark_goes_with_its_order_and_crosses_a_rename(agent, t
         assert rec.released is None
         for x in (sid, new):
             await person.call("kill", id=x)
+
+
+async def test_a_designs_answer_is_its_designers_news_and_never_the_grinders(agent, tmp_path):
+    """TD-1705 (design §6 rule 6 *save a design's answer*, TD-1590's ledgerboard case): the person's answer to a
+    design's end-of-rounds item — a decided line whose Context is `TD-9 decision (paul)`, TD-9 an open design-first
+    entry — is joined on the tick to the designer that reported `done` on TD-9 (`for`), told to it and to no
+    grinder. Its successor, not the superseded record, is the `for` once the name is restarted."""
+    from sessionorc import workorders
+
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    text = "End of rounds on TD-9: go, one more round, or hold? Context: TD-9 decision (paul). Due: 2026-11-11."
+    line = workorders.entry(
+        {
+            "id": "board:1a2b3c4d",
+            "title": "End",
+            "text": text,
+            "decided": {"text": "One more round", "date": "2026-11-11"},
+        }
+    )
+    led = [_e("TD-001"), {**_e("TD-9", pickable="no", kind="design-first"), "owner": "designer"}]
+    async with LocalClient() as person:
+        gri = await _finished(agent, person, tmp_path, "g", ["free-pick", "owner:grinder"], led, team="t")
+        des = await _finished(agent, person, tmp_path, "d", ["design-first", "owner:designer"], led, team="t")
+        agent.sessions[des].progress = [ProgressEntry(ref="TD-9", status="done", pr=5)]
+        agent._repos[str(tmp_path)]["work_orders"] = {"orders": [line]}
+        await agent._keep_running(now)
+        [got] = agent._repos[str(tmp_path)]["work_orders"]["orders"]
+        assert (got["lane"], got["design"], got["owner"], got["for"]) == ("design-first", "TD-9", "designer", des)
+        assert any("board:1a2b3c4d" in n for n in _notes(agent, des))
+        assert not any("board:1a2b3c4d" in n for n in _notes(agent, gri)), "the grinder is never told"
+        assert "board:1a2b3c4d" not in agent.sessions[gri].lane_seen["ids"]
+        # the name restarted: the new record carries none of the old one's words but `done` is read along the line
+        facts = agent._repos[str(tmp_path)]
+        new = await _finished(agent, person, tmp_path, "d2", ["design-first", "owner:designer"], led, team="t")
+        agent._repos[str(tmp_path)] = facts  # `_finished` writes a fresh reading: the joined one stands
+        agent.sessions[des].superseded_by = new
+        await agent._keep_running(now + timedelta(minutes=1))
+        assert agent._repos[str(tmp_path)]["work_orders"]["orders"][0]["for"] == new
+        assert any("board:1a2b3c4d" in n for n in _notes(agent, new)), "the line is news to the new record"
+        # no designer to reach any more (its lane is a grinder's): free-pick's again, and the grinder's news
+        agent.sessions[new].lane = ["free-pick"]
+        await agent._keep_running(now + timedelta(minutes=2))
+        assert "lane" not in agent._repos[str(tmp_path)]["work_orders"]["orders"][0]
+        assert any("board:1a2b3c4d" in n for n in _notes(agent, gri))
+        for sid in (gri, des, new):
+            await person.call("kill", id=sid)
+
+
+async def test_a_designs_answer_is_joined_before_either_store_of_a_fresh_board_reading(agent, tmp_path, monkeypatch):
+    """TD-1705 (design §6 rule 6 *save a design's answer*): the tick's repo pass and a press's re-read each hand
+    back fresh, unjoined orders, and each joins them before it stores them, so no reader sees the routed line as
+    free-pick's — and the pass's compare sees an unchanged board as unchanged, with nothing pushed."""
+    from sessionorc import hosts, workorders
+
+    await park_ticks(agent)
+    text = "End of rounds on TD-9? Context: TD-9 decision (paul). Due: 2026-11-11."
+    fresh = {"id": "board:1a2b3c4d", "title": "End", "text": text, "decided": {"text": "Go", "date": "2026-11-11"}}
+    led = {"entries": [_e("TD-001"), {**_e("TD-9", pickable="no", kind="design-first"), "owner": "designer"}]}
+    root = str(tmp_path)
+    reg = hosts.default_repos_registry()
+    reg.parent.mkdir(parents=True, exist_ok=True)
+    reg.write_text(f"{root}\n")
+    pushed: list[dict] = []
+
+    async def broadcast(ev):
+        if ev.get("event") == "repos":
+            pushed.append(ev)
+
+    def read(todo, prev, *a, **kw):
+        wos = {"orders": [workorders.entry(fresh)], "at": "x"}
+        return {r: {"name": "r", "root": r, "ledger": led, "boards": {"boards": []}, "work_orders": wos} for r in todo}
+
+    async with LocalClient() as person:
+        des = await _finished(
+            agent, person, tmp_path, "d", ["design-first", "owner:designer"], led["entries"], team="t"
+        )
+        agent.sessions[des].progress = [ProgressEntry(ref="TD-9", status="done", pr=5)]
+        monkeypatch.setattr(agent, "_broadcast", broadcast)
+        monkeypatch.setattr(agent, "_read_repos", read)
+        agent._repos_read_at = float("-inf")
+        await agent._refresh_repos()
+        assert agent._repos[root]["work_orders"]["orders"][0]["for"] == des
+        assert len(pushed) == 1
+        agent._repos_read_at = float("-inf")
+        await agent._refresh_repos()
+        assert len(pushed) == 1, "the same board read again is no change once joined"
+        await agent._join_orders()
+        assert len(pushed) == 1, "the tick's own join over an unchanged reading pushes nothing"
+        # a ledger read that failed: the fresh board's orders keep the stored routing, never free-pick's
+        good = dict(led)
+        led.clear()
+        led.update({**good, "error": "unreadable"})
+        agent._repos_read_at = float("-inf")
+        await agent._refresh_repos()
+        kept = {k: agent._repos[root]["work_orders"]["orders"][0].get(k) for k in workorders.ROUTED}
+        assert kept == {"lane": "design-first", "design": "TD-9", "owner": "designer", "for": des}
+        led.clear()
+        led.update(good)
+
+        # a join that raises: logged, and the stored routing carried the same way
+        designers = agent._designers
+
+        def boom(*a, **kw):
+            raise KeyError("id")
+
+        monkeypatch.setattr(agent, "_designers", boom)
+        agent._repos_read_at = float("-inf")
+        await agent._refresh_repos()
+        assert agent._repos[root]["work_orders"]["orders"][0].get("for") == des
+        monkeypatch.setattr(agent, "_designers", designers)
+        # a press's re-read stores its orders joined too
+        agent._repos[root]["work_orders"] = {"orders": []}
+        monkeypatch.setattr(
+            agent,
+            "_reread_repo",
+            lambda r, old, here, live, fetched=None: ({"boards": []}, read([r], {})[r]["work_orders"], None, None),
+        )
+        await agent._reread_board(root)
+        assert agent._repos[root]["work_orders"]["orders"][0]["for"] == des
+        await person.call("kill", id=des)
+
+
+async def test_who_is_a_designer_to_reach(agent, tmp_path):
+    """TD-1705 (design §6 rule 6 *save a design's answer*): a supervised member of the repo whose lane holds
+    `design-first` is a designer to reach while live; a seat, an extra, another repo's or a sat-out one never is;
+    one that ended counts only where rule 8 would start it — it finished while its team runs on."""
+    await park_ticks(agent)
+    led = [_e("TD-001")]
+    async with LocalClient() as person:
+        gri = await _finished(agent, person, tmp_path, "g", ["free-pick"], led, team="t", out_of_work=None)
+        des = await _finished(agent, person, tmp_path, "d", ["design-first"], led, team="t")
+        root = str(tmp_path)
+        assert [d["id"] for d in agent._designers(root, {})] == [des]
+        rec = agent.sessions[des]
+        for k, v in (("seat", {"trigger": "questions"}), ("scale", {"of": "d"}), ("repo", "/elsewhere"),
+                     ("closed_for", {"why": "sit_out"}), ("run_only", True), ("supervised", False)):  # fmt: skip
+            was = getattr(rec, k)
+            setattr(rec, k, v)
+            assert agent._designers(root, {}) == [], k
+            setattr(rec, k, was)
+        rec.state = "closed"  # declared out of work, its team running on: rule 8 would start it
+        assert [d["id"] for d in agent._designers(root, {})] == [des]
+        assert agent._designers(root, {"t": {"on_work": "off"}}) == [], "under off rule 8 starts nothing"
+        rec.out_of_work = None  # ended without declaring: rule 8 would not start it
+        assert agent._designers(root, {}) == []
+        # its whole team wound down (every member ended, each declared): rule 8 starts it, so it counts
+        rec.out_of_work = {"at": "2026-09-27T20:00:00Z", "why": "nothing pickable"}
+        g = agent.sessions[gri]
+        g.state, g.out_of_work = "closed", {"at": "2026-09-27T20:00:00Z", "why": "nothing pickable"}
+        assert [d["id"] for d in agent._designers(root, {})] == [des]
+        g.out_of_work = None  # the grinder ended without declaring: the team stopped, not wound down
+        assert agent._designers(root, {}) == []
+        g.state = "idle"
+        rec.state = "idle"
+        for sid in (gri, des):
+            await person.call("kill", id=sid)
