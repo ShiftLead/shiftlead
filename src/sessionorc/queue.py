@@ -662,7 +662,10 @@ def answered_hold(
     TD-1509), resolved through `refs_open`. The newest linked question answered by
     the person (`replied`, or `go_with_it`) holds while it owes its outcome and its asker's record is neither
     exited, closed nor absent; after a `done` outcome, while the entry's file is not written after the answer
-    and no longer than `ANSWERED_DONE_FOR` past the outcome's `at`; never on any other outcome."""
+    and no longer than `ANSWERED_DONE_FOR` past the outcome's `at`; never on any other outcome but `blocked`
+    (TD-1695): one the person has not replied on holds whatever its asker's state, the file and the day, and is
+    taken before a newer linked question; a replied one is read as no outcome, so it ends when its asker is gone and
+    with its person-inbox copy. A `blocked` or `done` hold returns the outcome as it is."""
     if not ledger_mod.decided_by(dict(member), PERSON):
         return None
     mail = _mail_hold(member, questions, states, refs_open, now, asker_repo)
@@ -682,6 +685,7 @@ def _mail_hold(
     """`answered_hold`'s mail half (TD-1316): the newest linked question the person answered, while it holds."""
     me = qid(str(member.get("repo") or ""), str(member.get("id") or ""))
     best: tuple[datetime, Any] | None = None
+    stopped: tuple[datetime, Any] | None = None  # the newest unreplied `blocked` one, which holds whatever is newer
     for q in questions:
         if _get(q, "kind") not in ("ask", "steer") or _get(q, "closed_reason") not in ("replied", "go_with_it"):
             continue
@@ -694,12 +698,18 @@ def _mail_hold(
         at = _aware(_get(q, "closed_at"))
         if at is not None and (best is None or at > best[0]):
             best = (at, q)
+        if at is not None and _blocked(_get(q, "outcome")) == "open" and (stopped is None or at > stopped[0]):
+            stopped = (at, q)
+    best = stopped or best
     if best is None:
         return None
     closed, q = best
     outcome = _get(q, "outcome")
     asker = naming.split_address(str(_get(q, "from_") or ""))[0]
-    if not outcome:
+    blocked = _blocked(outcome)
+    if blocked == "open":
+        pass  # work stopped on something only the person can move: it holds, whatever its asker's state (TD-1695)
+    elif not outcome or blocked == "replied":
         if states.get(asker, "closed") in _GONE:
             return None  # the asker is gone with the debt unpaid: the question is the person's again
     elif not isinstance(outcome, Mapping) or outcome.get("state") != "done":
@@ -712,6 +722,14 @@ def _mail_hold(
             return None
     return {"mid": _get(q, "id"), "asker": asker, "kind": _get(q, "kind"), "closed_at": closed.isoformat(),
             "outcome": dict(outcome) if isinstance(outcome, Mapping) else None}  # fmt: skip
+
+
+def _blocked(outcome: Any) -> str:
+    """A question's `blocked` outcome (§4.10 *`blocked` is not a dead end*, TD-1694): `open` until the person
+    replies on it, then `replied`; '' for any other outcome, or none."""
+    if not isinstance(outcome, Mapping) or outcome.get("state") != "blocked":
+        return ""
+    return "replied" if outcome.get("replied") else "open"
 
 
 # a decided board line still open this many civil days after its `Decided:` date is the Inbox's need again, and a

@@ -252,6 +252,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _added_words,  # noqa: F401
     _ahead_words,  # noqa: F401
     _answered_of,  # noqa: F401
+    _blocked_words,  # noqa: F401
     _board_age,  # noqa: F401
     _board_holder,  # noqa: F401
     _board_named,  # noqa: F401

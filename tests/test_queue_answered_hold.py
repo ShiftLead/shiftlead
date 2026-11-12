@@ -95,7 +95,7 @@ def test_after_done_the_word_holds_until_the_file_is_written_after_the_answer_or
 
 def test_any_outcome_but_done_or_a_gone_asker_is_the_need_again(tmp_path):
     root, r = _held(tmp_path, written=ANSWERED - timedelta(hours=2))
-    for state in ("blocked", "dropped", "asker_gone", "dismissed", "asked_again"):
+    for state in ("dropped", "asker_gone", "dismissed", "asked_again"):  # `blocked` holds (TD-1695, below)
         out = {"state": state, "text": "", "at": NOW.isoformat(), "by": ""}
         c = _top({root: r}, [_q(outcome=out)])[1]["r#TD-001"]
         assert c["top"]["answered"] is None and c["status"] == "needs you", state
@@ -240,3 +240,35 @@ async def test_the_home_hands_its_person_inbox_to_the_reading_it_pushes(agent, t
     c = _by_id(sent[-1]["queue"])["r#TD-001"]
     assert c["top"]["state"] == "answered — waiting on designer" and c["status"] != "needs you"
     assert _by_id(await agent.rpc_queue())["r#TD-001"]["top"]["answered"]["mid"] == "m-1"
+
+
+BLOCKED = {"state": "blocked", "text": "needs your token", "at": NOW.isoformat(), "by": "m-9"}
+
+
+def test_an_unreplied_blocked_outcome_holds_whatever_its_asker_the_file_or_a_newer_answer(tmp_path):
+    """TD-1695, §4.4 *A `blocked` outcome keeps the word*: the outcome's own row is the need (a Do item on the
+    card), so the member is held while it has no `replied` — its asker exited, its file written after the answer, a
+    day past, and a newer answered question about the entry beside it — and the hold carries the outcome whole."""
+    root, r = _held(tmp_path, written=NOW - timedelta(minutes=1))
+    old = {**BLOCKED, "at": (NOW - timedelta(days=2)).isoformat()}
+    newer = _q(mid="m-2", at=NOW - timedelta(minutes=5))  # answered after it, still owing
+    first = _q(outcome=old)
+    first.repo = newer.repo = "r"  # the send's stamp (TD-1467), so an absent asker's bare ref still links
+    for recs in ([_asker("exited")], [_asker("closed")], [], [_asker()]):
+        c = _top({root: r}, [first, newer], records=recs)[1]["r#TD-001"]
+        held = c["top"]["answered"]
+        assert held is not None and held["mid"] == "m-1" and held["outcome"] == old, recs
+        assert c["status"] != "needs you", recs
+
+
+def test_a_replied_blocked_outcome_holds_as_an_unreported_answer_and_ends_with_its_asker(tmp_path):
+    root, r = _held(tmp_path, written=ANSWERED - timedelta(hours=2))
+    replied = {**BLOCKED, "replied": {"at": NOW.isoformat(), "by": "m-10"}}
+    c = _top({root: r}, [_q(outcome=replied)])[1]["r#TD-001"]
+    assert c["top"]["answered"]["outcome"] == replied and c["status"] != "needs you"
+    for recs in ([_asker("exited")], [_asker("closed")], []):
+        c = _top({root: r}, [_q(outcome=replied)], records=recs)[1]["r#TD-001"]
+        assert c["top"]["answered"] is None and c["status"] == "needs you", recs
+    # a replied one is not taken before a newer answered question: the newest holds, as any
+    c = _top({root: r}, [_q(outcome=replied, at=ANSWERED - timedelta(minutes=9)), _q(mid="m-2")])[1]["r#TD-001"]
+    assert c["top"]["answered"]["mid"] == "m-2"

@@ -283,6 +283,9 @@
 {% macro outcome_line(e) -%}
 {%- set o = e.outcome or {} %}
 {%- if o.state %}<div class="row gap wrap"><span class="badge kindmark k-outcome o-{{ o.state }}">outcome · {{ o.state }}</span><span class="st">{{ o.text or '—' }}{% if e.outcome_age %} · {{ e.outcome_age }} ago{% endif %}</span></div>{% endif %}
+{#- §4.5a *Inbox row: `blocked` outcome* (TD-1695): the person's Reply on it, and a replaced one kept as `was` -#}
+{%- if o.state == 'blocked' and o.replied %}<div class="st dflt">you replied{% if e.replied_age %} · {{ e.replied_age }} ago{% endif %}</div>{% endif %}
+{%- if e.was_blocked %}<div class="st dflt">was blocked: {{ e.was_blocked.text or '—' }}{% if e.was_blocked.replied %} · you replied{% if e.was_blocked.replied_age %} {{ e.was_blocked.replied_age }} ago{% endif %}{% endif %}</div>{% endif %}
 {%- endmacro %}
 
 {# *Waiting on them*: never counted — it waits on a session, not on the person. **Dismiss** says
