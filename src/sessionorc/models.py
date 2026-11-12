@@ -184,6 +184,7 @@ HOME_OWNED = frozenset(
         "findings",
         "out_of_work",
         "lane_seen",
+        "released",
         "balance_refused",
         "restart_wanted",
         "suspended",
@@ -1273,6 +1274,13 @@ class Session:
     # another record of the repo that was told (TD-258), so a released lease is told once too. The
     # home's; cleared wherever `out_of_work` is set or cleared.
     lane_seen: dict[str, Any] | None = None
+    # `{ref: {at_drop, told}}`: the work orders (`board:<key>`, `pr:<n>`) this record dropped itself (design §6
+    # rule 6 *save one the member itself released*, TD-1706), so rule 6 does not tell them back to it after each
+    # `none` — `at_drop` the line's `Decided:` `{text, date}` as the home's reading held it at the drop (None for
+    # a `pr:<n>`), never changed after; `told` the last answer told to it. Not in `lane_seen`, which a claim and
+    # a `none` clear: the record's next claim of the ref clears its mark, and the tick removes one whose order
+    # the reading no longer holds. The home's; carried with `lane_seen` across a rename (`_carry`).
+    released: dict[str, Any] | None = None
     # `{at, ref}` once a claim of this record's was refused because its team is over its line
     # (design §6 *Balance*, TD-239) — `ref` None for a refused `ao progress none` — so the mark's
     # clearing can ring it; while the mark stands, the idle nudge and rule 6's telling pass it by.

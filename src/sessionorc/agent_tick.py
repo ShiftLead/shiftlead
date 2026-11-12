@@ -211,6 +211,33 @@ def _orders(r: dict[str, Any] | None) -> list[Any]:
     return [*((r.get("work_orders") or {}).get("orders") or []), *((r.get("pr_orders") or {}).get("orders") or [])]
 
 
+def _order_reading(r: dict[str, Any] | None, ref: str) -> dict[str, Any] | None:
+    """The reading of a repo that holds work order `ref` — `{id: order}` of its board's decided lines for a
+    `board:<key>`, of its red PRs for a `pr:<n>` — or None where there is none to judge by: no reading, or one
+    that carries `error` (design §6 rule 6 *save one the member itself released*, TD-1706)."""
+    r = r or {}
+    if ref.startswith(workorders.PREFIX):
+        got = r.get("work_orders")
+        bad = not isinstance(got, dict) or "error" in got or "error" in (r.get("boards") or {})
+    elif ref.startswith(workorders.PR_PREFIX):
+        got = r.get("pr_orders")
+        bad = not isinstance(got, dict) or "error" in got or "error" in (r.get("prs") or {})
+    else:
+        return None
+    if bad:
+        return None
+    return {str(o["id"]): o for o in got.get("orders") or [] if isinstance(o, dict) and o.get("id")}
+
+
+def _answer(order: dict[str, Any], ref: str) -> dict[str, Any] | None:
+    """A work order's answer as a `released` mark keeps it: a line's `Decided:` `{text, date}`; None for a
+    `pr:<n>`, which has none (TD-1706)."""
+    if not ref.startswith(workorders.PREFIX):
+        return None
+    d = order.get("decided") if isinstance(order.get("decided"), dict) else {}
+    return {"text": str(d.get("text") or ""), "date": d.get("date")}
+
+
 NODE_CHANGES = "agent-cadence path cadence-changes.md"  # rule 12's command on a node: `ao host up`'s link (TD-1046)
 SETUP_EVERY = 3600.0  # seconds between the setup notes' reads with `profiles.yml` unchanged (TD-875)
 
@@ -1039,6 +1066,7 @@ class TickMixin:
         records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
         for s in records:
             try:
+                self._released_prune(s)  # every record of the repo, at work or not (TD-1706)
                 await self._scheduled_start(s, now)
                 if await self._extra_drop(s):
                     continue  # an extra a lowered max dropped: no rule restarts or fills it (§4.9, TD-1545)
@@ -2280,6 +2308,14 @@ class TickMixin:
         # close (TD-1389): untold and unseen, so a reading after the `done` that still holds it is told
         closed = self._closed_untold(s, new, facts)
         new = [i for i in new if i not in closed]
+        # a work order the member dropped itself is no news to it while its answer is the one it was last
+        # told (TD-1706): seen untold, before any return, so a sibling's release of it is still told below;
+        # a line answered again stays new, and its mark's `told` moves only where the note is sent
+        quiet, answered = self._released_untold(s, new, facts)
+        if quiet:
+            new = [i for i in new if i not in quiet]
+            s.lane_seen = {**s.lane_seen, "ids": [*s.lane_seen.get("ids", []), *quiet]}
+            self._save(s)
         seen = set(s.lane_seen.get("ids") or [])
         drops = self._lane_drops(s, [i for i in ids if i in seen])
         if not (new or drops) or s.state in ("exited", "closed") or s.suspended:
@@ -2300,6 +2336,8 @@ class TickMixin:
             return
         if drops:
             s.lane_seen["dropped"] = {**(s.lane_seen.get("dropped") or {}), **{i: at for i, _, at in drops}}
+        if s.released and (moved := {i: a for i, a in answered.items() if i in new}):
+            s.released = {**s.released, **{i: {**s.released[i], "told": a} for i, a in moved.items()}}
         told = [*new, *(f"{i} (dropped by {who})" for i, who, _ in drops)]
         named = ", ".join(told[:LANE_NEWS_NAMED]) + (
             f" and {len(told) - LANE_NEWS_NAMED} more" if len(told) > LANE_NEWS_NAMED else ""
@@ -2313,6 +2351,51 @@ class TickMixin:
         )
         self._save(s)
         log.info("%s: told of %s new in its lane", self._address(s), count)
+
+    @staticmethod
+    def _released_untold(
+        s: Session, ids: list[str], facts: Mapping[str, Any]
+    ) -> tuple[list[str], dict[str, dict[str, Any] | None]]:
+        """Of `ids`, the work orders `s` carries a `released` mark for (design §6 rule 6 *save one the member
+        itself released*, TD-1706): those whose answer in the reading is still the mark's `told`, which are no
+        news to it, and those answered since, each with its new answer — told once, as news. A reading that
+        does not hold the order, or carries `error`, leaves it as news as before."""
+        quiet: list[str] = []
+        answered: dict[str, dict[str, Any] | None] = {}
+        for i in ids:
+            mark = (s.released or {}).get(i)
+            held = _order_reading(facts, i) if isinstance(mark, dict) else None
+            if held is None or i not in held:
+                continue
+            now = _answer(held[i], i)
+            if now == mark.get("told"):
+                quiet.append(i)
+            else:
+                answered[i] = now
+        return quiet, answered
+
+    def _release(self, s: Session, ref: str) -> None:
+        """The `released` mark of a work order `s` itself dropped (design §6 rule 6, TD-1706): written only where
+        the home's reading holds the order, both values its answer there. The caller saves."""
+        held = _order_reading(self._repos.get(s.repo or ""), ref)
+        if held is None or ref not in held:
+            return
+        answer = _answer(held[ref], ref)
+        s.released = {**(s.released or {}), ref: {"at_drop": answer, "told": answer}}
+
+    def _released_prune(self, s: Session) -> None:
+        """Rule 6's pass over every record of a repo, at work or not (TD-1706): a `released` mark whose order
+        the repo's reading no longer holds (the line closed, the PR merged or went green) is removed; a reading
+        that carries `error`, or none, removes no mark."""
+        if not s.released:
+            return
+        facts = self._repos.get(s.repo or "")
+        gone = [
+            i for i in s.released if (held := _order_reading(facts, i)) is not None and i not in held
+        ]  # fmt: skip
+        if gone:
+            s.released = {i: m for i, m in s.released.items() if i not in gone} or None
+            self._save(s)
 
     @staticmethod
     def _closed_untold(s: Session, ids: list[str], facts: Mapping[str, Any]) -> set[str]:
