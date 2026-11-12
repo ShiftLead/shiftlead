@@ -46,7 +46,7 @@
          a need the amber badge's, *held by X* the holder's pill, a Waiting card's leaf its wait phrase #}
       {{ extras(t.ext, repo) }}{{ meter(t.meter) }}{#- *with you in <name>* on a top entry that needs nothing of the person stands in the pill's place, a link; a
           top entry *stalled* beside a *stalled* status is drawn once, the status's (§4.5 screen 12, TD-1724) #}
-      {%- set mine_word = (t.state or '').startswith('with you in') and not t.needs %}
+      {%- set mine_word = (t.state or '').startswith('with you in') and not t.needs and not (c.wait and c.wait.id == t.qid) %}
       {%- if not mine_word %}{{ holder(t.holder) }}{% endif %}{% if t.state and t.state != 'ready' and not t.needs and not t.state.startswith('held by') and not (c.wait and c.wait.id == t.qid) and not (t.state == 'stalled' and c.status == 'stalled') %}{{ state(t) }}{% endif %}
       {#- the header's ⋯ acts on the top entry, the same macro as a row's (§4.5 screen 12 *Three verbs: ⋯*, TD-914) #}
       {%- if not t.ext %}{{ menu(t) }}{% endif %}

@@ -140,3 +140,34 @@ def test_stalled_holder_reads_the_top_entry_first_then_the_rows_as_drawn():
     assert queue.stalled_holder(rows) == b
     assert queue.stalled_holder([{"state": "stalled", "holder": a}, *rows]) == a
     assert queue.stalled_holder([]) is None
+
+
+def test_two_stuck_claims_stand_for_the_first_by_id(tmp_path):
+    root, r = _one(tmp_path)
+    recs = [_rec("z-idle", root, "TD-001", state="idle"), _rec("b-idle", root, "TD-001", state="idle")]
+    c = _by_id(_cards({root: r}, recs))["r#TD-001"]
+    assert c["top"]["holder"]["id"] == "b-idle" and c["stalled_holder"]["id"] == "b-idle"
+
+
+def test_a_waiting_leaf_held_by_the_person_keeps_its_pill(tmp_path):
+    root, r = _one(tmp_path)
+    (shaped,) = _shaped(_cards({root: r}, [_mine("p", root, "TD-001")]))
+    t = shaped["top"]
+    waiting = {**shaped, "group": "waiting", "wait": {"id": t["qid"], "phrase": "waits until 2026-12-01"}}
+    head = _card_html(waiting).split('<div class="qrows">')[0]
+    assert 'class="qpill mono" href="/focus/p"' in head, "the wait phrase stands in the word's place: the pill names p"
+
+
+def test_an_archived_row_is_no_stalled_holder():
+    a = {"id": "a", "name": "a", "state": "idle"}
+    assert queue.stalled_holder([{"state": "stalled", "holder": a, "archived": True}]) is None
+
+
+def test_lay_held_reads_stalled_holder_again_over_marked_rows(tmp_path):
+    root, r = _one(tmp_path)
+    q = _cards({root: r}, [_rec("b-idle", root, "TD-001", state="idle")])
+    (c,) = q["cards"]
+    assert c["stalled_holder"]["id"] == "b-idle"
+    marked = {**r, "ledger": {**r["ledger"], "entries": [{**r["ledger"]["entries"][0], "applying": {"answer": "Go"}}]}}
+    (out,) = queue.lay_held(q, {root: marked})["cards"]
+    assert out["top"]["state"] != "stalled" and out["stalled_holder"] is None

@@ -1599,7 +1599,7 @@ def stalled_holder(rows: Iterable[Any]) -> dict[str, Any] | None:
     """The record a card's *stalled* stands for (§4.5 screen 12 *A holder's word opens the holder*, TD-1567): the
     holder of its first *stalled* row that has one, in the card's order — the top entry, then its rows as drawn."""
     for r in rows:
-        if isinstance(r, Mapping) and r.get("state") == "stalled" and r.get("holder"):
+        if isinstance(r, Mapping) and not r.get("archived") and r.get("state") == "stalled" and r.get("holder"):
             return dict(r["holder"])
     return None
 
