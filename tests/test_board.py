@@ -1691,8 +1691,10 @@ async def test_a_persons_session_presses_done_and_back_to_design_but_answers_no_
     agent.remote = {
         "laptop": {"ao-me": Session(id="ao-me", name="lap", kind="interactive", adapter="claude-code", dir="")}
     }
-    entries.append({"id": "TD-36", "title": "on a node", "for_page": "pickable"})
-    settle.observe(entries, "o/r", {}, datetime.now(UTC))
+    # the reading the home stores: a press's re-read marks a copy (§4.4 *An entry no lane takes is marked*)
+    stored = agent._repos[root]["ledger"]["entries"]
+    stored.append({"id": "TD-36", "title": "on a node", "for_page": "pickable"})
+    settle.observe(stored, "o/r", {}, datetime.now(UTC))
     got = await agent.rpc_ledger_decide(repo=root, id="TD-36", road="done", caller="ao-me@laptop")
     assert got["message"].endswith("(session lap)")
 

@@ -1710,11 +1710,14 @@ def _repo_line(r: dict[str, Any]) -> str:
         orders = [*orders, *reds]
         # an entry the settle clock withholds is counted not pickable, its page kind unchanged (§4.7, TD-710),
         # and so is one whose wait stands (§4.4 *An entry says what it waits for*, TD-716), and one that needs
-        # a team (§4.4 *An entry names its team*, TD-730)
+        # a team (§4.4 *An entry names its team*, TD-730) — where it is not marked `no_lane`, which the home's mark
+        # moved out of *pickable* already (§4.4 *An entry no lane takes is marked*, TD-1573)
         withheld = sum(
             1
             for e in led["entries"]
-            if e.get("for_page") == "pickable" and (_settle_mark(e) or teamrun.wait_words(e) or e.get("needs_team"))
+            if e.get("for_page") == "pickable"
+            and not e.get("no_lane")
+            and (_settle_mark(e) or teamrun.wait_words(e) or e.get("needs_team"))
         )
         # the page's seven kinds as the kind bar names them (§4.4 *Repo facts*, §4.7, TD-418)
         led_part = (

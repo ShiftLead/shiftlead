@@ -1256,6 +1256,10 @@ class InboxMixin:
         got: dict[str, Any] = {} if "error" in bds else {"boards": bds, "work_orders": wos}
         if led is not None:
             self._archived[root] = arch or []
+        if led is not None:  # marked before the compare, as the tick's pass marks (TD-1573)
+            marked = {**cur, "ledger": led}
+            self._mark_lanes(root, marked)
+            led = marked["ledger"]
         if led is not None and led != cur.get("ledger"):
             got["ledger"] = led
             got["completed"] = ledger_mod.completed(led.get("recent"), (cur.get("prs") or {}).get("recent"))
