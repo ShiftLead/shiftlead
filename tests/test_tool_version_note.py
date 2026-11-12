@@ -339,3 +339,18 @@ async def test_the_pass_never_raises(home, agents, monkeypatch):
 
     monkeypatch.setattr(a, "_compare_versions", boom)
     await a._version_notes()
+
+
+@pytest.mark.unit
+def test_the_noted_time_in_memory_holds_the_day_when_the_file_lost_it(home, agents):
+    """A write that failed after the note went: `noted_at` kept in memory still holds the day (§4.3)."""
+    a = agents()
+    rec(a, "1.0.0")
+    compare(a)
+    rec(a, "1.1.0")
+    compare(a)  # noted at T0
+    (home / "tool_versions.json").unlink()  # the file lost: first sights again, but the day holds
+    rec(a, "1.2.0")
+    compare(a, T0 + timedelta(hours=1))
+    assert len(notes(a)) == 1
+    assert stored(home)["noted_at"] == "2026-11-12T09:00:00Z"
