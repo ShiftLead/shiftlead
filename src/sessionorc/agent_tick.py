@@ -89,6 +89,7 @@ from sessionorc.agent_common import (
     _recent,
     _usage_checked_at,
     _usage_key,
+    _without_finished_designs,
     backup_store,
     log,
 )
@@ -5303,6 +5304,9 @@ class TickMixin:
             # `progress` and `findings` are the home's (§4.4a, step 4b.2): a claim written to the
             # replica is overwritten on reconnect and was never checked against the siblings' leases.
             return
+        designs = queue_mod.finished_designs(self._repos)
+        if self.mode == "home":
+            self._retire_finished_designs(now, designs)
         holders = reports.holds_directory(self.sessions.values())
         due: list[tuple[Session, str | None, list[tuple[str, int]], list[tuple[str, str | None]]]] = []
         for s in self.sessions.values():
@@ -5356,6 +5360,8 @@ class TickMixin:
                 # sent to the home as the derived reports they are; the home's push brings them back
                 await self._send_derived(live, progress, findings, retire)
                 continue
+            # a finished design's derived claim is never written (§4.8 *A finished design lets go of its derived claim*)
+            progress = _without_finished_designs(progress, designs(live))
             # Lists, not generators: these upserts are the write, and `any()` over a generator
             # would stop at the first change and silently drop every later entry (review 2026-09-11).
             applied = [live.report_progress(e) for e in progress] + [live.report_finding(e) for e in findings]
@@ -5364,6 +5370,24 @@ class TickMixin:
             changed = any(applied) | live.retire_branch_claims(retire)
             if changed:
                 self.store.save(live)
+
+    def _retire_finished_designs(self, now: datetime, designs: Callable[[Any], frozenset[str]]) -> None:
+        """At the home, on `DERIVE_EVERY` (§4.8 *A finished design lets go of its derived claim*, TD-1725): retire a
+        derived claim with no PR on an entry whose design is done from every record the derive pass reaches —
+        the home's own and each node's (`self.remote`, a pass of its own on this clock, since the derive loop walks
+        `self.sessions` alone) — whether or not the record has anything else to derive. A record with no `dir`, a
+        `closed` one and one with no agent are passed over, as the derive loop passes them; the delete is
+        `retire_branch_claims`', whatever branch the record is on. A node's record is saved as `_take_derived`
+        saves it; `_derive_reports` pushes what changed."""
+        if now - self._designs_retired_at <= DERIVE_EVERY:
+            return
+        self._designs_retired_at = now
+        recs = [*self.sessions.values(), *(s for host in list(self.remote) for s in list(self.remote[host].values()))]
+        for s in recs:
+            if not s.dir or s.state == "closed" or not adapters.has_agent(s.adapter):
+                continue
+            if s.retire_branch_claims(designs(s)):
+                self._save(s)
 
     async def _refresh_model(self, now: datetime) -> None:
         """The model each live agent session is running (TD-031, design §4.2a). The hook reports it

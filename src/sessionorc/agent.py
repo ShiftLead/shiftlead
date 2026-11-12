@@ -721,6 +721,7 @@ class HostAgent(
         # the status each record's recent files were last read at (§4.2, TD-538): `(oid, dirty, porcelain)`
         self._files_read: dict[str, tuple[Any, ...]] = {}
         self._derived_at: dict[str, datetime] = {}
+        self._designs_retired_at = datetime.min.replace(tzinfo=UTC)  # the home's finished-design pass (TD-1725)
         self._model_checked: dict[str, datetime] = {}
         self._context_checked: dict[str, datetime] = {}  # the context reading's cadence (TD-190)
         self._shells_saved: dict[str, datetime] = {}  # when a record's `shells_at` was last saved (TD-766)

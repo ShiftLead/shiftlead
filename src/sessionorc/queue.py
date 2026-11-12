@@ -965,6 +965,37 @@ class _Repos:
         return None
 
 
+def design_done(e: Mapping[str, Any]) -> bool:
+    """§4.8 *A finished design lets go of its derived claim* (TD-1567): an open `design-first` entry that some entry,
+    open or archived, names in `Part of:` (`parts_open`, `parts_archived` — an archived part keeps it done after its
+    last build archives while the entry waits on something else, §4.9c) and whose `Blocked by:` carries no
+    `decision (paul)` — the gate alone, never an `Owner:`."""
+    return (
+        str(e.get("kind") or "") == "design-first"
+        and bool(e.get("parts_open") or e.get("parts_archived"))
+        and not ledger_mod.decided_by(dict(e), PERSON)
+    )
+
+
+def finished_designs(repos: Mapping[str, Mapping[str, Any]]) -> Callable[[Any], frozenset[str]]:
+    """For a record, the ids of its repo's open entries whose design is done (`design_done`), the repo found as the
+    Queue maps a record to one (`_Repos.of_record`). A record it cannot map, or a repo with no ledger reading, reads
+    the empty set, so its claims are left as they are — never retired on a reading the home lacks (TD-1725)."""
+    reps = _Repos(repos)
+    done = {
+        name: frozenset(
+            str(e["id"]) for e in r["ledger"]["entries"] if isinstance(e, Mapping) and e.get("id") and design_done(e)
+        )
+        for name, r in reps.by_name.items()
+    }
+
+    def of(rec: Any) -> frozenset[str]:
+        name = reps.of_record(rec)
+        return done.get(name, frozenset()) if name is not None else frozenset()
+
+    return of
+
+
 def _resolved_pr(fields: Mapping[str, str]) -> int | None:
     line = str(fields.get("resolved") or "")
     m = RESOLVED_PR.search(line) or ANY_PR.search(line)

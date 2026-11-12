@@ -21,7 +21,7 @@ import struct
 import tarfile
 import time
 import unicodedata
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -501,6 +501,12 @@ def _is_branch_claim(e: Any) -> bool:
     """A derived `claimed` entry with no PR: only the branch it came from ever supported it, so it
     is the one kind of report entry the tick may retire (TD-045)."""
     return e.source != "declared" and e.status == "claimed" and not e.pr
+
+
+def _without_finished_designs(progress: list[Any], done: Collection[str]) -> list[Any]:
+    """Derived reports less the branch claims on an entry whose design is done (`queue.finished_designs`): the set
+    `retire_branch_claims` deletes, never written (§4.8 *A finished design lets go of its derived claim*, TD-1725)."""
+    return [e for e in progress if not (_is_branch_claim(e) and e.ref in done)]
 
 
 class _Wait:
