@@ -7,6 +7,14 @@
  ],
  "check": [
   {
+   "field": "location",
+   "id": "TD-001",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-001: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
+  },
+  {
    "field": "blocked by",
    "id": "TD-002",
    "kind": "retired",
@@ -72,6 +80,14 @@
   }
  ],
  "check_since_empty": [
+  {
+   "field": "location",
+   "id": "TD-001",
+   "kind": "retired",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-001: a new or changed Location line — the header field is retired; write the **Location:** body section, or run migrate, which moves it (SPEC *Retired words*)"
+  },
   {
    "field": "blocked by",
    "id": "TD-002",
@@ -311,6 +327,13 @@
   }
  ],
  "flags": [
+  {
+   "field": "location",
+   "id": "TD-001",
+   "kind": "retired",
+   "level": "info",
+   "text": "ℹ TD-001: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
+  },
   {
    "field": "blocked by",
    "id": "TD-002",

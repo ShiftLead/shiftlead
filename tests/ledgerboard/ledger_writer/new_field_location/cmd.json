@@ -1,0 +1,24 @@
+{
+ "argv": [
+  "new",
+  "--id",
+  "TD-3",
+  "--title",
+  "List the late entries",
+  "--priority",
+  "Medium",
+  "--type",
+  "feature",
+  "--field",
+  "Location=`src/report.py`",
+  "--why",
+  "why.md",
+  "--fix",
+  "fix.md",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

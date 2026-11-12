@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "migrate",
+  "unusable": "--closed-dates names TD-058 twice"
+ }
+}

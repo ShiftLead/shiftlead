@@ -28,6 +28,38 @@
    "level": "info",
    "standing": false,
    "text": "ℹ TD-403: Blocked by acme/tools#TD-33, another repo's entry archived Dropped — decide this entry: drop the blocker if it no longer applies, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "status",
+   "id": "TD-401",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-401: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-402",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-402: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-403",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-403: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-404",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-404: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
   }
  ],
  "check_since_empty": [
@@ -54,6 +86,38 @@
    "level": "info",
    "standing": false,
    "text": "ℹ TD-403: Blocked by acme/tools#TD-33, another repo's entry archived Dropped — decide this entry: drop the blocker if it no longer applies, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "status",
+   "id": "TD-401",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-401: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-402",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-402: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-403",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-403: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-404",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-404: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
   }
  ],
  "declared": {},

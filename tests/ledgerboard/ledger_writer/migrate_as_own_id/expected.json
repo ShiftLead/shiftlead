@@ -1,0 +1,33 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "migrate",
+  "entries": {
+   "TD-001": {
+    "changes": [
+     "Status Designed 2026-10-01 → Open"
+    ],
+    "listed": [
+     "stage word Designed: Kind not set"
+    ],
+    "stops": []
+   },
+   "TD-004": {
+    "changes": [],
+    "listed": [],
+    "stops": [
+     "Status Gone: no archived form"
+    ]
+   },
+   "TD-005": {
+    "changes": [],
+    "listed": [],
+    "stops": [
+     "refused: superseded by its own id"
+    ]
+   }
+  },
+  "plan": {},
+  "reblocked": {}
+ }
+}

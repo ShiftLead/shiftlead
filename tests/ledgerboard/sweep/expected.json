@@ -28,6 +28,34 @@
     "decide 2026-10-02 (n/a) — Should the report be weekly? Context: TD-213 decision (pat). Due: 2026-11-10. Answers: Go | Not yet | Drop it. Decided: Drop it (by pat) (2026-10-12).",
     "decided"
    ]
+  ],
+  [
+   [
+    "example.com/acme/widgets",
+    "decide 2026-10-02 (n/a) — An invented question? Context: TD-224 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-25).",
+    "closed-decided"
+   ]
+  ],
+  [
+   [
+    "example.com/acme/widgets",
+    "decide 2026-10-02 (n/a) — An invented question? Context: TD-225 decision (pat). Parts: TD-226, TD-227, TD-228, TD-229. Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-28).",
+    "closed-decided"
+   ]
+  ],
+  [
+   [
+    "gitlab.example/acme/alpha",
+    "decide 2026-10-02 (n/a) — An invented question? Context: acme/widgets#TD-259 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by kim) (2026-10-25).",
+    "closed-decided"
+   ]
+  ],
+  [
+   [
+    "github.com/acme/beta",
+    "decide 2026-10-02 (n/a) — An invented question? Context: acme/widgets#TD-262 decision (kim). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by kim) (2026-10-27).",
+    "closed-decided"
+   ]
   ]
  ],
  "parts_problems": {
@@ -561,6 +589,730 @@
   "to_file": {}
  },
  "runs": {
+  "reask_days 0": {
+   "lifts": [
+    {
+     "evidence": "date reached",
+     "gate": "until 2026-11-01",
+     "id": "TD-208",
+     "kind": "until"
+    },
+    {
+     "evidence": "acme/other#12",
+     "gate": "event (delta-ready)",
+     "id": "TD-209",
+     "kind": "event"
+    },
+    {
+     "evidence": "team-events/rec-0042",
+     "gate": "event (iota-ready)",
+     "id": "TD-222",
+     "kind": "event"
+    }
+   ],
+   "to_close": {
+    "example.com/acme/widgets": [
+     "- [ ] decide 2026-10-02 (n/a) — Should the search be fuzzy? Context: TD-214 decision (pat). Answers: Go | Not yet",
+     "- [ ] act 2026-10-26 (n/a) — Event check broken on TD-216: the check for event (zeta-ready) errors. Context: TD-216 event (zeta-ready)",
+     "- [ ] decide 2026-10-02 (n/a) — Still waiting on event (eta-ready) for TD-217? Context: TD-217 event (eta-ready). Answers: Keep waiting (default) | Drop the gate | Rewrite the check. Lifts: Drop the gate",
+     "- [ ] decide 2026-10-02 (n/a) — Should the old form go? Context: TD-220 decision (pat). Answers: Go | Not yet",
+     "- [ ] act 2026-10-29 (n/a) — TD-215's decision (kim) was lifted by an answer on acme/beta's board, which holds no decided item for TD-215. Context: TD-215 decision (kim) board acme/beta",
+     "- [ ] act 2026-10-29 (n/a) — decision (pat) on TD-233 was answered with a lift on 2026-10-28 but still stands on TD-234: lift it. Context: TD-233 decision (pat) lift",
+     "- [ ] act 2026-10-29 (n/a) — Lift of decision (pat) on TD-269 was closed unmerged. Context: TD-269 decision (pat) lift"
+    ]
+   },
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-201 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-201 (The widget's colour waits on pat) waits on decision (pat), and no board item asked for it",
+       "question": "Should the widget be blue rather than green?",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Should the widget be blue rather than green?"
+     },
+     {
+      "answers": null,
+      "context": "TD-202 decision (lee)",
+      "default": null,
+      "detail": null,
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (lee) on TD-202 has no board: no board read lists lee in its People."
+     },
+     {
+      "answers": null,
+      "context": "TD-205 event (alpha-ready)",
+      "default": null,
+      "detail": null,
+      "kind": "act",
+      "lifts": null,
+      "text": "Event check broken on TD-205: the check for event (alpha-ready) errors."
+     },
+     {
+      "answers": [
+       "Drop the gate",
+       "Rewrite the check",
+       "Drop the entry"
+      ],
+      "context": "TD-206 event (beta-ready)",
+      "default": null,
+      "detail": {
+       "context": "The check for event (beta-ready) on TD-206 says it can no longer happen",
+       "question": "Drop the gate, rewrite its check, or drop the entry?",
+       "recommended": "Only the person who knows why it waits can say"
+      },
+      "kind": "decide",
+      "lifts": [
+       "Drop the gate"
+      ],
+      "text": "event (beta-ready) on TD-206 can no longer happen."
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-211 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-211 (A decision lifted, then added again ten days later) waits on decision (pat), and no board item asked for it",
+       "question": "Should the cache be cleared nightly?",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Should the cache be cleared nightly?"
+     },
+     {
+      "answers": null,
+      "context": "TD-214 decision (pat) board acme/beta",
+      "default": null,
+      "detail": null,
+      "kind": "act",
+      "lifts": null,
+      "text": "TD-214's decision (pat) was lifted by an answer on acme/beta's board, which holds no decided item for TD-214."
+     },
+     {
+      "answers": [
+       "Drop the gate",
+       "Rewrite the check",
+       "Drop the entry"
+      ],
+      "context": "TD-217 event (eta-ready)",
+      "default": null,
+      "detail": {
+       "context": "The check for event (eta-ready) on TD-217 says it can no longer happen",
+       "question": "Drop the gate, rewrite its check, or drop the entry?",
+       "recommended": "Only the person who knows why it waits can say"
+      },
+      "kind": "decide",
+      "lifts": [
+       "Drop the gate"
+      ],
+      "text": "event (eta-ready) on TD-217 can no longer happen."
+     },
+     {
+      "answers": [
+       "Drop the gate",
+       "Rewrite the check",
+       "Drop the entry"
+      ],
+      "context": "TD-218 event (theta-ready)",
+      "default": null,
+      "detail": {
+       "context": "The check for event (theta-ready) on TD-218 says it can no longer happen",
+       "question": "Drop the gate, rewrite its check, or drop the entry?",
+       "recommended": "Only the person who knows why it waits can say"
+      },
+      "kind": "decide",
+      "lifts": [
+       "Drop the gate"
+      ],
+      "text": "event (theta-ready) on TD-218 can no longer happen."
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-219 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-219 (A decision written twice, and a gate lifted twice from a board this sweep does not read) waits on decision (pat), and no board item asked for it",
+       "question": "Should the archive be compressed?",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Should the archive be compressed?"
+     },
+     {
+      "answers": null,
+      "context": "TD-219 decision (kim) board acme/other",
+      "default": null,
+      "detail": null,
+      "kind": "act",
+      "lifts": null,
+      "text": "TD-219's decision (kim) was lifted by an answer on acme/other's board, which holds no decided item for TD-219."
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-224 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-224 (Never lifted: an answer Go closed as lifted, the gate still on the entry) waits on decision (pat), and no board item asked for it",
+       "question": "Never lifted: an answer Go closed as lifted, the gate still on the entry",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Never lifted: an answer Go closed as lifted, the gate still on the entry"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-226 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-226 (A part never lifted) waits on decision (pat), and no board item asked for it",
+       "question": "A part never lifted",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "A part never lifted"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-227 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-227 (A part lifted, then the gate added again) waits on decision (pat), and no board item asked for it",
+       "question": "A part lifted, then the gate added again",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "A part lifted, then the gate added again"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-229 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-229 (Another part never lifted) waits on decision (pat), and no board item asked for it",
+       "question": "Another part never lifted",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Another part never lifted"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-232 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-232 (The close: a part lifted and added again) waits on decision (pat), and no board item asked for it",
+       "question": "The close: a part lifted and added again",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The close: a part lifted and added again"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-235 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-235 (The close: a part lifted and added again, its parent's act closing) waits on decision (pat), and no board item asked for it",
+       "question": "The close: a part lifted and added again, its parent's act closing",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The close: a part lifted and added again, its parent's act closing"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-236 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-236 (Removed by hand and added again after the answer) waits on decision (pat), and no board item asked for it",
+       "question": "Removed by hand and added again after the answer",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Removed by hand and added again after the answer"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-237 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-237 (Lifted the day before its answer's date, then added again) waits on decision (pat), and no board item asked for it",
+       "question": "Lifted the day before its answer's date, then added again",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Lifted the day before its answer's date, then added again"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-238 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-238 (Its gate added the day after its answer's date) waits on decision (pat), and no board item asked for it",
+       "question": "Its gate added the day after its answer's date",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Its gate added the day after its answer's date"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-239 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-239 (Two answers for one entry) waits on decision (pat), and no board item asked for it",
+       "question": "Two answers for one entry",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Two answers for one entry"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-241 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-241 (The older answer's part) waits on decision (pat), and no board item asked for it",
+       "question": "The older answer's part",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The older answer's part"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-242 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-242 (The newer answer's part) waits on decision (pat), and no board item asked for it",
+       "question": "The newer answer's part",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The newer answer's part"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-247 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-247 (A part answered by its parent and by itself) waits on decision (pat), and no board item asked for it",
+       "question": "A part answered by its parent and by itself",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "A part answered by its parent and by itself"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-248 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-248 (Past the window, no act) waits on decision (pat), and no board item asked for it",
+       "question": "Past the window, no act",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Past the window, no act"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-250 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-250 (Past the window, its act closed) waits on decision (pat), and no board item asked for it",
+       "question": "Past the window, its act closed",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Past the window, its act closed"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-251 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-251 (Filed once: its act closed with no lift) waits on decision (pat), and no board item asked for it",
+       "question": "Filed once: its act closed with no lift",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Filed once: its act closed with no lift"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-252 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-252 (Filed once: its closed act dated the day before the answer) waits on decision (pat), and no board item asked for it",
+       "question": "Filed once: its closed act dated the day before the answer",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Filed once: its closed act dated the day before the answer"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-256 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-256 (A part the act names) waits on decision (pat), and no board item asked for it",
+       "question": "A part the act names",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "A part the act names"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-257 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-257 (Answered by someone the board does not let answer) waits on decision (pat), and no board item asked for it",
+       "question": "Answered by someone the board does not let answer",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Answered by someone the board does not let answer"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-258 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-258 (Answered with no name) waits on decision (pat), and no board item asked for it",
+       "question": "Answered with no name",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Answered with no name"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-259 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-259 (Answered on a board where anyone listed may answer) waits on decision (pat), and no board item asked for it",
+       "question": "Answered on a board where anyone listed may answer",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Answered on a board where anyone listed may answer"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-260 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-260 (Answered on that board by someone not listed) waits on decision (pat), and no board item asked for it",
+       "question": "Answered on that board by someone not listed",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Answered on that board by someone not listed"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-261 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-261 (The window's edge) waits on decision (pat), and no board item asked for it",
+       "question": "The window's edge",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The window's edge"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-264 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-264 (A part whose parent is archived) waits on decision (pat), and no board item asked for it",
+       "question": "A part whose parent is archived",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "A part whose parent is archived"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-265 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-265 (Answered on two boards) waits on decision (pat), and no board item asked for it",
+       "question": "Answered on two boards",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Answered on two boards"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-266 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-266 (Answered on two boards, the newer board's act closed by hand) waits on decision (pat), and no board item asked for it",
+       "question": "Answered on two boards, the newer board's act closed by hand",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Answered on two boards, the newer board's act closed by hand"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-267 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-267 (An answer dated in the future) waits on decision (pat), and no board item asked for it",
+       "question": "An answer dated in the future",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "An answer dated in the future"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-268 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-268 (Answered Not yet and closed) waits on decision (pat), and no board item asked for it",
+       "question": "Answered Not yet and closed",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Answered Not yet and closed"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-273 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-273 (A shared item's parent, its decided item closed and not asked again) waits on decision (pat), and no board item asked for it",
+       "question": "A shared item's parent, its decided item closed and not asked again",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "A shared item's parent, its decided item closed and not asked again"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-275 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-275 (Its part never answered) waits on decision (pat), and no board item asked for it",
+       "question": "Its part never answered",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Its part never answered"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-276 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-276 (A shared item's parent, asked again and answered Not yet) waits on decision (pat), and no board item asked for it",
+       "question": "A shared item's parent, asked again and answered Not yet",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "A shared item's parent, asked again and answered Not yet"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-278 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-278 (Its part never answered, kept waiting) waits on decision (pat), and no board item asked for it",
+       "question": "Its part never answered, kept waiting",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Its part never answered, kept waiting"
+     }
+    ],
+    "github.com/acme/beta": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "acme/widgets#TD-203 decision (kim)",
+      "default": null,
+      "detail": {
+       "context": "TD-203 (The importer waits on kim, who is on two other repos' boards) waits on decision (kim), and no board item asked for it",
+       "question": "Should the importer skip blank lines?",
+       "recommended": "Only kim can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Should the importer skip blank lines?"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "acme/widgets#TD-262 decision (kim)",
+      "default": null,
+      "detail": {
+       "context": "TD-262 (Its answer in another board's archive) waits on decision (kim), and no board item asked for it",
+       "question": "Its answer in another board's archive",
+       "recommended": "Only kim can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Its answer in another board's archive"
+     }
+    ]
+   }
+  },
   "today": {
    "lifts": [
     {
@@ -588,11 +1340,182 @@
      "- [ ] act 2026-10-26 (n/a) — Event check broken on TD-216: the check for event (zeta-ready) errors. Context: TD-216 event (zeta-ready)",
      "- [ ] decide 2026-10-02 (n/a) — Still waiting on event (eta-ready) for TD-217? Context: TD-217 event (eta-ready). Answers: Keep waiting (default) | Drop the gate | Rewrite the check. Lifts: Drop the gate",
      "- [ ] decide 2026-10-02 (n/a) — Should the old form go? Context: TD-220 decision (pat). Answers: Go | Not yet",
-     "- [ ] act 2026-10-29 (n/a) — TD-215's decision (kim) was lifted by an answer on acme/beta's board, which holds no decided item for TD-215. Context: TD-215 decision (kim) board acme/beta"
+     "- [ ] act 2026-10-29 (n/a) — TD-215's decision (kim) was lifted by an answer on acme/beta's board, which holds no decided item for TD-215. Context: TD-215 decision (kim) board acme/beta",
+     "- [ ] act 2026-10-29 (n/a) — decision (pat) on TD-233 was answered with a lift on 2026-10-28 but still stands on TD-234: lift it. Context: TD-233 decision (pat) lift",
+     "- [ ] act 2026-10-29 (n/a) — Lift of decision (pat) on TD-269 was closed unmerged. Context: TD-269 decision (pat) lift"
     ]
    },
    "to_file": {
     "example.com/acme/widgets": [
+     {
+      "answers": null,
+      "context": "TD-224 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-224's decision (pat) was answered with a lift on 2026-10-25, and the item was closed as lifted, but the gate was never lifted on TD-224",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-224 was answered with a lift on 2026-10-25 but still stands on TD-224: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-225 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-225's decision (pat) was answered with a lift on 2026-10-28, and the item was closed as lifted, but the gate was never lifted on TD-226, TD-229",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-225 was answered with a lift on 2026-10-28 but still stands on TD-226, TD-229: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-238 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-238's decision (pat) was answered with a lift on 2026-10-25, and the item was closed as lifted, but the gate was never lifted on TD-238",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-238 was answered with a lift on 2026-10-25 but still stands on TD-238: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-239 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-239's decision (pat) was answered with a lift on 2026-10-27, and the item was closed as lifted, but the gate was never lifted on TD-239",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-239 was answered with a lift on 2026-10-27 but still stands on TD-239: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-240 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-240's decision (pat) was answered with a lift on 2026-10-27, and the item was closed as lifted, but the gate was never lifted on TD-241, TD-242",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-240 was answered with a lift on 2026-10-27 but still stands on TD-241, TD-242: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-246 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-246's decision (pat) was answered with a lift on 2026-10-27, and the item was closed as lifted, but the gate was never lifted on TD-247",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-246 was answered with a lift on 2026-10-27 but still stands on TD-247: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-247 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-247's decision (pat) was answered with a lift on 2026-10-27, and the item was closed as lifted, but the gate was never lifted on TD-247",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-247 was answered with a lift on 2026-10-27 but still stands on TD-247: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-254 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-254's decision (pat) was answered with a lift on 2026-10-27, and the item was closed as lifted, but the gate was never lifted on TD-256",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-254 was answered with a lift on 2026-10-27 but still stands on TD-256: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-258 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-258's decision (pat) was answered with a lift on 2026-10-25, and the item was closed as lifted, but the gate was never lifted on TD-258",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-258 was answered with a lift on 2026-10-25 but still stands on TD-258: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-261 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-261's decision (pat) was answered with a lift on 2026-10-05, and the item was closed as lifted, but the gate was never lifted on TD-261",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-261 was answered with a lift on 2026-10-05 but still stands on TD-261: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-263 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-263's decision (pat) was answered with a lift on 2026-10-27, and the item was closed as lifted, but the gate was never lifted on TD-264",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-263 was answered with a lift on 2026-10-27 but still stands on TD-264: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-273 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-273's decision (pat) was answered with a lift on 2026-10-20, and the item was closed as lifted, but the gate was never lifted on TD-273, TD-275",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-273 was answered with a lift on 2026-10-20 but still stands on TD-273, TD-275: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-276 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-276's decision (pat) was answered with a lift on 2026-10-20, and the item was closed as lifted, but the gate was never lifted on TD-276, TD-278",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-276 was answered with a lift on 2026-10-20 but still stands on TD-276, TD-278: lift it."
+     },
      {
       "answers": [
        "Go",
@@ -733,9 +1656,182 @@
       "kind": "act",
       "lifts": null,
       "text": "TD-219's decision (kim) was lifted by an answer on acme/other's board, which holds no decided item for TD-219."
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-227 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-227 (A part lifted, then the gate added again) waits on decision (pat), and no board item asked for it",
+       "question": "A part lifted, then the gate added again",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "A part lifted, then the gate added again"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-232 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-232 (The close: a part lifted and added again) waits on decision (pat), and no board item asked for it",
+       "question": "The close: a part lifted and added again",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The close: a part lifted and added again"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-235 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-235 (The close: a part lifted and added again, its parent's act closing) waits on decision (pat), and no board item asked for it",
+       "question": "The close: a part lifted and added again, its parent's act closing",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The close: a part lifted and added again, its parent's act closing"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-236 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-236 (Removed by hand and added again after the answer) waits on decision (pat), and no board item asked for it",
+       "question": "Removed by hand and added again after the answer",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Removed by hand and added again after the answer"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-237 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-237 (Lifted the day before its answer's date, then added again) waits on decision (pat), and no board item asked for it",
+       "question": "Lifted the day before its answer's date, then added again",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Lifted the day before its answer's date, then added again"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-248 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-248 (Past the window, no act) waits on decision (pat), and no board item asked for it",
+       "question": "Past the window, no act",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Past the window, no act"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-250 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-250 (Past the window, its act closed) waits on decision (pat), and no board item asked for it",
+       "question": "Past the window, its act closed",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Past the window, its act closed"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-257 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-257 (Answered by someone the board does not let answer) waits on decision (pat), and no board item asked for it",
+       "question": "Answered by someone the board does not let answer",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Answered by someone the board does not let answer"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-260 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-260 (Answered on that board by someone not listed) waits on decision (pat), and no board item asked for it",
+       "question": "Answered on that board by someone not listed",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Answered on that board by someone not listed"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-267 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-267 (An answer dated in the future) waits on decision (pat), and no board item asked for it",
+       "question": "An answer dated in the future",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "An answer dated in the future"
      }
     ],
     "github.com/acme/beta": [
+     {
+      "answers": null,
+      "context": "acme/widgets#TD-262 decision (kim) lift",
+      "default": null,
+      "detail": {
+       "context": "acme/widgets#TD-262's decision (kim) was answered with a lift on 2026-10-27, and the item was closed as lifted, but the gate was never lifted on acme/widgets#TD-262",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (kim) on acme/widgets#TD-262 was answered with a lift on 2026-10-27 but still stands on acme/widgets#TD-262: lift it."
+     },
      {
       "answers": [
        "Go",
@@ -751,6 +1847,34 @@
       "kind": "decide",
       "lifts": null,
       "text": "Should the importer skip blank lines?"
+     }
+    ],
+    "gitlab.example/acme/alpha": [
+     {
+      "answers": null,
+      "context": "acme/widgets#TD-259 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "acme/widgets#TD-259's decision (pat) was answered with a lift on 2026-10-25, and the item was closed as lifted, but the gate was never lifted on acme/widgets#TD-259",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on acme/widgets#TD-259 was answered with a lift on 2026-10-25 but still stands on acme/widgets#TD-259: lift it."
+     },
+     {
+      "answers": null,
+      "context": "acme/widgets#TD-265 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "acme/widgets#TD-265's decision (pat) was answered with a lift on 2026-10-27, and the item was closed as lifted, but the gate was never lifted on acme/widgets#TD-265",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on acme/widgets#TD-265 was answered with a lift on 2026-10-27 but still stands on acme/widgets#TD-265: lift it."
      }
     ]
    }
@@ -782,11 +1906,169 @@
      "- [ ] act 2026-10-26 (n/a) — Event check broken on TD-216: the check for event (zeta-ready) errors. Context: TD-216 event (zeta-ready)",
      "- [ ] decide 2026-10-02 (n/a) — Still waiting on event (eta-ready) for TD-217? Context: TD-217 event (eta-ready). Answers: Keep waiting (default) | Drop the gate | Rewrite the check. Lifts: Drop the gate",
      "- [ ] decide 2026-10-02 (n/a) — Should the old form go? Context: TD-220 decision (pat). Answers: Go | Not yet",
-     "- [ ] act 2026-10-29 (n/a) — TD-215's decision (kim) was lifted by an answer on acme/beta's board, which holds no decided item for TD-215. Context: TD-215 decision (kim) board acme/beta"
+     "- [ ] act 2026-10-29 (n/a) — TD-215's decision (kim) was lifted by an answer on acme/beta's board, which holds no decided item for TD-215. Context: TD-215 decision (kim) board acme/beta",
+     "- [ ] act 2026-10-29 (n/a) — decision (pat) on TD-233 was answered with a lift on 2026-10-28 but still stands on TD-234: lift it. Context: TD-233 decision (pat) lift",
+     "- [ ] act 2026-10-29 (n/a) — Lift of decision (pat) on TD-269 was closed unmerged. Context: TD-269 decision (pat) lift"
     ]
    },
    "to_file": {
     "example.com/acme/widgets": [
+     {
+      "answers": null,
+      "context": "TD-224 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-224's decision (pat) was answered with a lift on 2026-10-25, and the item was closed as lifted, but the gate was never lifted on TD-224",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-224 was answered with a lift on 2026-10-25 but still stands on TD-224: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-225 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-225's decision (pat) was answered with a lift on 2026-10-28, and the item was closed as lifted, but the gate was never lifted on TD-226, TD-229",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-225 was answered with a lift on 2026-10-28 but still stands on TD-226, TD-229: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-238 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-238's decision (pat) was answered with a lift on 2026-10-25, and the item was closed as lifted, but the gate was never lifted on TD-238",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-238 was answered with a lift on 2026-10-25 but still stands on TD-238: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-239 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-239's decision (pat) was answered with a lift on 2026-10-27, and the item was closed as lifted, but the gate was never lifted on TD-239",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-239 was answered with a lift on 2026-10-27 but still stands on TD-239: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-240 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-240's decision (pat) was answered with a lift on 2026-10-27, and the item was closed as lifted, but the gate was never lifted on TD-241, TD-242",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-240 was answered with a lift on 2026-10-27 but still stands on TD-241, TD-242: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-246 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-246's decision (pat) was answered with a lift on 2026-10-27, and the item was closed as lifted, but the gate was never lifted on TD-247",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-246 was answered with a lift on 2026-10-27 but still stands on TD-247: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-247 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-247's decision (pat) was answered with a lift on 2026-10-27, and the item was closed as lifted, but the gate was never lifted on TD-247",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-247 was answered with a lift on 2026-10-27 but still stands on TD-247: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-254 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-254's decision (pat) was answered with a lift on 2026-10-27, and the item was closed as lifted, but the gate was never lifted on TD-256",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-254 was answered with a lift on 2026-10-27 but still stands on TD-256: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-258 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-258's decision (pat) was answered with a lift on 2026-10-25, and the item was closed as lifted, but the gate was never lifted on TD-258",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-258 was answered with a lift on 2026-10-25 but still stands on TD-258: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-263 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-263's decision (pat) was answered with a lift on 2026-10-27, and the item was closed as lifted, but the gate was never lifted on TD-264",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-263 was answered with a lift on 2026-10-27 but still stands on TD-264: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-273 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-273's decision (pat) was answered with a lift on 2026-10-20, and the item was closed as lifted, but the gate was never lifted on TD-273, TD-275",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-273 was answered with a lift on 2026-10-20 but still stands on TD-273, TD-275: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-276 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-276's decision (pat) was answered with a lift on 2026-10-20, and the item was closed as lifted, but the gate was never lifted on TD-276, TD-278",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-276 was answered with a lift on 2026-10-20 but still stands on TD-276, TD-278: lift it."
+     },
      {
       "answers": [
        "Go",
@@ -946,9 +2228,198 @@
       "kind": "act",
       "lifts": null,
       "text": "TD-219's decision (kim) was lifted by an answer on acme/other's board, which holds no decided item for TD-219."
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-227 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-227 (A part lifted, then the gate added again) waits on decision (pat), and no board item asked for it",
+       "question": "A part lifted, then the gate added again",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "A part lifted, then the gate added again"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-232 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-232 (The close: a part lifted and added again) waits on decision (pat), and no board item asked for it",
+       "question": "The close: a part lifted and added again",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The close: a part lifted and added again"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-235 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-235 (The close: a part lifted and added again, its parent's act closing) waits on decision (pat), and no board item asked for it",
+       "question": "The close: a part lifted and added again, its parent's act closing",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The close: a part lifted and added again, its parent's act closing"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-236 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-236 (Removed by hand and added again after the answer) waits on decision (pat), and no board item asked for it",
+       "question": "Removed by hand and added again after the answer",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Removed by hand and added again after the answer"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-237 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-237 (Lifted the day before its answer's date, then added again) waits on decision (pat), and no board item asked for it",
+       "question": "Lifted the day before its answer's date, then added again",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Lifted the day before its answer's date, then added again"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-248 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-248 (Past the window, no act) waits on decision (pat), and no board item asked for it",
+       "question": "Past the window, no act",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Past the window, no act"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-250 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-250 (Past the window, its act closed) waits on decision (pat), and no board item asked for it",
+       "question": "Past the window, its act closed",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Past the window, its act closed"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-257 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-257 (Answered by someone the board does not let answer) waits on decision (pat), and no board item asked for it",
+       "question": "Answered by someone the board does not let answer",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Answered by someone the board does not let answer"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-260 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-260 (Answered on that board by someone not listed) waits on decision (pat), and no board item asked for it",
+       "question": "Answered on that board by someone not listed",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Answered on that board by someone not listed"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-261 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-261 (The window's edge) waits on decision (pat), and no board item asked for it",
+       "question": "The window's edge",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "The window's edge"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-267 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-267 (An answer dated in the future) waits on decision (pat), and no board item asked for it",
+       "question": "An answer dated in the future",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "An answer dated in the future"
      }
     ],
     "github.com/acme/beta": [
+     {
+      "answers": null,
+      "context": "acme/widgets#TD-262 decision (kim) lift",
+      "default": null,
+      "detail": {
+       "context": "acme/widgets#TD-262's decision (kim) was answered with a lift on 2026-10-27, and the item was closed as lifted, but the gate was never lifted on acme/widgets#TD-262",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (kim) on acme/widgets#TD-262 was answered with a lift on 2026-10-27 but still stands on acme/widgets#TD-262: lift it."
+     },
      {
       "answers": [
        "Go",
@@ -964,6 +2435,34 @@
       "kind": "decide",
       "lifts": null,
       "text": "Should the importer skip blank lines?"
+     }
+    ],
+    "gitlab.example/acme/alpha": [
+     {
+      "answers": null,
+      "context": "acme/widgets#TD-259 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "acme/widgets#TD-259's decision (pat) was answered with a lift on 2026-10-25, and the item was closed as lifted, but the gate was never lifted on acme/widgets#TD-259",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on acme/widgets#TD-259 was answered with a lift on 2026-10-25 but still stands on acme/widgets#TD-259: lift it."
+     },
+     {
+      "answers": null,
+      "context": "acme/widgets#TD-265 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "acme/widgets#TD-265's decision (pat) was answered with a lift on 2026-10-27, and the item was closed as lifted, but the gate was never lifted on acme/widgets#TD-265",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on acme/widgets#TD-265 was answered with a lift on 2026-10-27 but still stands on acme/widgets#TD-265: lift it."
      }
     ]
    }

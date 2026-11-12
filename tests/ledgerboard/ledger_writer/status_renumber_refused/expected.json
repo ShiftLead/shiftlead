@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "renumber",
+  "refused": "⚠ TD-012: an open entry's Status is Open alone — this one is Designed (retired: Open, the stage in Kind) — run migrate, which maps it, lists it, or names what a person decides"
+ }
+}

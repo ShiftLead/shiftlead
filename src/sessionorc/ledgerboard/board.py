@@ -1,4 +1,4 @@
-# ledgerboard v2.6 sha256:c2d1e631392f22a5f59565ce900de9c5a2a0f2557c3bd53e9da4580e539be68b
+# ledgerboard v2.7 sha256:ba573a3f2869123512902e492395f10dac1b134d37f4c522fc8ca58e365eb7b2
 # SYNCED FILE — canonical copy: ShiftLead/ledgerboard ledgerboard/board.py (vendored by agent-cadence as files/scripts/ledgerboard/board.py)
 # Edit it there and release; an edit made in a consumer's copy is overwritten by the next vendor or sync.
 """The board and rank writer: the module's board edits, read from and written to files (SPEC *The board writer*).
@@ -29,7 +29,9 @@ git, the network or anything of a consumer's: the caller passes who replies or a
 (``--today``, default the local clock) and the tool and session the subject names, and makes the
 commit itself. A write that leaves an open line (``add``, ``snooze``, ``due``, ``decide``, ``reply``) also reports
 that line's notes (``item_notes()`` at ``--today``): ``item_notes`` in ``--json`` and ``--plan``, and on stderr as
-``line n: ℹ <note>`` otherwise; a note never changes the exit code.
+``line n: ℹ <note>`` otherwise; a note never changes the exit code. A ``decide --board-only`` whose lifting
+answer leaves a listed entry still carrying the gate writes nothing (v2.7): it reports ``left_open`` and prints
+``left open: <ids> still carry <gate>`` on stderr in every mode.
 
 Exit, the package's one table (``ledger.py`` shares it): 0 written (or nothing to change); 1 refused; 2 usage
 (a bad ``--today`` among it), or (``decide`` and ``add --parts``) the ledger cannot be used as asked; 4 a write failed (every file restored). 3 is ``ledger.py``'s
@@ -52,7 +54,10 @@ from . import (
     ITEM_RE,
     QUEUE_ACTIONS,
     Refused,
+    _carried,
     _item_gate,
+    _lifting,
+    _num,
     answered_by,
     archive_closed,
     archive_subject,
@@ -72,6 +77,7 @@ from . import (
     item_record,
     load,
     parse_board,
+    parse_lifts,
     parse_parts,
     parts_problems,
     people_problems,
@@ -97,6 +103,7 @@ class Plan:
     subject: str | None
     changes: dict[str, str | None] = field(default_factory=dict)  # None: the file is removed
     info: dict = field(default_factory=dict)
+    warn: list[str] = field(default_factory=list)  # lines for stderr in every mode, never in the JSON
 
     def as_json(self) -> dict:
         return {"action": self.action, "subject": self.subject,
@@ -417,6 +424,11 @@ def plan_edit(board: str, action: str, line: int, expect: str, *, to: str | None
         by = who_answered(old, by)
         close, changes, info = _decide_ledger(board, old, body, answer, by, day, ledger, board_only, today)
         info = {"line": line, **info}
+        if "left_open" in info:  # v2.7: a --board-only lift that does not close the item writes nothing
+            gate_ = info.pop("gate")
+            info["item_notes"] = _line_notes(old, line, day)
+            return Plan("decide", None, {}, info,
+                        [f"left open: {', '.join(info['left_open'])} still carry {gate_}"])
     new = edit_line(body, action, to=when, answer=answer, why=why, reply=text, by=by, today=day, close=close)
     lines[line - 1] = new + eol
     out = "".join(lines)
@@ -450,7 +462,8 @@ def _decide_ledger(board_path: str, board_text: str, body: str, label: str | Non
     decide lift: ``decide_lift()`` on the ledger's base texts of that entry and its `Parts:` (a listed id only the
     archive holds passed as an id in ``archived``, never as a text, v2.6), judged as the ledger writer judges a write, then ``closes()`` on the texts after. With ``board_only`` (the ``set by=``
     route, which has written the ledger already) nothing is written there, and ``closes()`` reads the ledger as
-    it stands. An item naming another repo's entry is answered on the board alone and stays open."""
+    it stands; a lifting answer that does not close the item (a listed entry still carries the gate) reports
+    ``left_open``, those ids as the item spells them in its order, and the gate, and the board is not written (v2.7). An item naming another repo's entry is answered on the board alone and stays open."""
     ref, gate_ = _item_gate(ITEM_RE.match(body).group("text").strip())
     if ref is None or gate_ is None:
         if ledger is not None or board_only:
@@ -485,7 +498,13 @@ def _decide_ledger(board_path: str, board_text: str, body: str, label: str | Non
                 found[tid] = p
         base = {tid: led.files[p] for tid, p in found.items()}
         if board_only:
-            return closes(body, label or "", base), {}, {"entries": [], "board_only": True}
+            shut = closes(body, label or "", base)
+            text = ITEM_RE.match(body).group("text")
+            if not shut and _lifting(label or "", parse_lifts(text)):  # v2.7: write the line only when it closes
+                by_num = {_num(t): x for t, x in base.items()}
+                left = [x for x in ids if _carried(by_num.get(_num(x)), gate_) is not None]
+                return False, {}, {"entries": [], "board_only": True, "left_open": left, "gate": gate_}
+            return shut, {}, {"entries": [], "board_only": True}
         ledger_day = L._today(today)
         got = decide_lift(body, base, label or "", by, ledger_day, board_people(board_text), answered_by(board_text),
                           archived=gone)
@@ -714,7 +733,9 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--context", help="add: what the item refers to (TD-n, PR #n)")
     ap.add_argument("--kind", help="add: decide, act, look, watch or fyi")
     ap.add_argument("--default", type=int, help="add: the 0-based index of the default answer")
-    ap.add_argument("--detail", help="add: the detail block's parts, a JSON object")
+    ap.add_argument("--detail", help="add: the detail block's parts, a JSON object (context, question, "
+                                         "caveats, recommended, otherwise); on a decide with a default the writer opens "
+                                         "Recommended with '<label> — ' itself, so recommended gives only the words after it")
     ap.add_argument("--host", help="add: the host the item's session runs on")
     ap.add_argument("--decided", help="add: the person's words, for an item already decided")
     ap.add_argument("--under", default=NEEDS, help=f"add: the heading whose section takes the item ({NEEDS!r})")
@@ -755,6 +776,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"ledgerboard.board: refused: {e}", file=sys.stderr)
         return code
+    for w in plan.warn:
+        print(w, file=sys.stderr)
     if a.plan:
         print(json.dumps(plan.as_json(), ensure_ascii=False))
         return 0

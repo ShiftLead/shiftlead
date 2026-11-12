@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "migrate",
+  "unusable": "--as takes TD-n=FORM, FORM resolved, dropped, superseded <id> or open, not 'TD-1=closed'"
+ }
+}

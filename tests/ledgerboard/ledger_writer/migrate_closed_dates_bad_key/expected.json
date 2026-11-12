@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "migrate",
+  "unusable": "--closed-dates maps TD-n to a real YYYY-MM-DD, not '58': '2026-10-20'"
+ }
+}

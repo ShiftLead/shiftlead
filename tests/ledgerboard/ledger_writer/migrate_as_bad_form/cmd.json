@@ -1,0 +1,14 @@
+{
+ "argv": [
+  "migrate",
+  "--release",
+  "2.7",
+  "--as",
+  "TD-1=closed",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-11-11",
+  "--json"
+ ]
+}

@@ -4,7 +4,7 @@ People: robin, sam
 
 ## Needs the user
 
-- [ ] decide 2026-01-12 (n/a) — Go on the export format? Context: TD-1 decision (robin). Due: 2026-01-20. Answers: Go (default) | Not yet. Decided: Go (by robin) (2026-01-15).
+- [ ] decide 2026-01-12 (n/a) — Go on the export format? Context: TD-1 decision (robin). Due: 2026-01-20. Answers: Go (default) | Not yet.
   - **Context:** The gate waits on you.
   - **Question:** Go?
   - **Recommended:** Go — it is ready.

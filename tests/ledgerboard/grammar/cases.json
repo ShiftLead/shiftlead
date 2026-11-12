@@ -728,5 +728,413 @@
         "**Event (applied):** the next Apply.\ncheck: host-log s times 1000 \"x\""
       ]
     }
+  },
+  "status-open": {
+    "status-open": {
+      "accept": [
+        "Open"
+      ],
+      "refuse": [
+        "Open 2026-01-05",
+        "open",
+        "Open, held"
+      ]
+    }
+  },
+  "status-resolved": {
+    "status-resolved": {
+      "accept": [
+        "Resolved 2026-01-05"
+      ],
+      "refuse": [
+        "Resolved",
+        "Resolved 2026-01-05.",
+        "Resolved 2026-01-05: shipped"
+      ]
+    },
+    "date": {
+      "accept": [
+        "Resolved 2026-01-31"
+      ],
+      "refuse": [
+        "Resolved 2026-1-31"
+      ]
+    },
+    "digit": {
+      "accept": [
+        "Resolved 2026-10-09"
+      ],
+      "refuse": [
+        "Resolved 2026-1O-09"
+      ]
+    }
+  },
+  "status-dropped": {
+    "status-dropped": {
+      "accept": [
+        "Dropped 2026-01-05"
+      ],
+      "refuse": [
+        "Dropped",
+        "Dropped 2026-01-05.",
+        "Dropped 2026-01-05: shipped"
+      ]
+    },
+    "date": {
+      "accept": [
+        "Dropped 2026-01-31"
+      ],
+      "refuse": [
+        "Dropped 2026-1-31"
+      ]
+    },
+    "digit": {
+      "accept": [
+        "Dropped 2026-10-09"
+      ],
+      "refuse": [
+        "Dropped 2026-1O-09"
+      ]
+    }
+  },
+  "status-superseded": {
+    "status-superseded": {
+      "accept": [
+        "Superseded 2026-01-05 by TD-7"
+      ],
+      "refuse": [
+        "Superseded 2026-01-05",
+        "Superseded 2026-01-05 by",
+        "Superseded 2026-01-05 by TD-7: merged"
+      ]
+    },
+    "date": {
+      "accept": [
+        "Superseded 2026-01-31 by TD-7"
+      ],
+      "refuse": [
+        "Superseded 26-01-31 by TD-7"
+      ]
+    },
+    "digit": {
+      "accept": [
+        "Superseded 2026-01-05 by TD-70"
+      ],
+      "refuse": [
+        "Superseded 2026-01-05 by TD-7a"
+      ]
+    },
+    "entry-id": {
+      "accept": [
+        "Superseded 2026-01-05 by TD-12"
+      ],
+      "refuse": [
+        "Superseded 2026-01-05 by td-12"
+      ]
+    },
+    "repo": {
+      "accept": [
+        "Superseded 2026-01-05 by acme/tools#TD-3"
+      ],
+      "refuse": [
+        "Superseded 2026-01-05 by a//b#TD-3"
+      ]
+    },
+    "repo-part": {
+      "accept": [
+        "Superseded 2026-01-05 by my.repo_2#TD-3"
+      ],
+      "refuse": [
+        "Superseded 2026-01-05 by -x#TD-3"
+      ]
+    }
+  },
+  "added": {
+    "added": {
+      "accept": [
+        "2026-01-05"
+      ],
+      "refuse": [
+        "2026-01-01 (x)",
+        "2026-01-01.",
+        "soon"
+      ]
+    },
+    "date": {
+      "accept": [
+        "2026-12-31"
+      ],
+      "refuse": [
+        "2026-1-31"
+      ]
+    },
+    "digit": {
+      "accept": [
+        "2026-10-09"
+      ],
+      "refuse": [
+        "2026-1O-09"
+      ]
+    }
+  },
+  "header-block": {
+    "header-block": {
+      "accept": [
+        "**Priority:** High\n**Type:** debt\n**Status:** Open"
+      ],
+      "refuse": [
+        "Priority: High",
+        "**Priority** High"
+      ]
+    },
+    "field-line": {
+      "accept": [
+        "**Blocked by:** TD-2, decision (pat)",
+        "**Kind:**"
+      ],
+      "refuse": [
+        "**1st:** x",
+        "**A*b:** x"
+      ]
+    },
+    "char": {
+      "accept": [
+        "**Why it waits:** a — b, c: \"d\""
+      ],
+      "refuse": [
+        "**Priority:** High\nnot a field"
+      ]
+    }
+  },
+  "log-line": {
+    "log-line": {
+      "accept": [
+        "- 2026-01-05: gate added: until 2026-02-01"
+      ],
+      "refuse": [
+        "2026-01-05: gate added: until 2026-02-01",
+        "- 2026-01-05:gate added: until 2026-02-01"
+      ]
+    },
+    "log-words": {
+      "accept": [
+        "- 2026-01-05: reopened — the fix did not hold"
+      ],
+      "refuse": [
+        "- 2026-01-05: gate lifted: someone said so"
+      ]
+    },
+    "log-filed": {
+      "accept": [
+        "- 2026-01-05: filed by grinder-1, session s-7, while TD-3: \"the parser drops a comment\"",
+        "- 2026-01-05: filed by pat, session n/a: \"a \"quoted\" word\""
+      ],
+      "refuse": [
+        "- 2026-01-05: filed by grinder-1: \"no session\"",
+        "- 2026-01-05: filed by grinder-1, session s-7, while soon: \"x\""
+      ]
+    },
+    "log-gate-added": {
+      "accept": [
+        "- 2026-01-05: gate added: decision (pat)"
+      ],
+      "refuse": [
+        "- 2026-01-05: gate added: hold"
+      ]
+    },
+    "gate": {
+      "accept": [
+        "- 2026-01-05: gate added: event (vendor-ships)"
+      ],
+      "refuse": [
+        "- 2026-01-05: gate added: until soon"
+      ]
+    },
+    "log-lift-answer": {
+      "accept": [
+        "- 2026-01-05: gate lifted: decision (pat) — by pat; answer \"Go\"; shared board item left open"
+      ],
+      "refuse": [
+        "- 2026-01-05: gate lifted: decision (pat) — by pat; answer Go",
+        "- 2026-01-05: gate lifted: decision (pat) — by pat; answer \"Go\"; left open"
+      ]
+    },
+    "lift-gate": {
+      "accept": [
+        "- 2026-01-05: gate lifted: event (ships) — by pat; answer \"Drop the gate\""
+      ],
+      "refuse": [
+        "- 2026-01-05: gate lifted: until 2026-02-01 — by pat; answer \"Go\""
+      ]
+    },
+    "lift-suffix": {
+      "accept": [
+        "- 2026-01-05: gate lifted: decision (pat) — by sam; answer \"Go\"; board acme/tools",
+        "- 2026-01-05: gate lifted: decision (pat) — by pat; answer \"Go\"; no board item"
+      ],
+      "refuse": [
+        "- 2026-01-05: gate lifted: decision (pat) — by pat; answer \"Go\"; board a//b"
+      ]
+    },
+    "log-lift-override": {
+      "accept": [
+        "- 2026-01-05: gate lifted: decision (pat) — by sam; override: pat is away a month"
+      ],
+      "refuse": [
+        "- 2026-01-05: gate lifted: decision (pat) — by sam; override:"
+      ]
+    },
+    "log-lift-check": {
+      "accept": [
+        "- 2026-01-05: gate lifted: event (ships) — by box-1; pr-merged passed; acme/tools#3"
+      ],
+      "refuse": [
+        "- 2026-01-05: gate lifted: event (ships) — by box-1; pr-merged passed; two words"
+      ]
+    },
+    "log-lift-date": {
+      "accept": [
+        "- 2026-01-05: gate lifted: until 2026-01-05 — by box-1; date reached"
+      ],
+      "refuse": [
+        "- 2026-01-05: gate lifted: until 2026-01-05 — by box-1; reached"
+      ]
+    },
+    "log-lift-skipped": {
+      "accept": [
+        "- 2026-01-05: gate lift skipped: TD-9 no longer carries decision (pat)"
+      ],
+      "refuse": [
+        "- 2026-01-05: gate lift skipped: TD-9 no longer carries until 2026-02-01"
+      ]
+    },
+    "log-kept-waiting": {
+      "accept": [
+        "- 2026-01-05: kept waiting: decision (pat) — by pat; answer \"Not yet\""
+      ],
+      "refuse": [
+        "- 2026-01-05: kept waiting: decision (pat) — by pat"
+      ]
+    },
+    "log-reassigned": {
+      "accept": [
+        "- 2026-01-05: gate reassigned: decision (pat) → decision (sam) — by pat; sam owns the export now"
+      ],
+      "refuse": [
+        "- 2026-01-05: gate reassigned: decision (pat) -> decision (sam) — by pat; why"
+      ]
+    },
+    "log-archived": {
+      "accept": [
+        "- 2026-01-05: archived: Resolved — the comment survives a round trip"
+      ],
+      "refuse": [
+        "- 2026-01-05: archived: Resolved 2026-01-05 — done"
+      ]
+    },
+    "log-reopened": {
+      "accept": [
+        "- 2026-01-05: reopened — it came back"
+      ],
+      "refuse": [
+        "- 2026-01-05: reopened —  it came back"
+      ]
+    },
+    "log-was": {
+      "accept": [
+        "- 2026-01-05: was: Done: shipped"
+      ],
+      "refuse": [
+        "- 2026-01-05: was: "
+      ]
+    },
+    "log-token": {
+      "accept": [
+        "- 2026-01-05: kept waiting: until 2026-02-01 — by w-1@box.2/a_b; answer \"Keep waiting\""
+      ],
+      "refuse": [
+        "- 2026-01-05: kept waiting: until 2026-02-01 — by pat, sam; answer \"Keep waiting\""
+      ]
+    },
+    "nonspace": {
+      "accept": [
+        "- 2026-01-05: was: «Open»"
+      ],
+      "refuse": [
+        "- 2026-01-05: was:  Open"
+      ]
+    },
+    "char": {
+      "accept": [
+        "- 2026-01-05: archived: Dropped — ⚠ it no longer applies"
+      ],
+      "refuse": [
+        "- 2026-01-05: archived: Dropped — first\nsecond"
+      ]
+    },
+    "date": {
+      "accept": [
+        "- 2026-12-31: reopened — again"
+      ],
+      "refuse": [
+        "- 2026-12-1: reopened — again"
+      ]
+    },
+    "digit": {
+      "accept": [
+        "- 2026-10-09: reopened — again"
+      ],
+      "refuse": [
+        "- 2026-1O-09: reopened — again"
+      ]
+    },
+    "entry-id": {
+      "accept": [
+        "- 2026-01-05: gate lift skipped: TD-12 no longer carries event (ships)"
+      ],
+      "refuse": [
+        "- 2026-01-05: gate lift skipped: TD12 no longer carries event (ships)"
+      ]
+    },
+    "repo": {
+      "accept": [
+        "- 2026-01-05: gate lift skipped: acme/tools#TD-4 no longer carries decision (pat)"
+      ],
+      "refuse": [
+        "- 2026-01-05: gate lift skipped: https://h/o#TD-4 no longer carries decision (pat)"
+      ]
+    },
+    "repo-part": {
+      "accept": [
+        "- 2026-01-05: gate lift skipped: .github#TD-4 no longer carries decision (pat)"
+      ],
+      "refuse": [
+        "- 2026-01-05: gate lift skipped: -x#TD-4 no longer carries decision (pat)"
+      ]
+    },
+    "event-name": {
+      "accept": [
+        "- 2026-01-05: gate added: event (vendor-v2)"
+      ],
+      "refuse": [
+        "- 2026-01-05: gate added: event (Vendor)"
+      ]
+    },
+    "person": {
+      "accept": [
+        "- 2026-01-05: gate added: decision (sam.lee)"
+      ],
+      "refuse": [
+        "- 2026-01-05: gate added: decision (sam..lee)"
+      ]
+    },
+    "person-part": {
+      "accept": [
+        "- 2026-01-05: gate added: decision (a-b_c)"
+      ],
+      "refuse": [
+        "- 2026-01-05: gate added: decision (a+b)"
+      ]
+    }
   }
 }

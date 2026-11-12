@@ -16,3 +16,48 @@ People: pat
 - [ ] act 2026-10-29 (n/a) — TD-298's decision (pat) was lifted by an answer on acme/other's board, which holds no decided item for TD-298. Context: TD-298 decision (pat) board acme/other. Due: 2026-11-10.
 - [x] decide 2026-10-02 (n/a) — Still waiting on event (gamma-ready) for TD-207? Context: TD-207 event (gamma-ready). Due: 2026-10-06. Answers: Keep waiting (default) | Drop the gate | Rewrite the check. Lifts: Drop the gate. Decided: Keep waiting (by pat) (2026-10-05). Closed: 2026-10-05 — kept waiting.
 - [x] decide 2026-10-02 (n/a) — Should the cache be cleared nightly? Context: TD-211 decision (pat). Due: 2026-10-20. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-20). Closed: 2026-10-20 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-224 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-25). Closed: 2026-10-25 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-225 decision (pat). Parts: TD-226, TD-227, TD-228, TD-229. Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-28). Closed: 2026-10-28 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-230 decision (pat). Parts: TD-231, TD-232. Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-28). Closed: 2026-10-28 — lifted.
+- [ ] act 2026-10-29 (n/a) — decision (pat) on TD-230 was answered with a lift on 2026-10-28 but still stands on TD-231: lift it. Context: TD-230 decision (pat) lift. Due: 2026-11-10.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-233 decision (pat). Parts: TD-234, TD-235. Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-28). Closed: 2026-10-28 — lifted.
+- [ ] act 2026-10-29 (n/a) — decision (pat) on TD-233 was answered with a lift on 2026-10-28 but still stands on TD-234: lift it. Context: TD-233 decision (pat) lift. Due: 2026-11-10.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-236 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-25). Closed: 2026-10-25 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-237 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-25). Closed: 2026-10-25 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-238 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-25). Closed: 2026-10-25 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-239 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-20). Closed: 2026-10-20 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-239 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-27). Closed: 2026-10-27 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-240 decision (pat). Parts: TD-241. Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-09-20). Closed: 2026-09-20 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-240 decision (pat). Parts: TD-242. Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-27). Closed: 2026-10-27 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-243 decision (pat). Parts: TD-244. Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-09-20). Closed: 2026-09-20 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-243 decision (pat). Parts: TD-245. Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-27). Closed: 2026-10-27 — lifted.
+- [ ] act 2026-10-28 (n/a) — decision (pat) on TD-243 was answered with a lift on 2026-10-27 but still stands on TD-244, TD-245: lift it. Context: TD-243 decision (pat) lift. Due: 2026-11-10.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-246 decision (pat). Parts: TD-247. Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-27). Closed: 2026-10-27 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-247 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-27). Closed: 2026-10-27 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-248 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-01). Closed: 2026-10-01 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-249 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-01). Closed: 2026-10-01 — lifted.
+- [ ] act 2026-10-01 (n/a) — decision (pat) on TD-249 was answered with a lift on 2026-10-01 but still stands on TD-249: lift it. Context: TD-249 decision (pat) lift. Due: 2026-11-10.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-250 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-01). Closed: 2026-10-01 — lifted.
+- [x] act 2026-10-01 (n/a) — decision (pat) on TD-250 was answered with a lift on 2026-10-01 but still stands on TD-250: lift it. Context: TD-250 decision (pat) lift. Due: 2026-11-10. Closed: 2026-10-02 — left as it is.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-251 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-25). Closed: 2026-10-25 — lifted.
+- [x] act 2026-10-26 (n/a) — decision (pat) on TD-251 was answered with a lift on 2026-10-25 but still stands on TD-251: lift it. Context: TD-251 decision (pat) lift. Due: 2026-11-10. Closed: 2026-10-27 — left as it is.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-252 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-25). Closed: 2026-10-25 — lifted.
+- [x] act 2026-10-24 (n/a) — decision (pat) on TD-252 was answered with a lift on 2026-10-25 but still stands on TD-252: lift it. Context: TD-252 decision (pat) lift. Due: 2026-11-10. Closed: 2026-10-26 — left as it is.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-253 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-25). Closed: 2026-10-25 — lifted.
+- [ ] decide 2026-10-26 (n/a) — Should the covered one go? Context: TD-253 decision (pat). Due: 2026-11-10. Answers: Go | Not yet.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-254 decision (pat). Parts: TD-255, TD-256. Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-27). Closed: 2026-10-27 — lifted.
+- [ ] decide 2026-10-26 (n/a) — Should the covered part go? Context: TD-255 decision (pat). Due: 2026-11-10. Answers: Go | Not yet.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-257 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by kim) (2026-10-25). Closed: 2026-10-25 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-258 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (2026-10-25). Closed: 2026-10-25 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-261 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-05). Closed: 2026-10-05 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-263 decision (pat). Parts: TD-264. Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-27). Closed: 2026-10-27 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-265 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-20). Closed: 2026-10-20 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-266 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-20). Closed: 2026-10-20 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-267 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-11-06). Closed: 2026-11-06 — lifted.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-268 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Not yet (by pat) (2026-10-25). Closed: 2026-10-25 — kept waiting.
+- [ ] act 2026-10-29 (n/a) — Lift of decision (pat) on TD-269 was closed unmerged. Context: TD-269 decision (pat) lift. Due: 2026-11-10.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-270 decision (pat). Parts: TD-271, TD-272. Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-20). Closed: 2026-10-21 — asked again for TD-272.
+- [ ] decide 2026-10-21 (n/a) — Go on the part left? Context: TD-270 decision (pat). Parts: TD-272. Due: 2026-11-10. Answers: Go | Not yet.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-273 decision (pat). Parts: TD-274, TD-275. Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-20). Closed: 2026-10-21 — closed by hand.
+- [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-276 decision (pat). Parts: TD-277, TD-278. Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-20). Closed: 2026-10-21 — asked again for TD-278.
+- [x] decide 2026-10-21 (n/a) — Go on the part left? Context: TD-276 decision (pat). Parts: TD-278. Due: 2026-11-10. Answers: Go | Not yet. Decided: Not yet (by pat) (2026-10-25). Closed: 2026-10-25 — kept waiting.

@@ -1,0 +1,99 @@
+{
+ "closed": [],
+ "items": [
+  {
+   "answers": [
+    "Go",
+    "Not yet"
+   ],
+   "consequences": [
+    "",
+    ""
+   ],
+   "decided": null,
+   "decided_by": null,
+   "default": "Go",
+   "detail": [],
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "decide",
+   "lifts": null,
+   "line": 7,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [
+    "TD-15",
+    "TD-16"
+   ],
+   "refs": [
+    "TD-12"
+   ],
+   "replies": [],
+   "session": "w-1",
+   "text": "decide 2026-01-05 (session `w-1`) — Go on the report parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-20. Answers: Go (default) | Not yet.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [
+    "Go",
+    "Not yet"
+   ],
+   "consequences": [
+    "",
+    ""
+   ],
+   "decided": {
+    "date": "2026-01-08",
+    "text": "Go"
+   },
+   "decided_by": "pat",
+   "default": "Go",
+   "detail": [],
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "decide",
+   "lifts": null,
+   "line": 8,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [
+    "TD-21",
+    "TD-22"
+   ],
+   "refs": [
+    "TD-20"
+   ],
+   "replies": [],
+   "session": "w-1",
+   "text": "decide 2026-01-05 (session `w-1`) — Go on the export parts? Context: TD-20 decision (pat). Parts: TD-21, TD-22. Due: 2026-01-20. Answers: Go (default) | Not yet. Decided: Go (by pat) (2026-01-08).",
+   "waiting_on": "session"
+  }
+ ],
+ "keys": [
+  "- [ ] decide 2026-01-05 (session `w-1`) — Go on the report parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Answers: Go (default) | Not yet",
+  "- [ ] decide 2026-01-05 (session `w-1`) — Go on the export parts? Context: TD-20 decision (pat). Parts: TD-21, TD-22. Answers: Go (default) | Not yet"
+ ],
+ "needs_you": [
+  [
+   8,
+   "decided",
+   7
+  ],
+  [
+   7,
+   "due",
+   -5
+  ]
+ ],
+ "people": [
+  "pat"
+ ]
+}

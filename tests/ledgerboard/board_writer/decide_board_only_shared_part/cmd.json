@@ -1,0 +1,21 @@
+{
+ "argv": [
+  "decide",
+  "--board",
+  "board.md",
+  "--line",
+  "7",
+  "--expect",
+  "decide 2026-01-12",
+  "--answer",
+  "Go",
+  "--by",
+  "robin",
+  "--board-only",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

@@ -1,0 +1,15 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "fmt",
+  "entries": 1,
+  "formatted": [
+   "ledger/TD-001.md"
+  ],
+  "paths": [
+   "ledger/TD-001.md"
+  ],
+  "refused": [],
+  "subject": null
+ }
+}

@@ -64,14 +64,6 @@
    "text": "ℹ TD-106: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
   },
   {
-   "field": "status",
-   "id": "TD-106",
-   "kind": "retired",
-   "level": "info",
-   "standing": false,
-   "text": "ℹ TD-106: the Status word 'Built' is retired — write Open, with Kind live-check (SPEC *Retired words*)"
-  },
-  {
    "field": "blocked by",
    "id": "TD-106",
    "kind": "retired",
@@ -206,6 +198,142 @@
    "level": "error",
    "standing": false,
    "text": "⚠ TD-117: Blocked by names event (x) and the entry has no **Event (x):** section — its words, then check: <type> <args>"
+  },
+  {
+   "field": "status",
+   "id": "TD-101",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-101: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-102",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-102: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-103",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-103: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-104",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-104: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-105",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-105: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-106",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-106: an open entry's Status is Open alone — this one is Built (retired: Open, the stage in Kind) — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-107",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-107: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-108",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-108: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-110",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-110: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-111",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-111: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-112",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-112: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-113",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-113: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-114",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-114: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-115",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-115: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-116",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-116: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-117",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-117: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-118",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-118: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
   }
  ],
  "check_since_empty": [
@@ -253,17 +381,9 @@
    "field": "waits",
    "id": "TD-106",
    "kind": "retired",
-   "level": "info",
+   "level": "error",
    "standing": false,
-   "text": "ℹ TD-106: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
-  },
-  {
-   "field": "status",
-   "id": "TD-106",
-   "kind": "retired",
-   "level": "info",
-   "standing": false,
-   "text": "ℹ TD-106: the Status word 'Built' is retired — write Open, with Kind live-check (SPEC *Retired words*)"
+   "text": "⚠ TD-106: a new or changed Waits line — the field is retired and no reader takes it as a gate; write the wait in Blocked by as until YYYY-MM-DD, or as event (<name>) with its **Event (<name>):** section (SPEC *Retired words*)"
   },
   {
    "field": "blocked by",
@@ -341,9 +461,9 @@
    "field": "waits",
    "id": "TD-116",
    "kind": "retired",
-   "level": "info",
+   "level": "error",
    "standing": false,
-   "text": "ℹ TD-116: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
+   "text": "⚠ TD-116: a new or changed Waits line — the field is retired and no reader takes it as a gate; write the wait in Blocked by as until YYYY-MM-DD, or as event (<name>) with its **Event (<name>):** section (SPEC *Retired words*)"
   },
   {
    "field": "blocked by",
@@ -400,6 +520,142 @@
    "level": "error",
    "standing": false,
    "text": "⚠ TD-117: Blocked by names event (x) and the entry has no **Event (x):** section — its words, then check: <type> <args>"
+  },
+  {
+   "field": "status",
+   "id": "TD-101",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-101: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-102",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-102: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-103",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-103: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-104",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-104: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-105",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-105: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-106",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-106: an open entry's Status is Open alone — this one is Built (retired: Open, the stage in Kind) — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-107",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-107: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-108",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-108: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-110",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-110: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-111",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-111: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-112",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-112: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-113",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-113: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-114",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-114: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-115",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-115: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-116",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-116: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-117",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-117: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-118",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-118: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
   }
  ],
  "declared": {},
@@ -819,13 +1075,6 @@
    "kind": "retired",
    "level": "info",
    "text": "ℹ TD-106: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
-  },
-  {
-   "field": "status",
-   "id": "TD-106",
-   "kind": "retired",
-   "level": "info",
-   "text": "ℹ TD-106: the Status word 'Built' is retired — write Open, with Kind live-check (SPEC *Retired words*)"
   },
   {
    "field": "blocked by",

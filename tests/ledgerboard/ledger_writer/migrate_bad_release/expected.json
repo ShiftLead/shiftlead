@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "migrate",
+  "unusable": "--release is <major>.<minor>, each one to nine digits, not '2.7.1'"
+ }
+}

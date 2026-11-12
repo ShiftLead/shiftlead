@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "set",
+  "unusable": "Location is not a header field from v2.7: write the body section with edit TD-1 --section Location (an empty --location still removes the header field)"
+ }
+}

@@ -5,10 +5,11 @@
   "board_only": true,
   "entries": [],
   "item_notes": [],
-  "line": 7,
-  "paths": [
-   "board.md"
+  "left_open": [
+   "TD-1"
   ],
-  "subject": "ledgerboard: decide Go on the export format?: Go (session n/a)"
+  "line": 7,
+  "paths": [],
+  "subject": null
  }
 }

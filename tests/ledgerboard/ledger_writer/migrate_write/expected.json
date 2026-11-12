@@ -1,0 +1,38 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "migrate",
+  "entries": {
+   "TD-001": {
+    "changes": [
+     "Status Designed 2026-10-01: drafted → Open",
+     "Kind none → stage-a",
+     "Location → body"
+    ],
+    "listed": [],
+    "stops": []
+   },
+   "TD-002": {
+    "changes": [
+     "Added comment → Log"
+    ],
+    "listed": [],
+    "stops": []
+   },
+   "TD-004": {
+    "changes": [
+     "Status Done 2026-10-03: shipped → Resolved 2026-10-03"
+    ],
+    "listed": [],
+    "stops": []
+   }
+  },
+  "paths": [
+   "ledger/TD-001.md",
+   "ledger/TD-002.md",
+   "ledger/archive/TD-004.md"
+  ],
+  "reblocked": {},
+  "subject": "ledger: migrate v2.7 (3 entries)"
+ }
+}

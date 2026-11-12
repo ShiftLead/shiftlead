@@ -1,0 +1,16 @@
+{
+ "argv": [
+  "migrate",
+  "--release",
+  "2.7",
+  "--stage-kind",
+  "designed=a",
+  "--stage-kind",
+  "DESIGNED=b",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-11-11",
+  "--json"
+ ]
+}

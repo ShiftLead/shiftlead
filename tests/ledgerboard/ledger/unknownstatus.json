@@ -138,6 +138,230 @@
    "level": "info",
    "standing": false,
    "text": "ℹ TD-530: every blocker is archived (TD-531) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "status",
+   "id": "TD-501",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-501: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-502",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-502: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-503",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-503: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-504",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-504: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-505",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-505: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-506",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-506: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-507",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-507: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-508",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-508: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-509",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-509: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-510",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-510: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-521",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-521: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-523",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-523: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-525",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-525: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-527",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-527: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-528",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-528: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-530",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-530: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-511",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-511: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Xyzzy — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-512",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-512: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Steps — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-513",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-513: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is DONE (retired: Resolved) — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-514",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-514: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-515",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-515: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Live (retired: Resolved, Superseded or Dropped) — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-517",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-517: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Xyzzy — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-519",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-519: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved) — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-520",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-520: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved**, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-522",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-522: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is ** — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-524",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-524: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Open — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-529",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-529: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is ** — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-531",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-531: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is  — run migrate, which maps it, lists it, or names what a person decides"
   }
  ],
  "check_since_empty": [
@@ -268,6 +492,230 @@
    "level": "info",
    "standing": false,
    "text": "ℹ TD-530: every blocker is archived (TD-531) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "status",
+   "id": "TD-501",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-501: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-502",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-502: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-503",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-503: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-504",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-504: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-505",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-505: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-506",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-506: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-507",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-507: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-508",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-508: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-509",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-509: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-510",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-510: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-521",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-521: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-523",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-523: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-525",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-525: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-527",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-527: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-528",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-528: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-530",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-530: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-511",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-511: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Xyzzy — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-512",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-512: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Steps — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-513",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-513: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is DONE (retired: Resolved) — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-514",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-514: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — it has none — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-515",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-515: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Live (retired: Resolved, Superseded or Dropped) — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-517",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-517: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Xyzzy — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-519",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-519: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved) — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-520",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-520: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved**, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-522",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-522: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is ** — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-524",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-524: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Open — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-529",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-529: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is ** — run migrate, which maps it, lists it, or names what a person decides"
+  },
+  {
+   "field": "status",
+   "id": "TD-531",
+   "kind": "status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-531: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is  — run migrate, which maps it, lists it, or names what a person decides"
   }
  ],
  "declared": {},

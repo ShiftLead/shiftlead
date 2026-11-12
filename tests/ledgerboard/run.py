@@ -45,7 +45,8 @@ Fixtures, each an invented input and its expected JSON:
 - ``sweep/cases.json`` → ``sweep/expected.json`` (v2.4): ``sweep()`` and ``covers()`` over ``sweep/``'s ledger and
   boards; and ``parts_problems()`` (v2.6) of each ``parts_problems`` case's line against its own entries and
   ``archived``, with, where the case asks, ``covers()`` of each listed part on a one-item board holding the line,
-  and the ``decide_lift()`` cross-check of a ``Go``.
+  and the ``decide_lift()`` cross-check of a ``Go``. From v2.7, a lifting answer closed with no lift (TD-224 to
+  TD-269): the ``act`` that says its lift is owed, held entries, its close, and a run's own ``reask_days``.
 - ``archive/<case>.board.md`` and ``<case>.archive.md`` → ``<case>.json`` (v2.3): ``archive_closed()`` of the
   two, read as bytes, or its refusal.
 - ``ledger/belowheader.md`` (TD-049): a ``decision`` gate below the header block — ``check()`` gives its ℹ and
@@ -61,7 +62,9 @@ Fixtures, each an invented input and its expected JSON:
   and ``gate_age()`` of each gate the case names (from v2.5 ``gate_added()`` too, and a ``set`` step takes the
   case's own ``today`` when it gives one). Also from v2.4, ``archive_plan()`` of each ``archive_plan`` case
   (``plan/``: a supersede, its chain, each refusal, a chain ending in a Status word this reader does not know
-  among them), the Dropped archive, and ``rename_ref`` keeping one copy.
+  among them), the Dropped archive, and ``rename_ref`` keeping one copy. From v2.7, ``check()``'s ``retired`` flag on a
+  ``Waits`` line (``check/waits_*``): an error where the edit added or changed the line, ℹ where it left it, or with
+  no ``old``.
 - ``ledger/supersede.md`` (v2.4): an archived blocker's Status read — Resolved, Superseded (by an open entry, a
   Resolved one, another repo's, a chain ending in Dropped, a loop, no successor) and Dropped, here and through the
   resolver's ``status`` and ``successor``.
@@ -82,6 +85,9 @@ Fixtures, each an invented input and its expected JSON:
 - ``ledger_writer/<case>/`` (v2.4): the ledger writer, ``ledger.py`` — laid out as ``board_writer/``'s cases, each
   ``argv`` carrying ``--json`` so what it prints is one object: a report, the paths written, the plan, why it
   refused, or the ids it ``needs``.
+- ``migrate/cases.json`` → ``migrate/expected.json`` (v2.7): ``migrate_entry()`` of one entry's invented text,
+  open or archived, with its ``closed_date``, ``kinds`` and ``decided``; its output run again, which changes
+  nothing; and ``status_problem()`` of each form, in its place and out of it.
 - ``grammar/cases.json`` → ``grammar/expected.json`` (v2.3): SPEC's grammar appendix — per start symbol and
   production, strings that production's EBNF accepts and refuses, and the module's verdict on each:
   ``item_problem()`` of an item line, ``rank()``'s flags of a rank file, ``parse_gates()`` of a ``Blocked by`` (v2.4,
@@ -594,7 +600,8 @@ def ledger_edit_cases(L, spec: dict, root: Path = HERE) -> dict:
                                                      old=text({"file": c["old"]}) if c.get("old") else None,
                                                      today=spec["today"])
                                   if r["kind"] in ("archive-open-parts", "part-of-archived", "part-of-unknown",
-                                                   "log-not-last", "log-line", "event-undated")]
+                                                   "log-not-last", "log-line", "event-undated", "status")  # status: v2.7
+                                  or (r["kind"], r["field"]) in (("retired", "waits"), ("retired", "location"))]  # v2.7
                       for c in spec["check"]},
             "entry_text": {c["name"]: _refused(lambda c=c: L.entry_text(
                 c["id"], c["title"], c["fields"],
@@ -697,6 +704,7 @@ def sweep_cases(L, spec: dict, root: Path = HERE) -> dict:
     results = {(r[0], r[1]): (r[2], r[3]) if len(r) > 3 else r[2] for r in spec["results"]}
 
     def run(c, bs=boards, **kw):
+        kw.update({"reask_days": c["reask_days"]} if "reask_days" in c else {})  # v2.7: a run's own window
         return L.sweep(ents, bs, results, c["today_utc"], c["today_local"], repo=spec["repo"], **kw)
     runs = {c["name"]: run(c) for c in spec["runs"]}
     first = next(c for c in spec["runs"] if c["name"] == spec["rerun"])
@@ -828,10 +836,25 @@ def verdict_cases(L, spec: dict, root: Path = HERE) -> dict:
 
 def grammar_cases(L, spec: dict) -> dict:
     """The grammar appendix's fixtures (v2.3): each string's verdict, from the module — an item line's
-    ``item_problem()``, a rank file's ``rank()`` flags, a ``Blocked by``'s ``parse_gates()``, an Event section's ``parse_event_section()`` (v2.4)."""
+    ``item_problem()``, a rank file's ``rank()`` flags, a ``Blocked by``'s ``parse_gates()``, an Event section's ``parse_event_section()`` (v2.4),
+    and (v2.7) a Status value's ``status_problem()``, a Log line's ``log_line()``, a header block's ``canonical()``
+    and an ``Added`` value's ``migrate_entry()``."""
     if not hasattr(L, "parse_gates"):  # a module older than v2.4: this case fails, the others still run
         return {"missing": "the module has no parse_gates — older than v2.4"}
+    if not hasattr(L, "status_problem") or not hasattr(L, "migrate_entry"):  # older than v2.7: the same
+        return {"missing": "the module has no status_problem or migrate_entry — older than v2.7"}
+
+    def status(archived: bool):  # v2.7: a Status value on a minimal entry
+        return lambda s: _why(L.status_problem(f"## TD-1: x\n\n**Status:** {s}\n", archived=archived))
     judge = {
+        "status-open": status(False),
+        "status-resolved": status(True),
+        "status-superseded": status(True),
+        "status-dropped": status(True),
+        "log-line": lambda s: _log_verdict(L.log_line(s)),
+        "header-block": lambda s: _why(_refused(lambda: L.canonical(f"## TD-1: x\n\n{s}\n")).get("refused")),
+        "added": lambda s: _added_verdict(L.migrate_entry(f"## TD-1: x\n\n**Added:** {s}\n**Status:** Open\n",
+                                                          archived=False, today=TODAY)),
         "item-line": lambda s: (L.item_problem(s) is None, L.item_problem(s)),
         "rank-file": lambda s: (not L.rank(s)[1], L.rank(s)[1]),
         "blocked-by": lambda s: _gates_verdict(L.parse_gates(s)),  # v2.4: a person's name is a decision's
@@ -840,6 +863,25 @@ def grammar_cases(L, spec: dict) -> dict:
     return {start: {prod: [dict(zip(("accepted", "why"), judge[start](s))) for s in g["accept"] + g["refuse"]]
                     for prod, g in groups.items()}
             for start, groups in spec.items()}
+
+
+def _why(problem) -> tuple[bool, object]:
+    """A judge's verdict from a problem, None when there is none."""
+    return problem is None, problem
+
+
+def _log_verdict(r: dict | None) -> tuple[bool, str | None]:
+    """A Log line's verdict (v2.7): read, and not ``malformed`` (a writer's prefix out of its shape)."""
+    if r is None:
+        return False, "not a Log line"
+    return r["kind"] != "malformed", r["kind"] if r["kind"] == "malformed" else None
+
+
+def _added_verdict(got: dict) -> tuple[bool, list[str] | None]:
+    """An ``Added`` value's verdict (v2.7): ``migrate_entry()`` changes nothing, lists nothing and stops on nothing
+    (an entry it stops on is not one it leaves alone)."""
+    left = got["changes"] + got["listed"] + got["stops"]
+    return not left, left or None
 
 
 def _gates_verdict(g: dict) -> tuple[bool, list[str] | None]:
@@ -858,6 +900,31 @@ def origin_cases(L, spec: dict) -> dict:
             "item_refs": {x: L.item_refs(x) for x in spec["item_refs"]},
             "blocked": {x: list(L.parse_blocked(x)) for x in spec["blocked"]},
             "item_problem": {x: L.item_problem(x) for x in spec.get("item_problem", [])}}
+
+
+def migrate_cases(L, spec: dict) -> dict:
+    """``migrate_entry()`` of one entry (v2.7), each case's text with ``archived`` and its own ``closed_date``,
+    ``kinds`` and ``decided`` at the file's ``today``; ``again`` is its output run once more without ``decided``
+    (null after a stop), which must change nothing; ``gate_age`` (a case naming a ``gate``) that gate's age before
+    and after; and ``status_problem()`` of each ``status_problem`` case."""
+    if not hasattr(L, "migrate_entry"):  # a module older than v2.7
+        return {"missing": "the module has no migrate_entry — older than v2.7"}
+
+    def run(c: dict) -> dict:
+        kw = {k: c[k] for k in ("closed_date", "kinds", "decided") if k in c}
+        got = L.migrate_entry(c["text"], archived=c["archived"], today=c.get("today", spec["today"]), **kw)
+        if "gate" in c:  # a gate's age before and after: a line migrate writes first in the Log moves it
+            got = dict(got, gate_age=[str(L.gate_age(t, c["gate"])) for t in (c["text"], got["text"])])
+        if got["stops"]:
+            return dict(got, again=None)
+        kw.pop("decided", None)
+        again = L.migrate_entry(got["text"], archived=c["archived"], today=c.get("today", spec["today"]), **kw)
+        return dict(got, again={"same_text": again["text"] == got["text"], "changes": again["changes"],
+                                "stops": again["stops"]})
+
+    return {"migrate_entry": {c["name"]: run(c) for c in spec["migrate_entry"]},
+            "status_problem": {c["name"]: L.status_problem(c["text"], archived=c["archived"])
+                               for c in spec["status_problem"]}}
 
 
 def event_cases(L, spec: dict) -> dict:
@@ -948,6 +1015,8 @@ def cases(L, root: Path):
     yield root / "host-log-pure" / "expected.json", host_log_cases(L, spec)
     spec = json.loads((root / "verdict" / "cases.json").read_text(encoding="utf-8"))
     yield root / "verdict" / "expected.json", verdict_cases(L, spec, root)
+    spec = json.loads((root / "migrate" / "cases.json").read_text(encoding="utf-8"))
+    yield root / "migrate" / "expected.json", migrate_cases(L, spec)
 
 
 def main(argv: list[str] | None = None) -> int:

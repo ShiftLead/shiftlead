@@ -9,6 +9,10 @@
    "file": "already.md"
   },
   {
+   "name": "retired_after_part_of",
+   "text": "## TD-041: A Waits and a header Location, placed after Part of in the file's order\n\n**location:** `src/thing.py`\n**Waits:** the vendor's next release\n**Part of:** TD-012\n**Status:** Open\n**Tracker:** ABC-123\n**Priority:** Low\n\n**Why:** a reason.\n"
+  },
+  {
    "name": "heading_only",
    "file": "heading_only.md"
   },
@@ -1564,6 +1568,50 @@
    "name": "host_log_no_old",
    "ledger": "check/hostlog_after.md",
    "archive": ""
+  },
+  {
+   "name": "waits_written_is_an_error",
+   "ledger": "check/waits_after.md",
+   "archive": "",
+   "old": "check/waits_before.md"
+  },
+  {
+   "name": "waits_no_old",
+   "ledger": "check/waits_after.md",
+   "archive": ""
+  },
+  {
+   "name": "location_written_is_an_error",
+   "ledger": "check/location_after.md",
+   "archive": "",
+   "old": "check/location_before.md"
+  },
+  {
+   "name": "location_no_old",
+   "ledger": "check/location_after.md",
+   "archive": ""
+  },
+  {
+   "name": "status_outside_the_set_no_old",
+   "ledger": "check/status_after.md",
+   "archive": "check/status_after.archive.md"
+  },
+  {
+   "name": "status_outside_the_set_standing_is_still_an_error",
+   "ledger": "check/status_after.md",
+   "archive": "check/status_after.archive.md",
+   "old": "check/status_after.md"
+  },
+  {
+   "name": "status_after_archive_open_parts",
+   "ledger": "check/status_parts_after.md",
+   "archive": "check/status_parts_after.archive.md",
+   "old": "check/status_parts_before.md"
+  },
+  {
+   "name": "status_v1_is_info",
+   "ledger": "check/status_v1.md",
+   "archive": "check/status_v1.archive.md"
   }
  ],
  "log": [

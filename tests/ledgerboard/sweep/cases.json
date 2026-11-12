@@ -79,6 +79,12 @@
    "name": "two days later",
    "today_utc": "2026-11-05",
    "today_local": "2026-11-05"
+  },
+  {
+   "name": "reask_days 0",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03",
+   "reask_days": 0
   }
  ],
  "rerun": "today",
@@ -102,6 +108,22 @@
   [
    "TD-213",
    "decision (pat)"
+  ],
+  [
+   "TD-224",
+   "decision (pat)"
+  ],
+  [
+   "TD-226",
+   "decision (pat)"
+  ],
+  [
+   "TD-259",
+   "decision (pat)"
+  ],
+  [
+   "TD-262",
+   "decision (kim)"
   ]
  ],
  "refused": [

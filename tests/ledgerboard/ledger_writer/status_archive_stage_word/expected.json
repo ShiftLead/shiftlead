@@ -1,0 +1,22 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "archive",
+  "id": "TD-001",
+  "moved": {
+   "from": "ledger/TD-001.md",
+   "to": "ledger/archive/TD-001.md"
+  },
+  "notes": [],
+  "paths": [
+   "ledger/TD-001.md",
+   "ledger/archive/TD-001.md",
+   "ledger/README.md",
+   "ledger/TD-002.md",
+   "notes.md"
+  ],
+  "rewired": [],
+  "subject": null,
+  "successor": null
+ }
+}
