@@ -264,3 +264,51 @@ def test_only_a_ledger_id_normalises_and_a_bad_store_never_raises():
     assert _step(store, [_m("TD-1")], T0) == ["TD-1"]
     store2: dict = {}
     assert _step(store2, [], T0, lanes=False) == [] and store2 == {}  # no key for an origin never read
+
+
+@pytest.mark.unit
+async def test_a_progress_ref_no_longer_claimed_holds_no_note_back(agent, tmp_path, monkeypatch):
+    """TD-1737 (a): only a live record's *claimed* progress ref holds a mark's note back (§4.4 *The note to the
+    taker*); a ref the record reported done or dropped is no claim, and the taker is told."""
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    root = _registered(tmp_path)
+    agent.sessions["ao-d"] = _rec("ao-d", root, ["design-first", "owner:designer"], host=agent.host)
+    agent.sessions["ao-c"] = _rec(
+        "ao-c", root, None, host=agent.host,
+        progress=[ProgressEntry(ref="TD-58", status="done", pr=7), ProgressEntry(ref="TD-058", status="dropped")],
+    )  # fmt: skip
+    agent.sessions["ao-t"] = _rec("ao-t", root, None, state="closed", host=agent.host)
+    key = agent_ids.settle_key(root, "")
+    agent_ids._record_given(key, ["TD-058"], "ao-t")
+    sent = []
+    monkeypatch.setattr(agent, "_system_note", lambda to, text, **kw: sent.append(to))
+    here = str(tmp_path.resolve() / "repo")
+    old = (datetime.now(UTC) - timedelta(minutes=31)).isoformat()
+    no_lane.save({key: {"roots": {here: {"from": old, "marked": {"TD-058": {"why": WHY, "since": old}}}}, "ids": []}})
+    agent._mark_lanes(root, {"remote": "", "ledger": _led(_e("TD-058"))})
+    assert sent == ["ao-t"] and no_lane.load()[key]["ids"] == ["TD-058"]
+
+
+@pytest.mark.unit
+async def test_a_pass_with_records_but_no_lane_is_no_first_pass(agent, tmp_path, monkeypatch):
+    """TD-1737 (b): records of the repo that carry no lane read no lane — the pass empties its clocks and
+    starts none — so the first pass that does read a lane is still a first pass: it spends the owner marks
+    and sends nothing."""
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    root = _registered(tmp_path)
+    agent.sessions["ao-c"] = _rec("ao-c", root, None, host=agent.host)
+    agent.sessions["ao-t"] = _rec("ao-t", root, None, state="closed", host=agent.host)
+    key = agent_ids.settle_key(root, "")
+    agent_ids._record_given(key, ["TD-058"], "ao-t")
+    sent = []
+    monkeypatch.setattr(agent, "_system_note", lambda to, text, **kw: sent.append(to))
+    here = str(tmp_path.resolve() / "repo")
+    agent._mark_lanes(root, {"remote": "", "ledger": _led(_e("TD-058"))})
+    assert "from" not in ((no_lane.load().get(key) or {}).get("roots") or {}).get(here, {})
+    agent.sessions["ao-d"] = _rec("ao-d", root, ["design-first", "owner:designer"], host=agent.host)
+    agent._mark_lanes(root, {"remote": "", "ledger": _led(_e("TD-058"))})
+    assert sent == [] and no_lane.load()[key]["ids"] == ["TD-058"]
