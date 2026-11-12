@@ -596,12 +596,13 @@ def show(root: str | Path, want: str, *, fetch: bool = True) -> dict[str, Any] |
 
 def holds_pr(record: Any, pr: dict[str, Any]) -> bool:
     """Whether a live record holds an open PR: not `exited` or `closed`, not superseded, no
-    `out_of_work`, and either a `progress` entry names it (`pr:<n>` or its `pr`, claimed or done) or
-    its checkout's branch is the PR's head."""
+    `out_of_work`, and either a `progress` entry names it (`pr:<n>`, its `pr`, claimed or done, or the
+    `review_pr` a claim keeps while its PR is with a reader, TD-150, TD-1701) or its checkout's branch is
+    the PR's head."""
     if record.state in ("exited", "closed") or record.superseded_by or record.out_of_work:
         return False
     n = pr.get("number")
-    if any(e.ref == f"{PR_PREFIX}{n}" or e.pr == n for e in record.progress):
+    if any(e.ref == f"{PR_PREFIX}{n}" or e.pr == n or e.review_pr == n for e in record.progress):
         return True
     branch = (record.git or {}).get("branch")
     return bool(branch) and branch == pr.get("branch")
