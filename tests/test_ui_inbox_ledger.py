@@ -74,7 +74,7 @@ def test_the_fold_lists_each_repos_for_you_entries_in_the_repo_pages_order(tmp_p
     assert {r["team"] for r in rows} == {"ao-grind"} and rows[0]["url"] == "/repo/agentorc#TD-002"
     assert got["groups"][1]["rows"][0]["team"] == "sam-defined"  # the definitions' team first
     assert ledger_for_you(_repos(tmp_path), [], {})["groups"][0]["rows"][0]["team"] == ""  # none: *no team*
-    assert ledger_for_you({}, [], {}) == {"n": 0, "groups": []}
+    assert ledger_for_you({}, [], {}) == {"n": 0, "groups": [], "entries": {}}
 
 
 def test_a_rows_year_its_default_and_its_detail_read_only_what_they_can(tmp_path):

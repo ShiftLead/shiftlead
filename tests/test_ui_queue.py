@@ -441,13 +441,19 @@ def test_a_board_lines_bare_ref_its_repo_holds_only_archived_never_homes_on_anot
     line = {"row": "board", "id": "b", "key": "k", "kind": "decide", "repo_name": "contractmatch",
             "text": "**Works?** Context: TD-051 (archived), TD-017. Due: 2026-10-29."}  # fmt: skip
     got = item_home(line, index)
-    assert got == {
+    assert {k: v for k, v in got.items() if k not in ("covers", "holds")} == {
         "home": "queue",
         "on_card": "contractmatch#TD-017",
         "on_row": "contractmatch#TD-017",
         "mentions": [],
         "tied": {"by": "context", "ref": "contractmatch#TD-017"},
     }
+    # what it covers, in the order written (TD-1380); its *holds* line lists the archived one only while no open
+    # entries are read, since then nothing says it is closed
+    assert got["covers"] == ["contractmatch#TD-051", "contractmatch#TD-017"]
+    assert [h["id"] for h in got["holds"]] == ["contractmatch#TD-051"]
+    opened = {"contractmatch#TD-017": {"repo": "contractmatch"}}
+    assert item_home(line, index, entries=opened)["holds"] == []
     assert item_home({**line, "text": "Context: TD-051 (archived)."}, index)["home"] == "inbox"
     assert asked_entries([line]) == {"contractmatch#TD-051", "contractmatch#TD-017"}
     both = {**index, "contractmatch#TD-051": ("contractmatch#TD-051", "contractmatch#TD-051")}
