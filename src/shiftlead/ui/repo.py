@@ -118,12 +118,14 @@ def entry_hand(servicing: list[dict[str, str]], records: Mapping[str, dict[str, 
 
 # -- the Repo page (design §4.5 screen 11, TD-176 slice 5) -------------------------------------------
 
-# the page's seven kinds, each a list with its `#debt-<key>` anchor (§4.5 screen 11, §4.4 *Repo facts*, TD-418)
+# the page's seven kinds and *no lane*, each a list with its `#debt-<key>` anchor (§4.5 screen 11, §4.4, TD-418)
 LEDGER_LISTS = (
     ("pickable", "pickable"),
     ("design", "design"),
     ("for-you", "for you"),
     ("live-check", "live check"),
+    # an entry the home marks `no_lane` leaves its kind's list for this one (§4.5 screen 11, TD-1573, built by TD-1687)
+    ("no-lane", "no lane"),
     ("blocked", "blocked"),
     ("evaluation", "evaluation"),
     ("other", "other"),
@@ -395,7 +397,9 @@ def ledger_lists(
     row id, title, priority and owner, *held by <name>* when a member claims it and *blocked by …*
     from the entry's `blocked_by` (§4.4 *Repo facts*), and a live check *live check* or *waits for
     its build to be live* with its build's PRs (§4.9b, TD-323; the template's), sorted by priority
-    then id; `fold` the rows past the fold; an *other* row carries `flag`, this reader's flag on it.
+    then id; `fold` the rows past the fold; an *other* row carries `flag`, this reader's flag on it. An entry
+    the home marks `no_lane` is in the **no lane** list and out of its kind's, its `flag` the mark's `why`
+    (§4.4 *An entry no lane takes is marked*, TD-1573, built by TD-1687), which sends it to the board's fold.
     A design's row carries `builds`, its builds line, and a build's `builds_of`, the designs it builds
     (`design_builds`, TD-693).
     The board's open decided lines, the lanes' work orders
@@ -444,11 +448,17 @@ def ledger_lists(
                     # ids and decisions alone: the waits mark says the gate (§4.5a *Repo page: waits mark*, TD-1395)
                     "blocked_by": [b for b in e.get("blocked_by") or [] if not ledger.is_gate(str(b))],
                     **({"flag": LEDGER_FLAGS[key]} if key in LEDGER_FLAGS else {}),
+                    # a marked row's flag is its own why, never a kind's word (TD-1573): the fold draws it
+                    **(
+                        {"flag": str(e["no_lane"].get("why") or "no lane takes it")}
+                        if key == ledger.NO_LANE_KIND
+                        else {}
+                    ),
                     "builds": builds.get(e["id"]),
                     "builds_of": builds_of.get(e["id"], []),
                 }
                 for e in entries
-                if e.get("for_page") == key
+                if (ledger.NO_LANE_KIND if isinstance(e.get("no_lane"), dict) else e.get("for_page")) == key
             ),
             key=lambda e: (PRIORITY_RANK.get(e.get("priority") or "", 9), e["id"]),
         )
