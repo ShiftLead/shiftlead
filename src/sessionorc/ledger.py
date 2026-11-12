@@ -506,6 +506,68 @@ def _unwaited(entry: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+NO_LANE_KIND = "no-lane"  # `by_kind`'s key for the entries marked `no_lane` (§4.4 *An entry no lane takes is marked*)
+
+
+def lane_gap(entry: dict[str, Any], lanes: Collection[tuple[list[str], str]]) -> tuple[str, str] | None:
+    """Why no lane of a repo's records takes an entry (design §4.4 *An entry no lane takes is marked*,
+    TD-1573): None where some lane takes it or it is not tested, else `(case, why)`, `case` `team`, `kind` or
+    `owner`, `why` naming the header field that keeps it out. `lanes` are `(lane words, team)`, a teamless
+    record's team ''. Tested: an entry whose page kind is *design* or *live check* — or *pickable* tagged with a
+    team no lane's record carries — not the person's (`PERSON_OWNER`), not marked `needs_team`, which reads
+    pickable once its `settling` and `waiting` marks are dropped and its `until` and `event` gates read past
+    (`_unwaited`), so one held by a decision, an open id or an open part is never marked."""
+    page = entry.get("for_page")
+    if page not in ("design", "live-check", "pickable") or entry.get("needs_team"):
+        return None
+    if str(entry.get("owner") or "").casefold() == PERSON_OWNER:
+        return None
+    probe = _unwaited({k: v for k, v in entry.items() if k not in ("settling", "no_lane")})
+    if probe.get("pickable") != "yes":
+        return None
+    tag = str(entry.get("team") or "")
+    carried = {t.casefold() for _, t in lanes if t}
+    if tag and tag.casefold() not in carried:
+        return "team", f"Team {tag}: no lane of {tag}"
+    if page == "pickable":
+        return None  # its miss is *the rest*'s, by `Owner:` (§4.4 *In a team's lanes*)
+    allowed = [(list(lane), t) for lane, t in lanes if not tag or not t or t.casefold() == tag.casefold()]
+    if any(lane_matches(lane, probe, t or None) for lane, t in allowed):
+        return None
+    head = f"Team {tag}: " if tag else ""
+    word = "design-first" if entry.get("kind") == "design-first" else "free-pick"
+    takers = [lane for lane, _ in allowed if word in lane]
+    if not takers:
+        return "kind", f"{head}no lane takes {word}"
+    owners = sorted({o for lane in takers for w in lane if (o := owner_word(w))})
+    if not owners:
+        return None  # a lane takes its kind with no owner narrowing it: nothing in the header keeps it out
+    takes = " or ".join(f"owner:{o}" for o in owners)
+    return "owner", f"{head}Owner {entry.get('owner')}: the lanes that take {word} take {takes}"
+
+
+def mark_no_lane(led: dict[str, Any], lanes: Collection[tuple[list[str], str]]) -> dict[str, Any]:
+    """A ledger reading marked for the entries no lane takes (design §4.4 *An entry no lane takes is marked*):
+    a new reading whose entries are copies with any old `no_lane` dropped and `no_lane: {case, why}` set where
+    `lane_gap` gives one, its `by_kind` rebuilt from each entry's `for_page` with each marked entry moved under
+    `no-lane` (always present), and `no_lane: [{id, why}]` beside `needs_team`. The reading given is never
+    changed — a carried reading shares its entries with the stored one. No lanes (none carried, or the repo
+    unserved) marks nothing but still copies, drops and rebuilds; a reading with `error`, or none, is returned
+    as it is."""
+    if not isinstance(led, dict) or led.get("error") or not isinstance(led.get("entries"), list):
+        return led
+    ents = [{k: v for k, v in e.items() if k != "no_lane"} if isinstance(e, dict) else e for e in led["entries"]]
+    marked: list[dict[str, str]] = []
+    for e in ents:
+        if lanes and isinstance(e, dict) and e.get("id") and (gap := lane_gap(e, lanes)):
+            e["no_lane"] = {"case": gap[0], "why": gap[1]}
+            marked.append({"id": e["id"], "why": gap[1]})
+    pages = [e.get("for_page") for e in ents if isinstance(e, dict) and not e.get("no_lane")]
+    by_kind = {k: pages.count(k) for k in KINDS}
+    by_kind[NO_LANE_KIND] = len(marked)
+    return {**led, "entries": ents, "by_kind": by_kind, "no_lane": marked}
+
+
 def _word_matches(word: str, entry: dict[str, Any]) -> bool:
     if entry.get("pickable") != "yes":
         return False

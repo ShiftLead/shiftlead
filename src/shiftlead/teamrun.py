@@ -1677,13 +1677,17 @@ def lane_kinds(r: Mapping[str, Any] | None) -> dict[str, Any]:
     them; never in the priorities, which are the ledger's alone. An entry the home's settle clock
     withholds (`settling`, §4.4 *What settling withholds*, TD-710), and one whose wait stands
     (`waiting`, §4.4 *An entry says what it waits for*, TD-716), is not counted pickable, as `ao repo`
-    counts it; its page kind is unchanged."""
+    counts it; its page kind is unchanged. One marked `no_lane` is subtracted only where it is not marked: the
+    home's mark moved it to `no-lane` already (§4.4 *An entry no lane takes is marked*, TD-1573)."""
     led = (r or {}).get("ledger") or {}
     kinds = dict(led.get("by_kind") or {})
     withheld = sum(
         1
         for e in led.get("entries") or ()
-        if isinstance(e, dict) and e.get("for_page") == "pickable" and (e.get("settling") or e.get("waiting"))
+        if isinstance(e, dict)
+        and e.get("for_page") == "pickable"
+        and (e.get("settling") or e.get("waiting"))
+        and not e.get("no_lane")  # a marked one has left *pickable*'s count already (TD-1573)
     )
     if n := len(work_orders(r)) + len(pr_orders(r)) - withheld:
         kinds["pickable"] = max(0, int(kinds.get("pickable") or 0) + n)

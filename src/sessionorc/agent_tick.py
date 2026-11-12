@@ -4491,6 +4491,8 @@ class TickMixin:
                     self._archived[r] = arch  # installed with the reading it was read with
             for r, v in got.items():  # joined before the compare and the store: no reader sees a routed line unjoined
                 v["work_orders"] = self._joined(r, v.get("work_orders"), v.get("ledger"))
+            for r, v in got.items():  # marked before the compare: an unchanged mark changes nothing (TD-1573)
+                self._mark_lanes(r, v)
             changed = {r: v for r, v in got.items() if v != self._repos.get(r)}
             for r, v in changed.items():
                 self._turned_unserved(r, self._repos.get(r), v)
@@ -4510,6 +4512,33 @@ class TickMixin:
                 await self._ci_spells_step()
         except Exception:  # noqa: BLE001 — a detached task: log it, and the next tick tries again
             log.exception("reading the repo facts failed")
+
+    def _repo_lanes(self, root: str) -> list[tuple[list[str], str]]:
+        """The repo's lanes (design §4.4 *An entry no lane takes is marked*): `(lane words, team)` of every record
+        the home holds whose `repo` resolves to the checkout and that carries a lane — live or ended, never one
+        superseded, a teamless one with team '' — the records `shiftlead.teamrun.in_repo` selects, written here
+        since `sessionorc` never imports `shiftlead`."""
+        here = Path(root).resolve()
+        out: list[tuple[list[str], str]] = []
+        for s in self._graph().values():
+            if not s.repo or s.superseded_by or not s.lane:
+                continue
+            try:
+                if Path(s.repo).resolve() != here:
+                    continue
+            except (OSError, ValueError):
+                continue
+            out.append((list(s.lane), str(s.team or "")))
+        return out
+
+    def _mark_lanes(self, root: str, reading: dict[str, Any]) -> None:
+        """The no-lane mark on a repo reading about to be compared and stored (design §4.4 *An entry no lane takes
+        is marked*, TD-1573): its `ledger` replaced by `ledger.mark_no_lane`'s copy, from the records as they stand;
+        an unserved repo marks nothing, and a reading with `error` is left as it is."""
+        led = reading.get("ledger")
+        if isinstance(led, dict):
+            lanes = [] if seams_mod.unserved(reading) else self._repo_lanes(root)
+            reading["ledger"] = ledger_mod.mark_no_lane(led, lanes)
 
     async def _red_prs(self, now: datetime) -> None:
         """Design §4.4 *A red PR nobody holds is a work order* (TD-613): on every tick at the home, each

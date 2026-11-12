@@ -1622,7 +1622,8 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
         # an open part counts as an open id its parent is blocked by (TD-1130)
         return bool(ids or e.get("parts_open")) and all(not b.startswith("decision (") for b in ids)
 
-    if any(e.get("unreachable") for e in ents) or all(e.get("for_page") in NO_LANE for e in ents):
+    # a kind no lane takes, or an entry the home marked `no_lane` (§4.4 *An entry no lane takes is marked*, TD-1573)
+    if any(e.get("unreachable") for e in ents) or all(e.get("for_page") in NO_LANE or e.get("no_lane") for e in ents):
         return "blocked"
     if all(waits(e) for e in ents):
         return "waiting"
@@ -1658,7 +1659,7 @@ def _wait(
         return _key_sort(keyed[q], q)
 
     def far(e: Mapping[str, Any]) -> bool:
-        return bool(e.get("unreachable")) or e.get("for_page") in NO_LANE
+        return bool(e.get("unreachable") or e.get("no_lane")) or e.get("for_page") in NO_LANE
 
     def of_its_own(q: str) -> bool:
         e = open_[q]
