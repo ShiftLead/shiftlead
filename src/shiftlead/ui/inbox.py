@@ -2209,6 +2209,14 @@ def board_rows(report: Any, repos_of: Mapping[str, Mapping[str, Any]] | None = N
                     # a press landing (§4.4 *A press is drawn as it lands*, TD-1508): the home's mark, laid over
                     "applying": dict(it["applying"]) if isinstance(it.get("applying"), Mapping) else None,
                     "kind": str(it.get("kind") or ""),
+                    # §4.5a **Have a session do it** (TD-1543, built by TD-1624): on an open `act` line — its kind
+                    # written `act` — with no `Decided:`, no `Answers:` and no *only you can do this* mark, where a
+                    # lane of the repo would take the work (`repo_boards`' `session_do`, the 409's function)
+                    "session_do": bool(of.get("session_do"))
+                    and str(it.get("kind") or "") == "act"
+                    and not it.get("decided")
+                    and not any(str(a).strip() for a in it.get("answers") or ())
+                    and not board_mod.marked_for_person(text),
                     # §4.5a **Works** / **Not right…** (TD-255 slice 3): a live look's pair, known
                     # by its words; `head` and `name` are what the *Not right* hand-off sends
                     "pair": live_look(it),

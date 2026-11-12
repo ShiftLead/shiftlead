@@ -30,7 +30,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from markupsafe import Markup
 
-from sessionorc import gitinfo, hosts, mail, naming, paths
+from sessionorc import board as board_mod
+from sessionorc import gitinfo, hosts, mail, naming, paths, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import settle as settle_mod
 from sessionorc.agent_common import PATHS_RUN_CHARS, PATHS_RUNS_MAX
@@ -526,22 +527,28 @@ def road_refusal(org: orgmod.Org, root: str, road: str, host: str) -> str:
     """Why **Done…** or **Back to design…** on a ledger row of the checkout `root` is refused before the home
     is asked (design §4.5 screen 12 *any open row*, TD-905), or '': no team's `repo:` is the checkout, so
     nobody would read the decided line; and, for Back to design, no member's lane and no stage of a
-    servicing team's current flow takes `design-first`, so nobody would design it. The home reads no
-    `org.yml`, so the page says it."""
+    servicing team's current flow takes `design-first`, so nobody would design it. The road `session` is
+    **Have a session do it** on an `act` line of that checkout's board (§4.5 screen 12 *Three verbs: Have a
+    session do it*, TD-1624): the same read with `free-pick`, so nobody would take the work — one function for
+    the button's draw and its stale press's 409, so they never disagree. A team that has never run reads as
+    any other. The home reads no `org.yml`, so the page says it."""
     want = Path(root).expanduser().resolve()
     serving = [
         t for t in org.teams.values() if (p := org.checkout(t.repo, host)) and Path(p).expanduser().resolve() == want
     ]
     if not serving:
         return f"no team services {want.name}: nobody would read the line"
-    if road != "design":
+    if road not in ("design", "session"):
         return ""
+    lane = "design-first" if road == "design" else "free-pick"
     for t in serving:
-        if any("design-first" in m.lane for m in t.members):
+        if any(lane in m.lane for m in t.members):
             return ""
         under = teams.compiled(org, t, t.host or host, host, None)
-        if under is not None and any("design-first" in st.lane for st in under.flow.stages):
+        if under is not None and any(lane in st.lane for st in under.flow.stages):
             return ""
+    if road == "session":
+        return f"no lane of {serving[0].repo} takes a work order: nobody would take the work"
     names = ", ".join(t.name for t in serving)
     return f"no lane of {names} takes design-first: nobody would design it"
 
@@ -551,7 +558,9 @@ def repo_boards(org: orgmod.Org, host: str) -> dict[str, dict[str, Any]]:
     repo*, TD-722, built by TD-741): the board is the repo's, so a row names the repo and no team —
     `name`, the rail's `repo` pick; `label`, *ContractMatch · samscrape* where the repo's project has
     several repos, else the name; and `teams`, every team whose `repo:` it is in definition order, which
-    a team pick narrows board rows by and whose rail counts take them in."""
+    a team pick narrows board rows by and whose rail counts take them in; and `session_do`, whether a lane would take
+    an `act` line's work (`road_refusal`'s `session` road, TD-1624), which `board_rows` folds into each row's
+    **Have a session do it**."""
     out: dict[str, dict[str, Any]] = {}
 
     def entry(repo: str, path: Path) -> dict[str, Any]:
@@ -565,6 +574,8 @@ def repo_boards(org: orgmod.Org, host: str) -> dict[str, dict[str, Any]]:
     for tname, t in org.teams.items():
         if path := org.checkout(t.repo, host):
             entry(t.repo, path)["teams"].append(tname)
+    for root, e in out.items():
+        e["session_do"] = not road_refusal(org, root, "session", host)
     return out
 
 
@@ -4209,7 +4220,7 @@ async def card_mail(
         roots=await h.repo_roots(),
         entries_open=lf.get("entries"),
     )
-    later = split_later(lf, hz["ahead"], index, hz["hidden"], entries=lf.get("entries"))[2]
+    later = split_later(lf, hz["ahead"], index, hz["hidden"], entries=lf.get("entries"), waiting=hz["waiting"])[2]
     with timing.step("render"):  # each attached row drawn by the Inbox's own renderer
         by_id = {str(c.get("id")): c for c in cards if isinstance(c, dict)}
         mail = attach(
@@ -5001,7 +5012,9 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         picks = rail_picks(request.query_params)
         # the ledger's rows and the board's lines not yet due whose entry a Queue card holds are drawn there
         # (§4.5 screen 6 *Where a row is drawn*, TD-771): *Later* keeps the rest
-        lf, ahead, _, unshown = split_later(lf, hz["ahead"], cards, hz["hidden"], hz["due"], lf.get("entries"))
+        lf, ahead, _, unshown = split_later(
+            lf, hz["ahead"], cards, hz["hidden"], hz["due"], lf.get("entries"), hz["waiting"]
+        )
         hz = horizon_left(hz, ahead, unshown)
         return templates.TemplateResponse(
             request,
@@ -5202,7 +5215,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         cards, roots = await h.queue_cards(), await h.repo_roots()
         opened = lf.get("entries")  # what a board line covers is read through them (TD-1380)
         lf, ahead, _, unshown = split_later(
-            lf, hz["ahead"], cards, hz["hidden"], hz["due"], opened
+            lf, hz["ahead"], cards, hz["hidden"], hz["due"], opened, hz["waiting"]
         )  # a card's is drawn there (TD-771)
         hz = horizon_left(hz, ahead, unshown)
 
@@ -5358,6 +5371,15 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 if not answer or not isinstance(answers, list):
                     raise HTTPException(400, "a decide names the answer and the item's answers")
                 more = {"answer": answer, "answers": [str(a) for a in answers]}
+                if not answers and " ".join(answer.split()) == board_mod.HAVE_A_SESSION:
+                    # **Have a session do it** (§4.5 screen 12, TD-1624): a stale press where no lane would take
+                    # the work is refused here, by the function the button's draw reads
+                    want = Path(board).expanduser().resolve()
+                    roots = [Path(r) for r in hosts.local_host().repos()]
+                    root = next((str(r) for r in roots if (r / workorders.board_rel(r)).resolve() == want), "")
+                    org, _notes = await asyncio.to_thread(org_here)
+                    if root and (why := await asyncio.to_thread(road_refusal, org, root, "session", host_name())):
+                        raise HTTPException(409, why)
             key = str(body.get("key") or "").strip()  # the row's id (§4.4 *A board line's id*, TD-603)
             got = await call("board_edit", board=board, line=line, text=text, action=what, due=due, key=key, **more)
             return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
