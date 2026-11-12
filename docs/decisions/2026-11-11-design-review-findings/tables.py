@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Rebuild the tables of docs/decisions/2026-11-11-design-review-findings.md.
 
-Reads the review records (docs/reviews/TD-*.md) at a commit and the labels beside this file.
+Reads the review records (docs/reviews/TD-*.md) at a commit and the labels beside this file
+(labels.csv, the first pass; patterns.csv, the second).
 
     python3 docs/decisions/2026-11-11-design-review-findings/tables.py [commit]
 
@@ -131,6 +132,17 @@ def main():
             f"| {model}, {role} | {n} | {tokens / 1e6:.1f}M | {len(mine)} | {sum(group(i) == 'substantive' for i in mine)}"
             f" | {sum(lab[i]['catch'] in ('design-only', 'live') for i in mine)} | {sum(lab[i]['catch'] == 'mechanical' for i in mine)} |"
         )
+
+    # The second pass (patterns.csv): the pattern behind each finding.
+    with open(HERE / "patterns.csv", newline="") as f:
+        pat = {r["id"]: r for r in csv.DictReader(f)}
+    for key, title, col_of, cols in [
+        ("case", "The situation a design had not handled, by where it would have been caught", lambda i: lab[i]["catch"], ["builder", "design-only", "live", "test"]),
+        ("fact", "The sort of fact a false claim got wrong", lambda i: lab[i]["catch"], ["mechanical", "builder", "design-only"]),
+        ("check", "The check a script would run, by what was wrong", lambda i: lab[i]["kind"], ["xref", "bookkeeping", "false-claim", "contradiction"]),
+        ("fixfail", "Why an earlier fix led to a finding", lambda i: lab[i]["catch"], ["mechanical", "builder", "design-only"]),
+    ]:
+        table(title, [i for i in ids if i in pat and pat[i][key] != "-"], cols, lambda i, key=key: pat[i][key], col_of)
 
     # A sanity check a reader can repeat: the rows that say they reopen a finding should be fix-induced.
     cites = [i for i in ids if re.search(r"(reopens|corrects|refines|extends) F\d", findings[i]["text"])]
