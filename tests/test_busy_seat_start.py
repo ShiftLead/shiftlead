@@ -325,3 +325,30 @@ def test_a_suffixed_holders_clause_is_matched_to_its_own_record():
     rec = _rec("techlead-ao-2", "working")
     got = teamrun._holder_words("ao-grind", v, rec, {"why": ["techlead-ao working", "techlead-ao-2 working"]})
     assert got[0] == "techlead-ao-2 working"
+
+
+def test_startable_is_none_beside_a_working_member_and_for_an_idle_orphan(world):  # noqa: F811
+    tmp_path, state = world
+    _seated(tmp_path)
+    org = cli._org_here()
+    _team(state, members="idle")
+    state["sessions"][1]["state"] = "working"
+    (row,) = [r for r in teamrun.rows(org, state["sessions"], {}) if r["name"] == "ao-grind"]
+    assert row["busy"] and row["startable"] is None, "a working member keeps the team from concluded"
+    _team(state, members="idle")
+    state["sessions"].append(_rec("oldseat", "idle", seat={"trigger": "asks"}))  # no clause of its own
+    (row,) = [r for r in teamrun.rows(org, state["sessions"], {}) if r["name"] == "ao-grind"]
+    assert row["busy"] and row["startable"] is None, "an orphan alone takes away startable"
+
+
+def test_a_busy_trigger_seat_is_not_created(world):  # noqa: F811
+    tmp_path, state = world
+    state["host"] = {"host": "local"}
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["seats"] = [{"name": "scout-ao", "role": "sweeper", "trigger": {"swept": "7d"}}]
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    _team(state, seat={"state": "exited"})
+    state["sessions"].append(_rec("scout-ao", "working", seat={"trigger": "swept"}))
+    _, result = teamrun.start(cli.call_sync, cli._org_here(), "ao-grind", "kmaster")
+    assert "scout-ao" not in [p["name"] for p in creates(state)]
+    assert result["left_running"] == [{"name": "scout-ao", "state": "working"}]
