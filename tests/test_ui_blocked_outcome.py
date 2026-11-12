@@ -17,6 +17,8 @@ AT = datetime(2026, 9, 19, 12, tzinfo=UTC)
 def steer(mid, **kw):
     """A steer the person answered (`answered` makes an ask)."""
     return {**answered(mid, **kw), "kind": "steer"}
+
+
 LIVE = [{"id": "ao-w1", "state": "working"}]
 BLOCKED = {"state": "blocked", "text": "needs your token", "at": "2026-09-19T11:30:00Z", "by": "m-9"}
 REPLIED = {**BLOCKED, "replied": {"at": "2026-09-19T11:45:00Z", "by": "m-10"}}
