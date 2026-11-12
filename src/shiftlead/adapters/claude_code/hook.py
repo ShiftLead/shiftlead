@@ -303,8 +303,11 @@ def call_agent(params: dict[str, Any], timeout: float | None, method: str = "hoo
 REPORT_TIMEOUT = 1.0
 # A host agent slow to answer — in the minutes after a restart its loop lags by seconds — must still
 # find the reporter alive when it reads the caller's /proc entry (§4.8a), or it judges the report
-# *unknown* (`unreadable`) and refuses it (TD-1589); a hook waits as long, a bound on each step.
-REPORT_WAIT = 5.0
+# *unknown* (`unreadable`) and refuses it (TD-1589). A hook's five seconds a step was not enough: a
+# running member's report was refused so with #3479 live (TD-1696). Fifteen a step, its three steps
+# (connect, send, the reply) together inside the status line's minute, so a report is never sent
+# after the next one is due.
+REPORT_WAIT = 15.0
 # The status line it displaced gets this long; the tool cancels ours past its own bound anyway.
 CHAINED_TIMEOUT = 5.0
 
