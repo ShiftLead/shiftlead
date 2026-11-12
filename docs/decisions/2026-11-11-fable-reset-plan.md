@@ -20,8 +20,8 @@ text by a second reader, which the later rounds' fact-checks and the closing one
   third. Over 2026-11-03 to 11-11 the designer session spent about $1,770 and 3.1B tokens against the
   reviewers' 60M (the two are not shown to count tokens the same way): a design's cost is the author's own
   turns, above all the turns that apply each round's fixes at 140k to 300k tokens of context.
-- On the evening of 2026-11-11, 39 open entries name a decision of Paul's in their `Blocked by` (20 of them
-  wait on nothing else) and 10 are pickable.
+- At 21:39 on 2026-11-11, 27 open entries name a decision of Paul's in their `Blocked by` (19 of them wait
+  on nothing else) and 12 are pickable; the counts move within hours as he answers.
 
 ## Timing
 
@@ -34,8 +34,8 @@ what Paul can decide, so the decisions its work waits on are cleared first.
 
 The aim is the same designs, as sound, for fewer Fable tokens. The saving is the fix loop: today the Fable
 designer applies every round's fixes; here a Sonnet seat does, and Fable is asked only about the hard
-findings. A script does what needs no model. The review rounds keep their cap and their stop rule (the
-designs that ran past the cap, up to 12 rounds, did so on bought rounds and held revisions).
+findings. A script does what needs no model. The review rounds keep their cap and their stop rule (most
+of the designs that ran past the cap, up to 12 rounds, did so on bought rounds and held revisions).
 
 | Step | Who | What | Status |
 |---|---|---|---|
@@ -133,7 +133,7 @@ gate's reading.
 ## Open
 
 - Who reviews: Fable then Sonnet as today, or Sonnet alone. In tokens for each finding only a design review
-  would catch Fable is about 16% cheaper, and for each substantive finding about 10% dearer; both figures
+  would catch Fable is about 14% cheaper, and for each substantive finding about 13% dearer; both figures
   are confounded, since the two read the same text in turn and the first takes what both would find.
 - The thresholds of the trial, and the latest date for reset 1 (both proposed above; Paul's).
 - How large a question to Fable may be, and what the last read costs; the trial measures both.
@@ -143,7 +143,8 @@ gate's reading.
 - *A Sonnet fact pack before drafting.* The claims block and the script cover it.
 - *A cap of two design rounds.* Rounds 3 and 4 each still raise, for each design that reaches them, about
   0.8 and 0.7 findings only a design review would catch; a round costs the designer at most about $10 (an
-  estimate: the designer session's $1,770 over about 175 rounds, its other work included), and a flaw that
+  estimate: the designer session's $1,770 over about 175 rounds, its other work included, and a few of
+  those rounds dated before the spend's nine days), and a flaw that
   escapes costs at least a fix PR and, live, far more.
 - *Fable does the design reviews* (it costs far more for each review; Paul).
 - *Every minor finding goes to the builder* (two thirds of the findings labelled minor are substantive).
