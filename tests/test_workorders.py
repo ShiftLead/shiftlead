@@ -767,3 +767,55 @@ async def test_the_tick_gives_a_lift_order_its_entrys_priority_from_the_ledger(a
     await agent._red_prs(T0 + HOUR)
     got = {o["id"]: o["priority"] for o in agent._repos[root]["pr_orders"]["orders"]}
     assert got == {"pr:1900": "Medium", "pr:1901": "High"}
+
+
+def test_a_routed_design_answer_is_the_design_first_lanes_and_its_designers_alone():
+    """TD-1705 (design §6 rule 6 *save a design's answer*): a work order the join routed (`lane:
+    "design-first"`) matches a lane holding `design-first`, never one by `free-pick`, narrowed by its design's
+    `owner` as an entry is; with `for`, only the lane of the record at that address, and none given no address."""
+    o = {"id": "board:1a2b3c4d", "work_order": True, "pickable": "yes"}
+    routed = {**o, "lane": "design-first", "design": "TD-9", "owner": "designer"}
+    assert ledger_mod.lane_matches(["design-first"], routed)
+    assert ledger_mod.lane_matches(["free-pick", "design-first"], routed)  # a lane holding both takes it
+    assert not ledger_mod.lane_matches(["free-pick"], routed)
+    assert not ledger_mod.lane_matches(["free-pick", "owner:grinder"], routed)
+    assert ledger_mod.lane_matches(["design-first", "owner:designer"], routed)
+    assert not ledger_mod.lane_matches(["design-first", "owner:designer"], {**routed, "owner": "techlead"})
+    assert not ledger_mod.lane_matches(["design-first"], {**routed, "pickable": "no"})
+    assert not ledger_mod.lane_matches(["design-first"], {**routed, "settling": True})
+    mine = {**routed, "for": "designer-ao-1@node"}
+    assert ledger_mod.lane_matches(["design-first"], mine, None, "designer-ao-1@node")
+    assert not ledger_mod.lane_matches(["design-first"], mine, None, "designer-ao-2")
+    assert not ledger_mod.lane_matches(["design-first"], mine)  # no address: no lane
+    # an unrouted order is free-pick's as before, whatever address is given
+    assert ledger_mod.lane_matches(["free-pick"], o, None, "grinder-ao-1")
+    assert not ledger_mod.lane_matches(["design-first"], o, None, "designer-ao-1")
+
+
+def test_in_lanes_gives_a_routed_order_to_its_for_record_alone_and_no_rest():
+    """TD-1705: `in_lanes` reads each record's `id` as its address, so a routed order with `for` is in that
+    member's `ids` alone, and an order with a `lane` is in no team's `rest`."""
+    order = {
+        "id": "board:1a2b3c4d",
+        "work_order": True,
+        "pickable": "yes",
+        "for_page": "pickable",
+        "lane": "design-first",
+        "design": "TD-9",
+        "owner": "designer",
+        "for": "designer-ao-1",
+    }
+    records = [
+        {"id": "designer-ao-1", "name": "designer-ao-1", "lane": ["design-first"], "team": "t", "state": "idle"},
+        {"id": "designer-ao-2", "name": "designer-ao-2", "lane": ["design-first"], "team": "t", "state": "idle"},
+        {"id": "grinder-ao-1", "name": "grinder-ao-1", "lane": ["free-pick"], "team": "t", "state": "idle"},
+    ]
+    got = ledger_mod.in_lanes([order], records)
+    assert {m["id"]: m["ids"] for m in got["members"]} == {
+        "designer-ao-1": ["board:1a2b3c4d"],
+        "designer-ao-2": [],
+        "grinder-ao-1": [],
+    }
+    assert got["rest"] == []
+    # with no record at its `for` it is nobody's, and still in no rest
+    assert ledger_mod.in_lanes([order], records[1:])["rest"] == []

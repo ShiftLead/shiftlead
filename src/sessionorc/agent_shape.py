@@ -111,7 +111,7 @@ class ShapeMixin:
                 if p.status == "claimed"
             }
             views = [
-                {"id": r.id, "name": r.name, "lane": list(r.lane), "team": r.team, "state": r.state}
+                {"id": self._address(r), "name": r.name, "lane": list(r.lane), "team": r.team, "state": r.state}
                 | {"out_of_work": r.out_of_work}
                 for r in crew
                 if r.repo == root
@@ -140,7 +140,7 @@ class ShapeMixin:
                         seat=seat,
                         in_review=r.id in review,
                         waiting_person=r.id in person,
-                        lane_count=counts.get(r.id, 0),
+                        lane_count=counts.get(self._address(r), 0),
                         prs_waiting=bool(seat and r.prs_waiting(home=self.host)),
                     ),
                 }

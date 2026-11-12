@@ -1717,7 +1717,7 @@ def _passed_over(
                     if open_[m].get("pickable") == "yes"
                     and not (open_[m].get("settling") or open_[m].get("waiting"))
                     and home == open_[m]["repo"]
-                    and ledger_mod.lane_matches(list(rec.lane), dict(open_[m]), rec.team or None)
+                    and ledger_mod.lane_matches(list(rec.lane), dict(open_[m]), rec.team or None, rec.id)
                 ]
                 if not takes:
                     continue

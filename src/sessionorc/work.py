@@ -470,7 +470,7 @@ def finished(
 
 
 def reread(
-    member: Session, entries: list[Any], lane: list[str] | None = None
+    member: Session, entries: list[Any], lane: list[str] | None = None, who: str | None = None
 ) -> tuple[dict[str, Any] | None, list[str]]:
     """The one reading of a lane's memory (design §6 rule 6 *`lane_seen` is the lane's memory, never
     the ledger's*, TD-407, TD-411), for rule 6 and rule 8 alike:
@@ -492,7 +492,7 @@ def reread(
             continue
         i = str(e["id"])
         held.add(i)
-        if i not in matching and ledger_mod.lane_matches(lane, e, member.team):
+        if i not in matching and ledger_mod.lane_matches(lane, e, member.team, who):
             matching.append(i)
     ids = list(seen.get("ids") or [])
     left = {i for i in ids if i in held and i not in matching}
@@ -505,7 +505,8 @@ def reread(
     return seen, [i for i in matching if i not in kept]
 
 
-def gained(member: Session, entries: list[Any]) -> list[str]:
+def gained(member: Session, entries: list[Any], who: str | None = None) -> list[str]:
     """The ids in a ledger reading that match `member`'s lane and are not in its `lane_seen` as
-    `reread` prunes it, in the ledger's order; none before rule 6 has written `lane_seen`."""
-    return reread(member, entries)[1]
+    `reread` prunes it, in the ledger's order; none before rule 6 has written `lane_seen`. `who` is the
+    member's address, which a routed order's `for` names (TD-1705)."""
+    return reread(member, entries, who=who)[1]

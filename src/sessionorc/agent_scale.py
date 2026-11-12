@@ -140,7 +140,7 @@ class ScaleMixin:
                 if _lease(p, now)
             }
             views = [
-                {"id": r.id, "name": r.name, "lane": list(r.lane), "team": r.team, "state": r.state}
+                {"id": self._address(r), "name": r.name, "lane": list(r.lane), "team": r.team, "state": r.state}
                 for r in line
                 if r.repo == root
             ]

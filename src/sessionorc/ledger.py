@@ -356,7 +356,7 @@ def _buildlike(entry: dict[str, Any]) -> bool:
     return entry.get("kind") in ("", "build", "live-check")
 
 
-def lane_matches(lane: list[str], entry: dict[str, Any], team: str | None = None) -> bool:
+def lane_matches(lane: list[str], entry: dict[str, Any], team: str | None = None, who: str | None = None) -> bool:
     """Whether an entry belongs to a lane (design §6 rule 6, TD-195), by its header and never its
     prose. A word: `design-first` is a pickable entry with `Kind: design-first`; `free-pick` a
     pickable one whose kind is `build` or unwritten (TD-228), or a pickable live check — its `event (live…)`
@@ -373,7 +373,11 @@ def lane_matches(lane: list[str], entry: dict[str, Any], team: str | None = None
     entry says what it waits for*, TD-716), matches no lane. **`team`** is the lane's record's (§4.4 *An
     entry names its team*, TD-730): an entry marked `needs_team` matches nothing; one with a `team`
     matches only a lane of that team, case-folded; a lane with no team ('' or None) narrows nothing;
-    a work order carries no team and matches as its own rule says."""
+    a work order carries no team and matches as its own rule says. **A design's answer** (§6 rule 6 *save a
+    design's answer*, TD-1705): a work order the join routed carries `lane: "design-first"`, and matches a lane
+    holding `design-first`, whatever else it holds, never one by `free-pick`, narrowed by `owner:<word>` against
+    its `owner` as an entry is; one carrying `for` matches only the lane of the record whose address is `who`,
+    and none where `who` is not given."""
     if entry.get("settling") or entry.get("waiting"):
         return False
     owners = {o for w in lane if (o := owner_word(w))}
@@ -383,6 +387,15 @@ def lane_matches(lane: list[str], entry: dict[str, Any], team: str | None = None
         mine_team = str(entry.get("team") or "").casefold()
         if team and mine_team and mine_team != team.casefold():
             return False
+    if entry.get("work_order") and entry.get("lane") == "design-first":
+        # a design's answer the join routed (§6 rule 6, TD-1705): the design-first lanes', the designer's own
+        # alone where it names one (`for`), and narrowed by its design's `Owner:` as an entry is
+        if "design-first" not in lane or entry.get("pickable") != "yes":
+            return False
+        mine = str(entry.get("owner") or "").lower()
+        if owners and mine and mine not in owners:
+            return False
+        return not entry.get("for") or (who is not None and who == entry["for"])
     if entry.get("work_order"):
         # a decided board line has no owner, and `owner:<word>` never narrows one out (TD-384); nor a
         # red PR's (TD-613): both are on the grinders' pick list (§4.9b *No anchor seat*)
@@ -420,20 +433,25 @@ def in_lanes(
     an entry marked `needs_team` is in no kind, no `rest` and no member's `ids`; another team's entry is in
     no `rest` of a team's records. None where no record
     carries a lane: nothing is drawn."""
-    lanes = [(list(r["lane"]), str(r.get("team") or "")) for r in records if r.get("lane")]
+    # each lane with its record's team and address (`id`, `id@host` for a node's): a routed order's `for`
+    lanes = [(list(r["lane"]), str(r.get("team") or ""), r.get("id")) for r in records if r.get("lane")]
     if not lanes:
         return None
     open_ = [e for e in entries if e.get("for_page") in LANE_KINDS]
-    taken = {e["id"] for e in open_ if any(lane_matches(lane, e, t) for lane, t in lanes)}
+    taken = {e["id"] for e in open_ if any(lane_matches(lane, e, t, who) for lane, t, who in lanes)}
     waits = {
-        e["id"]: e for e in open_ if e.get("waiting") and any(lane_matches(lane, _unwaited(e), t) for lane, t in lanes)
+        e["id"]: e
+        for e in open_
+        if e.get("waiting") and any(lane_matches(lane, _unwaited(e), t, who) for lane, t, who in lanes)
     }
     by_owner: dict[str, list[str]] = {}
-    ours = {t.casefold() for _, t in lanes if t}  # another team's entry is in its own team's rest, not this one's
+    ours = {t.casefold() for _, t, _ in lanes if t}  # another team's entry is in its own team's rest, not this one's
     for e in open_:
         withheld = e.get("settling") or e.get("waiting") or e.get("needs_team")
         if ours and str(e.get("team") or "") and str(e["team"]).casefold() not in ours:
             continue
+        if e.get("lane"):
+            continue  # a routed order is the design-first lanes', never a team's rest (TD-1705)
         if e["for_page"] == "pickable" and e["id"] not in taken and not withheld:
             by_owner.setdefault(str(e.get("owner") or "").lower() or UNOWNED, []).append(e["id"])
     rest = [{"owner": o, "n": len(ids), "ids": ids} for o, ids in by_owner.items()]
@@ -445,11 +463,12 @@ def in_lanes(
         if not r.get("lane"):
             continue
         team = str(r.get("team") or "")
-        ids = [e["id"] for e in entries if e["id"] not in held and lane_matches(list(r["lane"]), e, team)]
+        who = r.get("id")
+        ids = [e["id"] for e in entries if e["id"] not in held and lane_matches(list(r["lane"]), e, team, who)]
         waiting = [
             e["id"]
             for e in entries
-            if e.get("waiting") and e["id"] not in held and lane_matches(list(r["lane"]), _unwaited(e), team)
+            if e.get("waiting") and e["id"] not in held and lane_matches(list(r["lane"]), _unwaited(e), team, who)
         ]
         name = r.get("name") or r.get("id")
         k = alive.count(frozenset(r["lane"]))
