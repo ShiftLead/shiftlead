@@ -175,7 +175,8 @@ def board(
     `n_blocked` always. `up` is a card Up next with its first row here (the grip and ⤒ ↑ ↓), `place` its
     number in this repo; `wait` a Waiting card's `{column, phrase, id}` and `would_be` its place here once the
     wait ends, drawn in the gutter with no grip (TD-918). The work orders `orders` (open decided board lines)
-    lead the pick's queued rows.
+    lead the pick's queued rows; a design's answer, its stored order carrying `lane: design-first` (TD-1705),
+    leads the queued rows of the column taking `design-first`.
     `fold` is *no lane takes these*: `(row, words)` pairs. `numbered` is whether the home served the cards."""
     opened = set(opened)
     doing = doing or {}
@@ -201,10 +202,15 @@ def board(
     }
     fold: list[tuple[dict[str, Any], str]] = []
     pick = next((c["key"] for c in cols if PICK in c["kinds"]), "")
-    if pick:
-        by_key[pick]["orders"] = list(orders)
-    else:  # no stage takes free-pick: a decided line is in no lane, so it waits in For you's fold
-        fold.extend(({**o, "anchor": "", "ext": {}, "work_order": True}, "no lane takes it") for o in orders)
+    design = next((c["key"] for c in cols if DESIGN in c["kinds"]), "")
+    for o in orders:
+        # a design's answer, routed on its stored order (§6 rule 6 *save a design's answer*, TD-1705), is the
+        # column's whose stage's lane takes `design-first`; any other decided line the pick's
+        to = design if o.get("lane") == DESIGN else pick
+        if to:
+            by_key[to]["orders"].append(o)
+        else:  # no stage takes its lane: a decided line is in no lane, so it waits in For you's fold
+            fold.append(({**o, "anchor": "", "ext": {}, "work_order": True}, "no lane takes it"))
 
     if cards is not None:
         seq = []

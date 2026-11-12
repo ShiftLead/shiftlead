@@ -275,6 +275,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _parts_text,  # noqa: F401
     _pr_parts,  # noqa: F401
     _rail_teams,  # noqa: F401
+    _record_name,  # noqa: F401
     _resolved,  # noqa: F401
     _same_ref,  # noqa: F401
     _shot_host_down,  # noqa: F401
@@ -2069,7 +2070,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         with timing.step("lists"):  # the ledger's lists, the cards and the rows the page draws (TD-893)
             # the teams' lanes over the ledger and the board's work orders (§4.4 *In a team's lanes*, TD-384)
             lanes = teamrun.repo_lanes(teamrun.lane_entries(r), str(r.get("root") or ""), sessions)
-            lists = ledger_lists(r, motion, lanes, now)
+            names = {str(s["id"]): str(s.get("name") or s["id"]) for s in sessions if s.get("id")}
+            lists = ledger_lists(r, motion, lanes, now, names)
             # only what is shown (§4.5 *Page loads*, TD-882): the lists unfolded, and an anchor's id not yet sent
             opened = [k for k in str(request.query_params.get("open") or "").split(",") if k]
             cards = debt_cards(queue, name, lists) if (r.get("ledger") or {}).get("entries") is not None else None

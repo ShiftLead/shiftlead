@@ -1760,6 +1760,40 @@ def test_a_decided_lines_teams_skip_a_resumed_away_record_and_read_live_from_any
         assert board_waiting_on(row, fleet, now) == "pickable by grind", [r["id"] for r in fleet]
 
 
+def test_a_designs_answer_is_pickable_by_the_design_first_lanes_and_names_its_designer(tmp_path):
+    """TD-1705 step 4 (§4.5 screen 6, §6 rule 6 *save a design's answer*): the Inbox's row reads the stored order's
+    routed fields, never re-derives them — a design's answer is *pickable by <team>* naming the teams whose
+    `design-first` lanes take it, then *· for <designer>* where it names a `for`; a grinder's `free-pick` lane does
+    not take it, and a designer the `for` does not name does not either."""
+    from shiftlead.ui.app import board_reading
+    from shiftlead.ui.inbox import board_waiting_on
+
+    root = repo(tmp_path, "r", "- [ ] x\n")
+    text = "decide 2026-11-10 — **Go?** Context: TD-058 decision (paul). Due: 2026-11-11. Decided: Go (2026-11-12)."
+    one = {**item(3, text, "2026-11-11", "1d overdue"), "key": "board:0123abcd", "decided": {"text": "Go"}}
+    routed = {"lane": "design-first", "design": "TD-058", "owner": "designer", "for": "ao-d1@node"}
+    order = {"id": "board:0123abcd", "work_order": True, "pickable": "yes", "for_page": "pickable", **routed}
+    got = reading(report(root, one))
+    got[str(root)]["work_orders"] = {"orders": [order]}
+    (row,) = board_reading(got)[0]
+    assert row["routed"] == routed
+    # an unrouted stored order (a build's gate) gives the row nothing to read
+    got[str(root)]["work_orders"] = {"orders": [{**order, **dict.fromkeys(routed, "")}]}
+    assert "routed" not in board_reading(got)[0][0]
+    now = datetime(2026, 11, 12, 12, tzinfo=UTC)
+    g1 = {"id": "ao-g1", "name": "g1", "state": "working", "team": "grind", "repo": str(root), "lane": ["free-pick"]}
+    d1 = {**g1, "id": "ao-d1@node", "name": "designer-1", "team": "design", "lane": ["design-first"]}
+    d2 = {**d1, "id": "ao-d2", "name": "designer-2", "team": "other"}
+    assert board_waiting_on(row, [g1, d1, d2], now) == "pickable by design · for designer-1"
+    nobody = "waiting on the next session to read r's board"
+    assert board_waiting_on(row, [g1, d2], now) == nobody
+    # no `for`: every design-first lane takes it, and no designer is named
+    free = {**row, "routed": {k: v for k, v in routed.items() if k != "for"}}
+    assert board_waiting_on(free, [g1, d1, d2], now) == "pickable by design, other"
+    # the same line unrouted is the grinders'
+    assert board_waiting_on({**row, "routed": None}, [g1, d1], now) == "pickable by grind"
+
+
 @pytest.mark.unit
 def test_every_board_row_draws_its_id_and_every_press_on_it_carries_it(tmp_path, monkeypatch):
     """§4.5a *board row: id* (§4.4 *A board line's id*, TD-603, TD-607): the row's `key` is the

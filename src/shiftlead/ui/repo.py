@@ -389,6 +389,7 @@ def ledger_lists(
     motion: Collection[dict[str, Any]],
     lanes: Mapping[str, Mapping[str, Any]] | None = None,
     now: datetime | None = None,
+    names: Mapping[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """**Technical debt** (§4.5 screen 11): the open entries in seven lists by the page's kind, each
     row id, title, priority and owner, *held by <name>* when a member claims it and *blocked by …*
@@ -400,7 +401,9 @@ def ledger_lists(
     The board's open decided lines, the lanes' work orders
     (§4.5a *Repo page: decided lines*, TD-384), come first in *pickable*, each with its `decided`
     and, held by nobody, `pickable_by`: the teams whose lanes (`teamrun.repo_lanes`') take it, None
-    where the ledger was not read and the lanes could not be (`lanes` None or the entries unread).
+    where the ledger was not read and the lanes could not be (`lanes` None or the entries unread). A design's
+    answer, its stored order routed to the `design-first` lanes (§6 rule 6 *save a design's answer*, TD-1705),
+    carries `for_name`, the name of the designer its `for` addresses (`names`, address to name; else the address).
     An entry the home's settle clock withholds carries `settle`, *settles in 7m*, drawn with no press
     (§4.5a *Repo page: settles in 7m on an entry*, TD-710); one whose wait stands carries `wait`, *waits
     until 10-16* or *waits: <words>*, and `wait_line`, its gates with their Event lines
@@ -423,6 +426,7 @@ def ledger_lists(
             "pickable_by": [t for t, got in (lanes or {}).items() if e["id"] in (got.get("pickable") or ())]
             if known
             else None,
+            **({"for_name": (names or {}).get(str(e["for"])) or str(e["for"])} if e.get("for") else {}),
         }
         for e in teamrun.work_orders(r)
     ]

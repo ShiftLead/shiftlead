@@ -541,6 +541,14 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     assert "6 open entries, 1 decided board line: 2 pickable, 0 design" in out
     assert "pickable     board:0123abcd  High    board        Keep the backup? · decided keep 2026-10-07" in out
     assert out.index("board:0123abcd") < out.index("pickable     TD-012")
+    # a design's answer, routed on the stored order (§6 rule 6 *save a design's answer*, TD-1705): its design's
+    # owner in the owner column, the design it answers and the designer it is for
+    routed = {**order, "lane": "design-first", "design": "TD-058", "owner": "designer", "for": "ao-d1"}
+    reading[str(repo)]["work_orders"] = {"orders": [routed]}
+    assert cli.main(["repo"]) == 0
+    row = "board:0123abcd  High    designer     Keep the backup? · decided keep 2026-10-07 · answers TD-058, for ao-d1"
+    assert row in capsys.readouterr().out
+    reading[str(repo)]["work_orders"] = {"orders": [order]}
     # the lanes take it beside the entries: the out-of-work line names it (§4.4 *In a team's lanes*)
     fleet.append({"id": "g2", "name": "g2", "team": "t", "repo": str(repo), "state": "idle", "lane": ["free-pick"],
                   "out_of_work": {"at": now.isoformat()}})  # fmt: skip
