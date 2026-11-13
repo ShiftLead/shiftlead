@@ -1,0 +1,91 @@
+{"id": "TD-1557:F1", "case": "which", "q": "Which source supplies a value when two parts could?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F2", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F3", "case": "failure", "q": "What happens when the underlying write refuses this input?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F4", "case": "shape", "q": "Which fields must a call pass through to its caller?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F5", "case": "shape", "q": "Does the data's shape survive each hop between parts?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F6", "case": "-", "q": "-", "fact": "code-behaviour", "check": "other", "fixfail": "-"}
+{"id": "TD-1557:F7", "case": "which", "q": "Which of two refusals runs first?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F8", "case": "shape", "q": "Which spellings and case variants does the marker accept?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F9", "case": "-", "q": "-", "fact": "design-text", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F10", "case": "-", "q": "-", "fact": "-", "check": "format", "fixfail": "-"}
+{"id": "TD-1557:F11", "case": "interaction", "q": "How does the new kind interact with existing write paths?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F12", "case": "shape", "q": "Can a malformed combination of inputs pass a validator unnoticed?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F13", "case": "interaction", "q": "How does the new control combine with the existing one?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F14", "case": "concurrency", "q": "Is a read-then-write done inside one lock?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1557:F15", "case": "failure", "q": "Is every refusal stated, and what does each one refuse?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F16", "case": "-", "q": "-", "fact": "work-state", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1557:F17", "case": "interaction", "q": "Which other readers share the changed helper?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F18", "case": "shape", "q": "What are the edge cases of the new format?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F19", "case": "scope", "q": "Does the rule cover every variant the page draws?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F20", "case": "display", "q": "When exactly is this control drawn, and with what words?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F21", "case": "shape", "q": "What fields must a hand-off between pages carry?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F22", "case": "display", "q": "What mark and counts does the screen show in this state?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F23", "case": "who", "q": "Which actors may do this, not only the person?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F24", "case": "-", "q": "-", "fact": "code-exists", "check": "path-symbol", "fixfail": "-"}
+{"id": "TD-1557:F25", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1557:F26", "case": "failure", "q": "What happens when input matches the marker but supplies nothing?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1557:F27", "case": "display", "q": "Is the generic caption still true in every state of the box?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1557:F28", "case": "scope", "q": "Does the rule hold on every other path writing the same thing?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F29", "case": "shape", "q": "Does a stored value carry decorations a comparison must strip?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F30", "case": "scope", "q": "What does a generalised helper keep of the original's behaviour?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F31", "case": "who", "q": "Which side parses the text, the page or the agent?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F32", "case": "concurrency", "q": "How does a worker thread signal a state change to its caller?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F33", "case": "shape", "q": "How are multi-line inputs normalised?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F34", "case": "which", "q": "Which actor's check runs first?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F35", "case": "interaction", "q": "How does an existing marker convention interact with the new kind?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F36", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F37", "case": "interaction", "q": "What do keyboard shortcuts do on the new control?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F38", "case": "-", "q": "-", "fact": "-", "check": "id-ref", "fixfail": "incomplete"}
+{"id": "TD-1557:F39", "case": "interaction", "q": "Does every route and RPC pass the new field along?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F40", "case": "-", "q": "-", "fact": "-", "check": "path-symbol", "fixfail": "wrong-fix"}
+{"id": "TD-1557:F41", "case": "concurrency", "q": "Can a retry or thread hop rerun a callback?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F42", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F43", "case": "scope", "q": "Which existing checks guard the new kind on other record types?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F44", "case": "which", "q": "In what order are several candidate matches tried?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1557:F45", "case": "shape", "q": "Which side splits the text, and what does it receive?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1557:F46", "case": "-", "q": "-", "fact": "code-exists", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1557:F47", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "incomplete"}
+{"id": "TD-1557:F48", "case": "-", "q": "-", "fact": "design-text", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F49", "case": "shape", "q": "How is the new text written back to the record?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F50", "case": "display", "q": "What does the optimistic redraw show before the answer returns?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F51", "case": "who", "q": "Does the page parse text that the agent should parse?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F52", "case": "-", "q": "-", "fact": "code-exists", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F53", "case": "interaction", "q": "Does a control's predicate match the agent's own reading?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1557:F54", "case": "interaction", "q": "Which module may import which, given the layering?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1557:F55", "case": "scope", "q": "Does the predicate over-match kinds it should leave ordinary?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1557:F56", "case": "interaction", "q": "Does a revised statement leave the old one standing?", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1557:F57", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1557:F58", "case": "interaction", "q": "Does every route forward the new field?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F59", "case": "interaction", "q": "Does a decision delegated upstream break a local check?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1557:F60", "case": "failure", "q": "What does the helper do on bad index or non-string input?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F61", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F62", "case": "interaction", "q": "What do early returns skip on the already-decided path?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F63", "case": "who", "q": "Which module computes each new field?", "fact": "-", "check": "path-symbol", "fixfail": "-"}
+{"id": "TD-1557:F64", "case": "-", "q": "-", "fact": "-", "check": "format", "fixfail": "-"}
+{"id": "TD-1557:F65", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1557:F66", "case": "interaction", "q": "Does every route forward the new field?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F67", "case": "shape", "q": "Where is the default stored, and where is it cleared?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F68", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1557:F69", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F70", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F71", "case": "which", "q": "What identifies the item a mark belongs to?", "fact": "-", "check": "other", "fixfail": "-"}
+{"id": "TD-1557:F72", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F73", "case": "scope", "q": "What else must move with the moved predicate?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1557:F74", "case": "display", "q": "Does the immediate redraw show unfilled or final text?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1557:F75", "case": "interaction", "q": "Does clearing a default leave an option unreachable?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F76", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "other"}
+{"id": "TD-1557:F77", "case": "scope", "q": "Is a CLI-only refusal also enforced at the RPC?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F78", "case": "interaction", "q": "Do outer validations pre-empt the design's refusal words?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F79", "case": "-", "q": "-", "fact": "code-exists", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F80", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F81", "case": "scope", "q": "Does the sibling tool follow the same rule?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F82", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "-"}
+{"id": "TD-1557:F83", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1557:F84", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F85", "case": "shape", "q": "Which values does the commit take from the turned action?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F86", "case": "interaction", "q": "Do sibling sections give the same refusal words?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F87", "case": "-", "q": "-", "fact": "design-text", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F88", "case": "-", "q": "-", "fact": "design-text", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F89", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1557:F90", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "not-propagated"}
+{"id": "TD-1557:F91", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "incomplete"}

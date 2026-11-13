@@ -1,0 +1,89 @@
+{"id": "TD-1569:F1", "case": "who", "q": "Which identifier names an actor in each document?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F2", "case": "which", "q": "Which step runs first when a filter and a check both apply?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F3", "case": "scope", "q": "Which states does the new category cover?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F4", "case": "shape", "q": "Where does each refusal clause's text come from?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F5", "case": "scope", "q": "Does a team-level action also apply to a single member?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F6", "case": "display", "q": "What do counts and headers show once something is excluded?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F7", "case": "display", "q": "Which controls are drawn in this state?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F8", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F9", "case": "shape", "q": "How are suffixed or renamed names handled?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F10", "case": "which", "q": "Which population does the check run over?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F11", "case": "interaction", "q": "Does skipping one part break another feature that needs the whole?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F12", "case": "scope", "q": "Which parts does the exclusion cover for each caller?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F13", "case": "concurrency", "q": "What if the state changes between the reading and the act?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F14", "case": "shape", "q": "Which fields does the reading expose to other consumers?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F15", "case": "interaction", "q": "Which other consumers depend on the changed field?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F16", "case": "display", "q": "Which controls and confirms show in the related state?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1569:F17", "case": "scope", "q": "Which states count as blocking?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F18", "case": "scope", "q": "How are the unusual states handled by the rule?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1569:F19", "case": "failure", "q": "What happens on a collision during a replay?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F20", "case": "scope", "q": "Which holders is a control offered to, and what are they told?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F21", "case": "shape", "q": "Which shape does the reading take for each consumer?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F22", "case": "which", "q": "Which reading decides, and is it taken once?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F23", "case": "interaction", "q": "Can the shared helper exclude one item without side effects?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F24", "case": "scope", "q": "Which holders does the reading never cover?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1569:F25", "case": "shape", "q": "What fields does each item of the result carry?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F26", "case": "scope", "q": "Does the rule cover the standing manager?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F27", "case": "shape", "q": "How is a suffixed name noted in the output?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1569:F28", "case": "shape", "q": "What are the key and fields of the result?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F29", "case": "interaction", "q": "Does an adjacent surface follow the changed field?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F30", "case": "which", "q": "How is a record matched to its holder?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F31", "case": "interaction", "q": "Does a later step undo the earlier exclusion?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F32", "case": "concurrency", "q": "Is a re-read after a mutation fresh or reused?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F33", "case": "empty-first", "q": "What does the reading return when nothing is live?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F34", "case": "shape", "q": "How is text matched without matching a longer name's prefix?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F35", "case": "display", "q": "What exact words does each surface show for the state?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F36", "case": "which", "q": "Is a name-based lookup safe when names collide?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F37", "case": "interaction", "q": "Is one pure reading shared by every consumer?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F38", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F39", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F40", "case": "scope", "q": "Which records count as members?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F41", "case": "interaction", "q": "Which state governs when two rules both apply?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1569:F42", "case": "which", "q": "Which source supplies the text?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1569:F43", "case": "failure", "q": "What happens when the plan renames something that blocks it?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F44", "case": "ends", "q": "What does a rule do when its target is renamed away?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F45", "case": "-", "q": "-", "fact": "-", "check": "section-ref", "fixfail": "-"}
+{"id": "TD-1569:F46", "case": "interaction", "q": "Does the front-end code carry the new data?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F47", "case": "failure", "q": "Does a failed read count as nobody or as unknown?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F48", "case": "when", "q": "When is the reading taken?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F49", "case": "scope", "q": "What is said to a holder with unfinished work?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F50", "case": "who", "q": "Which function builds each part of the result?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F51", "case": "failure", "q": "What happens when a supporting read fails?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F52", "case": "which", "q": "How is a suffixed record matched to a seat?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F53", "case": "interaction", "q": "Which files carry the new data to the screen?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1569:F54", "case": "ends", "q": "How is an orphan of a rename detected?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F55", "case": "which", "q": "Which skip set governs when two readings exist?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F56", "case": "failure", "q": "Does a strict or a fallback reading apply on failure?", "fact": "-", "check": "-", "fixfail": "overreach"}
+{"id": "TD-1569:F57", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1569:F58", "case": "interaction", "q": "Does every menu that offers actions gain the new one?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F59", "case": "scope", "q": "Which holders does the cure cover?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1569:F60", "case": "display", "q": "What words does the state show in each case?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F61", "case": "shape", "q": "By which key is a holder's clause matched?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F62", "case": "scope", "q": "What cure is offered for holders with no clause?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F63", "case": "display", "q": "Which controls are drawn in each branch?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F64", "case": "when", "q": "Is a refusal made before or after the first mutation?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F65", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F66", "case": "when", "q": "When is a refusal made before any change, and when not?", "fact": "-", "check": "-", "fixfail": "overreach"}
+{"id": "TD-1569:F67", "case": "scope", "q": "Which special records does the rule exclude?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F68", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1569:F69", "case": "who", "q": "Which layer owns the guard?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F70", "case": "display", "q": "When is the confirm shown and what does it say?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F71", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "other"}
+{"id": "TD-1569:F72", "case": "concurrency", "q": "What if a member turns busy mid-operation?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F73", "case": "shape", "q": "Does stripping a name break matching for every record?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F74", "case": "interaction", "q": "Are two overlapping rules disjoint or contradictory?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F75", "case": "interaction", "q": "Does a new mark touch records it should skip?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F76", "case": "which", "q": "In what order are the controls listed?", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1569:F77", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1569:F78", "case": "scope", "q": "Which records count as holders?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1569:F79", "case": "scope", "q": "What does the rule do with the switch off?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F80", "case": "interaction", "q": "Do two tests of the same state always agree?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1569:F81", "case": "scope", "q": "Which callers and records does a shared helper cover?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1569:F82", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F83", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "-"}
+{"id": "TD-1569:F84", "case": "-", "q": "-", "fact": "-", "check": "format", "fixfail": "-"}
+{"id": "TD-1569:F85", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F86", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1569:F87", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "not-propagated"}
+{"id": "TD-1569:F88", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "-"}
+{"id": "TD-1569:F89", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "-"}
