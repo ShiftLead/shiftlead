@@ -78,7 +78,7 @@ def test_a_gate_nothing_covers_gets_its_board_item():
 def test_the_pure_parts():
     assert gatesweep.due(None, UTC) and gatesweep.due(date(2026, 11, 4), UTC) and not gatesweep.due(UTC, UTC)
     assert gatesweep.lift_branch("TD-7", "event (x-merged)") == "lift/TD-7/x-merged"
-    assert gatesweep.lift_branch("TD-7", "until 2026-11-05") == "lift/TD-7/until"
+    assert gatesweep.lift_branch("TD-7", "until 2026-11-05") == "lift/TD-7/until-2026-11-05"
     got = {
         "checks": [PASSED],
         "lifts": [{"id": "TD-7", "gate": "event (x-merged)"}],
@@ -207,6 +207,31 @@ def test_a_lift_whose_pr_was_closed_is_never_reopened_and_asked_about(repo, tmp_
     )
     board = _branch(root, f"sweep/{UTC.isoformat()}", "docs/user_attention.md")
     assert "Lift of event (x-merged) on TD-7 was closed" in board and "Context: TD-7 event (x-merged) lift" in board
+
+
+def test_an_until_regated_after_its_lift_was_closed_is_lifted_on_a_branch_of_its_own(repo):
+    """TD-1751: every `until` lift was `lift/TD-n/until`, so an entry re-gated to a later day after its first
+    lift was closed found that closed PR (and its branch, which a close leaves on origin) and was asked about
+    on the board instead of lifted. The branch now carries the date: the later gate is lifted."""
+    root, ran = repo
+    bare = root.parent / "r-origin.git"
+    regated = EVENT.replace("TD-7: Waits on a PR", "TD-9: Waits a day").replace(
+        "**Blocked by:** event (x-merged)", "**Blocked by:** until 2026-11-05"
+    )
+    (root / "docs" / "ledger" / "TD-9.md").write_text(regated)
+    _git("-C", str(root), "add", "-A")
+    _git("-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "TD-9")
+    _git("-C", str(root), "push", "-q", "origin", "main")
+    _git("-C", str(root), "push", "-q", "origin", "main:refs/heads/lift/TD-9/until")  # the old lift's branch
+    _git("-C", str(root), "fetch", "-q", "origin")
+    old = {"base": "main", "head": "lift/TD-9/until", "title": "TD-9: lift until 2026-11-04", "state": "closed"}
+    (bare / "fake-gh.json").write_text(json.dumps({"prs": {"1": old}}))
+    got, why = gatesweep.sweep(root, [], today_utc=UTC, today_local=LOCAL, by="kmaster")
+    assert why is None, why
+    assert "lift TD-9 until 2026-11-05: opened https://github.com/o/r/pull/3" in got["applied"], got["applied"]
+    lifted = _branch(root, "lift/TD-9/until-2026-11-05", "docs/ledger/TD-9.md")
+    assert "until 2026-11-05" not in lifted.split("**Why:**")[0] and "gate lifted: until 2026-11-05" in lifted
+    assert not any("Lift of until" in line for line in got["applied"]), "no act item asks about the old close"
 
 
 def test_a_check_with_no_answer_is_left_out_and_a_failed_check_run_is_no_reading(repo, tmp_path):
