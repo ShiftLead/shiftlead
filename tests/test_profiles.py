@@ -223,6 +223,10 @@ def test_a_metered_profile_of_an_adapter_with_no_spend_is_refused(tmp_path, home
     # Claude Code and Gemini CLI report spend: their metered profiles load as today
     got = _load(
         tmp_path,
-        "profiles:\n  a: {billing: metered, config_dir: /c/a}\n  b: {adapter: gemini, billing: metered, config_dir: /c/b}\n",
+        "profiles:\n  a: {billing: metered, config_dir: /c/a}\n"
+        "  b: {adapter: gemini, billing: metered, config_dir: /c/b}\n",
     )
     assert got["a"].metered and got["b"].metered
+    with pytest.raises(ValueError, match="s is metered, but shell reports no spend"):
+        _load(tmp_path, "profiles:\n  s: {adapter: shell, billing: metered, config_dir: /c/s}\n")
+    assert sorted(_load(tmp_path, "profiles:\n  odd: {adapter: [a]}\n")) == ["odd"]  # no adapter name: unread

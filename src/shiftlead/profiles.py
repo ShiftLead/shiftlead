@@ -132,7 +132,7 @@ def _adapter_rules(profiles: dict[str, Profile]) -> None:
     for p in profiles.values():
         try:
             ad = adapters.get(p.adapter)
-        except KeyError:
+        except (KeyError, TypeError):  # not registered (or no name at all): neither rule reads it
             continue
         own = getattr(ad, "own_home", None)
         if own is not None:
