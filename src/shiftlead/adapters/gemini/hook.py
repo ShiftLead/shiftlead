@@ -136,9 +136,8 @@ def start_hooks(payload: dict[str, Any]) -> str:
     """Run the repo's start hooks from inside the pane (`sessionorc.start_hooks`): the project the tool
     names (`CLAUDE_PROJECT_DIR`, which it sets, else the payload's `cwd`) and the pane's own environment,
     with each call's own bound and no deadline over them."""
-    cwd = str(payload.get("cwd") or os.getcwd())
-    project = os.environ.get("CLAUDE_PROJECT_DIR") or cwd
-    return _runner.start_hooks({**payload, "cwd": cwd}, project=project, env=os.environ)
+    project = os.environ.get("CLAUDE_PROJECT_DIR") or str(payload.get("cwd") or os.getcwd())
+    return _runner.start_hooks(payload, project=project, env=os.environ)  # the payload on stdin unchanged
 
 
 def mail_context(payload: dict[str, Any], reply: Any) -> str:

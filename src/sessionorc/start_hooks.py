@@ -80,20 +80,15 @@ def start_hooks(
     today's: `PIN_FAILED` alone in the pinned mode, "" in the copied one."""
     end = None if deadline is None else time.monotonic() + deadline
     cwd = Path(str(payload.get("cwd") or project))
+    pinned = False  # a lapse in `hook_pinned`'s own read is the copied mode's, as an unread list was
     try:
-        if _hook_pinned(Path(project), end):
+        pinned = _hook_pinned(Path(project), end)
+        if pinned:
             return _pinned_hooks(payload, cwd, env, end)
         return _copied_hooks(payload, Path(project), cwd, env, end)
     except _Lapsed as lapse:
-        notice = (PIN_FAILED if _pinned_mode(project) else "") if on_timeout is _TODAY else str(on_timeout)
+        notice = (PIN_FAILED if pinned else "") if on_timeout is _TODAY else str(on_timeout)
         return "\n".join(x for x in (lapse.out.rstrip("\n"), notice) if x)
-
-
-def _pinned_mode(project: Path | str) -> bool:
-    """Which mode a lapse happened in, for the default notice: read again, without a deadline."""
-    from sessionorc import cadence
-
-    return cadence.hook_pinned(project)
 
 
 def _left(own: float, end: float | None) -> float:
@@ -177,7 +172,9 @@ def _run(
 ) -> tuple[int, str]:
     """One run in a group of its own, the payload on its stdin: a lapse kills the group and drains the
     pipes, so no grandchild holding a pipe outlives the bound (`subprocess.run(timeout=)` kills the child
-    alone, then waits on the pipes). `_Lapsed` carries what the run printed before it."""
+    alone, then waits on the pipes). `_Lapsed` carries what the run printed before it. A deadline already
+    spent starts nothing."""
+    timeout = _left(START_HOOKS_TIMEOUT, end)
     proc = subprocess.Popen(
         argv,
         stdin=subprocess.PIPE,
@@ -189,14 +186,20 @@ def _run(
         start_new_session=True,
     )
     try:
-        out, _ = proc.communicate(json.dumps(dict(payload)), timeout=_left(START_HOOKS_TIMEOUT, end))
-    except (subprocess.TimeoutExpired, _Lapsed) as e:
+        out, _ = proc.communicate(json.dumps(dict(payload)), timeout=timeout)
+    except subprocess.TimeoutExpired as e:
         with contextlib.suppress(OSError):
             os.killpg(proc.pid, signal.SIGKILL)
-        out = e.output if isinstance(e, subprocess.TimeoutExpired) and isinstance(e.output, str) else ""
+        # what was read before the lapse, kept should the drain not end (a grandchild of another session
+        # holding the pipe): `TimeoutExpired.output` is the raw bytes even in text mode
+        got = e.output
+        out = got.decode(errors="replace") if isinstance(got, bytes) else (got or "")
         with contextlib.suppress(subprocess.TimeoutExpired, OSError, ValueError):
             out, _ = proc.communicate(timeout=DRAIN_TIMEOUT)
         with contextlib.suppress(subprocess.TimeoutExpired):
             proc.wait(timeout=DRAIN_TIMEOUT)
+        for pipe in (proc.stdout, proc.stderr):
+            with contextlib.suppress(OSError):
+                pipe.close()
         raise _Lapsed(out or "") from None
     return proc.returncode, out

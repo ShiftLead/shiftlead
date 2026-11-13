@@ -4,6 +4,7 @@ its own. Gemini CLI's road through it is `test_cadence_hook_line.py`'s."""
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import subprocess
@@ -205,3 +206,43 @@ def test_core_runs_start_hooks_for_an_agent_with_no_start_context(monkeypatch):
     assert adapters.core_runs_start_hooks("no-such-adapter") is False  # the host that holds the pane decides
     for name in ("claude-code", "gemini", "shell"):  # each runs its own, or none
         assert adapters.core_runs_start_hooks(name) is False
+
+
+def test_a_deadline_spent_before_the_run_starts_nothing(tmp_path):
+    here = _copied(tmp_path / "repo")
+    with pytest.raises(start_hooks._Lapsed):
+        start_hooks._run(
+            [str(here / "cadence_hooks.sh")], PAYLOAD, tmp_path, _env("/usr/bin:/bin"), time.monotonic() - 1
+        )
+    assert not (here / "argv").exists()  # never spawned, so a repo hook did nothing
+
+
+DETACHED = """#!/bin/sh
+here=$(dirname "$0")
+echo "hooked"
+setsid sh -c 'echo $$ > "$0/gc"; exec sleep 30' "$here" &
+sleep 20
+"""
+
+
+def test_what_a_lapsed_run_printed_is_kept_when_a_detached_grandchild_holds_the_pipe(tmp_path):
+    repo = tmp_path / "repo"
+    here = _copied(repo)
+    (here / "cadence_hooks.sh").write_text(DETACHED)
+    try:
+        out = start_hooks.start_hooks(
+            {**PAYLOAD, "cwd": str(repo)},
+            project=repo,
+            env=_env("/usr/bin:/bin"),
+            deadline=1.5,
+            on_timeout=START_HOOKS_TIMED_OUT,
+        )
+        assert out == f"hooked\n{START_HOOKS_TIMED_OUT}"  # the drain timed out, the line read before it kept
+    finally:
+        for _ in range(50):  # the grandchild this test started, outside the run's group: ours to stop
+            if (here / "gc").exists() and (here / "gc").read_text().strip():
+                break
+            time.sleep(0.05)
+        if (here / "gc").exists():
+            with contextlib.suppress(ProcessLookupError, ValueError):
+                os.kill(int((here / "gc").read_text()), 9)
