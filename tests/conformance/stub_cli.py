@@ -80,8 +80,11 @@ class Stub:
             self.log(f"hook stderr: {cp.stderr.strip()[-2000:]}")
 
     def paint(self) -> None:
-        sys.stdout.write("\x1b[2J\x1b[H" + self.pane.rstrip("\n") + "\n")
-        sys.stdout.flush()
+        try:
+            sys.stdout.write("\x1b[2J\x1b[H" + self.pane.rstrip("\n") + "\n")
+            sys.stdout.flush()
+        except OSError as e:  # the pane closed under the write: its signal is on its way (TD-1749)
+            self.log(f"tty write failed: {e.errno}")
 
     def turn(self, commands: bool) -> None:
         first, *rest = self.life["turn"]
@@ -153,7 +156,13 @@ class Stub:
         self.log("started")
         self.paint()
         while True:
-            line = sys.stdin.readline()
+            try:
+                line = sys.stdin.readline()
+            except OSError as e:
+                # a closed pane's tty answers a read with EIO, which can land before the close's SIGHUP:
+                # raised, it ended the stub before `end` ran (TD-1749); it is the terminal gone, as EOF is
+                self.log(f"tty read failed: {e.errno}")
+                line = ""
             if not line:
                 time.sleep(3600)  # the terminal is gone: the close's signal ends the stub
                 continue
