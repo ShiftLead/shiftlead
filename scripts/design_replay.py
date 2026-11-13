@@ -37,7 +37,7 @@ LONG_ROUNDS = 6  # a design whose original ran more than this many rounds gets t
 TIMEOUT_HOURS, LONG_TIMEOUT_HOURS = 24, 72
 FIRST_REPLAY_ID = "TD-9001"
 LEDGER_SCRIPTS_ALLOWED = {"ledger.py", "cadence_config.py"}
-HARMLESS = ("/dev", "/usr", "/bin", "/lib")  # never flagged, and listed in the audit's output
+HARMLESS = ("/dev", "/usr", "/bin", "/sbin", "/lib", "/lib64")  # never flagged, and listed in the audit's output
 CADENCE = ["agent-cadence"]  # the launcher; a test points it at a stub
 GIT_TIMEOUT = 300
 PREP_TIMEOUT = 1800
@@ -477,7 +477,7 @@ def run_command(
     out["CLAUDE_CONFIG_DIR"] = str(config_dir)
     out["TMPDIR"] = str(tmp)
     out["PATH"] = f"{stubs}{os.pathsep}{env.get('PATH', '')}"
-    return ["setsid", "sh", "-c", inner], out
+    return ["sh", "-c", inner], out  # spawn makes it a session leader: the pid recorded is the wrapper's
 
 
 def spawn(argv: list[str], cwd: Path, env: dict[str, str]) -> int:
@@ -584,8 +584,11 @@ def wait(args: argparse.Namespace) -> int:
 
 # --- audit ---------------------------------------------------------------------------------------------------------
 
-PATH_IN_TEXT_RE = re.compile(r"(?<![\w.:/~$-])(~(?:/[^\s'\"`;|&<>(){}]*)?|/[^\s'\"`;|&<>(){}]+)")
+PATH_IN_TEXT_RE = re.compile(r"(?<![\w./~$])(~(?:/[^\s'\"`;|&<>(){}:]*)?|/[^\s'\"`;|&<>(){}:]+)")
 SEGMENT_SPLIT_RE = re.compile(r"\|\||&&|[;|&\n]|\$\(|`|\(|\)")
+SHELL_WORDS = {"if", "then", "else", "elif", "do", "while", "until", "!", "{", "}", "fi", "done"}
+WRAPPERS = {"sudo", "env", "timeout", "nohup", "exec", "command", "time", "xargs", "nice", "setsid", "stdbuf"}
+SHELLS = {"sh", "bash", "zsh", "dash"}
 REMOTE_GIT = {"fetch", "pull", "push", "clone", "ls-remote", "remote", "submodule"}
 WEB_TOOLS = {"WebFetch", "WebSearch"}
 PATH_TOOLS = {"Read": "file_path", "Edit": "file_path", "Write": "file_path", "Glob": "path", "Grep": "path"}
@@ -612,38 +615,54 @@ def command_flags(cmd: str, tree: Path) -> list[str]:
             words = shlex.split(seg, comments=True)
         except ValueError:
             words = seg.split()
-        while words and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", words[0]):
-            words = words[1:]  # an assignment before the command
-        while words and words[0] in {"sudo", "env", "timeout", "nohup", "exec", "command", "time"}:
+        out += words_flags(words, tree)
+    return out
+
+
+def words_flags(words: list[str], tree: Path) -> list[str]:
+    """One simple command's flags, after its keywords, assignments and wrappers; a shell's `-c`, `xargs` and
+    `find -exec` are read for the command they run."""
+    out: list[str] = []
+    while words:
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", words[0]) or words[0] in SHELL_WORDS:
             words = words[1:]
-            while words and (words[0].startswith("-") or words[0].isdigit()):
+        elif os.path.basename(words[0]) in WRAPPERS:
+            words = words[1:]
+            while words and (words[0].startswith("-") or re.fullmatch(r"[\d.]+[smhd]?", words[0])):
                 words = words[1:]
-        if not words:
-            continue
-        w0 = os.path.basename(words[0])
-        if w0 in {"ao", "gh"}:
-            out.append(f"`{w0}` run")
-        elif w0 == "agent-cadence":
-            rest = [w for w in words[1:] if not w.startswith("-")]
-            if "-C" in words[1:3]:
-                rest = [w for w in words[words.index("-C") + 2 :] if not w.startswith("-")]
-            if rest[:1] == ["hook"]:
-                out.append("`agent-cadence hook` run")
-            elif rest[:1] == ["run"] and (len(rest) < 2 or os.path.basename(rest[1]) not in LEDGER_SCRIPTS_ALLOWED):
-                out.append(f"`agent-cadence run {rest[1] if len(rest) > 1 else ''}` run".replace(" `", "`"))
-        elif w0 == "git":
-            rest, i = words[1:], 0
-            while i < len(rest) and rest[i].startswith("-"):
-                if rest[i] == "-C" and i + 1 < len(rest):
-                    if norm(rest[i + 1], tree) != os.path.normpath(str(tree)):
-                        out.append(f"`git -C {rest[i + 1]}` on another path")
-                    i += 2
-                elif rest[i] == "-c" and i + 1 < len(rest):
-                    i += 2
-                else:
-                    i += 1
-            if i < len(rest) and rest[i] in REMOTE_GIT:
-                out.append(f"remote `git {rest[i]}`")
+        else:
+            break
+    if not words:
+        return out
+    if "-exec" in words or "-execdir" in words:
+        i = words.index("-exec") if "-exec" in words else words.index("-execdir")
+        out += words_flags(words[i + 1 :], tree)
+    w0 = os.path.basename(words[0])
+    if w0 in SHELLS and "-c" in words[1:] and words.index("-c") + 1 < len(words):
+        return out + command_flags(words[words.index("-c") + 1], tree)
+    if w0 in {"ao", "gh"}:
+        out.append(f"`{w0}` run")
+    elif w0 == "agent-cadence":
+        rest = [w for w in words[1:] if not w.startswith("-")]
+        if "-C" in words[1:3]:
+            rest = [w for w in words[words.index("-C") + 2 :] if not w.startswith("-")]
+        if rest[:1] == ["hook"]:
+            out.append("`agent-cadence hook` run")
+        elif rest[:1] == ["run"] and (len(rest) < 2 or os.path.basename(rest[1]) not in LEDGER_SCRIPTS_ALLOWED):
+            out.append(f"`agent-cadence run {rest[1] if len(rest) > 1 else ''}` run".replace(" `", "`"))
+    elif w0 == "git":
+        rest, i = words[1:], 0
+        while i < len(rest) and rest[i].startswith("-"):
+            if rest[i] == "-C" and i + 1 < len(rest):
+                if norm(rest[i + 1], tree) != os.path.normpath(str(tree)):
+                    out.append(f"`git -C {rest[i + 1]}` on another path")
+                i += 2
+            elif rest[i] == "-c" and i + 1 < len(rest):
+                i += 2
+            else:
+                i += 1
+        if i < len(rest) and rest[i] in REMOTE_GIT:
+            out.append(f"remote `git {rest[i]}`")
     return out
 
 
@@ -684,14 +703,17 @@ def audit(args: argparse.Namespace) -> int:
             if name in WEB_TOOLS:
                 flags.append(f"{rel} · web tool `{name}`")
             elif name in PATH_TOOLS:
-                raw = inp.get(PATH_TOOLS[name]) or (inp.get("pattern") if name == "Glob" else None)
-                if raw and (name != "Glob" or inp.get(PATH_TOOLS[name]) or raw.startswith(("/", "~"))):
-                    p = norm(raw, here)
-                    if outside(p):
+                raws = [inp.get(PATH_TOOLS[name])]
+                if name == "Glob" and str(inp.get("pattern") or "").startswith(("/", "~")):
+                    raws.append(inp["pattern"])  # an absolute pattern reaches past its path
+                for raw in filter(None, raws):
+                    if outside(norm(str(raw), here)):
                         flags.append(f"{rel} · `{name}` of {raw} outside the allowed places")
             elif name == "Bash":
                 cmd = str(inp.get("command") or "")
                 for m in PATH_IN_TEXT_RE.finditer(cmd):
+                    if m.group(1).startswith("//"):
+                        continue  # a URL's host, which the web check is for
                     p = norm(m.group(1), here)
                     if outside(p):
                         flags.append(f"{rel} · Bash names {m.group(1)} outside the allowed places")

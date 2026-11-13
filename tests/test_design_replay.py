@@ -230,8 +230,8 @@ def test_prepare_stops_when_the_script_cannot_start(src, tmp_path, capsys):
 def test_run_builds_the_command_and_environment(tmp_path):
     env = {"PATH": "/usr/bin", "SHIFTLEAD_SESSION": "x", "SHIFTLEAD_HOME": "/h", "HOME": "/home/u"}
     argv, out = dr.run_command("TD-1", 2, tmp_path, 300, 24, Path("/c/.claude-conformance"), env)
-    assert argv[:3] == ["setsid", "sh", "-c"]
-    inner = argv[3]
+    assert argv[:2] == ["sh", "-c"]
+    inner = argv[2]
     assert inner.startswith("timeout 86400 claude -p --model claude-opus-5-5 --max-turns 300 ")
     for part in (
         "--permission-mode bypassPermissions",
@@ -266,7 +266,7 @@ def test_run_starts_the_newest_run_detached(src, tmp_path, monkeypatch, capsys):
     assert dr.main(["--root", str(root), "run", "TD-1", "--max-turns", "50"]) == 0
     assert (root / "TD-1.1.pid").read_text().strip() == "4242"
     assert seen["cwd"] == root / "TD-1.1" and seen["env"]["CLAUDE_CONFIG_DIR"].endswith(".claude-conformance")
-    assert "timeout 259200 " in seen["argv"][3]  # seven rounds: the long bound
+    assert "timeout 259200 " in seen["argv"][2]  # seven rounds: the long bound
     stub = root / "TD-1.1.run/bin/ao"
     r = subprocess.run([str(stub), "status", "--json"], capture_output=True, text=True)
     assert r.returncode == 2 and "ao status --json" in (root / "TD-1.1.run/calls.log").read_text()
@@ -365,14 +365,15 @@ def test_audit_passes_a_clean_run(tmp_path, capsys):
         _use("Grep", pattern="gate", path=str(tmp_path / "ac/docs")),
         _use("Glob", pattern="docs/**/*.md"),
         _use("Bash", command=f"{tmp_path}/main/.venv/bin/python scripts/design_prep.py --entry TD-1 --base abc"),
-        _use("Bash", command="agent-cadence run ledger.py note TD-1 'x' && git log -1 && ls /usr/bin /dev/null"),
+        _use("Bash", command="agent-cadence run ledger.py note TD-1 'x' && git log -1 && ls /usr/bin /dev/null /lib64"),
+        _use("Bash", command="curl https://example.invalid/x || true; if test -f a; then echo ok; fi"),
         _use("Bash", command=f"cat {tmp_path}/replays/TD-1.1.tmp/out.txt | head; git -C {tree} status"),
         _use("Bash", command=f"cat {tmp_path}/cfg/projects/{dr.project_dir(Path('/'), tree).name}/s.jsonl"),
     ]
     code, out = audit(tmp_path, capsys, {"s.jsonl": clean, "s/subagents/agent-a.jsonl": clean})
     assert code == 0, out
     assert out[0].startswith("design-replay audit · TD-1 run 1 · transcripts 2 · flags 0")
-    assert any(ln.startswith("never flagged: /dev/ · /usr/ · /bin/ · /lib/") for ln in out)
+    assert any(ln.startswith("never flagged: /dev/ · /usr/ · /bin/ · /sbin/ · /lib/ · /lib64/") for ln in out)
     assert "cannot see: a path a script computes for itself" in out
 
 
@@ -389,6 +390,13 @@ def test_audit_flags_each_forbidden_step(tmp_path, capsys):
         _use("Bash", command="git -C /other/repo log"),
         _use("Bash", command="cat ~/.shiftlead/home.yml"),
         _use("WebFetch", url="https://example.com"),
+        _use("Bash", command="bash -c 'agent-cadence run forge.py x'"),
+        _use("Bash", command="if git push; then :; fi"),
+        _use("Bash", command="env FOO=1 git ls-remote"),
+        _use("Bash", command="ls | xargs -n1 git clone"),
+        _use("Bash", command="find . -exec git pull \\;"),
+        _use("Bash", command="PATH=/usr/bin:/opt/elsewhere/bin make"),
+        _use("Glob", pattern="/srv/**/*.md", path="."),
     ]
     code, out = audit(tmp_path, capsys, {"s/subagents/agent-b.jsonl": dirty}, calls="2026-11-13T00:00:00Z gh pr view\n")
     flags = [ln for ln in out if ln.startswith("flag · ")]
@@ -408,6 +416,13 @@ def test_audit_flags_each_forbidden_step(tmp_path, capsys):
         "Bash names ~/.shiftlead/home.yml",
         "web tool `WebFetch`",
         "stub · 2026-11-13T00:00:00Z gh pr view",
+        "`agent-cadence run forge.py` run",
+        "remote `git push`",
+        "remote `git ls-remote`",
+        "remote `git clone`",
+        "remote `git pull`",
+        "Bash names /opt/elsewhere/bin",
+        "`Glob` of /srv/**/*.md",
     ):
         assert want in body, want
     assert all("s/subagents/agent-b.jsonl" in f for f in flags if "stub ·" not in f)
@@ -420,3 +435,12 @@ def test_audit_with_no_transcripts_is_no_pass(tmp_path, capsys):
 
 def test_names_replayed_needs_the_whole_id():
     assert dr.names_replayed("see TD-1557's rows") and not dr.names_replayed("TD-15570 and TD-155")
+
+
+def test_spawn_records_the_wrapper_itself(tmp_path):
+    """The pid `run` records is the wrapper's, alive while it runs, and the wrapper writes the exit file."""
+    exitf = tmp_path / "x.exit"
+    pid = dr.spawn(["sh", "-c", f"sleep 1; echo $? > {exitf}"], tmp_path, dict(os.environ))
+    assert dr.alive(pid)
+    os.waitpid(pid, 0)  # reap our own child, so it is gone rather than a zombie
+    assert exitf.read_text().strip() == "0" and not dr.alive(pid)
