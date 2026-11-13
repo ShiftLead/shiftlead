@@ -4879,6 +4879,8 @@
         // a row whose entry was archived since it was drawn is *done* where it stands, not *gone* (its move into
         // the ✓ n done fold waits); a card that left draws its items and rows *gone*
         if (!left && rDone.has(k) && !dDone.has(k)) { out.doneUnits.push([id, k]); gone++; shape = false; return; }
+        // a row drawn done already that the reading moved into the fold is a place change of the card, not *gone*
+        if (!left && rDone.has(k) && dDone.has(k) && !(r.units[b] || []).includes(k)) { gone++; shape = false; return; }
         if (left || !(r.units[b] || []).includes(k)) { if (!own(k)) { out.gone.push([id, k]); gone++; } shape = false; }
       }));
       // its header's top entry archived while the card keeps it as its top: *done*, its controls hidden
@@ -5497,10 +5499,16 @@
     // own press is drawn at once*): the values that waited, its *gone* among them, are drawn with the refusal
     document.addEventListener("ao:refused", (e) => {
       const id = e.detail && e.detail.card; if (!id || !reading) return;
+      const c = $(`.qgroup .qcard[data-card="${CSS.escape(id)}"]`, lists);
+      const hadFocus = !!(c && c.contains(document.activeElement));
       freed = id;
       try { patch(); } finally { freed = ""; }
+      // a whole patch replaced the pressed control: focus goes back to the card's header
+      const n = $(`.qgroup .qcard[data-card="${CSS.escape(id)}"] > .qhead`, lists);
+      if (hadFocus && n && !lists.contains(document.activeElement)) n.focus({ preventScroll: true });
     });
-    const release = () => { if (reading && $(".qcard[data-waits]", lists)) patch(); };
+    // a hold begun after the return to the tab, before its reading arrived, makes that reading an ordinary re-read
+    const release = () => { if ($$(".qgroup .qcard[data-card]", lists).some(holds)) whole = false; if (reading && $(".qcard[data-waits]", lists)) patch(); };
     document.addEventListener("pointerover", (e) => {
       if (e.pointerType !== "mouse") return;
       const id = cardId(e.target); if (id === pointerOn) return;
@@ -5654,12 +5662,17 @@
       lists.innerHTML = readingHtml;
       reading = parse(readingHtml);
       applied.clear();
+      const tops = new Map();  // per group, the last kept card put at its top: several keep their order
       kept.forEach((k) => {
         const there = $(`.qgroup .qcard[data-card="${CSS.escape(k.node.dataset.card)}"]`, lists);
         if (there) { there.replaceWith(k.node); return; }
         const prev = k.prev && $(`.qgroup .qcard[data-card="${CSS.escape(k.prev)}"]`, lists);
-        const q = $(`.qgroup[data-group="${CSS.escape(k.group)}"] .qcards`, lists);
-        if (prev) prev.after(k.node); else if (q) q.prepend(k.node);
+        const q = $(`.qgroup[data-group="${CSS.escape(k.group)}"] .qcards`, lists) || $(".qgroup .qcards", lists);
+        const top = tops.get(q);
+        if (prev) prev.after(k.node);
+        else if (top) top.after(k.node);
+        else if (q) q.prepend(k.node);  // its group gone too: the first group's top, never lost with its open menu
+        if (!prev && q) tops.set(q, k.node);
       });
       AO.qcardReapply(lists);  // a card's press still out (TD-1461), before the item's own keep takes a left row out
       AO.restoreRowErrs(lists, errs);

@@ -93,6 +93,8 @@ const one = (o) => page([group("in_progress", [card("A", o)])]);
 out.done_fold = dn([one({ rows: ["a1", "a2"] }), one({ rows: ["a1"], fold: ["a2"] })]);
 out.done_inline = dn([one({ rows: ["a1", "a2"] }), one({ rows: ["a1", "a2"], archived: ["a2"] })]);
 out.done_drawn = dn([one({ rows: ["a1"], fold: ["a2"] }), one({ rows: ["a1"], fold: ["a2"] })]);
+// a row drawn archived in its place that the reading moved into the fold: a place change, never *gone*
+out.done_folded = dn([one({ rows: ["a1", "a2"], archived: ["a2"] }), one({ rows: ["a1"], fold: ["a2"] })]);
 out.done_head = dn([one({ rows: ["a1"] }), one({ rows: ["a1"], headDone: 1 })]);
 out.lis = [...AO.qLis([0, 3, 1, 2])].sort();
 out.age = [AO.qAge(12000), AO.qAge(185000), AO.qAge(7300000)];
@@ -184,6 +186,8 @@ def test_a_row_whose_entry_was_archived_is_done_not_gone_and_moves_its_card(got)
         d = got[case]
         assert d["doneUnits"] == [["A", "r:a2"]] and d["gone"] == [], case
         assert d["moved"] == 1 and d["words"] == ["1 card moved"] and "A" not in d["same"], case
+    d = got["done_folded"]
+    assert d["gone"] == [] and d["doneUnits"] == [] and d["moved"] == 1
     # a row drawn done already is nothing new
     d = got["done_drawn"]
     assert d["doneUnits"] == [] and _counts(d) == NOTHING
