@@ -48,6 +48,7 @@ from sessionorc import (
     naming,
     paths,
     reports,
+    start_hooks,
     witness,
     work,
 )
@@ -1835,6 +1836,8 @@ class HostAgent(
             # — and then the suffix is part of the name the Org shows (TD-030 step 2).
             taken = (set(self.sessions) | set(live)) - ({freed} if freed else set())
             base = naming.base_id(directory, repo, name)
+            first_prompt = spec.first_prompt or None
+            hooks_due = bool(first_prompt) and adapters.core_runs_start_hooks(adapter)
             for _attempt in range(5):
                 sid = naming.session_id(directory, repo, name, taken)
                 # Ours win, whatever an adapter sets. SHIFTLEAD_HOME is explicit because the tmux
@@ -1858,6 +1861,15 @@ class HostAgent(
                     **model_env,
                 }
                 run_log = paths.runs_dir() / f"{sid}-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.log"
+                if hooks_due:
+                    # the repo's start hooks for a tool that runs none of its own, before the pane, into the
+                    # first prompt after the brief (§4.3 *The repo's start hooks*, TD-1637): once, with the first
+                    # attempt's env; a retry on tmux's verdict reuses the text
+                    hooks_due = False
+                    told = await asyncio.to_thread(
+                        self._start_hooks_text, directory, env, spec.adapter_id or resume, bool(resume), name
+                    )
+                    first_prompt = start_hooks.with_hooks(first_prompt or "", told)
                 self._starting.add(sid)
                 try:
                     await asyncio.to_thread(self._start, sid, directory, spec.argv, env, run_log)
@@ -1904,7 +1916,7 @@ class HostAgent(
                 review=reading,
                 context_bound=bound,
                 start_context=start_context,
-                first_prompt=spec.first_prompt or None,
+                first_prompt=first_prompt,
                 model_file=model_env.get("AGENT_MODEL_FILE"),
                 tool_version=tool_version if isinstance(tool_version, str) and tool_version else None,
             )
@@ -2557,6 +2569,31 @@ class HostAgent(
         occ = await asyncio.to_thread(self.occupants, directory)
         is_git = (directory / ".git").exists() or await asyncio.to_thread(lambda: git_info(directory) is not None)
         return {"dir": str(directory.resolve()), "occupants": occ, "git": bool(is_git)}
+
+    def _start_hooks_text(
+        self, directory: Path, env: dict[str, str], session_id: str | None, resumed: bool, name: str
+    ) -> str:
+        """What the repo's start hooks print for a launch (§4.3 *The repo's start hooks*, TD-1637): run in the
+        session's directory with the environment its pane gets, bounded at `START_HOOKS_LAUNCH_TIMEOUT`. A
+        failure never refuses the launch: the runner's notice is the text, and anything else is logged and
+        reads as nothing."""
+        payload = {
+            "cwd": str(directory),
+            "session_id": session_id or None,
+            "source": "resume" if resumed else "startup",
+        }
+        try:
+            run_env = start_hooks.pane_env(self.tmux, os.environ, env)
+            return start_hooks.start_hooks(
+                payload,
+                project=directory,
+                env=run_env,
+                deadline=start_hooks.START_HOOKS_LAUNCH_TIMEOUT,
+                on_timeout=start_hooks.START_HOOKS_TIMED_OUT,
+            )
+        except Exception as e:  # noqa: BLE001 — the launch goes on whatever the run does
+            log.warning("create %s: start hooks: %s", name, e)
+            return ""
 
     def _start(self, sid: str, cwd: Path, argv: list[str] | None, env: dict[str, str], run_log: Path) -> None:
         self.tmux.ensure_server()
