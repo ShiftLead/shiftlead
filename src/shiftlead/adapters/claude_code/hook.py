@@ -86,6 +86,19 @@ NOTIFICATION_KINDS = {
     "elicitation_url_dialog": "question",
     "agent_needs_input": "question",
 }
+# A turn that ends on an API error fires `StopFailure`, never `Stop`, its `error` one of the tool's own codes.
+# These are the account's: nothing the session does next can succeed until a person acts in the terminal
+# (`/login`, a plan, an org setting), so the record reads `needs-you`, a question, not the `working` its
+# `UserPromptSubmit` left — a seat smoke on an expired login read `working` for ten minutes (TD-1747).
+# Any other code (a rate limit, an overload, a server error) changes no state here.
+ACCOUNT_ERRORS = {
+    "authentication_failed",
+    "oauth_org_not_allowed",
+    "account_on_hold",
+    "verification_required",
+    "billing_error",
+    "cloud_credential_error",
+}
 # A tool event's place in its call, in the core's neutral words (design §4.2 *A waiter is keyed by its
 # call*, TD-950): the core tells a call's first event from its last without reading the tool's names.
 CALL_EDGE = {"PreToolUse": "start", "PostToolUse": "end"}
@@ -199,9 +212,26 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
         # `prompt`: a prompt went in, which is what the host agent's typed brief waits on (§4.1 *No
         # prose in the argv*, TD-339) — a word, not the prompt's text
         return {**out, "state": "working", "pending": None, "prompt": True}
+    if ev == "StopFailure":
+        return _stop_failure(out, payload)
     if ev in STATE_EVENTS:
         return {**out, "state": STATE_EVENTS[ev], "pending": None}
     return None
+
+
+def _stop_failure(out: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any] | None:
+    """A turn ended on an API error (TD-1747): an account's error is a question for the person in the
+    terminal, its text the tool's own words (*Login expired · Please run /login*); any other, no change."""
+    error = str(payload.get("error") or "")
+    if error not in ACCOUNT_ERRORS:
+        return out or None
+    said = " ".join(str(payload.get("last_assistant_message") or payload.get("error_details") or error).split())
+    lead = "Claude Code wants a login" if error == "authentication_failed" else "Claude Code's account stopped the turn"
+    return {
+        **out,
+        "state": "needs-you",
+        "pending": {"kind": "question", "text": f"{lead}: {said[:200]} (answer in the terminal)"},
+    }
 
 
 def _call(ev: str, payload: dict[str, Any]) -> dict[str, Any]:
