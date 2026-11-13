@@ -66,7 +66,7 @@ def clean_windows(raw: Any) -> list[dict[str, Any]]:
             "resets": str(resets) if _instant(resets) is not None else None,
         }
         if label in out and out[label]["pct"] >= n["pct"]:
-            continue  # a label twice in one report: the higher stands, as it would across two
+            continue  # a label twice in one report: the higher stands
         out[label] = n
     return list(out.values())[:8]
 

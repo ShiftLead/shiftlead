@@ -1,5 +1,5 @@
 """TD-233 slice 2, the host agent's half (design §4.4 *Usage, reported first and asked for last*):
-a session's report of its account's limits, merged by what a window can do, with an age of its
+a session's report of its account's limits, merged by how fresh its word is, with an age of its
 own and a short history; the endpoint then asked only for what reports cannot give."""
 
 from __future__ import annotations
