@@ -88,6 +88,8 @@ def test_the_four_known_outcomes():
         assert outcome in s5, outcome
     assert "a keyword hit alone is never a match" in s5
     assert "A `Superseded` entry is followed" in s5
+    assert "the finding's `last` is no later than its `Resolved:` day, or the entry has no `Resolved:` day" in s5
+    assert "the finding's `last` is after its `Resolved:` day. File it new, its Why naming the entry" in s5
     assert "*not deduped against <repo>*" in s5
 
 
@@ -110,6 +112,7 @@ def test_the_pr_its_body_lines_and_the_note_form():
 def test_already_noted_and_the_approval_answers():
     s7 = section(7)
     assert "*already noted*, the earlier note shown beside it, and left out of *notes: all*" in s7
+    assert "naming each of this note's seats, with a window sharing more than an instant with this run's" in s7
     assert "a different seat, or a window meeting only at an instant, is not marked" in s7
     assert "the change may remove a part from the group" in s7
     assert "*file* — file its shiftlead part and list its parts for other repos" in s7
@@ -167,7 +170,12 @@ def test_a_record_with_an_error_and_the_runs_again():
         "Every run again carries every earlier run again's `--skip`s",
         "An accepted seat** stays in the command",
         "its `failed` is never skipped",
-        "nor read at step 3 whatever a later index holds for it (a whole read, or another error)",
+        "nor read at step 3 whatever a later index holds for it (a whole read, another error, or a read past a "
+        "conversation another record's run again skipped)",
+        "it is not offered again whatever its error then is",
+        "**Offer the choice again** on each run again's index while a record in it has an `error` and is not one the "
+        "person has accepted",
+        "The choice is made per record, before step 3",
         "the `seat` and `error` of the record that reported it failed",
         "skipped there too, and is named under the failed record's seat alone",
     ):

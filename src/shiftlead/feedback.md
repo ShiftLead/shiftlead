@@ -30,8 +30,8 @@ you have read the match and the person has answered (steps 5 and 7).
    `ao repo shiftlead --json`. Run anywhere else, stop here and say where to run it: a worktree of that checkout,
    or the checkout itself, at the home.
 2. **Stop while a `feedback:` PR is open.** List the open shiftlead PRs whose title opens `feedback: `
-   (`gh pr list -R <owner/repo> --state open --search "feedback: in:title" --json number,title`, keeping the
-   titles that open `feedback: `). Where one exists, name it and stop until that PR merges or closes, since
+   (the same `gh pr list` as in 3 below, with `--state open` in place of `--state merged`, keeping the titles
+   that open `feedback: `). Where one exists, name it and stop until that PR merges or closes, since
    the notes it writes are on no branch a later run reads.
 3. **Find the last run.** It is the shiftlead PR titled `feedback: <since> → <until>` with the latest
    `mergedAt`: `gh pr list -R <the owner/repo of the remote in ao repo shiftlead --json> --state merged
@@ -78,8 +78,8 @@ Run `ao feedback digest <seat>… --since <since> --until <until> --out <dir> --
   person has accepted — a record whose `failed` is null included, with nothing skipped, until the person
   accepts it unread. Every run again carries every earlier run again's `--skip`s with the new ones.
 - **An accepted seat** stays in the command, so the order holds; its `failed` is never skipped; it is not
-  offered again whatever its error then is, nor read at step 3 whatever a later index holds for it (a whole
-  read, or another error). Name it unread with the error the person accepted, which you keep, and name in the
+  offered again whatever its error then is, nor read at step 3 whatever a later index holds for it (a whole read, another error, or a read
+  past a conversation another record's run again skipped). Name it unread with the error the person accepted, which you keep, and name in the
   report each other record sharing its directory, since a later index may list a shared conversation under
   the accepted seat, where it goes unread.
 - **Keep, for each conversation a run again skips**, the `seat` and `error` of the record that reported it
@@ -166,8 +166,7 @@ rolled up for each seat and for the run, since a noisy agent is a sign of a bad 
 
 ### 7. Approve
 
-Write the report to the scratch directory as `feedback-report.md`, a name no digest part can have, and show
-it in the chat. It gives, in order:
+Write the report to the scratch directory as `feedback-report.md`, a name no digest part can have, and show it in the chat. It gives:
 
 - the window, the seats, and what went unread at step 2 with its error (a seat accepted unread, each other
   record sharing its directory, and each conversation a run again skipped, under its failed record's seat);
@@ -264,5 +263,5 @@ filed.
 
 **Then clean up.** Remove the digests — the index's `parts` paths. The report, `feedback-report.md` in the
 scratch directory, stays: the procedure never removes the scratch directory, and the person copies what they
-mean to keep. It holds the evidence quotes, each at most 200 characters, so some transcript text outlives the
-digests in that file. **The run's last message names the report's absolute path.**
+mean to keep. It holds the evidence quotes, each at most 200 characters, so some transcript text outlives the digests in that file, on the machine the run is at, besides the chat
+you show it in. **The run's last message names the report's absolute path.**
