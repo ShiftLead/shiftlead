@@ -146,18 +146,16 @@ def select(src: Path) -> None:
             picked += keep
             windows.append((s, keep[0]["ts"], keep[-1]["ts"]))
         picked.sort(key=lambda r: r["ts"])
-        mode, open_reviews = "drafting", 0
+        mode = "drafting"
         for r in picked:
             r["calls"] = "report" if r["tools"] == "REPORT" else ";".join(klass(c) for c in r["tools"].split(";") if c)
             del r["tools"]
             if r["calls"] == "report":
-                open_reviews = max(0, open_reviews - 1)
                 mode = "applying"
                 r["phase"] = "report"
                 continue
             ph = phase_of(r["calls"], mode)
             if ph == "reviews":
-                open_reviews += r["calls"].split(";").count("agent")
                 mode = "reviews"
             r["phase"] = ph
         for r in picked:

@@ -10,8 +10,8 @@ $88.82). Per design it is 42% to 57%. That is above the quarter line TD-1764 pro
 
 **Three facts the plan did not assume:**
 
-1. **The designer is not Fable.** Every designer turn on kmaster since 2026-10-14, 21,955 of them, ran on
-   `claude-opus-5-5`. Fable (`claude-fable-5-1`, then `-5-2`) runs only as a design *reviewer*.
+1. **The designer is not Fable.** Every designer turn on kmaster since 2026-10-14, about 22,000 of them, ran on
+   `claude-opus-5-5`, but for two `<synthetic>` lines. Fable (`claude-fable-5-1`, then `-5-2`) runs only as a design *reviewer*.
 2. **The reviewers cost twice what the designer does.** The five designs' reviewers spent $173.85, against
    the designer's $88.82. Fable reviews alone were $118.04 of that. The designer's fix turns are 17% of a
    design's whole spend.
@@ -82,10 +82,10 @@ Over each design's turns in time order:
   until the next report;
 - **applying fixes**: every turn from a report to the next reviewer started;
 - **drafting**: every turn before the first reviewer is started;
-- **bookkeeping** overrides those three: a turn whose every tool call is the ledger, the board, the review record,
+- **bookkeeping** overrides drafting, applying and the waiting turns, never a turn that starts a reviewer: a turn whose every tool call is the ledger, the board, the review record,
   the history, or the PR and its merge (`ledger.py`, `board_edit`, `docs/reviews/`, `gh`, `git add/commit/push`,
   `ao progress`, `ao td`, `ao pr`, `check_cadence`, `precheck`, `forge.py`). Mixed with mail, it is still bookkeeping;
-- **other** also overrides them: a turn whose every call is mail or a record read (`ao inbox`, `ao msg`,
+- **other** overrides them the same way: a turn whose every call is mail or a record read (`ao inbox`, `ao msg`,
   `ao doing`, `ao status`, `ao repo`, the attention board).
 
 The designer edits mostly through scripts run in Bash, not the Edit tool, so a phase is read from the review
