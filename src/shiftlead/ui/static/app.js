@@ -5474,6 +5474,13 @@
     }
     return seen;
   };
+  // whether a completed line's entry ids (`data-ids`, space-separated) name the id a `/queue#<id>` address asks for:
+  // the same ref, zero-padded as qRefs writes it, and a bare id any repo's (TD-1762). Pure, for a test.
+  AO.qIdsHave = (ids, id) => {
+    const want = AO.qRefs(id)[0];
+    if (!want) return String(ids || "").split(" ").includes(id);
+    return AO.qRefs(String(ids || "")).some((r) => r === want || (!want.includes("#") && r.replace(/^.*#/, "") === want));
+  };
   AO.qWord = (w) => {
     w = String(w).replace(/\btd-(?=\d)/gi, "TD-");
     const refs = /^(?:[\w.-]+#)?TD-\d+$/.test(w) ? AO.qRefs(w) : [];
@@ -5737,10 +5744,12 @@
     // a window a read answered without (an older home) is not asked again on every apply, only by the poll
     let short = "";
     const loading = () => { const w = AO.qWinFetch(loaded(), store.get("qwin", "day")); return w === short ? "" : w; };
+    // a window held for the one apply() that follows: the hash's completed line past the one picked (TD-1762)
+    let winOnce = "";
     function apply() {
       qc.applyFolds();
       applyPicks();
-      const win = store.get("qwin", "day");
+      const win = winOnce || store.get("qwin", "day");
       $$(".qwin", box).forEach((b) => b.setAttribute("aria-pressed", b.dataset.win === win ? "true" : "false"));
       $$(".qwinword", box).forEach((el) => (el.hidden = el.dataset.wv !== win));
       let shown = 0;
@@ -5778,13 +5787,61 @@
     }
     function reveal(el, ring) {
       const g = el.closest(".qgroup"); if (g && g.classList.contains("qgfolded")) toggleGroup(g, true);
+      const fold = el.closest("details.qfold"); if (fold && !fold.open) fold.open = true;  // an archived row's ✓ n done
       const card = el.closest(".qcard");
       if (card && card.classList.contains("folded")) qc.toggleFold(card);
       el.scrollIntoView({ block: "center" });
       if (ring) { $$(".qring", box).forEach((x) => x.classList.remove("qring")); el.classList.add("qring"); }
     }
+    // `/queue#<id>`, the Queue's own *where is TD-n* (§4.5 screen 12 *Addresses*, TD-1762): the card or row that has
+    // the id, opened and ringed, the picks hiding it dropped; else the Recently completed line that lists it (the
+    // window widened to *month* for that draw where the line is past the one picked); else one read with `find=<id>`,
+    // the picks untouched, for the line past the window held or the find's note with its Repo link. An id starting
+    // `loose:` is matched whole against the cards and, finding none, ends on the plain `/queue`
+    const lineFor = (root, id) => $$(".qdline[data-ids]", root).find((ln) => AO.qIdsHave(ln.dataset.ids, id)) || null;
+    function showLine(ln) {
+      const wide = !(ln.dataset.w || "").split(" ").includes(store.get("qwin", "day"));
+      winOnce = wide ? "month" : "";
+      try { if (ln.closest(".qoff")) hidden(ln, ""); else apply(); } finally { winOnce = ""; }
+      const body = $(".qdbody", ln); if (body && body.hidden) openLine(ln);
+      reveal(ln, true);
+    }
+    // the hash's note, outside the lists so no re-read draws it away; gone with the next address
+    function hashMiss(note) { const old = $("#qhashmiss", box); if (old) old.remove(); if (note) lists.before(note); }
+    const asked = new Set();  // the addresses read with `find=`, once each: never again on a re-read
+    async function findHash(id) {
+      if (asked.has(id)) return;
+      asked.add(id);
+      try {
+        const res = await fetch(`/queue?${new URLSearchParams({ part: "1", win: "month", find: id })}`);
+        const fresh = res.ok ? parse(await res.text()) : null;
+        if (!fresh || !$("#qcounts", fresh)) { asked.delete(id); return; }
+        if (AO.hashId(location.hash) !== id) return;  // the person went on to another address
+        if (lineFor(fresh, id)) {
+          drawWindow(fresh);
+          apply();  // the picks' marks on the lines drawn in, never the find's
+          const ln = lineFor(lists, id); if (ln) showLine(ln);
+          return;
+        }
+        const m = $("#qfindmiss", fresh); if (!m) return;
+        const n = m.cloneNode(true); n.id = "qhashmiss"; delete n.dataset.for;
+        hashMiss(n); reveal(n, true);
+      } catch (err) { asked.delete(id); }
+    }
     function showHash() {
-      const el = onCard(AO.hashId(location.hash)); if (el && !hidden(el, "")) reveal(el, false);
+      const id = AO.hashId(location.hash);
+      hashMiss(null);
+      if (!id) return;
+      if (id.startsWith("loose:")) {
+        const c = $(`.qgroup .qcard[data-card="${CSS.escape(id)}"]`, lists);
+        if (!c) { history.replaceState(null, "", location.pathname + location.search); return; }
+        hidden(c, ""); reveal(c, true); return;
+      }
+      const el = onCard(id);
+      if (el) { hidden(el, ""); reveal(el, true); return; }
+      const ln = lineFor(lists, id);
+      if (ln) { showLine(ln); return; }
+      findHash(id);
     }
     box.addEventListener("click", (e) => {
       // a board line's *holds* link (§4.5 screen 12 *Three verbs*, TD-1380): its row's anchor, unless a pick hides

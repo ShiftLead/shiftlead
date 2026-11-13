@@ -28,7 +28,7 @@
   {% if q.kept %}<div class="qcards qkepts">{% for c in q.kept %}{{ qc.card(c) }}{% endfor %}</div>{% endif %}
   <div class="rlist qdone">
   {% for ln in (q.completed.sent if q.completed.sent is defined else q.completed.lines) %}
-    <div class="qdline{% if ln.entries %} opens{% endif %}{% if ln.off %} qoff{% endif %}" data-n="{{ ln.n }}" data-repo="{{ ln.repo }}" data-find="{{ ln.find }}" data-key="{{ ln.kind }}:{{ ln.show }}" data-w="{{ ln.wins | join(' ') }}"{% if 'day' not in ln.wins %} hidden{% endif %}>
+    <div class="qdline{% if ln.entries %} opens{% endif %}{% if ln.off %} qoff{% endif %}" data-n="{{ ln.n }}" data-repo="{{ ln.repo }}" data-find="{{ ln.find }}" data-key="{{ ln.kind }}:{{ ln.show }}" data-ids="{{ (ln.ids or []) | join(' ') }}" data-w="{{ ln.wins | join(' ') }}"{% if 'day' not in ln.wins %} hidden{% endif %}>
       <div class="qdhead"{% if ln.entries %} role="button" tabindex="0" aria-expanded="false" title="what was done"{% endif %}>
         <span class="qsub qage">{{ ln.age }}</span><span class="qid mono strong">{{ ln.show }}</span>{{ pbadge(ln.priority) }}<span class="qtitle">{{ ln.title }}</span>
         <span class="qright">{#- §4.5a *Queue page, Recently completed: live mark* (TD-904) #}{% if ln.live %}<span class="qlive{% if ln.live == 'not yet live' %} notlive{% endif %}" title="{{ help_title('live-mark') }}">{{ ln.live }}</span>{% endif %}{% if ln.kind == 'row' %}<a class="qsub" href="#{{ ln.on }}">on {{ ln.on }}'s card</a>{% elif ln.n > 1 %}<span class="qsub">{{ ln.n }} entries</span>{% endif %}</span>
