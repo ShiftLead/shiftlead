@@ -228,3 +228,13 @@ def test_a_run_before_the_seam_is_written_in_the_reply_it_ends():
 def test_a_cut_reply_holds_at_least_one_entry():
     got = run([E(kind="text", at=at(9, 0), text="w" * 20_000), E(kind="text", at=at(9, 1), text="v")], limit=5000)
     assert got["text"].startswith("=== 2026-11-04 ===\n09:00 < www") and got["next"] == {"at": at(9, 1), "skip": 0}
+
+
+def test_a_reply_under_the_limit_with_many_runs_is_not_cut():
+    entries = []
+    for i in range(400):
+        entries += [E(kind="text", at=at(9, 0, i % 60), text=f"t{i}"), E(kind="tool", at=at(9, 0, i % 60), name="Bash")]
+    whole = run(entries)
+    size = len(dg.json.dumps(whole))
+    got = run(entries, limit=dg.REPLY_SLACK + size)
+    assert got["next"] is None and got["text"] == whole["text"]

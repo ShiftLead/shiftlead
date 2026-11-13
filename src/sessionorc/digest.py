@@ -30,6 +30,7 @@ RESULT_LINES = 3  # a failed call's result: its first lines, or
 RESULT_CHARS = 300  # its first characters, whichever is shorter
 PROMPT_LINES = 3  # a prompt's first lines
 CUT = " (cut)"
+RUN_GUESS = 256  # an open run's line, counted from its first call until it is written
 EMPTY: dict[str, Any] = {"text": "", "lines": 0, "next": None}
 
 
@@ -175,14 +176,16 @@ def render(window: list[_Timed], zone: tzinfo) -> tuple[list[str], list[int]]:
         total += len(json.dumps(block)) - 1  # as the JSON escapes it, its newline counted
 
     def flush() -> None:
+        nonlocal total
         if run:
+            total -= RUN_GUESS  # the open run's placeholder, now written at its real size
             put(_run_line(run, zone), run[0].at)
             run.clear()
 
     for t in window:
         if _folded(t.entry):
             if not run:
-                total += 80  # the run's line, written at its end, counted at its first call
+                total += RUN_GUESS  # the run's line, written at its end, counted at its first call while open
             run.append(t)
         else:
             block = _block(t.entry, t.at.astimezone(zone).strftime("%H:%M"))
