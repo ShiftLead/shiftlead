@@ -24,7 +24,16 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import cadence, identity, paths
-from sessionorc.adapters import ExternalSession, LaunchSpec, Link, Prompt, Transcript, read_version
+from sessionorc.adapters import (
+    Conversation,
+    ExternalSession,
+    LaunchSpec,
+    Link,
+    Prompt,
+    Transcript,
+    oldest_first,
+    read_version,
+)
 from sessionorc.identity import ProcReader
 from sessionorc.models import Confidence, State
 from sessionorc.screen import Manifest, Match, painted_text
@@ -581,7 +590,10 @@ class ClaudeCodeAdapter:
     cadence_hook_lines_past = CADENCE_HOOK_LINES_PAST  # the earlier seeds a repo may still carry (TD-1023)
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112); no `mail`: a
     # session of this tool is handed its mail by a pane write (§4.10)
-    implements = frozenset({"background", "composer", "context", "links", "prompts", "spend", "title", "usage_report"})
+    implements = frozenset(
+        {"background", "composer", "context", "conversations", "links", "prompts", "spend", "title", "usage_report"}
+    )
+    marks_errors = True  # a tool result's `is_error` (design §4.3 `read_transcript`, TD-1491)
     usage_report = staticmethod(usage_report)  # the status line's windows, read by the hook command (§4.4 *Usage*)
 
     def __init__(self, binary: str | None = None, rules: Path | None = None):
@@ -840,6 +852,21 @@ class ClaudeCodeAdapter:
             )
         except OSError:
             return None
+
+    def conversations(self, cwd: Path, profile: str = "") -> list[Conversation] | None:
+        """Every conversation the profile holds for `cwd` (design §4.3 `conversations`, TD-1491): each
+        `projects/<munged cwd>/*.jsonl` with a timestamped entry, oldest first, whoever started it. None
+        when the profile is unknown (never another account's directory), [] when there are none."""
+        try:
+            prof = profiles_mod.get(profile or None)
+        except (KeyError, ValueError):
+            return None
+        base = config_dir(prof) / "projects" / munge(cwd)
+        try:
+            files = [p for p in base.glob("*.jsonl") if p.is_file()]
+        except OSError:
+            return []
+        return oldest_first([c for p in files if (c := transcript_mod.conversation(p)) is not None])
 
     def links(self, session_id: str, cwd: Path, profile: str = "", *, cursor: int = 0) -> tuple[list[Link], int] | None:
         """The http/https URLs the session printed past byte `cursor` — its text and its tool results,

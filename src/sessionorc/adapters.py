@@ -11,6 +11,7 @@ import shutil
 import subprocess
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -246,11 +247,26 @@ class Adapter(Protocol):
     #                                                      (§4.2a, TD-151): the home reads it before the cap
     #                                                      rule, and prices the turns with it. No method, or
     #                                                      None: a subscription — never guessed
+    #   marks_errors: bool                                whether `read_transcript` sets a `tool` entry's `error`
+    #                                                      at all (design §4.3, TD-1491): False where unset, so
+    #                                                      §4.7 *Feedback*'s index can say a seat's failed calls
+    #                                                      are unseen; read through `marks_errors`
 
 
 # The optional methods an agent adapter declares in `implements` (design §4.3 *The conformance suite*,
 # TD-112): what the suite tests where declared and finds absent where not.
-OPTIONAL_METHODS = ("background", "composer", "context", "links", "mail", "prompts", "spend", "title", "usage_report")
+OPTIONAL_METHODS = (
+    "background",
+    "composer",
+    "context",
+    "conversations",
+    "links",
+    "mail",
+    "prompts",
+    "spend",
+    "title",
+    "usage_report",
+)
 
 # The live walk's `--capture` (design §4.3 *The conformance suite*, TD-784): set in a launch's environment,
 # it names a directory where the adapter's hook appends each payload its tool hands it, as received, one
@@ -262,6 +278,12 @@ def implements(adapter: object) -> frozenset[str]:
     """The optional methods `adapter` declares (design §4.3 *The conformance suite*): its `implements`,
     each one of `OPTIONAL_METHODS`; none where unset."""
     return frozenset(getattr(adapter, "implements", None) or ())
+
+
+def marks_errors(adapter: object) -> bool:
+    """Whether the adapter's `read_transcript` marks a failed call's `error` (design §4.3, TD-1491); False
+    where unset."""
+    return getattr(adapter, "marks_errors", False) is True
 
 
 # -- the transcript's neutral shape (design §4.5 screen 9 *The adapter renders, the core draws*) --
@@ -313,7 +335,9 @@ class TranscriptEntry:
     `prompt` or `text` carries `text` and `at`; a `thought` its `text` and `lines`; a `tool` its
     `name`, the one-line `call` (its input's first line, as the pane draws it), its `result` (None
     until one came back) and, for a call that started a subagent, `sidechain`; a `sidechain` its
-    `count` and `entries`; a `compaction` its `at`. Nothing here is named after a tool's field."""
+    `count` and `entries`; a `compaction` its `at`. A `tool` entry's `error` is True when the tool marked
+    the call's result as failed, False where it did not or the adapter cannot tell (`marks_errors`, TD-1491).
+    Nothing here is named after a tool's field."""
 
     kind: str
     at: str | None = None
@@ -325,6 +349,7 @@ class TranscriptEntry:
     count: int = 0
     entries: list[TranscriptEntry] = field(default_factory=list)
     sidechain: TranscriptEntry | None = None
+    error: bool = False
 
     def to_dict(self) -> dict:
         """The entry with only the fields its kind carries: what the RPC and `--json` hand over."""
@@ -337,6 +362,8 @@ class TranscriptEntry:
             out["lines"] = self.lines
         if self.kind == "tool":
             out.update(name=self.name, call=self.call, result=self.result)
+            if self.error:
+                out["error"] = True
             if self.sidechain is not None:
                 out["sidechain"] = self.sidechain.to_dict()
         if self.kind == "sidechain":
@@ -373,6 +400,39 @@ class Transcript:
         if self.raw is not None:
             out["raw"] = self.raw
         return out
+
+
+@dataclass(frozen=True)
+class Conversation:
+    """One conversation a tool holds for a directory (design §4.3 `conversations`, TD-1491): `id`, what
+    `read_transcript` takes; `first_at` and `last_at`, the instants of the file's first and last timestamped
+    entries, as the tool wrote them; `size`, the file's bytes."""
+
+    id: str
+    first_at: str
+    last_at: str
+    size: int
+
+    def to_dict(self) -> dict:
+        return {"id": self.id, "first_at": self.first_at, "last_at": self.last_at, "size": self.size}
+
+
+def instant(at: str | None) -> datetime | None:
+    """An RFC 3339 instant as an aware datetime (a trailing `Z` read as UTC), None when it does not parse or
+    carries no offset."""
+    if not at:
+        return None
+    try:
+        got = datetime.fromisoformat(at.replace("Z", "+00:00") if at.endswith("Z") else at)
+    except ValueError:
+        return None
+    return got if got.tzinfo is not None else None
+
+
+def oldest_first(conversations: list[Conversation]) -> list[Conversation]:
+    """Conversations ordered by their first instant, then id: the order `conversations` answers in."""
+    floor = datetime.min.replace(tzinfo=UTC)
+    return sorted(conversations, key=lambda c: (instant(c.first_at) or floor, c.id))
 
 
 def start_context_system(name: str) -> bool:

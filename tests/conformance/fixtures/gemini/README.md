@@ -34,3 +34,7 @@ person's session is in them. `manifest.json` names each fixture with what the ad
   with two shell-mode commands (`!timeout 300 sleep 290`, `!python3 -c …`) each moved to the background with
   Ctrl+B: the pane's `node`, the `node` it relaunches itself as, and each command's `bash -c` wrapper under
   that; each `cmdline` value cut to 160 characters (`background`).
+
+- `conversations` (TD-1716) reads the two `transcripts/` chats placed unchanged in one project whose
+  `.project_root` names the cwd; the harness puts a copy of each in another project and under a subagent's
+  `chats/<parent id>/`, both of which the read leaves out.

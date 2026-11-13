@@ -1,0 +1,8 @@
+{"type": "last-prompt", "leafUuid": "f35b9d1f-321d-4631-b92e-e9bfc21fe23e", "sessionId": "d364cb80-a6f4-4d7b-a1c0-d4001205dade"}
+{"type": "custom-title", "customTitle": "grinder-ao-1", "sessionId": "d364cb80-a6f4-4d7b-a1c0-d4001205dade"}
+{"type": "agent-name", "agentName": "grinder-ao-1", "sessionId": "d364cb80-a6f4-4d7b-a1c0-d4001205dade"}
+{"type": "mode", "mode": "normal", "sessionId": "d364cb80-a6f4-4d7b-a1c0-d4001205dade"}
+{"type": "permission-mode", "permissionMode": "bypassPermissions", "sessionId": "d364cb80-a6f4-4d7b-a1c0-d4001205dade"}
+{"type": "session-owner", "accountUuid": "00000000-0000-0000-0000-000000000000", "organizationUuid": "00000000-0000-0000-0000-000000000000", "sessionId": "d364cb80-a6f4-4d7b-a1c0-d4001205dade"}
+{"type": "atis-latch", "atis": "", "sessionId": "d364cb80-a6f4-4d7b-a1c0-d4001205dade"}
+{"type": "file-history-snapshot", "messageId": "35175516-7c7a-4be4-a5fb-a827317b0bd7", "snapshot": {"messageId": "35175516-7c7a-4be4-a5fb-a827317b0bd7", "trackedFileBackups": {}, "timestamp": "2026-11-13T15:27:24.463Z"}, "isSnapshotUpdate": false}

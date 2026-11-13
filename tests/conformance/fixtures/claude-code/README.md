@@ -34,3 +34,16 @@ read from it at capture.
   keeps its `user`, `assistant`, `system` and `custom-title` lines, unshortened; the `attachment` and
   `api-request*` lines are dropped, since they carry the system prompt. The pane is `capture-pane -p -S -
   -E -` of the same conversation at its end, trailing empty rows dropped.
+
+- `transcripts/failed-call.jsonl` (TD-1716, `read_transcript`'s `error` and `marks_errors`): lines 815–833 of
+  grinder-ao-1's own transcript (`~/.claude/projects/-home-kmaster-shiftlead--claude-worktrees-grinder-ao-1/
+  bad14ff1-….jsonl`, Claude Code on kmaster, 2026-11-13): the bookkeeping the tool writes at a resume, then a
+  Bash call whose result the tool marked `is_error` (a `git show` of a path not on `origin/main`) and the next
+  call, its result not yet written. The `attachment` and `api-request*` lines are dropped; long string values
+  shortened (`… <cut>`) and a thinking block's `signature` as `sig`; the account and organisation ids zeroed.
+- `conversations/` (TD-1716, `conversations`): four files of the same directory, each named for its
+  conversation as the tool names them — the head (up to its second timestamped entry) and the tail (from its
+  third-last) of three of grinder-ao-1's own conversations of 2026-11-13, shortened and zeroed as above, and the
+  bookkeeping lines the tool wrote before the fourth's first turn alone, which carry no top-level timestamp
+  (one nests in a `file-history-snapshot`) and so are left out. The tail of one ends with a `cost-state` line
+  whose `startTime` is epoch milliseconds, not an instant.

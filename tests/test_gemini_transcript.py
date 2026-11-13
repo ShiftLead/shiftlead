@@ -301,3 +301,28 @@ def test_spend_says_an_unreadable_root_and_keeps_its_cursors(tmp_path, profile, 
     got = GeminiAdapter().spend(profile, {"x": 3})
     assert got["turns"] == [] and got["cursors"] == {"x": 3}
     assert got["reason"].startswith("unreadable: ") and got["reason"].endswith(": PermissionError")
+
+
+def test_conversations_keep_the_newest_file_of_a_session_and_leave_out_a_chat_with_no_instant(
+    tmp_path, profile, monkeypatch
+):
+    """`conversations` (design §4.3, TD-1491): one per session, the newest file where several name it, as
+    `transcript_path` finds it; a chat whose records carry no timestamp left out."""
+    chats = _chats(tmp_path)
+    old = _write(chats / f"session-2026-10-22T07-05-{SID[:8]}.jsonl", [_meta(), _user("u1", "hi")])
+    new = _write(
+        chats / f"session-2026-10-22T07-09-{SID[:8]}.jsonl",
+        [_meta(), _user("u1", "hi"), _user("u2", "again", at="2026-10-22T07:09:00.000Z")],
+    )
+    os.utime(old, (1, 1))
+    monkeypatch.setattr(t, "TAIL", 48)  # the backward scan carries a line cut by a chunk
+    _write(chats / "session-2026-10-22T07-10-bbbbbbbb.jsonl", [{"sessionId": "bbbbbbbb-x", "projectHash": "h"}])
+    got = GeminiAdapter().conversations(Path("/work/repo"), profile)
+    assert [c.to_dict() for c in got] == [
+        {
+            "id": SID,
+            "first_at": "2026-10-22T07:05:00.000Z",
+            "last_at": "2026-10-22T07:09:00.000Z",
+            "size": new.stat().st_size,
+        }
+    ]
