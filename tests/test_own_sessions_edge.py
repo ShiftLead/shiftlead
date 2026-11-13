@@ -78,6 +78,8 @@ def test_a_record_before_the_field_resolves_it_from_its_controllers():
     lead_start = _rec("w", by_person=None, controllers=["ao-x-lead"], team="")
     assert not mail.by_person(lead_start) and not mail.own_end(lead_start)
     assert mail.taken_over(lead_start, True)
+    # the approximation §4.10 accepts: a lead's pre-field start with an explicit team reads as the person's
+    assert mail.by_person(_rec("w", by_person=None, controllers=["ao-x-lead"], team="t"))
     # a seat before the field is never the person's, whatever else it carries
     assert not mail.by_person(_rec("s", by_person=None, seat={"trigger": "question"}))
     assert not mail.by_person(_rec("s", by_person=None, team="t", controllers=["m"], seat={"trigger": "question"}))
