@@ -2003,6 +2003,12 @@
     const box = a.closest("#boardhorizon, .inboxpage"), d = box && box.querySelector("details.boardfold");
     if (d) { if (d.dataset.fold) { foldsShut.delete(d.dataset.fold); foldsOpen.add(d.dataset.fold); } d.open = true; d.scrollIntoView({ block: "nearest" }); }
   });
+  // a re-topped Queue card's fold keys, from its old id to its new (§4.5 screen 12 *The page holds still*, TD-1761)
+  AO.foldsRekey = function (from, to) {
+    [foldsOpen, foldsShut].forEach((set) => [...set].forEach((k) => {
+      if (k === from || k.startsWith(from + ":")) { set.delete(k); set.add(to + k.slice(from.length)); }
+    }));
+  };
   AO.reopenFolds = function (root) {
     // a Queue card's Read and its ✓ n done folds too (TD-911, TD-1315): a re-read never opens or shuts one
     (root ? $$("details.fold, details.cardline, details.qread, details.qfold", root) : []).forEach((d) => {
@@ -4824,13 +4830,45 @@
         if (b === "done" || u.classList.contains("archived")) done.add(k);
       });
       const head = [...c.children].find((x) => x.classList.contains("qhead"));
+      // its open members (`data-ids`), and every entry it holds — its top and its rows — for a re-top's match
+      const ids = String(c.dataset.ids || "").split(" ").filter(Boolean), holds = new Set([id, ...ids]);
+      Object.values(units).forEach((ks) => ks.forEach((k) => { if (k.startsWith("r:")) holds.add(k.slice(2)); }));
       cards.set(id, { id, group: g ? g.dataset.group : "", off: c.classList.contains("qoff"), units, done,
-        headDone: !!(head && head.getAttribute("data-done") !== null) });
+        headDone: !!(head && head.getAttribute("data-done") !== null), ids: ids.length ? ids : [id], holds,
+        newTop: c.dataset.newtop || "" });
       order.push(id);
     });
     let upnext = [];
     try { upnext = JSON.parse(((root && root.querySelector("#qcards")) || { dataset: {} }).dataset.upnext || "[]"); } catch (e) { upnext = []; }
     return { cards, order, upnext };
+  };
+  // A card is the same card across the copies by its id, or by **a re-top** (§4.5 screen 12 *The page holds still*):
+  // a drawn card whose id is no card's in the reading is the reading's card holding any of its open members as its
+  // top or a row, where no drawn card has that card's id. Pairs are taken greedily, best first — most shared open
+  // members, then the better key (the reading's order), then the drawn order — each card used once. A drawn card
+  // left over that a reading card holds members of has **joined** it (the one sharing most; a re-top's card too).
+  // `retop` and `joined` map a drawn card's id to the reading card's.
+  AO.qMatch = function (drawn, reading) {
+    const retop = new Map(), joined = new Map();
+    const at = new Map(reading.order.map((id, i) => [id, i])), dat = new Map(drawn.order.map((id, i) => [id, i]));
+    const shared = (d, r) => d.ids.filter((x) => r.holds.has(x)).length;
+    const lost = drawn.order.filter((id) => !reading.cards.has(id));
+    const pairs = [];
+    lost.forEach((did) => reading.cards.forEach((r, rid) => {
+      if (drawn.cards.has(rid)) return;
+      const n = shared(drawn.cards.get(did), r);
+      if (n) pairs.push({ did, rid, n });
+    }));
+    pairs.sort((a, b) => b.n - a.n || at.get(a.rid) - at.get(b.rid) || dat.get(a.did) - dat.get(b.did));
+    const used = new Set();
+    pairs.forEach((p) => { if (!retop.has(p.did) && !used.has(p.rid)) { retop.set(p.did, p.rid); used.add(p.rid); } });
+    lost.filter((did) => !retop.has(did)).forEach((did) => {
+      const d = drawn.cards.get(did);
+      let best = null, bn = 0;
+      reading.order.forEach((rid) => { const n = shared(d, reading.cards.get(rid)); if (n > bn) { best = rid; bn = n; } });
+      if (best && (drawn.cards.has(best) || used.has(best))) joined.set(did, best);
+    });
+    return { retop, joined };
   };
   // the indices of a longest increasing run of `xs`: the cards that kept their places, so one card moving counts once
   AO.qLis = function (xs) {
@@ -4850,14 +4888,22 @@
   // in; the part counts items), *done* (a drawn card that left the page or went to Recently completed), *moved*, *new*.
   // A card the picks hide, or in a folded group, in both copies counts nothing. `gone` lists the drawn units the
   // reading no longer holds in their blocks — never one the person's own press answered (`own(key)`); `same` the
-  // cards whose group and units are as drawn, whose values a patch may draw whole.
+  // cards whose group and units are as drawn, whose values a patch may draw whole. A re-topped card is the reading's
+  // card under the reading's id (`retop`, drawn id → reading id; its units and `same` are keyed by the new id), its
+  // new top's drawn row neither *gone* nor patched, a place change; a card that **joined** another is *done*, its
+  // units *gone* where the card it joined does not hold them in their block, and the card it joined *moved*.
   AO.qDiff = function (drawn, reading, folded, own) {
     folded = folded || new Set(); own = own || (() => false);
     const hidden = (c) => c.off || folded.has(c.group);
-    const out = { asks: 0, done: 0, moved: 0, new: 0, gone: [], doneUnits: [], doneHeads: [], same: new Set() };
-    const askCards = new Set();
+    const out = { asks: 0, done: 0, moved: 0, new: 0, gone: [], doneUnits: [], doneHeads: [], same: new Set(),
+      retop: [], joined: [] };
+    const askCards = new Set(), m = AO.qMatch(drawn, reading), byNew = new Map();
+    m.retop.forEach((rid, did) => { byNew.set(rid, did); out.retop.push([did, rid]); });
+    m.joined.forEach((rid, did) => out.joined.push([did, rid]));
+    const rid = (id) => m.retop.get(id) || id;  // a drawn card's id in the reading
+    const joinedTo = new Set(m.joined.values());
     reading.cards.forEach((r, id) => {
-      const d = drawn.cards.get(id);
+      const d = drawn.cards.get(byNew.has(id) ? byNew.get(id) : id);
       if (hidden(r) && (!d || hidden(d))) return;
       let n = 0;
       Q_BLOCKS.forEach((b) => (r.units[b] || []).forEach((k) => {
@@ -4866,14 +4912,17 @@
       if (n) { out.asks += n; askCards.add(id); }
     });
     // the places kept are read among the cards that keep their group: a card changing group is counted for that alone
-    const both = drawn.order.filter((id) => reading.cards.has(id) && reading.cards.get(id).group === drawn.cards.get(id).group);
+    const both = drawn.order.filter((id) => reading.cards.has(rid(id)) && reading.cards.get(rid(id)).group === drawn.cards.get(id).group);
     const at = new Map(reading.order.map((id, i) => [id, i]));
-    const kept = AO.qLis(both.map((id) => at.get(id)));
+    const kept = AO.qLis(both.map((id) => at.get(rid(id))));
     const stayed = new Set(both.filter((id, i) => kept.has(i)));
-    drawn.cards.forEach((d, id) => {
-      const r = reading.cards.get(id);
+    drawn.cards.forEach((d, did) => {
+      const id = rid(did), r = reading.cards.get(id), into = m.joined.has(did) ? reading.cards.get(m.joined.get(did)) : null;
       const left = !r || (r.group === "completed" && d.group !== "completed");
-      let gone = 0, shape = !left && r.group === d.group;
+      // a re-top's new top, drawn as a row: neither *gone* nor patched, it keeps its place until Refresh — in the
+      // re-read that re-tops the card and every one after it (`data-newtop`, which only a whole draw takes away)
+      const newTop = id !== did ? "r:" + id : d.newTop ? "r:" + d.newTop : "";
+      let gone = 0, shape = !left && r.group === d.group && !newTop;
       const rDone = (r && r.done) || new Set(), dDone = d.done || new Set();
       Object.entries(d.units).forEach(([b, ks]) => ks.forEach((k) => {
         // a row whose entry was archived since it was drawn is *done* where it stands, not *gone* (its move into
@@ -4881,6 +4930,9 @@
         if (!left && rDone.has(k) && !dDone.has(k)) { out.doneUnits.push([id, k]); gone++; shape = false; return; }
         // a row drawn done already that the reading moved into the fold is a place change of the card, not *gone*
         if (!left && rDone.has(k) && dDone.has(k) && !(r.units[b] || []).includes(k)) { gone++; shape = false; return; }
+        if (k === newTop && !left) { gone++; return; }
+        // a joined card's unit the card it joined holds in the same block is still held
+        if (left && into && (into.units[b] || []).includes(k)) return;
         if (left || !(r.units[b] || []).includes(k)) { if (!own(k)) { out.gone.push([id, k]); gone++; } shape = false; }
       }));
       // its header's top entry archived while the card keeps it as its top: *done*, its controls hidden
@@ -4897,10 +4949,10 @@
       if (inside) shape = false;
       if (shape && Object.keys(d.units).length === Object.keys(r.units).length) out.same.add(id);
       if ((hidden(d) && hidden(r)) || askCards.has(id)) return;
-      if (d.group !== r.group || hidden(d) !== hidden(r) || !stayed.has(id) || gone || inside) out.moved++;
+      if (d.group !== r.group || hidden(d) !== hidden(r) || !stayed.has(did) || gone || inside || joinedTo.has(id)) out.moved++;
     });
     reading.cards.forEach((r, id) => {
-      if (!drawn.cards.has(id) && !hidden(r) && !askCards.has(id) && r.group !== "completed") out.new++;
+      if (!drawn.cards.has(id) && !byNew.has(id) && !hidden(r) && !askCards.has(id) && r.group !== "completed") out.new++;
     });
     return out;
   };
@@ -4961,6 +5013,36 @@
     let w = right && [...right.children].find((x) => x.classList.contains("qgonew"));
     if (on && right && !w) { w = document.createElement("span"); w.className = "qgonew"; w.textContent = "done"; right.prepend(w); }
     if (!on && w) w.remove();
+  };
+  // A re-top's keys, rewritten at once even on a held card (§4.5 screen 12 *The page holds still*): `el` is the drawn
+  // card, `r` the reading's card it is. Its id and members, its header's `data-qid` and anchor, its place in the
+  // drawn `data-upnext`, its folds' keys (the page's and the stored `qfold`), and the Start / Open session buttons'
+  // `data-card`; the words and pills shown — and those buttons' `data-ref` / `data-repo` — are values, and wait
+  AO.qRetop = function (el, r, root) {
+    const from = el.dataset.card, to = r.dataset.card;
+    if (!from || from === to) return;
+    el.dataset.card = to; el.dataset.ids = r.dataset.ids || to; el.dataset.newtop = to;
+    // a press still out on the card (its keep, TD-1461) follows it
+    if (AO.inflight["qcard:" + from] && !AO.inflight["qcard:" + to]) {
+      AO.inflight["qcard:" + to] = AO.inflight["qcard:" + from]; delete AO.inflight["qcard:" + from];
+    }
+    const head = [...el.children].find((x) => x.classList.contains("qhead"));
+    const rhead = [...r.children].find((x) => x.classList.contains("qhead"));
+    if (head && rhead) { head.dataset.qid = rhead.dataset.qid; if (rhead.id) head.id = rhead.id; else head.removeAttribute("id"); }
+    [...el.querySelectorAll("[data-card]")].forEach((b) => { if (b.dataset.card === from) b.dataset.card = to; });
+    [...el.querySelectorAll("details[data-fold]")].forEach((d) => {
+      const k = d.dataset.fold;
+      if (k === from || k.startsWith(from + ":")) d.dataset.fold = to + k.slice(from.length);
+    });
+    if (AO.foldsRekey) AO.foldsRekey(from, to);
+    const folded = store.get("qfold", []);
+    if (folded.includes(from)) store.set("qfold", [...new Set(folded.map((x) => (x === from ? to : x)))]);
+    const q = root && root.querySelector("#qcards");
+    if (q) {
+      let up = [];
+      try { up = JSON.parse(q.dataset.upnext || "[]"); } catch (e) { up = []; }
+      if (up.includes(from)) q.dataset.upnext = JSON.stringify(up.map((x) => (x === from ? to : x)));
+    }
   };
   // an age, as the bar says it: *12 s ago*, *3 min ago*, *2 h ago*
   AO.qAge = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? `${s} s ago` : s < 3600 ? `${Math.floor(s / 60)} min ago` : `${Math.floor(s / 3600)} h ago`; };
@@ -5484,6 +5566,7 @@
     // a touch from `pointerdown` to the press's end, keyboard focus in it, or a menu or a box open on it
     let pointerOn = "", touchOn = "", boxOn = "";
     const cardId = (t) => { const c = t && t.closest && t.closest("#queuelists .qcard[data-card]"); return c ? c.dataset.card : ""; };
+    const renamed = new Map();  // a re-topped card's old id → its new one, for a press answered after the re-top
     let freed = "";  // the card a refused press was on: its hold ends for the patch that follows the refusal
     function holds(el) {
       const id = el.dataset.card, a = document.activeElement;
@@ -5498,7 +5581,8 @@
     // a refused press (a 409, a permission's `call` check) ends any hold on its card (§4.5 screen 12 *The person's
     // own press is drawn at once*): the values that waited, its *gone* among them, are drawn with the refusal
     document.addEventListener("ao:refused", (e) => {
-      const id = e.detail && e.detail.card; if (!id || !reading) return;
+      let id = e.detail && e.detail.card; if (!id || !reading) return;
+      while (renamed.has(id)) id = renamed.get(id);  // a press sent before its card was re-topped
       const c = $(`.qgroup .qcard[data-card="${CSS.escape(id)}"]`, lists);
       const hadFocus = !!(c && c.contains(document.activeElement));
       freed = id;
@@ -5561,7 +5645,7 @@
           const k = AO.qUnitKey(u), b = AO.qBlockOf(u), ru = unitIn(r, b, k);
           if (ru && !ru.querySelector(Q_UNITS)) swapIn(u, ru, `unit:${el.dataset.card}:${b}:${k}`);
         });
-        [".qhead .qtitle", ".qhead .qright"].forEach((sel) => {
+        [".qhead .qmain > .qid", ".qhead .qtitle", ".qhead .qright"].forEach((sel) => {
           const a = $(sel, el), b = $(sel, r);
           if (a && b && quiet(a) && !a.querySelector(Q_UNITS)) swapIn(a, b, `part:${el.dataset.card}:${sel}`);
         });
@@ -5577,6 +5661,17 @@
       const diff = AO.qDiff(AO.qModel(lists), AO.qModel(reading), folded, own);
       const errs = AO.rowErrs(lists), byId = new Map();
       $$(".qgroup .qcard[data-card]", reading).forEach((c) => { if (!byId.has(c.dataset.card)) byId.set(c.dataset.card, c); });
+      // a re-top's keys first, even on a held card: the card is the reading's from here on
+      diff.retop.forEach(([from, to]) => {
+        const el = $(`.qgroup .qcard[data-card="${CSS.escape(from)}"]`, lists);
+        if (!el || !byId.has(to)) return;
+        applied.delete("card:" + from); AO.qRetop(el, byId.get(to), lists);
+        // the hold the person has on it follows its new id
+        renamed.delete(to); renamed.set(from, to);  // its new id never maps on: no chain loops
+        if (pointerOn === from) pointerOn = to;
+        if (touchOn === from) touchOn = to;
+        if (boxOn === from) boxOn = to;
+      });
       $$(".qgroup .qcard[data-card]", lists).forEach((el) => {
         const r = byId.get(el.dataset.card);
         if (!r || (r.closest(".qgroup") || { dataset: {} }).dataset.group !== (el.closest(".qgroup") || { dataset: {} }).dataset.group) return;
