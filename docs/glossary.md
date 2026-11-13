@@ -339,6 +339,11 @@ not mix:
 - **doing log** — the last fifty `ao doing` calls of a team, and each doer's newest five beside them, with time and caller, kept by the host agent for the Doing feed; the record itself keeps only the latest line (design §4.8). — *proposed 2026-09-26*.
 - **Repo page** — `/repo/<name>`: the repo's group of the Sessions page expanded — its line and Repo facet, every servicing team's whole card — then **the board**, one column per stage of its team's flow (TD-900), one repo at a time (design §4.5 screen 11). *Not:* dashboard — no history beyond the window. — *proposed 2026-09-25, reshaped 2026-09-26 and 2026-10-15 (Paul, TD-722)*.
 - **run log** — a session's recorded pane output from its first byte (invariant 3). — *proposed*.
+- **feedback report** — what `/shiftlead-feedback` writes in report mode, at an install whose person cannot push
+  to shiftlead: its approved findings with every name of that install taken out, which the person submits
+  themselves as a `feedback report: ` issue on `ShiftLead/shiftlead`, and which a file-mode run at shiftlead's
+  home reads beside its seats (design §4.7 *Feedback*, *Reports from other installs*; TD-1718). *Not:*
+  telemetry: nothing is sent by the procedure. — *proposed* 2026-11-13 (the designer).
 - **run window** — the hours unattended sessions may work (design §6). — *proposed*.
 - **setting** — a value the person turns without redefining anything: a reserve, a team's stop time or priority, a schedule, the promote's `auto`, the person's own editor and terminal. Every setting lives in the home's `settings.yml` (design §5), written only through `set_settings`, and the Settings page (§4.5 screen 8) is where it is turned. *Not:* definition, option, config. — *proposed* 2026-09-25 (Paul's line).
 - **definition** — what a team, a repo, a host or a profile *is*: `org.yml`, `.shiftlead.yml`, `hosts.yml`, `profiles.yml`, edited by hand or by PR and shown read-only on the Settings page with where each comes from. *Not:* setting. — *proposed* 2026-09-25.
