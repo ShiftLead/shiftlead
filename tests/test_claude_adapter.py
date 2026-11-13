@@ -1307,3 +1307,49 @@ def test_title_is_the_tools_own_name_for_the_session_or_nothing():
     assert ad.title("kmaster@dev: ~/agentorc") is None
     # a name that merely contains an @ is still a name
     assert ad.title("mail @ the inbox") == "mail @ the inbox"
+
+
+# The `StopFailure` payload of a seat smoke's first turn on an expired login (TD-1648, Claude Code 2.1.323): the
+# transcript's assistant entry carried `error: authentication_failed` and this text, and no `Stop` followed.
+LOGIN_EXPIRED = {
+    "hook_event_name": "StopFailure",
+    "session_id": "u1",
+    "error": "authentication_failed",
+    "last_assistant_message": "Login expired · Please run /login",
+}
+
+
+def test_a_turn_ended_on_an_account_error_needs_a_person():
+    """TD-1747, design §4.2: a turn that ends on an account's API error fires `StopFailure`, never `Stop`, and
+    the record read the `working` its `UserPromptSubmit` left. It reads `needs-you`, a question naming the login
+    in the tool's own words; any other error changes no state, and the event is installed."""
+    got = translate(LOGIN_EXPIRED)
+    assert got["state"] == "needs-you" and got["adapter_id"] == "u1"
+    assert got["pending"] == {
+        "kind": "question",
+        "text": "Claude Code wants a login: Login expired · Please run /login (answer in the terminal)",
+    }
+    no_text = translate({"hook_event_name": "StopFailure", "error": "authentication_failed"})
+    assert "login: authentication_failed" in no_text["pending"]["text"]  # the code, where the tool said nothing
+    billing = translate({"hook_event_name": "StopFailure", "error": "billing_error", "error_details": "Credit\nlow"})
+    assert billing["pending"]["text"].startswith("Claude Code's account stopped the turn: Credit low")
+    for error in ("rate_limit", "overloaded", "server_error", "unknown", "max_output_tokens", ""):
+        assert translate({**LOGIN_EXPIRED, "error": error}) == {"adapter_id": "u1"}, error  # no state
+        assert translate({"hook_event_name": "StopFailure", "error": error}) is None
+    assert "StopFailure" in HOOK_EVENTS  # or the failure never reaches the hook at all
+
+
+async def test_an_expired_login_reads_needs_you_and_the_next_prompt_ends_it(agent, hookstub, tmp_path):
+    """TD-1747: through the host agent — the brief's `UserPromptSubmit` reads `working`, the login's
+    `StopFailure` `needs-you` with the login as its pending text, and the prompt after a `/login` `working`."""
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="s", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        await _hook(sid, hook_event_name="UserPromptSubmit", session_id="u1")
+        assert (await c.call("get", id=sid))["state"] == "working"
+        await _hook(sid, **LOGIN_EXPIRED)
+        rec = await c.call("get", id=sid)
+        assert rec["state"] == "needs-you" and rec["confidence"] == "hook"
+        assert rec["pending"]["kind"] == "question" and "Please run /login" in rec["pending"]["text"]
+        await _hook(sid, hook_event_name="UserPromptSubmit", session_id="u1")
+        rec = await c.call("get", id=sid)
+        assert rec["state"] == "working" and rec["pending"] is None

@@ -43,6 +43,7 @@ HOOK_EVENTS = (
     "PermissionRequest",
     "Notification",
     "Stop",
+    "StopFailure",  # a turn ended on an API error: an account's reads needs-you (TD-1747)
     "SubagentStart",
     "SubagentStop",
     "SessionEnd",
