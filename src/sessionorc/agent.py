@@ -1946,9 +1946,10 @@ class HostAgent(
                         # conversation's, so a later replay still has it (TD-1669); a resume handed a role's
                         # brief is the person's latest choice, kept as handed
                         carried = self._carried_launch(resume, holder)
-                        for k in ("prompt", "prompt_from", "start_context"):
-                            if carried.get(k) is not None:
-                                params[k] = carried[k]
+                        if carried.get("prompt_from"):  # a role's brief alone: any other prompt is as handed
+                            for k in ("prompt", "prompt_from", "start_context"):
+                                if carried.get(k) is not None:
+                                    params[k] = carried[k]
                     self._write_launch(s.id, s, params)
                 else:
                     self._drop_launch(s.id)  # a fresh start that took a supervised record's id is not it
@@ -2076,7 +2077,7 @@ class HostAgent(
                 if await asyncio.to_thread(paths.context_file(resume).is_file):
                     return prompt, {"keep_context": True}
             carried = self._carried_launch(resume, holder)
-            if carried.get("prompt_from") and isinstance(carried.get("prompt"), str):
+            if carried.get("prompt_from") and isinstance(carried.get("prompt"), str) and not carried.get("argv"):
                 told, _ = _split_filled_for(carried["prompt"])
                 return prompt, {"start_context": mail.start_context_file_text(told)}
             log.warning("resume of %s: its context file is gone and no launch record holds its brief", resume)
@@ -2097,7 +2098,7 @@ class HostAgent(
             reverse=True,
         )
         for r in held:
-            with contextlib.suppress(RpcError):
+            with contextlib.suppress(RpcError, ValueError, OSError):  # none, or one that cannot be read
                 return self._read_launch(self._address(r))
         return {}
 
