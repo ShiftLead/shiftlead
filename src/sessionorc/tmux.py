@@ -237,6 +237,27 @@ class Tmux:
         out = cp.stdout.strip()
         return int(out) if cp.returncode == 0 and out.isdigit() else None
 
+    def global_environment(self) -> dict[str, str] | None:
+        """The server's global environment (`show-environment -g`), which a new session starts from (design
+        §4.3 *The repo's start hooks*, TD-1637): its `-NAME` lines (a name tmux removes) dropped. None where
+        the read fails."""
+        cp = self.run("show-environment", "-g", check=False)
+        if cp.returncode != 0:
+            return None
+        out: dict[str, str] = {}
+        for line in cp.stdout.splitlines():
+            if line.startswith("-") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            out[k] = v
+        return out
+
+    def update_environment(self) -> list[str] | None:
+        """The names the `update-environment` option lists, which `new-session` copies from its client's
+        environment (TD-1637). None where the read fails."""
+        cp = self.run("show-options", "-gv", "update-environment", check=False)
+        return cp.stdout.split() if cp.returncode == 0 else None
+
     def pane_pid(self, name: str) -> int | None:
         """The pid of a session's first pane's process, or None when tmux cannot say."""
         cp = self.run("display-message", "-p", "-t", f"={name}:", "#{pane_pid}", check=False)

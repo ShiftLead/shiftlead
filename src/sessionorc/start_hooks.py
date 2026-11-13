@@ -16,6 +16,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -203,3 +204,70 @@ def _run(
                 pipe.close()
         raise _Lapsed(out or "") from None
     return proc.returncode, out
+
+
+# --- at a launch: the host agent's road (design §4.3 *The repo's start hooks*, *Into the first prompt*) ---
+
+# tmux's documented default `update-environment`, used where reading the option alone fails
+TMUX_UPDATE_ENVIRONMENT = (
+    "DISPLAY",
+    "KRB5CCNAME",
+    "SSH_ASKPASS",
+    "SSH_AUTH_SOCK",
+    "SSH_AGENT_PID",
+    "SSH_CONNECTION",
+    "WINDOWID",
+    "XAUTHORITY",
+)
+START_HOOKS_TEXT_MAX = 16 * 1024  # bytes of UTF-8 the first prompt carries of the hooks' output
+CUT_LINE = "… (the start hooks' output was cut at 16 KiB)"
+# an escape sequence whole — CSI, OSC (ended by BEL or ST) and the two-byte forms — then any control
+# character left but newline and tab: C0, DEL and C1 (an 8-bit CSI among them)
+_ESCAPES = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b[@-Z\\-_]")
+_CONTROLS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f\x80-\x9f]")
+
+
+def pane_env(
+    tmux: Any, own: Mapping[str, str], attempt: Mapping[str, str], unset: tuple[str, ...] | list[str] = ()
+) -> dict[str, str]:
+    """The environment the pane gets, built in tmux's own order (`new-session` execs the argv with its `-e`
+    pairs over it, spawning no shell): the server's global environment; then the names `update-environment`
+    lists, each set from the host agent's own (`own`) or removed where absent there; then the attempt's
+    env; then `unset`'s names removed. Where the global read fails, `own` with the attempt's env over it.
+    `CLAUDE_PROJECT_DIR` is dropped either way: the runner is given its project."""
+    base = tmux.global_environment()
+    if base is None:
+        env = {**own, **attempt}
+    else:
+        env = dict(base)
+        names = tmux.update_environment()
+        for name in TMUX_UPDATE_ENVIRONMENT if names is None else names:
+            if name in own:
+                env[name] = own[name]
+            else:
+                env.pop(name, None)
+        env.update(attempt)
+    for name in unset:
+        env.pop(name, None)
+    env.pop("CLAUDE_PROJECT_DIR", None)
+    return env
+
+
+def clean(text: str) -> str:
+    """The hooks' output made safe for a bracketed paste and capped: escapes and control characters out,
+    surrounding whitespace trimmed, cut at `START_HOOKS_TEXT_MAX` bytes on a character boundary with
+    `CUT_LINE` after it (outside the cap)."""
+    text = _CONTROLS.sub("", _ESCAPES.sub("", text)).strip()
+    raw = text.encode("utf-8")
+    if len(raw) <= START_HOOKS_TEXT_MAX:
+        return text
+    return raw[:START_HOOKS_TEXT_MAX].decode("utf-8", errors="ignore").rstrip() + "\n" + CUT_LINE
+
+
+def with_hooks(first_prompt: str, text: str) -> str:
+    """The launch's first prompt with the hooks' output after the brief, under `mail.START_HOOKS_LINE`; a text
+    empty once cleaned adds nothing, not even the separator."""
+    from sessionorc.mail import START_HOOKS_LINE
+
+    told = clean(text)
+    return f"{first_prompt}\n\n{START_HOOKS_LINE}\n{told}" if told else first_prompt
