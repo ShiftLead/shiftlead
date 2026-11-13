@@ -51,7 +51,7 @@ from sessionorc.models import (
     tokens_short,
 )
 from sessionorc.tmux import attach_argv
-from shiftlead import connect, doctor, orgcheck, repoconfig, service, teamrun, teams
+from shiftlead import connect, doctor, feedback, orgcheck, repoconfig, service, teamrun, teams
 from shiftlead import org as orgmod
 from shiftlead.ending import (
     closer_words,
@@ -1404,6 +1404,49 @@ def cmd_transcript(args: argparse.Namespace) -> int:
         print(t.get("raw") or "")
         return 0
     return emit(args, t, lambda: print("\n".join(transcript_text(t))))
+
+
+def cmd_feedback_digest(args: argparse.Namespace) -> int:
+    """`ao feedback digest <seat>… --since <when>` (design §4.7 *Feedback*, TD-1716): each record's
+    conversations over the window, condensed into parts under `--out`, and the index; `--list` lists them
+    and writes nothing. Exit 1 when any record has an error."""
+    zone = feedback.local_zone()
+    tz = feedback.zone_of(zone)
+    try:
+        since = feedback.resolve_when(args.since, tz)
+        until = feedback.resolve_when(args.until, tz) if args.until else datetime.now(UTC)
+    except ValueError as e:
+        print(f"ao feedback digest: {e}", file=sys.stderr)
+        return 2
+    if args.part_bytes < feedback.PART_BYTES_MIN:
+        print(f"ao feedback digest: --part-bytes is at least {feedback.PART_BYTES_MIN}", file=sys.stderr)
+        return 2
+    out = None
+    if not args.list:
+        if not args.out:
+            print("ao feedback digest: --out <dir> is needed, but with --list", file=sys.stderr)
+            return 2
+        out = pathlib.Path(args.out)
+        out.mkdir(parents=True, exist_ok=True)
+    records = [(seat, resolve(seat)) for seat in args.seats]
+    own = feedback.own_conversation(call_sync, os.environ.get("SHIFTLEAD_SESSION") or None)
+    index = feedback.run(
+        call_sync,
+        records,
+        since=since,
+        until=until,
+        zone=zone,
+        out=out,
+        skip=list(args.skip or []),
+        own=own,
+        bound=args.part_bytes,
+        list_only=args.list,
+    )
+    if args.json:
+        print(json.dumps(index, indent=1))
+    else:
+        print("\n".join(feedback.list_table(index, tz) if args.list else feedback.summary(index)))
+    return 1 if any(r.get("error") for r in index["records"]) else 0
 
 
 def cmd_mode(args: argparse.Namespace) -> int:
@@ -5672,6 +5715,24 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--before", type=int, metavar="OFFSET", help="the turns before this byte offset (from --json)")
     p.add_argument("--raw", action="store_true", help="the file's own last N lines instead")
     p.set_defaults(fn=cmd_transcript)
+
+    p = add("feedback", help="seats' transcripts over a window, condensed for a review of friction (§4.7 Feedback)")
+    fsub = p.add_subparsers(dest="action", required=True)
+    q = fsub.add_parser("digest", help="condense each seat's conversations over a window into parts and an index")
+    q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the index as JSON")
+    q.add_argument("seats", nargs="+", metavar="seat", help="a record's id or name, read in the order given")
+    q.add_argument("--since", required=True, help="a local day (YYYY-MM-DD, its midnight) or an RFC 3339 instant")
+    q.add_argument("--until", help="a local day or an RFC 3339 instant (default: now)")
+    q.add_argument("--out", help="the directory the parts are written to (not needed with --list)")
+    q.add_argument(
+        "--part-bytes",
+        type=int,
+        default=feedback.PART_BYTES,
+        help=f"a part's bound in bytes (default {feedback.PART_BYTES}; under {feedback.PART_BYTES_MIN} refused)",
+    )
+    q.add_argument("--skip", action="append", metavar="CONVERSATION", help="leave out this conversation (repeatable)")
+    q.add_argument("--list", action="store_true", help="list the conversations each record would read; write nothing")
+    q.set_defaults(fn=cmd_feedback_digest)
 
     p = add("mode", help="flip a session between unattended and interactive")
     p.add_argument("id")
