@@ -45,6 +45,8 @@ READS = frozenset(
         "log_tail",
         "explain",
         "transcript",
+        "conversations",
+        "transcript_digest",
         "paths",
         "git_files",
         "occupancy",
