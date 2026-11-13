@@ -80,6 +80,9 @@ def test_a_record_before_the_field_resolves_it_from_its_controllers():
     assert mail.taken_over(lead_start, True)
     # the approximation §4.10 accepts: a lead's pre-field start with an explicit team reads as the person's
     assert mail.by_person(_rec("w", by_person=None, controllers=["ao-x-lead"], team="t"))
+    # a shell given a team names no controller (`ao new --team` fills the manager for an agent alone), so a
+    # pre-field shell with both is no start of the person's
+    assert not mail.by_person(_rec("sh", by_person=None, adapter="shell", team="t", controllers=["ao-x-lead"]))
     # a seat before the field is never the person's, whatever else it carries
     assert not mail.by_person(_rec("s", by_person=None, seat={"trigger": "question"}))
     assert not mail.by_person(_rec("s", by_person=None, team="t", controllers=["m"], seat={"trigger": "question"}))
