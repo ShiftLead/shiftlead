@@ -27,7 +27,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from sessionorc.adapters import Link, Transcript, TranscriptEntry
+from sessionorc.adapters import Conversation, Link, Transcript, TranscriptEntry, instant
 from shiftlead.adapters.claude_code.transcript import urls_in
 
 PREAMBLE = "<session_context>"  # the tool's own first user record: the workspace it set up, not a prompt
@@ -299,6 +299,68 @@ def _first_at(data: bytes) -> str | None:
         if isinstance(d, dict) and (at := d.get("startTime") or d.get("timestamp")):
             return str(at)
     return None
+
+
+def _last_at(path: Path, size: int) -> str | None:
+    """The last record's `timestamp` (else the header's `startTime`), read backwards from the file's end
+    `TAIL` bytes at a time until one is found; None when there is none."""
+    end, carry = size, b""
+    with path.open("rb") as f:
+        while end > 0:
+            start = max(0, end - TAIL)
+            f.seek(start)
+            lines = (f.read(end - start) + carry).split(b"\n")
+            carry = lines.pop(0) if start > 0 else b""
+            for line in reversed(lines):
+                try:
+                    d = json.loads(line)
+                except ValueError:
+                    continue
+                if (
+                    isinstance(d, dict)
+                    and isinstance(at := d.get("timestamp") or d.get("startTime"), str)
+                    and instant(at)
+                ):
+                    return at
+            end = start
+    return None
+
+
+def conversation(path: Path) -> Conversation | None:
+    """One chat as design §4.3 `conversations` lists it: the session its first record names, the instants of
+    its first and last timestamped records and its bytes, read from its head and tail. None when it names no
+    session, holds no timestamped record, or cannot be read."""
+    sid = session_of(path)
+    if sid is None:
+        return None
+    try:
+        size = path.stat().st_size
+        with path.open("rb") as f:
+            first = _first_at(f.read(HEAD))
+        last = _last_at(path, size) if first else None
+    except OSError:
+        return None
+    if not first or not last:
+        return None
+    return Conversation(id=sid, first_at=first, last_at=last, size=size)
+
+
+def project_chats(root: Path, cwd: Path) -> list[Path]:
+    """The top-level chats of every project under `root` whose `.project_root` names `cwd` — a subagent's,
+    under `chats/<parent id>/`, never."""
+    out: list[Path] = []
+    try:
+        projects = [p for p in root.iterdir() if p.is_dir()]
+    except OSError:
+        return out
+    for project in projects:
+        try:
+            named = (project / ".project_root").read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if named and Path(named) == Path(cwd):
+            out.extend(p for p in (project / "chats").glob("*.jsonl") if p.is_file())
+    return out
 
 
 def last_turns(path: Path):

@@ -183,5 +183,6 @@
  ],
  "procs": [
   {"file": "procs/two-tasks.json", "background": ["timeout 300 sleep 290", "python3 -c import time; time.sleep(280)"]}
- ]
+ ],
+  "conversations": [{"files": ["transcripts/walk-resume.jsonl", "transcripts/walk-limit.jsonl"], "conversations": [{"id": "d7303d5f-b877-4027-a73d-3bd654bc6776", "first_at": "2026-10-21T23:22:11.680Z", "last_at": "2026-10-21T23:25:13.458Z", "size": 7736}, {"id": "0b22427e-9282-4281-88e1-c62d1dc4ecb1", "first_at": "2026-10-22T07:05:04.954Z", "last_at": "2026-10-22T07:07:11.421Z", "size": 18958}]}]
 }

@@ -72,5 +72,7 @@
   ],
   "titles": [
     {"file": "captured/titles.json", "names": ["conformance-walk"]}
-  ]
+  ],
+  "failed_calls": [{"file": "transcripts/failed-call.jsonl", "errors": [true, false]}],
+  "conversations": [{"dir": "conversations", "conversations": [{"id": "3cedea7f-caf8-434e-82e9-9e858f5e4da7", "first_at": "2026-11-13T06:50:42.538Z", "last_at": "2026-11-13T07:20:20.272Z", "size": 9331}, {"id": "9014d53e-9d42-4ed0-b5e6-7edb543c382c", "first_at": "2026-11-13T07:20:27.281Z", "last_at": "2026-11-13T15:06:56.881Z", "size": 9003}, {"id": "76d5c8ae-2891-4c33-90ef-0d9c34ceaf2b", "first_at": "2026-11-13T15:07:03.371Z", "last_at": "2026-11-13T15:27:17.446Z", "size": 9285}]}]
 }

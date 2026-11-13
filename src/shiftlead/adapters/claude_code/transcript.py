@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from sessionorc.adapters import Link, Prompt, Transcript, TranscriptEntry
+from sessionorc.adapters import Conversation, Link, Prompt, Transcript, TranscriptEntry, instant
 
 CHUNK = 256 * 1024  # bytes read per step backwards
 HEAD = 64 * 1024  # bytes read from the file's start for its first timestamp
@@ -159,6 +159,46 @@ def _first_at(path: Path) -> str | None:
     return None
 
 
+def _last_at(path: Path, size: int) -> str | None:
+    """The file's last top-level timestamp, read backwards from its end a chunk at a time until one is
+    found; None when there is none."""
+    end, carry = size, b""
+    try:
+        with path.open("rb") as f:
+            while end > 0:
+                start = max(0, end - CHUNK)
+                f.seek(start)
+                data = f.read(end - start) + carry
+                lines = data.split(b"\n")
+                carry = lines.pop(0) if start > 0 else b""
+                for line in reversed(lines):
+                    try:
+                        d = json.loads(line)
+                    except ValueError:
+                        continue
+                    if isinstance(d, dict) and isinstance(at := d.get("timestamp"), str) and instant(at):
+                        return at
+                end = start
+    except OSError:
+        return None
+    return None
+
+
+def conversation(path: Path) -> Conversation | None:
+    """One conversation file as design §4.3 `conversations` lists it: its id (the file's name), its first
+    and last timestamped entries' instants and its bytes, read from its head and tail. None when it holds
+    no timestamped entry or cannot be read."""
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return None
+    first = _first_at(path)
+    last = _last_at(path, size) if first else None
+    if not first or not instant(first) or not last:
+        return None
+    return Conversation(id=path.stem, first_at=first, last_at=last, size=size)
+
+
 def _call_line(tool_input: Any) -> str:
     """The call's one line: the input field the pane shows, first line, capped."""
     if not isinstance(tool_input, dict):
@@ -229,6 +269,7 @@ def _entries(
                     call = calls.get(str(b.get("tool_use_id") or ""))
                     if call is not None:
                         call.result = _result_text(b.get("content"))
+                        call.error = b.get("is_error") is True
             continue
         if kind != "assistant":
             continue

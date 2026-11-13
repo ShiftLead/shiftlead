@@ -28,7 +28,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from sessionorc import identity, paths
-from sessionorc.adapters import LaunchSpec, Link, MailDelivery, Transcript, read_version
+from sessionorc.adapters import Conversation, LaunchSpec, Link, MailDelivery, Transcript, oldest_first, read_version
 from sessionorc.identity import ProcReader
 from sessionorc.models import Confidence, Pending, State
 from sessionorc.screen import Manifest, Match, painted_text
@@ -262,7 +262,9 @@ class GeminiAdapter:
     start_context = True
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): the rest come
     # with TD-786's later slices
-    implements: frozenset[str] = frozenset({"background", "composer", "context", "links", "mail", "spend", "title"})
+    implements: frozenset[str] = frozenset(
+        {"background", "composer", "context", "conversations", "links", "mail", "spend", "title"}
+    )
 
     def __init__(self, binary: str | None = None, rules: Path | None = None):
         self._binary = binary
@@ -549,6 +551,25 @@ class GeminiAdapter:
             return transcript_mod.read(p, before=before, turns=turns, raw=raw)
         except OSError:
             return None
+
+    def conversations(self, cwd: Path, profile: str = "") -> list[Conversation] | None:
+        """Every chat the profile's home holds for `cwd` (design §4.3 `conversations`, TD-1491): the top-level
+        chats of the projects whose `.project_root` names it, oldest first, one per session — the newest file
+        where several name one, as `transcript_path` finds it. None when the profile is unknown, [] when there
+        are none."""
+        prof = _profile(profile)
+        if prof is None:
+            return None
+        newest: dict[str, tuple[float, Conversation]] = {}
+        for p in transcript_mod.project_chats(transcript_mod.chats_root(home(prof)), cwd):
+            c = transcript_mod.conversation(p)
+            try:
+                mtime = p.stat().st_mtime
+            except OSError:
+                continue
+            if c is not None and (c.id not in newest or mtime > newest[c.id][0]):
+                newest[c.id] = (mtime, c)
+        return oldest_first([c for _m, c in newest.values()])
 
     def context(self, session_id: str, cwd: Path, profile: str = "") -> dict | None:
         """The session's context size now (design §4.3 `context`, §6 rule 5): the last turn's input, the

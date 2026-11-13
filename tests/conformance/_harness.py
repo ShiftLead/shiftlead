@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, get_args
 
 from sessionorc import adapters
-from sessionorc.adapters import ENTRY_KINDS, OPTIONAL_METHODS, Link, Prompt, Transcript, TranscriptEntry
+from sessionorc.adapters import ENTRY_KINDS, OPTIONAL_METHODS, Conversation, Link, Prompt, Transcript, TranscriptEntry
 from sessionorc.identity import Proc
 from sessionorc.models import State
 
@@ -127,6 +127,16 @@ def check_links(got: object) -> None:
     for link in found:
         assert isinstance(link, Link), f"{link!r} is not a Link"
         assert link.url.startswith(("http://", "https://")), f"{link.url!r} is not an http(s) URL"
+
+
+def check_conversations(got: object) -> None:
+    assert isinstance(got, list), f"conversations returned {got!r}, not a list"
+    for c in got:
+        assert isinstance(c, Conversation), f"{c!r} is not a Conversation"
+        assert c.id and isinstance(c.size, int) and c.size > 0, f"{c!r}"
+        assert adapters.instant(c.first_at) and adapters.instant(c.last_at), f"{c!r} carries an instant that is none"
+        assert adapters.instant(c.first_at) <= adapters.instant(c.last_at), f"{c!r} ends before it starts"
+    assert got == adapters.oldest_first(got), "conversations are not oldest first"
 
 
 def check_prompts(got: object) -> None:
@@ -312,6 +322,18 @@ class ClaudeCodeHarness:
         (d / f"{session_id}.jsonl").write_bytes(src.read_bytes())
         return cwd
 
+    def place_conversations(self, tmp_path: Path, entry: dict, name: str) -> Path:
+        """Put the manifest's `conversations` directory where the adapter looks for the cwd's conversations,
+        each file under its own name; the cwd."""
+        from shiftlead.adapters.claude_code import munge
+
+        cwd = tmp_path / "convs"
+        d = tmp_path / "cc" / "projects" / munge(cwd)
+        d.mkdir(parents=True, exist_ok=True)
+        for src in sorted(fixture(name, entry["dir"]).glob("*.jsonl")):
+            (d / src.name).write_bytes(src.read_bytes())
+        return cwd
+
 
 class GeminiHarness:
     """Gemini CLI keeps a session's chat at `<home>/.gemini/tmp/<slug>/chats/session-<minute>-<id[:8]>.jsonl`,
@@ -386,6 +408,29 @@ class GeminiHarness:
         captured = json.loads(data.split(b"\n", 1)[0])["sessionId"].encode()
         out = project / "chats" / f"session-2026-10-22T00-00-{session_id[:8]}.jsonl"
         out.write_bytes(data.replace(captured, session_id.encode()))
+        return cwd
+
+    def place_conversations(self, tmp_path: Path, entry: dict, name: str) -> Path:
+        """Put the manifest's chats, unchanged, in one project whose `.project_root` names the cwd — a chat of
+        another project and a subagent's chat beside them, which the read leaves out; the cwd."""
+        cwd = tmp_path / "convs"
+        project = tmp_path / "gm" / ".gemini" / "tmp" / "convs"
+        other = tmp_path / "gm" / ".gemini" / "tmp" / "elsewhere"
+        for p in (project, other):
+            (p / "chats").mkdir(parents=True, exist_ok=True)
+        (project / ".project_root").write_text(str(cwd), encoding="utf-8")
+        (other / ".project_root").write_text(str(tmp_path / "elsewhere"), encoding="utf-8")
+        for i, rel in enumerate(entry["files"]):
+            data = fixture(name, rel).read_bytes()
+            sid = json.loads(data.split(b"\n", 1)[0])["sessionId"]
+            (project / "chats" / f"session-2026-10-22T00-0{i}-{sid[:8]}.jsonl").write_bytes(data)
+            (other / "chats" / f"session-2026-10-22T00-0{i}-{sid[:8]}.jsonl").write_bytes(
+                data.replace(sid.encode(), b"other-" + sid[6:].encode())
+            )
+            (project / "chats" / sid).mkdir(exist_ok=True)
+            (project / "chats" / sid / "sub.jsonl").write_bytes(
+                data.replace(sid.encode(), b"subagt-" + sid[7:].encode())
+            )
         return cwd
 
 

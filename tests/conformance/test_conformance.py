@@ -16,6 +16,7 @@ from _harness import (
     agent_adapters,
     check_background,
     check_context,
+    check_conversations,
     check_declaration,
     check_hook_reading,
     check_links,
@@ -278,6 +279,49 @@ def test_spend_reports_neutral_turns_with_four_token_kinds(name, tmp_path, monke
     assert len(got["turns"]) == sum(t["spend_turns"] for t in transcripts)
     again = ad.spend(profile, got["cursors"])
     assert again["turns"] == [] and again["cursors"] == got["cursors"]
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_conversations_list_the_directorys_files_oldest_first(name, tmp_path, monkeypatch):
+    """The `conversations` read (design §4.3 `conversations`, TD-1491) on captured files: each conversation of
+    the cwd with its first and last instants and its bytes, oldest first; a file with no timestamped entry,
+    another directory's and a subagent's left out; None for an unknown profile, [] for a cwd with none."""
+    harness = HARNESSES[name]
+    ad = adapters.get(name)
+    profile = harness.profile(tmp_path, monkeypatch)
+    for entry in _need(name, "conversations", "conversations"):
+        cwd = harness.place_conversations(tmp_path, entry, name)
+        got = ad.conversations(cwd, profile)
+        check_conversations(got)
+        assert [c.to_dict() for c in got] == entry["conversations"]
+        assert ad.conversations(tmp_path / "nowhere", profile) == []
+        assert ad.conversations(cwd, "no-such-profile") is None
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_a_failed_call_is_marked_only_where_the_adapter_marks_errors(name, tmp_path, monkeypatch):
+    """`marks_errors` (design §4.3 `read_transcript`, TD-1491): an adapter that marks them ships a captured
+    failed call and marks exactly it, `to_dict` carrying `error` only when True; one that does not leaves
+    every tool entry's `error` False."""
+    harness = HARNESSES[name]
+    ad = adapters.get(name)
+    profile = harness.profile(tmp_path, monkeypatch)
+    if not adapters.marks_errors(ad):
+        for i, t in enumerate(manifest(name).get("transcripts") or []):
+            cwd = harness.place_transcript(tmp_path, fixture(name, t["file"]), f"e{i}")
+            tr = ad.read_transcript(f"e{i}", cwd, profile, turns=1000)
+            assert not any(e.error for e in tr.entries if e.kind == "tool")
+        return
+    files = manifest(name).get("failed_calls") or []
+    if not files:
+        pytest.fail(f"{name} marks errors and ships no failed_calls fixture")
+    for i, t in enumerate(files):
+        cwd = harness.place_transcript(tmp_path, fixture(name, t["file"]), f"f{i}")
+        tr = ad.read_transcript(f"f{i}", cwd, profile, turns=1000)
+        check_transcript(tr, harness.tool_fields)
+        tools = [e for e in tr.entries if e.kind == "tool"]
+        assert [e.error for e in tools] == t["errors"]
+        assert [("error" in e.to_dict()) for e in tools] == t["errors"]
 
 
 @pytest.mark.parametrize("name", AGENTS)

@@ -234,3 +234,55 @@ async def test_the_rpc_reads_by_record_or_by_row_and_refuses_what_has_none(agent
         for s in (sh, sid):
             await person.call("kill", id=s)
             await person.call("remove", id=s)
+
+
+def test_a_conversation_reads_its_head_and_tail_only_and_skips_an_instant_that_is_none(tmp_path, monkeypatch):
+    """`conversations`' one file (design §4.3, TD-1491): the last timestamp found reading back chunk by chunk,
+    a line whose `timestamp` is no RFC 3339 instant skipped, and a file with no timestamped entry left out."""
+    monkeypatch.setattr(tr, "CHUNK", 64)
+    p = tmp_path / "abc.jsonl"
+    lines = [
+        {"type": "custom-title", "customTitle": "x"},
+        {"type": "user", "timestamp": _at(1), "message": {"content": "go"}},
+        {"type": "assistant", "timestamp": _at(2), "message": {"content": [{"type": "text", "text": "y" * 300}]}},
+        {"type": "cost-state", "timestamp": 1794552637857},
+        {"type": "last-prompt", "lastPrompt": "z" * 200},
+    ]
+    p.write_text("".join(json.dumps(d) + "\n" for d in lines), encoding="utf-8")
+    c = tr.conversation(p)
+    assert c is not None and (c.id, c.first_at, c.last_at, c.size) == ("abc", _at(1), _at(2), p.stat().st_size)
+    bare = tmp_path / "bare.jsonl"
+    bare.write_text(json.dumps(lines[0]) + "\n" + json.dumps(lines[4]) + "\n", encoding="utf-8")
+    assert tr.conversation(bare) is None
+
+
+def test_a_failed_call_carries_error_and_to_dict_only_when_true(tmp_path):
+    p = tmp_path / "s.jsonl"
+    lines = [
+        {"type": "user", "timestamp": _at(0), "message": {"content": "go"}},
+        {
+            "type": "assistant",
+            "timestamp": _at(1),
+            "message": {
+                "content": [
+                    {"type": "tool_use", "id": "a", "name": "Bash", "input": {"command": "false"}},
+                    {"type": "tool_use", "id": "b", "name": "Bash", "input": {"command": "true"}},
+                ]
+            },
+        },
+        {
+            "type": "user",
+            "timestamp": _at(2),
+            "message": {
+                "content": [
+                    {"type": "tool_result", "tool_use_id": "a", "content": "Exit code 1", "is_error": True},
+                    {"type": "tool_result", "tool_use_id": "b", "content": "", "is_error": False},
+                ]
+            },
+        },
+    ]
+    p.write_text("".join(json.dumps(d) + "\n" for d in lines), encoding="utf-8")
+    tools = [e for e in tr.read(p).entries if e.kind == "tool"]
+    assert [e.error for e in tools] == [True, False]
+    assert tools[0].to_dict()["error"] is True and "error" not in tools[1].to_dict()
+    assert adapters.marks_errors(ClaudeCodeAdapter()) and not adapters.marks_errors(object())
