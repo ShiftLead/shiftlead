@@ -1,0 +1,16 @@
+n,situation,question,rows
+1,interaction,"Does every reader, section and site treat this the same way?",TD-1364:F15 TD-1411:F16 TD-1422:F30 TD-1422:F8 TD-1434:F8 TD-1453:F79 TD-1453:F115 TD-1453:F118 TD-1529:F95 TD-1538:F12 TD-1541:F8 TD-1541:F37 TD-1543:F31 TD-1543:F99 TD-1543:F101 TD-1543:F125 TD-1564:F36 TD-1564:F61 TD-1453:F9 TD-1422:F1 TD-1422:F4 TD-1435:F21
+2,interaction,"Does the new rule contradict any existing rule, text, or test?",TD-1264:F24 TD-1264:F27 TD-1264:F31 TD-1264:F40 TD-1264:F35 TD-1364:F6 TD-1364:F24 TD-1411:F55 TD-1485:F57 TD-1529:F108 TD-1543:F33 TD-1550:F71 TD-1554:F70 TD-1286:F11 TD-1485:F67 TD-1576:F36 TD-1434:F73
+3,interaction,What existing behaviour or guarantee does this lose or undermine?,TD-1528:F23 TD-1550:F50 TD-1581:F10 TD-1581:F12 TD-1577:F28 TD-1577:F62 TD-1437:F33 TD-1436:F19
+4,concurrency,What does a background pass or read see mid-action?,TD-1437:F96 TD-1471:F1 TD-1471:F3 TD-1471:F13 TD-1471:F50 TD-1471:F39 TD-1471:F64 TD-1526:F13 TD-1564:F39 TD-1550:F76 TD-1437:F128
+5,concurrency,"Which steps must be atomic, and what lock serialises them?",TD-1436:F18 TD-1437:F133 TD-1529:F61 TD-1529:F64 TD-1529:F71 TD-1543:F79 TD-1543:F109 TD-1581:F21 TD-1581:F43 TD-1581:F44 TD-1529:F49
+6,when,"What clears this marker or stale state, and when?",TD-1423:F2 TD-1422:F18 TD-1437:F72 TD-1437:F76 TD-1437:F97 TD-1437:F98 TD-1550:F1 TD-1554:F8 TD-1564:F8 TD-1564:F67 TD-1564:F15
+7,when,"What bounds each wait, timer or retry, and when does it restart?",TD-1443:F3 TD-1443:F13 TD-1443:F16 TD-1443:F24 TD-1550:F60 TD-1550:F63 TD-1554:F39 TD-1576:F39 TD-1422:F32
+8,scope,"Exactly which kinds, members or records does the rule include?",TD-1295:F19 TD-1295:F40 TD-1364:F39 TD-1364:F44 TD-1379:F5 TD-1411:F83 TD-1412:F2 TD-1437:F17 TD-1526:F22 TD-1527:F37 TD-1564:F52 TD-1564:F66 TD-1564:F79 TD-1577:F96 TD-1543:F129 TD-1543:F28 TD-1453:F22 TD-1453:F117 TD-1543:F51
+9,scope,"Does the description cover every rule, risk, and exception?",TD-1264:F12 TD-1550:F109 TD-1550:F110 TD-1550:F116 TD-1577:F82 TD-1541:F5
+10,ends,"What happens to a record that is replaced, redone or archived?",TD-1526:F9 TD-1526:F21 TD-1526:F28 TD-1437:F124 TD-1485:F27 TD-1485:F33 TD-1437:F11
+11,who,"Who performs each step, and who picks up the hand-off?",TD-1264:F8 TD-1264:F30 TD-1264:F41 TD-1286:F1 TD-1295:F73 TD-1378:F15 TD-1423:F59 TD-1437:F10 TD-1437:F35 TD-1527:F13 TD-1543:F12 TD-1541:F11
+12,failure,What state remains if an operation fails partway?,TD-1437:F18 TD-1437:F47 TD-1437:F137 TD-1471:F14 TD-1554:F10 TD-1554:F25 TD-1554:F32 TD-1581:F36
+13,restart,Does stored state or a counter survive a restart or replay?,TD-1422:F17 TD-1437:F23 TD-1437:F32 TD-1437:F71 TD-1437:F134 TD-1443:F58 TD-1443:F66 TD-1471:F51 TD-1551:F20
+14,which,"When several candidates apply, which wins and in what order?",TD-1392:F44 TD-1437:F46 TD-1453:F127 TD-1471:F11 TD-1526:F18 TD-1526:F27 TD-1529:F27 TD-1564:F60 TD-1543:F67 TD-1564:F11 TD-1541:F27 TD-1476:F53 TD-1364:F16 TD-1437:F113
+15,shape,Which identity does each stored or printed value refer to?,TD-1437:F70 TD-1437:F89 TD-1437:F99 TD-1437:F103 TD-1264:F37
