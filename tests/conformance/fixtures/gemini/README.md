@@ -35,6 +35,13 @@ person's session is in them. `manifest.json` names each fixture with what the ad
   Ctrl+B: the pane's `node`, the `node` it relaunches itself as, and each command's `bash -c` wrapper under
   that; each `cmdline` value cut to 160 characters (`background`).
 
+- `transcripts/failed-read.jsonl` and `transcripts/refused-shell.jsonl` (TD-1719, `read_transcript`'s `error` and
+  `marks_errors`, the manifest's `failed_calls`): two headless chats (`gemini --skip-trust -m gemini-2.5-flash -p
+  …`, 0.66.0, 2026-11-13) in scratch directories on the `gemini-conformance` home, copied unchanged. `failed-read`
+  (`--approval-mode yolo`): `ls` of a path that does not exist, which ran, exited 2 and is recorded `success`, then
+  `read_file` of a missing file, recorded `error`; `refused-shell` (default approval): a shell call the headless run
+  does not offer, recorded `error`. A call declined in the pane (`cancelled`) is not captured here.
+
 - `conversations` (TD-1716) reads the two `transcripts/` chats placed unchanged in one project whose
   `.project_root` names the cwd; the harness puts a copy of each in another project and under a subagent's
   `chats/<parent id>/`, both of which the read leaves out.

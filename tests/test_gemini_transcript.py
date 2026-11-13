@@ -326,3 +326,17 @@ def test_conversations_keep_the_newest_file_of_a_session_and_leave_out_a_chat_wi
             "size": new.stat().st_size,
         }
     ]
+
+
+def test_a_calls_status_word_marks_it_failed(tmp_path):
+    """A tool entry's `error` (design §4.3 `read_transcript`, TD-1719) is the call's `status`: `error` and
+    `cancelled` mark it failed, `success` does not, and a call with no status is not marked. The captured
+    `error` cases are the conformance fixtures; `cancelled` (a declined call) is the tool's own third status."""
+    calls = [
+        {"id": f"c{i}", "name": "run_shell_command", "args": {"command": "ls"}, **({"status": s} if s else {})}
+        for i, s in enumerate(["success", "error", "cancelled", None])
+    ]
+    path = _write(tmp_path / "c.jsonl", [_meta(), _user("u1", "go"), _gemini("g1", "", toolCalls=calls)])
+    tools = [e for e in t.read(path).entries if e.kind == "tool"]
+    assert [e.error for e in tools] == [False, True, True, False]
+    assert GeminiAdapter.marks_errors is True

@@ -37,6 +37,11 @@ RESULT_CAP = 20_000  # characters of one tool result carried (the reader folds i
 CALL_CAP = 200  # characters of a call's one line
 # which argument is the call's line, in order, as the pane draws `Shell(<command>)` or `ReadFile(<path>)`
 CALL_KEYS = ("command", "file_path", "absolute_path", "dir_path", "path", "pattern", "url", "query", "prompt")
+# a tool call's `status` words that mark it failed (TD-1719): `error` where the tool could not do the call (a
+# file not found, a tool the run does not offer), as the captured fixtures hold; `cancelled` where it was declined
+# or stopped, the third of the tool's own statuses (0.66.0's `CoreToolCallStatus`). A shell command that ran and
+# exited non-zero is `success`: its exit code is in its output, not its status.
+FAILED = frozenset({"error", "cancelled"})
 WINDOW = 1_048_576  # the tool's own token limit for the Gemini models (design §4.3 `context`)
 GEMMA_WINDOW = 256_000  # and for a Gemma one
 
@@ -228,6 +233,7 @@ def _entries(records: list[dict]) -> tuple[list[TranscriptEntry], int]:
             results = [p for p in _parts(tc.get("result")) if isinstance(p.get("functionResponse"), dict)]
             if results:
                 entry.result = "\n".join(_response_text(p) for p in results)
+            entry.error = tc.get("status") in FAILED  # design §4.3 `read_transcript`'s `error` (TD-1719)
             if tc.get("id"):
                 calls[str(tc["id"])] = entry  # a response names its call by id; one with none answers nothing
             out.append(entry)
