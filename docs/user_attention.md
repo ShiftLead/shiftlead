@@ -10,6 +10,10 @@ People: paul
 
 ## Needs the user
 
+- [ ] decide 2026-11-13 (n/a) — Go on TD-1718's design of reports from other installs (PR #3736)? Its rounds ended at the cap with nothing build-changing left; the scrub's names pass recurred: is this the wrong design? Context: TD-1718 decision (paul). Parts: TD-1794, TD-1795, TD-1796. Due: 2026-11-17. Answers: Go (default) — the three builds become pickable | One more round — one more Sonnet round on the design | Hold: <note> — a revision round on your note.
+  - **Context:** TD-1718's design of reports from other installs (design 4.7 Feedback, PR #3736) ran six rounds, the last with no build-changing finding, so the stop rule and the cap ended them together; one topic recurred, the scrub's names pass (which names it reads and where a word's edge falls), reopened in rounds 2 and 4 and settled since; every build-changing fix has been read by a review; unread by any review, all minor: TD-1794, the percent-decoding wording; the synopsis page and the review record (docs/synopses/TD-1718.md, docs/reviews/TD-1718.md) say the rest.
+  - **Question:** Build the design as it stands (Go), buy one more review round, or hold it with a note for a revision?
+  - **Recommended:** Go — Go: the names pass recurred as refinements (more sources, wider edges), never a reversal, and the person's own read stays the last check by design.
 - [ ] decide 2026-11-13 (session `ao-shiftlead-techlead-ao-1` on kmaster) — Will you start TD-1801's design round now (answer on the Queue again, keeping the Refresh bar), with mockups to you before any review round? Context: TD-1801 decision (paul). Due: 2026-11-20. Answers: Go | Not yet.
   - **Context:** TD-1801 is a design-first entry you asked for through ao-led-tds-ledger on 2026-11-13: keep the Queue that holds still and its Refresh bar, and bring the items' controls back from the card's page. It lands held so no designer starts it before you say.
   - **Question:** Will you start the design round now? Mockups in light and dark come to you before any review round runs.
