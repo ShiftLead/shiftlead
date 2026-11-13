@@ -95,7 +95,8 @@ out.row_reorders = diff(base(), page([inprog([card("A", { rows: ["a2", "a1"] })]
   upnext([card("B", { up: 1 }), card("C", { up: 1, decide: ["m1"] }), card("D", { up: 1 })])]));
 // a new ask on a card the picks hide in both copies, or on a hidden card not drawn, is not counted
 out.hidden_asks = diff(page([upnext([card("B", { up: 1, off: 1 }), card("C", { up: 1 })])]),
-  page([upnext([card("B", { up: 1, off: 1, do: ["m7"] }), card("C", { up: 1 }), card("F", { up: 1, off: 1, decide: ["m8"] })])]));
+  page([upnext([card("B", { up: 1, off: 1, do: ["m7"] }), card("C", { up: 1 }),
+    card("F", { up: 1, off: 1, decide: ["m8"] })])]));
 // an ask the person's own press brought is not a new ask
 out.own_ask = diff(page([upnext([card("B", { up: 1 })])]), page([upnext([card("B", { up: 1, do: ["m7"] })])]), [],
   (k) => k === "m:m7");
