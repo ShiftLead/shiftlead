@@ -104,6 +104,20 @@ def test_the_refused_homes_are_every_agent_adapters_default_in_and_out_of_the_en
     assert elsewhere.resolve() not in inside and Path("~/.claude").expanduser().resolve() in inside
 
 
+def test_an_adapters_own_home_is_refused_beside_its_default_home(monkeypatch):
+    """§4.3 *Live, by hand*, TD-1550: an adapter that writes into its tool home declares `own_home`, and the walk
+    refuses it beside the adapter's `default_home`."""
+    from sessionorc import adapters
+
+    class HomeWriter:
+        name = "homewriter"
+        own_home = "~/.homewriter"
+
+    adapters.load_all()
+    monkeypatch.setitem(adapters._REGISTRY, HomeWriter.name, HomeWriter())
+    assert Path("~/.homewriter").expanduser().resolve() in _load().refused_homes({})
+
+
 def test_a_gemini_profile_on_the_tools_own_home_is_refused(tmp_path):
     cw = _load()
     live = _profiles(tmp_path, "profiles:\n  g: {adapter: gemini, account: g, config_dir: '~'}\n")

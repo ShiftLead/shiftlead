@@ -100,6 +100,11 @@ class Adapter(Protocol):
     #                                                      runs a turn on — `shell` and `command`; True where
     #                                                      unset. Read through `has_agent`, never an adapter's
     #                                                      name (design §4.3 *A record with no agent*, TD-665)
+    #   own_home: Path | None                             the tool's own default home, set where the launch writes
+    #                                                      into the profile's tool home (Grok Build's `~/.grok`):
+    #                                                      a profile of it names a `config_dir` of its own, not
+    #                                                      unset, not this path, not another account's, refused
+    #                                                      at load (design §4.2a, §4.3, TD-1550); None where unset
     #   start_context: bool                               True when `launch` takes `start_context`, text the
     #                                                      session holds from its start with no turn run for it
     #                                                      (design §4.3, TD-283); `create` hands it only to such

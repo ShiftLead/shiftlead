@@ -121,6 +121,35 @@ def _metered_dirs(profiles: dict[str, Profile]) -> None:
                 )
 
 
+def _adapter_rules(profiles: dict[str, Profile]) -> None:
+    """The two rules of the load that read a profile's adapter (design §4.2a, §4.3, TD-1550), naming no tool: a
+    profile of an adapter that writes into its tool home (`own_home`) names a `config_dir` of its own — set, not
+    that home, and shared only with profiles of the same account — and a metered profile of an adapter that
+    reports no `spend` is refused, since its amount would bind nothing. The adapter is resolved here, lazily,
+    since the adapters import this module; a profile whose adapter is not registered is checked by neither."""
+    from sessionorc import adapters
+
+    for p in profiles.values():
+        try:
+            ad = adapters.get(p.adapter)
+        except KeyError:
+            continue
+        own = getattr(ad, "own_home", None)
+        if own is not None:
+            mine = p.config_dir.resolve() if p.config_dir is not None else None
+            shared = any(
+                q is not p
+                and q.config_dir is not None
+                and q.config_dir.resolve() == mine
+                and (q.account or q.name) != (p.account or p.name)
+                for q in profiles.values()
+            )
+            if mine is None or mine == Path(own).expanduser().resolve() or shared:
+                raise ValueError(f"profiles.yml: {p.name} needs a config_dir of its own ({p.adapter} writes into it)")
+        if p.metered and not callable(getattr(ad, "spend", None)):
+            raise ValueError(f"profiles.yml: {p.name} is metered, but {p.adapter} reports no spend")
+
+
 def profiles_file() -> Path:
     return paths.home() / "profiles.yml"
 
@@ -150,6 +179,7 @@ def load(path: Path | None = None) -> tuple[dict[str, Profile], str]:
             prices=prices,
         )
     _metered_dirs(out)
+    _adapter_rules(out)
     if not out:
         out["default"] = Profile(name="default")
     default = data.get("default") or next(iter(out))

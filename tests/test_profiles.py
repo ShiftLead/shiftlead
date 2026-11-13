@@ -170,3 +170,59 @@ def test_spend_says_why_when_it_cannot_read(tmp_path, monkeypatch):
     assert ad.spend("nope", {"x": 3}) == {"turns": [], "cursors": {"x": 3}, "reason": "no_profile"}
     got = ad.spend("api", {"x": 3})
     assert got["turns"] == [] and got["cursors"] == {"x": 3} and got["reason"].startswith("no transcripts under ")
+
+
+class _HomeWriter:
+    """An adapter that writes into its tool home and reports no spend (Grok Build's shape, design §4.3)."""
+
+    name = "homewriter"
+    own_home = "~/.homewriter"
+
+
+@pytest.fixture
+def homewriter(monkeypatch):
+    from sessionorc import adapters
+
+    adapters.load_all()
+    monkeypatch.setitem(adapters._REGISTRY, _HomeWriter.name, _HomeWriter())
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "profiles:\n  g: {adapter: homewriter}\n",  # unset
+        "profiles:\n  g: {adapter: homewriter, config_dir: ~/.homewriter}\n",  # the tool's own home
+        "profiles:\n  g: {adapter: homewriter, config_dir: ~/.homewriter/../.homewriter}\n",  # resolving to it
+        "profiles:\n  g: {adapter: homewriter, account: a, config_dir: /c/g}\n  h: {account: b, config_dir: /c/g}\n",
+    ],
+)
+def test_a_profile_of_an_adapter_writing_its_home_needs_a_config_dir_of_its_own(tmp_path, homewriter, body):
+    """§4.2a, TD-1550: the load refuses it in words, naming no tool."""
+    with pytest.raises(
+        ValueError, match=r"profiles\.yml: g needs a config_dir of its own \(homewriter writes into it\)"
+    ):
+        _load(tmp_path, body)
+
+
+def test_two_profiles_of_one_account_may_share_a_home_and_an_unregistered_adapter_is_checked_by_neither(
+    tmp_path, homewriter
+):
+    got = _load(
+        tmp_path,
+        "profiles:\n  g: {adapter: homewriter, account: a, config_dir: /c/g}\n"
+        "  h: {adapter: homewriter, account: a, config_dir: /c/g}\n"
+        "  later: {adapter: notyet, billing: metered, config_dir: /c/later}\n"
+        "  claude: {config_dir: /c/claude}\n",
+    )
+    assert sorted(got) == ["claude", "g", "h", "later"]
+
+
+def test_a_metered_profile_of_an_adapter_with_no_spend_is_refused(tmp_path, homewriter):
+    with pytest.raises(ValueError, match=r"profiles\.yml: g is metered, but homewriter reports no spend"):
+        _load(tmp_path, "profiles:\n  g: {adapter: homewriter, billing: metered, config_dir: /c/g}\n")
+    # Claude Code and Gemini CLI report spend: their metered profiles load as today
+    got = _load(
+        tmp_path,
+        "profiles:\n  a: {billing: metered, config_dir: /c/a}\n  b: {adapter: gemini, billing: metered, config_dir: /c/b}\n",
+    )
+    assert got["a"].metered and got["b"].metered
