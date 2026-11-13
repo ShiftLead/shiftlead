@@ -15,7 +15,7 @@ People: paul
   - **Question:** Is the trial design ready to build, or does one more round read its last fixes first?
   - **Recommended:** One more round — the repo's rule recommends it while a build-changing fix is unread (F93, F95); Go would mark F93, F94 and F95, already in TD-1772's, TD-1773's and TD-1774's Fix, as fixed, not reviewed, for the builder to check.
 - [ ] watch 2026-11-13 (n/a) — Once #3689 is live, read a team card's TDs in motion on the live Sessions page (headless GET): a claim whose PR has an open ask at the techlead reads a REVIEW chip, and one whose PR nobody has asked reads its holder's BUILD or DESIGN; close with what was read, or ledger what is wrong. Context: none. Due: 2026-11-15.
-- [ ] decide 2026-11-13 (n/a) — Mark TD-704's design (the TDs in motion chip reads the claim's flow stage) as go, so it closes with its build TD-1765? Context: TD-704 decision (paul). Due: 2026-11-13. Answers: Go (default) | Hold.
+- [x] decide 2026-11-13 (n/a) — Mark TD-704's design (the TDs in motion chip reads the claim's flow stage) as go, so it closes with its build TD-1765? Context: TD-704 decision (paul). Due: 2026-11-13. Answers: Go (default) | Hold. Decided: Go (by paul) (2026-11-13). Closed: 2026-11-13 — lifted.
   - **Context:** You answered go ahead on 2026-11-13 to a board line about TD-704 (board:10276598), but that line named no gate, so the press could not lift TD-704's decision (paul) gate, and an unattended session is refused the lift. The design merged in #3676; its build TD-1765 has slices 1 and 2 merged (#3687, #3688) and slice 3 open as #3689.
   - **Question:** Lift TD-704's design gate (Go), or keep it held?
   - **Recommended:** Go — you already said go ahead; Go lets TD-704 archive with TD-1765's last slice.
