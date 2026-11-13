@@ -443,3 +443,21 @@ def test_refresh_slides_the_cards_in_200_ms_or_at_once_under_reduced_motion():
     # presses during the slide are ignored
     ignored = "if (Date.now() < sliding) { e.preventDefault(); e.stopPropagation(); }"
     assert f'lists.addEventListener("click", (e) => {{ {ignored} }}, true);' in Q
+
+
+def test_completed_and_other_work_lines_patch_by_key_and_count_nothing():
+    # slice 4: §4.5 screen 12 *Values are patched in place* — Recently completed's lines and the other-work lines
+    # patch by key, keeping the window's `hidden`, the picks' `qoff` and an opened body; nothing counts them
+    from pathlib import Path
+
+    p = Q[Q.index("function patch()") : Q.index("function drawBar(")]
+    assert "patchLines();" in p
+    lines = Q[Q.index("function patchLines()") :]
+    lines = lines[: lines.index("\n    }\n")]
+    assert '".qdline[data-key], .qother[data-key]"' in lines
+    assert 'n.hidden = hid; n.classList.toggle("qoff", off);' in lines and "if (open) openLine(n);" in lines
+    assert "if (!r || !quiet(el)) return;" in lines  # a line gone from the reading stays as drawn
+    t = Path(APP_JS).parents[1] / "templates" / "queue_part.html"
+    assert 'data-other="1" data-key="{{ o.ref }}"' in t.read_text()
+    m = JS[JS.index("AO.qModel = function") :]
+    assert ".qgroup .qcard[data-card]" in m[: m.index("\n  };\n")]  # lines are no cards: the bar never counts them
