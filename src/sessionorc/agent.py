@@ -999,7 +999,7 @@ class HostAgent(
         self._pulls: dict[str, dict[str, Any]] = {}  # the pull's readings by repo (design §6 *Pull*)
         # per team, the last fifty `ao doing` calls and each doer's newest five (design §4.8 *the doing log*)
         self.doing_log = DoingLogStore()
-        self._pre_limited: dict[str, State] = {}  # what a `limited` session was before the cap
+        self._pre_limited: dict[str, State] = {}  # what a `limited` session was before the cap; lost on a restart
         # Sessions removed recently: name → (the removed pane's tmux creation time, a monotonic
         # stamp for expiry). A pane snapshot taken before the remove must not re-adopt the pane it
         # still lists (the tick snapshots in a thread; remove runs between). Keyed by the pane's

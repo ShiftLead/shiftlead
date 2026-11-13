@@ -5931,8 +5931,10 @@ class TickMixin:
                         s.set_state(saved[0], confidence=saved[2], pending=saved[1])
                 else:
                     # back to what it was (idle stays idle: no hook will come to correct a wrong `working`); a
-                    # hook's `limited` ended a turn, so the composer waits: `idle`, read from the record (TD-1750)
-                    back = self._pre_limited.pop(s.id, "working")
+                    # hook's `limited` ended a turn, so the composer waits: `idle`, read from the record (TD-1750);
+                    # what it was is memory alone, so after a restart `idle`, which a working session's next hook
+                    # corrects, where a wrong `working` would read `stalled?` (§4.2, TD-1798)
+                    back = self._pre_limited.pop(s.id, "idle")
                     s.set_state("idle" if hooked else back, confidence="hook")
                 self.store.save(s)
 
