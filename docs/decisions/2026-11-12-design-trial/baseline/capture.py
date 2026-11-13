@@ -23,7 +23,7 @@ import importlib.util
 import statistics
 import subprocess
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -86,11 +86,59 @@ def select(src: Path) -> None:
                 out += list(r)
     finally:
         part.unlink(missing_ok=True)
+    out, shared = one_design_each(out)
     with TURNS.open("w", newline="") as f:
         w = csv.DictWriter(f, fields)
         w.writeheader()
         w.writerows(out)
-    print(f"{len(out)} rows written to {TURNS.name}")
+    print(f"{len(out)} rows written to {TURNS.name}; {shared} turns two designs picked, each kept once")
+
+
+def one_design_each(rows: list[dict]) -> tuple[list[dict], int]:
+    """Each turn counted under one design. One session works several designs' branches in turn, so `select`, run
+    a design at a time, picks a reviewer whose first turn falls in two designs' windows, and a launch-branch turn
+    between them, for both. Such a turn goes to the design whose branches hold its own branch; a reviewer on a
+    launch branch, to the design that holds most of its own rows' branches; a turn left over, to the design of its
+    session's next turn on a design's branch, else its last."""
+    owner = {b: td for td, prs in DESIGNS.items() for _, b, _ in prs}
+    key = lambda r: (r["session"], r["side"], r["msg"], r["ts"])  # noqa: E731
+    picked: dict[tuple, list[dict]] = defaultdict(list)
+    for r in rows:
+        picked[key(r)].append(r)
+    side_vote: dict[tuple, Counter] = defaultdict(Counter)
+    for r in rows:
+        if r["side"] and r["branch"] in owner:
+            side_vote[(r["session"], r["side"])][owner[r["branch"]]] += 1
+    mains = defaultdict(list)  # a session's own turns on a design's branch, in time order
+    for r in rows:
+        if not r["side"] and r["branch"] in owner:
+            mains[r["session"]].append((r["ts"], owner[r["branch"]]))
+    for v in mains.values():
+        v.sort()
+
+    def choose(rs: list[dict]) -> str:
+        r, claim = rs[0], {x["design"] for x in rs}
+        if owner.get(r["branch"]) in claim:
+            return owner[r["branch"]]
+        vote = side_vote.get((r["session"], r["side"]))
+        if vote:
+            best = [td for td, _ in vote.most_common() if td in claim]
+            if best:
+                return best[0]
+        later = [td for ts, td in mains[r["session"]] if ts >= r["ts"] and td in claim]
+        earlier = [td for ts, td in mains[r["session"]] if ts < r["ts"] and td in claim]
+        return (later or earlier[-1:] or sorted(claim))[0]
+
+    out, shared = [], 0
+    for r in rows:
+        rs = picked[key(r)]
+        if len(rs) == 1:
+            out.append(r)
+        elif r is rs[0]:
+            shared += 1
+            td = choose(rs)
+            out.append(next(x for x in rs if x["design"] == td))
+    return out, shared
 
 
 def sizes() -> None:
