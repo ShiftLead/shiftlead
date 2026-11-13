@@ -134,6 +134,16 @@ def test_a_repo_flow_is_found_by_its_directory_and_reaches_package_and_sibling_b
     [
         ([{"name": "b", "role": "grinder", "lane": ["free-pick"], "brief": "gone.md"}], "", "is not a file"),
         ([{"name": "b", "role": "grinder", "lane": ["free-pick"], "brief": "b.md", "when": 1}], "", "not a stage key"),
+        (
+            [{"name": "b", "role": "grinder", "lane": ["free-pick"], "brief": "b.md", "color": "red"}],
+            "",
+            "'red' is not a palette name",
+        ),
+        (
+            [{"name": "b", "role": "grinder", "lane": ["free-pick"], "brief": "b.md", "color": "#2563eb"}],
+            "",
+            "not a palette name",
+        ),
         ([{"name": "b", "role": "grinder", "lane": ["free-pick"], "brief": "b.md"}], "owner: x\n", "not a flow key"),
         ([{"name": "b", "role": "grinder", "lane": ["free-pick"]}], "", "brief is required"),
         ([{"name": "b", "role": "techlead", "lane": ["free-pick"], "brief": "b.md"}], "", "names a worker"),
@@ -161,6 +171,28 @@ def test_a_flow_that_is_not_whole_is_not_usable_and_says_why(tmp_path, stages, e
     repo_flow(tmp_path, "f", stages, {"b.md": "brief", "sub/x.md": "a directory's file"}, extra)
     f = flowdefs.load("f", cfg_with(tmp_path))
     assert not f.usable and any(says in p for p in f.problems), f.problems
+
+
+def test_a_stages_color_is_written_then_defaulted_by_name_then_the_first_free_palette_name(tmp_path):
+    """TD-1765 slice 2 (design §4.9c `color`): three passes — every written `color`, then each unwritten stage's
+    name default unless a written one took it, then the first palette name no stage holds, in stage order, and past
+    the seventh the palette again from the start."""
+
+    def flow(*stages):
+        # the roles do not matter to the colours: a flow that is not usable still has its stages
+        repo_flow(tmp_path, "f", [{"role": f"r{i}", "brief": "b.md", **x} for i, x in enumerate(stages)], {"b.md": "x"})
+        return flowdefs.load("f", cfg_with(tmp_path))
+
+    td = flowdefs.load("td", cfg_with(tmp_path))
+    assert flowdefs.colors(td) == {"design": "indigo", "build": "blue", "review": "amber"}
+    f = flow({"name": "find"}, {"name": "build"}, {"name": "fact-check", "color": "teal"}, {"name": "review"})
+    assert flowdefs.colors(f) == {"find": "pink", "build": "blue", "fact-check": "teal", "review": "amber"}
+    # a written colour takes a default's place: *build* written amber, so *review* takes the first free name
+    f = flow({"name": "build", "color": "amber"}, {"name": "review"}, {"name": "audit"})
+    assert flowdefs.colors(f) == {"build": "amber", "review": "pink", "audit": "indigo"}
+    # past the seventh, the palette again from the start
+    f = flow(*({"name": f"s{i}"} for i in range(9)))
+    assert list(flowdefs.colors(f).values()) == [*flowdefs.PALETTE, "pink", "indigo"]
 
 
 def test_lane_words_are_rule_6s_a_named_items_or_a_hunters_area(tmp_path):
