@@ -335,10 +335,10 @@ def test_a_claimed_work_order_is_in_motion_with_the_lines_head_text():
     m = rec("g1", "/r", progress=[{"ref": "board:1a2b3c4d", "status": "claimed"}])
     (row,) = motion_rows([m], r)
     assert motion_rows([m], {**r, "ledger": {"entries": None}})[0]["title"] == "Keep the nightly backup?"
-    assert (row["ref"], row["title"], row["phase"], row["priority"]) == (
+    assert (row["ref"], row["title"], row["stage"], row["priority"]) == (
         "board:1a2b3c4d",
         "Keep the nightly backup?",
-        "grind",
+        "session",
         "high",
     )
 

@@ -16,16 +16,25 @@ from urllib.parse import quote
 from sessionorc import ledger, workorders
 from sessionorc.models import open_prompts, pr_marks, stop_note
 from sessionorc.reports import branch_ref
-from shiftlead import teamrun
+from shiftlead import flowdefs, teamrun
 
 from . import uiconf
-from .cards import DEAD, NO_TEAM, card_order, prompt_line, subagent_held, terminal_only
+from .cards import (
+    DEAD,
+    FLOW_ACTS,
+    FLOW_STAGES,
+    FLOW_WHATS,
+    NO_TEAM,
+    card_order,
+    prompt_line,
+    subagent_held,
+    terminal_only,
+)
 from .common import _age, _instant, _short_age, templates
 from .inbox import NEEDS_YOU_ROWS, PERSON_ASK_KINDS, _entry_open, state_kind
 
 # -- the team-first Org (design §4.5 screen 1 *The Sessions page, team-first*, TD-176 slice 3) ---------------
 
-PHASES = ("add", "design", "grind", "review")
 # The events stream's groups (§4.5a *team groups*, TD-572): a delta that changes one of these fields on
 # its record — or names a record the stream has not seen — carries the groups with it, since it can
 # move a card or change a count; any other delta (a pane's tail, a context reading) leaves them to one
@@ -350,19 +359,68 @@ def _holders_width(members: Collection[Mapping[str, Any]]) -> int:
     return sum(len(str(m["name"])) + (2 if m.get("mine") else 0) for m in members) + 2 * (len(members) - 1)
 
 
-def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
-    """**TDs in motion** (§4.5a *team card: TDs in motion*): one row per reference a member holds as
-    a `claimed` progress entry, with its **phase** derived here, never declared — *review* with a
-    PR (its own `pr`, the tick's `review_pr`, or else an open PR whose head branch names the
-    reference — the tick reads only the branch checked out, and a grinder that asked its reader has
-    moved on), a design's as a build's (TD-814); without one, *design* on an entry whose `Kind:` is
-    design-first (its kind, not the page's bucket: one blocked by a decision sits under *for you*,
-    TD-197, TD-228), else *grind*; a PR
-    that is no longer open keeps *review*, marked *merged* / *closed*, until the member marks the
-    claim done or dropped. A reference two members hold is one row naming both. Each row carries
-    the entry's `priority` — *high*, *medium* or *low*, else '' (a foreign or archived reference, an
-    entry with none or another word), drawn as a letter (TD-232). Rows in phase order, then priority
-    with High first and an unmarked row last, then by reference."""
+def _reading_of(m: Mapping[str, Any], repos: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    """The reading of the record's own repo (`repo` on the record, a worktree's main checkout), or None."""
+    if not m.get("repo"):
+        return None
+    want = str(Path(str(m["repo"])).resolve())
+    return next(
+        (r for root, r in (repos or {}).items() if isinstance(r, dict) and str(Path(str(root)).resolve()) == want),
+        None,
+    )
+
+
+GREY_YOU = "you"  # the chip of a claim the person has (§4.9c rule 2), grey, sorted last
+NO_ROLE = "session"  # the chip of a holder with no role (§4.9c rule 5)
+
+
+def _stage_named(m: Mapping[str, Any] | None, stages: Any, whats: Mapping[str, Collection[str]]) -> bool:
+    """Whether a member's stage name is read (§4.9c *Stage names are read*): its team's flow read and usable,
+    and no pending Apply moving it — a `relaunch` with a `lane ` line, a `rename` — and not one the flow sits
+    out (`sit_out`, `left`)."""
+    if stages is None or m is None:
+        return False
+    if m.get("sit_out"):
+        return False
+    act = FLOW_ACTS.get(str(m.get("id") or ""))
+    if act in ("rename", "sit_out", "left"):
+        return False
+    return not (act == "relaunch" and any(str(w).startswith("lane ") for w in whats.get(str(m.get("id") or "")) or ()))
+
+
+def _chip_of_role(role: str, stages: Any, review: bool, named: bool, colors: Mapping[str, str]) -> tuple[str, str]:
+    """(word, palette name) for a role: the stage of its kind whose `role` it is where its name is read, else
+    the role's own word in grey (§4.9c rules 3–5)."""
+    if named:
+        for st in stages or ():
+            if st.review == review and st.role == role:
+                return st.name, colors.get(st.name, "")
+    return (role or NO_ROLE), ""
+
+
+def motion_rows(
+    members: Collection[dict[str, Any]],
+    r: Mapping[str, Any] | None,
+    repos: Mapping[str, Any] | None = None,
+    stages: Any = None,
+    fleet: Collection[Mapping[str, Any]] | None = None,
+    whats: Mapping[str, Collection[str]] | None = None,
+) -> list[dict[str, Any]]:
+    """**TDs in motion** (§4.5a *team card: TDs in motion*): one row per reference and **stage chip** a
+    member holds as a `claimed` progress entry, the chip derived here, never declared (§4.9c *A claim's chip
+    is its stage*, TD-704), by the first rule that applies: (1) a PR no longer open reads its holder's stage,
+    marked *merged* / *closed*; (2) **you**, grey, while the person has the PR — a `person` entry of the PR's
+    `pr_orders.reads` in the reading of the claim's own record's repo that is `open`, or `answered` without
+    `again` while no other addressee's entry is newer — or the work, an open ask or steer of the holder's to
+    the person about the reference or `#<pr>` (`waits_on`); (3) the review stage of a seat whose entry is
+    `open`, the later in the flow's order where two are; (4) the holder's own worker stage by its role, never
+    the entry's `Kind:`; (5) the role's word in grey (*session* with none). `stages` is the team's flow's
+    (`repo_board.team_stages`), None where it is not read; a member whose difference (`FLOW_ACTS`, and
+    `whats`, its lines) would move it to another stage reads its role. The PR is the claim's `pr`, the tick's
+    `review_pr`, or an open PR whose head branch names the reference. A reference whose holders read
+    different chips is a row per chip; holders of one chip share a row. Each row carries `stage`, `color`
+    (a palette name, '' for grey) and the entry's `priority` (*high*, *medium*, *low* or ''). Rows in the
+    flow's stage order, grey after by word, *you* last, then priority with High first, then by reference."""
     # a claimed work order (`board:<key>`, TD-384) is drawn as any reference, its title the line's head;
     # a claimed red PR (`pr:<n>`, TD-613) is held, so out of the orders: its title is the open PR's
     led_entries = ((r or {}).get("ledger") or {}).get("entries") or []
@@ -370,29 +428,73 @@ def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None
         e["id"]: e for e in [*led_entries, *teamrun.work_orders(r), *teamrun.pr_orders(r)] if isinstance(e, dict)
     }
     prs, web = _pr_states(r), _https(str((r or {}).get("remote") or ""))
-    # open PRs only: a merged slice's branch must not mark the next slice of the same entry *review*
+    whats = whats if whats is not None else FLOW_WHATS
+    colors = flowdefs.stage_colors(stages) if stages else {}
+    by_id = {str(x.get("id")): x for x in [*(fleet or ()), *members] if isinstance(x, Mapping) and x.get("id")}
+    # open PRs only: a merged slice's branch must not read as the next slice's PR
     by_branch: dict[str, int] = {}
     for p in ((r or {}).get("prs") or {}).get("open") or []:
         if isinstance(p, dict) and isinstance(p.get("number"), int) and (ref := branch_ref(p.get("branch"))):
             by_branch.setdefault(ref, p["number"])  # oldest first, as the reading keeps them
-    rows: dict[str, dict[str, Any]] = {}
+
+    def seat_chip(to: str) -> tuple[str, str, int]:
+        """A reader seat's chip and its place in the flow's order (one with no stage before every stage)."""
+        rec = by_id.get(to) or by_id.get(to.split("@", 1)[0])
+        role = str((rec or {}).get("role") or "")
+        word, color = _chip_of_role(role, stages, True, _stage_named(rec, stages, whats), colors)
+        if not color:
+            return (role or "reader"), "", -1
+        return word, color, next(i for i, st in enumerate(stages) if st.name == word)
+
+    rows: dict[tuple[str, str], dict[str, Any]] = {}
     for m in members:
+        named = _stage_named(m, stages, whats)
+        mr = _reading_of(m, repos) or r
+        reads = ((mr or {}).get("pr_orders") or {}).get("reads") or {}
+        waits_on = {str(w) for w in m.get("waits_on") or ()}
         for p in m.get("progress") or []:
             if not isinstance(p, dict) or p.get("status") != "claimed" or not p.get("ref"):
                 continue
             ref = str(p["ref"])
-            row = rows.setdefault(ref, {"ref": ref, "members": [], "pr": None})
-            row["members"].append({"id": m["id"], "name": m.get("name") or m["id"], "mine": not m.get("unattended")})
             pr = p.get("pr") or p.get("review_pr")
-            if isinstance(pr, int) and not row["pr"]:
+            pr = pr if isinstance(pr, int) else by_branch.get(ref)
+            state = str((prs.get(pr) or {}).get("state") or "") if pr else ""
+            closed = state in ("merged", "closed")
+            own = _chip_of_role(str(m.get("role") or ""), stages, False, named, colors)
+            chip = own
+            if not closed:
+                got = [x for x in reads.get(str(pr)) or [] if isinstance(x, Mapping)] if pr else []
+                person = next((x for x in got if x.get("to") == "person"), None)
+                later = person is not None and any(
+                    x.get("to") != "person" and str(x.get("at") or "") > str(person.get("at") or "") for x in got
+                )
+                if (
+                    person is not None
+                    and (
+                        person.get("state") == "open"
+                        or (person.get("state") == "answered" and not person.get("again") and not later)
+                    )
+                ) or (ref in waits_on or (pr and f"#{pr}" in waits_on)):
+                    chip = (GREY_YOU, "")
+                else:
+                    seats = [
+                        seat_chip(str(x.get("to"))) for x in got if x.get("to") != "person" and x.get("state") == "open"
+                    ]
+                    if seats:
+                        word, color, _ = max(seats, key=lambda c: c[2])
+                        chip = (word, color)
+            row = rows.setdefault(
+                (ref, chip[0]), {"ref": ref, "stage": chip[0], "color": chip[1], "members": [], "pr": None}
+            )
+            row["members"].append({"id": m["id"], "name": m.get("name") or m["id"], "mine": not m.get("unattended")})
+            if pr and not row["pr"]:
                 row["pr"] = pr
     out = []
-    for ref, row in rows.items():
+    for (ref, _), row in rows.items():
         e = entries.get(ref) or {}
-        pr = row["pr"] = row["pr"] or by_branch.get(ref)
+        pr = row["pr"]
         known = prs.get(pr) if pr else None
         state = str((known or {}).get("state") or "")
-        row["phase"] = "review" if pr else "design" if e.get("kind") == "design-first" else "grind"
         if not e and (n := pr_ref(ref)) is not None:
             e = {"title": (prs.get(n) or {}).get("title") or ""}
         row["title"] = str(e.get("title") or "")
@@ -402,8 +504,23 @@ def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None
         row["pr_url"] = str((known or {}).get("url") or (f"{web}/pull/{pr}" if pr and web else ""))
         out.append(row)
     rank = {p: i for i, p in enumerate(MOTION_PRIORITIES)}
-    out.sort(key=lambda x: (PHASES.index(x["phase"]), rank.get(x["priority"], len(rank)), x["ref"]))
+    order = {st.name: i for i, st in enumerate(stages or ())}
+    out.sort(
+        key=lambda x: (
+            (2, "") if x["stage"] == GREY_YOU else (0, order[x["stage"]]) if x["color"] else (1, x["stage"]),
+            rank.get(x["priority"], len(rank)),
+            x["ref"],
+        )
+    )
     return out
+
+
+def motion_phases(motion: Collection[Mapping[str, Any]]) -> list[tuple[str, int]]:
+    """The heading's counts of the chips, in the rows' order (*2 design · 2 build · 2 review · 1 hunter*)."""
+    out: dict[str, int] = {}
+    for x in motion:
+        out[x["stage"]] = out.get(x["stage"], 0) + 1
+    return list(out.items())
 
 
 COMPLETED_ROWS = 8  # the completed face's rows per window, then *+n more* (§4.5a *team card: TDs in motion*)
@@ -642,7 +759,7 @@ def team_summary(
     now = now or datetime.now(UTC)
     r = repo_named(repo, repos or {}) if repo else None
     r = r or team_repo(members, repos or {})
-    motion = motion_rows(members, r)
+    motion = motion_rows(members, r, repos, FLOW_STAGES.get(team), fleet if fleet is not None else members)
     done = completed_faces(members, r, now)
     shown = [c for w in done.values() for c in w["rows"]]
     answers = answer_blocks(members)
@@ -658,7 +775,11 @@ def team_summary(
         if r
         else None,
         "motion": motion,
-        "phases": {ph: sum(1 for x in motion if x["phase"] == ph) for ph in PHASES},
+        "phases": motion_phases(motion),
+        # the facet's count is references: a reference whose holders read two chips is two rows (§4.9c)
+        "n_refs": len({x["ref"] for x in motion}),
+        # the chip column as wide as the card's longest chip, set as `ref_w` is
+        "phase_w": max((len(x["stage"]) for x in motion), default=0),
         # the reference and holders columns' widths, from the rows, so every row's grid is the same (§4.5a **Columns**)
         "ref_w": min(max((len(x["ref"]) for x in motion), default=1), REF_WIDTH),
         "who_w": min(max((_holders_width(x["members"]) for x in motion), default=1), HOLDERS_WIDTH),

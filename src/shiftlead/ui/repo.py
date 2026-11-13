@@ -414,13 +414,21 @@ def ledger_lists(
     whole (TD-716, TD-1395), and its `blocked_by` drops the gates the mark says; `held` is the
     claim's, as ever."""
     now = now or datetime.now(UTC)
-    held = {x["ref"]: ", ".join(w["name"] for w in x["members"]) for x in motion}
+    # a reference whose holders read two chips is two rows (§4.9c *A claim's chip is its stage*): joined here
+    holders: dict[str, list[str]] = {}
+    prs_of: dict[str, dict[str, Any]] = {}
+    for x in motion:
+        got = holders.setdefault(x["ref"], [])
+        got += [w["name"] for w in x["members"] if w["name"] not in got]
+        if not (prs_of.get(x["ref"]) or {}).get("pr"):  # the first row naming a PR gives the reference's
+            prs_of[x["ref"]] = {"pr": x.get("pr"), "url": x.get("pr_url")}
+    held = {ref: ", ".join(names) for ref, names in holders.items()}
     entries = [e for e in ((r.get("ledger") or {}).get("entries") or []) if isinstance(e, dict)]
     builds, builds_of = design_builds(
         entries,
         (r.get("ledger") or {}).get("archived") or [],
         held,
-        {x["ref"]: {"pr": x.get("pr"), "url": x.get("pr_url")} for x in motion},
+        prs_of,
     )
     known = lanes is not None and teamrun.lane_entries(r) is not None
     orders = [

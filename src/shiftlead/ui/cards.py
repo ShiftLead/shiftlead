@@ -505,6 +505,10 @@ def view(
     d["brief_changed"] = brief_changed_view(s.get("brief_changed"))
     d["flow_mark"] = flow_mark(s, hosts.local_host().name) if s.get("team") else None
     d["waiting"] = waiting_view((waits or {}).get(s.get("id")))
+    # the references its open asks and steers to the person name: a chip's *you* (§4.9c rule 2's *or the work*)
+    d["waits_on"] = [
+        str(q["ref"]) for q in (waits or {}).get(s.get("id")) or () if isinstance(q, Mapping) and q.get("ref")
+    ]
     # **waiting** (§4.2 *Waiting*, §4.5 *The card's anatomy*, TD-734): an `idle` session that waits on a
     # person or another session — a reader holding its ask for a claim's PR, or the mark above — and has no
     # own work live (*One order*, TD-1227) is drawn *waiting*, teal, in the order after `working`; it stays
@@ -929,6 +933,12 @@ def _middle(text: str, width: int) -> str:
 FLOWS: dict[str, str] = {}
 FLOW_ACTS: dict[str, str] = {}
 FLOW_RENAMES: dict[str, str] = {}  # a `rename`'s newcomer, by the old record's id (TD-703)
+# §4.9c *A claim's chip is its stage* (TD-704): each team's current flow's stages as `repo_board.team_stages` reads
+# them against the team's `repo` on this host — None where no flow is read (a node team, a read that failed, a flow
+# that is not usable) — and each member difference's `what` lines by id, the stage-name gate's input. Set by the app's
+# `flow_views` once per page load, off the loop, so a delta redraws the chips without a file read
+FLOW_STAGES: dict[str, Any] = {}
+FLOW_WHATS: dict[str, list[str]] = {}
 NODE_RESTART = "flow changed — restarts when it next works or at the team's next Start"
 
 
