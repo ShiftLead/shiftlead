@@ -48,7 +48,7 @@ class SettingsMixin:
         first and asked for last*, TD-233 slice 2), from its adapter's hook command: `windows`
         `[{label, pct, resets}]` as the adapter's `usage_report` read them, `fresh` whether the
         session had a response since its last report. The caller is the session, as the envelope
-        names it. Merged into its account's reading by what a window can do (`sessionorc.usage`),
+        names it. Merged into its account's reading by how fresh its word is (`sessionorc.usage`),
         never by who spoke last; a report that is not fresh moves no age. Answers `{taken}`: false
         for a caller that is no live tool session here, a metered profile, or no windows — a
         report is never refused in words, since the status line that sends it prints nothing."""

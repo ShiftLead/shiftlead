@@ -4,11 +4,13 @@
 A reading is `{windows: [{label, pct, resets, at, source, history}], fetched, source, by, reason}`.
 Each window carries its own `at` (when a fresh report or an answer last confirmed its number) and
 `source` (`reported` or `asked`); `fetched`, `source` and `by` on the reading are the newest
-confirmation's, which is what the chip's age reads. Windows merge by what a window can do, not by
-who spoke last: inside one `resets` its use never falls, so the highest percentage stands, and a
-later `resets` replaces it outright. The short history beside each window — the newest reading and
-one per `HISTORY_STEP` for `HISTORY_SPAN` before it — is what the gate's projection takes its rate
-from (§6 *Usage gate*, slice 4). Adapter-neutral: labels are the adapter's, never named here."""
+confirmation's, which is what the chip's age reads. Windows merge by how fresh the word is, not by
+who spoke last: a fresh report or an answer sets the number, a lower one included (the account's
+allowance can be reset inside one `resets`, TD-1797), a report that is not fresh changes no number
+already held, and a later `resets` replaces the window outright. The short history beside each
+window — the newest reading and one per `HISTORY_STEP` for `HISTORY_SPAN` before it — is what the
+gate's projection takes its rate from (§6 *Usage gate*, slice 4). Adapter-neutral: labels are the
+adapter's, never named here."""
 
 from __future__ import annotations
 
@@ -84,6 +86,12 @@ def _history(held: list[Any], at: str, pct: float) -> list[dict[str, Any]]:
     return [h for h in hist if when - _instant(h["at"]) <= HISTORY_SPAN]  # type: ignore[operator]
 
 
+def _since_drop(held: list[Any], pct: float) -> list[Any]:
+    """`held` without the points above `pct`: inside one window use only rises, so a higher point before
+    a lower number is from before the allowance was reset, and no rate is read across it (TD-1797)."""
+    return [h for h in held if not isinstance(h, dict) or (_pct(h.get("pct")) or 0.0) <= pct]
+
+
 def _older(a: Any, b: Any) -> bool:
     """Whether instant `a` is before instant `b`, both known."""
     ta, tb = _instant(a), _instant(b)
@@ -109,11 +117,13 @@ def merge(
     by: str | None = None,
 ) -> dict[str, Any]:
     """`held` with `windows` folded in, as a new reading. `fresh` says the numbers were confirmed
-    at `at` (an answer, or a report after a response): only then does any `at` move, and a report
-    that is not fresh can still raise a number or bring a later reset, never an age. The
-    endpoint's answer (`source` `asked`) is the account's own and sets each window it names
-    outright, so a number it lowers is lowered; reports, each one session's view of it, merge by
-    the rule above. A window
+    at `at` (an answer, or a report after a response): only then does any `at` or any number held
+    move, so a fresh report sets its window's number, a lower one included — the allowance can be
+    reset inside one `resets` (TD-1797) — and a report that is not fresh, the number a session was
+    last handed and no newer than its last fresh one, brings only a window the reading lacks or a
+    later reset. The endpoint's answer (`source` `asked`) is the account's own and sets each window
+    it names outright, its reset included. A number that falls takes the history's higher points
+    with it. A window
     `held` has and `windows` does not (the endpoint's per-model one, in a report) is kept as it
     was. `reason` is left as `held` had it: it is the last poll's word, not the report's."""
     held = held or {}
@@ -129,18 +139,17 @@ def merge(
                 o is not None and not _later(w["resets"], o.get("resets")) and not _later(o.get("resets"), w["resets"])
             )
             n = {**w, "at": at, "source": source}
-            n["history"] = _history(list(o.get("history") or ()) if same else [], at, w["pct"])
+            n["history"] = _history(_since_drop(list(o.get("history") or ()), w["pct"]) if same else [], at, w["pct"])
         elif o is None or _later(w["resets"], o.get("resets")):
             n = {**w, "at": at if fresh else None, "source": source}
             n["history"] = _history([], at, w["pct"]) if fresh else []
         elif _later(o.get("resets"), w["resets"]):
             continue  # a report of the window before its reset: already over
+        elif not fresh:
+            continue  # the number a session was last handed, of no known age: what is held stands
         else:
-            n = dict(o)
-            n["pct"] = max(_pct(o.get("pct")) or 0.0, w["pct"])
-            if fresh:
-                n["at"], n["source"] = at, source
-                n["history"] = _history(list(o.get("history") or ()), at, n["pct"])
+            n = {**o, "pct": w["pct"], "at": at, "source": source}
+            n["history"] = _history(_since_drop(list(o.get("history") or ()), w["pct"]), at, w["pct"])
         out[w["label"]] = n
         moved = moved or fresh
     reading: dict[str, Any] = {**held, "windows": list(out.values())}

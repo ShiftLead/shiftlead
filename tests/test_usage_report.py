@@ -31,14 +31,30 @@ def pcts(reading: dict) -> dict:
     return {x["label"]: x["pct"] for x in reading["windows"]}
 
 
-def test_two_sessions_inside_one_reset_read_the_higher():
-    """Inside one `resets` a window's use never falls, so the highest stands, whoever spoke last."""
+def test_a_fresh_report_sets_the_number_inside_one_reset_a_lower_one_included():
+    """A fresh report is the account's word as of a response just had, so it stands, lower or not (TD-1797)."""
     a = usage.merge(
         None, usage.clean_windows([w("5h", 61.5)]), at="2026-10-01T01:00:00Z", source="reported", fresh=True
     )
     b = usage.merge(a, usage.clean_windows([w("5h", 60.0)]), at="2026-10-01T01:01:00Z", source="reported", fresh=True)
-    assert pcts(b) == {"5h": 61.5}
+    assert pcts(b) == {"5h": 60.0}
     assert b["fetched"] == "2026-10-01T01:01:00Z" and b["source"] == "reported"  # confirmed again, so it is younger
+
+
+def test_an_allowance_reset_inside_one_window_clears_the_cap_and_stale_reports_do_not_bring_it_back():
+    """TD-1797, 2026-11-13: the week window stood at 100%, the allowance was reset with `resets` unchanged,
+    and every capped session's status line went on handing the 100% it was last given."""
+    r = None
+    for i, pct in enumerate((96.0, 98.0, 100.0)):
+        r = usage.merge(r, [w("week", pct)], at=f"2026-10-01T0{i + 1}:00:00Z", source="reported", fresh=True, by="g1")
+    r = usage.merge(r, [w("week", 2.0)], at="2026-10-01T03:30:00Z", source="reported", fresh=True, by="paul")
+    assert pcts(r) == {"week": 2.0} and r["by"] == "paul"
+    assert [h["pct"] for h in r["windows"][0]["history"]] == [2.0]  # no rate is read across the reset
+    stale = usage.merge(r, [w("week", 100.0)], at="2026-10-01T03:31:00Z", source="reported", fresh=False, by="g1")
+    assert stale == r  # the number a capped session was last handed: nothing moves
+    asked = usage.merge(None, [w("week", 100)], at="2026-10-01T03:00:00Z", source="asked", fresh=True)
+    asked = usage.merge(asked, [w("week", 3)], at="2026-10-01T03:40:00Z", source="asked", fresh=True)
+    assert [h["pct"] for h in asked["windows"][0]["history"]] == [3]  # an answer's fall drops them too
 
 
 def test_a_later_reset_replaces_and_an_earlier_one_is_over():
@@ -53,9 +69,12 @@ def test_a_later_reset_replaces_and_an_earlier_one_is_over():
 def test_a_report_that_is_not_fresh_moves_no_age():
     a = usage.merge(None, [w("week", 40.0)], at="2026-10-01T01:00:00Z", source="asked", fresh=True)
     b = usage.merge(a, [w("week", 41.0)], at="2026-10-01T02:00:00Z", source="reported", fresh=False, by="g1")
-    assert pcts(b) == {"week": 41.0}  # the number may rise
+    assert pcts(b) == {"week": 40.0}  # nor a number already held (TD-1797)
     assert b["fetched"] == "2026-10-01T01:00:00Z" and b["source"] == "asked" and "by" not in b
     assert b["windows"][0]["at"] == "2026-10-01T01:00:00Z"
+    c = usage.merge(b, [w("5h", 7.0), w("week", 1.0, R2)], at="2026-10-01T02:01:00Z", source="reported", fresh=False)
+    assert pcts(c) == {"week": 1.0, "5h": 7.0}  # a window the reading lacks, and a later reset, are taken
+    assert c["fetched"] == "2026-10-01T01:00:00Z" and [x["at"] for x in c["windows"]] == [None, None]
 
 
 def test_a_window_only_the_endpoint_gives_is_kept_beside_a_report():
@@ -140,7 +159,7 @@ async def test_a_report_reaches_the_accounts_reading_and_holds_the_endpoint_off(
 
         async with LocalClient(caller=sb["id"]) as me:
             await me.call("usage_report", windows=[w("5h", 60.0)], fresh=True)  # lower, inside one reset
-        assert pcts(agent._usage["pa"])["5h"] == 61.5 and agent._usage["pa"]["by"] == "rb"
+        assert pcts(agent._usage["pa"])["5h"] == 60.0 and agent._usage["pa"]["by"] == "rb"  # fresh: it stands
 
         # the endpoint's answer is the account's own: it sets the windows it names outright, keeps the rest
         hookstub.usage_value = {"windows": [w("5h", 59), w("week · Fable", 17)], "fetched": iso(datetime.now(UTC))}
@@ -152,6 +171,15 @@ async def test_a_report_reaches_the_accounts_reading_and_holds_the_endpoint_off(
         async with LocalClient(caller=sa["id"]) as me:
             await me.call("usage_report", windows=[w("5h", 100.0, R1)], fresh=True)
         assert agent.sessions[sa["id"]].state == "limited" and agent.sessions[sb["id"]].state == "limited"
+        # the allowance is reset inside the window (TD-1797): one session's fresh report lifts every session
+        # on the account, and the other's status line, still handing the 100% it was last given, marks none
+        async with LocalClient(caller=sb["id"]) as me:
+            await me.call("usage_report", windows=[w("5h", 2.0, R1)], fresh=True)
+        assert "limited" not in (agent.sessions[sa["id"]].state, agent.sessions[sb["id"]].state)
+        async with LocalClient(caller=sa["id"]) as me:
+            await me.call("usage_report", windows=[w("5h", 100.0, R1)], fresh=False)
+        assert pcts(agent._usage["pa"])["5h"] == 2.0
+        assert "limited" not in (agent.sessions[sa["id"]].state, agent.sessions[sb["id"]].state)
 
         async with LocalClient() as nobody:
             assert await nobody.call("usage_report", windows=[w("5h", 99.0)], fresh=True) == {"taken": False}
@@ -288,7 +316,8 @@ async def test_two_nodes_keying_one_profile_to_two_accounts_show_one_and_never_f
     agent._take_records("desk", [node_record("ao-d-w", host="desk", state="exited")], whole=False)
     await agent._refresh_usage_inner()
     assert ("desk", "pn") not in agent._usage_remote_keys
-    await agent._take_usage_report("laptop", {"id": "ao-x-w", "account": "hookstub:bob", "windows": [w("5h", 21.0)]})
+    report = {"id": "ao-x-w", "account": "hookstub:bob", "windows": [w("5h", 21.0)], "fresh": True}
+    await agent._take_usage_report("laptop", report)
     assert agent._usage["pn"]["account"] == "bob" and pcts(agent._usage["pn"]) == {"5h": 21.0}
 
 
