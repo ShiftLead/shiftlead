@@ -70,6 +70,19 @@ def test_a_record_before_the_field_resolves_it_from_its_controllers():
     assert not mail.by_person(_rec("lead", by_person=None, supervised=True))
     # an explicit false stays false, whatever the controllers say
     assert not mail.by_person(_rec("w", by_person=False))
+    # TD-1793: the person's own start in a team before the field (`ao-paul`): its team's manager in controllers
+    paul = _rec("ao-paul", by_person=None, team="ao-grind", controllers=["ao-x-manager-ao-1"])
+    assert mail.by_person(paul) and mail.own_end(paul)
+    assert not mail.taken_over(paul, True)
+    # a lead's start before the field names the lead and carries no team: still a member, held once taken over
+    lead_start = _rec("w", by_person=None, controllers=["ao-x-lead"], team="")
+    assert not mail.by_person(lead_start) and not mail.own_end(lead_start)
+    assert mail.taken_over(lead_start, True)
+    # a seat before the field is never the person's, whatever else it carries
+    assert not mail.by_person(_rec("s", by_person=None, seat={"trigger": "question"}))
+    assert not mail.by_person(_rec("s", by_person=None, team="t", controllers=["m"], seat={"trigger": "question"}))
+    # nor a team start's member before the field, supervised, team set
+    assert not mail.by_person(_rec("m", by_person=None, team="t", controllers=["m"], supervised=True))
     records = {"a": _rec("a"), "old": _rec("old", by_person=None, team="t")}
     assert mail.message_edge(records, "a", "old", kind="note") == "own"
     assert Session.from_dict({k: v for k, v in _rec("o").to_dict().items() if k != "by_person"}).by_person is None
