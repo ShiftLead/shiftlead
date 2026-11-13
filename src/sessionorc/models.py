@@ -86,6 +86,7 @@ NODE_OWNED = frozenset(
         "turn_at",
         "pending",
         "limited_reset",
+        "limited_hook_at",
         "pendings",
         "kept",
         "confidence",
@@ -1107,6 +1108,10 @@ class Session:
     # read once, at the spell's first tick, from the screen rule's `resets` or the usage cap's window, and kept
     # until the state leaves `limited` — so a daily reset already passed is not recomputed into tomorrow.
     limited_reset: str | None = None
+    # When a hook's `limited` landed, ISO UTC (design §4.2's `rate_limit` row, TD-1748, TD-1750): a turn that
+    # ended on a cap, which only a usage reading fetched after it lifts, and lifts to `idle`. On the record, so a
+    # host-agent restart keeps both; None for the poll's or a screen rule's `limited`, and once the lift ends it.
+    limited_hook_at: str | None = None
     confidence: Confidence = "scraped"
     unattended: bool = False
     # Who last changed the mode, when and from which control (design §4.5 *A taken-over member*, §4.4a,

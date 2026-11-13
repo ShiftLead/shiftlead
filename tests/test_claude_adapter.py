@@ -1412,7 +1412,7 @@ async def test_a_rate_limited_turn_reads_limited_until_the_poll_lifts_it_to_idle
         assert s.state == "limited" and s.limited_reset == iso(resets)  # the cap stands, its reset known
         agent._usage[s.profile] = {"windows": [], "fetched": iso(now + timedelta(seconds=10))}
         agent._usage_limits([s], set())
-        assert (s.state, s.confidence, s.pending) == ("idle", "hook", None) and sid not in agent._hook_limited
+        assert (s.state, s.confidence, s.pending) == ("idle", "hook", None) and s.limited_hook_at is None
         await _hook(sid, hook_event_name="StopFailure", session_id="u1", error="rate_limit")
         agent._usage.pop(s.profile)
         agent._usage_limits([s], {s.profile})  # a metered profile has no cap to wait for
@@ -1420,8 +1420,38 @@ async def test_a_rate_limited_turn_reads_limited_until_the_poll_lifts_it_to_idle
         await _hook(sid, hook_event_name="StopFailure", session_id="u1", error="rate_limit")
         agent._usage_limits([s], set())
         assert s.state == "limited"  # no reading at all: it waits the poll's age for one
-        agent._hook_limited[sid] -= timedelta(seconds=901)
+        s.limited_hook_at = iso(datetime.now(UTC) - timedelta(seconds=901))
         agent._usage_limits([s], set())
         assert s.state == "idle"
         await _hook(sid, hook_event_name="StopFailure", session_id="u1", error="overloaded")
         assert (await c.call("get", id=sid))["state"] == "idle"
+
+
+async def test_a_rate_limited_turn_keeps_its_lift_marks_across_a_restart(agent, hookstub, tmp_path):
+    """TD-1750, design §4.2's `rate_limit` row: the hook's `limited` is marked on the record, not in the host
+    agent's memory. With the in-memory marks gone, as after a restart, a reading fetched before the `limited`
+    still lifts nothing, and one fetched after it with no cap lifts it to `idle`, never the poll's `working`."""
+    from datetime import UTC, datetime, timedelta
+
+    from sessionorc.store import SessionStore
+
+    def iso(dt):
+        return dt.isoformat().replace("+00:00", "Z")
+
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="s", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        await _hook(sid, hook_event_name="UserPromptSubmit", session_id="u1")
+        await _hook(sid, hook_event_name="StopFailure", session_id="u1", error="rate_limit")
+        landed = agent.sessions[sid].limited_hook_at
+        assert landed is not None
+        saved = SessionStore(agent.store.root).load(sid)
+        assert saved is not None and (saved.state, saved.limited_hook_at) == ("limited", landed)  # on disk
+        agent._pre_limited.clear()  # what a restart forgets
+        s = agent.sessions[sid]
+        now = datetime.now(UTC)
+        agent._usage[s.profile] = {"windows": [], "fetched": iso(now - timedelta(minutes=5))}
+        agent._usage_limits([s], set())
+        assert s.state == "limited"  # an older reading cannot have seen the cap the tool met
+        agent._usage[s.profile] = {"windows": [], "fetched": iso(now + timedelta(seconds=5))}
+        agent._usage_limits([s], set())
+        assert (s.state, s.confidence, s.pending, s.limited_hook_at) == ("idle", "hook", None, None)
