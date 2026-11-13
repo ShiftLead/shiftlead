@@ -180,6 +180,43 @@ async def test_a_parked_tick_leaves_no_sweep_running(agent, monkeypatch):
 
 
 @pytest.mark.unit
+def test_a_first_piece_survives_the_sweep_removing_its_new_folder(tmp_path, monkeypatch):
+    """TD-1744: the retention sweep, in its thread, `rmdir`s an empty folder of an id its snapshot did not
+    hold — a session made after the snapshot. Between the mkdir and the open that is the new attachment's
+    own folder, and an upload's first piece failed `FileNotFoundError` on the `.part` (#3630's first
+    precheck). Forced here: the folder is removed before the first open, and the piece, and a whole file
+    sent at once, still land; a folder gone twice is the error it was."""
+    import os
+
+    from sessionorc import agent as agent_mod
+
+    part = tmp_path / "attachments" / "ao-new" / "deck.pptx.0123456789abcdef.part"
+    real, opens = os.open, []
+
+    def swept(path, *a, **kw):  # the sweep's rmdir, between the mkdir and this open
+        opens.append(path)
+        if len(opens) == 1:
+            pathlib.Path(path).parent.rmdir()
+        return real(path, *a, **kw)
+
+    monkeypatch.setattr(os, "open", swept)
+    agent_mod._start_part(part, b"piece")
+    assert part.read_bytes() == b"piece" and len(opens) == 2
+    assert stat.S_IMODE(part.stat().st_mode) == 0o600
+    opens.clear()
+    whole = agent_mod._write_attachment(tmp_path / "attachments" / "ao-new2", "a.txt", b"all")
+    assert whole.read_bytes() == b"all" and len(opens) == 2
+
+    def always(path, *a, **kw):
+        pathlib.Path(path).parent.rmdir()
+        return real(path, *a, **kw)
+
+    monkeypatch.setattr(os, "open", always)
+    with pytest.raises(FileNotFoundError):
+        agent_mod._start_part(tmp_path / "attachments" / "ao-gone" / "x.0123456789abcdef.part", b"")
+
+
+@pytest.mark.unit
 def test_attachment_names_need_no_quoting_in_a_prompt():
     assert paths.attachment_name("Screenshot 2026-10-07 at 5.12.png") == "Screenshot_2026-10-07_at_5.12.png"
     assert paths.attachment_name("../../etc/passwd") == "passwd"
