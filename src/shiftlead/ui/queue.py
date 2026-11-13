@@ -1357,6 +1357,7 @@ def queue_view(
             lines.append(
                 {
                     "kind": "row",
+                    "ids": [str(r.get("qid") or "")] if r.get("qid") else [],  # the Queue's find matches it (TD-1762)
                     "repo": str(r.get("repo") or str(r.get("qid") or "").partition("#")[0]),
                     "find": _find_text([r]),
                     "at": at,
