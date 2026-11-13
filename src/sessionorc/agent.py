@@ -3182,6 +3182,13 @@ class HostAgent(
             raise RpcError(f"{s.name} is scheduled and has not started: Cancel it instead {rule}")
         if s.sit_out or work_mod.sat_out(s):
             return self._view(s)
+        mark = {"at": now_iso(), **({"dropped": True} if dropped else {})}
+        if s.host == self.host and s.state not in ("exited", "closed") and self._brief_holds(s):
+            # its brief is not in: nothing is typed, the mark goes on first and the kill's own save keeps it
+            # (§4.3 *No send until it is in*, TD-1637); a node's record keeps today's order, its own stop branch
+            await self._stop_marked(s, "sit_out", mark, f"so it is not sat out {rule}", caller)
+            log.info("%s sat out by the person's Apply: stopped, its brief not in", self._address(s))
+            return self._view(s)
         if s.state not in ("exited", "closed") and adapters.has_agent(s.adapter):
             try:  # a record with no agent is typed nothing: the sit-out's close stops it (§4.3)
                 if s.host == self.host:
@@ -3193,7 +3200,7 @@ class HostAgent(
                     f"{s.name}: the wrap-up could not be sent ({str(e) or type(e).__name__}), "
                     f"so it is not sat out {rule}"
                 ) from None
-        s.sit_out = {"at": now_iso(), **({"dropped": True} if dropped else {})}
+        s.sit_out = mark
         self._save(s)
         await self._push_changes()
         log.info("%s sat out by the person's Apply: the wrap-up sent", self._address(s))
@@ -3215,6 +3222,11 @@ class HostAgent(
             raise RpcError(f"{s.name} runs on {s.host}: an extra is dropped at the host it runs on {rule}")
         if s.scale.get("drop"):
             return self._view(s)
+        if s.state not in ("exited", "closed") and self._brief_holds(s):
+            # its brief is not in: marked, then stopped, nothing typed (§4.3 *No send until it is in*, TD-1637)
+            await self._stop_marked(s, "scale", {**s.scale, "drop": now_iso()}, f"so it is not dropped {rule}", caller)
+            log.info("%s: an extra past its line's max — stopped, its brief not in", self._address(s))
+            return self._view(s)
         if s.state not in ("exited", "closed") and adapters.has_agent(s.adapter):
             try:
                 await self.rpc_send(s.id, WRAPUP_PROMPT, wrapup=True, caller=caller)
@@ -3228,6 +3240,19 @@ class HostAgent(
         await self._push_changes()
         log.info("%s: an extra past its line's max — the wrap-up sent, dropped once closed", self._address(s))
         return self._view(s)
+
+    async def _stop_marked(self, s: Session, field: str, value: Any, refused: str, caller: Any) -> None:
+        """`relaunch`'s stop of a record whose brief is not in (§4.3 *No send until it is in*, TD-1637): its mark
+        (`field` set to `value`) on the record in memory, unsaved, then `rpc_kill` with `relaunch`'s caller, whose
+        own save persists it, so the tick never sees it stopped unmarked. Where the kill raises, the mark is taken
+        back and the failure worded as a wrap-up's (`refused`), so a refused relaunch touches nothing."""
+        old = getattr(s, field)
+        setattr(s, field, value)
+        try:
+            await self.rpc_kill(s.id, caller=caller)
+        except Exception as e:  # noqa: BLE001 — said to the person who pressed, nothing marked
+            setattr(s, field, old)
+            raise RpcError(f"{s.name}: it could not be stopped ({str(e) or type(e).__name__}), {refused}") from None
 
     def _restart_check(self, s: Session, now: datetime) -> dict[str, Any]:
         """`restart`'s refusals, each by name (design §6 rule 2 *A person's restart*), and the launch

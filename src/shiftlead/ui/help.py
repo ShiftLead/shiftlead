@@ -44,7 +44,8 @@ HELP: tuple[Help, ...] = (
         (
             "Sends the wrap-up to every member and then to the manager: each finishes what it holds, pushes, "
             "and exits. Press it when the team should stop after the work in hand, not in the middle of it. "
-            "It kills nothing — Stop now does — and forgets nothing."
+            "It kills nothing — Stop now does — but for a member whose brief is not in yet, which it stops, "
+            "and forgets nothing."
         ),
     ),
     Help(
@@ -170,8 +171,8 @@ HELP: tuple[Help, ...] = (
         (
             "Sends the wrap-up prompt — the one a policy sends before a stop — so the session finishes, "
             "pushes and ledgers what it holds, then ends its turn. Press it when you want the work saved "
-            "rather than the process stopped. It kills nothing: the session ends when it says it has, and a "
-            "stop time does the same on a clock."
+            "rather than the process stopped. It kills nothing, but for a session whose brief is not in yet, "
+            "which it stops: the session ends when it says it has, and a stop time does the same on a clock."
         ),
     ),
     Help(
