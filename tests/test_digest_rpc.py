@@ -28,6 +28,7 @@ class DigestStub:
     marks_errors = True
     gate: threading.Event | None = None
     listed = ("q", "gone")
+    bare: tuple = ()  # conversations under `p` with no instants, added by a test
 
     def launch(self, **_):
         return adapters.LaunchSpec(argv=["bash", "--norc", "--noprofile"], adapter_id="tool-1")
@@ -40,7 +41,7 @@ class DigestStub:
 
     def conversations(self, cwd, profile):
         return {
-            "p": [C("b", "2026-11-04T09:00:00Z", "2026-11-04T10:00:00Z", 5)],
+            "p": [C("b", "2026-11-04T09:00:00Z", "2026-11-04T10:00:00Z", 5), *self.bare],
             "q": [
                 C("a", "2026-11-03T08:00:00Z", "2026-11-04T08:30:00Z", 7),
                 C("b", "2026-11-04T09:00:00Z", "2026-11-04T10:00:00Z", 5),
@@ -58,6 +59,13 @@ class DigestStub:
             TranscriptEntry(kind="text", at="2026-11-04T09:01:00Z", text="done"),
         ]
         return Transcript(path="/f", size=1, first_at="2026-11-04T09:00:00Z", entries=e)
+
+
+class QuietStub(DigestStub):
+    """The same listing from an adapter whose transcripts do not mark a failed call."""
+
+    name = "quiet"
+    marks_errors = False
 
 
 class NoListStub(DigestStub):
@@ -78,6 +86,7 @@ def stubs(monkeypatch):
     stub = DigestStub()
     monkeypatch.setitem(adapters._REGISTRY, "dstub", stub)
     monkeypatch.setitem(adapters._REGISTRY, "nolist", NoListStub())
+    monkeypatch.setitem(adapters._REGISTRY, "quiet", QuietStub())
     return stub
 
 
@@ -108,6 +117,58 @@ async def test_conversations_ask_every_profile_once_per_id_oldest_first(agent, t
         stubs.listed = ()  # an adapter whose profiles() omits the record's own: it is asked anyway
         got = await person.call("conversations", id=sid)
         assert [c["id"] for c in got["conversations"]] == ["b"]
+        await person.call("kill", id=sid)
+        await person.call("remove", id=sid)
+
+
+@pytest.mark.integration
+async def test_conversations_window_is_half_open_and_skips_a_conversation_with_no_instants(agent, tmp_path, stubs):
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="d", dir=str(tmp_path), adapter="dstub", profile="p"))["id"]
+        (tmp_path / "quiet").mkdir()
+        quiet = (await person.call("create", name="qt", dir=str(tmp_path / "quiet"), adapter="quiet", profile="p"))[
+            "id"
+        ]
+        # `[since, until)`: `a` ends exactly at since and is kept; `b` starts exactly at until and is dropped
+        got = await person.call("conversations", id=sid, since="2026-11-04T08:30:00Z", until="2026-11-04T09:00:00Z")
+        assert [c["id"] for c in got["conversations"]] == ["a"]
+        # a conversation whose instants do not parse is skipped, window or none
+        stubs.bare = (C("noat", "", "", 1), C("naive", "2026-11-04T09:00:00", "2026-11-04T09:30:00", 1))
+        got = await person.call("conversations", id=sid)
+        assert [c["id"] for c in got["conversations"]] == ["old", "a", "b"]
+        got = await person.call("conversations", id=sid, since="2026-11-04T00:00:00Z", until="2026-11-05T00:00:00Z")
+        assert [c["id"] for c in got["conversations"]] == ["a", "b"]
+        stubs.bare = ()
+        # a malformed bound is refused, never read as unset
+        for bound in ("since", "until"):
+            for bad in ("2026-11-04", "2026-11-04T08:00:00", "yesterday", 5):
+                with pytest.raises(AgentError, match=f"{bound} is an RFC 3339 instant with its offset"):
+                    await person.call("conversations", id=sid, **{bound: bad})
+        # marks_errors is the adapter's own: true for one that marks a failed call, false for one that does not
+        assert (await person.call("conversations", id=sid))["marks_errors"] is True
+        assert (await person.call("conversations", id=quiet))["marks_errors"] is False
+        for s in (sid, quiet):
+            await person.call("kill", id=s)
+            await person.call("remove", id=s)
+
+
+@pytest.mark.integration
+async def test_a_digest_refuses_a_missing_conversation_or_window_and_a_bad_skip(agent, tmp_path, stubs):
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="d", dir=str(tmp_path), adapter="dstub", profile="p"))["id"]
+        window = {"since": "2026-11-04T00:00:00Z", "until": "2026-11-05T00:00:00Z"}
+        for conv in ({}, {"conversation": ""}, {"conversation": 5}):
+            with pytest.raises(AgentError, match="needs the conversation's id"):
+                await person.call("transcript_digest", id=sid, profile="p", **conv, **window)
+        for drop in ("since", "until"):
+            part = {k: v for k, v in window.items() if k != drop}
+            with pytest.raises(AgentError, match="needs since and until"):
+                await person.call("transcript_digest", id=sid, conversation="b", profile="p", **part)
+        with pytest.raises(AgentError, match="since is an RFC 3339 instant"):
+            await person.call("transcript_digest", id=sid, conversation="b", profile="p", since="x", until="y")
+        for skip in (-1, True, "1", 1.0):
+            with pytest.raises(AgentError, match="skip is a count"):
+                await person.call("transcript_digest", id=sid, conversation="b", profile="p", skip=skip, **window)
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
 
