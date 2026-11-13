@@ -339,7 +339,9 @@ async def test_an_unknown_verdicts_method_is_bounded_and_each_signal_is_logged(a
     with caplog.at_level("INFO", logger="shiftlead.agent"):
         await agent._identify({"id": 1, "method": long, "params": {}, "caller": "ao-x"}, 4242)
     judged = [r.getMessage() for r in caplog.records if "judged unknown" in r.getMessage()]
-    assert judged == [f"{'m' * 60} from peer 4242 judged unknown: unreadable"]
+    assert judged == [
+        f"{'m' * 60} from peer 4242 judged unknown: unreadable (gone at the first read; connection age unknown)"
+    ]
     alarmed = [r.getMessage() for r in caplog.records if r.getMessage().startswith("identity alarm")]
     assert alarmed == [f"identity alarm (enforce): unknown claimed 'ao-x' on {'m' * 60}"], "bounded too (TD-1644)"
     caplog.clear()
@@ -359,6 +361,80 @@ async def test_an_unknown_verdicts_method_is_bounded_and_each_signal_is_logged(a
     with caplog.at_level("INFO", logger="shiftlead.agent"):
         await agent._identify({"id": 3, "method": "usage_report", "params": {}, "caller": "ao-x"}, 400)
     assert "usage_report from peer 400 judged unknown: cgroup" in caplog.text
+
+
+def _unreadable_lines(caplog) -> list[str]:
+    return [r.getMessage() for r in caplog.records if "judged unknown: unreadable" in r.getMessage()]
+
+
+async def test_an_unreadable_verdict_says_which_read_failed(agent, monkeypatch, caplog):
+    """TD-1741: 28 `usage_report`s were judged *unreadable* in a day with the reporter's wait at fifteen
+    seconds, and the line could not say why. It now says whether the socket's credential would not read,
+    or the peer's /proc entry was gone at the first classification, or at the second after the wait for a
+    fresh pane list — and how long that wait was, the window a reporter could exit in."""
+    from types import SimpleNamespace
+
+    await park_ticks(agent)
+    agent._id_detached = ""
+    agent._id_panes = list(PANES)
+    agent.identity_mode = "enforce"
+    req = {"id": 1, "method": "usage_report", "params": {"windows": []}, "caller": "ao-x"}
+    fake = FakeProc(list(BASE))
+    monkeypatch.setattr(agent, "proc", fake)
+    with caplog.at_level("INFO", logger="shiftlead.agent"):
+        await agent._identify(dict(req), -1)  # the credential itself did not read
+        await agent._identify(dict(req), 4242)  # gone at once, and no unlisted pane to wait for
+    assert _unreadable_lines(caplog) == [
+        "usage_report from peer -1 judged unknown: unreadable (no credential; connection age unknown)",
+        "usage_report from peer 4242 judged unknown: unreadable (gone at the first read; connection age unknown)",
+    ]
+    # a live record whose pane no list has shown: a peer that matched no pane waits for a fresh list
+    agent.sessions["ao-new"] = SimpleNamespace(pane="%9", host=None, state="working")
+    monkeypatch.setattr(agent.tmux, "main_panes", lambda prefix: [])
+    monkeypatch.setattr(agent, "_id_note_panes", lambda panes: None)
+    agent._id_listed_at = 0.0  # no list yet: the read is asked again at once
+    fake.script[4242] = [P(4242, 1, 4242)]  # there at the first read, gone at the second
+    caplog.clear()
+    with caplog.at_level("INFO", logger="shiftlead.agent"):
+        await agent._identify(dict(req), 4242)
+        await agent._identify(dict(req), 4243)  # gone at both
+    (second, both) = _unreadable_lines(caplog)
+    assert second.startswith("usage_report from peer 4242 judged unknown: unreadable (gone at the second read, ")
+    assert second.endswith("s after a first that read outside; connection age unknown)")
+    assert both.startswith("usage_report from peer 4243 judged unknown: unreadable (gone at the first read, and at")
+    assert both.endswith("s later; connection age unknown)")
+    del agent.sessions["ao-new"]
+
+
+async def test_an_unreadable_verdict_over_a_connection_says_its_age(agent, monkeypatch, caplog):
+    """TD-1741: over a real connection the line carries the time from its accept to the verdict, which
+    says whether the home lagged past the reporter's wait; a later request on the same connection keeps
+    the first one's classification, and its line says so rather than naming a read it never made."""
+    from sessionorc import agent_common
+
+    await park_ticks(agent)
+    agent._id_detached = ""
+    agent._id_panes = list(PANES)
+    monkeypatch.setattr(agent, "proc", FakeProc(list(BASE)))  # 4242 has exited
+    monkeypatch.setattr(agent_common, "_peer_pid", lambda writer: (4242, os.geteuid()))
+    agent.identity_mode = "observe"
+    with caplog.at_level("INFO", logger="shiftlead.agent"):
+        async with LocalClient(caller="ao-x") as c:
+            with contextlib.suppress(AgentError):
+                await c.call("inbox_delete", ids=["m-none"])
+            with contextlib.suppress(AgentError):
+                await c.call("inbox_delete", ids=["m-none"])
+    lines = _unreadable_lines(caplog)
+    assert len(lines) == 2, lines
+    first, kept = lines
+    assert first.startswith(
+        "inbox_delete from peer 4242 judged unknown: unreadable (gone at the first read; connection "
+    )
+    assert first.endswith("s old)") and "age unknown" not in first
+    assert kept.startswith(
+        "inbox_delete from peer 4242 judged unknown: unreadable (kept from the connection's first request; connection "
+    )
+    assert await wait_for(lambda: not agent._id_conn_at), "a closed connection leaves no accept time behind"
 
 
 async def test_a_served_connection_carries_its_peers_uid_to_the_classification(agent, monkeypatch):

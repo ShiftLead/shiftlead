@@ -9,6 +9,7 @@ import asyncio
 import contextlib
 import inspect
 import json
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -252,6 +253,7 @@ class ServeMixin:
 
     async def _handle_conn(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         self._conns.add(writer)
+        self._id_conn_at[writer] = time.monotonic()  # its age at an `unreadable` verdict (TD-1741)
         try:
             while line := await reader.readline():
                 try:
@@ -292,6 +294,7 @@ class ServeMixin:
         finally:
             self._conns.discard(writer)
             self._id_conns.pop(writer, None)
+            self._id_conn_at.pop(writer, None)
             self._subscribers.pop(writer, None)
             self._sub_omit.pop(writer, None)
             writer.close()
