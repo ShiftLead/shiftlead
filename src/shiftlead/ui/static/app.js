@@ -5809,14 +5809,16 @@
     // the hash's note, outside the lists so no re-read draws it away; gone with the next address
     function hashMiss(note) { const old = $("#qhashmiss", box); if (old) old.remove(); if (note) lists.before(note); }
     const asked = new Set();  // the addresses read with `find=`, once each: never again on a re-read
+    const notes = new Map();  // each address's note, drawn again when the person comes back to it
     async function findHash(id) {
+      if (notes.has(id)) { hashMiss(notes.get(id).cloneNode(true)); return; }
       if (asked.has(id)) return;
       asked.add(id);
       try {
         const res = await fetch(`/queue?${new URLSearchParams({ part: "1", win: "month", find: id })}`);
         const fresh = res.ok ? parse(await res.text()) : null;
         if (!fresh || !$("#qcounts", fresh)) { asked.delete(id); return; }
-        if (AO.hashId(location.hash) !== id) return;  // the person went on to another address
+        if (AO.hashId(location.hash) !== id) { asked.delete(id); return; }  // gone on to another address: unread
         if (lineFor(fresh, id)) {
           drawWindow(fresh);
           apply();  // the picks' marks on the lines drawn in, never the find's
@@ -5825,6 +5827,7 @@
         }
         const m = $("#qfindmiss", fresh); if (!m) return;
         const n = m.cloneNode(true); n.id = "qhashmiss"; delete n.dataset.for;
+        notes.set(id, n.cloneNode(true));
         hashMiss(n); reveal(n, true);
       } catch (err) { asked.delete(id); }
     }

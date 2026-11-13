@@ -235,7 +235,8 @@ def test_the_page_puts_a_refused_card_back_and_says_why():
     show = js[js.index("function reveal(") :]
     show = show[: show.index("\n    }\n")]
     assert show.index("toggleFold(card)") < show.index("el.scrollIntoView(")
-    assert "reveal(el, true)" in js[js.index("function showHash()") :][:900]  # ringed (TD-1762)
+    show = js[js.index("function showHash()") :]
+    assert "reveal(el, true)" in show[: show.index("\n    }\n")]  # ringed (TD-1762)
 
 
 PROBE = """

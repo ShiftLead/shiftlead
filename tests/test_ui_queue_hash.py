@@ -103,4 +103,7 @@ def test_the_hash_reads_the_queue_once_per_address_with_the_picks_untouched():
     # a line past the window held is drawn in and shown; else the find's note, outside the lists a re-read draws
     assert find.index("drawWindow(fresh)") < find.index("showLine(ln)") < find.index('$("#qfindmiss", fresh)')
     assert 'n.id = "qhashmiss"' in find and "hashMiss(n)" in find
+    # an address come back to draws its note again, without a second read; one left mid-read stays unread
+    assert find.index("if (notes.has(id))") < find.index("if (asked.has(id)) return;")
+    assert "notes.set(id, n.cloneNode(true));" in find and "{ asked.delete(id); return; }" in find
     assert "lists.before(note)" in js
