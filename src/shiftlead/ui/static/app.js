@@ -4995,13 +4995,19 @@
   // gone — refresh*): its controls hidden in their place, its links kept, its height kept
   // `word` *done* marks a row whose entry was archived (§4.5 screen 12 *Values are patched in place*): drawn as
   // *gone* is, and withdrawn the same way
-  AO.qGone = function (u, on, word) {
+  // `href` draws the word's last part as a link (a card's page's *gone — now on <card> ›*, TD-1762), `word` its text
+  AO.qGone = function (u, on, word, href) {
     word = word || "gone — refresh";
     u.classList.toggle("qgone", on);
     let w = [...u.querySelectorAll(".qgonew")].find((x) => x.closest(Q_UNITS) === u);
-    if (on && w && w.textContent !== word) { w.remove(); w = null; }
+    const linked = (x) => (x.querySelector("a") ? x.querySelector("a").getAttribute("href") : "");
+    if (on && w && (w.textContent !== word || linked(w) !== (href || ""))) { w.remove(); w = null; }
     if (on && !w) {
       w = document.createElement("span"); w.className = "qgonew"; w.textContent = word;
+      if (href) {
+        const cut = word.indexOf("now on ") + "now on ".length, a = document.createElement("a");
+        a.href = href; a.textContent = word.slice(cut); w.textContent = word.slice(0, cut); w.appendChild(a);
+      }
       if (word.startsWith("gone")) w.setAttribute("title", AO.QGONE_TITLE || "");
       // in the controls' own line, where they were; a unit with none draws it at its line's end
       const line = [...u.querySelectorAll(".sugg")].find((x) => x.closest(Q_UNITS) === u);
@@ -5255,14 +5261,24 @@
     let freed = false;  // a refused press: the values that waited are drawn with the refusal
     function patch() {
       if (!reading) return;
-      if (boxOpen() && !freed) return;  // an open box holds the whole page, values too
       const found = $("#cardfound", reading), c = drawnCard();
+      // a box open while the card has left the Queue keeps its words, its send disabled (§4.5 screen 12)
+      boxLeft(!!c && !(found && found.dataset.found) && boxOpen());
+      if (boxOpen() && !freed) return;  // an open box holds the whole page, values too
       const isFound = !!(found && found.dataset.found);
       const rc = isFound ? $(".qgroup .qcard[data-card]", reading) : null;
       const rid = rc ? rc.dataset.card : id;
       const diff = AO.cardDiff(AO.qModel(lists), AO.qModel(reading), c ? c.dataset.card : rid, isFound && !!rc && (!c || rc.dataset.card === c.dataset.card),
         found && found.dataset.topdone, own);
       left = diff.left && !!c;
+      // a unit another card draws now: *gone — now on <card> ›*, a link to that card's page
+      let now = {};
+      try { now = JSON.parse((found && found.dataset.now) || "{}"); } catch (err) { now = {}; }
+      const goneOn = (u, k, word) => {
+        const to = now[k];
+        if (!to) { AO.qGone(u, true, word); return; }
+        AO.qGone(u, true, `gone — now on ${to.replace(/^.*#/, "")} ›`, `/card/${encodeURIComponent(to)}`);
+      };
       // a page drawn as a completed line whose card reopened (or a card drawn now as a line): one change, for Refresh
       if (!c) { drawBar(isFound && !!rc ? { left: false, items: 0, asks: 0, moved: "", done: false, changed: 1 } : null); return; }
       if (c && rc && !diff.left) {
@@ -5276,7 +5292,10 @@
           const a = $(sel, c), b = $(sel, rc);
           if (a && b && !(held(a.closest(".qhead")) && !freed) && a.outerHTML !== b.outerHTML) a.replaceWith(b.cloneNode(true));
         });
-        unitsOf(c).forEach((u) => { const k = AO.qUnitKey(u); AO.qGone(u, gone.has(k) || done.has(k), done.has(k) ? "done" : ""); });
+        unitsOf(c).forEach((u) => {
+          const k = AO.qUnitKey(u);
+          if (gone.has(k) && !done.has(k)) goneOn(u, k, ""); else AO.qGone(u, done.has(k), done.has(k) ? "done" : "");
+        });
         // a reading that holds the id again withdraws the header's *gone*; its top archived draws *done*
         const head = [...c.children].find((x) => x.classList.contains("qhead")), rh = [...rc.children].find((x) => x.classList.contains("qhead"));
         if (head) AO.qHeadDone(head, !!(rh && rh.getAttribute("data-done") !== null));
@@ -5285,13 +5304,42 @@
       } else if (c && diff.left) {
         // the id left: every item and row *gone* at once, its controls hidden, but one the person's own press answered
         const gone = new Set(diff.gone);
-        unitsOf(c).forEach((u) => AO.qGone(u, gone.has(AO.qUnitKey(u)), "gone"));
+        unitsOf(c).forEach((u) => { const k = AO.qUnitKey(u); if (gone.has(k)) goneOn(u, k, "gone"); else AO.qGone(u, false); });
         const head = [...c.children].find((x) => x.classList.contains("qhead"));
         if (head) AO.qHeadDone(head, true, "gone");
       }
       AO.qcardReapply(lists);
       openFolds(lists);
+      cardLinks();
       drawBar(diff);
+    }
+    // a box still open over a card that has left the Queue: its words kept, its send disabled, *the card has left
+    // the Queue*; withdrawn when a reading holds the card again or the box closes
+    function boxLeft(on) {
+      $$("dialog", document).forEach((dlg) => {
+        const here = on && dlg.open;
+        $$("button.primary", dlg).forEach((b) => {
+          if (here && !b.disabled) { b.disabled = true; b.dataset.cardleft = "1"; }
+          if (!here && b.dataset.cardleft) { b.disabled = false; delete b.dataset.cardleft; }
+        });
+        let w = $(".cardleftw", dlg);
+        if (here && !w) {
+          w = document.createElement("div"); w.className = "meta warn cardleftw"; w.textContent = "the card has left the Queue";
+          dlg.appendChild(w);
+        }
+        if (!here && w) w.remove();
+      });
+    }
+    // a link the card renderer draws to another card is that card's page; one to a row of this card stays an anchor
+    function cardLinks() {
+      $$('a.qon[href^="#"], a.qsub[href^="#"], a.holdsref[href^="#"], .qbuilds a[href^="#"], .meta a[href^="#"]', lists).forEach((a) => {
+        let q = "";
+        try { q = decodeURIComponent(a.getAttribute("href").slice(1)); } catch (err) { return; }
+        if (!/TD-\d+$/.test(q)) return;
+        const here = document.getElementById(q) || $(`[data-qid="${CSS.escape(q)}"]`, lists)
+          || (!q.includes("#") && $$("[data-qid]", lists).some((x) => x.dataset.qid.replace(/^.*#/, "") === q));
+        if (!here) a.setAttribute("href", `/card/${encodeURIComponent(q)}?row=${encodeURIComponent(q)}`);
+      });
     }
     function drawBar(diff) {
       if (!bar) return;
@@ -5326,6 +5374,7 @@
       lists.innerHTML = readingHtml;
       AO.qcardReapply(lists); AO.restoreRowErrs(lists, errs); AO.reopenFolds(lists); AO.reopenMenus(lists, menus);
       openFolds(lists);
+      cardLinks();
       const w = $("#cardwhere", page), rw = $("#cardwhereread", lists); if (w && rw) w.innerHTML = rw.innerHTML;
       drawBar(null);
     }
@@ -5349,6 +5398,8 @@
       if (busy) return; busy = true;
       try {
         const q = new URLSearchParams(location.search); q.set("part", "1");
+        // the units drawn, so the reading says which another card draws now (*gone — now on <card>*)
+        unitsOf(drawnCard()).slice(0, 400).forEach((u) => q.append("u", AO.qUnitKey(u)));  // the server reads 400
         const res = await fetch(`${location.pathname}?${q}`);
         const html = res.ok ? await res.text() : null;
         const fresh = html === null ? null : parse(html);
@@ -5370,7 +5421,7 @@
     document.addEventListener("pointerout", (e) => { if (e.pointerType === "mouse" && !e.relatedTarget && pointerOn) { pointerOn = null; release(); } });
     lists.addEventListener("focusout", release);
     lists.addEventListener("toggle", (e) => { if (!e.target.open) release(); }, true);
-    document.addEventListener("close", () => release(), true);
+    document.addEventListener("close", () => { boxLeft(false); release(); }, true);
     // a refused press (a 409): the box and its words kept, the values that waited drawn so the person sees why
     document.addEventListener("ao:refused", () => { freed = true; try { patch(); } finally { freed = false; } });
     // a back-forward return re-reads and draws whole, the open-box hold excepted
@@ -5391,6 +5442,7 @@
     });
     if (typeof AO.refreshInboxPage !== "function") AO.refreshInboxPage = () => reread();
     openFolds(lists);
+    cardLinks();
     showAddress();
     // the page as served is the first reading, but where it drew no card: its first client read opens the address
     if (drawnCard() || $(".qdline", lists)) { opened = true; readingHtml = lists.innerHTML; reading = parse(readingHtml); }

@@ -453,6 +453,7 @@ from .queue import (
     card_index,
     card_page_find,
     card_page_goto,
+    card_page_now,
     card_session,
     card_view,
     card_wants,
@@ -4464,6 +4465,13 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             keep = urlencode([(k, qp[k]) for k in ("row", "item") if qp.get(k)])
             goto = f"/card/{quote(to, safe='')}?{keep}" if to and to != cid else f"/queue#{quote(cid, safe='')}"
         c = (found or {}).get("card")
+        # the units the page drew that another card draws now (`u=`, the re-read's own keys): *gone — now on <card>*
+        units = qp.getlist("u")[:400]
+        now = (
+            card_page_now(view, card_index(rd.got), str((c or {}).get("id") or cid), units)
+            if units and rd.got is not None
+            else {}
+        )
         # the page's top entry among the reading's completed ids, which the bar reads *done* by once the view holds
         # no card with the page's id (§4.5 screen 12 *The card's page*)
         top = "" if cid.startswith("loose:") else (_refs_of(cid) or [cid])[0]
@@ -4492,6 +4500,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "repo": repo,
             "team": team,
             "goto": goto,
+            "now": now,
             "top": top,
             "top_done": top_done,
             "served": bool(view.get("served")),

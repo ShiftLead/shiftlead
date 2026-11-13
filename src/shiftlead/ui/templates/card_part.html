@@ -7,7 +7,7 @@
 {% elif not served %}<div class="warn" id="noqueue">{{ why or 'the home serves no Queue yet: a node, or a home before its first tick' }}</div>
 {% else %}
 <span id="qcounts" hidden></span>
-<span id="cardfound" hidden data-found="{{ '1' if found else '' }}" data-group="{{ group }}" data-topdone="{{ '1' if top_done else '' }}" data-goto="{{ goto }}"><span id="cardwhereread">{% include "card_where.html" %}</span></span>
+<span id="cardfound" hidden data-found="{{ '1' if found else '' }}" data-group="{{ group }}" data-topdone="{{ '1' if top_done else '' }}" data-goto="{{ goto }}" data-now="{{ now | tojson | forceescape }}"><span id="cardwhereread">{% include "card_where.html" %}</span></span>
 {% if c %}
 <section class="qgroup" data-group="{{ 'completed' if group == 'kept' else 'in_progress' if group == 'loose' else group }}"><div class="qcards{% if group == 'waiting' %} qwaits{% elif group == 'kept' %} qkepts{% endif %}{% if not one_repo and group in ('waiting', 'up_next') %} multi{% endif %}">{{ qc.card(c) }}</div></section>
 {% elif line %}

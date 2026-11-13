@@ -1489,6 +1489,22 @@ def card_page_goto(view: Mapping[str, Any], index: Mapping[str, Any], row: str, 
     return ""
 
 
+def card_page_now(view: Mapping[str, Any], index: Mapping[str, Any], cid: str, keys: Iterable[str]) -> dict[str, str]:
+    """Where the view now draws each unit a card's page drew and the re-read no longer holds on it (§4.5 screen 12
+    *The card's page*: *gone — now on <card> ›*, TD-1762): `{key: card id}` for each `m:<item>` or `r:<row>` key
+    another card than `cid` draws — an item by the cards' wants, a row by `card_index` for open and kept cards and
+    the loose cards' own rows, as `card_page_goto` finds them. A key no card draws, or `cid` draws, is left out."""
+    out: dict[str, str] = {}
+    for k in keys:
+        kind, _, x = k.partition(":")
+        if kind not in ("m", "r") or not x:
+            continue
+        to = card_page_goto(view, index, x if kind == "r" else "", x if kind == "m" else "")
+        if to and to != cid:
+            out[k] = to
+    return out
+
+
 def _side_status(wants: Mapping[str, Any]) -> str:
     """A kept or loose card's status (TD-1468): *needs you* while an item on it is not a running steer, else
     *steer*, as an open card's mail raises it (`_mail_status`)."""

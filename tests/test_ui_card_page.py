@@ -5,6 +5,8 @@ to it."""
 
 from __future__ import annotations
 
+import html
+import json
 import re
 from pathlib import Path
 from urllib.parse import quote
@@ -121,3 +123,30 @@ def test_the_client_reads_the_card_page_and_the_bar_words():
         assert words in js, words
     assert "location.replace(found.dataset.goto)" in js  # the opening fallback, in the first client read
     assert "function showAddress" not in js[js.index("AO.queue = function") :]  # /queue?card= is the server's now
+
+
+def _now(part: str) -> dict:
+    m = re.search(r'data-now="([^"]*)"', part)
+    return json.loads(html.unescape(m.group(1))) if m else {}
+
+
+def test_the_part_says_which_card_draws_a_unit_now(tmp_path, monkeypatch):
+    """*gone — now on <card> ›* (§4.5 screen 12 *The card's page*, TD-1762): the re-read sends the units the page drew
+    (`u=`) and the part names the card that draws each now — an item by the cards' wants, a row by `card_index` —
+    leaving out one no card draws and one the page's own card draws."""
+    c = client(monkeypatch, tmp_path, fake(queue(), [mail("m1", "which one?", about="TD-21")]))
+    keys = "&".join("u=" + quote(k, safe="") for k in ("r:s#TD-21", "m:m1", "r:s#TD-404", "m:nope", "x"))
+    assert _now(page(c, "s#TD-99", "?part=1&" + keys)) == {"r:s#TD-21": "s#TD-20", "m:m1": "s#TD-20"}
+    assert _now(page(c, "s#TD-20", "?part=1&" + keys)) == {}  # its own card's units are not *now on* another
+    assert _now(page(c, "s#TD-20", "?part=1")) == {}
+
+
+def test_the_client_draws_now_on_links_to_other_cards_and_the_left_box():
+    js = (UI / "static" / "app.js").read_text(encoding="utf-8")
+    body = js[js.index("AO.cardPage = function") : js.index("AO.cardPage = function") + 20000]
+    assert 'q.append("u", AO.qUnitKey(u))' in body  # the re-read names its units
+    assert "gone — now on ${to.replace" in body and "/card/${encodeURIComponent(to)}" in body
+    # a link to another card's row is that card's page, the server's opening finding the card that draws it
+    assert "`/card/${encodeURIComponent(q)}?row=${encodeURIComponent(q)}`" in body
+    # a box open over a card that left: words kept, send disabled, its line
+    assert '"the card has left the Queue"' in body and "b.disabled = true" in body
