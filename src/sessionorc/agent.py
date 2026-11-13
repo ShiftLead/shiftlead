@@ -986,6 +986,7 @@ class HostAgent(
         # per team, the last fifty `ao doing` calls and each doer's newest five (design §4.8 *the doing log*)
         self.doing_log = DoingLogStore()
         self._pre_limited: dict[str, State] = {}  # what a `limited` session was before the cap
+        self._hook_limited: dict[str, datetime] = {}  # when a hook's `limited` landed (§4.2, TD-1748)
         # Sessions removed recently: name → (the removed pane's tmux creation time, a monotonic
         # stamp for expiry). A pane snapshot taken before the remove must not re-adopt the pane it
         # still lists (the tick snapshots in a thread; remove runs between). Keyed by the pane's

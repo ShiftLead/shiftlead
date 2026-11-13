@@ -1383,8 +1383,14 @@ def test_a_turn_ended_on_any_other_api_error_reads_idle_and_a_rate_limit_limited
 
 
 async def test_a_rate_limited_turn_reads_limited_until_the_poll_lifts_it_to_idle(agent, hookstub, tmp_path):
-    """TD-1748: through the host agent — the `rate_limit` `StopFailure` reads `limited` (`hook`), the poll
-    reading a cap keeps it, and the poll reading none lifts it to `idle`, never the poll's default `working`."""
+    """TD-1748: through the host agent — the `rate_limit` `StopFailure` reads `limited` (`hook`). A reading
+    fetched before it lifts nothing, since it cannot have seen the cap; a later one with a cap keeps it and
+    gives it the spell's reset; a later one with none lifts it to `idle`, never the poll's default `working`."""
+    from datetime import UTC, datetime, timedelta
+
+    def iso(dt):
+        return dt.isoformat().replace("+00:00", "Z")
+
     async with LocalClient() as c:
         sid = (await c.call("create", name="s", dir=str(tmp_path), adapter=hookstub.name))["id"]
         await _hook(sid, hook_event_name="UserPromptSubmit", session_id="u1")
@@ -1392,11 +1398,30 @@ async def test_a_rate_limited_turn_reads_limited_until_the_poll_lifts_it_to_idle
         rec = await c.call("get", id=sid)
         assert (rec["state"], rec["confidence"], rec["pending"]["kind"]) == ("limited", "hook", "limit")
         s = agent.sessions[sid]
-        agent._usage[s.profile] = {"windows": [{"label": "5-hour", "pct": 100}]}
+        now = datetime.now(UTC)
+        agent._usage[s.profile] = {
+            "windows": [{"label": "5-hour", "pct": 80}],
+            "fetched": iso(now - timedelta(minutes=5)),
+        }
         agent._usage_limits([s], set())
-        assert s.state == "limited"  # the cap still stands: nothing lifts it, no ring reaches it
+        assert s.state == "limited"  # an older reading cannot have seen the cap the tool met
+        resets = now + timedelta(hours=2)
+        capped = [{"label": "5-hour", "pct": 100, "resets": iso(resets)}]
+        agent._usage[s.profile] = {"windows": capped, "fetched": iso(now + timedelta(seconds=5))}
+        agent._usage_limits([s], set())
+        assert s.state == "limited" and s.limited_reset == iso(resets)  # the cap stands, its reset known
+        agent._usage[s.profile] = {"windows": [], "fetched": iso(now + timedelta(seconds=10))}
+        agent._usage_limits([s], set())
+        assert (s.state, s.confidence, s.pending) == ("idle", "hook", None) and sid not in agent._hook_limited
+        await _hook(sid, hook_event_name="StopFailure", session_id="u1", error="rate_limit")
         agent._usage.pop(s.profile)
+        agent._usage_limits([s], {s.profile})  # a metered profile has no cap to wait for
+        assert s.state == "idle"
+        await _hook(sid, hook_event_name="StopFailure", session_id="u1", error="rate_limit")
         agent._usage_limits([s], set())
-        assert (s.state, s.confidence, s.pending) == ("idle", "hook", None)
+        assert s.state == "limited"  # no reading at all: it waits the poll's age for one
+        agent._hook_limited[sid] -= timedelta(seconds=901)
+        agent._usage_limits([s], set())
+        assert s.state == "idle"
         await _hook(sid, hook_event_name="StopFailure", session_id="u1", error="overloaded")
         assert (await c.call("get", id=sid))["state"] == "idle"
