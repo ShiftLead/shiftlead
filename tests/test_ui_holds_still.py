@@ -211,3 +211,12 @@ def test_the_bar_and_the_held_mark_are_drawn():
     assert page.index('id="qbar" role="status"') < page.index('id="queuelists"')
     assert "help_title('queue-bar')" in page
     assert "help_title('card-held')" in (t / "queue_card.html").read_text()
+
+
+def test_a_kept_button_is_wired_once_and_a_hold_ends_when_its_cause_does():
+    # review of #TD-1761 slice 1: a patch keeps nodes, so `wire()` must not add Dismiss all's press twice
+    w = Q[Q.index("function wire()") :]
+    w = w[: w.index("AO.dismissOnScreen(")]
+    assert "if (b.dataset.wired) return;" in w
+    assert 'document.addEventListener("pointerout"' in Q  # the pointer leaving the window
+    assert 'if (!document.querySelector("dialog[open]")) boxOn = "";' in Q  # a press that opened no box

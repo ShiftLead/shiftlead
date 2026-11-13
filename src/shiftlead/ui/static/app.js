@@ -5241,7 +5241,10 @@
     }
     // a card's *Answered for you* and *FYI* each carry Dismiss all over that section's rows on screen (TD-828)
     function wire() {
+      // once per button: a patch keeps the nodes it did not change, so a button may outlive many re-reads (TD-1761)
       $$(".qsec .qdismissall", lists).forEach((b) => {
+        if (b.dataset.wired) return;
+        b.dataset.wired = "1";
         const sec = b.closest(".qsec"), which = sec.dataset.sec;
         AO.dismissOnScreen(b, () => $$(".mailrow:not(.qgone)", sec), which === "fyi" ? "nothing in this FYI to dismiss" : "no answers on screen to dismiss",
           AO.DISMISS_ASK[which], reread);
@@ -5464,10 +5467,18 @@
       const id = cardId(e.target); if (id === pointerOn) return;
       pointerOn = id; release();
     });
+    // the pointer leaving the window ends its hold
+    document.addEventListener("pointerout", (e) => { if (e.pointerType === "mouse" && !e.relatedTarget && pointerOn) { pointerOn = ""; release(); } });
     document.addEventListener("pointerdown", (e) => { if (e.pointerType !== "mouse") touchOn = cardId(e.target); });
     const touchEnd = () => { if (touchOn) setTimeout(() => { touchOn = ""; release(); }, 0); };
     document.addEventListener("pointerup", touchEnd); document.addEventListener("pointercancel", touchEnd);
-    lists.addEventListener("click", (e) => { const id = cardId(e.target); if (id && e.target.closest("button")) boxOn = id; }, true);
+    // the card a box was opened from: a press that opens none leaves no hold behind
+    lists.addEventListener("click", (e) => {
+      const id = cardId(e.target);
+      if (!id || !e.target.closest("button")) return;
+      boxOn = id;
+      setTimeout(() => { if (!document.querySelector("dialog[open]")) boxOn = ""; }, 0);
+    }, true);
     lists.addEventListener("focusout", () => setTimeout(release, 0));
     lists.addEventListener("toggle", (e) => { if (!e.target.open) setTimeout(release, 0); }, true);
     document.addEventListener("close", () => setTimeout(() => { if (!document.querySelector("dialog[open]")) { boxOn = ""; release(); } }, 0), true);
@@ -5498,6 +5509,7 @@
           if (op && np) np.replaceWith(op);  // Up next's numbers are the drawn order's
         }
       } else {
+        applied.delete("card:" + el.dataset.card);  // drawn unit by unit now: a later whole patch is never skipped
         unitsOf(el).filter((u) => !u.querySelector(Q_UNITS) && quiet(u)).forEach((u) => {
           const k = AO.qUnitKey(u), b = AO.qBlockOf(u), ru = unitIn(r, b, k);
           if (ru && !ru.querySelector(Q_UNITS)) swapIn(u, ru, `unit:${el.dataset.card}:${b}:${k}`);
