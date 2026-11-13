@@ -31,6 +31,7 @@ ICON = {
     "inbox.html": "page-inbox",
     "inbox_entry.html": "page-inbox",
     "queue.html": "page-queue",
+    "card_page.html": "page-queue",
     "repo.html": "page-repo",
     "settings.html": "page-settings",
     "help.html": "page-help",
