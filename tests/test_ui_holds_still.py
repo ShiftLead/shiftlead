@@ -100,6 +100,12 @@ out.hidden_asks = diff(page([upnext([card("B", { up: 1, off: 1 }), card("C", { u
 // an ask the person's own press brought is not a new ask
 out.own_ask = diff(page([upnext([card("B", { up: 1 })])]), page([upnext([card("B", { up: 1, do: ["m7"] })])]), [],
   (k) => k === "m:m7");
+// TD-1789: the same, into a block the card already draws: no new block keeps it from `same`, its own line does
+out.own_ask_in_block = diff(page([upnext([card("B", { up: 1, do: ["m6"] })])]),
+  page([upnext([card("B", { up: 1, do: ["m6", "m7"] })])]), [], (k) => k === "m:m7");
+// TD-1789: a block whose order differs from the drawn one only by the person's own item is no place change
+out.own_reorder = diff(page([upnext([card("B", { up: 1, decide: ["m5", "m1", "m2"] })])]),
+  page([upnext([card("B", { up: 1, decide: ["m1", "m5", "m2"] })])]), [], (k) => k === "m:m5");
 
 // rank moves: the drawn order places the card, the latest reading names its neighbours
 const drawn = ["B", "C", "D"];
@@ -302,6 +308,13 @@ def test_asks_on_hidden_cards_and_the_persons_own_are_not_counted(got):
     # (TD-1785), and the card is not drawn whole from that reading
     assert _counts(got["own_ask"]) == NOTHING
     assert "B" not in got["own_ask"]["same"]
+    assert _counts(got["own_ask_in_block"]) == NOTHING
+    assert "B" not in got["own_ask_in_block"]["same"]
+
+
+def test_an_order_changed_only_by_the_persons_own_item_is_no_place_change(got):
+    # TD-1789: a lagging re-read in the old order around the person's own press counts nothing
+    assert _counts(got["own_reorder"]) == NOTHING
 
 
 def test_a_rank_move_names_the_latest_readings_neighbours(got):
