@@ -4939,12 +4939,15 @@
       // its header's top entry archived while the card keeps it as its top: *done*, its controls hidden
       if (!left && r.headDone && !d.headDone) { out.doneHeads.push(id); gone++; shape = false; }
       if (left) { if (!hidden(d) && !askCards.has(id)) out.done++; return; }
-      // an item or a row arriving, or the order inside a block changing, is a place of the card
+      // an item or a row arriving, or the order inside a block changing, is a place of the card — never the person's
+      // own press (`own(key)`), whose consequences inside its card drew at once: a lagging re-read that still holds
+      // the item the press took off is not a place change, though the card is no longer as drawn (`same`)
       let inside = false;
       Object.entries(r.units).forEach(([b, ks]) => {
         const mine = d.units[b] || [];
-        if (ks.some((k) => !mine.includes(k))) inside = true;
-        const common = ks.filter((k) => mine.includes(k)), was = mine.filter((k) => ks.includes(k));
+        if (ks.some((k) => !mine.includes(k) && own(k))) shape = false;
+        if (ks.some((k) => !mine.includes(k) && !own(k))) inside = true;
+        const common = ks.filter((k) => mine.includes(k) && !own(k)), was = mine.filter((k) => ks.includes(k) && !own(k));
         if (common.join(" ") !== was.join(" ")) inside = true;
       });
       if (inside) shape = false;
