@@ -209,5 +209,7 @@ async def test_a_seats_life_on_the_stub(name, agent, tmp_path, monkeypatch):
         record = await _close(c, sid, out)
         assert record["state"] == "closed", record["state"]
         end = manifest(name)["life"]["end"]
-        assert await wait_for(lambda: any(x.startswith("exit on signal") for x in _events(out)), timeout=10.0)
+        assert await wait_for(lambda: any(x.startswith("exit on signal") for x in _events(out)), timeout=10.0), (
+            "\n".join(_events(out))
+        )
         assert ("end played" in _events(out)) == (end is not None), _events(out)
