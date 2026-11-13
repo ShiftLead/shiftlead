@@ -45,7 +45,6 @@
   --p-high: #1e3a8a; --p-medium: #2563eb; --p-low: #93c5fd;
   --k-pickable: #2563eb; --k-design: #4f46e5; --k-foryou: #d97706; --k-other: #e5e7eb; --k-other-fg: #374151;
   --k-live: #0d9488; --k-eval: #64748b; --k-blocked: #475569; --k-blocked-2: #5b6b80;
-  --ph-add: #db2777; --ph-design: #4f46e5; --ph-grind: #2563eb; --ph-review: #d97706;
   /* a flow stage's chip (§4.9c `color`, TD-704): the palette a flow names; red is no stage's */
   --hue-pink: #db2777; --hue-indigo: #4f46e5; --hue-blue: #2563eb; --hue-amber: #d97706; --hue-teal: #0d9488;
   --hue-green: #059669; --hue-violet: #7c3aed;
@@ -71,7 +70,6 @@ html[data-theme="dark"] {
   --p-high: #93c5fd; --p-medium: #3b82f6; --p-low: #1e3a8a;
   --k-pickable: #3b82f6; --k-design: #6366f1; --k-foryou: #d97706; --k-other: #2a313a; --k-other-fg: #c9d1db;
   --k-live: #0f766e; --k-eval: #64748b; --k-blocked: #475569; --k-blocked-2: #3b4656;
-  --ph-add: #ec4899; --ph-design: #6366f1; --ph-grind: #3b82f6; --ph-review: #d97706;
   --hue-pink: #ec4899; --hue-indigo: #6366f1; --hue-blue: #3b82f6; --hue-amber: #d97706; --hue-teal: #14b8a6;
   --hue-green: #10b981; --hue-violet: #8b5cf6;
   --blk-opened: #1d4ed8; --blk-closed: #047857;
@@ -898,12 +896,12 @@ html.phonefocus .composer.nopen #send { min-height: 40px; border-radius: 20px; m
 .lanecount.solid { color: #fff; background: var(--lc); }
 .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
 /* TDs in motion in columns (§4.5a **Columns**, TD-252): one grid per row with the same tracks, so
-   each column starts at one x down the facet — the phase in the width of its longest word, the
+   each column starts at one x down the facet — the stage chip in the width of the card's longest (`--phase-n`), the
    priority's fixed slot (TD-232), then the reference, the holders and the PR in the server's widths
    (`--ref-n`, `--who-n`, `--pr-n` characters; `--mch` is one character of their mono font, since a
    track's `ch` would be the row's own face); the title alone flexes. Every cell is drawn, empty
    where a row has none, so a row with no PR keeps its place */
-.mrow { --mch: .62em; display: grid; grid-template-columns: 58px 18px calc(var(--ref-n, 6) * var(--mch)) minmax(0, 1fr) calc(var(--who-n, 12) * var(--mch)) calc(var(--pr-n, 0) * var(--mch)); column-gap: 7px; align-items: baseline; min-width: 0; font-size: var(--t-small); }
+.mrow { --mch: .62em; --phase-w: calc(var(--phase-n, 6) * .62em + 14px); display: grid; grid-template-columns: var(--phase-w) 18px calc(var(--ref-n, 6) * var(--mch)) minmax(0, 1fr) calc(var(--who-n, 12) * var(--mch)) calc(var(--pr-n, 0) * var(--mch)); column-gap: 7px; align-items: baseline; min-width: 0; font-size: var(--t-small); }
 .mrow > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mrow .mphase { overflow: visible; }
 .mrow .mtitle { color: var(--strong); }
@@ -913,11 +911,15 @@ html.phonefocus .composer.nopen #send { min-height: 40px; border-radius: 20px; m
 .mrow .mpr .nopr { color: var(--muted); } /* a close by a commit naming no PR (TD-1189) */
 /* a phone: the PR goes under the title before the holder is lost */
 @media (max-width: 720px) {
-  .mrow { grid-template-columns: 58px 18px calc(var(--ref-n, 6) * var(--mch)) minmax(0, 1fr) calc(var(--who-n, 12) * var(--mch)); }
+  .mrow { grid-template-columns: var(--phase-w) 18px calc(var(--ref-n, 6) * var(--mch)) minmax(0, 1fr) calc(var(--who-n, 12) * var(--mch)); }
   .mrow .mpr { grid-column: 4 / -1; } .mrow .mpr:empty { display: none; }
 }
 .phase { flex: none; font-size: var(--t-cap); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 3px; color: var(--seg-fg); }
-.phase.ph-add { background: var(--ph-add); } .phase.ph-design { background: var(--ph-design); } .phase.ph-grind { background: var(--ph-grind); } .phase.ph-review { background: var(--ph-review); }
+/* the stage chip's colour, a palette name of the flow's stage (§4.9c `color`, TD-704); grey where no stage holds the
+   claim — *you*, a role's word */
+.phase.hue-pink { background: var(--hue-pink); } .phase.hue-indigo { background: var(--hue-indigo); } .phase.hue-blue { background: var(--hue-blue); }
+.phase.hue-amber { background: var(--hue-amber); } .phase.hue-teal { background: var(--hue-teal); } .phase.hue-green { background: var(--hue-green); }
+.phase.hue-violet { background: var(--hue-violet); } .phase.st-out { background: var(--k-other); color: var(--k-other-fg); }
 .facet.fface.answering { background: var(--warn-bg); border-color: var(--warn-line); }
 .ablock { display: flex; flex-direction: column; gap: 5px; padding-bottom: 8px; border-bottom: 1px solid var(--line2); }
 .ablock:last-child { border-bottom: 0; }
@@ -1023,8 +1025,7 @@ html.phonefocus .composer.nopen #send { min-height: 40px; border-radius: 20px; m
   .rollup-list .ru-legend { display: block; padding: 6px 14px; } .rollup-list .ru-legend td { display: block; border: 0; padding: 0; }
   .rollup-list .ru-menu { right: 8px; }
 }
-.bseg.phase { border-radius: 2px; } .legend .ph-add { background: var(--ph-add); } .legend .ph-design { background: var(--ph-design); }
-.legend .ph-grind { background: var(--ph-grind); } .legend .ph-review { background: var(--ph-review); }
+.bseg.phase { border-radius: 2px; }
 /* the Repo page (design §4.5 screen 11, TD-176 slice 5) */
 .repopage #repohead > .rhead { margin-bottom: 14px; align-items: baseline; }
 .repopage .seams { margin: -8px 0 12px; display: grid; gap: 2px; }  /* missing seams (§4.5a, TD-591) */

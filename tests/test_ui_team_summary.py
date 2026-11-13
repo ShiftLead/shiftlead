@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 
 from conftest import scratch_dir
 
+from shiftlead.flowdefs import Stage
 from shiftlead.ui import app as ui
 
 NOW = datetime(2026, 9, 26, 12, 0, tzinfo=UTC)
@@ -97,30 +98,43 @@ def test_the_repo_facet_draws_the_bars_the_blocks_and_could_not_look():
     assert "Pull requests (1 open)" in html and "the last read failed: gh: offline" in html
 
 
-def test_tds_in_motion_derive_the_phase_and_merge_a_shared_reference():
+TD_FLOW = [
+    Stage("design", "designer", ["design-first", "owner:designer"]),
+    Stage("build", "grinder", ["free-pick", "owner:grinder"]),
+    Stage("review", "techlead"),
+]
+
+
+def test_tds_in_motion_read_the_holders_stage_and_merge_a_shared_reference():
+    # TD-704 (§4.9c *A claim's chip is its stage*, rule 4): a claim is its holder's stage by its role — a PR alone
+    # (no reader has it) is still the holder's; a merged PR keeps the holder's stage, marked, until done
     r = reading("/r/s")
     ms = [
-        member("g1", progress=[claim("TD-301", 811)]),
-        member("g2", progress=[claim("TD-296", 437), claim("TD-100", status="done")]),
-        member("g3", progress=[claim("TD-290")]),
-        member("d1", progress=[claim("TD-310")]),
-        member("me", unattended=False, progress=[claim("TD-290")]),
+        member("g1", role="grinder", progress=[claim("TD-301", 811)]),
+        member("g2", role="grinder", progress=[claim("TD-296", 437), claim("TD-100", status="done")]),
+        member("g3", role="grinder", progress=[claim("TD-290")]),
+        member("d1", role="designer", progress=[claim("TD-310")]),
+        member("me", role="grinder", unattended=False, progress=[claim("TD-290")]),
     ]
-    rows = {x["ref"]: x for x in ui.motion_rows(ms, r)}
+    rows = {x["ref"]: x for x in ui.motion_rows(ms, r, stages=TD_FLOW)}
     assert set(rows) == {"TD-301", "TD-296", "TD-290", "TD-310"}  # a done claim is not in motion
-    assert rows["TD-310"]["phase"] == "design" and rows["TD-290"]["phase"] == "grind"
-    assert rows["TD-301"]["phase"] == "review" and rows["TD-301"]["pr_url"].endswith("/pull/811")
-    assert rows["TD-296"]["phase"] == "review" and rows["TD-296"]["pr_state"] == "merged"  # review until done
+    assert (rows["TD-310"]["stage"], rows["TD-310"]["color"]) == ("design", "indigo")
+    assert (rows["TD-290"]["stage"], rows["TD-290"]["color"]) == ("build", "blue")
+    assert rows["TD-301"]["stage"] == "build" and rows["TD-301"]["pr_url"].endswith("/pull/811")
+    assert rows["TD-296"]["stage"] == "build" and rows["TD-296"]["pr_state"] == "merged"  # rule 1, until done
     assert [w["name"] for w in rows["TD-290"]["members"]] == ["g3", "me"] and rows["TD-290"]["members"][1]["mine"]
-    assert [x["phase"] for x in ui.motion_rows(ms, r)] == ["design", "grind", "review", "review"]
+    assert [x["stage"] for x in ui.motion_rows(ms, r, stages=TD_FLOW)] == ["design", "build", "build", "build"]
     assert rows["TD-301"]["title"] == "recover stuck notices" and rows["TD-296"]["title"] == ""  # not in the ledger
+    # with no flow read, each reads its role in grey (rule 5); a record with no role, *session*
+    rows = {x["ref"]: x for x in ui.motion_rows([*ms, member("x", progress=[claim("TD-7")])], r)}
+    assert (rows["TD-310"]["stage"], rows["TD-310"]["color"]) == ("designer", "")
+    assert (rows["TD-7"]["stage"], rows["TD-7"]["color"]) == ("session", "")
 
 
-def test_tds_in_motion_read_the_entrys_kind_and_find_a_claims_pr_by_its_branch():
-    # TD-197, the screenshot's three rows: a pickable design-first entry (the page's bucket says
-    # *pickable*) reads *design* while it has no PR (TD-814: with one, *review*); a claim whose PR
-    # waits for its reader while the grinder has moved to another branch reads *review*, found by
-    # the PR's head branch; a claim with nothing reads *grind*
+def test_tds_in_motion_find_a_claims_pr_by_its_branch_and_read_the_role_not_the_kind():
+    # TD-197: a claim whose PR waits for its reader while the grinder has moved to another branch finds it by the
+    # PR's head branch; a merged slice's branch is no PR of the next slice. TD-704 rule 4: by the holder's role,
+    # never the entry's `Kind:` — a grinder holding a design-first entry is building it
     r = reading("/r/s")
     r["ledger"]["entries"] += [
         {"id": "TD-175", "title": "round log", "for_page": "pickable", "kind": "design-first", "priority": "medium"},
@@ -131,30 +145,18 @@ def test_tds_in_motion_read_the_entrys_kind_and_find_a_claims_pr_by_its_branch()
         {"number": 629, "branch": "fix-something"},
     ]
     r["prs"]["recent"] += [{"number": 600, "state": "merged", "branch": "td146-slice-1"}]
-    ms = [member("g1", progress=[claim("TD-146"), claim("TD-186")]), member("d1", progress=[claim("TD-175")])]
-    rows = {x["ref"]: x for x in ui.motion_rows(ms, r)}
-    assert rows["TD-175"]["phase"] == "design"
-    assert rows["TD-186"]["phase"] == "review" and rows["TD-186"]["pr"] == 628
-    assert rows["TD-186"]["pr_url"].endswith("/pull/628")
-    # a merged slice's branch does not make the entry's next slice *review*
-    assert rows["TD-146"]["phase"] == "grind" and rows["TD-146"]["pr"] is None
-    # TD-814: a design-first claim with a PR reads *review*, a design's PR as a build's — its own `pr`,
-    # or an open PR found by its branch alone; one without a PR still reads *design*
-    r["ledger"]["entries"] += [
-        {"id": "TD-177", "title": "designed", "for_page": "pickable", "kind": "design-first", "priority": "low"},
-        {"id": "TD-178", "title": "by branch", "for_page": "pickable", "kind": "design-first", "priority": "low"},
+    ms = [
+        member("g1", role="grinder", progress=[claim("TD-146"), claim("TD-186"), claim("TD-175")]),
+        member("d1", role="designer", progress=[claim("TD-175")]),
     ]
-    r["prs"]["open"].append({"number": 631, "branch": "td178-design"})
-    ms[1]["progress"] += [claim("TD-177", pr=630), claim("TD-178")]
-    rows = {x["ref"]: x for x in ui.motion_rows(ms, r)}
-    assert rows["TD-175"]["phase"] == "design"
-    assert rows["TD-177"]["phase"] == "review" and rows["TD-177"]["pr"] == 630
-    assert rows["TD-178"]["phase"] == "review" and rows["TD-178"]["pr"] == 631
-    assert rows["TD-186"]["phase"] == "review" and rows["TD-146"]["phase"] == "grind"  # a build's as before
-    # one designer, one design without a PR and one with: *1 design · 1 review*, not *2 design*
-    d = [member("d1", progress=[claim("TD-175"), claim("TD-177", pr=630)])]
-    s = ui.team_summary("design", d, {"/r/samscrape": r}, {}, now=NOW)
-    assert s["phases"]["design"] == 1 and s["phases"]["review"] == 1
+    rows = ui.motion_rows(ms, r, stages=TD_FLOW)
+    got = {(x["ref"], x["stage"]): x for x in rows}
+    assert got[("TD-186", "build")]["pr"] == 628 and got[("TD-186", "build")]["pr_url"].endswith("/pull/628")
+    assert got[("TD-146", "build")]["pr"] is None
+    # one reference, two chips: a row each, the facet counting the reference once
+    assert {k for k in got if k[0] == "TD-175"} == {("TD-175", "design"), ("TD-175", "build")}
+    s = ui.team_summary("td", ms, {"/r/samscrape": r}, {}, now=NOW)
+    assert s["n_refs"] == 3 and len(s["motion"]) == 4
 
 
 def test_tds_in_motion_carry_the_entrys_priority_as_a_letter_and_sort_by_it():
@@ -181,9 +183,9 @@ def test_tds_in_motion_carry_the_entrys_priority_as_a_letter_and_sort_by_it():
         ("TD-250", ""),
         ("TD-999", ""),
     ]
-    ms[0]["progress"][0]["pr"] = 5  # a phase comes before a priority: a Low in review sorts after them all
-    assert [x["ref"] for x in ui.motion_rows(ms, r)][-1] == "TD-100"
-    ms[0]["progress"][0]["pr"] = None
+    ms[0]["role"] = "designer"  # a stage comes before a priority: a Low in an earlier stage sorts before them all
+    assert [x["ref"] for x in ui.motion_rows(ms, r, stages=TD_FLOW)][0] == "TD-100"
+    ms[0]["role"] = None
     ms.append(member("g3", progress=[claim("TD-301")]))
     r["ledger"]["entries"].append({"id": "TD-050", "title": "high", "for_page": "pickable", "priority": "High"})
     ms.append(member("g4", progress=[claim("TD-050")]))
@@ -214,7 +216,9 @@ def test_tds_in_motion_are_drawn_in_columns_with_every_cell():
     assert s["who_w"] == ui.HOLDERS_WIDTH  # g1, grinder-with-a-long-name and the glyph: cut at the bound
     html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
     assert s["pr_w"] == len("#7")
-    assert f'<div class="facet fmotion" style="--ref-n: 6; --who-n: {ui.HOLDERS_WIDTH}; --pr-n: 2">' in html
+    assert (
+        f'<div class="facet fmotion" style="--ref-n: 6; --who-n: {ui.HOLDERS_WIDTH}; --pr-n: 2; --phase-n: 7">' in html
+    )
     bare = ui.team_summary("grind", [member("g1", progress=[claim("TD-999")])], {"/r/samscrape": r}, {}, now=NOW)
     assert (bare["ref_w"], bare["who_w"], bare["pr_w"]) == (6, 2, 0)  # no PR in the facet: no room kept for one
     rows = html.split('<div class="mrow">')[1:]
@@ -228,8 +232,8 @@ def test_tds_in_motion_are_drawn_in_columns_with_every_cell():
     assert 'title="g1, grinder-with-a-long-name"' in by_ref["TD-999"]  # the whole list on hover
     css = (pathlib.Path(ui.__file__).parent / "static" / "app.css").read_text(encoding="utf-8")
     assert (
-        ".mrow { --mch: .62em; display: grid; grid-template-columns: 58px 18px calc(var(--ref-n, 6) * var(--mch))"
-        in css
+        ".mrow { --mch: .62em; --phase-w: calc(var(--phase-n, 6) * .62em + 14px); display: grid; grid-template-columns:"
+        " var(--phase-w) 18px calc(var(--ref-n, 6) * var(--mch))" in css
     )
     assert ".mrow .mpr { grid-column: 4 / -1; }" in css  # a phone: the PR under the title
 
@@ -944,7 +948,7 @@ def test_a_claims_pr_the_tick_set_is_its_review_row_and_its_compact_lines_pr():
     asked = {"ref": "TD-1", "status": "claimed", "pr": None, "review_pr": 1302}
     ms = [member("g1", progress=[asked])]
     (row,) = ui.motion_rows(ms, r)
-    assert row["phase"] == "review" and row["pr"] == 1302 and row["pr_url"].endswith("/pull/1302")
+    assert row["stage"] == "session" and row["pr"] == 1302 and row["pr_url"].endswith("/pull/1302")
     assert ui.compact_line({**ms[0], "role_label": "Grinder"}) == "Grinder · TD-1 → #1302"
 
 

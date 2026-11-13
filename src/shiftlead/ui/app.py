@@ -67,6 +67,8 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     DEFS_TTL,  # noqa: F401
     FLOW_ACTS,  # noqa: F401
     FLOW_RENAMES,  # noqa: F401
+    FLOW_STAGES,  # noqa: F401
+    FLOW_WHATS,  # noqa: F401
     FLOWS,  # noqa: F401
     MEMBER_HOLD,  # noqa: F401
     MODE_VIA_WORDS,  # noqa: F401
@@ -374,13 +376,14 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     COMPLETED_WORD,  # noqa: F401
     DOER_WIDTH,  # noqa: F401
     FACETS,  # noqa: F401
+    GREY_YOU,  # noqa: F401
     HEADS_EVERY,  # noqa: F401
     HOLDERS_WIDTH,  # noqa: F401
     KIND_BARS,  # noqa: F401
     LEDGER_VIEWS,  # noqa: F401
     LIGHT_KEYS,
     MOTION_PRIORITIES,  # noqa: F401
-    PHASES,  # noqa: F401
+    NO_ROLE,  # noqa: F401
     PRIORITY_BARS,  # noqa: F401
     REF_WIDTH,  # noqa: F401
     ROLLUP_CLS,  # noqa: F401
@@ -390,12 +393,15 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     WINDOWS,  # noqa: F401
     _bars,  # noqa: F401
     _blocks,  # noqa: F401
+    _chip_of_role,  # noqa: F401
     _holders_width,  # noqa: F401
     _https,  # noqa: F401
     _own_stop,  # noqa: F401
     _pr_states,  # noqa: F401
+    _reading_of,  # noqa: F401
     _rollup_block,  # noqa: F401
     _rollup_debt,  # noqa: F401
+    _stage_named,  # noqa: F401
     answer_blocks,  # noqa: F401
     answer_members,  # noqa: F401
     ask_blocks,  # noqa: F401
@@ -409,6 +415,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     entries_by_id,
     lane_count,  # noqa: F401
     lanes_line,
+    motion_phases,  # noqa: F401
     motion_rows,  # noqa: F401
     no_lane_ids,  # noqa: F401
     no_lane_title,  # noqa: F401
@@ -1628,10 +1635,27 @@ def create_app() -> FastAPI:
                         log.debug("team %s: its flows were not read", n, exc_info=True)
                 return out
 
+        def stages_read() -> dict[str, Any]:
+            """Each team's flow's stages for its chips (§4.9c *A claim's chip is its stage*, TD-704): read against
+            the team's `repo` from this home's checkout, as the Repo board reads them — a node team's is not read."""
+            o = org or org_here()[0]
+            got: dict[str, Any] = {}
+            for n, t in o.teams.items():
+                root = o.checkout(t.repo, here) if not t.host or t.host == here else None
+                try:
+                    got[n] = repo_board.team_stages(o, [n], str(Path(root).expanduser()))[0][1] if root else None
+                except Exception:  # noqa: BLE001 — a team whose flow is not read reads its roles in grey
+                    got[n] = None
+            return got
+
         try:
             flow_cache["flows"] = await asyncio.to_thread(read)
         except Exception:  # noqa: BLE001 — a read that failed keeps the last; it never costs the page
             log.debug("the flows read failed; the last reading stands", exc_info=True)
+        try:
+            refill(cards_mod.FLOW_STAGES, await asyncio.to_thread(stages_read))
+        except Exception:  # noqa: BLE001 — as the flows' read: the last reading stands
+            log.debug("the flows' stages read failed; the last reading stands", exc_info=True)
         # what every card a delta draws reads of it (`cards.flow_mark`): the flow by team, the acts by id
         got = flow_cache["flows"]
         refill(cards_mod.FLOWS, {n: str(v["flow"]) for n, v in got.items() if v.get("flow")})
@@ -1642,6 +1666,13 @@ def create_app() -> FastAPI:
             if d.get("id")
         }
         refill(cards_mod.FLOW_ACTS, acts)
+        whats = {
+            str(d["id"]): [str(w) for w in d.get("what") or ()]
+            for v in got.values()
+            for d in v.get("differences") or []
+            if d.get("id")
+        }
+        refill(cards_mod.FLOW_WHATS, whats)
         to = {str(d["id"]): str(d["to"]) for v in got.values() for d in v.get("differences") or [] if d.get("to")}
         refill(cards_mod.FLOW_RENAMES, to)
         return got

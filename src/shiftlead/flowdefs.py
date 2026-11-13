@@ -192,20 +192,25 @@ def colors(flow: Flow) -> dict[str, str]:
     every written `color`; then each unwritten stage whose name has a default (`DEFAULT_COLORS`) unless a
     written one took it; then each stage still without one, in stage order, the first palette name no
     stage holds — past the seventh, the palette again from the start."""
-    got = {s.name: s.color for s in flow.stages if s.color}
-    for s in flow.stages:
+    return stage_colors(flow.stages)
+
+
+def stage_colors(stages: Collection[Stage]) -> dict[str, str]:
+    """`colors` over a flow's stages as `repo_board.team_stages` gives them (§4.9c `color`, TD-704)."""
+    got = {s.name: s.color for s in stages if s.color}
+    for s in stages:
         d = DEFAULT_COLORS.get(s.name)
         if s.name not in got and d and d not in got.values():
             got[s.name] = d
     again = 0
-    for s in flow.stages:
+    for s in stages:
         if s.name in got:
             continue
         free = next((c for c in PALETTE if c not in got.values()), None)
         if free is None:
             free, again = PALETTE[again % len(PALETTE)], again + 1
         got[s.name] = free
-    return {s.name: got[s.name] for s in flow.stages}
+    return {s.name: got[s.name] for s in stages}
 
 
 def org_dir() -> Path:

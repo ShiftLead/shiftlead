@@ -11,18 +11,18 @@
   {# -- Repo (§4.5a *team card: Repo facet*, TD-1189): first, with no name row — the repo's line above says it -- #}
   {% if 'repo' in drawn %}{% set on_line = true %}{% include "repo_facet.html" %}{% endif %}
   {# -- TDs in motion (§4.5a *team card: TDs in motion*) -- #}
-  {# **Columns** (§4.5a, TD-252): phase · priority · reference · title · holders · PR on one grid, every
+  {# **Columns** (§4.5a, TD-252): stage chip (§4.9c, TD-704) · priority · reference · title · holders · PR on one grid, every
      track but the title's a fixed width — the reference's, the holders' and the PR's the server's (`ref_w`,
      `who_w`, `pr_w`) — and every cell drawn, empty where a row has no priority or no PR, so a row keeps its place #}
   {#- **Completed** (TD-1189): the facet's other face, *in motion · completed*, stored per team (`motion:<team>`) -#}
   {%- set motion_pick %}<span class="seg" data-pick="motion"><button type="button" data-v="motion">in motion</button><button type="button" data-v="completed">completed</button></span>{% endset %}
   {% if 'motion' in drawn %}
-  <div class="facet fmotion" style="--ref-n: {{ m.ref_w or 6 }}; --who-n: {{ m.who_w or 12 }}; --pr-n: {{ m.pr_w or 0 }}">
+  <div class="facet fmotion" style="--ref-n: {{ m.ref_w or 6 }}; --who-n: {{ m.who_w or 12 }}; --pr-n: {{ m.pr_w or 0 }}; --phase-n: {{ m.phase_w or 6 }}">
     <div class="mv" data-mv="motion"{% if m.motion_face == 'completed' %} hidden{% endif %}>
-    <div class="fhead"><span class="kind">TDs in motion ({{ m.motion | length }})</span> <span class="meta">{% for ph in ('add', 'design', 'grind', 'review') %}{% if m.phases[ph] %}{{ m.phases[ph] }} {{ ph }}{{ ' · ' if not loop.last }}{% endif %}{% endfor %}</span>{{ motion_pick }}</div>
+    <div class="fhead"><span class="kind">TDs in motion ({{ m.n_refs if m.n_refs is defined else m.motion | length }})</span> <span class="meta">{% for ph, n in m.phases %}{{ n }} {{ ph }}{{ ' · ' if not loop.last }}{% endfor %}</span>{{ motion_pick }}</div>
     {% for x in m.motion %}
     <div class="mrow">
-      <span class="mphase"><span class="phase ph-{{ x.phase }}">{{ x.phase }}</span></span>
+      <span class="mphase"><span class="phase {{ 'hue-' ~ x.color if x.color else 'st-out' }}">{{ x.stage }}</span></span>
       {% if x.priority %}<span class="mprio bseg p-{{ x.priority }}" title="{{ x.priority | capitalize }}" aria-label="priority {{ x.priority | capitalize }}">{{ x.priority[0] | upper }}</span>{% else %}<span class="mprio"></span>{% endif %}
       <a class="mref mono strong" href="{{ m.repo.url if m.repo else '#' }}#{{ x.ref }}" title="{{ x.ref }}">{{ x.ref }}</a>
       <span class="mtitle" title="{{ x.title }}">{{ x.title }}</span>
