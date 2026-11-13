@@ -1365,7 +1365,8 @@ class Session:
     # *The person started it by hand* (design §4.10 *between the person's own sessions*, TD-1069): written
     # once by the create — the caller the person or their own shell, the start not `supervised` and no
     # `seat` — and never changed; None on a record written before the field, which `mail.by_person`
-    # resolves. On a node's record the home's (§4.4a): the home sets it on its copy from the create's reply.
+    # resolves (interactive, not supervised, no seat, and no controllers or an agent's team: TD-1793). On a node's
+    # record the home's (§4.4a): the home sets it on its copy from the create's reply.
     by_person: bool | None = None
     # What the tick's restarts made of it (design §6 *Keeping a team running* rule 1, TD-103 slice 2):
     # `restarts` is every restart of this session, `[{at, why, done, left, error?}]` — `why` is `crash`,

@@ -69,6 +69,10 @@ def test_taken_over_reads_the_derived_by_person():
     # a record from before the field: interactive, not supervised, no controllers reads as the person's own
     assert not mail.taken_over(_rec(by_person=None, supervised=False), True)
     assert mail.taken_over(_rec(by_person=None, supervised=True), True)
+    # TD-1793: the person's own pre-field start in a team, its manager in controllers, is not held
+    assert not mail.taken_over(_rec(by_person=None, supervised=False, controllers=["ao-x-manager-ao-1"]), True)
+    # a lead's pre-field start, no team, its lead in controllers, is
+    assert mail.taken_over(_rec(by_person=None, supervised=False, team="", controllers=["ao-x-lead"]), True)
 
 
 # -- the view ---------------------------------------------------------------------------------------

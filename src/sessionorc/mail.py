@@ -352,11 +352,20 @@ def as_person(caller: Any, records: Mapping[str, Session]) -> bool:
 def by_person(record: Session) -> bool:
     """Whether the person started this record by hand (design §4.10 *between the person's own
     sessions*, TD-1069): its `by_person`, written once by the create; a record written before the
-    field reads it from being interactive, not `supervised` and with no `controllers`, since a
-    session's start names its starter from birth (§4.8). What the gate and the pushed view read."""
+    field reads it from being interactive, not `supervised`, holding no `seat`, and with no `controllers`
+    or, an agent's record, a `team` (TD-1793): a session's start names its starter from birth (§4.8), an
+    agent the person starts in a team names the team's manager (a shell given a team names none), a create
+    never takes its caller's team, and every start `ao team start` makes is `supervised`. What the gate
+    and the pushed view read."""
     if record.by_person is not None:
         return record.by_person
-    return record.kind == "interactive" and not record.unattended and not record.supervised and not record.controllers
+    return (
+        record.kind == "interactive"
+        and not record.unattended
+        and not record.supervised
+        and not record.seat
+        and (not record.controllers or (bool(record.team) and adapters.has_agent(record.adapter)))
+    )
 
 
 def taken_over(record: Session, agent: bool) -> bool:
