@@ -752,9 +752,9 @@ HELP: tuple[Help, ...] = (
         "Start session",
         "Queue card",
         (
-            "Starts your own session on this card's team, on its top entry, with the card's entries as its "
-            "context. It is drawn where no item on the card asks you anything. Reads Open session while yours "
-            "is running."
+            "On the card's page, starts your own session on this card's team, on its top entry, with the card's "
+            "entries as its context. It is drawn where no item on the card asks you anything. Reads Open session "
+            "while yours is running."
         ),
     ),
     Help(
@@ -762,8 +762,9 @@ HELP: tuple[Help, ...] = (
         "Start session",
         "Queue card, all items",
         (
-            "Starts one session for every item on this card that waits on you, one at a time: it reads each "
-            "with you and waits for your answer before the next. Reads Open session while yours is running."
+            "On the card's page, starts one session for every item on this card that waits on you, one at a time: it "
+            "reads each with you and waits for your answer before the next. Reads Open session while yours is "
+            "running."
         ),
     ),
     Help(
@@ -771,10 +772,10 @@ HELP: tuple[Help, ...] = (
         "Start session",
         "Queue card item",
         (
-            "Starts your own session about this item: it opens on the card's entry, or on this entry where the "
-            "item is one (on a completed card, the archived entry the item is about), with the item as its "
-            "subject, to read first and walk through with you. Reads Open session while yours is on the card: the "
-            "press goes there and copies the item's id for you to paste."
+            "On the card's page, starts your own session about this item: it opens on the card's entry, or on this "
+            "entry where the item is one (on a completed card, the archived entry the item is about), with the item "
+            "as its subject, to read first and walk through with you. Reads Open session while yours is on the card: "
+            "the press goes there and copies the item's id for you to paste."
         ),
     ),
     Help(
@@ -782,8 +783,8 @@ HELP: tuple[Help, ...] = (
         "answers, Answer…",
         "Queue card",
         (
-            "Answers this item: each button says what it leads to, and the outlined one is recommended. Answer… "
-            "sends your own words."
+            "Answers this item: each button says what it leads to, and the outlined one is recommended. Answer… sends "
+            "your own words. On the Queue an item keeps only its one-press answers; the card's page has them all."
         ),
     ),
     Help(
@@ -791,9 +792,21 @@ HELP: tuple[Help, ...] = (
         "⋯",
         "Queue card",
         (
-            "The team's controls for this card, row or item: send it back to design, close it, open it on the Repo "
-            "page, and an item's own — delete, pause, send to reviewer."
+            "On the card's page, the team's controls for this card, row or item: send it back to design, close it, "
+            "open it on the Repo page, and an item's own — delete, pause, send to reviewer."
         ),
+    ),
+    Help(
+        "card-open-card",
+        "Open card ›",
+        "Queue card",
+        ("Opens this card's own page, where every action on it is; the page holds still while you work."),
+    ),
+    Help(
+        "card-answer-on-card",
+        "Answer on its card ›",
+        "Queue card item",
+        ("Opens this item on its card's page, to answer it there."),
     ),
     Help(
         "board",
@@ -995,6 +1008,8 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "card-item-start",
             "card-answers",
             "card-dots",
+            "card-open-card",
+            "card-answer-on-card",
             "live-mark",
             "row-done",
             "row-back-to-design",

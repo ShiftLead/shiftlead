@@ -159,13 +159,18 @@ out.join_drawn = rt(up([card("A", { up: 1, ids: ["A"] }), card("B", { up: 1, ids
   const fold = h("details", "qread", { "data-fold": "B:read" }, []);
   const start = h("button", "qstart", { "data-card": "B", "data-ref": "TD-1" }, []);
   c.children[0].appendChild(start); c.appendChild(fold);
+  // its links to its own page (TD-1763): Open card ›, a preview's sentence and Answer on its card ›; one to another
+  // card, and one whose id merely starts the same, stay
+  const links = ["/card/B", "/card/B?row=B&item=m1", "/card/BB?item=m2", "/card/C"]
+    .map((href) => h("a", "", { href, "data-cardhref": "" }, []));
+  links.forEach((a) => c.children[0].appendChild(a));
   const root = page([h("div", "qcards", { id: "qcards", "data-upnext": JSON.stringify(["B", "C"]) }, [c])]);
   root.children[0].id = "qcards";
   const r = card("A", { up: 1, ids: ["A", "x"] });
   AO.qRetop(c, r, root);
   out.rekey = { card: c.dataset.card, ids: c.dataset.ids, qid: c.children[0].dataset.qid, start: start.dataset.card,
     ref: start.dataset.ref, fold: fold.dataset.fold, upnext: JSON.parse(root.children[0].dataset.upnext),
-    newtop: c.dataset.newtop };
+    newtop: c.dataset.newtop, links: links.map((a) => a.getAttribute("href")) };
 }
 
 // TD-1784: qRankFrom's own after-anchor and the end of the reading; qModel's folds, nesting, a card twice, Up next
@@ -371,6 +376,7 @@ def test_a_retop_rewrites_the_cards_keys_at_once(got):
         "fold": "A:read",
         "upnext": ["A", "C"],
         "newtop": "A",
+        "links": ["/card/A", "/card/A?row=B&item=m1", "/card/BB?item=m2", "/card/C"],  # TD-1763
     }
 
 

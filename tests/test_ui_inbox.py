@@ -3695,7 +3695,8 @@ def test_every_inbox_control_has_its_verb_under_way():
     row = (root / "templates/inbox_row.html").read_text()
     macro = row[row.index("{% macro row(e, section") :]
     assert macro.count('<div class="st rowerr" role="alert" hidden></div>') == 5  # each of the five row shapes
-    assert row.count('class="st rowerr"') == 5  # and nowhere else, so a row has one
+    # and the Queue's one-line preview of an item (TD-1763), which is its row there, and nowhere else: a row has one
+    assert row.count('class="st rowerr"') == 6
     # the frame of a press: marked before the request leaves, the row out first when the press takes it
     assert (
         'pressed(key === "board_decide" ? body.answer : undefined);\n'

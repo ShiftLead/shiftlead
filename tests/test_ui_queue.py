@@ -613,8 +613,13 @@ def test_the_ledger_rows_leave_later_for_their_cards(tmp_path, monkeypatch):
     clock's `held` mark draws nothing (TD-1297)."""
     c = client(monkeypatch, tmp_path, fake(queue(), [], ledger_repos()))
     html = c.get("/queue").text
-    card20 = html[html.index('data-card="s#TD-20"') : html.index('data-card="s#TD-30"')]
+    queue20 = html[html.index('data-card="s#TD-20"') : html.index('data-card="s#TD-30"')]
     card30 = html[html.index('data-card="s#TD-30"') :]
+    # the Queue previews each (TD-1763): Done and Lift the hold are on the card's page
+    assert "entry TD-20" in queue20 and "entry TD-21" in queue20 and "Lift the hold" not in queue20
+    assert 'data-words="done"' not in queue20
+    page = c.get("/card/s%23TD-20").text
+    card20 = page[page.index('data-card="s#TD-20"') :]
     assert "held until your decision" in card20 and ">Lift the hold</button>" in card20
     assert 'data-words="go ahead"' in card20
     assert "yours to do" in card20 and 'data-words="done"' in card20 and ">Done</button>" in card20
@@ -635,8 +640,8 @@ def test_a_hold_reads_the_words_after_its_dash(tmp_path, monkeypatch):
     """§4.5a *Queue card: what needs the person* (TD-795): *held until <the words after the dash>*."""
     repos = ledger_repos()
     repos["/r/s"]["ledger"]["entries"][1]["until"] = "after the trial"
-    html = client(monkeypatch, tmp_path, fake(queue(), [], repos)).get("/queue").text
-    card20 = html[html.index('data-card="s#TD-20"') : html.index('data-card="s#TD-30"')]
+    html = client(monkeypatch, tmp_path, fake(queue(), [], repos)).get("/card/s%23TD-20").text
+    card20 = html[html.index('data-card="s#TD-20"') :]
     assert "held until after the trial" in card20 and "held until your decision" not in card20
 
 

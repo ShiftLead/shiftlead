@@ -4,4 +4,6 @@
    renderer that it draws for the Queue: no `data-find` on a row and no Snooze (§4.5 *Page loads*, TD-890),
    in its `card` mode (§4.5 screen 12 *An item's shape*, TD-911) — a Read item one line, a Decide or Do item
    whole, by the item's `want`. #}
-{% set drawn_on_queue = true %}{% set mode = 'card' %}{% import "inbox_row.html" as r with context %}{{ r.row(e, section) }}
+{#- `preview`: the Queue page draws each item as its one-line preview (§4.5 screen 12 *Previews*, TD-1763); a card's
+    page draws it whole -#}
+{% set drawn_on_queue = true %}{% set mode = 'card' %}{% import "inbox_row.html" as r with context %}{% if preview %}{{ r.queue_preview(e, section) }}{% else %}{{ r.row(e, section) }}{% endif %}

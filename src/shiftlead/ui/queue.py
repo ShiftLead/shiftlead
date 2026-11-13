@@ -18,6 +18,7 @@ from urllib.parse import quote
 
 from sessionorc import board as board_mod
 from sessionorc import ledger as ledger_mod
+from sessionorc import notify as notify_mod
 from sessionorc.queue import (  # noqa: F401 — the home's
     DESIGN_KEY,
     HOLDER,
@@ -738,13 +739,17 @@ def attach(
             if start is not None and want in (*WANTS, "with_you") and not pr_row
             else {}
         )
+        # the item's address, its card's page at it (§4.5 screen 12 *Addresses*): the Queue's preview links it (TD-1763)
+        addr = notify_mod.queue_path(card, str(e.get("on_row") or ""), str(mid or "")) if card else ""
         cards.setdefault(card, {}).setdefault(sec, []).append(
             {
                 "section": sec,
                 "id": str(mid or ""),
                 "item": ref,
                 # its renderer's `card` mode reads the want, and draws the item's Start session from `start`
-                "html": drawn({**e, "want": want, "start": go, **({"with_you": mine} if mine else {})}, drawn_as),
+                "html": drawn(
+                    {**e, "want": want, "start": go, "addr": addr, **({"with_you": mine} if mine else {})}, drawn_as
+                ),
                 "kind": kind,
                 "want": want,
                 # on a loose card its first words, the card's head (TD-1468); `_cut_item` drops them from a read

@@ -200,8 +200,17 @@ def test_the_queue_page_draws_no_reply_word_and_the_headers_dots(tmp_path, monke
     assert not re.search(r"\bReply\b", body) and ">Snooze" not in body
     card20 = html[html.index('data-card="s#TD-20"') : html.index('data-card="s#TD-30"')]
     head = card20[: card20.index('class="qgap"')]
+    # on the Queue the header draws Open card › where the ⋯ was, and no item draws Answer… (TD-1763)
+    assert "qdots" not in card20 and ">Answer…</button>" not in card20
+    assert '<a class="btn sm ghost qopencard" href="/card/s%23TD-20" data-cardhref' in head
+    # …the card's page draws them: the top entry's ⋯ and the item's Answer…
+    page = c.get("/card/s%23TD-20").text
+    body = re.sub(r"<script.*?</script>", "", page, flags=re.S)
+    assert not re.search(r"\bReply\b", body) and ">Snooze" not in body
+    head = page[page.index('data-card="s#TD-20"') :]
+    head = head[: head.index('class="qgap"')]
     assert 'class="more qdots"' in head and 'href="/repo/s#TD-20" role="menuitem"' in head  # the top entry's
-    assert ">Answer…</button>" in card20
+    assert ">Answer…</button>" in page and "Open card ›" not in page
     inbox_page = c.get("/inbox").text
     assert "qdots" not in inbox_page
 

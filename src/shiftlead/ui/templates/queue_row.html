@@ -126,11 +126,12 @@
 {%- endif %}
 {%- endmacro %}
 
-{% macro row(r, repo='') %}
+{#- `preview`: the Queue page's card, which draws no ⋯ on a row (§4.5 screen 12 *Previews*, TD-1763) -#}
+{% macro row(r, repo='', preview=False) %}
   <div class="qrow{% if r.archived %} archived{% endif %}{% if r.needs and not (r.with_you or r.answered) %} needsyou{% endif %}{% if r.state == 'stalled' %} stalled{% endif %}" style="--qd: {{ r.depth or 1 }}"{% if r.anchor %} id="{{ r.anchor }}"{% endif %} data-qid="{{ r.qid }}">
     {%- for b in r.rails or [] %}{% if b %}<span class="qrail b-{{ b }}" style="--ql: {{ loop.index }}" aria-hidden="true"></span>{% endif %}{% endfor %}
     <span class="qid mono">{{ r.show }}</span>{{ pbadge(r.priority) }}<span class="qtitle">{{ r.title }}{{ synopsis(r.synopsis, ' ') }}</span>
-    <span class="qright">{{ extras(r.ext, repo) }}{{ meter(r.meter) }}{{ state(r) }}{{ afters(r) }}{% if not (r.state or '').startswith(('held by', 'with you in')) and not r.with_you %}{{ holder(r.holder) }}{% endif %}{% if not r.ext %}{{ menu(r) }}{% endif %}</span>
+    <span class="qright">{{ extras(r.ext, repo) }}{{ meter(r.meter) }}{{ state(r) }}{{ afters(r) }}{% if not (r.state or '').startswith(('held by', 'with you in')) and not r.with_you %}{{ holder(r.holder) }}{% endif %}{% if not r.ext and not preview %}{{ menu(r) }}{% endif %}</span>
     {{ builds(r.ext) }}
     {{ mentioned(r) }}
   </div>
@@ -139,9 +140,9 @@
 {# finished rows folded (§4.4 *Rows*, §4.5 screen 12 *A card*; TD-1131): a parent's finished parts to one line,
    *✓ n done*, first on its spine, at the parts' level; finished loose rows to the same line, unindented, at the
    card's end; a press opens it in place, and a re-read keeps it as the press left it (`data-fold`, TD-1315) #}
-{% macro fold(f, repo='', card='') %}
+{% macro fold(f, repo='', card='', preview=False) %}
   <details class="qfold{% if f.loose %} loose{% endif %}" data-fold="{{ card }}:done:{{ f.of }}"><summary class="qrow qfoldsum" style="--qd: {{ f.depth or 1 }}">
     {%- for b in f.rails or [] %}{% if b %}<span class="qrail b-{{ b }}" style="--ql: {{ loop.index }}" aria-hidden="true"></span>{% endif %}{% endfor %}<span class="qtick" aria-hidden="true">✓</span> {{ f.n }} done</summary>
-    {%- for r in f.fold %}{{ row(r, repo) }}{% endfor %}
+    {%- for r in f.fold %}{{ row(r, repo, preview) }}{% endfor %}
   </details>
 {% endmacro %}

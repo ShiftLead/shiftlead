@@ -15,8 +15,8 @@ from shiftlead import repoconfig
 from shiftlead.ui.queue import card_wants, items_n, queue_view, walk_mine
 
 CID = "samscrape#TD-020"
-ALL = "Starts one session for every item on this card"  # `card-start-all`'s title
-ONE = "Starts your own session on this card"  # `card-start`'s
+ALL = "On the card's page, starts one session for every item on this card"  # `card-start-all`'s title
+ONE = "On the card's page, starts your own session on this card"  # `card-start`'s
 ITEM = {"section": "needs", "id": "m-1", "item": "m-1", "html": "", "kind": "decide", "want": "decide",
         "red": False, "running": False, "on_row": CID}  # fmt: skip
 
@@ -35,6 +35,7 @@ def _head(got: dict | None, fleet: list[dict] | None = None) -> tuple[dict, str]
 
     (c,) = queue_view(_q(), NOW, {"cards": {CID: got}} if got else None, fleet=fleet)["up_next"]
     html = templates.env.from_string('{% from "queue_card.html" import card %}{{ card(c) }}').render(c=c)
+    html = html.replace("&#39;", "'")
     return c, html[: html.index('<span class="qgap">')]
 
 
