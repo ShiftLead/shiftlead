@@ -35,6 +35,25 @@ out.row_arrives = cd(A("up_next", { rows: ["a1"] }), A("up_next", { rows: ["a1",
 out.reorder = cd(A("up_next", { rows: ["a1", "a2"] }), A("up_next", { rows: ["a2", "a1"] }));
 out.left = cd(A("up_next", { decide: ["m1", "m2"], rows: ["a1"] }), null, { own: (k) => k === "m:m2" });
 out.left_done = cd(A("up_next", { decide: ["m1"] }), null, { topDone: "1" });
+// TD-1791: the address rings its item; a re-read that replaces the item's node takes the ring, and ringing again
+// after the draw puts it on the new node, the one ring on the page
+{
+  const L = page([A("up_next", { decide: ["m1", "m2"], rows: ["a1"] })]), byId = () => null;
+  const rung = () => L.querySelectorAll(".qring").map((x) => x.dataset.msg || x.dataset.qid);
+  const at = (q) => {
+    const a = AO.ringAddress(L, L, q, byId);
+    return [a.it && a.it.dataset.msg, a.at && a.at.dataset.qid];
+  };
+  const found = at("?row=A&item=m1"), atLoad = rung();
+  const old = L.querySelector('.mailrow[data-msg="m1"]'), fresh = item("m1");
+  old.before(fresh); old.remove();  // a patch's replaceWith
+  const lost = rung();
+  at("?row=A&item=m1");
+  out.ring = { found, atLoad, lost, again: rung(), onNew: fresh.classList.contains("qring") };
+  at("?row=a1"); out.ring.row = rung();
+  at("?row=A"); out.ring.head = rung();
+  at("?row=A&item=nope"); out.ring.noItem = rung();
+}
 console.log(JSON.stringify(out));
 """
 
@@ -78,3 +97,23 @@ def test_a_card_the_reading_no_longer_holds_is_gone_whole_its_bar_alone(got):
     assert got["left"]["left"] is True and got["left"]["words"] == ["no longer on the Queue"]
     assert got["left"]["gone"] == ["m:m1", "r:a1"]  # its own press's item keeps its result
     assert got["left_done"]["words"] == ["done"]
+
+
+def test_the_address_ring_is_put_back_after_a_re_read_replaces_its_item(got):
+    """TD-1791, §4.5 screen 12 *Addresses*: the address rings the item; the first re-read's patch replaced the item's
+    node and the ring went with it, so the page rings the address again after each draw."""
+    r = got["ring"]
+    assert r["found"] == ["m1", "A"] and r["atLoad"] == ["m1"]
+    assert r["lost"] == []  # the replaced node took the ring
+    assert r["again"] == ["m1"] and r["onNew"]
+    assert r["row"] == ["a1"]  # a row alone is rung, the one ring on the page
+    assert r["head"] == ["A"] and r["noItem"] == ["A"]  # the top entry's header; the row where the item is not drawn
+
+
+def test_the_card_page_rings_its_address_after_a_patch_and_a_whole_draw():
+    js = APP_JS.read_text(encoding="utf-8")
+    body = js[js.index("AO.cardPage = function") :]
+    patch = body[body.index("function patch()") : body.index("function boxLeft(")]
+    whole = body[body.index("function drawWhole(") : body.index("refreshBtn.addEventListener")]
+    assert "ringAddress();" in patch and "ringAddress();" in whole
+    assert "AO.ringAddress(page, lists, location.search, byId)" in body

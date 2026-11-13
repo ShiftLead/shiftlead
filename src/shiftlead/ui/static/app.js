@@ -5188,6 +5188,24 @@
     if (d.changed) parts.push(`${d.changed} changed`);
     return parts.map((p) => (typeof p === "string" ? { t: p, ask: false } : p)).map((p) => (p.ask ? p : p.t));
   };
+  // a card page's address (`?row=…&item=…`, §4.5 screen 12 *Addresses*): the item it names and its row, found in
+  // `lists` (a mail item by its message id, else an element by the id or its short id, else a header or row by its id)
+  AO.cardAddress = function (lists, search, byId) {
+    const p = new URLSearchParams(search), row = p.get("row"), item = p.get("item");
+    const find = (x) => x && ($(`.mailrow[data-msg="${CSS.escape(x)}"]`, lists) || byId(x) || byId(x.replace(/^.*#/, ""))
+      || $(`.qhead[data-qid="${CSS.escape(x)}"], .qrow[data-qid="${CSS.escape(x)}"]`, lists));
+    return { it: find(item), at: find(row) };
+  };
+  // the address rings its item, else its row, the one ring on `page`; run again after each draw of a re-read, since a
+  // patch or a whole draw replaces the node the ring was on (TD-1791)
+  AO.ringAddress = function (page, lists, search, byId) {
+    const a = AO.cardAddress(lists, search, byId), el = a.it || a.at;
+    if (el && !el.classList.contains("qring")) {
+      $$(".qring", page).forEach((x) => x.classList.remove("qring"));
+      el.classList.add("qring");
+    }
+    return a;
+  };
   // the difference between the drawn card and the reading's (both `AO.qModel` copies of one card): `left` where the
   // reading holds no card with the page's id; `items` the items not drawn in the block the reading holds them in
   // (`asks` those in Decide or Do), each counted once there; `moved` the open group it moved to; `done` the card
@@ -5318,6 +5336,7 @@
       AO.qcardReapply(lists);
       openFolds(lists);
       cardLinks();
+      ringAddress();  // a replaced item takes the ring with it (TD-1791)
       drawBar(diff);
     }
     // a box still open over a card that has left the Queue: its words kept, its send disabled, *the card has left
@@ -5382,6 +5401,7 @@
       AO.qcardReapply(lists); AO.restoreRowErrs(lists, errs); AO.reopenFolds(lists); AO.reopenMenus(lists, menus);
       openFolds(lists);
       cardLinks();
+      ringAddress();
       const w = $("#cardwhere", page), rw = $("#cardwhereread", lists); if (w && rw) w.innerHTML = rw.innerHTML;
       drawBar(null);
     }
@@ -5391,14 +5411,12 @@
       drawWhole();
     });
     // the address's row and item: scroll to the row (the header for the top entry) and ring the item
+    const byId = (x) => document.getElementById(x);
+    const ringAddress = () => AO.ringAddress(page, lists, location.search, byId);
     function showAddress() {
-      const p = new URLSearchParams(location.search), row = p.get("row"), item = p.get("item");
-      const find = (x) => x && ($(`.mailrow[data-msg="${CSS.escape(x)}"]`, lists) || document.getElementById(x)
-        || document.getElementById(x.replace(/^.*#/, "")) || $(`.qhead[data-qid="${CSS.escape(x)}"], .qrow[data-qid="${CSS.escape(x)}"]`, lists));
-      const it = find(item), at = find(row);
-      const ring = (el) => { $$(".qring", page).forEach((x) => x.classList.remove("qring")); el.classList.add("qring"); };
-      if (at) { at.scrollIntoView({ block: "center" }); if (!it) ring(at); }
-      if (it) { it.scrollIntoView({ block: "center" }); ring(it); }
+      const { it, at } = ringAddress();
+      if (at) at.scrollIntoView({ block: "center" });
+      if (it) it.scrollIntoView({ block: "center" });
     }
     let busy = false;
     async function reread(whole) {
