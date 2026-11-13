@@ -293,7 +293,10 @@ def test_a_row_arriving_alone_and_a_reorder_alone_are_each_moved(got):
 
 def test_asks_on_hidden_cards_and_the_persons_own_are_not_counted(got):
     assert _counts(got["hidden_asks"]) == NOTHING
-    assert got["own_ask"]["asks"] == 0
+    # a lagging re-read still holding the item the person's own press took off counts nothing, its card not moved
+    # (TD-1785), and the card is not drawn whole from that reading
+    assert _counts(got["own_ask"]) == NOTHING
+    assert "B" not in got["own_ask"]["same"]
 
 
 def test_a_rank_move_names_the_latest_readings_neighbours(got):
