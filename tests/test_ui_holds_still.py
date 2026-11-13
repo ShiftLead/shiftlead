@@ -231,6 +231,7 @@ def test_asks_on_hidden_cards_and_the_persons_own_are_not_counted(got):
     assert _counts(got["hidden_asks"]) == NOTHING
     assert got["own_ask"]["asks"] == 0
 
+
 def test_a_rank_move_names_the_latest_readings_neighbours(got):
     assert got["rank_same"]["prev"] == "B" and got["rank_same"]["next"] == "C"
     assert got["rank_same"]["order"] == ["B", "D", "C"]
