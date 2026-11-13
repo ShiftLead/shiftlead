@@ -49,7 +49,7 @@ log = logging.getLogger("shiftlead.agent")
 
 LEDGER = "docs/ledger"  # a split ledger: the sweep reads no v1 file here
 SWEEP_BRANCH = "sweep/"  # the board PR's branch: sweep/<UTC date>
-LIFT_BRANCH = "lift/"  # a lift PR's: lift/TD-n/<event name> | until
+LIFT_BRANCH = "lift/"  # a lift PR's: lift/TD-n/<event name> | until-<date>
 SESSION = "gate-sweep"  # the session an item the sweep files names
 GIT_TIMEOUT = 60.0
 GH_TIMEOUT = 60.0
@@ -68,11 +68,14 @@ def due(last: date | None, today_utc: date) -> bool:
 
 
 def lift_branch(tid: str, gate: str) -> str:
-    """cadence §2.14's key, as `gate_sweep.py` writes it: `lift/TD-n/<event name>`, `…/until`."""
+    """cadence §2.14's key: `lift/TD-n/<event name>`, and `…/until-<date>` for an `until` gate (TD-1751). The
+    date is the home's alone: `gate_sweep.py` still writes `…/until` for every `until`, so an entry re-gated to a
+    later day found its earlier lift's PR, closed or merged, and its branch, which a close leaves on origin, and
+    was never lifted again. A by-hand lift on `…/until` still counts while open, by the open-PR rule in `_lift`."""
     if gate.startswith("event ("):
         return f"{LIFT_BRANCH}{tid}/{gate[len('event (') : -1]}"
     if gate.startswith("until "):
-        return f"{LIFT_BRANCH}{tid}/until"
+        return f"{LIFT_BRANCH}{tid}/until-{gate[len('until ') :].strip()}"
     return f"{LIFT_BRANCH}{tid}/decision-{gate[gate.index('(') + 1 : -1].lower()}"
 
 
