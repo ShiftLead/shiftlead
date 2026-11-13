@@ -10,6 +10,7 @@ document is printed by the second form, so a second reader re-derives them from 
 from __future__ import annotations
 
 import csv
+import re
 import statistics
 import sys
 from collections import defaultdict
@@ -322,8 +323,104 @@ def estimates(turns: list[dict]) -> None:
     print(f"| the designer's own session, at its median applying context | {med:,} read | {in_session:.2f} |")
 
 
+# TD-1721's pricing (design §4.9c *Who reviews a design's rounds*, *What the designer carries*): each reviewer
+# subagent's spend by model, and the designer's spend had each design (or each round past a bound) started in a
+# fresh run. A fresh run starts at START_RUN tokens, the median first turn of a design session in this sample;
+# carrying less shrinks only a turn's cache read, and a run ended mid-design pays its reload as a cache write.
+START_RUN = 60_000
+
+
+def reviewers(rows: list[dict]) -> dict[str, list[float]]:
+    agents: dict[tuple, list] = defaultdict(lambda: [0.0, ""])
+    for r in rows:
+        if r["phase"] == "reviewer":
+            a = agents[(r["design"], r["side"])]
+            a[0] += cost(r)
+            a[1] = r["model"]
+    out: dict[str, list[float]] = defaultdict(list)
+    for c, model in agents.values():
+        out[next((k for k in ("fable", "sonnet", "opus") if k in model), model)].append(c)
+    return out
+
+
+def fresh_runs(turns: list[dict], bound: int | None) -> float:
+    w = WEIGHTS["claude-opus-5-5"]
+    total = 0.0
+    for td in DESIGNS:
+        session, off = None, 0
+        for r in sorted((r for r in turns if r["design"] == td), key=lambda r: r["ts"]):
+            ctx = int(r["context"])
+            if r["session"] != session:
+                session, off = r["session"], max(0, ctx - START_RUN)
+            if bound and ctx - off > bound:
+                off = ctx - START_RUN
+                total += START_RUN * w["cache_write"] / 1e6
+            total += cost(r) - min(int(r["cache_read"]), off) * w["cache_read"] / 1e6
+    return total
+
+
+def td1721() -> None:
+    rows = list(csv.DictReader(TURNS.open()))
+    turns = [r for r in rows if r["phase"] in PHASES]
+    print("## For TD-1721: one review, by model\n")
+    print("| model | reviews | $ | mean $ | median $ |")
+    print("|---|---|---|---|---|")
+    for m, cs in sorted(reviewers(rows).items()):
+        print(f"| {m} | {len(cs)} | {sum(cs):.2f} | {sum(cs) / len(cs):.2f} | {statistics.median(cs):.2f} |")
+    as_run = sum(cost(r) for r in turns)
+    print("\n## For TD-1721: the designer, from a fresh run\n")
+    print("| the designer's runs | $ | ratio |")
+    print("|---|---|---|")
+    print(f"| as run | {as_run:.2f} | 1.00 |")
+    for label, bound in (("a fresh run at each design's start", None), ("and again past 150k mid-design", 150_000)):
+        f = fresh_runs(turns, bound)
+        print(f"| {label} | {f:.2f} | {f / as_run:.2f} |")
+    by_round()
+
+
+def by_round() -> None:
+    """Findings only a design review (or live use) would catch, for each review, by round and reviewer, over the
+    findings analysis's 41 records at its commit, with its labels (rounds 5 and later together, as it counts)."""
+    import importlib.util
+
+    path = HERE.parent / "2026-11-11-design-review-findings" / "tables.py"
+    spec = importlib.util.spec_from_file_location("findings", path)
+    fa = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fa)
+    fa.COMMIT = "df866eeb8"
+    findings, _, designs = fa.read_records()
+    labels = {r["id"]: r["catch"] for r in csv.DictReader((path.parent / "labels.csv").open())}
+    reviews: dict[tuple, int] = defaultdict(int)
+    for name in fa.git("ls-tree", "--name-only", "--full-tree", fa.COMMIT, "docs/reviews/").split():
+        if not re.search(r"/TD-\d+\.md$", name):
+            continue
+        text = fa.git("show", f"{fa.COMMIT}:{name}")
+        if "Source:** backfill" in text:
+            continue
+        for line in text.splitlines():
+            c = fa.cells(line)
+            if re.match(r"\|\s*R\d+\s*\|", line) and len(c) >= 5 and c[2] != "fact-check":
+                rnd = re.match(r"\d+", c[1])
+                reviews[(min(int(rnd.group()), 5) if rnd else 0, fa.model_of(c[3]))] += 1
+    found: dict[tuple, int] = defaultdict(int)
+    for i, f in findings.items():
+        if f["role"] == "design" and labels.get(i) in ("design-only", "live"):
+            found[(f["round"], f["model"])] += 1
+    print(f"\n## For TD-1721: design-only findings for each design review, by round ({designs} designs)\n")
+    print("| round | Fable reviews | Fable, each | Sonnet reviews | Sonnet, each |")
+    print("|---|---|---|---|---|")
+    for rnd in range(1, 6):
+        cells = []
+        for m in ("fable", "sonnet"):
+            n = reviews[(rnd, m)]
+            cells += [str(n), f"{found[(rnd, m)] / n:.2f}" if n else "-"]
+        print(f"| {rnd if rnd < 5 else '5 and later'} | " + " | ".join(cells) + " |")
+
+
 if __name__ == "__main__":
     if len(sys.argv) > 2 and sys.argv[1] == "select":
         select(Path(sys.argv[2]))
+    elif sys.argv[1:] == ["td1721"]:
+        td1721()
     else:
         tables()
