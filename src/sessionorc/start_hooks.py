@@ -221,9 +221,16 @@ TMUX_UPDATE_ENVIRONMENT = (
 )
 START_HOOKS_TEXT_MAX = 16 * 1024  # bytes of UTF-8 the first prompt carries of the hooks' output
 CUT_LINE = "… (the start hooks' output was cut at 16 KiB)"
-# an escape sequence whole — CSI, OSC (ended by BEL or ST) and the two-byte forms — then any control
-# character left but newline and tab: C0, DEL and C1 (an 8-bit CSI among them)
-_ESCAPES = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b[@-Z\\-_]")
+# an escape sequence whole — CSI (7- and 8-bit), OSC and the string sequences (DCS, SOS, PM, APC) to their
+# terminator or, unterminated, the line's end, an nF sequence with its intermediates, and the two-byte forms —
+# then any control character left but newline and tab: C0, DEL and C1
+_ESCAPES = re.compile(
+    r"\x1b\[[0-?]*[ -/]*[@-~]"
+    r"|\x9b[0-?]*[ -/]*[@-~]"
+    r"|(?:\x1b[\]PX^_]|[\x90\x98\x9d\x9e\x9f])[^\x07\x1b\x9c\n]*(?:\x07|\x1b\\|\x9c)?"
+    r"|\x1b[ -/]+[0-~]"
+    r"|\x1b[0-~]"
+)
 _CONTROLS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f\x80-\x9f]")
 
 

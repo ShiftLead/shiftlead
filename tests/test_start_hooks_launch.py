@@ -158,7 +158,9 @@ def test_tmux_s_default_update_environment_is_the_list(agent):
 @pytest.mark.unit
 def test_the_text_is_cleaned_and_capped():
     raw = "\x1b[1;31mred\x1b[0m \x1b]0;title\x07ok\r\n\x9b2Jbell\x07\x7f\tend"
-    assert start_hooks.clean(raw) == "red ok\n2Jbell\tend"
+    assert start_hooks.clean(raw) == "red ok\nbell\tend"
+    # tput sgr0's charset select, a DCS string, an unterminated OSC kept to its own line
+    assert start_hooks.clean("a\x1b(B\x1b[mb \x1bPq#0;2\x1b\\c\n\x1b]0;lost\nkept") == "ab c\n\nkept"
     big = "é" * (start_hooks.START_HOOKS_TEXT_MAX)  # two bytes each: twice the cap
     cut = start_hooks.clean(big)
     body, line = cut.rsplit("\n", 1)
@@ -172,3 +174,30 @@ def test_os_environ_is_untouched_by_pane_env():
     before = dict(os.environ)
     start_hooks.pane_env(_Tmux({"X": "1"}, []), os.environ, {"Y": "2"}, ["PATH"])
     assert dict(os.environ) == before
+
+
+class WithContextStub(NoContextStub):
+    """The same tool, but one whose launch takes a start context: it runs its own start hooks."""
+
+    start_context = True
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.name = "withcontext0"
+
+    def launch(self, *, profile, resume, prompt, unattended, cwd, name="", **_context):
+        return super().launch(profile=profile, resume=resume, prompt=prompt, unattended=unattended, cwd=cwd, name=name)
+
+
+async def test_a_tool_that_takes_a_start_context_runs_no_hooks_at_launch(agent, monkeypatch, tmp_path):
+    adapters.load_all()
+    monkeypatch.setitem(adapters._REGISTRY, "withcontext0", WithContextStub())
+    repo = _repo(tmp_path)
+    bin_ = _launcher(tmp_path)
+    agent.tmux.run("set-environment", "-g", "PATH", f"{bin_}:/usr/bin:/bin")
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="w", dir=str(repo), adapter="withcontext0", unattended=True, prompt=BRIEF))[
+            "id"
+        ]
+    assert agent.sessions[sid].first_prompt == BRIEF
+    assert not (bin_ / "stdin").exists()

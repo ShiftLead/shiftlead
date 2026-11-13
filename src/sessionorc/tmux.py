@@ -47,6 +47,9 @@ def attach_argv(
     return argv + ["attach", "-t", f"={session}:"]
 
 
+_ENV_LINE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")  # a `show-environment` line's start
+
+
 class TmuxError(RuntimeError):
     pass
 
@@ -246,8 +249,8 @@ class Tmux:
             return None
         out: dict[str, str] = {}
         for line in cp.stdout.splitlines():
-            if line.startswith("-") or "=" not in line:
-                continue
+            if line.startswith("-") or not _ENV_LINE.match(line):
+                continue  # a removed name, or a later line of a multi-line value
             k, v = line.split("=", 1)
             out[k] = v
         return out
