@@ -30,7 +30,9 @@ and run no `ao`, `gh` or web tool. Write nothing but your output file.
   is about something below the design's level — an implementation bug, a typo, a test's flakiness, a lint or format
   rule, a missing test of a behaviour the design states plainly, wording of a help text the design does not give; or
   it is outside what the design covers.
-- **unsure**: the escape and the design do not let you tell. Never guess.
+
+The label is one of the two: the trial counts the escapes that trace. Where the escape and the design leave you
+unsure, give the label the reading favours and set `conf` to `low`; the report shows the low-confidence labels apart.
 
 Read the escape first and name, to yourself, the behaviour that went wrong in plain words. Then find where the design
 speaks to that behaviour, by the situation and not only by the escape's words, and decide.
@@ -40,11 +42,12 @@ speaks to that behaviour, by the situation and not only by the escape's words, a
 One JSON object per escape, in the input's order, one per line, to `<out>`, with exactly these keys:
 
 - `id`: copied from the input.
-- `traces`: `yes`, `no` or `unsure`.
+- `traces`: `yes` or `no`.
+- `conf`: `high`, or `low` where the escape and the design leave you unsure.
 - `why`: one line: the design's sentence that was silent, wrong or right on it (its file and first words), or why the
   escape is below or outside the design.
 
 Judge every escape by reading it; do not write a keyword or regex classifier. When done, check with a short script
-that the output has one valid line per input row, the ids in order and every `traces` allowed; fix what fails.
+that the output has one valid line per input row, the ids in order and every `traces` and `conf` allowed; fix what fails.
 
-Final report (under 100 words): escapes labelled, counts by label, and the verification result.
+Final report (under 100 words): escapes labelled, counts by label and by `conf`, and the verification result.
