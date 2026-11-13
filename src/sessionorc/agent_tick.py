@@ -5859,8 +5859,11 @@ class TickMixin:
         hook set, which only a reading fetched after it lifts, since an older one cannot have seen the cap the
         tool met. A metered profile has no cap to wait for; a profile with no timed reading waits
         `USAGE_FRESH`, the poll's own age for a reading, and then lifts, since none will come."""
-        at = self._hook_limited.get(s.id)
-        if at is None or s.profile in metered:
+        if s.limited_hook_at is None or s.profile in metered:
+            return True
+        try:
+            at = agent_common._parse(s.limited_hook_at)
+        except (TypeError, ValueError):  # a mark that names no time: nothing to wait for
             return True
         fetched = (self._usage.get(s.profile) or {}).get("fetched")
         try:
@@ -5875,14 +5878,14 @@ class TickMixin:
         for s in live:
             found = None if s.profile in metered else agent_common.cap_window(self._usage.get(s.profile))
             cap = found[0] if found else None
-            if found and s.state == "limited" and s.id in self._hook_limited:
+            if found and s.state == "limited" and s.limited_hook_at is not None:
                 # a hook's `limited` the poll now reads a cap under: the spell's reset (§4.2, TD-1748)
                 if found[1] is not None and s.limited_reset is None:
                     s.limited_reset = found[1].isoformat().replace("+00:00", "Z")
                     self.store.save(s)
             elif found and s.state not in ("limited", "needs-you"):
                 # the tool's own endpoint, not the screen: reported, so `hook` (design §9 invariant 4)
-                self._hook_limited.pop(s.id, None)
+                s.limited_hook_at = None
                 self._pre_limited[s.id] = s.state
                 s.set_state("limited", confidence="hook", pending=Pending(kind="limit", text=found[0]))
                 if found[1] is not None:  # the spell's reset, read once (§4.3, TD-1474)
@@ -5893,7 +5896,7 @@ class TickMixin:
                     continue  # the record's own tail is the authority: a restart forgets nothing
                 if not self._hook_lift_due(s, metered):
                     continue  # a hook's `limited` waits for a reading taken after it (TD-1748)
-                self._hook_limited.pop(s.id, None)
+                hooked, s.limited_hook_at = s.limited_hook_at is not None, None
                 if s.confidence == "scraped":
                     # a screen rule's `limited` goes back to what the verdict replaced, as `_screen_gone` does
                     saved = self._hook_state.pop(s.id, None)
@@ -5904,8 +5907,10 @@ class TickMixin:
                     else:
                         s.set_state(saved[0], confidence=saved[2], pending=saved[1])
                 else:
-                    # back to what it was (idle stays idle: no hook will come to correct a wrong `working`)
-                    s.set_state(self._pre_limited.pop(s.id, "working"), confidence="hook")
+                    # back to what it was (idle stays idle: no hook will come to correct a wrong `working`); a
+                    # hook's `limited` ended a turn, so the composer waits: `idle`, read from the record (TD-1750)
+                    back = self._pre_limited.pop(s.id, "working")
+                    s.set_state("idle" if hooked else back, confidence="hook")
                 self.store.save(s)
 
     def _usage_only_due(self, key: str, profs: list[str], whole: dict[str, Any]) -> bool:
@@ -6406,9 +6411,10 @@ class TickMixin:
         if state == "limited" and thread is None:
             # a hook's `limited` is a turn that ended on a cap (§4.2, TD-1748): once the poll reads no cap,
             # the composer waits, so the lift goes to `idle`, never the poll's own default `working`; and
-            # only a reading taken after it lifts it (`_hook_lift_due`), since an older one cannot know the cap
-            self._pre_limited[sid] = "idle"
-            self._hook_limited[sid] = datetime.now(UTC)
+            # only a reading taken after it lifts it (`_hook_lift_due`), since an older one cannot know the cap;
+            # the mark is the record's, so a host-agent restart keeps it (TD-1750); to the microsecond, since a
+            # reading fetched in the same second may be from before it
+            s.limited_hook_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
         starting = thread is not None and (event.get("subagent_delta") or 0) > 0  # a `SubagentStart` ends nothing
         if thread is None and state and state not in ("needs-you", "exited", "closed") and s.pendings:
             # the main thread's own state goes beneath the open prompts, before any of them ends (§4.2
@@ -6752,7 +6758,6 @@ class TickMixin:
             self._prompts_checked,
             self._prompts_cursor,
             self._pre_limited,
-            self._hook_limited,
             self._last_hook,
             self._hook_state,
             self._live_hook_at,
