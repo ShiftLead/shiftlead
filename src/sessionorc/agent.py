@@ -533,6 +533,7 @@ class HostAgent(
         self._id_own_cg: str | None = None  # the host agent's own cgroup, never a pane's scope
         self._id_other_scopes: set[str] = set()  # own scopes of the server's panes no record holds (TD-362)
         self._id_conns: dict[Any, identity.Channel] = {}  # a connection's classification, for its life
+        self._id_conn_at: dict[Any, float] = {}  # when each connection was accepted, monotonic (TD-1741)
         self._id_dirty: set[str] = set()  # records whose alarm counts moved since their last write
         self._id_listed_at = 0.0
         self._id_list_lock = asyncio.Lock()

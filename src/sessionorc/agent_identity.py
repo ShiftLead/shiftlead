@@ -155,11 +155,15 @@ class IdentityMixin:
         st = self.proc.stat(pid)
         return (pid, st.start if st else 0)
 
-    async def _id_channel(self, peer: int, peer_uid: int | None = None) -> identity.Channel:
+    async def _id_channel(
+        self, peer: int, peer_uid: int | None = None, read: dict[str, Any] | None = None
+    ) -> identity.Channel:
         """Classify one connection's peer. A peer that matches no pane we know may belong to one the
         tick has not listed yet — a session's first hook can beat the first tick after `create` —
         so it waits for a fresh list (one at a time, at most one a second) before it is judged
-        *outside* or *unknown*; never against the old one."""
+        *outside* or *unknown*; never against the old one. `read`, where given, is told which
+        classification gave the answer — `first`, or `second` with the seconds it `waited` for the
+        list — so an `unreadable` verdict can say when the peer was found gone (TD-1741)."""
         if self._id_detached is None:
             await self._id_read_detached(await asyncio.to_thread(self.tmux.server_pid))
         detached = self._id_detached or None
@@ -170,6 +174,8 @@ class IdentityMixin:
             sid not in listed and r.pane and (r.host or self.host) == self.host and r.state not in ("exited", "closed")
             for sid, r in self.sessions.items()
         )
+        if read is not None:
+            read["read"] = "first"
         if ch.kind == "session" or not unlisted:
             # Every live record's pane is known, so a peer that matched none is under none: the
             # person's terminal and the UI — nearly every such connection — never wait for a list.
@@ -181,7 +187,31 @@ class IdentityMixin:
                 if self._id_listed_at and wait > 0:
                     await asyncio.sleep(wait)
                 self._id_note_panes(await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX))
+        if read is not None:
+            read.update(read="second", first=ch.signal or ch.kind, waited=time.monotonic() - asked)
         return identity.classify(peer, self._id_panes, self.proc, detached=detached, ours=self._id_ours(), **uids)
+
+    def _id_unreadable_why(self, peer: int, conn: Any, read: dict[str, Any]) -> str:
+        """What an `unreadable` verdict looked like (TD-1741): the socket's credential that would not
+        read, or the peer's `/proc` entry gone — at the first classification, or at the second after
+        the wait for a fresh pane list — and the connection's age, from its accept to this line. A
+        day of them says whether the home lags past the reporter's wait or the reporter is gone at
+        once. A verdict kept from an earlier request of the connection says so."""
+        if peer < 0:
+            what = "no credential"
+        elif not read:
+            what = "kept from the connection's first request"
+        elif read.get("read") == "second":
+            waited, first = f"{read.get('waited', 0.0):.1f}s", read.get("first")
+            if first == "unreadable":
+                what = f"gone at the first read, and at the second {waited} later"
+            else:
+                what = f"gone at the second read, {waited} after a first that read {first}"
+        else:
+            what = "gone at the first read"
+        at = self._id_conn_at.get(conn) if conn is not None else None
+        age = f"connection {time.monotonic() - at:.1f}s old" if at is not None else "connection age unknown"
+        return f" ({what}; {age})"
 
     def _id_ours(self) -> set[str]:
         """The scopes of this server's panes that no live record's pane holds (TD-362): a pane that is
@@ -204,8 +234,9 @@ class IdentityMixin:
         # about whoever holds that pid *now* — a process that connects, hands the socket to a child
         # and exits must not become whatever reuses its pid.
         ch = self._id_conns.get(conn) if conn is not None else None
+        read: dict[str, Any] = {}
         if ch is None:
-            ch = await self._id_channel(peer, peer_uid)
+            ch = await self._id_channel(peer, peer_uid, read)
             self.identity_tally[f"{ch.kind}:{ch.signal}" if ch.signal else ch.kind] += 1
             if conn is not None:
                 self._id_conns[conn] = ch
@@ -228,7 +259,13 @@ class IdentityMixin:
                 # which signal made it unknown (§4.8a): a peer gone before the read (`unreadable`), another
                 # pid namespace or uid, or a detached cgroup — the alarm line alone says only *unknown* (TD-1589);
                 # the method is the caller's word, so it is bounded
-                log.info("%s from peer %s judged unknown: %s", rpc[:60], peer, ch.signal or "no signal")
+                log.info(
+                    "%s from peer %s judged unknown: %s%s",
+                    rpc[:60],
+                    peer,
+                    ch.signal or "no signal",
+                    self._id_unreadable_why(peer, conn, read) if ch.signal == "unreadable" else "",
+                )
             self._id_alarm(verdict.alarm, verdict.about)
         if self.identity_mode != "enforce":
             return None
