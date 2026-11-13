@@ -12,8 +12,8 @@ import pytest
 from conftest import park_ticks
 
 from sessionorc import adapters
-from sessionorc.client import AgentError, LocalClient
 from sessionorc.agent_common import RpcError
+from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import Pending
 
 pytestmark = pytest.mark.integration
