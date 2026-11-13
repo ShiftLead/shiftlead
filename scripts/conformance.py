@@ -89,14 +89,19 @@ def refusal(env: dict[str, str], profile: str | None) -> str | None:
 def refused_homes(env: dict[str, str]) -> set[Path]:
     """The homes no walk and no seat smoke runs in (design §4.3, TD-1648): each agent adapter's
     `default_home(env)` and `default_home({})`, resolved — so Claude Code's `~/.claude` stays refused when
-    `$CLAUDE_CONFIG_DIR` points elsewhere. `env` is the environment the run started in, read once."""
+    `$CLAUDE_CONFIG_DIR` points elsewhere — and its `own_home` where it declares one (TD-1550). `env` is the
+    environment the run started in, read once."""
     from sessionorc import adapters
 
     out: set[Path] = set()
     for n in adapters.names():
         if not adapters.has_agent(n):
             continue
-        home = getattr(adapters.get(n), "default_home", None)
+        ad = adapters.get(n)
+        own = getattr(ad, "own_home", None)
+        if own is not None:
+            out.add(Path(own).expanduser().resolve())
+        home = getattr(ad, "default_home", None)
         if home is None:
             continue
         out |= {Path(home(e)).expanduser().resolve() for e in (env, {})}
