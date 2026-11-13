@@ -390,6 +390,19 @@ def has_agent(adapter: str) -> bool:
         return True
 
 
+def core_runs_start_hooks(adapter: str) -> bool:
+    """Whether the host agent runs the repo's start hooks for a record of this adapter, before its pane
+    (design §4.3 *The repo's start hooks*, TD-1637): an adapter whose launch hands the model no start context
+    (`start_context` false) runs no start hook of its own, so core runs them where it runs an agent
+    (`has_agent`; a shell would execute their text). False for an adapter this host does not know, since the
+    gate is the host's that holds the pane."""
+    try:
+        ad = get(adapter)
+    except KeyError:
+        return False
+    return not getattr(ad, "start_context", False) and bool(getattr(ad, "agent", True))
+
+
 def permission_channel(adapter: str) -> bool:
     """Whether a pending permission of this adapter's sessions is answered through the hook channel
     (design §4.3 *Permissions: no channel*, §4.5a **Allow / Deny**, TD-785): the adapter's

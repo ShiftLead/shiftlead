@@ -25,14 +25,23 @@ from __future__ import annotations
 import contextlib
 import json
 import os
-import shutil
-import subprocess
 import sys
 import time
 from pathlib import Path
 from typing import Any
 
+from sessionorc import start_hooks as _runner
 from sessionorc.mail import unread_line
+
+# the repo's start hooks' runner and its notices live in `sessionorc` (design §4.3 *The repo's start hooks*,
+# TD-1637), which the host agent also runs for an adapter with no start hook of its own; named here as before
+from sessionorc.start_hooks import (  # noqa: F401
+    NO_LAUNCHER,
+    PIN_FAILED,
+    PINNED_HOOK,
+    START_HOOKS,
+    START_HOOKS_TIMEOUT,
+)
 from sessionorc.store import EventQueue
 from shiftlead import wait_guard
 from shiftlead.adapters.claude_code.hook import Refused, call_agent, capture
@@ -52,21 +61,6 @@ START_CONTEXT_ENV = "SHIFTLEAD_START_CONTEXT_FILE"
 # `1` when the launch read a layer under which a background command's end wakes the session (design §4.3
 # *A wait the guard refuses*): the tool reads its settings once, at launch, so the hook reads this, never the file
 WAKES_ENV = "SHIFTLEAD_GEMINI_WAKES"
-# agent-cadence's runner (design §4.3 *A repo's start hooks are every adapter's to run*), the main checkout's
-START_HOOKS = ("scripts", "cadence_hooks.sh")
-START_HOOKS_TIMEOUT = 150  # seconds: the runner's own bound, > 5 children × its 25 s child timeout
-# a pinned repo's (design §4.2, TD-1023): the launcher's word, from PATH, and the two sentences agent-cadence's
-# seed line prints when it cannot run the pin (exit 2) or there is none, copied from the seed (a parity test)
-PINNED_HOOK = ("agent-cadence", "hook", "session-start")
-PIN_FAILED = (
-    "agent-cadence: the launcher could not run the pin in docs/cadence.toml (it said why above), "
-    "so the cadence session-start hooks did not run (TD-129)"
-)
-NO_LAUNCHER = (
-    "agent-cadence: this repo pins agent-cadence in docs/cadence.toml but no agent-cadence launcher is on PATH, "
-    "so the cadence session-start hooks did not run; install it once per machine: clone agent-cadence at its "
-    "latest tag, then run: install -m 755 launcher/agent_cadence.py ~/.local/bin/agent-cadence"
-)
 
 
 def translate(payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -139,63 +133,11 @@ def start_context(payload: dict[str, Any]) -> str:
 
 
 def start_hooks(payload: dict[str, Any]) -> str:
-    """Run the repo's start hooks, as Claude Code's layer line does (`CADENCE_HOOK_LINE`). In a pinned repo
-    (`cadence.hook_pinned`), `agent-cadence hook session-start` from PATH in `cwd`, the payload on its stdin:
-    its stdout whatever its exit, then `PIN_FAILED` after an exit 2; `PIN_FAILED` alone on a timeout, and
-    `NO_LAUNCHER` with none on PATH — never "" (design §4.2, TD-1023). Otherwise the main checkout's
-    runner — the first entry of `git worktree list` — else the project's own copy, only where it is
-    executable; its stdout, or "" when there is none or it failed."""
-    from sessionorc import cadence  # here, not at the top: every other event's import path stays light
-
-    cwd = Path(str(payload.get("cwd") or os.getcwd()))
-    project = Path(os.environ.get("CLAUDE_PROJECT_DIR") or cwd)
-    if cadence.hook_pinned(project):
-        return _pinned_hooks(payload, cwd)
-    try:
-        listed = subprocess.run(
-            ["git", "-C", str(project), "worktree", "list", "--porcelain"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        ).stdout
-    except (OSError, subprocess.SubprocessError, ValueError):
-        listed = ""
-    first = listed.splitlines()[0] if listed else ""
-    root = Path(first.removeprefix("worktree ")) if first.startswith("worktree ") else project
-    runner = root.joinpath(*START_HOOKS)
-    if not (runner.is_file() and os.access(runner, os.X_OK)):
-        return ""
-    try:
-        done = subprocess.run(
-            [str(runner), "--session-start"],
-            capture_output=True,
-            text=True,
-            cwd=cwd if cwd.is_dir() else None,
-            timeout=START_HOOKS_TIMEOUT,
-        )
-    except (OSError, subprocess.SubprocessError, ValueError):
-        return ""
-    return done.stdout
-
-
-def _pinned_hooks(payload: dict[str, Any], cwd: Path) -> str:
-    """The seed line's pinned mode: the launcher's `hook session-start` and what it printed (`start_hooks`)."""
-    if shutil.which(PINNED_HOOK[0]) is None:
-        return NO_LAUNCHER
-    try:
-        done = subprocess.run(
-            list(PINNED_HOOK),
-            input=json.dumps(payload),
-            capture_output=True,
-            text=True,
-            cwd=cwd if cwd.is_dir() else None,
-            timeout=START_HOOKS_TIMEOUT,
-        )
-    except (OSError, subprocess.SubprocessError, ValueError):  # a timeout too: a first fetch can outlast the bound
-        return PIN_FAILED
-    if done.returncode == 2:
-        return "\n".join(x for x in (done.stdout.rstrip("\n"), PIN_FAILED) if x)
-    return done.stdout
+    """Run the repo's start hooks from inside the pane (`sessionorc.start_hooks`): the project the tool
+    names (`CLAUDE_PROJECT_DIR`, which it sets, else the payload's `cwd`) and the pane's own environment,
+    with each call's own bound and no deadline over them."""
+    project = os.environ.get("CLAUDE_PROJECT_DIR") or str(payload.get("cwd") or os.getcwd())
+    return _runner.start_hooks(payload, project=project, env=os.environ)  # the payload on stdin unchanged
 
 
 def mail_context(payload: dict[str, Any], reply: Any) -> str:
