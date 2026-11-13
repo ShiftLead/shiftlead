@@ -245,3 +245,15 @@ def test_the_clause_rides_the_unread_line_or_stands_alone(capsys):
     cli.unread_line(args)
     assert capsys.readouterr().out == f"[shiftlead] you have 2 unread messages — run ao inbox ({over})\n"
     clientmod.last_mail = None
+
+
+def test_this_repos_designer_is_bound_at_150k_over_an_org_layer():
+    """This repo's `.shiftlead.yml` binds its designer at 150k (design §4.9c *What the designer carries from one
+    design to the next*, TD-1721, TD-1788); the repo's `roles:` win over `org.yml`'s per key, so an org layer's
+    300k does not reach it. CI has no `org.yml`, so the layer is passed as `resolve_role`'s overlay."""
+    from pathlib import Path
+
+    cfg = repoconfig.load(Path(__file__).resolve().parents[1])
+    for overlay in (None, {"designer": {"context": {"bound": "300k"}}}):
+        designer = repoconfig.resolve_role(cfg, "designer", roles_overlay=overlay)
+        assert designer.context_bound == 150_000 and not designer.context_default
