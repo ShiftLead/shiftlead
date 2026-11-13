@@ -377,6 +377,18 @@ class WakeMixin:
         """The record holds a brief that is neither sent nor given up on."""
         return bool(s.first_prompt) and not s.first_prompt_sent_at and not s.first_prompt_error
 
+    @classmethod
+    def _brief_holds(cls, s: Session) -> bool:
+        """No line but the brief is typed into this pane yet (§4.3 *No send until it is in*, TD-1637): its
+        brief is due and its adapter's start hooks ride it (`adapters.core_runs_start_hooks`), so another
+        line's `prompt` event would take the brief's place."""
+        return cls._first_prompt_due(s) and adapters.core_runs_start_hooks(s.adapter)
+
+    @staticmethod
+    def _brief_not_in(s: Session) -> str:
+        """The refusal's words while `_brief_holds` (§4.3 *No send until it is in*)."""
+        return f"{s.name}'s brief is not in yet; send again once it is (design §4.3)."
+
     def _first_prompt_road(self, s: Session, now: datetime) -> str | None:
         """How the brief may be sent now: `hook` at a hook-reported `idle` — the composer the launch
         landed at — or, once, `scraped` (§4.1 *A brief whose first hook is lost*, TD-348, and *A launch
