@@ -90,7 +90,10 @@ NOTIFICATION_KINDS = {
 # These are the account's: nothing the session does next can succeed until a person acts in the terminal
 # (`/login`, a plan, an org setting), so the record reads `needs-you`, a question, not the `working` its
 # `UserPromptSubmit` left — a seat smoke on an expired login read `working` for ten minutes (TD-1747).
-# Any other code (a rate limit, an overload, a server error) changes no state here.
+# `rate_limit` is a cap, or a throttle the tool cannot tell from one: the record reads `limited`, so no ring
+# drives the session into it, and the usage poll lifts it to `idle` once it reads no cap. Every other code (an
+# overload, a server error, a bad request or model, an output cap, `unknown`) ended the turn with the composer
+# waiting: `idle` (TD-1748).
 ACCOUNT_ERRORS = {
     "authentication_failed",
     "oauth_org_not_allowed",
@@ -220,12 +223,15 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
 
 
 def _stop_failure(out: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any] | None:
-    """A turn ended on an API error (TD-1747): an account's error is a question for the person in the
-    terminal, its text the tool's own words (*Login expired · Please run /login*); any other, no change."""
+    """A turn ended on an API error (design §4.2): an account's error is a question for the person in the
+    terminal, its text the tool's own words (*Login expired · Please run /login*, TD-1747); a rate limit reads
+    `limited`; any other code `idle`, the turn over (TD-1748)."""
     error = str(payload.get("error") or "")
-    if error not in ACCOUNT_ERRORS:
-        return out or None
     said = " ".join(str(payload.get("last_assistant_message") or payload.get("error_details") or error).split())
+    if error == "rate_limit":
+        return {**out, "state": "limited", "pending": {"kind": "limit", "text": f"Claude Code: {said[:200]}"}}
+    if error not in ACCOUNT_ERRORS:
+        return {**out, "state": "idle", "pending": None}
     lead = "Claude Code wants a login" if error == "authentication_failed" else "Claude Code's account stopped the turn"
     return {
         **out,

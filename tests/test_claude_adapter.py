@@ -1322,7 +1322,7 @@ LOGIN_EXPIRED = {
 def test_a_turn_ended_on_an_account_error_needs_a_person():
     """TD-1747, design §4.2: a turn that ends on an account's API error fires `StopFailure`, never `Stop`, and
     the record read the `working` its `UserPromptSubmit` left. It reads `needs-you`, a question naming the login
-    in the tool's own words; any other error changes no state, and the event is installed."""
+    in the tool's own words, and the event is installed; the other codes are TD-1748's, below."""
     got = translate(LOGIN_EXPIRED)
     assert got["state"] == "needs-you" and got["adapter_id"] == "u1"
     assert got["pending"] == {
@@ -1333,9 +1333,6 @@ def test_a_turn_ended_on_an_account_error_needs_a_person():
     assert "login: authentication_failed" in no_text["pending"]["text"]  # the code, where the tool said nothing
     billing = translate({"hook_event_name": "StopFailure", "error": "billing_error", "error_details": "Credit\nlow"})
     assert billing["pending"]["text"].startswith("Claude Code's account stopped the turn: Credit low")
-    for error in ("rate_limit", "overloaded", "server_error", "unknown", "max_output_tokens", ""):
-        assert translate({**LOGIN_EXPIRED, "error": error}) == {"adapter_id": "u1"}, error  # no state
-        assert translate({"hook_event_name": "StopFailure", "error": error}) is None
     assert "StopFailure" in HOOK_EVENTS  # or the failure never reaches the hook at all
 
 
@@ -1353,3 +1350,53 @@ async def test_an_expired_login_reads_needs_you_and_the_next_prompt_ends_it(agen
         await _hook(sid, hook_event_name="UserPromptSubmit", session_id="u1")
         rec = await c.call("get", id=sid)
         assert rec["state"] == "working" and rec["pending"] is None
+
+
+# Every `error` Claude Code 2.1.323's hook schema gives `StopFailure` but the account's (TD-1748), and none.
+TURN_OVER_ERRORS = (
+    "overloaded",
+    "server_error",
+    "invalid_request",
+    "model_not_found",
+    "max_output_tokens",
+    "unknown",
+    "",
+)
+
+
+def test_a_turn_ended_on_any_other_api_error_reads_idle_and_a_rate_limit_limited():
+    """TD-1748, design §4.2: no turn ended on an API error reads the `working` its `UserPromptSubmit` left. A
+    rate limit reads `limited`, its pending the tool's words, so no ring drives the session into a cap; every
+    other non-account code reads `idle`, the composer waiting."""
+    for error in TURN_OVER_ERRORS:
+        got = translate({**LOGIN_EXPIRED, "error": error, "last_assistant_message": "API Error: 529"})
+        assert got == {"adapter_id": "u1", "state": "idle", "pending": None}, error
+        assert translate({"hook_event_name": "StopFailure", "error": error})["state"] == "idle", error
+    limit = translate({**LOGIN_EXPIRED, "error": "rate_limit", "last_assistant_message": "API Error: 429\nslow down"})
+    assert limit == {
+        "adapter_id": "u1",
+        "state": "limited",
+        "pending": {"kind": "limit", "text": "Claude Code: API Error: 429 slow down"},
+    }
+    bare = translate({"hook_event_name": "StopFailure", "error": "rate_limit"})
+    assert bare["state"] == "limited" and bare["pending"]["text"] == "Claude Code: rate_limit"
+
+
+async def test_a_rate_limited_turn_reads_limited_until_the_poll_lifts_it_to_idle(agent, hookstub, tmp_path):
+    """TD-1748: through the host agent — the `rate_limit` `StopFailure` reads `limited` (`hook`), the poll
+    reading a cap keeps it, and the poll reading none lifts it to `idle`, never the poll's default `working`."""
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="s", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        await _hook(sid, hook_event_name="UserPromptSubmit", session_id="u1")
+        await _hook(sid, hook_event_name="StopFailure", session_id="u1", error="rate_limit")
+        rec = await c.call("get", id=sid)
+        assert (rec["state"], rec["confidence"], rec["pending"]["kind"]) == ("limited", "hook", "limit")
+        s = agent.sessions[sid]
+        agent._usage[s.profile] = {"windows": [{"label": "5-hour", "pct": 100}]}
+        agent._usage_limits([s], set())
+        assert s.state == "limited"  # the cap still stands: nothing lifts it, no ring reaches it
+        agent._usage.pop(s.profile)
+        agent._usage_limits([s], set())
+        assert (s.state, s.confidence, s.pending) == ("idle", "hook", None)
+        await _hook(sid, hook_event_name="StopFailure", session_id="u1", error="overloaded")
+        assert (await c.call("get", id=sid))["state"] == "idle"

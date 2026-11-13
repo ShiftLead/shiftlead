@@ -6380,6 +6380,10 @@ class TickMixin:
             self._bell_answered(s, event)  # a ring's turn, judged at its Stop (§4.10, TD-347)
         state = None if stale else event.get("state")
         thread = event.get("subagent") or None
+        if state == "limited" and thread is None:
+            # a hook's `limited` is a turn that ended on a cap (§4.2, TD-1748): once the poll reads no cap,
+            # the composer waits, so the lift goes to `idle`, never the poll's own default `working`
+            self._pre_limited[sid] = "idle"
         starting = thread is not None and (event.get("subagent_delta") or 0) > 0  # a `SubagentStart` ends nothing
         if thread is None and state and state not in ("needs-you", "exited", "closed") and s.pendings:
             # the main thread's own state goes beneath the open prompts, before any of them ends (§4.2
