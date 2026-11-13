@@ -5332,7 +5332,7 @@
     }
     // a link the card renderer draws to another card is that card's page; one to a row of this card stays an anchor
     function cardLinks() {
-      $$('a[href^="#"]', lists).forEach((a) => {
+      $$('a.qon[href^="#"], a.qsub[href^="#"], a.holdsref[href^="#"], .qbuilds a[href^="#"], .meta a[href^="#"]', lists).forEach((a) => {
         let q = "";
         try { q = decodeURIComponent(a.getAttribute("href").slice(1)); } catch (err) { return; }
         if (!/TD-\d+$/.test(q)) return;
@@ -5399,7 +5399,7 @@
       try {
         const q = new URLSearchParams(location.search); q.set("part", "1");
         // the units drawn, so the reading says which another card draws now (*gone — now on <card>*)
-        unitsOf(drawnCard()).forEach((u) => q.append("u", AO.qUnitKey(u)));
+        unitsOf(drawnCard()).slice(0, 400).forEach((u) => q.append("u", AO.qUnitKey(u)));  // the server reads 400
         const res = await fetch(`${location.pathname}?${q}`);
         const html = res.ok ? await res.text() : null;
         const fresh = html === null ? null : parse(html);
