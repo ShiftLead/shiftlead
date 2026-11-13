@@ -32,23 +32,23 @@ This is the shiftlead repo's part of the designer brief (design §4.8 `{repo}`, 
 - **The answered item is yours** (design §6 rule 6, §4.9a *A design's answer*): the decided line is a work order `board:<key>` routed to the design-first lanes, the design's own designer's alone where you reported on its design, and you claim it as any work order. On `Go` you drop the blocks (`ledger.py set TD-n --blocked-by …`), move the fixes no review has read into each build's Fix as the detail block lists them (`ledger.py edit TD-n --section Fix`), and close the line (`ao board edit done`), in one PR. On `One more round` (one round) or a `Hold: <note>` revision (its own count against the cap), you write a `Hold`'s note into the design entry's `**Ask:**` (`ledger.py edit TD-<design> --section Ask`), leave every block standing, file one entry (`Owner: designer`, `Kind: design-first`, `Part of: TD-<design>`, its Why carrying the answer and any note) and close the line pointing at it (`ao board edit done --carried-to TD-n`), in a ledger PR merged before the round; then run the round as a new design PR against the merged design, its round(s) and closing fact-check as above. Where the repo has no designer to reach, a grinder takes the line and carries a round or a `Hold` to such an entry the same way. After a bought round the item is raised again, as §4.8 says; after a `Hold` revision it is raised however its rounds ended, since only `Go` drops the block a `Hold` keeps.
 - **The record.** The design's Status says how the rounds ended, the trend (build-changing findings per round, the fact-checks' apart) and any answers; the review record `docs/reviews/TD-NNN.md` is in §4.8's form (the model the Agent result reports, else the alias with `?`; tokens the runner's total); each review is a line in `docs/history/TD-<n>.md` under its section, and the PR body lists the rounds.
 
-**The author's checklist** (design §4.9c *The checklist: fifteen questions, weighted to the hard situations*, TD-1757). Read it before drafting a design and again before its first review, and answer each question in the design itself wherever the design meets its situation: there is no answers block, since an answer worth writing is a rule a reviewer reads. The questions come from the findings only a design review or the live system caught, the places weighted by situation and no row of a design TD-1722 replays drawn from; `docs/decisions/2026-11-11-design-review-findings/checklist.csv` names each question's situation and the findings behind it. The list changes only by a design PR, and until TD-1722's trial ends never takes a row from a replayed design.
+**The author's checklist** (design §4.9c *The checklist: fifteen questions, weighted to the hard situations*, TD-1757). Read it before drafting a design and again before its first review, and answer each question in the design itself wherever the design meets its situation: there is no answers block, since an answer worth writing is a rule a reviewer reads. The questions are drawn from the situation findings in `patterns.csv`, the places weighted by how many of each situation's findings only a design review or the live system caught, and no row of a design TD-1722 replays drawn from; `docs/decisions/2026-11-11-design-review-findings/checklist.csv` names each question's situation and the findings behind it. The list changes only by a design PR, and until TD-1722's trial ends never takes a row from a replayed design.
 
-1. Does every reader, section and site treat this the same way? *(interaction)*
-2. Does the new rule contradict any existing rule, text, or test? *(interaction)*
-3. What existing behaviour or guarantee does this lose or undermine? *(interaction)*
-4. What does a background pass or read see mid-action? *(concurrency)*
-5. Which steps must be atomic, and what lock serialises them? *(concurrency)*
-6. What clears this marker or stale state, and when? *(when)*
-7. What bounds each wait, timer or retry, and when does it restart? *(when)*
-8. Exactly which kinds, members or records does the rule include? *(scope)*
-9. Does the description cover every rule, risk, and exception? *(scope)*
-10. What happens to a record that is replaced, redone or archived? *(ends)*
-11. Who performs each step, and who picks up the hand-off? *(who)*
-12. What state remains if an operation fails partway? *(failure)*
-13. Does stored state or a counter survive a restart or replay? *(restart)*
-14. When several candidates apply, which wins and in what order? *(which)*
-15. Which identity does each stored or printed value refer to? *(shape)*
+1. Does the new rule contradict any existing rule, section or text? *(interaction)*
+2. How does the new rule combine with existing rules and flows? *(interaction)*
+3. Which other readers or places use this field and must change? *(interaction)*
+4. What happens when a second action arrives before the first finishes? *(concurrency)*
+5. What does a background pass read or overwrite mid-action? *(concurrency)*
+6. When does a temporary marker or hold end, and what clears it? *(when)*
+7. Which clock, calendar or timestamp decides, and what skew is accepted? *(when)*
+8. Which kinds of record, message or item does the rule cover? *(scope)*
+9. Which entry points, callers or creation paths must the change reach? *(scope)*
+10. What happens to dependents when a record is removed, renamed or replaced? *(ends)*
+11. Who performs, writes or owns each step, field or hand-off? *(who)*
+12. What state remains or is restored when a step fails partway? *(failure)*
+13. What state survives a restart, and what is rebuilt or reset? *(restart)*
+14. Which candidate wins when several records match, overlap or conflict? *(which)*
+15. Which exact fields or keys does each record carry? *(shape)*
 
 **How a change lands here.** Branch in this worktree → PR → an independent review by the repo's `review-model` (code: round one's reviewer, `agent-cadence run cadence_config.py get review-model --first`, the rounds as cadence §4.8 sizes them) or a fact-check by its `fact-check-model` (docs: `get fact-check-model`), recorded as a PR comment whose first line is `cadence-review: SHIP|FIXED|BLOCK · <model> · code|docs · n findings`, never edited afterwards → merge only when `agent-cadence run check_cadence.py --pr <n>` exits 0 (capture the exit code; `| head` hides a FAIL) and `ao pr held <n>` says the PR is not held. PR and comment bodies go through `--body-file`. A reviewer you start gets this worktree's path and never the main checkout's, never runs `ao`, never touches `~/.shiftlead`. Bare dates are local (MDT); a PR number is written only after the PR exists. `gh pr edit` fails in this repo — `gh api -X PATCH repos/ShiftLead/shiftlead/pulls/N --input -`. A ledger entry's Status changes in the PR that changes the thing; a conflict in a ledger entry resolves by taking main's copy and running the helper's command again on it; a conflict on the board (`docs/user_attention.md`, its archive with it) resolves by `agent-cadence run board_edit.py replay --board docs/user_attention.md` at the stop, which makes your side's board writes again on the other side's board and stages them, then `git rebase --continue` — never by hand, and run by the PR's author before the re-precheck (a cloud session's PR, its reader); a `done` that archives (the board already holds `ARCHIVE_AT` less one, nine, closed items) runs without `--no-commit`, the board committed first, so its archive is the helper's own commit (design §4.4 *Two PRs' records merge in either order*); an edit script on any other file asserts every replacement count before it writes, and nothing chains a git command after it.
 
