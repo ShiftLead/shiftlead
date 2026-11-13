@@ -22,6 +22,7 @@ fixtures. Run by the wrapper the case writes as the adapter's `binary`:
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import re
@@ -161,6 +162,8 @@ class Stub:
             except OSError as e:
                 # a closed pane's tty answers a read with EIO, which can land before the close's SIGHUP:
                 # raised, it ended the stub before `end` ran (TD-1749); it is the terminal gone, as EOF is
+                if e.errno != errno.EIO:
+                    raise
                 self.log(f"tty read failed: {e.errno}")
                 line = ""
             if not line:
