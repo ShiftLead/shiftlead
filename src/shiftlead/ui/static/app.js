@@ -6258,7 +6258,7 @@
         if (document.hidden || whole) drawWhole({ keepOpen: true }); else patch();
         if (widened || $("#qfindmiss", lists)) apply();  // the window's lines and the find's note shown
       } catch (err) { notLive(); /* the next poll tries again */ } finally {
-        busy = false; whole = false;
+        busy = false; whole = false; anchorOn = null;  // a back-forward anchor is this read's alone (TD-1763)
         // a wider window picked while this read was out: read once more, never again for the same window
         if (read && AO.qWinFetch(loaded(), win) === win) short = win;
         if (read && loading() && loading() !== win) setTimeout(reread, 0);
