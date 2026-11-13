@@ -664,6 +664,43 @@ async def test_acts_are_gated_at_the_home_executed_on_the_node_and_the_verdict_r
             await person.call("kill", id=lead["id"])
 
 
+async def test_a_node_routed_sit_out_with_the_brief_due_is_stopped_by_the_nodes_own_stop_branch(
+    home, hookstub, tmp_path, monkeypatch
+):
+    """§4.3 *No send until it is in* (TD-1637): the home's copy of a node's record can be up to `REPORT_EVERY`
+    stale, so a sit-out of a node's member keeps today's order — the wrap-up routed to the node, whose own
+    `rpc_send` stop branch stops a member whose brief is not in, nothing typed — and the home's mark is written
+    after the act returns."""
+    # the start hooks ride the brief (the stub's default already, said here so the test does not lean on it);
+    # only the node reads it: the home routes a node's record before `_brief_holds`
+    monkeypatch.setattr(hookstub, "start_context", False, raising=False)
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        acts = Acts(node, monkeypatch)
+        async with LocalClient() as c:
+            w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
+        rec = node.sessions[w["id"]]
+        rec.first_prompt = "the brief"  # due: neither sent nor given up on
+        assert node._brief_holds(rec)
+        address = f"{w['id']}@laptop"
+        await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
+        marks_at_the_act = []
+        orig = node._act
+
+        async def act(params):
+            if params.get("rpc") == "send":  # the home's mark not yet written when the wrap-up crosses
+                marks_at_the_act.append((await at_home(home, address)).get("sit_out"))
+            return await orig(params)
+
+        monkeypatch.setattr(node, "_act", act)
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            view = await person.call("relaunch", id=address, sit_out=True)
+        assert acts.taken[-1]["rpc"] == "send" and acts.taken[-1]["params"]["wrapup"] is True  # routed as today
+        assert marks_at_the_act == [None]
+        assert rec.state == "exited" and rec.sends == [] and rec.wrapup_at is None  # stopped there, nothing typed
+        assert view["sit_out"]["at"] and view["id"] == address
+        await until(home, address, lambda v: v is not None and v["state"] == "exited")
+
+
 async def test_a_node_refuses_an_act_for_a_record_that_is_not_its_own(agent):
     """The node's side of *routes acts only to records whose host is that node's* (§4.4a): an `act`
     naming another host's record, or a create for another host, is refused in words and nothing
