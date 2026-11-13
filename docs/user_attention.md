@@ -28,7 +28,7 @@ People: paul
   - **Context:** Second look 2026-11-13: the account week window resets 2026-11-18T00:00Z, not Thursday as the last look assumed; no schedule line in the journal, no restarts with why schedule; whether ao-grind has a schedule set is not readable from a session.
   - **Question:** Keep watching through the 2026-11-18 reset, or drop the live check on the tests alone?
   - **Recommended:** Keep watching.
-- [ ] decide 2026-11-12 (n/a) — Keep watching TD-1462 (rule 8's idle-start cap, live since #3065), or drop it: no team has been started a fourth time in a day yet, though every live start has read as worked. Context: TD-1462 decision (paul). Due: 2026-11-16. Answers: Keep watching | Drop it. Lifts: Keep watching | Drop it.
+- [x] decide 2026-11-12 (n/a) — Keep watching TD-1462 (rule 8's idle-start cap, live since #3065), or drop it: no team has been started a fourth time in a day yet, though every live start has read as worked. Context: TD-1462 decision (paul). Due: 2026-11-16. Answers: Keep watching | Drop it. Lifts: Keep watching | Drop it. Decided: Drop it (by paul) (2026-11-12). Closed: 2026-11-12 — lifted.
   - **Context:** Second look 2026-11-13: four rule-8 starts since 2026-11-07, each logged worked within two minutes; no team held at day. The event the check waits for (a fourth start in one day after three worked) has not come.
   - **Question:** Keep watching for a fourth start in a day, or drop the live check on the evidence so far?
   - **Recommended:** Drop it.
