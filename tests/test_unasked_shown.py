@@ -125,13 +125,15 @@ def fake(repos, fleet, inbox=None):
     return Fake
 
 
-def page(monkeypatch, tmp_path, fleet, inbox=None):
+def page(monkeypatch, tmp_path, fleet, reads=None):
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     from shiftlead.ui import app as ui
 
     root = str(tmp_path / "samscrape")
     fleet = [{**s, "kind": "agent", "team": "grind", "repo": root, "dir": root, "unattended": True} for s in fleet]
-    monkeypatch.setattr(ui, "LocalClient", fake({root: reading(root)}, fleet, inbox))
+    r = reading(root)
+    r["pr_orders"]["reads"] = reads or {}
+    monkeypatch.setattr(ui, "LocalClient", fake({root: r}, fleet))
     html = TestClient(ui.create_app()).get("/repo/samscrape").text
     return html[html.index('id="prs"') : html.index('id="completed"')]
 
@@ -139,12 +141,9 @@ def page(monkeypatch, tmp_path, fleet, inbox=None):
 def test_the_repo_page_tags_a_held_pr_nobody_asked_with_its_age_and_reader(tmp_path, monkeypatch):
     fleet = [m("grinder-1", review=REVIEW), m("techlead-1", role="techlead")]
     # 811 has a standing (an open ask): the standing is drawn, never the tag
-    inbox = {
-        "ao-r-techlead-1": {
-            "entries": [{"kind": "ask", "pr": 811, "at": _iso(datetime.now(UTC) - timedelta(minutes=40))}]
-        }
-    }
-    prs = page(monkeypatch, tmp_path, fleet, inbox)
+    at = _iso(datetime.now(UTC) - timedelta(minutes=40))
+    reads = {"811": [{"id": "m-1", "to": "ao-r-techlead-1", "at": at, "state": "open", "verdict": "", "again": False}]}
+    prs = page(monkeypatch, tmp_path, fleet, reads)
     row = prs[prs.index("#805") : prs.index("#811")]
     assert (
         '<span class="tag wait" title="touches held paths (docs/briefs/designer.md): post its review, then ao msg --kind ask --pr 805 techlead-1 — where your own ao pr held says held">unasked · 17h'

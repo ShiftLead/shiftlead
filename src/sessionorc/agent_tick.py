@@ -4629,11 +4629,14 @@ class TickMixin:
         it, first in the list (§4.4 *A sync PR is the team's at once*, TD-684), and so is a live check's
         lift PR, at its entry's priority (§4.4 *A live check's lift PR is the team's at once*, TD-1450). It
         keeps the first ask of each open PR the mail holds, `asked`, and lists the held PRs nobody
-        asked, `unasked` (§4.4 *A held PR nobody asked is marked, never ordered*, TD-789). A change
+        asked, `unasked` (§4.4 *A held PR nobody asked is marked, never ordered*, TD-789), and each open
+        PR's reads, `reads`, recomputed from the mail every pass (§4.4 *The PR's reads*, TD-704). A change
         is saved and pushed as a `repos` event."""
         graph = self._graph()
         records = [r for r in graph.values() if r.repo]
         found = held_mod.asks(graph, self.person_inbox, self._repos)
+        fresh = held_mod.reads(graph, self.person_inbox, self._repos)  # the PR's reads (§4.4, TD-704)
+        held_ids = held_mod.ask_ids(graph, self.person_inbox)
         sync_on, at = self._sync_on(), datetime.now(UTC)
         for root, r in list(self._repos.items()):
             try:
@@ -4660,17 +4663,23 @@ class TickMixin:
                 held = workorders.red_holders(prs, mine, now, ORPHAN_AFTER)  # the pages' *held by* (TD-652)
                 # the first ask is kept past the mail's prune, and dropped once its PR closes
                 asked = {**(found.get(root) or {}), **(old.get("asked") or {})}
+                numbers: set[str] | None = None
                 if "open" in (r.get("prs") or {}):
                     numbers = {str(p.get("number")) for p in prs if isinstance(p, dict)}
                     asked = {n: a for n, a in asked.items() if n in numbers}
                 unasked = held_mod.unasked(prs, asked, held_mod.has_reader(root, graph, self._repos))
-                new = {"orders": orders, "told": told, "held": held, "asked": asked, "unasked": unasked}
+                # recomputed from the mail at every pass, a saved entry kept only where its ask is gone (TD-704)
+                reads = held_mod.merge_reads(fresh.get(root) or {}, old.get("reads") or {}, held_ids, numbers)
+                new = {
+                    "orders": orders, "told": told, "held": held, "asked": asked, "unasked": unasked, "reads": reads,
+                }  # fmt: skip
                 if new == {
                     "orders": old.get("orders") or [],
                     "told": old.get("told") or {},
                     "held": old.get("held") or {},
                     "asked": old.get("asked") or {},
                     "unasked": old.get("unasked") or [],
+                    "reads": old.get("reads") or {},
                 }:
                     continue
                 if (cur := self._repos.get(root)) is None:

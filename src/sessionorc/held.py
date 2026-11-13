@@ -181,17 +181,26 @@ def asks(
     found += [(e, PERSON, None) for e in person_inbox]
     out: dict[str, dict[str, dict[str, str]]] = {}
     for e, to, team in sorted(found, key=lambda x: str(x[0].at or "")):
-        pr = e.pr
-        if e.kind != "ask" or not isinstance(pr, int) or isinstance(pr, bool):
+        if not _pr_ask(e):
             continue
-        sender = graph.get(e.from_) or graph.get(_bare(e.from_))
-        if sender is not None and sender.repo in repos:
-            roots = _of_remote([sender.repo], repos)
-        else:
-            roots = _team_roots(e.team if to == PERSON else team, graph, repos) or set(repos)
-        for root in roots:
-            out.setdefault(root, {}).setdefault(str(pr), {"at": str(e.at), "to": to})
+        for root in _sender_roots(e, to, team, graph, repos):
+            out.setdefault(root, {}).setdefault(str(e.pr), {"at": str(e.at), "to": to})
     return out
+
+
+def _pr_ask(e: Any) -> bool:
+    return e.kind == "ask" and isinstance(e.pr, int) and not isinstance(e.pr, bool)
+
+
+def _sender_roots(
+    e: Any, to: str, team: str | None, graph: dict[str, Session], repos: dict[str, dict[str, Any]]
+) -> set[str]:
+    """The roots an ask counts for by its sender (`asks`): its record's repo's remote's checkouts, else the
+    seat's team's repos — in `person_inbox`, its `team` stamp's — else every repo."""
+    sender = graph.get(e.from_) or graph.get(_bare(e.from_))
+    if sender is not None and sender.repo in repos:
+        return _of_remote([sender.repo], repos)
+    return _team_roots(e.team if to == PERSON else team, graph, repos) or set(repos)
 
 
 def has_reader(root: str, graph: dict[str, Session], repos: dict[str, dict[str, Any]]) -> bool:
@@ -214,6 +223,114 @@ def unasked(prs: Iterable[dict[str, Any]], asked: dict[str, Any], reader: bool) 
         if not (p.get("draft") or p.get("sync") or p.get("conflicting"))
         if p.get("checks") in ("green", "none")
     )
+
+
+# ── the PR's reads (§4.4 *The PR's reads*, TD-704) ────────────────────────────────────────────────
+
+
+def _named(name: str, repos: dict[str, dict[str, Any]]) -> set[str]:
+    """Every checkout of the remote of the registry entry named `name` (an envelope's `repo` stamp,
+    TD-1467), named as the readings name it: its `name`, else its root's last component."""
+
+    def named(k: str, r: dict[str, Any] | None) -> str:
+        return str((r or {}).get("name") or Path(str((r or {}).get("root") or k)).name)
+
+    return _of_remote({k for k, r in repos.items() if named(k, r) == name}, repos)
+
+
+def _read_state(e: Any, to: str, extras: dict[str, str] | None = None) -> str:
+    """`open`, `answered` or `closed`, for the addressee `to`'s copy `e`: a seat that passed the ask up reads
+    `closed` from the pass on, whatever later closes its copy (§4.9b) — the passer by its `recommend.by`."""
+    if e.passed_up and to != PERSON and as_seat(str((e.recommend or {}).get("by") or ""), extras) == to:
+        return "closed"
+    if e.closed_by:
+        return "answered"
+    if e.closed_reason or e.expired_at:
+        return "closed"
+    return "open"
+
+
+def reads(
+    graph: dict[str, Session], person_inbox: Iterable[Any], repos: dict[str, dict[str, Any]]
+) -> dict[str, dict[str, list[dict[str, Any]]]]:
+    """`pr_orders.reads` as the mail the home holds gives it (§4.4 *The PR's reads*, TD-704), by root and PR
+    number (a string, as the reading is saved): for each addressee an ask carrying the PR went to — a seat by id,
+    an extra's copy as its seat's (`extras_of`), the copy in `person_inbox` as `person` — its **latest** such
+    ask by `at`, as `{id, to, at, state, verdict, again}`, in the order the asks were sent. `state` is
+    `_read_state`'s; `verdict` the word of the reply `closed_by` names, read from the outbox of whichever
+    record sent it, `''` for none; `again` true only on the person's copy of a take-up question (`unanswered`,
+    `pr`) answered with its first answer, *Ask the reader again*. An ask counts for the repo its envelope's
+    `repo` stamp names, and only where the stamp is empty for the roots `asks` gives it."""
+    extras = extras_of(graph.values())
+    found: list[tuple[Any, str, str | None]] = []
+    for sid, s in graph.items():
+        if s.seat or s.role == "techlead":
+            seat = as_seat(sid, extras)
+            found += [(e, seat, s.team) for e in s.inbox]
+    found += [(e, PERSON, None) for e in person_inbox]
+    replies = {e.id: e for s in graph.values() for e in s.outbox if e.kind == "reply"}
+    latest: dict[str, dict[str, dict[str, Any]]] = {}  # root → pr → to → the entry
+    for e, to, team in found:
+        if not _pr_ask(e):
+            continue
+        roots = _named(e.repo, repos) if e.repo else _sender_roots(e, to, team, graph, repos)
+        state = _read_state(e, to, extras)
+        reply = replies.get(e.closed_by or "")
+        entry = {
+            "id": e.id,
+            "to": to,
+            "at": str(e.at),
+            "state": state,
+            "verdict": str(reply.verdict or "") if reply is not None and state == "answered" else "",
+            "again": bool(to == PERSON and state == "answered" and e.unanswered and e.pr is not None and e.answer == 0),
+        }
+        for root in roots:
+            by = latest.setdefault(root, {}).setdefault(str(e.pr), {})
+            if to not in by or entry["at"] >= by[to]["at"]:
+                by[to] = entry
+    return {
+        root: {pr: sorted(by.values(), key=lambda x: x["at"]) for pr, by in prs.items()} for root, prs in latest.items()
+    }
+
+
+def ask_ids(graph: dict[str, Session], person_inbox: Iterable[Any]) -> set[str]:
+    """The ids of every ask carrying a PR that the mail the home holds keeps, in any mailbox `reads` walks."""
+    held_mail = [e for s in graph.values() if s.seat or s.role == "techlead" for e in s.inbox]
+    return {e.id for e in [*held_mail, *person_inbox] if _pr_ask(e)}
+
+
+def merge_reads(
+    fresh: dict[str, list[dict[str, Any]]],
+    old: dict[str, list[dict[str, Any]]],
+    held_ids: set[str],
+    open_prs: set[str] | None,
+) -> dict[str, list[dict[str, Any]]]:
+    """One repo's `pr_orders.reads`, recomputed (§4.4 *The PR's reads*): the mail's reading, and a saved entry
+    only where the mail no longer holds its ask by `id` — then as it was last read, an `open` one read
+    `closed` (its copy is gone), and kept only while no newer ask to the same addressee stands. A verdict once
+    read is never blanked by a pruned reply. `open_prs` (the open PRs' numbers, None when unknown) prunes a
+    closed PR's entry."""
+    out: dict[str, list[dict[str, Any]]] = {}
+    for pr in {*fresh, *old}:
+        if open_prs is not None and pr not in open_prs:
+            continue
+        was = {x["id"]: x for x in old.get(pr) or [] if isinstance(x, dict) and x.get("id")}
+        by: dict[str, dict[str, Any]] = {}
+        for x in fresh.get(pr) or []:
+            prior = was.get(x["id"])
+            if prior is not None and prior.get("verdict") and not x.get("verdict") and x["state"] == "answered":
+                x = {**x, "verdict": prior["verdict"]}
+            by[x["to"]] = x
+        for x in was.values():
+            if x["id"] in held_ids:
+                continue
+            kept = {**x, "state": "closed"} if x.get("state") == "open" else dict(x)
+            cur = by.get(str(x.get("to")))
+            if cur is None or str(kept.get("at") or "") > cur["at"]:
+                by[str(x.get("to"))] = kept
+        if by:
+            out[pr] = sorted(by.values(), key=lambda x: str(x.get("at") or ""))
+    return out
 
 
 # ── rule 11: merged without its read ────────────────────────────────────────────────────────────

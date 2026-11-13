@@ -94,41 +94,41 @@ def walk(links: list[dict[str, Any]], asks: list[dict[str, Any]] | None, *, olde
 STANDING_WORDS = {"pass": "passed by", "merged": "merged by", "findings": "findings from"}
 
 
-def standing(seats: list[tuple[str, list[Any], list[Any]]], age: Callable[[str], str]) -> dict[int, dict[str, str]]:
-    """Each open PR's standing with the team's readers (§4.5 screen 11, §4.9c *What is shown*, TD-315
-    slice 5b), by number, for the Repo page and `ao repo`: `seats` is one `(name, inbox, sent)` per
-    seat — its inbox entries, whose `ask`s carrying a `pr` are what it was asked to read, and its sent
-    mail, whose replies carry the `verdict`. Per seat the latest ask for a number wins: open, *waiting
-    on <name> · <age>*; answered, *passed by*, *findings from* or *merged by <name>* by its reply's
-    verdict, *reviewed by <name>* for an answer with none (a person's word, an older reply). A latest
-    ask closed unanswered stands for nothing. The seats' words are joined in the order their asks were
-    sent — *passed by ui-reader-ao-1 · waiting on techlead-ao-1 · 40m* — and `cls` is `wait` while
-    the turn is the reader's or the author's (an open ask, findings), else `done`."""
-    verdicts = {
-        str(e.get("id")): e.get("verdict") for _, _, sent in seats for e in sent if isinstance(e, dict) and e.get("id")
-    }
-    reads: dict[int, dict[str, dict[str, Any]]] = {}
-    for name, inbox, _ in seats:
-        for e in sorted((e for e in inbox if isinstance(e, dict)), key=lambda e: str(e.get("at") or "")):
-            pr = e.get("pr")
-            if not isinstance(pr, int) or isinstance(pr, bool) or e.get("kind") != "ask":
-                continue
-            at = str(e.get("at") or "")
-            if e.get("closed_by"):
-                v = verdicts.get(str(e["closed_by"]))
-                word = f"{STANDING_WORDS[v]} {name}" if v in STANDING_WORDS else f"reviewed by {name}"
-                reads.setdefault(pr, {})[name] = {"at": at, "word": word, "wait": v == "findings"}
-            elif not e.get("closed_reason"):
-                reads.setdefault(pr, {})[name] = {"at": at, "word": f"waiting on {name} · {age(at)}", "wait": True}
-            else:  # the latest ask closed unanswered: what an earlier one came to no longer stands
-                reads.get(pr, {}).pop(name, None)
+def standing(
+    reads: dict[str, Any] | None, names: dict[str, str], age: Callable[[str], str]
+) -> dict[int, dict[str, str]]:
+    """Each open PR's standing with its readers (§4.5 screen 11, §4.9c *What is shown*, TD-704), by number,
+    for the Repo page and `ao repo`: worded from the repo reading's `pr_orders.reads` (§4.4 *The PR's
+    reads*), the value the stage chip reads too. One word per addressee, in the order the asks were sent, a
+    seat by `names` (its record's name), else its id: `open`, *waiting on <name> · <age>*; `answered`, *passed
+    by*, *findings from* or *merged by <name>* by its verdict, *reviewed by <name>* for none; `closed`,
+    nothing. The person's entry reads *waiting on you · <age>* while open and *with you* once answered without
+    `again` while no other entry is newer; otherwise nothing. `cls` is `wait` while the turn is the reader's,
+    the author's or the person's (an open ask, findings, the person's), else `done`."""
     out: dict[int, dict[str, str]] = {}
-    for pr, by in reads.items():
-        if not by:
+    for pr, entries in (reads or {}).items():
+        if not str(pr).isdigit() or not isinstance(entries, list):
             continue
-        parts = sorted(by.values(), key=lambda x: x["at"])
-        cls = "wait" if any(x["wait"] for x in parts) else "done"
-        out[pr] = {"word": " · ".join(x["word"] for x in parts), "cls": cls}
+        rows = sorted((x for x in entries if isinstance(x, dict)), key=lambda x: str(x.get("at") or ""))
+        parts: list[tuple[str, bool]] = []
+        for x in rows:
+            to, at, state = str(x.get("to") or ""), str(x.get("at") or ""), x.get("state")
+            if to == PERSON:
+                if state == "open":
+                    parts.append((f"waiting on you · {age(at)}", True))
+                elif state == "answered" and not x.get("again") and all(str(y.get("at") or "") <= at for y in rows):
+                    parts.append(("with you", True))
+                continue
+            name = names.get(to) or to
+            if state == "open":
+                parts.append((f"waiting on {name} · {age(at)}", True))
+            elif state == "answered":
+                v = x.get("verdict")
+                word = f"{STANDING_WORDS[v]} {name}" if v in STANDING_WORDS else f"reviewed by {name}"
+                parts.append((word, v == "findings"))
+        if parts:
+            cls = "wait" if any(w for _, w in parts) else "done"
+            out[int(pr)] = {"word": " · ".join(w for w, _ in parts), "cls": cls}
     return out
 
 
