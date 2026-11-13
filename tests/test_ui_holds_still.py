@@ -167,6 +167,30 @@ out.join_drawn = rt(up([card("A", { up: 1, ids: ["A"] }), card("B", { up: 1, ids
     ref: start.dataset.ref, fold: fold.dataset.fold, upnext: JSON.parse(root.children[0].dataset.upnext),
     newtop: c.dataset.newtop };
 }
+
+// TD-1784: qRankFrom's own after-anchor and the end of the reading; qModel's folds, nesting, a card twice, Up next
+out.rank_after = AO.qRankFrom(drawn, ["B", "X", "C", "D"], "D", { after: "B" });
+out.rank_end = AO.qRankFrom(drawn, ["B", "C", "D"], "B", { after: "D" });
+const units = (root, id) => AO.qModel(root).cards.get(id).units;
+// an item in the Read fold, a row in the ✓ n done fold, beside a Decide item and a row
+out.model_blocks = units(page([group("in_progress", [h("div", "qcard", { "data-card": "A" }, [
+  h("div", "qhead", { "data-qid": "A" }, [sec("decide", ["m1"]), h("details", "qread", {}, [item("m2")])]),
+  h("div", "qrows", {}, [row("a1"), h("details", "qfold", {}, [row("a2", "archived")])])])])]), "A");
+// a card nested in a card: each keeps its own units
+const nested = page([group("in_progress", [h("div", "qcard", { "data-card": "P" }, [
+  h("div", "qrows", {}, [row("p1"), card("N", { rows: ["n1"] })])])])]);
+out.model_nested = { P: units(nested, "P"), N: units(nested, "N") };
+// a card drawn twice is read once, where it is first
+const twice = AO.qModel(page([group("in_progress", [card("A", { rows: ["a1"] })]),
+  group("up_next", [card("B", { up: 1 }), card("A", { up: 1, rows: ["a9"] })])]));
+out.model_twice = { order: twice.order, group: twice.cards.get("A").group, units: twice.cards.get("A").units };
+// Up next's order, and a damaged one read as empty (the probe's selectors have no `#id`, so `#qcards` matches the
+// copy's first descendant: the element carrying `data-upnext` stays first)
+const withUp = (v) => h("div", "", {}, [h("div", "qcards", { id: "qcards", "data-upnext": v }, []),
+  group("up_next", [card("B", { up: 1 })])]);
+out.model_upnext = AO.qModel(withUp('["B","C"]')).upnext;
+try { out.model_upnext_bad = AO.qModel(withUp("[B,")).upnext; } catch (e) { out.model_upnext_bad = "threw"; }
+
 out.lis = [...AO.qLis([0, 3, 1, 2])].sort();
 out.age = [AO.qAge(12000), AO.qAge(185000), AO.qAge(7300000)];
 console.log(JSON.stringify(out));
@@ -356,6 +380,24 @@ def test_a_retop_is_applied_before_the_hold_in_a_patch():
     assert "while (renamed.has(id)) id = renamed.get(id);" in Q
     r = JS[JS.index("AO.qRetop = function") :]
     assert 'AO.inflight["qcard:" + to] = AO.inflight["qcard:" + from];' in r[: r.index("\n  };\n")]
+
+
+def test_a_drop_after_a_card_keeps_its_anchor_and_the_end_sends_no_next(got):
+    a = got["rank_after"]
+    assert (a["prev"], a["next"]) == ("B", "X") and a["latest"] == ["B", "D", "X", "C"]
+    e = got["rank_end"]
+    assert e["prev"] == "D" and "next" in e and e["next"] is None  # null, never undefined (dropped by JSON)
+
+
+def test_a_model_reads_each_block_and_each_card_once(got):
+    assert got["model_blocks"] == {"decide": ["m:m1"], "read": ["m:m2"], "rows": ["r:a1"], "done": ["r:a2"]}
+    assert got["model_nested"] == {"P": {"rows": ["r:p1"]}, "N": {"rows": ["r:n1"]}}
+    assert got["model_twice"] == {"order": ["A", "B"], "group": "in_progress", "units": {"rows": ["r:a1"]}}
+
+
+def test_a_model_reads_up_next_and_a_damaged_one_as_empty(got):
+    assert got["model_upnext"] == ["B", "C"]
+    assert got["model_upnext_bad"] == []
 
 
 def test_the_helpers(got):
