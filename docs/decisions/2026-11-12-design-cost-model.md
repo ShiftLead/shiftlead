@@ -183,3 +183,58 @@ Applying fixes is 51% of the designer's spend, pooled over the sample. That is a
 is not held on Paul's decision: it is free to start once this entry closes. The three facts above go to TD-1721
 and TD-1722 as notes. Those are the designer's to weigh: the designer is Opus 5.5, the reviewers cost twice as
 much, and the Sonnet saving depends on context size.
+
+## For TD-1721: who reviews, and what the designer carries
+
+Added 2026-11-13 for TD-1721's design (design §4.9c *Who reviews a design's rounds*, *What the designer carries from
+one design to the next*). `tables.py td1721` prints the three tables below; the third reads the findings analysis's
+records and labels at its commit.
+
+**One review, by model**, over the five designs' reviewer subagents (fact-checks and design reviews together for
+Sonnet):
+
+| model | reviews | $ | mean $ | median $ |
+|---|---|---|---|---|
+| Fable | 33 | 118.04 | 3.58 | 3.04 |
+| Opus 5.5 | 3 | 2.82 | 0.94 | 0.95 |
+| Sonnet 5.5 | 98 | 52.99 | 0.54 | 0.45 |
+
+**Design-only findings for each design review, by round**, over the 41 records (a design-only or live-use catch,
+as the analysis labels it; Fable reads first in every round):
+
+| round | Fable reviews | Fable, each | Sonnet reviews | Sonnet, each |
+|---|---|---|---|---|
+| 1 | 41 | 2.12 | 41 | 1.27 |
+| 2 | 40 | 1.25 | 40 | 0.70 |
+| 3 | 35 | 0.66 | 34 | 0.53 |
+| 4 | 26 | 0.77 | 29 | 0.14 |
+| 5 and later | 29 | 1.59 | 36 | 1.28 |
+
+Fable raised 226 such findings, 87 of them in round 1 and 139 after it (3.4 for each design). The rounds past 4 are
+the long designs' (bought rounds and `Hold` revisions), where both reviewers find more again.
+
+**A design's reviewers, three ways**, on the 41 records' review counts for each design (4.17 Fable reviews, 4.39
+Sonnet design reviews, 7.32 fact-checks) at the means above:
+
+| who reviews | $ for each design |
+|---|---|
+| Fable then Sonnet in every round (as run) | 21.25 |
+| Fable in round 1 alone, then Sonnet | 9.90 |
+| Sonnet alone in every round | 6.32 |
+
+The designer's own spend is about $17.76 for each design in the five, so a design costs about $39 as run, about $28
+with Fable in round 1 alone (−29%), and about $24 with Sonnet alone (−38%). These hold the rounds' number fixed; what
+a round without Fable leaves silent, and whether that makes rounds fewer or more, is not measured here.
+
+**The designer, from a fresh run.** A design session's first turn is at a median of about 67k tokens; a fresh run is
+taken to start at 60k. Carrying less shrinks only a turn's cache read; a run ended mid-design pays its reload as a
+cache write:
+
+| the designer's runs | $ | ratio |
+|---|---|---|
+| as run | 88.82 | 1.00 |
+| a fresh run at each design's start | 71.79 | 0.81 |
+| and again past 150k mid-design | 63.21 | 0.71 |
+
+Five of the 17 sessions the five designs ran in, in four of the designs, opened at 236k to 299k, carrying the work
+before.
