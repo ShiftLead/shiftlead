@@ -384,12 +384,25 @@ def _registered_checkout(repo: Any) -> Path | None:
     return Path(real) if real in roots else None
 
 
+def _open_new(path: Path) -> int:
+    """A new `0600` file at `path`, its folder made `0700`, opened for writing. The folder is made again
+    once if it is gone before the open: the retention sweep, in its thread, removes an empty folder of
+    an id its snapshot did not hold, so a session made after the snapshot can lose the folder its first
+    attachment just made (TD-1744); once the file is in it, the folder is no longer empty."""
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    try:
+        return os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileNotFoundError:
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        return os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+
+
 def _write_attachment(where: Path, name: str, raw: bytes) -> Path:
     """`raw` as a new `0600` file in `where` (made `0700`), named by `_place_attachment`."""
     where.mkdir(mode=0o700, parents=True, exist_ok=True)
 
     def write(path: Path) -> None:
-        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        fd = _open_new(path)
         with os.fdopen(fd, "wb") as f:
             f.write(raw)
 
@@ -406,19 +419,8 @@ def _mint_draft() -> str:
 
 
 def _start_part(part: Path, raw: bytes) -> None:
-    """An upload's first piece as its new `0600` `.part` (§4.4 *Attachment drop*, TD-478). The folder is
-    made again once if it is gone before the open: the retention sweep, in its thread, removes an empty
-    folder of an id its snapshot did not hold, so a session made after the snapshot can lose the folder
-    its first upload just made (TD-1744); once the `.part` is in it, the folder is no longer empty."""
-    for again in (False, True):
-        part.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        try:
-            fd = os.open(part, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-            break
-        except FileNotFoundError:
-            if again:
-                raise
-    with os.fdopen(fd, "wb") as f:
+    """An upload's first piece as its new `0600` `.part` (§4.4 *Attachment drop*, TD-478), by `_open_new`."""
+    with os.fdopen(_open_new(part), "wb") as f:
         f.write(raw)
 
 
