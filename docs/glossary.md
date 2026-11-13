@@ -110,7 +110,7 @@ not mix:
   *Not:* workflow, pipeline. — *proposed* 2026-10-04 (Paul; design §4.9c, TD-307).
 - **stage** — one step of a flow: a role, the lane it gives that role's members, and the stage brief
   that tells them the path from that step's side; a team that lists a flow staffs every stage of it.
-  A stage is not a phase (*design · grind · review*, derived from claims) and not a state. —
+  A stage is not a state; its name and colour are the **stage chip** a claim in it shows on *TDs in motion* (design §4.9c *A claim's chip is its stage*). —
   *proposed* 2026-10-04 (design §4.9c).
 - **path set** — a named list of a repo's held paths (`.shiftlead.yml` `held: {<name>: […]}`), which a review stage names as the paths it reads (design §4.9c *A review stage any seat may hold*, TD-314). — *proposed* 2026-10-04.
 - **verdict** — the word on a reader's answer to a held PR's `ask`: `pass`, `merged` or `findings`, a field of the reply and never read from its text (design §4.9c, TD-314). — *proposed* 2026-10-04.

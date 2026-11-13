@@ -587,7 +587,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      waiting claims; `context_sent_at` marks it, and it is sent again after twenty minutes if the
      member is still idle and over. **A waiting claim is not in progress, for this rule and rule 4**
      (TD-820; and for rule 7's boundary, TD-1485; rules 9 and 3, the flow's restart (§4.9c) and §4.10 still count it as in progress):
-     a claim whose PR is open (the claim's `pr` or `review_pr`, TD-814's *review* phase) **and**
+     a claim whose PR is open (the claim's `pr` or `review_pr`, TD-814) **and**
      whose next move is someone else's — the *waiting* reading of §4.2: an open `ask` or `steer` of
      the member's about that reference, or its ask held in a seat's `prs_waiting.asks`. A designer's
      design waiting on its steer's bound or its reader is a waiting claim; a PR whose CI runs or which
