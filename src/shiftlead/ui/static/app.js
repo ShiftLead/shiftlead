@@ -4329,6 +4329,7 @@
     get: (k) => { try { return JSON.parse(sessionStorage.getItem(k) || "null"); } catch (e) { return null; } },
     set: (k, v) => { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private mode: j / k then do nothing */ } },
   };
+  AO.qSess = sess;
   AO.entryUrl = (id, back) => `/inbox/${encodeURIComponent(id)}${back ? `?back=${encodeURIComponent(back)}` : ""}`;
   AO.openEntry = function (id) {
     // the list the row is drawn in: the Inbox's as filtered, or the Queue's cards (TD-771), Back to it
@@ -5048,6 +5049,12 @@
       if (k === from || k.startsWith(from + ":")) d.dataset.fold = to + k.slice(from.length);
     });
     if (AO.foldsRekey) AO.foldsRekey(from, to);
+    // its links to its own page — Open card ›, each preview's sentence and Answer on its card › (TD-1763)
+    const was = "/card/" + encodeURIComponent(from), now = "/card/" + encodeURIComponent(to);
+    [...el.querySelectorAll("a[data-cardhref]")].forEach((a) => {
+      const h = a.getAttribute("href") || "";
+      if (h === was || h.startsWith(was + "?")) a.setAttribute("href", now + h.slice(was.length));
+    });
     const folded = store.get("qfold", []);
     if (folded.includes(from)) store.set("qfold", [...new Set(folded.map((x) => (x === from ? to : x)))]);
     const q = root && root.querySelector("#qcards");
@@ -5910,7 +5917,7 @@
     }
     // ---- the page holds still (§4.5 screen 12 *The page holds still*, TD-1761) ----
     // `reading` is the latest reading (its HTML, parsed, never shown); the lists are the drawn copy
-    let reading = null, readingHtml = "", readAt = 0, lastMove = 0, whole = false;
+    let reading = null, readingHtml = "", readAt = 0, lastMove = 0, whole = false, anchorOn = null;
     const bar = $("#qbar", box), barWords = bar && $(".qbarw", bar), refreshBtn = bar && $("#qrefresh", bar);
     const parse = (html) => { const t = document.createElement("template"); t.innerHTML = html; const d = document.createElement("div"); d.appendChild(t.content); return d; };
     function setUpnext(order) {
@@ -6158,7 +6165,15 @@
       apply();
       wire();
       drawBar(null);  // before the scroll is set: the bar's own height changes with its Refresh
-      if (atTop) window.scrollTo(0, 0);
+      // back from a card's page (‹ Queue, TD-1763): that card at the screen place it had, where it is in the same
+      // group; else the stored place is kept and the nearest card after it takes it
+      const at = anchorOn; anchorOn = null;
+      const at1 = (id) => $(`.qgroup .qcard[data-card="${CSS.escape(id)}"]`, lists);
+      const own = at && at1(at.card), ownG = own && own.closest(".qgroup");
+      const take = at && (own && ownG && ownG.dataset.group === at.group ? own : (at.after || []).map(at1).find(Boolean));
+      if (take) window.scrollBy(0, take.getBoundingClientRect().top - at.top);
+      else if (at) { /* nothing after it is drawn: the scroll stays */ }
+      else if (atTop) window.scrollTo(0, 0);
       else {
         const keep = anchorIds.map((id) => $(`.qcard[data-card="${CSS.escape(id)}"]`, lists)).find(Boolean);
         if (keep) window.scrollBy(0, keep.getBoundingClientRect().top - was.get(keep.dataset.card));
@@ -6243,12 +6258,34 @@
         if (document.hidden || whole) drawWhole({ keepOpen: true }); else patch();
         if (widened || $("#qfindmiss", lists)) apply();  // the window's lines and the find's note shown
       } catch (err) { notLive(); /* the next poll tries again */ } finally {
-        busy = false; whole = false;
+        busy = false; whole = false; anchorOn = null;  // a back-forward anchor is this read's alone (TD-1763)
         // a wider window picked while this read was out: read once more, never again for the same window
         if (read && AO.qWinFetch(loaded(), win) === win) short = win;
         if (read && loading() && loading() !== win) setTimeout(reread, 0);
       }
     }
+    // ‹ Queue (§4.5 screen 12 *The card's page*, TD-1763): before a card's page opens in this tab (no modifier key,
+    // not a middle click) the card and its place on the screen are written to the tab's `sessionStorage`; a
+    // back-forward return reads it, clears it, re-reads and draws whole anchored on that card. A plain load ignores
+    // and clears it; a back-forward return with none (from a Focus, a holder, a message page) draws whole, keeping scroll
+    lists.addEventListener("click", (e) => {
+      const a = e.target.closest && e.target.closest("a[data-cardhref]");
+      if (!a || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      const c = a.closest(".qgroup .qcard[data-card]"), g = c && c.closest(".qgroup");
+      if (!c) return;
+      const cs = drawnCards();
+      AO.qSess.set(CARD_FROM, { card: c.dataset.card, group: g ? g.dataset.group : "", top: c.getBoundingClientRect().top,
+        after: cs.slice(cs.indexOf(c) + 1, cs.indexOf(c) + 41).map((x) => x.dataset.card) });
+    });
+    window.addEventListener("pageshow", (e) => {
+      const nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
+      const o = AO.qSess.get(CARD_FROM);
+      AO.qSess.set(CARD_FROM, null);
+      if (!(e.persisted || (nav && nav.type === "back_forward"))) return;
+      anchorOn = o && o.card ? o : null;
+      whole = true;
+      reread();
+    });
     // returning to the tab re-reads at once and draws whole, unless a hold began before the reading arrived
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) { pointerOn = ""; touchOn = ""; return; }

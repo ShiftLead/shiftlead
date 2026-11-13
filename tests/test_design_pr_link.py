@@ -212,9 +212,11 @@ def test_the_card_and_the_inbox_row_draw_it(tmp_path, monkeypatch):
     ]
     c = client(monkeypatch, tmp_path, fake(q, entries))
     html = c.get("/queue").text
-    card20 = html[html.index('data-card="s#TD-20"') : html.index('data-card="s#TD-30"')]
+    assert 'class="st designpr"' not in html  # the Queue's previews draw no item's link (TD-1763)
+    html = c.get("/card/s%23TD-20").text  # …the card's page draws it
+    card20 = html[html.index('data-card="s#TD-20"') :]
     assert 'class="st designpr"' in card20 and "· design #12</span>" in card20
-    assert html.count('class="st designpr"') == 1  # the item about other#TD-9 links nothing
+    assert html.count('class="st designpr"') == 1  # once, on its item
     # with no origin the number is bare; an Inbox row draws the same words
     inbox = c.get("/inbox").text
     fyi = inbox[inbox.index('id="sec-fyi"') :]

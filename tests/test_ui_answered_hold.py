@@ -260,7 +260,8 @@ def test_the_queue_cards_item_reads_answered(tmp_path, monkeypatch):
     top = {"qid": q, "id": "TD-60", "repo": "r", "title": "held", "priority": "Medium", "needs": "decision",
            "state": WORD, "with_you": None, "answered": {"mid": "m-1", "asker": "ao-r-designer"}}  # fmt: skip
     card = {"id": q, "group": "up_next", "status": "", "top": top, "rows": [], "order": [q], "start": q}
-    html = _route_client(tmp_path, monkeypatch, queue={"at": NOW.isoformat(), "cards": [card]}).get("/queue").text
+    c = _route_client(tmp_path, monkeypatch, queue={"at": NOW.isoformat(), "cards": [card]})
+    html = c.get("/card/r%23TD-060").text  # drawn whole on the card's page (TD-1763)
     item = html[html.index(f'data-card="{q}"') :]
     assert "you answered · in designer's ask" in item, "the card's item is the answered row, from card_mail"
 

@@ -217,6 +217,15 @@ def card_whole(mode: Any, e: Any) -> bool:
 templates.env.globals["card_whole"] = card_whole
 
 
+def card_path(cid: Any) -> str:
+    """A card's page (§4.5 screen 12 *The card's page*, *Addresses*): `/card/<card id>`, the id percent-encoded whole
+    — a card's id carries a `#`, a loose card's a `:` too — as `notify.queue_path` writes it (TD-1763)."""
+    return "/card/" + quote(str(cid or ""), safe="")
+
+
+templates.env.globals["card_path"] = card_path
+
+
 def md(text: Any, origin: Any = None, *, inline: bool = False, links: bool = True) -> Markup:
     """Text from the closed markdown subset as `shaped` renders it, unsplit — a board row's halves
     and its replies (§4.5a *Inbox board row: text*, TD-279), already cut where they are drawn.

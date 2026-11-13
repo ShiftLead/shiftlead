@@ -156,7 +156,9 @@ def test_the_kept_cards_items_draw_start_session_and_its_header_none(tmp_path, m
     from test_ui_queue import mail, queue
 
     asks = [mail("m-1", "merge #13?", about="TD-3"), mail("m-2", "and the docs?", about="TD-3")][:n]
-    html = client(monkeypatch, tmp_path, fake(queue(), asks)).get("/queue").text
+    c = client(monkeypatch, tmp_path, fake(queue(), asks))
+    assert "qistart" not in c.get("/queue").text  # on the card's own page (TD-1763)
+    html = c.get("/card/s%23TD-3").text
     i = html.index('data-card="s#TD-3"')
     card = html[i : html.index("</article>", i)] if "</article>" in html[i:] else html[i:]
     first = card.index('class="btn sm qstart qistart"')
