@@ -10,6 +10,7 @@ People: paul
 
 ## Needs the user
 
+- [ ] watch 2026-11-13 (n/a) — Once #3689 is live, read a team card's TDs in motion on the live Sessions page (headless GET): a claim whose PR has an open ask at the techlead reads a REVIEW chip, and one whose PR nobody has asked reads its holder's BUILD or DESIGN; close with what was read, or ledger what is wrong. Context: none. Due: 2026-11-15.
 - [ ] decide 2026-11-13 (n/a) — Mark TD-704's design (the TDs in motion chip reads the claim's flow stage) as go, so it closes with its build TD-1765? Context: TD-704 decision (paul). Due: 2026-11-13. Answers: Go (default) | Hold.
   - **Context:** You answered go ahead on 2026-11-13 to a board line about TD-704 (board:10276598), but that line named no gate, so the press could not lift TD-704's decision (paul) gate, and an unattended session is refused the lift. The design merged in #3676; its build TD-1765 has slices 1 and 2 merged (#3687, #3688) and slice 3 open as #3689.
   - **Question:** Lift TD-704's design gate (Go), or keep it held?
