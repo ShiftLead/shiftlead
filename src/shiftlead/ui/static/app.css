@@ -1505,3 +1505,12 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
 .qgone { opacity: .7; }
 .qgonew { visibility: visible; margin-right: 8px; color: var(--muted); font-style: italic; }
 .qheaddone > .qmain > .qright button, .qheaddone > .qmain > .qright details.qdots, .qheaddone > .qmain > .qright details.more { visibility: hidden; }
+
+/* A card's page (design §4.5 screen 12 *The card's page*, §4.5a *Card page*; TD-1762): its line, then the one card;
+   the Queue's own move controls are not drawn here */
+.cardpage .cardline { align-items: baseline; margin: 4px 0 2px; }
+.cardpage .cardback { font-weight: 600; }
+.cardpage .cardlive { color: var(--working-fg); }
+.cardpage .qmoves { display: none; }
+.cardpage .qgrip { visibility: hidden; }  /* its grid column kept: the header's place and words stay where they are */
+.cardpage .qgroup { border: 0; padding: 0; }

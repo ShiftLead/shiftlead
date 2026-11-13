@@ -260,8 +260,8 @@ async def test_an_ask_and_an_alarm_are_told_and_a_steer_is_not(agent, sent, tmp_
 
 async def test_a_question_on_an_open_card_is_linked_to_its_card(agent, sent, tmp_path):
     """§4.10 *What a message says* (TD-795): a question whose item is drawn on the Queue — its `about` an
-    entry an open card holds — is linked to that card, `/queue?card=…&row=…&item=…`; one about an id found nowhere
-    to its loose card, `/queue?card=loose%3A…&item=…` with no `row=` (TD-1468)."""
+    entry an open card holds — is linked to that card, `/card/…?row=…&item=…`; one about an id found nowhere
+    to its loose card, `/card/loose%3A…?item=…` with no `row=` (TD-1468)."""
     _on()
     t0 = datetime.now(UTC)
     s = _session(agent, tmp_path, state="idle", since=_z(t0), repo=str(tmp_path / "s"))
@@ -275,9 +275,9 @@ async def test_a_question_on_an_open_card_is_linked_to_its_card(agent, sent, tmp
         await _pass(agent, t0 + timedelta(seconds=61))
         links = sorted(t.split("\n")[1] for _, t in sent)
         assert links == [
-            "http://kmaster:8765/queue?card=loose%3As%23TD-099&item=m-c3",
-            "http://kmaster:8765/queue?card=s%23TD-020&row=s%23TD-020&item=m-c2",
-            "http://kmaster:8765/queue?card=s%23TD-020&row=s%23TD-021&item=m-c1",
+            "http://kmaster:8765/card/loose%3As%23TD-099?item=m-c3",
+            "http://kmaster:8765/card/s%23TD-020?row=s%23TD-020&item=m-c2",
+            "http://kmaster:8765/card/s%23TD-020?row=s%23TD-021&item=m-c1",
         ]
     finally:
         agent._queue = None
@@ -305,9 +305,9 @@ async def test_a_questions_bare_ref_is_its_askers_repos_on_telegram(agent, sent,
         await _pass(agent, t0 + timedelta(seconds=61))
         links = sorted(t.split("\n")[1] for _, t in sent)
         assert links == [  # a's on its loose card, never b's (TD-1468)
+            "http://kmaster:8765/card/b%23TD-051?row=b%23TD-051&item=m-r2",
+            "http://kmaster:8765/card/loose%3Aa%23TD-051?item=m-r1",
             "http://kmaster:8765/inbox/m-r3",
-            "http://kmaster:8765/queue?card=b%23TD-051&row=b%23TD-051&item=m-r2",
-            "http://kmaster:8765/queue?card=loose%3Aa%23TD-051&item=m-r1",
         ]
     finally:
         agent._queue = None
@@ -348,9 +348,9 @@ async def test_a_blocked_outcome_on_an_open_card_is_linked_to_it_and_a_reviewers
         await _pass(agent, t0 + timedelta(seconds=61))
         links = sorted(t.split("\n")[1] for _, t in sent)
         assert links == [
+            "http://kmaster:8765/card/s%23TD-020?row=s%23TD-020&item=m-b3",
+            "http://kmaster:8765/card/s%23TD-020?row=s%23TD-021&item=m-b1",
             "http://kmaster:8765/inbox/m-b2",
-            "http://kmaster:8765/queue?card=s%23TD-020&row=s%23TD-020&item=m-b3",
-            "http://kmaster:8765/queue?card=s%23TD-020&row=s%23TD-021&item=m-b1",
         ]
     finally:
         agent._queue = None
@@ -680,8 +680,8 @@ async def test_a_stopped_holders_row_is_linked_to_its_card(agent, sent, tmp_path
         await _pass(agent, t0 + timedelta(seconds=61))
         links = sorted(t.split("\n")[1] for _, t in sent)
         assert links == [
+            "http://kmaster:8765/card/s%23TD-020?row=s%23TD-021&item=ao-x-w%3Apermission",
             "http://kmaster:8765/inbox?row=ao-x-o%7Cquestion",
-            "http://kmaster:8765/queue?card=s%23TD-020&row=s%23TD-021&item=ao-x-w%3Apermission",
         ]
     finally:
         agent._queue = None

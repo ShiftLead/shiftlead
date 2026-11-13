@@ -1,0 +1,8 @@
+{#- a card's page's line after ‹ Queue (§4.5a *Card page*): its group, its place as Up next numbers it, its repo and
+    team — each only where it has one #}
+{%- set parts = [] %}
+{%- if group_word %}{% set _ = parts.append(group_word) %}{% endif %}
+{%- if c and c.group == 'up_next' %}{% set p = (c.places or [])[0].n if c.places else c.place %}{% if p %}{% set _ = parts.append(p | string) %}{% endif %}{% endif %}
+{%- if repo %}{% set _ = parts.append(repo) %}{% endif %}
+{%- if team %}{% set _ = parts.append(team) %}{% endif %}
+{%- for x in parts %} · <span class="cw{{ loop.index }}">{{ x }}</span>{% endfor %}
