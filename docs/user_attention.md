@@ -10,7 +10,7 @@ People: paul
 
 ## Needs the user
 
-- [ ] act 2026-11-12 (n/a) — Log in again on the conformance profile, so TD-1648's seat smoke can run there: run CLAUDE_CONFIG_DIR=~/.claude-conformance claude in a scratch directory, /login, then /exit — only you can do this. Context: none. Due: 2026-11-13.
+- [x] act 2026-11-12 (n/a) — Log in again on the conformance profile, so TD-1648's seat smoke can run there: run CLAUDE_CONFIG_DIR=~/.claude-conformance claude in a scratch directory, /login, then /exit — only you can do this. Context: none. Due: 2026-11-13. Closed: 2026-11-12 — Paul did it on 2026-11-12 (told the led-tds session); the item drew nowhere in the UI, so the session closed it for him.
   - **Context:** Only Paul can sign in an account. The seat smoke on 2026-11-13 00:35Z read Login expired on that profile and timed out; TD-1648 waits until 2026-11-14 for the next run.
 - [ ] decide 2026-11-06 (n/a) — Run ao td add --repo shiftlead from a shell on the contractmatch node: does it print a message id (look m-54bb05fa8c71)? Context: TD-1404 decision (paul). Due: 2026-11-10. Answers: Works | Not right: <what it printed>. Lifts: Works | Not right: <what it printed>.
   - **Context:** TD-1404 is the live check of #2977: a person shell on a node hands an entry into another repo by name, resolved at the home. Only a real node shell shows it, and a session never presses it.
