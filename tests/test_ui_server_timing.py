@@ -194,8 +194,9 @@ def test_settings_refused_by_the_agent_still_draws_its_files_with_the_words(tmp_
 
 
 def test_the_repo_page_reads_at_once_names_its_steps_and_reads_each_once(tmp_path, monkeypatch):
-    """TD-893: the Repo page's reads that wait on none of each other are made at once, every seat's two
-    inbox reads among them; the top bar's chips take the route's own `list`, `usage`, `gate` and `host`;
+    """TD-893: the Repo page's reads that wait on none of each other are made at once — no seat's mail among
+    them since the standing is the reading's `pr_orders.reads` (TD-704); the top bar's chips take the route's
+    own `list`, `usage`, `gate` and `host`;
     the definitions are read once, for the page and its flows; and its own work is in named steps
     (`files`, `flows`, `views`, `groups`, `lists`), so nothing it waits on is in no step."""
     import asyncio
@@ -237,8 +238,9 @@ def test_the_repo_page_reads_at_once_names_its_steps_and_reads_each_once(tmp_pat
     r = c.get("/repo/samscrape")
     assert r.status_code == 200
     assert all(calls.count(m) == 1 for m in ("list", "host", "usage", "gate", "queue")), calls
-    # two seats, two reads each, at once; and the person inbox once, for For you's held rows (TD-1331)
-    assert calls.count("inbox") == 5 and live["inbox_most"] == 4
+    # no seat's mail is read (the standing is `pr_orders.reads`, TD-704); the person inbox once, for For you's
+    # held rows (TD-1331)
+    assert calls.count("inbox") == 1 and live["inbox_most"] == 0
     assert live["most"] >= 5  # the fleet, the home, the cards, the chip's two: in flight together
     assert len(reads) == 1  # the definitions, once: the page's and its flows'
     steps = _steps(r.headers["server-timing"])

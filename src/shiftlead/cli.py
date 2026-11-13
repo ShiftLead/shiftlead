@@ -1766,24 +1766,15 @@ def _board_due(r: dict[str, Any]) -> dict[str, Any]:
     return {"items": items, **({"error": str(got["error"])} if got.get("error") else {})}
 
 
-def _pr_standing(members: list[dict[str, Any]]) -> dict[str, str]:
-    """Each PR's standing with the servicing team's readers (§4.9c *What is shown*), by number: from
-    every seat's inbox entries carrying a `pr` and its sent replies' verdicts (`review.standing`, the
-    page's words). A session's `ao repo` may not read another's mail, so from a session this is
-    empty — the page's read is a person's."""
+def _pr_standing(r: dict[str, Any], fleet: list[dict[str, Any]]) -> dict[str, str]:
+    """Each PR's standing with its readers (§4.9c *What is shown*, TD-704), by number: the repo reading's
+    `pr_orders.reads` worded by `review.standing`, the page's words — the reading is the home's, so a
+    session's `ao repo` prints it as the page does."""
     from shiftlead import review as reviewmod
 
-    seats: list[tuple[str, list[Any], list[Any]]] = []
-    for m in members:
-        if not (m.get("seat") or m.get("role") == "techlead"):
-            continue
-        try:
-            inbox = (call_sync("inbox", id=m["id"]) or {}).get("entries") or []
-            sent = (call_sync("inbox", id=m["id"], sent=True) or {}).get("entries") or []
-        except AgentError:
-            continue
-        seats.append((str(m.get("name") or m["id"]), inbox, sent))
-    return {str(pr): st["word"] for pr, st in reviewmod.standing(seats, _age).items()}
+    names = {str(s.get("id")): str(s.get("name") or s.get("id")) for s in fleet if s.get("id")}
+    reads = (r.get("pr_orders") or {}).get("reads")
+    return {str(pr): st["word"] for pr, st in reviewmod.standing(reads, names, _age).items()}
 
 
 def _org_order(names: set[str], members: list[dict[str, Any]]) -> list[str]:
@@ -2040,7 +2031,7 @@ def cmd_repo(args: argparse.Namespace) -> int:
                 for p in s.get("progress") or []
                 if isinstance(p, dict) and p.get("status") == "claimed"
             ]
-            r["standing"] = _pr_standing(members)
+            r["standing"] = _pr_standing(r, fleet)
             # a held PR nobody asked, the reading's tag (§4.4 *A held PR nobody asked is marked, never ordered*, TD-790)
             by_team = [[s for s in members if s["team"] == t] for t in teams]
             asked = (r.get("pr_orders") or {}).get("asked") or {}

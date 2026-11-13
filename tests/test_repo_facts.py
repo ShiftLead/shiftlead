@@ -484,7 +484,11 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
         {"id": "tl", "team": "t", "repo": str(repo), "state": "exited", "role": "techlead"},
         {"id": "x", "team": "u", "repo": "/elsewhere"},
     ]
-    inbox = {"entries": [{"kind": "ask", "pr": 9, "at": (now - timedelta(minutes=40)).isoformat()}]}
+    # the standing is the reading's `pr_orders.reads` (TD-704): an exited seat's open ask still reads
+    at = (now - timedelta(minutes=40)).isoformat()
+    reading[str(repo)]["pr_orders"] = {
+        "reads": {"9": [{"id": "m-1", "to": "tl", "at": at, "state": "open", "verdict": "", "again": False}]}
+    }
     # the board is the host agent's reading (§4.4 *The boards*, TD-615): `ao repo` runs no reader,
     # and prints the items due now with their ids
     due = {"text": "decide TD-283", "due_tag": "3d overdue", "overdue_days": 3, "key": "board:0123abcd"}
@@ -500,7 +504,7 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     monkeypatch.setattr(
         cli,
         "call_sync",
-        lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": log, "queue": {}, "inbox": inbox}[rpc],
+        lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": log, "queue": {}}[rpc],
     )
     monkeypatch.chdir(repo)
     assert cli.main(["repo"]) == 0

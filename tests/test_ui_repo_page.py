@@ -117,21 +117,21 @@ def test_the_repo_page_draws_the_facets_and_the_four_lists(tmp_path, monkeypatch
             {"id": "techlead-1", "text": "read #805", "at": _iso(NOW)},
         ]
     }
-    # the standing ages against the clock when the page renders, not the module's import time
-    inbox = {
-        "techlead-1": {
-            "entries": [
-                {"kind": "ask", "pr": 811, "at": _iso(datetime.now(UTC) - timedelta(minutes=40))},
-                {"kind": "ask", "pr": 805, "at": _iso(NOW), "closed_by": "m-1"},
-            ]
-        },
-        "techlead-1/sent": {"entries": [{"id": "m-1", "kind": "reply", "verdict": "pass"}]},
-        "ui-reader-1": {
-            "entries": [{"kind": "ask", "pr": 811, "at": _iso(NOW - timedelta(hours=1)), "closed_by": "m-2"}]
-        },
-        "ui-reader-1/sent": {"entries": [{"id": "m-2", "kind": "reply", "verdict": "pass"}]},
-    }
-    c = client(monkeypatch, tmp_path, fake({root: reading(root)}, fleet, doing, inbox))
+    # the standing is the reading's `pr_orders.reads` (TD-704), aged against the clock when the page renders
+    r = reading(root)
+    r["pr_orders"] = {
+        "reads": {
+            "811": [
+                {"id": "m-a", "to": "ui-reader-1", "at": _iso(NOW - timedelta(hours=1)), "state": "answered",
+                 "verdict": "pass", "again": False},
+                {"id": "m-b", "to": "techlead-1", "at": _iso(datetime.now(UTC) - timedelta(minutes=40)),
+                 "state": "open", "verdict": "", "again": False},
+            ],
+            "805": [{"id": "m-c", "to": "techlead-1", "at": _iso(NOW), "state": "answered", "verdict": "pass",
+                     "again": False}],
+        }
+    }  # fmt: skip
+    c = client(monkeypatch, tmp_path, fake({root: r}, fleet, doing))
     html = c.get("/repo/samscrape").text
     assert 'class="tsum"' in html and "Technical debt (7 open)" in html  # the team's facets
     # Review (the board's, TD-903): newest last, the author the member whose branch it is, draft, the standing
@@ -174,17 +174,8 @@ def test_the_ledger_lists_sort_by_priority_then_id_and_the_chips_count():
     assert lists["design"]["rows"] == []
     rows = [{"name": "a"}, {"name": "b"}, {"name": "a"}]
     assert [(c["label"], c["n"]) for c in doing_chips(rows)] == [("all", 3), ("a", 2), ("b", 1)]
-    got = pr_standing(
-        [
-            (
-                "tl",
-                [{"kind": "ask", "pr": 5, "at": _iso(NOW), "closed_reason": "expired"}, {"kind": "note", "pr": 6}],
-                [],
-            )
-        ],
-        NOW,
-    )
-    assert got == {}  # an expired ask stands for nothing; a note is not a request for review
+    got = pr_standing({"5": [{"id": "m", "to": "tl", "at": _iso(NOW), "state": "closed"}]}, {}, NOW)
+    assert got == {}  # an ask closed unanswered stands for nothing
 
 
 def test_a_team_given_the_repo_with_nothing_live_keeps_its_facets(tmp_path, monkeypatch):

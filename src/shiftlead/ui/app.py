@@ -2044,18 +2044,10 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         members = [m for g in serving for m in g["members"]]
         motion = [x for g in serving for x in (g.get("summary") or {}).get("motion") or []]
         facet = next((g.get("facet") for g in items if g["kind"] == "repo"), None)
-        # every seat's inbox and sent mail, read as a person's read (§4.9c *What is shown*): a seat by
-        # the definitions or its record, running or not — a view's `seat` is only an empty one's
-        seat_ids = {*seats, *(str(s.get("id")) for s in sessions if s.get("seat"))}
-        readers = [m for m in members if m["id"] in seat_ids or str(m.get("role") or "") == "techlead"]
-        mail = await asyncio.gather(  # each seat's two reads, every seat at once
-            *(call("inbox", id=m["id"], **sent) for m in readers for sent in ({}, {"sent": True})),
-            return_exceptions=True,
-        )
-        # an older home or a failed read: the asks still say who waits
-        entries = [x.get("entries") or [] if isinstance(x, dict) else [] for x in mail]
-        reads = [(str(m.get("name") or m["id"]), entries[2 * k], entries[2 * k + 1]) for k, m in enumerate(readers)]
-        standing = pr_standing(reads, now)
+        # the PR standing from the reading's `pr_orders.reads` (§4.9c *What is shown*, TD-704), a seat named by
+        # its record's name, else its id — no seat's mail is read here
+        names = {str(s.get("id")): str(s.get("name") or s.get("id")) for s in sessions if s.get("id")}
+        standing = pr_standing((r.get("pr_orders") or {}).get("reads"), names, now)
         rel = (r.get("ledger") or {}).get("path") or ""
         ledger_file = str(Path(str(r.get("root") or "")) / rel) if rel else ""
         # (3) Waiting on you: the Inbox's horizon cut to the repo — due rows, coming up, the fold, the line (TD-220)

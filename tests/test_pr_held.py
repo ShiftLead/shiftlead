@@ -161,42 +161,38 @@ def test_the_walk_says_whose_turn_it_is(monkeypatch, capsys):
 
 
 def test_the_standing_names_each_reader_and_says_its_verdict():
-    """TD-315 slice 5b (design §4.9c *What is shown*): the PR standing over every seat — each seat's
-    latest ask for a number, by its reply's verdict, in the order the asks were sent."""
+    """TD-315 slice 5b, TD-704 (design §4.9c *What is shown*): the PR standing worded from
+    `pr_orders.reads` — one word per addressee, by its state and verdict, in the order the asks were
+    sent, a seat by its record's name; the person's entry *waiting on you* and *with you*."""
 
-    def ask(pr, at, **kw):
-        return {"kind": "ask", "pr": pr, "at": f"2026-10-05T{at}:00+00:00", **kw}
+    def e(to, at, state, verdict="", again=False):
+        return {"id": f"m-{to}-{at}", "to": to, "at": f"2026-10-05T{at}:00+00:00", "state": state,
+                "verdict": verdict, "again": again}  # fmt: skip
 
-    ui = (
-        "ui-reader-ao-1",
-        [ask(7, "10:00", closed_by="r1"), ask(8, "10:00", closed_by="r2"), {"kind": "note", "pr": 9}],
-        [{"id": "r1", "kind": "reply", "verdict": "pass"}, {"id": "r2", "kind": "reply", "verdict": "pass"}],
-    )
-    tl = (
-        "techlead-ao-1",
-        [
-            ask(7, "11:00"),
-            ask(8, "11:00", closed_by="r3"),
-            ask(8, "12:00", closed_by="r4"),  # asked again on findings: the latest ask wins
-            ask(10, "11:00", closed_by="r5"),
-            ask(11, "11:00", closed_by="p1"),  # the person's word past the bound: no verdict
-            ask(12, "11:00", closed_reason="expired"),  # closed unanswered: stands for nothing
-            ask(10, "10:00", closed_by="r5"),
-            ask(13, "10:00", closed_by="r5"),
-            ask(13, "11:00", closed_reason="expired"),  # the latest closed unanswered: the earlier word goes
-        ],
-        [
-            {"id": "r3", "kind": "reply", "verdict": "findings"},
-            {"id": "r4", "kind": "reply", "verdict": "merged"},
-            {"id": "r5", "kind": "reply", "verdict": "findings"},
-        ],
-    )
-    got = reviewmod.standing([tl, ui], lambda at: "40m")
+    ui, tl = "ao-x-ui-reader-ao-1", "ao-x-techlead-ao-1"
+    names = {ui: "ui-reader-ao-1", tl: "techlead-ao-1"}
+    reads = {
+        "7": [e(ui, "10:00", "answered", "pass"), e(tl, "11:00", "open")],
+        "8": [e(ui, "10:00", "answered", "pass"), e(tl, "12:00", "answered", "merged")],
+        "10": [e(tl, "11:00", "answered", "findings")],
+        "11": [e(tl, "11:00", "answered")],  # the person's word past the bound: no verdict
+        "12": [e(tl, "11:00", "closed")],  # closed unanswered: stands for nothing
+        "14": [e("ao-gone", "11:00", "open")],  # a seat with no record: by its id
+        "20": [e(tl, "10:00", "closed"), e("person", "11:00", "open")],
+        "21": [e(tl, "10:00", "closed"), e("person", "11:00", "answered")],
+        "22": [e("person", "10:00", "answered", again=True), e(tl, "11:00", "open")],
+        "23": [e("person", "10:00", "answered"), e(tl, "11:00", "open")],  # a newer ask to a seat
+    }
+    got = reviewmod.standing(reads, names, lambda at: "40m")
     assert got[7] == {"word": "passed by ui-reader-ao-1 · waiting on techlead-ao-1 · 40m", "cls": "wait"}
     assert got[8] == {"word": "passed by ui-reader-ao-1 · merged by techlead-ao-1", "cls": "done"}
     assert got[10] == {"word": "findings from techlead-ao-1", "cls": "wait"}
     assert got[11] == {"word": "reviewed by techlead-ao-1", "cls": "done"}
-    assert 9 not in got and 12 not in got and 13 not in got
+    assert got[14]["word"] == "waiting on ao-gone · 40m"
+    assert got[20] == {"word": "waiting on you · 40m", "cls": "wait"}
+    assert got[21] == {"word": "with you", "cls": "wait"}
+    assert got[22] == got[23] == {"word": "waiting on techlead-ao-1 · 40m", "cls": "wait"}
+    assert 12 not in got and reviewmod.standing(None, names, lambda at: "") == {}
 
 
 def test_a_github_origin_makes_a_pr_link_and_anything_else_draws_it_bare(monkeypatch):

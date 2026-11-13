@@ -379,11 +379,11 @@ def send_folds(
     return win
 
 
-def pr_standing(seats: list[tuple[str, list[Any], list[Any]]], now: datetime) -> dict[int, dict[str, Any]]:
-    """Each PR's standing with the team's readers (§4.5 screen 11, §4.9c *What is shown*): `seats`
-    one `(name, inbox, sent)` per seat of the team, read as a person's read — `review.standing`,
-    the words `ao repo` prints too, aged against `now`."""
-    return review.standing(seats, lambda at: _age(at, now))
+def pr_standing(reads: dict[str, Any] | None, names: dict[str, str], now: datetime) -> dict[int, dict[str, Any]]:
+    """Each PR's standing with its readers (§4.5 screen 11, §4.9c *What is shown*, TD-704): the repo
+    reading's `pr_orders.reads` worded by `review.standing`, the words `ao repo` prints too, a seat
+    named by `names`, aged against `now`."""
+    return review.standing(reads, names, lambda at: _age(at, now))
 
 
 def ledger_lists(
