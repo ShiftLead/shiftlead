@@ -227,6 +227,14 @@ agent and no checkout of this repo, so it works inside a container node too. Tha
 this section is the pointer (TD-067). `ao --skill` is the other document and answers the other
 question: how to behave *inside* a session, once one is running.
 
+## Review seats' transcripts for friction
+
+`ao feedback --skill` prints `/shiftlead-feedback`, the procedure a person runs from a session they drive: it
+reads chosen seats' transcripts over a window through `ao feedback digest`, finds where shiftlead, the cadence
+or ledgerboard got in their way, files what is new to shiftlead's ledger, and lists for the person what is new
+to another repo's (design §4.7 *Feedback*). Like `ao team --skill`, it needs no host agent; that is the
+source, and the repo's `/shiftlead-feedback` skill points at it.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

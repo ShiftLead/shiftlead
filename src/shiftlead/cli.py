@@ -5306,6 +5306,25 @@ def team_skill_text() -> str:
     return resources.files("shiftlead").joinpath("team_skill.md").read_text(encoding="utf-8")
 
 
+def feedback_skill_text() -> str:
+    """`ao feedback --skill` (design §4.7 *Feedback*, TD-1717): the `/shiftlead-feedback` procedure. It lives in
+    the package beside `skill.md`, so it prints wherever `ao` runs with no host agent; the repo's skill
+    points here, and there is no copy under `docs/`."""
+    return resources.files("shiftlead").joinpath("feedback.md").read_text(encoding="utf-8")
+
+
+class _FeedbackSkillAction(argparse.Action):
+    """`ao feedback --skill`: prints and exits during parsing, before `feedback`'s required subcommand is
+    demanded, as `ao team --skill` does."""
+
+    def __init__(self, option_strings, dest, **kw):  # noqa: ANN001
+        super().__init__(option_strings, dest, nargs=0, **kw)
+
+    def __call__(self, parser, namespace, values, option_string=None):  # noqa: ANN001
+        print(feedback_skill_text(), end="")
+        parser.exit(0)
+
+
 class _SkillAction(argparse.Action):
     def __init__(self, option_strings, dest, **kw):  # noqa: ANN001 — argparse's Action signature
         super().__init__(option_strings, dest, nargs=0, **kw)
@@ -5721,6 +5740,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_transcript)
 
     p = add("feedback", help="seats' transcripts over a window, condensed for a review of friction (§4.7 Feedback)")
+    p.add_argument(
+        "--skill",
+        action=_FeedbackSkillAction,
+        help="print the /shiftlead-feedback procedure (Markdown) — and exit, without an agent",
+    )
     fsub = p.add_subparsers(dest="action", required=True)
     q = fsub.add_parser("digest", help="condense each seat's conversations over a window into parts and an index")
     q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the index as JSON")
