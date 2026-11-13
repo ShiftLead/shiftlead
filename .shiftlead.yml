@@ -73,6 +73,9 @@ teams:
 roles:
   designer:
     brief: docs/briefs/designer-ao-1.md
+    # a 150k bound, so each design starts in a fresh run: Paul's answer to TD-1721 (2026-11-13; design §4.9c
+    # *What the designer carries from one design to the next*), at the designer's next start
+    context: {bound: 150k}
   # a 200k bound on the grinders, measured: two trial weeks (2026-10-09 to 10-23) cost 5-7% less per
   # merged PR than the week before (TD-460; docs/decisions/2026-10-08-prompt-cache.md, Consequences)
   grinder:
