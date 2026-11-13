@@ -941,6 +941,12 @@ class TickMixin:
                     log.info("%s reached its run_until on a pending %s; stopping it", s.id, s.pending.kind)
                     await self.rpc_kill(s.id, killer={"by": "tick", "why": "stop time"})
                     continue
+                if self._brief_holds(s):
+                    # it never began its work: nothing to wrap up, and no line goes before its brief
+                    # (§4.3 *No send until it is in*, TD-1637)
+                    log.info("%s reached its run_until before its brief went in; stopping it", s.id)
+                    await self.rpc_kill(s.id, killer={"by": "tick", "why": "stop time"})
+                    continue
                 if not s.wrapup_prompt:
                     # Nothing to say, so say nothing and stop it: a stop time with no wrap-up text is
                     # still a stop time, and silently running past it is the failure this fixes.
@@ -1023,7 +1029,10 @@ class TickMixin:
                     s.gated = mark
                     self.store.save(s)
                     changed = True
-                if not s.gated.get("sent_at") and s.pause_prompt and not self._on_a_dialog(s):
+                # the pause line waits for the brief (§4.3 *No send until it is in*): `sent_at` stays unset,
+                # so it is tried again once the brief is in, and a gate that ends first sends no line
+                pause_due = not s.gated.get("sent_at") and s.pause_prompt and not self._brief_holds(s)
+                if pause_due and not self._on_a_dialog(s):
                     try:
                         await self._submit(s.id, adapters.get(s.adapter), s.pause_prompt)
                     except Exception:  # noqa: BLE001 — retried on the next tick (§6)
@@ -3771,6 +3780,8 @@ class TickMixin:
         adapter = adapters.get(s.adapter)
         if not adapters.has_agent(s.adapter):
             return False  # a policy's line typed into a shell runs as a command line (§4.3)
+        if self._brief_holds(s):
+            return False  # it waits for the brief, as the doorbell does (§4.3 *No send until it is in*)
         if getattr(adapter, "composer", None) is None or self._on_a_dialog(s):
             return False
         typing = self._typing[s.id]

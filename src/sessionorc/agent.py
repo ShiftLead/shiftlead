@@ -3353,6 +3353,11 @@ class HostAgent(
             if first is not None:
                 return await first
         self._refuse_gone(s)
+        if wrapup and s.state != "scheduled" and self._brief_holds(s):
+            # a session whose brief (and the start hooks' text riding it) is not in never began its work:
+            # a wrap-up stops it, as a stop time does one with no wrap-up prompt, the press's own kill
+            # (§4.3 *No send until it is in*, TD-1637) — before a dialog's refusal and before any stamp
+            return await self.rpc_kill(id, caller=caller)
         if s.pending and s.pending.pane_held:
             # a subagent's dialog is not drawn while the hook blocks (§4.2 *A subagent's dialog is held
             # back*, TD-950): the buttons are its one channel until the deadline, never the terminal
@@ -3363,6 +3368,8 @@ class HostAgent(
             raise RpcError(f"{id} has a pending {s.pending.kind}; answer it in the terminal")
         if wrapup and not adapters.has_agent(s.adapter):
             raise RpcError(f"{s.name}: a shell runs no turns: there is nothing to wrap up — Close it (design §4.3)")
+        if self._brief_holds(s):
+            raise RpcError(self._brief_not_in(s))  # before any stamp or record: a refused send leaves no trace
         s.wrapup_at = now_iso() if wrapup else None
         s.wrapup_by = closer_of(caller, None, "")["by"] if wrapup else None  # who stopped it (§6 rule 8, TD-781)
         entry = self._record_send(s, caller, text, key=str(key) if key else None)
@@ -3578,6 +3585,9 @@ class HostAgent(
     async def rpc_keys(self, id: str, keys: list[str], caller: Any = None) -> None:
         s = self._get(id)
         self._refuse_gone(s)
+        if self._brief_holds(s) and not mail.as_person(caller, self._graph()):
+            # the person's keys answer a launch dialog holding the brief, as their terminal does (§4.3)
+            raise RpcError(self._brief_not_in(s))
         self._record_send(s, caller, " ".join(str(k) for k in keys))
         if mail.as_person(caller, self._graph()):
             self._refill(s)  # keys are how a person answers a menu or a question in the pane
