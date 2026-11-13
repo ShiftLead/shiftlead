@@ -184,7 +184,8 @@ out.model_nested = { P: units(nested, "P"), N: units(nested, "N") };
 const twice = AO.qModel(page([group("in_progress", [card("A", { rows: ["a1"] })]),
   group("up_next", [card("B", { up: 1 }), card("A", { up: 1, rows: ["a9"] })])]));
 out.model_twice = { order: twice.order, group: twice.cards.get("A").group, units: twice.cards.get("A").units };
-// Up next's order, and a damaged one read as empty
+// Up next's order, and a damaged one read as empty (the probe's selectors have no `#id`, so `#qcards` matches the
+// copy's first descendant: the element carrying `data-upnext` stays first)
 const withUp = (v) => h("div", "", {}, [h("div", "qcards", { id: "qcards", "data-upnext": v }, []),
   group("up_next", [card("B", { up: 1 })])]);
 out.model_upnext = AO.qModel(withUp('["B","C"]')).upnext;
