@@ -54,6 +54,7 @@ from sessionorc import (
 )
 from sessionorc import balance as balance_mod
 from sessionorc import cadence as cadence_mod
+from sessionorc import digest as digest_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc import seats as seats_mod
 from sessionorc import settings as settings_mod
@@ -82,6 +83,8 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     CONTEXT_EVERY,  # noqa: F401
     CREATE_GRACE,  # noqa: F401
     DERIVE_EVERY,  # noqa: F401
+    DIGEST_READS,  # noqa: F401
+    DIGEST_TIMEOUT,
     DOORBELL_TRIES,  # noqa: F401
     ENTRY_PRIORITIES,  # noqa: F401
     ENTRY_TYPES,  # noqa: F401
@@ -291,6 +294,16 @@ from sessionorc.store import (
     UsageStore,
 )
 from sessionorc.tmux import ARG_LIMIT, DuplicateSession, Tmux
+
+
+def _window_bound(value: Any, name: str) -> datetime | None:
+    """A digest window's edge (design §4.7 *Feedback*): an RFC 3339 instant with its offset, or None when unset."""
+    if value is None or value == "":
+        return None
+    got = adapters.instant(value) if isinstance(value, str) else None
+    if got is None:
+        raise RpcError(f"{name} is an RFC 3339 instant with its offset, not {value!r}")
+    return got
 
 
 def _split_filled_for(prompt: str) -> tuple[str, str]:
@@ -3809,6 +3822,109 @@ class HostAgent(
         if t is None:
             raise RpcError(f"no transcript for {id or adapter_id}: the tool's file is not on {self.host}")
         return t.to_dict()
+
+    def _digest_adapter(self, id: str) -> tuple[Session, Any]:
+        """The record and its adapter for a digest read (design §4.7 *Feedback*, TD-1491): a shell is refused with
+        the `transcript` RPC's words, an agent adapter that does not declare `conversations` by its `implements`."""
+        s = self._get(id)
+        if not adapters.has_agent(s.adapter):
+            raise RpcError(f"{id}: a shell has no transcript (design §4.5 screen 9)")
+        try:
+            ad = adapters.get(s.adapter)
+        except KeyError:
+            raise RpcError(f"no adapter {s.adapter}") from None
+        if "conversations" not in adapters.implements(ad):
+            raise RpcError(f"the {s.adapter} adapter lists no conversations (§4.3)")
+        return s, ad
+
+    async def _digest_read(self, fn: Any, *args: Any, **kw: Any) -> Any:
+        """A digest read off the loop, bounded by DIGEST_TIMEOUT (design §4.7 *Feedback*)."""
+        try:
+            return await asyncio.wait_for(asyncio.to_thread(fn, *args, **kw), DIGEST_TIMEOUT)
+        except TimeoutError:
+            raise RpcError(f"the read did not finish within {DIGEST_TIMEOUT:g} s") from None
+
+    async def rpc_conversations(self, id: str, since: str | None = None, until: str | None = None) -> dict[str, Any]:
+        """`ao feedback digest`'s listing (design §4.7 *Feedback*, TD-1491): every conversation of the record's
+        adapter in the record's directory whose span meets `[since, until)`, asked of each profile the adapter
+        lists and of the record's own, one entry per id (the record's own profile first), oldest first, with the
+        adapter's `marks_errors`. Served on the record's host — a node's record through `read` (`NODE_READS`).
+        A read: never gated (§9 invariant 11)."""
+        s, ad = self._digest_adapter(id)
+        lo, hi = _window_bound(since, "since"), _window_bound(until, "until")
+        listed = [str(p.get("name")) for p in (ad.profiles() if callable(getattr(ad, "profiles", None)) else [])]
+        own = s.profile or ""
+        names = [own, *(n for n in listed if n and n != own)]
+
+        def read() -> list[tuple[str, Any]]:
+            out: list[tuple[str, Any]] = []
+            for name in names:
+                got = ad.conversations(Path(s.dir), name)
+                if got is None and name == own:
+                    raise LookupError(name)
+                out.extend((name, c) for c in got or [])
+            return out
+
+        try:
+            found = await self._digest_read(read)
+        except LookupError:
+            raise RpcError(f"{id}'s profile {own} is unknown to the {s.adapter} adapter") from None
+        seen: dict[str, tuple[str, Any]] = {}
+        for name, c in found:
+            seen.setdefault(c.id, (name, c))
+        rows = []
+        for name, c in seen.values():
+            first, last = adapters.instant(c.first_at), adapters.instant(c.last_at)
+            if first is None or last is None or (hi is not None and first >= hi) or (lo is not None and last < lo):
+                continue
+            rows.append((name, c))
+        order = {c.id: i for i, c in enumerate(adapters.oldest_first([c for _n, c in rows]))}
+        rows.sort(key=lambda r: order[r[1].id])
+        return {
+            "marks_errors": adapters.marks_errors(ad),
+            "conversations": [{**c.to_dict(), "profile": name} for name, c in rows],
+        }
+
+    async def rpc_transcript_digest(
+        self,
+        id: str,
+        conversation: str = "",
+        profile: str | None = None,
+        since: str | None = None,
+        until: str | None = None,
+        zone: dict | None = None,
+        skip: int = 0,
+    ) -> dict[str, Any]:
+        """One conversation's digest over `[since, until)` (design §4.7 *Feedback*, TD-1491): `{text, lines,
+        next}`, read through the adapter's `read_transcript` under `profile` (required: the one the listing
+        named), less the first `skip` entries at `since`. Served on the record's host. A read: never gated."""
+        s, ad = self._digest_adapter(id)
+        if not conversation or not isinstance(conversation, str):
+            raise RpcError("transcript_digest needs the conversation's id (design §4.7)")
+        if not isinstance(profile, str):
+            raise RpcError("transcript_digest needs the profile the listing named (design §4.7)")
+        lo, hi = _window_bound(since, "since"), _window_bound(until, "until")
+        if lo is None or hi is None:
+            raise RpcError("transcript_digest needs since and until (design §4.7)")
+        if isinstance(skip, bool) or not isinstance(skip, int) or skip < 0:
+            raise RpcError(f"skip is a count, not {skip!r}")
+        first: dict[str, str | None] = {}
+
+        def page(before: int | None) -> Any:
+            t = ad.read_transcript(conversation, Path(s.dir), profile, before=before, turns=digest_mod.PAGE_TURNS)
+            if t is not None and before is None:
+                first["at"] = t.first_at
+            return t
+
+        def run() -> dict[str, Any] | None:
+            return digest_mod.digest(
+                page, first_at=lambda: first.get("at"), since=lo, until=hi, zone=digest_mod.zone_of(zone), skip=skip
+            )
+
+        got = await self._digest_read(run)
+        if got is None:
+            raise RpcError(f"no transcript for {conversation}: the tool's file is not on {self.host}")
+        return got
 
     async def rpc_paths(
         self, id: str | None = None, runs: list[str] | None = None, repo: str | None = None

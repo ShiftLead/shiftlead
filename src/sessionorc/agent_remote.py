@@ -29,6 +29,8 @@ from sessionorc import stuck as stuck_mod
 from sessionorc import usage as usage_mod
 from sessionorc.agent_common import (
     ACT_TIMEOUT,
+    DIGEST_READS,
+    DIGEST_TIMEOUT,
     HOME_EDITS,
     INTENT_FIELDS,
     NODE_ACTS,
@@ -473,7 +475,8 @@ class RemoteMixin:
             raise RpcError(f"no session {rid}@{host}")
         mux = self._node_mux(host)
         try:
-            reply = await mux.request("read", timeout=ACT_TIMEOUT, rpc=method, params={**params, "id": rid})
+            timeout = DIGEST_TIMEOUT if method in DIGEST_READS else ACT_TIMEOUT  # §4.7 *Feedback*, TD-1491
+            reply = await mux.request("read", timeout=timeout, rpc=method, params={**params, "id": rid})
         except link.LinkError as e:
             raise RpcError(f"{host}: {e}") from None
         except (link.LinkClosed, TimeoutError) as e:

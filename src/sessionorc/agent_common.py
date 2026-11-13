@@ -191,6 +191,11 @@ REPORT_WRITE = 5.0  # seconds a node's report may take to write before the link 
 # An act routed to a node (§4.4a, step 4a) is answered within this, on top of any wait the act
 # itself carries (`send --wait --timeout N`): a `create` runs a worktree add and a tmux start.
 ACT_TIMEOUT = 120.0
+# A digest's read (`conversations`, `transcript_digest`; design §4.7 *Feedback*, TD-1491) is bounded by this, by
+# the RPC's name: the handler wraps a read of its own host's record in it, and the home forwards either read
+# to a node's record with it in place of ACT_TIMEOUT. The CLI waits it plus CALL_TIMEOUT.
+DIGEST_TIMEOUT = 300.0
+DIGEST_READS = frozenset({"conversations", "transcript_digest"})
 # What the home routes to the node whose name is the record's `host` (design §4.4a "A node reports
 # and executes; the home decides"): the acts that touch a pane or the node's waiters, executed
 # there with no gate of their own. `name_check` is a read, routed with a `host` for a team start.
@@ -217,7 +222,9 @@ MODE_VIAS = frozenset({"focus", "card", "inbox", "cli"})
 # read can never reach an acting method through it, and `act`'s allowlist never grows by a read.
 # A transcript is on its host too (TD-165), and so is the file a pane names (`paths`, TD-501), and
 # the Git card's pick (`git_files`, TD-856).
-NODE_READS = frozenset({"tail", "explain", "log_tail", "transcript", "paths", "git_files"})
+NODE_READS = frozenset(
+    {"tail", "explain", "log_tail", "transcript", "paths", "git_files", "conversations", "transcript_digest"}
+)
 TRANSCRIPT_TURNS_MAX = 500  # prompts one transcript read may ask for: a page is twenty
 PATHS_RUNS_MAX = 8  # runs one `paths` read may ask about: one row of a pane (§4.6 *A path in the pane is a link*)
 PATHS_RUN_CHARS = 512  # and the length of each
