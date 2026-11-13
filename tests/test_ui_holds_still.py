@@ -135,6 +135,12 @@ const up = (cards) => page([group("up_next", cards)]);
 // B merged: the card is now A, its row A the new top's
 out.retop = rt(up([card("B", { up: 1, ids: ["B", "A"], rows: ["A"] }), card("C", { up: 1 })]),
   up([card("A", { up: 1, ids: ["A"] }), card("C", { up: 1 })]));
+// the re-read after: the card drawn under its new id, its new top's row still waiting for Refresh, never *gone*
+{
+  const c = card("A", { up: 1, ids: ["A", "x"], rows: ["A"] }); c.setAttribute("data-newtop", "A");
+  out.retop_after = rt(up([c, card("C", { up: 1 })]),
+    up([card("A", { up: 1, ids: ["A", "x"] }), card("C", { up: 1 })]));
+}
 // A archived splits its card in two: the half with most open members is the same card, the other new
 out.split = rt(up([card("A", { up: 1, ids: ["A", "B", "C", "D"], rows: ["B", "C", "D"] })]),
   up([card("B", { up: 1, ids: ["B", "C"], rows: ["C"] }), card("D", { up: 1, ids: ["D"] })]));
@@ -158,7 +164,8 @@ out.join_drawn = rt(up([card("A", { up: 1, ids: ["A"] }), card("B", { up: 1, ids
   const r = card("A", { up: 1, ids: ["A", "x"] });
   AO.qRetop(c, r, root);
   out.rekey = { card: c.dataset.card, ids: c.dataset.ids, qid: c.children[0].dataset.qid, start: start.dataset.card,
-    ref: start.dataset.ref, fold: fold.dataset.fold, upnext: JSON.parse(root.children[0].dataset.upnext) };
+    ref: start.dataset.ref, fold: fold.dataset.fold, upnext: JSON.parse(root.children[0].dataset.upnext),
+    newtop: c.dataset.newtop };
 }
 out.lis = [...AO.qLis([0, 3, 1, 2])].sort();
 out.age = [AO.qAge(12000), AO.qAge(185000), AO.qAge(7300000)];
@@ -302,6 +309,12 @@ def test_a_retopped_card_is_the_same_card_nothing_done_or_new(got):
     assert d["gone"] == [] and d["done"] == 0 and d["new"] == 0 and d["moved"] == 1
 
 
+def test_the_new_tops_row_waits_on_every_reread_until_refresh(got):
+    # review of slice 3: the exemption is the card's (`data-newtop`), not the one re-read's that re-topped it
+    d = got["retop_after"]
+    assert d["retop"] == [] and d["gone"] == [] and d["moved"] == 1 and d["same"] == ["C"]
+
+
 def test_a_split_card_matches_the_half_with_most_open_members(got):
     d = got["split"]
     assert d["retop"] == [["A", "B"]] and d["new"] == 1 and d["done"] == 0
@@ -330,6 +343,7 @@ def test_a_retop_rewrites_the_cards_keys_at_once(got):
         "ref": "TD-1",  # a value: it waits with the words
         "fold": "A:read",
         "upnext": ["A", "C"],
+        "newtop": "A",
     }
 
 
@@ -338,6 +352,10 @@ def test_a_retop_is_applied_before_the_hold_in_a_patch():
     assert p.index("AO.qRetop(el, byId.get(to), lists)") < p.index("if (holds(el))")
     # the hold follows the card's new id (found by the scratch-home check: a hovered card lost its hold)
     assert "if (pointerOn === from) pointerOn = to;" in p and "if (boxOn === from) boxOn = to;" in p
+    # a press sent before the re-top: its refusal and its keep find the card under its new id
+    assert "while (renamed.has(id)) id = renamed.get(id);" in Q
+    r = JS[JS.index("AO.qRetop = function") :]
+    assert 'AO.inflight["qcard:" + to] = AO.inflight["qcard:" + from];' in r[: r.index("\n  };\n")]
 
 
 def test_the_helpers(got):

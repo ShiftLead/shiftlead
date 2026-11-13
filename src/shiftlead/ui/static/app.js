@@ -4834,7 +4834,8 @@
       const ids = String(c.dataset.ids || "").split(" ").filter(Boolean), holds = new Set([id, ...ids]);
       Object.values(units).forEach((ks) => ks.forEach((k) => { if (k.startsWith("r:")) holds.add(k.slice(2)); }));
       cards.set(id, { id, group: g ? g.dataset.group : "", off: c.classList.contains("qoff"), units, done,
-        headDone: !!(head && head.getAttribute("data-done") !== null), ids: ids.length ? ids : [id], holds });
+        headDone: !!(head && head.getAttribute("data-done") !== null), ids: ids.length ? ids : [id], holds,
+        newTop: c.dataset.newtop || "" });
       order.push(id);
     });
     let upnext = [];
@@ -4918,8 +4919,9 @@
     drawn.cards.forEach((d, did) => {
       const id = rid(did), r = reading.cards.get(id), into = m.joined.has(did) ? reading.cards.get(m.joined.get(did)) : null;
       const left = !r || (r.group === "completed" && d.group !== "completed");
-      // a re-top's new top, drawn as a row: neither *gone* nor patched, it keeps its place until Refresh
-      const newTop = id !== did ? "r:" + id : "";
+      // a re-top's new top, drawn as a row: neither *gone* nor patched, it keeps its place until Refresh — in the
+      // re-read that re-tops the card and every one after it (`data-newtop`, which only a whole draw takes away)
+      const newTop = id !== did ? "r:" + id : d.newTop ? "r:" + d.newTop : "";
       let gone = 0, shape = !left && r.group === d.group && !newTop;
       const rDone = (r && r.done) || new Set(), dDone = d.done || new Set();
       Object.entries(d.units).forEach(([b, ks]) => ks.forEach((k) => {
@@ -5019,7 +5021,11 @@
   AO.qRetop = function (el, r, root) {
     const from = el.dataset.card, to = r.dataset.card;
     if (!from || from === to) return;
-    el.dataset.card = to; el.dataset.ids = r.dataset.ids || to;
+    el.dataset.card = to; el.dataset.ids = r.dataset.ids || to; el.dataset.newtop = to;
+    // a press still out on the card (its keep, TD-1461) follows it
+    if (AO.inflight["qcard:" + from] && !AO.inflight["qcard:" + to]) {
+      AO.inflight["qcard:" + to] = AO.inflight["qcard:" + from]; delete AO.inflight["qcard:" + from];
+    }
     const head = [...el.children].find((x) => x.classList.contains("qhead"));
     const rhead = [...r.children].find((x) => x.classList.contains("qhead"));
     if (head && rhead) { head.dataset.qid = rhead.dataset.qid; if (rhead.id) head.id = rhead.id; else head.removeAttribute("id"); }
@@ -5030,7 +5036,7 @@
     });
     if (AO.foldsRekey) AO.foldsRekey(from, to);
     const folded = store.get("qfold", []);
-    if (folded.includes(from)) store.set("qfold", folded.map((x) => (x === from ? to : x)));
+    if (folded.includes(from)) store.set("qfold", [...new Set(folded.map((x) => (x === from ? to : x)))]);
     const q = root && root.querySelector("#qcards");
     if (q) {
       let up = [];
@@ -5560,6 +5566,7 @@
     // a touch from `pointerdown` to the press's end, keyboard focus in it, or a menu or a box open on it
     let pointerOn = "", touchOn = "", boxOn = "";
     const cardId = (t) => { const c = t && t.closest && t.closest("#queuelists .qcard[data-card]"); return c ? c.dataset.card : ""; };
+    const renamed = new Map();  // a re-topped card's old id → its new one, for a press answered after the re-top
     let freed = "";  // the card a refused press was on: its hold ends for the patch that follows the refusal
     function holds(el) {
       const id = el.dataset.card, a = document.activeElement;
@@ -5574,7 +5581,8 @@
     // a refused press (a 409, a permission's `call` check) ends any hold on its card (§4.5 screen 12 *The person's
     // own press is drawn at once*): the values that waited, its *gone* among them, are drawn with the refusal
     document.addEventListener("ao:refused", (e) => {
-      const id = e.detail && e.detail.card; if (!id || !reading) return;
+      let id = e.detail && e.detail.card; if (!id || !reading) return;
+      while (renamed.has(id)) id = renamed.get(id);  // a press sent before its card was re-topped
       const c = $(`.qgroup .qcard[data-card="${CSS.escape(id)}"]`, lists);
       const hadFocus = !!(c && c.contains(document.activeElement));
       freed = id;
@@ -5659,6 +5667,7 @@
         if (!el || !byId.has(to)) return;
         applied.delete("card:" + from); AO.qRetop(el, byId.get(to), lists);
         // the hold the person has on it follows its new id
+        renamed.delete(to); renamed.set(from, to);  // its new id never maps on: no chain loops
         if (pointerOn === from) pointerOn = to;
         if (touchOn === from) touchOn = to;
         if (boxOn === from) boxOn = to;
