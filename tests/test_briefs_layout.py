@@ -39,7 +39,7 @@ NAMED = {
     "auditor": {"{cadence_rules}", "{design_dir}", "{gate}", "{ledger}", "{merge}", "{test}"},
     "sweeper": {"{board}", "{cadence_rules}", "{gate}", "{merge}", "{test}"},
     "fact-checker": set(),
-    "designer": {"{board}", "{cadence_rules}"},
+    "designer": {"{board}", "{cadence_rules}", "{merge}"},
 }
 ROLES = tuple(NAMED)
 
@@ -112,6 +112,19 @@ def test_no_built_in_merges_outside_step_5s_line():
     for name, text in built_ins():
         if "{merge}" in text and name != "team_skill.md":
             assert "typed whole as one command" in text, name
+
+
+# a sentence that has the session merge its own PR on the gate
+MERGES = re.compile(r"\bmerges? (?:it )?(?:once the gate passes|on the gate|at the gate)")
+
+
+def test_a_brief_that_merges_names_step_5s_line():
+    """TD-1742: a built-in brief or flow stage that tells its session to merge (*merge once the gate passes*,
+    *merges on the gate*) holds `{merge}`, so its rendered brief carries cadence step 5's line; the designer's
+    brief once said only *you merge nothing on a held path*, and its design PRs merged with no `Merged-by:`."""
+    merging = {name: text for name, text in built_ins() if MERGES.search(text)}
+    assert any(name.endswith("designer.md") for name in merging)
+    assert [name for name, text in merging.items() if "{merge}" not in text] == []
 
 
 # design §4.3 *The untrusted-flags guard* (TD-1576): the commands the fact-checker's brief names carry
