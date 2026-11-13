@@ -1,0 +1,21 @@
+{% import "queue_card.html" as qc %}
+{# A card's page's card (design §4.5 screen 12 *The card's page*; TD-1762), re-read whole with `?part=1`: the card in
+   a group of its own, as the Queue draws it, so the Queue's own readers (`AO.qModel`, `AO.qDiff`) read it; or a
+   completed card's line opened; or, where the view holds no card with the page's id, where the page opens at load
+   (`data-goto`) #}
+{% if agent_down %}<div class="warn">the host agent is not answering — nothing to draw</div>
+{% elif not served %}<div class="warn" id="noqueue">{{ why or 'the home serves no Queue yet: a node, or a home before its first tick' }}</div>
+{% else %}
+<span id="qcounts" hidden></span>
+<span id="cardfound" hidden data-found="{{ '1' if found else '' }}" data-group="{{ group }}" data-topdone="{{ '1' if top_done else '' }}" data-goto="{{ goto }}"><span id="cardwhereread">{% include "card_where.html" %}</span></span>
+{% if c %}
+<section class="qgroup" data-group="{{ 'completed' if group == 'kept' else 'in_progress' if group == 'loose' else group }}"><div class="qcards{% if group == 'waiting' %} qwaits{% elif group == 'kept' %} qkepts{% endif %}{% if not one_repo and group in ('waiting', 'up_next') %} multi{% endif %}">{{ qc.card(c) }}</div></section>
+{% elif line %}
+<section class="qgroup" data-group="completed"><div class="rlist qdone">
+  <div class="qdline opens" data-key="{{ line.kind }}:{{ line.show }}" data-ids="{{ line.ids | join(' ') }}">
+    <div class="qdhead"><span class="qsub qage">Recently completed · {{ line.age }}</span><span class="qid mono strong">{{ line.show }}</span><span class="qtitle">{{ line.title }}</span>{% if line.n > 1 %}<span class="qright"><span class="qsub">{{ line.n }} entries</span></span>{% endif %}</div>
+    <div class="qdbody">{% for e in line.entries %}<div class="qdres"><span class="qid mono">{{ e.show }}</span>{% if e.pr %} <span class="mono">#{{ e.pr }}</span>{% endif %}{% if line.entries | length > 1 %} <span class="qsub">{{ e.title }}</span>{% endif %}<div class="qsub">{{ e.resolved or 'no Resolved line' }}</div></div>{% else %}<div class="qsub">no Resolved line</div>{% endfor %}</div>
+  </div>
+</div></section>
+{% endif %}
+{% endif %}

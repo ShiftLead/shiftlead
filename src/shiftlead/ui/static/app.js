@@ -4332,10 +4332,11 @@
   AO.entryUrl = (id, back) => `/inbox/${encodeURIComponent(id)}${back ? `?back=${encodeURIComponent(back)}` : ""}`;
   AO.openEntry = function (id) {
     // the list the row is drawn in: the Inbox's as filtered, or the Queue's cards (TD-771), Back to it
-    const queue = !!$(".queuepage");
-    const order = $$(queue ? ".queuepage .qcard:not(.qoff) .mailrow[data-page]" : ".inboxpage .mailrow[data-page]")
+    const queue = !!$(".queuepage"), card = !!$("#cardpage");
+    // …or a card's page (TD-1762): that one card's items, Back to the page itself (`inbox_entry_page` adds `item=`)
+    const order = $$(card ? "#cardpage .qcard .mailrow[data-page]" : queue ? ".queuepage .qcard:not(.qoff) .mailrow[data-page]" : ".inboxpage .mailrow[data-page]")
       .filter((r) => !r.hidden).map((r) => r.dataset.msg);
-    const back = queue ? `/queue${location.search}` : location.search;
+    const back = card ? location.pathname : queue ? `/queue${location.search}` : location.search;
     sess.set(ENTRY_ORDER, { back, ids: order });
     location.href = AO.entryUrl(id, back);
   };
@@ -5007,11 +5008,14 @@
   };
   // a card's header whose top entry was archived while the card keeps it as its top: *done*, its controls hidden,
   // **Open card ›** (a link) staying
-  AO.qHeadDone = function (head, on) {
+  // (`word` *gone* on a card's page whose id left, TD-1762)
+  AO.qHeadDone = function (head, on, word) {
+    word = word || "done";
     head.classList.toggle("qheaddone", on);
     const right = head.querySelector(":scope > .qmain > .qright");
     let w = right && [...right.children].find((x) => x.classList.contains("qgonew"));
-    if (on && right && !w) { w = document.createElement("span"); w.className = "qgonew"; w.textContent = "done"; right.prepend(w); }
+    if (on && w && w.textContent !== word) { w.remove(); w = null; }
+    if (on && right && !w) { w = document.createElement("span"); w.className = "qgonew"; w.textContent = word; right.prepend(w); }
     if (!on && w) w.remove();
   };
   // A re-top's keys, rewritten at once even on a held card (§4.5 screen 12 *The page holds still*): `el` is the drawn
@@ -5147,6 +5151,254 @@
     });
     applyFolds();
     return { applyFolds, toggleFold };
+  };
+
+  // ---- A card's page (design §4.5 screen 12 *The card's page*, §4.5a *Card page*; TD-1558, built by TD-1762) ----
+  // One card, drawn by the Queue's card renderer, that holds still as the Queue does with the card as the page: a
+  // re-read (`/card/<id>?part=1`) patches values in place and marks *gone*; an item or row arriving and the card's
+  // own group changing wait, counted in the bar; Refresh draws the reading whole. The hold is an item's or a row's
+  // (a mouse pointer over it, keyboard focus in it, its menu open); an open box holds the whole page. The page never
+  // follows a card that changes id: where the reading holds no card with its id, every item and row is *gone* but
+  // one the person's own press answered, and the bar reads *done* or *no longer on the Queue* alone.
+  const CARD_FROM = "qcardfrom";  // the tab's entry the Queue writes before it opens a card's page (TD-1763)
+  const CARD_OPEN_GROUPS = { in_progress: "In progress", waiting: "Waiting", up_next: "Up next" };
+  // the bar's words for a card's page, in the design's order; `d` from `AO.cardDiff`
+  AO.cardBarParts = (d) => {
+    const s = (n) => (n === 1 ? "" : "s"), parts = [];
+    if (d.left) return [d.topDone ? "done" : "no longer on the Queue"];
+    if (d.items) parts.push({ t: `${d.items} new item${s(d.items)}`, ask: d.asks > 0 });
+    if (d.moved) parts.push(`moved to ${d.moved}`);
+    if (d.done) parts.push("done");
+    if (d.changed) parts.push(`${d.changed} changed`);
+    return parts.map((p) => (typeof p === "string" ? { t: p, ask: false } : p)).map((p) => (p.ask ? p : p.t));
+  };
+  // the difference between the drawn card and the reading's (both `AO.qModel` copies of one card): `left` where the
+  // reading holds no card with the page's id; `items` the items not drawn in the block the reading holds them in
+  // (`asks` those in Decide or Do), each counted once there; `moved` the open group it moved to; `done` the card
+  // completing or its top entry among the completed ids; `changed` the *gone* or *done* units, a row arriving, an
+  // order change inside a block; `gone` and `doneUnits` the drawn units to mark
+  AO.cardDiff = function (drawn, reading, id, found, topDone, own) {
+    own = own || (() => false);
+    const d = drawn.cards.get(id) || [...drawn.cards.values()][0], r = found ? reading.cards.get(id) : null;
+    const out = { left: !r, topDone: !!topDone, items: 0, asks: 0, moved: "", done: false, changed: 0, gone: [], doneUnits: [] };
+    if (!d) return out;
+    if (!r) {
+      Object.values(d.units).forEach((ks) => ks.forEach((k) => { if (!own(k)) out.gone.push(k); }));
+      return out;
+    }
+    const rDone = r.done || new Set(), dDone = d.done || new Set();
+    const drawnAll = new Set(Object.values(d.units).flat());
+    Object.entries(r.units).forEach(([b, ks]) => ks.forEach((k) => {
+      if (!k.startsWith("m:") || own(k) || (d.units[b] || []).includes(k)) return;
+      out.items++; if (Q_BLOCKS.includes(b)) out.asks++;
+    }));
+    const newItem = (k) => k.startsWith("m:") && Object.entries(r.units).some(([b, ks]) => ks.includes(k) && !(d.units[b] || []).includes(k));
+    Object.entries(d.units).forEach(([b, ks]) => ks.forEach((k) => {
+      if (rDone.has(k) && !dDone.has(k)) { out.doneUnits.push(k); out.changed++; return; }
+      if (!(r.units[b] || []).includes(k)) {
+        if (own(k)) return;
+        out.gone.push(k);
+        if (!newItem(k)) out.changed++;  // an item that moved block counts once, in *n new items*
+      }
+    }));
+    Object.entries(r.units).forEach(([b, ks]) => {
+      const mine = d.units[b] || [];
+      ks.forEach((k) => { if (k.startsWith("r:") && !drawnAll.has(k)) out.changed++; });  // a row arriving
+      const common = ks.filter((k) => mine.includes(k)), was = mine.filter((k) => ks.includes(k));
+      if (common.join(" ") !== was.join(" ")) out.changed++;  // a place change inside the card
+    });
+    if (r.headDone && !d.headDone) out.changed++;
+    if (r.group !== d.group && CARD_OPEN_GROUPS[r.group]) out.moved = CARD_OPEN_GROUPS[r.group];
+    out.done = (r.group === "completed" && d.group !== "completed") || !!topDone;
+    out.same = r.group === d.group && !out.items && !out.changed && Object.keys(d.units).length === Object.keys(r.units).length;
+    return out;
+  };
+  AO.cardPage = function () {
+    const page = $("#cardpage"); if (!page) return;
+    const id = page.dataset.card, top = page.dataset.top || "";
+    const lists = $("#cardlists", page), bar = $("#qbar", page), barWords = bar && $(".qbarw", bar), refreshBtn = bar && $("#qrefresh", bar);
+    const parse = (html) => { const t = document.createElement("template"); t.innerHTML = html; const d = document.createElement("div"); d.appendChild(t.content); return d; };
+    let reading = null, readingHtml = "", readAt = 0, left = false, opened = false;
+    // the Read and ✓ n done folds open, the card never folded (§4.5a *Card page*); the Queue's move controls are its own
+    function openFolds(root) {
+      $$("details.qread, details.qfold", root).forEach((d) => { d.open = true; });
+      $$(".qcard", root).forEach((c) => c.classList.remove("folded"));
+      $$(".qdline .qdbody", root).forEach((b) => { b.hidden = false; });
+    }
+    // ‹ Queue: back in history when the Queue opened this page, else the Queue's find for the card
+    const back = $("#cardback", page);
+    if (back) back.addEventListener("click", (e) => {
+      const from = sess.get(CARD_FROM);
+      let ref = "";
+      try { ref = new URL(document.referrer).pathname; } catch (err) { ref = ""; }
+      if (from && from.card === id && ref === "/queue" && history.length > 1) { e.preventDefault(); history.back(); }
+    });
+    // an item's or a row's hold: the pointer over it, keyboard focus in it, its menu open; an open box holds the page
+    const unitOf = (t) => (t && t.closest ? t.closest(Q_UNITS + ", .qhead[data-qid]") : null);
+    let pointerOn = null;
+    const boxOpen = () => !!document.querySelector("dialog[open]");
+    function held(u) {
+      if (u.querySelector("details.more[open], details.qdots[open]")) return true;
+      if (document.hidden) return false;
+      if (pointerOn && (u === pointerOn || u.contains(pointerOn))) return true;
+      const a = document.activeElement;
+      return !!(a && u.contains(a) && a.matches && a.matches(":focus-visible"));
+    }
+    const own = (k) => k.startsWith("m:") && (!!AO.inflight[k.slice(2)]
+      || Object.keys(AO.inflight).some((x) => x.startsWith("qcard:") && Q_BLOCKS.some((b) => AO.inflight[x].keys[b].includes(k.slice(2)))));
+    const drawnCard = () => $(".qgroup .qcard[data-card]", lists);
+    const unitsOf = (c) => (c ? [...c.querySelectorAll(Q_UNITS)].filter((u) => u.closest(".qcard") === c) : []);
+    const unitIn = (c, b, k) => unitsOf(c).find((u) => AO.qUnitKey(u) === k && AO.qBlockOf(u) === b) || null;
+    let freed = false;  // a refused press: the values that waited are drawn with the refusal
+    function patch() {
+      if (!reading) return;
+      if (boxOpen() && !freed) return;  // an open box holds the whole page, values too
+      const found = $("#cardfound", reading), c = drawnCard();
+      const isFound = !!(found && found.dataset.found);
+      const rc = isFound ? $(".qgroup .qcard[data-card]", reading) : null;
+      const rid = rc ? rc.dataset.card : id;
+      const diff = AO.cardDiff(AO.qModel(lists), AO.qModel(reading), c ? c.dataset.card : rid, isFound && !!rc && (!c || rc.dataset.card === c.dataset.card),
+        found && found.dataset.topdone, own);
+      left = diff.left && !!c;
+      if (c && rc && !diff.left) {
+        // values in place: a unit the person is not on, from the reading's same unit; the header's words
+        const gone = new Set(diff.gone), done = new Set(diff.doneUnits);
+        unitsOf(c).filter((u) => !u.querySelector(Q_UNITS)).forEach((u) => {
+          const k = AO.qUnitKey(u), b = AO.qBlockOf(u), ru = unitIn(rc, b, k);
+          if (ru && !ru.querySelector(Q_UNITS) && !(held(u) && !freed) && ru.outerHTML !== u.outerHTML) u.replaceWith(ru.cloneNode(true));
+        });
+        [".qhead .qmain > .qid", ".qhead .qtitle", ".qhead .qright"].forEach((sel) => {
+          const a = $(sel, c), b = $(sel, rc);
+          if (a && b && !(held(a.closest(".qhead")) && !freed) && a.outerHTML !== b.outerHTML) a.replaceWith(b.cloneNode(true));
+        });
+        unitsOf(c).forEach((u) => { const k = AO.qUnitKey(u); AO.qGone(u, gone.has(k) || done.has(k), done.has(k) ? "done" : ""); });
+        // a reading that holds the id again withdraws the header's *gone*; its top archived draws *done*
+        const head = [...c.children].find((x) => x.classList.contains("qhead")), rh = [...rc.children].find((x) => x.classList.contains("qhead"));
+        if (head) AO.qHeadDone(head, !!(rh && rh.getAttribute("data-done") !== null));
+        // the place patches as a value while the group holds
+        if (!diff.moved && !diff.done) { const w = $("#cardwhere", page), rw = $("#cardwhereread", reading); if (w && rw) w.innerHTML = rw.innerHTML; }
+      } else if (c && diff.left) {
+        // the id left: every item and row *gone* at once, its controls hidden, but one the person's own press answered
+        const gone = new Set(diff.gone);
+        unitsOf(c).forEach((u) => AO.qGone(u, gone.has(AO.qUnitKey(u)), "gone"));
+        const head = [...c.children].find((x) => x.classList.contains("qhead"));
+        if (head) AO.qHeadDone(head, true, "gone");
+      }
+      AO.qcardReapply(lists);
+      openFolds(lists);
+      drawBar(diff);
+    }
+    function drawBar(diff) {
+      if (!bar) return;
+      const parts = diff ? AO.cardBarParts(diff) : [];
+      bar.classList.remove("notlive");
+      $(".qbarlive", bar).textContent = "● live";
+      barWords.innerHTML = "";
+      if (!parts.length) barWords.textContent = "· up to date";
+      parts.forEach((p) => {
+        const sp = document.createElement("span");
+        sp.textContent = "· " + (typeof p === "string" ? p : p.t) + " ";
+        if (typeof p !== "string") sp.className = "qbarask";
+        barWords.appendChild(sp);
+      });
+      refreshBtn.hidden = !parts.length;
+      refreshBtn.disabled = boxOpen();
+    }
+    function notLive(why) {
+      if (!bar) return;
+      bar.classList.add("notlive");
+      $(".qbarlive", bar).textContent = "not live";
+      barWords.textContent = why || `— last read ${readAt ? AO.qAge(Date.now() - readAt) : "never"}`;
+    }
+    // Refresh, and a back-forward return: the reading drawn whole; where the id left, the Queue's find
+    function drawWhole() {
+      if (!reading) return;
+      if (left) { location.href = top ? `/queue#${encodeURIComponent(top)}` : "/queue"; return; }
+      const menus = AO.openMenus(lists), errs = AO.rowErrs(lists);
+      lists.innerHTML = readingHtml;
+      AO.qcardReapply(lists); AO.restoreRowErrs(lists, errs); AO.reopenFolds(lists); AO.reopenMenus(lists, menus);
+      openFolds(lists);
+      const w = $("#cardwhere", page), rw = $("#cardwhereread", lists); if (w && rw) w.innerHTML = rw.innerHTML;
+      drawBar(null);
+    }
+    if (refreshBtn) refreshBtn.addEventListener("click", () => {
+      if (boxOpen()) return;  // Refresh cannot be pressed while a box is open
+      $$("details.more[open], details.qdots[open]", lists).forEach((d) => { d.open = false; });
+      drawWhole();
+    });
+    // the address's row and item: scroll to the row (the header for the top entry) and ring the item
+    function showAddress() {
+      const p = new URLSearchParams(location.search), row = p.get("row"), item = p.get("item");
+      const find = (x) => x && ($(`.mailrow[data-msg="${CSS.escape(x)}"]`, lists) || document.getElementById(x)
+        || document.getElementById(x.replace(/^.*#/, "")) || $(`.qhead[data-qid="${CSS.escape(x)}"], .qrow[data-qid="${CSS.escape(x)}"]`, lists));
+      const it = find(item), at = find(row);
+      const ring = (el) => { $$(".qring", page).forEach((x) => x.classList.remove("qring")); el.classList.add("qring"); };
+      if (at) { at.scrollIntoView({ block: "center" }); if (!it) ring(at); }
+      if (it) { it.scrollIntoView({ block: "center" }); ring(it); }
+    }
+    let busy = false;
+    async function reread(whole) {
+      if (busy) return; busy = true;
+      try {
+        const q = new URLSearchParams(location.search); q.set("part", "1");
+        const res = await fetch(`${location.pathname}?${q}`);
+        const html = res.ok ? await res.text() : null;
+        const fresh = html === null ? null : parse(html);
+        // a failed or unserved read never replaces the reading (TD-1761's rule)
+        if (!fresh || !$("#qcounts", fresh)) { notLive(opened ? "" : "· could not read the Queue — retrying"); if (!opened) setTimeout(() => reread(), 5000); return; }
+        const found = $("#cardfound", fresh);
+        // opening (§4.5 screen 12 *Opening a card's page*): at load only, where the view holds no card with the id
+        if (!opened) {
+          opened = true;
+          if (found && !found.dataset.found && !drawnCard() && !$(".qdline", lists)) { if (found.dataset.goto) { location.replace(found.dataset.goto); return; } }
+        }
+        reading = fresh; readingHtml = html; readAt = Date.now();
+        if (whole && !boxOpen()) drawWhole(); else patch();
+      } catch (err) { notLive(); } finally { busy = false; }
+    }
+    // a hold ending draws what waited
+    const release = () => setTimeout(() => { if (reading && !boxOpen()) patch(); }, 0);
+    document.addEventListener("pointerover", (e) => { if (e.pointerType !== "mouse") return; const u = unitOf(e.target); if (u !== pointerOn) { pointerOn = u; release(); } });
+    document.addEventListener("pointerout", (e) => { if (e.pointerType === "mouse" && !e.relatedTarget && pointerOn) { pointerOn = null; release(); } });
+    lists.addEventListener("focusout", release);
+    lists.addEventListener("toggle", (e) => { if (!e.target.open) release(); }, true);
+    document.addEventListener("close", () => release(), true);
+    // a refused press (a 409): the box and its words kept, the values that waited drawn so the person sees why
+    document.addEventListener("ao:refused", () => { freed = true; try { patch(); } finally { freed = false; } });
+    // a back-forward return re-reads and draws whole, the open-box hold excepted
+    window.addEventListener("pageshow", (e) => {
+      const nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
+      if (e.persisted || (nav && nav.type === "back_forward")) reread(true);
+    });
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) reread(); else pointerOn = null; });
+    // a mail item's sentence opens its message page, Back to this page; j / k step this card's items
+    page.addEventListener("click", (e) => {
+      const link = e.target.closest(".mailrow a.pagelink");
+      const body = !link && e.target.closest(".mailrow[data-page] .body, .mailrow[data-page] > .subj");
+      if (!link && !body) return;
+      if (body && (e.target.closest("a, summary, button") || String(window.getSelection ? window.getSelection() : "").trim())) return;
+      if (link && (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1)) return;
+      e.preventDefault();
+      AO.openEntry(e.target.closest(".mailrow").dataset.msg);
+    });
+    if (typeof AO.refreshInboxPage !== "function") AO.refreshInboxPage = () => reread();
+    openFolds(lists);
+    showAddress();
+    // the page as served is the first reading, but where it drew no card: its first client read opens the address
+    if (drawnCard() || $(".qdline", lists)) { opened = true; readingHtml = lists.innerHTML; reading = parse(readingHtml); }
+    reread();
+    setInterval(() => reread(), 30000);
+    let soon = null;
+    connectEvents((ev) => {
+      if (ev.event !== "queue") return;
+      clearTimeout(soon); soon = setTimeout(() => { soon = null; reread(); }, 1500);
+    });
+    let rev = null;
+    document.addEventListener("ao:counts", (e) => {
+      const r = e.detail && e.detail.rev;
+      if (rev !== null && r !== rev) { clearTimeout(soon); soon = setTimeout(() => { soon = null; reread(); }, 1500); }
+      rev = r === undefined ? rev : r;
+    });
   };
 
   // The Queue's picks, read in the browser as `ui.queue` reads them on the server (§4.5 screen 12 *Filters*,
@@ -5473,18 +5725,6 @@
     }
     function showHash() {
       const el = onCard(AO.hashId(location.hash)); if (el && !hidden(el, "")) reveal(el, false);
-    }
-    // a TD item's address (§4.5 screen 12 *Addresses*, TD-771): `?card=<top id>&row=<TD-n>&item=<entry id>`
-    // opens the card, scrolls to the row (the header for the top entry) and rings the item
-    function showAddress() {
-      const p = new URLSearchParams(location.search);
-      const card = p.get("card"), row = p.get("row"), item = p.get("item");
-      if (!card && !row && !item) return;
-      const it = item && onCard(item), at = onCard(row) || onCard(card);
-      const keep = new URLSearchParams(); [["card", card], ["row", row], ["item", item]].forEach(([k, v]) => { if (v) keep.set(k, v); });
-      if ((it && hidden(it, `?${keep}`)) || (at && hidden(at, `?${keep}`))) return;
-      if (at) reveal(at, !it);
-      if (it) reveal(it, true);
     }
     box.addEventListener("click", (e) => {
       // a board line's *holds* link (§4.5 screen 12 *Three verbs*, TD-1380): its row's anchor, unless a pick hides
@@ -5904,7 +6144,6 @@
     apply();
     wire();
     showHash();
-    showAddress();
     setInterval(reread, 30000);
     // an Inbox item drawn on a card opens its message page as the Inbox's does: Back returns here, and j / k
     // step through the items this page draws (§4.5 screen 6 *Where a row is drawn*)

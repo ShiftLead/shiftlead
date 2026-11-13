@@ -31,6 +31,7 @@ PAGES = {
     "help.html": "/help",
     "settings.html": "/settings",
     "queue.html": "/queue",
+    "card_page.html": "/card/s%23TD-1",
     "spend.html": "/spend",
     "repo.html": "/repo/samscrape",
 }

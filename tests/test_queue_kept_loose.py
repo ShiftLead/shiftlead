@@ -6,7 +6,7 @@ card** `loose:<ref>`; an item that needs nobody stays in the Inbox."""
 
 from __future__ import annotations
 
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 import pytest
 from test_ui_queue import NOW, at, client, fake, mail, queue
@@ -143,9 +143,10 @@ def test_kept_or_loose_and_mail_card_read_alike():
 
 def test_a_loose_cards_address_is_percent_encoded_with_no_row():
     path = notify.queue_path("loose:other#TD-9", "other#TD-9", "m-1")
-    assert path == "/queue?card=loose%3Aother%23TD-9&item=m-1"
-    assert parse_qs(urlsplit(path).query) == {"card": ["loose:other#TD-9"], "item": ["m-1"]}
-    assert notify.queue_path("s#TD-3", "s#TD-3", "m-1") == "/queue?card=s%23TD-3&row=s%23TD-3&item=m-1"
+    assert path == "/card/loose%3Aother%23TD-9?item=m-1"
+    assert parse_qs(urlsplit(path).query) == {"item": ["m-1"]}  # the card is the path's, a page of its own (TD-1762)
+    assert unquote(urlsplit(path).path) == "/card/loose:other#TD-9"
+    assert notify.queue_path("s#TD-3", "s#TD-3", "m-1") == "/card/s%23TD-3?row=s%23TD-3&item=m-1"
 
 
 def test_the_page_draws_a_kept_card_and_a_loose_card_and_the_inbox_neither(tmp_path, monkeypatch):

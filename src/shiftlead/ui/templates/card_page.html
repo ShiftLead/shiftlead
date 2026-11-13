@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ (c.top.show if c else cid) }} · Queue · ShiftLead{% endblock %}
+{% block icon %}page-queue{% endblock %}
+{% block body %}
+{# design §4.5 screen 12 *The card's page*, §4.5a *Card page: ‹ Queue, the page's line, its bar* (TD-1558, built by
+   TD-1762): one Queue card, drawn by the Queue's own card renderer with every control and its folds open, under its
+   line and its bar. The card is `card_part.html`, which the page re-reads; it holds still as the Queue does, with
+   the card as the page (`AO.cardPage`). #}
+<div class="page cardpage" id="cardpage" data-card="{{ cid }}" data-top="{{ top }}">
+<div class="row gap cardline">
+  <a href="/queue#{{ cid | urlencode }}" id="cardback" class="cardback">‹ Queue</a>
+  <span class="qsub" id="cardwhere">{% include "card_where.html" %}</span>
+  <span class="grow"></span>
+  <span class="qsub cardlive">● live — values update in place; nothing here moves</span>
+</div>
+{#- the card's bar (§4.5 screen 12 *The card's page*): what changed on this card since it was drawn, counted and
+    not drawn; **Refresh** draws it #}
+<div class="qbar" id="qbar" role="status"><span class="qbarlive">● live</span> <span class="qbarw">· up to date</span><button type="button" class="btn sm qrefresh" id="qrefresh" title="{{ help_title('card-bar') }}" hidden>Refresh</button></div>
+<div id="cardlists">{% include "card_part.html" %}</div>
+{% include "board_add.html" %}
+</div>
+{% endblock %}
+{% block scripts %}<script>AO.cardPage();</script>{% endblock %}

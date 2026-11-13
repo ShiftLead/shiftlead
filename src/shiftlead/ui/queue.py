@@ -21,6 +21,7 @@ from sessionorc import ledger as ledger_mod
 from sessionorc.queue import (  # noqa: F401 — the home's
     DESIGN_KEY,
     HOLDER,
+    KEPT,
     LOOSE,
     PERSON,
     SYNOPSIS_KEY,
@@ -1320,6 +1321,9 @@ def queue_view(
         lines.append(
             {
                 "kind": "card",
+                # the card's own id and its entries', which a card's page and the Queue's find match (TD-1762)
+                "id": str(c.get("id") or ""),
+                "ids": [str(e.get("qid") or "") for e in ents if e.get("qid")],
                 "repo": str(c.get("id") or "").partition("#")[0],
                 "find": _find_text([*ents, {"qid": c.get("id"), "title": top.get("title")}]),
                 "at": at,
@@ -1409,6 +1413,80 @@ def queue_view(
         "repos": sorted(repos - {""}),
         "served": q.get("at") is not None or bool(cards),
     }
+
+
+GROUP_WORD = {
+    "in_progress": "In progress",
+    "waiting": "Waiting",
+    "up_next": "Up next",
+    "kept": "Recently completed",
+    "completed": "Recently completed",
+    "loose": "In progress",
+}
+
+
+def _spelled(id: str) -> str:
+    """An id as the reading spells it (§4.5 screen 12 *The card's page*, TD-1762): its first ref by `_refs` — the
+    number zero-padded — else the id as given."""
+    return (_refs(id) or [id])[0]
+
+
+def card_page_find(view: Mapping[str, Any], id: str) -> dict[str, Any] | None:
+    """The card whose own id equals a card page's (§4.5 screen 12 *The card's page*, TD-1762), from `queue_view`'s
+    answer: `{card, group}` for an open, kept or loose card, `{line, group: "completed"}` for a completed card the
+    view draws as a line — never a card that merely holds the id as a row (that is `card_view`'s lookup, `ao
+    card`'s). A `loose:` id is its remainder spelled by `_refs`, compared with the loose cards' ids; any other is
+    matched whole, then spelled, against the open and kept cards' ids and the completed lines'. None where the view
+    holds no card with the id."""
+    if id.startswith(LOOSE):
+        want = _spelled(id[len(LOOSE) :])
+        c = next(
+            (
+                c
+                for c in view.get("loose") or ()
+                if str(c.get("id")) == id or _spelled(str(c["id"])[len(LOOSE) :]) == want
+            ),
+            None,
+        )
+        return {"card": c, "group": "loose"} if c else None
+    cards = [(c, g) for g in ("in_progress", "waiting", "up_next") for c in view.get(g) or ()]
+    cards += [(c, "kept") for c in view.get("kept") or ()]
+    lines = [ln for ln in (view.get("completed") or {}).get("lines") or () if ln.get("kind") == "card"]
+    for same in (lambda x: x == id, lambda x: _spelled(x) == _spelled(id)):  # whole first, then spelled
+        if got := next(({"card": c, "group": g} for c, g in cards if same(str(c.get("id")))), None):
+            return got
+        if ln := next((ln for ln in lines if same(str(ln.get("id") or ""))), None):
+            return {"line": ln, "group": "completed"}
+    return None
+
+
+def card_page_goto(view: Mapping[str, Any], index: Mapping[str, Any], row: str, item: str) -> str:
+    """Where a card's page whose id the view holds no card for opens at load (§4.5 screen 12 *Opening a card's
+    page*, TD-1762): the card that draws the address's `item=`, else its `row=` — by `card_index` for an open
+    card, its `kept:` key for a kept one, and the loose cards' own rows — as that card's id; "" where neither is
+    drawn."""
+    every = [*(c for g in ("in_progress", "waiting", "up_next", "kept", "loose") for c in view.get(g) or ())]
+    if item:
+        for c in every:
+            w = c.get("wants") or {}
+            blocks = [
+                w.get("decide"),
+                w.get("do"),
+                w.get("with_you"),
+                w.get("answered"),
+                *(w.get("read") or {}).values(),
+            ]
+            if any(str(m.get("id") or "") == item for b in blocks for m in b or () if isinstance(m, Mapping)):
+                return str(c["id"])
+    if row:
+        key = _spelled(row)
+        for k in (key, KEPT + key):
+            if k in index:
+                return str(index[k][0])
+        for c in view.get("loose") or ():
+            if any(_spelled(str(r.get("qid") or "")) == key for r in [c.get("top") or {}, *(c.get("rows") or ())]):
+                return str(c["id"])
+    return ""
 
 
 def _side_status(wants: Mapping[str, Any]) -> str:

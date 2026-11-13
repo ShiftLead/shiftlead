@@ -117,7 +117,7 @@ def mail_link(link: str, mid: str) -> str:
 
 def queue_link(link: str, card: str, row: str, mid: str) -> str:
     """A question drawn on the Queue (§4.10 *What a message says*, §4.5 screen 12 *Addresses*, TD-795): its
-    card, `<link>/queue?card=<top id>&row=<TD-n>&item=<entry id>`, which opens it and rings the item."""
+    card, `<link>/card/<top id>?row=<TD-n>&item=<entry id>`, its card's page, which rings the item (TD-1762)."""
     return f"{link}{queue_path(card, row, mid)}" if link else ""
 
 
@@ -135,12 +135,13 @@ def mail_path(mid: str) -> str:
 
 
 def queue_path(card: str, row: str | None, mid: str) -> str:
-    """A Queue item's address (§4.5 screen 12 *Addresses*): `card=`, `row=` and `item=`, each percent-encoded — a
-    loose card's id (`loose:<repo>#TD-n`) carries a `#` — and no `row=` on a loose card, which has none (TD-1468)."""
-    q = {"card": card, "row": row, "item": mid}
+    """A Queue item's address, its card's page (§4.5 screen 12 *Addresses*, TD-1558, built by TD-1762):
+    `/card/<card id>` with `row=` and `item=`, each percent-encoded — a card's id carries a `#`, a loose card's
+    (`loose:<repo>#TD-n`) a `:` too — and no `row=` on a loose card, which has none (TD-1468)."""
+    q = {"row": row, "item": mid}
     if card.startswith("loose:") or not row:
         del q["row"]
-    return "/queue?" + urllib.parse.urlencode(q)
+    return f"/card/{urllib.parse.quote(card, safe='')}?" + urllib.parse.urlencode(q)
 
 
 def body(line: str) -> str:

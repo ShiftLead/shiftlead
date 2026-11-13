@@ -854,6 +854,16 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     # TD-1761: §4.5 screen 12 *The page holds still*
+    # TD-1762: §4.5 screen 12 *The card's page*
+    Help(
+        "card-bar",
+        "the bar",
+        "Card page",
+        (
+            "Counts what changed on this card since it was drawn — new items, a move to another group — without "
+            "moving anything; Refresh draws it."
+        ),
+    ),
     Help(
         "queue-bar",
         "the bar",
@@ -989,6 +999,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "row-done",
             "row-back-to-design",
             "queue-bar",
+            "card-bar",
             "card-held",
             "card-gone",
         ),

@@ -22,7 +22,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Annotated, Any
-from urllib.parse import parse_qsl, urlencode
+from urllib.parse import parse_qsl, quote, urlencode
 
 from fastapi import FastAPI, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
@@ -48,6 +48,7 @@ from sessionorc.models import (
     stop_note,
 )
 from sessionorc.queue import TD_REF, card_entries, qid, repo_roots
+from sessionorc.queue import refs as _refs_of
 from sessionorc.store import kept as doing_kept
 from shiftlead import org as orgmod
 from shiftlead import profiles as profiles_mod
@@ -443,12 +444,15 @@ from .pty_bridge import (
     watch_clients,
 )
 from .queue import (
+    GROUP_WORD,
     WANTS,
     WINDOW_LABEL,
     WINDOW_WORD,
     apply_picks,
     attach,
     card_index,
+    card_page_find,
+    card_page_goto,
     card_session,
     card_view,
     card_wants,
@@ -4345,13 +4349,11 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return JSONResponse({"error": f"no open card holds {id}"}, status_code=404)
         return JSONResponse(json.loads(json.dumps(got, default=str)))  # rows carry dates
 
-    @app.get("/queue", response_class=HTMLResponse)
-    async def queue_page(request: Request):
-        """design §4.5 screen 12 / §4.5a **Queue page** (TD-748, built by TD-771): one card per effort,
-        ranked by the person, in three groups — Recently completed with its window picker, In progress
-        with the other work, Up next numbered with the grip and ⤒ ↑ ↓ — from the home's `queue`
-        reading (`ui.queue.queue_view`). `part=1` is the lists alone, which the page re-reads on its
-        poll and on the `queue` event."""
+    async def queue_read(request: Request) -> SimpleNamespace:
+        """The Queue's reading as its pages draw it (§4.5 screen 12; TD-771, TD-1762): the `queue` RPC, what is
+        attached to each card (the Inbox's own sections over the same reads, each `home: queue` row drawn in its
+        card's section by the Inbox's own renderer), the teams, and the promote reading — the Queue page's and a
+        card's page's one road."""
         agent_down, got, why = False, None, ""
         try:
             got = await call("queue")
@@ -4364,8 +4366,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         mail: dict[str, Any] = {}
         tabs: dict[str, int] = {}  # the top bar's numbers at first paint
         if got is not None:
-            # what is attached to a card (§4.5 screen 12, TD-771, TD-828): the Inbox's own sections over the
-            # same reads, each `home: queue` row drawn in its card's section by the Inbox's own renderer
+            # what is attached to a card (§4.5 screen 12, TD-771, TD-828)
             repos_omit(REPOS_OMIT_INBOX)
             with contextlib.suppress(HTTPException):
                 fleet = await call("list")
@@ -4380,9 +4381,6 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     [*(got.get("cards") or ()), *(got.get("completed") or ())],
                 )
                 tabs = tab_counts(sections)
-        # the filter row (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): carried in the URL,
-        # what it hides marked, never dropped — a move's neighbours are the whole Up next order
-        picks = queue_picks(request.query_params)
         teams: dict[str, str] = {}
         with contextlib.suppress(Exception):
             teams = {n: t.repo for n, t in (await h.defs()).teams.items() if t.repo}
@@ -4391,39 +4389,118 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if not agent_down:
             with contextlib.suppress(Exception):  # display only, as the chip is: no mark, never a failed page
                 info = dict(await call("host"))
-        promotes = (info or {}).get("promotes")
+        return SimpleNamespace(
+            agent_down=agent_down, got=got, why=why, fleet=fleet, mail=mail, tabs=tabs, teams=teams, info=info
+        )
+
+    async def page_chrome(request: Request, rd: SimpleNamespace, active: str) -> dict[str, Any]:
+        """A full Queue or card page's top bar (§4.5 *Top bar*): the host, the numbers, the usage and build chips."""
+        fleet = rd.fleet
+        with contextlib.suppress(HTTPException):
+            fleet = fleet or ([] if rd.agent_down else await call("list"))
+        return {
+            **rd.tabs,
+            "host": host_name(),
+            "active": active,
+            "volatile": hosts.local_host().volatile,
+            "usage": {} if rd.agent_down else await chip_usage(call, fleet),
+            "build_chip": None if rd.agent_down or rd.info is None else await chip_build(call, rd.info),
+        }
+
+    @app.get("/queue", response_class=HTMLResponse)
+    async def queue_page(request: Request):
+        """design §4.5 screen 12 / §4.5a **Queue page** (TD-748, built by TD-771): one card per effort,
+        ranked by the person, in three groups — Recently completed with its window picker, In progress
+        with the other work, Up next numbered with the grip and ⤒ ↑ ↓ — from the home's `queue`
+        reading (`ui.queue.queue_view`). `part=1` is the lists alone, which the page re-reads on its
+        poll and on the `queue` event. `?card=…`, every item address written before TD-1558, redirects to that
+        card's page with its `row=` and `item=` (§4.5 screen 12 *Addresses*, TD-1762)."""
+        qp = request.query_params
+        if qp.get("card") and not qp.get("part"):
+            keep = urlencode([(k, qp[k]) for k in ("row", "item") if qp.get(k)])
+            return RedirectResponse(f"/card/{quote(qp['card'], safe='')}{'?' + keep if keep else ''}", status_code=303)
+        rd = await queue_read(request)
+        # the filter row (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): carried in the URL,
+        # what it hides marked, never dropped — a move's neighbours are the whole Up next order
+        picks = queue_picks(request.query_params)
+        promotes = (rd.info or {}).get("promotes")
         # Recently completed sends the picked window's lines alone (§4.5 *Page loads*, TD-882)
         view = send_window(
-            apply_picks(queue_view(got, datetime.now(UTC), mail, promotes, fleet), picks, teams),
+            apply_picks(queue_view(rd.got, datetime.now(UTC), rd.mail, promotes, rd.fleet), picks, rd.teams),
             queue_window(request.query_params),
         )
         ctx = {
             "q": view,
             "picks": picks,
             "pq": picks_query,
-            "chips": filter_chips(teams, view["repos"], picks["team"]),
-            "team_repos": teams,  # a team chip's repo, which the browser's apply reads as the server's does (TD-829)
+            "chips": filter_chips(rd.teams, view["repos"], picks["team"]),
+            "team_repos": rd.teams,  # a team chip's repo, which the browser's apply reads as the server's does (TD-829)
             "labels": WINDOW_LABEL,
             "words": WINDOW_WORD,
-            "why": why,
-            "agent_down": agent_down,
+            "why": rd.why,
+            "agent_down": rd.agent_down,
         }
         if request.query_params.get("part"):
             return templates.TemplateResponse(request, "queue_part.html", ctx)
-        with contextlib.suppress(HTTPException):
-            fleet = fleet or ([] if agent_down else await call("list"))
+        return templates.TemplateResponse(request, "queue.html", {**ctx, **await page_chrome(request, rd, "Queue")})
+
+    @app.get("/card/{cid:path}", response_class=HTMLResponse)
+    async def card_page(request: Request, cid: str):
+        """design §4.5 screen 12 *The card's page*, §4.5a *Card page* (TD-1558, built by TD-1762): one Queue card,
+        drawn by the Queue's card renderer with every control and its folds open, under its line — *‹ Queue · <group>
+        · <place> · <repo> · <team>* — and its bar. The card is the one whose own id equals `cid` (decoded:
+        `shiftlead%23TD-1551`, `loose%3Aother%23TD-009`; `card_page_find`), from the Queue's own view over the
+        home's reading; a completed card with no item for the person is its *Recently completed* line opened.
+        `part=1` is the card alone, which the page re-reads; where the view holds no card with the id, the part
+        carries where the page opens at load (`data-goto`: the card drawing `item=` or `row=`, else the Queue's find
+        for the id)."""
+        rd = await queue_read(request)
+        view = queue_view(rd.got, datetime.now(UTC), rd.mail, (rd.info or {}).get("promotes"), rd.fleet)
+        found = card_page_find(view, cid) if rd.got is not None else None
+        qp = request.query_params
+        goto = ""
+        if rd.got is not None and found is None:
+            to = card_page_goto(view, card_index(rd.got), qp.get("row") or "", qp.get("item") or "")
+            keep = urlencode([(k, qp[k]) for k in ("row", "item") if qp.get(k)])
+            goto = f"/card/{quote(to, safe='')}?{keep}" if to and to != cid else f"/queue#{quote(cid, safe='')}"
+        c = (found or {}).get("card")
+        # the page's top entry among the reading's completed ids, which the bar reads *done* by once the view holds
+        # no card with the page's id (§4.5 screen 12 *The card's page*)
+        top = "" if cid.startswith("loose:") else (_refs_of(cid) or [cid])[0]
+        top_done = bool(top) and any(
+            top
+            in {
+                (_refs_of(i) or [i])[0]
+                for i in [str(x.get("id") or ""), *(str(e.get("qid") or "") for e in x.get("entries") or ())]
+            }
+            for x in (rd.got or {}).get("completed") or ()
+            if isinstance(x, dict)
+        )
+        repo = str(((c or {}).get("top") or {}).get("repo") or "") or str(cid).removeprefix("loose:").partition("#")[0]
+        team = next((n for n, r in sorted(rd.teams.items()) if r == repo), "")
+        ctx = {
+            "cid": cid,
+            "found": found,
+            "c": c,
+            "line": (found or {}).get("line"),
+            "group": (found or {}).get("group") or "",
+            "group_word": GROUP_WORD.get((found or {}).get("group") or "", ""),
+            "repo": repo,
+            "team": team,
+            "goto": goto,
+            "top": top,
+            "top_done": top_done,
+            "served": bool(view.get("served")),
+            "one_repo": bool(view.get("one_repo", True)),
+            "why": rd.why,
+            "agent_down": rd.agent_down,
+        }
+        if qp.get("part"):
+            return templates.TemplateResponse(request, "card_part.html", ctx)
         return templates.TemplateResponse(
             request,
-            "queue.html",
-            {
-                **ctx,
-                **tabs,
-                "host": host_name(),
-                "active": "Queue",
-                "volatile": hosts.local_host().volatile,
-                "usage": {} if agent_down else await chip_usage(call, fleet),
-                "build_chip": None if agent_down or info is None else await chip_build(call, info),
-            },
+            "card_page.html",
+            {**ctx, "board_choices": board_choices(), **await page_chrome(request, rd, "Queue")},
         )
 
     async def spend_reading(picks: dict[str, Any]) -> dict[str, Any]:
@@ -5112,7 +5189,10 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # Back returns to the list the row is drawn in (§4.5 screen 6 *Where a row is drawn*, TD-771): the
         # Inbox's picks (`?…`), or the Queue's page with its picks (`/queue…`) for a row drawn on a card
         on_queue = back == "/queue" or back.startswith("/queue?")
-        back = back if back.startswith("?") or on_queue else ""
+        # …or a card's page (TD-1762): its path alone, used as is, and Back rings the item there (`item=`), no
+        # fragment (§4.5 screen 12 *The card's page*)
+        on_card = bool(re.fullmatch(r"/card/[^/?#\\\s]+", back))
+        back = back if back.startswith("?") or on_queue or on_card else ""
         ctx: dict[str, Any] = {
             "host": host_name(),
             "active": "Inbox",
@@ -5120,7 +5200,11 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "build_chip": await chip_build(call),
             "volatile": hosts.local_host().volatile,
             "mid": mid,
-            "back_url": f"{back}#{mid}" if on_queue else f"/inbox{back}#{mid}",
+            "back_url": f"{back}?{urlencode({'item': mid})}"
+            if on_card
+            else f"{back}#{mid}"
+            if on_queue
+            else f"/inbox{back}#{mid}",
             "origin": page_origin(request),
             "fold_open": True,
             "board_choices": board_choices(),
