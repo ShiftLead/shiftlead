@@ -296,8 +296,8 @@ def _first_at(data: bytes) -> str | None:
             d = json.loads(line)
         except ValueError:
             continue
-        if isinstance(d, dict) and (at := d.get("startTime") or d.get("timestamp")):
-            return str(at)
+        if isinstance(d, dict) and isinstance(at := d.get("startTime") or d.get("timestamp"), str) and instant(at):
+            return at
     return None
 
 

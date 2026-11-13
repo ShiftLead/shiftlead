@@ -242,7 +242,7 @@ def test_a_conversation_reads_its_head_and_tail_only_and_skips_an_instant_that_i
     monkeypatch.setattr(tr, "CHUNK", 64)
     p = tmp_path / "abc.jsonl"
     lines = [
-        {"type": "custom-title", "customTitle": "x"},
+        {"type": "custom-title", "customTitle": "x", "timestamp": 1794552637857},
         {"type": "user", "timestamp": _at(1), "message": {"content": "go"}},
         {"type": "assistant", "timestamp": _at(2), "message": {"content": [{"type": "text", "text": "y" * 300}]}},
         {"type": "cost-state", "timestamp": 1794552637857},

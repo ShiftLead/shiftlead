@@ -154,8 +154,8 @@ def _first_at(path: Path) -> str | None:
             d = json.loads(line)
         except ValueError:
             continue
-        if isinstance(d, dict) and d.get("timestamp"):
-            return str(d["timestamp"])
+        if isinstance(d, dict) and isinstance(at := d.get("timestamp"), str) and instant(at):
+            return at
     return None
 
 
@@ -194,7 +194,7 @@ def conversation(path: Path) -> Conversation | None:
         return None
     first = _first_at(path)
     last = _last_at(path, size) if first else None
-    if not first or not instant(first) or not last:
+    if not first or not last:
         return None
     return Conversation(id=path.stem, first_at=first, last_at=last, size=size)
 
