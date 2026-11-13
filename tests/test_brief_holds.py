@@ -14,7 +14,7 @@ from conftest import park_ticks
 from sessionorc import adapters
 from sessionorc.agent_common import RpcError
 from sessionorc.client import AgentError, LocalClient
-from sessionorc.models import Pending
+from sessionorc.models import WRAPUP_PROMPT, Pending
 
 pytestmark = pytest.mark.integration
 
@@ -177,4 +177,97 @@ async def test_a_stop_time_reached_while_the_brief_is_due_stops_the_session(agen
         await agent._enforce_stop_times(datetime.now(UTC))
         assert typed == [] and rec.wrapup_sent_at is None
         assert rec.state == "exited" and rec.ended["by"] == "tick" and rec.ended["why"] == "stop time"
+        await person.call("remove", id=sid)
+
+
+async def test_a_sit_out_with_the_brief_due_is_marked_then_stopped_and_nothing_typed(agent, hooks_ride, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _due(agent, person, tmp_path)
+        rec = agent.sessions[sid]
+        rec.scale = {"line": "grind"}
+        real, seen = agent.rpc_kill, []
+
+        async def kill(id, caller=None, killer=None):
+            seen.append((dict(rec.sit_out or {}), dict(rec.scale), caller))  # the mark is on before the kill
+            return await real(id, caller=caller, killer=killer)
+
+        agent.rpc_kill = kill
+        view = await person.call("relaunch", id=sid, sit_out=True)
+        assert seen[0][0]["at"] and seen[0][2] is None, "marked before the kill, by the person's own call"
+        assert view["sit_out"] and rec.state == "exited" and rec.ended["by"] == "person"
+        assert rec.sends == [] and rec.wrapup_at is None
+        assert agent.store.load(sid).sit_out == rec.sit_out  # the kill's own save kept the mark
+        await person.call("remove", id=sid)
+
+
+async def test_a_sit_out_with_the_brief_in_sends_the_wrapup_as_today(agent, hooks_ride, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _due(agent, person, tmp_path)
+        rec = agent.sessions[sid]
+        rec.first_prompt_sent_at = datetime.now(UTC).isoformat()
+        await person.call("relaunch", id=sid, sit_out=True)
+        assert rec.sit_out and rec.wrapup_at and rec.sends[-1].text == WRAPUP_PROMPT and rec.state != "exited"
+        await person.call("kill", id=sid)
+        await person.call("remove", id=sid)
+
+
+async def test_a_stop_that_raises_takes_the_mark_back(agent, hooks_ride, tmp_path, monkeypatch):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _due(agent, person, tmp_path)
+        rec = agent.sessions[sid]
+
+        async def refused(id, caller=None, killer=None):
+            raise RpcError("tmux said no")
+
+        monkeypatch.setattr(agent, "rpc_kill", refused)
+        with pytest.raises(AgentError, match=r"w: it could not be stopped \(tmux said no\), so it is not sat out"):
+            await person.call("relaunch", id=sid, sit_out=True)
+        assert rec.sit_out is None
+        rec.scale = {"line": "grind"}
+        with pytest.raises(AgentError, match="so it is not dropped"):
+            await person.call("relaunch", id=sid, drop_extra=True)
+        assert rec.scale == {"line": "grind"}
+        monkeypatch.undo()
+        await person.call("kill", id=sid)
+        await person.call("remove", id=sid)
+
+
+async def test_a_dropped_extra_with_the_brief_due_is_stopped_and_forgotten_with_no_git_reading(
+    agent, hooks_ride, tmp_path
+):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _due(agent, person, tmp_path)
+        rec = agent.sessions[sid]
+        rec.scale = {"line": "grind"}
+        real, seen = agent.rpc_kill, []
+
+        async def kill(id, caller=None, killer=None):
+            seen.append(rec.scale.get("drop"))  # the mark is on before the kill
+            return await real(id, caller=caller, killer=killer)
+
+        agent.rpc_kill = kill
+        view = await person.call("relaunch", id=sid, drop_extra=True)
+        assert seen and seen[0] and view["scale"]["drop"] and rec.state == "exited" and rec.sends == []
+        rec.git = None  # it never worked: no git reading yet
+        rec.first_prompt_error = "given up"  # the brief's bound passing on the exited record changes nothing
+        await agent._keep_running(datetime.now(UTC))
+        assert sid not in agent.sessions
+
+
+async def test_an_extra_launched_with_no_brief_exited_dirty_is_kept_as_today(agent, hooks_ride, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _due(agent, person, tmp_path)
+        rec = agent.sessions[sid]
+        rec.first_prompt = None
+        rec.scale = {"line": "grind"}
+        await person.call("relaunch", id=sid, drop_extra=True)
+        await person.call("kill", id=sid)
+        rec.git = {"dirty": 1, "unpushed": 0}
+        await agent._keep_running(datetime.now(UTC))
+        assert agent.sessions.get(sid) is rec
         await person.call("remove", id=sid)

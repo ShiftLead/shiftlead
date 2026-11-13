@@ -1673,7 +1673,10 @@ class TickMixin:
             return False
         git = s.git or {}
         clean = all(isinstance(git.get(k), int) and git[k] == 0 for k in ("dirty", "unpushed"))
-        if s.state == "exited" and not clean:
+        # one stopped before its brief went in never worked, and may carry no git reading yet (§4.3 *No send
+        # until it is in*, TD-1637): not `_first_prompt_due`, whose given-up leg may be set on the exited record
+        unbriefed = bool(s.first_prompt) and not s.first_prompt_sent_at and adapters.core_runs_start_hooks(s.adapter)
+        if s.state == "exited" and not clean and not unbriefed:
             return True
         if s.state not in ("exited", "closed") and not await self._finished_close(s, "extra_dropped"):
             return True
