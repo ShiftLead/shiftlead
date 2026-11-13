@@ -189,7 +189,7 @@ def paragraphs(file: str, text: str, ledger: bool = False) -> list[Para]:
             continue
         if not raw.strip():
             flush()
-        elif raw.startswith("#") or raw.startswith("|"):
+        elif raw.startswith("|"):
             flush()
             cur = [(i, raw)]
             flush()
@@ -263,14 +263,17 @@ def load_prep(rel: str, raw: str) -> Prep:
         if "at" in c:
             if "is" in c:
                 raise NotPrepared(f"claims item {n}: is goes with count, not at")
-            if not re.fullmatch(r".+?(?::\d+)?", c["at"]):
-                raise NotPrepared(f"claims item {n}'s at is not a path or path:line")
+            at_path = re.sub(r":\d+$", "", c["at"]).removeprefix("agent-cadence:")
+            if at_path.startswith("/") or ".." in at_path.split("/"):
+                raise NotPrepared(f"claims item {n}'s at leaves the repo")
         else:
             if "has" in c:
                 raise NotPrepared(f"claims item {n}: has goes with at, not count")
             cnt = c["count"]
             if not isinstance(cnt, dict) or not isinstance(cnt.get("glob"), str) or not cnt["glob"].strip():
                 raise NotPrepared(f"claims item {n}'s count needs a glob")
+            if cnt["glob"].startswith("/") or ".." in cnt["glob"].split("/"):
+                raise NotPrepared(f"claims item {n}'s glob leaves the repo")
             if set(cnt) - {"glob", "grep", "lines"}:
                 raise NotPrepared(f"claims item {n}'s count has an unknown key")
             if "grep" in cnt:
@@ -339,8 +342,21 @@ def added_lines(top: Path, base: str, commit: str) -> dict[str, set[int]]:
     """The lines the PR adds against the base, by file, in the changed-text paths."""
     out: dict[str, set[int]] = {}
     diff = git(
-        top, "diff", "--unified=0", "--no-color", "--no-renames", "--no-ext-diff", base, commit, "--", *CHANGED_PATHS
-    )
+        top,
+        "-c",
+        "core.quotepath=off",
+        "diff",
+        "--unified=0",
+        "--no-color",
+        "--no-renames",
+        "--no-ext-diff",
+        "--src-prefix=a/",
+        "--dst-prefix=b/",
+        base,
+        commit,
+        "--",
+        *CHANGED_PATHS,
+    )  # the prefixes named, so a person's diff.noprefix or mnemonicPrefix never empties the changed text
     cur: str | None = None
     for line in diff.split("\n"):
         if line.startswith("+++ "):
@@ -536,6 +552,9 @@ def check_claims(
         for rel, line in paths_in(p, added):
             if rel in new_paths or (tree / rel).exists() or (ac_root is not None and (ac_root / rel).exists()):
                 continue
+            if ac_root is None:
+                cnr.append(f"agent-cadence path: the pinned tree could not be found to read {rel}")
+                continue
             flags.append(Flag("claims", p.file, line, rel, f"{rel} does not exist at the commit"))
     return flags
 
@@ -546,7 +565,8 @@ def paths_in(p: Para, added: dict[str, set[int]]) -> list[tuple[str, int]]:
     adds = added.get(p.file, set())
     for tok in re.finditer(r"\S+", p.text):
         t = tok.group(0)
-        if any(c in t for c in "<*$") or "://" in t or t.lower().startswith("www."):
+        bare = t.strip("*_`.,;:()")  # emphasis around a path is not a glob
+        if any(c in bare for c in "<*$") or "://" in t or t.lower().startswith("www."):
             continue
         links = [m.span(1) for m in LINK_TARGET_RE.finditer(t)]
         for run in PATH_RUN_RE.finditer(t):
@@ -681,11 +701,11 @@ def run_tools(tree: Path, base: str) -> tuple[list[Flag], list[str]]:
             flags.append(
                 Flag("tools", rel or "docs/ledger", 1, collapse(f.get("text", "")), collapse(f.get("text", "")))
             )
-    except FileNotFoundError:
+    except OSError:
         cnr.append("ledger check: agent-cadence will not start")
     except subprocess.TimeoutExpired:
         cnr.append(f"ledger check: timed out after {TOOL_TIMEOUT} s")
-    except (ValueError, AttributeError, KeyError) as e:
+    except (ValueError, AttributeError, KeyError, TypeError) as e:
         cnr.append(f"ledger check: unreadable output ({type(e).__name__})")
     env = dict(os.environ)
     env["PYTHONPATH"] = os.pathsep.join([str(tree / "src")] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
@@ -700,7 +720,7 @@ def run_tools(tree: Path, base: str) -> tuple[list[Flag], list[str]]:
             check=False,
         )
         if r.returncode == 1:
-            failed = re.findall(r"^FAILED (\S+?)::(\S+)", r.stdout, re.MULTILINE)
+            failed = re.findall(r"^FAILED (\S+?)::(.+?)(?: - .*)?$", r.stdout, re.MULTILINE)
             if not failed:
                 last = (r.stderr.strip() or r.stdout.strip()).split("\n")[-1]
                 cnr.append(f"doc-bound tests: exit 1 with no failed test named ({collapse(last)[:160]})")
@@ -708,7 +728,7 @@ def run_tools(tree: Path, base: str) -> tuple[list[Flag], list[str]]:
                 flags.append(Flag("tools", rel, _def_line(tree, rel, test), test, f"{test} failed"))
         elif r.returncode != 0:
             cnr.append(f"doc-bound tests: pytest exit {r.returncode}")
-    except (FileNotFoundError, PermissionError):
+    except OSError:
         cnr.append("doc-bound tests: pytest will not start")
     except subprocess.TimeoutExpired:
         cnr.append(f"doc-bound tests: timed out after {TOOL_TIMEOUT} s")
@@ -767,6 +787,7 @@ def check(entry: str, rev: str, base: str | None) -> tuple[int, list[str]]:
         raise NotPrepared(f"--entry {entry!r} is not TD-<n>")
     prep_rel = f"docs/reviews/{entry}.prep.yml"
     top = Path(git(Path.cwd(), "rev-parse", "--show-toplevel").strip())
+    prune_stale(top)  # every run first, whatever it ends in
     if rev == "HEAD":
         d = dirty(top, prep_rel)
         if d:
@@ -782,7 +803,6 @@ def check(entry: str, rev: str, base: str | None) -> tuple[int, list[str]]:
         b = git(top, "merge-base", commit, "origin/main", check=False).strip()
         if not b:
             raise CannotRun("no merge base with origin/main (fetch it, or pass --base)")
-    prune_stale(top)
     tree = Path(tempfile.mkdtemp(prefix=PREFIX))
     try:
         git(top, "worktree", "add", "--detach", "--quiet", str(tree), commit)

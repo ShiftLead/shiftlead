@@ -87,7 +87,8 @@ def repo(tmp_path, monkeypatch):
     _git(r, "update-ref", "refs/remotes/origin/main", "HEAD")
     monkeypatch.chdir(r)
     monkeypatch.setattr(dp, "run_tools", lambda tree, base: ([], []))
-    monkeypatch.setattr(dp, "cadence_root", lambda tree: None)
+    (tmp_path / "ac").mkdir()
+    monkeypatch.setattr(dp, "cadence_root", lambda tree: tmp_path / "ac")  # a pinned tree holding nothing
     return r
 
 
@@ -512,3 +513,83 @@ def test_the_script_runs_as_a_command(repo):
         timeout=120,
     )
     assert r.returncode == 3 and r.stdout.startswith("design-prep: CANNOT RUN · ")
+
+
+def test_a_diff_prefix_config_does_not_empty_the_changed_text(repo, capsys):
+    """A person's `diff.noprefix` or `diff.mnemonicPrefix` never hides the changed text (review of #3681)."""
+    put(repo, {"docs/design/1-problem.md": "# P\n\nSee src/gone.py.\n", PREP: ""})
+    for key in ("diff.noprefix", "diff.mnemonicPrefix"):
+        _git(repo, "config", key, "true")
+        code, out = run(capsys)
+        assert code == 1 and out[1:] == [
+            "claims · docs/design/1-problem.md:3 · src/gone.py does not exist at the commit"
+        ]
+        _git(repo, "config", "--unset", key)
+
+
+def test_a_heading_with_text_under_it_is_one_paragraph(repo, capsys):
+    put(
+        repo,
+        {
+            "docs/design/1-problem.md": "# No reviewer here\npassed at the commit.\n\nNo reviewer: passed, commit.\n",
+            PREP: RULE,
+        },
+    )
+    code, out = run(capsys)
+    assert code == 0, out
+
+
+def test_a_path_in_bold_or_italics_is_read(repo, capsys):
+    put(
+        repo,
+        {"docs/design/1-problem.md": "# P\n\nSee **docs/nope.md** and *docs/nope2.md*, not docs/*.md.\n", PREP: ""},
+    )
+    code, out = run(capsys)
+    assert code == 1
+    assert [ln.split(" · ")[2] for ln in out[1:]] == [
+        "docs/nope.md does not exist at the commit",
+        "docs/nope2.md does not exist at the commit",
+    ]
+
+
+def test_a_path_with_no_pinned_tree_to_read_is_cannot_run(repo, capsys, monkeypatch):
+    monkeypatch.setattr(dp, "cadence_root", lambda tree: None)
+    put(repo, {"docs/design/1-problem.md": "# P\n\nSee scripts/ledger.py.\n", PREP: ""})
+    code, out = run(capsys)
+    assert code == 3 and "the pinned tree could not be found to read scripts/ledger.py" in out[0]
+
+
+def test_a_stale_worktree_is_pruned_even_by_a_run_that_stops_early(repo, capsys, tmp_path):
+    stale = tmp_path / "design-prep-early"
+    _git(repo, "worktree", "add", "-q", "--detach", str(stale), "HEAD")
+    import shutil
+
+    shutil.rmtree(stale)
+    assert run(capsys, "--rev", "nosuchref")[0] == 3
+    assert "design-prep-" not in _git(repo, "worktree", "list", "--porcelain")
+
+
+@pytest.mark.parametrize(
+    "prep",
+    ['claims:\n  - says: x\n    count: {glob: "../*"}\n    is: 1\n', "claims:\n  - says: x\n    at: /etc/passwd\n"],
+)
+def test_a_claim_leaving_the_repo_is_not_prepared(repo, capsys, prep):
+    put(repo, {PREP: prep})
+    code, out = run(capsys)
+    assert code == 2 and "leaves the repo" in out[0]
+
+
+def test_a_class_test_and_a_spaced_param_keep_their_names(tmp_path, monkeypatch):
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_history.py").write_text("class TestA:\n    def test_c(self):\n        pass\n")
+    out = "FAILED tests/test_history.py::TestA::test_c[a b] - assert 0\n"
+
+    def fake(cmd, **kw):
+        if cmd[0] == "agent-cadence":
+            return subprocess.CompletedProcess(cmd, 0, '{"flags": 5}', "")
+        return subprocess.CompletedProcess(cmd, 1, out, "")
+
+    monkeypatch.setattr(dp.subprocess, "run", fake)
+    flags, cnr = dp.run_tools(tmp_path, "abc")
+    assert [f.render() for f in flags] == ["tools · tests/test_history.py:2 · TestA::test_c[a b] failed"]
+    assert cnr == ["ledger check: unreadable output (TypeError)"]
