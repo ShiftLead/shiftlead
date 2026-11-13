@@ -340,7 +340,7 @@ not mix:
 - **Repo page** — `/repo/<name>`: the repo's group of the Sessions page expanded — its line and Repo facet, every servicing team's whole card — then **the board**, one column per stage of its team's flow (TD-900), one repo at a time (design §4.5 screen 11). *Not:* dashboard — no history beyond the window. — *proposed 2026-09-25, reshaped 2026-09-26 and 2026-10-15 (Paul, TD-722)*.
 - **run log** — a session's recorded pane output from its first byte (invariant 3). — *proposed*.
 - **feedback report** — what `/shiftlead-feedback` writes in report mode, at an install whose person cannot push
-  to shiftlead: its approved findings with every name of that install taken out, which the person submits
+  to shiftlead: its approved findings with the install's names the scrub knows taken out, which the person submits
   themselves as a `feedback report: ` issue on `ShiftLead/shiftlead`, and which a file-mode run at shiftlead's
   home reads beside its seats (design §4.7 *Feedback*, *Reports from other installs*; TD-1718). *Not:*
   telemetry: nothing is sent by the procedure. — *proposed* 2026-11-13 (the designer).
