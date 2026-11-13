@@ -104,6 +104,13 @@ class Adapter(Protocol):
     #                                                      session holds from its start with no turn run for it
     #                                                      (design §4.3, TD-283); `create` hands it only to such
     #                                                      an adapter, and refuses it in words for any other
+    #   start_context_system: bool                        True when the start context is the tool's system
+    #                                                      prompt (Claude Code's); False where unset. Such an
+    #                                                      adapter's `launch` also takes `keep_context=True`:
+    #                                                      the conversation's context file as it stands, no
+    #                                                      text. The home moves a member's brief there at a
+    #                                                      fresh launch (design §4.3 *The shared text goes in
+    #                                                      the system prompt*, TD-1669); implies start_context
     #   explain(tail) -> screen.Match | None               the screen-rule verdict with its evidence
     #                                                      (hook-fed adapters: applied as `scraped` only
     #                                                      when no fresher hook state exists; TD-015)
@@ -361,6 +368,16 @@ class Transcript:
         if self.raw is not None:
             out["raw"] = self.raw
         return out
+
+
+def start_context_system(name: str) -> bool:
+    """Whether the adapter's start context is its tool's system prompt (design §4.3, TD-1669): where a member's
+    brief moves at a fresh launch. False for an unknown adapter or one that does not say."""
+    try:
+        ad = get(name)
+    except KeyError:
+        return False
+    return bool(getattr(ad, "start_context_system", False))
 
 
 def has_agent(adapter: str) -> bool:

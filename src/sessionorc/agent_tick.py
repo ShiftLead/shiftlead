@@ -6867,7 +6867,7 @@ def merge_prompts(
     for x in reversed(out):  # the held entries consume their sends again, oldest first
         at = _when(x.get("at"))
         if x.get("from") == "brief":
-            take_brief(at, lead=str(x.get("text") or "").startswith(mail.BRIEF_LINE))
+            take_brief(at, lead=str(x.get("text") or "").startswith(mail.BRIEF_LINES))
         elif x.get("from") not in (PERSON, None):
             take(str(x["from"]), _first(str(x.get("text") or "")), at)
     for p in found:
@@ -6880,7 +6880,7 @@ def merge_prompts(
                 same["reply"] = p.reply
             continue
         at = _when(p.at)
-        if p.text.startswith(mail.BRIEF_LINE):
+        if p.text.startswith(mail.BRIEF_LINES):
             take_brief(at, lead=True)
             sender = "brief"
         elif take_brief(at, lead=False):

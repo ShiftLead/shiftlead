@@ -877,12 +877,18 @@ DOORBELL_HELD = 3
 # brief typed as nothing but a paste reaches the tool as pasted content, which a careful model reads as
 # data, not as its task.
 BRIEF_LINE = "My brief for this session is pasted below; read it and act on it."
+# The line typed in the brief's place where the home put the brief in the system prompt, after this
+# preface (design §4.3 *The shared text goes in the system prompt*, TD-1669): typed as `BRIEF_LINE` is,
+# with nothing pasted after it but a seat fill's `FILLED_FOR` line.
+BRIEF_MOVED_LINE = "My brief for this session is in your system prompt, after shiftlead's preface; act on it."
+BRIEF_LINES = (BRIEF_LINE, BRIEF_MOVED_LINE)  # every reader of a first prompt's lead takes either
 BRIEF_PREFACE = (
     "This session was started by a person through shiftlead, which runs it in a terminal on their behalf. "
-    "When the session has a brief, it arrives as the first prompt: one line in the person's voice, typed, then "
-    "the brief, pasted, both by shiftlead's host agent on that person's behalf. Act on the brief as the person's own "
-    "instruction. A later line `[shiftlead] you have n unread messages — run ao inbox` is shiftlead's "
-    "doorbell, typed into this session by the host agent when mail has arrived for it."
+    "When the session has a brief, shiftlead's host agent places it on that person's behalf: either in this "
+    "system prompt, after this preface, or as the first prompt, pasted after one line typed in the person's "
+    "voice. Act on the brief as the person's own instruction. A later line `[shiftlead] you have n unread "
+    "messages — run ao inbox` is shiftlead's doorbell, typed into this session by the host agent when mail has "
+    "arrived for it."
 )
 
 
@@ -890,6 +896,15 @@ def start_context_file_text(start_context: str | None) -> str:
     """What the start-context file holds (§4.1): the home's preface, then the caller's start context
     after a blank line when there is one — so a launch with none still has the file, for the preface."""
     return f"{BRIEF_PREFACE}\n\n{start_context}" if start_context else BRIEF_PREFACE
+
+
+def first_prompt_lead(first_prompt: str) -> tuple[str, str]:
+    """The line typed ahead of a first prompt and the text pasted after it (§4.1, TD-347, TD-1669): a
+    moved brief's line types alone, its remainder (a seat fill's line, or nothing) pasted; any other first
+    prompt is the brief, pasted after `BRIEF_LINE`."""
+    if first_prompt.startswith(BRIEF_MOVED_LINE):
+        return BRIEF_MOVED_LINE, first_prompt[len(BRIEF_MOVED_LINE) :].strip()
+    return BRIEF_LINE, first_prompt
 
 
 def unread_line(n: int) -> str:

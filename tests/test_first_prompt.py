@@ -83,6 +83,23 @@ async def test_the_brief_is_typed_at_the_first_idle_and_before_the_doorbell(agen
         assert (await _submitted(agent, w))[0] == "SUBMITTED " + TYPED, "typed once"
 
 
+async def test_a_moved_brief_types_its_line_alone_or_with_the_fill_line_pasted(agent, briefstubs, tmp_path):
+    # §4.3 *The shared text goes in the system prompt* (TD-1669): the brief is in the system prompt, so the
+    # first prompt is the moved line, typed as BRIEF_LINE is; a seat fill's line is pasted after it
+    filled = "[shiftlead] you are filled for: m-1"
+    async with LocalClient() as c:
+        for name, prompt, typed in (
+            ("m", mail.BRIEF_MOVED_LINE, mail.BRIEF_MOVED_LINE),
+            ("f", f"{mail.BRIEF_MOVED_LINE}\n\n{filled}", f"{mail.BRIEF_MOVED_LINE} {filled}"),
+        ):
+            w = await _start(agent, c, tmp_path, name, "brief0", prompt=prompt)
+            rec = agent.sessions[w]
+            await agent.rpc_hook(w, state="idle")
+            assert await wait_for(lambda w=w, t=typed: _first(agent, w, "SUBMITTED " + t), timeout=6), name
+            assert await wait_for(lambda rec=rec: _sent(rec), timeout=6)
+            assert rec.sends[-1].text == "(the brief)"
+
+
 async def _first(agent, sid: str, line: str, at: int = 0) -> bool:
     got = await _submitted(agent, sid)
     return len(got) > at and got[at] == line

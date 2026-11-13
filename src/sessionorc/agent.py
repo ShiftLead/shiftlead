@@ -245,7 +245,7 @@ from sessionorc.agent_settings import SettingsMixin
 from sessionorc.agent_shape import ShapeMixin
 from sessionorc.agent_spend import SpendMixin
 from sessionorc.agent_sync import SyncMixin
-from sessionorc.agent_tick import TickMixin
+from sessionorc.agent_tick import FILLED_FOR, TickMixin
 from sessionorc.agent_wake import WakeMixin
 from sessionorc.gitinfo import (
     REAP_STEP,
@@ -290,6 +290,12 @@ from sessionorc.store import (
     UsageStore,
 )
 from sessionorc.tmux import ARG_LIMIT, DuplicateSession, Tmux
+
+
+def _split_filled_for(prompt: str) -> tuple[str, str]:
+    """A brief and the seat fill's `FILLED_FOR` line a create's prompt ends with, if any (§6 rule 3, TD-1669)."""
+    told, sep, rest = prompt.partition(f"\n\n{FILLED_FOR}")
+    return told, (FILLED_FOR + rest) if sep else ""
 
 
 def _stamp_start(s: Session) -> None:
@@ -1406,7 +1412,18 @@ class HostAgent(
         return out
 
     async def rpc_get(self, id: str) -> dict[str, Any]:
-        return self._view(self._find(id), bookkeeping=True)  # one record: its tallies and wakes ride along
+        s = self._find(id)
+        v = self._view(s, bookkeeping=True)  # one record: its tallies and wakes ride along
+        if not v.get("start_context") and s.adapter_id and adapters.start_context_system(s.adapter):
+            # a moved brief is in the conversation's context file, never on the record: Focus shows it from
+            # there, in this reply's copy alone (§4.3 *The shared text goes in the system prompt*, TD-1669)
+            told = None
+            with contextlib.suppress(OSError, ValueError):
+                text = await asyncio.to_thread(paths.context_file(s.adapter_id).read_text, encoding="utf-8")
+                told = text.partition("\n\n")[2].strip() or None  # the preface holds no blank line
+            if told:
+                v["start_context"] = told
+        return v
 
     def _live_here(self, replaced: frozenset[str] | set[str] = frozenset()) -> list[Session]:
         """This host's records that hold a slot under `scale.live`: every one not `exited` or `closed`, but the
@@ -1765,20 +1782,21 @@ class HostAgent(
             replaced = {r.id for r in (holder, starting) if isinstance(r, Session)}
             room = await self._evict_for_room(name, scale.get("line") if isinstance(scale, dict) else None, replaced)
             locks.callback(room.clear)
+            # what the launch is handed, on copies: `prompt`, `start_context` and `prompt_from` stay the caller's,
+            # which the record, the launch record and every replay read (§4.3 *The shared text goes in the system
+            # prompt*, TD-1669)
+            handed_prompt, handed_context = await self._launch_texts(
+                ad, resume, prompt, prompt_from, start_context, argv, holder
+            )
             try:
                 spec = ad.launch(
                     profile=profile,
                     resume=resume,
-                    prompt=prompt,
+                    prompt=handed_prompt,
                     unattended=unattended,
                     cwd=directory,
                     name=name,
-                    # the home's preface heads it, so every launch of such a tool has the file (§4.1, TD-347)
-                    **(
-                        {"start_context": mail.start_context_file_text(start_context)}
-                        if getattr(ad, "start_context", False)
-                        else {}
-                    ),
+                    **handed_context,
                 )
             except (KeyError, ValueError, OSError) as e:  # OSError: the start context's file (TD-339)
                 raise RpcError(str(e).strip('"')) from None
@@ -1922,7 +1940,16 @@ class HostAgent(
                     s.brief = await asyncio.to_thread(brief.record, prompt_from, False)
                     self.store.save(s)
                 if s.supervised:
-                    self._write_launch(s.id, s, launch_params(locals()))
+                    params = launch_params(locals())
+                    if resume and not prompt_from:
+                        # a resume's typed prompt is its own, never the brief: the launch record keeps the
+                        # conversation's, so a later replay still has it (TD-1669); a resume handed a role's
+                        # brief is the person's latest choice, kept as handed
+                        carried = self._carried_launch(resume, holder)
+                        for k in ("prompt", "prompt_from", "start_context"):
+                            if carried.get(k) is not None:
+                                params[k] = carried[k]
+                    self._write_launch(s.id, s, params)
                 else:
                     self._drop_launch(s.id)  # a fresh start that took a supervised record's id is not it
                 if succeeding is not None:  # the launch record moves to the new id: dropped once that is written
@@ -2019,6 +2046,60 @@ class HostAgent(
         else:
             log.info("%s written %s with no pane: rule 3 fills it", sid, state)
         return s.view()
+
+    async def _launch_texts(
+        self,
+        ad: Any,
+        resume: str | None,
+        prompt: str | None,
+        prompt_from: dict[str, Any] | None,
+        start_context: str | None,
+        argv: list[str] | None,
+        holder: Session | str | None,
+    ) -> tuple[str | None, dict[str, Any]]:
+        """The first prompt and the start-context keywords `create` hands an adapter's `launch` (§4.1, §4.3).
+
+        The home's preface heads every start context, so every launch of such a tool has the file (TD-347).
+        **A member's brief moves** (§4.3 *The shared text goes in the system prompt*, TD-1669) at a fresh create
+        this home launches itself, carrying a role's brief (`prompt_from`) and no start context or `argv`, on an
+        adapter whose start context is its system prompt (`start_context_system`): the brief goes after the
+        preface, and the first prompt is `BRIEF_MOVED_LINE` with a seat fill's `FILLED_FOR` line after it. **A
+        resume keeps the conversation's file** where it gives no start context: `keep_context`, never the preface
+        alone over a moved brief; a file gone is written again from the conversation's launch record."""
+        if not getattr(ad, "start_context", False):
+            return prompt, {}
+        system = bool(getattr(ad, "start_context_system", False))
+        if resume:
+            if not (system and start_context is None):
+                return prompt, {"start_context": mail.start_context_file_text(start_context)}
+            with contextlib.suppress(ValueError):  # an id that cannot name a file has no file to keep
+                if await asyncio.to_thread(paths.context_file(resume).is_file):
+                    return prompt, {"keep_context": True}
+            carried = self._carried_launch(resume, holder)
+            if carried.get("prompt_from") and isinstance(carried.get("prompt"), str):
+                told, _ = _split_filled_for(carried["prompt"])
+                return prompt, {"start_context": mail.start_context_file_text(told)}
+            log.warning("resume of %s: its context file is gone and no launch record holds its brief", resume)
+            return prompt, {"start_context": mail.BRIEF_PREFACE}
+        if system and self.mode != "node" and prompt_from and prompt and start_context is None and not argv:
+            told, filled = _split_filled_for(str(prompt))
+            moved = mail.BRIEF_MOVED_LINE + (f"\n\n{filled}" if filled else "")
+            return moved, {"start_context": mail.start_context_file_text(told)}
+        return prompt, {"start_context": mail.start_context_file_text(start_context)}
+
+    def _carried_launch(self, resume: str, holder: Session | str | None) -> dict[str, Any]:
+        """The launch record a resume of conversation `resume` carries its brief from (TD-1669): the name's
+        record's, when it holds that conversation, else the newest record's that does; empty where none is."""
+        held = [holder] if isinstance(holder, Session) and holder.adapter_id == resume else []
+        held += sorted(
+            (r for r in self.sessions.values() if r.adapter_id == resume and r is not holder),
+            key=lambda r: r.created,
+            reverse=True,
+        )
+        for r in held:
+            with contextlib.suppress(RpcError):
+                return self._read_launch(self._address(r))
+        return {}
 
     def _start_context_of(self, resume: str, holder: Session | str | None) -> str | None:
         """The start context a resume of conversation `resume` carries when its create gave none
@@ -3382,9 +3463,11 @@ class HostAgent(
         # A pane scrolled back is in copy mode, where the Enter would be the mode's (§4.3, TD-667).
         await asyncio.to_thread(self.tmux.leave_copy_mode, sid)
         if lead:
-            await asyncio.to_thread(self.tmux.send_literal, sid, lead + " ")
+            # a moved brief's line with nothing after it is the whole prompt: no space, no paste (TD-1669)
+            await asyncio.to_thread(self.tmux.send_literal, sid, lead + " " if text else lead)
         try:
-            await asyncio.to_thread(self.tmux.paste, sid, text)
+            if text or not (lead or lead_in):
+                await asyncio.to_thread(self.tmux.paste, sid, text)
         except Exception as e:
             if lead or lead_in:
                 raise LeadTyped(f"the paste was refused after the line went in: {e}") from e

@@ -68,6 +68,16 @@ def test_the_declared_methods_are_there_and_the_rest_absent(name):
 
 
 @pytest.mark.parametrize("name", AGENTS)
+def test_a_system_prompt_start_context_is_a_start_context(name):
+    """§4.3's contract block (TD-1669): `start_context_system` implies `start_context`, and such a `launch` takes
+    `keep_context`, the conversation's file kept at a resume."""
+    ad = adapters.get(name)
+    if getattr(ad, "start_context_system", False):
+        assert getattr(ad, "start_context", False), f"{name} says start_context_system without start_context"
+        assert "keep_context" in inspect.signature(ad.launch).parameters, f"{name}'s launch takes no keep_context"
+
+
+@pytest.mark.parametrize("name", AGENTS)
 def test_the_constructor_takes_binary(name):
     """Every agent adapter is built with the tool it runs (§4.3's Protocol block, TD-1647): a seat's life
     builds it with `binary` set to the stub's wrapper."""

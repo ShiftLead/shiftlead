@@ -465,16 +465,18 @@ class WakeMixin:
         elif road == "scraped":
             return  # a scraped idle is trusted only with a composer that reads empty (§4.1, TD-348)
         try:
+            # a moved brief's line types alone, its remainder pasted (TD-1669); any other, the brief after BRIEF_LINE
+            lead, rest = mail.first_prompt_lead(s.first_prompt)
             if left and sid in self._lead_typed:
                 # the brief's line went in and the paste was refused: the brief goes after it, never an
                 # Enter on the line alone, which would submit no brief and mark it sent. Known from the
                 # failed step, not read back: the tool paints a long line over two rows (review of PR #1158)
-                await self._type(sid, adapter, s.first_prompt, lead_in=True)
+                await self._type(sid, adapter, rest, lead_in=True)
             elif left:
                 await self._enter_again(sid, reader)  # the last try's brief is still in the composer
             else:
                 # the brief's line, then the brief as the paste: one prompt (§4.1, TD-347); the lock is held already
-                await self._type(sid, adapter, s.first_prompt, lead=mail.BRIEF_LINE)
+                await self._type(sid, adapter, rest, lead=lead)
         except Exception as e:  # noqa: BLE001 — `prompt-stuck`, or tmux refusing the paste
             if self.sessions.get(sid) is not s:
                 return  # forgotten, or its name taken by a new record, while it typed
