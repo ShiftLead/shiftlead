@@ -574,6 +574,7 @@ class ClaudeCodeAdapter:
     volatile_rows = (r"^\s*\S\s+[^()]+…\s*\(",)
     volatile_after = r"^\s*\u2500{8,}\s*$"
     start_context = True  # `--append-system-prompt-file`, given at every launch of the conversation (§4.3, TD-283)
+    start_context_system = True  # that file is the system prompt's tail: a member's brief moves there (§4.3, TD-1669)
     permission_channel = True  # a pending permission is answered through the hook's decision (§4.3, §4.5a)
     asking_args = ASKING_ARGS  # added to an unattended launch under `permission_prompts: all` (§4.3, TD-823)
     cadence_hook_line = CADENCE_HOOK_LINE  # the repo's own SessionStart is compared with it (§5 *The seams*)
@@ -604,6 +605,7 @@ class ClaudeCodeAdapter:
         cwd: Path,
         name: str = "",
         start_context: str | None = None,
+        keep_context: bool = False,
     ) -> LaunchSpec:
         prof = profiles_mod.get(profile or None)
         adapter_id = resume or str(uuid.uuid4())
@@ -628,6 +630,9 @@ class ClaudeCodeAdapter:
             # a resume is handed it again (design §4.3, TD-283) — by file, never as prose in the argv,
             # which every `pkill -f` on the host reads (design §4.1 *No prose in the argv*, TD-339)
             argv += ["--append-system-prompt-file", str(write_context_file(adapter_id, start_context))]
+        elif keep_context and resume:
+            # a resume keeps the conversation's file as it stands, a moved brief in it (§4.3, TD-1669)
+            argv += ["--append-system-prompt-file", str(paths.context_file(adapter_id))]
         env = {"SHIFTLEAD_PERMISSION_WAIT": str(prof.permission_wait)}
         if not resume:
             env[AT_COMPOSER_ENV] = "1"  # every launch lands at the composer: `startup` reads idle (TD-283, TD-339)
