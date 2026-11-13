@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from sessionorc import cadence
+from sessionorc import cadence, start_hooks
 from shiftlead import doctor
 from shiftlead.adapters.claude_code import (
     CADENCE_HOOK_LINE,
@@ -145,7 +145,7 @@ def test_geminis_start_hooks_follow_the_pin(tmp_path, monkeypatch):
     assert _start(repo, monkeypatch) == "hooked by the pin\n"
     (bin_ / "rc").write_text("0")
     (bin_ / "sleep").write_text("5")  # a first fetch past the bound: the line's sentence, never ""
-    monkeypatch.setattr(hook, "START_HOOKS_TIMEOUT", 0.5)
+    monkeypatch.setattr(start_hooks, "START_HOOKS_TIMEOUT", 0.5)  # the runner's own bound, in `sessionorc`
     assert _start(repo, monkeypatch) == hook.PIN_FAILED
     monkeypatch.setenv("PATH", "/usr/bin:/bin")
     assert _start(repo, monkeypatch) == hook.NO_LAUNCHER

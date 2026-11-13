@@ -111,20 +111,27 @@ def pinned(root: Path | str) -> bool:
         return True
 
 
-def hook_pinned(root: Path | str) -> bool:
+def hook_pinned(root: Path | str, *, timeout: float = 10, lapse: bool = False) -> bool:
     """Whether the SessionStart line runs in its pinned mode for `root` (design §4.2, TD-1023): the main
     checkout's `docs/cadence.toml` — the first entry of `git worktree list`, else `root` itself, as the
     line's `${r:-…}` falls back — has a `[agent-cadence]` header (`PIN_HEADER_RE`, matched as the line's grep
     and the launcher match it). The hooks' view, not `pinned`: a repo pinned with its lock still there is
-    hook-pinned. False where the file is missing or unreadable."""
+    hook-pinned. False where the file is missing or unreadable. `timeout` bounds its `git` read; with `lapse`,
+    a read past it raises `subprocess.TimeoutExpired` rather than reading as no worktree list (the start hooks'
+    runner under a deadline, design §4.3 *Before the pane*)."""
     root = Path(root)
     try:
         listed = subprocess.run(
             ["git", "-C", str(root), "worktree", "list", "--porcelain"],
             capture_output=True,
             text=True,
-            timeout=10,
+            stdin=subprocess.DEVNULL,
+            timeout=timeout,
         ).stdout
+    except subprocess.TimeoutExpired:
+        if lapse:
+            raise
+        listed = ""
     except (OSError, subprocess.SubprocessError, ValueError):
         listed = ""
     first = listed.splitlines()[0] if listed else ""
