@@ -448,7 +448,10 @@ def test_a_reread_queue_reopens_its_folds_and_fills_each_open_one():
     reopen = js[js.index("AO.reopenFolds = function") : js.index("AO.fillFold = async function")]
     assert "AO.fillFold(d)" in reopen
     q = js[js.index("AO.queue = function") :]
-    assert "AO.reopenFolds(lists);" in q[: q.index("wire();")]
+    # TD-1761: the whole draw (Refresh, a hidden page) swaps; a patch reopens the folds of each node it swapped
+    whole = q[q.index("function drawWhole()") :]
+    assert "AO.reopenFolds(lists);" in whole[: whole.index("wire();")]
+    assert "AO.reopenFolds(n);" in q[q.index("function patchCard(") : q.index("function patch()")]
 
 
 def _placed() -> dict:
@@ -584,11 +587,14 @@ def test_a_reread_opens_again_the_menu_the_person_had_open(tmp_path):
     # TD-1315: an open ⋯ or Snooze is shut by the swap; it is opened again on the fresh copy, never holding the read
     js = JS.read_text()
     q = js[js.index("AO.queue = function") :]
-    body = q[q.index("async function reread()") : q.index("wire();")]
+    # TD-1761: the swap is the whole draw's (Refresh, a hidden page); a re-read patches, and a held card waits
+    body = q[q.index("function drawWhole()") :]
+    body = body[: body.index("wire();")]
     assert (
         body.index("AO.openMenus(lists)") < body.index("lists.innerHTML =") < body.index("AO.reopenMenus(lists, menus)")
     )
-    assert "details.more[open]" not in body[: body.index("busy = true")]  # a menu never holds a read back
+    read = q[q.index("async function reread()") :]
+    assert "details.more[open]" not in read[: read.index("busy = true")]  # a menu never holds a read back
     probe = tmp_path / "menus_probe.js"
     probe.write_text(MENUS_PROBE)
     got = subprocess.run(["node", str(probe), str(JS)], capture_output=True, text=True, timeout=60, check=True)

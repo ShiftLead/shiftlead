@@ -786,7 +786,8 @@ def test_dismiss_all_is_the_inboxs_hoisted_press():
     js = (Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     assert "AO.dismissOnScreen = (btn, rows, empty, ask, refresh)" in js
     assert 'AO.dismissOnScreen($("#dismissall"), "#rows-fyi .mailrow"' in js and "refreshInbox);" in js
-    assert 'AO.dismissOnScreen(b, () => $$(".mailrow", sec)' in js
+    # TD-1761: the drawn rows that are not *gone*
+    assert 'AO.dismissOnScreen(b, () => $$(".mailrow:not(.qgone)", sec)' in js
     assert "const dismissOnScreen" not in js
 
 

@@ -1489,3 +1489,18 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
   .setpushdev .setpushrm { grid-column: 2; }
 }
 .mupto { display: inline-flex; align-items: center; gap: 4px; } .mupto input.input { width: 4.5em; height: 28px; }  /* the Members dialog's **up to** (§4.5a, TD-1545) */
+
+/* The page holds still (§4.5 screen 12, §4.5a *Queue page: the bar, Refresh*, *Queue card: held*, *gone — refresh*;
+   TD-1761): the bar above the first group; the held mark in width kept for it, drawn only while something waits;
+   a gone item's controls hidden in their place, its links and height kept */
+.qbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 4px 0 8px; color: var(--muted); }
+.qbar .qbarlive { color: var(--working-fg); }
+.qbar.notlive .qbarlive { color: var(--warn-fg); }
+.qbar .qbarask { color: var(--needs-fg); font-weight: 600; }
+.qbar .qrefresh { margin-left: 4px; }
+.qheldw { display: none; }
+.queuepage .qheldw { display: inline-block; visibility: hidden; margin: 0 4px; font-size: var(--t-mono-s); color: var(--muted); }
+.queuepage .qcard[data-waits] .qheldw { visibility: visible; }
+.qgone button, .qgone details.more, .qgone details.qdots, .qgone input, .qgone textarea, .qgone form { visibility: hidden; }
+.qgone { opacity: .7; }
+.qgonew { visibility: visible; margin-right: 8px; color: var(--muted); font-style: italic; }

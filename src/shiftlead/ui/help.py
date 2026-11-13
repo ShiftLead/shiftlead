@@ -853,6 +853,28 @@ HELP: tuple[Help, ...] = (
             " open one stays named on the entry — and it is refused where no team's lane takes design-first."
         ),
     ),
+    # TD-1761: §4.5 screen 12 *The page holds still*
+    Help(
+        "queue-bar",
+        "the bar",
+        "Queue page",
+        (
+            "Counts what changed since the page was drawn — new asks for you, cards done, moved, new — without "
+            "moving anything; Refresh draws it."
+        ),
+    ),
+    Help(
+        "card-held",
+        "held",
+        "Queue card",
+        "Nothing on this card changes while your pointer, keyboard focus or an open menu is on it.",
+    ),
+    Help(
+        "card-gone",
+        "gone — refresh",
+        "Queue card",
+        "This item was answered or closed elsewhere; Refresh takes it away.",
+    ),
 )
 
 BY_KEY: dict[str, Help] = {h.key: h for h in HELP}
@@ -966,6 +988,9 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "live-mark",
             "row-done",
             "row-back-to-design",
+            "queue-bar",
+            "card-held",
+            "card-gone",
         ),
     ),
     ("settings", "Settings", ("on-work", "balance", "schedule", "file-link", "telegram", "telegram-test")),

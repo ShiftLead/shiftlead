@@ -9,6 +9,9 @@
    event. #}
 <div class="page queuepage" id="queuepage">
 {% include "queue_filters.html" %}
+{#- the bar (§4.5 screen 12 *The page holds still*, §4.5a *Queue page: the bar, Refresh*; TD-1761): what changed
+    since the page was drawn, counted and not drawn; **Refresh** draws it #}
+<div class="qbar" id="qbar" role="status"><span class="qbarlive">● live</span> <span class="qbarw">· up to date</span><button type="button" class="btn sm qrefresh" id="qrefresh" title="{{ help_title('queue-bar') }}" hidden>Refresh</button></div>
 <div id="queuelists">{% include "queue_part.html" %}</div>
 </div>
 {% endblock %}
