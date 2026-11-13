@@ -70,6 +70,37 @@ out.folded = diff(base(), page([group("in_progress", [card("A", { rows: ["a1"] }
 out.completed = diff(base(), page([group("completed", [card("A", { rows: ["a1", "a2"] })]),
   group("up_next", [card("B", { up: 1 }), card("C", { up: 1, decide: ["m1"] }), card("D", { up: 1 })])]));
 
+// TD-1783: each counting rule in its other direction
+const upnext = (cards) => group("up_next", cards);
+const inprog = (cards) => group("in_progress", cards);
+// a card already in Recently completed in both copies is not done again
+out.completed_both = diff(page([group("completed", [card("A", {})]), upnext([card("B", { up: 1 })])]),
+  page([group("completed", [card("A", {})]), upnext([card("B", { up: 1 })])]));
+// a card that leaves for Recently completed carrying a new ask counts once, as the ask
+out.done_with_ask = diff(page([inprog([card("A", {})]), upnext([card("B", { up: 1 })])]),
+  page([group("completed", [card("A", { decide: ["m5"] })]), upnext([card("B", { up: 1 })])]));
+// a card the picks hide that leaves is not done
+out.hidden_leaves = diff(page([inprog([card("A", { off: 1 })]), upnext([card("B", { up: 1 })])]),
+  page([inprog([]), upnext([card("B", { up: 1 })])]));
+// a card arriving straight in Recently completed is not new
+out.new_completed = diff(page([upnext([card("B", { up: 1 })])]),
+  page([group("completed", [card("G", {})]), upnext([card("B", { up: 1 })])]));
+// a card hidden in one copy only, in its place, is moved
+out.revealed = diff(page([upnext([card("B", { up: 1, off: 1 }), card("C", { up: 1 })])]),
+  page([upnext([card("B", { up: 1 }), card("C", { up: 1 })])]));
+// a row arriving alone, and a reorder alone, are each a place of the card
+out.row_arrives = diff(base(), page([inprog([card("A", { rows: ["a1", "a2", "a3"] })]),
+  upnext([card("B", { up: 1 }), card("C", { up: 1, decide: ["m1"] }), card("D", { up: 1 })])]));
+out.row_reorders = diff(base(), page([inprog([card("A", { rows: ["a2", "a1"] })]),
+  upnext([card("B", { up: 1 }), card("C", { up: 1, decide: ["m1"] }), card("D", { up: 1 })])]));
+// a new ask on a card the picks hide in both copies, or on a hidden card not drawn, is not counted
+out.hidden_asks = diff(page([upnext([card("B", { up: 1, off: 1 }), card("C", { up: 1 })])]),
+  page([upnext([card("B", { up: 1, off: 1, do: ["m7"] }), card("C", { up: 1 }),
+    card("F", { up: 1, off: 1, decide: ["m8"] })])]));
+// an ask the person's own press brought is not a new ask
+out.own_ask = diff(page([upnext([card("B", { up: 1 })])]), page([upnext([card("B", { up: 1, do: ["m7"] })])]), [],
+  (k) => k === "m:m7");
+
 // rank moves: the drawn order places the card, the latest reading names its neighbours
 const drawn = ["B", "C", "D"];
 out.rank_same = AO.qRankFrom(drawn, ["B", "C", "D"], "D", "up");
@@ -166,6 +197,39 @@ def test_a_card_the_picks_hide_or_a_folded_group_holds_counts_nothing(got):
 def test_a_card_gone_to_recently_completed_is_done(got):
     d = got["completed"]
     assert d["done"] == 1 and d["words"] == ["1 done"]
+
+
+def test_a_card_in_recently_completed_in_both_copies_is_not_done_again(got):
+    assert _counts(got["completed_both"]) == NOTHING
+
+
+def test_a_card_that_leaves_carrying_a_new_ask_counts_once_as_the_ask(got):
+    d = got["done_with_ask"]
+    assert (d["asks"], d["done"], d["moved"], d["new"]) == (1, 0, 0, 0)
+
+
+def test_a_hidden_card_that_leaves_is_not_done(got):
+    assert _counts(got["hidden_leaves"]) == NOTHING
+
+
+def test_a_card_arriving_in_recently_completed_is_not_new(got):
+    assert _counts(got["new_completed"]) == NOTHING
+
+
+def test_a_card_hidden_in_one_copy_only_is_moved(got):
+    assert _counts(got["revealed"]) == {**NOTHING, "moved": 1, "words": ["1 card moved"]}
+
+
+def test_a_row_arriving_alone_and_a_reorder_alone_are_each_moved(got):
+    for case in ("row_arrives", "row_reorders"):
+        d = got[case]
+        assert _counts(d) == {**NOTHING, "moved": 1, "words": ["1 card moved"]}, case
+        assert "A" not in d["same"], case
+
+
+def test_asks_on_hidden_cards_and_the_persons_own_are_not_counted(got):
+    assert _counts(got["hidden_asks"]) == NOTHING
+    assert got["own_ask"]["asks"] == 0
 
 
 def test_a_rank_move_names_the_latest_readings_neighbours(got):
