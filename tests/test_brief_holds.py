@@ -185,7 +185,16 @@ async def test_a_sit_out_with_the_brief_due_is_marked_then_stopped_and_nothing_t
     async with LocalClient() as person:
         sid = await _due(agent, person, tmp_path)
         rec = agent.sessions[sid]
+        rec.scale = {"line": "grind"}
+        real, seen = agent.rpc_kill, []
+
+        async def kill(id, caller=None, killer=None):
+            seen.append((dict(rec.sit_out or {}), dict(rec.scale), caller))  # the mark is on before the kill
+            return await real(id, caller=caller, killer=killer)
+
+        agent.rpc_kill = kill
         view = await person.call("relaunch", id=sid, sit_out=True)
+        assert seen[0][0]["at"] and seen[0][2] is None, "marked before the kill, by the person's own call"
         assert view["sit_out"] and rec.state == "exited" and rec.ended["by"] == "person"
         assert rec.sends == [] and rec.wrapup_at is None
         assert agent.store.load(sid).sit_out == rec.sit_out  # the kill's own save kept the mark
@@ -234,8 +243,15 @@ async def test_a_dropped_extra_with_the_brief_due_is_stopped_and_forgotten_with_
         sid = await _due(agent, person, tmp_path)
         rec = agent.sessions[sid]
         rec.scale = {"line": "grind"}
+        real, seen = agent.rpc_kill, []
+
+        async def kill(id, caller=None, killer=None):
+            seen.append(rec.scale.get("drop"))  # the mark is on before the kill
+            return await real(id, caller=caller, killer=killer)
+
+        agent.rpc_kill = kill
         view = await person.call("relaunch", id=sid, drop_extra=True)
-        assert view["scale"]["drop"] and rec.state == "exited" and rec.sends == []
+        assert seen and seen[0] and view["scale"]["drop"] and rec.state == "exited" and rec.sends == []
         rec.git = None  # it never worked: no git reading yet
         rec.first_prompt_error = "given up"  # the brief's bound passing on the exited record changes nothing
         await agent._keep_running(datetime.now(UTC))

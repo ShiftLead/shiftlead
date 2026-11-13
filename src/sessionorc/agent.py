@@ -3222,7 +3222,7 @@ class HostAgent(
             raise RpcError(f"{s.name} runs on {s.host}: an extra is dropped at the host it runs on {rule}")
         if s.scale.get("drop"):
             return self._view(s)
-        if s.state not in ("exited", "closed") and self._brief_holds(s):
+        if s.state not in ("exited", "closed", "scheduled") and self._brief_holds(s):
             # its brief is not in: marked, then stopped, nothing typed (§4.3 *No send until it is in*, TD-1637)
             await self._stop_marked(s, "scale", {**s.scale, "drop": now_iso()}, f"so it is not dropped {rule}", caller)
             log.info("%s: an extra past its line's max — stopped, its brief not in", self._address(s))
