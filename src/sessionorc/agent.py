@@ -83,6 +83,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     CONTEXT_EVERY,  # noqa: F401
     CREATE_GRACE,  # noqa: F401
     DERIVE_EVERY,  # noqa: F401
+    DIGEST_READS,  # noqa: F401
     DIGEST_TIMEOUT,
     DOORBELL_TRIES,  # noqa: F401
     ENTRY_PRIORITIES,  # noqa: F401
