@@ -94,3 +94,24 @@ async def test_a_scraped_lift_spends_a_polls_mark_the_verdict_replaced(agent, st
     agent._pre_limited[s.id] = "idle"  # a stale mark from an earlier cap
     agent._usage_limits([s], set())
     assert s.state == "idle" and s.id not in agent._pre_limited
+
+
+@pytest.mark.parametrize(("before", "restart", "after"), [("idle", True, "idle"), ("working", False, "working")])
+async def test_the_polls_lift_goes_back_to_the_state_before_its_mark_or_idle_after_a_restart(
+    agent, tmp_path, before, restart, after
+):
+    """TD-1798, design §4.2: what a session was before the poll's `limited` is the host agent's memory alone;
+    a restart inside the spell drops it, and the lift then reads `idle`, never a `working` the tick would read
+    as `stalled?`. With the memory kept, the lift goes back to what it was, a working session included."""
+    adapters.load_all()
+    s = _rec(tmp_path, state=before)
+    resets = (datetime.now(UTC) + timedelta(hours=2)).isoformat().replace("+00:00", "Z")
+    agent._usage[s.profile] = {"windows": [{"label": "week", "pct": 100, "resets": resets}]}
+    agent._usage_limits([s], set())
+    assert (s.state, s.confidence) == ("limited", "hook") and s.pending is not None and s.pending.kind == "limit"
+    assert agent._pre_limited[s.id] == before
+    if restart:
+        agent._pre_limited.clear()  # what a host-agent restart forgets
+    agent._usage[s.profile] = {"windows": [{"label": "week", "pct": 2, "resets": resets}]}
+    agent._usage_limits([s], set())
+    assert (s.state, s.confidence, s.pending) == (after, "hook", None) and s.id not in agent._pre_limited
