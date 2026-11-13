@@ -23,7 +23,7 @@ const sec = (b, msgs) => h("div", "qsec", { "data-sec": b }, msgs.map(item));
 const row = (qid, cls) => h("div", `qrow${cls ? " " + cls : ""}`, { "data-qid": qid }, []);
 // a card: Decide and Do in its header, its rows under it
 const card = (id, o) => h("div", `qcard${o.off ? " qoff" : ""}`,
-  { "data-card": id, ...(o.up ? { "data-up": "1" } : {}) }, [
+  { "data-card": id, ...(o.up ? { "data-up": "1" } : {}), ...(o.ids ? { "data-ids": o.ids.join(" ") } : {}) }, [
   h("div", "qhead", { "data-qid": id, ...(o.headDone ? { "data-done": "" } : {}) },
     [...(o.decide ? [sec("decide", o.decide)] : []), ...(o.do ? [sec("do", o.do)] : [])]),
   h("div", "qrows", {}, [...(o.rows || []).map((q) => row(q, (o.archived || []).includes(q) ? "archived" : "")),
@@ -127,6 +127,39 @@ out.done_drawn = dn([one({ rows: ["a1"], fold: ["a2"] }), one({ rows: ["a1"], fo
 // a row drawn archived in its place that the reading moved into the fold: a place change, never *gone*
 out.done_folded = dn([one({ rows: ["a1", "a2"], archived: ["a2"] }), one({ rows: ["a1"], fold: ["a2"] })]);
 out.done_head = dn([one({ rows: ["a1"] }), one({ rows: ["a1"], headDone: 1 })]);
+// slice 3: a re-top — a drawn card whose id is no card's in the reading is the reading's card holding its open
+// members, where no drawn card has that card's id; one left over that a reading card holds has joined it
+const rt = (a, b) => { const d = AO.qDiff(AO.qModel(a), AO.qModel(b));
+  return { ...diff(a, b), retop: d.retop, joined: d.joined }; };
+const up = (cards) => page([group("up_next", cards)]);
+// B merged: the card is now A, its row A the new top's
+out.retop = rt(up([card("B", { up: 1, ids: ["B", "A"], rows: ["A"] }), card("C", { up: 1 })]),
+  up([card("A", { up: 1, ids: ["A"] }), card("C", { up: 1 })]));
+// A archived splits its card in two: the half with most open members is the same card, the other new
+out.split = rt(up([card("A", { up: 1, ids: ["A", "B", "C", "D"], rows: ["B", "C", "D"] })]),
+  up([card("B", { up: 1, ids: ["B", "C"], rows: ["C"] }), card("D", { up: 1, ids: ["D"] })]));
+// a new parent over two drawn cards re-tops the one sharing most members; the other has joined it
+out.parent = rt(up([card("A", { up: 1, ids: ["A", "a1"], rows: ["a1"] }), card("B", { up: 1, ids: ["B"] })]),
+  up([card("P", { up: 1, ids: ["P", "A", "a1", "B"], rows: ["A", "a1", "B"] })]));
+// two hops: the top and a part archived, a blocked entry still open — the same card
+out.two_hop = rt(up([card("A", { up: 1, ids: ["A", "B", "C"], rows: ["B", "C"] })]),
+  up([card("C", { up: 1, ids: ["C"] })]));
+// a drawn card the reading holds under its own id is never re-topped onto: it joined
+out.join_drawn = rt(up([card("A", { up: 1, ids: ["A"] }), card("B", { up: 1, ids: ["B"] })]),
+  up([card("B", { up: 1, ids: ["B", "A"], rows: ["A"] })]));
+// the keys rewritten at once: id, members, header, Start session's card, folds, Up next's place
+{
+  const c = card("B", { up: 1, ids: ["B", "A"], rows: ["A"] });
+  const fold = h("details", "qread", { "data-fold": "B:read" }, []);
+  const start = h("button", "qstart", { "data-card": "B", "data-ref": "TD-1" }, []);
+  c.children[0].appendChild(start); c.appendChild(fold);
+  const root = page([h("div", "qcards", { id: "qcards", "data-upnext": JSON.stringify(["B", "C"]) }, [c])]);
+  root.children[0].id = "qcards";
+  const r = card("A", { up: 1, ids: ["A", "x"] });
+  AO.qRetop(c, r, root);
+  out.rekey = { card: c.dataset.card, ids: c.dataset.ids, qid: c.children[0].dataset.qid, start: start.dataset.card,
+    ref: start.dataset.ref, fold: fold.dataset.fold, upnext: JSON.parse(root.children[0].dataset.upnext) };
+}
 out.lis = [...AO.qLis([0, 3, 1, 2])].sort();
 out.age = [AO.qAge(12000), AO.qAge(185000), AO.qAge(7300000)];
 console.log(JSON.stringify(out));
@@ -260,6 +293,51 @@ def test_a_row_whose_entry_was_archived_is_done_not_gone_and_moves_its_card(got)
 def test_a_header_whose_top_was_archived_is_done(got):
     d = got["done_head"]
     assert d["doneHeads"] == ["A"] and d["moved"] == 1 and d["gone"] == []
+
+
+def test_a_retopped_card_is_the_same_card_nothing_done_or_new(got):
+    d = got["retop"]
+    assert d["retop"] == [["B", "A"]] and d["joined"] == []
+    # the new top's drawn row is neither *gone* nor patched: it waits for Refresh, a place change
+    assert d["gone"] == [] and d["done"] == 0 and d["new"] == 0 and d["moved"] == 1
+
+
+def test_a_split_card_matches_the_half_with_most_open_members(got):
+    d = got["split"]
+    assert d["retop"] == [["A", "B"]] and d["new"] == 1 and d["done"] == 0
+    assert d["gone"] == [["B", "r:D"]]  # keyed by the card's new id; D's row went to the other half
+
+
+def test_a_new_parent_retops_one_card_and_the_other_has_joined(got):
+    d = got["parent"]
+    assert d["retop"] == [["A", "P"]] and d["joined"] == [["B", "P"]]
+    assert (d["done"], d["new"], d["moved"]) == (1, 0, 1)
+
+
+def test_a_two_hop_match_and_a_join_onto_a_drawn_card(got):
+    assert got["two_hop"]["retop"] == [["A", "C"]] and got["two_hop"]["new"] == 0
+    j = got["join_drawn"]
+    assert j["retop"] == [] and j["joined"] == [["A", "B"]]
+    assert (j["done"], j["moved"], j["new"]) == (1, 1, 0)
+
+
+def test_a_retop_rewrites_the_cards_keys_at_once(got):
+    assert got["rekey"] == {
+        "card": "A",
+        "ids": "A x",
+        "qid": "A",
+        "start": "A",
+        "ref": "TD-1",  # a value: it waits with the words
+        "fold": "A:read",
+        "upnext": ["A", "C"],
+    }
+
+
+def test_a_retop_is_applied_before_the_hold_in_a_patch():
+    p = Q[Q.index("function patch()") : Q.index("function drawBar(")]
+    assert p.index("AO.qRetop(el, byId.get(to), lists)") < p.index("if (holds(el))")
+    # the hold follows the card's new id (found by the scratch-home check: a hovered card lost its hold)
+    assert "if (pointerOn === from) pointerOn = to;" in p and "if (boxOn === from) boxOn = to;" in p
 
 
 def test_the_helpers(got):
