@@ -38,14 +38,16 @@ not counted.
 | TD-1671 | 112 | 111 | 101 | 6.04 | 11.30 | 17.33 | 15.48 |
 | TD-1650 | 158 | 135 | 177 | 8.78 | 14.53 | 23.31 | 14.76 |
 | TD-1567 | 185 | 151 | 262 | 9.18 | 22.44 | 31.62 | 17.09 |
-| TD-1543 | 460 | 687 | 1283 | 47.18 | 110.44 | 157.63 | 34.27 |
+| TD-1543 | 460 | 686 | 924 | 47.12 | 73.97 | 121.09 | 26.32 |
 | TD-1590 | 230 | 208 | 161 | 13.33 | 16.97 | 30.30 | 13.17 |
-| TD-1568 | 235 | 195 | 275 | 15.02 | 19.84 | 34.86 | 14.83 |
-| TD-1556 | 240 | 230 | 725 | 15.03 | 63.29 | 78.31 | 32.63 |
+| TD-1568 | 235 | 188 | 271 | 14.55 | 19.34 | 33.89 | 14.42 |
+| TD-1556 | 240 | 230 | 541 | 15.03 | 48.98 | 64.00 | 26.67 |
 | TD-1577 | 527 | 409 | 410 | 25.04 | 42.59 | 67.63 | 12.83 |
-| all ten | 3267 | 3075 | 4958 | 204.80 | 437.31 | 642.11 | 19.65 |
+| all ten | 3267 | 3067 | 4411 | 204.27 | 386.02 | 590.29 | 18.07 |
 
-The median of the ten's $ per hundred lines is 15.16. Every one of the ten has transcripts, so all ten are costed.
+The median of the ten's $ per hundred lines is 15.15. *Designer turns* are the designer's own turns without the
+reports reaching it (the `report` rows), as the originals' main-thread turns are counted. Every one of the ten has
+transcripts, so all ten are costed.
 
 ## How each file was made
 
@@ -55,8 +57,15 @@ The median of the ten's $ per hundred lines is 15.16. Every one of the ten has t
   the designer's; then `python capture.py select <that output>`, which runs the cost model's
   [`tables.py`](../../2026-11-12-design-cost-model/tables.py) `select` (its Method step 2: the design's branches, the
   launch-branch turns next to them, the reviewers by their first turn) one design at a time, since `select` phases
-  the rows it picks in place. Its columns are the cost model's. TD-1543's and TD-1650's rows match the cost model's own
-  `turns.csv` turn for turn.
+  the rows it picks in place. Its columns are the cost model's. One designer session works several designs' branches
+  in turn, so 555 turns were picked for two designs (TD-1543 with TD-1550 and with TD-1590, TD-1556 with TD-1568),
+  nearly all reviewers whose first turn fell in both designs' windows; each is kept once, under the design whose
+  branches hold its own branch, a reviewer on a launch branch under the design that holds most of its rows'
+  branches, and any other under the design of its session's next turn on a design's branch. Before that, TD-1650's
+  and TD-1543's rows matched the cost model's own `turns.csv` turn for turn; after it TD-1650's still do, and TD-1543
+  keeps 1,660 of the 2,020 rows the cost model gives it: the other 360, nearly all reviewers on `td1550-design` and
+  `td1590-design`, are TD-1550's and TD-1590's, designs the cost model did not select, so it counted them under
+  TD-1543 (TD-1800).
 - **`sizes.csv`** — `python capture.py sizes`: each design PR's additions under `docs/design/`, `docs/ledger/` and
   `docs/synopses/`, by `git show --numstat` of its squash commit.
 - **Prices** are the cost model's weights (`tables.py` `WEIGHTS`, `ao spend`'s defaults).
