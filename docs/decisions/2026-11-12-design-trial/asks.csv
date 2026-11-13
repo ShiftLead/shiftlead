@@ -1,0 +1,183 @@
+id,asks,person
+TD-1557:F1,"When a person answers a decision line on the board, where do the line's offered answers and kind come from, and may the answering screen supply them?",no
+TD-1557:F2,"Which answers on a decision line count as merely deferring (keeping the line waiting) rather than settling it, and does an answer with a blank for the person's words ever count as deferring?",no
+TD-1557:F3,What does a person's typed answer that starts with a blank-bearing answer's head do on a line that cannot be decided (for instance a line of another kind)?,no
+TD-1557:F4,"How does the screen's request to decide a ledger entry's question carry along the fact that the answer is the blank-bearing kind, so the server can fill it correctly?",no
+TD-1557:F5,"How does the reading of an item's offered answers tell the screen which of them have a blank for the person's words, without breaking how the answers are listed and sent back?",no
+TD-1557:F6,"Which documentation or help text must say that a decide-answer with a blank is drawn and sent differently, and where is that wording checked for consistency?",no
+TD-1557:F7,"When a session or script picks an answer that has a blank, what stops the unfilled placeholder text from being sent as the answer, including on the older fallback path?",no
+TD-1557:F8,How exactly is the start of a typed answer matched against an answer's head (letter case) and which refusal wordings are used when the words are missing or still a placeholder?,no
+TD-1557:F9,"Which part of the specification describes an answer with a blank for the person's words, and how is the work in the shared board library tracked and handed over so the shiftlead work knows when it may start?",no
+TD-1557:F11,"What happens when a ledger entry's question is answered by position or by the default word and that answer is one with an unfilled blank, and how is such an answer shown on the row?",no
+TD-1557:F12,"What happens when a session picks a blank-bearing answer by position and also supplies extra words: does the check look at the whole text, only the first paragraph, or the picked answer itself?",no
+TD-1557:F13,"When a person presses a blank-bearing answer on a card and types into its box, does the head always remain in the sent words, and is that press a decision rather than a free-text reply?",no
+TD-1557:F15,"For a blank-bearing answer pressed with the blank empty or left as the placeholder, is every kind of refusal treated as refusing the decision, never silently turned into a plain reply?",no
+TD-1557:F17,"Which readers of a decided line (closing, sweeping, checks that the person's answer lifted a hold) must recognise a filled blank-bearing answer as its answer, and which must not?",no
+TD-1557:F18,"What are the exact rules for recognising a blank-bearing answer: where its head ends, how its filled words are spelled, and what a board check does with two such answers sharing a head or one marked as the default?",no
+TD-1557:F19,"How is the rule for what a Reply does worded so it covers a pair of answers that the page draws side by side, where one decides and the other does not?",no
+TD-1557:F20,"When is a blank-bearing answer drawn on a page, and how are the cases of two such answers on one item worded?",no
+TD-1557:F21,What information must the reply controls on an item carry so the server can locate the right repository and the right answer head when the person sends?,no
+TD-1557:F22,"How is a reply that actually decides a line classified in the person's views (item type and counts), so it is not counted as a plain reply?",no
+TD-1557:F23,"Whose reply, the person's alone or any session's, may decide a line by beginning with an answer head, and how do mail displays show such an answer?",no
+TD-1557:F24,"Is a specified piece of behaviour that does not exist in the system's current state described as existing, and how is the missing piece named instead?",no
+TD-1557:F28,"What happens to words typed into a decision line that begin with a blank-bearing answer's head but have no content after it, on the session-facing write path?",no
+TD-1557:F29,"When comparing a person's words with a line's stored answers that carry a consequence note and a recommended mark, what is stripped first so the right answer is recognised?",no
+TD-1557:F30,"Which of the two boxes on a card hands work on to another party after sending, and is that hand-off tied to the kind of answer or to the box used?",no
+TD-1557:F31,"Who puts the answer's head back when a person types over it in the box, and why must the page not parse or rewrite the words itself?",no
+TD-1557:F32,"How does the background worker that writes the decision tell the rest of the system that the answer was marked, given a worker thread cannot return it directly?",no
+TD-1557:F33,"What happens to a multi-line reply typed into the box, and is its length limited?",no
+TD-1557:F34,"Does a decision line's check apply to the person's answers alone or to every replier's, and how are the statements about it made consistent?",no
+TD-1557:F35,"What is done when a blank-bearing answer is wrongly marked as the recommended or default answer, in a place where a default would be handed out?",no
+TD-1557:F37,"What does the Answer control on an item open, which the design left unsaid?",no
+TD-1557:F39,"Which server entry points on the person's board path must carry the extra information that an answer is blank-bearing, so it is not dropped en route?",no
+TD-1557:F41,"What guarantees idempotence and thread-safety when the post-write marking of an answer may be run twice or from a worker thread, and what happens when the mark must be redone?",no
+TD-1557:F43,"What happens when a ledger entry's own answers line contains a blank-bearing answer: is a default handed out, and may an accept-default word be used?",no
+TD-1557:F48,"Which sets of parties must be told when a decision made in one repository concerns work in a third repository, and how many hand-offs result?",no
+TD-1557:F49,"When a ledger entry's decision is made with a blank-bearing answer, are the person's words filled into the answer with its head restored, rather than written as typed?",no
+TD-1557:F50,"After sending, which words does the optimistic redraw and the follow-on hand-off use: the typed text or the answer the server actually recorded?",no
+TD-1557:F51,"How does a mail reply that begins with an answer head become a decision, and does the page do any parsing of it?",no
+TD-1557:F52,"How many places decide whether a pair of answers should be drawn together, and should they share one rule?",no
+TD-1557:F58,Do the mail reply path and the messaging call used by sessions carry the information that the reply is a blank-bearing answer through to the server?,no
+TD-1557:F60,"What are the exact refusals and contents for malformed input to the answer path: a bad index, a non-text value, which answers are offered, new test cases and exact code locations?",no
+TD-1557:F62,"When a reply to a line turns into a decision, what exactly are the early-exit conditions, who is recorded as the author, and how is the later re-marking invoked?",no
+TD-1557:F63,"Which code areas change for the blank-bearing answer, and how is the changed shape of the answers reading described to builders?",no
+TD-1557:F66,"Does the ledger entry's answering path of the page pass the blank-bearing marker through to the server, or silently drop it?",no
+TD-1557:F67,Where is the marker that distinguishes a blank-bearing answer cleared when a board item is read for the Inbox?,no
+TD-1557:F69,"Does the check that rejects a bad answer set apply to lines already decided, or only to open decision lines?",no
+TD-1557:F70,"How does the reading of an entry's suggested answers expose which of them have a blank, given it previously returned plain text only?",no
+TD-1557:F71,"How is a mark on a reply tracked per message when one reply can yield several marks, so the right one is re-marked?",no
+TD-1557:F75,"Can a session accept the default word on a ledger entry whose answer is blank-bearing, given its default has been cleared, and what happens where mail's default is cleared?",no
+TD-1557:F77,"Where is the refusal of a bad or unfilled blank-bearing reply enforced when a session uses the messaging call, so a command-line-only check cannot be bypassed, and how are the rest of the reply's words combined with the head?",no
+TD-1557:F78,"When a blank-bearing answer is sent with empty words, which refusal wording does the person see, the design's or the route's generic one?",no
+TD-1557:F79,"Which template or macro draws the answers on a mail row in the Inbox, and does it get the same head-and-ellipsis treatment as board rows?",no
+TD-1557:F80,"Does the rule that recognises a blank-bearing answer exclude certain heads (such as field-like names), and must it agree with the shared library's own list?",no
+TD-1557:F81,Does the session-side board tool's reply follow the same rule that words beginning with an answer head decide the line?,no
+TD-1557:F85,"When a reply is turned into a decision, which values (commit subject, author, the lifted hold, the plan edit) come from the decision rather than from the reply?",no
+TD-1557:F86,"What does a ledger row's accept-the-default answer do when the default is blank-bearing, and is its refusal worded like the other roads?",no
+TD-1557:F87,"On which roads is a blank-bearing answer marked as the default refused: boards only, mail only, or others too, and does the plain-words summary say so correctly?",no
+TD-1557:F88,"When a person sends a blank-bearing answer, does the item first show the line landing before it reads as decided, and is that stated accurately?",no
+TD-1569:F1,"How does the team-start decision identify seats that are members of the crew, including an on-call manager seat that is busy, given the briefs name seats by a different identifier?",no
+TD-1569:F2,"At what point in a team start is a busy seat taken out of the set of launches and verdicts, relative to the name-collision check, mail retention and creating the new members?",no
+TD-1569:F3,"Which live seat states count as busy for a team start, including seats waiting on the person, stalled, or limited?",no
+TD-1569:F4,"How is the refusal's per-session explanation worded and built for a session that is finished, a busy one left out, or a suspended one?",no
+TD-1569:F5,"What does the Close offered as a cure close: only the one named session, or the whole team, and how is its safety judged?",no
+TD-1569:F6,"How are a team card's live count, its stopped state and its nothing-live wording computed when busy seats are left out of the start?",no
+TD-1569:F7,Is a manual wind-down offered on a team whose seats wind down by themselves anyway?,no
+TD-1569:F9,Is a seat whose name carries a suffix handled the same way as an unsuffixed seat at team start?,no
+TD-1569:F13,"Which reading of the live sessions decides who is busy for a start, and what happens when a seat turns busy after that reading or a skipped seat later closes by its own rule?",no
+TD-1569:F14,"What does the team card's reading expose about which seats are busy and whether a start would work, and is it available to the command line too?",no
+TD-1569:F15,"Does the busy-seat reading change the existing live count, and where is Start drawn relative to Wind down and Stop now?",no
+TD-1569:F17,"Does an idle seat holding unpushed work block a team start, or count as busy to be left running?",no
+TD-1569:F19,"What happens to the whole-team start versus the member-by-member replay when a start collides with something, and can a team ever be half started?",no
+TD-1569:F20,"For which blocking sessions is Close offered as the cure, and what is a session that is waiting told?",no
+TD-1569:F22,"Is one single reading of live sessions used for the busy decision, name check, mail retention, start moves and closing concluded seats, or can they disagree?",no
+TD-1569:F25,"What information accompanies each blocking session in a refused start, and is a single common cure line still used?",no
+TD-1569:F26,"How is a standing manager seat treated when a team is started: ever busy, or refused as before?",no
+TD-1569:F28,"How is the result of a start reported when some seats were closed and others left running, in the command output, machine output and the on-screen notice?",no
+TD-1569:F29,Does the Inbox's row offering to start a team follow the same rule as the team card?,no
+TD-1569:F31,"Does the step that closes concluded seats at start avoid closing a seat left running because busy, including in its safety check?",no
+TD-1569:F34,How is a refusal clause tied to its session so that one session's name being a prefix of another's cannot confuse them?,no
+TD-1569:F35,"When a start would be allowed, is the not-concluded warning still shown, and where does the notice's per-session text come from?",no
+TD-1569:F39,"What does the offered kill cure stop: only that one session, or the team?",no
+TD-1569:F40,"Which records count as seats of the crew for this decision, and what happens to a filled extra seat?",no
+TD-1569:F43,"What does the card offer when the team definition has renamed or dropped a busy seat, so a start is impossible?",no
+TD-1569:F46,Which page script must carry the leave-running information so the confirmation and notice can name the seats left running?,no
+TD-1569:F47,"Is the waiting-state reading used for a start the same strict reading the card uses, or can the card offer Start where the press would fail?",no
+TD-1569:F48,"When is the live-session reading taken: for every start, or only when the crew has live records?",no
+TD-1569:F49,"What is a finished seat holding unpushed work told, and is its work pushed before it is closed?",no
+TD-1569:F50,"Who works out each blocking session's explanation and cure, and what is the exception object only responsible for?",no
+TD-1569:F58,"Does the overflow menu on a team's rollup also offer Start where it would work, and keep wind-down and stop-now?",no
+TD-1569:F60,"What wording describes an idle but busy seat's state (a live shell, a live subagent, unpushed work)?",no
+TD-1569:F61,How is a suffixed session's refusal clause matched to the right session?,no
+TD-1569:F62,"What cure is stated for blocking sessions that are the person's own, suspended, sat out, or held extras, and what is offered when none applies?",no
+TD-1569:F63,"When a team is not stopped but a start would work, which controls (Start, Wind down, Stop now) does its card draw?",no
+TD-1569:F64,"When a start is refused because of an orphan, is it refused before or after any seat is closed?",no
+TD-1569:F69,"Where is the guard that the card's live count agrees with the busy reading, and what happens where they disagree?",no
+TD-1569:F70,When does the start's confirmation appear and what does it say if nothing needs closing but some seats are left running?,no
+TD-1569:F72,What is shown if an extra seat turns busy in the middle of a start?,no
+TD-1569:F75,Is the usage-at-start record written for a team start that leaves live seats untouched?,no
+TD-1569:F79,How does a start behave when a working seat from a sweep is present and the relevant switch is off?,no
+TD-1569:F82,"When does a seat close itself, and how long does a seat that comes on a question linger, in the user-facing description of the rule?",no
+TD-1569:F85,"Which seats are described as lingering after a question is answered, in the user-facing description?",no
+TD-1569:F86,"What happens to a seat with unpushed work: does it close itself, and when?",no
+TD-1470:F1,"How does the check on whether a question's recipient can act treat a session that is stalled, and what words explain it?",no
+TD-1470:F2,"From what moment is a question or a PR counted as having waited, when it has no question time of its own?",no
+TD-1470:F3,Where does the text explaining why work is stuck come from: a stored field or something computed when shown?,no
+TD-1470:F4,"Does the host's persistent record keep the new stuck-work bookkeeping when it is loaded and saved, or discard fields it does not know?",no
+TD-1470:F5,"Which sessions count as acting on a PR: only those that declared it, or also those whose claim implies they are reviewing it?",no
+TD-1470:F6,"Where does a decided board line appear while it is stuck, and what accompanies it?",no
+TD-1470:F7,"How is a seat that has exited or been closed judged when deciding whether it can act, including a seat whose fill test says it can be refilled?",no
+TD-1470:F8,"What does a stuck-work row say about work waiting on a team that holds nothing back, such as one that just needs your Start?",no
+TD-1470:F9,Do the words for a team being held come from the older rule or does the stuck-work check write its own per cause?,no
+TD-1470:F10,"Is a lost-send mark left when a host agent is simply restarted, and which host agent reads which marks?",no
+TD-1470:F11,"What does a command's machine-readable output say to a session whose send did not land, and how is that flagged?",no
+TD-1470:F12,How does the home-page item builder treat a row that is stuck?,no
+TD-1470:F13,"Is a session that is idle while holding open work past the wait treated as able to act, or not?",no
+TD-1470:F14,"When every cause of stuckness names a known end within the wait, does the work show as needing you or as merely waiting?",no
+TD-1470:F15,"For a question addressed to several sessions, when is it stuck: when none can act, or when any cannot?",no
+TD-1470:F16,"When a session's missed send is to be told again, how is the right current session found if the original was replaced, and what if none remains?",no
+TD-1470:F18,"Which open PRs of a session are covered, whether green or not, and from which moment is the wait counted?",no
+TD-1470:F19,"What does a decided board line say when no team lane will take it, or when two teams could, and whose reason is shown?",no
+TD-1470:F20,What is drawn when the session holding work and the stuck-work notice sit on different cards?,no
+TD-1470:F21,"Does a handed-over entry's row move to the needs-you place when stuck, as a decided line's does?",no
+TD-1470:F23,"What is recorded if a second send misses before the first was told, is it appended or does it replace?",no
+TD-1470:F24,Is an Open control offered for a session that is gone?,no
+TD-1470:F25,Is work whose only actors are the person's own sessions ever considered stuck?,no
+TD-1470:F27,"When a PR's holder has asked a reader and is waiting for the answer, is the work read as the PR or as that question?",no
+TD-1470:F29,Is the time until a known cause ends stored or recomputed each time it is read?,no
+TD-1470:F30,How is a stuck explanation shown for a session that already shows it needs you?,no
+TD-1470:F32,"Which commands leave a missed-send mark when the host agent is down: all of them, or only those that write something?",no
+TD-1470:F33,What does the note to a session say about a send that may have actually landed before the agent went down?,no
+TD-1470:F34,"Is a session that the person started themselves ever treated as stuck, and how is a member the person took over described?",no
+TD-1470:F37,"What happens when the command itself cannot be found (no way to know who ran it), and which sessions are nudged about it?",no
+TD-1470:F38,"How is a claim that waits only on a steering instruction to a session read, as the PR or as that instruction?",no
+TD-1470:F39,"Where is the first moment a work order was seen open remembered, given the first tick that reads it has nowhere to keep it?",no
+TD-1470:F40,"When does an early-start wait end, and how is a usage-gated cause without a known reset treated?",no
+TD-1470:F41,Where does the reset time for a limited or gated session come from?,no
+TD-1470:F42,Which time is used as the starting point of work held by each session record?,no
+TD-1470:F43,"Which words are used for sessions that are idle or stalled, and does the general word builder get called for them?",no
+TD-1470:F44,In what order do the passes run relative to the earlier idle-nudge rule's pass in each tick?,no
+TD-1470:F45,"How is a supervised, unattended seat that cannot be filled for no named reason treated?",no
+TD-1470:F46,"Does reading the inbox record anything for the check, and what is lost if its marking read fails?",no
+TD-1470:F48,"Is an idle session that still has a running subagent or shell counted as acting, and from what time is it clocked?",no
+TD-1470:F49,"How often are missed-send marks read, so one written after the first tick back is still seen?",no
+TD-1470:F50,What does the row say about a team that wound down after the line was seen but never picked up?,no
+TD-1470:F51,"Which moment is a PR's open time, and where is the calculation of the wait's starting moment stated?",no
+TD-1470:F53,"When several works share an actor and a reason, how are their rows worded so the reason isn't repeated in full?",no
+TD-1470:F57,"How are concurrent missed-send marks written and consumed safely, and what happens to an unreadable one?",no
+TD-1470:F60,"Where is the shortened wording applied when several rows share a cause, and where is it documented?",no
+TD-1470:F61,"Which records count as the members of a wound-down team, and what words replace the individual session reasons?",no
+TD-1470:F63,"What is the stored start time of a stuck row, and when does a row stop being shown?",no
+TD-1470:F68,"Whose push resets a PR's wait: any holder's, or only an idle holder's?",no
+TD-1470:F69,"Does a steering instruction to a session also expire, and how is a PR waiting on a question counted?",no
+TD-1470:F70,Where does the reset time for a usage-gated cause come from?,no
+TD-1470:F73,"What happens to a note sent to an empty seat: is it a cause that counts, and is the person told?",no
+TD-1470:F74,"What is the stored shape of a stuck record's reason and actor, and are its words made when shown?",no
+TD-1470:F75,"When two sessions both claim the same PR, are both treated as actors?",no
+TD-1470:F76,From when is a board line counted as having been open for the wait?,no
+TD-1470:F80,From what moment is a stalled session clocked?,no
+TD-1470:F81,"Which sessions are counted as the actors for a team lane, including a seat's replacement or an empty one?",no
+TD-1470:F82,Where does the time until a cause ends come from: each actor's current state or a stored reason?,no
+TD-1470:F83,In what order are the actors of each kind of work listed?,no
+TD-1470:F87,Which clock is used for when a stall began?,no
+TD-1470:F88,How long is a note to an empty seat kept before it is lost?,no
+TD-1470:F89,Is a question that a seat passed up to the person read as stuck?,no
+TD-1470:F94,How does a stuck row appear in the command-line card view?,no
+TD-1470:F95,What decides whether a restart leaves a missed-send mark?,no
+TD-1470:F97,"When does a stuck row drop, including when its work is no longer read, and is the whole set recomputed?",no
+TD-1470:F98,Is a member that its team's flow sat out an actor for any work order?,no
+TD-1470:F100,Is a question addressed to include the person read as stuck?,no
+TD-1470:F102,"Exactly which commands count as writes that leave a missed-send mark, and which do not?",no
+TD-1470:F116,"What does the card read while a stuck line's press is still being applied, and is the stuck clock disturbed?",no
+TD-1470:F123,"How is a PR's open time derived each tick, and which pushes extend it?",no
+TD-1470:F124,"Which instant does the sentence 'idle since' show, and which is kept as the clock?",no
+TD-1470:F138,"How is the previous holder named in 'released by', and what is said when no holder can be found?",no
+TD-1470:F141,"For what purposes may the ancestry of a session be read, and may any act trust it as an identity?",no
+TD-1470:F151,"Which repository registry is meant, and what name or roster does it use?",no
+TD-1470:F162,"When does a PR's recorded open time end, and is a PR with only finished claims work?",no
+TD-1470:F164,"When one kind of reading of open work is unusable, are the other kinds still read?",no
+TD-1470:F165,"Which roster of repositories is read, and does it include imported ones?",no
+TD-1470:F174,"Which field names a PR's head, and does a reading with the maximum number of open PRs silently drop any?",no
+TD-1470:F177,How is a fetch result of 'none' distinguished from a good fetch with no case value?,no
+TD-1470:F182,"For a session holding several PR claims, are all its open claims counted, not just the newest?",no
+TD-1470:F187,What is the page cap on the GitLab reading of open PRs?,no
