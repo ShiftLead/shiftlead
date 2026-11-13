@@ -671,7 +671,9 @@ async def test_a_node_routed_sit_out_with_the_brief_due_is_stopped_by_the_nodes_
     stale, so a sit-out of a node's member keeps today's order — the wrap-up routed to the node, whose own
     `rpc_send` stop branch stops a member whose brief is not in, nothing typed — and the home's mark is written
     after the act returns."""
-    monkeypatch.setattr(hookstub, "start_context", False, raising=False)  # the start hooks ride the brief
+    # the start hooks ride the brief (the stub's default already, said here so the test does not lean on it);
+    # only the node reads it: the home routes a node's record before `_brief_holds`
+    monkeypatch.setattr(hookstub, "start_context", False, raising=False)
     async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
         acts = Acts(node, monkeypatch)
         async with LocalClient() as c:
@@ -685,7 +687,8 @@ async def test_a_node_routed_sit_out_with_the_brief_due_is_stopped_by_the_nodes_
         orig = node._act
 
         async def act(params):
-            marks_at_the_act.append((await at_home(home, address))["sit_out"])  # the home's mark not yet written
+            if params.get("rpc") == "send":  # the home's mark not yet written when the wrap-up crosses
+                marks_at_the_act.append((await at_home(home, address)).get("sit_out"))
             return await orig(params)
 
         monkeypatch.setattr(node, "_act", act)
