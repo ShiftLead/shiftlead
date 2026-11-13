@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from sessionorc import ledger, workorders
+from sessionorc import ledger, work, workorders
 from sessionorc.models import open_prompts, pr_marks, stop_note
 from sessionorc.reports import branch_ref
 from shiftlead import flowdefs, teamrun
@@ -380,10 +380,10 @@ def _stage_named(m: Mapping[str, Any] | None, stages: Any, whats: Mapping[str, C
     out (`sit_out`, `left`)."""
     if stages is None or m is None:
         return False
-    if m.get("sit_out"):
+    if m.get("sit_out") or work.sat_out(m):
         return False
     act = FLOW_ACTS.get(str(m.get("id") or ""))
-    if act in ("rename", "sit_out", "left"):
+    if act in ("rename", "removed", "sit_out", "left"):
         return False
     return not (act == "relaunch" and any(str(w).startswith("lane ") for w in whats.get(str(m.get("id") or "")) or ()))
 
@@ -431,11 +431,14 @@ def motion_rows(
     whats = whats if whats is not None else FLOW_WHATS
     colors = flowdefs.stage_colors(stages) if stages else {}
     by_id = {str(x.get("id")): x for x in [*(fleet or ()), *members] if isinstance(x, Mapping) and x.get("id")}
+
     # open PRs only: a merged slice's branch must not read as the next slice's PR
-    by_branch: dict[str, int] = {}
-    for p in ((r or {}).get("prs") or {}).get("open") or []:
-        if isinstance(p, dict) and isinstance(p.get("number"), int) and (ref := branch_ref(p.get("branch"))):
-            by_branch.setdefault(ref, p["number"])  # oldest first, as the reading keeps them
+    def branches(rd: Mapping[str, Any] | None) -> dict[str, int]:
+        got: dict[str, int] = {}
+        for p in ((rd or {}).get("prs") or {}).get("open") or []:
+            if isinstance(p, dict) and isinstance(p.get("number"), int) and (ref := branch_ref(p.get("branch"))):
+                got.setdefault(ref, p["number"])  # oldest first, as the reading keeps them
+        return got
 
     def seat_chip(to: str) -> tuple[str, str, int]:
         """A reader seat's chip and its place in the flow's order (one with no stage before every stage)."""
@@ -449,8 +452,11 @@ def motion_rows(
     rows: dict[tuple[str, str], dict[str, Any]] = {}
     for m in members:
         named = _stage_named(m, stages, whats)
+        # the claim's PR, its state and its reads are its own record's repo's (§4.9c rule 2), the team's where unread
         mr = _reading_of(m, repos) or r
         reads = ((mr or {}).get("pr_orders") or {}).get("reads") or {}
+        m_prs, by_branch = (prs, branches(r)) if mr is r else (_pr_states(mr), branches(mr))
+        m_web = web if mr is r else _https(str((mr or {}).get("remote") or ""))
         waits_on = {str(w) for w in m.get("waits_on") or ()}
         for p in m.get("progress") or []:
             if not isinstance(p, dict) or p.get("status") != "claimed" or not p.get("ref"):
@@ -458,7 +464,8 @@ def motion_rows(
             ref = str(p["ref"])
             pr = p.get("pr") or p.get("review_pr")
             pr = pr if isinstance(pr, int) else by_branch.get(ref)
-            state = str((prs.get(pr) or {}).get("state") or "") if pr else ""
+            known = m_prs.get(pr) if pr else None
+            state = str((known or {}).get("state") or "")
             closed = state in ("merged", "closed")
             own = _chip_of_role(str(m.get("role") or ""), stages, False, named, colors)
             chip = own
@@ -489,19 +496,18 @@ def motion_rows(
             row["members"].append({"id": m["id"], "name": m.get("name") or m["id"], "mine": not m.get("unattended")})
             if pr and not row["pr"]:
                 row["pr"] = pr
+                row["pr_state"] = state if closed else ""
+                row["pr_url"] = str((known or {}).get("url") or (f"{m_web}/pull/{pr}" if m_web else ""))
     out = []
     for (ref, _), row in rows.items():
         e = entries.get(ref) or {}
-        pr = row["pr"]
-        known = prs.get(pr) if pr else None
-        state = str((known or {}).get("state") or "")
         if not e and (n := pr_ref(ref)) is not None:
             e = {"title": (prs.get(n) or {}).get("title") or ""}
         row["title"] = str(e.get("title") or "")
         prio = str(e.get("priority") or "").lower()
         row["priority"] = prio if prio in MOTION_PRIORITIES else ""
-        row["pr_state"] = state if state in ("merged", "closed") else ""
-        row["pr_url"] = str((known or {}).get("url") or (f"{web}/pull/{pr}" if pr and web else ""))
+        row.setdefault("pr_state", "")
+        row.setdefault("pr_url", "")
         out.append(row)
     rank = {p: i for i, p in enumerate(MOTION_PRIORITIES)}
     order = {st.name: i for i, st in enumerate(stages or ())}

@@ -117,6 +117,18 @@ def test_rule_5_and_the_stage_name_gate():
         cards.FLOW_ACTS.clear()
         cards.FLOW_ACTS.update(old)
     assert chips([g(sit_out=True)], reading()) == [("TD-1", "grinder", "")]
+    assert chips([g(closed_for={"why": "sit_out"})], reading()) == [("TD-1", "grinder", "")]
+
+
+def test_a_claims_pr_is_read_in_its_own_records_repo():
+    # the team's repo has #9 merged; the member's own repo has #9 open with the techlead's ask: *review*, not closed
+    team = {
+        **reading(recent=[{"number": 9, "state": "merged"}]),
+        "prs": {"open": [], "recent": [{"number": 9, "state": "merged"}]},
+    }
+    own = {**reading({"9": [ask(TL, "open", "1")]}), "root": "/r/b", "name": "b"}
+    rows = ui.motion_rows([g(repo="/r/b")], team, {"/r/s": team, "/r/b": own}, TD, (SEAT,), {})
+    assert [(x["stage"], x["pr_state"]) for x in rows] == [("review", "")]
 
 
 def test_a_flows_written_color_and_the_heading_in_stage_order():
