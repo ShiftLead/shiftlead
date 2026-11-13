@@ -46,7 +46,10 @@ def local_zone(now: datetime | None = None) -> dict[str, Any]:
             target = ""
         _, sep, rest = target.partition("zoneinfo/")
         name = rest if sep and rest else None
-    now = (now or datetime.now(UTC)).astimezone(zone_of({"name": name}) if name else None)
+    zone = zone_of({"name": name}) if name else None
+    if zone is UTC:
+        name, zone = None, None  # a name this machine cannot resolve: the offset alone, read from the system
+    now = (now or datetime.now(UTC)).astimezone(zone)
     off = now.utcoffset()
     return {"name": name, "offset": int(off.total_seconds() // 60) if off is not None else 0}
 
@@ -303,7 +306,10 @@ def digest_record(
                 nxt = got.get("next")
                 if not nxt:
                     break
-                at, skip = str(nxt.get("at")), int(nxt.get("skip") or 0)
+                step = (str(nxt.get("at") or ""), int(nxt.get("skip") or 0))
+                if not step[0] or step == (at, skip):
+                    raise AgentError(f"the host's next for {cid} does not move on: {nxt!r}")
+                at, skip = step
         except AgentError as e:
             parts.discard()
             r.error, r.failed = str(e), cid
@@ -336,9 +342,11 @@ def run(
     leave = set(skip) | ({own} if own else set())
     index_records: list[dict[str, Any]] = []
     claimed: set[str] = set()
+    cleared: set[str] = set()
     for seat, rid in records:
         r = Record(seat=seat, id=rid)
-        if not list_only and out is not None:
+        if not list_only and out is not None and rid not in cleared:
+            cleared.add(rid)  # a record named twice keeps what its first reading wrote
             clear_record(out, rid)
         try:
             got = call("conversations", id=rid, since=utc(since), until=utc(until), _timeout=WAIT)

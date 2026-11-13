@@ -1422,13 +1422,17 @@ def cmd_feedback_digest(args: argparse.Namespace) -> int:
         print(f"ao feedback digest: --part-bytes is at least {feedback.PART_BYTES_MIN}", file=sys.stderr)
         return 2
     out = None
-    if not args.list:
-        if not args.out:
-            print("ao feedback digest: --out <dir> is needed, but with --list", file=sys.stderr)
-            return 2
-        out = pathlib.Path(args.out)
-        out.mkdir(parents=True, exist_ok=True)
+    if not args.list and not args.out:
+        print("ao feedback digest: --out <dir> is needed, but with --list", file=sys.stderr)
+        return 2
     records = [(seat, resolve(seat)) for seat in args.seats]
+    if args.out and not args.list:
+        out = pathlib.Path(args.out)
+        try:
+            out.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            print(f"ao feedback digest: --out {args.out}: {e.strerror or e}", file=sys.stderr)
+            return 2
     own = feedback.own_conversation(call_sync, os.environ.get("SHIFTLEAD_SESSION") or None)
     index = feedback.run(
         call_sync,

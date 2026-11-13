@@ -186,6 +186,68 @@ def test_a_split_with_no_prompt_before_the_bound_and_a_part_at_the_floor_holding
         assert sum(1 for r in rows if not r.startswith("  ")) == 3  # one entry
 
 
+def test_a_conversation_larger_than_a_part_behind_another_splits_inside_and_a_huge_first_entry_moves_whole(
+    tmp_path,
+):
+    a = ["=== 2026-11-04 ===", "09:00 < short"]
+    b = ["=== 2026-11-04 ==="]
+    for i, mark in enumerate("<><<"):  # ~20 KiB each: b is larger than a part
+        b += big(f"10:0{i}", mark, 200)
+    c = ["=== 2026-11-04 ==="] + big("11:00", "<", 660)  # one entry past the bound on its own
+    fake = Fake(
+        {"r1": [conv("a"), conv("b"), conv("c")]},
+        {("r1", "a"): [reply(*a)], ("r1", "b"): [reply(*b)], ("r1", "c"): [reply(*c)]},
+    )
+    rec = go(fake, [("s", "r1")], tmp_path, bound=65536)["records"][0]
+    texts = [Path(p).read_text() for p in rec["parts"]]
+    firsts = [[ln for ln in t.splitlines() if not ln.startswith(("  ", "==="))] for t in texts]
+    # b does not fit a part from its header, so it is not moved whole: it starts beside a and splits at its last
+    # prompt before the bound; c's one entry, larger than a part, opens a part at c's own header, never leaving
+    # that header at the end of the part before it
+    assert [[f.split(" · ")[0] if f.startswith("##") else f[6:7] for f in fs] for fs in firsts] == [
+        ["## a", "<", "## b", "<"],
+        ["## b", ">", "<", "<"],
+        ["## c", "<"],
+    ]
+    assert firsts[1][0].endswith("(continued)") and not firsts[2][0].endswith("(continued)")
+
+
+def test_a_split_inside_a_conversation_never_reaches_back_to_a_prompt_before_its_header(tmp_path):
+    a = ["=== 2026-11-04 ===", "09:00 < short", "09:01 > again"]
+    b = ["=== 2026-11-04 ==="]
+    for i in range(4):  # ~20 KiB each, no prompt: b splits before the entry that passes the bound
+        b += big(f"10:0{i}", "<", 200)
+    fake = Fake({"r1": [conv("a"), conv("b")]}, {("r1", "a"): [reply(*a)], ("r1", "b"): [reply(*b)]})
+    rec = go(fake, [("s", "r1")], tmp_path, bound=65536)["records"][0]
+    texts = [Path(p).read_text() for p in rec["parts"]]
+    assert [len([ln for ln in t.splitlines() if ln[:2].isdigit()]) for t in texts] == [5, 1]
+
+
+def test_a_day_line_counts_toward_the_bound(tmp_path):
+    entry = lambda hhmm: [f"{hhmm} < " + "x" * 13096]  # noqa: E731  13105 bytes with its newline
+    lines = ["=== 2026-11-04 ===", *entry("09:00"), *entry("09:01"), *entry("09:02"), *entry("09:03")]
+    lines += ["=== 2026-11-05 ===", *entry("00:01")]
+    c = conv("a")
+    head = len((feedback.header(c, UTC) + "\n").encode())
+    day = len(b"=== 2026-11-04 ===\n")
+    fake = Fake({"r1": [c]}, {("r1", "a"): [reply(*lines)]})
+    # five entries and one day line fit the bound; the second day line, before the fifth, passes it
+    rec = go(fake, [("s", "r1")], tmp_path, bound=head + day + 5 * 13105 + day - 1)["records"][0]
+    assert len(rec["parts"]) == 2
+    assert Path(rec["parts"][1]).read_text().splitlines()[1] == "=== 2026-11-05 ==="
+
+
+def test_a_record_named_twice_keeps_its_first_reading_and_a_next_that_does_not_move_is_an_error(tmp_path):
+    fake = Fake({"r1": [conv("a")]}, {("r1", "a"): [reply("=== 2026-11-04 ===", "09:00 < a")]})
+    index = go(fake, [("one", "r1"), ("two", "r1")], tmp_path)
+    assert index["records"][0]["parts"] == [str(tmp_path / "r1.txt")] and (tmp_path / "r1.txt").exists()
+    assert index["records"][1]["conversations"] == []
+    stuck = {"at": "2026-11-04T00:00:00Z", "skip": 0}
+    fake = Fake({"r2": [conv("a")]}, {("r2", "a"): [reply("=== 2026-11-04 ===", "09:00 < a", nxt=stuck)]})
+    rec = go(fake, [("s", "r2")], tmp_path)["records"][0]
+    assert (rec["failed"], rec["parts"]) == ("a", []) and "does not move on" in rec["error"]
+
+
 def test_skips_the_callers_own_and_an_earlier_records_conversations(tmp_path):
     fake = Fake(
         {"r1": [conv("a"), conv("mine"), conv("x")], "r2": [conv("a"), conv("y"), conv("z")]},
@@ -293,6 +355,8 @@ def test_the_zone_is_tz_else_etc_localtime(monkeypatch):
     monkeypatch.delenv("TZ")
     monkeypatch.setattr(feedback.os, "readlink", lambda p: "/usr/share/zoneinfo/Asia/Tokyo")
     assert feedback.local_zone(datetime(2026, 1, 1, tzinfo=UTC)) == {"name": "Asia/Tokyo", "offset": 540}
+    monkeypatch.setenv("TZ", "Nowhere/Atall")  # a name this machine cannot resolve: no name, the system's offset
+    assert feedback.local_zone(datetime(2026, 1, 1, tzinfo=UTC))["name"] is None
 
 
 @pytest.mark.parametrize(
