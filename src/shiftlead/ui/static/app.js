@@ -5260,6 +5260,8 @@
       const diff = AO.cardDiff(AO.qModel(lists), AO.qModel(reading), c ? c.dataset.card : rid, isFound && !!rc && (!c || rc.dataset.card === c.dataset.card),
         found && found.dataset.topdone, own);
       left = diff.left && !!c;
+      // a page drawn as a completed line whose card reopened (or a card drawn now as a line): one change, for Refresh
+      if (!c) { drawBar(isFound && !!rc ? { left: false, items: 0, asks: 0, moved: "", done: false, changed: 1 } : null); return; }
       if (c && rc && !diff.left) {
         // values in place: a unit the person is not on, from the reading's same unit; the header's words
         const gone = new Set(diff.gone), done = new Set(diff.doneUnits);
@@ -5311,9 +5313,12 @@
       barWords.textContent = why || `— last read ${readAt ? AO.qAge(Date.now() - readAt) : "never"}`;
     }
     // Refresh, and a back-forward return: the reading drawn whole; where the id left, the Queue's find
-    function drawWhole() {
+    function drawWhole(back) {
       if (!reading) return;
-      if (left) { location.href = top ? `/queue#${encodeURIComponent(top)}` : "/queue"; return; }
+      // where the reading holds no card with the id, Refresh opens the Queue's find; a back-forward return marks
+      // the drawn card *gone* instead, never blanking it
+      const f = $("#cardfound", reading), gone = !(f && f.dataset.found) && !!(drawnCard() || $(".qdline", lists));
+      if (gone) { if (back) { patch(); return; } location.href = top ? `/queue#${encodeURIComponent(top)}` : "/queue"; return; }
       const menus = AO.openMenus(lists), errs = AO.rowErrs(lists);
       lists.innerHTML = readingHtml;
       AO.qcardReapply(lists); AO.restoreRowErrs(lists, errs); AO.reopenFolds(lists); AO.reopenMenus(lists, menus);
@@ -5353,7 +5358,7 @@
           if (found && !found.dataset.found && !drawnCard() && !$(".qdline", lists)) { if (found.dataset.goto) { location.replace(found.dataset.goto); return; } }
         }
         reading = fresh; readingHtml = html; readAt = Date.now();
-        if (whole && !boxOpen()) drawWhole(); else patch();
+        if (whole && !boxOpen()) drawWhole(true); else patch();
       } catch (err) { notLive(); } finally { busy = false; }
     }
     // a hold ending draws what waited

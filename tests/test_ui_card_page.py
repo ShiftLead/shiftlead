@@ -71,6 +71,7 @@ def test_a_kept_and_a_loose_card_by_their_ids_padded_or_typed(tmp_path, monkeypa
     entries = [mail("m1", "merge #13?", about="TD-3"), mail("m4", "is other#TD-9 done?")]
     c = client(monkeypatch, tmp_path, fake(queue(), entries))
     kept = page(c, "s#TD-3", "?part=1")
+    assert 'data-topdone=""' in kept  # its top is a completed card's, but the page holds it: no *done* (review)
     assert 'data-group="kept"' in kept and '<section class="qgroup" data-group="completed">' in kept
     for cid in ("loose:other#TD-009", "loose:other#TD-9"):  # the padded id and the hand-typed one are one page
         part = page(c, cid, "?part=1")

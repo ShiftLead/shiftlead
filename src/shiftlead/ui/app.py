@@ -4467,14 +4467,18 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # the page's top entry among the reading's completed ids, which the bar reads *done* by once the view holds
         # no card with the page's id (§4.5 screen 12 *The card's page*)
         top = "" if cid.startswith("loose:") else (_refs_of(cid) or [cid])[0]
-        top_done = bool(top) and any(
-            top
-            in {
-                (_refs_of(i) or [i])[0]
-                for i in [str(x.get("id") or ""), *(str(e.get("qid") or "") for e in x.get("entries") or ())]
-            }
-            for x in (rd.got or {}).get("completed") or ()
-            if isinstance(x, dict)
+        top_done = (
+            found is None
+            and bool(top)
+            and any(
+                top
+                in {
+                    (_refs_of(i) or [i])[0]
+                    for i in [str(x.get("id") or ""), *(str(e.get("qid") or "") for e in x.get("entries") or ())]
+                }
+                for x in (rd.got or {}).get("completed") or ()
+                if isinstance(x, dict)
+            )
         )
         repo = str(((c or {}).get("top") or {}).get("repo") or "") or str(cid).removeprefix("loose:").partition("#")[0]
         team = next((n for n, r in sorted(rd.teams.items()) if r == repo), "")
