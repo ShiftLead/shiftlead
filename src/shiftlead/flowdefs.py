@@ -28,7 +28,11 @@ FILE = "flow.yml"
 BUILTIN = ("td", "build-review", "build")
 ORG_SUB = "flows"  # the org's flow directories: `~/.shiftlead/flows/<name>/` (§4.9c, TD-313)
 FLOW_KEYS = ("stages",)
-STAGE_KEYS = ("name", "role", "lane", "brief", "held")
+STAGE_KEYS = ("name", "role", "lane", "brief", "held", "color")
+# The stage chip's palette (§4.9c `color`, TD-704): each a light and a dark value in the stylesheet
+# (`--hue-<name>`); red is not in it, it is the stalled and alarm colour, and grey is no stage's
+PALETTE = ("pink", "indigo", "blue", "amber", "teal", "green", "violet")
+DEFAULT_COLORS = {"find": "pink", "design": "indigo", "build": "blue", "review": "amber"}  # by stage name
 PACKAGE_REF = "package:"
 # The role of the team's `techlead:` seat (§4.9b): a review stage of any other seat role is staffed by
 # a `seats:` entry of that role on `asks` (§4.9c *A review stage any seat may hold*, TD-315)
@@ -45,6 +49,7 @@ class Stage:
     brief: str = ""  # the reference as written
     path: Path | None = None  # the brief's file, resolved; None when the reference cannot be
     held: str = ""  # a review stage's path set, by name (TD-315); "" holds every held path of the repo
+    color: str = ""  # the palette name written on the stage (§4.9c `color`); "" unwritten — `colors` resolves it
 
     @property
     def review(self) -> bool:
@@ -160,6 +165,12 @@ def parse(name: str, place: str, flow_dir: Path, text: str | None, place_root: P
                 flow.problems.append(f"{key}.held names one path set: a word of lower-case letters, digits and -")
             else:
                 stage.held = held.strip()
+        color = st.get("color")
+        if color is not None:
+            if not isinstance(color, str) or color.strip() not in PALETTE:
+                flow.problems.append(f"{key}.color {color!r} is not a palette name ({', '.join(PALETTE)})")
+            else:
+                stage.color = color.strip()
         if brief:
             stage.path, why = _brief_path(brief, flow_dir, place_root)
             if why:
@@ -174,6 +185,27 @@ def parse(name: str, place: str, flow_dir: Path, text: str | None, place_root: P
         if roles.count(r) > 1:
             flow.problems.append(f"{where}: two stages name the role {r!r} — a member would have two lanes")
     return flow
+
+
+def colors(flow: Flow) -> dict[str, str]:
+    """Each stage's chip colour, a palette name, by stage name (§4.9c `color`, TD-704), in three passes:
+    every written `color`; then each unwritten stage whose name has a default (`DEFAULT_COLORS`) unless a
+    written one took it; then each stage still without one, in stage order, the first palette name no
+    stage holds — past the seventh, the palette again from the start."""
+    got = {s.name: s.color for s in flow.stages if s.color}
+    for s in flow.stages:
+        d = DEFAULT_COLORS.get(s.name)
+        if s.name not in got and d and d not in got.values():
+            got[s.name] = d
+    again = 0
+    for s in flow.stages:
+        if s.name in got:
+            continue
+        free = next((c for c in PALETTE if c not in got.values()), None)
+        if free is None:
+            free, again = PALETTE[again % len(PALETTE)], again + 1
+        got[s.name] = free
+    return {s.name: got[s.name] for s in flow.stages}
 
 
 def org_dir() -> Path:

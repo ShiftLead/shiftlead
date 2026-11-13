@@ -46,6 +46,9 @@
   --k-pickable: #2563eb; --k-design: #4f46e5; --k-foryou: #d97706; --k-other: #e5e7eb; --k-other-fg: #374151;
   --k-live: #0d9488; --k-eval: #64748b; --k-blocked: #475569; --k-blocked-2: #5b6b80;
   --ph-add: #db2777; --ph-design: #4f46e5; --ph-grind: #2563eb; --ph-review: #d97706;
+  /* a flow stage's chip (§4.9c `color`, TD-704): the palette a flow names; red is no stage's */
+  --hue-pink: #db2777; --hue-indigo: #4f46e5; --hue-blue: #2563eb; --hue-amber: #d97706; --hue-teal: #0d9488;
+  --hue-green: #059669; --hue-violet: #7c3aed;
   --blk-opened: #2563eb; --blk-closed: #059669; --seg-fg: #fff;
   --lh: 1.5; --lh-mono: 1.55;
   --row: 22px; --row1: 26px; --slot: 72px; --foot: 26px;
@@ -69,6 +72,8 @@ html[data-theme="dark"] {
   --k-pickable: #3b82f6; --k-design: #6366f1; --k-foryou: #d97706; --k-other: #2a313a; --k-other-fg: #c9d1db;
   --k-live: #0f766e; --k-eval: #64748b; --k-blocked: #475569; --k-blocked-2: #3b4656;
   --ph-add: #ec4899; --ph-design: #6366f1; --ph-grind: #3b82f6; --ph-review: #d97706;
+  --hue-pink: #ec4899; --hue-indigo: #6366f1; --hue-blue: #3b82f6; --hue-amber: #d97706; --hue-teal: #14b8a6;
+  --hue-green: #10b981; --hue-violet: #8b5cf6;
   --blk-opened: #1d4ed8; --blk-closed: #047857;
 }
 * { box-sizing: border-box; }
