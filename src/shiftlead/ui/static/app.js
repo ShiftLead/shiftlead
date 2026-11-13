@@ -5691,10 +5691,29 @@
         const head = [...c.children].find((x) => x.classList.contains("qhead"));
         if (head) AO.qHeadDone(head, heads.has(c.dataset.card));
       });
+      patchLines();
       qc.applyFolds();
       if (AO.qRecount) AO.qRecount();
       wire();
       drawBar(diff);
+    }
+    // Recently completed's lines (`data-key`) and the *other work* lines (`.qother`, keyed by the hold's ref) patch
+    // as values by key: each keeps its window's `hidden`, the picks' `qoff` and its opened body. A line arriving or
+    // ageing out is that group's own place, drawn by Refresh and never counted
+    function patchLines() {
+      const sel = ".qdline[data-key], .qother[data-key]";
+      const kind = (el) => (el.classList.contains("qother") ? "other:" : "done:");
+      const got = new Map();
+      $$(sel, reading).forEach((r) => { const k = kind(r) + r.dataset.key; if (!got.has(k)) got.set(k, r); });
+      $$(sel, lists).forEach((el) => {
+        const k = kind(el) + el.dataset.key, r = got.get(k);
+        if (!r || !quiet(el)) return;
+        const open = !!el.querySelector(".qdbody:not([hidden])"), hid = el.hidden, off = el.classList.contains("qoff");
+        const n = swapIn(el, r, "line:" + k);
+        if (n === el) return;
+        n.hidden = hid; n.classList.toggle("qoff", off);
+        if (open) openLine(n);
+      });
     }
     function drawBar(diff) {
       if (!bar) return;

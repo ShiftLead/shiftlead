@@ -46,7 +46,7 @@
   {% if q.in_progress or q.other or q.loose %}
   <div class="qcards">
   {% for c in q.in_progress %}{{ qc.card(c) }}{% endfor %}
-  {% for o in q.other %}<div class="qother{% if o.off %} qoff{% endif %}" data-other="1"><span class="qsub">other work</span>{{ holder(o.holder) }}<span class="mono">{{ o.ref }}</span>{% if o.pr %}<span class="qsub">#{{ o.pr }}</span>{% endif %}</div>{% endfor %}
+  {% for o in q.other %}<div class="qother{% if o.off %} qoff{% endif %}" data-other="1" data-key="{{ o.ref }}"><span class="qsub">other work</span>{{ holder(o.holder) }}<span class="mono">{{ o.ref }}</span>{% if o.pr %}<span class="qsub">#{{ o.pr }}</span>{% endif %}</div>{% endfor %}
   {#- a loose card (TD-1468): an open item that needs the person names a ref no card holds; after the other work #}
   {% for c in q.loose or [] %}{{ qc.card(c) }}{% endfor %}
   </div>
