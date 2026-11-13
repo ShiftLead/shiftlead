@@ -6415,6 +6415,10 @@ class TickMixin:
             # the mark is the record's, so a host-agent restart keeps it (TD-1750); to the microsecond, since a
             # reading fetched in the same second may be from before it
             s.limited_hook_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        elif thread is None and state and state != "needs-you":
+            # any other main-thread state ends the hook's `limited` (a next prompt, an exit), so its mark goes
+            # with it (TD-1752); a permission prompt does not: the `limited` is kept beneath it (TD-950)
+            s.limited_hook_at = None
         starting = thread is not None and (event.get("subagent_delta") or 0) > 0  # a `SubagentStart` ends nothing
         if thread is None and state and state not in ("needs-you", "exited", "closed") and s.pendings:
             # the main thread's own state goes beneath the open prompts, before any of them ends (§4.2

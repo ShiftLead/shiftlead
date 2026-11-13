@@ -1455,3 +1455,39 @@ async def test_a_rate_limited_turn_keeps_its_lift_marks_across_a_restart(agent, 
         agent._usage[s.profile] = {"windows": [], "fetched": iso(now + timedelta(seconds=5))}
         agent._usage_limits([s], set())
         assert (s.state, s.confidence, s.pending, s.limited_hook_at) == ("idle", "hook", None, None)
+
+
+async def test_a_hook_limited_ended_by_the_next_prompt_leaves_no_mark(agent, hookstub, tmp_path):
+    """TD-1752, design §4.2's `rate_limit` row: a hook's `limited` that the next prompt ends takes its
+    `limited_hook_at` with it, so a later `limited` on the session waits on no stale mark; a permission prompt
+    during the `limited` keeps the mark through its answer (TD-950), and the tool's next hook ends it."""
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="s", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        await _hook(sid, hook_event_name="UserPromptSubmit", session_id="u1")
+        await _hook(sid, hook_event_name="StopFailure", session_id="u1", error="rate_limit")
+        s = agent.sessions[sid]
+        assert s.state == "limited" and s.limited_hook_at is not None
+        await _hook(sid, hook_event_name="UserPromptSubmit", session_id="u1")
+        assert s.state == "working" and s.limited_hook_at is None
+        await _hook(sid, hook_event_name="StopFailure", session_id="u1", error="rate_limit")
+        landed = s.limited_hook_at
+        assert s.state == "limited" and landed is not None
+        payload = {
+            "hook_event_name": "PermissionRequest",
+            "session_id": "u1",
+            "tool_name": "Bash",
+            "tool_input": {"command": "ls"},
+            "tool_use_id": "tu-1752",
+        }
+        fut = asyncio.get_running_loop().run_in_executor(None, run_hook, sid, payload)
+
+        async def needs_you():
+            return (await c.call("get", id=sid))["state"] == "needs-you"
+
+        assert await wait_for(needs_you)
+        assert s.limited_hook_at == landed  # the `limited` waits beneath the prompt, its mark with it
+        await c.call("decide", id=sid, tool_use_id="tu-1752", behavior="allow")
+        assert (await fut).returncode == 0
+        assert s.limited_hook_at == landed  # the answer is no hook of the tool's: the mark stands
+        await _hook(sid, hook_event_name="Stop", session_id="u1")
+        assert (s.state, s.limited_hook_at) == ("idle", None)

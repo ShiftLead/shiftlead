@@ -1110,7 +1110,8 @@ class Session:
     limited_reset: str | None = None
     # When a hook's `limited` landed, ISO UTC (design §4.2's `rate_limit` row, TD-1748, TD-1750): a turn that
     # ended on a cap, which only a usage reading fetched after it lifts, and lifts to `idle`. On the record, so a
-    # host-agent restart keeps both; None for the poll's or a screen rule's `limited`, and once the lift ends it.
+    # host-agent restart keeps both; None for the poll's or a screen rule's `limited`, and once the lift ends it or
+    # a hook reports the main thread in any state but `needs-you` (TD-1752).
     limited_hook_at: str | None = None
     confidence: Confidence = "scraped"
     unattended: bool = False
