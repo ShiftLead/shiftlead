@@ -1443,6 +1443,9 @@
     // §4.5 screen 12 *Three verbs: Answer* (TD-1555): what an Answer… sends is read from the button **when it is
     // pressed** — a copy of its data and its line, never the button again after the box closes
     const at = { ...b.dataset }, atLine = lineText(b), atItem = AO.answerItem(b);
+    // the Queue card the press was on, read now: a refusal ends any hold on it (§4.5 screen 12, TD-1761)
+    const atCard = (b.closest(".qcard[data-card]") || { dataset: {} }).dataset.card || "";
+    let refusedOn = false;
     let action2 = null;  // the endpoint's name when it differs from the button's (controllers chip)
     // design §4.5a **Inbox row: state** (TD-069 step 2): a state row on the Inbox page carries the
     // card's own controls, so the press goes to the card's own route — and the row, which is the
@@ -1914,6 +1917,7 @@
         say(`under: ${(res.controllers || []).join(", ") || "nobody"}`, true);
       }
     } catch (e) {
+      refusedOn = true;
       // Answered twice — two tabs, or the tool timed out into its own dialog between the poll and
       // the press — is not a failure to shout about: the state is simply no longer pending, and
       // the refresh below shows what it is now (design §4.5a **Inbox row: state**).
@@ -1970,6 +1974,8 @@
       if (qled && AO.inflight[qled] && !AO.inflight[qled].until) delete AO.inflight[qled];
       if (waiting) say(PRESS_NOT[key] || "done", true);  // a press whose answer said nothing of its own
       if (row && !left && row.isConnected && row.classList.contains("pending")) AO.unPend(row);
+      // a refused press draws its refusal and ends its card's hold: the values that waited are drawn with it
+      if (refusedOn && atCard) document.dispatchEvent(new CustomEvent("ao:refused", { detail: { card: atCard } }));
     }
   });
 
@@ -4810,12 +4816,16 @@
     (root ? [...root.querySelectorAll(".qgroup .qcard[data-card]")] : []).forEach((c) => {
       const id = c.dataset.card;
       if (cards.has(id)) return;  // a card drawn twice is read once, where it is first
-      const g = c.closest(".qgroup"), units = {};
+      const g = c.closest(".qgroup"), units = {}, done = new Set();
       [...c.querySelectorAll(Q_UNITS)].filter((u) => u.closest(".qcard") === c).forEach((u) => {
-        const b = AO.qBlockOf(u);
-        (units[b] = units[b] || []).push(AO.qUnitKey(u));
+        const b = AO.qBlockOf(u), k = AO.qUnitKey(u);
+        (units[b] = units[b] || []).push(k);
+        // a row whose entry was archived: in the card's ✓ n done fold, or drawn `archived` where it was
+        if (b === "done" || u.classList.contains("archived")) done.add(k);
       });
-      cards.set(id, { id, group: g ? g.dataset.group : "", off: c.classList.contains("qoff"), units });
+      const head = [...c.children].find((x) => x.classList.contains("qhead"));
+      cards.set(id, { id, group: g ? g.dataset.group : "", off: c.classList.contains("qoff"), units, done,
+        headDone: !!(head && head.getAttribute("data-done") !== null) });
       order.push(id);
     });
     let upnext = [];
@@ -4844,7 +4854,7 @@
   AO.qDiff = function (drawn, reading, folded, own) {
     folded = folded || new Set(); own = own || (() => false);
     const hidden = (c) => c.off || folded.has(c.group);
-    const out = { asks: 0, done: 0, moved: 0, new: 0, gone: [], same: new Set() };
+    const out = { asks: 0, done: 0, moved: 0, new: 0, gone: [], doneUnits: [], doneHeads: [], same: new Set() };
     const askCards = new Set();
     reading.cards.forEach((r, id) => {
       const d = drawn.cards.get(id);
@@ -4864,9 +4874,17 @@
       const r = reading.cards.get(id);
       const left = !r || (r.group === "completed" && d.group !== "completed");
       let gone = 0, shape = !left && r.group === d.group;
+      const rDone = (r && r.done) || new Set(), dDone = d.done || new Set();
       Object.entries(d.units).forEach(([b, ks]) => ks.forEach((k) => {
+        // a row whose entry was archived since it was drawn is *done* where it stands, not *gone* (its move into
+        // the ✓ n done fold waits); a card that left draws its items and rows *gone*
+        if (!left && rDone.has(k) && !dDone.has(k)) { out.doneUnits.push([id, k]); gone++; shape = false; return; }
+        // a row drawn done already that the reading moved into the fold is a place change of the card, not *gone*
+        if (!left && rDone.has(k) && dDone.has(k) && !(r.units[b] || []).includes(k)) { gone++; shape = false; return; }
         if (left || !(r.units[b] || []).includes(k)) { if (!own(k)) { out.gone.push([id, k]); gone++; } shape = false; }
       }));
+      // its header's top entry archived while the card keeps it as its top: *done*, its controls hidden
+      if (!left && r.headDone && !d.headDone) { out.doneHeads.push(id); gone++; shape = false; }
       if (left) { if (!hidden(d) && !askCards.has(id)) out.done++; return; }
       // an item or a row arriving, or the order inside a block changing, is a place of the card
       let inside = false;
@@ -4919,16 +4937,29 @@
   };
   // *gone — refresh* on a unit the reading no longer holds where it is drawn, or taken off again (§4.5a *Queue card:
   // gone — refresh*): its controls hidden in their place, its links kept, its height kept
-  AO.qGone = function (u, on) {
+  // `word` *done* marks a row whose entry was archived (§4.5 screen 12 *Values are patched in place*): drawn as
+  // *gone* is, and withdrawn the same way
+  AO.qGone = function (u, on, word) {
+    word = word || "gone — refresh";
     u.classList.toggle("qgone", on);
     let w = [...u.querySelectorAll(".qgonew")].find((x) => x.closest(Q_UNITS) === u);
+    if (on && w && w.textContent !== word) { w.remove(); w = null; }
     if (on && !w) {
-      w = document.createElement("span"); w.className = "qgonew"; w.textContent = "gone — refresh";
-      w.setAttribute("title", AO.QGONE_TITLE || "");
+      w = document.createElement("span"); w.className = "qgonew"; w.textContent = word;
+      if (word.startsWith("gone")) w.setAttribute("title", AO.QGONE_TITLE || "");
       // in the controls' own line, where they were; a unit with none draws it at its line's end
       const line = [...u.querySelectorAll(".sugg")].find((x) => x.closest(Q_UNITS) === u);
       if (line) line.prepend(w); else u.appendChild(w);
     }
+    if (!on && w) w.remove();
+  };
+  // a card's header whose top entry was archived while the card keeps it as its top: *done*, its controls hidden,
+  // **Open card ›** (a link) staying
+  AO.qHeadDone = function (head, on) {
+    head.classList.toggle("qheaddone", on);
+    const right = head.querySelector(":scope > .qmain > .qright");
+    let w = right && [...right.children].find((x) => x.classList.contains("qgonew"));
+    if (on && right && !w) { w = document.createElement("span"); w.className = "qgonew"; w.textContent = "done"; right.prepend(w); }
     if (!on && w) w.remove();
   };
   // an age, as the bar says it: *12 s ago*, *3 min ago*, *2 h ago*
@@ -5453,15 +5484,31 @@
     // a touch from `pointerdown` to the press's end, keyboard focus in it, or a menu or a box open on it
     let pointerOn = "", touchOn = "", boxOn = "";
     const cardId = (t) => { const c = t && t.closest && t.closest("#queuelists .qcard[data-card]"); return c ? c.dataset.card : ""; };
+    let freed = "";  // the card a refused press was on: its hold ends for the patch that follows the refusal
     function holds(el) {
       const id = el.dataset.card, a = document.activeElement;
-      if (id === pointerOn || id === touchOn) return true;
-      if (a && el.contains(a) && a.matches && a.matches(":focus-visible")) return true;
+      if (id && id === freed) return false;
       if (el.querySelector("details.more[open], details.qdots[open]")) return true;
-      return id === boxOn && !!document.querySelector("dialog[open]");
+      if (id === boxOn && !!document.querySelector("dialog[open]")) return true;
+      // while the page is hidden only a menu or a box holds (§4.5 screen 12 *The card the person is on holds*)
+      if (document.hidden) return false;
+      if (id === pointerOn || id === touchOn) return true;
+      return !!(a && el.contains(a) && a.matches && a.matches(":focus-visible"));
     }
-    const anyBox = () => !!document.querySelector("dialog[open]") || !!$("details.more[open], details.qdots[open]", lists);
-    const release = () => { if (reading && $(".qcard[data-waits]", lists)) patch(); };
+    // a refused press (a 409, a permission's `call` check) ends any hold on its card (§4.5 screen 12 *The person's
+    // own press is drawn at once*): the values that waited, its *gone* among them, are drawn with the refusal
+    document.addEventListener("ao:refused", (e) => {
+      const id = e.detail && e.detail.card; if (!id || !reading) return;
+      const c = $(`.qgroup .qcard[data-card="${CSS.escape(id)}"]`, lists);
+      const hadFocus = !!(c && c.contains(document.activeElement));
+      freed = id;
+      try { patch(); } finally { freed = ""; }
+      // a whole patch replaced the pressed control: focus goes back to the card's header
+      const n = $(`.qgroup .qcard[data-card="${CSS.escape(id)}"] > .qhead`, lists);
+      if (hadFocus && n && !lists.contains(document.activeElement)) n.focus({ preventScroll: true });
+    });
+    // a hold begun after the return to the tab, before its reading arrived, makes that reading an ordinary re-read
+    const release = () => { if ($$(".qgroup .qcard[data-card]", lists).some(holds)) whole = false; if (reading && $(".qcard[data-waits]", lists)) patch(); };
     document.addEventListener("pointerover", (e) => {
       if (e.pointerType !== "mouse") return;
       const id = cardId(e.target); if (id === pointerOn) return;
@@ -5539,8 +5586,16 @@
         patchCard(el, r, diff.same.has(el.dataset.card), errs);
       });
       AO.qcardReapply(lists);
-      const gone = new Set(diff.gone.map(([id, k]) => id + "\n" + k));
-      $$(".qgroup .qcard[data-card]", lists).forEach((c) => unitsOf(c).forEach((u) => AO.qGone(u, gone.has(c.dataset.card + "\n" + AO.qUnitKey(u)))));
+      const gone = new Set(diff.gone.map(([id, k]) => id + "\n" + k)), done = new Set(diff.doneUnits.map(([id, k]) => id + "\n" + k));
+      const heads = new Set(diff.doneHeads);
+      $$(".qgroup .qcard[data-card]", lists).forEach((c) => {
+        unitsOf(c).forEach((u) => {
+          const at = c.dataset.card + "\n" + AO.qUnitKey(u);
+          AO.qGone(u, gone.has(at) || done.has(at), done.has(at) ? "done" : "");
+        });
+        const head = [...c.children].find((x) => x.classList.contains("qhead"));
+        if (head) AO.qHeadDone(head, heads.has(c.dataset.card));
+      });
       qc.applyFolds();
       if (AO.qRecount) AO.qRecount();
       wire();
@@ -5572,14 +5627,34 @@
     // the picks on the reading's cards, as on the drawn ones, so a card the picks hide in both counts nothing
     function offIn(root) { $$(".qgroup .qcard", root).forEach((el) => el.classList.toggle("qoff", !AO.qPass(card(el), picks, teams))); }
     // **Refresh**, and each whole draw: the reading swapped in, the folds, menus, row errors and keeps put back, the
-    // first card in view kept where it is on the screen (the top of the page stays at the top)
-    function drawWhole() {
+    // first card in view kept where it is on the screen (the top of the page stays at the top). `slide` (Refresh):
+    // each card whose old or new place is in view slides between them in 200 ms (FLIP), at once under
+    // `prefers-reduced-motion`, presses during the slide ignored. `keepOpen` (a hidden page): a card with a menu or a
+    // box open keeps its node, placed where the reading puts it, else where it was
+    const SLIDE_MS = 200;
+    let sliding = 0;
+    lists.addEventListener("click", (e) => { if (Date.now() < sliding) { e.preventDefault(); e.stopPropagation(); } }, true);
+    const drawnCards = () => $$(".qgroup .qcard[data-card]", lists);
+    const firstById = (cs) => { const m = new Map(); cs.forEach((c) => { if (!m.has(c.dataset.card)) m.set(c.dataset.card, c); }); return m; };
+    function drawWhole(opts) {
       if (!reading) return;
+      opts = opts || {};
       const atTop = window.scrollY <= 0;
-      const inView = $$(".qgroup .qcard[data-card]", lists).filter((c) => { const b = c.getBoundingClientRect(); return b.bottom > 0 && b.top < window.innerHeight; });
-      const anchorIds = inView.length ? $$(".qgroup .qcard[data-card]", lists).slice($$(".qgroup .qcard[data-card]", lists).indexOf(inView[0])).map((c) => c.dataset.card) : [];
-      const was = new Map(anchorIds.map((id) => [id, ($(`.qcard[data-card="${CSS.escape(id)}"]`, lists) || { getBoundingClientRect: () => ({ top: 0 }) }).getBoundingClientRect().top]));
+      const before = drawnCards();
+      const inView = before.filter((c) => { const b = c.getBoundingClientRect(); return b.bottom > 0 && b.top < window.innerHeight; });
+      const anchorIds = inView.length ? before.slice(before.indexOf(inView[0])).map((c) => c.dataset.card) : [];
+      const was = new Map();
+      firstById(before).forEach((c, id) => was.set(id, c.getBoundingClientRect().top));
       const focusCard = cardId(document.activeElement);
+      const focusIn = !!(document.activeElement && lists.contains(document.activeElement));
+      // a hidden page's draw keeps the node of a card with a menu or a box open, and nothing else held
+      const kept = opts.keepOpen ? before.filter((c) => c.querySelector("details.more[open], details.qdots[open]")
+        || (c.dataset.card === boxOn && !!document.querySelector("dialog[open]"))).map((c) => {
+        let p = c.previousElementSibling; while (p && !p.matches(".qcard[data-card]")) p = p.previousElementSibling;
+        const g = c.closest(".qgroup");
+        return { node: c, prev: p ? p.dataset.card : "", group: g ? g.dataset.group : "" };
+      }) : [];
+      kept.forEach((k) => k.node.remove());
       const opened = $$(".qdline .qdbody:not([hidden])", lists).map((el) => el.closest(".qdline").dataset.key);
       const menus = AO.openMenus(lists);
       const errs = AO.rowErrs(lists), on = document.activeElement;
@@ -5587,6 +5662,18 @@
       lists.innerHTML = readingHtml;
       reading = parse(readingHtml);
       applied.clear();
+      const tops = new Map();  // per group, the last kept card put at its top: several keep their order
+      kept.forEach((k) => {
+        const there = $(`.qgroup .qcard[data-card="${CSS.escape(k.node.dataset.card)}"]`, lists);
+        if (there) { there.replaceWith(k.node); return; }
+        const prev = k.prev && $(`.qgroup .qcard[data-card="${CSS.escape(k.prev)}"]`, lists);
+        const q = $(`.qgroup[data-group="${CSS.escape(k.group)}"] .qcards`, lists) || $(".qgroup .qcards", lists);
+        const top = tops.get(q);
+        if (prev) prev.after(k.node);
+        else if (top) top.after(k.node);
+        else if (q) q.prepend(k.node);  // its group gone too: the first group's top, never lost with its open menu
+        if (!prev && q) tops.set(q, k.node);
+      });
       AO.qcardReapply(lists);  // a card's press still out (TD-1461), before the item's own keep takes a left row out
       AO.restoreRowErrs(lists, errs);
       const back = ring && $(`.mailrow[data-msg="${CSS.escape(ring)}"]`, lists);
@@ -5602,15 +5689,36 @@
         const keep = anchorIds.map((id) => $(`.qcard[data-card="${CSS.escape(id)}"]`, lists)).find(Boolean);
         if (keep) window.scrollBy(0, keep.getBoundingClientRect().top - was.get(keep.dataset.card));
       }
-      // the card that had focus left: focus goes to the next card's header
-      if (focusCard && !$(`.qcard[data-card="${CSS.escape(focusCard)}"]`, lists)) {
-        const nx = anchorIds.slice(anchorIds.indexOf(focusCard) + 1).map((id) => $(`.qcard[data-card="${CSS.escape(id)}"] > .qhead`, lists)).find(Boolean);
-        if (nx) nx.focus({ preventScroll: true });
+      if (focusCard && !back) {
+        const same = $(`.qcard[data-card="${CSS.escape(focusCard)}"] > .qhead`, lists);
+        // the card that had focus left: focus goes to the next card's header; one still drawn (a hidden page's
+        // draw ended its focus hold) gets its focus back on its own header
+        const nx = same || anchorIds.slice(anchorIds.indexOf(focusCard) + 1).map((id) => $(`.qcard[data-card="${CSS.escape(id)}"] > .qhead`, lists)).find(Boolean);
+        if (nx && (!same || (focusIn && !lists.contains(document.activeElement)))) nx.focus({ preventScroll: true });
       }
+      if (opts.slide) slide(was);
+    }
+    // FLIP: First (the old places, `was`), Last (drawn now), Invert (a transform back to the old place), Play
+    function slide(was) {
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const h = window.innerHeight, moving = [];
+      firstById(drawnCards()).forEach((c, id) => {
+        if (!was.has(id)) return;
+        const now = c.getBoundingClientRect(), old = was.get(id), dy = old - now.top;
+        const seen = (t) => t + now.height > 0 && t < h;
+        if (!dy || !(seen(old) || seen(now.top))) return;
+        c.style.transition = "none"; c.style.transform = `translateY(${dy}px)`;
+        moving.push(c);
+      });
+      if (!moving.length) return;
+      sliding = Date.now() + SLIDE_MS;
+      void lists.offsetHeight;  // the inverted places drawn before the play
+      moving.forEach((c) => { c.style.transition = `transform ${SLIDE_MS}ms ease`; c.style.transform = ""; });
+      setTimeout(() => moving.forEach((c) => { c.style.transition = ""; }), SLIDE_MS + 20);
     }
     if (refreshBtn) refreshBtn.addEventListener("click", () => {
       $$("details.more[open], details.qdots[open]", lists).forEach((d) => { d.open = false; });  // Refresh closes menus first
-      drawWhole();
+      drawWhole({ slide: true });
     });
     // Recently completed's wider window replaces only that group's lines, in both copies, and releases nothing
     function drawWindow(fresh) {
@@ -5656,8 +5764,9 @@
         const widened = win !== loaded();
         if (widened) drawWindow(fresh);
         drawFindMiss(fresh);
-        // a page nobody can see, or one just come back to, draws whole — but where a menu or a box is open
-        if ((document.hidden || whole) && !anyBox()) drawWhole(); else patch();
+        // a page nobody can see draws whole but for a card with a menu or a box open, whose node stays
+        // (and so does the reading that answers a return to the tab, before any hold began)
+        if (document.hidden || whole) drawWhole({ keepOpen: true }); else patch();
         if (widened || $("#qfindmiss", lists)) apply();  // the window's lines and the find's note shown
       } catch (err) { notLive(); /* the next poll tries again */ } finally {
         busy = false; whole = false;

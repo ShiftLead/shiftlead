@@ -449,7 +449,7 @@ def test_a_reread_queue_reopens_its_folds_and_fills_each_open_one():
     assert "AO.fillFold(d)" in reopen
     q = js[js.index("AO.queue = function") :]
     # TD-1761: the whole draw (Refresh, a hidden page) swaps; a patch reopens the folds of each node it swapped
-    whole = q[q.index("function drawWhole()") :]
+    whole = q[q.index("function drawWhole(opts)") :]
     assert "AO.reopenFolds(lists);" in whole[: whole.index("wire();")]
     assert "AO.reopenFolds(n);" in q[q.index("function patchCard(") : q.index("function patch()")]
 
@@ -588,7 +588,7 @@ def test_a_reread_opens_again_the_menu_the_person_had_open(tmp_path):
     js = JS.read_text()
     q = js[js.index("AO.queue = function") :]
     # TD-1761: the swap is the whole draw's (Refresh, a hidden page); a re-read patches, and a held card waits
-    body = q[q.index("function drawWhole()") :]
+    body = q[q.index("function drawWhole(opts)") :]
     body = body[: body.index("wire();")]
     assert (
         body.index("AO.openMenus(lists)") < body.index("lists.innerHTML =") < body.index("AO.reopenMenus(lists, menus)")

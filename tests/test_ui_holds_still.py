@@ -20,13 +20,14 @@ global.CSS = { escape: (s) => s };
 const out = {};
 const item = (msg) => h("div", "mailrow", { "data-msg": msg }, []);
 const sec = (b, msgs) => h("div", "qsec", { "data-sec": b }, msgs.map(item));
-const row = (qid) => h("div", "qrow", { "data-qid": qid }, []);
+const row = (qid, cls) => h("div", `qrow${cls ? " " + cls : ""}`, { "data-qid": qid }, []);
 // a card: Decide and Do in its header, its rows under it
 const card = (id, o) => h("div", `qcard${o.off ? " qoff" : ""}`,
   { "data-card": id, ...(o.up ? { "data-up": "1" } : {}) }, [
-  h("div", "qhead", { "data-qid": id },
+  h("div", "qhead", { "data-qid": id, ...(o.headDone ? { "data-done": "" } : {}) },
     [...(o.decide ? [sec("decide", o.decide)] : []), ...(o.do ? [sec("do", o.do)] : [])]),
-  h("div", "qrows", {}, (o.rows || []).map(row))]);
+  h("div", "qrows", {}, [...(o.rows || []).map((q) => row(q, (o.archived || []).includes(q) ? "archived" : "")),
+    ...(o.fold ? [h("details", "qfold", {}, o.fold.map((q) => row(q, "archived")))] : [])])]);
 const group = (g, cards) => h("section", "qgroup", { "data-group": g }, [h("div", "qcards", {}, cards)]);
 const page = (groups) => h("div", "", {}, groups);
 const diff = (a, b, folded, own) => {
@@ -84,6 +85,17 @@ out.rank_none = AO.qRankFrom(drawn, ["D", "Y"], "D", "up");
 out.rank_stays = AO.qRankFrom(drawn, ["B", "C", "D"], "B", "top");
 // a drop keeps its own anchor: before C
 out.rank_drop = AO.qRankFrom(drawn, ["C", "Z", "B", "D"], "D", { before: "C" });
+// slice 2: a row whose entry was archived is *done* where it stands, not *gone*: moved into the ✓ n done fold, or
+// drawn archived in its place; a header whose top entry was archived (no re-top) is *done*; both count *moved*
+const dn = (d) => ({ ...diff(d[0], d[1]), doneUnits: AO.qDiff(AO.qModel(d[0]), AO.qModel(d[1])).doneUnits,
+  doneHeads: AO.qDiff(AO.qModel(d[0]), AO.qModel(d[1])).doneHeads });
+const one = (o) => page([group("in_progress", [card("A", o)])]);
+out.done_fold = dn([one({ rows: ["a1", "a2"] }), one({ rows: ["a1"], fold: ["a2"] })]);
+out.done_inline = dn([one({ rows: ["a1", "a2"] }), one({ rows: ["a1", "a2"], archived: ["a2"] })]);
+out.done_drawn = dn([one({ rows: ["a1"], fold: ["a2"] }), one({ rows: ["a1"], fold: ["a2"] })]);
+// a row drawn archived in its place that the reading moved into the fold: a place change, never *gone*
+out.done_folded = dn([one({ rows: ["a1", "a2"], archived: ["a2"] }), one({ rows: ["a1"], fold: ["a2"] })]);
+out.done_head = dn([one({ rows: ["a1"] }), one({ rows: ["a1"], headDone: 1 })]);
 out.lis = [...AO.qLis([0, 3, 1, 2])].sort();
 out.age = [AO.qAge(12000), AO.qAge(185000), AO.qAge(7300000)];
 console.log(JSON.stringify(out));
@@ -169,6 +181,23 @@ def test_a_rank_move_names_the_latest_readings_neighbours(got):
     assert (got["rank_drop"]["prev"], got["rank_drop"]["next"]) == (None, "C")
 
 
+def test_a_row_whose_entry_was_archived_is_done_not_gone_and_moves_its_card(got):
+    for case in ("done_fold", "done_inline"):
+        d = got[case]
+        assert d["doneUnits"] == [["A", "r:a2"]] and d["gone"] == [], case
+        assert d["moved"] == 1 and d["words"] == ["1 card moved"] and "A" not in d["same"], case
+    d = got["done_folded"]
+    assert d["gone"] == [] and d["doneUnits"] == [] and d["moved"] == 1
+    # a row drawn done already is nothing new
+    d = got["done_drawn"]
+    assert d["doneUnits"] == [] and _counts(d) == NOTHING
+
+
+def test_a_header_whose_top_was_archived_is_done(got):
+    d = got["done_head"]
+    assert d["doneHeads"] == ["A"] and d["moved"] == 1 and d["gone"] == []
+
+
 def test_the_helpers(got):
     assert got["lis"] == [0, 2, 3]
     assert got["age"] == ["12 s ago", "3 min ago", "2 h ago"]
@@ -183,11 +212,11 @@ def test_a_reread_patches_and_only_refresh_and_a_hidden_page_draw_whole():
     read = Q[Q.index("async function reread()") :]
     read = read[: read.index('document.addEventListener("visibilitychange"')]
     assert "lists.innerHTML" not in read
-    assert "if ((document.hidden || whole) && !anyBox()) drawWhole(); else patch();" in read
+    assert "if (document.hidden || whole) drawWhole({ keepOpen: true }); else patch();" in read
     # a reading that fails, or answers without a served Queue, is no reading
     assert 'if (!fresh || !$("#qcounts", fresh)) { notLive(); return; }' in read
     assert "if (sent < lastMove) return;" in read  # a read that left before the last move is dropped
-    assert 'refreshBtn.addEventListener("click"' in Q and "drawWhole();" in Q
+    assert 'refreshBtn.addEventListener("click"' in Q and "drawWhole({ slide: true });" in Q
 
 
 def test_a_held_card_waits_and_its_gone_does_not():
@@ -220,3 +249,37 @@ def test_a_kept_button_is_wired_once_and_a_hold_ends_when_its_cause_does():
     assert "if (b.dataset.wired) return;" in w
     assert 'document.addEventListener("pointerout"' in Q  # the pointer leaving the window
     assert 'if (!document.querySelector("dialog[open]")) boxOn = "";' in Q  # a press that opened no box
+
+
+def test_a_refused_press_ends_its_cards_hold():
+    # §4.5 screen 12 *The person's own press is drawn at once*: the press handler names its card, and the Queue
+    # patches that card past its hold
+    assert 'document.dispatchEvent(new CustomEvent("ao:refused", { detail: { card: atCard } }))' in JS
+    r = Q[Q.index('document.addEventListener("ao:refused"') :]
+    r = r[: r.index("});")]
+    assert "freed = id;" in r and "patch();" in r
+    h = Q[Q.index("function holds(el)") :]
+    h = h[: h.index("\n    }\n")]
+    assert "if (id && id === freed) return false;" in h
+
+
+def test_a_hidden_page_holds_only_by_a_menu_or_a_box():
+    h = Q[Q.index("function holds(el)") :]
+    h = h[: h.index("\n    }\n")]
+    # a menu or a box is read before the page's hidden state, every other hold after it
+    assert h.index("details.more[open]") < h.index("if (document.hidden) return false;") < h.index("pointerOn")
+    w = Q[Q.index("function drawWhole(opts)") : Q.index("function slide(was)")]
+    assert "kept.forEach((k) => k.node.remove());" in w and "there.replaceWith(k.node)" in w
+    # focus back on the same card's header, or the next card's where it left
+    assert '.qcard[data-card="${CSS.escape(focusCard)}"] > .qhead' in w
+
+
+def test_refresh_slides_the_cards_in_200_ms_or_at_once_under_reduced_motion():
+    s = Q[Q.index("function slide(was)") :]
+    s = s[: s.index("\n    }\n")]
+    assert "const SLIDE_MS = 200;" in Q
+    assert s.index('matchMedia("(prefers-reduced-motion: reduce)").matches) return;') < s.index("translateY")
+    assert "sliding = Date.now() + SLIDE_MS;" in s
+    # presses during the slide are ignored
+    ignored = "if (Date.now() < sliding) { e.preventDefault(); e.stopPropagation(); }"
+    assert f'lists.addEventListener("click", (e) => {{ {ignored} }}, true);' in Q
