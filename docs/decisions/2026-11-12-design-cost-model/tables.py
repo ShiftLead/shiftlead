@@ -125,6 +125,19 @@ def phase_of(calls: str, mode: str) -> str:
     return mode
 
 
+def reviewer_rows(rs: list[dict], branches: set[str]) -> list[dict]:
+    """One reviewer's rows that are the design's, by the branch each ran on, after the trial's baseline (`capture.py`
+    `one_design_each`, TD-1775), which votes among the designs that claim a turn; this model selects five, so: a
+    row on one of the design's branches is; a row on a launch branch is where the design's branches hold the most
+    of the reviewer's other rows, or it has none; a row on another branch is not."""
+    votes: dict[str, int] = defaultdict(int)
+    for x in rs:
+        if x["branch"] not in LAUNCH:
+            votes["mine" if x["branch"] in branches else x["branch"]] += 1
+    launch_mine = not votes or votes["mine"] >= max(votes.values())
+    return [x for x in rs if x["branch"] in branches or (x["branch"] in LAUNCH and launch_mine)]
+
+
 def select(src: Path) -> None:
     rows = list(csv.DictReader(src.open()))
     by_session: dict[str, list[dict]] = defaultdict(list)
@@ -162,7 +175,9 @@ def select(src: Path) -> None:
         for r in picked:
             r["design"] = td
         out += picked
-        # the reviewers this design's sessions started within its window (their own spend, apart)
+        # the reviewers this design's sessions started within its window (their own spend, apart), each row kept
+        # only where it ran on the design's branches (TD-1800): one designer session works several designs'
+        # branches in turn, so a window takes in other designs' reviewers
         for s, t0, t1 in windows:
             subs = defaultdict(list)
             for r in by_session[s]:
@@ -170,7 +185,7 @@ def select(src: Path) -> None:
                     subs[r["side"]].append(r)
             for rs in subs.values():
                 if t0 <= min(x["ts"] for x in rs) <= t1:
-                    for x in rs:
+                    for x in reviewer_rows(rs, branches):
                         y = {k: v for k, v in x.items() if k != "tools"}
                         out.append({**y, "design": td, "phase": "reviewer", "calls": ""})
     fields = ["design", "phase"] + [k for k in rows[0] if k != "tools"] + ["calls"]
