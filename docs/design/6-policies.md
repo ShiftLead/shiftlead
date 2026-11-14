@@ -283,7 +283,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      kill a fact-check or CI it left running and leave the PR with nobody. A PR it handed to a
      reader — an `ask` carrying it, open in any record's inbox — is the reader's, and no longer
      holds it; and the wait is bounded: idle `SEAT_PR_WAIT` (two hours, `review.bound`'s default),
-     it is closed as before, and the PR stands among the repo's open ones. **The fill ceiling**:
+     it is closed as before, and the PR stands among the repo's open ones — a filing PR among them an order a
+     day after it opened (§4.4 *A filing PR nobody holds is a work order*, TD-1804). **The fill ceiling**:
      `FILL_CEILING` — six fills an hour over all seats sharing a controller (the graph, not the
      team badge), then `restart_ceiling` (with `why: fill`; the card says *fills exhausted · 6 in
      1 h*) on the seat whose fill tripped it and the Inbox row as for a crash, its siblings merely
@@ -735,7 +736,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      team's `rest` (§4.4 *In a team's lanes*). A grinder's claim of the line, taken while it was still
      `free-pick`'s, is a lease like any other and stands when the line leaves its lane: it does the fallback's
      work (§4.9a), carrying *One more round* or *Hold*, never dropping it. The line is still `High` and still a work
-     order, taken first; and **every red PR nobody holds**, a work order `pr:<n>` (§4.4 *A red PR nobody holds is a work order*, TD-613), the same: the grinders' pick list takes both first (§4.9b *No anchor seat*) — so an
+     order, taken first; and **every red PR nobody holds**, a work order `pr:<n>` (§4.4 *A red PR nobody holds is a work order*, TD-613), and every filing PR nobody holds past `FILING_AFTER` (§4.4 *A filing PR nobody holds is a work order*, TD-1804), the same: the grinders' pick list takes both first (§4.9b *No anchor seat*) — so an
      evaluation, a decision and a live check whose gate stands match no lane, and a ledger
      with no header lines at all gives a `free-pick` lane everything it has unblocked; a lane of
      references gains nothing, and any other lane word matches nothing until a role gives it a
