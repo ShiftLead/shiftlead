@@ -836,6 +836,20 @@ def ledger_start_form(root: str, name: str, ref: str, team: str, role: str, mana
     return "/new?" + urlencode({k: v for k, v in q.items() if v})
 
 
+def _form_index(body: Mapping[str, Any]) -> int | None:
+    """The index of the form a press filled (`form`, §4.4 *A form's press is the decide*, TD-1698), or None; a
+    value that is no index is refused here, its range the agent's."""
+    raw = body.get("form")
+    if raw is None or raw == "":
+        return None
+    if isinstance(raw, bool):
+        raise HTTPException(400, "a form is the index of the form pressed")
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "a form is the index of the form pressed") from None
+
+
 def _int_param(raw: str | None, default: int, lo: int, hi: int) -> int:
     try:
         v = int(float(raw)) if raw not in (None, "") else default
@@ -5508,9 +5522,14 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 # handed; the agent refuses an answer that is not one of them word for word
                 answer = str(body.get("answer") or "").strip()
                 answers = body.get("answers")
-                if not answer or not isinstance(answers, list):
+                form = _form_index(body)
+                # a form's press may carry empty words: the agent refuses them in the design's words, *<head>
+                # needs its words* (§4.4 *A form's press is the decide*, TD-1698)
+                if (not answer and form is None) or not isinstance(answers, list):
                     raise HTTPException(400, "a decide names the answer and the item's answers")
                 more = {"answer": answer, "answers": [str(a) for a in answers]}
+                if form is not None:
+                    more["form"] = form
                 if not answers and " ".join(answer.split()) == board_mod.HAVE_A_SESSION:
                     # **Have a session do it** (§4.5 screen 12, TD-1624): a stale press where no lane would take
                     # the work is refused here, by the function the button's draw reads
@@ -5553,6 +5572,9 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     more["answer"] = int(body["answer"])
                 except (TypeError, ValueError):
                     raise HTTPException(400, "a ledger answer is the answer's index") from None
+            elif (form := _form_index(body)) is not None:
+                # a form's press, filled by the agent with the words, empty ones refused there (TD-1698)
+                more["form"], more["words"] = form, str(body.get("words") or "").strip()
             else:
                 words = str(body.get("words") or "").strip()
                 if not words:

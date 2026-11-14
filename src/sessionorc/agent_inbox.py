@@ -101,6 +101,12 @@ def _blocked_unreplied(e: MailEntry) -> bool:
     return o.get("state") == "blocked" and not o.get("replied")
 
 
+def _offered_head(label: str) -> str:
+    """A form's head as offered (`Hold` of `Hold: <note>`), for *<head> needs its words* (TD-1698)."""
+    m = ledgerboard.FORM_RE.fullmatch(" ".join(str(label).split()))
+    return m.group("head").strip() if m else str(label)
+
+
 class InboxMixin:
     # -- the person's own bookkeeping on their inbox (design §4.10, TD-069 step 0) ----------------
     # Each is refused to every session exactly as `inbox_delete` is, and each acts on the org's
@@ -342,6 +348,7 @@ class InboxMixin:
         answers: list[str] | None = None,
         key: str = "",
         why: str = "",
+        form: int | None = None,
         caller: Any = None,
     ) -> dict[str, Any]:
         """**Snooze**, **Done** or **Decide** on a board item (design §4.4 *Board write-back*, TD-069 step 3):
@@ -362,9 +369,10 @@ class InboxMixin:
 
         `action: decide` is the fourth edit (§4.4 *Decide*, TD-255): `answer` written as the
         line's `Decided:` field. `answers` is the item's own list as the reader gave it to the
-        page, handed as a Reply's `refs` are, and the answer is one of them word for word — or,
-        where the live look's pair is among them, `Not right:` and the person's words. Anything
-        else typed is a Reply.
+        page, handed as a Reply's `refs` are, and the answer is one of them word for word — or a form
+        among them filled (`<head>: <words>`, §4.4 *A form's press is the decide*, TD-1698). `form`
+        is the index of the form pressed: that form alone is filled, its head put back where the words
+        lack it. Anything else typed is a Reply.
 
         `why`, on a Done alone, is written in its `Closed:` field (`Closed: <date> — <why>.`, §4.4 *Board
         write-back*): only **Have a session do it**'s hand-off gives it (TD-1660)."""
@@ -380,7 +388,7 @@ class InboxMixin:
         if line is None and not key:
             raise RpcError(f"a board {action or 'edit'} names the item's line or its id (design §4.4)")
         try:
-            said = self._board_answer(action, answer, answers)
+            said = self._board_answer(action, answer, answers, form)
         except board_mod.Refused as e:
             raise RpcError(str(e)) from None
         async with self._applying_mark(root, str(key or ""), action, said):  # drawn as it lands (TD-1508)
@@ -426,26 +434,27 @@ class InboxMixin:
             raise RpcError(str(e)) from None
 
     @staticmethod
-    def _board_answer(action: str, answer: Any, answers: Any) -> str:
-        """The answer a `decide` writes, or "" for every other edit: one of the item's `answers`
-        word for word, or `Not right: <what>` where the pair's second answer is among them
-        (design §4.4 *Decide*) — refused otherwise, since any other typed answer is a Reply."""
+    def _board_answer(action: str, answer: Any, answers: Any, form: Any = None) -> str:
+        """The answer a `decide` writes, or "" for every other edit: one of the item's complete `answers`
+        word for word, or a form among them filled through ledgerboard (`<head>: <words>` on one line,
+        design §4.4 *A form's press is the decide*, TD-1698) — with `form`, that form alone, its head put
+        back where the words lack it. A form as written, or its head alone, is refused with *<head> needs
+        its words*; any other typed answer is a Reply, refused here."""
         if action != "decide":
             return ""
         offered = [" ".join(str(a).split()) for a in answers] if isinstance(answers, list) else []
         said = " ".join(str(answer or "").split())
-        # an offered answer word for word comes first, so an item's own complete *Not right: wrong
-        # repo* is an answer like any other; the pair's second answer is a form, `Not right: <what>`,
-        # whose slot is the person's words, and pressed as written — or filled with a slot — it says
-        # nothing (ledgerboard's reading of the form, TD-585)
-        if said and said in offered and not ledgerboard.is_not_right_form(said):
-            return said
-        if not offered and said == board_mod.HAVE_A_SESSION:
-            # **Have a session do it** (TD-1624): an `act` line's fixed answer, checked against the line's own kind
-            # where `board.edit_line` finds it on origin's head — never a kind the page sent (§4.4 *Decide*)
-            return said
+        if form is None:
+            # a complete offered answer word for word comes first, so an item's own complete *Not right: wrong
+            # repo* is an answer like any other; a form pressed as written says nothing (ledgerboard's form)
+            if said and said in offered and not ledgerboard.is_form(ledgerboard.split_answer(said)[0]):
+                return said
+            if not offered and said == board_mod.HAVE_A_SESSION:
+                # **Have a session do it** (TD-1624): an `act` line's fixed answer, checked against the line's own
+                # kind where `board.edit_line` finds it on origin's head — never a kind the page sent (§4.4 *Decide*)
+                return said
         try:
-            filled = ledgerboard.fill_not_right(said, offered)
+            filled = ledgerboard.fill_form(said, offered, form)
         except ledgerboard.Refused as e:
             raise board_mod.Refused(str(e)) from None
         if filled:
@@ -1127,6 +1136,7 @@ class InboxMixin:
         answer: int | None = None,
         go: bool = False,
         road: str = "",
+        form: int | None = None,
         caller: Any = None,
     ) -> dict[str, Any]:
         """The person's answer to a ledger entry that waits on them (design §4.5 screen 6 *The ledger's
@@ -1140,7 +1150,11 @@ class InboxMixin:
         once the line lands, so the row leaves on the next poll. `road` is **Done…** (`done`) or **Back to
         design…** (`design`) on any open row (`_ledger_road`, TD-905). A person's session passes for a road
         alone (`mail.PERSON_SESSION`, §4.8 *A person's session passes one of them*, TD-1117): the answer with
-        no road was put to the person, and stays theirs."""
+        no road was put to the person, and stays theirs.
+        A form among its answers is filled, never pressed (§4.4 *A form's press is the decide*, TD-1698): `form` is
+        the index of the form pressed, filled with `words` through ledgerboard as a board's decide fills it; an
+        `answer` index naming a form, or words that are an offered form unfilled, are refused with *<head> needs
+        its words*."""
         agent_common.person_only(
             caller, "answer a ledger entry", "§4.5", self._graph(), session_ok=bool(str(road or ""))
         )
@@ -1174,9 +1188,16 @@ class InboxMixin:
         elif answer is not None:
             if isinstance(answer, bool) or not isinstance(answer, int) or not 0 <= answer < len(answers):
                 raise RpcError(f"{id} has no answer {answer!r}: reload the Inbox")
+            if ledgerboard.is_form(answers[answer]):
+                raise RpcError(f"{_offered_head(answers[answer])} needs its words")
             said = answers[answer]
         else:
             said = str(words or "")
+            try:
+                # a form filled (with `form`, that one; else any whose head the words begin with)
+                said = ledgerboard.fill_form(said, answers, form) or said
+            except ledgerboard.Refused as err:
+                raise RpcError(str(err)) from None
         key = f"ledger:{root}:{id}"
         if key in self._board_adding:
             raise RpcError(f"{id} is already being decided")

@@ -1306,6 +1306,14 @@ def test_a_press_hands_the_answer_and_the_readers_list_to_the_write_back(tmp_pat
         for bad in ({"answers": ["approve"]}, {"answer": "hold"}, {"answer": "hold", "answers": "hold"}):
             assert c.post("/api/person/board", json={**base, **bad}).status_code == 400
         assert len(calls) == 1
+        # a form's press (TD-1698): `form` forwarded, its empty words passed for the agent to refuse in its words
+        r = c.post("/api/person/board", json={**base, "answer": "", "answers": ["Go", "Hold: <note>"], "form": 1})
+        assert r.status_code == 200
+        assert calls[-1][1]["form"] == 1 and calls[-1][1]["answer"] == ""
+        for bad in ("one", True):
+            body = {**base, "answer": "x", "answers": ["Go", "Hold: <note>"], "form": bad}
+            assert c.post("/api/person/board", json=body).status_code == 400
+        assert len(calls) == 2
 
 
 @pytest.mark.integration

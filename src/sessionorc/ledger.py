@@ -133,9 +133,9 @@ def answers_of(value: str) -> tuple[list[str], list[str], int | None]:
     split and mark: the items split on `|` (`\\|` a literal bar), the closing full stop dropped, each
     split on its first ` — ` into its label and what it leads to (§4.10 *The answers' split*, TD-913),
     and the index of the one whose label is marked ` (default)` — None unless exactly one is (cadence
-    §3.5, TD-066: at most one, and with two there is no single recommendation). `(labels, consequences,
-    default)`. The value is the field alone, so a `Due:` or `Decided:` in it is words, not a board item's
-    trailing field."""
+    §3.5, TD-066: at most one, and with two there is no single recommendation; none where it is a form, TD-1698).
+    `(labels, consequences, default)`. The value is the field alone, so a `Due:` or `Decided:` in it is words,
+    not a board item's trailing field."""
     out: list[str] = []
     consequences: list[str] = []
     marked: list[int] = []
@@ -150,7 +150,9 @@ def answers_of(value: str) -> tuple[list[str], list[str], int | None]:
         if words:
             out.append(words)
             consequences.append(consequence)
-    return out, consequences, marked[0] if len(marked) == 1 else None
+    # a form marked the default is no default: it is filled, never pressed (§4.4 *Decide*, TD-1698)
+    default = marked[0] if len(marked) == 1 and not lb.is_form(out[marked[0]]) else None
+    return out, consequences, default
 
 
 def ask_of(body: str) -> str:
