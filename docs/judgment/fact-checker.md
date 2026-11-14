@@ -12,3 +12,4 @@ The first row is not a run. It is the Gemini fact-check trial's own tally to 202
 | date | profile | model | caught | missed | false | none | minutes | passed |
 |---|---|---|---|---|---|---|---|---|
 | 2026-11-10 | gemini-reader | — | 0 | 9 | — | 63 of 72 | — | not a run |
+| 2026-11-14 | gemini-conformance | gemini/gemini-3.5-flash-lite | 2 | 6 | 4 | 3 | 24 | no |
