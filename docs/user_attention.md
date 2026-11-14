@@ -10,6 +10,8 @@ People: paul
 
 ## Needs the user
 
+- [ ] act 2026-11-14 (n/a) — Declare the grok-reader profile in ~/.shiftlead/profiles.yml, so TD-1638's Grok fact-check seat (fact-check-ao-2) can land: under profiles:, add grok-reader: {adapter: grok, account: paul-supergrok, config_dir: ~/.config/grok-reader, billing: subscription} (the home is already signed in; grok-conformance, if you want it declared too, takes the same account) — only you can do this. Context: none. Due: 2026-11-14.
+  - **Context:** Only the person can do this: profiles.yml is the home's, which no session writes. ao org check --root on TD-1638's branch reads team ao-grind: fact-check-ao-2: unknown profile grok-reader; the seat smoke on grok-reader passed from a scratch home (grok 1.0.77). The live copy carries the Grok adapter (#3837), so the line loads today.
 - [x] decide 2026-11-14 (n/a) — Pin model gemini-3.5-flash-lite on the gemini-conformance profile so TD-1648's Gemini 0.66.0 seat smoke can run, or drop that half and archive TD-1648 on the Claude Code pass? Context: TD-1648 decision (paul). Due: 2026-11-17. Answers: Pinned, run it again | Drop the Gemini half. Lifts: Pinned, run it again | Drop the Gemini half. Decided: Pinned, run it again (by paul) (2026-11-14). Closed: 2026-11-14 — lifted.
   - **Context:** The seat smoke passed on Claude Code 2.1.325 (2026-11-14). On gemini-conformance, which names no model, Auto picks gemini-3.8-flash and the free key hit its usage limit before the seat sent a reply, so the untrusted-flags prompt the run is meant to show never had a chance to appear (TD-1648 Log, 2026-11-14).
   - **Question:** Pin a model on gemini-conformance so the Gemini half can run, or drop it?
