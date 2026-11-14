@@ -163,3 +163,14 @@ def test_a_reference_two_chips_hold_joins_on_the_repo_pages_held_by():
     lists = ledger_lists(r, motion, {}, None, {})
     (row,) = [e for got in lists for e in got["rows"] if e.get("id") == "TD-1"]
     assert sorted(row["held"].split(", ")) == ["g1", "g2"]
+
+
+def test_one_role_with_a_worker_and_a_review_stage_reads_each_by_its_kind():
+    """TD-1780 (§4.9c rules 3 and 4): where one role holds both a worker stage and a review stage, a holder's
+    PR nobody asked reads the worker stage and an open ask's seat the review stage — in either order of the flow."""
+    lead = g("t1", role="techlead")
+    fix, rev = Stage("fix", "techlead", ["free-pick", "owner:techlead"]), Stage("review", "techlead")
+    for flow in ([TD[0], fix, rev], [TD[0], rev, fix]):
+        names = [s.name for s in flow]
+        assert [x[1] for x in chips([lead], reading(), flow)] == ["fix"], names
+        assert [x[1] for x in chips([lead], reading({"9": [ask(TL, "open", "1")]}), flow)] == ["review"], names
