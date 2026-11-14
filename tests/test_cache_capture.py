@@ -363,3 +363,12 @@ def test_show_reads_a_responses_request_its_cache_key_blocks_and_cached_tokens(t
         "  messages[2] ? [0] function_call_output: 66 chars",
         "first request's cache: read 1664, input (the read included) 23800",
     ]
+
+
+def test_show_measures_a_null_content_item_whole_and_reads_a_string_input_as_one_message(tmp_path):
+    reasoning = {"type": "reasoning", "content": None, "summary": []}
+    (tmp_path / "0001-request.json").write_text(json.dumps({"tools": [], "input": [reasoning]}))
+    (tmp_path / "0002-request.json").write_text(json.dumps({"tools": [], "input": "hello"}))
+    lines = cc.show(sorted(tmp_path.iterdir()), provider="responses").splitlines()
+    assert f"  messages[0] ? [0] reasoning: {len(json.dumps(reasoning))} chars" in lines
+    assert lines[-2] == "  messages[0] user [0] text: 5 chars"  # the last is the first request's usage line

@@ -237,7 +237,7 @@ def _size(block: Any) -> int:
         return len(block)
     if isinstance(block, dict):
         for k in ("text", "content", "input"):
-            if k in block:
+            if block.get(k) is not None:  # a null value is no content: the block is measured whole
                 return _size(block[k])
     if isinstance(block, list):
         return sum(_size(b) for b in block)
@@ -271,6 +271,8 @@ def layout(req: dict[str, Any], row: dict[str, str] | None) -> list[str]:
         lines.append(f"  {row['key']}: {req.get(row['key'])}")
     role_of = row.get("system_role")
     items = req.get(row["messages"]) or []
+    if isinstance(items, str):  # a Responses `input` may be one string: one user message
+        items = [{"role": "user", "content": items}]
     if role_of:  # the system text is among the messages, as the items of that role
         system = [
             b for m in items if isinstance(m, dict) and m.get("role") == role_of for b in _blocks(m.get("content"))
