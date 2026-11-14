@@ -736,7 +736,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      team's `rest` (§4.4 *In a team's lanes*). A grinder's claim of the line, taken while it was still
      `free-pick`'s, is a lease like any other and stands when the line leaves its lane: it does the fallback's
      work (§4.9a), carrying *One more round* or *Hold*, never dropping it. The line is still `High` and still a work
-     order, taken first; and **every red PR nobody holds**, a work order `pr:<n>` (§4.4 *A red PR nobody holds is a work order*, TD-613), and every filing PR nobody holds past `FILING_AFTER` (§4.4 *A filing PR nobody holds is a work order*, TD-1804), the same: the grinders' pick list takes both first (§4.9b *No anchor seat*) — so an
+     order, taken first; and **every red PR nobody holds**, a work order `pr:<n>` (§4.4 *A red PR nobody holds is a work order*, TD-613), the same, and every filing PR nobody holds past `FILING_AFTER` (§4.4 *A filing PR nobody holds is a work order*, TD-1804), at *Medium*, after the other PR orders: the grinders' pick list takes them first (§4.9b *No anchor seat*) — so an
      evaluation, a decision and a live check whose gate stands match no lane, and a ledger
      with no header lines at all gives a `free-pick` lane everything it has unblocked; a lane of
      references gains nothing, and any other lane word matches nothing until a role gives it a
