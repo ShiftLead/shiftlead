@@ -11,6 +11,7 @@ from importlib import resources
 from pathlib import Path
 
 import pytest
+import yaml
 
 from shiftlead import cli
 
@@ -22,6 +23,13 @@ FLAT = re.sub(r"\s+", " ", DOC)
 def has(*phrases: str) -> None:
     for p in phrases:
         assert re.sub(r"\s+", " ", p) in FLAT, p
+
+
+def part(title: str) -> str:
+    """A `## ` part of the procedure, its heading to the next one's."""
+    got = re.search(rf"^## {re.escape(title)}\n.*?(?=^## |\Z)", DOC, re.S | re.M)
+    assert got, title
+    return re.sub(r"\s+", " ", got.group(0))
 
 
 def section(n: int) -> str:
@@ -186,13 +194,15 @@ def test_step_one_its_stops_and_what_the_last_run_left_unread():
     s1 = section(1)
     for phrase in (
         "`git rev-parse --path-format=absolute --git-common-dir`",
-        "the `root` of `ao repo shiftlead --json`",
+        "the `root` of the entry *The mode* chose (the `ao repo --all --json` entry whose remote is the upstream)",
         "Run anywhere else, stop here and say where to run it",
         "Where one exists, name it and stop until that PR merges or closes",
         '--search "feedback: in:title sort:created-desc" --limit 100 --json number,title,body,mergedAt',
         "each read up to its first ` — `",
-        "Only that PR's lines count — the latest merged `feedback:` PR, whether or not it has any",
-        "offered by each run until a later `feedback:` PR merges",
+        "Only that PR's lines count — the latest merged `feedback: <since> → <until>` PR, whether or not it has any",
+        "offered by each run until a later such PR merges (a reports-only `feedback: reports …` PR is not one)",
+        "keeping the titles of the form `feedback: <since> → <until>` alone, so a reports-only run's "
+        "`feedback: reports #<a>…` (step 8) is never taken for one",
         "A person who declines the offer accepts it unread",
         "ao feedback digest <seat>… --since <since> --until <until> --list",
     ):
@@ -220,3 +230,264 @@ def test_a_bare_feedback_exits_2(argv, capsys):
     with pytest.raises(SystemExit) as e:
         cli.main(argv)
     assert e.value.code == 2
+
+
+# TD-1796: report mode, the reports' intake in file mode, and the issue form (design §4.7 *Reports from other
+# installs*).
+
+
+def test_the_mode_is_chosen_by_remote_before_step_one():
+    mode = part("The mode, chosen before step 1")
+    assert DOC.index("## The mode, chosen before step 1") < DOC.index("### 1. The person picks")
+    for phrase in (
+        "`ao repo --all --json`",
+        'An `ao` that fails (exits non-zero, or prints `{"error": …}`) stops the run with its error',
+        "An entry whose `remote` is `null` is skipped",
+        "(`git@github.com:ShiftLead/shiftlead.git`)",
+        "any `user:token@` before the host dropped, a port after the host dropped, a trailing `.git` dropped, case "
+        "ignored, and the host `github.com` alone (or `www.github.com`, or `ssh.github.com`",
+        "a mirror of the same name on another host is no upstream",
+        "**No entry's remote is the upstream: report mode**, a fork registered as `shiftlead` among them",
+        "`gh auth status --hostname github.com` exits non-zero), is report mode",
+        "`gh api repos/ShiftLead/shiftlead --jq .permissions.push`: `true` is **file mode**, any other answer report "
+        "mode; a signed-in `gh` whose call fails stops the run with its error",
+        "whatever its `name`",
+        "the one whose `root` is the directory's main checkout (step 1's check), and the run stops where none is",
+        "never `ao repo shiftlead`",
+        "what file mode files is not scrubbed and lands in a public ledger, and offer report mode instead",
+        "a person who answers *report mode* gets a run in report mode from there on",
+        "Never offer file mode to a run in report mode",
+    ):
+        assert phrase in mode, phrase
+    # Report mode reads its build and runs the dry check before step 1, before any transcript is read.
+    build = mode.index("`ao feedback report --build --json`")
+    dry = mode.index(
+        "`agent-cadence -C <checkout> run cadence_layer.py --publish-check --accept <an empty file> <another empty "
+        "file>`"
+    )
+    assert build < dry
+    for phrase in (
+        "`{checkout, commit, build_day, local}`",
+        "which must exit 0",
+        "**Where either fails, stop there**, saying report mode cannot finish at this install and why, before any "
+        "transcript is read",
+        "`agent-cadence -C <checkout> run cadence_config.py get sweep-model`",
+        "step 5 uses the `build_day` this printed",
+    ):
+        assert phrase in mode, phrase
+    assert "ao repo shiftlead --json" not in DOC
+
+
+def test_where_it_runs_and_sends_nothing_cover_both_modes():
+    where = DOC[DOC.index("**Where it runs.**") :]
+    where = re.sub(r"\s+", " ", where[: where.index("\n\n")])
+    assert "In file mode, at the home, from a worktree of the shiftlead checkout" in where
+    assert "In report mode, from any directory of a session the person drives at the home" in where
+    assert "it has no checkout check, since it writes nothing in any repo" in where
+    assert "run `ao feedback --skill` and follow it, or by starting the session in their clone" in where
+    sends = DOC[DOC.index("**This run sends nothing to another repo**") :]
+    sends = re.sub(r"\s+", " ", sends[: sends.index("\n\n")])
+    assert "the run closes the reports it read, by its PR's `Closes` lines or, where it opens none" in sends
+    assert "the report leaves this machine only by the person's own submission" in sends
+    assert "no run records what was sent" in sends and "none that sends a report" in sends
+    has("never print or read an issue's title or body yourself", "step 3's agents are never given its path")
+
+
+def test_report_mode_window_clones_and_classes_by_the_build_day():
+    rm = part("Report mode")
+    for phrase in (
+        "no `feedback:` PR to find — so list none and offer no `Not read:` lines",
+        "two RFC 3339 instants exactly seven days apart",
+        "**A run with no seat picked stops there**",
+        "a finding sent before is proposed again unless the person drops it",
+        "`ShiftLead/shiftlead`, `ShiftLead/agent-cadence` and `ShiftLead/ledgerboard`",
+        "git clone --depth 1 --filter=blob:none --sparse https://github.com/<owner/repo> <scratch>/ledgers/<repo>",
+        "git -C <scratch>/ledgers/<repo> sparse-checkout set docs/ledger",
+        "Read no open PR",
+        "A clone that fails, or whose `docs/ledger` holds no `TD-*.md`, marks that repo's findings *not deduped "
+        "against <repo>*",
+        "**the build's day** (`build_day` from `--build`) in place of the finding's `last`",
+        "a build day on or after the `Resolved:` day is **recurred**, sent as a new finding whose `recurs` is that "
+        "entry's id and whose `area` is the repo of that entry",
+        "a build day before it is **fixed after your build**, never sent, and named in the report with *update "
+        "shiftlead* and the entry's id",
+        "draft no parts",
+        "*include*",
+        "*merge with <group>*",
+        "*counts: all*, *counts: none*, or *counts:* and the ones to send",
+    ):
+        assert phrase in rm, phrase
+
+
+def test_report_mode_step_eight_its_stops_its_exits_and_the_clean_up():
+    rm = part("Report mode")
+    for phrase in (
+        "{days, seats, noise, new: [{area, what, fix, count, recurs}], known: [{repo, id, count}], names: "
+        "[<record id>…]}",
+        "the digest index's `until` less its `since`, in days, rounded up to a whole number",
+        "the digest index's record ids, a closed seat's among them",
+        "**With nothing included, write no report and say so.**",
+        "Past 40 findings, `new` and `known` together, go back to step 7: **the person drops groups**",
+        "`ao feedback report --findings <scratch>/feedback-findings.json --out <scratch>/feedback-issue.md --json`",
+        "never step 7's `feedback-report.md`",
+        "`{out, commit, build_day, local, check: {exit, lines}}`",
+        "**Exit 1**: the check flagged a line; the report is kept. Show the check's `lines`, the person changes the "
+        "finding with *edit*, you write the findings file again and run the verb again",
+        "**Exit 2**: stop the run, saying why; never show the report or the form's address",
+        "`report over 65536 characters`, where you go back to step 7 for the person to drop or shorten groups",
+        "a name source that failed, where you say the error and run the verb again on the person's word",
+        "**Never edit the written report by hand**",
+        "`tool` findings are listed for the person to send through their tool's own channel; `seat` findings are "
+        "never in the report",
+        "remove the clones (`<scratch>/ledgers/`), the digests, the findings file",
+        "step 7's `feedback-report.md`",
+        "**however the run ends** — a stop at exit 2, a failed dry check, nothing included or the person ending it",
+        "report mode sets aside the rule that the scratch directory is never removed",
+        "`feedback-issue.md` is kept only by a run that reached the hand-off",
+        "(an exit 1 never mended among them) removes it",
+    ):
+        assert phrase in rm, phrase
+
+
+def test_the_hand_off_asks_before_the_address_and_the_clean_up():
+    rm = part("Report mode")
+    for phrase in (
+        "**the scrub catches only the names it knows, as it spells them, and the patterns it matches**",
+        "private work described in plain words",
+        "The person's read of the whole report is the only check on those",
+        "**a submitted report is public at once**, mailed to the repo's watchers as it lands",
+        "leaves the earlier text in the issue's edit history",
+        "the text is never changed by hand, since each sentence stands twice",
+        "**the clean-up runs only after it**",
+        "Give no command that sends it",
+    ):
+        assert phrase in rm, phrase
+    question = rm.index("Then ask one question")
+    answers = [rm.index(a, question) for a in ("- *submit as is*", "- *edit*", "- *drop* — no report")]
+    address = rm.index("https://github.com/ShiftLead/shiftlead/issues/new?template=feedback-report.yml&title=")
+    assert question < answers[0] < answers[1] < answers[2] < address
+    assert "`https://github.com/ShiftLead/shiftlead/issues/new?template=feedback-report.yml&title=`" in rm
+    assert "the report's first line percent-encoded" in rm and "its `·` as `%C2%B7`" in rm
+    assert 'urllib.parse.quote(first_line, safe="")' in rm
+
+
+def test_the_address_encodes_a_report_title():
+    from urllib.parse import quote
+
+    title = "feedback report: abc1234 · 3 findings"
+    assert quote(title, safe="") == "feedback%20report%3A%20abc1234%20%C2%B7%203%20findings"
+
+
+def test_file_mode_lists_the_reports_through_the_intake_and_reads_at_most_five():
+    s1 = section(1)
+    for phrase in (
+        'gh issue list -R ShiftLead/shiftlead --state open --search "feedback report: in:title sort:created-asc" \\ '
+        "--limit 100 --json number,title,body,author,createdAt > <scratch>/reports.json",
+        "never printed. A `gh` that fails here is said, and the run goes on with its seats alone",
+        "`git -C <root> fetch origin`",
+        "`ao feedback intake --issues <scratch>/reports.json --root <root> --json`",
+        "*100 reports listed: older ones first, more wait* when `limit_reached` is true",
+        "**The person picks which to read, at most 5 in a run**, the oldest 5 parsed ones by default",
+        "--json --read <number>…` with those numbers",
+        "**a reports-only run** proposes no window and asks for none, and runs neither the digest (step 2) nor the "
+        "agents (step 3)",
+    ):
+        assert phrase in s1, phrase
+    assert "--read" in DOC and "MAX_READ" not in DOC
+
+
+def test_the_reports_findings_at_steps_four_to_six():
+    s4, s5, s6 = section(4), section(5), section(6)
+    assert "findings of the seat `report #<number>`, with no evidence, refs, days or `why`" in s4
+    assert "never with a seat's" in s4
+    assert "a report's `recurs` id is resolved first, as a `refs` id is" in s5
+    assert "*recurred* when any of them is on or after the `Resolved:` day, *known fixed* when every one is" in s5
+    assert "shown to the person as *build unknown* and *recurred* unless the person says otherwise" in s5
+    assert "an entry archived since is named *fixed since the report* and counted nowhere" in s5
+    assert "is named *no such entry* and dropped" in s5
+    assert "`root` and `ledger.path` are those of the entry *The mode* chose" in s5
+    assert "marked *inferred*" in s6 and "outside the run's noise" in s6
+
+
+def test_step_seven_reports_the_two_note_forms_and_the_closes_offered():
+    s7 = section(7)
+    for phrase in (
+        "its number, login, build (with *build unknown* where it has none, and its `days` beside a *recurred* "
+        "finding's build), seats, noise and what was cut",
+        "the parsed ones not picked; and the issues the run will close and with which comment",
+        "A reports-only run's report gives the reports read and the counts by outcome, with no window, seats or noise",
+        "its Why naming `feedback report #<number>` as the source (`ShiftLead/shiftlead#<number>` in a part listed "
+        "for another repo's maintainers",
+        "Each report count is listed with its login, for the person to weigh, and **never summed**",
+        'agent-cadence run ledger.py note TD-n "feedback report #<a>[, #<b>…]: seen by <n> install(s)"',
+        "the distinct logins among them, each `null` login an install of its own",
+        "marked *already noted* only where every number it names is already in a note of that form on the entry",
+        "The two note forms are matched each against its own kind alone",
+        "at most one seat note and one report note in a run",
+        "*notes: all*, *notes: none* and *notes:* answer both kinds",
+        "is offered for one answer, *close* or *leave*, *leave* when the person gives none",
+        "*close: refused* answers *close* for every refused report at once",
+    ):
+        assert phrase in s7, phrase
+
+
+def test_step_eight_closes_every_report_read_and_the_reports_only_title():
+    s8 = section(8)
+    for phrase in (
+        "a line `Closes #<number>` for each report read",
+        'with `gh issue close <number> -R ShiftLead/shiftlead -c "<what was done>"`',
+        "once the person has answered every group",
+        "*filed as TD-n*",
+        "*noted on TD-n*",
+        "*already noted on TD-n*",
+        "*known in <repo> as TD-n*",
+        "*listed for <repo>'s maintainers*",
+        "*fixed in TD-n: update shiftlead*",
+        "*fixed since the report: TD-n*",
+        "*dropped as TD-n*",
+        "*no such entry TD-n*",
+        "*not taken up*",
+        "*nothing new*",
+        "*cut at 40 findings*",
+        '-c "not read: <why>"` (*not read: not picked* for the second), whether or not the run opens a PR, and has '
+        "no `Closes` line",
+        "titled `feedback: reports #<a>, #<b>…`, naming every number of its `Closes` lines, lowest first, at most five",
+        "with no `Window:` line; its body is the `Closes` lines",
+        "keeps only titles of the form `feedback: <since> → <until>`",
+        "Remove the digests — the index's `parts` paths — and `reports.json`",
+    ):
+        assert phrase in s8, phrase
+
+
+def test_the_skill_description_and_the_readme_say_how_each_mode_starts():
+    text = (ROOT / ".claude/skills/shiftlead-feedback/SKILL.md").read_text(encoding="utf-8")
+    desc = yaml.safe_load(text.split("---")[1])["description"]
+    assert "In file mode" in desc and "in report mode" in desc and "feedback report" in desc
+    readme = re.sub(r"\s+", " ", (ROOT / "README.md").read_text(encoding="utf-8"))
+    assert "(report mode)" in readme and "(file mode)" in readme
+    assert "ask a session you drive at the home to run `ao feedback --skill` and follow it" in readme
+    assert "start the session in your clone of this repo, where its `/shiftlead-feedback` skill is" in readme
+
+
+def test_the_feedback_report_issue_form():
+    path = ROOT / ".github/ISSUE_TEMPLATE/feedback-report.yml"
+    form = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert form["title"] == "feedback report: "
+    assert "labels" not in form and "assignees" not in form
+    assert not (ROOT / ".github/ISSUE_TEMPLATE/config.yml").exists()
+    fields = [f for f in form["body"] if f["type"] != "markdown"]
+    assert len(fields) == 1
+    (field,) = fields
+    assert field["type"] == "textarea"
+    assert field["attributes"]["label"] == "Report" and "render" not in field["attributes"]
+    assert field["validations"]["required"] is True
+    warning = re.sub(r"\s+", " ", " ".join(f["attributes"]["value"] for f in form["body"] if f["type"] == "markdown"))
+    for phrase in (
+        "public as soon as you submit it, and it is mailed to the repo's watchers at once",
+        "It holds the findings you approved",
+        "keeps the earlier text in the issue's edit history",
+        "Only your read of the whole report catches what it cannot",
+        "private work described in plain words",
+        "Never change it by hand",
+    ):
+        assert phrase in warning, phrase
