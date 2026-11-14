@@ -273,3 +273,82 @@ def test_paging_back_reads_each_turn_once(home):
     whole = a.read_transcript("abc", home, "gk")
     mid = a.read_transcript("abc", home, "gk", before=whole.size - 5)  # inside the last line
     assert [e.text for e in mid.entries][-1] == [e.text for e in whole.entries][-1]
+
+
+def test_two_cwds_holding_one_id_read_the_newer_log(home):
+    """`find` (§4.3 *Reads*, TD-1822): where two cwd directories hold one session id, the newer log is read."""
+    import os
+
+    a = ad(home)
+    old = _place(home, "abc", "%2Fold")
+    new = _place(home, "abc", "%2Fnew")
+    os.utime(old / "updates.jsonl", (1_000_000, 1_000_000))
+    os.utime(new / "updates.jsonl", (2_000_000, 2_000_000))
+    assert a.transcript_path("abc", home, "gk") == new / "updates.jsonl"
+    os.utime(old / "updates.jsonl", (3_000_000, 3_000_000))
+    assert a.transcript_path("abc", home, "gk") == old / "updates.jsonl"
+
+
+def test_a_failed_call_carries_its_result_and_both_lines_are_cut_to_their_caps(tmp_path):
+    """A `tool_call_update` with `status: failed` completes its call as `completed` does (`DONE`), its text the
+    tool entry's result; a result over `RESULT_CAP` and a call line over `CALL_CAP` are cut to them (TD-1822)."""
+    from shiftlead.adapters.grok import transcript
+
+    def rec(ts, up):
+        return json.dumps({"timestamp": ts, "method": "session/update", "params": {"sessionId": "s", "update": up}})
+
+    long_cmd = "x" * (transcript.CALL_CAP + 50)
+    long_out = "y" * (transcript.RESULT_CAP + 50)
+    lines = [
+        rec(1, {"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": "go"}}),
+        rec(2, {"sessionUpdate": "tool_call", "toolCallId": "c1", "title": "run", "rawInput": {"command": "false"}}),
+        rec(
+            3,
+            {
+                "sessionUpdate": "tool_call_update",
+                "toolCallId": "c1",
+                "status": "in_progress",
+                "content": {"type": "text", "text": "interim"},
+            },
+        ),
+        rec(
+            4,
+            {
+                "sessionUpdate": "tool_call_update",
+                "toolCallId": "c1",
+                "status": "failed",
+                "content": {"type": "text", "text": "exit: 1"},
+            },
+        ),
+        rec(5, {"sessionUpdate": "tool_call", "toolCallId": "c2", "title": "run", "rawInput": {"command": long_cmd}}),
+        rec(
+            6,
+            {
+                "sessionUpdate": "tool_call_update",
+                "toolCallId": "c2",
+                "status": "completed",
+                "content": {"type": "text", "text": long_out},
+            },
+        ),
+    ]
+    p = tmp_path / "updates.jsonl"
+    p.write_text("\n".join(lines) + "\n")
+    failed, long_call = [e for e in transcript.read(p).entries if e.kind == "tool"]
+    assert failed.call == "false" and failed.result == "exit: 1"
+    assert long_call.call == long_cmd[: transcript.CALL_CAP] and long_call.result == long_out[: transcript.RESULT_CAP]
+
+
+def test_an_unreadable_log_reads_as_none(home):
+    """`read_transcript` answers None, never raises, for a log found but unreadable (an `OSError` on read)."""
+    import os
+
+    if os.geteuid() == 0:
+        pytest.skip("root reads a mode-0 file")
+    a = ad(home)
+    log = _place(home, "abc") / "updates.jsonl"
+    log.chmod(0)
+    try:
+        assert a.transcript_path("abc", home, "gk") == log
+        assert a.read_transcript("abc", home, "gk") is None
+    finally:
+        log.chmod(0o644)
