@@ -253,6 +253,8 @@ def short_date(d: Any, due: bool = False, today: date_cls | None = None) -> str:
     s = d.isoformat() if isinstance(d, date_cls) else str(d or "").strip()
     if not s:
         return "no due date" if due else ""
+    if len(s) > 10 and not re.match(r"[T ]\d", s[10:12]):  # a date with words after it is free text, as written
+        return ""
     try:
         when = date_cls.fromisoformat(s[:10])
     except ValueError:

@@ -36,6 +36,8 @@ def test_short_date_draws_the_designs_table():
     assert short_date("2025-11-19", today=TODAY) == "Nov 19 2025"
     assert short_date(date(2026, 3, 1), today=TODAY) == "Mar 1"
     assert short_date("", today=TODAY) == "" and short_date("someday", today=TODAY) == ""  # nothing that reads
+    assert short_date("2026-11-19 after review", today=TODAY) == ""  # a date with words after it: free text
+    assert short_date("2026-11-19T08:00:00", today=TODAY) == "Nov 19"  # a timestamp reads as its day
     # against the host's local today by default
     assert short_date(date.today(), due=True) == "due today"
 
