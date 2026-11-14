@@ -5704,7 +5704,10 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 if not 0 <= answer < len(offered):
                     raise HTTPException(400, "that is not one of the suggested answers")
                 text = offered[answer]
-            got = await call("msg", text=text, kind="reply", reply_to=ref, answer=answer)
+            # a form's press (§4.10 *A form is filled, never pressed*, TD-1698): its index and the typed words; the
+            # home puts the head back and refuses an empty fill in its own words
+            more = {"form": form} if (form := _form_index(body)) is not None else {}
+            got = await call("msg", text=text, kind="reply", reply_to=ref, answer=answer, **more)
             if "entry" not in got:
                 # an orphaned question's answer (§4.10, TD-216): no reply entry — it went on the board
                 # and to the holders, and `note` is the toast's sentence, the standing as a result

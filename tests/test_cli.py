@@ -1533,6 +1533,10 @@ def test_msg_answer_and_pick_and_the_inbox_lines_that_show_them(subprocess_agent
     ask_argv = ["--json", "msg", "person", "merge PR 9?", "--kind", "ask"]
     assert cli.main([*ask_argv, "--answer", "merge it", "--answer", "hold it"]) == 0
     ask = json.loads(capsys.readouterr().out)["entry"]
+    # a form is printed to be filled, never picked (§4.10, TD-1698)
+    form_argv = ["msg", "person", "end the rounds?", "--kind", "ask", "--answer", "Go", "--answer", "Hold: <note>"]
+    assert cli.main(form_argv) == 0
+    capsys.readouterr()
     assert ask["answers"] == ["merge it", "hold it"]
     steer_argv = ["--json", "msg", "person", "which branch?", "--kind", "steer", "--default", "off main"]
     assert cli.main([*steer_argv, "--answer", "off main", "--answer", "off develop"]) == 0
@@ -1547,6 +1551,7 @@ def test_msg_answer_and_pick_and_the_inbox_lines_that_show_them(subprocess_agent
     assert "  1. merge it" in out and "  2. hold it" in out
     assert "  1. off main — default" in out and "  2. off develop" in out
     assert "hold it — default" not in out
+    assert "  2. Hold…: fill it, do not pick it" in out and "Hold: <note>" not in out
     # --pick sends the answer itself, by the number printed above, and closes the question
     assert cli.main(["--json", "msg", "--reply-to", ask["id"], "--pick", "2"]) == 0
     sent = json.loads(capsys.readouterr().out)

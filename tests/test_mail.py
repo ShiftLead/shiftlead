@@ -2134,6 +2134,61 @@ async def test_the_home_checks_that_a_picked_answer_is_one_of_them(agent, tmp_pa
         await person.call("kill", id=loner)
 
 
+async def test_a_mail_form_is_filled_never_pressed(agent, tmp_path):
+    """TD-1698 (§4.10 *A form is filled, never pressed*): a reply that is an offered form unfilled — as written, its
+    head alone, its head with a placeholder, in any case — is refused with *<head> needs its words*, and so is an
+    index naming the form, whatever words follow; `Hold: x` with no index is taken; `form` with words puts the head
+    back. A steer's form `default` and a form marked ` (default)` are refused at the send, and no reader hands a
+    default for a form."""
+    from sessionorc import mail as mail_mod
+
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        loner = await mk("loner", unattended=True)
+        async with LocalClient(caller=loner) as c:
+            asked = (
+                await c.call(
+                    "msg", to="person", text="end the rounds?", kind="ask",
+                    answers=["Go", "Hold: <note> — pauses the design"],
+                )
+            )["entry"]["id"]  # fmt: skip
+            for kw in (
+                {"kind": "steer", "default": "Hold: <note>", "answers": ["Go", "Hold: <note>"]},
+                {"kind": "ask", "answers": ["Go", "Hold: <note> (default)"]},
+            ):
+                with pytest.raises(AgentError, match="a form is filled, never pressed"):
+                    await c.call("msg", to="person", text="end?", **kw)
+        for bad in (
+            {"text": "Hold: <note>"},
+            {"text": "hold:"},
+            {"text": "HOLD: <b>"},
+            {"text": "Hold: <note>", "answer": 1},
+            {"text": "Hold: <note>\n\nsoon", "answer": 1},  # `--pick <form> "words"`
+            {"text": "", "form": 1},
+            {"text": "Hold:", "form": 1},
+        ):
+            with pytest.raises(AgentError, match="Hold needs its words"):
+                await person.call("msg", kind="reply", reply_to=asked, **bad)
+        for bad, why in (
+            ({"form": 0}, "complete answer"),
+            ({"form": 5}, "index of one of"),
+            ({"form": True}, "index of one of"),
+        ):
+            with pytest.raises(AgentError, match=why):
+                await person.call("msg", kind="reply", reply_to=asked, text="x", **bad)
+        got = await person.call("msg", kind="reply", reply_to=asked, text="x\n\nand more", form=1)
+        assert got["entry"]["text"] == "Hold: x\n\nand more"
+        got = await person.call("msg", kind="reply", reply_to=asked, text="hold: y", form=1)
+        assert got["entry"]["text"] == "hold: y"
+        got = await person.call("msg", kind="reply", reply_to=asked, text="Hold: drop it")
+        assert got["entry"]["text"] == "Hold: drop it" and got["entry"].get("answer") is None
+        await person.call("kill", id=loner)
+    read = mail_mod.read_answers({"kind": "ask", "answers": ["Go", "Hold: <note> (default)"]})
+    assert read["answers"] == ["Go", "Hold: <note>"] and read["recommended"] is None
+    steer = mail_mod.read_answers({"kind": "steer", "default": "Hold: <note>", "answers": ["Go", "Hold: <note>"]})
+    assert steer["recommended"] is None
+
+
 async def test_an_answers_reader_splits_label_from_consequence_and_a_press_still_matches(agent, tmp_path):
     """§4.10 *The answers' split* (TD-913): what is stored is the whole line; every reading — the person's
     inbox, a session's, a thread — gives the labels as `answers`, a parallel `consequences`, and the

@@ -21,6 +21,7 @@ from sessionorc import (
     adapters,
     agent_common,
     hosts,
+    ledgerboard,
     mail,
     seat_send,
     unanswered,
@@ -191,6 +192,44 @@ def _replaces(outcome: dict[str, Any], intent: str) -> bool:
     return outcome.get("state") == "blocked" and intent in ("done", "dropped", "thread")
 
 
+FORM_NO_DEFAULT = "a form is filled, never pressed: it is no default — mark a complete answer (design §4.10)"
+
+
+def _form_reply(replied: MailEntry, text: str, answer: Any, form: Any) -> str:
+    """A reply's form check (§4.10 *A form is filled, never pressed*, TD-1698), for every replier: with `form` (the
+    index of the form pressed) that form's head is put back on the reply's first paragraph where it lacks it, and the
+    rest is kept; an `answer` index naming a form is refused whatever words follow; and a first paragraph that is an
+    offered form unfilled — as written, `<head>:` alone, or the head and a placeholder, the head in any case — is
+    refused with *<head> needs its words*. Compared against each offered answer's label, never the stored line."""
+    labels = mail.answer_labels(replied.answers)
+    if form is not None:
+        if answer is not None:
+            raise RpcError("a form's press carries the words, not an answer's index (design §4.10)")
+        if isinstance(form, bool) or not isinstance(form, int) or not 0 <= form < len(labels):
+            raise RpcError(f"form is the index of one of {replied.id}'s {len(labels)} answers, not {form!r}")
+        if not ledgerboard.is_form(labels[form]):
+            raise RpcError(f"{labels[form]!r} is a complete answer, not a form: pick it (design §4.10)")
+        head = mail.form_head_as_offered(labels[form])
+        first, sep, rest = text.partition("\n\n")
+        before, colon, _after = first.partition(":")
+        if not (colon and before.strip().lower() == head.lower()):
+            first = f"{head}: {first}".rstrip()
+        text = first + sep + rest
+    elif (
+        answer is not None
+        and isinstance(answer, int)
+        and not isinstance(answer, bool)
+        and 0 <= answer < len(labels)
+        and ledgerboard.is_form(labels[answer])
+    ):
+        raise RpcError(f"{mail.form_head_as_offered(labels[answer])} needs its words")
+    try:
+        ledgerboard.fill_form(text.split("\n\n", 1)[0], labels)
+    except ledgerboard.Refused as e:
+        raise RpcError(str(e)) from None
+    return text
+
+
 class MailMixin:
     # -- mail (design §4.10, TD-052 step 1) ------------------------------------------------------
 
@@ -220,6 +259,7 @@ class MailMixin:
         repo: str | None = None,
         shots_at: Any = None,
         shots_ref: Any = None,
+        form: Any = None,
     ) -> dict[str, Any]:
         """`ao msg <to>… "…" [--kind] [--about] [--reply-to]` (design §4.10): put an attributed
         entry in each addressee's inbox. Nothing is typed anywhere. Gated by §4.10's graph, never
@@ -236,7 +276,10 @@ class MailMixin:
         names what landed, what was copied, and what was forwarded to a resumed successor.
         `team` or `repo` in place of `to` addresses that team's or repo's question seat, resolved here
         from the records (§4.10 *A team or a repo as the address*, TD-1000), and the kind is then an
-        `ask` unless given."""
+        `ask` unless given. `form` is the index of the form a reply's press filled (§4.10 *A form is filled, never
+        pressed*, TD-1698): the form's head is put back on the reply's first paragraph; an `answer` index naming a
+        form, and a reply whose first paragraph is an offered form unfilled, are refused with *<head> needs its
+        words*, and a form is never a steer's `default` nor an answer marked ` (default)`."""
         sender = PERSON if mail.is_person(caller) else str(caller)
         kind = kind or ("ask" if team or repo else "note")
         key = (sender, str(nonce)) if nonce else None
@@ -287,6 +330,7 @@ class MailMixin:
                 shots_at,
                 shots_ref,
                 routed,
+                form=form,
             )
         except RpcError as e:
             if key:
@@ -1124,6 +1168,7 @@ class MailMixin:
         routed: dict[str, Any] | None = None,
         handed: bool = False,
         entry: dict[str, Any] | None = None,
+        form: Any = None,
     ) -> dict[str, Any]:
         """One message, every rule of §4.10 in the order it applies. Long on purpose: the order is
         the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land).
@@ -1145,7 +1190,9 @@ class MailMixin:
                 raise RpcError(f"`pr` is a pull request's number, a positive integer, not {pr!r}")
         looks = _shots(shots, kind)
         text = str(text or "").strip()
-        if not text:
+        if form is not None and not reply_to:
+            raise RpcError("a form is pressed on a reply: --reply-to <id> (design §4.10)")
+        if not text and form is None:  # a form's empty fill is refused in its own words, below (TD-1698)
             raise RpcError("a message needs a body")
         if len(text.encode()) > mail.TEXT_CAP:
             raise RpcError(
@@ -1182,6 +1229,8 @@ class MailMixin:
             )
         if kind != "steer" and line:
             raise RpcError(f"only a steer carries a default: {kind} says what it says (design §4.10)")
+        if line and ledgerboard.is_form(line):
+            raise RpcError(FORM_NO_DEFAULT)
         # -- where a reply's answer is written down (§4.9b): one line, checked, never parsed ------
         src = None
         if source is not None:
@@ -1223,6 +1272,10 @@ class MailMixin:
             raise RpcError(f"only a question carries answers: a {kind} says what it says (design §4.10)")
         if len(picks) > mail.ANSWERS_MAX:  # the word below is `mail.ANSWERS_MAX`, which is 4
             raise RpcError(f"an ask carries at most four answers: {len(picks)} given (design §4.10)")
+        for pick in picks:
+            bare, marked = mail.answer_mark(mail.split_answer(pick)[0])
+            if marked and ledgerboard.is_form(bare):
+                raise RpcError(FORM_NO_DEFAULT)
         # -- a reply belongs to its root's thread, and answers an entry the replier holds ----------
         replied: MailEntry | None = None
         copies: list[str] = []
@@ -1251,6 +1304,8 @@ class MailMixin:
                     "a system note reports what happened to your own message; there is nobody to reply to "
                     "(design §4.10)"
                 )
+            # a form is filled, never pressed (§4.10, TD-1698): ahead of the index check and the orphan road
+            text = _form_reply(replied, text, answer, form)
             if sender == PERSON and replied.orphaned and not replied.open:
                 raise RpcError(
                     f"{reply_to} is already closed ({replied.closed_reason}): its asker is gone (design §4.10)"
