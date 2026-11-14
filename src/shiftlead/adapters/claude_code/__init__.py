@@ -580,8 +580,13 @@ class ClaudeCodeAdapter:
     # rows its repaints move, masked from the liveness clock (design §4.3 *An adapter names its volatile rows*,
     # TD-1475): the spinner line (*✶ Hatching… (4m 50s · ↓ 19.3k tokens …)*), and everything under the
     # composer's lower rule — the mode line and the status line
-    volatile_rows = (r"^\s*\S\s+[^()]+…\s*\(",)
+    volatile_rows = (r"^\s*\S\s+[^()]+…\s*\(", r"^\s*\u2500{8,}")
     volatile_after = r"^\s*\u2500{8,}\s*$"
+    # the composer's two rules are masked too, the upper one labelled with the session's name: a resize (a
+    # Focus page attaching) repaints them at the new width (TD-1807). The rows that show a turn under way —
+    # the spinner line, its *esc to interrupt* — are its busy rows: with none on screen and an empty composer,
+    # a tick's `working` or `stalled?` reads `idle` (design §4.2 *A tick's `working` at a waiting composer*)
+    busy_rows = (r"^\s*\S\s+[^()]+…\s*\(", r"\besc to interrupt\b")
     start_context = True  # `--append-system-prompt-file`, given at every launch of the conversation (§4.3, TD-283)
     start_context_system = True  # that file is the system prompt's tail: a member's brief moves there (§4.3, TD-1669)
     permission_channel = True  # a pending permission is answered through the hook's decision (§4.3, §4.5a)

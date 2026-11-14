@@ -10,7 +10,8 @@
     {"file": "../../../fixtures/screens/trust-dialog.txt", "state": "needs-you", "composer": null},
     {"file": "../../../fixtures/screens/usage-limit-hit.txt", "state": "limited"},
     {"file": "../../../fixtures/screens/usage-limit-reached.txt", "state": "limited"},
-    {"file": "panes/grinder-working.txt", "state": null, "composer": ""}
+    {"file": "panes/grinder-working.txt", "state": null, "composer": ""},
+    {"file": "panes/idle-composer.txt", "state": null, "composer": ""}
   ],
   "transcripts": [
     {

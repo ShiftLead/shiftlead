@@ -434,6 +434,11 @@ class TickMixin:
         self._id_flush()
         await self._id_recheck_detached()
         tails = await asyncio.to_thread(lambda: {sid: self.tmux.capture_tail(sid, TAIL_LINES) for sid in panes})
+        # the raw composer rows of a tick-set `working` or `stalled?` alone, for the way back to `idle` (TD-1807)
+        waiting = [sid for sid in panes if self._composer_candidate(self.sessions.get(sid))]
+        self._composer_tails = await asyncio.to_thread(
+            lambda: {sid: self.tmux.capture_tail(sid, COMPOSER_LINES, raw=True) for sid in waiting}
+        )
         self._reconcile(panes, tails, snapshot_at)
         self._note_tick(snapshot_at)
         self._note_attention(snapshot_at)
@@ -6249,11 +6254,43 @@ class TickMixin:
             s.screen_hash, s.screen_at = h, stamp
         due = self._stall_due(s, now)
         worked = bool(s.work_at and s.since and s.work_at > s.since)
-        if s.state == "working" and due:
+        if not worked and self._at_waiting_composer(s, adapter, now):
+            # a tick's `working` or `stalled?` the screen shows ended: idle at the composer (§4.2, TD-1807)
+            s.set_state("idle", confidence="tick")
+        elif s.state == "working" and due:
             s.set_state("stalled?", confidence="tick")
         elif s.state == "stalled?" and s.confidence == "tick" and not due and (moved or worked):
             s.set_state("working", confidence="tick")
         s.stalled_ticks = s.stalled_ticks + 1 if s.state == "stalled?" else 0
+
+    @staticmethod
+    def _composer_candidate(s: Session | None) -> bool:
+        """Whether the tick reads this record's raw composer rows: a hook-fed `working` or `stalled?` the tick
+        itself set (`confidence: tick`), with no open prompt, of an adapter naming its busy rows and reading its
+        composer (design §4.2 *A tick's `working` at a waiting composer*, TD-1807)."""
+        if s is None or s.state not in ("working", "stalled?") or s.confidence != "tick" or s.pendings:
+            return False
+        adapter = adapters.get(s.adapter)
+        return bool(getattr(adapter, "busy_rows", None)) and getattr(adapter, "composer", None) is not None
+
+    def _at_waiting_composer(self, s: Session, adapter: Any, now: datetime) -> bool:
+        """Whether a tick-set `working` or `stalled?` reads as resting at its composer (design §4.2 *A tick's
+        `working` at a waiting composer*, TD-1807): no tool call open, no live subagent, no row of the tail the
+        adapter's `busy_rows` match (a turn's spinner), and an empty composer on this tick's raw rows. A
+        composer holding text (someone's words), or none on screen (a dialog), is not waiting."""
+        raw = self._composer_tails.get(s.id)
+        if raw is None or not self._composer_candidate(s):
+            return False
+        if agent_common.subagents_live(s, now):
+            return False
+        with contextlib.suppress(ValueError):
+            if s.tool_open_at and now - _parse(s.tool_open_at) <= OPEN_TOOL_CEILING:
+                return False
+        busy = tuple(getattr(adapter, "busy_rows", None) or ())
+        rows = [screen_mod.painted_text(r) for r in s.tail]
+        if any(re.search(p, r) for p in busy for r in rows):
+            return False
+        return adapter.composer(raw) == ""
 
     @staticmethod
     def _stall_due(s: Session, now: datetime) -> bool:
