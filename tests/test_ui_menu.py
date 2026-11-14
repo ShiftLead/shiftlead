@@ -93,7 +93,7 @@ const listeners = [];
 const document = { documentElement: el(), body: el(), activeElement: null, createElement: el,
   querySelector: () => null,
   querySelectorAll: (sel) => sel === "details.more[open]" ? nodes.filter((n) => n.cls === "more" && n.open) : [],
-  addEventListener: (type, fn, capture) => listeners.push({ type, capture: !!capture }) };
+  addEventListener: (type, fn, capture) => listeners.push({ type, fn, capture: !!capture }) };
 document.activeElement = document.body;
 global.window = {}; global.document = document;
 global.localStorage = { getItem: () => null, setItem: noop };
@@ -122,6 +122,22 @@ out.other_key = [AO.menuEsc({ key: "x" }), menu.open];
 out.esc_on_body = [AO.menuEsc({ key: "Escape" }), menu.open, document.activeElement === summary];
 out.esc_none_open = AO.menuEsc({ key: "Escape" });
 out.pointerdown_capture = listeners.some((l) => l.type === "pointerdown" && l.capture);
+// the wiring itself (TD-1339): an event goes through the page's own capturing listeners, as a browser sends it
+// down, each listener's throw kept to itself (a browser reports it and goes on to the next)
+const fire = (type, ev) => {
+  for (const l of listeners.filter((x) => x.type === type && x.capture)) { try { l.fn(ev); } catch (e) { /* not ours */ } }
+  return ev;
+};
+const key = (k) => ({ key: k, prevented: false, preventDefault() { this.prevented = true; } });
+menu.open = true; fold.open = true;
+fire("pointerdown", { target: item });
+out.fired_inside = menu.open;
+fire("pointerdown", { target: page });
+out.fired_outside = [menu.open, fold.open];
+menu.open = true; document.activeElement = item;
+out.fired_esc_in_menu = [fire("keydown", key("Escape")).prevented, menu.open, document.activeElement === summary];
+menu.open = true; document.activeElement = composer;
+out.fired_esc_in_composer = [fire("keydown", key("Escape")).prevented, menu.open, document.activeElement === composer];
 console.log(JSON.stringify(out));
 """
 
@@ -150,6 +166,12 @@ def test_a_press_outside_an_open_menu_or_esc_closes_it_and_a_fold_stays_open():
     assert got["esc_on_body"] == [True, False, True]
     assert got["esc_none_open"] is False
     assert got["pointerdown_capture"] is True
+    # the listeners themselves, fired (TD-1339): a press inside leaves the menu open, one outside closes it and
+    # not the fold; `Esc` closes it and is taken (`preventDefault`) from the menu, and goes on from a composer
+    assert got["fired_inside"] is True
+    assert got["fired_outside"] == [False, True]
+    assert got["fired_esc_in_menu"] == [True, False, True]
+    assert got["fired_esc_in_composer"] == [False, False, True]
 
 
 @pytest.mark.unit
