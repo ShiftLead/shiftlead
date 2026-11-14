@@ -54,7 +54,7 @@ def test_a_done_writes_its_why_and_any_other_edit_refuses_one():
         board.write_back(Path("/nowhere"), 1, ACT, "decide", answer="have a session do it", why="x")
 
 
-# -- board_find ----------------------------------------------------------------------------------------------------------
+# -- board_find --------------------------------------------------------------------------------------------------------
 
 
 def test_board_find_reads_the_act_line_on_origin(repo):  # noqa: F811
@@ -106,7 +106,7 @@ def test_board_find_is_the_persons_own():
     assert "board_find" in mail.PERSON_ONLY
 
 
-# -- entry_add's hand-off fields -----------------------------------------------------------------------------------------
+# -- entry_add's hand-off fields ---------------------------------------------------------------------------------------
 
 RELAY = (
     "Relayed from shiftlead's board (board:0a1b2c3d): session w wrote it and the person pressed Have a session do "
@@ -186,7 +186,7 @@ async def test_board_edit_refuses_a_why_on_any_action_but_done(agent):
             await person.call("board_edit", board="/nowhere", line=1, text="t", action="snooze", why="x")
 
 
-# -- LocalClient.ignored -------------------------------------------------------------------------------------------------
+# -- LocalClient.ignored -----------------------------------------------------------------------------------------------
 
 
 @pytest.mark.integration
