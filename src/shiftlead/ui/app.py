@@ -1108,12 +1108,13 @@ async def board_hand(call: Any, facts: Any, body: Mapping[str, Any]) -> dict[str
     naming the ask — or, where the doer does not resolve or anything refuses before the send, TD-1624's press
     (the decide write-back). Answers `{ok, end, toast, red, ...}`, `end` *taken* or *fallback*; a row that comes
     back open is an HTTP error carrying its words. `call` is the page's RPC; `facts` is `Readings.repo_facts`."""
-    board, text, key = (str(body.get(k) or "").strip() for k in ("board", "text", "key"))
+    board, key = (str(body.get(k) or "").strip() for k in ("board", "key"))
+    text = str(body.get("text") or "")  # word for word, as `board_edit` matches it
     try:
         line = int(body.get("line"))
     except (TypeError, ValueError):
         raise HTTPException(400, "Have a session do it names the item's line") from None
-    if not board or not text or not key:
+    if not board or not text.strip() or not key:
         raise HTTPException(400, "Have a session do it names the board, the item's text and its key")
     root = await asyncio.to_thread(board_root_of, board)
     if not root:

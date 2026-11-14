@@ -258,3 +258,20 @@ def test_a_keyless_send_is_taken_red_and_its_failed_done_says_a_second_press_sen
     assert got["red"] is False and got["toast"] == (
         "handed to other (the host agent is older than this page: refs or doer not stored)"
     )
+
+
+def test_a_keyless_done_meeting_a_closed_line_is_taken_red(roots, monkeypatch):
+    keyless = (SENT[0], ["doer", "key", "refs"])
+    s = Script(entry_add=[NONE, keyless], board_find=[(FOUND, [])],
+               board_edit=[(AgentError(f"no line {KEY} on the board — reworded or closed"), [])])  # fmt: skip
+    got = press(roots, monkeypatch, s)
+    assert got.status_code == 200 and got.json()["end"] == "taken" and got.json()["red"] is True
+    assert got.json()["toast"].startswith("handed to other — sent without its key")
+
+
+def test_a_named_team_that_does_not_service_its_repo_is_refused_not_re_picked(roots, monkeypatch):
+    org, _ = ui.org_here()
+    board = str(roots["samscrape"].resolve())
+    real = ui.entry_teams
+    monkeypatch.setattr(ui, "entry_teams", lambda *a: [t for t in real(*a) if t["team"] != "oth"])
+    assert ui.doer_target(org, board, "team oth", "kmaster") is None
