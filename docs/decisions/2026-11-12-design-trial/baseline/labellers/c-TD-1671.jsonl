@@ -1,0 +1,6 @@
+{"id": "TD-1671:F11", "kind": "contradiction", "origin": "original", "catch": "design-only", "area": "mail", "conf": "low"}
+{"id": "TD-1671:F20", "kind": "unspecified", "origin": "fix-induced", "catch": "design-only", "area": "mail", "conf": "low"}
+{"id": "TD-1671:F23", "kind": "wording", "origin": "original", "catch": "pr-review", "area": "mail", "conf": "low"}
+{"id": "TD-1671:F24", "kind": "xref", "origin": "fix-induced", "catch": "design-only", "area": "mail", "conf": "high"}
+{"id": "TD-1671:F40", "kind": "test", "origin": "original", "catch": "pr-review", "area": "mail", "conf": "high"}
+{"id": "TD-1671:F42", "kind": "false-claim", "origin": "original", "catch": "design-only", "area": "mail", "conf": "high"}

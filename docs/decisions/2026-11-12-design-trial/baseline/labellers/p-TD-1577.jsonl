@@ -1,0 +1,18 @@
+{"id": "TD-1577:F121", "case": "-", "q": "-", "fact": "design-text", "check": "-", "fixfail": "overreach"}
+{"id": "TD-1577:F122", "case": "shape", "q": "What exact value does the rule hold for each adapter?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1577:F123", "case": "when", "q": "At what moment is the input read, and is it re-read later?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1577:F124", "case": "scope", "q": "Does one name mean the same thing everywhere it is used?", "fact": "-", "check": "duplicate-text", "fixfail": "-"}
+{"id": "TD-1577:F125", "case": "which", "q": "Which record wins when several match, and in what order?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1577:F126", "case": "shape", "q": "What exact name or wording does the output take?", "fact": "-", "check": "duplicate-text", "fixfail": "-"}
+{"id": "TD-1577:F127", "case": "interaction", "q": "Which outer-environment variables leak into the child, and who strips them?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1577:F128", "case": "which", "q": "Which version of the files does the check read?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1577:F129", "case": "scope", "q": "Which other variables does the rule cover besides the one named?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1577:F130", "case": "shape", "q": "Is the path expanded before comparison, and by whom?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1577:F131", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1577:F132", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1577:F133", "case": "shape", "q": "Where exactly does each named location live?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1577:F134", "case": "scope", "q": "What does the pick do on each edge input?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1577:F135", "case": "scope", "q": "Which other tools' variables does the removal leave alone?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1577:F136", "case": "which", "q": "When two options name the same thing, which one wins?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1577:F137", "case": "-", "q": "-", "fact": "design-text", "check": "-", "fixfail": "-"}
+{"id": "TD-1577:F138", "case": "-", "q": "-", "fact": "work-state", "check": "entry-fields", "fixfail": "-"}

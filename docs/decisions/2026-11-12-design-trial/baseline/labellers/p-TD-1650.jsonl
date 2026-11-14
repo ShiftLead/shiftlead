@@ -1,0 +1,70 @@
+{"id": "TD-1650:F1", "case": "multi-node", "q": "Which side owns each field when a node reports to the home?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F2", "case": "-", "q": "-", "fact": "code-exists", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F3", "case": "which", "q": "When several records match, which one counts as newest?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F4", "case": "multi-node", "q": "What if two hosts report different values under one key?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F5", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F6", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F7", "case": "interaction", "q": "Does the process see the same environment the real launch does?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F8", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F9", "case": "empty-first", "q": "How is the default or empty value named and keyed?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F10", "case": "when", "q": "What bounds how often a repeated notice is raised?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F11", "case": "multi-node", "q": "Does a check run at the home speak for a node?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F12", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F13", "case": "interaction", "q": "How does an explicit override interact with the new step?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F14", "case": "shape", "q": "Which stream and exact line shape counts as valid output?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F15", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F16", "case": "failure", "q": "What is lost if a crash lands between two writes?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F17", "case": "interaction", "q": "Does a second reader use the same inputs as the record's?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F18", "case": "scope", "q": "Which launches does the new step apply to?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F19", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F20", "case": "display", "q": "What is printed before the record exists?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F21", "case": "concurrency", "q": "Which locks are held while the new step runs?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F22", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F23", "case": "who", "q": "Which tick or node runs the comparison?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F24", "case": "shape", "q": "Which record field names the adapter?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F25", "case": "scope", "q": "Do scheduled or held creations also reach the step?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F26", "case": "failure", "q": "What happens when the tool refuses the generated command?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F27", "case": "restart", "q": "What state survives a restart that the timer needs?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F28", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1650:F29", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F30", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1650:F31", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F32", "case": "which", "q": "Can one thing have two names or keys?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1650:F33", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F34", "case": "failure", "q": "What happens with a corrupt file or failing write?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F35", "case": "scope", "q": "Which kinds of launch carry the extra field?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F36", "case": "failure", "q": "What if the lookup raises for an unknown name?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F37", "case": "shape", "q": "Which sentence of the text is the subject?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F38", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F39", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F40", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F41", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1650:F42", "case": "shape", "q": "What exact text form does the consumer parse?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F43", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F44", "case": "shape", "q": "Where does each new constant live?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F45", "case": "empty-first", "q": "What does the output show when the method is absent?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F46", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F47", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F48", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1650:F49", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "not-propagated"}
+{"id": "TD-1650:F50", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1650:F51", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F52", "case": "shape", "q": "Where do the new constants live?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F53", "case": "scope", "q": "Does the key distinguish every kind that can collide?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F54", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1650:F55", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F56", "case": "display", "q": "What exact words does each variant of the line show?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F57", "case": "ends", "q": "What happens to records of things that went away?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F58", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1650:F59", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1650:F60", "case": "-", "q": "-", "fact": "-", "check": "path-symbol", "fixfail": "incomplete"}
+{"id": "TD-1650:F61", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F62", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1650:F63", "case": "interaction", "q": "Can a change in place bypass the launch path?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F64", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F65", "case": "who", "q": "How does the home tell its own host?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F66", "case": "failure", "q": "What does the user see when the tool refuses a named profile?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F67", "case": "empty-first", "q": "How is a missing stored time read?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F68", "case": "when", "q": "Which time does a deferred change carry?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F69", "case": "-", "q": "-", "fact": "other", "check": "-", "fixfail": "-"}
+{"id": "TD-1650:F70", "case": "when", "q": "Does the read happen before or after the refusals?", "fact": "-", "check": "-", "fixfail": "-"}

@@ -1,0 +1,84 @@
+{"id": "TD-1590:F1", "case": "interaction", "q": "Do two sections describe the same state in compatible terms?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F2", "case": "which", "q": "Which component actually has the data a computation needs?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F3", "case": "-", "q": "-", "fact": "-", "check": "id-ref", "fixfail": "-"}
+{"id": "TD-1590:F4", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F5", "case": "when", "q": "Is a derived match recomputed on every reading?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1590:F6", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F7", "case": "which", "q": "Which actor counts as holder when the claimed state is rarely live?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F8", "case": "ends", "q": "What answer does a rule give when its target is gone or finished?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F9", "case": "scope", "q": "Which kinds of actors count as live for this rule?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F10", "case": "display", "q": "Do every screen and reader show the changed state?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F11", "case": "when", "q": "Does a changed answer after a drop get told, and how often?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F12", "case": "scope", "q": "Is the answer narrowed by every filter an entry has?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F13", "case": "scope", "q": "Which bucket gets an item routed elsewhere?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F14", "case": "who", "q": "Does the actor still do its earlier duties after this change?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F15", "case": "when", "q": "When does a busy actor learn of the new item?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F16", "case": "which", "q": "Who is told when the named actor itself drops the item?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1590:F17", "case": "interaction", "q": "Does a lane rule and a filter rule leave any item in no lane?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1590:F18", "case": "shape", "q": "Is a compound condition worded unambiguously?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F19", "case": "when", "q": "Do two sections agree on the moment a baseline is written?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F20", "case": "which", "q": "What happens when several gates match one item?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F21", "case": "when", "q": "Is a wait bounded when the holder stays busy?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F22", "case": "shape", "q": "Is every branch of a new path stated, including its default?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F23", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F24", "case": "shape", "q": "Is a derived result stored or recomputed, and where?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F25", "case": "who", "q": "What does a setting like ask do when the actor is gone?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F26", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "not-propagated"}
+{"id": "TD-1590:F27", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1590:F28", "case": "-", "q": "-", "fact": "-", "check": "path-symbol", "fixfail": "-"}
+{"id": "TD-1590:F29", "case": "display", "q": "Does a screen show the new field beside or instead of the old?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F30", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F31", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F32", "case": "when", "q": "Is a write placed before any early return that skips it?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F33", "case": "when", "q": "How often does a computation run relative to the data it reads?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F34", "case": "which", "q": "Which stored state is cleared by which event, and does the baseline survive?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1590:F35", "case": "shape", "q": "Are callers and defaults of a changed function listed?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F36", "case": "restart", "q": "Does a stored reference survive a restart that supersedes the record?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F37", "case": "which", "q": "Is an actor excluded by its own action still reachable?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1590:F38", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "-"}
+{"id": "TD-1590:F39", "case": "shape", "q": "Is the output shape of a changed function fixed?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F40", "case": "which", "q": "Does an exclusion still allow a re-tell after a changed answer?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1590:F41", "case": "restart", "q": "Do two rules about successor records agree on whose drop counts?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1590:F42", "case": "when", "q": "Is a join run before the data it joins is stored?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1590:F43", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F44", "case": "shape", "q": "Does each carried pair identify its record?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F45", "case": "multi-node", "q": "Can an id collide across hosts?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F46", "case": "who", "q": "Whose action counts as the members own?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F47", "case": "ends", "q": "Is a mark cleared when the thing it marks closes?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F48", "case": "ends", "q": "What happens to marks when a removed record goes?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F49", "case": "who", "q": "How is the members own action told from another?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1590:F50", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F51", "case": "shape", "q": "Do the views a function reads carry the needed field?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1590:F52", "case": "when", "q": "Does re-telling change the baseline that decides who is told next?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1590:F53", "case": "interaction", "q": "Is an old exclusion removed everywhere once replaced?", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1590:F54", "case": "when", "q": "At which step does a told marker advance?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F55", "case": "concurrency", "q": "Do all sites that store a result apply the same join first?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F56", "case": "scope", "q": "Which members does a start rule never use?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F57", "case": "multi-node", "q": "Does a node have the data its handler needs?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F58", "case": "when", "q": "Which repeats and foreign events write a mark?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F59", "case": "when", "q": "Which pass removes a stale mark, and for which records?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F60", "case": "which", "q": "Does a notice text stay right when the target moves?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F61", "case": "which", "q": "Who is told after a re-answer by a marked actor?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F62", "case": "ends", "q": "Is a stored marker carried across a rename?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F63", "case": "scope", "q": "Does a silent actor still count toward a total?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F64", "case": "-", "q": "-", "fact": "design-text", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1590:F65", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "other"}
+{"id": "TD-1590:F66", "case": "who", "q": "Does every path to an end state pass the handler?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F67", "case": "when", "q": "Is a stored result written before its comparison?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F68", "case": "interaction", "q": "Does a downstream rule re-derive a value that was routed?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F69", "case": "scope", "q": "Which case remains after a fix to silent counting?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1590:F70", "case": "who", "q": "Can another session act on this records behalf?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F71", "case": "display", "q": "Does wording still describe the new targeting?", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1590:F72", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "-"}
+{"id": "TD-1590:F73", "case": "failure", "q": "What does a join do if its input read failed?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F74", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F75", "case": "which", "q": "Do two sections agree whether the actor drops the item?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F76", "case": "failure", "q": "Can a failed read wipe stored state?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F77", "case": "multi-node", "q": "Is a forwarded caller compared in the form the home sees?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F78", "case": "shape", "q": "Are shapes of changed readers given exactly?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F79", "case": "interaction", "q": "Does an existing start rule loop with the new mark?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F80", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "not-propagated"}
+{"id": "TD-1590:F81", "case": "-", "q": "-", "fact": "design-text", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1590:F82", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F83", "case": "scope", "q": "For whom does a within-tick rule apply?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1590:F84", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
