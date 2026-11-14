@@ -1122,11 +1122,16 @@ class MailMixin:
         shots_at: Any = None,
         shots_ref: Any = None,
         routed: dict[str, Any] | None = None,
+        handed: bool = False,
+        entry: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """One message, every rule of §4.10 in the order it applies. Long on purpose: the order is
         the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land).
         The records are the org's one graph (§4.4a, step 5): an addressee on another host is its
-        record here, its inbox the home's copy — landed whether or not its link is up, and said so."""
+        record here, its inbox the home's copy — landed whether or not its link is up, and said so.
+        `handed` and `entry` are a handed entry's mark and fields (§4.10 *An entry handed to a seat*), written
+        into the envelope it lands, so no copy is ever without them (TD-1660)."""
+        carried = dict(entry) if entry else None
         records = self._graph()
         if kind in FOLDED_KINDS:
             raise RpcError(CITES_ON_AN_ASK)
@@ -1588,6 +1593,10 @@ class MailMixin:
             entry.unanswered = self._unanswered(records, taken, now)
         if routed:  # §4.9b *A seat that cannot answer is routed around* (TD-1443): the seat it was moved from
             entry.routed = dict(routed)
+        if handed:
+            entry.handed = True
+        if carried is not None:
+            entry.entry = carried
         landed: list[str] = []
         failed: list[str] = []
         for sid in copies:

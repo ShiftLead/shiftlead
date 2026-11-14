@@ -52,6 +52,7 @@ last_mail: dict[str, Any] | None = None
 # `name_check` and a `create` per member), `ao control … add <many>` — would otherwise have the
 # warning from its first call cleared by its last, which is exactly where an operator most needs it.
 # Deduped, so a long-lived client (the UI) is bounded by the number of distinct parameter names.
+# The CLI's: a caller that must read one call's list reads `LocalClient.ignored` (TD-1660).
 last_ignored: list[str] = []
 
 
@@ -76,6 +77,10 @@ class LocalClient:
         self._reader: asyncio.StreamReader | None = None
         self._writer: asyncio.StreamWriter | None = None
         self._n = 0
+        # The parameter names the host agent dropped from **this client's last call** (design §4.4, TD-1660):
+        # reset before each request is written and set from its reply, an error's too, before `call` returns or
+        # raises — so a call that never answers leaves `[]`. The page's hand-off reads it per call.
+        self.ignored: list[str] = []
 
     async def __aenter__(self) -> LocalClient:
         try:
@@ -115,6 +120,7 @@ class LocalClient:
         req: dict[str, Any] = {"id": self._n, "method": method, "params": sent}
         if self.caller:
             req["caller"] = self.caller
+        self.ignored = []
         self._writer.write((json.dumps(req) + "\n").encode())
         await self._writer.drain()
         try:
@@ -129,7 +135,8 @@ class LocalClient:
         resp = json.loads(line)
         global last_mail, last_ignored
         last_mail = resp.get("mail") if isinstance(resp, dict) else None
-        for name in (resp.get("ignored") or []) if isinstance(resp, dict) else []:
+        self.ignored = [str(n) for n in ((resp.get("ignored") or []) if isinstance(resp, dict) else [])]
+        for name in self.ignored:
             if name not in last_ignored:
                 last_ignored.append(name)
         if "error" in resp:
