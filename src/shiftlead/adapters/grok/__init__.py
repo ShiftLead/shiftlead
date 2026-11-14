@@ -242,6 +242,35 @@ class GrokAdapter:
             return None
         return True if (Path(profile.config_dir).expanduser() / "auth.json").is_file() else None
 
+    def doctor_profiles(self) -> list[dict]:
+        """What `ao doctor` reads of each Grok profile (design §4.7, §4.3 *Reads*): its home and whether it is
+        signed in (`auth.json`), with the person's login line as the cure. A profile with no `config_dir` of its
+        own, or a metered one, never gets here: the load refuses it (§4.2a), and that refusal is the one row. An
+        `XAI_API_KEY` or `GROK_CODE_XAI_API_KEY` in the host agent's environment is noted, since each launch clears
+        it."""
+        try:
+            profs, _ = profiles_mod.load()
+        except (OSError, ValueError, TypeError, AttributeError) as e:
+            return [{"error": f"profiles.yml: {e}"}]
+        keys = [k for k in ("XAI_API_KEY", "GROK_CODE_XAI_API_KEY") if os.environ.get(k)]
+        out: list[dict] = []
+        for prof in profs.values():
+            if prof.adapter != self.name:
+                continue
+            home = Path(prof.config_dir).expanduser() if prof.config_dir else None
+            row: dict = {
+                "profile": prof.name,
+                "account": prof.account or prof.name,
+                "config_dir": str(home) if home else None,
+                "metered": prof.metered,
+                "credentials": self.credentials_ok(prof),
+                "login": f"GROK_HOME={home} {self.binary} login" if home else None,
+            }
+            if keys:
+                row["note"] = f"{' and '.join(keys)} set in the host agent's environment; each launch clears it"
+            out.append(row)
+        return out
+
     def setup_note(self) -> dict | None:
         """What the host agent tells the person once per key (§4.3 `launch`): None with no Grok profile; `key` None
         where the binary is there; else the missing binary's path as `key` and the note's `text`. The binary is the
