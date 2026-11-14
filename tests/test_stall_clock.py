@@ -287,3 +287,28 @@ def test_the_tick_reads_composer_rows_only_for_a_tick_set_working_or_stalled(age
     g.set_state("stalled?", confidence="tick")
     assert not cand(g)  # an adapter naming no busy rows keeps its stall
     assert not cand(None)
+
+
+async def test_the_tick_captures_raw_composer_rows_for_a_tick_set_working_alone(agent, tmp_path, monkeypatch):
+    """TD-1820: the tick itself fills `_composer_tails` — raw rows (`capture_tail(…, raw=True)`) for a tick-set
+    `working` only, never a hook-set one — so a real `tick()` over the idle composer brings the tick-set
+    record back to `idle` and leaves the hook's own `working` as it is."""
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    ticked = _tick_set(agent, tmp_path, "working", sid="ao-x-q")
+    hooked = _rec(agent, tmp_path, "claude-code", sid="ao-x-h")
+    pane = {sid: PaneInfo(sid, 0, "node", 1, dead=False, dead_status=None, title="") for sid in (ticked.id, hooked.id)}
+    raw_for: list[str] = []
+
+    def capture_tail(sid, lines=8, raw=False):
+        if raw:
+            raw_for.append(sid)
+        return list(IDLE)
+
+    monkeypatch.setattr(agent.tmux, "main_panes", lambda prefix="ao-": pane)
+    monkeypatch.setattr(agent.tmux, "capture_tail", capture_tail)
+    await agent.tick()
+    assert raw_for == [ticked.id]
+    assert agent.sessions[ticked.id].state == "idle"
+    assert agent.sessions[hooked.id].state == "working"
