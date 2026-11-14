@@ -1,1 +1,0 @@
-design §4.4 A filing PR nobody holds is a work order; src/sessionorc/workorders.py (red_prs, pr_order, red_holders, pr_note), agent_common.py, agent_tick.py (_red_prs), queue.py; src/shiftlead/teamrun.py (red_prs, lane_entries), cli.py (ao repo), ui/repo.py, ui/inbox.py, briefs/grinder.md, team_skill.md
