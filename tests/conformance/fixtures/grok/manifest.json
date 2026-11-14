@@ -247,5 +247,27 @@
   ],
   "end": null,
   "composer": "captured/panes/idle-empty.txt"
- }
+ },
+ "transcripts": [
+  {
+   "file": "captured/transcripts/tools.jsonl",
+   "turns": 2,
+   "kinds": [
+    "prompt",
+    "thought",
+    "tool",
+    "text"
+   ]
+  },
+  {
+   "file": "captured/transcripts/panes.jsonl",
+   "turns": 5,
+   "kinds": [
+    "prompt",
+    "thought",
+    "tool",
+    "text"
+   ]
+  }
+ ]
 }

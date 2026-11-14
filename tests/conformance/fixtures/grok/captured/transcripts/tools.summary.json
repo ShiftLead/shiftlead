@@ -1,0 +1,26 @@
+{
+  "info": {
+    "id": "11111111-2222-4333-8444-555555555555",
+    "cwd": "/tmp/claude-1000/-home-kmaster-shiftlead--claude-worktrees-grinder-ao-2/03dd5049-68b7-42bf-8402-e18585a1231d/scratchpad/proj"
+  },
+  "agent_id": "ag1.4e446a85cfd44fa993b269ca9999cbe",
+  "attempt_id": "at1.59fd9cf0dd2543ca8cae5480d301e9f3",
+  "session_summary": "Shell file create, list, and cleanup commands",
+  "created_at": "2026-11-14T00:47:13.409972615Z",
+  "updated_at": "2026-11-14T00:49:12.238653652Z",
+  "num_messages": 28,
+  "num_chat_messages": 17,
+  "current_model_id": "grok-4.7",
+  "next_trace_turn": 2,
+  "chat_format_version": 1,
+  "git_root_dir": "/tmp/claude-1000/-home-kmaster-shiftlead--claude-worktrees-grinder-ao-2/03dd5049-68b7-42bf-8402-e18585a1231d/scratchpad/proj/",
+  "request_id": "21208347-531e-48a0-95cc-ebb3f4b3f2fb",
+  "grok_home": "/tmp/claude-1000/-home-kmaster-shiftlead--claude-worktrees-grinder-ao-2/03dd5049-68b7-42bf-8402-e18585a1231d/scratchpad/gh",
+  "last_active_at": "2026-11-14T00:49:12.238653652Z",
+  "generated_title": "Shell file create, list, and cleanup commands",
+  "agent_name": "grok-build-plan",
+  "sandbox_profile": "off",
+  "reasoning_effort": "high",
+  "last_turn_summary": "Shell run finished; status word is done",
+  "last_turn_summary_prompt_id": "c7b876f3-db7c-4527-aa18-ca3555551909"
+}
