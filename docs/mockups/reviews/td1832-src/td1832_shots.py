@@ -43,6 +43,7 @@ html[data-theme="dark"] .m32-head .m32-mark { color: #fde68a; background: #4a341
 .m32-bar .btn.m32-pressed::before { content: "✓"; color: var(--done); }
 .m32-bar .m32-sep { width: 1px; align-self: stretch; background: var(--line); margin: 2px 4px; }
 .m32-bar .m32-quiet { color: var(--muted); }
+.m32-why { height: 26px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); padding: 0 6px; font: inherit; font-size: var(--t-small); }
 /* what happened, in a fixed slot just above the bar */
 .m32-said { margin: 6px 0 0; padding: 6px 10px; border-left: 3px solid var(--idle); background: var(--idle-bg); color: var(--idle-fg); font-size: var(--t-small); border-radius: 0 3px 3px 0; }
 .m32-said.m32-stuck { border-left-color: var(--needs); background: var(--warn-bg); color: var(--warn-fg); }
@@ -84,11 +85,11 @@ def head(mark, where, right):
             f'<span class="m32-grow"></span><span>{right}</span></div>')
 
 
-def bar(answers, answer_box=True, start="Start session", dismiss=False, open_label="Open"):
+def bar(answers, answer_box=True, start="Start session", dismiss=False, open_label="Open", dots=True):
     """The one set: [its answers] [Answer…] | [Start session] ··· [Dismiss] [Open] [⋯]."""
     left = "".join(answers) + (btn("Answer…") if answer_box else "")
     mid = btn(start, "") if start else ""
-    right = (btn("Dismiss", "ghost", "m32-quiet") if dismiss else "") + btn(open_label) + btn("⋯", "ghost")
+    right = (btn("Dismiss", "ghost", "m32-quiet") if dismiss else "") + btn(open_label) + (btn("⋯", "ghost") if dots else "")
     sep = '<span class="m32-sep"></span>' if mid else ""
     return (f'<div class="m32-bar"><span class="m32-g">{left}</span>{sep}<span class="m32-g">{mid}</span>'
             f'<span class="m32-grow"></span><span class="m32-g">{right}</span></div>')
@@ -132,23 +133,25 @@ ONE = [
         head("Do", "from shiftlead's board · on TD-1305", "due 10 days ago"), ACT, CTX,
         b=bar([btn("Done"), btn("Have a session do it")]))),
     ("A session waiting on a permission", item(
-        head("Decide", '<a href="#">grinder-ao-1</a> is waiting on you', "4 min"), PERM, "",
-        b=bar([btn("Allow"), btn("Deny…")], answer_box=False, start=None))),
+        head("Do", '<a href="#">grinder-ao-1</a> is waiting on you', "4 min"), PERM, "",
+        b=bar([btn("Allow"), btn("Deny"), '<input class="m32-why" placeholder="why?" size="14">'],
+              answer_box=False, start=None, dots=False))),
 ]
 
 # ---- a press that did not finish: the set stays, a sentence says what happened ----------------
 STUCK = [
     ("An ask you answered, which the session could not do", item(
-        head("Decide", 'asked by <a href="#">grinder-ao-2</a> · on TD-1796', "2h ago"), ASK, CTX,
+        head("Do", 'asked by <a href="#">grinder-ao-2</a> · on TD-1796', "2h ago"), ASK, CTX,
         said=said("You answered <b>Lift it</b>. grinder-ao-2 could not do it: a session may not lift your hold. "
-                  "Press <b>Lift the hold</b> on TD-1796 to lift it yourself, answer again, or start a session.",
+                  "Press <b>Lift the hold</b> to lift TD-1796's hold yourself, answer again, or start a session.",
                   "m32-stuck"),
-        b=bar([btn("Lift it", "ghost", "m32-pressed"), btn("Keep it held")], dismiss=True))),
+        b=bar([btn("Lift the hold", "ghost", "m32-rec"), btn("Lift it", "ghost", "m32-pressed"),
+               btn("Keep it held")], dismiss=True))),
     ("A held entry whose answer is still with a session", item(
         head("Decide", "TD-1796 · held for you in shiftlead's ledger", "added Nov 14"), GATE, CTX,
-        said=said("You answered <b>go ahead</b> 2 hours ago. grinder-ao-2 has it and has not acted yet. "
-                  "Lift the hold yourself, or answer again to change what you said.")
-        , b=bar([btn("Lift the hold", "ghost", "m32-rec")], start="Open session"))),
+        said=said("You answered <b>\u201cLift it\u201d</b> in grinder-ao-2's ask, 2 hours ago \u2014 the hold goes "
+                  "when its PR merges.")
+        , b=bar([btn("Lift the hold", "ghost", "m32-rec")]))),
     ("A press that was refused", item(
         head("Decide", "from shiftlead's board · holds TD-1840, TD-1841", "due tomorrow"), DECIDE, CTX,
         said=said("<b>Go</b> was not written: the line changed after this page was drawn, and nothing was sent. "

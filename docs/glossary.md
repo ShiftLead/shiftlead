@@ -129,6 +129,8 @@ not mix:
   `Hold: <note>` on a design's end-of-rounds item, a look's `Not right: <what>`. Drawn as **<head>…**, it opens
   the word box begun with its head and is never sent as written; words that start with its head fill it, and
   on a board line they decide the line even when typed into Answer… or Reply (design §4.4 *Decide*, TD-1557).
+- **answer bar** — the one row of controls every item on the Queue and a card's page ends in, its slots in a fixed order: the item's answers, **Answer…**, Start session, then **Dismiss**, **Open** and **⋯** at the right (design §4.5 screen 12 *One answer set*, TD-1832). *Not:* the Queue's **bar**, the Refresh bar at the page's top. — *proposed* 2026-11-14.
+- **press line** — the one sentence above an item's answer bar saying what became of the person's press that did not finish: still with a session, could not be done, or refused (design §4.5 screen 12 *A press is never left stranded*, TD-1832). *Not:* an outcome, which is the seat's report (§4.10) and which the press line quotes. — *proposed* 2026-11-14.
 - **look** — a message to the person that names screenshots: a builder's question about a
   merged change to a page, for the one thing its checks and the techlead could not settle. A
   `steer` with the default *Works* where the techlead leaned (under *Steering*; it lapses to
