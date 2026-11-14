@@ -269,5 +269,213 @@
     "text"
    ]
   }
+ ],
+ "sequences": [
+  {
+   "file": "captured/hooks-subagents.jsonl",
+   "at_composer": true,
+   "records": [
+    {
+     "state": "idle",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 1
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 1
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 1
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 1
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "idle",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "needs-you",
+     "pending": "permission",
+     "subagents": 0
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 1
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 1
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 1
+    },
+    {
+     "state": "needs-you",
+     "pending": "permission",
+     "subagents": 1
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 1
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "idle",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "needs-you",
+     "pending": "question",
+     "subagents": 0
+    },
+    {
+     "state": "needs-you",
+     "pending": "question",
+     "subagents": 0
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "idle",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 1
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 1
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 1
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "working",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "idle",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "idle",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "exited",
+     "pending": null,
+     "subagents": 0
+    },
+    {
+     "state": "exited",
+     "pending": null,
+     "subagents": 0
+    }
+   ]
+  }
  ]
 }

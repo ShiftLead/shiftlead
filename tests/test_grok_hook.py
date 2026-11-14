@@ -98,8 +98,9 @@ def test_a_question_tool_is_a_question(tool, tool_input, text):
         ({"hook_event_name": "SessionEnd", "reason": "clear"}, None),
         ({"hook_event_name": "SessionStart", "source": "compact", "sessionId": FIRST}, {"adapter_id": FIRST}),
         ({"hook_event_name": "Notification", "notificationType": "other"}, None),
-        ({"hook_event_name": "PostToolUse", "subagentType": "explore", "toolName": "x"}, None),
-        ({"hook_event_name": "SubagentStart"}, None),
+        ({"hook_event_name": "PostToolUse", "subagentType": "explore", "toolName": "x"}, None),  # names no child
+        # an id-less start: its count alone
+        ({"hook_event_name": "SubagentStart"}, {"subagent_delta": 1, "subagent": None, "state": None}),
     ],
 )
 def test_the_feed_beyond_the_capture(payload, want):
@@ -274,13 +275,70 @@ def _sub_payloads() -> list[dict]:
     return [json.loads(line) for line in SUBAGENTS.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
-def test_a_childs_payloads_report_nothing_and_its_end_never_exits_the_session():
+CHILD = "01a1d7e"  # the captured children's ids all start so
+
+
+def test_a_childs_prompt_ending_events_and_its_start_and_stop_are_forwarded_and_its_end_never_exits():
+    """TD-1817 (§4.3 *A subagent's events*): a child's `PostToolUse`, `SubagentStart` and `SubagentStop` are sent
+    with `subagent` and `subagent_seen` and no state, `adapter_id`, `transcript`, `turn` or `call`; the rest of a
+    child's payloads (its prompt, `PreToolUse`, `SessionEnd`) are dropped."""
     got = [(p, translate(p)) for p in _sub_payloads()]
-    children = [p for p, _ in got if p.get("subagentType")]
-    assert {p["hook_event_name"] for p in children} >= {"SubagentStart", "UserPromptSubmit", "SessionEnd"}
-    assert all(out is None for p, out in got if p.get("subagentType"))
+    children = [(p, out) for p, out in got if p.get("subagentType")]
+    sent = {p["hook_event_name"] for p, out in children if out is not None}
+    assert sent == {"SubagentStart", "PostToolUse", "SubagentStop"}
+    dropped = {p["hook_event_name"] for p, out in children if out is None}
+    assert dropped == {"UserPromptSubmit", "PreToolUse", "SessionEnd"}
+    banned = {"state", "pending", "adapter_id", "transcript", "turn", "turn_start", "turn_end", "call"}
+    for p, out in children:
+        if out is not None:
+            assert not banned & set(out), f"{p['hook_event_name']}: {sorted(banned & set(out))}"
+            assert out["subagent"].startswith(CHILD) and out["subagent_seen"] is True
+    start = next((p, out) for p, out in children if p["hook_event_name"] == "SubagentStart")
+    assert start[0]["sessionId"].startswith("2222") and start[1]["subagent"] == start[0]["subagentId"]
+    assert start[1]["subagent_delta"] == 1
+    stop = next(out for p, out in children if p["hook_event_name"] == "SubagentStop")
+    assert stop["subagent_delta"] == -1
+    post = next(out for p, out in children if p["hook_event_name"] == "PostToolUse")
+    assert post["event"] == "PostToolUse:run_terminal_command" and post["tool_use_id"]
     exits = [p for p, out in got if out and out.get("state") == "exited"]
     assert [p["sessionId"] for p in exits] == ["22222222-3333-4444-8555-666666666666"]  # the main one's, at /exit
+
+
+def test_a_childs_stop_cancelled_is_forwarded_only_for_a_permission_and_carries_no_state():
+    child = {"hook_event_name": "StopCancelled", "subagentType": "explore", "sessionId": "c-1", "promptId": "t"}
+    for reason in ("permission_rejected", "permission_cancelled"):
+        assert translate({**child, "reason": reason}) == {"subagent": "c-1", "subagent_seen": True}
+    assert translate({**child, "reason": "user_interrupt"}) is None
+    assert translate({**child, "reason": "permission_rejected", "subagentType": None, "subagent_type": "x"}) == {
+        "subagent": "c-1",
+        "subagent_seen": True,
+    }
+    failed = {"hook_event_name": "PostToolUseFailure", "subagentType": "x", "sessionId": "c-1", "toolName": "t"}
+    denied = {**failed, "hook_event_name": "PermissionDenied"}
+    for p in (failed, denied):
+        out = translate({**p, "transcript_path": "/c/updates.jsonl"})
+        assert out is not None and out["subagent"] == "c-1" and not {"state", "transcript", "call"} & set(out)
+
+
+def test_a_notification_is_never_a_childs_and_the_kill_names_the_task_on_either_thread():
+    note = {"hook_event_name": "Notification", "notificationType": "permission_prompt", "message": "Allow?"}
+    marked = translate({**note, "subagentType": "x", "sessionId": "c-1", "transcript_path": "/c/updates.jsonl"})
+    assert marked == {"state": "needs-you", "pending": {"kind": "permission", "text": "Allow?"}}
+    idle = translate({"hook_event_name": "Notification", "notificationType": "idle_prompt", "sessionId": "p-1"})
+    assert idle is not None and (idle["state"], idle["adapter_id"]) == ("idle", "p-1")
+    kill = {"hook_event_name": "PostToolUse", "toolName": "kill_command_or_subagent", "toolInput": {"task_id": "t-9"}}
+    main = translate({**kill, "sessionId": "p-1"})
+    assert main is not None and main["subagent_stopped"] == "t-9" and "subagent_seen" not in main
+    child = translate({**kill, "sessionId": "c-1", "subagentType": "x"})
+    assert child is not None and (child["subagent_stopped"], child["subagent"], child["subagent_seen"]) == (
+        "t-9",
+        "c-1",
+        True,
+    )
+    assert "subagent_stopped" not in translate({**kill, "toolInput": {"task_id": 7}})
+    posts = [p for p in _sub_payloads() if p["hook_event_name"] == "PostToolUse"]
+    captured = next(p for p in posts if p["toolName"] == "kill_command_or_subagent")
+    assert translate(captured)["subagent_stopped"] == captured["toolInput"]["task_id"]
 
 
 def test_the_captured_child_key_and_the_kill():
@@ -301,7 +359,8 @@ def test_the_captured_child_key_and_the_kill():
 
 
 def test_a_childs_prompt_carries_no_marker_and_reads_as_the_main_sessions():
-    """TD-1815: the child's `permission_prompt` names the parent and nothing of the child's."""
+    """TD-1815: the child's `permission_prompt` names the parent and nothing of the child's, so it is sent as the
+    main session's permission; the child's next event ends it in core (TD-1817)."""
     subs = _sub_payloads()
     prompts = [p for p in subs if p.get("notificationType") == "permission_prompt"]
     assert prompts and all(not p.get("subagentType") and p["sessionId"].startswith("2222") for p in prompts)

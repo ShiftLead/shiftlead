@@ -230,3 +230,87 @@ async def test_a_permission_with_a_channel_waits_for_its_waiter(agent, hookstub,
         rec = await person.call("get", id=sid)
         assert (rec["state"], rec["pending"]["kind"]) == ("needs-you", "permission")
         await person.call("kill", id=sid)
+
+
+# ── a subagent's event, for a tool with no channel (§4.2, TD-1817) ──────────────────────────────────
+
+
+def _put(agent, adapter, tmp_path, state="working"):
+    s = Session(id=f"ao-sub-{adapter}", name="s", kind="agent", dir=str(tmp_path), adapter=adapter, state=state)
+    s.confidence = "hook"
+    agent.sessions[s.id] = s
+    return s
+
+
+def _perm(agent, sid, text="Tool permission requested"):
+    agent._apply_event(sid, {"state": "needs-you", "pending": {"kind": "permission", "text": text}})
+
+
+CHILD_POST = {"subagent": "c1", "subagent_seen": True, "event": "PostToolUse:run_terminal_command"}
+
+
+@pytest.mark.integration
+async def test_a_childs_event_ends_the_main_thread_permissions_and_restores_kept(agent, nochannel, tmp_path):
+    """A tool whose child's prompt names no thread: a child's next event ends it, back to `kept` — `working`
+    mid-turn, `idle` once the main thread had stopped — writing nothing into `kept`; two open main-thread
+    permissions end together, and a main-thread question stands."""
+    s = _put(agent, "nochannel", tmp_path)
+    agent._apply_event(s.id, {"subagent_delta": 1, "subagent": "c1", "subagent_seen": True})
+    _perm(agent, s.id)
+    assert (s.state, s.kept["state"]) == ("needs-you", "working")
+    agent._apply_event(s.id, dict(CHILD_POST))
+    assert (s.state, s.pending, s.pendings, s.kept) == ("working", None, [], None)
+    # the main thread stopped, then a background child's prompt: its event goes back to `idle`
+    agent._apply_event(s.id, {"state": "idle", "pending": None, "turn_end": True})
+    _perm(agent, s.id)
+    _perm(agent, s.id, "another")
+    assert len(s.pendings) == 2 and s.kept["state"] == "idle"
+    agent._apply_event(s.id, dict(CHILD_POST))
+    assert (s.state, s.pendings) == ("idle", [])
+    # a main-thread question is the main thread's to end: a child's event leaves it
+    agent._apply_event(s.id, {"state": "needs-you", "pending": {"kind": "question", "text": "Red or blue?"}})
+    _perm(agent, s.id)
+    agent._apply_event(s.id, dict(CHILD_POST))
+    assert [p.kind for p in s.pendings] == ["question"] and (s.state, s.pending.kind) == ("needs-you", "question")
+    # a stale (queued, older than a live event) child's event ends nothing
+    _perm(agent, s.id)
+    agent._apply_event(s.id, {**CHILD_POST, "at": 1.0}, queued=True)
+    assert [p.kind for p in s.pendings] == ["question", "permission"]
+    del agent.sessions[s.id]
+
+
+@pytest.mark.integration
+async def test_a_childs_event_after_the_main_stop_leaves_the_record_idle(agent, nochannel, tmp_path):
+    s = _put(agent, "nochannel", tmp_path)
+    agent._apply_event(s.id, {"state": "idle", "pending": None, "turn_end": True})
+    agent._apply_event(s.id, dict(CHILD_POST))
+    agent._apply_event(s.id, {"subagent": "c1", "subagent_seen": True})  # a StopCancelled of a refusal
+    assert s.state == "idle"
+    del agent.sessions[s.id]
+
+
+@pytest.mark.integration
+async def test_a_subagent_start_ends_a_no_channel_main_permission_and_waits_on_no_waiter(
+    agent, nochannel, hookstub, tmp_path, monkeypatch
+):
+    """`SubagentStart` ends a foreground spawn's own prompt for a tool with no channel, and stays out of
+    `_end_waiters`; for a tool with a channel neither a start nor a child's tool event ends a main entry."""
+    ended = []
+    real = agent._end_waiters
+    monkeypatch.setattr(agent, "_end_waiters", lambda *a, **kw: (ended.append((a, kw)), real(*a, **kw))[1])
+    s = _put(agent, "nochannel", tmp_path)
+    _perm(agent, s.id)
+    ended.clear()
+    agent._apply_event(s.id, {"subagent_delta": 1, "subagent": "c1", "subagent_seen": True})
+    assert (s.state, s.pendings, s.subagents, ended) == ("working", [], 1, [])
+    # an id-less start names no thread and ends nothing
+    _perm(agent, s.id)
+    agent._apply_event(s.id, {"subagent_delta": 1})
+    assert [p.kind for p in s.pendings] == ["permission"]
+    del agent.sessions[s.id]
+    h = _put(agent, "hookstub", tmp_path)
+    _perm(agent, h.id, "Bash: touch x")
+    agent._apply_event(h.id, {"subagent_delta": 1, "subagent": "c1", "subagent_seen": True})
+    agent._apply_event(h.id, dict(CHILD_POST))
+    assert [(p.kind, p.subagent) for p in h.pendings] == [("permission", None)] and h.state == "needs-you"
+    del agent.sessions[h.id]
