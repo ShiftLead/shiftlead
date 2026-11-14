@@ -23,6 +23,7 @@ from sessionorc.agent_common import DIGEST_TIMEOUT
 from sessionorc.client import CALL_TIMEOUT, AgentError
 from sessionorc.digest import zone_of
 
+UPSTREAM = "ShiftLead/shiftlead"  # the public repo a feedback report is for (§4.7 *Reports from other installs*)
 PART_BYTES = 250_000  # a part's bound by default: about a fifth of an agent's context
 PART_BYTES_MIN = 65_536  # under this refused: one entry is written to 64 KiB at most
 WAIT = DIGEST_TIMEOUT + CALL_TIMEOUT  # the CLI's wait on each call, so the host's bound reaches it as its error
