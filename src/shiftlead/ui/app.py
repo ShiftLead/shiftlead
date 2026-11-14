@@ -5464,6 +5464,16 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             got = await call("inbox", id=PERSON)
             # a row the person handed to a seat is the seat's entry, carried as `handed` (§4.10 *A look*)
             e = next((x for x in [*(got.get("entries") or ()), *(got.get("handed") or ())] if x.get("id") == mid), None)
+            if e is not None and (e.get("passed_up") or e.get("routed")):
+                # its *context* names the asker and the passer by the names they are known by, as the card does
+                fleet = []
+                with contextlib.suppress(HTTPException):
+                    fleet = await call("list")
+                names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+                e["from_name"] = names.get(e.get("from"), e.get("from"))
+                rec = e.get("recommend")
+                if isinstance(rec, dict) and rec.get("by"):
+                    e["passer_name"] = names.get(str(rec["by"]), str(rec["by"]))
         if e is None:
             raise HTTPException(404, f"{key or 'no key'}: gone — reload")
         with timing.step("render"):
