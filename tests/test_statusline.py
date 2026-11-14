@@ -250,14 +250,16 @@ def test_a_lagging_agent_still_finds_the_reporter_alive_and_the_line_does_not_wa
     plain.mkdir()
     p = {**payload(), "workspace": {"project_dir": str(plain)}}
     code = "import sys; from shiftlead.adapters.claude_code import hook; sys.argv[1:] = ['--statusline']; hook.main()"
-    t0 = time.monotonic()
     # pipes captured: `run` returns at their end too, so a child that kept one would hold it past the lag
     done = subprocess.run(
-        [sys.executable, "-c", code], input=json.dumps(p), capture_output=True, text=True, check=True, timeout=10
+        [sys.executable, "-c", code], input=json.dumps(p), capture_output=True, text=True, check=True, timeout=20
     )
-    assert time.monotonic() - t0 < 2.6  # the line returned before the agent answered
+    # the line returned before the agent answered: read as the event, not a wall-clock bound, since the
+    # interpreter's start and imports under a loaded full suite took most of the old 2.6s (TD-1731); the
+    # agent answers `lag` after the child connects, past the status line's own REPORT_TIMEOUT wait
+    assert agent.got == [], f"the status line waited for the agent's answer: {agent.got}"
     assert done.stdout == ""  # no line of the person's here, and nothing of the child's
-    end = time.monotonic() + 8
+    end = time.monotonic() + 20
     while time.monotonic() < end and not hook_mod.last_report_file("ao-x-w1").exists():
         time.sleep(0.05)
     assert agent.alive == [True]  # read after its lag, the caller was still there
