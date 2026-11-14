@@ -11,9 +11,9 @@ import time
 
 import pytest
 
-from sessionorc.agent_tick import TURNS_KEPT
+from sessionorc.agent_tick import TURNS_KEPT, TickMixin
 from sessionorc.client import LocalClient
-from sessionorc.models import HOME_OWNED, NODE_OWNED
+from sessionorc.models import HOME_OWNED, NODE_OWNED, Session
 
 pytestmark = pytest.mark.integration
 
@@ -111,3 +111,16 @@ async def test_a_queued_start_older_than_a_live_event_adds_nothing(agent, hookst
         assert agent.sessions[sid].turns == ["p2"]
         rec = await _end(c, sid, "p2")
         assert rec["state"] == "idle"
+
+
+@pytest.mark.parametrize("state", ["exited", "closed"])
+def test_a_dying_runs_own_end_never_empties_the_new_conversations_turns(state):
+    """TD-1806: `_late_turn` empties the list on a new `adapter_id` except on an `exited` or `closed` event — a
+    run's own end, which names the run that is going, not a conversation that replaced it. Read on the method
+    itself: through `hook`, `_apply_event` already drops an end naming a run the record no longer holds
+    (TD-186) before the turns are read, so only this reaches the exemption."""
+    s = Session(id="t", name="t", kind="agent", adapter="hookstub", dir="/x", adapter_id="a1", turns=["p1"])
+    assert TickMixin._late_turn(s, {"state": state, "adapter_id": "a2"}) is False
+    assert s.turns == ["p1"]
+    TickMixin._late_turn(s, {"state": "idle", "adapter_id": "a2"})  # a live event of a new conversation: emptied
+    assert s.turns == []
