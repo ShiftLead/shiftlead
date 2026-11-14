@@ -232,6 +232,25 @@ def test_a_size_lowered_while_down_makes_the_record_past_it_an_extra(world, extr
     assert removed(state) == []
 
 
+def test_a_held_extra_at_a_name_the_plan_launches_is_no_surplus(world, extras_on, removes):  # noqa: F811
+    """A name the plan launches is no surplus (TD-1613): on a live team whose size was raised 2 → 3 and whose third
+    member is not started yet, the reconcile (`write_extras`, as `set_max`'s live half and Apply's starts run it)
+    leaves the held extra `grind-3` for the +'s create to adopt, and never removes it."""
+    tmp_path, state = world
+    assert cli.main(["team", "start", "ao-grind"]) == 0  # the team live
+    team = ("orc-ao", "grind-1", "grind-2", "hunt")
+    state["sessions"][:] = [s for s in state["sessions"] if s["name"] in team] + [extra("grind-3", "grind")]
+    state["calls"].clear()
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["members"][0]["count"] = 3
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    plan = teams.plan(orgmod_with_settings(tmp_path), "ao-grind", "kmaster")
+    assert "grind-3" in {x.name for x in plan.launches} and "grind-3" not in {x.name for x in plan.extras}
+    teamrun.write_extras(cli.call_sync, plan, [], None)
+    assert "ao-shiftlead-grind-3" not in removed(state)
+    assert "grind-3" not in held(state)  # nor rewritten as an extra: the line's extras are past it
+
+
 def test_a_refused_extra_is_said_and_the_start_stands(world, extras_on, monkeypatch, capsys):  # noqa: F811
     tmp_path, state = world
     real = cli.call_sync
