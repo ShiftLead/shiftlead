@@ -3,7 +3,9 @@ against the payloads captured from the installed 1.0.77 (`fixtures/grok/captured
 
 from __future__ import annotations
 
+import io
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -108,3 +110,156 @@ def test_the_feed_beyond_the_capture(payload, want):
         assert out is not None and {k: out.get(k) for k in want} == want
         if "turn" not in want:
             assert "turn" not in out
+
+
+# --- the hook's `main` and its two guards (§4.3 *The kill guard and the wait guard*, TD-1637 slice 11) ---
+
+WATCH = "timeout 1800 gh pr checks 12 --watch"
+
+
+def _pre_tool(command: str, tool: str = "run_terminal_command", **tool_input) -> dict:
+    """The captured `PreToolUse` of `run_terminal_command`, its command and tool replaced."""
+    base = next(p for p in _payloads() if p["hook_event_name"] == "PreToolUse")
+    ti = {**base["toolInput"], "command": command, **tool_input}
+    return {**base, "toolName": tool, "tool_name": tool, "toolInput": ti, "tool_input": ti}
+
+
+@pytest.fixture
+def hooked(tmp_path, monkeypatch):
+    """The hook's `main` in a session, the host agent a stub that records each event and answers `reply`."""
+    from shiftlead.adapters.grok import hook
+
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x-k")
+    sent: list[dict] = []
+    state: dict = {"reply": None}
+
+    def agent(params, timeout):
+        sent.append(params)
+        return state["reply"]
+
+    monkeypatch.setattr(hook, "call_agent", agent)
+
+    def run(payload: dict, reply: dict | None = None) -> None:
+        state["reply"] = reply
+        monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
+        assert hook.main() == 0  # the tool's block is the JSON on stdout, never an exit code
+
+    return run, sent
+
+
+def _decision(out: str) -> dict | None:
+    return json.loads(out) if out.strip() else None
+
+
+@pytest.mark.parametrize("tool", ["run_terminal_command", "monitor"])
+def test_the_kill_guard_denies_alone_and_the_event_still_reports(hooked, capsys, tool):
+    from shiftlead import kill_guard
+
+    run, sent = hooked
+    run(_pre_tool("pkill -f grok", tool), reply={"refuse_wait": True})
+    assert _decision(capsys.readouterr().out) == {"decision": "deny", "reason": kill_guard.REASON}
+    [ev] = sent  # one report, the event's own, asking nothing
+    assert ev["state"] == "working" and ev["session"] == "ao-x-k" and "wait" not in ev
+    run(_pre_tool("kill 1234", tool))
+    assert capsys.readouterr().out == "" and sent[-1]["state"] == "working"
+
+
+def test_a_childs_kill_is_denied_and_reports_nothing(hooked, capsys):
+    run, sent = hooked
+    run({**_pre_tool("killall grok", "monitor"), "subagentType": "explore"})
+    assert _decision(capsys.readouterr().out)["decision"] == "deny"
+    assert sent == []
+
+
+def test_a_kill_inside_a_watch_is_the_kill_guards_alone(hooked, capsys):
+    from shiftlead import kill_guard
+
+    run, sent = hooked
+    run(_pre_tool(f"{WATCH}; kill $PPID"), reply={"refuse_wait": True})
+    out = capsys.readouterr().out
+    assert len(out.splitlines()) == 1 and _decision(out)["reason"] == kill_guard.REASON
+    assert all("wait" not in e for e in sent)
+
+
+@pytest.mark.parametrize("extra", [{}, {"block_until_ms": 120000}, {"block_until_ms": "0"}, {"background": "true"}])
+def test_an_unattended_foreground_watch_is_denied_with_groks_words(hooked, capsys, extra):
+    from shiftlead import wait_guard
+
+    run, sent = hooked
+    run(_pre_tool(WATCH, **extra), reply={"refuse_wait": True})
+    assert _decision(capsys.readouterr().out) == {"decision": "deny", "reason": wait_guard.GROK_REASON}
+    assert sent[-1]["wait"] is True and sent[-1]["state"] == "working"
+
+
+@pytest.mark.parametrize(
+    ("payload", "reply"),
+    [
+        (_pre_tool(WATCH, block_until_ms=0), {"refuse_wait": True}),
+        (_pre_tool(WATCH, background=True), {"refuse_wait": True}),
+        ({**_pre_tool(WATCH), "subagentType": "explore"}, {"refuse_wait": True}),
+        (_pre_tool(WATCH, "monitor"), {"refuse_wait": True}),
+        (_pre_tool("gh pr checks 12"), {"refuse_wait": True}),
+        (_pre_tool(WATCH), None),
+    ],
+    ids=["block_until_ms-0", "background-true", "a-child", "monitor", "a-single-poll", "interactive"],
+)
+def test_what_is_no_unattended_foreground_watch_runs(hooked, capsys, payload, reply):
+    run, sent = hooked
+    run(payload, reply=reply)
+    assert capsys.readouterr().out == ""
+    if reply is None:  # asked, and answered nothing: the record is interactive, so the watch runs
+        assert sent[-1]["wait"] is True
+    else:
+        assert all("wait" not in e for e in sent)
+
+
+def test_three_reasons_and_groks_names_its_background_form():
+    from shiftlead import wait_guard
+
+    assert len({wait_guard.REASON, wait_guard.GEMINI_REASON, wait_guard.GROK_REASON}) == 3
+    assert "`block_until_ms: 0`" in wait_guard.GROK_REASON and "do not wait on its output" in wait_guard.GROK_REASON
+
+
+def test_with_the_host_agent_down_the_watch_runs_and_the_queued_event_has_no_wait(tmp_path, monkeypatch, capsys):
+    from shiftlead.adapters.grok import hook
+
+    home = tmp_path / "home"
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x-k")
+
+    def down(params, timeout):
+        raise ConnectionRefusedError
+
+    monkeypatch.setattr(hook, "call_agent", down)
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(_pre_tool(WATCH))))
+    assert hook.main() == 0 and capsys.readouterr().out == ""
+    got = json.loads((home / "events" / "ao-x-k.jsonl").read_text().strip())
+    assert got["state"] == "working" and "wait" not in got and "session" not in got
+
+
+def test_the_captured_session_reports_and_decides_nothing(hooked, capsys):
+    run, sent = hooked
+    for p in _payloads():
+        run(p, reply={"refuse_wait": True})
+    assert capsys.readouterr().out == ""  # no decision written on any event
+    assert [e["state"] for e in sent][:2] == ["idle", "working"] and all(e["session"] == "ao-x-k" for e in sent)
+    assert all("wait" not in e for e in sent)
+
+
+def test_no_session_exits_at_once(monkeypatch, capsys):
+    from shiftlead.adapters.grok import hook
+
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
+    monkeypatch.setattr(hook, "call_agent", lambda params, timeout: pytest.fail("called the host agent"))
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(_pre_tool("pkill -f x"))))
+    assert hook.main() == 0 and capsys.readouterr().out == ""
+
+
+def test_shiftlead_hook_dispatches_adapter_grok(monkeypatch):
+    from shiftlead import hook_entry
+    from shiftlead.adapters.grok import hook
+
+    monkeypatch.setattr(sys, "argv", ["shiftlead-hook", "--adapter", "grok"])
+    monkeypatch.setattr(hook, "main", lambda: 7)
+    assert hook_entry.main() == 7

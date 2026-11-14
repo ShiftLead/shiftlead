@@ -5,7 +5,7 @@ command, whose end wakes it. `waits` reads a shell command's shape and names a C
 `gh pr checks … --watch`, `gh run watch` or `ao pr wait` — read as the kill guard reads a kill: the text masked,
 each command's word found past the same wrappers. A single `gh pr checks <n>`, a short `sleep` and a
 loop pass. Whether the call is refused is the hook's: only in the foreground of an unattended record
-(Claude Code's hook also tests the main thread; Gemini CLI's carries no subagent marker). It reads text
+(Claude Code's and Grok Build's hooks also test the main thread; Gemini CLI's carries no subagent marker). It reads text
 only and calls nothing.
 """
 
@@ -23,6 +23,14 @@ REASON = (
 GEMINI_REASON = (
     "shiftlead: refused — a foreground CI watch in an unattended session; run the same command with "
     "`is_background: true` and end the turn: its end wakes you (design §4.10)"
+)
+
+# Grok Build's words (TD-1637): its background form is `block_until_ms: 0` on `run_terminal_command` (the 1.0.77
+# guide's *Background Tasks*; `background: true` in the tool's other shell schema), whose end wakes the session by
+# the tool's own default; a blocking read of the output is not guarded, so the words ask the session not to
+GROK_REASON = (
+    "shiftlead: refused — a foreground CI watch in an unattended session; run the same command in the background "
+    "(`block_until_ms: 0`), do not wait on its output, and end the turn: its end wakes you (design §4.10)"
 )
 
 # `gh`'s own options before the subcommand that take the next word as their value.
