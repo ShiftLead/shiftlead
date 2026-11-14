@@ -53,21 +53,24 @@ transcripts, so all ten are costed.
 
 `python labels.py` prints this from `labels.csv` and `patterns.csv`. *Mechanical* is the share whose `catch` is
 `mechanical`, *fix-induced* the share whose `origin` is; *hard after round 1* counts the findings after round 1 whose
-pattern `case` is one of the hard situations (interaction, concurrency, when, ends, who, failure, restart).
+pattern `case` is one of the hard situations (interaction, concurrency, when, ends, who, failure, restart), and *of
+them Sonnet's design reviews'* those a Sonnet design review raised (the pass test's part 2 read without the Fable
+reviews, design §4.9c); *design-only outside the hard* counts the findings in no hard situation whose `catch` is
+`design-only`.
 
-| design | rounds | findings | the analysis's | per round | mechanical | fix-induced | hard after round 1 |
-|---|---|---|---|---|---|---|---|
-| TD-1550 | 10 | 279 | 116 | 27.9 | 19% | 50% | 74 |
-| TD-1573 | 5 | 129 | 0 | 25.8 | 9% | 36% | 16 |
-| TD-1671 | 3 | 42 | 0 | 14.0 | 0% | 26% | 3 |
-| TD-1650 | 4 | 70 | 0 | 17.5 | 3% | 17% | 10 |
-| TD-1567 | 4 | 68 | 0 | 17.0 | 24% | 19% | 9 |
-| TD-1543 | 11 | 209 | 149 | 19.0 | 19% | 34% | 52 |
-| TD-1590 | 4 | 84 | 0 | 21.0 | 8% | 24% | 23 |
-| TD-1568 | 4 | 70 | 0 | 17.5 | 11% | 40% | 7 |
-| TD-1556 | 4 | 88 | 0 | 22.0 | 10% | 27% | 17 |
-| TD-1577 | 6 | 138 | 120 | 23.0 | 17% | 22% | 15 |
-| all ten | 55 | 1177 | 385 | 21.4 | 14% | 34% | 226 (22.6 a design) |
+| design | rounds | findings | the analysis's | per round | mechanical | fix-induced | hard after round 1 | of them Sonnet's design reviews' | design-only outside the hard |
+|---|---|---|---|---|---|---|---|---|---|
+| TD-1550 | 10 | 279 | 116 | 27.9 | 19% | 50% | 74 | 29 | 30 |
+| TD-1573 | 5 | 129 | 0 | 25.8 | 9% | 36% | 16 | 5 | 14 |
+| TD-1671 | 3 | 42 | 0 | 14.0 | 0% | 26% | 3 | 0 | 4 |
+| TD-1650 | 4 | 70 | 0 | 17.5 | 3% | 17% | 10 | 5 | 5 |
+| TD-1567 | 4 | 68 | 0 | 17.0 | 24% | 19% | 9 | 1 | 4 |
+| TD-1543 | 11 | 209 | 149 | 19.0 | 19% | 34% | 52 | 21 | 11 |
+| TD-1590 | 4 | 84 | 0 | 21.0 | 8% | 24% | 23 | 10 | 14 |
+| TD-1568 | 4 | 70 | 0 | 17.5 | 11% | 40% | 7 | 3 | 1 |
+| TD-1556 | 4 | 88 | 0 | 22.0 | 10% | 27% | 17 | 5 | 6 |
+| TD-1577 | 6 | 138 | 120 | 23.0 | 17% | 22% | 15 | 4 | 15 |
+| all ten | 55 | 1177 | 385 | 21.4 | 14% | 34% | 226 (22.6 a design) | 83 (8.3 a design) | 104 (9%) |
 
 Of the 1,177 findings, 385 (TD-1550's, TD-1543's and TD-1577's earlier rounds, whose records were among the
 analysis's 41) keep the analysis's labels; the other 792 were labelled for this baseline. The two classify labellers

@@ -147,8 +147,11 @@ def report() -> None:
     labels = {r["id"]: r for r in K.read_csv(HERE / "labels.csv")}
     patterns = {r["id"]: r for r in K.read_csv(HERE / "patterns.csv")}
     have_l, _ = analysis()
-    print("| design | rounds | findings | the analysis's | per round | mechanical | fix-induced | hard after round 1 |")
-    print("|---|---|---|---|---|---|---|---|")
+    print(
+        "| design | rounds | findings | the analysis's | per round | mechanical | fix-induced | hard after round 1"
+        " | of them Sonnet's design reviews' | design-only outside the hard |"
+    )
+    print("|---|---|---|---|---|---|---|---|---|---|")
     tot = Counter()
     for td in DESIGNS:
         rows = findings(td)
@@ -156,18 +159,26 @@ def report() -> None:
         n = len(rows)
         mech = sum(labels[f["id"]]["catch"] == "mechanical" for f in rows)
         fix = sum(labels[f["id"]]["origin"] == "fix-induced" for f in rows)
-        hard = sum(patterns[f["id"]]["case"] in HARD and int(f["round"]) > 1 for f in rows)
+        late = [f for f in rows if patterns[f["id"]]["case"] in HARD and int(f["round"]) > 1]
+        hard = len(late)
+        sonnet = sum(f["role"] == "design" and f["model"] == "sonnet" for f in late)
+        donly = sum(patterns[f["id"]]["case"] not in HARD and labels[f["id"]]["catch"] == "design-only" for f in rows)
         old = sum(f["id"] in have_l for f in rows)
-        for k, v in (("rounds", rounds), ("n", n), ("old", old), ("mech", mech), ("fix", fix), ("hard", hard)):
+        for k, v in (
+            ("rounds", rounds), ("n", n), ("old", old), ("mech", mech), ("fix", fix), ("hard", hard),
+            ("sonnet", sonnet), ("donly", donly),
+        ):  # fmt: skip
             tot[k] += v
         print(
             f"| {td} | {rounds} | {n} | {old} | {n / rounds:.1f} | {100 * mech / n:.0f}% | {100 * fix / n:.0f}% |"
-            f" {hard} |"
+            f" {hard} | {sonnet} | {donly} |"
         )
     n = tot["n"]
     print(
         f"| all ten | {tot['rounds']} | {n} | {tot['old']} | {n / tot['rounds']:.1f} | {100 * tot['mech'] / n:.0f}% |"
         f" {100 * tot['fix'] / n:.0f}% | {tot['hard']} ({tot['hard'] / len(DESIGNS):.1f} a design) |"
+        f" {tot['sonnet']} ({tot['sonnet'] / len(DESIGNS):.1f} a design) |"
+        f" {tot['donly']} ({100 * tot['donly'] / n:.0f}%) |"
     )
 
 
