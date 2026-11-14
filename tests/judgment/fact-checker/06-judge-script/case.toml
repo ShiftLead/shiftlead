@@ -1,0 +1,14 @@
+# a judge script claimed as built
+pinned = "0ef0364b76e1f8bed694d341dbca4a2b1c553e57"
+
+[[defect]]
+id = "D1"
+file = "README.md"
+lines = [268, 269]
+says = "pyproject.toml's scripts table holds no judge script."
+[[defect.refutes]]
+file = "pyproject.toml"
+lines = [64, 64]
+[[defect.refutes]]
+file = "pyproject.toml"
+lines = [104, 104]

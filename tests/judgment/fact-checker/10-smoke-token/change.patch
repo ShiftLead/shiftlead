@@ -1,0 +1,12 @@
+diff --git a/docs/design/4.3-adapter-contract.md b/docs/design/4.3-adapter-contract.md
+index 86fdf1159..1a818e3fe 100644
+--- a/docs/design/4.3-adapter-contract.md
++++ b/docs/design/4.3-adapter-contract.md
+@@ -1909,3 +1909,7 @@ The core cannot read a profile, so the adapter says how one is billed: `billing_
+ {billing, prices}` as `profiles.yml` declares it, an adapter without it billing every profile as a
+ subscription.
+ 
++
++**The smoke's token.**
++The seat smoke's nonce is twelve hex digits from `secrets` (`new_nonce` in `scripts/seat_run.py`), new
++each run.

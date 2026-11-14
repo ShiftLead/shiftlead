@@ -1,0 +1,11 @@
+# the tick, in numbers
+pinned = "0ef0364b76e1f8bed694d341dbca4a2b1c553e57"
+
+[[defect]]
+id = "D1"
+file = "docs/design/4.2-state-feed.md"
+lines = [791, 792]
+says = "TICK_SECONDS defaults to 2 seconds."
+[[defect.refutes]]
+file = "src/sessionorc/agent_common.py"
+lines = [47, 47]

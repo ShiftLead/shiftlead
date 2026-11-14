@@ -1,0 +1,20 @@
+# the toolchain's pins
+pinned = "0ef0364b76e1f8bed694d341dbca4a2b1c553e57"
+
+[[defect]]
+id = "D1"
+file = "README.md"
+lines = [268, 268]
+says = "pyproject.toml sets ruff's line-length to 120."
+[[defect.refutes]]
+file = "pyproject.toml"
+lines = [137, 137]
+
+[[defect]]
+id = "D2"
+file = "docs/design/4.4a-home-and-nodes.md"
+lines = [753, 753]
+says = "requires-python is >=3.12."
+[[defect.refutes]]
+file = "pyproject.toml"
+lines = [7, 7]

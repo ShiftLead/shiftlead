@@ -1,0 +1,16 @@
+diff --git a/README.md b/README.md
+index 8ee3737e6..e2763d69a 100644
+--- a/README.md
++++ b/README.md
+@@ -263,6 +263,11 @@ knows taken out, which you read whole and submit yourself as an issue (report mo
+ you drive at the home to run `ao feedback --skill` and follow it, or start the session in your clone of this repo,
+ where its `/shiftlead-feedback` skill is.
+ 
++## Judging a model
++
++`pdm run judge <role> --profile <p>` runs a planted-defect set against a seat profile and prints its score;
++it is one of the scripts in `pyproject.toml`, beside `conformance`.
++
+ ## License
+ 
+ MIT — see [LICENSE](LICENSE).

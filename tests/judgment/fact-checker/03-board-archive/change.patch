@@ -1,0 +1,11 @@
+diff --git a/docs/glossary.md b/docs/glossary.md
+index 512927e56..bee1c6634 100644
+--- a/docs/glossary.md
++++ b/docs/glossary.md
+@@ -397,3 +397,6 @@ not mix:
+ 5. **fleet** — retired, as above.
+ 6. **orc** — only in product, package and command names; never a session or position. Also
+    decided: **conductor → director**, and **doorbell** kept.
++
++**board archive** — closed board items stay on the board, ticked, until ten of them sit there; the helper
++then moves them to the board's archive (`ARCHIVE_AT` in `src/sessionorc/ledgerboard/__init__.py`).

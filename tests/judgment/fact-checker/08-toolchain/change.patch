@@ -1,0 +1,26 @@
+diff --git a/README.md b/README.md
+index 8ee3737e6..c9cad6668 100644
+--- a/README.md
++++ b/README.md
+@@ -263,6 +263,10 @@ knows taken out, which you read whole and submit yourself as an issue (report mo
+ you drive at the home to run `ao feedback --skill` and follow it, or start the session in your clone of this repo,
+ where its `/shiftlead-feedback` skill is.
+ 
++## Formatting
++
++`pdm run fmt` formats with ruff at line length 100, as `pyproject.toml` sets it.
++
+ ## License
+ 
+ MIT — see [LICENSE](LICENSE).
+diff --git a/docs/design/4.4a-home-and-nodes.md b/docs/design/4.4a-home-and-nodes.md
+index 5e18c0fab..630a7592a 100644
+--- a/docs/design/4.4a-home-and-nodes.md
++++ b/docs/design/4.4a-home-and-nodes.md
+@@ -748,3 +748,6 @@ call by call.
+ - *The relay as the bus now*: the home hosted elsewhere, with a hosted service's login, tenancy and operations before there is a product.
+ - Prior art pointing the same way: a Kubernetes control plane with a node agent per machine that keeps running its workloads while the control plane is away; NATS leaf nodes dialing out to their hub; IMAP rather than SMTP — the mailbox lives on the always-on server and the laptop is a client of it.
+ 
++
++**What a node needs.**
++A node's interpreter is Python 3.11 or later, as the package's `requires-python` says.

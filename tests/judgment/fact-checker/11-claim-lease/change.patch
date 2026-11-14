@@ -1,0 +1,11 @@
+diff --git a/docs/design/4.10-messages.md b/docs/design/4.10-messages.md
+index 77319dd1d..23df543d3 100644
+--- a/docs/design/4.10-messages.md
++++ b/docs/design/4.10-messages.md
+@@ -2182,3 +2182,6 @@ cannot; two workers in a team can each learn the other holds a reference before
+ every one of those is refused when the graph does not permit it; a session out of wake budget
+ receives mail that lands without waking it, visibly to itself and to the sender; and a person's
+ session is never woken by mail at all.
++
++**A claim's lease, in numbers.**
++A claim is a lease held for 24 hours and renewed by claiming again (`LEASE_TTL` in `src/sessionorc/mail.py`).

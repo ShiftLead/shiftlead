@@ -1,0 +1,11 @@
+# the reader's bound, in numbers
+pinned = "0ef0364b76e1f8bed694d341dbca4a2b1c553e57"
+
+[[defect]]
+id = "D1"
+file = "docs/design/4.9b-techlead.md"
+lines = [1433, 1434]
+says = "REVIEW_BOUND is \"2h\"."
+[[defect.refutes]]
+file = "src/sessionorc/models.py"
+lines = [687, 687]

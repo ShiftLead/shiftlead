@@ -1,0 +1,11 @@
+# a claim's lease, in numbers
+pinned = "0ef0364b76e1f8bed694d341dbca4a2b1c553e57"
+
+[[defect]]
+id = "D1"
+file = "docs/design/4.10-messages.md"
+lines = [2187, 2187]
+says = "LEASE_TTL is 12 hours."
+[[defect.refutes]]
+file = "src/sessionorc/mail.py"
+lines = [120, 120]

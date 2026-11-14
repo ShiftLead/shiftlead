@@ -1,0 +1,12 @@
+diff --git a/docs/design/4.3-adapter-contract.md b/docs/design/4.3-adapter-contract.md
+index 86fdf1159..c7c64b7af 100644
+--- a/docs/design/4.3-adapter-contract.md
++++ b/docs/design/4.3-adapter-contract.md
+@@ -1909,3 +1909,7 @@ The core cannot read a profile, so the adapter says how one is billed: `billing_
+ {billing, prices}` as `profiles.yml` declares it, an adapter without it billing every profile as a
+ subscription.
+ 
++
++**The seat smoke's wait, in numbers.**
++The smoke waits five minutes for a reply to land on its ask's thread (`REPLY_WAIT` in `scripts/seat_run.py`).
++While it waits it reads the seat's record and the person's inbox every two seconds.
