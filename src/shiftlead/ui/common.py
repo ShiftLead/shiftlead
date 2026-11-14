@@ -204,25 +204,77 @@ def shaped(text: Any, origin: Any = None) -> dict[str, Markup]:
 templates.env.globals["shaped"] = shaped
 
 
-def card_shape(text: Any, origin: Any = None) -> dict[str, Any]:
+def passed_question(e: Any) -> str:
+    """The passer's own question on a question passed up to the person (§4.9b, §4.5 screen 12 *An item's shape*,
+    TD-1845): `recommend.question`, which TD-1846's pass-up stores; "" on any other entry, and on a pass made
+    before it, which is drawn as before."""
+    if not isinstance(e, Mapping) or not e.get("passed_up"):
+        return ""
+    rec = e.get("recommend")
+    return str(rec.get("question") or "").strip() if isinstance(rec, Mapping) else ""
+
+
+def _recommends_html(e: Mapping[str, Any]) -> str:
+    """*`<passer>` recommends: `<line>`*, labelled and drawn as text (§4.5a *Inbox row: passed up*)."""
+    rec = e.get("recommend")
+    if not isinstance(rec, Mapping) or not rec.get("text"):
+        return ""
+    by = Markup.escape(str(rec.get("by") or ""))
+    who = Markup.escape(str(e.get("passer_name") or rec.get("by") or ""))
+    line = Markup.escape(str(rec["text"]))
+    return (
+        f'<div class="st dflt recommends" title="passed up to you by {by}: its recommendation, not the asker\'s">'
+        f"{who} recommends: {line}</div>"
+    )
+
+
+def _from_asker_html(e: Mapping[str, Any], text: str, origin: str | None, default: Any = None) -> str:
+    """The asker's whole text under a *from `<asker>`* label (§4.5 screen 12 *An item's shape*, TD-1845): a seat's
+    words, folded, never the item's sentence; a passed-up `steer`'s inherited default drawn after it as text."""
+    who = Markup.escape(str(e.get("from_name") or e.get("from") or "the asker"))
+    html = f'<div class="st fromasker">from {who}</div>' + (rendermod.render(text, origin) if text.strip() else "")
+    if default:
+        html += f'<div class="st dflt">its default, unless you say otherwise: {Markup.escape(str(default))}</div>'
+    return html
+
+
+def card_shape(e: Any, origin: Any = None, card: bool = True) -> dict[str, Any]:
     """A mail item drawn whole on a Queue card (design §4.5 screen 12 *An item's shape*, §4.10 *An item leads
-    with one sentence*; TD-911): `one`, whether its first paragraph is one sentence (`render.one_sentence`);
-    if so `sentence` that paragraph, `leads` the second — what each answer leads to — and `context` the rest;
-    if not, no sentence (the row draws its `subject`, the 80-character clip) and `context` the whole text, so
-    the person always reads one line first. Each part rendered as `shaped` renders it."""
-    t, o = str(text or ""), (str(origin) if origin else None)
+    with one sentence*; TD-911, TD-1847): `one`, whether it leads with one sentence; if so `sentence` that
+    sentence and `context` what is folded under it. Where each part comes from is fixed per kind: an `ask` or
+    `steer` leads with its first paragraph and folds its second paragraph on — its consequences are its answers'
+    (`mail.read_answers`), and mail filed before them, whose second paragraph held them, folds that paragraph too;
+    a question passed up to the person with the passer's `recommend.question` leads with that question's first
+    paragraph and folds its context, *`<passer>` recommends*, then the asker's whole text under *from `<asker>`*;
+    a question rerouted to the person (§4.9b, `routed`), its text a seat's, draws no sentence (the row draws its
+    `subject`) and folds its text under *from `<asker>`*; any other first paragraph that is not one sentence
+    draws no sentence and folds the whole text, so the person always reads one line first. `e` is the entry, or
+    its text alone; `card` false is the Inbox row's fold (§4.5a *Inbox row: passed up*), where a `steer`'s row
+    draws its default on its own line. Each part rendered as `shaped` renders it."""
+    if isinstance(e, Mapping):
+        t = str(e.get("text") or "")
+    else:
+        t, e = str(e or ""), {}
+    o = str(origin) if origin else None
+
+    def r(part: str) -> str:
+        return rendermod.render(part, o) if part.strip() else ""
+
+    if q := passed_question(e):
+        lead, qrest = rendermod.paragraph_break(q) or (q, "")
+        default = e.get("default") if card and e.get("kind") == "steer" else None
+        ctx = r(qrest) + _recommends_html(e) + _from_asker_html(e, t, o, default)
+        return {"one": True, "sentence": Markup(r(lead)), "context": Markup(ctx)}
+    if e.get("routed") and not e.get("passed_up"):
+        return {"one": False, "sentence": Markup(""), "context": Markup(_from_asker_html(e, t, o))}
     if not rendermod.one_sentence(t):
-        return {"one": False, "sentence": Markup(""), "leads": Markup(""), "context": Markup(rendermod.render(t, o))}
+        return {"one": False, "sentence": Markup(""), "context": Markup(rendermod.render(t, o))}
     lead, rest = rendermod.paragraph_break(t) or (t, "")
-    second, after = rendermod.paragraph_break(rest) or (rest, "")
-
-    def r(part: str) -> Markup:
-        return Markup(rendermod.render(part, o) if part.strip() else "")
-
-    return {"one": True, "sentence": r(lead), "leads": r(second), "context": r(after)}
+    return {"one": True, "sentence": Markup(r(lead)), "context": Markup(r(rest))}
 
 
 templates.env.globals["card_shape"] = card_shape
+templates.env.globals["passed_question"] = passed_question
 
 
 def card_whole(mode: Any, e: Any) -> bool:

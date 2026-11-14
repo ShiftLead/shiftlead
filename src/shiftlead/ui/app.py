@@ -153,6 +153,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _amount_says,  # noqa: F401
     _as_session_id,  # noqa: F401
     _countdown,  # noqa: F401
+    _from_asker_html,  # noqa: F401
     _getattr,  # noqa: F401
     _icon_cache,  # noqa: F401
     _instant,  # noqa: F401
@@ -166,6 +167,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _place_asking,  # noqa: F401
     _place_cache,  # noqa: F401
     _projected,  # noqa: F401
+    _recommends_html,  # noqa: F401
     _reserve_why,  # noqa: F401
     _short_age,  # noqa: F401
     _str_list,  # noqa: F401
@@ -197,6 +199,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     org_here,  # noqa: F401
     own_repo,
     page_origin,  # noqa: F401
+    passed_question,  # noqa: F401
     paths_ctx,  # noqa: F401
     promote_reading,  # noqa: F401
     repos_of,  # noqa: F401
@@ -5464,6 +5467,17 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             got = await call("inbox", id=PERSON)
             # a row the person handed to a seat is the seat's entry, carried as `handed` (§4.10 *A look*)
             e = next((x for x in [*(got.get("entries") or ()), *(got.get("handed") or ())] if x.get("id") == mid), None)
+            if e is not None and (e.get("passed_up") or e.get("routed")):
+                # its *context* names the asker and the passer by the names they are known by, as the card does
+                fleet = []
+                with contextlib.suppress(HTTPException):
+                    fleet = await call("list")
+                names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+                orphan = e.get("orphaned") if isinstance(e.get("orphaned"), dict) else {}
+                e["from_name"] = str(orphan.get("name") or names.get(e.get("from"), e.get("from")))
+                rec = e.get("recommend")
+                if isinstance(rec, dict) and rec.get("by"):
+                    e["passer_name"] = names.get(str(rec["by"]), str(rec["by"]))
         if e is None:
             raise HTTPException(404, f"{key or 'no key'}: gone — reload")
         with timing.step("render"):

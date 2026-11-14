@@ -76,8 +76,8 @@
    row's detail. On a Queue card a fold drawn closed is sent as its summary alone (`data-lazy`), its body
    read on its first open; drawn open, and on every other page, it is sent whole. #}
 {% macro fold_body(kind, e, rest=none) -%}
-{%- if kind == 'mail' %}<div class="body md">{{ rest if rest is not none else shaped(e.text, origin).rest }}</div>
-{%- elif kind == 'card' %}<div class="body md">{{ rest if rest is not none else card_shape(e.text, origin).context }}</div>
+{%- if kind == 'mail' %}<div class="body md">{{ rest if rest is not none else (card_shape(e, origin, False).context if passed_question(e) else shaped(e.text, origin).rest) }}</div>
+{%- elif kind == 'card' %}<div class="body md">{{ rest if rest is not none else card_shape(e, origin).context }}</div>
 {%- elif kind == 'boardcard' %}
 {%- if e.card.context %}<div class="body md">{{ md(e.card.context, origin) }}</div>{% endif %}
 {%- if e.key %}<div class="st"><button class="mono boardkey" type="button" data-copy="{{ e.key }}" data-copied="copied {{ e.key }}" title="the line's id: type it in chat or in ao board show; a click copies it">{{ e.key }}</button></div>{% endif %}
@@ -122,15 +122,22 @@
 
 {% macro body(e) -%}
 {%- if card_whole(mode, e) %}
-{#- on a card (§4.5 screen 12 *An item's shape*): its one sentence, its second paragraph — what each answer
-    leads to — and the rest under *context*; a first paragraph that is not one sentence draws the subject as
-    the sentence and the whole text under *context* -#}
-{%- set c = card_shape(e.text, origin) %}
+{#- on a card (§4.5 screen 12 *An item's shape*, TD-1847): its one sentence and the rest under *context* — what
+    each answer leads to is its answers' own, drawn beside them; a question passed up with the passer's question
+    leads with that question, the asker's text folded under *from <asker>*; a first paragraph that is not one
+    sentence, or a seat's question rerouted here, draws the subject as the sentence and the text under
+    *context* -#}
+{%- set c = card_shape(e, origin) %}
 {%- if c.one %}<div class="body md sentence">{{ c.sentence }}</div>{% else %}<div class="subj sentence">{{ plain(row_subject(e)) }}</div>{% endif %}
-{%- if c.leads %}<div class="body md leads">{{ c.leads }}</div>{% endif %}
 {%- if c.context %}
 {{ fold('card:' ~ e.id, fold_open, 'card', e, c.context) }}
 {%- endif %}
+{%- elif passed_question(e) %}
+{#- §4.5a *Inbox row: passed up* (TD-1847): led by the first paragraph of the passer's question, and under
+    *details* its context, the *recommends* line, then the asker's text labelled *from <asker>* -#}
+{{ subj(e) }}
+<div class="body md">{{ shaped(passed_question(e), origin).lead }}</div>
+{{ fold(e.id, fold_open, 'mail', e, card_shape(e, origin, False).context) }}
 {%- else %}
 {{ subj(e) }}
 {%- set s = shaped(e.text, origin) %}
@@ -478,7 +485,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
    text**, from the entry's structured `recommend`. Never a control: the recommendation is also the
    first suggested answer, which is the one press the passing up is for. #}
 {% macro recommends(e) -%}
-{%- if e.passed_up and e.recommend and e.recommend.text %}
+{%- if e.passed_up and e.recommend and e.recommend.text and not passed_question(e) %}
 <div class="st dflt recommends" title="passed up to you by {{ e.recommend.by }}: its recommendation, not the asker's">{{ e.passer_name or e.recommend.by }} recommends: {{ e.recommend.text }}</div>
 {%- endif %}
 {%- endmacro %}
@@ -556,7 +563,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {{ head(e) }}
 {{ body(e) }}
 {{ not_answered_line(e) }}
-<div class="st dflt">unless you say otherwise: {{ e.default or '—' }}</div>
+{%- if not (card_whole(mode, e) and passed_question(e)) %}<div class="st dflt">unless you say otherwise: {{ e.default or '—' }}</div>{% endif %}
 {{ recommends(e) }}
 {%- set whole = card_whole(mode, e) %}
 {%- if whole %}{{ answer_row(e, 'mail', 'Go with it? The sender takes its default now instead of waiting out the clock.') }}{% else %}{{ answers(e) }}{% endif %}
@@ -596,7 +603,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {% macro orphaned(e, section) -%}
 {{ head(e) }}
 {{ body(e) }}
-{%- if e.kind == 'steer' %}<div class="st dflt">its asker would have gone with: {{ e.default or '—' }}</div>{% endif %}
+{%- if e.kind == 'steer' and not (card_whole(mode, e) and passed_question(e)) %}<div class="st dflt">its asker would have gone with: {{ e.default or '—' }}</div>{% endif %}
 {{ recommends(e) }}
 {%- set whole = card_whole(mode, e) %}
 {%- if whole %}{{ answer_row(e, 'mail', 'Go with it? Its default is written on the board as your answer, and sent to whoever holds ' ~ e.about ~ '.' if e.kind == 'steer' else '') }}{% else %}{{ answers(e) }}{% endif %}
