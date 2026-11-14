@@ -1,0 +1,60 @@
+
+  ~/.c/aogrkp/work                                                                                                                                                           1.8K / 256K │ [Dashboard]
+
+                                   ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── [✗] ─┐
+     ❯ /hooks-list                 │  Hooks  Plugins  Marketplace  Skills  Workflows  MCP Servers                                                                   │                       10:16 PM
+                                   │────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────│
+                                   │   / to search                                                                                                         All f    │
+     Loaded hooks (14):            │────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────│                       10:16 PM
+       global/shiftlead:session_sta│  ◆ Hosted connectors from grok.com (1)                                                                                         │10s
+       global/shiftlead:user_prompt│      Add, remove, or manage connectors. Ctrl+O to open or go to:                                                               │out: 10s
+       global/shiftlead:pre_tool_us│      grok.com/connectors?teamId=77d5fc76-fbe5-4bb3-9841-125d40393e7a                                                           │0s
+       global/shiftlead:post_tool_u│    › Automations [ready]                                                                                           (managed)   │10s
+       global/shiftlead:post_tool_u│                                                                                                                                │imeout: 10s
+       global/shiftlead:permission_│                                                                                                                                │ut: 10s
+       global/other:stop[0].hooks[0│                                                                                                                                │
+       global/shiftlead:stop[0].hoo│                                                                                                                                │
+       global/shiftlead:stop_failur│                                                                                                                                │0s
+       global/shiftlead:stop_cancel│                                                                                                                                │ 10s
+       global/shiftlead:notificatio│                                                                                                                                │0s
+       global/shiftlead:subagent_st│                                                                                                                                │ 10s
+       global/shiftlead:subagent_st│                                                                                                                                │10s
+       global/shiftlead:session_end│                                                                                                                                │s
+                                   │                                                                                                                                │
+     Worked for 0.0s               │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+                                   │                                                                                                                                │
+  Help improve Grok                │                                                                                                                                │               [Opt out] [Opt in]
+  Off by default. Opt-in to allow S│                                                                                                                                │
+  Read Terms and Privacy Policy.   │        Tab tabs  |  r refresh  |  a add  |  i auth  |  space enable/disable  |  x remove  |  ctrl-o open  |  Esc close         │
+                                   └────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+  ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  │ ❯                                                                                                                                                                                                │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── Grok 4.7 (high) ─╯
+
+  Shift+Tab:mode  │  Ctrl+x:shortcuts
+

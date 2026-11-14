@@ -42,6 +42,7 @@ import contextlib
 import itertools
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -209,6 +210,117 @@ def describe(rec: dict[str, Any]) -> str:
     )
 
 
+LISTING_COLS, LISTING_ROWS = 200, 60  # a listing's lines fit whole: at tmux's 80x24 Grok scrolls them in a box
+LISTING_WAIT = 20.0  # a slash command's listing drawn in the pane
+GROK_HOOKS_HEAD = re.compile(r"^\s*Loaded hooks \((\d+)\):")
+# `global/shiftlead:session_start[0].hooks[0]  command: … --adapter grok  timeout: 10s` (1.0.77's `/hooks-list`)
+GROK_HOOK_ROW = re.compile(
+    r"^\s*(?P<origin>\S+?):(?P<event>[a-z_]+)\[\d+\]\.hooks\[\d+\]\s+command: (?P<command>.*?)\s+timeout:"
+)
+GROK_MCP_SECTION = re.compile(r"│\s*◆\s+(?P<section>.+?)\s+\((?P<count>\d+)\)\s*│")
+# `│    › Automations [ready]          (managed)   │` — a row of the `/mcps` modal, the selected one marked `›`
+GROK_MCP_ROW = re.compile(r"│\s+(?:›\s+)?(?P<name>[^│\[◆]+?)\s+\[(?P<state>[^\]]+)\](?P<rest>[^│]*)│")
+
+
+def grok_hooks(lines: list[str]) -> tuple[int, list[tuple[str, str]]] | None:
+    """The last `/hooks-list` block in a pane: its count and each handler's (origin, command), or None
+    where the pane holds no such block."""
+    heads = [i for i, line in enumerate(lines) if GROK_HOOKS_HEAD.match(line)]
+    if not heads:
+        return None
+    count = int(GROK_HOOKS_HEAD.match(lines[heads[-1]]).group(1))
+    rows = []
+    for line in lines[heads[-1] + 1 :]:
+        m = GROK_HOOK_ROW.match(line)
+        if not m:
+            break
+        rows.append((m["origin"], m["command"]))
+    return count, rows
+
+
+def grok_mcp_sections(lines: list[str]) -> dict[str, int]:
+    """The `/mcps` modal's section headers in a pane and the count each says (`◆ Hosted connectors … (1)`)."""
+    return {m["section"]: int(m["count"]) for line in lines if (m := GROK_MCP_SECTION.search(line))}
+
+
+def grok_mcps(lines: list[str]) -> list[tuple[str, str, str]]:
+    """The `/mcps` modal's servers in a pane: (section, name, state) for each row, `disabled` ones too."""
+    out, section = [], ""
+    for line in lines:
+        if m := GROK_MCP_SECTION.search(line):
+            section = m["section"]
+        elif m := GROK_MCP_ROW.search(line):
+            out.append((section, m["name"].strip(), m["state"].strip()))
+    return out
+
+
+def grok_foreign(walk: Walk) -> list[str]:
+    """Grok's listing (design §4.3 *The third adapter: Grok Build*): every hook handler and MCP server the
+    live session loaded that is not ShiftLead's, by origin. The walk widens its own private window first,
+    then types `/hooks-list` and reads its block, then opens `/mcps` and reads every server not
+    `[disabled]` (a hosted connector from grok.com among them), closing the modal with Escape."""
+    from shiftlead.adapters.grok import ADAPTER_FLAG, HOOK_FILE, NAME
+
+    walk.resize(LISTING_COLS, LISTING_ROWS)
+    mine = f"global/{HOOK_FILE.stem}"
+    walk.call("keys", id=walk.id, keys=["/hooks-list"])
+    walk.call("keys", id=walk.id, keys=["Enter"])
+    end = time.monotonic() + LISTING_WAIT
+    while True:  # read once at least, then until the block is whole or the wait is spent
+        listed = grok_hooks(walk.tail(LISTING_ROWS))
+        if (listed and len(listed[1]) >= listed[0]) or time.monotonic() >= end:
+            break
+        time.sleep(1.0)
+    if listed is None:
+        raise StepFailed(f"/hooks-list drew no 'Loaded hooks' block within {LISTING_WAIT:.0f}s")
+    count, rows = listed
+    if len(rows) != count:
+        raise StepFailed(f"/hooks-list says {count} hooks loaded and the pane shows {len(rows)} of them")
+    foreign = [
+        f"hook {origin}: {command}"
+        for origin, command in rows
+        if origin != mine or not command.endswith(f"{ADAPTER_FLAG} {NAME}")
+    ]
+    walk.call("keys", id=walk.id, keys=["/mcps"])
+    walk.call("keys", id=walk.id, keys=["Enter"])
+    end = time.monotonic() + LISTING_WAIT
+    try:
+        # the modal's frame draws before its rows (an empty box read 0 servers on the first walk): it is read once
+        # it shows a section and holds still across two reads a second apart; a modal with no section is taken as
+        # empty only once the whole wait is spent
+        last: list[str] | None = None
+        while True:
+            pane = walk.tail(LISTING_ROWS)
+            drawn = any("MCP Servers" in line for line in pane)
+            if drawn and pane == last and grok_mcp_sections(pane):
+                break
+            if time.monotonic() >= end:
+                if drawn and pane == last:
+                    break
+                raise StepFailed(f"/mcps drew no settled modal within {LISTING_WAIT:.0f}s")
+            last = pane
+            time.sleep(1.0)
+        servers = grok_mcps(pane)
+        for section, n in grok_mcp_sections(pane).items():
+            if (seen := sum(1 for s, _n, _s in servers if s == section)) != n:
+                raise StepFailed(f"/mcps says {n} in {section} and the pane shows {seen} of them")
+    finally:
+        with contextlib.suppress(Exception):  # a failed close never hides why the step failed
+            walk.call("keys", id=walk.id, keys=["Escape"])
+    foreign += [
+        f"MCP server {name} [{state}] ({section or 'no section'})"
+        for section, name, state in servers
+        if state != "disabled"
+    ]
+    walk.listed = f"hooks by /hooks-list ({count}), MCP servers by /mcps ({len(servers)})"
+    return foreign
+
+
+# a per-adapter step of the walk's *first hook* (design §4.3): every handler and server the live session loaded
+# that is not ShiftLead's, by origin; Claude Code and Gemini CLI have no entry
+FOREIGN: dict[str, Callable[[Walk], list[str]]] = {"grok": grok_foreign}
+
+
 class Walk:
     """The steps, in order, against a host agent already up on the scratch home."""
 
@@ -220,9 +332,12 @@ class Walk:
         call: Callable[..., Any],
         out=print,
         snap: Callable[[str, str], None] | None = None,
+        resize: Callable[[str, int, int], None] | None = None,
     ):
         self.adapter, self.profile, self.work, self.call, self.out = adapter, profile, work, call, out
         self.snap = snap  # under `--capture`: (step, session id) → its pane and title saved
+        self.resizer = resize  # (session id, cols, rows) → the walk's own private window resized
+        self.listed = ""  # how the adapter's listing was read, said by the *first hook* step
         self.current = ""
         self.id = ""
         self.adapter_id = ""
@@ -230,6 +345,13 @@ class Walk:
 
     def get(self) -> dict[str, Any]:
         return self.call("get", id=self.id)
+
+    def tail(self, lines: int) -> list[str]:
+        return self.call("tail", id=self.id, lines=lines) or []
+
+    def resize(self, cols: int, rows: int) -> None:
+        if self.resizer is not None:
+            self.resizer(self.id, cols, rows)
 
     def shot(self, name: str) -> None:
         if self.snap is not None and self.id:
@@ -282,6 +404,10 @@ class Walk:
             raise StepFailed(f"no hook-confirmed idle within {FIRST_HOOK_WAIT:.0f}s: {describe(rec)}")
         if rec.get("adapter_id") != self.adapter_id:
             raise StepFailed(f"the hook reported the tool's session as {rec.get('adapter_id')}, not {self.adapter_id}")
+        if (listing := FOREIGN.get(self.adapter)) is not None:
+            if foreign := listing(self):
+                raise StepFailed(f"{describe(rec)}; not ShiftLead's ({self.listed}): {'; '.join(foreign)}")
+            return f"{describe(rec)}; nothing but ShiftLead's ({self.listed})"
         return describe(rec)
 
     def prompt(self) -> str:
@@ -606,7 +732,14 @@ def main(argv: list[str] | None = None) -> int:
             def snap(step: str, sid: str) -> None:
                 save_pane(capture, sock, next(snaps), step, sid)
 
-        walk = Walk(args.adapter, args.profile, work, lambda m, **p: call_sync(m, **p), snap=snap)
+        def resize(sid: str, cols: int, rows: int) -> None:
+            subprocess.run(
+                ["tmux", "-L", sock, "resize-window", "-t", f"={sid}:", "-x", str(cols), "-y", str(rows)],
+                capture_output=True,
+                timeout=5,
+            )
+
+        walk = Walk(args.adapter, args.profile, work, lambda m, **p: call_sync(m, **p), snap=snap, resize=resize)
         ok = walk.run()
         if capture is not None:
             dest = ROOT / "tests" / "conformance" / "fixtures" / args.adapter / "captured"
