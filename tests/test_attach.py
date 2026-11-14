@@ -638,7 +638,10 @@ async def test_a_link_that_fails_leaves_no_part(agent, tmp_path, monkeypatch):
         monkeypatch.setattr(os, "link", refuse)
         with pytest.raises(AgentError):
             await c.call("attach", id=s.id, data=_b64(b"4567"), upload=up, offset=4)
-        assert not list(where.iterdir()) and not agent._uploads
+        # the folder emptied can be gone too: the tick's prune removes an empty attachments folder (TD-1663)
+        left = sorted(f.name for f in where.iterdir()) if where.is_dir() else []
+        assert left == [], f"{where} still holds {left}"
+        assert not agent._uploads, f"uploads still open: {list(agent._uploads)}"
 
 
 CLIP_PROBE = (
