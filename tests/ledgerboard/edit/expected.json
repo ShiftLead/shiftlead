@@ -89,6 +89,44 @@
     3,
     "people: `People:` lists no name"
    ]
+  ],
+  [
+   [
+    0,
+    "ℹ people: no `People:` line — nobody is named who may answer this board's items"
+   ],
+   [
+    1,
+    "answers: two answers are forms with one head, Hold: a fill could not say which"
+   ]
+  ],
+  [
+   [
+    0,
+    "ℹ people: no `People:` line — nobody is named who may answer this board's items"
+   ],
+   [
+    1,
+    "answers: a form cannot be the default: pressing it sends no words"
+   ]
+  ],
+  [
+   [
+    0,
+    "ℹ people: no `People:` line — nobody is named who may answer this board's items"
+   ]
+  ],
+  [
+   [
+    0,
+    "ℹ people: no `People:` line — nobody is named who may answer this board's items"
+   ]
+  ],
+  [
+   [
+    0,
+    "ℹ people: no `People:` line — nobody is named who may answer this board's items"
+   ]
   ]
  ],
  "bold_heads": {
@@ -151,6 +189,21 @@
   },
   {
    "refused": "the rewrite would change the line's item key or what the reader reads: fix the line by hand — due: spelled 'due', not `Due:`; due: no period after its date"
+  },
+  {
+   "refused": "doer: `Doer:` follows Context"
+  },
+  {
+   "refused": "doer: no period after its value"
+  },
+  {
+   "refused": "doer: written `Doer: <value>.`, one space after `Doer:` and after `team`"
+  },
+  {
+   "refused": "answers: two answers are forms with one head, Hold: a fill could not say which"
+  },
+  {
+   "refused": "answers: a form cannot be the default: pressing it sends no words"
   }
  ],
  "components": {
@@ -635,6 +688,87 @@
   },
   {
    "refused": "a board line's text carries a field's name (due:) — the reader would read it as the field; say it in other words"
+  },
+  {
+   "ok": "- [ ] act 2026-01-15 (session `w-1`) — Bump the pin. Context: TD-12. Doer: acme/widgets. Due: 2026-01-20.\n"
+  },
+  {
+   "ok": "- [ ] act 2026-01-15 (session `w-1`) — Bump the pin. Context: TD-12. Doer: team ops. Due: 2026-01-20.\n"
+  },
+  {
+   "ok": "- [ ] act 2026-01-15 (session `w-1`) — Bump the pin. Context: TD-12. Doer: team web.grind. Due: 2026-01-20.\n"
+  },
+  {
+   "ok": "- [ ] act 2026-01-15 (session `w-1`) — Bump the pin. Context: TD-12. Doer: team. Due: 2026-01-20.\n"
+  },
+  {
+   "refused": "only an act names who does its step (doer), not a decide"
+  },
+  {
+   "refused": "only an act names who does its step (doer), not a look"
+  },
+  {
+   "refused": "only an act names who does its step (doer), not a watch"
+  },
+  {
+   "refused": "only an act names who does its step (doer), not a fyi"
+  },
+  {
+   "refused": "only an act names who does its step (doer), not an item with no kind"
+  },
+  {
+   "refused": "a doer is a repo, `<repo>` not ending in `.`, or a team, `team <name>` with one space, not ''"
+  },
+  {
+   "refused": "a doer is a repo, `<repo>` not ending in `.`, or a team, `team <name>` with one space, not ' team ops'"
+  },
+  {
+   "refused": "a doer is a repo, `<repo>` not ending in `.`, or a team, `team <name>` with one space, not 'team '"
+  },
+  {
+   "refused": "a doer is a repo, `<repo>` not ending in `.`, or a team, `team <name>` with one space, not 'team  ops'"
+  },
+  {
+   "refused": "a doer is a repo, `<repo>` not ending in `.`, or a team, `team <name>` with one space, not 'team a b'"
+  },
+  {
+   "refused": "a doer is a repo, `<repo>` not ending in `.`, or a team, `team <name>` with one space, not 'Team ops'"
+  },
+  {
+   "refused": "a doer is a repo, `<repo>` not ending in `.`, or a team, `team <name>` with one space, not '../x'"
+  },
+  {
+   "refused": "a doer is a repo, `<repo>` not ending in `.`, or a team, `team <name>` with one space, not 'acme.'"
+  },
+  {
+   "refused": "a doer is a repo, `<repo>` not ending in `.`, or a team, `team <name>` with one space, not 'acme\\nwidgets'"
+  },
+  {
+   "refused": "a board line's text carries a field's name (Doer:) — the reader would read it as the field; say it in other words"
+  },
+  {
+   "refused": "the context carries a field's name (Doer:) — the reader would read it as the field; say it in other words"
+  },
+  {
+   "refused": "an answer carries a field's name (Doer:) — the reader would read it as the field; say it in other words"
+  },
+  {
+   "refused": "the detail block's context carries a field's name (Doer:) — the reader would read it as the field; say it in other words"
+  },
+  {
+   "refused": "two answers are forms with one head, Hold: a fill could not say which"
+  },
+  {
+   "refused": "a form cannot be the default: pressing it sends no words"
+  },
+  {
+   "refused": "an answer carries a field's name (Due:) — the reader would read it as the field; say it in other words"
+  },
+  {
+   "ok": "- [ ] look 2026-01-15 (session `w-1`) — Check the page. Context: PR #4. Due: 2026-01-20. Answers: Works (default) | Not right: <what>.\n"
+  },
+  {
+   "ok": "- [ ] decide 2026-01-15 (person) — Go on the build. Context: TD-12. Due: 2026-01-15. Answers: Go | Hold: <note>. Decided: Hold: the vendor (2026-01-15).\n"
   }
  ],
  "edit_actions": {
@@ -659,8 +793,14 @@
   "decide-by-refused-name": {
    "refused": "who answered, 'pat smith', is not a person's name (letters, digits, `_`, `-`, dot-separated)"
   },
+  "decide-close-keeps-doer": {
+   "ok": "- [x] act 2026-01-05 (session `w-1`) — Lift the gate. Context: TD-12 decision (pat). Doer: team ops. Due: 2026-01-20. Decided: Go (by pat) (2026-01-15). Closed: 2026-01-15 — lifted."
+  },
   "decide-fresh": {
    "ok": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-10. Answers: a | b (default). Decided: b (2026-01-15)."
+  },
+  "decide-keeps-doer": {
+   "ok": "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: team ops. Due: 2026-01-20. Decided: done (by pat) (2026-01-15)."
   },
   "decide-keeps-parts-lifts": {
    "ok": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-20. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B. Decided: Option B (by pat) (2026-01-15)."
@@ -674,11 +814,38 @@
   "decide-refused-not-right-ends-by": {
    "refused": "an answer may not end in `(by <name>)` — the reader would read it as who answered; say it in other words"
   },
+  "decide_complete_answer_unchanged": {
+   "ok": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the build? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Hold: <note>. Lifts: Hold: <note>. Decided: go (by pat) (2026-01-15)."
+  },
+  "decide_fill_ending_by_refused": {
+   "refused": "an answer may not end in `(by <name>)` — the reader would read it as who answered; say it in other words"
+  },
+  "decide_fill_with_dash_and_colon": {
+   "ok": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the build? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Hold: <note>. Lifts: Hold: <note>. Decided: Hold: revise — add log sources: the shapes (by pat) (2026-01-15)."
+  },
+  "decide_refuses_empty_fill": {
+   "refused": "Hold needs its words"
+  },
+  "decide_refuses_unfilled_form": {
+   "refused": "Hold needs its words"
+  },
+  "decide_writes_fill": {
+   "ok": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the build? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Hold: <note>. Lifts: Hold: <note>. Decided: Hold: wait (by pat) (2026-01-15)."
+  },
+  "done-keeps-doer": {
+   "ok": "- [x] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: acme/widgets. Due: 2026-01-20. Closed: 2026-01-15 — bumped."
+  },
   "done-unpunctuated": {
    "ok": "- [x] 2026-01-05 (session s-1) — Ship it. Closed: 2026-01-15."
   },
   "done-with-why": {
    "ok": "- [x] 2026-01-05 (session s-1 on h) — Ship it. Due: 2026-01-10. Closed: 2026-01-15 — merged."
+  },
+  "due-added-after-doer": {
+   "ok": "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: team ops. Due: 2026-01-25."
+  },
+  "due-added-after-doer-no-period": {
+   "ok": "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: acme. Due: 2026-01-25."
   },
   "due-added-after-parts": {
    "ok": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15. Due: 2026-01-25."
@@ -688,6 +855,9 @@
   },
   "due-fyi-refused": {
    "refused": "after the edit the reader does not read Due: 2026-01-20 with the item's other fields unchanged"
+  },
+  "due-keeps-doer": {
+   "ok": "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: team ops. Due: 2026-01-25."
   },
   "due-keeps-parts-lifts": {
    "ok": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-25. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B."
@@ -704,6 +874,12 @@
   "due-undated-no-fields": {
    "ok": "- [ ] 2026-01-05 (session s-1) — Plain. Due: 2026-01-20."
   },
+  "look_decided_fill": {
+   "ok": "- [ ] look 2026-01-05 (session `w-1`) — Check the page. Context: PR #4. Due: 2026-01-20. Answers: Works | Not right: <what>. Decided: Not right: grey (by pat) (2026-01-15)."
+  },
+  "look_decided_form_refused": {
+   "refused": "Not right needs its words"
+  },
   "not-an-open-item": {
    "refused": "the line is not an open item"
   },
@@ -713,11 +889,17 @@
   "reply-keeps-decided-by": {
    "ok": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-10. — w-2, 2026-01-15: on it. Answers: a | b. Decided: a (by pat) (2026-01-11)."
   },
+  "reply-keeps-doer": {
+   "ok": "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: acme/widgets. Due: 2026-01-20. — w-2, 2026-01-15: on it"
+  },
   "reply-keeps-parts-lifts": {
    "ok": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-20. — w-2, 2026-01-15: looking. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B."
   },
   "reply-naming-hide-refused": {
    "refused": "a reply carries a field's name (Hide until:) — the reader would read it as the field; say it in other words"
+  },
+  "reply-refused-doer": {
+   "refused": "a reply carries a field's name (Doer:) — the reader would read it as the field; say it in other words"
   },
   "reply-refused-due-on-undated": {
    "refused": "this item has no Due: date, so a reply may not carry one — the reader would take it for the item's; snooze sets its date"
@@ -734,6 +916,9 @@
   "reply-second": {
    "ok": "- [ ] act 2026-01-05 (session s-1) — Rotate. Due: 2026-01-10. — Sam, 2026-01-12: halfway — Sam, 2026-01-15: all done"
   },
+  "snooze-after-doer-no-period": {
+   "ok": "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: acme. Hide until: 2026-01-18."
+  },
   "snooze-answer-holding-a-hide": {
    "ok": "- [ ] decide 2026-01-05 (n/a) — Pick. Context: TD-1. Due: 2026-01-20. Hide until: 2026-01-25. Answers: A (ok. Hide until: 2030-01-01) | B."
   },
@@ -749,6 +934,9 @@
   "snooze-keeps-decided-by": {
    "ok": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-10. Hide until: 2026-01-20. Answers: a | b. Decided: a (by pat) (2026-01-11)."
   },
+  "snooze-keeps-doer": {
+   "ok": "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: team ops. Due: 2026-01-20. Hide until: 2026-01-18."
+  },
   "snooze-keeps-parts-lifts": {
    "ok": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-20. Hide until: 2026-01-18. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B."
   },
@@ -763,6 +951,122 @@
   },
   "snooze-undated-no-fields": {
    "refused": "after the edit the reader does not read Hide until: 2026-01-20 with the item's other fields unchanged"
+  }
+ },
+ "form_fills": {
+  "empty_words": {
+   "refused": "Hold needs its words"
+  },
+  "equals_complete_answer": {
+   "ok": null
+  },
+  "filled": {
+   "ok": "Hold: wait for the vendor"
+  },
+  "first_of_two_heads": {
+   "ok": "Hold: x"
+  },
+  "form_as_offered": {
+   "refused": "Hold needs its words"
+  },
+  "form_index_complete_answer": {
+   "refused": "'Go' is a complete answer, not a form"
+  },
+  "form_index_other_head": {
+   "ok": "Hold: Note: foo"
+  },
+  "form_index_out_of_range": {
+   "refused": "form is the index of one of the 2 offered answers, not 2"
+  },
+  "form_index_prefix_not_head": {
+   "ok": "Hold: Holdfast"
+  },
+  "form_index_said_equals_complete": {
+   "ok": "Hold: later"
+  },
+  "head_any_case": {
+   "ok": "Hold: wait for the vendor"
+  },
+  "names_no_form": {
+   "ok": null
+  },
+  "no_space_after_colon": {
+   "ok": "Hold: later"
+  },
+  "offered_with_consequence": {
+   "ok": "Hold: the vendor"
+  },
+  "other_head_spaced": {
+   "ok": "Other: x"
+  },
+  "placeholder_words": {
+   "refused": "Hold needs its words"
+  },
+  "said_not_a_string": {
+   "refused": "the answer is a string, not NoneType"
+  },
+  "space_before_colon": {
+   "ok": "Hold: the vendor"
+  },
+  "with_form_index": {
+   "ok": "Hold: the vendor"
+  },
+  "with_form_index_head_present": {
+   "ok": "Hold: the vendor"
+  }
+ },
+ "forms": {
+  ": <x>": {
+   "form_head": null,
+   "is_form": false
+  },
+  "<x>: <y>": {
+   "form_head": null,
+   "is_form": false
+  },
+  "A: b: <c>": {
+   "form_head": null,
+   "is_form": false
+  },
+  "Go": {
+   "form_head": null,
+   "is_form": false
+  },
+  "Hold:": {
+   "form_head": "hold",
+   "is_form": true
+  },
+  "Hold: <a> <b>": {
+   "form_head": null,
+   "is_form": false
+  },
+  "Hold: <note>": {
+   "form_head": "hold",
+   "is_form": true
+  },
+  "Hold:<note>": {
+   "form_head": "hold",
+   "is_form": true
+  },
+  "Not right : <what>": {
+   "form_head": "not right",
+   "is_form": true
+  },
+  "Not right: <what>": {
+   "form_head": "not right",
+   "is_form": true
+  },
+  "Not right: wrong repo": {
+   "form_head": null,
+   "is_form": false
+  },
+  "Other :  <what>": {
+   "form_head": "other",
+   "is_form": true
+  },
+  "hold: <x>": {
+   "form_head": "hold",
+   "is_form": true
   }
  },
  "implicit_keys": [
@@ -790,6 +1094,7 @@
   "  - [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20.": "open: an item line opens `- [ ] ` at column 0, single-spaced",
   "- [ ] \tact 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20.": "open: an item line opens `- [ ] ` at column 0, single-spaced",
   "- [ ] \u000bact 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20.": "open: an item line opens `- [ ] ` at column 0, single-spaced",
+  "- [ ] 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: team ops. Due: 2026-01-20.": "doer: an item with no kind carries no `Doer:`: only an act names who does its step",
   "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it  Context: TD-7. Due: 2026-01-20.": "text: does not end a sentence (`.`, `?` or `!`)",
   "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7 Due: 2026-01-20.": "context: does not end with its period",
   "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20.": null,
@@ -808,11 +1113,26 @@
   "- [ ] act 2026-01-05 (n/a) — Rotate. Context: TD-1. Hide until: 2026-01-12. Due: 2026-01-10.": "due: `Due:` stands after `Hide until:`; it follows Context; hide: `Hide until:` follows Due",
   "- [ ] act 2026-01-05 (session `s-1`) — Rotate. Context: TD-1. Due: 2026-01-10. Hide until: 2026-01-12. — Pat, 2026-01-06: later. Answers: now | later.": "answers: an act carries no answers: a question with answers is a decide",
   "- [ ] act 2026-01-05 (session `s-1`) — Rotate. Context: TD-1. Due: 2026-01-10. — Pat, 2026-01-06: later. Answers: now | later. Hide until: 2026-01-12.": "hide: `Hide until:` follows Due; answers: `Hide until:` stands after `Answers:`; answers: an act carries no answers: a question with answers is a decide",
+  "- [ ] act 2026-01-15 (session `w-1` on box-1) — Ask the Doer: acme. Context: TD-7. Due: 2026-01-20.": "text: names a field (Doer:): say it in other words",
+  "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: Team ops. Due: 2026-01-20.": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`",
+  "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: acme Due: 2026-01-20.": "doer: no period after its value",
+  "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: acme.. Due: 2026-01-20.": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`",
+  "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: acme/widgets. Due: 2026-01-20.": null,
+  "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: team  ops. Due: 2026-01-20.": "doer: written `Doer: <value>.`, one space after `Doer:` and after `team`",
+  "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: team ops. Doer: acme. Due: 2026-01-20.": "doer: `Doer:` stands more than once",
+  "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: team ops. Due: 2026-01-20.": null,
+  "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: team ops. Due: 2026-01-20. Decided: done (by pat) (2026-01-16).": null,
+  "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: team ops. Hide until: 2026-01-18.": "due: no `Due:` (every kind but fyi carries one)",
+  "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: team. Due: 2026-01-20.": null,
+  "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer:acme. Due: 2026-01-20.": "doer: written `Doer: <value>.`, one space after `Doer:` and after `team`",
+  "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Due: 2026-01-20. Doer: acme.": "doer: `Doer:` follows Context",
+  "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Doer: acme. Context: TD-7. Due: 2026-01-20.": "text: names a field (Doer:): say it in other words",
   "- [ ] act 2026-01-15 (session `w-1` on box-1) — Check it. Context: TD-12. Due: 2026-01-20. Lifts: Go.": "lifts: an act carries no `Lifts:`: only a decide's answer lifts; lifts: `Lifts: Go.` is what no `Lifts:` means: leave it out; lifts: `Lifts:` follows Answers",
   "- [ ] act 2026-01-15 (session `w-1` on box-1) — Check it. Context: TD-12. Parts: TD-15. Due: 2026-01-20.": "parts: an act carries no `Parts:`: only a decide asks about a parent's parts",
   "- [ ] act 2026-01-15 (session `w-1` on box-1) — Do it. Context: TD-7. Due: 2026-01-20. Answers: yes | no.": "answers: an act carries no answers: a question with answers is a decide",
   "- [ ] decide 2026-01-15 (person) — Pick a region. Context: TD-41. Due: 2026-01-15. Answers: North (default) | South.": "head: `(person)` stands only on a decided line",
   "- [ ] decide 2026-01-15 (person) — Pick a region. Context: TD-41. Due: 2026-01-15. Answers: North (default) | South. Decided: North (2026-01-15).": null,
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Doer: team ops. Parts: TD-15. Due: 2026-01-20. Answers: Go | Not yet.": "parts: `Parts:` follows Context; doer: a decide carries no `Doer:`: only an act names who does its step",
   "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: A | B. Lifts: A | a.": "lifts: an answer stands twice",
   "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Not yet. Lifts: Go.": "lifts: `Lifts: Go.` is what no `Lifts:` means: leave it out",
   "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Not yet. Lifts: Later.": "lifts: not one of the item's answers: Later",
@@ -822,26 +1142,33 @@
   "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-15. Due: 2026-01-20. Answers: Go | Not yet.": "parts: an id stands twice",
   "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-20. Answers: Option A | Not yet. Lifts: Option A.": null,
   "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-20. Hide until: 2026-01-18. Answers: Option A | Not yet. Lifts: Option A.": null,
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15. Doer: team ops. Due: 2026-01-20. Answers: Go | Not yet.": "doer: a decide carries no `Doer:`: only an act names who does its step",
   "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go? Context: PR #5 decision (pat). Due: 2026-01-20. Answers: Go | Not yet.": "context: a decide that lifts a gate names exactly one entry in its Context",
   "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go? Context: TD-12 decision (pat), TD-13. Due: 2026-01-20. Answers: Go | Not yet.": "context: a decide that lifts a gate names exactly one entry in its Context",
   "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go? Context: TD-12, TD-13, see the decision (made last week). Due: 2026-01-20. Answers: Go | Not yet.": null,
   "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go? Context: TD-12, TD-13. Due: 2026-01-20. Answers: Go | Not yet.": null,
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick one? Context: TD-7. Doer: team ops. Due: 2026-01-20. Answers: a | b.": "doer: a decide carries no `Doer:`: only an act names who does its step",
   "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick one? Context: TD-7. Due: 2026-01-20.": "answers: a decide carries two or more answers",
   "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick one? Context: TD-7. Due: 2026-01-20. Answers: a (default) | b (default).": "answers: more than one marked ` (default)`",
   "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick the cache store? Context: TD-7. Due: 2026-01-20. Answers: a | b.": null,
   "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick the cache store? Context: TD-7. Due: 2026-01-20. Answers: a | b. Decided: Context: x (2026-01-16).": null,
   "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick the cache store? Context: TD-7. Due: 2026-01-20. Answers: a | b. Decided: a (2026-01-16).": null,
   "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick the cache store? Context: TD-7. Due: 2026-01-20. Answers: a | b. Decided: b (default) (2026-01-16).": null,
+  "- [ ] decide 2026-01-15 (session `w-1`) — Go on the build? Context: TD-12. Due: 2026-01-20. Answers: Go | Hold: <note> (default).": "answers: a form cannot be the default: pressing it sends no words",
+  "- [ ] decide 2026-01-15 (session `w-1`) — Go on the build? Context: TD-12. Due: 2026-01-20. Answers: Go | Hold: <note> | hold:.": "answers: two answers are forms with one head, Hold: a fill could not say which",
+  "- [ ] decide 2026-01-15 (session `w-1`) — Go on the build? Context: TD-12. Due: 2026-01-20. Answers: Go | Hold: <note> | hold:. Decided: Hold: x (2026-01-16).": null,
   "- [ ] decide 2026-01-15 (session `w-1`) — Go on the builds? Context: TD-4 decision (pat). Parts: TD-9, TD-10. Due: 2026-01-20. Answers: Go (default) | Not yet.": null,
   "- [ ] fyi 2026-01-05 (n/a) — Moved. Context: none. Hide until: 2026-01-12.": null,
   "- [ ] fyi 2026-01-15 (n/a) — The nightly job moved to 02:00. Context: TD-7.": null,
   "- [ ] fyi 2026-01-15 (n/a) — The nightly job moved to 02:00. Context: TD-7. — w-2, 2026-01-16: noted. Decided: ok (2026-01-16).": null,
   "- [ ] fyi 2026-01-15 (session `w-1` on box-1) — Heads up. Context: TD-7. Due: 2026-01-20.": "due: an fyi carries no `Due:`",
   "- [ ] look 2026-01-15 (session `w-1` on box-1) — Look at it. Context: TD-7. Due: 2026-01-20. Answers: Works | Not right:.": "answers: a look carries exactly `Works | Not right: <what>`, `Works` marked ` (default)` or not",
+  "- [ ] look 2026-01-15 (session `w-1`) — Check the page. Context: PR #4. Due: 2026-01-20. Answers: Works | Not right: <what>.": null,
   "- [ ] look 2026-01-15 (session `w-1`) — Look at the new export page. Context: PR #12. Due: 2026-01-20. Answers: Works | Not right: <what>.": null,
   "- [ ] todo 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20.": "kind: 'todo' is not a kind: one of decide, act, look, watch, fyi, in lower case",
   "- [ ]  act 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20.": "open: an item line opens `- [ ] ` at column 0, single-spaced",
-  "- [x] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20. Closed: 2026-01-16.": "open: not an open item"
+  "- [x] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20. Closed: 2026-01-16.": "open: not an open item",
+  "- [x] decide 2026-01-15 (session `w-1`) — Go on the build? Context: TD-12. Due: 2026-01-20. Answers: Go | Hold: <note> | hold:. Closed: 2026-01-16.": "open: not an open item"
  },
  "key_orders": [
   [
@@ -929,10 +1256,19 @@
   "filled": {
    "ok": "Not right: the button is grey"
   },
+  "filled_lower_head": {
+   "ok": "Not right: grey"
+  },
   "form-as-offered": {
    "refused": "Not right needs its words: say what is off"
   },
   "no-form-offered": {
+   "ok": null
+  },
+  "no_space_after_colon": {
+   "ok": "Not right: grey"
+  },
+  "other_head": {
    "ok": null
   },
   "placeholder-only": {
@@ -940,16 +1276,20 @@
   },
   "prefix-only": {
    "refused": "Not right needs its words: say what is off"
+  },
+  "said_none": {
+   "ok": null
   }
  },
  "not_right_forms": {
+  "Not right : <what>": true,
   "Not right:": true,
   "Not right:   <say what>": true,
   "Not right: <a> <b>": false,
   "Not right: <what>": true,
   "Not right: wrong repo": false,
   "Works": false,
-  "not right: <what>": false
+  "not right: <what>": true
  },
  "predicates": {
   "  - [x] 2026-01-05 (session s-1) — Closed.": {
@@ -1281,6 +1621,12 @@
   },
   {
    "refused": "a due needs its date"
+  },
+  {
+   "ok": "board_edit: append Bump the pin. (session `w-1`)"
+  },
+  {
+   "ok": "board_edit: append Ask the (session `w-1`)"
   }
  ],
  "versions": [

@@ -246,6 +246,126 @@
       "line": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15.",
       "action": "due",
       "to": "2026-01-25"
+    },
+    {
+      "name": "snooze-keeps-doer",
+      "line": "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: team ops. Due: 2026-01-20.",
+      "action": "snooze",
+      "to": "2026-01-18"
+    },
+    {
+      "name": "due-keeps-doer",
+      "line": "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: team ops. Due: 2026-01-20.",
+      "action": "due",
+      "to": "2026-01-25"
+    },
+    {
+      "name": "done-keeps-doer",
+      "line": "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: acme/widgets. Due: 2026-01-20.",
+      "action": "done",
+      "why": "bumped."
+    },
+    {
+      "name": "decide-keeps-doer",
+      "line": "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: team ops. Due: 2026-01-20.",
+      "action": "decide",
+      "answer": "done",
+      "by": "pat"
+    },
+    {
+      "name": "reply-keeps-doer",
+      "line": "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: acme/widgets. Due: 2026-01-20.",
+      "action": "reply",
+      "reply": "on it",
+      "by": "w-2"
+    },
+    {
+      "name": "due-added-after-doer",
+      "line": "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: team ops.",
+      "action": "due",
+      "to": "2026-01-25"
+    },
+    {
+      "name": "due-added-after-doer-no-period",
+      "line": "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: acme",
+      "action": "due",
+      "to": "2026-01-25"
+    },
+    {
+      "name": "snooze-after-doer-no-period",
+      "line": "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: acme",
+      "action": "snooze",
+      "to": "2026-01-18"
+    },
+    {
+      "name": "reply-refused-doer",
+      "line": "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: team ops. Due: 2026-01-20.",
+      "action": "reply",
+      "reply": "ask Doer: acme",
+      "by": "w-2"
+    },
+    {
+      "name": "decide-close-keeps-doer",
+      "line": "- [ ] act 2026-01-05 (session `w-1`) — Lift the gate. Context: TD-12 decision (pat). Doer: team ops. Due: 2026-01-20.",
+      "action": "decide",
+      "answer": "Go",
+      "by": "pat",
+      "close": true
+    },
+    {
+      "name": "decide_writes_fill",
+      "line": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the build? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Hold: <note>. Lifts: Hold: <note>.",
+      "action": "decide",
+      "answer": "hold:  wait",
+      "by": "pat"
+    },
+    {
+      "name": "decide_refuses_unfilled_form",
+      "line": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the build? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Hold: <note>. Lifts: Hold: <note>.",
+      "action": "decide",
+      "answer": "Hold: <note>",
+      "by": "pat"
+    },
+    {
+      "name": "decide_refuses_empty_fill",
+      "line": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the build? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Hold: <note>. Lifts: Hold: <note>.",
+      "action": "decide",
+      "answer": "Hold:",
+      "by": "pat"
+    },
+    {
+      "name": "decide_complete_answer_unchanged",
+      "line": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the build? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Hold: <note>. Lifts: Hold: <note>.",
+      "action": "decide",
+      "answer": "go",
+      "by": "pat"
+    },
+    {
+      "name": "decide_fill_with_dash_and_colon",
+      "line": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the build? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Hold: <note>. Lifts: Hold: <note>.",
+      "action": "decide",
+      "answer": "Hold: revise — add log sources: the shapes",
+      "by": "pat"
+    },
+    {
+      "name": "decide_fill_ending_by_refused",
+      "line": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the build? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Hold: <note>. Lifts: Hold: <note>.",
+      "action": "decide",
+      "answer": "Hold: ask (by kim)"
+    },
+    {
+      "name": "look_decided_fill",
+      "line": "- [ ] look 2026-01-05 (session `w-1`) — Check the page. Context: PR #4. Due: 2026-01-20. Answers: Works | Not right: <what>.",
+      "action": "decide",
+      "answer": "not right:grey",
+      "by": "pat"
+    },
+    {
+      "name": "look_decided_form_refused",
+      "line": "- [ ] look 2026-01-05 (session `w-1`) — Check the page. Context: PR #4. Due: 2026-01-20. Answers: Works | Not right: <what>.",
+      "action": "decide",
+      "answer": "Not right: <what>",
+      "by": "pat"
     }
   ],
   "subjects": [
@@ -292,6 +412,16 @@
       "tool": "board_edit",
       "action": "due",
       "text": "act 2026-01-05 (n/a) — Rotate. Context: TD-1."
+    },
+    {
+      "tool": "board_edit",
+      "action": "append",
+      "text": "act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-12. Doer: team ops. Due: 2026-01-20."
+    },
+    {
+      "tool": "board_edit",
+      "action": "append",
+      "text": "act 2026-01-05 (session `w-1`) — Ask the Doer: acme to bump it. Context: TD-12. Due: 2026-01-20."
     }
   ],
   "subject_kinds": [
@@ -1809,6 +1939,319 @@
       "session": "w-1",
       "host": "box-1",
       "context": "TD-7"
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "act",
+      "doer": "acme/widgets"
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "act",
+      "doer": "team ops"
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "act",
+      "doer": "team web.grind"
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "act",
+      "doer": "team"
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "decide",
+      "doer": "team ops",
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "x.",
+        "question": "y?",
+        "recommended": "z."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "look",
+      "doer": "team ops"
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "watch",
+      "doer": "team ops"
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": null,
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "fyi",
+      "doer": "team ops"
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "doer": "team ops"
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "act",
+      "doer": ""
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "act",
+      "doer": " team ops"
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "act",
+      "doer": "team "
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "act",
+      "doer": "team  ops"
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "act",
+      "doer": "team a b"
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "act",
+      "doer": "Team ops"
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "act",
+      "doer": "../x"
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "act",
+      "doer": "acme."
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "act",
+      "doer": "acme\nwidgets"
+    },
+    {
+      "fn": "item_line",
+      "text": "Ask the Doer: acme.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "act"
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12 Doer: acme",
+      "kind": "act"
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "decide",
+      "answers": [
+        "Go",
+        "Doer: acme"
+      ],
+      "detail": {
+        "context": "x.",
+        "question": "y?",
+        "recommended": "z."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Bump the pin.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "act",
+      "detail": {
+        "context": "Doer: acme."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the build?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "decide",
+      "detail": {
+        "context": "Two ways on.",
+        "question": "Which?",
+        "recommended": "Go."
+      },
+      "answers": [
+        "Go",
+        "Hold: <note>",
+        "hold:"
+      ]
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the build?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "decide",
+      "detail": {
+        "context": "Two ways on.",
+        "question": "Which?",
+        "recommended": "Go."
+      },
+      "answers": [
+        "Go",
+        "Hold: <note>"
+      ],
+      "default": 1
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the build?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-12",
+      "kind": "decide",
+      "detail": {
+        "context": "Two ways on.",
+        "question": "Which?",
+        "recommended": "Go."
+      },
+      "answers": [
+        "Go",
+        "Due: <x>"
+      ]
+    },
+    {
+      "fn": "item_line",
+      "text": "Check the page.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "PR #4",
+      "kind": "look",
+      "default": 0
+    },
+    {
+      "fn": "decided_line",
+      "title": "Go on the build",
+      "ref": "TD-12",
+      "answers": [
+        "Go",
+        "Hold: <note>"
+      ],
+      "default": 1,
+      "words": "Hold: the vendor"
     }
   ],
   "predicates": [
@@ -1847,7 +2290,8 @@
     "Not right: wrong repo",
     "not right: <what>",
     "Works",
-    "Not right: <a> <b>"
+    "Not right: <a> <b>",
+    "Not right : <what>"
   ],
   "not_right_fills": [
     {
@@ -1909,6 +2353,38 @@
     {
       "name": "placeholder-only",
       "said": "Not right: <b>",
+      "offered": [
+        "Works",
+        "Not right: <what>"
+      ]
+    },
+    {
+      "name": "filled_lower_head",
+      "said": "not right: grey",
+      "offered": [
+        "Works",
+        "Not right: <what>"
+      ]
+    },
+    {
+      "name": "other_head",
+      "said": "Hold: x",
+      "offered": [
+        "Works",
+        "Not right: <what>"
+      ]
+    },
+    {
+      "name": "no_space_after_colon",
+      "said": "Not right:grey",
+      "offered": [
+        "Works",
+        "Not right: <what>"
+      ]
+    },
+    {
+      "name": "said_none",
+      "said": null,
       "offered": [
         "Works",
         "Not right: <what>"
@@ -2231,7 +2707,30 @@
     "- [ ] \tact 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20.",
     "- [ ]  act 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20.",
     "- [ ] \u000bact 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20.",
-    "- [ ] decide 2026-01-15 (session `w-1`) — Go on the builds? Context: TD-4 decision (pat). Parts: TD-9, TD-10. Due: 2026-01-20. Answers: Go (default) | Not yet."
+    "- [ ] decide 2026-01-15 (session `w-1`) — Go on the builds? Context: TD-4 decision (pat). Parts: TD-9, TD-10. Due: 2026-01-20. Answers: Go (default) | Not yet.",
+    "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: acme/widgets. Due: 2026-01-20.",
+    "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: team ops. Due: 2026-01-20.",
+    "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: team. Due: 2026-01-20.",
+    "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick one? Context: TD-7. Doer: team ops. Due: 2026-01-20. Answers: a | b.",
+    "- [ ] 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: team ops. Due: 2026-01-20.",
+    "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: team ops. Doer: acme. Due: 2026-01-20.",
+    "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: Team ops. Due: 2026-01-20.",
+    "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: acme.. Due: 2026-01-20.",
+    "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: acme Due: 2026-01-20.",
+    "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Due: 2026-01-20. Doer: acme.",
+    "- [ ] act 2026-01-15 (session `w-1` on box-1) — Ask the Doer: acme. Context: TD-7. Due: 2026-01-20.",
+    "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: team ops. Hide until: 2026-01-18.",
+    "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: team ops. Due: 2026-01-20. Decided: done (by pat) (2026-01-16).",
+    "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer:acme. Due: 2026-01-20.",
+    "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: team  ops. Due: 2026-01-20.",
+    "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Doer: acme. Context: TD-7. Due: 2026-01-20.",
+    "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15. Doer: team ops. Due: 2026-01-20. Answers: Go | Not yet.",
+    "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Doer: team ops. Parts: TD-15. Due: 2026-01-20. Answers: Go | Not yet.",
+    "- [ ] decide 2026-01-15 (session `w-1`) — Go on the build? Context: TD-12. Due: 2026-01-20. Answers: Go | Hold: <note> | hold:.",
+    "- [ ] decide 2026-01-15 (session `w-1`) — Go on the build? Context: TD-12. Due: 2026-01-20. Answers: Go | Hold: <note> (default).",
+    "- [ ] decide 2026-01-15 (session `w-1`) — Go on the build? Context: TD-12. Due: 2026-01-20. Answers: Go | Hold: <note> | hold:. Decided: Hold: x (2026-01-16).",
+    "- [x] decide 2026-01-15 (session `w-1`) — Go on the build? Context: TD-12. Due: 2026-01-20. Answers: Go | Hold: <note> | hold:. Closed: 2026-01-16.",
+    "- [ ] look 2026-01-15 (session `w-1`) — Check the page. Context: PR #4. Due: 2026-01-20. Answers: Works | Not right: <what>."
   ],
   "canonical_items": [
     "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. due: 2026-01-20.",
@@ -2250,7 +2749,12 @@
     "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20.\n",
     "- [ ] fyi 2026-01-15 (session `w-1` on box-1) — Heads up. Context: TD-7 — w-2, 2026-01-16: noted. Decided: ok (2026-01-16).",
     "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7 Due: 2026-01-20. — w-2, 2026-01-16: on it",
-    "- [ ] act 2026-01-05 (n/a) — Rotate. Context: TD-1. due: 2026-01-10 Hide until: 2026-01-12."
+    "- [ ] act 2026-01-05 (n/a) — Rotate. Context: TD-1. due: 2026-01-10 Hide until: 2026-01-12.",
+    "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Due: 2026-01-20. Doer: acme.",
+    "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer: acme Due: 2026-01-20.",
+    "- [ ] act 2026-01-15 (session `w-1` on box-1) — Bump the pin. Context: TD-7. Doer:  acme. Due: 2026-01-20.",
+    "- [ ] decide 2026-01-15 (session `w-1`) — Go on the build? Context: TD-12. Due: 2026-01-20. Answers: Go | Hold: <note> | hold:.",
+    "- [ ] decide 2026-01-15 (session `w-1`) — Go on the build? Context: TD-12. Due: 2026-01-20. Answers: Go | Hold: <note> (default)."
   ],
   "board_problems": [
     {
@@ -2296,6 +2800,26 @@
     {
       "old": null,
       "new": "# Board\n\nPeople:\n"
+    },
+    {
+      "old": "",
+      "new": "- [ ] decide 2026-01-15 (session `w-1`) — Go on the build? Context: TD-12. Due: 2026-01-20. Answers: Go | Hold: <note> | hold:.\n"
+    },
+    {
+      "old": "",
+      "new": "- [ ] decide 2026-01-15 (session `w-1`) — Go on the build? Context: TD-12. Due: 2026-01-20. Answers: Go | Hold: <note> (default).\n"
+    },
+    {
+      "old": "",
+      "new": "- [ ] decide 2026-01-15 (session `w-1`) — Go on the build? Context: TD-12. Due: 2026-01-20. Answers: Go | Hold: <note> | hold:. Decided: Hold: x (2026-01-16).\n"
+    },
+    {
+      "old": "",
+      "new": "- [x] decide 2026-01-15 (session `w-1`) — Go on the build? Context: TD-12. Due: 2026-01-20. Answers: Go | Hold: <note> | hold:. Closed: 2026-01-16.\n"
+    },
+    {
+      "old": "",
+      "new": "- [ ] look 2026-01-15 (session `w-1`) — Check the page. Context: PR #4. Due: 2026-01-20. Answers: Works | Not right: <what>.\n"
     }
   ],
   "archive_subjects": [
@@ -2403,6 +2927,192 @@
     {
       "name": "later hide on an fyi with a due",
       "line": "- [ ] fyi 2026-01-01 (n/a) — An fyi with a date. Context: none. Due: 2026-01-20. Hide until: 2026-02-01."
+    }
+  ],
+  "forms": [
+    "Hold: <note>",
+    "Hold:",
+    "Hold:<note>",
+    "Other :  <what>",
+    "hold: <x>",
+    "Not right: <what>",
+    "Not right : <what>",
+    "Not right: wrong repo",
+    "Hold: <a> <b>",
+    "A: b: <c>",
+    ": <x>",
+    "<x>: <y>",
+    "Go"
+  ],
+  "form_fills": [
+    {
+      "name": "filled",
+      "said": "Hold: wait for the vendor",
+      "offered": [
+        "Go",
+        "Hold: <note>"
+      ]
+    },
+    {
+      "name": "head_any_case",
+      "said": "hold:wait for the vendor",
+      "offered": [
+        "Go",
+        "Hold: <note>"
+      ]
+    },
+    {
+      "name": "space_before_colon",
+      "said": "Hold : the vendor",
+      "offered": [
+        "Go",
+        "Hold: <note>"
+      ]
+    },
+    {
+      "name": "no_space_after_colon",
+      "said": "Hold:later",
+      "offered": [
+        "Go",
+        "Hold: <note>"
+      ]
+    },
+    {
+      "name": "other_head_spaced",
+      "said": "other :x",
+      "offered": [
+        "Go",
+        "Other :  <what>"
+      ]
+    },
+    {
+      "name": "empty_words",
+      "said": "Hold:",
+      "offered": [
+        "Go",
+        "Hold: <note>"
+      ]
+    },
+    {
+      "name": "placeholder_words",
+      "said": "Hold: <why>",
+      "offered": [
+        "Go",
+        "Hold: <note>"
+      ]
+    },
+    {
+      "name": "form_as_offered",
+      "said": "Hold: <note>",
+      "offered": [
+        "Go",
+        "Hold: <note>"
+      ]
+    },
+    {
+      "name": "names_no_form",
+      "said": "Wait: a week",
+      "offered": [
+        "Go",
+        "Hold: <note>"
+      ]
+    },
+    {
+      "name": "equals_complete_answer",
+      "said": "Not right: wrong repo",
+      "offered": [
+        "Works",
+        "Not right: wrong repo",
+        "Not right: <what>"
+      ]
+    },
+    {
+      "name": "first_of_two_heads",
+      "said": "hold: x",
+      "offered": [
+        "Hold: <a>",
+        "HOLD:"
+      ]
+    },
+    {
+      "name": "with_form_index",
+      "said": "the vendor",
+      "offered": [
+        "Go",
+        "Hold: <note>"
+      ],
+      "form": 1
+    },
+    {
+      "name": "with_form_index_head_present",
+      "said": "hold: the vendor",
+      "offered": [
+        "Go",
+        "Hold: <note>"
+      ],
+      "form": 1
+    },
+    {
+      "name": "form_index_out_of_range",
+      "said": "x",
+      "offered": [
+        "Go",
+        "Hold: <note>"
+      ],
+      "form": 2
+    },
+    {
+      "name": "form_index_complete_answer",
+      "said": "x",
+      "offered": [
+        "Go",
+        "Hold: <note>"
+      ],
+      "form": 0
+    },
+    {
+      "name": "form_index_prefix_not_head",
+      "said": "Holdfast",
+      "offered": [
+        "Go",
+        "Hold: <note>"
+      ],
+      "form": 1
+    },
+    {
+      "name": "form_index_other_head",
+      "said": "Note: foo",
+      "offered": [
+        "Go",
+        "Hold: <note>"
+      ],
+      "form": 1
+    },
+    {
+      "name": "form_index_said_equals_complete",
+      "said": "Hold: later",
+      "offered": [
+        "Go",
+        "Hold: <note>",
+        "Hold: later"
+      ],
+      "form": 1
+    },
+    {
+      "name": "said_not_a_string",
+      "said": null,
+      "offered": [
+        "Go",
+        "Hold: <note>"
+      ]
+    },
+    {
+      "name": "offered_with_consequence",
+      "said": "Hold: the vendor",
+      "offered": [
+        "Go",
+        "Hold: <note> — keep it unfiled"
+      ]
     }
   ]
 }

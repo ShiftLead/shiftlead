@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "new",
+  "refused": "the title is the heading: use set --title"
+ }
+}

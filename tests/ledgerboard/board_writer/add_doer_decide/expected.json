@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "add",
+  "refused": "only an act names who does its step (doer), not a decide"
+ }
+}

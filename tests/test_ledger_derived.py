@@ -411,6 +411,18 @@ def test_a_decisions_words_after_its_dash_are_what_it_is_held_until():
     assert ledger.until_of("TD-001") == ledger.until_of(None) == ""
 
 
+def test_a_migrated_old_form_reads_its_ask_and_the_gate_alone():
+    """TD-1803 step 2 (the techlead's answer, gate alone): ledgerboard v2.8's `migrate` moves an old
+    decision form's words into an `**Ask:**`, leaving `decision (paul)` bare. The entry then has no
+    `until` words, so its card reads *held until your decision*, and it still leads with the Ask."""
+    old, migrated = ledger.entries(
+        "## TD-070: old\n\n**Blocked by:** TD-001, decision (paul) — will you run the trial?\n\n"
+        "## TD-071: migrated\n\n**Blocked by:** TD-001, decision (paul)\n\n**Ask:** will you run the trial?\n"
+    )
+    assert old["until"] == "will you run the trial?"
+    assert (migrated["until"], migrated["ask"]) == ("", "will you run the trial?")
+
+
 def test_a_part_of_line_holds_its_parent_and_stays_out_of_blocked_by(tmp_path):
     """TD-1130 (ADR 2026-10-27 §2): pickable is ledgerboard's, so an open part holds its parent; the
     part is carried as `parts_open`, never in `blocked_by`, and a parent with open parts is *blocked*

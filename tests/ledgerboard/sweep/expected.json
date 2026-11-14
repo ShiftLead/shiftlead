@@ -618,7 +618,8 @@
      "- [ ] decide 2026-10-02 (n/a) — Should the old form go? Context: TD-220 decision (pat). Answers: Go | Not yet",
      "- [ ] act 2026-10-29 (n/a) — TD-215's decision (kim) was lifted by an answer on acme/beta's board, which holds no decided item for TD-215. Context: TD-215 decision (kim) board acme/beta",
      "- [ ] act 2026-10-29 (n/a) — decision (pat) on TD-233 was answered with a lift on 2026-10-28 but still stands on TD-234: lift it. Context: TD-233 decision (pat) lift",
-     "- [ ] act 2026-10-29 (n/a) — Lift of decision (pat) on TD-269 was closed unmerged. Context: TD-269 decision (pat) lift"
+     "- [ ] act 2026-10-29 (n/a) — Lift of decision (pat) on TD-269 was closed unmerged. Context: TD-269 decision (pat) lift",
+     "- [ ] decide 2026-10-02 (n/a) — Go or hold? Context: TD-281 decision (pat). Answers: Go | Hold: <note>. Lifts: Hold: <note>"
     ]
    },
    "to_file": {
@@ -1275,6 +1276,22 @@
       "kind": "decide",
       "lifts": null,
       "text": "Its part never answered, kept waiting"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-280 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-280 (A form's fill closed as lifted, the gate still on the entry (v2.8)) waits on decision (pat), and no board item asked for it",
+       "question": "Go, or hold with a note?",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Go, or hold with a note?"
      }
     ],
     "github.com/acme/beta": [
@@ -1342,7 +1359,8 @@
      "- [ ] decide 2026-10-02 (n/a) — Should the old form go? Context: TD-220 decision (pat). Answers: Go | Not yet",
      "- [ ] act 2026-10-29 (n/a) — TD-215's decision (kim) was lifted by an answer on acme/beta's board, which holds no decided item for TD-215. Context: TD-215 decision (kim) board acme/beta",
      "- [ ] act 2026-10-29 (n/a) — decision (pat) on TD-233 was answered with a lift on 2026-10-28 but still stands on TD-234: lift it. Context: TD-233 decision (pat) lift",
-     "- [ ] act 2026-10-29 (n/a) — Lift of decision (pat) on TD-269 was closed unmerged. Context: TD-269 decision (pat) lift"
+     "- [ ] act 2026-10-29 (n/a) — Lift of decision (pat) on TD-269 was closed unmerged. Context: TD-269 decision (pat) lift",
+     "- [ ] decide 2026-10-02 (n/a) — Go or hold? Context: TD-281 decision (pat). Answers: Go | Hold: <note>. Lifts: Hold: <note>"
     ]
    },
    "to_file": {
@@ -1515,6 +1533,19 @@
       "kind": "act",
       "lifts": null,
       "text": "decision (pat) on TD-276 was answered with a lift on 2026-10-20 but still stands on TD-276, TD-278: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-280 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-280's decision (pat) was answered with a lift on 2026-10-25, and the item was closed as lifted, but the gate was never lifted on TD-280",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-280 was answered with a lift on 2026-10-25 but still stands on TD-280: lift it."
      },
      {
       "answers": [
@@ -1908,7 +1939,8 @@
      "- [ ] decide 2026-10-02 (n/a) — Should the old form go? Context: TD-220 decision (pat). Answers: Go | Not yet",
      "- [ ] act 2026-10-29 (n/a) — TD-215's decision (kim) was lifted by an answer on acme/beta's board, which holds no decided item for TD-215. Context: TD-215 decision (kim) board acme/beta",
      "- [ ] act 2026-10-29 (n/a) — decision (pat) on TD-233 was answered with a lift on 2026-10-28 but still stands on TD-234: lift it. Context: TD-233 decision (pat) lift",
-     "- [ ] act 2026-10-29 (n/a) — Lift of decision (pat) on TD-269 was closed unmerged. Context: TD-269 decision (pat) lift"
+     "- [ ] act 2026-10-29 (n/a) — Lift of decision (pat) on TD-269 was closed unmerged. Context: TD-269 decision (pat) lift",
+     "- [ ] decide 2026-10-02 (n/a) — Go or hold? Context: TD-281 decision (pat). Answers: Go | Hold: <note>. Lifts: Hold: <note>"
     ]
    },
    "to_file": {
@@ -2068,6 +2100,19 @@
       "kind": "act",
       "lifts": null,
       "text": "decision (pat) on TD-276 was answered with a lift on 2026-10-20 but still stands on TD-276, TD-278: lift it."
+     },
+     {
+      "answers": null,
+      "context": "TD-280 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-280's decision (pat) was answered with a lift on 2026-10-25, and the item was closed as lifted, but the gate was never lifted on TD-280",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it by hand (an `override:` naming the answer); to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-280 was answered with a lift on 2026-10-25 but still stands on TD-280: lift it."
      },
      {
       "answers": [

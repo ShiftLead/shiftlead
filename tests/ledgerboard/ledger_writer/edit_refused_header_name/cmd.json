@@ -1,0 +1,15 @@
+{
+ "argv": [
+  "edit",
+  "TD-001",
+  "--section",
+  "Status",
+  "--from",
+  "status.md",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

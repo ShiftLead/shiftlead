@@ -1,0 +1,41 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "migrate",
+  "entries": {
+   "TD-001": {
+    "changes": [
+     "Taken by → Log",
+     "old decision form → Ask"
+    ],
+    "listed": [],
+    "stops": []
+   },
+   "TD-002": {
+    "changes": [
+     "Waits (empty) removed",
+     "Resolved → body"
+    ],
+    "listed": [],
+    "stops": []
+   },
+   "TD-004": {
+    "changes": [
+     "Taken by → Log",
+     "Waits → Log",
+     "Resolved → body",
+     "old decision form → Log"
+    ],
+    "listed": [],
+    "stops": []
+   }
+  },
+  "plan": {
+   "ledger/TD-001.md": "## TD-001: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** TD-002, decision (Kim)\n\n**Why:** a reason.\n\n**Ask:** is the vendor's API stable?\n\n**Log:**\n- 2026-09-10: a note\n- 2026-09-10: Taken by abc123\n",
+   "ledger/TD-002.md": "## TD-002: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-02\n**Status:** Open\n\n**Why:** a reason.\n\n**Resolved:** 2026-10-08 (PR #4), reopened since\n",
+   "ledger/archive/TD-004.md": "## TD-004: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-03\n**Blocked by:** decision (Kim)\n\n**Why:** a reason.\n\n**Ask:** ship it now?\n\n**Resolved:** 2026-10-03 (PR #7)\n\n**Log:**\n- 2026-09-01: Blocked by decision (Kim) — ship it?\n- 2026-09-01: Waits the vendor\n- 2026-09-01: Taken by def456\n- 2026-09-20: a note\n"
+  },
+  "reblocked": {},
+  "subject": "ledger: migrate v2.8 (3 entries)"
+ }
+}

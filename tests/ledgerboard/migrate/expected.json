@@ -199,6 +199,24 @@
    "stops": [],
    "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-05\n**Status:** Open\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-05: seen\n- 2026-09-10: b\n- 2026-09-02: a\n- 2026-09-20: c\n"
   },
+  "all_four_and_status": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "Status Done 2026-10-08 → Resolved 2026-10-08",
+    "Added comment → Log",
+    "Taken by → Log",
+    "Waits → Log",
+    "Resolved → body",
+    "old decision form → Log"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n**Blocked by:** decision (Kim)\n\n**Why:** a reason.\n\n**Ask:** an older ask.\n\n**Resolved:** 2026-10-08 (PR #4)\n\n**Log:**\n- 2026-09-01: Blocked by decision (Kim) — x\n- 2026-09-01: Waits the vendor\n- 2026-09-01: Taken by abc123\n- 2026-09-01: seen in the review\n- 2026-10-08: was: Done 2026-10-08\n"
+  },
   "archived_built": {
    "again": {
     "changes": [],
@@ -540,11 +558,12 @@
     "stops": []
    },
    "changes": [
-    "Status Done → Resolved 2026-10-08"
+    "Status Done → Resolved 2026-10-08",
+    "Resolved → body"
    ],
    "listed": [],
    "stops": [],
-   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n**Resolved:** 2026-10-08\n\n**Why:** a reason.\n\n**Log:**\n- 2026-10-08: was: Done\n"
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n\n**Why:** a reason.\n\n**Resolved:** 2026-10-08\n\n**Log:**\n- 2026-10-08: was: Done\n"
   },
   "date_resolved_line_over_closed_date": {
    "again": {
@@ -1140,6 +1159,210 @@
    "stops": [],
    "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** event (vendor-release)\n\n**Why:** a reason.\n\n**Event (vendor-release):** the vendor ships.\ncheck: pr-merged acme#12\n\n**Log:**\n- 2026-10-01: noted\n"
   },
+  "old_form_commas_after_id": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "old decision form → Ask"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** TD-3, decision (Kim)\n\n**Why:** a reason.\n\n**Ask:** a, b (c, d)\n\n**Fix:** a fix.\n"
+  },
+  "old_form_commas_after_id_with_ask": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "old decision form → Log"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** TD-3, decision (Kim)\n\n**Why:** a reason.\n\n**Ask:** an older ask.\n\n**Log:**\n- 2026-09-10: a note\n- 2026-09-10: Blocked by decision (Kim) — a, b (c, d)\n"
+  },
+  "old_form_header_ask": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "old decision form → Log"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (Kim)\n**Ask:** an older ask in the header\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n- 2026-09-10: Blocked by decision (Kim): x\n"
+  },
+  "old_form_ids_kept": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "old decision form → Ask"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** TD-3, decision (Kim)\n\n**Why:** a reason.\n\n**Ask:** x\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
+  "old_form_no_ask": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "old decision form → Ask"
+   ],
+   "gate_age": [
+    "2026-09-10",
+    "2026-09-10"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (Kim)\n\n**Why:** a reason.\n\n**Ask:** is the vendor's API stable?\n\n**Fix:** a fix.\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
+  "old_form_no_text_archived": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "old decision form (no text)"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n**Blocked by:** decision (Kim)\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
+  "old_form_no_text_open_stops": {
+   "again": null,
+   "changes": [],
+   "listed": [],
+   "stops": [
+    "old decision form: no text for its Ask"
+   ],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (Kim) —\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
+  "old_form_no_text_open_with_ask": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "old decision form (no text)"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (Kim)\n\n**Why:** a reason.\n\n**Ask:** an older ask.\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
+  "old_form_no_text_role_open": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "old decision form (no text)"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (designer)\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
+  "old_form_not_a_person_stops": {
+   "again": null,
+   "changes": [],
+   "listed": [],
+   "stops": [
+    "old decision form: the owner is not a person"
+   ],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (the owner) — x\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
+  "old_form_role": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "old decision form → Ask"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (designer)\n\n**Why:** a reason.\n\n**Ask:** x\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
+  "old_form_who_repeated_no_space_stops": {
+   "again": null,
+   "changes": [],
+   "listed": [],
+   "stops": [
+    "old decision form: Kim already has a decision"
+   ],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision(kim), decision (Kim) — x\n\n**Why:** a reason.\n\n**Ask:** an older ask.\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
+  "old_form_who_repeated_stops": {
+   "again": null,
+   "changes": [],
+   "listed": [],
+   "stops": [
+    "old decision form: Kim already has a decision"
+   ],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (kim), decision (Kim) — x\n\n**Why:** a reason.\n\n**Ask:** an older ask.\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
+  "old_form_with_ask_archived": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "old decision form → Log"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n**Blocked by:** decision (Kim)\n\n**Why:** a reason.\n\n**Ask:** an older ask.\n\n**Log:**\n- 2026-09-01: Blocked by decision (Kim) — x\n- 2026-09-10: a note\n"
+  },
+  "old_form_with_ask_no_log": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "old decision form → Log"
+   ],
+   "gate_age": [
+    "2026-09-01",
+    "2026-09-01"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (Kim)\n\n**Why:** a reason.\n\n**Ask:** an older ask.\n\n**Log:**\n- 2026-09-01: Blocked by decision (Kim) — x\n"
+  },
+  "old_form_with_ask_open": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "old decision form → Log"
+   ],
+   "gate_age": [
+    "2026-09-10",
+    "2026-09-10"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (Kim)\n\n**Why:** a reason.\n\n**Ask:** an older ask.\n\n**Log:**\n- 2026-09-10: a note\n- 2026-09-10: Blocked by decision (Kim) — x\n- 2026-09-12: a later note\n"
+  },
   "open_bold_lead": {
    "again": {
     "changes": [],
@@ -1430,6 +1653,67 @@
    ],
    "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Moved 2026-10-03 to TD-5 and TD-6\n**Priority:** High\n\n**Why:** a reason.\n"
   },
+  "resolved_header_and_body_stops": {
+   "again": null,
+   "changes": [],
+   "listed": [],
+   "stops": [
+    "Resolved in the header and the body"
+   ],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n**Resolved:** 2026-10-08 (PR #4)\n\n**Why:** a reason.\n\n**Resolved:** 2026-10-08 (PR #4)\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
+  "resolved_header_archived": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "Resolved → body"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n\n**Why:** a reason.\n\n**Resolved:** 2026-10-08 (PR #4)\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
+  "resolved_header_empty": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "Resolved (empty) removed"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
+  "resolved_header_no_log": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "Resolved → body"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n\n**Why:** a reason.\n\n**Fix:** a fix.\n\n**Resolved:** 2026-10-08 (PR #4)\n"
+  },
+  "resolved_header_open": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "Resolved → body"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n\n**Why:** a reason.\n\n**Resolved:** 2026-10-08 (PR #4)\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
   "stage_built_kind": {
    "again": {
     "changes": [],
@@ -1686,6 +1970,107 @@
    "stops": [],
    "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Superseded 2026-10-03 by TD-5\n\n**Why:** a reason.\n\n**Log:**\n- 2026-10-03: then by TD-6\n"
   },
+  "taken_by_added_not_a_date": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "Taken by → Log"
+   ],
+   "listed": [
+    "Added early September: not a date"
+   ],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** early September\n**Status:** Resolved 2026-10-08\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: Taken by abc123\n- 2026-09-10: a note\n- 2026-09-12: a later note\n"
+  },
+  "taken_by_archived": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "Taken by → Log"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-01: Taken by abc123\n- 2026-09-10: a note\n"
+  },
+  "taken_by_archived_no_log": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "Taken by → Log"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-01: Taken by abc123\n"
+  },
+  "taken_by_empty": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "Taken by (empty) removed"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
+  "taken_by_open_no_gate": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "Taken by → Log"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-01: Taken by abc123\n- 2026-09-10: a note\n"
+  },
+  "taken_by_open_with_gate": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "Taken by → Log"
+   ],
+   "gate_age": [
+    "2026-09-10",
+    "2026-09-10"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** event (vendor-release)\n\n**Why:** a reason.\n\n**Event (vendor-release):** the vendor ships.\ncheck: pr-merged acme#12\n\n**Log:**\n- 2026-09-10: a note\n- 2026-09-10: another note\n- 2026-09-10: Taken by abc123\n- 2026-09-12: a later note\n"
+  },
+  "taken_by_open_with_gate_no_log": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "Taken by → Log"
+   ],
+   "gate_age": [
+    "2026-09-01",
+    "2026-09-01"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** event (vendor-release)\n\n**Why:** a reason.\n\n**Event (vendor-release):** the vendor ships.\ncheck: pr-merged acme#12\n\n**Log:**\n- 2026-09-01: Taken by abc123\n"
+  },
   "today_refused": {
    "again": null,
    "changes": [],
@@ -1742,20 +2127,95 @@
    "stops": [],
    "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Kind:** stage-a\n**Status:** Open\n**Blocked by:** someday (when the tool ships)\n**Reviewer:** the second reader\n\n**Why:** a reason.\n\n**Notes:** kept as written.\n\n**Log:**\n- 2026-09-02: tagged: v1\n- 2026-10-01: was: Designed 2026-10-01\n"
   },
-  "waits_taken_by_old_form_left": {
+  "unreal_first_log_date": {
    "again": {
     "changes": [],
     "same_text": true,
     "stops": []
    },
    "changes": [
-    "Status Built 2026-10-01 → Open"
+    "Taken by → Log"
    ],
+   "listed": [
+    "Added early March: not a date"
+   ],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** early March\n**Status:** Resolved 2026-10-08\n\n**Why:** a reason.\n\n**Log:**\n- 2026-02-30: an unreal date\n- 2026-03-04: Taken by abc123\n- 2026-03-04: a note\n"
+  },
+  "waits_archived": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "Waits → Log"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-01: Waits the vendor\n- 2026-09-10: a note\n"
+  },
+  "waits_archived_empty": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "Waits (empty) removed"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
+  "waits_open_empty": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "Waits (empty) removed"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
+  "waits_open_stops": {
+   "again": null,
+   "changes": [],
+   "listed": [],
+   "stops": [
+    "Waits on an open entry"
+   ],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Waits:** the vendor\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n"
+  },
+  "waits_taken_by_old_form_archived": {
+   "again": {
+    "changes": [],
+    "same_text": true,
+    "stops": []
+   },
+   "changes": [
+    "Status Built 2026-10-01 → Resolved 2026-10-01",
+    "Taken by → Log",
+    "Waits → Log",
+    "old decision form → Ask"
+   ],
+   "listed": [],
+   "stops": [],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-01\n**Blocked by:** decision (pat)\n\n**Why:** a reason.\n\n**Ask:** wants a look\n\n**Log:**\n- 2026-09-01: Waits the vendor\n- 2026-09-01: Taken by abc123\n- 2026-10-01: was: Built 2026-10-01\n"
+  },
+  "waits_taken_by_old_form_open_stops": {
+   "again": null,
+   "changes": [],
    "listed": [
     "stage word Built: Kind not set"
    ],
-   "stops": [],
-   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Taken by:** abc123\n**Blocked by:** decision (pat) — wants a look\n**Waits:** the vendor\n\n**Why:** a reason.\n\n**Log:**\n- 2026-10-01: was: Built 2026-10-01\n"
+   "stops": [
+    "Waits on an open entry"
+   ],
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Built 2026-10-01\n**Taken by:** abc123\n**Blocked by:** decision (pat) — wants a look\n**Waits:** the vendor\n\n**Why:** a reason.\n"
   }
  },
  "status_problem": {

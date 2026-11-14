@@ -36,17 +36,17 @@
     },
     "other-item": {
       "accept": [
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20.",
         "- [ ] watch 2026-01-05 (n/a) — Recheck the job. Context: none. Due: 2026-01-20."
       ],
       "refuse": [
-        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7."
+        "- [ ] watch 2026-01-05 (n/a) — Recheck the job. Context: none."
       ]
     },
     "decided-item": {
       "accept": [
         "- [ ] decide 2026-01-05 (person) — Ship it. Context: TD-12. Due: 2026-01-05. Answers: Go | Not yet. Decided: Go (by pat) (2026-01-05).",
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. Decided: done (2026-01-06)."
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. Decided: done (2026-01-06).",
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team ops. Due: 2026-01-20. Decided: done (2026-01-06)."
       ],
       "refuse": [
         "- [ ] decide 2026-01-05 (person) — Ship it. Context: TD-12. Due: 2026-01-05. Answers: Go | Not yet."
@@ -295,7 +295,8 @@
     },
     "field-name": {
       "accept": [
-        "- [ ] act 2026-01-05 (n/a) — Answer the mail. Context: TD-7. Due: 2026-01-20."
+        "- [ ] act 2026-01-05 (n/a) — Answer the mail. Context: TD-7. Due: 2026-01-20.",
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: acme. Due: 2026-01-20."
       ],
       "refuse": [
         "- [ ] act 2026-01-05 (n/a) — Rotate it. Context: TD-7 Closed: soon. Due: 2026-01-20."
@@ -348,6 +349,66 @@
       ],
       "refuse": [
         "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none. — sam, 2026-01-06: (Due:2026-02-01)."
+      ]
+    },
+    "act-item": {
+      "accept": [
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20.",
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: acme/widgets. Due: 2026-01-20.",
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team ops. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: Team ops. Due: 2026-01-20.",
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: acme.. Due: 2026-01-20.",
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: Due: 2026-01-20.",
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Doer: acme. Context: TD-7. Due: 2026-01-20."
+      ]
+    },
+    "doer": {
+      "accept": [
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: acme/widgets. Due: 2026-01-20.",
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team ops. Due: 2026-01-20.",
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: Team ops. Due: 2026-01-20.",
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: acme.. Due: 2026-01-20.",
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: Due: 2026-01-20."
+      ]
+    },
+    "doer-repo": {
+      "accept": [
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: acme/widgets. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: acme/x.. Due: 2026-01-20."
+      ]
+    },
+    "doer-part": {
+      "accept": [
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: widgets. Due: 2026-01-20.",
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: .x. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: x.. Due: 2026-01-20.",
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: ... Due: 2026-01-20."
+      ]
+    },
+    "person": {
+      "accept": [
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team web.grind. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team web..grind. Due: 2026-01-20."
+      ]
+    },
+    "person-part": {
+      "accept": [
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team ops. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team web... Due: 2026-01-20.",
+        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team a b. Due: 2026-01-20."
       ]
     }
   },
@@ -1046,6 +1107,15 @@
       ],
       "refuse": [
         "- 2026-01-05: was: "
+      ]
+    },
+    "log-retitled": {
+      "accept": [
+        "- 2026-01-05: retitled: was \"An \"old\" title\"",
+        "- 2026-01-05: retitled: was \"\""
+      ],
+      "refuse": [
+        "- 2026-01-05: retitled: the old one"
       ]
     },
     "log-token": {

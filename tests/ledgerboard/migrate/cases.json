@@ -647,7 +647,7 @@
    }
   },
   {
-   "name": "waits_taken_by_old_form_left",
+   "name": "waits_taken_by_old_form_open_stops",
    "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Built 2026-10-01\n**Taken by:** abc123\n**Blocked by:** decision (pat) — wants a look\n**Waits:** the vendor\n\n**Why:** a reason.\n",
    "archived": false
   },
@@ -788,6 +788,186 @@
    "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Note 2026-10-03: put aside\n\n**Why:** a reason.\n",
    "archived": true,
    "decided": "resolved"
+  },
+  {
+   "name": "taken_by_archived",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n**Taken by:** abc123\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": true
+  },
+  {
+   "name": "taken_by_archived_no_log",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n**Taken by:** abc123\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "taken_by_open_no_gate",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Taken by:** abc123\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": false
+  },
+  {
+   "name": "taken_by_open_with_gate",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Taken by:** abc123\n**Blocked by:** event (vendor-release)\n\n**Why:** a reason.\n\n**Event (vendor-release):** the vendor ships.\ncheck: pr-merged acme#12\n\n**Log:**\n- 2026-09-10: a note\n- 2026-09-10: another note\n- 2026-09-12: a later note\n",
+   "archived": false,
+   "gate": "event (vendor-release)"
+  },
+  {
+   "name": "taken_by_open_with_gate_no_log",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Taken by:** abc123\n**Blocked by:** event (vendor-release)\n\n**Why:** a reason.\n\n**Event (vendor-release):** the vendor ships.\ncheck: pr-merged acme#12\n",
+   "archived": false,
+   "gate": "event (vendor-release)"
+  },
+  {
+   "name": "taken_by_empty",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n**Taken by:**\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": true
+  },
+  {
+   "name": "taken_by_added_not_a_date",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** early September\n**Status:** Resolved 2026-10-08\n**Taken by:** abc123\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n- 2026-09-12: a later note\n",
+   "archived": true
+  },
+  {
+   "name": "waits_archived",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n**Waits:** the vendor\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": true
+  },
+  {
+   "name": "waits_archived_empty",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n**Waits:**\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": true
+  },
+  {
+   "name": "waits_open_stops",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Waits:** the vendor\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": false
+  },
+  {
+   "name": "waits_open_empty",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Waits:**\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": false
+  },
+  {
+   "name": "resolved_header_archived",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n**Resolved:** 2026-10-08 (PR #4)\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": true
+  },
+  {
+   "name": "resolved_header_no_log",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n**Resolved:** 2026-10-08 (PR #4)\n\n**Why:** a reason.\n\n**Fix:** a fix.\n",
+   "archived": true
+  },
+  {
+   "name": "resolved_header_and_body_stops",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n**Resolved:** 2026-10-08 (PR #4)\n\n**Why:** a reason.\n\n**Resolved:** 2026-10-08 (PR #4)\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": true
+  },
+  {
+   "name": "resolved_header_empty",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n**Resolved:**\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": true
+  },
+  {
+   "name": "resolved_header_open",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Resolved:** 2026-10-08 (PR #4)\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": false
+  },
+  {
+   "name": "old_form_no_ask",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (Kim) — is the vendor's API stable?\n\n**Why:** a reason.\n\n**Fix:** a fix.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": false,
+   "gate": "decision (Kim)"
+  },
+  {
+   "name": "old_form_commas_after_id",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** TD-3, decision (Kim) — a, b (c, d)\n\n**Why:** a reason.\n\n**Fix:** a fix.\n",
+   "archived": false
+  },
+  {
+   "name": "old_form_commas_after_id_with_ask",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** TD-3, decision (Kim) — a, b (c, d)\n\n**Why:** a reason.\n\n**Ask:** an older ask.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": false
+  },
+  {
+   "name": "old_form_header_ask",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Ask:** an older ask in the header\n**Blocked by:** decision (Kim): x\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": false
+  },
+  {
+   "name": "old_form_no_text_open_stops",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (Kim) —\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": false
+  },
+  {
+   "name": "old_form_with_ask_open",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (Kim) — x\n\n**Why:** a reason.\n\n**Ask:** an older ask.\n\n**Log:**\n- 2026-09-10: a note\n- 2026-09-12: a later note\n",
+   "archived": false,
+   "gate": "decision (Kim)"
+  },
+  {
+   "name": "old_form_with_ask_no_log",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (Kim) — x\n\n**Why:** a reason.\n\n**Ask:** an older ask.\n",
+   "archived": false,
+   "gate": "decision (Kim)"
+  },
+  {
+   "name": "old_form_with_ask_archived",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n**Blocked by:** decision (Kim) — x\n\n**Why:** a reason.\n\n**Ask:** an older ask.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": true
+  },
+  {
+   "name": "old_form_ids_kept",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** TD-3, decision (Kim) — x\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": false
+  },
+  {
+   "name": "old_form_no_text_archived",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-08\n**Blocked by:** decision (Kim) —\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": true
+  },
+  {
+   "name": "old_form_role",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (designer) — x\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": false
+  },
+  {
+   "name": "old_form_not_a_person_stops",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (the owner) — x\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": false
+  },
+  {
+   "name": "old_form_who_repeated_stops",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (kim), decision (Kim) — x\n\n**Why:** a reason.\n\n**Ask:** an older ask.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": false
+  },
+  {
+   "name": "old_form_who_repeated_no_space_stops",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision(kim), decision (Kim) — x\n\n**Why:** a reason.\n\n**Ask:** an older ask.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": false
+  },
+  {
+   "name": "all_four_and_status",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01 (seen in the review)\n**Status:** Done 2026-10-08\n**Taken by:** abc123\n**Waits:** the vendor\n**Resolved:** 2026-10-08 (PR #4)\n**Blocked by:** decision (Kim) — x\n\n**Why:** a reason.\n\n**Ask:** an older ask.\n",
+   "archived": true
+  },
+  {
+   "name": "unreal_first_log_date",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** early March\n**Status:** Resolved 2026-10-08\n**Taken by:** abc123\n\n**Why:** a reason.\n\n**Log:**\n- 2026-02-30: an unreal date\n- 2026-03-04: a note\n",
+   "archived": true
+  },
+  {
+   "name": "waits_taken_by_old_form_archived",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Built 2026-10-01\n**Taken by:** abc123\n**Blocked by:** decision (pat) — wants a look\n**Waits:** the vendor\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "old_form_no_text_open_with_ask",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (Kim) —\n\n**Why:** a reason.\n\n**Ask:** an older ask.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": false
+  },
+  {
+   "name": "old_form_no_text_role_open",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n**Blocked by:** decision (designer) —\n\n**Why:** a reason.\n\n**Log:**\n- 2026-09-10: a note\n",
+   "archived": false
   }
  ],
  "status_problem": [

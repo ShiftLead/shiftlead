@@ -578,6 +578,36 @@
   ]
  },
  "item-line": {
+  "act-item": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
+   },
+   {
+    "accepted": false,
+    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
+   },
+   {
+    "accepted": false,
+    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`; doer: no period after its value"
+   },
+   {
+    "accepted": false,
+    "why": "text: names a field (Doer:): say it in other words"
+   }
+  ],
   "answer": [
    {
     "accepted": true,
@@ -722,6 +752,10 @@
     "why": null
    },
    {
+    "accepted": true,
+    "why": null
+   },
+   {
     "accepted": false,
     "why": "head: `(person)` stands only on a decided line"
    }
@@ -734,6 +768,60 @@
    {
     "accepted": false,
     "why": "due: '2026-0x-20' is not a date as YYYY-MM-DD"
+   }
+  ],
+  "doer": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
+   },
+   {
+    "accepted": false,
+    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
+   },
+   {
+    "accepted": false,
+    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`; doer: no period after its value"
+   }
+  ],
+  "doer-part": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
+   },
+   {
+    "accepted": false,
+    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
+   }
+  ],
+  "doer-repo": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
    }
   ],
   "due": [
@@ -781,6 +869,10 @@
    }
   ],
   "field-name": [
+   {
+    "accepted": true,
+    "why": null
+   },
    {
     "accepted": true,
     "why": null
@@ -948,10 +1040,6 @@
     "why": null
    },
    {
-    "accepted": true,
-    "why": null
-   },
-   {
     "accepted": false,
     "why": "due: no `Due:` (every kind but fyi carries one)"
    }
@@ -964,6 +1052,30 @@
    {
     "accepted": false,
     "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
+   }
+  ],
+  "person": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
+   }
+  ],
+  "person-part": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
+   },
+   {
+    "accepted": false,
+    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
    }
   ],
   "reply": [
@@ -1289,6 +1401,20 @@
    }
   ],
   "log-reopened": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   }
+  ],
+  "log-retitled": [
+   {
+    "accepted": true,
+    "why": null
+   },
    {
     "accepted": true,
     "why": null

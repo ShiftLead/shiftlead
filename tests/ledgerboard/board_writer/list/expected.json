@@ -10,6 +10,7 @@
     "decided_by": null,
     "default": null,
     "detail": [],
+    "doer": null,
     "due": "2026-01-20",
     "due_error": null,
     "due_tag": "due 2026-01-20",
@@ -47,6 +48,7 @@
      "- **Question:** Which one?",
      "- **Recommended:** Memory — it is faster."
     ],
+    "doer": null,
     "due": "2026-01-18",
     "due_error": null,
     "due_tag": "due 2026-01-18",
