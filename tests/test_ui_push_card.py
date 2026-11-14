@@ -327,6 +327,8 @@ def test_the_worker_draws_every_push_opens_its_row_and_subscribes_again():
     fallback = [(s["body"], s["tag"], s["data"]["path"]) for s in got["shown"][1:4]]
     assert fallback == [("something needs you", "more", "/inbox")] * 3
     assert [s["data"]["path"] for s in got["shown"][4:9]] == ["/inbox"] * 5  # never a page off the app
+    # ... but drawn with its own body and tag, not as *something needs you* (TD-1327)
+    assert [(s["body"], s["tag"]) for s in got["shown"][4:9]] == [("b", "t")] * 5
     assert got["opened"] == ["https://home.ts.net/inbox?row=x"]
     assert got["nav"] == ["focus", "https://home.ts.net/inbox?row=y"]
     (u1, b1), (u2, b2) = got["posted"]
