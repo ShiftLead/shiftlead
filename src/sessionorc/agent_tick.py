@@ -6549,6 +6549,12 @@ class TickMixin:
                 sure=not tid or None,
                 tool_use_id=tid,
             )
+        if thread is not None and not stale and state != "needs-you" and not adapters.permission_channel(s.adapter):
+            # a tool with no permission channel may name no thread on a prompt (Grok Build's child's carries the
+            # parent's session), so any subagent's event that opens none, its start among them, also removes the
+            # main-thread permissions, and nothing else; not a sure end, and nothing written into `kept`
+            # (§4.2 *A subagent's event, for a tool with no channel*, TD-1817)
+            self._end_entries(s, lambda p: p.subagent is None and p.kind == "permission", sure=False)
         if state == "needs-you":
             pending = Pending.from_dict(event["pending"]) if event.get("pending") else Pending("question", "")
             if thread is not None:
