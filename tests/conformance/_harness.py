@@ -441,4 +441,46 @@ def _rooted(p: Any) -> os.stat_result:
     return os.stat_result((mode, st.st_ino, st.st_dev, st.st_nlink, 0, 0, st.st_size, 0, 0, 0))
 
 
-HARNESSES: dict[str, Any] = {"claude-code": ClaudeCodeHarness(), "gemini": GeminiHarness()}
+class GrokHarness:
+    """Grok Build reads its hooks from `<GROK_HOME>/hooks/*.json`, which its launch writes ShiftLead's file into,
+    and hands each payload to `shiftlead-hook --adapter grok`, whose `translate` makes the host agent's `hook`
+    params. Its transcript is not read yet (TD-1637's later slices)."""
+
+    tool_fields = frozenset({"sessionId", "hookEventName", "toolName", "toolInput", "promptId", "subagentType"})
+    skip_flags = ("--always-approve",)
+
+    def profile(self, tmp_path: Path, monkeypatch: Any) -> str:
+        home = tmp_path / "home"
+        home.mkdir()
+        monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
+        (home / "profiles.yml").write_text(
+            f"default: t\nprofiles:\n  t: {{adapter: grok, account: t, config_dir: {tmp_path / 'gk'}}}\n",
+            encoding="utf-8",
+        )
+        return "t"
+
+    def stub_setup(self, tmp: Path, monkeypatch: Any) -> None:
+        """The suite's hook first on `PATH`, and the hook file the launch writes into the case's scratch
+        `GROK_HOME` naming it (`hook_path` patched: the real one is the interpreter's own `bin/`)."""
+        from shiftlead.adapters import grok
+
+        hook = suite_bin(tmp, monkeypatch) / "shiftlead-hook"
+        monkeypatch.setattr(grok, "hook_path", lambda: str(hook))
+
+    def hook_command(self, argv: list[str], env: dict[str, str]) -> str:
+        """The command the hook file in the launch's `GROK_HOME` names for every event."""
+        from shiftlead.adapters import grok
+
+        doc = json.loads((Path(env["GROK_HOME"]) / grok.HOOK_FILE).read_text(encoding="utf-8"))
+        return doc["hooks"]["Stop"][0]["hooks"][0]["command"]
+
+    def session_id(self, argv: list[str], env: dict[str, str]) -> tuple[str | None, str]:
+        return _flag(argv, "--session-id", "--resume"), "sessionId"
+
+    def hook_params(self, payload: dict[str, Any], *, at_composer: bool) -> dict[str, Any] | None:
+        from shiftlead.adapters.grok.hook import translate
+
+        return translate(payload)  # every Grok launch lands at the composer: no `at_composer` to pass
+
+
+HARNESSES: dict[str, Any] = {"claude-code": ClaudeCodeHarness(), "gemini": GeminiHarness(), "grok": GrokHarness()}

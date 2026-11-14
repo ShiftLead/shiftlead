@@ -1,5 +1,5 @@
 """Grok Build's state feed (design §4.3 *The third adapter: Grok Build*, *The state feed*, TD-1637), read
-against the payloads captured from the installed 1.0.77 (`fixtures/grok/captured/hooks-scratch.jsonl`)."""
+against the payloads captured from the installed 1.0.77 (`fixtures/grok/captured/hooks.jsonl`)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import pytest
 
 from shiftlead.adapters.grok.hook import translate
 
-CAPTURED = Path(__file__).parent / "conformance" / "fixtures" / "grok" / "captured" / "hooks-scratch.jsonl"
+CAPTURED = Path(__file__).parent / "conformance" / "fixtures" / "grok" / "captured" / "hooks.jsonl"
 FIRST, SECOND = "11111111-2222-4333-8444-555555555555", "01a1d787-8d98-7951-a058-825197037226"
 
 

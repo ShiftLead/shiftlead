@@ -95,7 +95,11 @@ def test_each_agent_adapter_declares_its_default_home(name):
 
 # each agent adapter's home variable and the default it falls back to (§4.3's Protocol block): a new adapter
 # fails `test_default_home_reads_the_variable_outside_a_session` until it is named here
-HOME_VARIABLES = {"claude-code": ("CLAUDE_CONFIG_DIR", "~/.claude"), "gemini": ("GEMINI_CLI_HOME", "~")}
+HOME_VARIABLES = {
+    "claude-code": ("CLAUDE_CONFIG_DIR", "~/.claude"),
+    "gemini": ("GEMINI_CLI_HOME", "~"),
+    "grok": ("GROK_HOME", "~/.grok"),
+}
 
 
 @pytest.mark.parametrize("name", AGENTS)

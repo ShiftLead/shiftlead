@@ -32,6 +32,7 @@ agent-cadence = "sessionorc.agent_cadence_entry:main"
 [project.entry-points."shiftlead.adapters"]
 claude-code = "shiftlead.adapters.claude_code:ClaudeCodeAdapter"
 gemini = "shiftlead.adapters.gemini:GeminiAdapter"
+grok = "shiftlead.adapters.grok:GrokAdapter"
 
 [build-system]
 requires = ["pdm-backend"]

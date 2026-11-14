@@ -4,6 +4,7 @@ written into the profile's own home, the home and credential reads, and the mach
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import uuid
 from pathlib import Path
@@ -23,7 +24,6 @@ def home(tmp_path, monkeypatch):
         f"  gk: {{adapter: grok, account: paul, model: grok-code-fast, config_dir: {tmp_path / 'g'}}}\n"
         f"  asks: {{adapter: grok, account: paul, permission_prompts: ask, config_dir: {tmp_path / 'g'}}}\n"
         f"  close: {{adapter: grok, account: paul, permission_prompts: all, config_dir: {tmp_path / 'g'}}}\n"
-        "  bare: {adapter: grok, account: paul}\n"
         "  own: {adapter: grok, account: paul, extra_args: [--x1, v1], unattended_args: [--yolo],"
         f" config_dir: {tmp_path / 'g'}}}\n"
     )
@@ -84,8 +84,13 @@ def test_a_resume_an_unattended_launch_ask_and_all(home):
 
 
 def test_a_launch_is_refused_in_words(home, tmp_path):
-    with pytest.raises(ValueError, match="needs a config_dir of its own"):
+    yml = home / "home" / "profiles.yml"
+    kept = yml.read_text()
+    # registered, the adapter's `own_home` refuses a home-less profile at the load, before any launch (§4.2a)
+    yml.write_text(kept + "  bare: {adapter: grok, account: paul}\n")
+    with pytest.raises(ValueError, match="bare needs a config_dir of its own"):
         ad(home).launch(profile="bare", resume=None, prompt=None, unattended=False, cwd=home)
+    yml.write_text(kept)
     missing = GrokAdapter(binary=str(tmp_path / "nowhere" / "grok"))
     with pytest.raises(ValueError, match=r"not installed at .*nowhere/grok .*install\.sh"):
         missing.launch(profile="gk", resume=None, prompt=None, unattended=False, cwd=home)
@@ -104,7 +109,7 @@ def test_the_home_the_credentials_and_the_machines_note(home, tmp_path):
     from shiftlead import profiles
 
     gk = profiles.get("gk")
-    assert a.credentials_ok(gk) is None and a.credentials_ok(profiles.get("bare")) is None
+    assert a.credentials_ok(gk) is None and a.credentials_ok(dataclasses.replace(gk, config_dir=None)) is None
     (home / "g").mkdir()
     (home / "g" / "auth.json").write_text("{}")
     assert a.credentials_ok(gk) is True
@@ -123,3 +128,22 @@ def test_a_profiles_own_extra_and_unattended_args_reach_the_argv(home):
     assert i.argv[3:] == ["--x1", "v1"]  # extra_args always; the unattended ones not on an attended launch
     u = a.launch(profile="own", resume=None, prompt=None, unattended=True, cwd=home)
     assert u.argv[3:] == ["--x1", "v1", "--yolo"] and "--always-approve" not in u.argv
+
+
+def test_the_composer_title_and_volatile_rows_off_the_captured_panes():
+    """What the conformance fixtures do not hold (design §4.3 `composer`, `title`, TD-1637 slice 13): a history
+    `❯` row is never the composer, a pane with no box reads None, a title not the tool's is no name, and the
+    spinner and a running tool's timer are the rows the liveness clock masks."""
+    import re
+
+    a = GrokAdapter(binary="/x/grok")
+    assert a.composer(["     ❯ a submitted prompt", "  ┃  1 (●) Yes, proceed"]) is None
+    assert a.composer(["  ╭────╮", "  │ ❯ hi there   │", "  ╰────╯"]) == "hi there"
+    assert a.composer(["  ╭────╮", "  ╰────╯"]) is None
+    assert a.title("user@host: ~/d") is None and a.title("") is None and a.title("grok") is None
+    assert a.title("⠹ - Responding - grok") is None
+    assert a.title("⚠ Action Required - ⠴ - Run it… - My name - grok") == "My name"
+    assert not a.state_in_title and {"composer", "title"} == set(a.implements)
+    rows = ["   ⠦ Responding… 2.0s", "   ◆ Remove a.txt and create made directory… 11s", "     ◆ Thought for 0.0s"]
+    masked = [r for r in rows if any(re.search(p, r) for p in a.volatile_rows)]
+    assert masked == rows[:2]
