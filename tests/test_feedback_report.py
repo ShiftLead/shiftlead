@@ -176,6 +176,13 @@ def test_sharp_s_in_a_name_matches_and_the_text_around_it_is_unchanged():
     assert s("die STRASSE", ("Straße", "team")) == "die <team>"
 
 
+def test_a_name_that_would_split_one_characters_folding_is_no_match():
+    """TD-1814: `İ` casefolds to `i` and a combining dot, a non-word mark, so `abci` matches the folded `abcİ`
+    with word edges both sides; only the fold-split guard sees that its end falls inside one character."""
+    assert s("in abcİ here", ("abci", "team")) == "in abcİ here"
+    assert s("in abci here", ("abci", "team")) == "in <team> here"  # the same name whole is replaced
+
+
 def test_a_longer_name_wins_and_a_string_from_two_sources_takes_the_first_kind():
     assert s("acme-billing and acme", ("acme", "team"), ("acme-billing", "seat")) == "<seat> and <team>"
     assert s("acme here", ("acme", "team"), ("acme", "repo")) == "<repo> here"
