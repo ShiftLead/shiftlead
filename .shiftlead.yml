@@ -60,6 +60,9 @@ teams:
       # the fact-check trial (design §4.9b *The fact-check*, TD-1213): a Gemini seat on a free account, asked
       # beside each member's own fact-check of a doc-only PR, never instead of it; filled by an ask, closed idle
       - {name: fact-check-ao-1, role: fact-checker, profile: gemini-reader, trigger: asks}
+      # a second model on trial (design §4.9b *A second model on trial*, TD-1638): a Grok Build seat on the
+      # person's SuperGrok account, asked beside fact-check-ao-1 on every doc-only PR, its trial lines counted apart
+      - {name: fact-check-ao-2, role: fact-checker, profile: grok-reader, trigger: asks}
     members:
       - {role: grinder, name: grinder-ao-1, brief: docs/briefs/grinder-ao-1.md}
       # the second grinder: both share the build stage's one lane and pick the top-ranked entry nobody holds (TD-749)
