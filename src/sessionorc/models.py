@@ -107,6 +107,7 @@ NODE_OWNED = frozenset(
         "subagents",
         "subagent_ids",
         "subagent_at",
+        "turns",
         "shells",
         "shells_at",
         "files",
@@ -1155,6 +1156,11 @@ class Session:
     # event the adapter marked `subagent_seen`, never moved back, so a replay never revives a stale
     # pill. `subagents_live` reads it with `subagents`; both are reset on a fresh conversation and on exit.
     subagent_at: str | None = None
+    # The last `TURNS_KEPT` turns the tool named as started (design §4.2 *A turn's id*, TD-1637): an adapter whose
+    # tool names each turn sends it as the event's neutral `turn`, `turn_start` on the one that starts it, and
+    # a turn-end report of a turn in the list but not its newest is a cancelled turn's, landing late. Newest
+    # last; emptied when a new `adapter_id` is adopted (a `/clear`). Observed where the hooks apply: the node's.
+    turns: list[str] = field(default_factory=list)
     # The tool's background shell tasks (design §4.2 *A background shell task*, TD-766): `{pid, start, cmd,
     # since}`, read from the process tree by the tick while the record is idle with no live subagent
     # (the adapter's `background`), `since` this host's first sight of the task. `shells_at` is the last

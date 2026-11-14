@@ -194,6 +194,8 @@ SHELLS_SAVE_EVERY = timedelta(minutes=1)
 # How long after a `kill` an `exited` hook on a record a new run has taken is the killed run's own
 # `SessionEnd` (TD-822): the walk saw it land within a second or two; fifteen is the walk's own wait.
 KILLED_END_GRACE = 15.0
+# the turns a record keeps for its turn-end reports (design §4.2 *A turn's id*, TD-1637)
+TURNS_KEPT = 8
 # A thread's open calls (design §4.2 *A waiter is keyed by its call*, TD-950): the last eight per thread, at
 # most sixteen threads per session; a call that never ends (the tool's own id, every subagent capture) ages out.
 OPEN_CALLS = 8
@@ -6357,6 +6359,32 @@ class TickMixin:
             return False
         return explain(s.tail) is None
 
+    @staticmethod
+    def _late_turn(s: Session, event: dict[str, Any]) -> bool:
+        """Read an event's neutral `turn` against the record's `turns` (design §4.2 *A turn's id*, TD-1637), and
+        whether the event is to be dropped. A main-thread event that names a new `adapter_id` empties the list
+        first (a `/clear`'s new conversation). `turn_start` adds its `turn`, newest last, keeping the last
+        `TURNS_KEPT`. A turn-end report (`turn_end`, which only an adapter whose tool names turns sends, its
+        `turn` the turn it ends where the tool names one) is dropped where its turn is in the list but not its
+        newest — a cancelled turn's, landing after the next one started — or where it names none and the
+        record is already `exited`; a turn not in the list (never seen to start, or older than the list) is
+        applied. An event with neither mark is read as before."""
+        if event.get("subagent"):
+            return False
+        aid = event.get("adapter_id")
+        if aid and s.adapter_id and aid != s.adapter_id and event.get("state") not in ("exited", "closed"):
+            s.turns = []
+        turn = event.get("turn")
+        if event.get("turn_start"):
+            if isinstance(turn, str) and turn:
+                s.turns = [t for t in s.turns if t != turn][-(TURNS_KEPT - 1) :] + [turn]
+            return False
+        if not event.get("turn_end"):
+            return False
+        if not isinstance(turn, str) or not turn:
+            return s.state == "exited"
+        return turn in s.turns and turn != s.turns[-1]
+
     def _apply_event(self, sid: str, event: dict[str, Any], queued: bool = False) -> None:
         """A hook-fed state transition (design §4.2 table). Adapters map hook names to these.
 
@@ -6399,6 +6427,9 @@ class TickMixin:
             # `closed` — never forgot the record (TD-200 (3)). Whatever a closed run still says is
             # the dying run's.
             log.info("%s: ignored %s on a closed record", sid, event.get("event") or event.get("state") or "a hook")
+            return
+        if self._late_turn(s, event):
+            log.info("%s: dropped a turn-end report of turn %s, not the newest started", sid, event.get("turn"))
             return
         if not queued:
             self._live_hook_at[sid] = time.time()
