@@ -10,7 +10,7 @@ People: paul
 
 ## Needs the user
 
-- [ ] decide 2026-11-14 (n/a) — Pin model gemini-3.5-flash-lite on the gemini-conformance profile so TD-1648's Gemini 0.66.0 seat smoke can run, or drop that half and archive TD-1648 on the Claude Code pass? Context: TD-1648 decision (paul). Due: 2026-11-17. Answers: Pinned, run it again | Drop the Gemini half. Lifts: Pinned, run it again | Drop the Gemini half.
+- [x] decide 2026-11-14 (n/a) — Pin model gemini-3.5-flash-lite on the gemini-conformance profile so TD-1648's Gemini 0.66.0 seat smoke can run, or drop that half and archive TD-1648 on the Claude Code pass? Context: TD-1648 decision (paul). Due: 2026-11-17. Answers: Pinned, run it again | Drop the Gemini half. Lifts: Pinned, run it again | Drop the Gemini half. Decided: Pinned, run it again (by paul) (2026-11-14). Closed: 2026-11-14 — lifted.
   - **Context:** The seat smoke passed on Claude Code 2.1.325 (2026-11-14). On gemini-conformance, which names no model, Auto picks gemini-3.8-flash and the free key hit its usage limit before the seat sent a reply, so the untrusted-flags prompt the run is meant to show never had a chance to appear (TD-1648 Log, 2026-11-14).
   - **Question:** Pin a model on gemini-conformance so the Gemini half can run, or drop it?
   - **Recommended:** Pinned, run it again: one line in ~/.shiftlead/profiles.yml (model: gemini-3.5-flash-lite, 500 requests a day), as gemini-reader has; the run then shows the guard TD-1576 asked for is still needed.
