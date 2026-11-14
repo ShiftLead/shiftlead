@@ -1453,6 +1453,43 @@ def cmd_feedback_digest(args: argparse.Namespace) -> int:
     return 1 if any(r.get("error") for r in index["records"]) else 0
 
 
+def cmd_feedback_report(args: argparse.Namespace) -> int:
+    """`ao feedback report --findings <file> --out <file.md>`, and its `--build` read (design §4.7 *Feedback*,
+    *Reports from other installs*, TD-1794): the findings scrubbed of the install's names the scrub knows, written
+    in the report's shape, then the publish check over it. Exit 0 when the check passes, 1 with its lines (the
+    report kept), 2 with `<out>` removed when a field is refused, the build or a name source cannot be read, the
+    report passes 65,536 characters or the check cannot run. The rules are `shiftlead.feedback_report`'s."""
+    from shiftlead import feedback_report as fr
+
+    if args.build:
+        if args.findings or args.out:
+            return fail(args, "--build takes neither --findings nor --out", 2)
+        try:
+            got = fr.read_build(fr.direct_url())
+        except fr.Refused as e:
+            return fail(args, str(e), 2, prose=f"ao feedback report: {e}")
+        tail = " — a commit of your own; the build sent is the last public one" if got["local"] else ""
+        return emit(args, got, lambda: print(f"{got['checkout']}: {got['commit'][:7]} of {got['build_day']}{tail}"))
+    if not args.findings or not args.out:
+        return fail(args, "--findings <file> and --out <file.md> are needed, but with --build", 2)
+    try:
+        got = fr.report(args.findings, args.out)
+    except fr.Refused as e:
+        return fail(args, str(e), 2, prose=f"ao feedback report: {e}")
+    check = got["check"]
+
+    def prose() -> None:
+        for line in check["lines"]:
+            print(line)
+        if check["exit"]:
+            print(f"{got['out']}: the publish check flagged {len(check['lines'])} line(s): edit the finding, run again")
+        else:
+            print(f"{got['out']}: written for {got['commit'][:7]} of {got['build_day']}; the publish check passed")
+
+    emit(args, got, prose)
+    return check["exit"]
+
+
 def cmd_mode(args: argparse.Namespace) -> int:
     s = call_sync(
         "set_mode",
@@ -5761,6 +5798,12 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--skip", action="append", metavar="CONVERSATION", help="leave out this conversation (repeatable)")
     q.add_argument("--list", action="store_true", help="list the conversations each record would read; write nothing")
     q.set_defaults(fn=cmd_feedback_digest)
+    q = fsub.add_parser("report", help="a feedback report: findings scrubbed, in the report's shape, publish-checked")
+    q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the result as JSON")
+    q.add_argument("--findings", help="the findings file (JSON) the procedure wrote from step 7's answers")
+    q.add_argument("--out", help="the report's Markdown file")
+    q.add_argument("--build", action="store_true", help="read the build this install runs, and write nothing")
+    q.set_defaults(fn=cmd_feedback_report)
 
     p = add("mode", help="flip a session between unattended and interactive")
     p.add_argument("id")
