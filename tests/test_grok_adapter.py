@@ -235,3 +235,38 @@ def test_chunks_of_one_kind_join_until_something_else_comes(tmp_path):
         ("text", "three"),
     ]
     assert tr.entries[1].lines == 2 and tr.turns == 1 and tr.first_at == "1970-01-01T00:00:01Z"
+
+
+def test_a_profile_with_no_home_of_its_own_reads_nothing_and_the_default_profile_is_read(home):
+    """A Grok profile never reads the person's `~/.grok`: one with no `config_dir` refuses the load, so nothing is
+    found; `""` is the default profile's home."""
+    a = ad(home)
+    _place(home, "abc")
+    assert a.transcript_path("abc", home, "") is not None  # the default, gk
+    assert a.transcript_path("abc\0", home, "gk") is None  # a NUL in the id finds nothing, never raises
+    (home / "home" / "profiles.yml").write_text(
+        f"profiles:\n  bare: {{adapter: grok}}\n  gk: {{adapter: grok, config_dir: {home / 'g'}}}\n"
+    )
+    for p in ("bare", "gk", ""):
+        assert a.transcript_path("abc", home, p) is None and a.read_transcript("abc", home, p) is None
+        assert a.model_in_use("abc", home, p) is None
+
+
+def test_paging_back_reads_each_turn_once(home):
+    """`turns` and `before` (§4.3 `read_transcript`): one turn a page, each page's `before` the next page's cursor,
+    None at the file's start, and a cursor inside a line reading that line whole."""
+    a = ad(home)
+    _place(home, "abc")
+    pages, before = [], None
+    while True:
+        tr = a.read_transcript("abc", home, "gk", turns=1, before=before)
+        pages.append([e.text for e in tr.entries if e.kind == "prompt"])
+        if tr.before is None:
+            break
+        before = tr.before
+    assert [p[0].split()[0] for p in pages] == ["then", "Write", "Use", "Run", "line"] and all(
+        len(p) == 1 for p in pages
+    )
+    whole = a.read_transcript("abc", home, "gk")
+    mid = a.read_transcript("abc", home, "gk", before=whole.size - 5)  # inside the last line
+    assert [e.text for e in mid.entries][-1] == [e.text for e in whole.entries][-1]

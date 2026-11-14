@@ -48,10 +48,10 @@ def find(root: Path, session_id: str) -> Path | None:
     if not session_id or any(c in session_id for c in "/\\*?[]") or session_id in (".", ".."):
         return None
     try:
-        found = [p for p in root.glob(f"*/{session_id}/{LOG}") if p.is_file()]
-    except OSError:
+        found = [(p.stat().st_mtime, p) for p in root.glob(f"*/{session_id}/{LOG}") if p.is_file()]
+    except (OSError, ValueError):  # a log gone between the glob and its stat; a NUL in the id
         return None
-    return max(found, key=lambda p: p.stat().st_mtime) if found else None
+    return max(found)[1] if found else None
 
 
 def model(path: Path) -> str | None:
@@ -163,9 +163,12 @@ def _entries(records: list[dict]) -> tuple[list[TranscriptEntry], int]:
 
 
 def _lines(data: bytes, end: int) -> list[tuple[int, dict]]:
-    """Each parsed record before byte `end` with its offset; a line that does not parse is skipped."""
+    """Each parsed record starting before byte `end`, whole, with its offset; a line that does not parse is
+    skipped."""
     out, offset = [], 0
-    for line in data[:end].splitlines(keepends=True):
+    for line in data.splitlines(keepends=True):
+        if offset >= end:
+            break
         if line.strip():
             try:
                 rec = json.loads(line)
