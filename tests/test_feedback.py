@@ -483,11 +483,13 @@ def test_the_feedback_report_issue_form():
     assert field["validations"]["required"] is True
     warning = re.sub(r"\s+", " ", " ".join(f["attributes"]["value"] for f in form["body"] if f["type"] == "markdown"))
     for phrase in (
-        "public as soon as you submit it, and it is mailed to the repo's watchers at once",
-        "It holds the findings you approved",
+        "Public at once: this issue is mailed to the repo's watchers as soon as you submit it",
+        "**What it holds:** the findings you approved",
         "keeps the earlier text in the issue's edit history",
         "Only your read of the whole report catches what it cannot",
         "private work described in plain words",
         "Never change it by hand",
     ):
         assert phrase in warning, phrase
+    # TD-1816: short enough to read at a glance — a lead and a few headed points, not paragraphs
+    assert len(warning.split()) < 140, len(warning.split())
