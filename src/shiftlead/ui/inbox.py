@@ -3125,6 +3125,7 @@ def ledger_for_you(
     now: datetime | None = None,
     inbox: Iterable[Mapping[str, Any]] = (),
     every: Mapping[str, Any] | None = None,
+    handed: Iterable[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """The ledger's rows of the Inbox's **Later** section (design §4.5 screen 6 *The ledger's entries
     that wait on you*, §4.5a **Inbox row: ledger entry**, TD-368, TD-565): the entries §4.4 *Repo
@@ -3149,12 +3150,15 @@ def ledger_for_you(
     (the answer's) and `outcome` (its `done`, if any) — and draws no answers. `every` is every repo's facts, the
     bare `TD-n` link's index (the Repo page passes one repo as `repos`); `repos` where none is given. `entries` is
     every open entry of `every` by `<repo>#TD-n`, each `{repo, part_of, part_of_raw, blocked_by}`: what a board
-    line covers is read through it (`ui.queue.covered`, TD-1380)."""
+    line covers is read through it (`ui.queue.covered`, TD-1380). `handed` is the `inbox` read's `handed` list: a
+    row its open hand-off's `refs` name, not *with you*, carries `answered` of kind `handed`, *handed to <seat>*
+    (`queue.handed_hold`, §4.5 screen 12 *Three verbs: Have a session do it*, TD-1660), when no answer holds it."""
     from .repo import PRIORITY_RANK  # repo imports this module: read at call time
 
     now = now or datetime.now(UTC)
     live = [s for s in fleet if s.get("state") not in ("exited", "closed") and s.get("repo")]
     questions = [q for q in inbox or () if isinstance(q, Mapping)]
+    handed = [h for h in handed or () if isinstance(h, Mapping)]
     states = {str(s.get("id")): str(s.get("state") or "") for s in fleet if s.get("id")}
     names = {str(s.get("id")): str(s.get("name") or s.get("id")) for s in fleet if s.get("id")}
     readings = {
@@ -3238,6 +3242,9 @@ def ledger_for_you(
                 if not owner
                 else None
             )
+            if got_q is None and handed and not any(not s.get("unattended") for s in holders):
+                # a step handed by Have a session do it, its ask open, and the entry not *with you* (TD-1660)
+                got_q = queue_mod.handed_hold({**e, "repo": name}, handed, boards, linked, now)
             rows.append(
                 {
                     "row": "ledger",
@@ -3349,6 +3356,19 @@ def _held_answered(
     `answer_how`) — `age`, the answer's, and `outcome`, its `done` outcome where one is sent. A board answer's
     (`kind: board`, TD-1368) carries `board`, the line's `{key, open, to}`, and `words` *you answered "<its
     `Decided:` words>" on the board*, its age the `Decided:` date's; a kept-waiting one `until`, its date."""
+    if got.get("kind") == "handed":
+        # a step handed by Have a session do it (§4.5 screen 12, TD-1660): its seat and the first send's age
+        asker = str(got.get("asker") or "")
+        outcome = got.get("outcome") if isinstance(got.get("outcome"), Mapping) else None
+        return {
+            "mid": str(got.get("mid") or ""),
+            "asker": asker,
+            "name": names.get(asker, asker),
+            "kind": "handed",
+            "words": "you handed this step on",
+            "age": _age(got.get("closed_at"), now),
+            "outcome": {"state": "blocked", "text": str(outcome.get("text") or "")} if outcome else None,
+        }
     if got.get("kind") == "board":
         line = got.get("line") if isinstance(got.get("line"), Mapping) else {}
         asker = str(got.get("asker") or "")

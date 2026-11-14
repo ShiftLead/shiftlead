@@ -96,6 +96,7 @@ from sessionorc.agent_common import (
     log,
 )
 from sessionorc.agent_ids import given_of, settle_key
+from sessionorc.agent_mail import handed_list
 from sessionorc.agent_spend import SEAT_EVERY, _metered_of
 from sessionorc.gitinfo import UNKNOWN as GIT_UNKNOWN
 from sessionorc.gitinfo import changed_files, git_info, work_left
@@ -4752,6 +4753,8 @@ class TickMixin:
                 got = queue_mod.reading(
                     applied, graph, now, waiting=waiting, doing=doing, questions=list(self.person_inbox),
                     archived=self._archived, host=self.host,
+                    # the person's handed asks, the Inbox's own list: the handed cover (TD-1660)
+                    handed=handed_list(self._graph()),
                 )  # fmt: skip
                 self._queue_read = got
         except Exception:  # noqa: BLE001 — the Queue is a reading: the last one stands, the next tick tries again

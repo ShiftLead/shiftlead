@@ -11,7 +11,7 @@ import logging
 import re
 import secrets
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -228,6 +228,19 @@ def _form_reply(replied: MailEntry, text: str, answer: Any, form: Any) -> str:
     except ledgerboard.Refused as e:
         raise RpcError(str(e)) from None
     return text
+
+
+def handed_list(graph: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Work the person handed a session (§4.10 *An entry handed to a seat*, TD-218 slice 3), as the person's `inbox`
+    read lists it beside the inbox — each holder's copy while it owes its outcome or came back `blocked`, with its
+    `holder`, `holder_name` and `holder_state` — and the Queue's reading takes it for the handed cover (§4.5 screen
+    12 *Three verbs: Have a session do it*, TD-1660): one list, so the Inbox and the Queue agree."""
+    return [
+        {**e.to_dict(), "holder": addr, "holder_name": r.name, "holder_state": r.state}
+        for addr, r in graph.items()
+        for e in r.inbox
+        if e.handed_entry and (e.owes or (e.outcome or {}).get("state") == "blocked")
+    ]
 
 
 class MailMixin:
@@ -2442,12 +2455,7 @@ class MailMixin:
                     # its one copy is the holder's, so the person's read lists it beside the inbox —
                     # while it owes its outcome, or came back `blocked` — for the row under *Waiting on
                     # them*; Dismiss names its id, and its outcome is written on that copy
-                    "handed": [
-                        {**e.to_dict(), "holder": addr, "holder_name": r.name, "holder_state": r.state}
-                        for addr, r in self._graph().items()
-                        for e in r.inbox
-                        if e.handed_entry and (e.owes or (e.outcome or {}).get("state") == "blocked")
-                    ],
+                    "handed": handed_list(self._graph()),
                     "threads": {},
                     "sends": [],
                     "unread": sum(1 for e in self.person_inbox if not e.read_at),

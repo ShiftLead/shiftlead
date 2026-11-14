@@ -1370,7 +1370,9 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
    draws no answers, Reply, Go with it or Start session: **Lift the hold** and **Open** are in its ⋯. A board
    answer (`ans.kind == 'board'`, TD-1364) is the same row, its foot *you answered "<Decided: words>" on the
    board, <age> ago* then *carried to TD-m* or *<holder> acts on it*; a kept-waiting one reads *waits until
-   <date>*. A row a press is landing on (`e.applying`, §4.4 *A press is drawn as it lands*, TD-1508) reads its
+   <date>*. A step handed by **Have a session do it** (`ans.kind == 'handed'`, TD-1660) reads *handed to <seat> ·
+   <age>*, its foot the seat and what ends the hold, its ⋯ the entry's own answer — **Done** on an `Owner: paul`
+   entry, else **Lift the hold**. A row a press is landing on (`e.applying`, §4.4 *A press is drawn as it lands*, TD-1508) reads its
    mark's words — *answered — applying*, or *applying <act>* — after *with you*, before an answer's hold, and draws
    no answers nor any press until it lands: its foot what was pressed, and **Open** in its ⋯. #}
 {% macro ledger(e, section) -%}
@@ -1385,6 +1387,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- if e.held and not with_you %} <span class="st">held by {{ e.held }}</span>{% endif %}
   {%- if app %} <span class="st qans">{{ e.applying_words }}</span>
   {%- elif ans and ans.until %} <span class="st qans">waits until {{ (short_date(ans.until) if mode == 'card' else '') or ans.until }}</span>
+  {%- elif ans and ans.kind == 'handed' %} <span class="st qans">handed to {{ ans.name }}{% if ans.age %} · {{ ans.age }}{% endif %}</span>
   {%- elif ans %} <span class="st qans">answered — waiting on {{ ans.name }}</span>
   {%- elif e.home == 'queue' %} <span class="st qneed">{% if with_you %}with you in {{ e.with_you }}{% elif e.why == 'yours' %}yours to do{% else %}held until {{ e.until or 'your decision' }}{% endif %}</span>{% endif %}
   {{- design_link(e) }}
@@ -1415,6 +1418,10 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- if app %}
   {#- a press landing (§4.4 *A press is drawn as it lands*, TD-1508): what was pressed, and where it lands -#}
   <span class="st">{% if app.answer %}you {{ 'answered' if app.act == 'decide' else 'wrote' }} &ldquo;{{ app.answer }}&rdquo; — {% endif %}landing on {{ e.name }}'s board</span>
+  {%- elif ans and ans.kind == 'handed' %}
+  {#- a step handed by Have a session do it (§4.5 screen 12 *Three verbs: Have a session do it*, TD-1660): the seat
+      it went to, and what ends the hold -#}
+  <span class="st">{{ ans.words }} to {{ ans.name }} — {% if ans.outcome %}{{ ans.name }} could not do it: {{ ans.outcome.text or 'blocked' }}{% else %}its outcome ends this hold{% endif %}</span>
   {%- elif ans and ans.kind == 'board' %}
   {#- a board answer's foot (§4.5 screen 12 *Three wants*, TD-1364): its `Decided:` words and age, then the
       entry it was carried to, else its holder; a kept-waiting answer, the date it is asked again -#}
@@ -1429,6 +1436,9 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   <span class="grow"></span>
   {%- if app %}
   {%- call qrow.dots(['Open']) %}<a role="menuitem" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>{% endcall %}
+  {%- elif ans and ans.kind == 'handed' and e.why == 'yours' %}
+  {#- the entry's own answer kept in its ⋯ (TD-1660): **Done** on an `Owner: paul` entry -#}
+  {%- call qrow.dots(['Done', 'Open']) %}<button role="menuitem" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="done" data-answer="done" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: done — its session archives the entry, or asks you what was done" data-confirm="Done? &ldquo;done&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Done</button><a role="menuitem" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>{% endcall %}
   {%- elif ans %}
   {%- call qrow.dots(['Lift the hold', 'Open']) %}<button role="menuitem" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="go ahead" data-answer="go ahead" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: go ahead — its session drops decision (paul) from Blocked by" data-confirm="Lift the hold? &ldquo;go ahead&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Lift the hold</button><a role="menuitem" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>{% endcall %}
   {%- else %}
