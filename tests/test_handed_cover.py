@@ -11,7 +11,7 @@ from datetime import timedelta
 from types import SimpleNamespace
 
 import pytest
-from test_queue import NOW, _entry, _rec, _repo
+from test_queue import NOW, _entry, _rec
 from test_queue_board_hold import HELD, _board, _open, _read, _row, _setup
 
 from sessionorc import queue
@@ -46,8 +46,10 @@ def _seat(rid: str = "ao-other-techlead"):
 
 def _q(tmp_path, handed, *board, records=(), entries=None):
     root, r = _setup(tmp_path, entries or [_entry(1, "held", **HELD)], *board)
-    return _read({root: r}, [_seat(), *records]) if not handed else queue.reading(
-        {root: r}, [_seat(), *records], NOW, handed=handed, archived={}
+    return (
+        _read({root: r}, [_seat(), *records])
+        if not handed
+        else queue.reading({root: r}, [_seat(), *records], NOW, handed=handed, archived={})
     )
 
 
@@ -131,7 +133,8 @@ def test_covered_by_open_line_reads_the_member_and_its_parent(tmp_path):
 @pytest.mark.unit
 def test_handed_list_is_the_inbox_reads_open_and_blocked_handed_asks():
     def ask(mid, **kw):
-        return MailEntry(id=mid, from_="person", to=["ao-x"], kind="ask", text="t", at=NOW.isoformat(), handed=True, **kw)
+        at = NOW.isoformat()
+        return MailEntry(id=mid, from_="person", to=["ao-x"], kind="ask", text="t", at=at, handed=True, **kw)
 
     rec = SimpleNamespace(
         name="x",
