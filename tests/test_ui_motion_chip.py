@@ -109,6 +109,10 @@ def test_rule_5_and_the_stage_name_gate():
         ]
         cards.FLOW_ACTS.update({"g1": "rename"})
         assert chips([g()], reading(), whats={}) == [("TD-1", "grinder", "")]
+        # a member the flow has lost — left, or removed by a pending Apply — reads its role (TD-1779)
+        for act in ("left", "removed"):
+            cards.FLOW_ACTS.update({"g1": act})
+            assert chips([g()], reading(), whats={}) == [("TD-1", "grinder", "")], act
         # …and a reader seat whose own stage name is not read reads its role
         cards.FLOW_ACTS.clear()
         cards.FLOW_ACTS.update({TL: "sit_out"})
