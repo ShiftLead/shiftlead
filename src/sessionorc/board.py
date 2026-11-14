@@ -779,7 +779,8 @@ def _write_back(
         _reset(t, want)
         gate = ledgerboard._item_gate(text)[1]
         return {"commit": head, "message": msg, "line": at + 1, "text": text, "due": due,
-                "left_open": list(plan.info["left_open"]), "gate": gate}  # fmt: skip
+                "left_open": list(plan.info["left_open"]), "gate": gate,
+                **({"decided": decided} if decided else {})}  # fmt: skip
     _apply(plan)
     also = sorted(os.path.relpath(p, t) for p in plan.changes if Path(p).resolve() != path.resolve())
     if _read_lines(path)[at] == lines[at]:
@@ -787,7 +788,10 @@ def _write_back(
         # page, so it was no longer hidden): nothing is landed, and the press is answered as done (TD-1349)
         head = _git(t, "rev-parse", "--short", f"origin/{want}").stdout.strip()
         _reset(t, want)
-        return {"commit": head, "message": msg, "line": at + 1, "text": text, "due": due}
+        return {
+            "commit": head, "message": msg, "line": at + 1, "text": text, "due": due,
+            **({"decided": decided} if decided else {}),
+        }  # fmt: skip
 
     def still() -> bool:
         return _find(_read_origin(t, want, rel), None, text) is not None

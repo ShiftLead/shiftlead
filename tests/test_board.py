@@ -2456,3 +2456,20 @@ async def test_board_reply_that_fills_a_form_answers_decided_and_mails_nobody(ag
         trail = [t for t in (await me.call("inbox"))["trail"] if t["kind"] == "board reply"]
     assert trail == []
     assert "Decided: Hold: drop Dismiss (by t)" in origin_board(repo).splitlines()[8]
+
+
+def test_a_reply_filling_a_lifting_form_on_a_gated_decide_lifts_it(repo):
+    """TD-1698: on a gated item, a Reply that fills `Hold:` where `Hold: <note>` is in `Lifts:` is the decide, with
+    its lift: the entry's gate lifted and the item closed in one commit, as a pressed lifting answer does."""
+    _gated(repo)
+    held = GATED.replace("Answers: Go | Not yet.", "Answers: Go | Hold: <note>. Lifts: Hold: <note>.")
+    (repo / board.BOARD).write_text(origin_board(repo).replace(GATED, held))
+    git(repo, "commit", "-qam", "a form lifts")
+    git(repo, "push", "-q", "origin", "main")
+    at = origin_board(repo).splitlines().index(f"- [ ] {held}") + 1
+    got = board.write_back(repo, at, held, "reply", reply="Hold: until the release")
+    assert got["decided"] == "Hold: until the release" and got["entries"] == ["TD-190"]
+    entry = on_origin(repo, "show", "origin/main:docs/ledger/TD-190.md")
+    assert "**Blocked by:**" not in entry and "gate lifted: decision (paul)" in entry
+    line = origin_board(repo).splitlines()[at - 1]
+    assert line.startswith("- [x] ") and "Decided: Hold: until the release" in line
