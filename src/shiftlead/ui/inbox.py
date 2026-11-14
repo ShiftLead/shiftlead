@@ -2222,8 +2222,16 @@ def board_rows(report: Any, repos_of: Mapping[str, Mapping[str, Any]] | None = N
                     # §4.5 screen 12 *An item's shape* (TD-1066): the same text as a card draws it whole
                     "card": board_card(board_body(text, it), it, repo_name),
                     "detail": detail,  # §4.5a *Inbox board row: detail block* (TD-312)
-                    "answers": [str(a) for a in it.get("answers") or () if str(a).strip()],
-                    "default": str(it.get("default") or ""),
+                    "answers": (offered := [str(a) for a in it.get("answers") or () if str(a).strip()]),
+                    # beside each answer its form's head, '' for a complete one, which the page draws **<head>…**
+                    # by (§4.5a **<head>…**, TD-1698); a form marked the default is no default: filled, never pressed
+                    "heads": mail_mod.form_heads(offered),
+                    "default": "" if lb.is_form(str(it.get("default") or "")) else str(it.get("default") or ""),
+                    # whether a Reply here can decide the line: the reply box's foot (§4.5a **<head>…**, TD-1698)
+                    # (the reader's items are its open ones alone)
+                    "reply_decides": board_mod.reply_decides(
+                        str(it.get("kind") or ""), offered, bool(it.get("decided"))
+                    ),
                     "decided": _decided(it),
                     # a press landing (§4.4 *A press is drawn as it lands*, TD-1508): the home's mark, laid over
                     "applying": dict(it["applying"]) if isinstance(it.get("applying"), Mapping) else None,
@@ -3176,6 +3184,7 @@ def ledger_for_you(
             pairs = [(str(a), str(got[i]) if i < len(got) else "") for i, a in enumerate(e.get("answers") or ())]
             pairs = [(a, c) for a, c in pairs if a.strip()]
             answers = [a for a, _ in pairs]
+            heads = mail_mod.form_heads(answers)  # in step with the answers kept (§4.5a **<head>…**, TD-1698)
             d = e.get("default")
             ok = isinstance(d, int) and not isinstance(d, bool) and 0 <= d < len(answers)
             added = str(e.get("added") or "")
@@ -3216,8 +3225,9 @@ def ledger_for_you(
                     "detail": "\n".join(str(x) for x in e.get("detail") or () if isinstance(x, str)).strip("\n"),
                     "answers": answers,
                     "consequences": [c for _, c in pairs],
+                    "heads": heads,
                     "ask": str(e.get("ask") or ""),  # its one sentence on a card (§4.10)
-                    "default": answers[d] if ok else "",
+                    "default": answers[d] if ok and not heads[d] else "",
                     "root": str(r.get("root") or root),  # the checkout `ledger_decide` names the repo by
                     # what the row's controls read, as a Queue row carries them (§4.5 screen 12 *any open row*, TD-905)
                     "page": str(e.get("for_page") or ""),

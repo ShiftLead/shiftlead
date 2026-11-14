@@ -371,19 +371,24 @@ def test_a_for_you_entry_carries_added_answers_and_detail():
     assert mine["added"] == "2026-10-07"
     assert mine["answers"] == ["At the reset", "A fixed | time", "Not now"]
     assert mine["default"] is None  # two marks: no single recommendation
-    assert ledger.answers_of("Keep it (default) | Drop it.") == (["Keep it", "Drop it"], ["", ""], 0)
+    assert ledger.answers_of("Keep it (default) | Drop it.") == (["Keep it", "Drop it"], ["", ""], 0, ["", ""])
     # the field alone, in ledgerboard's split and mark (TD-585): a `Due:`/`Decided:` in it is words, the
     # default is the marked item's place, and a bare mark is no answer
-    assert ledger.answers_of("Works. Due: 2026-01-01 | x") == (["Works. Due: 2026-01-01", "x"], ["", ""], None)
-    assert ledger.answers_of("A | Decided: x (2026-01-01)") == (["A", "Decided: x (2026-01-01)"], ["", ""], None)
-    assert ledger.answers_of("A | A (default)") == (["A", "A"], ["", ""], 1)
-    assert ledger.answers_of("A | (default)") == (["A"], [""], None)
+    want = (["Works. Due: 2026-01-01", "x"], ["", ""], None, ["", ""])
+    assert ledger.answers_of("Works. Due: 2026-01-01 | x") == want
+    want = (["A", "Decided: x (2026-01-01)"], ["", ""], None, ["", ""])
+    assert ledger.answers_of("A | Decided: x (2026-01-01)") == want
+    assert ledger.answers_of("A | A (default)") == (["A", "A"], ["", ""], 1, ["", ""])
+    assert ledger.answers_of("A | (default)") == (["A"], [""], None, [""])
     # §4.10 *The answers' split* (TD-913): each split on its first ` — `, the mark read on the label
     assert ledger.answers_of("Keep it (default) — it ships Friday | Drop it — a — b") == (
         ["Keep it", "Drop it"],
         ["it ships Friday", "a — b"],
         0,
+        ["", ""],
     )
+    # beside each label its form's head as offered, '' for a complete answer (§4.5a **<head>…**, TD-1698)
+    assert ledger.answers_of("Go | hold : <note> | Not right:")[3] == ["", "hold", "Not right"]
     assert mine["consequences"] == ["", "", ""] and mine["ask"] == ""
     assert mine["detail"][:3] == ["**Why:** the reason,", "over two lines.", "**Fix:**"]
     assert len(mine["detail"]) == ledger.MAX_DETAIL_LINES

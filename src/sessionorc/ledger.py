@@ -128,13 +128,14 @@ def until_of(blocked_raw: str | None) -> str:
     return old[1].lstrip("—–-").strip() if old else ""
 
 
-def answers_of(value: str) -> tuple[list[str], list[str], int | None]:
+def answers_of(value: str) -> tuple[list[str], list[str], int | None, list[str]]:
     """An `**Answers:**` line read in the board's `Answers:` grammar (cadence §3.5), by ledgerboard's
     split and mark: the items split on `|` (`\\|` a literal bar), the closing full stop dropped, each
     split on its first ` — ` into its label and what it leads to (§4.10 *The answers' split*, TD-913),
     and the index of the one whose label is marked ` (default)` — None unless exactly one is (cadence
     §3.5, TD-066: at most one, and with two there is no single recommendation; none where it is a form, TD-1698).
-    `(labels, consequences, default)`. The value is the field alone, so a `Due:` or `Decided:` in it is words,
+    `(labels, consequences, default, heads)`, `heads` each label's form head as offered or '' (`mail.form_heads`,
+    TD-1698). The value is the field alone, so a `Due:` or `Decided:` in it is words,
     not a board item's trailing field."""
     out: list[str] = []
     consequences: list[str] = []
@@ -152,7 +153,7 @@ def answers_of(value: str) -> tuple[list[str], list[str], int | None]:
             consequences.append(consequence)
     # a form marked the default is no default: it is filled, never pressed (§4.4 *Decide*, TD-1698)
     default = marked[0] if len(marked) == 1 and not lb.is_form(out[marked[0]]) else None
-    return out, consequences, default
+    return out, consequences, default, mail.form_heads(out)
 
 
 def ask_of(body: str) -> str:
@@ -715,7 +716,7 @@ def entries(
         if kept := kept_waiting_of(t[m.start() : nxt.start() if nxt else len(t)]):
             e["kept_waiting"] = kept  # the newest `kept waiting` date per gate (§4.4 *The card's status*, TD-1368)
         if e["for_page"] == "for-you":
-            e["answers"], e["consequences"], e["default"] = answers_of(fields.get("answers", ""))
+            e["answers"], e["consequences"], e["default"], e["heads"] = answers_of(fields.get("answers", ""))
             e["ask"] = ask_of(body)  # its one sentence (§4.10 *An item leads with one sentence*, TD-913)
             e["until"] = until_of(read["blocked_raw"])
         out.append(e)
