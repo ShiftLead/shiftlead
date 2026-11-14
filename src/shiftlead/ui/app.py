@@ -5470,7 +5470,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 with contextlib.suppress(HTTPException):
                     fleet = await call("list")
                 names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
-                e["from_name"] = names.get(e.get("from"), e.get("from"))
+                orphan = e.get("orphaned") if isinstance(e.get("orphaned"), dict) else {}
+                e["from_name"] = str(orphan.get("name") or names.get(e.get("from"), e.get("from")))
                 rec = e.get("recommend")
                 if isinstance(rec, dict) and rec.get("by"):
                     e["passer_name"] = names.get(str(rec["by"]), str(rec["by"]))

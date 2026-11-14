@@ -603,7 +603,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {% macro orphaned(e, section) -%}
 {{ head(e) }}
 {{ body(e) }}
-{%- if e.kind == 'steer' %}<div class="st dflt">its asker would have gone with: {{ e.default or '—' }}</div>{% endif %}
+{%- if e.kind == 'steer' and not (card_whole(mode, e) and passed_question(e)) %}<div class="st dflt">its asker would have gone with: {{ e.default or '—' }}</div>{% endif %}
 {{ recommends(e) }}
 {%- set whole = card_whole(mode, e) %}
 {%- if whole %}{{ answer_row(e, 'mail', 'Go with it? Its default is written on the board as your answer, and sent to whoever holds ' ~ e.about ~ '.' if e.kind == 'steer' else '') }}{% else %}{{ answers(e) }}{% endif %}
