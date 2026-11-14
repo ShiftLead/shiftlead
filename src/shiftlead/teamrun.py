@@ -1832,16 +1832,39 @@ def red_prs(
     (*nobody's* where no team services the repo: its row is the Inbox's), *held by <names>* for one a
     live record of the repo holds, as the reading names them (`pr_orders.held`, TD-652), *no order while
     a draft* for a draft (not a sync PR) nobody holds (TD-745), *its author's* for a fork's PR nobody holds, a draft
-    included (TD-1292); before it, ''.
+    included (TD-1292); before it, ''. Each row's `since` is the stamp its age reads.
+    A filing PR the reading lists in `pr_orders.filing` (§4.4 *A filing PR nobody holds is a work order*, TD-1811)
+    is a row too, never tested again here (TD-652): `word` *filing*, `filing_since` and `since` its `created`, and
+    `whose` *nobody's — the grinders' order* or *held by <names>*; the facet leaves it out of its red count.
     `sessions` the records, or the pages' views."""
     r = r or {}
     mine = in_repo(sessions, str(r.get("root") or "")) if r.get("root") else []
     orders = {e.get("pr") for e in pr_orders(r)}
     holders = ((r.get("pr_orders") or {}).get("held")) or {}
     nobody = "nobody's — the grinders' order" if any(s.get("team") for s in mine) else "nobody's"
+    filing = {n for n in ((r.get("pr_orders") or {}).get("filing") or []) if isinstance(n, int)}
     out = []
     for p in ((r.get("prs") or {}).get("open")) or []:
-        if not isinstance(p, dict) or not isinstance(p.get("number"), int) or not p.get("red_since"):
+        if not isinstance(p, dict) or not isinstance(p.get("number"), int):
+            continue
+        if p["number"] in filing and not p.get("red_since"):
+            held = [str(x) for x in holders.get(str(p["number"])) or []]
+            created = str(p.get("created") or "")
+            out.append(
+                {
+                    "number": p["number"],
+                    "title": str(p.get("title") or ""),
+                    "url": str(p.get("url") or ""),
+                    "author": str(p.get("author") or ""),
+                    "word": "filing",
+                    "failing": [],
+                    "filing_since": created,
+                    "since": created,
+                    "whose": nobody if p["number"] in orders else f"held by {', '.join(held)}" if held else "",
+                }
+            )
+            continue
+        if not p.get("red_since"):
             continue
         try:
             since = datetime.fromisoformat(str(p["red_since"]))
@@ -1866,10 +1889,11 @@ def red_prs(
                 "word": "red" if p.get("checks") == "red" else "conflicting",
                 "failing": list(p.get("failing") or []),
                 "red_since": str(p["red_since"]),
+                "since": str(p["red_since"]),
                 "whose": whose,
             }
         )
-    out.sort(key=lambda x: x["red_since"])
+    out.sort(key=lambda x: x["since"])
     return out
 
 

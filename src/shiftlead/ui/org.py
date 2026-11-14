@@ -294,7 +294,8 @@ def repo_facet(
     entries = led.get("entries")
     open_ = prs.get("open")
     oldest = _age(open_[0].get("created"), now) if open_ else ""
-    red = [{**x, "age": _age(x["red_since"], now)} for x in teamrun.red_prs(r, fleet, now)]
+    # a filing PR's row is no red PR: the facet's count and its hover leave it out (§4.4, TD-1811)
+    red = [{**x, "age": _age(x["since"], now)} for x in teamrun.red_prs(r, fleet, now) if x["word"] != "filing"]
     # CI that never started, counted apart from red (§4.4, TD-686): the person's, not a lane's
     not_run = [p for p in open_ or [] if isinstance(p, dict) and p.get("checks") == "not_run"]
     return {

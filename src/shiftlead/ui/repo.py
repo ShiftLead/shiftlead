@@ -231,14 +231,16 @@ def pr_rows(
     branch it is, else the GitHub login — its age, *draft*, its standing with the techlead
     (`standing`, by number; nothing when no entry names it), and `red` for one that reads red or
     conflicting — its word, how long, and past `ORPHAN_AFTER` whose it is among `fleet`'s records
-    (`teamrun.red_prs`, TD-613); `not_run` for one whose CI never started (TD-686), drawn *CI never ran*;
+    (`teamrun.red_prs`, TD-613), or a filing PR the reading lists, its word *filing* and its age since `created`
+    (§4.4 *A filing PR nobody holds is a work order*, TD-1811); `not_run` for one whose CI never started
+    (TD-686), drawn *CI never ran*;
     `unasked` for a held PR nobody asked, in the standing's place (§4.4, TD-790): `teams` the servicing
     teams' members in the Org's order, whose reader the tag names (`review.unasked`); `fork` for a fork's PR,
     its tag's title (TD-1285), and `fork_line` while it is ready to precheck (`teamrun.ready_to_precheck`):
     `{line, diff, title}`, the person's `--fork-ok` line, the PR's diff and *type it in a terminal on
     <home>, where <root> is* (`home` the home's host name, TD-1292)."""
     by_branch = {str((m.get("git") or {}).get("branch") or ""): m for m in members if isinstance(m.get("git"), dict)}
-    reds = {x["number"]: {**x, "age": _age(x["red_since"], now)} for x in teamrun.red_prs(r, fleet, now)}
+    reds = {x["number"]: {**x, "age": _age(x["since"], now)} for x in teamrun.red_prs(r, fleet, now)}
     rows = []
     for p in (r.get("prs") or {}).get("open") or []:
         if not isinstance(p, dict) or not isinstance(p.get("number"), int):

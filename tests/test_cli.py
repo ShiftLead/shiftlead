@@ -2910,7 +2910,10 @@ def test_the_grinder_preset_takes_a_decided_board_line_first_with_its_four_outco
     claimed as `board:<key>` before any entry, ends one of four ways in a PR that closes the line, and
     an unclaimed one keeps the lane from out of work."""
     text = (pathlib.Path(__file__).parents[1] / "src/shiftlead/briefs/grinder.md").read_text()
-    assert "A decided board line comes first" in text and "Take it before any entry" in text
+    assert "A decided board line comes next" in text and "Take it before every other order and any entry" in text
+    # the pick order (§4.4 *A filing PR nobody holds is a work order*, TD-1811): sync, board, red and lift, filing
+    order = "sync orders, decided board lines, red and lift orders, filing orders, then the lane's entries"
+    assert order in text and "lists no `pr:<n>` order nobody holds (a sync, red, lift or filing PR's)" in text
     assert "`ao progress claim board:<key>`" in text and "`ao progress done board:<key> --pr <n>`" in text
     for outcome in (
         "needs nothing but the line closed",

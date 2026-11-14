@@ -700,15 +700,30 @@ def holds_pr(record: Any, pr: dict[str, Any]) -> bool:
 
 
 def red_holders(
-    open_prs: list[dict[str, Any]], records: list[Any], now: datetime, after: timedelta
+    open_prs: list[dict[str, Any]],
+    records: list[Any],
+    now: datetime,
+    after: timedelta,
+    *,
+    filing_after: timedelta | None = None,
+    key: list[str] | None = None,
+    reads: dict[str, list[dict[str, Any]]] | None = None,
 ) -> dict[str, list[str]]:
     """Who holds each red PR past `after`, by number as a string: the names of the live records
     `holds_pr` finds, for the pages' *held by <name>* (TD-652; the reading carries them, so no page
-    re-derives the test). A PR nobody holds, or not yet red for `after`, is not listed."""
+    re-derives the test). A PR nobody holds, or not yet red for `after`, is not listed. With
+    `filing_after`, a filing row is gated by `is_filing_order` in place of `red_since` (§4.4 *A filing PR
+    nobody holds is a work order*, TD-1811); absent, no filing row is read."""
     out: dict[str, list[str]] = {}
     for pr in open_prs:
-        since = pr.get("red_since") if isinstance(pr, dict) else None
-        if not since or not isinstance(pr.get("number"), int):
+        if not isinstance(pr, dict) or not isinstance(pr.get("number"), int):
+            continue
+        if filing_after is not None and is_filing_order(pr, now, filing_after, key, reads):
+            if held := [str(r.name or r.id) for r in records if holds_pr(r, pr)]:
+                out[str(pr["number"])] = held
+            continue
+        since = pr.get("red_since")
+        if not since:
             continue
         try:
             red_since = datetime.fromisoformat(str(since))
@@ -743,6 +758,54 @@ def is_lift_order(pr: dict[str, Any]) -> bool:
     return lift and not pr.get("draft") and not pr.get("fork")
 
 
+def _instant(stamp: Any) -> datetime | None:
+    """A stored stamp as an aware instant (UTC where it has no offset, as every stamp in the store is), else None."""
+    try:
+        at = datetime.fromisoformat(str(stamp))
+    except ValueError:
+        return None
+    return at.replace(tzinfo=UTC) if at.tzinfo is None else at
+
+
+def filing_row(pr: dict[str, Any]) -> bool:
+    """A row the filing rule reads rather than the red rule (§4.4 *A filing PR nobody holds is a work order*,
+    TD-1811): stamped `filing` true, not a sync or lift PR, its checks neither *red* nor `not_run`, and not
+    conflicting — a red or conflicting filing PR is the red rule's alone, one order, never two."""
+    if pr.get("filing") is not True or pr.get("sync") or is_lift_order(pr):
+        return False
+    return pr.get("checks") not in ("red", "not_run") and not pr.get("conflicting")
+
+
+def is_filing_order(
+    pr: dict[str, Any],
+    now: datetime,
+    after: timedelta,
+    key: list[str] | None,
+    reads: dict[str, list[dict[str, Any]]] | None,
+) -> bool:
+    """The one test of a filing PR's row (§4.4 *A filing PR nobody holds is a work order*, TD-1811), at every
+    call site: `filing_row`, its `filing` read at its head (`filing_head`); with a held `key` (the one the
+    reading reads at, `_held_keys`), `held` read at that head and key and empty — unread, it waits; with an
+    empty key, no fresh `held` is needed, but a row carrying a non-empty `held`, kept from an earlier key, is
+    never one; not a draft or a fork; opened (`created`) at least `after` ago; and no read of it open in
+    `reads` (the pass's reads by PR number, any addressee's, the person's included)."""
+    if not isinstance(pr, dict) or not isinstance(pr.get("number"), int) or not filing_row(pr):
+        return False
+    head = pr.get("head")
+    if not head or pr.get("filing_head") != head or pr.get("draft") or pr.get("fork"):
+        return False
+    if key:
+        read = pr.get("held_head") == head and list(pr.get("held_key") or []) == list(key)
+        if not read or not isinstance(pr.get("held"), list) or pr["held"]:
+            return False
+    elif pr.get("held"):
+        return False
+    created = _instant(pr.get("created")) if pr.get("created") else None
+    if created is None or now - created < after:
+        return False
+    return not any(isinstance(x, dict) and x.get("state") == "open" for x in (reads or {}).get(str(pr["number"])) or [])
+
+
 def lift_context(pr: dict[str, Any]) -> str:
     """A lift order's words beside its URL: the gate it lifts on its entry, `lifts TD-n event (live)`."""
     tid, gate = reports.lift_of(pr.get("branch")) or ("", "")
@@ -769,6 +832,8 @@ def pr_note(pr: dict[str, Any]) -> str:
     if is_lift_order(pr):
         since = pr.get("lift_since")
         return f"lift PR #{pr['number']} has been open since {since}: {lift_context(pr)} — take it or say why"
+    if filing_row(pr):
+        return f"filing PR #{pr['number']} has been open since {pr.get('created')}: merge it or say why"
     why = ", ".join(pr.get("failing") or []) or ("conflicting with its base" if pr.get("conflicting") else "red")
     return f"PR #{pr['number']} has been red since {pr.get('red_since')}: {why} — fix it or say why"
 
@@ -784,12 +849,16 @@ def pr_order(pr: dict[str, Any], priorities: dict[str, str] | None = None) -> di
     failing = list(pr.get("failing") or [])
     sync = is_sync_order(pr)
     lift = not sync and is_lift_order(pr)
+    filing = not sync and not lift and filing_row(pr)
+    since = str(pr.get("created") or "")
     why = sync_reason(pr) if sync else lift_context(pr) if lift else ""
+    if filing:
+        why = f"filing, open since {since[:10]}, nobody holds it: review and merge it, or close it if superseded"
     tid, gate = (reports.lift_of(pr.get("branch")) or ("", "")) if lift else ("", "")
-    priority = str((priorities or {}).get(tid) or "high").capitalize() if lift else "High"
+    priority = str((priorities or {}).get(tid) or "high").capitalize() if lift else "Medium" if filing else "High"
     red = [", ".join(failing), "conflicting" * bool(pr.get("conflicting"))]
     red += ["CI never ran"] if pr.get("checks") == "not_run" else []  # ordered by its conflict alone (TD-686)
-    context = " · ".join(filter(None, [str(pr.get("url") or ""), *([why] if sync or lift else red)]))
+    context = " · ".join(filter(None, [str(pr.get("url") or ""), *([why] if sync or lift or filing else red)]))
     return {
         "id": f"{PR_PREFIX}{pr['number']}",
         "title": str(pr.get("title") or ""),
@@ -814,6 +883,7 @@ def pr_order(pr: dict[str, Any], priorities: dict[str, str] | None = None) -> di
         "text": "",
         **({"sync": True, "sync_since": pr.get("sync_since"), "reason": why} if sync else {}),
         **({"lift": True, "lift_since": pr.get("lift_since"), "entry": tid, "gate": gate} if lift else {}),
+        **({"filing": True, "filing_since": since} if filing else {}),
     }
 
 
@@ -824,6 +894,10 @@ def red_prs(
     told: dict[str, dict[str, str]],
     after: timedelta,
     priorities: dict[str, str] | None = None,
+    *,
+    filing_after: timedelta | None = None,
+    key: list[str] | None = None,
+    reads: dict[str, list[dict[str, Any]]] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, dict[str, str]], list[tuple[str, dict[str, Any]]]]:
     """A repo's red PRs read against its live records: the `pr:<n>` orders, the memory of whom was
     told (`{n: {red_since, at}}`, one per red spell), and the notes to send now `(record id, pr)`.
@@ -845,7 +919,13 @@ def red_prs(
     marked ready red past `after` is an order at once and a holder told before the draft is not told again.
 
     A fork's PR (the reading's `fork`) is no order and no note either (design §4.4 *A fork's PR is no work
-    order*, TD-1285): its fix is its author's, and running its code here is the person's call."""
+    order*, TD-1285): its fix is its author's, and running its code here is the person's call.
+
+    With `filing_after` (absent: none), a filing PR (`filing_row`) is one too (§4.4 *A filing PR nobody holds
+    is a work order*, TD-1811): its spell's stamp is its `created`, kept while the row stays a filing row
+    whether or not it passes; it is read once `is_filing_order` passes it (`key` and `reads` its held key and
+    its reads), with no `red_since`-past-`after` line; unheld, an order; held with every holder idle, told
+    once and an order `after` later. Filing orders come after every other PR order."""
     orders: list[dict[str, Any]] = []
     kept: dict[str, dict[str, str]] = {}
     notes: list[tuple[str, dict[str, Any]]] = []
@@ -854,7 +934,9 @@ def red_prs(
             continue
         sync = is_sync_order(pr)
         lift = not sync and is_lift_order(pr)
+        filing = not sync and not lift and filing_after is not None and filing_row(pr)
         since = pr.get("sync_since") if sync else pr.get("lift_since") if lift else pr.get("red_since")
+        since = pr.get("created") if filing else since
         if not since:
             continue
         try:
@@ -863,32 +945,34 @@ def red_prs(
             continue
         if red_since.tzinfo is None:  # a stamp with no offset is UTC, as every stamp in the store is
             red_since = red_since.replace(tzinfo=UTC)
-        key = str(pr["number"])
+        num = str(pr["number"])
         # the memory's key is `red_since` whatever the spell: a sync PR's is its `sync_since`
-        was = told.get(key) if (told.get(key) or {}).get("red_since") == since else None
+        was = told.get(num) if (told.get(num) or {}).get("red_since") == since else None
         if was:
-            kept[key] = was  # this red spell's memory stays while it lasts
+            kept[num] = was  # this red spell's memory stays while it lasts
         if pr.get("draft") and not sync:
             continue  # a draft is no order and no note, its memory kept for when it is ready (TD-745)
         if pr.get("fork") and not sync:
             continue  # a fork's PR is no order and no note: its precheck is the person's (TD-1285)
+        if filing and not is_filing_order(pr, now, filing_after or after, key, reads):
+            continue  # not yet, or not now: its spell's memory kept while it is a filing row (TD-1811)
         holders = [r for r in records if holds_pr(r, pr)]
         if not holders and (sync or lift):
             orders.append(pr_order(pr, priorities))
             continue
-        if now - red_since < after:
-            continue
+        if not filing and now - red_since < after:
+            continue  # a filing row's age is `is_filing_order`'s
         if not holders:
             orders.append(pr_order(pr, priorities))
             continue
         if any(r.state != "idle" for r in holders):
             continue
         if was is None:
-            kept[key] = {"red_since": since, "at": now.isoformat()}
+            kept[num] = {"red_since": since, "at": now.isoformat()}
             notes.extend((r.id, pr) for r in holders)
         elif now - datetime.fromisoformat(was["at"]) >= after:
             orders.append(pr_order(pr, priorities))
-    orders.sort(key=lambda o: not o.get("sync"))  # a sync order first (a stable sort)
+    orders.sort(key=lambda o: (not o.get("sync"), bool(o.get("filing"))))  # sync first, filing last (stable)
     return orders, kept, notes
 
 
