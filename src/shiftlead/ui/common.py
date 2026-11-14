@@ -132,6 +132,23 @@ def suggested_answers(e: Any) -> list[str]:
 templates.env.globals["suggested_answers"] = suggested_answers
 
 
+def suggested_heads(e: Any) -> list[str]:
+    """Beside each of `suggested_answers(e)`, its form's head, '' for a complete answer (§4.5a **<head>…**, TD-1698):
+    the reading's `heads`, filtered and clipped in step with the answers, so a row draws **Hold…** for `Hold: <note>`
+    and never matches the shape itself. A `heads` that is not a list as long as the answers reads as no forms."""
+    raw = e.get("answers") if hasattr(e, "get") else None
+    if not isinstance(raw, list):
+        return []
+    heads = e.get("heads")
+    heads = heads if isinstance(heads, list) and len(heads) == len(raw) else [""] * len(raw)
+    return [
+        h if isinstance(h, str) else "" for a, h in zip(raw, heads, strict=True) if isinstance(a, str) and a.strip()
+    ][: mail.ANSWERS_MAX]
+
+
+templates.env.globals["suggested_heads"] = suggested_heads
+
+
 def not_answered(e: Any) -> dict[str, str] | None:
     """A taken-up question's one line (design §4.5a *Inbox row: taken up*, §4.9b *Why it did not answer*,
     TD-1431): who did not answer, the read's time, and the home's fixed words for the state — the words from

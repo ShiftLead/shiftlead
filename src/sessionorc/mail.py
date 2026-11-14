@@ -290,8 +290,9 @@ def picks_answer(text: str, line: str) -> bool:
 
 def read_answers(entry: dict[str, Any]) -> dict[str, Any]:
     """A mail entry's reading with its `answers` split (§4.10 *The answers' split*, TD-913): `answers` the
-    labels, a parallel `consequences`, and `recommended` — the index of a `steer`'s `default` (matched on
-    the label or the whole line, word for word) or of the one `ask` label ending in ` (default)`, else None.
+    labels, a parallel `consequences` and `heads` (`form_heads`, TD-1698), and `recommended` — the index of a
+    `steer`'s `default` (matched on the label or the whole line, word for word) or of the one `ask` label ending in
+    ` (default)`, else None.
     What is stored is unchanged; a reading without answers is returned as it is."""
     lines = [str(a) for a in entry.get("answers") or ()]
     if not lines:
@@ -311,7 +312,7 @@ def read_answers(entry: dict[str, Any]) -> dict[str, Any]:
         rec = marked[0] if len(marked) == 1 else None
     if rec is not None and ledgerboard.is_form(labels[rec]):
         rec = None  # a form is filled, never pressed: no default (§4.10 *A form is filled, never pressed*, TD-1698)
-    return {**entry, "answers": labels, "consequences": consequences, "recommended": rec}
+    return {**entry, "answers": labels, "consequences": consequences, "recommended": rec, "heads": form_heads(labels)}
 
 
 def answer_labels(lines: Iterable[Any]) -> list[str]:
@@ -324,6 +325,13 @@ def form_head_as_offered(label: str) -> str:
     """A form's head as offered (`Hold` of `Hold: <note>`); the label itself where it is no form (TD-1698)."""
     m = ledgerboard.FORM_RE.fullmatch(" ".join(str(label).split()))
     return m.group("head").strip() if m else str(label)
+
+
+def form_heads(labels: Iterable[Any]) -> list[str]:
+    """Beside each offered answer's label, its form's head as offered (`Hold` of `Hold: <note>`), or '' for a complete
+    answer: the `heads` every reader hands the page beside `answers`, so the page draws **Hold…** and never matches
+    the shape itself (§4.5a **<head>…**, TD-1698)."""
+    return [form_head_as_offered(a) if ledgerboard.is_form(str(a)) else "" for a in labels]
 
 
 def is_person(caller: Any) -> bool:

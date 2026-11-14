@@ -79,7 +79,7 @@ def test_a_ledger_entry_carries_its_ask_and_its_answers_consequences():
     assert asked["consequences"] == ["one login for all", "your quota"] and asked["default"] == 0
     assert "**Ask:**" not in "\n".join(asked["detail"])  # context is Why and Fix alone
     long = "x" * 120 + " (default)"  # a ledger answer is not capped: it is what the decided line writes
-    assert ledger.answers_of(f"{long} — y | b") == (["x" * 120, "b"], ["y", ""], 0)
+    assert ledger.answers_of(f"{long} — y | b") == (["x" * 120, "b"], ["y", ""], 0, ["", ""])
     assert bare["ask"] == "" and bare["answers"] == [] and bare["consequences"] == []
 
 

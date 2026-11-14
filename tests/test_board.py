@@ -1403,8 +1403,8 @@ async def test_a_ledger_entrys_form_is_filled_never_pressed(agent, repo, tmp_pat
 
     from sessionorc import ledger as ledger_mod
 
-    labels, _cons, default = ledger_mod.answers_of("Go | Hold: <note> (default)")
-    assert labels == ["Go", "Hold: <note>"] and default is None
+    labels, _cons, default, heads = ledger_mod.answers_of("Go | Hold: <note> (default)")
+    assert labels == ["Go", "Hold: <note>"] and default is None and heads == ["", "Hold"]
     assert ledger_mod.answers_of("Go (default) | Hold: <note>")[2] == 0
     shutil.copytree(Path(__file__).resolve().parent.parent / "scripts", repo / "scripts", dirs_exist_ok=True)
     root = str(repo)

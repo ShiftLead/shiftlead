@@ -186,6 +186,19 @@ def live_look_pair(kind: str, answers: Any) -> bool:
     )
 
 
+def reply_decides(kind: str, answers: Any, decided: bool) -> bool:
+    """Whether a Reply on a line can decide it (§4.4 *A Reply that fills a form decides*, TD-1698): undecided, a
+    `decide` or `look` line, or a `watch` carrying the look's pair, whose answers offer a form. `reply_fills` reads a
+    found line by it, and the page's reader hands it as `reply_decides`, which the reply box's foot is drawn on."""
+    said = [str(a) for a in answers or ()]
+    k = str(kind or "").lower()
+    return (
+        not decided
+        and any(ledgerboard.is_form(a) for a in said)
+        and (k in ("decide", "look") or (k == "watch" and live_look_pair(k, said)))
+    )
+
+
 def reply_fills(text: str, reply: str) -> str | None:
     """The answer a Reply's words write as the line's decide (§4.4 *A Reply that fills a form decides*, TD-1698), or
     None where they stay a Reply: on an open, undecided `decide` or `look` line, or a `watch` carrying the look's
@@ -193,14 +206,9 @@ def reply_fills(text: str, reply: str) -> str | None:
     form's press, filled through ledgerboard (`<head>: <words>`, one line). An empty fill — the head alone, or the
     head with a placeholder — is refused with *<head> needs its words*. Read from the found line's own text, never
     from anything the page sent."""
-    if ledgerboard.parse_decided(text) is not None:
-        return None
     km = ledgerboard.KIND_RE.match(text)
-    kind = km.group("kind").lower() if km else ""
     answers = ledgerboard.parse_answers(text)
-    if not any(ledgerboard.is_form(a) for a in answers):
-        return None
-    if kind not in ("decide", "look") and not (kind == "watch" and live_look_pair(kind, answers)):
+    if not reply_decides(km.group("kind") if km else "", answers, ledgerboard.parse_decided(text) is not None):
         return None
     try:
         return ledgerboard.fill_form(" ".join(str(reply or "").split()), answers)
