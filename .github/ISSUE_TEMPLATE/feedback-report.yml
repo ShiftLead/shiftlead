@@ -11,7 +11,7 @@ body:
 
         **Before you submit**
         - **Read it for names and private work.** The scrub misses other spellings, branches, people's names and private work described in plain words. Only your read of the whole report catches what it cannot.
-        - **Paste it exactly as the run wrote it**, everything after its first line (the title). Never change it by hand: answer *edit* in the run instead.
+        - **Paste it as the run wrote it.** The block is parsed by machine. To change a finding, please choose *edit* in the run.
         - **An edit after submitting** keeps the earlier text in the issue's edit history, which anyone who sees the issue can open.
 
   - type: textarea

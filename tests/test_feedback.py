@@ -488,7 +488,9 @@ def test_the_feedback_report_issue_form():
         "keeps the earlier text in the issue's edit history",
         "Only your read of the whole report catches what it cannot",
         "private work described in plain words",
-        "Never change it by hand",
+        "Paste it as the run wrote it.",
+        "The block is parsed by machine",
+        "please choose *edit* in the run",
     ):
         assert phrase in warning, phrase
     # TD-1816: short enough to read at a glance — a lead and a few headed points, not paragraphs
