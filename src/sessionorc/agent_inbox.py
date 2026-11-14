@@ -447,7 +447,10 @@ class InboxMixin:
         if form is None:
             # a complete offered answer word for word comes first, so an item's own complete *Not right: wrong
             # repo* is an answer like any other; a form pressed as written says nothing (ledgerboard's form)
-            if said and said in offered and not ledgerboard.is_form(ledgerboard.split_answer(said)[0]):
+            if said and said in offered:
+                label = ledgerboard.split_answer(said)[0]
+                if ledgerboard.is_form(label):  # a form as offered, its consequence and all, says nothing
+                    raise board_mod.Refused(f"{_offered_head(label)} needs its words")
                 return said
             if not offered and said == board_mod.HAVE_A_SESSION:
                 # **Have a session do it** (TD-1624): an `act` line's fixed answer, checked against the line's own

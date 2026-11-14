@@ -1002,6 +1002,10 @@ def test_a_form_is_filled_never_pressed_on_a_decide():
             A._board_answer("decide", bad, hold)
     with pytest.raises(board.Refused, match="word for word"):
         A._board_answer("decide", "Wait: a day", hold)  # no such form: a Reply
+    # a form handed with its consequence, pressed as written, is the form unfilled (review of #3894)
+    with pytest.raises(board.Refused, match="Hold needs its words"):
+        A._board_answer("decide", "Hold: <note> — pauses it", ["Go", "Hold: <note> — pauses it"])
+    assert A._board_answer("decide", "Hold: soon", ["Go", "Hold: <note> — pauses it"]) == "Hold: soon"
     # with `form`: the head goes back, and only that form fills
     assert A._board_answer("decide", "Holding it", hold, 1) == "Hold: Holding it"
     assert A._board_answer("decide", "Go", hold, 1) == "Hold: Go"
