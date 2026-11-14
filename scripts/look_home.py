@@ -65,6 +65,9 @@ BOARD = "\n".join(
         # a decided line: a work order `board:<key>` in the repo reading's lanes (§4.4 *Board write-back*, TD-384)
         _LINE.format(kind="decide", head="A fixture decided line.", rest="Keep it or drop it? ", due="{today}")
         + " Answers: keep | drop. Decided: keep ({today}).",
+        # a step only the person can do, naming no entry: the Inbox's to-do list (§4.5 screen 6, TD-1825)
+        "- [ ] act {today} (n/a) — Sign in the fixture home, so TD-002 can run — only you can do this."
+        " Context: none. Due: {today}.",
         "",
     ]
 )
