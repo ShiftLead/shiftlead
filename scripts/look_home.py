@@ -62,6 +62,9 @@ BOARD = "\n".join(
         # an undecided decide line with a default: its answers and Go with it (§4.5 screen 6 rule 4, TD-1321)
         _LINE.format(kind="decide", head="A fixture question.", rest="Keep it or drop it? ", due="{today}")
         + " Answers: keep (default) | drop.",
+        # an end of rounds: two answers and a form, drawn **Go**, **One more round** and **Hold…** (TD-1699)
+        _LINE.format(kind="decide", head="A fixture end of rounds.", rest="Go, or buy one more round? ", due="{today}")
+        + " Answers: Go | One more round | Hold: <note>.",
         # a decided line: a work order `board:<key>` in the repo reading's lanes (§4.4 *Board write-back*, TD-384)
         _LINE.format(kind="decide", head="A fixture decided line.", rest="Keep it or drop it? ", due="{today}")
         + " Answers: keep | drop. Decided: keep ({today}).",

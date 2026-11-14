@@ -1104,6 +1104,23 @@
     AO.toast(text.trim() ? "the item changed — your words are kept: Answer… on it again to send them" : "the item changed — the box was closed", false);
     return true;
   };
+  // a form's box (§4.5a **<head>…**, TD-1699): sent untouched — only the words it was begun with, and nothing more,
+  // are refused here, as the agent refuses them (*<head> needs its words*)
+  AO.formFilled = function (text, begun) {
+    if (String(text || "").trim() === String(begun || "").trim()) throw new Error(`${String(begun).replace(/:\s*$/, "")} needs its words`);
+  };
+  // a live look's *Not right* fill hands an entry to the repo's techlead (§4.4 *Decide*, TD-255 slice 3), after the
+  // decide committed: `[the toast's words, ok]`, a refusal said, never thrown — the decision stands
+  AO.handOn = async function (repo, head, answer) {
+    try {
+      const r = await fetch("/api/entry/hand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: "debt", words: `${head} — ${answer}` }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.detail || r.statusText);
+      return [j.text || "handed to the techlead", true];
+    } catch (e) {
+      return [`no entry was handed on: ${e.message}`, false];
+    }
+  };
   AO.compose = function (o) {
     const dlg = $("#mailbox");
     if (!mailAttach && $("#mailattach")) {
@@ -1127,6 +1144,9 @@
     // words a re-read's close kept for this item (TD-1555) come back, once
     const keep = o.keep || o.row;
     if (keep && AO.keptWords[keep]) { $("#mailtext").value = AO.keptWords[keep]; delete AO.keptWords[keep]; }
+    // the box's foot (§4.5 screen 6 *A board line's Reply*, TD-1699): which words decide the line, where a Reply can
+    const foot = $("#mailfoot");
+    if (foot) { foot.textContent = o.foot || ""; foot.hidden = !o.foot; }
     // §4.10 *When it is read* (TD-168): the addressee's pair, from its record's view, never a
     // request; a reply reads as a note does, and switching the kind swaps the sentence
     const when = $("#mailwhen");
@@ -1635,10 +1655,10 @@
           ...(action === "reply" ? { item: atItem, row: AO.answerRow(b) } : {}),
         });
         if (!m) return;
-        // §4.5a **Inbox row: a look** (TD-292): **Not right…** begins the reply with the form, and
-        // the form's prefix is kept whatever case it was retyped in, as a board row's is
-        if (at.begun === "Not right: ") m.text = `Not right: ${m.text.trim().replace(/^not right\s*:?\s*/i, "")}`.trim();
         body = action === "reply" ? { reply_to: at.msg, text: m.text } : m;
+        // §4.5a **<head>…** (TD-1699): a form's box sends its index; the home puts the head back where it was
+        // retyped away, so the page matches nothing — the look's **Not right…** is this case
+        if (action === "reply" && at.form) { AO.formFilled(m.text, at.begun); body.form = Number(at.form); }
       }
       // design §4.5a **Inbox row: suggested answers** (§4.10, TD-070): a press is an ordinary
       // reply — the same route, the same RPC, the same wake — and what it sends is **the index**,
@@ -1747,7 +1767,7 @@
       // is not Done — and the refresh brings it back with the reply on it. `refs` are the reader's,
       // handed as they came: the home mails each live lease holder on one of them (TD-142).
       if (action === "board_reply") {
-        const m = await AO.compose({ to: at.name || "the board", reply: true, quote: atLine, item: atItem, row: AO.answerRow(b), keep: at.key || "" });
+        const m = await AO.compose({ to: at.name || "the board", reply: true, quote: atLine, item: atItem, row: AO.answerRow(b), keep: at.key || "", foot: at.foot || "" });
         if (!m) return;
         let refs = [];
         try { refs = JSON.parse(at.refs || "[]"); } catch (_) { refs = []; }
@@ -1755,6 +1775,21 @@
         const res = await act("person", "board", {
           action: "reply", board: at.board, line: Number(at.line), text: atLine, key: at.key || "", reply: m.text, refs,
         });
+        if (res.decided) {
+          // words that filled a form decided the line (§4.4 *A Reply that fills a form decides*, TD-1698): drawn
+          // decided by the answer the call returns, the Queue card's item to *Waiting on them* on the re-read
+          const r = fresh(), f = msgOf && AO.inflight[msgOf];
+          if (r) { r.querySelectorAll(".st.boardreply[data-drawn]").forEach((x) => x.remove()); AO.qcardOff(r, msgOf); }
+          if (f) f.kind = "decided";
+          answered(`decided: ${res.decided} · ${AO.today()}`);
+          // a live look's Reply that filled *Not right* hands its entry on, as **Not right…** does
+          if (at.pair) {
+            const [handed, ok] = await AO.handOn(at.repo, at.head, res.decided);
+            say(`decided: ${res.decided} — landed on the board on origin · ${handed}`, ok);
+          } else say("decided — written on the board", true);
+          if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+          return;
+        }
         answered(m.text);  // the words without *landing…*: on the board now
         const to = (res.sent || []).map((x) => `${x.session} (holds ${x.ref})`).join(", ");
         say(to ? `written on the board · sent to ${to}` : res.note || "written on the board", true);
@@ -1766,28 +1801,28 @@
       // write. Then the page's second call hands an entry to the repo's techlead, as **Add entry…**
       // does (`entry_add`), its first line the item's head and the person's words — after the
       // decide has committed, and a refusal there is toasted: the decision stands.
+      // §4.5a **<head>…** (TD-1557, built by TD-1699) generalises it: any form's press opens the box begun with its
+      // head and sends the `decide` with the words as typed and `form`, its index — the agent puts the head back, the
+      // page matches nothing. Only the live look's pair (`data-pair`) hands an entry on: a **Hold…** hands nothing.
       if (action === "board_notright") {
-        const m = await AO.compose({ to: at.name || "the board", reply: true, quote: atLine, text: "Not right: ", item: atItem, row: AO.answerRow(b), keep: at.key || "" });
+        const begun = at.begun || "Not right: ";
+        const m = await AO.compose({ to: at.name || "the board", reply: true, quote: atLine, text: begun, item: atItem, row: AO.answerRow(b), keep: at.key || "" });
         if (!m) return;
         const said = m.text.split(/\s+/).filter(Boolean).join(" ");
-        // the prefix is the form's, whatever case it was retyped in
-        const answer = `Not right: ${said.replace(/^not right\s*:?\s*/i, "")}`.trim();
-        pressed(answer);
-        await act("person", "board", {
+        AO.formFilled(said, begun);
+        pressed(said);
+        const res = await act("person", "board", {
           action: "decide", board: at.board, line: Number(at.line), text: atLine, key: at.key || "",
-          answer, answers: JSON.parse(at.answers || "[]"),
+          answer: said, answers: JSON.parse(at.answers || "[]"), form: Number(at.form || 1),
         });
+        const answer = res.decided || said;  // the filled answer the call returns, never the words sent
         answered(`decided: ${answer} · ${AO.today()}`);  // the decided line on the decide's answer, the toast after both
-        let handed = "", refused = false;
-        try {
-          const r = await fetch("/api/entry/hand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo: at.repo, type: "debt", words: `${at.head} — ${answer}` }) });
-          const j = await r.json().catch(() => ({}));
-          if (!r.ok) throw new Error(j.detail || r.statusText);
-          handed = j.text || "handed to the techlead";
-        } catch (e) {
-          handed = `no entry was handed on: ${e.message}`; refused = true;
+        if (!at.pair) {
+          say(`decided: ${answer} — landed on the board on origin; the item stays, as its session's work order`, true);
+        } else {
+          const [handed, ok] = await AO.handOn(at.repo, at.head, answer);
+          say(`decided: ${answer} — landed on the board on origin · ${handed}`, ok);
         }
-        say(`decided: ${answer} — landed on the board on origin · ${handed}`, !refused);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
@@ -1812,9 +1847,11 @@
           return;
         }
         if (action === "ledger_reply") {
-          const m = await AO.compose({ to: at.name || "the board", reply: true, quote: at.quote, item: atItem, row: AO.answerRow(b) });
+          const m = await AO.compose({ to: at.name || "the board", reply: true, quote: at.quote, item: atItem, row: AO.answerRow(b), text: at.begun || "" });
           if (!m) return;
           want.words = m.text;
+          // a form's Reply (§4.5a **<head>…**, TD-1699): its index beside the words, the head put back by the agent
+          if (at.form) { AO.formFilled(m.text, at.begun); want.form = Number(at.form); }
         } else if (b.dataset.words) want.words = b.dataset.words;  // Done, Lift the hold: fixed words (TD-771)
         else if (b.dataset.go) want.go = true;
         else want.answer = Number(b.dataset.index);

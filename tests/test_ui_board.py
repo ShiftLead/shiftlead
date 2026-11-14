@@ -1204,7 +1204,8 @@ def test_only_a_look_or_watch_with_exactly_the_pair_is_a_live_look(tmp_path, mon
     ):
         assert not live_look(it)
         rows, html = rows_html(tmp_path, monkeypatch, it)
-        assert not rows[0]["pair"] and "board_notright" not in html and "&ldquo;" in html
+        # no pair: a form among them is a **<head>…** (TD-1699), handing nothing on — never the look's Not right…
+        assert not rows[0]["pair"] and "data-pair" not in html and "&ldquo;" in html
     assert live_look(look_item()) and live_look(look_item(answers=("Works", "Not right:")))
     assert live_look(look_item(kind="look"))  # the kind cadence names for it (TD-292), as a `watch` before it
     rows, html = rows_html(tmp_path, monkeypatch, look_item(kind="look"))
@@ -1217,19 +1218,25 @@ def test_only_a_look_or_watch_with_exactly_the_pair_is_a_live_look(tmp_path, mon
 
 @pytest.mark.unit
 def test_not_right_opens_the_composer_begun_decides_then_hands_an_entry_on():
-    """The page's half, read from its source: the composer opens with *Not right:* begun, one
-    `decide` carries the typed text, and only then the second call hands a `debt` entry to the
-    techlead, its words the item's head and the answer; a refusal there is toasted and returns."""
+    """The page's half, read from its source: the composer opens begun with the form's head (*Not right:* on a look,
+    TD-1699 generalising it), one `decide` carries the typed text and `form`, the page matching nothing, and only on
+    a look's pair the second call hands a `debt` entry to the techlead, its words the item's head and the filled
+    answer the call returned; a refusal there is toasted red and returns."""
     import pathlib
 
     js = (pathlib.Path(__file__).parent.parent / "src/shiftlead/ui/static/app.js").read_text()
     at = js.index('if (action === "board_notright") {')
     block = js[at : js.index('if (action === "board_add") {', at)]
-    assert 'text: "Not right: "' in block and '$("#mailtext").value = o.text || "";' in js
-    decide, hand = block.index('action: "decide"'), block.index('fetch("/api/entry/hand"')
-    assert decide < hand and 'type: "debt"' in block and "words: `${at.head} — ${answer}`" in block
-    assert "no entry was handed on" in block and 'board_notright: "Not right…"' in js
-    assert "!refused);" in block and "/^not right\\s*:?\\s*/i" in block  # a refusal is not a green toast
+    assert 'const begun = at.begun || "Not right: ";' in block and "text: begun" in block
+    assert '$("#mailtext").value = o.text || "";' in js
+    decide, hand = block.index('action: "decide"'), block.index("AO.handOn(at.repo, at.head, answer)")
+    assert decide < hand and "if (!at.pair)" in block and "form: Number(at.form || 1)" in block
+    assert "const answer = res.decided || said;" in block
+    helper = js[js.index("AO.handOn = async function") : js.index("AO.compose = function")]
+    assert 'type: "debt"' in helper and "words: `${head} — ${answer}`" in helper
+    assert "no entry was handed on" in helper and 'board_notright: "Not right…"' in js
+    assert "say(`decided: ${answer} — landed on the board on origin · ${handed}`, ok);" in block
+    assert "/^not right" not in js  # the form's head is the agent's to put back, never matched here
     assert 'text: ["Go with it", "Go with it: Works"]' in js
 
 
