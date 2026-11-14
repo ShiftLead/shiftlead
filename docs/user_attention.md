@@ -19,7 +19,7 @@ People: paul
   - **Context:** TD-656 (Build TD-646 (3): the Cloudflare route, its Access token check, ao connect cloudflare, its doctor line and guide) waits on decision (paul). Nobody runs the route today, and the home passkey (design 4.5b) may replace its token check.
   - **Question:** Should a session build the Cloudflare route now, or leave it unbuilt until someone needs a Cloudflare tunnel?
   - **Recommended:** Not yet: no device needs the route today, and the passkey may change what it checks.
-- [ ] decide 2026-11-14 (session `gate-sweep` on kmaster) — Should a `steer` a techlead passed up to you count in the Inbox's *Needs you* number (and as a Decide item on the Queue), instead of sitting uncounted under *Steering* until its default applies? Context: TD-1353 decision (paul). Due: 2026-11-14. Answers: Go | Not yet.
+- [x] decide 2026-11-14 (session `gate-sweep` on kmaster) — Should a `steer` a techlead passed up to you count in the Inbox's *Needs you* number (and as a Decide item on the Queue), instead of sitting uncounted under *Steering* until its default applies? Context: TD-1353 decision (paul). Due: 2026-11-14. Answers: Go | Not yet. Decided: Not yet (by paul) (2026-11-14). Closed: 2026-11-14 — kept waiting.
   - **Context:** TD-1353 (Should a passed-up `steer` be counted in *Needs you* and drawn on the Queue, rather than run uncounted under *Steering*?) waits on decision (paul), and no board item asked for it.
   - **Question:** Should a `steer` a techlead passed up to you count in the Inbox's *Needs you* number (and as a Decide item on the Queue), instead of sitting uncounted under *Steering* until its default applies?
   - **Recommended:** Only paul can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days.
