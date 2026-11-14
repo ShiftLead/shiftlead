@@ -308,3 +308,15 @@ def test_the_verbs_exits(tmp_path, capsys):
         (tmp_path / "bad.json").write_text(bad, encoding="utf-8")
         assert cli.main(["feedback", "intake", "--issues", str(tmp_path / "bad.json"), "--root", root, "--json"]) == 2
         assert "not gh's list" in json.loads(capsys.readouterr().out)["error"]
+
+
+def test_a_crlf_body_a_lone_surrogate_and_a_float_v(tmp_path, capsys):
+    crlf = body(block(new=[finding("crlf")])).replace("\n", "\r\n")
+    assert one(tmp_path, raw=crlf)["reports"][0]["new"][0]["what"] == "crlf"
+    assert one(tmp_path, block(v=1.0))["refused"][0]["why"] == "unknown v"
+    raw = body(None, text='{"v": 1, "commit": null, "days": 1, "seats": 1, "noise": 0, "new": [{"area": "shiftlead",'
+               ' "what": "a\\ud800b", "fix": "c\\udfffd", "count": 1}]}')  # fmt: skip
+    f = save(tmp_path, [issue(1, raw)])
+    assert cli.main(["feedback", "intake", "--issues", f, "--root", str(tmp_path), "--read", "1", "--json"]) == 0
+    got = json.loads(capsys.readouterr().out)["reports"][0]["new"][0]
+    assert (got["what"], got["fix"]) == ("ab", "cd")

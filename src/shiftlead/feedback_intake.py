@@ -32,7 +32,7 @@ UNKNOWN_V = "unknown v"
 _COMMIT_RE = re.compile(r"[0-9a-fA-F]{7,40}")
 _LOGIN_RE = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})(?:\[bot\])?")
 _INSTANT_RE = re.compile(r"\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})")
-_FENCE_RE = re.compile(r"^```json[ \t]*\r?\n(.*?)^```[ \t]*$", re.MULTILINE | re.DOTALL)
+_FENCE_RE = re.compile(r"^```json[ \t]*\n(.*?)^```[ \t]*$", re.MULTILINE | re.DOTALL)
 
 
 class NotTheList(ValueError):
@@ -59,6 +59,7 @@ def _block(body: Any) -> Any:
     """The first fenced `json` block after the marker line, parsed."""
     if not isinstance(body, str) or fr.MARKER not in body:
         raise _Refused(NO_MARKER)
+    body = body.replace("\r\n", "\n")  # a body GitHub's form took in carries CRLF line ends
     m = _FENCE_RE.search(body, body.index(fr.MARKER) + len(fr.MARKER))
     if not m:
         raise _Refused(NO_PARSE)
@@ -82,7 +83,7 @@ def parse(data: Any) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise _Refused(NO_PARSE)
     v = data.get("v")
-    if isinstance(v, bool) or v != fr.V:
+    if type(v) is not int or v != fr.V:  # `1.0` and `true` are no v1
         raise _Refused(UNKNOWN_V)
     commit = data.get("commit")
     if commit is not None:

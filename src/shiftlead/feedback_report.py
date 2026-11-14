@@ -177,11 +177,12 @@ _SENT_RE = re.compile(f"[{_SENT}]")
 
 
 def normalize(text: str) -> str:
-    """NFKC; every whitespace character a space; every remaining Cc and Cf character dropped; backticks `'`, and
+    """NFKC; every whitespace character a space; every remaining Cc, Cf and Cs character dropped (a lone surrogate
+    no output encodes); backticks `'`, and
     `](` made `] (`. (A plane-15 private-use character is dropped too: it is the scrub's own set-aside mark.)"""
     t = unicodedata.normalize("NFKC", text)
     t = "".join(" " if c.isspace() else c for c in t)
-    t = "".join(c for c in t if unicodedata.category(c) not in ("Cc", "Cf") and not _SENT_RE.match(c))
+    t = "".join(c for c in t if unicodedata.category(c) not in ("Cc", "Cf", "Cs") and not _SENT_RE.match(c))
     return t.replace("`", "'").replace("](", "] (")
 
 
