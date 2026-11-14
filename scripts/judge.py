@@ -189,8 +189,8 @@ def ask_text(ordinal: int, sha: str) -> str:
 
 LIST_MARKER = re.compile(r"^(?:[-*+]|\d+[.)])\s")
 LOCATION = re.compile(r"^(?P<path>[^:\s]+):(?P<a>\d+)(?:[-–](?P<b>\d+))?$")
-STRIP = "`\"'()[]{}<>*_"
-TRAIL = ".,:;"
+STRIP = "`\"'()[]"  # surrounding backticks, brackets and quotes
+TRAIL = ".,:"  # a trailing full stop, comma or colon
 
 
 def blocks(text: str) -> list[str]:
@@ -417,6 +417,10 @@ def run(args: argparse.Namespace, entry: dict[str, Any]) -> int:
                 sid = rec["id"]
                 ask_id = seat_run.ask(sid, ask_text(n, sha), env, about=f"#{n}")
             except Exception as e:  # noqa: BLE001 — a refused create or ask is the case's `none`, said
+                if sid:  # launched, its ask refused: the seat ends with its case
+                    with contextlib.suppress(Exception):
+                        call("kill", id=sid)
+                    sid = ""
                 scores.append(Score(False, f"launch or ask: {type(e).__name__}: {e}"))
                 print(f"case {n} {case.name}: none — {scores[-1].why}")
                 continue
