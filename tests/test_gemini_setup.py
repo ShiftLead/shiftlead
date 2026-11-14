@@ -196,3 +196,37 @@ def test_the_containers_root_stage_installs_the_nodes_own_layer_root_owned(home,
         "/tmp/shiftlead-layer-0.json /etc/shiftlead/gemini-settings.json && rm -f /tmp/shiftlead-layer-0.json"
     ) in root
     assert df.rstrip().endswith("USER dev")
+
+
+def test_two_overlapping_write_layers_in_one_process_both_land_whole(home, monkeypatch):
+    """TD-1827: a launch on the event loop and the tick's `setup_note` thread are one pid, so each write's
+    temporary file is its own — two writes that have both written before either replaces both succeed, and
+    the wanted copy is whole. A name of the pid alone fails the second replace with ENOENT."""
+    import threading
+
+    gemini.wanted_file().unlink(missing_ok=True)
+    both = threading.Barrier(2, timeout=10)
+    replace = os.replace
+
+    def held(src, dst):
+        both.wait()  # neither replaces until both have written their temporary file
+        replace(src, dst)
+
+    monkeypatch.setattr(os, "replace", held)
+    errors: list[BaseException] = []
+
+    def write():
+        try:
+            gemini.write_layer()
+        except BaseException as e:  # noqa: BLE001 — the test reads it
+            errors.append(e)
+
+    threads = [threading.Thread(target=write) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=20)
+    assert errors == [] and not any(t.is_alive() for t in threads)
+    wanted = gemini.wanted_file()
+    assert wanted.read_text(encoding="utf-8") == gemini.layer_text(gemini.hook_path())
+    assert [p.name for p in wanted.parent.iterdir() if p.name.endswith(".tmp")] == []
