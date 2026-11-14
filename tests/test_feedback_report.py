@@ -549,6 +549,17 @@ def test_build_refuses_no_upstream_no_main_and_no_checkout(tmp_path):
     git(d, "remote", "add", "upstream", "https://github.com/ShiftLead/shiftlead")
     with pytest.raises(fr.Refused, match="no main under upstream"):
         fr.read_build(direct(d))
+    # a broken or shallow history: `merge-base --is-ancestor` exits 128, never read as *local* (TD-1813)
+    git(d, "update-ref", "refs/remotes/upstream/main", git(d, "rev-parse", "HEAD").strip())
+
+    def broken(cwd, *args):
+        if args[:2] == ("merge-base", "--is-ancestor"):
+            return subprocess.CompletedProcess(args, 128, "", "fatal: bad object\n")
+        return fr.git(cwd, *args)
+
+    assert fr.read_build(direct(d))["local"] is False  # the real git reads it: the stub alone refuses
+    with pytest.raises(fr.Refused, match="merge-base --is-ancestor HEAD refs/remotes/upstream/main"):
+        fr.read_build(direct(d), broken)
     plain = tmp_path / "plain"
     plain.mkdir()
     with pytest.raises(fr.Refused, match="no git checkout"):
