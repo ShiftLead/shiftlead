@@ -24,6 +24,8 @@ def home(tmp_path, monkeypatch):
         f"  asks: {{adapter: grok, account: paul, permission_prompts: ask, config_dir: {tmp_path / 'g'}}}\n"
         f"  close: {{adapter: grok, account: paul, permission_prompts: all, config_dir: {tmp_path / 'g'}}}\n"
         "  bare: {adapter: grok, account: paul}\n"
+        "  own: {adapter: grok, account: paul, extra_args: [--x1, v1], unattended_args: [--yolo],"
+        f" config_dir: {tmp_path / 'g'}}}\n"
     )
     binary = tmp_path / "bin" / "grok"
     binary.parent.mkdir()
@@ -111,3 +113,13 @@ def test_the_home_the_credentials_and_the_machines_note(home, tmp_path):
     assert note["key"] == f"missing:{tmp_path / 'nowhere' / 'grok'}" and grok.INSTALL_LINE in note["text"]
     (home / "home" / "profiles.yml").write_text("default: x\nprofiles:\n  x: {adapter: claude-code}\n")
     assert GrokAdapter(binary=str(tmp_path / "nowhere" / "grok")).setup_note() is None  # no Grok profile
+
+
+def test_a_profiles_own_extra_and_unattended_args_reach_the_argv(home):
+    """§4.3: a profile's `extra_args` pass on every launch, and its own `unattended_args` replace
+    `--always-approve` on an unattended launch under `skip` (TD-1805)."""
+    a = ad(home)
+    i = a.launch(profile="own", resume=None, prompt=None, unattended=False, cwd=home)
+    assert i.argv[3:] == ["--x1", "v1"]  # extra_args always; the unattended ones not on an attended launch
+    u = a.launch(profile="own", resume=None, prompt=None, unattended=True, cwd=home)
+    assert u.argv[3:] == ["--x1", "v1", "--yolo"] and "--always-approve" not in u.argv
