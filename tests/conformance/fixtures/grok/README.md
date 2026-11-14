@@ -17,3 +17,14 @@ registered yet (TD-1637); `tests/test_grok_hook.py` reads the hook capture throu
   `shutdown`), then the first conversation's `SessionEnd` and `Stop` (`shutdown`) after them; no
   `shutdown` `Stop` carries a `promptId`. No subagent, question
   tool or `StopCancelled` is in it.
+- `captured/hooks-subagents.jsonl` (Grok Build 1.0.77 on kmaster, 2026-11-13 local, TD-1637 slice 12): the same
+  capture-only hook file in a fresh scratch copy of `grok-conformance`, launched as above with `--session-id
+  22222222-3333-4444-8555-666666666666`, on the tool's default model (the data-sharing opt-in left unanswered,
+  off by default). In order: a prompt whose subagent ran `mkdir sub2 …` with no prompt (`spawn_subagent`,
+  `SubagentStart`, the child's `UserPromptSubmit`, tool events, `SubagentStop` and its own `SessionEnd`
+  `shutdown`, all with `subagentType`); a prompt whose subagent ran `rm a.txt && mkdir sub3`, raising a
+  `permission_prompt` on `spawn_subagent` and one on the child's command — both on the **parent's** `sessionId`,
+  with no `subagentType` — each answered *Yes* with Enter; an `ask_user_question` (`PreToolUse`, then a
+  `Notification` `elicitation_dialog`, answered *Blue*); a background subagent running `sleep 120`, killed by
+  `kill_command_or_subagent` (its `task_id` the `subagentId`), which fired no `SubagentStop`, only the child's
+  `SessionEnd`; and `/exit`.

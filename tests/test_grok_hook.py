@@ -263,3 +263,63 @@ def test_shiftlead_hook_dispatches_adapter_grok(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["shiftlead-hook", "--adapter", "grok"])
     monkeypatch.setattr(hook, "main", lambda: 7)
     assert hook_entry.main() == 7
+
+
+# --- a subagent, a question tool and a killed background subagent, captured (TD-1637 slice 12) ---
+
+SUBAGENTS = CAPTURED.parent / "hooks-subagents.jsonl"
+
+
+def _sub_payloads() -> list[dict]:
+    return [json.loads(line) for line in SUBAGENTS.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def test_a_childs_payloads_report_nothing_and_its_end_never_exits_the_session():
+    got = [(p, translate(p)) for p in _sub_payloads()]
+    children = [p for p, _ in got if p.get("subagentType")]
+    assert {p["hook_event_name"] for p in children} >= {"SubagentStart", "UserPromptSubmit", "SessionEnd"}
+    assert all(out is None for p, out in got if p.get("subagentType"))
+    exits = [p for p, out in got if out and out.get("state") == "exited"]
+    assert [p["sessionId"] for p in exits] == ["22222222-3333-4444-8555-666666666666"]  # the main one's, at /exit
+
+
+def test_the_captured_child_key_and_the_kill():
+    subs = _sub_payloads()
+    starts = [p for p in subs if p["hook_event_name"] == "SubagentStart"]
+    child_ids = {p["sessionId"] for p in subs if p.get("subagentType") and p["hook_event_name"] != "SubagentStart"}
+    assert {p["subagentId"] for p in starts} <= child_ids  # a child's events carry its subagentId as sessionId
+    kill = next(
+        p for p in subs if p["hook_event_name"] == "PostToolUse" and p["toolName"] == "kill_command_or_subagent"
+    )
+    killed = kill["toolInput"]["task_id"]
+    assert killed in {p["subagentId"] for p in starts}
+    stops = {p["subagentId"] for p in subs if p["hook_event_name"] == "SubagentStop"}
+    assert killed not in stops  # a killed background subagent fires no SubagentStop (§4.3)
+
+
+def test_a_childs_prompt_carries_no_marker_and_reads_as_the_main_sessions():
+    """TD-1815: the child's `permission_prompt` names the parent and nothing of the child's."""
+    subs = _sub_payloads()
+    prompts = [p for p in subs if p.get("notificationType") == "permission_prompt"]
+    assert prompts and all(not p.get("subagentType") and p["sessionId"].startswith("2222") for p in prompts)
+    assert all(translate(p)["pending"]["kind"] == "permission" for p in prompts)
+
+
+def test_the_question_tool_is_a_question_and_its_notification_is_dropped():
+    subs = _sub_payloads()
+    ask = next(p for p in subs if p["hook_event_name"] == "PreToolUse" and p["toolName"] == "ask_user_question")
+    out = translate(ask)
+    assert out["state"] == "needs-you" and out["pending"] == {"kind": "question", "text": "Red or blue?"}
+    note = next(p for p in subs if p.get("notificationType") == "elicitation_dialog")
+    assert translate(note) is None
+    after = next(p for p in subs if p["hook_event_name"] == "PostToolUse" and p["toolName"] == "ask_user_question")
+    assert translate(after)["pending"] is None and translate(after)["state"] == "working"
+
+
+def test_the_kill_guard_reads_a_childs_captured_shell_call():
+    from shiftlead.adapters.grok.hook import refused_command
+
+    child = next(p for p in _sub_payloads() if p.get("subagentType") and p.get("toolName") == "run_terminal_command")
+    assert refused_command(child) is None
+    ti = {**child["toolInput"], "command": "pkill -f grok"}
+    assert refused_command({**child, "toolInput": ti, "tool_input": ti}) is not None
