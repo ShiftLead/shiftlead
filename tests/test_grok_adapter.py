@@ -148,3 +148,30 @@ def test_the_composer_title_and_volatile_rows_off_the_captured_panes():
     rows = ["   ⠦ Responding… 2.0s", "   ◆ Remove a.txt… 11s", "   ◆ Build… 1m 5s", "     ◆ Thought for 0.0s"]
     masked = [r for r in rows if any(re.search(p, r) for p in a.volatile_rows)]
     assert masked == rows[:3]
+
+
+def test_doctor_reads_each_grok_profiles_home_its_sign_in_and_a_key_in_the_environment(home, monkeypatch):
+    """`ao doctor`'s row of each Grok profile (design §4.3 *Reads*, TD-1637 slice 14): its home, `auth.json` as its
+    credentials, the login line as the cure; a key in the host agent's environment noted, and a profile with no home
+    of its own read as the load's refusal, the one row."""
+    from shiftlead import doctor
+
+    monkeypatch.delenv("XAI_API_KEY", raising=False)
+    monkeypatch.delenv("GROK_CODE_XAI_API_KEY", raising=False)
+    a = ad(home)
+    rows = {r["profile"]: r for r in a.doctor_profiles()}
+    assert set(rows) == {"gk", "asks", "close", "own"}
+    gk = rows["gk"]
+    assert gk["config_dir"] == str(home / "g") and gk["account"] == "paul" and gk["metered"] is False
+    assert gk["credentials"] is None and gk["login"] == f"GROK_HOME={home / 'g'} {home / 'bin' / 'grok'} login"
+    assert "note" not in gk
+    (got,) = doctor.profiles([{"adapter": "grok", **gk}])[:1]
+    assert f"`{gk['login']}`" in got["text"]  # the cure in the adapter's own words
+    (home / "g").mkdir()
+    (home / "g" / "auth.json").write_text("{}")
+    monkeypatch.setenv("XAI_API_KEY", "k")
+    (gk,) = [r for r in a.doctor_profiles() if r["profile"] == "gk"]
+    assert gk["credentials"] is True and "XAI_API_KEY" in gk["note"] and "clears" in gk["note"]
+    (home / "home" / "profiles.yml").write_text("profiles:\n  bare: {adapter: grok}\n")
+    (row,) = a.doctor_profiles()
+    assert set(row) == {"error"} and "needs a config_dir of its own" in row["error"]
