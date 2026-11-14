@@ -120,6 +120,42 @@ const out = {};
   await press(moved.button);
   out.movedKept = ids["#mailtext"].value;
   box.close("cancel"); await tick();
+  // 5. Not right… (TD-1563): its box names the board line, and its words are kept by the line's own key, so they
+  //    come back on its Not right… at the line's new place after a line added above it moved the row's id
+  const nr = row("board:r:17", "board", "shiftlead#TD-1437", { ...draw().board.button.dataset, act: "board_notright" });
+  live = { "board:r:17": nr };
+  await press(nr.button);
+  out.nrTitle = ids["#mailtitle"].textContent;
+  ids["#mailtext"].value = "Not right: the toast is cut off";
+  const nrMoved = row("board:r:18", "board", "shiftlead#TD-1437", { ...nr.button.dataset, line: "18" });
+  live = { "board:r:18": nrMoved };
+  if (observe) observe();
+  await tick();
+  out.nrOpen = box.open;
+  ids["#mailtext"].value = "";
+  await press(nrMoved.button);
+  out.nrKept = ids["#mailtext"].value;
+  box.close("cancel"); await tick();
+  // 6. a ledger entry's roads (TD-1563): Reply, Done… and Back to design… each name the entry in the box's title, and
+  //    a re-read that takes the entry's row away closes the box, sending nothing, its words back on the next press
+  const ledger = (road) => row("ledger:shiftlead:TD-9", "ledger", "shiftlead#TD-1437", {
+    act: road ? "ledger" : "ledger_reply", ...(road ? { road } : {}), repo: "shiftlead", ref: "TD-9",
+    name: "shiftlead's board", quote: "Close TD-9?" });
+  for (const road of ["", "done", "design"]) {
+    let l = ledger(road); live = { "ledger:shiftlead:TD-9": l };
+    await press(l.button);
+    const title = ids["#mailtitle"].textContent;
+    ids["#mailtext"].value = `words for ${road || "reply"}`;
+    live = {};
+    if (observe) observe();
+    await tick();
+    const open = box.open, sent = posts.splice(0);
+    ids["#mailtext"].value = "";
+    l = ledger(road); live = { "ledger:shiftlead:TD-9": l };
+    await press(l.button);
+    out[`ledger_${road || "reply"}`] = { title, open, sent, kept: ids["#mailtext"].value };
+    box.close("cancel"); await tick();
+  }
   console.log(JSON.stringify(out));
 })();
 """
@@ -153,6 +189,20 @@ def test_a_reread_that_takes_the_item_away_closes_the_box_with_its_words_kept(tm
     assert out["kept"] == "words in flight"
     # a board line's words are kept by its own key, which outlives its row's id when the line moves
     assert out["movedOpen"] is False and out["movedKept"] == "kept across a move"
+
+
+def test_not_right_and_the_ledger_roads_are_bound_to_their_item(tmp_path):
+    """§4.5 screen 12 *Three verbs: Answer* binds every road — a mail reply, a board line's, a ledger entry's (TD-1563):
+    Not right… keeps its words by the line's `board:<key>`, and Reply, Done… and Back to design… on a ledger entry
+    name the entry and close, sending nothing, when a re-read takes its row away."""
+    out = run_probe(tmp_path, ANSWER_PROBE)
+    assert out["nrTitle"] == "Reply to shiftlead's board · the board line board:k1 on shiftlead#TD-1437"
+    assert out["nrOpen"] is False and out["nrKept"] == "Not right: the toast is cut off"
+    for road in ("reply", "done", "design"):
+        got = out[f"ledger_{road}"]
+        assert got["title"] == "Reply to shiftlead's board · the entry TD-9 on shiftlead#TD-1437", road
+        assert got["open"] is False and got["sent"] == [], road
+        assert got["kept"] == f"words for {road}", road
 
 
 CARD_MENUS_PROBE = (
