@@ -310,6 +310,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     board_choices,  # noqa: F401
     board_detail,  # noqa: F401
     board_due_now,  # noqa: F401
+    board_hand_of,  # noqa: F401
     board_head,  # noqa: F401
     board_horizon,  # noqa: F401
     board_line,  # noqa: F401
@@ -619,6 +620,22 @@ def doer_target(
     elif not servicing or not servicing[0]["seat"]:
         return None
     return {"root": root, "repo": roots[root], "team": team, "teams": servicing}
+
+
+def doer_hands(
+    org: orgmod.Org, host: str, declared: Mapping[str, Collection[str]] | None = None
+) -> Callable[[str, str], dict[str, Any] | None]:
+    """`doer_target` bound to one read of the org, for the board's draw (§4.5 screen 12 *Three verbs: Have a session
+    do it*, TD-1660): `(board root, doer) → target`, each pair resolved once per read — the press's own function, so
+    the draw and the press agree on whether a doer resolves."""
+    seen: dict[tuple[str, str], dict[str, Any] | None] = {}
+
+    def hands(root: str, doer: str) -> dict[str, Any] | None:
+        if (root, doer) not in seen:
+            seen[(root, doer)] = doer_target(org, root, doer, host, declared)
+        return seen[(root, doer)]
+
+    return hands
 
 
 def repo_boards(org: orgmod.Org, host: str) -> dict[str, dict[str, Any]]:
@@ -1219,7 +1236,15 @@ async def declared_teams(facts: Any) -> dict[str, list[str]]:
         rows = (await facts())[0]
     except Exception:  # noqa: BLE001 — no facts reads as no declared order, never a failed press
         return {}
+    return declared_of(rows)
+
+
+def declared_of(rows: Any) -> dict[str, list[str]]:
+    """Each checkout root → its ledger's declared teams, from the `repos` reading (`declared_teams`' read, which the
+    board's draw makes from the reading it already holds, TD-1660)."""
     out: dict[str, list[str]] = {}
+    if not isinstance(rows, Mapping):
+        return out
     for v in (rows or {}).values():
         if isinstance(v, dict) and v.get("root"):
             led = v.get("ledger") or {}
@@ -1467,10 +1492,12 @@ class Readings:
             repos = await self.repos()
         except Exception as e:  # noqa: BLE001 — said in words, never an empty board
             return [], f"board items are not shown: the host agent's repo reading could not be read ({e})"
-        boards_of = repo_boards(await self.defs(), host_name())
+        org, host = await self.defs(), host_name()
+        boards_of = repo_boards(org, host)
+        hands = doer_hands(org, host, declared_of(repos))
         # off the loop (TD-670): every repo's board rows and their standings run to ~40 ms on the live
         # home, on every recount of the Inbox's counts as on the page's read
-        return await asyncio.to_thread(board_reading, repos if isinstance(repos, dict) else {}, boards_of)
+        return await asyncio.to_thread(board_reading, repos if isinstance(repos, dict) else {}, boards_of, hands)
 
     async def board_items(self) -> tuple[list[dict[str, Any]], str]:
         """The Inbox's **due** board rows and the note beside them: what is counted is what is due,

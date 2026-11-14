@@ -2455,7 +2455,8 @@ def test_suspend_is_offered_only_where_there_is_something_to_stop_and_leaves_the
     # with a board row's decide (TD-255), an act on this page that does **not** take its row away; a ledger
     # decide does since rule 4 (TD-1321)
     assert (
-        'const keeps = ["suspend", "board_decide", "board_reply", "board_notright", "board_add"].includes(key);' in js
+        'const keeps = ["suspend", "board_decide", "board_hand", "board_reply", "board_notright", "board_add"]'
+        ".includes(key);" in js
     )
     assert "AO.handRing(row); row.remove(); left = true;" in js  # a state row leaves on the press (TD-340)
     assert 'if (action === "suspend") body = { id: b.dataset.who || "" };' in js

@@ -278,10 +278,16 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 <button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="checks the line off {{ e.repo_name or e.repo }}'s board: one edit landed on its origin by shiftlead's own pull request" data-confirm="Check this item off {{ e.repo_name or e.repo }}'s board? It lands on origin by shiftlead's own pull request.">Done</button>
 {%- endmacro %}
 {#- §4.5a **Have a session do it** (TD-1543, built by TD-1624; §4.5 screen 12 *Three verbs: Have a session do it*):
-    after an open `act` line's Done where a lane of its repo would take the work (`e.session_do`, drawn by the line's
-    kind, never from an `Answers:` field) — the `decide` write-back with the fixed text and no answers -#}
+    after an open `act` line's Done where a lane of its repo would take the work, or where its `Doer:` resolves to
+    another repo's techlead seat (`e.session_do`, drawn by the line's kind, never from an `Answers:` field) — the
+    `decide` write-back with the fixed text and no answers; on a line whose `Doer:` names another repo or a team
+    (`e.hand`, TD-1660), the hand-off, its title naming where it goes where the doer resolves (`e.hand_to`) -#}
 {% macro board_session(e, cls, role='') -%}
+{%- if e.hand %}
+<button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board" data-id="person" data-board-act="hand" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ ("goes to " ~ e.hand_to ~ "'s techlead seat; this item closes") if e.hand_to else help_title('board-have-a-session-do-it') }}" data-confirm="Have a session do it? {% if e.hand_to %}The step goes to {{ e.hand_to }}'s techlead seat, and the item closes on {{ e.repo_name or e.repo }}'s board.{% else %}It is handed to {{ e.doer }} where it can be; otherwise &ldquo;have a session do it&rdquo; is written on {{ e.repo_name or e.repo }}'s board as your decision, and the line goes to its team as a work order.{% endif %}">Have a session do it</button>
+{%- else %}
 <button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board" data-id="person" data-board-act="decide" data-answer="have a session do it" data-answers='[]' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ help_title('board-have-a-session-do-it') }}" data-confirm="Have a session do it? &ldquo;have a session do it&rdquo; is written on {{ e.repo_name or e.repo }}'s board as your decision, and the line goes to its team as a work order.">Have a session do it</button>
+{%- endif %}
 {%- endmacro %}
 {% macro board_answer(e, cls, role='') -%}
 <button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ (e.repo_name or e.repo or e.name or 'the repo') ~ "'s board" }}" data-foot="{{ reply_foot(e) }}"{% if e.pair %} data-pair="1" data-repo="{{ e.name }}" data-head="{{ e.head }}"{% endif %} title="{{ ((e.session ~ ' · ') if e.session else '') ~ e.standing.text if e.standing else help_title('card-answers') }}">Answer…</button>
