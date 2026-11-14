@@ -120,7 +120,7 @@ def validate(data: Any) -> dict[str, Any]:
     noise = data.get("noise")
     if isinstance(noise, bool) or not isinstance(noise, int | float):
         raise Refused("noise: bad type")
-    if not math.isfinite(noise) or not 0 <= noise <= 1:
+    if not 0 <= noise <= 1 or not math.isfinite(noise):  # the range first: a huge int overflows a float
         raise Refused("noise: not allowed")
     new = []
     for i, f in enumerate(_objects(data.get("new"), "new")):
@@ -610,7 +610,7 @@ def publish_check(checkout: str, out: str, run: Callable[..., subprocess.Complet
     if cp.returncode == 0:
         return 0, []
     if cp.returncode == 1:
-        mine = re.compile(re.escape(out) + r":\d+: ")
+        mine = re.compile(r"\S.*?:\d+: ")  # its `path:line: finding` lines, whatever spelling of the path
         return 1, [line for line in (cp.stdout or "").splitlines() if mine.match(line)]
     why = ((cp.stderr or "").strip().splitlines() or [f"exit {cp.returncode}"])[-1]
     raise Refused(f"the publish check cannot run (exit {cp.returncode}): {why}")

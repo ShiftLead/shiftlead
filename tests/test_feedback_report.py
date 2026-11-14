@@ -77,6 +77,7 @@ def block(text: str) -> dict:
         ({"noise": True}, "noise: bad type"),
         ({"noise": 1.5}, "noise: not allowed"),
         ({"noise": "0.5"}, "noise: bad type"),
+        ({"noise": 10**400}, "noise: not allowed"),
         ({"new": [finding(count=True)]}, "new[0].count: bad type"),
         ({"new": [finding(count=0)]}, "new[0].count: not allowed"),
         ({"new": [finding(area="acme")]}, "new[0].area: not allowed"),
