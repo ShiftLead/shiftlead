@@ -205,3 +205,32 @@ def test_a_rows_hash_is_url_encoded_as_the_client_reads_it():
     repo = {"kind": "repo", "key": "repo:x y", "repo": "x y", "url": "/repo/x y", "facet": None}
     rows = ui.rollup_rows([team, repo], set())
     assert [r["hash"] for r in rows] == ["team=a%20b%25c", "repo=x%20y"]
+
+
+def test_seat_names_never_lists_person_and_names_each_seat_once():
+    """`seat_names` (TD-1210): a team's roles' holders, its manager, its techlead and its seats, in that
+    order, each once — never `person`, a person-held manager, whether it is the manager or a seat."""
+    from shiftlead.ui.repo import seat_names
+
+    row = {
+        "manager": "person",
+        "techlead": "tl",
+        "roles": [{"role": "grinder", "names": ["g1", "g2"]}, {"role": "reviewer", "names": ["g1"]}],
+        "seats": [{"name": "tl", "role": "techlead"}, {"name": "person"}, {"name": "fc"}],
+    }
+    assert seat_names(row) == ["g1", "g2", "tl", "fc"]
+
+
+def test_a_stopped_team_with_a_person_held_manager_stubs_no_person():
+    """**Members**: a stopped team whose manager is the person stubs its definition's seats with no counted
+    card, and none named *person* (TD-1210)."""
+    defs = [
+        {"name": "solo", "repo": "samscrape", "manager": "person",
+         "roles": [{"role": "grinder", "names": ["s1", "s2"]}], "wound_down": True, "wound_down_age": "1h"},
+    ]  # fmt: skip
+    repos = _repos()
+    ms = [_s("s1", "exited", team="solo")]
+    groups = ui.team_groups(ms, defs, repos, {})
+    rows = ui.rollup(ui.org_layout(groups, repos, (), ms, NOW), ms)["rows"]
+    solo = next(r for r in rows if r["key"] == "team:solo")
+    assert solo["stubs"] == ["s1", "s2"] and "person" not in solo["stubs"]
