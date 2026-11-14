@@ -280,6 +280,20 @@ async def test_a_childs_event_ends_the_main_thread_permissions_and_restores_kept
 
 
 @pytest.mark.integration
+async def test_a_childs_event_leaves_another_childs_permission(agent, nochannel, tmp_path):
+    """The end is the main thread's permissions' alone (§4.2 *A subagent's event, for a tool with no channel*,
+    TD-1824): child c1's event leaves child c2's own open permission standing."""
+    s = _put(agent, "nochannel", tmp_path)
+    agent._apply_event(
+        s.id, {"state": "needs-you", "pending": {"kind": "permission", "text": "c2 asks"}, "subagent": "c2"}
+    )
+    assert [p.subagent for p in s.pendings] == ["c2"] and s.state == "needs-you"
+    agent._apply_event(s.id, dict(CHILD_POST))
+    assert [(p.kind, p.subagent) for p in s.pendings] == [("permission", "c2")] and s.state == "needs-you"
+    del agent.sessions[s.id]
+
+
+@pytest.mark.integration
 async def test_a_childs_event_after_the_main_stop_leaves_the_record_idle(agent, nochannel, tmp_path):
     s = _put(agent, "nochannel", tmp_path)
     agent._apply_event(s.id, {"state": "idle", "pending": None, "turn_end": True})
