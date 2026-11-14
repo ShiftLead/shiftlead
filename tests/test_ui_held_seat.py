@@ -55,6 +55,10 @@ def test_the_held_line_counts_the_questions_and_says_who_stopped_it():
         "held: team stopped — waits for Start"
     )
     assert stop_held_line(_seat(asks_waiting=3), [_member()]) == "", "no `stop_held`, no line"
+    # a count that is not a number reads as none waiting (TD-1617)
+    assert stop_held_line(_seat(stop_held=_held(), asks_waiting="x"), [_member()]) == (
+        "held: team stopped — waits for Start"
+    )
 
 
 def test_the_held_line_reads_wound_down_for_a_wound_down_team():
@@ -92,6 +96,9 @@ def test_the_team_note_adds_a_clause_per_held_seat_and_a_held_only_mark_draws_it
     # a seat id the page's records do not hold draws as its id
     (gone,) = work_note({"members": {}, "seats_held": {"ao-g-gone": 3}}, NOW)["seats"]
     assert gone["words"] == "3 questions wait on ao-g-gone"
+    # a seat whose count is not a number is left out, the others drawn (TD-1617)
+    bad = work_note({"at": AT, "members": {}, "seats_held": {"ao-g-fc": "x", "ao-g-gone": 2}}, NOW, records=[FC])
+    assert [s["words"] for s in bad["seats"]] == ["2 questions wait on ao-g-gone"]
     # the start bound `held` is no held seat: the note is as it was
     plain = work_note({"at": AT, "members": {"w": ["TD-1"]}, "held": {"why": "day", "count": 3}}, NOW)
     assert plain["n"] == 1 and plain["seats"] == []
