@@ -184,3 +184,76 @@ def test_an_esc_that_closed_a_menu_presses_no_page_key():
     assert "ev.aoMenuClosed = true;" in js
     keys = js[js.index("const page = AO.keyPage(location.pathname);") :]
     assert keys.index("if (ev.aoMenuClosed) return;") < keys.index("const name = AO.keyName(ev);")
+
+
+ROLLUP_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [] });
+const docL = [], boxL = [];
+const focusable = (extra) =>
+  Object.assign({ focused: 0, focus() { this.focused++; document.activeElement = this; } }, extra);
+// one rollup row with its *more* button and the menu after it; the box's and the document's listeners kept
+const menu = focusable({ hidden: true, querySelector: () => null, querySelectorAll: () => [],
+  contains(t) { return t === this; }, parentElement: { contains: () => false } });
+const row = { dataset: { row: "team:t" } };
+const btn = focusable({ dataset: { menu: "more" }, isConnected: true, nextElementSibling: menu, attrs: {},
+  setAttribute(k, v) { this.attrs[k] = v; }, closest: (s) => (s === "[data-menu]" ? btn : s === "tr" ? row : null) });
+const box = { addEventListener: (type, fn) => boxL.push({ type, fn }) };
+const document = { documentElement: el(), body: focusable({}), activeElement: null, createElement: el,
+  querySelector: () => null, querySelectorAll: () => [],
+  addEventListener: (type, fn, capture) => docL.push({ type, fn, capture: !!capture }) };
+document.activeElement = document.body;
+global.window = {}; global.document = document;
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const wiredBefore = docL.length;
+window.AO.rollupWire(box);
+const fire = (list, type, ev) => { for (const l of list.filter((x) => x.type === type)) l.fn(ev); return ev; };
+const press = () => fire(boxL, "click", { target: btn, preventDefault: noop });
+const key = (k) => ({ key: k, target: document.activeElement, preventDefault: noop, stopPropagation: noop });
+const out = { wired: [boxL.map((l) => l.type).sort(), docL.slice(wiredBefore).map((l) => l.type).sort()] };
+press();
+out.opened = [menu.hidden, btn.attrs["aria-expanded"]];
+document.activeElement = document.body; btn.focused = 0;
+fire(docL.slice(wiredBefore), "keydown", key("x"));
+out.other_key = menu.hidden;
+fire(docL.slice(wiredBefore), "keydown", key("Escape"));
+out.esc_on_body = [menu.hidden, btn.attrs["aria-expanded"], btn.focused, document.activeElement === btn];
+press();
+const composer = focusable({});
+document.activeElement = composer; btn.focused = 0;
+fire(docL.slice(wiredBefore), "keydown", key("Escape"));
+out.esc_in_composer = [menu.hidden, btn.attrs["aria-expanded"], btn.focused, document.activeElement === composer];
+console.log(JSON.stringify(out));
+"""
+
+
+@pytest.mark.unit
+def test_esc_with_focus_outside_the_rollup_menu_closes_it():
+    """§4.5a *every page: a pop-up menu* (TD-1337), the Org rollup's own road (TD-1830): with a row's menu
+    opened by a press, the document's `keydown` closes it on `Esc` from outside the menu — focus back on its
+    button from no control, kept by a composer — and on no other key. The Org page's init wires its box
+    through `AO.rollupWire`, which the probe calls with a fake box."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
+    probe = scratch_dir() / "rollup_esc_probe.js"
+    probe.write_text(ROLLUP_PROBE)
+    out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    got = json.loads(out.stdout)
+    assert got["wired"] == [["click", "keydown"], ["click", "keydown"]]
+    assert got["opened"] == [False, "true"]
+    assert got["other_key"] is False
+    assert got["esc_on_body"] == [True, "false", 1, True]
+    assert got["esc_in_composer"] == [True, "false", 0, True]
+    js = (UI / "static" / "app.js").read_text()
+    org = js[js.index("AO.org = function () {") :]
+    assert "if (rollupBox) AO.rollupWire(rollupBox);" in org[: org.index("\n  };\n")]
