@@ -193,6 +193,8 @@ def test_the_standing_names_each_reader_and_says_its_verdict():
         "21": [e(tl, "10:00", "closed"), e("person", "11:00", "answered")],
         "22": [e("person", "10:00", "answered", again=True), e(tl, "11:00", "open")],
         "23": [e("person", "10:00", "answered"), e(tl, "11:00", "open")],  # a newer ask to a seat
+        # answered *Ask the reader again* with nothing newer yet: not *with you* (TD-1778)
+        "24": [e(tl, "10:00", "closed"), e("person", "11:00", "answered", again=True)],
     }
     got = reviewmod.standing(reads, names, lambda at: "40m")
     assert got[7] == {"word": "passed by ui-reader-ao-1 · waiting on techlead-ao-1 · 40m", "cls": "wait"}
@@ -203,6 +205,7 @@ def test_the_standing_names_each_reader_and_says_its_verdict():
     assert got[20] == {"word": "waiting on you · 40m", "cls": "wait"}
     assert got[21] == {"word": "with you", "cls": "wait"}
     assert got[22] == got[23] == {"word": "waiting on techlead-ao-1 · 40m", "cls": "wait"}
+    assert 24 not in got  # the closed seat's ask stands for nothing, and the person's again is no *with you*
     assert 12 not in got and reviewmod.standing(None, names, lambda at: "") == {}
 
 
