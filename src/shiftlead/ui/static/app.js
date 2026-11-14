@@ -151,6 +151,19 @@
     if (ev.type === "up") return { mark: { drag: false, edge: null }, fire: m.drag && ev.moved ? m.edge : null };
     return { mark: m, fire: null };
   };
+  // …a press on the terminal as the mark reads it: a Shift press, or any button but the primary, starts no drag
+  AO.pressEvent = function (e) {
+    return { type: "down", shift: !!e.shiftKey || e.button !== 0 };
+  };
+  // …what a release that moved the selection does (TD-1279): the fired edge stands only where the selection
+  // touches that row (`pos` xterm's selection position, `rows` the screen's); with copy on select on (and not
+  // disabled) a selection is copied, carrying the edge; else the edge alone draws its note. `act` is `copy`,
+  // `note` or null
+  AO.releaseAct = function ({ fire, pos, rows, copyOn, text }) {
+    const edge = pos && (fire === "top" ? pos.start.y === 0 : fire === "bottom" && pos.end.y === rows - 1) ? fire : null;
+    if (copyOn) return { act: text ? "copy" : null, edge };
+    return { act: edge ? "note" : null, edge };
+  };
   // …the note's words, or "": the edge's first; else the first copy of several rows on the page's load, only
   // where the header draws **Transcript**
   AO.copyNote = function ({ edge, multi, flagFree, transcript }) {
@@ -8423,7 +8436,7 @@
     let selMoved = false, mark = null;
     term.onSelectionChange(() => { selMoved = true; });
     $("#term").addEventListener("mousedown", (e) => {
-      mark = AO.edgeMark(mark, { type: "down", shift: e.shiftKey || e.button !== 0 }).mark;
+      mark = AO.edgeMark(mark, AO.pressEvent(e)).mark;
     }, { capture: true });
     document.addEventListener("mousemove", (e) => {
       if (!mark || !mark.drag) return;
@@ -8437,10 +8450,9 @@
       mark = up.mark;
       if (!moved) return;
       const t = term.getSelection(), pos = t && term.getSelectionPosition();
-      const edge = pos && (up.fire === "top" ? pos.start.y === 0 : up.fire === "bottom" && pos.end.y === term.rows - 1)
-        ? up.fire : null;
-      if (cos && cos.checked && !cos.disabled) { if (t) copySel(edge); }
-      else if (edge) AO.toast(AO.copyNote({ edge, transcript: hasTranscript() }), false, undefined, undefined, undefined, 7000);
+      const r = AO.releaseAct({ fire: up.fire, pos, rows: term.rows, copyOn: !!(cos && cos.checked && !cos.disabled), text: t });
+      if (r.act === "copy") copySel(r.edge);
+      else if (r.act === "note") AO.toast(AO.copyNote({ edge: r.edge, transcript: hasTranscript() }), false, undefined, undefined, undefined, 7000);
     });
     if (cos) {
       if (!window.isSecureContext) {

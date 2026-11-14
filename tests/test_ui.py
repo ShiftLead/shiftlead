@@ -2158,7 +2158,10 @@ def test_a_copy_on_release_says_so_with_copys_own_toast():
     was silent too. It goes through Copy's own path, which toasts *copied* or *clipboard blocked*."""
     js = (pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
     release = js.split('document.addEventListener("mouseup", () => {')[1].split("\n    });")[0]
-    assert "copySel(edge)" in release and "writeText" not in release
+    assert "copySel(r.edge)" in release and "writeText" not in release
+    # the release's decision and the press's mark are AO's, probed under node (TD-1279, tests/test_ui_focus_copy.py)
+    assert "AO.releaseAct(" in release and 'r.act === "note"' in release
+    assert "AO.edgeMark(mark, AO.pressEvent(e))" in js
     copy = js.split("const copySel = (edge) => {")[1].split("};")[0]
     assert "AO.copyWith(" in copy  # its toasts and notes: tests/test_ui_focus_copy.py (TD-1267)
     road = js.split("AO.copyWith = function")[1].split("\n  };")[0]

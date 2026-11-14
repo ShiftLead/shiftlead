@@ -79,6 +79,15 @@ const copies = async (runs) => {
     // the edge's note on a refused write too; no Transcript: the shell's edge note, and no first-copy note
     edgeRefused: await copies([["a\\nb", "bottom", true, true]]),
     shell: await copies([["a\\nb", "top", false], ["a\\nb", null, false], ["a\\nb", null, true]]),
+    // a press as the mark reads it (TD-1279): the primary button alone starts a drag
+    press: [AO.pressEvent({ shiftKey: false, button: 0 }), AO.pressEvent({ shiftKey: true, button: 0 }),
+      AO.pressEvent({ shiftKey: false, button: 2 }), AO.pressEvent({ shiftKey: false, button: 1 })],
+    // the release's decision over a 24-row screen: [fire, start row, end row, copy on, text]
+    release: [["top", 0, 5, true, "a"], ["top", 2, 5, true, "a"], ["bottom", 3, 23, true, "a"],
+      ["bottom", 3, 22, true, "a"], ["top", 0, 5, false, "a"], ["top", 2, 5, false, "a"],
+      [null, 0, 23, false, "a"], [null, 0, 5, true, "a"], ["top", null, null, true, ""], ["top", null, null, false, ""]]
+      .map(([fire, a, b, copyOn, text]) => AO.releaseAct({ fire, rows: 24, copyOn, text,
+        pos: a === null ? undefined : { start: { x: 0, y: a }, end: { x: 3, y: b } } })),
   }));
 })().catch((e) => { console.error(e); process.exit(1); });
 """
@@ -164,3 +173,31 @@ def test_a_copy_carries_its_note_for_seven_seconds_and_the_first_copy_note_once(
         [["copied", True, None], True],
         [[f"copied — {FIRST}", True, 7000], False],
     ]
+
+
+@pytest.mark.unit
+def test_a_press_starts_a_drag_only_with_the_primary_button_and_no_shift():
+    # TD-1279: a Shift press, or a middle or right button, starts no drag, so it can never draw the edge's note
+    assert _probe()["press"] == [
+        {"type": "down", "shift": False},
+        {"type": "down", "shift": True},
+        {"type": "down", "shift": True},
+        {"type": "down", "shift": True},
+    ]
+
+
+@pytest.mark.unit
+def test_a_release_keeps_the_edge_only_where_the_selection_touches_that_row_and_notes_it_when_copy_is_off():
+    got = _probe()["release"]
+    # TD-1279 (§4.6 *A selection is one screen*): the fired edge stands where the selection reaches row 0 (top) or the
+    # last row (bottom); a drag that crossed but left the selection short of it carries no edge
+    assert got[:4] == [
+        {"act": "copy", "edge": "top"},
+        {"act": "copy", "edge": None},
+        {"act": "copy", "edge": "bottom"},
+        {"act": "copy", "edge": None},
+    ]
+    # copy on select off (or disabled): the edge alone draws its note; short of the edge, or no edge fired, nothing
+    assert got[4:7] == [{"act": "note", "edge": "top"}, {"act": None, "edge": None}, {"act": None, "edge": None}]
+    # on, with no edge fired: the copy without a note; no selection: nothing copied and no note
+    assert got[7:] == [{"act": "copy", "edge": None}, {"act": None, "edge": None}, {"act": None, "edge": None}]
