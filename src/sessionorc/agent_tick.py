@@ -6287,7 +6287,7 @@ class TickMixin:
             if s.tool_open_at and now - _parse(s.tool_open_at) <= OPEN_TOOL_CEILING:
                 return False
         busy = tuple(getattr(adapter, "busy_rows", None) or ())
-        rows = [screen_mod.painted_text(r) for r in s.tail]
+        rows = [screen_mod.painted_text(r) for r in (*s.tail, *raw)]  # the raw rows too: a spinner pushed up
         if any(re.search(p, r) for p in busy for r in rows):
             return False
         return adapter.composer(raw) == ""

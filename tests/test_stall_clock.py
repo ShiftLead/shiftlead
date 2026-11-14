@@ -233,6 +233,9 @@ async def test_a_spinner_on_screen_keeps_a_tick_set_state(agent, tmp_path):
     interrupt = [*IDLE[:-6], "  Running the suite… esc to interrupt", *IDLE[-5:]]
     _composer(agent, s, interrupt)
     assert _tick(agent, s, interrupt, datetime.now(UTC)).state == "working"
+    s = _tick_set(agent, tmp_path, "stalled?", sid="ao-x-s2")
+    _composer(agent, s, CC)  # the spinner is in the composer's raw rows though the tail read misses it
+    assert _tick(agent, s, IDLE, datetime.now(UTC)).state == "stalled?"
 
 
 async def test_words_in_the_composer_or_no_composer_keep_a_tick_set_state(agent, tmp_path):
