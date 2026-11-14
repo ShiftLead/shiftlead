@@ -507,7 +507,7 @@ def state_rows(
 # reading as `boards`, which the page reads from the `repos` RPC and runs no reader of its own.
 # §4.5a's answers to a board row, the `board_edit` RPC's actions: Snooze, Done, and **Decide** — one
 # of the item's own `Answers:`, or *Go with it* for the one marked default (§4.4 *Decide*, TD-255)
-BOARD_ACTS = ("snooze", "done", "decide")
+BOARD_ACTS = ("snooze", "done", "decide", "hand")  # `hand`: Have a session do it's hand-off (TD-1660)
 # the kinds a live look is written as, and its first answer: the agent's, which reads the same pair (TD-1698)
 LOOK_KINDS = board_mod.LOOK_KINDS
 WORKS = board_mod.WORKS

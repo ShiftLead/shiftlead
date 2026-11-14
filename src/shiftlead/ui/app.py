@@ -17,7 +17,7 @@ import mimetypes
 import os
 import re
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -33,6 +33,7 @@ from markupsafe import Markup
 from sessionorc import board as board_mod
 from sessionorc import gitinfo, hosts, mail, naming, paths, workorders
 from sessionorc import ledger as ledger_mod
+from sessionorc import ledgerboard as lb
 from sessionorc import settle as settle_mod
 from sessionorc.agent_common import PATHS_RUN_CHARS, PATHS_RUNS_MAX
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
@@ -578,6 +579,48 @@ def road_refusal(org: orgmod.Org, root: str, road: str, host: str) -> str:
     return f"no lane of {names} takes design-first: nobody would design it"
 
 
+def doer_target(
+    org: orgmod.Org, board_root: str, doer: str, host: str, declared: Mapping[str, Collection[str]] | None = None
+) -> dict[str, Any] | None:
+    """Where an `act` line's `Doer:` hands its step (§4.5 screen 12 *Three verbs: Have a session do it*, TD-1660),
+    read synchronously from `org.yml` — one function for the press and the draw. None where it does not resolve:
+    a value that does not read, a repo with no registered root, no team servicing it, a named team that does not
+    service its `repo:`, or no techlead seat. `{own: True}` where it names the board's own repo (compared by
+    resolved root) or a team whose `repo:` it is: TD-1624's press. Else `{root, repo, team, teams}`, `teams` the
+    servicing teams (`entry_teams`, the ledger's declared order) with the named team first, `team` it or ''."""
+    parsed = lb.doer_value(str(doer or ""))
+    if parsed is None:
+        return None
+    kind, name = parsed
+    roots = {str(Path(r).expanduser().resolve()): Path(r).name for r in hosts.local_host().repos()}
+    team = ""
+    if kind == "team":
+        t = next((t for n, t in org.teams.items() if n.casefold() == name.casefold()), None)
+        if t is None:
+            return None
+        team = next(n for n in org.teams if n.casefold() == name.casefold())
+        path = org.checkout(t.repo, host)
+        root = str(Path(path).expanduser().resolve()) if path is not None else ""
+    else:
+        path = org.checkout(name, host)
+        root = str(Path(path).expanduser().resolve()) if path is not None else ""
+        if root not in roots:
+            root = next((r for r, n in roots.items() if n == name), "")
+    if not root or root not in roots:
+        return None
+    if root == str(Path(board_root).expanduser().resolve()):
+        return {"own": True}
+    servicing = entry_teams(org, root, host, (declared or {}).get(root, ()))
+    if team:
+        named = next((t for t in servicing if t["team"] == team), None)
+        if named is None or not named["seat"]:
+            return None
+        servicing = [named, *(t for t in servicing if t is not named)]
+    elif not servicing or not servicing[0]["seat"]:
+        return None
+    return {"root": root, "repo": roots[root], "team": team, "teams": servicing}
+
+
 def repo_boards(org: orgmod.Org, host: str) -> dict[str, dict[str, Any]]:
     """Each checkout on `host` → what a board row of it carries (§4.5 screen 6 *a board item carries its
     repo*, TD-722, built by TD-741): the board is the repo's, so a row names the repo and no team —
@@ -1008,6 +1051,179 @@ async def agent_call(method: str, **params: Any) -> Any:
         raise HTTPException(503, f"host agent unreachable: {e}") from e
     except AgentError as e:
         raise HTTPException(400, str(e)) from e
+
+
+async def agent_call_ignored(method: str, **params: Any) -> tuple[Any, list[str]]:
+    """`agent_call`'s twin for **Have a session do it**'s hand-off (§4.5 screen 12, TD-1660): one RPC answering
+    `(result, ignored)`, `ignored` the parameters this call's reply says the host agent dropped (`LocalClient.ignored`,
+    read per call). Down is the same 503; a refusal the same 400, carrying the client's list as its `ignored`."""
+    c = LocalClient()
+    try:
+        async with c:
+            got = await c.call(method, **params)
+        return got, list(c.ignored)
+    except AgentUnavailable as e:
+        raise HTTPException(503, f"host agent unreachable: {e}") from e
+    except AgentError as e:
+        err = HTTPException(400, str(e))
+        err.ignored = list(getattr(c, "ignored", []) or [])  # type: ignore[attr-defined]
+        raise err from e
+
+
+# **Have a session do it**'s hand-off (TD-1660): two presses of one line are serialised, per `(repo, key)`
+_HAND_LOCKS: dict[tuple[str, str], asyncio.Lock] = {}
+HAND_OLDER = "the host agent is older than this page (it does not know find_only): promote it"
+HAND_UNCHECKED = "could not check whether this was handed: {words}"
+
+
+def _no_line(words: str) -> bool:
+    """Whether a refusal is `workorders.NO_LINE`'s: the line closed or reworded since it was read."""
+    head, _, tail = workorders.NO_LINE.partition("{ref}")
+    return str(words).startswith(head) and tail in str(words)
+
+
+def board_root_of(board: str) -> str:
+    """The registered checkout whose board `board` is, or '' (the agent's own lookup, `_board_root`, refuses it)."""
+    want = Path(board).expanduser().resolve()
+    roots = [Path(r) for r in hosts.local_host().repos()]
+    return next((str(r) for r in roots if (r / workorders.board_rel(r)).resolve() == want), "")
+
+
+def _relay_text(repo: str, key: str, found: Mapping[str, Any]) -> str:
+    """The handed ask's text (§4.5 screen 12 *Have a session do it*, TD-1660): the *Relayed from* line, then the
+    line's own text, then its Context where it has one."""
+    who = f"session {found['session']}" if found.get("session") else "a session"
+    lead = f"Relayed from {repo}'s board ({key}): {who} wrote it and the person pressed Have a session do it"
+    if refs := [str(r) for r in found.get("context_refs") or () if str(r).strip()]:
+        lead += f"; context: {', '.join(refs)}"
+    if found.get("due"):
+        lead += f"; due {found['due']}"
+    out = f"{lead}\n{found.get('text') or ''}"
+    return out + (f"\n\n{found['context']}" if found.get("context") else "")
+
+
+async def board_hand(call: Any, facts: Any, body: Mapping[str, Any]) -> dict[str, Any]:
+    """**Have a session do it** on an `act` line naming its `Doer:` (§4.5 screen 12 *Three verbs: Have a session do
+    it*, TD-1660): `{board, line, text, key}` handed straight to the doer's techlead seat, the line closed Done
+    naming the ask — or, where the doer does not resolve or anything refuses before the send, TD-1624's press
+    (the decide write-back). Answers `{ok, end, toast, red, ...}`, `end` *taken* or *fallback*; a row that comes
+    back open is an HTTP error carrying its words. `call` is the page's RPC; `facts` is `Readings.repo_facts`."""
+    board, text, key = (str(body.get(k) or "").strip() for k in ("board", "text", "key"))
+    try:
+        line = int(body.get("line"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Have a session do it names the item's line") from None
+    if not board or not text or not key:
+        raise HTTPException(400, "Have a session do it names the board, the item's text and its key")
+    root = await asyncio.to_thread(board_root_of, board)
+    if not root:
+        raise HTTPException(400, f"{board} is not the board of a repo this host knows (its repos registry)")
+    repo = Path(root).name
+    stored = f"{repo}:{key}"
+
+    async def look() -> dict[str, Any] | None:
+        try:
+            got, _ign = await agent_call_ignored("entry_add", key=stored, find_only=True)
+        except HTTPException as e:
+            words = HAND_OLDER if "find_only" in (getattr(e, "ignored", None) or []) else str(e.detail)
+            raise HTTPException(e.status_code, HAND_UNCHECKED.format(words=words)) from None
+        return got if isinstance(got, dict) and got.get("existing") else None
+
+    async def done(ask: str, doer: str, keyless: bool, older: str = "") -> dict[str, Any]:
+        try:
+            got = await call("board_edit", board=board, line=line, text=text, action="done", key=key,
+                             why=f"handed to {doer}: {ask}")  # fmt: skip
+        except HTTPException as e:
+            if e.status_code == 400 and _no_line(str(e.detail)):
+                got = {}  # the first Done landed, or someone closed it meanwhile: taken (TD-1708)
+            elif keyless and e.status_code == 400:
+                raise HTTPException(409, f"sent without its key: {ask} — a second press would send it again; "
+                                         f"mark the line Done: {e.detail}") from None  # fmt: skip
+            elif keyless:
+                words = f"sent without its key: {ask} — the line may still be open; a second press would send it again"
+                raise HTTPException(e.status_code, f"{words}: {e.detail}") from None
+            else:
+                raise HTTPException(409 if e.status_code == 400 else e.status_code,
+                                    f"handed to {doer} — the line is still open: {e.detail}") from None  # fmt: skip
+        toast = (f"handed to {doer} — sent without its key (the host agent is older than this page): {ask}"
+                 if keyless else f"handed to {doer}" + (f" {older}" if older else ""))  # fmt: skip
+        return {"ok": True, "end": "taken", "toast": toast, "red": keyless, "id": ask, "doer": doer,
+                **(got if isinstance(got, dict) else {})}  # fmt: skip
+
+    async def fallback(words: str) -> dict[str, Any]:
+        org, _notes = await asyncio.to_thread(org_here)
+        if why := await asyncio.to_thread(road_refusal, org, root, "session", host_name()):
+            raise HTTPException(409, f"{words}; {why}" if words else why)
+        try:
+            got = await call("board_edit", board=board, line=line, text=text, action="decide", key=key,
+                             answer=board_mod.HAVE_A_SESSION, answers=[])  # fmt: skip
+        except HTTPException as e:
+            if e.status_code != 400:
+                raise
+            raise HTTPException(409, f"{words}; {e.detail}" if words else str(e.detail)) from None
+        toast = f"sent to {repo}'s lane" + (f": {words}" if words else "")
+        return {"ok": True, "end": "fallback", "toast": toast, "red": False, **(got if isinstance(got, dict) else {})}
+
+    lock = _HAND_LOCKS.setdefault((repo, key), asyncio.Lock())
+    async with lock:
+        # 0. the look: a handed ask of this line's key, open or settled, is only its Done to retry
+        if (had := await look()) is not None:
+            return await done(str(had["id"]), str(had.get("doer") or ""), keyless=False)
+        # 1. the line as found on origin's head, with its doer
+        try:
+            found = await call("board_find", board=board, line=line, key=key)
+        except HTTPException as e:
+            if e.status_code != 400:
+                raise
+            return await fallback(str(e.detail))
+        doer = str(found.get("doer") or "")
+        # 2. the doer resolved, by the function the draw reads
+        org, _notes = await asyncio.to_thread(org_here)
+        declared = await declared_teams(facts)
+        target = await asyncio.to_thread(doer_target, org, root, doer, host_name(), declared)
+        if target is None:
+            return await fallback(f"{doer} does not resolve to a techlead seat")
+        if target.get("own"):
+            return await fallback("")
+        # 3. the send
+        refs = [r if "#" in r else f"{repo}#{r}" for r in (str(x) for x in found.get("refs") or ()) if r.strip()]
+        try:
+            got, ignored = await agent_call_ignored(
+                "entry_add",
+                repo=target["root"],
+                type="debt",
+                text=_relay_text(repo, key, found),
+                teams=[{"team": t["team"], "seat": t["seat"]} for t in target["teams"]],
+                team=target["team"],
+                refs=refs,
+                key=stored,
+                doer=doer,
+            )
+        except HTTPException as e:
+            if e.status_code != 400:
+                raise HTTPException(e.status_code, f"the hand-off may have been sent: {e.detail}") from None
+            if await look() is not None:  # an error answer cannot say whether the ask landed
+                raise HTTPException(409, f"the hand-off may have been sent: {e.detail}") from None
+            return await fallback(str(e.detail))
+        if "key" in ignored:
+            return await done(str(got["id"]), doer, keyless=True)
+        older = ("(the host agent is older than this page: refs or doer not stored)"
+                 if {"refs", "doer"} & set(ignored) else "")  # fmt: skip
+        return await done(str(got["id"]), doer, keyless=False, older=older)
+
+
+async def declared_teams(facts: Any) -> dict[str, list[str]]:
+    """Each checkout root → its ledger's declared teams, from the repo facts (`{}` where they cannot be read)."""
+    try:
+        rows = (await facts())[0]
+    except Exception:  # noqa: BLE001 — no facts reads as no declared order, never a failed press
+        return {}
+    out: dict[str, list[str]] = {}
+    for v in (rows or {}).values():
+        if isinstance(v, dict) and v.get("root"):
+            led = v.get("ledger") or {}
+            out[str(Path(str(v["root"])).expanduser().resolve())] = list(led.get("declared_teams") or ())
+    return out
 
 
 async def paths_for(call: Any, body: dict[str, Any]) -> dict[str, Any]:
@@ -5507,6 +5723,10 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
             if what not in BOARD_ACTS:
                 raise HTTPException(400, f"a board row's act is {', '.join(BOARD_ACTS)}, not {what!r}")
+            if what == "hand":
+                # **Have a session do it** on a line naming its `Doer:` (§4.5 screen 12, TD-1660): straight to
+                # the doer's techlead seat, the line closed Done naming the ask; else TD-1624's press
+                return JSONResponse(await board_hand(call, h.repo_facts, body))
             try:
                 line = int(body.get("line"))
             except (TypeError, ValueError):
