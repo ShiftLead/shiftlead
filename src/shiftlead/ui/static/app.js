@@ -3881,13 +3881,15 @@
     return why ? { reason: why } : {};
   };
   // The card, the Focus header and an Inbox row are redrawn from pushed deltas and polls, and a
-  // redraw must not take a half-typed reason from under the person: read the boxes before it (by
-  // session id), put them back after it.
+  // redraw must not take a half-typed reason from under the person: read the boxes before it, put them back after
+  // it — by the permission's `call` where the box carries one (a Queue card's and a card page's, TD-1808), else by
+  // session id. A permission no longer drawn takes its words with it.
+  const denyKey = (i) => i.dataset.call || i.dataset.id;
   AO.denyWhys = function (root) {
     const kept = {};
     if (!root) return kept;
     root.querySelectorAll("input.denywhy").forEach((i) => {
-      if (i.value || i === document.activeElement) kept[i.dataset.id] = { value: i.value, focused: i === document.activeElement };
+      if (i.value || i === document.activeElement) kept[denyKey(i)] = { value: i.value, focused: i === document.activeElement };
     });
     return kept;
   };
@@ -3950,7 +3952,7 @@
   AO.restoreDenyWhys = function (root, kept) {
     if (!root) return;
     root.querySelectorAll("input.denywhy").forEach((i) => {
-      const k = kept[i.dataset.id];
+      const k = kept[denyKey(i)];
       if (!k) return;
       i.value = k.value;
       if (k.focused) i.focus();
@@ -5017,7 +5019,7 @@
     if (!on && w) w.remove();
   };
   // a card's header whose top entry was archived while the card keeps it as its top: *done*, its controls hidden,
-  // **Open card ›** (a link) staying
+  // **Its own page** (a link) staying
   // (`word` *gone* on a card's page whose id left, TD-1762)
   AO.qHeadDone = function (head, on, word) {
     word = word || "done";
@@ -5049,7 +5051,7 @@
       if (k === from || k.startsWith(from + ":")) d.dataset.fold = to + k.slice(from.length);
     });
     if (AO.foldsRekey) AO.foldsRekey(from, to);
-    // its links to its own page — Open card ›, each preview's sentence and Answer on its card › (TD-1763)
+    // its link to its own page, **Its own page** (TD-1763, TD-1808)
     const was = "/card/" + encodeURIComponent(from), now = "/card/" + encodeURIComponent(to);
     [...el.querySelectorAll("a[data-cardhref]")].forEach((a) => {
       const h = a.getAttribute("href") || "";
@@ -5284,6 +5286,11 @@
     const unitsOf = (c) => (c ? [...c.querySelectorAll(Q_UNITS)].filter((u) => u.closest(".qcard") === c) : []);
     const unitIn = (c, b, k) => unitsOf(c).find((u) => AO.qUnitKey(u) === k && AO.qBlockOf(u) === b) || null;
     let freed = false;  // a refused press: the values that waited are drawn with the refusal
+    // a unit or header part replaced by the reading's, a reason typed in its *why?* kept (TD-1808)
+    function swap(el, from) {
+      const whys = AO.denyWhys(el), n = from.cloneNode(true);
+      el.replaceWith(n); AO.restoreDenyWhys(n, whys);
+    }
     function patch() {
       if (!reading) return;
       const found = $("#cardfound", reading), c = drawnCard();
@@ -5311,11 +5318,11 @@
         const gone = new Set(diff.gone), done = new Set(diff.doneUnits);
         unitsOf(c).filter((u) => !u.querySelector(Q_UNITS)).forEach((u) => {
           const k = AO.qUnitKey(u), b = AO.qBlockOf(u), ru = unitIn(rc, b, k);
-          if (ru && !ru.querySelector(Q_UNITS) && !(held(u) && !freed) && ru.outerHTML !== u.outerHTML) u.replaceWith(ru.cloneNode(true));
+          if (ru && !ru.querySelector(Q_UNITS) && !(held(u) && !freed) && ru.outerHTML !== u.outerHTML) swap(u, ru);
         });
         [".qhead .qmain > .qid", ".qhead .qtitle", ".qhead .qright"].forEach((sel) => {
           const a = $(sel, c), b = $(sel, rc);
-          if (a && b && !(held(a.closest(".qhead")) && !freed) && a.outerHTML !== b.outerHTML) a.replaceWith(b.cloneNode(true));
+          if (a && b && !(held(a.closest(".qhead")) && !freed) && a.outerHTML !== b.outerHTML) swap(a, b);
         });
         unitsOf(c).forEach((u) => {
           const k = AO.qUnitKey(u);
@@ -5396,9 +5403,10 @@
       // the drawn card *gone* instead, never blanking it
       const f = $("#cardfound", reading), gone = !(f && f.dataset.found) && !!(drawnCard() || $(".qdline", lists));
       if (gone) { if (back) { patch(); return; } location.href = top ? `/queue#${encodeURIComponent(top)}` : "/queue"; return; }
-      const menus = AO.openMenus(lists), errs = AO.rowErrs(lists);
+      const menus = AO.openMenus(lists), errs = AO.rowErrs(lists), whys = AO.denyWhys(lists);
       lists.innerHTML = readingHtml;
       AO.qcardReapply(lists); AO.restoreRowErrs(lists, errs); AO.reopenFolds(lists); AO.reopenMenus(lists, menus);
+      AO.restoreDenyWhys(lists, whys);
       openFolds(lists);
       cardLinks();
       ringAddress();
@@ -6005,11 +6013,14 @@
     const unitIn = (c, b, k) => unitsOf(c).find((u) => AO.qUnitKey(u) === k && AO.qBlockOf(u) === b) || null;
     const quiet = (el) => { const a = document.activeElement; return !(a && el.contains(a)) && !el.querySelector("details[open].more, details[open].qdots"); };
     const applied = new Map();  // what each card, unit or header part was last patched from, by its key
+    // a reason typed in a permission's *why?* survives it (TD-1808)
     function swapIn(el, from, key) {  // `el` drawn from `from`'s copy, where that copy changed since the last patch
       const html = from.outerHTML;
       if (applied.get(key) === html) return el;
       applied.set(key, html);
-      const n = from.cloneNode(true); el.replaceWith(n); return n;
+      const whys = AO.denyWhys(el), n = from.cloneNode(true);
+      el.replaceWith(n); AO.restoreDenyWhys(n, whys);
+      return n;
     }
     // a drawn card's values from the reading's card: whole where its group and units are as drawn, else unit by unit
     // and the header's words; never its place, its group's look, its fold or the picks (a patch re-marks no `qoff`)
@@ -6156,7 +6167,7 @@
       kept.forEach((k) => k.node.remove());
       const opened = $$(".qdline .qdbody:not([hidden])", lists).map((el) => el.closest(".qdline").dataset.key);
       const menus = AO.openMenus(lists);
-      const errs = AO.rowErrs(lists), on = document.activeElement;
+      const errs = AO.rowErrs(lists), whys = AO.denyWhys(lists), on = document.activeElement;
       const ring = on && on.matches && on.matches(".mailrow[data-msg]") && lists.contains(on) ? on.dataset.msg : "";
       lists.innerHTML = readingHtml;
       reading = parse(readingHtml);
@@ -6175,6 +6186,7 @@
       });
       AO.qcardReapply(lists);  // a card's press still out (TD-1461), before the item's own keep takes a left row out
       AO.restoreRowErrs(lists, errs);
+      AO.restoreDenyWhys(lists, whys);  // a reason typed in *why?*, and its focus (TD-1808)
       const back = ring && $(`.mailrow[data-msg="${CSS.escape(ring)}"]`, lists);
       if (back) back.focus({ preventScroll: true });
       opened.forEach((k) => { const ln = k && $(`.qdline[data-key="${CSS.escape(k)}"]`, lists); if (ln) openLine(ln); });

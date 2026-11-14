@@ -212,10 +212,7 @@ def test_the_card_the_inbox_row_and_the_design_s_own_header_draw_it(github, tmp_
     ]
     c = client(monkeypatch, tmp_path, fake(q, entries))
     html = c.get("/queue").text
-    queue20 = html[html.index('data-card="s#TD-20"') : html.index('data-card="s#TD-30"')]
-    assert len(_draws(queue20)) == 1  # the Queue's previews draw the header's alone (TD-1763)
-    html = c.get("/card/s%23TD-20").text  # …and the card's page every item's
-    card20 = html[html.index('data-card="s#TD-20"') :]
+    card20 = html[html.index('data-card="s#TD-20"') : html.index('data-card="s#TD-30"')]
     head = card20[card20.index('<span class="qtitle">') :]
     head = head[: head.index("</span></span>") + 14]
     head = html_mod.unescape(head)
@@ -240,7 +237,7 @@ def test_the_card_the_inbox_row_and_the_design_s_own_header_draw_it(github, tmp_
 def test_with_no_editor_link_the_word_itself_links_github(github, tmp_path, monkeypatch):
     monkeypatch.setattr(uiconf, "open_in", lambda: uiconf.OpenIn(kind="none"))
     c = client(monkeypatch, tmp_path, fake(_q(_syn(), TD20=12), [mail("m1", "which way?", about="TD-20")]))
-    (got,) = _draws(html_mod.unescape(c.get("/card/s%23TD-20").text))
+    (got,) = _draws(html_mod.unescape(c.get("/queue").text))
     assert 'title="the design\'s synopsis, on GitHub">synopsis</a>' in got and "GitHub</a>" not in got.replace(
         ">synopsis</a>", ""
     )

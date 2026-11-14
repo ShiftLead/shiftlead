@@ -210,10 +210,7 @@ def test_the_in_process_road_carries_the_mail_and_draws_the_pages_card(tmp_path,
     # the page draws the same card: its wants, by the page's own read
     html = c.get("/queue").text
     card20 = html[html.index('data-card="s#TD-20"') : html.index('data-card="s#TD-30"')]
-    # the Queue previews it (§4.5 screen 12 *Previews*, TD-1763); Lift the hold is on the card's own page
-    assert "SECRET-ASK" in card20 and "Lift the hold" not in card20
-    page = c.get("/card/s%23TD-20").text
-    assert "SECRET-ASK" in page and "Lift the hold" in page
+    assert "SECRET-ASK" in card20 and "Lift the hold" in card20
     assert json.loads(json.dumps(got, default=str))["card"]["id"] == "s#TD-20"
 
 

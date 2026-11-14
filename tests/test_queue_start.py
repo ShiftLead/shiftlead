@@ -11,7 +11,6 @@ import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
 
 import pytest
 from conftest import scratch_dir
@@ -126,25 +125,23 @@ def test_the_card_draws_start_session_open_session_or_nothing(tmp_path, monkeypa
         c["start"] = c["id"]
     held = q["cards"][0]  # s#TD-10, held by grinder-1 (`g1`)
 
-    def page(fleet: list[dict], cid: str) -> str:
-        """The card's own page, where Start session is drawn (§4.5 screen 12 *Previews*, TD-1763)."""
-
+    def page(fleet: list[dict]) -> str:
         class Fake(fake(q)):
             async def call(self, method, **kw):
                 return fleet if method == "list" else await super().call(method, **kw)
 
-        return client(monkeypatch, tmp_path, Fake).get("/card/" + quote(cid, safe="")).text
+        return client(monkeypatch, tmp_path, Fake).get("/queue").text
 
     def head(html: str, cid: str) -> str:
         i = html.index(f'data-card="{cid}"')
         return html[i : html.index('<span class="qgap">', i)]
 
-    fleet = [_rec("g1", "/x/s", "TD-10", name="grinder-1")]
-    assert ">Start session<" not in head(page(fleet, held["id"]), held["id"]), "another holds `start`: no button"
-    up = head(page(fleet, "s#TD-20"), "s#TD-20")
+    html = page([_rec("g1", "/x/s", "TD-10", name="grinder-1")])
+    assert ">Start session<" not in head(html, held["id"]), "another holds `start`: no button"
+    up = head(html, "s#TD-20")
     assert ">Start session<" in up and 'data-card="s#TD-20"' in up and 'data-ref="TD-20"' in up
     assert 'data-repo="s"' in up and 'data-act="ledger_start"' in up
-    html = page([_rec("mine", "/x/s", "TD-21", unattended=False)], "s#TD-20")
+    html = page([_rec("mine", "/x/s", "TD-21", unattended=False)])
     assert ">Open session<" in head(html, "s#TD-20") and ">Start session<" not in head(html, "s#TD-20")
     # the view carries what the button reads
     v = queue_view(q, NOW, fleet=[_rec("mine", "/x/s", "TD-21", unattended=False)])
@@ -530,10 +527,7 @@ def test_the_queue_page_draws_an_asks_start_session_on_its_card_and_none_in_the_
     from test_ui_inbox import entry
 
     ask = entry("m-1", "ask", text="TD-20: merge PR 9?", subject="TD-20: merge PR 9?", answers=["merge it"])
-    c = client(monkeypatch, tmp_path, fake(_q(), entries=[{**ask, "about": "samscrape#TD-020"}]))
-    # on the card's own page (TD-1763): the Queue draws neither
-    assert "qstart" not in c.get("/queue").text
-    html = c.get("/card/samscrape%23TD-020").text
+    html = client(monkeypatch, tmp_path, fake(_q(), entries=[{**ask, "about": "samscrape#TD-020"}])).get("/queue").text
     i = html.index('data-card="samscrape#TD-020"')
     head = html[i : html.index('<span class="qgap">', i)]
     assert 'data-act="ledger_start"' not in head, "the item draws its own: none in the header"
