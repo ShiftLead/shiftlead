@@ -3119,8 +3119,8 @@ def test_deny_carries_an_optional_reason_from_every_place_it_is_offered(tmp_path
     assert deny + ' <input class="denywhy"' in js
     assert "body = AO.denyBody(w && w.value)" in js
     # the card's delta, the Focus header, the Inbox poll, a team summary's Answer needed facet and
-    # the Repo page's re-read (TD-176)
-    assert js.count("AO.restoreDenyWhys(") == 5
+    # the Repo page's re-read (TD-176); the Queue's and the card page's patches and whole draws (TD-1808)
+    assert js.count("AO.restoreDenyWhys(") == 9
 
     node = shutil.which("node")
     if not node:
@@ -3695,8 +3695,7 @@ def test_every_inbox_control_has_its_verb_under_way():
     row = (root / "templates/inbox_row.html").read_text()
     macro = row[row.index("{% macro row(e, section") :]
     assert macro.count('<div class="st rowerr" role="alert" hidden></div>') == 5  # each of the five row shapes
-    # and the Queue's one-line preview of an item (TD-1763), which is its row there, and nowhere else: a row has one
-    assert row.count('class="st rowerr"') == 6
+    assert row.count('class="st rowerr"') == 5  # and nowhere else, so a row has one
     # the frame of a press: marked before the request leaves, the row out first when the press takes it
     assert (
         'pressed(key === "board_decide" ? body.answer : undefined);\n'

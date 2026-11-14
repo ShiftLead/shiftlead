@@ -4351,12 +4351,12 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return JSONResponse({"error": f"no open card holds {id}"}, status_code=404)
         return JSONResponse(json.loads(json.dumps(got, default=str)))  # rows carry dates
 
-    async def queue_read(request: Request, preview: bool = False) -> SimpleNamespace:
+    async def queue_read(request: Request) -> SimpleNamespace:
         """The Queue's reading as its pages draw it (§4.5 screen 12; TD-771, TD-1762): the `queue` RPC, what is
         attached to each card (the Inbox's own sections over the same reads, each `home: queue` row drawn in its
         card's section by the Inbox's own renderer), the teams, and the promote reading — the Queue page's and a
-        card's page's one road. `preview` draws each item as the Queue's one-line preview, its one-press answers
-        alone (§4.5 screen 12 *Previews*, TD-1763); a card's page draws them whole."""
+        card's page's one road; both draw each item whole, every control on it (§4.5 screen 12 *An item is answered
+        where it is read*, TD-1808)."""
         agent_down, got, why = False, None, ""
         try:
             got = await call("queue")
@@ -4379,9 +4379,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     h,
                     fleet,
                     card_index(got),
-                    lambda e, sec, choices: Markup(
-                        one.render(e=e, section=sec, origin=origin, board_choices=choices, preview=preview)
-                    ),
+                    lambda e, sec, choices: Markup(one.render(e=e, section=sec, origin=origin, board_choices=choices)),
                     # a kept card's items start sessions too (TD-1618): its id must be in `by_id`
                     [*(got.get("cards") or ()), *(got.get("completed") or ())],
                 )
@@ -4424,7 +4422,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if qp.get("card") and not qp.get("part"):
             keep = urlencode([(k, qp[k]) for k in ("row", "item") if qp.get(k)])
             return RedirectResponse(f"/card/{quote(qp['card'], safe='')}{'?' + keep if keep else ''}", status_code=303)
-        rd = await queue_read(request, preview=True)
+        rd = await queue_read(request)
         # the filter row (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): carried in the URL,
         # what it hides marked, never dropped — a move's neighbours are the whole Up next order
         picks = queue_picks(request.query_params)

@@ -189,10 +189,8 @@
    own answers — **Go with it** on a steer, **Done** on *yours to do*, **Lift the hold** on a decision — and
    **Answer…**, a box for the person's own words. Each takes the road its kind already has (`how`): a message's
    reply, a board line's decided line (its words written on the line, the board's Reply road), a ledger entry's
-   decided board line. A red PR has no Answer row. With `one` it is the Queue's preview (§4.5 screen 12 *Previews*,
-   TD-1763): the recommended (outlined) answer alone, never a form, and an `act` line's **Done**; nothing that opens a
-   box, no **Go with it**, **Done** or **Lift the hold** on a ledger row, and no Start session — the card's page has them. -#}
-{% macro answer_row(e, how, gwi='', one=False) -%}
+   decided board line. A red PR has no Answer row. -#}
+{% macro answer_row(e, how, gwi='') -%}
 {%- set raw = e.get('answers') if how != 'owed' else [] %}{% set raw = raw if raw is sequence and raw is not string else [] %}
 {%- set cs = e.get('consequences') %}{% set cs = cs if cs is sequence and cs is not string else [] %}
 {%- set dflt = e.get('default') %}
@@ -201,8 +199,8 @@
 {%- set pair = look_pair(e) if how == 'mail' else (e.get('pair') if how == 'board' else false) %}
 {%- set by = e.get('passer_name') or e.get('from_name') or e.get('from') or e.get('name') or e.get('repo') %}
 {%- set where = (e.get('repo_name') or e.get('repo') or e.get('name') or 'the repo') ~ "'s board" %}
-<{{ 'span' if one else 'div' }} class="{{ 'qpans' if one else 'row gap wrap sugg qanswers' }}" role="group" aria-label="answer this item">
-  {%- for a in raw %}{% if a is string and a.strip() and (not one or (loop.index0 == rec and not pair)) %}
+<div class="row gap wrap sugg qanswers" role="group" aria-label="answer this item">
+  {%- for a in raw %}{% if a is string and a.strip() %}
   {%- set i = loop.index0 %}{% set form = pair and i == 1 %}
   <span class="qans"><button class="btn sm answer{% if i == rec and not pair %} rec{% endif %}" type="button"
   {%- if how == 'mail' and form %} data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ by }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="Not right: " title="say what is off: your words go back to {{ by }} as a reply"
@@ -211,10 +209,8 @@
   {%- elif how == 'board' %} data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ a }}"
   {%- else %} data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-index="{{ i }}" data-answer="{{ a }}" title="{{ a }}"
   {%- endif %}><span class="alabel">{% if pair %}{{ 'Not right…' if form else 'Works' }}{% else %}{{ a }}{% endif %}</span></button>
-  {%- set c = cs[i] if i < cs | length else '' %}{% if c is string and c.strip() and not one %}<span class="st alead">{{ c }}</span>{% endif %}</span>
+  {%- set c = cs[i] if i < cs | length else '' %}{% if c is string and c.strip() %}<span class="st alead">{{ c }}</span>{% endif %}</span>
   {%- endif %}{% endfor %}
-  {%- if one %}{% if how == 'board' and e.kind == 'act' %}{{ board_done(e, 'btn sm answer rec') }}{% endif %}
-  {%- else %}
   {%- if gwi %}<button class="btn sm ghost" type="button" data-act="gowithit" data-id="person" data-msg="{{ e.id }}" data-confirm="{{ gwi }}">Go with it</button>{% endif %}
   {%- if how == 'ledger' and e.home == 'queue' and e.why == 'yours' %}
   <button class="btn sm ghost" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="done" data-answer="done" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: done — its session archives the entry, or asks you what was done" data-confirm="Done? &ldquo;done&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Done</button>
@@ -234,8 +230,7 @@
   <button class="btn sm ghost" type="button" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" title="{{ help_title('card-answers') }}">Answer…</button>
   {%- endif %}
   {{- item_start(e) }}
-  {%- endif %}
-</{{ 'span' if one else 'div' }}>
+</div>
 {%- endmacro %}
 
 {#- a card's board item's **Done** — the write-back's, its *landed on origin* words its title — and **Answer…**, the
@@ -280,8 +275,8 @@
    entry itself, and a typed reply is not — it went to the asker's inbox, not to this one — so the
    row says which of the two it was rather than inventing words the person did not write. #}
 
-{#- a Read row's **Dismiss**, drawn by its row and by its Queue preview alike (§4.5 screen 12 *Previews*, TD-1763):
-    `who`, the session told, asks first in its row's words; with none it is one press -#}
+{#- a Read row's **Dismiss** (TD-1763): `who`, the session told, asks first in its row's words; with none it is one
+    press -#}
 {% macro dismiss_btn(e, who='', draft=False) -%}
 <button class="btn sm ghost" data-act="dismiss" data-id="person" data-msg="{{ e.id }}"{% if who %} data-confirm="Dismiss this? It says you do not need to hear back: the debt ends and {{ who }} is told.{% if draft %} A draft PR it opened stays open.{% endif %}"{% endif %}>Dismiss</button>
 {%- endmacro %}
@@ -752,7 +747,7 @@
   <span class="meta countdown" data-deadline="{{ e.deadline }}">{{ e.left or 'via hook' }}</span>
   <button class="btn sm primary" data-act="allow" data-id="{{ e.sid }}" data-call="{{ e.call }}">Allow</button>
   <button class="btn sm" data-act="deny" data-id="{{ e.sid }}" data-call="{{ e.call }}">Deny</button>
-  <input class="denywhy" type="text" maxlength="200" data-id="{{ e.sid }}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it">
+  <input class="denywhy" type="text" maxlength="200" data-id="{{ e.sid }}" data-call="{{ e.call }}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it">
   {%- elif e.row == 'limited' %}
   {#- §4.5a gives this row **Switch profile… / Wait**, which are the card's controls — and neither
       is built on the card. Until they are, the row says what the cap is doing and opens the
@@ -1421,52 +1416,6 @@
     by, written on the mail, board and ledger roots and a thread row, never on a trail or state row -#}
 {% macro paths_attr(e) -%}
 {%- set pc = paths_ctx(e) %}{% if pc %} data-paths-ctx="{{ pc }}"{% endif %}
-{%- endmacro %}
-
-{#- design §4.5 screen 12 *Previews: the Queue reads, the card's page acts* (TD-1558, built by TD-1763): on the Queue
-    every item is one line — its kind mark, its sentence cut to the line with an ellipsis (whole in its `title`), its
-    one-press answers where it has any, then **Answer on its card ›**; a press on the sentence or the link opens the
-    card's page at the item (`e.addr`, *Addresses*). The one-press answers are the only controls it keeps: the
-    recommended (outlined) answer, never a form and never one that needs words (`answer_row`'s `one`); an `act`
-    line's **Done**; a Read item's **Dismiss**, in its row's own words; a stopped holder's permission **Allow / Deny**,
-    the Deny with no *why?* box, so it sends no reason; and **Open** on an item whose only control is Open (a red PR, a
-    fork's PR, a stuck row, a holder's question or `limited` row). The row's own `data-*` are its full row's, so a
-    press works, and the page diffs and keeps it, as on the card's page. -#}
-{% macro preview_sentence(e) -%}
-{%- set c = card_shape(e.text, origin) if (e.text and not e.row) else none %}
-{%- if c and c.one %}{{ c.sentence | striptags }}{% elif e.row == 'ledger' %}{{ e.ask or (e.id ~ ' ' ~ e.title) }}
-{%- elif e.row == 'board' and (e.card or e.lead) %}{{ md(e.card.sentence if e.card else e.lead, origin) | striptags }}{% else %}{{ row_subject(e) or e.text or e.title or '' }}{% endif %}
-{%- endmacro %}
-{% macro queue_preview(e, section) -%}
-{%- set by_mate = e.answered and not e.row %}
-{%- set mark = 'answered' if by_mate else (e.row or e.kind) %}
-{%- set word = 'answered for you' if by_mate else ('board · ' ~ e.kind if e.row == 'board' else (e.kind or e.row)) %}
-{%- set cls = {'board': ' boardrow', 'ledger': ' ledgerrow', 'trail': ' trailrow'}.get(e.row, ' staterow' if e.row else '') %}
-{%- set sent = preview_sentence(e) | trim %}
-{%- set decides = e.want in ('decide', 'do') %}
-<div class="mailrow qpreview{{ cls }}" tabindex="0"{{ paths_attr(e) }} data-msg="{{ e.row_id if e.row == 'ledger' else e.id }}" data-at="{{ e.at or '' }}" data-kind="{{ {'board': 'board', 'ledger': 'ledger', 'trail': 'trail'}.get(e.row, 'state' if e.row else e.kind) }}" data-rkind="{{ {'board': 'board', 'ledger': 'ledger', 'trail': 'trail'}.get(e.row, 'states' if e.row else rail_kind(e)) }}"{% if e.row and e.row not in ('board', 'ledger', 'trail') %} data-row="{{ e.row }}"{% endif %} data-section="{{ section }}" data-team="{{ e.team or '' }}"{% if e.row == 'board' %} data-teams="{{ (e.teams or []) | join(' ') }}" data-repo="{{ e.repo_name or '' }}" data-repo-label="{{ e.repo }}" data-text="{{ e.text }}"{% endif %}>
-<div class="qpline">
-  <span class="badge kindmark k-{{ mark }}">{{ word }}</span>
-  {%- if e.addr %}<a class="qpsent" href="{{ e.addr }}" data-cardhref title="{{ sent }}">{{ sent }}</a>{% else %}<span class="qpsent" title="{{ sent }}">{{ sent }}</span>{% endif %}
-  {%- if e.row == 'board' %}{% if decides and not e.decided and section != 'waiting' %}{{ answer_row(e, 'board', one=True) }}{% endif %}
-  {%- elif e.row == 'ledger' %}{% if decides and not (e.answered or e.applying) %}{{ answer_row(e, 'ledger', one=True) }}{% endif %}
-  {%- elif e.row == 'trail' %}<span class="qpans">{{ dismiss_btn(e) }}</span>
-  {%- elif e.row == 'permission' %}<span class="qpans"><button class="btn sm primary" data-act="allow" data-id="{{ e.sid }}" data-call="{{ e.call }}">Allow</button><button class="btn sm" data-act="deny" data-id="{{ e.sid }}" data-call="{{ e.call }}" title="denied with no reason: the card's page has the why? box">Deny</button></span>
-  {%- elif e.row in ('question', 'needs', 'limited', 'stalled') %}<span class="qpans">{{ open_btn(e, 'Open') }}</span>
-  {%- elif e.row in ('red_pr', 'fork_pr') %}{% if e.url %}<span class="qpans"><a class="btn sm primary" href="{{ e.url }}" target="_blank" rel="noopener" title="the pull request, on its forge">Open</a></span>{% endif %}
-  {%- elif e.row == 'stuck' %}{% if e.open %}<span class="qpans"><a class="btn sm primary" href="/focus/{{ e.open }}" title="{{ help_title('stuck-open') }}">Open</a></span>{% endif %}
-  {%- elif e.row %}
-  {%- elif e.want == 'read' %}<span class="qpans">
-    {%- if e.handed_row %}{{ dismiss_btn(e, e.holder_name, True) }}
-    {%- elif section == 'waiting' %}{{ dismiss_btn(e, e.from_name or e['from']) }}
-    {%- elif section == 'answered' %}{{ dismiss_btn(e) }}
-    {%- elif section in ('fyi', 'snoozed') %}{{ fyi_dismiss(e) }}{% endif %}</span>
-  {%- elif decides and (e.kind in ('ask', 'steer') or e.orphaned) and not (section == 'needs' and (e.owes or e.outcome)) and not e.handed_row %}{{ answer_row(e, 'mail', one=True) }}
-  {%- endif %}
-  {%- if e.addr %}<a class="qpcard st" href="{{ e.addr }}" data-cardhref title="{{ help_title('card-answer-on-card') }}">Answer on its card ›</a>{% endif %}
-</div>
-<div class="st rowerr" role="alert" hidden></div>
-</div>
 {%- endmacro %}
 
 {#- every row carries an error line (§4.5a *Inbox row: pending*, TD-340): a refused write, or a press

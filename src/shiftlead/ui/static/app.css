@@ -1291,18 +1291,9 @@ a.qstate:hover, a.qstatus:hover { text-decoration: none; color: var(--link); }
 .qanswers .btn.answer .alabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qanswers .btn.answer.rec { border: 2px solid var(--link); }
 .qanswers .alead { color: var(--muted); }
-/* the Queue's preview of an item (§4.5 screen 12 *Previews*, TD-1763): one line — its kind mark, its sentence cut
-   with an ellipsis (whole in its title), its one-press answers, Answer on its card › */
-.qmail .mailrow.qpreview { padding: 2px 8px; }
-.qpline { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.qpline .qpsent { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; }
-.qpline .qpans { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
-.qpline .qpans:empty { display: none; }
-.qpline .qpans .qans { display: inline-flex; }
-.qpline .btn.answer { max-width: 24ch; }
-.qpline .btn.answer .alabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.qpline .btn.answer.rec { border: 2px solid var(--link); }
-.qpline .qpcard { flex: 0 0 auto; white-space: nowrap; }
+/* **Its own page** (§4.5 screen 12 *An item is answered where it is read*, TD-1808): a quiet link after the header's ⋯ */
+.qownpage { font-size: var(--t-small); color: var(--link); opacity: .8; text-decoration: none; white-space: nowrap; }
+.qownpage:hover { text-decoration: underline; }
 details.qdots { display: inline-block; }
 .qdotsbtn[aria-disabled="true"] { pointer-events: none; opacity: .4; }  /* off while its press is out (TD-1321) */
 .qdotsbtn { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 22px; padding: 0 6px; border-radius: 4px; color: var(--muted); cursor: pointer; font-weight: 600; letter-spacing: .05em; user-select: none; }
