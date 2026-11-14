@@ -39,6 +39,8 @@ def refresh(home: Path, launch_home: Path) -> Path:
     holding the same mirror of `<home>/.claude`, but the two settings files, a link under either name removed and a
     non-link moved aside. An `OSError` is the caller's to refuse the launch with."""
     home = Path(os.path.abspath(home))
+    if os.path.islink(launch_home):  # a link would mirror into, and move aside, whatever it points at
+        raise OSError(f"{launch_home} is a link, not a directory")
     launch_home.mkdir(parents=True, exist_ok=True)
     _mirror(home, launch_home, set(os.listdir(home)) - set(NOT_LINKED), keep=NOT_LINKED)
     claude = launch_home / ".claude"
@@ -141,7 +143,7 @@ def file_refusal(path: Path, profile: str, *, env_keys: tuple[str, ...] = ()) ->
     refuses on (read after the mode); empty, `env` is not read."""
     try:
         doc = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
+    except (FileNotFoundError, NotADirectoryError):  # a `.claude` that is a file holds no settings file
         return None
     except (OSError, UnicodeDecodeError, ValueError) as e:
         return cannot_read(path, e, profile)

@@ -477,3 +477,23 @@ def test_doctor_notes_a_managed_file_that_refuses_every_all_launch(env, monkeypa
     rows = _rows(env)
     assert "every unattended launch is refused" in rows["all"]["note"] and words in rows["all"]["note"]
     assert "note" not in rows["skip"] and "note" not in rows["ask"]
+
+
+def test_a_launch_home_that_is_a_link_is_refused_and_nothing_moves(tmp_path):
+    """A launch home that is a link is refused, so a refresh never mirrors into, or moves aside, what it points at."""
+    home, target = tmp_path / "home", tmp_path / "elsewhere"
+    home.mkdir()
+    target.mkdir()
+    (target / "keep.txt").write_text("mine")
+    (home / "keep.txt").write_text("home")
+    lhome = tmp_path / "launch-home"
+    lhome.symlink_to(target)
+    with pytest.raises(OSError, match="is a link"):
+        lh.refresh(home, lhome)
+    assert sorted(os.listdir(target)) == ["keep.txt"] and (target / "keep.txt").read_text() == "mine"
+
+
+def test_a_claude_that_is_a_file_holds_no_settings_file(tmp_path):
+    """A session directory whose `.claude` is a plain file has no settings file to read: no refusal."""
+    (tmp_path / ".claude").write_text("not a directory")
+    assert lh.file_refusal(tmp_path / ".claude" / "settings.json", "p") is None
