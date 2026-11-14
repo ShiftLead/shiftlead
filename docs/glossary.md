@@ -324,6 +324,10 @@ not mix:
   as `board:<key>` in the `free-pick` lanes of the repo's teams (a design's answer, its `Context:` an open
   design-first entry's gate, in the `design-first` lanes, §6 rule 6, TD-1590) until a session closes it (design §4.4
   *Board write-back*, TD-380). — *proposed* 2026-10-07 (the designer).
+- **filing PR** — an open PR, not a sync PR and not on a `lift/` branch, whose changed files are all the repo's ledger, its board or the board's archive:
+  it files or changes entries and nothing else. One nobody holds a day after it opened is a work order
+  `pr:<n>` in the grinders' lanes (design §4.4 *A filing PR nobody holds is a work order*, TD-1804). —
+  *proposed* 2026-11-13 (the designer).
 - **ledger** — a v2 directory `docs/ledger/` of one `TD-NNN.md` per entry, as shiftlead's is since TD-1195, or a v1 file `docs/technical_debt.md` (design §4.4 *Either layout*, TD-1143): known issues and deferred work as `TD-NNN` entries. —
   *proposed*.
 - **Add entry** — the form by which the person puts an entry in the ledger from a page: their
