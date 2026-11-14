@@ -125,7 +125,9 @@ out.pointerdown_capture = listeners.some((l) => l.type === "pointerdown" && l.ca
 // the wiring itself (TD-1339): an event goes through the page's own capturing listeners, as a browser sends it
 // down, each listener's throw kept to itself (a browser reports it and goes on to the next)
 const fire = (type, ev) => {
-  for (const l of listeners.filter((x) => x.type === type && x.capture)) { try { l.fn(ev); } catch (e) { /* not ours */ } }
+  for (const l of listeners.filter((x) => x.type === type && x.capture)) {
+    try { l.fn(ev); } catch (e) { /* not ours */ }
+  }
   return ev;
 };
 const key = (k) => ({ key: k, prevented: false, preventDefault() { this.prevented = true; } });
