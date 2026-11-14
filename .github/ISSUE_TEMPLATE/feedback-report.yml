@@ -5,23 +5,15 @@ body:
   - type: markdown
     attributes:
       value: |
-        **This report is public as soon as you submit it, and it is mailed to the repo's watchers at once.**
+        ### ⚠️ Public at once: this issue is mailed to the repo's watchers as soon as you submit it.
 
-        It holds the findings you approved: for each, its area, what and fix sentences and count (and the entry it
-        recurs from), the known entries you counted, and once, the shiftlead commit your install runs, its day, the
-        window's length in days, the number of seats read and the run's noise. It holds no transcript text but the
-        sentences you approved.
+        **What it holds:** the findings you approved, a few counts, and your install's shiftlead commit. No transcript text beyond the sentences you approved.
 
-        An edit after you submit keeps the earlier text in the issue's edit history, which anyone who can see the
-        issue can open.
+        **Before you submit**
+        - **Read it for names and private work.** The scrub misses other spellings, branches, people's names and private work described in plain words. Only your read of the whole report catches what it cannot.
+        - **Paste it as the run wrote it.** The block is parsed by machine. To change a finding, please choose *edit* in the run.
+        - **An edit after submitting** keeps the earlier text in the issue's edit history, which anyone who sees the issue can open.
 
-        The scrub takes out only the names it knows, as it spells them, and the patterns it matches. Only your read
-        of the whole report catches what it cannot: a name spelled another way, a branch, a person's name, and
-        private work described in plain words (a feature, a customer, a private entry's subject).
-
-        Paste the report's text as the run wrote it, everything after its first line, which is the title. Never
-        change it by hand: each sentence stands twice, in the table and in the block the intake reads. Change a
-        finding by answering *edit* in the run, which writes the report again.
   - type: textarea
     id: report
     attributes:
