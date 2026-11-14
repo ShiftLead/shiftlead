@@ -7,11 +7,14 @@ Two commands, standard library only:
   Code's `ANTHROPIC_BASE_URL=http://127.0.0.1:N`). It forwards each request to the upstream (default
   `https://api.anthropic.com`), streams the response back as it comes (an SSE stream included), passing its
   `content-encoding` through untouched, and writes each request body and each response body, decoded, to DIR as
-  `NNNN-request.json` and `NNNN-response.txt` — never a header, so no key reaches the files.
+  `NNNN-request.json` and `NNNN-response.txt` — never a header, so no key reaches the files. gzip and deflate are
+  decoded by the standard library, zstd (Grok's interactive request) by a `zstd` binary on `PATH`; with none, the body
+  is written as it came and stderr says so.
 - `show FILE…`: each request's layout — the tool count, each system and message block with its length and cache
   marker — and the first request's cache figures from its response (the `NNNN-response.txt` beside it). It reads
-  the shape from a small provider table (`--provider`, Anthropic's the first row); for a provider with no row it
-  prints the top-level block sizes and the raw `usage` alone.
+  the shape from a small provider table (`--provider`: Anthropic's Messages the first row, OpenAI's Responses,
+  which Grok sends, the second); for a provider with no row it prints the top-level block sizes and the raw `usage`
+  alone.
 """
 
 from __future__ import annotations
@@ -22,6 +25,8 @@ import http.client
 import http.server
 import json
 import re
+import shutil
+import subprocess
 import sys
 import threading
 import urllib.error
@@ -47,7 +52,9 @@ HOP = {
 }
 
 # Where each provider keeps what `show` reads. A row: the request's tool list, its system text, its messages, a
-# block's cache marker, and the usage's input, cache-read and cache-write fields.
+# block's cache marker, and the usage's input, cache-read and cache-write fields (a dotted path reads a nested one).
+# A row with a `system_role` keeps its system text among its messages, as the items of that role; an empty value
+# is a field the provider does not have; `key` is a top-level request field `show` prints as it is.
 PROVIDERS: dict[str, dict[str, str]] = {
     "anthropic": {
         "tools": "tools",
@@ -55,16 +62,50 @@ PROVIDERS: dict[str, dict[str, str]] = {
         "messages": "messages",
         "marker": "cache_control",
         "input": "input_tokens",
+        "input_label": "uncached input",
         "read": "cache_read_input_tokens",
         "write": "cache_creation_input_tokens",
+    },
+    "responses": {
+        "tools": "tools",
+        "system": "input",
+        "system_role": "system",
+        "messages": "input",
+        "marker": "",
+        "input": "input_tokens",
+        "input_label": "input (the read included)",
+        "read": "input_tokens_details.cached_tokens",
+        "write": "",
+        "key": "prompt_cache_key",
     },
 }
 
 
+def _unzstd(body: bytes) -> bytes:
+    """A zstd body decoded by the `zstd` binary (the standard library has no zstd before Python 3.14); with no binary,
+    or one that fails, the body as it came, and stderr says why."""
+    exe = shutil.which("zstd")
+    if exe is None:
+        sys.stderr.write("cache_capture: a zstd body is written raw: no zstd binary on PATH (read it with zstd -d)\n")
+        return body
+    try:
+        done = subprocess.run([exe, "-dcq"], input=body, capture_output=True, timeout=60, check=False)  # noqa: S603
+    except (OSError, subprocess.TimeoutExpired) as e:
+        sys.stderr.write(f"cache_capture: a zstd body is written raw: {e!r}\n")
+        return body
+    if done.returncode != 0:
+        why = done.stderr.decode(errors="replace").strip()
+        sys.stderr.write(f"cache_capture: a zstd body is written raw: zstd exited {done.returncode}: {why}\n")
+        return body
+    return done.stdout
+
+
 def decode(body: bytes, encoding: str | None) -> bytes:
-    """A body as its `content-encoding` names it, decoded where the standard library can (gzip, deflate); any other
-    encoding is kept as it came."""
+    """A body as its `content-encoding` names it, decoded where the standard library can (gzip, deflate) and zstd by
+    its binary (`_unzstd`); any other encoding is kept as it came."""
     enc = (encoding or "").strip().lower()
+    if enc == "zstd" and body:
+        return _unzstd(body)
     try:
         if enc in ("gzip", "x-gzip"):
             return gzip.decompress(body)
@@ -160,7 +201,8 @@ def serve(port: int, out: Path, upstream: str = UPSTREAM, host: str = "127.0.0.1
 
 def usage_of(text: str) -> dict[str, Any] | None:
     """The response's `usage`: a JSON body's own, or a streamed one's `message_start` usage updated by each
-    `message_delta`'s (the last figures win). None where neither is found."""
+    `message_delta`'s (the last figures win) — a Responses stream's in its `response.*` events' `response`. None
+    where neither is found."""
     try:
         doc = json.loads(text)
     except ValueError:
@@ -179,7 +221,12 @@ def usage_of(text: str) -> dict[str, Any] | None:
             continue
         if not isinstance(ev, dict):
             continue
-        u = ev.get("message", {}).get("usage") if ev.get("type") == "message_start" else ev.get("usage")
+        if ev.get("type") == "message_start":
+            u = ev.get("message", {}).get("usage")
+        elif isinstance(ev.get("response"), dict):  # Responses: response.created … response.completed
+            u = ev["response"].get("usage")
+        else:
+            u = ev.get("usage")
         if isinstance(u, dict):
             usage = {**(usage or {}), **{k: v for k, v in u.items() if v is not None}}
     return usage
@@ -203,22 +250,45 @@ def _blocks(value: Any) -> list[Any]:
     return list(value) if isinstance(value, list) else []
 
 
+def _field(doc: dict[str, Any], path: str) -> Any:
+    """`doc`'s value at a dotted path (`input_tokens_details.cached_tokens`); 0 where any step is missing."""
+    cur: Any = doc
+    for step in path.split("."):
+        if not isinstance(cur, dict) or step not in cur:
+            return 0
+        cur = cur[step]
+    return cur
+
+
 def layout(req: dict[str, Any], row: dict[str, str] | None) -> list[str]:
-    """One request's layout as lines: with a provider row, the tool count and each system and message block with
-    its length and cache marker; without one, each top-level key's size."""
+    """One request's layout as lines: with a provider row, the tool count, its cache key where the row names one, and
+    each system and message block with its length and cache marker; without one, each top-level key's size."""
     if row is None:
         return [f"  {k}: {len(json.dumps(v, ensure_ascii=False))} chars" for k, v in req.items()]
     mark = row["marker"]
     lines = [f"  tools: {len(req.get(row['tools']) or [])}"]
-    for i, b in enumerate(_blocks(req.get(row["system"]))):
-        cut = " [cache]" if isinstance(b, dict) and b.get(mark) else ""
+    if row.get("key"):
+        lines.append(f"  {row['key']}: {req.get(row['key'])}")
+    role_of = row.get("system_role")
+    items = req.get(row["messages"]) or []
+    if role_of:  # the system text is among the messages, as the items of that role
+        system = [
+            b for m in items if isinstance(m, dict) and m.get("role") == role_of for b in _blocks(m.get("content"))
+        ]
+        items = [m for m in items if not (isinstance(m, dict) and m.get("role") == role_of)]
+    else:
+        system = _blocks(req.get(row["system"]))
+    for i, b in enumerate(system):
+        cut = " [cache]" if mark and isinstance(b, dict) and b.get(mark) else ""
         lines.append(f"  system[{i}]: {_size(b)} chars{cut}")
-    for i, msg in enumerate(req.get(row["messages"]) or []):
+    for i, msg in enumerate(items):
         role = msg.get("role", "?") if isinstance(msg, dict) else "?"
         content = msg.get("content") if isinstance(msg, dict) else msg
+        if role_of and isinstance(msg, dict) and content is None:
+            content = [msg]  # a Responses item with no content (a function call, its output) is one block itself
         for j, b in enumerate(_blocks(content)):
             kind = b.get("type", "block") if isinstance(b, dict) else "text"
-            cut = " [cache]" if isinstance(b, dict) and b.get(mark) else ""
+            cut = " [cache]" if mark and isinstance(b, dict) and b.get(mark) else ""
             lines.append(f"  messages[{i}] {role} [{j}] {kind}: {_size(b)} chars{cut}")
     return lines
 
@@ -248,10 +318,11 @@ def show(files: list[Path], provider: str = "anthropic") -> str:
         elif row is None:
             out.append(f"first request's usage: {json.dumps(usage, sort_keys=True)}")
         else:
+            write = f"write {_field(usage, row['write'])}, " if row["write"] else ""
             out.append(
                 "first request's cache: "
-                f"read {usage.get(row['read'], 0)}, write {usage.get(row['write'], 0)}, "
-                f"uncached input {usage.get(row['input'], 0)}"
+                f"read {_field(usage, row['read'])}, {write}"
+                f"{row['input_label']} {_field(usage, row['input'])}"
             )
     return "\n".join(out)
 
