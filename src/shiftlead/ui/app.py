@@ -212,6 +212,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     static_url,  # noqa: F401
     stop_fields,  # noqa: F401
     suggested_answers,  # noqa: F401
+    suggested_heads,  # noqa: F401
     team_brief_ids,
     team_reader,  # noqa: F401
     teams_for_form,  # noqa: F401
