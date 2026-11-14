@@ -848,6 +848,83 @@ def _board_lines(boards: Mapping[str, Iterable[Mapping[str, Any]]]) -> list[dict
     return out
 
 
+def _line_named(ln: Mapping[str, Any], refs_open: Mapping[str, str]) -> list[str]:
+    """The entries a `_board_lines` line names in its `Context:` refs and `Parts:`, as `<repo>#TD-n`."""
+    return [q for r in [*ln["refs"], *ln["parts"]] if (q := _line_qid(r, ln["repo"], refs_open))]
+
+
+def covered_by_open_line(
+    member: Mapping[str, Any], items: Iterable[Mapping[str, Any]], refs_open: Mapping[str, str]
+) -> bool:
+    """Whether an open, undecided `decide` line covers `member` (an open entry with its `repo`) — names it, or the
+    entry it is `Part of`, in its `Context:` or `Parts:` — so the entry asks again (§4.4 *The card's status*,
+    TD-1368). `items` are `_board_lines`' lines, open and closed alike: the open, undecided ones are kept here. One
+    test, which `board_hold` and the handed cover (`handed_hold`, §4.5 screen 12 *Three verbs: Have a session do
+    it*, TD-1660) both make."""
+    me = qid(str(member.get("repo") or ""), str(member.get("id") or ""))
+    parent = parent_qid(member)
+    for ln in items:
+        if not ln.get("open") or ln.get("decided") is not None:
+            continue
+        named = _line_named(ln, refs_open)
+        if me in named or (parent is not None and parent in named):
+            return True
+    return False
+
+
+def handed_hold(
+    member: Mapping[str, Any],
+    handed: Iterable[Mapping[str, Any]],
+    boards: Mapping[str, Iterable[Mapping[str, Any]]],
+    refs_open: Mapping[str, str],
+    now: datetime,
+) -> dict[str, Any] | None:
+    """An entry the person handed a seat by **Have a session do it** (§4.5 screen 12 *Three verbs: Have a session do
+    it*, TD-1660), or None. `member` is an open entry with its `repo` that waits on the person and is not *with
+    you* (the caller's test); `handed` the person's handed asks, the `inbox` read's `handed` list (`agent_mail.
+    handed_list`), each the holder's copy with its `holder` and `entry`; `boards` the board readings by repo name.
+
+    The cover holds while an ask whose `entry.refs` names the member is open — no outcome, for fewer than
+    `BOARD_WAIT_DAYS` civil days from its first send's local date (`entry.handed_at`, else its `at`), or a `blocked`
+    outcome, with no day bound (TD-1556) — and no open, undecided `decide` line covers the member
+    (`covered_by_open_line`), which asks again. A copy moved on (`rerouted`) is skipped. Of several, the newest
+    first send. `{kind: "handed", mid, asker, closed_at, outcome}`, `asker` the holder's id, `closed_at` the first
+    send, `outcome` a `blocked` one as it is."""
+    if covered_by_open_line(member, _board_lines(boards), refs_open):
+        return None
+    me = qid(str(member.get("repo") or ""), str(member.get("id") or ""))
+    today = now.astimezone().date()  # the board's waits count civil days, local
+    best: tuple[datetime, Mapping[str, Any], Mapping[str, Any]] | None = None
+    for h in handed:
+        entry = h.get("entry") if isinstance(h, Mapping) else None
+        if not isinstance(entry, Mapping) or h.get("closed_reason") == "rerouted":
+            continue
+        outcome = h.get("outcome")
+        blocked = isinstance(outcome, Mapping) and outcome.get("state") == "blocked"
+        if outcome and not blocked:
+            continue  # its outcome ends it: the entry is the person's again
+        repo = str(entry.get("key") or "").partition(":")[0]
+        if me not in {q for r in entry.get("refs") or () if (q := _line_qid(str(r), repo, refs_open))}:
+            continue
+        sent = _aware(entry.get("handed_at")) or _aware(h.get("at"))
+        if sent is None:
+            continue
+        if not blocked and (today - sent.astimezone().date()).days >= BOARD_WAIT_DAYS:
+            continue  # unanswered past the board's wait: the entry comes back counted
+        if best is None or sent > best[0]:
+            best = (sent, h, outcome if blocked else {})
+    if best is None:
+        return None
+    sent, h, outcome = best
+    return {
+        "kind": "handed",
+        "mid": str(h.get("id") or ""),
+        "asker": naming.split_address(str(h.get("holder") or ""))[0],
+        "closed_at": sent.isoformat(),
+        "outcome": dict(outcome) if outcome else None,
+    }
+
+
 def board_hold(
     member: Mapping[str, Any],
     boards: Mapping[str, Iterable[Mapping[str, Any]]],
@@ -879,13 +956,14 @@ def board_hold(
     me = qid(str(member.get("repo") or ""), str(member.get("id") or ""))
     parent = parent_qid(member)
     today = now.astimezone().date()  # the board's dates are civil dates, local
+    lines = _board_lines(boards)
+    if covered_by_open_line(member, lines, refs_open):
+        return None  # an open undecided line covering the member asks again
     picked: tuple[tuple[Any, ...], dict[str, Any], list[str]] | None = None
-    for ln in _board_lines(boards):
-        named = [q for r in ln["refs"] + ln["parts"] if (q := _line_qid(r, ln["repo"], refs_open))]
+    for ln in lines:
+        named = _line_named(ln, refs_open)
         if me not in named and (parent is None or parent not in named):
             continue
-        if ln["decided"] is None:
-            return None  # an open undecided line covering the member asks again
         if ln["by"] and str(ln["by"]).strip().lower() != PERSON:
             continue  # a line decided by someone else is not the person's answer
         closed = (ln["closed"] or {}).get("date") or ""
@@ -1128,6 +1206,7 @@ def reading(
     questions: Iterable[Any] = (),
     archived: Mapping[str, list[dict[str, Any]]] | None = None,
     host: str = "",
+    handed: Iterable[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """The `queue` reading (§4.4 *The Queue*): `{cards, completed, other_work, origins, at}`.
 
@@ -1156,13 +1235,16 @@ def reading(
     names no open entry (`board:<key>`, a PR naming none), with its holder. `origins` maps each repo's name to its
     origin path, for a repo with a readable origin (`card_index`, TD-1371); `design_prs` the design PR an item about
     each entry links (`design_prs`, TD-1531). `host` is the home's own host name, against which `records` (other
-    hosts' among them, `host` set) are keyed (`asker_repos`, TD-1541)."""
+    hosts' among them, `host` set) are keyed (`asker_repos`, TD-1541); `handed` the person's handed asks (the
+    `inbox` read's `handed` list), whose `refs` draw an entry that waits on the person *handed to <seat>*
+    (`handed_hold`, TD-1660)."""
     rs = _Repos(repos)
     records = list(records)
     # every record's state by id, ended ones too: an answered question's asker exited or closed is gone (TD-1316)
     states = {str(r.id): str(getattr(r, "state", "") or "") for r in records}
     names = {str(r.id): str(getattr(r, "name", "") or r.id) for r in records}
     questions = list(questions)
+    handed = [h for h in handed if isinstance(h, Mapping)]
     askers = asker_repos(questions, records, rs.roots, host)  # a bare `TD-n` is its asker's repo's (TD-1509, TD-1541)
     recs = [r for r in records if getattr(r, "state", "") not in ("exited", "closed") and not r.superseded_by]
     open_: dict[str, dict[str, Any]] = {}
@@ -1350,11 +1432,16 @@ def reading(
                 if needs and not mine
                 else None
             )
+            if needs and not mine and answered is None and handed:
+                # a step handed by Have a session do it, its ask open (§4.5 screen 12, TD-1660): a mail or board
+                # answer wins, and the mark below is drawn over it
+                answered = handed_hold(e, handed, boards, linked, now)
             if answered and answered.get("until"):
                 st = f"waits until {answered['until']}"  # the person's own *not yet*, until the re-ask (TD-1368)
             elif answered:
                 answered["name"] = names.get(answered["asker"], answered["asker"])
-                st = f"answered — waiting on {answered['name']}"
+                handed_to = answered.get("kind") == "handed"
+                st = f"handed to {answered['name']}" if handed_to else f"answered — waiting on {answered['name']}"
             applying = pressing.get(q) if not mine else None  # *with you* first, then the mark (TD-1508)
             if applying:
                 st, needs, answered = applying_words(applying), None, None  # the mark is no need of the person

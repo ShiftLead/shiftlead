@@ -1730,18 +1730,19 @@ class Readings:
         return got
 
     @timing.timed("ledger")
-    async def ledger_view(self, fleet: list[dict[str, Any]], inbox: Any = ()) -> dict[str, Any]:
+    async def ledger_view(self, fleet: list[dict[str, Any]], inbox: Any = (), handed: Any = ()) -> dict[str, Any]:
         """The ledger's rows of *Later* (§4.5 screen 6, TD-368, TD-565) from the home's repo facts and the
         definitions' team per repo; empty when either cannot be read — nothing is then drawn. `inbox` is the
         person inbox's entries (`person_inbox`'s), which draw a held entry the person answered as *answered —
-        waiting on <asker>* (TD-1316). The Queue draws these rows on their cards (TD-771)."""
+        waiting on <asker>* (TD-1316), and `handed` its `handed` list, which draws an entry a step was handed for
+        *handed to <seat>* (TD-1660). The Queue draws these rows on their cards (TD-771)."""
         repos: dict[str, Any] = {}
         named: dict[str, str] = {}
         with contextlib.suppress(Exception):
             repos = await self.repos()
         with contextlib.suppress(Exception):
             named = repo_teams(await self.defs(), host_name())
-        return ledger_for_you(repos, fleet, named, None, inbox)
+        return ledger_for_you(repos, fleet, named, None, inbox, handed=handed)
 
     async def card(self, id: str, words: bool) -> dict[str, Any] | None:
         """One Queue card whole (§4.7 *`ao card`*, §4.4 *One owner*, TD-1411): the one read behind both of `ao
@@ -2361,8 +2362,10 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # the answered questions as the Inbox stamps them (`_owing`: what the person answered); unread, the
         # rows read as before — never the page's failure
         asked: list[dict[str, Any]] = []
+        handed: list[dict[str, Any]] = []  # the person's handed asks: the handed cover (TD-1660)
         if asks and isinstance(first[-1], dict):
             asked = [e for e in first[-1].get("entries") or () if isinstance(e, dict)]
+            handed = [e for e in first[-1].get("handed") or () if isinstance(e, dict)]
             for e in asked:
                 _owing(e, None, now)
         with timing.step("lists"):  # the ledger's lists, the cards and the rows the page draws (TD-893)
@@ -2390,7 +2393,13 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # For you's rows are the Inbox's ledger rows, and a due board line naming one is drawn in its place
             # and not again under Waiting on you (§4.5 screen 11 *For you*)
             fy = ledger_for_you(
-                {str(r.get("root") or ""): r}, sessions, {here_root: named} if named else None, now, asked, repos
+                {str(r.get("root") or ""): r},
+                sessions,
+                {here_root: named} if named else None,
+                now,
+                asked,
+                repos,
+                handed=handed,
             )
             # an entry's own held row links its design and the design's synopsis, as on its card (TD-1531, TD-1536)
             fy_index = card_index(queue) if queue else None
@@ -4507,7 +4516,7 @@ async def card_mail(
     inbox, states = await h.person_inbox(fleet, choices=choices), await h.person_states(fleet)
     hz = with_standings((await h.board_view(choices))[0], fleet)
     # the ledger first: what a board line covers is read through its open entries (TD-1380)
-    lf = await h.ledger_view(fleet, inbox["entries"])
+    lf = await h.ledger_view(fleet, inbox["entries"], inbox.get("handed") or ())
     sections = inbox_sections(
         inbox["entries"],
         states=states,
@@ -5385,7 +5394,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         hz = with_standings(hz, fleet)
         cards = {} if agent_down else await h.queue_cards()
         # the ledger first: what a board line covers is read through its open entries (TD-1380)
-        lf = {"n": 0, "groups": []} if agent_down else await ledger_view(fleet, got["entries"])
+        lf = {"n": 0, "groups": []} if agent_down else await ledger_view(fleet, got["entries"], got.get("handed") or ())
         sections = inbox_sections(
             got["entries"],
             states=states,
@@ -5608,7 +5617,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         hz, board_note = await board_view(choices)
         hz = with_standings(hz, fleet)
         build = await chip_build(call)
-        lf = await ledger_view(fleet, got["entries"])
+        lf = await ledger_view(fleet, got["entries"], got.get("handed") or ())
         origin = page_origin(request)
         gz = gzip_ok(request)
         cards, roots = await h.queue_cards(), await h.repo_roots()
