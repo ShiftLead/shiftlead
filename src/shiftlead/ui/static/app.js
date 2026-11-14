@@ -3118,6 +3118,22 @@
       if (items[j]) items[j].focus();
     } else if (e.key === "Tab") rollupClose(false);
   }
+  // the rollup (TD-1204): a row's press, its two menus, an Agents pill typing `state:<word>` into the filter
+  // box (pressed again, it takes the word out); a press outside an open menu closes it. The Org page's init
+  // calls it once with its `#rollup` box (its own function so a probe can wire a fake box, TD-1830).
+  AO.rollupWire = function (rollupBox) {
+    rollupBox.addEventListener("click", rollupPress);
+    rollupBox.addEventListener("keydown", rollupKeys);
+    // …never for a press whose target a held swap has just replaced: that press opened the menu now open
+    document.addEventListener("click", (e) => {
+      if (rollupMenu && e.target.isConnected && !rollupMenu.menu.parentElement.contains(e.target)) rollupClose(false);
+    });
+    // `Esc` with focus outside the menu closes it too, as every pop-up menu's (§4.5a *every page: a pop-up menu*,
+    // TD-1337); from inside it, `rollupKeys` has already closed it and put focus back
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && rollupMenu) rollupClose(!document.activeElement || document.activeElement === document.body);
+    });
+  };
   // a press inside the rollup: a menu's button, an item (the menu closed first, then the act with its
   // control's own confirm, or the link), a row anywhere but its buttons, an Agents pill, *n from teams*
   function rollupPress(e) {
@@ -4689,22 +4705,8 @@
     });
     // Start, Wind down and Stop now are all on the team's card, and so is its fold.
     wireGroups(box);
-    // the rollup (TD-1204): a row's press, its two menus, an Agents pill typing `state:<word>` into the filter
-    // box (pressed again, it takes the word out); a press outside an open menu closes it
     const rollupBox = $("#rollup");
-    if (rollupBox) {
-      rollupBox.addEventListener("click", rollupPress);
-      rollupBox.addEventListener("keydown", rollupKeys);
-      // …never for a press whose target a held swap has just replaced: that press opened the menu now open
-      document.addEventListener("click", (e) => {
-        if (rollupMenu && e.target.isConnected && !rollupMenu.menu.parentElement.contains(e.target)) rollupClose(false);
-      });
-      // `Esc` with focus outside the menu closes it too, as every pop-up menu's (§4.5a *every page: a pop-up menu*,
-      // TD-1337); from inside it, `rollupKeys` has already closed it and put focus back
-      document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && rollupMenu) rollupClose(!document.activeElement || document.activeElement === document.body);
-      });
-    }
+    if (rollupBox) AO.rollupWire(rollupBox);
     layout();
     // a load with a row's hash lands there once the groups are drawn; a hash naming nothing drawn is dropped
     const landKey = AO.rollupKey(location.hash);
