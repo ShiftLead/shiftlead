@@ -3,6 +3,8 @@ setting's write — a ceiling, `0` at or below the size, `off` and `on` — and 
 
 from __future__ import annotations
 
+import json
+
 import pytest
 import yaml
 from test_cli_teams import creates, org_doc, started, world  # noqa: F401 — the fixture, by name
@@ -136,6 +138,17 @@ def test_on_a_live_team_a_raise_writes_the_new_extras_held_at_once(world, extras
     assert sorted(got) == ["grind-3", "grind-4"]
     assert got["grind-3"]["held"] is True and got["grind-3"]["scale"] == {"line": "grind"}
     assert got["grind-3"]["controllers"] == ["ao-shiftlead-orc-ao"]  # under the live manager
+
+
+def test_a_raise_on_a_live_team_names_the_extras_it_wrote_by_id(world, extras_on, monkeypatch, capsys):  # noqa: F811
+    """`ao team max --json`'s result carries the records written in `extras`, by id (TD-1616)."""
+    _, state = world
+    _removes(state, monkeypatch)
+    assert cli.main(["team", "max", "ao-grind", "off"]) == 0
+    started(state)
+    capsys.readouterr()
+    assert cli.main(["--json", "team", "max", "ao-grind", "grind", "4"]) == 0
+    assert json.loads(capsys.readouterr().out)["extras"] == ["ao-shiftlead-grind-3", "ao-shiftlead-grind-4"]
 
 
 def test_a_lowered_max_on_a_live_team_drops_held_extras_and_winds_down_live_ones(world, extras_on, monkeypatch, capsys):  # noqa: F811, E501
