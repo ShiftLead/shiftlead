@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "edit",
+  "unusable": "--remove takes no --from: it removes the section"
+ }
+}

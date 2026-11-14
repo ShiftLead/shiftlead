@@ -1,0 +1,12 @@
+{
+ "argv": [
+  "note",
+  "TD-5",
+  "the header fix also reached the importer",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

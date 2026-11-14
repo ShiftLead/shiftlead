@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "edit",
+  "unusable": "give --from FILE|- with the section's text, or --remove"
+ }
+}

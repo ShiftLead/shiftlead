@@ -77,6 +77,14 @@
    "level": "info",
    "standing": false,
    "text": "ℹ TD-007: its Pickable line says yes, the derived pickable is no — the line is only a field (cadence.md §2.12)"
+  },
+  {
+   "field": "kind",
+   "id": "TD-007",
+   "kind": "misplaced-name",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-007: a body section named Kind belongs in the header — set Kind first, then remove it with edit TD-007 --section Kind --remove"
   }
  ],
  "check_since_empty": [
@@ -151,6 +159,14 @@
    "level": "error",
    "standing": false,
    "text": "⚠ TD-007: its Pickable line says yes, the derived pickable is no — the line is only a field (cadence.md §2.12)"
+  },
+  {
+   "field": "kind",
+   "id": "TD-007",
+   "kind": "misplaced-name",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-007: a body section named Kind belongs in the header — set Kind first, then remove it with edit TD-007 --section Kind --remove"
   }
  ],
  "declared": {

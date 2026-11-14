@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "note",
+  "refused": "TD-005 is archived (ledger/archive/TD-005.md) with a Status outside the closed set — run migrate first: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+ }
+}

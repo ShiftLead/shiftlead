@@ -635,3 +635,32 @@ Ledgerboard: 2
 
 **Log:**
 - 2026-10-25: kept waiting: decision (pat) — by pat; answer "Not yet"
+
+## TD-280: A form's fill closed as lifted, the gate still on the entry (v2.8)
+
+**Priority:** Low
+**Added:** 2026-09-01
+**Status:** Open
+**Blocked by:** decision (pat)
+
+**Ask:** Go, or hold with a note?
+
+## TD-281: A form's fill decided, the gate lifted, its item still open (v2.8)
+
+**Priority:** Low
+**Added:** 2026-09-01
+**Status:** Open
+
+**Ask:** Go, or hold with a note?
+
+**Log:**
+- 2026-10-25: gate lifted: decision (pat) — by pat; answer "Hold: the vendor"
+
+## TD-282: A fill of a form Lifts does not list, a work order (v2.8)
+
+**Priority:** Low
+**Added:** 2026-09-01
+**Status:** Open
+**Blocked by:** decision (pat)
+
+**Ask:** Go, or say what else?

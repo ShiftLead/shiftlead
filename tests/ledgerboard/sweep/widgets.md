@@ -61,3 +61,6 @@ People: pat
 - [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-273 decision (pat). Parts: TD-274, TD-275. Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-20). Closed: 2026-10-21 — closed by hand.
 - [x] decide 2026-10-02 (n/a) — An invented question? Context: TD-276 decision (pat). Parts: TD-277, TD-278. Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-20). Closed: 2026-10-21 — asked again for TD-278.
 - [x] decide 2026-10-21 (n/a) — Go on the part left? Context: TD-276 decision (pat). Parts: TD-278. Due: 2026-11-10. Answers: Go | Not yet. Decided: Not yet (by pat) (2026-10-25). Closed: 2026-10-25 — kept waiting.
+- [x] decide 2026-10-02 (n/a) — Go or hold? Context: TD-280 decision (pat). Due: 2026-11-10. Answers: Go | Hold: <note>. Lifts: Hold: <note>. Decided: Hold: the vendor (by pat) (2026-10-25). Closed: 2026-10-25 — lifted.
+- [ ] decide 2026-10-02 (n/a) — Go or hold? Context: TD-281 decision (pat). Due: 2026-11-10. Answers: Go | Hold: <note>. Lifts: Hold: <note>. Decided: Hold: the vendor (by pat) (2026-10-25).
+- [ ] decide 2026-10-02 (n/a) — Go or something else? Context: TD-282 decision (pat). Due: 2026-11-10. Answers: Go | Other: <what>. Decided: Other: rework it (by pat) (2026-11-02).

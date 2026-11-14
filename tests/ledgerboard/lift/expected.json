@@ -41,6 +41,12 @@
   }
  ],
  "close": {
+  "fill_lifts_closes": {
+   "ok": "- [x] decide 2026-01-06 (session `w-1`) — Go on the build? Context: TD-580 decision (pat). Due: 2026-01-20. Answers: Go | Hold: <note>. Lifts: Hold: <note>. Decided: Hold: the vendor (by pat) (2026-01-15). Closed: 2026-01-15 — lifted."
+  },
+  "fill_of_unlisted_form_refused": {
+   "refused": "'Hold: x' neither lifts nor only keeps waiting — a work order stays open"
+  },
   "kept_waiting": {
    "ok": "- [x] decide 2026-01-06 (session `w-1`) — **Go on the parts?** Context: TD-500 decision (pat). Parts: TD-501, TD-502. Due: 2026-01-20. Answers: Go (default) | Not yet | One more round. Decided: Not yet (by pat) (2026-01-15). Closed: 2026-01-15 — kept waiting."
   },
@@ -129,7 +135,16 @@
   true,
   false,
   true,
-  true
+  true,
+  true,
+  true,
+  true,
+  false,
+  false,
+  true,
+  false,
+  false,
+  false
  ],
  "decide_lift": {
   "answered_by_any": {
@@ -191,6 +206,11 @@
   },
   "cross_repo_refused": {
    "refused": "acme/app#TD-12 is another repo's entry — its lift is a tool PR there, through lift_gate"
+  },
+  "decide_lift_fill_lifts": {
+   "ok": {
+    "TD-580": "## TD-580: Waits on a go, or a hold with a note\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-04\n**Status:** Open\n\n**Why:** the build waits on the person's answer.\n\n**Ask:** go, or hold with a note.\n\n**Log:**\n- 2026-01-04: gate added: decision (pat)\n- 2026-01-15: gate lifted: decision (pat) — by pat; answer \"Hold: the vendor\"\n"
+   }
   },
   "event_answerer_off_people_refused": {
    "refused": "lee is not on the board's People: (pat, sam) — only a listed person answers"

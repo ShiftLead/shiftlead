@@ -1,0 +1,23 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "fmt",
+  "fixed": [],
+  "paths": [],
+  "refused": [
+   {
+    "line": 5,
+    "why": "doer: `Doer:` follows Context"
+   },
+   {
+    "line": 6,
+    "why": "doer: no period after its value"
+   },
+   {
+    "line": 7,
+    "why": "doer: written `Doer: <value>.`, one space after `Doer:` and after `team`"
+   }
+  ],
+  "subject": null
+ }
+}

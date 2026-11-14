@@ -29,3 +29,5 @@
 - 2026-01-12: note: was: a lifted note that would read as a writer line
 - 2026-01-12: a tool of the future wrote this: unknown, kept byte for byte
 - 2026-01-13: gate lifted: by hand, in no shape
+- 2026-01-14: retitled: was "An "old" title"
+- 2026-01-14: retitled: the old one

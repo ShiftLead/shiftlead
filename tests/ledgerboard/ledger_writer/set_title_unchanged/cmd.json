@@ -1,0 +1,13 @@
+{
+ "argv": [
+  "set",
+  "TD-001",
+  "--title",
+  "The parser drops a trailing comment",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

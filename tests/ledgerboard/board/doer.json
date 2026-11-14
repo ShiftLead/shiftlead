@@ -1,0 +1,580 @@
+{
+ "closed": [],
+ "items": [
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": {
+    "kind": "repo",
+    "name": "acme/widgets",
+    "text": "acme/widgets"
+   },
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": "box-1",
+   "kind": "act",
+   "lifts": null,
+   "line": 7,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-4"
+   ],
+   "replies": [],
+   "session": "w-1",
+   "text": "act 2026-01-05 (session `w-1` on box-1) — Bump the pin. Context: TD-4. Doer: acme/widgets. Due: 2026-01-20.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": {
+    "kind": "team",
+    "name": "ops",
+    "text": "team ops"
+   },
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 8,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-5"
+   ],
+   "replies": [],
+   "session": "w-1",
+   "text": "act 2026-01-05 (session `w-1`) — Rotate the key. Context: TD-5. Doer: team ops. Due: 2026-01-20.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": {
+    "kind": "team",
+    "name": "web.grind",
+    "text": "team web.grind"
+   },
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 9,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-4",
+    "PR #7"
+   ],
+   "replies": [],
+   "session": "w-1",
+   "text": "act 2026-01-06 (session `w-1`) — Vendor the release. Context: TD-4, PR #7. Doer: team web.grind. Due: 2026-01-20.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 10,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-6"
+   ],
+   "replies": [
+    {
+     "by": "pat",
+     "date": "2026-01-07",
+     "text": "Doer: someone."
+    }
+   ],
+   "session": "w-2",
+   "text": "act 2026-01-06 (session `w-2`) — Merge the docs. Context: TD-6. Due: 2026-01-20. — pat, 2026-01-07: Doer: someone.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": null,
+   "due_error": null,
+   "due_tag": "no due date",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "fyi",
+   "lifts": null,
+   "line": 11,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-7"
+   ],
+   "replies": [
+    {
+     "by": "pat",
+     "date": "2026-01-07",
+     "text": "Doer: acme."
+    }
+   ],
+   "session": "w-2",
+   "text": "fyi 2026-01-06 (session `w-2`) — Read the notes. Context: TD-7. — pat, 2026-01-07: Doer: acme.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [
+    "Files",
+    "Db"
+   ],
+   "consequences": [
+    "",
+    ""
+   ],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": {
+    "kind": "team",
+    "name": "ops",
+    "text": "team ops"
+   },
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "decide",
+   "lifts": null,
+   "line": 12,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-8"
+   ],
+   "replies": [],
+   "session": "w-2",
+   "text": "decide 2026-01-07 (session `w-2`) — Which store? Context: TD-8. Doer: team ops. Due: 2026-01-20. Answers: Files | Db.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 13,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-9"
+   ],
+   "replies": [],
+   "session": "w-3",
+   "text": "act 2026-01-07 (session `w-3`) — Check the mirror. Context: TD-9. Doer: two words. Due: 2026-01-20.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": {
+    "kind": "repo",
+    "name": "team",
+    "text": "team"
+   },
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 14,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-10"
+   ],
+   "replies": [],
+   "session": "w-3",
+   "text": "act 2026-01-08 (session `w-3`) — Tag it. Context: TD-10. Doer: team. Due: 2026-01-20.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 15,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-11"
+   ],
+   "replies": [],
+   "session": "w-3",
+   "text": "act 2026-01-08 (session `w-3`) — Tag the docs. Context: TD-11. Doer: Team ops. Due: 2026-01-20.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 16,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-12"
+   ],
+   "replies": [],
+   "session": "w-3",
+   "text": "act 2026-01-08 (session `w-3`) — Tag the site. Context: TD-12. Doer: acme.. Due: 2026-01-20.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 17,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-13"
+   ],
+   "replies": [],
+   "session": "w-3",
+   "text": "act 2026-01-09 (session `w-3`) — Tag the app. Context: TD-13. Doer: acme . Due: 2026-01-20.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": {
+    "kind": "repo",
+    "name": "acme",
+    "text": "acme"
+   },
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 18,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-14"
+   ],
+   "replies": [],
+   "session": "w-4",
+   "text": "act 2026-01-09 (session `w-4`) — Sweep the cache. Context: TD-14. Doer:acme. Due: 2026-01-20.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": {
+    "kind": "repo",
+    "name": "acme",
+    "text": "acme"
+   },
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 19,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-15"
+   ],
+   "replies": [],
+   "session": "w-4",
+   "text": "act 2026-01-09 (session `w-4`) — Sweep the logs. Context: TD-15. Doer: acme Due: 2026-01-20.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": {
+    "kind": "team",
+    "name": "ops",
+    "text": "team  ops"
+   },
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 20,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-16"
+   ],
+   "replies": [],
+   "session": "w-4",
+   "text": "act 2026-01-09 (session `w-4`) — Sweep the queue. Context: TD-16. Doer: team  ops. Due: 2026-01-20.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": {
+    "date": "2026-01-14",
+    "text": "done"
+   },
+   "decided_by": "pat",
+   "default": null,
+   "detail": [],
+   "doer": {
+    "kind": "team",
+    "name": "ops",
+    "text": "team ops"
+   },
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 21,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-17"
+   ],
+   "replies": [],
+   "session": "w-4",
+   "text": "act 2026-01-10 (session `w-4`) — Restart the runner. Context: TD-17. Doer: team ops. Due: 2026-01-20. Decided: done (by pat) (2026-01-14).",
+   "waiting_on": "session"
+  }
+ ],
+ "keys": [
+  "- [ ] act 2026-01-05 (session `w-1` on box-1) — Bump the pin. Context: TD-4. Doer: acme/widgets",
+  "- [ ] act 2026-01-05 (session `w-1`) — Rotate the key. Context: TD-5. Doer: team ops",
+  "- [ ] act 2026-01-06 (session `w-1`) — Vendor the release. Context: TD-4, PR #7. Doer: team web.grind",
+  "- [ ] act 2026-01-06 (session `w-2`) — Merge the docs. Context: TD-6",
+  "- [ ] fyi 2026-01-06 (session `w-2`) — Read the notes. Context: TD-7",
+  "- [ ] decide 2026-01-07 (session `w-2`) — Which store? Context: TD-8. Doer: team ops. Answers: Files | Db",
+  "- [ ] act 2026-01-07 (session `w-3`) — Check the mirror. Context: TD-9. Doer: two words",
+  "- [ ] act 2026-01-08 (session `w-3`) — Tag it. Context: TD-10. Doer: team",
+  "- [ ] act 2026-01-08 (session `w-3`) — Tag the docs. Context: TD-11. Doer: Team ops",
+  "- [ ] act 2026-01-08 (session `w-3`) — Tag the site. Context: TD-12. Doer: acme",
+  "- [ ] act 2026-01-09 (session `w-3`) — Tag the app. Context: TD-13. Doer: acme",
+  "- [ ] act 2026-01-09 (session `w-4`) — Sweep the cache. Context: TD-14. Doer:acme",
+  "- [ ] act 2026-01-09 (session `w-4`) — Sweep the logs. Context: TD-15. Doer: acme",
+  "- [ ] act 2026-01-09 (session `w-4`) — Sweep the queue. Context: TD-16. Doer: team  ops",
+  "- [ ] act 2026-01-10 (session `w-4`) — Restart the runner. Context: TD-17. Doer: team ops"
+ ],
+ "needs_you": [
+  [
+   21,
+   "decided",
+   1
+  ],
+  [
+   7,
+   "due",
+   -5
+  ],
+  [
+   8,
+   "due",
+   -5
+  ],
+  [
+   9,
+   "due",
+   -5
+  ],
+  [
+   10,
+   "due",
+   -5
+  ],
+  [
+   12,
+   "due",
+   -5
+  ],
+  [
+   13,
+   "due",
+   -5
+  ],
+  [
+   14,
+   "due",
+   -5
+  ],
+  [
+   15,
+   "due",
+   -5
+  ],
+  [
+   16,
+   "due",
+   -5
+  ],
+  [
+   17,
+   "due",
+   -5
+  ],
+  [
+   18,
+   "due",
+   -5
+  ],
+  [
+   19,
+   "due",
+   -5
+  ],
+  [
+   20,
+   "due",
+   -5
+  ],
+  [
+   11,
+   "fyi",
+   null
+  ]
+ ],
+ "people": [
+  "pat"
+ ]
+}

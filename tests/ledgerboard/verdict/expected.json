@@ -74,6 +74,10 @@
    "flags": [],
    "refusals": []
   },
+  "a new decision item whose only lifting answer is a form": {
+   "flags": [],
+   "refusals": []
+  },
   "a new decision item with no lifting answer": {
    "flags": [],
    "refusals": [
@@ -102,6 +106,10 @@
    ]
   },
   "a new decision, its item filed with it": {
+   "flags": [],
+   "refusals": []
+  },
+  "migrate_old_form_not_gained": {
    "flags": [],
    "refusals": []
   }
@@ -237,6 +245,11 @@
     ]
    ]
   },
+  "a lift by a form's fill": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
   "a lift not yet merged": {
    "carve_out": true,
    "flags": [],
@@ -249,6 +262,16 @@
     [
      "lift-files",
      "the PR changes ['docs/ledger/TD-100.md', 'docs/ledger/TD-150.md', 'docs/user_attention.md'], and a lift changes ['docs/ledger/TD-100.md', 'docs/user_attention.md']"
+    ]
+   ]
+  },
+  "a lift writing an unfilled form": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-board-line",
+     "the decide writer refuses the answer: Hold needs its words"
     ]
    ]
   },

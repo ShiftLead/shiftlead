@@ -310,6 +310,111 @@
      "w"
     ]
    ]
+  },
+  {
+   "name": "new_refused_title_field",
+   "id": "TD-090",
+   "title": "t",
+   "fields": {
+    "Priority": "Low",
+    "Title": "x"
+   },
+   "sections": [
+    [
+     "Why",
+     "w"
+    ]
+   ]
+  },
+  {
+   "name": "new_refused_log_field",
+   "id": "TD-090",
+   "title": "t",
+   "fields": {
+    "Priority": "Low",
+    "Log": "x"
+   },
+   "sections": [
+    [
+     "Why",
+     "w"
+    ]
+   ]
+  },
+  {
+   "name": "new_refused_status_section",
+   "id": "TD-090",
+   "title": "t",
+   "fields": {
+    "Priority": "Low"
+   },
+   "sections": [
+    [
+     "Why",
+     "w"
+    ],
+    [
+     "Status",
+     "Open"
+    ]
+   ]
+  },
+  {
+   "name": "new_refused_title_section",
+   "id": "TD-090",
+   "title": "t",
+   "fields": {
+    "Priority": "Low"
+   },
+   "sections": [
+    [
+     "Why",
+     "w"
+    ],
+    [
+     "Title",
+     "x"
+    ]
+   ]
+  },
+  {
+   "name": "new_refused_declared_section",
+   "id": "TD-090",
+   "title": "t",
+   "fields": {
+    "Priority": "Low"
+   },
+   "sections": [
+    [
+     "Why",
+     "w"
+    ],
+    [
+     "Tracker",
+     "x"
+    ]
+   ],
+   "declared_fields": [
+    "tracker"
+   ]
+  },
+  {
+   "name": "new_declared_section_undeclared",
+   "id": "TD-090",
+   "title": "t",
+   "fields": {
+    "Priority": "Low"
+   },
+   "sections": [
+    [
+     "Why",
+     "w"
+    ],
+    [
+     "Tracker",
+     "x"
+    ]
+   ]
   }
  ],
  "today": "2026-01-20",
@@ -1527,6 +1632,520 @@
      }
     }
    ]
+  },
+  {
+   "name": "set_title",
+   "file": "gate_added.md",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "title": "A narrower scope"
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_title_no_log",
+   "file": "reordered.md",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "title": "A narrower scope"
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_title_log_not_last",
+   "file": "log_not_last.md",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "title": "A narrower scope"
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_title_and_fields",
+   "file": "gate_added.md",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "title": "A narrower scope",
+      "fields": {
+       "Priority": "High"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_title_same",
+   "file": "gate_added.md",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "title": "   An entry whose gates were added, lifted and added again  "
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_title_refused_no_today",
+   "file": "gate_added.md",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "title": "A narrower scope"
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_title_refused_empty",
+   "file": "gate_added.md",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "title": "  "
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_title_refused_two_lines",
+   "file": "gate_added.md",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "title": "one\ntwo"
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_title_refused_comment",
+   "file": "gate_added.md",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "title": "a <!-- b"
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_title_from_comment_only",
+   "text": "## TD-074: <!-- x -->\n\n**Priority:** Low\n\n**Why:** w\n",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "title": "A real title"
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_title_comment_dropped",
+   "text": "## TD-075: Old <!-- x --> title\n\n**Priority:** Low\n\n**Why:** w\n",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "title": "A new title"
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_title_quotes",
+   "text": "## TD-071: An \"old\" title\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "title": "A plain title"
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_title_and_gate",
+   "file": "no_status.md",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "title": "A narrower scope",
+      "fields": {
+       "Blocked by": "until 2026-02-01"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_refused_title_field",
+   "file": "no_status.md",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Title": "x"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_refused_log_field",
+   "file": "no_status.md",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Log": "x"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_status_with_stray",
+   "text": "## TD-072: A stray body Status\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n\n**Status:** a stray, in the body\n",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Status": "Open"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_empty_removes_title",
+   "text": "## TD-076: A header Title\n\n**Priority:** Low\n**Title:** a stray\n\n**Why:** w\n",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Title": ""
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_refused_title",
+   "file": "no_status.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Title",
+      "words": "x"
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_refused_status",
+   "file": "no_status.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Status",
+      "words": "x"
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_waits_allowed",
+   "file": "no_status.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Waits",
+      "words": "x"
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_refused_declared",
+   "file": "no_status.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Tracker",
+      "words": "x",
+      "declared_fields": [
+       "tracker"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_entry_field_allowed",
+   "text": "## TD-077: A Tracker field\n\n**Priority:** Low\n**Tracker:** ABC-1\n\n**Why:** w\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Tracker",
+      "words": "x"
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_owner_allowed",
+   "file": "no_status.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Owner",
+      "words": "a body section"
+     }
+    },
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Owner": "builder"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_replaces_stray",
+   "text": "## TD-072: A stray body Status\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n\n**Status:** a stray, in the body\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Status",
+      "words": "corrected words"
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_remove_stray",
+   "text": "## TD-072: A stray body Status\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n\n**Status:** a stray, in the body\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Status",
+      "remove": true
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_remove_title",
+   "text": "## TD-078: A body Title\n\n**Priority:** Low\n\n**Why:** w\n\n**Title:** a stray\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Title",
+      "remove": true
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_remove_refused_no_header",
+   "text": "## TD-073: A body Status and no header Status\n\n**Priority:** Low\n\n**Why:** w\n\n**Status:** Open, in the body\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Status",
+      "remove": true
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_remove_set_first",
+   "text": "## TD-073: A body Status and no header Status\n\n**Priority:** Low\n\n**Why:** w\n\n**Status:** Open, in the body\n",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Status": "Open"
+      }
+     }
+    },
+    {
+     "action": "edit",
+     "args": {
+      "section": "Status",
+      "remove": true
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_remove_refused_why",
+   "file": "no_status.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Why",
+      "remove": true
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_remove_refused_location",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Location",
+      "remove": true
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_remove_refused_words",
+   "text": "## TD-072: A stray body Status\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n\n**Status:** a stray, in the body\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Status",
+      "remove": true,
+      "words": "x"
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_remove_refused_absent",
+   "file": "no_status.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Title",
+      "remove": true
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_qualified_status",
+   "file": "no_status.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Status (old)",
+      "words": "x"
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_location",
+   "file": "no_status.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Location",
+      "words": "`src/x.py`"
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_location_beside_header",
+   "text": "## TD-079: A header Location\n\n**Priority:** Low\n**Location:** `src/old.py`\n\n**Why:** w\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Location",
+      "words": "`src/x.py`"
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_refused_declared_fields",
+   "file": "no_status.md",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Priority": "Low"
+      },
+      "declared_fields": [
+       "tracker"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "note_refused_retitled",
+   "file": "no_status.md",
+   "steps": [
+    {
+     "action": "note",
+     "args": {
+      "words": "retitled: by hand"
+     }
+    }
+   ]
   }
  ],
  "check": [
@@ -1612,6 +2231,16 @@
    "name": "status_v1_is_info",
    "ledger": "check/status_v1.md",
    "archive": "check/status_v1.archive.md"
+  },
+  {
+   "name": "misplaced_names",
+   "ledger": "check/misplaced.md",
+   "archive": ""
+  },
+  {
+   "name": "misplaced_names_with_fields",
+   "ledger": "check/misplaced_fields.md",
+   "archive": ""
   }
  ],
  "log": [
@@ -1691,6 +2320,11 @@
    "gates": [
     "event (ships)"
    ]
+  },
+  {
+   "name": "retitled_quotes",
+   "text": "## TD-071: A plain title\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n\n**Log:**\n- 2026-01-20: retitled: was \"An \"old\" title\"\n",
+   "gates": []
   }
  ],
  "archive_plan": [

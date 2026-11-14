@@ -345,6 +345,28 @@
    "commits": 1,
    "created_at": "2026-01-15",
    "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a lift by a form's fill",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "subject": "board: decide Warm the cache nightly?: Hold: wait (session w-1)"
+  },
+  {
+   "name": "a lift writing an unfilled form",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "subject": "board: decide Warm the cache nightly?: Hold: <note> (session w-1)"
   }
  ],
  "tripwire": [
@@ -473,6 +495,14 @@
   },
   {
    "name": "a gate already at base",
+   "boards": []
+  },
+  {
+   "name": "a new decision item whose only lifting answer is a form",
+   "boards": []
+  },
+  {
+   "name": "migrate_old_form_not_gained",
    "boards": []
   }
  ]
