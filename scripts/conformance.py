@@ -217,7 +217,7 @@ GROK_HOOKS_HEAD = re.compile(r"^\s*Loaded hooks \((\d+)\):")
 GROK_HOOK_ROW = re.compile(
     r"^\s*(?P<origin>\S+?):(?P<event>[a-z_]+)\[\d+\]\.hooks\[\d+\]\s+command: (?P<command>.*?)\s+timeout:"
 )
-GROK_MCP_SECTION = re.compile(r"│\s*◆\s+(?P<section>.+?)\s+\(\d+\)\s*│")
+GROK_MCP_SECTION = re.compile(r"│\s*◆\s+(?P<section>.+?)\s+\((?P<count>\d+)\)\s*│")
 # `│    › Automations [ready]          (managed)   │` — a row of the `/mcps` modal, the selected one marked `›`
 GROK_MCP_ROW = re.compile(r"│\s+(?:›\s+)?(?P<name>[^│\[◆]+?)\s+\[(?P<state>[^\]]+)\](?P<rest>[^│]*)│")
 
@@ -236,6 +236,11 @@ def grok_hooks(lines: list[str]) -> tuple[int, list[tuple[str, str]]] | None:
             break
         rows.append((m["origin"], m["command"]))
     return count, rows
+
+
+def grok_mcp_sections(lines: list[str]) -> dict[str, int]:
+    """The `/mcps` modal's section headers in a pane and the count each says (`◆ Hosted connectors … (1)`)."""
+    return {m["section"]: int(m["count"]) for line in lines if (m := GROK_MCP_SECTION.search(line))}
 
 
 def grok_mcps(lines: list[str]) -> list[tuple[str, str, str]]:
@@ -281,19 +286,27 @@ def grok_foreign(walk: Walk) -> list[str]:
     end = time.monotonic() + LISTING_WAIT
     try:
         # the modal's frame draws before its rows (an empty box read 0 servers on the first walk): it is read once
-        # the pane holds still across two reads a second apart
+        # it shows a section and holds still across two reads a second apart; a modal with no section is taken as
+        # empty only once the whole wait is spent
         last: list[str] | None = None
         while True:
             pane = walk.tail(LISTING_ROWS)
-            if any("MCP Servers" in line for line in pane) and pane == last:
+            drawn = any("MCP Servers" in line for line in pane)
+            if drawn and pane == last and grok_mcp_sections(pane):
                 break
             if time.monotonic() >= end:
+                if drawn and pane == last:
+                    break
                 raise StepFailed(f"/mcps drew no settled modal within {LISTING_WAIT:.0f}s")
             last = pane
             time.sleep(1.0)
         servers = grok_mcps(pane)
+        for section, n in grok_mcp_sections(pane).items():
+            if (seen := sum(1 for s, _n, _s in servers if s == section)) != n:
+                raise StepFailed(f"/mcps says {n} in {section} and the pane shows {seen} of them")
     finally:
-        walk.call("keys", id=walk.id, keys=["Escape"])
+        with contextlib.suppress(Exception):  # a failed close never hides why the step failed
+            walk.call("keys", id=walk.id, keys=["Escape"])
     foreign += [
         f"MCP server {name} [{state}] ({section or 'no section'})"
         for section, name, state in servers

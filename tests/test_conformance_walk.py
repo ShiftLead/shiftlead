@@ -584,3 +584,42 @@ def test_an_mcps_modal_that_never_holds_still_fails_the_first_hook(tmp_path, mon
     assert walk.step("launch", walk.launch) and not walk.step("first hook", walk.first_hook)
     assert "/mcps drew no settled modal" in walk.results[-1][2]
     assert fake.keyed[-1] == "Escape"  # closed even so
+
+
+def test_an_mcps_section_whose_rows_the_pane_does_not_show_fails_the_first_hook(tmp_path, monkeypatch):
+    cw = _load()
+    monkeypatch.setattr(cw.time, "sleep", lambda _s: None)
+    hooks = [line for line in _listing("hooks-list.txt") if "global/other" not in line]
+    hooks = [line.replace("Loaded hooks (14)", "Loaded hooks (13)") for line in hooks]
+    cut = [line for line in _listing("mcps.txt") if "Automations" not in line]  # the header kept, its row not
+    assert cw.grok_mcp_sections(cut) == {"Hosted connectors from grok.com": 1}
+    walk = cw.Walk("grok", "g", tmp_path, GrokFake(tmp_path, hooks, cut), out=lambda _s: None)
+    assert walk.step("launch", walk.launch) and not walk.step("first hook", walk.first_hook)
+    assert "says 1 in Hosted connectors from grok.com and the pane shows 0" in walk.results[-1][2]
+
+
+def test_an_empty_mcps_frame_passes_only_once_the_wait_is_spent(tmp_path, monkeypatch):
+    cw = _load()
+    clock = iter(range(0, 1000))
+    monkeypatch.setattr(cw.time, "sleep", lambda _s: None)
+    monkeypatch.setattr(cw.time, "monotonic", lambda: next(clock))
+    hooks = [line for line in _listing("hooks-list.txt") if "global/other" not in line]
+    hooks = [line.replace("Loaded hooks (14)", "Loaded hooks (13)") for line in hooks]
+    frame = [line for line in _listing("mcps.txt") if "Automations" not in line and "◆" not in line]
+    fake = GrokFake(tmp_path, hooks, frame)
+    walk = cw.Walk("grok", "g", tmp_path, fake, out=lambda _s: None)
+    assert walk.step("launch", walk.launch) and walk.step("first hook", walk.first_hook)
+    assert "MCP servers by /mcps (0)" in walk.results[-1][2]
+    assert fake.calls.count("tail") > cw.LISTING_WAIT / 2  # read through the whole wait, not at the second still read
+
+
+def test_a_shiftlead_hook_file_row_running_another_command_is_not_shiftleads(tmp_path, monkeypatch):
+    cw = _load()
+    monkeypatch.setattr(cw.time, "sleep", lambda _s: None)
+    hooks = [line for line in _listing("hooks-list.txt") if "global/other" not in line]
+    hooks = [line.replace("Loaded hooks (14)", "Loaded hooks (13)") for line in hooks]
+    i = next(i for i, line in enumerate(hooks) if "global/shiftlead:stop[" in line)
+    hooks[i] = "       global/shiftlead:stop[0].hooks[0]  command: /bin/evil  timeout: 10s"
+    walk = cw.Walk("grok", "g", tmp_path, GrokFake(tmp_path, hooks, _listing("mcps-disabled.txt")), out=lambda _s: None)
+    assert walk.step("launch", walk.launch) and not walk.step("first hook", walk.first_hook)
+    assert "hook global/shiftlead: /bin/evil" in walk.results[-1][2]
