@@ -287,7 +287,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   sentence for agent-cadence's absence. An external tracker is mapped *into* the ledger by an importer,
   never read in its place. The rest are keys of this file, each with a default:
   - **`board:`** — the person's board, default `docs/user_attention.md`, agent-cadence's seed.
-    The Inbox reads it in-process through `ledgerboard.py` — the checkout's file and
+    The Inbox reads it in-process through `sessionorc.ledgerboard` — the checkout's file and
     `origin/<default>`'s after the host's own fetch, the origin note derived from the two (§4.5 screen 6
     *Boards are read against origin*) — and runs no agent-cadence script. A board missing at its path is
     a warning, never a lack (*no board at docs/user_attention.md*, on the Repo page and in `ao doctor`),

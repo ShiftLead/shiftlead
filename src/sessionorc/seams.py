@@ -1,5 +1,5 @@
 """A repo's seams as the host agent keeps them (design §4.4 *Repo facts*, *The seams*; §5 *The seams*;
-TD-584, built by TD-591; TD-1011): whether its ledger at `ledger:` parses through `ledgerboard.py` and
+TD-584, built by TD-591; TD-1011): whether its ledger at `ledger:` parses through `sessionorc.ledgerboard` and
 its `Ledgerboard:` major; for each of `board:` and `worktree_setup:` whether it is *set*, *defaulted*
 (the agent-cadence file the checkout holds) or *absent*; whether the repo is **served** — it holds
 agent-cadence's tree, the gate and the ledger, or `serve` names each lack in §5's words with its cure —

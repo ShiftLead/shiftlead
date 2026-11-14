@@ -4,7 +4,7 @@ as **`board:<key>`** — the first eight hex digits of a sha256 of the line's `i
 snooze, a reply and the decide itself leave unchanged — pickable, High, in every `free-pick` lane
 of a team servicing the repo, and counted by rule 8, until a session closes the line.
 
-The board is read in-process through the vendored `ledgerboard.py` (design §8 *Which side a thing
+The board is read in-process through the vendored package `sessionorc.ledgerboard` (design §8 *Which side a thing
 lives on*, ADR 2026-10-12, TD-585): its `parse_board`, `item_record`, `item_key` and line shapes,
 never a second parser here and no agent-cadence script, so a repo with a board needs no agent-cadence.
 Origin's side is this module's own fetch (`_against_origin`, §4.5 screen 6 *Boards are read against
