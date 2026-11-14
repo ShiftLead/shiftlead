@@ -121,11 +121,11 @@ ONE = [
         b=bar([btn("Lift the hold", "ghost", "m32-rec")]))),
     ("A session's question (ask)", item(
         head("Decide", 'asked by <a href="#">grinder-ao-2</a> · on TD-1796', "2h ago"), ASK, CTX,
-        b=bar([btn("Lift it", "ghost", "m32-rec"), btn("Keep it held")], dismiss=True))),
+        b=bar([btn("Lift it", "ghost", "m32-rec"), btn("Keep it held")]))),
     ("A session's steer", item(
         head("Decide", 'steer from <a href="#">lb-grinder</a> · on TD-108', "3h ago"), STEER, CTX,
         dflt="Unless you say otherwise by 9 pm: drop it, and exempt it by name in the tests.",
-        b=bar([btn("Go with it", "ghost", "m32-rec")], dismiss=True))),
+        b=bar([btn("Go with it", "ghost", "m32-rec")]))),
     ("A decision on a repo's board", item(
         head("Decide", "from shiftlead's board · holds TD-1840, TD-1841", "due tomorrow"), DECIDE, CTX,
         b=bar([btn("Go", "ghost", "m32-rec"), btn("One more round"), btn("Hold…")]))),
@@ -209,7 +209,7 @@ def page(theme, body, extra_cls=""):
 
 INTRO = ('<div class="m32-cap"><b>Mockup, TD-1832.</b> Every item ends in the same answer bar, in the same order: '
          'its own answers (the recommended one outlined), then <b>Answer…</b> for your own words, then '
-         '<b>Start session</b>; at the right, <b>Dismiss</b> where the item can be dismissed, <b>Open</b>, and '
+         '<b>Start session</b>; at the right, <b>Dismiss</b> where the item can be dismissed (a report, never an open question), <b>Open</b>, and '
          '<b>⋯</b>. A slot the item has no use for is left out, and the right group stays at the right. '
          'The heading names what the item is and who asks; it holds no buttons.</div>')
 
