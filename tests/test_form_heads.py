@@ -33,7 +33,9 @@ def test_a_board_item_hands_heads_and_whether_a_reply_decides(tmp_path, monkeypa
     assert _board(tmp_path, monkeypatch, "decide", ["Go", "Hold: <note>"], default="Hold: <note>")["default"] == ""
     assert _board(tmp_path, monkeypatch, "decide", ["Go", "Hold: <note>"], default="Go")["default"] == "Go"
     # a decided line, a line with no form, an `act` line, a `watch` with another form: no Reply decides
-    assert not _board(tmp_path, monkeypatch, "decide", ["Go", "Hold: <note>"], decided="Go")["reply_decides"]
+    assert not _board(
+        tmp_path, monkeypatch, "decide", ["Go", "Hold: <note>"], decided={"text": "Go", "date": "2026-11-14"}
+    )["reply_decides"]
     plain = _board(tmp_path, monkeypatch, "decide", ["Go", "Stop"])
     assert plain["heads"] == ["", ""] and not plain["reply_decides"]
     assert not _board(tmp_path, monkeypatch, "act", ["Go", "Hold: <note>"])["reply_decides"]

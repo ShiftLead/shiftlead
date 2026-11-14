@@ -2230,7 +2230,7 @@ def board_rows(report: Any, repos_of: Mapping[str, Mapping[str, Any]] | None = N
                     # whether a Reply here can decide the line: the reply box's foot (§4.5a **<head>…**, TD-1698)
                     # (the reader's items are its open ones alone)
                     "reply_decides": board_mod.reply_decides(
-                        str(it.get("kind") or ""), offered, bool(it.get("decided"))
+                        str(it.get("kind") or ""), offered, _decided(it) is not None
                     ),
                     "decided": _decided(it),
                     # a press landing (§4.4 *A press is drawn as it lands*, TD-1508): the home's mark, laid over
