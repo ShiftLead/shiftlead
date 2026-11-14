@@ -47,3 +47,18 @@ through the state feed's `translate` as well.
   them); `mcps.txt` with `/mcps` open on the account's hosted connector *Automations* `[ready]`; `mcps-disabled.txt`
   after Space on that row, which wrote `[disabled_mcp_tools] __managed_gateway_connectors = ["tasks"]` into the
   scratch home's `config.toml`. The walk's Grok listing reads these (`scripts/conformance.py`'s `FOREIGN`).
+- `captured/hooks-batch-plan-wake.jsonl`, `captured/hooks-plan-always-approve.jsonl` and
+  `captured/hooks-stop-failure.jsonl` (Grok Build 1.0.77 on kmaster, 2026-11-14, TD-1840): the same capture-only hook
+  file in a fresh scratch copy of `grok-conformance`, with `HOME` an empty scratch directory and the adapter's
+  `LAUNCH_ENV`. The first, on a private tmux server (160×45) with `--session-id 44444444-5555-4666-8777-888888888888`
+  and `--permission-mode default`: a two-call batch (`rm a.txt` and `mkdir made`), where the second call's
+  `PreToolUse` came only after the first's `permission_prompt` was answered *Yes*; `enter_plan_mode`, whose
+  `PostToolUse` followed its `PreToolUse` at once with nothing asked, and `exit_plan_mode`, which fired a
+  `permission_prompt` (*Plan approval requested*) until `a` approved the plan; a background `sleep 25; echo bg-done`
+  after whose `Stop` the command's end fired a `Notification` `task_complete` and a `UserPromptSubmit` of the tool's
+  own (a `<system-reminder>` naming the task), starting a turn; and `/exit`. The second, headless (`-p`) with
+  `--always-approve`: the same plan-mode pair, where `exit_plan_mode`'s `permission_prompt` still fired and passed
+  unanswered. The third, headless with `--always-approve` and `GROK_CLI_CHAT_PROXY_BASE_URL` a local stub answering
+  every request 400 (`--session-id 66666666-7777-4888-8999-aaaaaaaaaaaa`): a `Notification` `agent_error`, then
+  `StopFailure` with `error` `invalid_request`, `errorDetails` the API message and a `promptId` (the same stub answering
+  500 drew retries for over three minutes and no `StopFailure`).

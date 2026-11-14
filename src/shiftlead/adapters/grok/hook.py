@@ -8,8 +8,9 @@ captured from the installed 1.0.77 (`tests/conformance/fixtures/grok/captured/ho
   with `subagents_reset`; its `sessionId` is the record's `adapter_id`, which a `/clear` changes. Any other
   `source` changes no state.
 - `UserPromptSubmit` → `working` with the prompt mark, starting a turn: its `promptId` as `turn`, `turn_start`.
-- `PreToolUse` → `working`, but for the three tools that wait on the person (`ask_user_question`,
-  `enter_plan_mode`, `exit_plan_mode`) → `needs-you`, a question; `PostToolUse`, `PostToolUseFailure` and
+- `PreToolUse` → `working`, but for the two tools that wait on the person (`ask_user_question`,
+  `exit_plan_mode`) → `needs-you`, a question (`enter_plan_mode` waits on nobody: its `PostToolUse` follows at once,
+  captured on 1.0.77, TD-1840); `PostToolUse`, `PostToolUseFailure` and
   `PermissionDenied` → `working`, clearing a pending. A tool event carries its call (`tool_use_id`, `call`).
 - `Notification` `permission_prompt` → `needs-you`, a permission, its text the payload's `message`;
   `idle_prompt` → `idle`, the backstop.
@@ -56,8 +57,9 @@ from shiftlead.kill_guard import refuse
 # guide `load` for a resume; `startup`, `resume` and `clear` are Claude Code's names, kept should a version
 # write them (§4.3 *The state feed*)
 START_SOURCES = {"new", "load", "startup", "resume", "clear"}
-# tools that wait on the person: a `PreToolUse` of one is a question (§4.3 *The tool's questions*)
-QUESTION_TOOLS = {"ask_user_question", "enter_plan_mode", "exit_plan_mode"}
+# tools that wait on the person: a `PreToolUse` of one is a question (§4.3 *The tool's questions*); `enter_plan_mode`
+# is not one: 1.0.77 switches the mode unasked, its `PostToolUse` at once (TD-1840's capture)
+QUESTION_TOOLS = {"ask_user_question", "exit_plan_mode"}
 # tool events that end a pending, the tool's call going on or refused (§4.3: the order of a permission)
 AFTER_TOOL = {"PostToolUse", "PostToolUseFailure", "PermissionDenied"}
 CALL_EDGE = {"PreToolUse": "start", "PostToolUse": "end", "PostToolUseFailure": "end"}
@@ -188,7 +190,7 @@ def _ask(payload: dict[str, Any], tool: str) -> str:
         qs = ti.get("questions")
         if isinstance(qs, list) and qs and isinstance(qs[0], dict) and isinstance(qs[0].get("question"), str):
             return qs[0]["question"].strip()[:TEXT_CAP]
-    return {"enter_plan_mode": "enter plan mode?", "exit_plan_mode": "approve the plan?"}.get(tool, "a question")
+    return {"exit_plan_mode": "approve the plan?"}.get(tool, "a question")
 
 
 def _main_thread(payload: dict[str, Any]) -> bool:

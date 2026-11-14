@@ -237,6 +237,161 @@
      "state": null
     }
    ]
+  },
+  {
+   "file": "captured/hooks-batch-plan-wake.jsonl",
+   "at_composer": true,
+   "reads": [
+    {
+     "state": "idle"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "needs-you",
+     "pending": "permission"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "idle"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "needs-you",
+     "pending": "question"
+    },
+    {
+     "state": "needs-you",
+     "pending": "permission"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "idle"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "idle"
+    },
+    {
+     "state": null
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "idle"
+    },
+    {
+     "state": "exited"
+    },
+    {
+     "state": null
+    }
+   ]
+  },
+  {
+   "file": "captured/hooks-plan-always-approve.jsonl",
+   "at_composer": true,
+   "reads": [
+    {
+     "state": "idle"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "needs-you",
+     "pending": "question"
+    },
+    {
+     "state": "needs-you",
+     "pending": "permission"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "idle"
+    },
+    {
+     "state": "exited"
+    },
+    {
+     "state": null
+    }
+   ]
+  },
+  {
+   "file": "captured/hooks-stop-failure.jsonl",
+   "at_composer": true,
+   "reads": [
+    {
+     "state": "idle"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": null
+    },
+    {
+     "state": "idle"
+    },
+    {
+     "state": "exited"
+    },
+    {
+     "state": null
+    }
+   ]
   }
  ],
  "life": {

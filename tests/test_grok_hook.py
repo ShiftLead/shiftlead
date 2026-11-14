@@ -70,7 +70,7 @@ def test_the_captured_session_maps_event_by_event():
     [
         ("ask_user_question", {"questions": [{"question": "Which branch?"}]}, "Which branch?"),
         ("ask_user_question", {"question": "Go on?"}, "Go on?"),
-        ("enter_plan_mode", {}, "enter plan mode?"),
+        ("exit_plan_mode", {}, "approve the plan?"),
         ("exit_plan_mode", {"plan": "1. do it"}, "1. do it"),
     ],
 )
