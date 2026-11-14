@@ -14,5 +14,6 @@ registered yet (TD-1637), so no test reads these yet; the state-feed slice reads
   `Notification` `permission_prompt` (`message` *Tool permission requested*) before its `PostToolUse` and
   `Stop`; `/clear`, which fired a `SessionStart` (`source` `new`) with a new `sessionId` and no
   `SessionEnd`; and `/exit`, which fired the new conversation's `SessionEnd` and `Stop` (both `reason`
-  `shutdown`), then the first conversation's `SessionEnd` (`shutdown`) after them. No subagent, question
+  `shutdown`), then the first conversation's `SessionEnd` and `Stop` (`shutdown`) after them; no
+  `shutdown` `Stop` carries a `promptId`. No subagent, question
   tool or `StopCancelled` is in it.
