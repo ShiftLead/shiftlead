@@ -1337,8 +1337,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      without the reader's reply, the home checks. For a supervised member whose record carries
      `review`, each `done` with a PR — the member's own word or a derived one, since a declared
      `done` stands in a derived one's place (§9 invariant 10) — is read at the home once the PR
-     has **merged**: the PR's changed files and its merge time (`gh pr view --json
-     files,changedFiles,mergedAt`, five PRs a pass on the reports' cadence, the longest unread
+     has **merged**: the PR's changed files and its merge time (the paginated file list `ao pr held` reads,
+     renamed files' old names matched too, TD-1804, and `mergedAt` by its own call, five PRs a pass on the reports' cadence, the longest unread
      first; a PR not merged yet is read again, a settled one no more — kept in memory, so a
      restarted home reads each once more, and a PR merged longer ago than half the mail's
      retention is settled unjudged, since the reply that would clear it may be pruned — in the
