@@ -265,6 +265,15 @@ def test_user_names_reads_user_and_git_skipping_what_is_unset():
     assert fr.user_names({"USER": "kim"}, run) == ["kim", "Jane Q Doe", "Jane", "Q", "Doe"]
     assert fr.user_names({}, lambda *_a: subprocess.CompletedProcess([], 1, "", "")) == []
 
+    # user.email set: the address, then its part before `@`, the mailbox name a scrub must also find (TD-1812)
+    def run_mail(_cwd, *args):
+        value = {"user.name": "Jane Q Doe", "user.email": "jane.doe@example.com"}[args[-1]]
+        return subprocess.CompletedProcess(args, 0, value + "\n", "")
+
+    assert fr.user_names({"USER": "kim"}, run_mail) == [
+        "kim", "Jane Q Doe", "Jane", "Q", "Doe", "jane.doe@example.com", "jane.doe"
+    ]  # fmt: skip
+
 
 def test_a_failing_ao_is_refused():
     def ao(args):
