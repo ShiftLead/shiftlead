@@ -1,0 +1,57 @@
+{"id": "TD-1557:F1", "mark": "handled", "na": "-", "why": "4.4 Decide: checked twice, first against page's answers, then the line's own Answers: on origin"}
+{"id": "TD-1557:F2", "mark": "handled", "na": "-", "why": "4.4: a filled form is no Lifts: label and no waiting-only answer; keeps gate"}
+{"id": "TD-1557:F3", "mark": "handled", "na": "-", "why": "4.5 screen 12: on a decided line or one with no Answers:, any words are a Reply"}
+{"id": "TD-1557:F4", "mark": "handled", "na": "-", "why": "4.4 ledger road: server reads the entry's answers itself, words as typed; no flag carried"}
+{"id": "TD-1557:F5", "mark": "handled", "na": "-", "why": "TD-9002 reader: `forms` list parallel to `answers`, answers stay strings"}
+{"id": "TD-1557:F6", "mark": "handled", "na": "-", "why": "TD-9002 help text: amend help.py with design in the build PR, test_help binds both"}
+{"id": "TD-1557:F7", "mark": "handled", "na": "-", "why": "4.10/4.4: pick and bare-form reply refused from any sender, before orphan return"}
+{"id": "TD-1557:F8", "mark": "handled", "na": "-", "why": "4.4: str.lower() both sides; '<label> needs its words' wordings"}
+{"id": "TD-1557:F9", "mark": "handled", "na": "-", "why": "TD-9001 event gate and two asks to ledgerboard and agent-cadence seats; no SPEC section named though"}
+{"id": "TD-1557:F11", "mark": "handled", "na": "-", "why": "4.4: ledger index or go naming a form refused; decided line copies answers without default mark"}
+{"id": "TD-1557:F12", "mark": "handled", "na": "-", "why": "4.10: a pick of a form refused as a pick, words with it do not rescue it"}
+{"id": "TD-1557:F13", "mark": "handled", "na": "-", "why": "4.5a slot answer: box begun with label, board_slot decide never Reply, Send off unless label named"}
+{"id": "TD-1557:F15", "mark": "handled", "na": "-", "why": "4.4/4.5: label alone or lone placeholder refused by fill_slot, never a Reply"}
+{"id": "TD-1557:F17", "mark": "silent", "na": "-", "why": "Only Lifts/waiting-only and work order covered; closes(), close, sweep readers not addressed"}
+{"id": "TD-1557:F18", "mark": "handled", "na": "-", "why": "TD-9001 slot_label grammar, first form offered wins, (default) mark allowed"}
+{"id": "TD-1557:F19", "mark": "handled", "na": "-", "why": "4.4/4.5: row Reply always a Reply; on a look's pair Answer\u2026 filling Not right takes Not right\u2026's road"}
+{"id": "TD-1557:F20", "mark": "handled", "na": "-", "why": "4.5a slot answer row: drawn on every row that draws answers; first offered form whose label named"}
+{"id": "TD-1557:F21", "mark": "handled", "na": "-", "why": "4.5 Answer\u2026 bound box carries answers, forms, pair, head, repo, open-and-undecided"}
+{"id": "TD-1557:F22", "mark": "not-applicable", "na": "absent", "why": "No reply that decides; Answer\u2026 decides via the board decide road"}
+{"id": "TD-1557:F23", "mark": "not-applicable", "na": "absent", "why": "No reply-becomes-decision mechanism; mail replies go as typed"}
+{"id": "TD-1557:F24", "mark": "handled", "na": "-", "why": "fill_slot/slot_label named as TD-9001's missing piece, with event gate"}
+{"id": "TD-1557:F28", "mark": "handled", "na": "-", "why": "4.4: label with colon alone refused on every road; home refuses bare-form reply from any sender"}
+{"id": "TD-1557:F29", "mark": "handled", "na": "-", "why": "4.4: label read with its (default) mark and consequence removed"}
+{"id": "TD-1557:F30", "mark": "handled", "na": "-", "why": "4.5a: form's board_slot decide has no hand-off; filled Not right on a pair hands off"}
+{"id": "TD-1557:F31", "mark": "handled", "na": "-", "why": "fill_slot writes the label as offered; page builds no grammar, four comparisons"}
+{"id": "TD-1557:F32", "mark": "silent", "na": "-", "why": "applying mark carries the fill but nothing on worker thread return of the mark"}
+{"id": "TD-1557:F33", "mark": "silent", "na": "-", "why": "Nothing on multi-line replies or a length limit"}
+{"id": "TD-1557:F34", "mark": "not-applicable", "na": "absent", "why": "No reply-decides check; no person-only vs every-replier statements"}
+{"id": "TD-1557:F35", "mark": "handled", "na": "-", "why": "4.4: form may be marked default as recommendation; no Go with it, inbox_go_with_it refuses"}
+{"id": "TD-1557:F37", "mark": "handled", "na": "-", "why": "4.5 screen 12: Answer\u2026 on board item decides or replies by words; ledger/mail take any words"}
+{"id": "TD-1557:F39", "mark": "handled", "na": "-", "why": "Different mechanism: no marker; page hands answers, agent re-checks against the line's own Answers"}
+{"id": "TD-1557:F41", "mark": "silent", "na": "-", "why": "Nothing on rerun or thread safety of the post-write mark"}
+{"id": "TD-1557:F43", "mark": "handled", "na": "-", "why": "4.4: ledger go refused for form default; decided line passed no default"}
+{"id": "TD-1557:F48", "mark": "handled", "na": "-", "why": "TD-9001: asks to ledgerboard's seat and agent-cadence's seat, second blocked on first"}
+{"id": "TD-1557:F49", "mark": "handled", "na": "-", "why": "4.4 ledger road: words naming a form filled by fill_slot, label as offered"}
+{"id": "TD-1557:F50", "mark": "handled", "na": "-", "why": "4.5a: drawn on press as fill will be written, toast the server's decided words"}
+{"id": "TD-1557:F51", "mark": "handled", "na": "-", "why": "4.5a/4.10: mail reply sent as typed, never a decision; page parses nothing"}
+{"id": "TD-1557:F52", "mark": "handled", "na": "-", "why": "slot_label for Not right takes any placeholder pair test does, so pair and form agree"}
+{"id": "TD-1557:F58", "mark": "handled", "na": "-", "why": "No form flag; the home itself refuses form picks and bare-form replies from any sender"}
+{"id": "TD-1557:F60", "mark": "silent", "na": "-", "why": "No bad-index or non-string refusals or fixtures for the answer path"}
+{"id": "TD-1557:F62", "mark": "not-applicable", "na": "absent", "why": "No reply-to-decision conversion in this design"}
+{"id": "TD-1557:F63", "mark": "handled", "na": "-", "why": "TD-9002 Location lists modules; `forms` parallel list described"}
+{"id": "TD-1557:F66", "mark": "handled", "na": "-", "why": "Ledger road sends words as typed, home reads entry's answers; no marker to drop"}
+{"id": "TD-1557:F67", "mark": "not-applicable", "na": "absent", "why": "No marker; `forms` is computed in board_rows, nothing to clear"}
+{"id": "TD-1557:F69", "mark": "not-applicable", "na": "absent", "why": "No answer-set check on decided lines in this design"}
+{"id": "TD-1557:F70", "mark": "handled", "na": "-", "why": "TD-9002 reader: ledger.answers_of labels give forms parallel list"}
+{"id": "TD-1557:F71", "mark": "not-applicable", "na": "absent", "why": "No per-token marks of replies in this design"}
+{"id": "TD-1557:F75", "mark": "handled", "na": "-", "why": "Ledger go refused, steer default refused at send, go_with_it refuses form default"}
+{"id": "TD-1557:F77", "mark": "handled", "na": "-", "why": "4.10: refusal in home's mail send from any sender, so ao msg meets it; reply goes as typed"}
+{"id": "TD-1557:F78", "mark": "silent", "na": "-", "why": "Refusal wording is stated but not that routes' generic 400s would pre-empt it"}
+{"id": "TD-1557:F79", "mark": "handled", "na": "-", "why": "4.5a slot answer row: a mail item's row and ask row's suggested answers draw label\u2026"}
+{"id": "TD-1557:F80", "mark": "silent", "na": "-", "why": "slot_label grammar given, but no word on field-like heads or agreement with vendored list"}
+{"id": "TD-1557:F81", "mark": "silent", "na": "-", "why": "Session-side board reply not addressed"}
+{"id": "TD-1557:F85", "mark": "not-applicable", "na": "absent", "why": "No reply-to-decision conversion in this design"}
+{"id": "TD-1557:F86", "mark": "handled", "na": "-", "why": "Ledger go refused '<label> needs its words', as go_with_it; pick/steer wordings stated separately"}
+{"id": "TD-1557:F87", "mark": "handled", "na": "-", "why": "Steer default, go_with_it, ledger go refused; board/ask mark allowed as recommendation; synopsis agrees"}
+{"id": "TD-1557:F88", "mark": "handled", "na": "-", "why": "4.5 rule 4: decide drawn decided: <answer> \u2014 landing on the board\u2026"}
