@@ -128,6 +128,8 @@ from .cards import (  # re-exported: routes, templates and tests read these from
 )
 from .common import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     _DICT_NAMES,  # noqa: F401
+    _MONTHS,  # noqa: F401
+    _WAITS_UNTIL,  # noqa: F401
     GRANT_NOTES,  # noqa: F401
     HERE,  # noqa: F401
     ICON_TTL,  # noqa: F401
@@ -170,7 +172,9 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _usage_hover,  # noqa: F401
     _usage_line,  # noqa: F401
     _usage_profiles,  # noqa: F401
+    bare_id,  # noqa: F401
     build_chip,  # noqa: F401
+    cap_first,  # noqa: F401
     card_path,  # noqa: F401
     card_shape,  # noqa: F401
     card_whole,  # noqa: F401
@@ -190,6 +194,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     node_org_note,  # noqa: F401
     not_answered,  # noqa: F401
     org_here,  # noqa: F401
+    own_repo,
     page_origin,  # noqa: F401
     paths_ctx,  # noqa: F401
     promote_reading,  # noqa: F401
@@ -201,7 +206,9 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     rpc,  # noqa: F401
     settled_by_work,  # noqa: F401
     shaped,  # noqa: F401
+    short_date,  # noqa: F401
     start_fields,  # noqa: F401
+    state_words,  # noqa: F401
     static_url,  # noqa: F401
     stop_fields,  # noqa: F401
     suggested_answers,  # noqa: F401
@@ -4379,7 +4386,12 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     h,
                     fleet,
                     card_index(got),
-                    lambda e, sec, choices: Markup(one.render(e=e, section=sec, origin=origin, board_choices=choices)),
+                    # the card's own repo, which *The Queue's words* bare ids by (§4.5 screen 12, TD-1809)
+                    lambda e, sec, choices: Markup(
+                        one.render(
+                            e=e, section=sec, origin=origin, board_choices=choices, own=own_repo(e.get("on_card"))
+                        )
+                    ),
                     # a kept card's items start sessions too (TD-1618): its id must be in `by_id`
                     [*(got.get("cards") or ()), *(got.get("completed") or ())],
                 )

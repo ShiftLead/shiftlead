@@ -45,7 +45,9 @@ def test_an_act_line_is_a_do_and_its_card_item_leads_with_its_task(tmp_path, mon
     assert a["card"]["in_repo"] == "agent-cadence"
     html = card(a, "do")
     head = html[: html.index('class="body md sentence"')]
-    assert 'k-do">do</span>' in head and "in agent-cadence</b>" in head and "board line</span>" in head
+    # *Do · from <repo>'s board*, its *in <repo>* after it, never *board line* (*The Queue's words*, TD-1809)
+    assert 'k-do">Do</span><span class="st">· from ' in head and "'s board</span>" in head
+    assert "in agent-cadence</b>" in head and "board line" not in head
     assert "still on TD-1033" not in head and "board:741e117b" not in head  # no standing, no key in the head
     sentence = re.search(r'class="body md sentence">(.*?)</div>', html, re.S).group(1)
     assert "File one entry in agent-cadence" in sentence and "act 2026-10-26" not in sentence
@@ -67,7 +69,7 @@ def test_an_act_line_is_a_do_and_its_card_item_leads_with_its_task(tmp_path, mon
 def test_a_decide_line_on_the_same_card_stays_decide_and_the_card_counts_the_act_as_do(tmp_path, monkeypatch):
     a, d = rows(tmp_path, monkeypatch)
     html = card(d, "decide")
-    assert want_of(d, "needs") == "decide" and 'k-decide">decide</span>' in html and "in agent-cadence" not in html
+    assert want_of(d, "needs") == "decide" and 'k-decide">Decide</span>' in html and "in agent-cadence" not in html
     assert d["card"]["in_repo"] == "" and "Which name?" in html
     ans = html[html.index("qanswers") :]
     assert ">Alpha</span>" in ans and ">Beta</span>" in ans and ">Answer…</button>" in ans

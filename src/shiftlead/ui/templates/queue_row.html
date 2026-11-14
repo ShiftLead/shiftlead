@@ -10,11 +10,11 @@
 {#- a word that stands for a session opens its Focus, as the holder pill does (§4.5 screen 12 *A holder's word opens
     the holder*, §4.5a *Queue card: holder's word*, TD-1724): *with you in <name>*, *held by <name>* and *stalled*,
     wherever the row has a holder; *answered — waiting on <asker>*, the need words and a holderless *stalled* stay plain -#}
-{% macro state(r) %}{% set opens = r.holder and not r.archived and (r.with_you or (r.state or '').startswith(('with you in', 'held by')) or r.state == 'stalled') %}
-{%- if r.with_you or r.answered %}{% if r.with_you and opens %}<a class="qstate s-with" href="/focus/{{ r.holder.id }}" title="open {{ r.holder.name }}">{{ r.state }}</a>{% else %}<span class="qstate s-with">{{ r.state }}</span>{% endif %}
+{% macro state(r, words=False) %}{% set sw = state_words(r.state) if words else r.state %}{% set opens = r.holder and not r.archived and (r.with_you or (r.state or '').startswith(('with you in', 'held by')) or r.state == 'stalled') %}
+{%- if r.with_you or r.answered %}{% if r.with_you and opens %}<a class="qstate s-with" href="/focus/{{ r.holder.id }}" title="open {{ r.holder.name }}">{{ sw }}</a>{% else %}<span class="qstate s-with">{{ sw }}</span>{% endif %}
 {%- elif r.needs %}<span class="qstate needs">{{ needs_word(r) }}</span>
 {%- elif r.state %}{% set cls = "qstate s-" ~ (r.state.split(' ')[0] | replace('#', 'pr')) ~ (" done" if r.archived else "") %}
-{%- if opens %}<a class="{{ cls }}" href="/focus/{{ r.holder.id }}" title="open {{ r.holder.name }}">{{ r.state }}</a>{% else %}<span class="{{ cls }}">{{ r.state }}</span>{% endif %}{% endif %}{% endmacro %}
+{%- if opens %}<a class="{{ cls }}" href="/focus/{{ r.holder.id }}" title="open {{ r.holder.name }}">{{ sw }}</a>{% else %}<span class="{{ cls }}">{{ sw }}</span>{% endif %}{% endif %}{% endmacro %}
 
 {# the row's controls, defined once (design §4.5 screen 12 *any open row*, §4.5a *Queue card: what needs the
    person*; TD-900, built by TD-905): drawn on a Queue card's open rows and imported by the Inbox's ledger row, so
@@ -66,18 +66,30 @@
 {# a row's mentions, one phrase however many items name it beside another row (§4.5 screen 12 *Three wants*,
    TD-915): *mentioned in n items*, counted by item, their subjects on hover; the items themselves are the card's,
    in its wants (`want` and `read` below). The Repo page attaches nothing. #}
-{% macro mentioned(r) %}{% set ms = r.mentioned or [] %}{% if ms %}<div class="qnote qmention" title="{{ ms | join('\n') }}">mentioned in {{ ms | length }} item{{ '' if ms | length == 1 else 's' }}</div>{% endif %}{% endmacro %}
+{% macro mentioned(r, words=False) %}{% set ms = r.mentioned or [] %}{% if ms %}<div class="qnote qmention" title="{{ (ms | map('plain') | join('\n')) if words else ms | join('\n') }}">mentioned in {{ ms | length }} item{{ '' if ms | length == 1 else 's' }}</div>{% endif %}{% endmacro %}
 
 {# an item on a card, drawn by the Inbox's own renderer (`queue_mail.html`); one about another row says *on
    TD-n*, a link that scrolls to that row and rings it #}
-{% macro items(ms) %}<div class="qmail inboxrows">{% for m in ms %}{% if m.on %}<a class="qon qsub" href="#{{ m.on }}" data-on="{{ m.on }}" title="the row it is about">on {{ m.on }}</a>{% endif %}{{ m.html }}{% endfor %}</div>{% endmacro %}
+{% macro items(ms, words=False, own='') %}<div class="qmail inboxrows">{% for m in ms %}{% if m.on %}<a class="qon qsub" href="#{{ m.on }}" data-on="{{ m.on }}" title="the row it is about">on {{ bare_id(m.on, own) if words else m.on }}</a>{% endif %}{{ m.html }}{% endfor %}</div>{% endmacro %}
+
+{# a heading's count in words (§4.5 screen 12 *The Queue's words: Counts in words*, TD-1809): *One* for 1, the digit
+   for 2 and more, a zero form where a press empties a Decide or Do block in place; the Read fold and its lines are
+   never drawn at 0. Its twin is `AO.qCountWords` (`app.js`), held to the same table by a test. #}
+{% macro count_words(block, n) %}{% set n = n | int %}{% set t = {
+  'decide': ['No decision left for you', 'One decision for you', ' decisions for you'],
+  'do': ['Nothing left for you to do', 'One thing for you to do', ' things for you to do'],
+  'read': ['', 'One to read', ' to read'],
+  'answered': ['', 'One answered for you', ' answered for you'],
+  'waiting': ['', 'One waiting on them', ' waiting on them'],
+  'fyi': ['', 'One for your information', ' for your information'],
+}[block] %}{% if n <= 0 %}{{ t[0] }}{% elif n == 1 %}{{ t[1] }}{% else %}{{ n }}{{ t[2] }}{% endif %}{% endmacro %}
 
 {# a card's Decide or Do (§4.5 screen 12 *Three wants*, §4.5a *Queue page: card*; TD-909, built by TD-911): drawn
    in the header, open, amber, its heading with its count, not drawn at 0 #}
-{% macro want(c, w) %}{% set ms = ((c.wants or {}).get(w)) or [] %}{% if ms %}
+{% macro want(c, w, words=False, own='') %}{% set ms = ((c.wants or {}).get(w)) or [] %}{% if ms %}
   <div class="qsec qwant qsec-{{ w }}" data-sec="{{ w }}">
-    <div class="qsech"><span>{{ {'decide': 'Decide', 'do': 'Do'}[w] }} ({{ ms | length }})</span></div>
-    {{ items(ms) }}
+    <div class="qsech">{% if words %}<span data-n="{{ ms | length }}">{{ count_words(w, ms | length) }}</span>{% else %}<span>{{ {'decide': 'Decide', 'do': 'Do'}[w] }} ({{ ms | length }})</span>{% endif %}</div>
+    {{ items(ms, words, own) }}
   </div>
 {% endif %}{% endmacro %}
 
@@ -85,12 +97,12 @@
    uncounted, never colouring the card; inside, each Inbox section it gathers its own line, *answered for you*
    and *fyi* each with **Dismiss all** over the ids on screen in that line of that card; a line at 0 is not drawn;
    a re-read keeps it as the person's press left it (`data-fold`, `AO.reopenFolds`, TD-1315) #}
-{% macro read(c) %}{% set rd = (c.wants or {}).get('read') or {} %}{% if rd %}
-  <details class="qread" data-fold="{{ c.id }}:read"><summary class="qsech">Read ({{ c.wants.n.read }})</summary>
+{% macro read(c, words=False, own='') %}{% set rd = (c.wants or {}).get('read') or {} %}{% if rd %}
+  <details class="qread" data-fold="{{ c.id }}:read"><summary class="qsech">{% if words %}<span data-n="{{ c.wants.n.read }}">{{ count_words('read', c.wants.n.read) }}</span>{% else %}Read ({{ c.wants.n.read }}){% endif %}</summary>
   {%- for sec, label in {'answered': 'answered for you', 'waiting': 'waiting on them', 'fyi': 'fyi'}.items() %}{% set ms = rd.get(sec) %}{% if ms %}
     <div class="qsec qsec-{{ sec }}" data-sec="{{ sec }}">
-      <div class="qsech"><span>{{ label }} ({{ ms | length }})</span>{% if sec in ('answered', 'fyi') %}<button type="button" class="btn sm ghost qdismissall" title="dismiss the ones on screen in this line of this card — never one that arrived after the page was drawn">Dismiss all</button>{% endif %}</div>
-      {{ items(ms) }}
+      <div class="qsech">{% if words %}<span data-n="{{ ms | length }}">{{ count_words(sec, ms | length) }}</span>{% else %}<span>{{ label }} ({{ ms | length }})</span>{% endif %}{% if sec in ('answered', 'fyi') %}<button type="button" class="btn sm ghost qdismissall" title="dismiss the ones on screen in this line of this card — never one that arrived after the page was drawn">Dismiss all</button>{% endif %}</div>
+      {{ items(ms, words, own) }}
     </div>
   {%- endif %}{% endfor %}
   </details>
@@ -98,7 +110,7 @@
 
 {# an entry the person's own session holds (§4.5 screen 12 *Three wants*, TD-1281): no want, grey, after Decide and Do
    in the header, in no count; each item's line and foot say *with you in <name>* #}
-{% macro with_you(c) %}{% set ms = ((c.wants or {}).get('with_you') or []) + ((c.wants or {}).get('answered') or []) %}{% if ms %}<div class="qsec qwith" data-sec="with_you">{{ items(ms) }}</div>{% endif %}{% endmacro %}
+{% macro with_you(c, words=False, own='') %}{% set ms = ((c.wants or {}).get('with_you') or []) + ((c.wants or {}).get('answered') or []) %}{% if ms %}<div class="qsec qwith" data-sec="with_you">{{ items(ms, words, own) }}</div>{% endif %}{% endmacro %}
 
 {# the card's pill (§4.5 screen 12 *A card*): its Decide and Do counts, amber, in every group where it has one #}
 {% macro pill(c) %}{% set n = (c.wants or {}).get('n') or {} %}{% if n.decide or n.do %}<span class="qstatus needsyou qwpill" title="what on this card waits on you: Decide and Do items">{% if n.decide %}Decide {{ n.decide }}{% endif %}{% if n.decide and n.do %} · {% endif %}{% if n.do %}Do {{ n.do }}{% endif %}</span>{% endif %}{% endmacro %}
@@ -109,7 +121,7 @@
 
 {# what a row waits on, beside its word (§4.4 *A row's state*, TD-1131): *after TD-n*, each a link that scrolls
    to and rings that row (`AO`'s `a.qon` press), lit on hover or focus #}
-{% macro afters(r) %}{% for a in r.afters or [] %}<span class="meta qafter">after <a class="qon" href="#{{ a }}" data-on="{{ a }}" title="waits on {{ a }}: scroll to it">{{ a }}</a></span>{% endfor %}{% endmacro %}
+{% macro afters(r, words=False, own='') %}{% for a in r.afters or [] %}<span class="meta qafter">after <a class="qon" href="#{{ a }}" data-on="{{ a }}" title="waits on {{ a }}: scroll to it">{{ bare_id(a, own) if words else a }}</a></span>{% endfor %}{% endmacro %}
 
 {# a row: its state word, and the holder's pill unless the word already names it (*held by X*); the tree drawn
    (§4.5 screen 12 *A card*, TD-915, TD-1131) — a part hangs on its parent's spine, a 2 px rule down each level's
@@ -126,22 +138,22 @@
 {%- endif %}
 {%- endmacro %}
 
-{% macro row(r, repo='') %}
+{% macro row(r, repo='', words=False, own='') %}
   <div class="qrow{% if r.archived %} archived{% endif %}{% if r.needs and not (r.with_you or r.answered) %} needsyou{% endif %}{% if r.state == 'stalled' %} stalled{% endif %}" style="--qd: {{ r.depth or 1 }}"{% if r.anchor %} id="{{ r.anchor }}"{% endif %} data-qid="{{ r.qid }}">
     {%- for b in r.rails or [] %}{% if b %}<span class="qrail b-{{ b }}" style="--ql: {{ loop.index }}" aria-hidden="true"></span>{% endif %}{% endfor %}
-    <span class="qid mono">{{ r.show }}</span>{{ pbadge(r.priority) }}<span class="qtitle">{{ r.title }}{{ synopsis(r.synopsis, ' ') }}</span>
-    <span class="qright">{{ extras(r.ext, repo) }}{{ meter(r.meter) }}{{ state(r) }}{{ afters(r) }}{% if not (r.state or '').startswith(('held by', 'with you in')) and not r.with_you %}{{ holder(r.holder) }}{% endif %}{% if not r.ext %}{{ menu(r) }}{% endif %}</span>
+    <span class="qid mono">{{ r.show }}</span>{{ pbadge(r.priority) }}<span class="qtitle">{{ md(r.title, inline=True) if words else r.title }}{{ synopsis(r.synopsis, ' ') }}</span>
+    <span class="qright">{{ extras(r.ext, repo) }}{{ meter(r.meter) }}{{ state(r, words) }}{{ afters(r, words, own) }}{% if not (r.state or '').startswith(('held by', 'with you in')) and not r.with_you %}{{ holder(r.holder) }}{% endif %}{% if not r.ext %}{{ menu(r) }}{% endif %}</span>
     {{ builds(r.ext) }}
-    {{ mentioned(r) }}
+    {{ mentioned(r, words) }}
   </div>
 {% endmacro %}
 
 {# finished rows folded (§4.4 *Rows*, §4.5 screen 12 *A card*; TD-1131): a parent's finished parts to one line,
    *✓ n done*, first on its spine, at the parts' level; finished loose rows to the same line, unindented, at the
    card's end; a press opens it in place, and a re-read keeps it as the press left it (`data-fold`, TD-1315) #}
-{% macro fold(f, repo='', card='') %}
+{% macro fold(f, repo='', card='', words=False, own='') %}
   <details class="qfold{% if f.loose %} loose{% endif %}" data-fold="{{ card }}:done:{{ f.of }}"><summary class="qrow qfoldsum" style="--qd: {{ f.depth or 1 }}">
     {%- for b in f.rails or [] %}{% if b %}<span class="qrail b-{{ b }}" style="--ql: {{ loop.index }}" aria-hidden="true"></span>{% endif %}{% endfor %}<span class="qtick" aria-hidden="true">✓</span> {{ f.n }} done</summary>
-    {%- for r in f.fold %}{{ row(r, repo) }}{% endfor %}
+    {%- for r in f.fold %}{{ row(r, repo, words, own) }}{% endfor %}
   </details>
 {% endmacro %}

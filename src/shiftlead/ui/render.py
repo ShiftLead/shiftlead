@@ -276,3 +276,18 @@ _PART_HEAD = re.compile(r"(?<=[.;!?)])\s+(?=\*\*[^*\n]{1,80}?:\*\*)")
 def part_heads(text: str) -> str:
     """`text` with each part's bold head (`_PART_HEAD`) opening a paragraph of its own."""
     return _PART_HEAD.sub("\n\n", text)
+
+
+def plain(text: str) -> str:
+    """`text` with its inline markup taken off (§4.5 screen 12 *The Queue's words*, TD-1809): a code span, a link,
+    strong and emphasis drawn as their words, and a backtick or asterisk a cut left without its pair dropped, so a
+    title cut to its line shows no lone mark."""
+
+    def words(m: re.Match[str]) -> str:
+        if m.group("code"):
+            return m.group("ctext")
+        if m.group("url") is not None:
+            return m.group("ltext")
+        return plain(m.group("strong") if m.group("strong") is not None else m.group("em"))
+
+    return re.sub(r"[`*]", "", _INLINE.sub(words, str(text or "")))
