@@ -138,7 +138,7 @@ class GrokAdapter:
     state_in_title = False
     # rows its repaints move, masked from the liveness clock (design §4.3 *An adapter names its volatile rows*):
     # the spinner line (a braille glyph) with its elapsed timer, and a running tool's `◆ <what>… 11s` line
-    volatile_rows = (r"^\s*[\u2800-\u28ff]\s", r"^\s*◆ .*…\s+\d+(\.\d+)?m?s\s*$")
+    volatile_rows = (r"^\s*[\u2800-\u28ff]\s", r"^\s*◆ .*…\s+(\d+[hm]\s*)*\d+(\.\d+)?m?s\s*$")
 
     def __init__(self, binary: str | None = None, hook_cmd: str | None = None):
         self.binary = binary or str(BINARY.expanduser())
@@ -206,8 +206,9 @@ class GrokAdapter:
             return None
         text = TITLE_ACTION.sub("", text.removesuffix(TITLE_SUFFIX))
         if TITLE_SPINNER.match(text):
-            parts = text.split(" - ", 2)
-            text = parts[2] if len(parts) == 3 else ""
+            # the name is the last part: an activity may hold ` - ` (a running command's), a name rarely does
+            parts = text.split(" - ")
+            text = parts[-1] if len(parts) >= 3 else ""
         return text.strip() or None
 
     def account_for(self, profile: str) -> str | None:

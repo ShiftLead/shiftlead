@@ -143,7 +143,8 @@ def test_the_composer_title_and_volatile_rows_off_the_captured_panes():
     assert a.title("user@host: ~/d") is None and a.title("") is None and a.title("grok") is None
     assert a.title("⠹ - Responding - grok") is None
     assert a.title("⚠ Action Required - ⠴ - Run it… - My name - grok") == "My name"
+    assert a.title("⠴ - Running: git log - x… - My name - grok") == "My name"
     assert not a.state_in_title and {"composer", "title"} == set(a.implements)
-    rows = ["   ⠦ Responding… 2.0s", "   ◆ Remove a.txt and create made directory… 11s", "     ◆ Thought for 0.0s"]
+    rows = ["   ⠦ Responding… 2.0s", "   ◆ Remove a.txt… 11s", "   ◆ Build… 1m 5s", "     ◆ Thought for 0.0s"]
     masked = [r for r in rows if any(re.search(p, r) for p in a.volatile_rows)]
-    assert masked == rows[:2]
+    assert masked == rows[:3]
