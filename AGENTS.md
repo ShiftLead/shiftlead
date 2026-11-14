@@ -143,7 +143,9 @@ concurrent session in this repo works in a worktree (`claude --worktree <name>` 
 `agent-cadence run open_worktree.sh <topic>`); the first session in the checkout is the anchor.
 A PR's gate is its `cadence/precheck` status, not GitHub Actions:
 `agent-cadence run precheck.py --pr <n>` runs `docs/cadence.toml`'s `precheck` on its head and records it
-(cadence §4.12, TD-1035). A fork's PR is the exception (TD-1285): `ci.yml` runs on it in Actions (and by
+(cadence §4.12, TD-1035); a PR whose every file matches `[precheck-paths]`' docs globs runs that table's narrower
+command instead (`pdm run test-docs`, the host-log validation, the ledger check and lint, TD-1483), so its green is not the
+whole suite, which main's own precheck runs (design §6 *The precheck on main*). A fork's PR is the exception (TD-1285): `ci.yml` runs on it in Actions (and by
 hand), and its precheck runs a stranger's code here, so it is Paul's alone, after reading the diff and
 seeing that run green, with `--fork-ok`. A session never prechecks a fork's PR, and ShiftLead never
 hands it one as a work order. Self-authored PRs get an independent cheaper-model review before merge; doc-only PRs get a
