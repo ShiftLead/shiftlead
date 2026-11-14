@@ -52,6 +52,8 @@ teams:
     # docs and the tests, and never fix it; each fills after ten merged PRs, so an idle week costs nothing.
     # A seat line lands, or moves to another profile, only on a profile the seat smoke has passed on, its passing
     # line quoted in the PR (`pdm run conformance <adapter> --profile <p> --smoke`, design §4.3, TD-1648).
+    # A seat line holding the fact-checker role alone lands only on a profile with a passing `pdm run judge` row
+    # in docs/judgment/fact-checker.md, quoted in the PR (design §4.9b *A model's fitness, before the role*, TD-1649).
     seats:
       - {name: docs-audit-ao-1, role: auditor, brief: docs/briefs/docs-audit.md, trigger: {prs: 10}}
       - {name: test-audit-ao-1, role: auditor, brief: docs/briefs/test-audit.md, trigger: {prs: 10}}

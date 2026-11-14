@@ -1,0 +1,12 @@
+diff --git a/docs/design/4.3-adapter-contract.md b/docs/design/4.3-adapter-contract.md
+index 86fdf1159..c7117c522 100644
+--- a/docs/design/4.3-adapter-contract.md
++++ b/docs/design/4.3-adapter-contract.md
+@@ -1909,3 +1909,7 @@ The core cannot read a profile, so the adapter says how one is billed: `billing_
+ {billing, prices}` as `profiles.yml` declares it, an adapter without it billing every profile as a
+ subscription.
+ 
++
++**Reading the smoke's reply.**
++`scripts/seat_run.py`'s `reply_for(entries, ask_id)` returns the first reply on the ask's thread among the
++person's inbox entries, or None, and the smoke passes on it.

@@ -200,10 +200,11 @@ def launch(call: Callable[..., Any], seat: SeatBrief, adapter: str, profile: str
     )
 
 
-def ask(sid: str, text: str, env: dict[str, str], ao: list[str] | None = None) -> str:
-    """One `ao msg --kind ask` to `sid` as the person (`env` the scratch home's, its session and pane dropped);
-    the ask's id."""
-    cmd = [*(ao or [sys.executable, "-m", "shiftlead.cli"]), "--json", "msg", "--kind", "ask", sid, text]
+def ask(sid: str, text: str, env: dict[str, str], ao: list[str] | None = None, about: str | None = None) -> str:
+    """One `ao msg --kind ask` to `sid` as the person (`env` the scratch home's, its session and pane dropped),
+    with `--about` where given (a judge case's `#<ordinal>`, as an author's ask carries); the ask's id."""
+    opts = ["--about", about] if about else []
+    cmd = [*(ao or [sys.executable, "-m", "shiftlead.cli"]), "--json", "msg", "--kind", "ask", *opts, sid, text]
     cp = subprocess.run(cmd, capture_output=True, text=True, env=person_env(env), timeout=60)
     if cp.returncode:
         raise RuntimeError(f"ao msg exited {cp.returncode}: {(cp.stderr or cp.stdout).strip()}")

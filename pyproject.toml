@@ -102,6 +102,8 @@ lint = { composite = ["ruff check src tests", "ruff format --check src tests"] }
 fmt = "ruff format src tests"
 # the adapter conformance suite's live walk, by hand (design §4.3, TD-784): `pdm run conformance <adapter> --profile <p>`
 conformance = "python scripts/conformance.py"
+# a model's fitness for a role, its planted-defect set run by hand (design §4.9b, TD-1649): `pdm run judge <role> --profile <p>`
+judge = "python scripts/judge.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

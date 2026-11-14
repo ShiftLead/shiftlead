@@ -1,0 +1,12 @@
+diff --git a/docs/design/4.3-adapter-contract.md b/docs/design/4.3-adapter-contract.md
+index 86fdf1159..47dd5b40d 100644
+--- a/docs/design/4.3-adapter-contract.md
++++ b/docs/design/4.3-adapter-contract.md
+@@ -1909,3 +1909,7 @@ The core cannot read a profile, so the adapter says how one is billed: `billing_
+ {billing, prices}` as `profiles.yml` declares it, an adapter without it billing every profile as a
+ subscription.
+ 
++
++**A send as the person.**
++The smoke's ask is sent as the person: `scripts/seat_run.py` drops two variables from its environment,
++`SHIFTLEAD_SESSION` and `TMUX`, so the send names nobody's session.

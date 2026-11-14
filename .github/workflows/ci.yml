@@ -25,6 +25,8 @@ jobs:
         python-version: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the judgment sets' shape test reads each case's pinned commit (TD-1649)
       - uses: pdm-project/setup-pdm@v4
         with:
           python-version: ${{ matrix.python-version }}

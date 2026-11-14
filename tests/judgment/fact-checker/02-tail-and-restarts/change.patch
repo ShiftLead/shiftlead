@@ -1,0 +1,23 @@
+diff --git a/docs/design/6-policies.md b/docs/design/6-policies.md
+index bfba6fce8..52871d8a2 100644
+--- a/docs/design/6-policies.md
++++ b/docs/design/6-policies.md
+@@ -2959,3 +2959,7 @@ teams:
+   seat, never refused, and says nothing; and `manager`'s standing brief says such a team is neither crashed nor
+   finished, that its part is one log line, and that an idle member on another host is told of the
+   clearing with one send.
++
++**The restart ceiling, in numbers.**
++The tick restarts a crashed session at most five times inside two hours (`RESTART_CEILING` and
++`RESTART_WINDOW` in `src/sessionorc/agent_common.py`); the next exit inside the window is the person's.
+diff --git a/docs/glossary.md b/docs/glossary.md
+index 512927e56..0763e1851 100644
+--- a/docs/glossary.md
++++ b/docs/glossary.md
+@@ -397,3 +397,6 @@ not mix:
+ 5. **fleet** — retired, as above.
+ 6. **orc** — only in product, package and command names; never a session or position. Also
+    decided: **conductor → director**, and **doorbell** kept.
++
++**tail, in numbers** — a card's tail is cut from the last 30 lines of the pane the host agent reads
++(`TAIL_LINES` in `src/sessionorc/agent_common.py`); the card shows the last three of them.

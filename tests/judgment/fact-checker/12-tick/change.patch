@@ -1,0 +1,12 @@
+diff --git a/docs/design/4.2-state-feed.md b/docs/design/4.2-state-feed.md
+index 6b4804559..9b4d23d2e 100644
+--- a/docs/design/4.2-state-feed.md
++++ b/docs/design/4.2-state-feed.md
+@@ -786,3 +786,7 @@ the footer carries a failed `/rc`. The pane lives, the tool answers, and nothing
+ That is not `idle`, which is a session resting between turns (TD-032). A screen rule reads the
+ banner as `stalled?` with a note saying so, and a `stalled?` card shows that note above its tail.
+ 
++
++**The tick, in numbers.**
++The host agent's tick runs every five seconds unless `SHIFTLEAD_TICK` says otherwise (`TICK_SECONDS` in
++`src/sessionorc/agent_common.py`).

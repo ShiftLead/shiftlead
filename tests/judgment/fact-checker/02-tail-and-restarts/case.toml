@@ -1,0 +1,20 @@
+# a card's tail and the restart ceiling, in numbers
+pinned = "0ef0364b76e1f8bed694d341dbca4a2b1c553e57"
+
+[[defect]]
+id = "D1"
+file = "docs/glossary.md"
+lines = [401, 402]
+says = "TAIL_LINES is 15, not 30."
+[[defect.refutes]]
+file = "src/sessionorc/agent_common.py"
+lines = [49, 49]
+
+[[defect]]
+id = "D2"
+file = "docs/design/6-policies.md"
+lines = [2964, 2965]
+says = "RESTART_CEILING is 3: three restarts inside the window, not five."
+[[defect.refutes]]
+file = "src/sessionorc/agent_common.py"
+lines = [133, 133]

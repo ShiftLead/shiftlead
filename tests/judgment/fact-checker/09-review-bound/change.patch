@@ -1,0 +1,12 @@
+diff --git a/docs/design/4.9b-techlead.md b/docs/design/4.9b-techlead.md
+index 860d21436..0bb54c42f 100644
+--- a/docs/design/4.9b-techlead.md
++++ b/docs/design/4.9b-techlead.md
+@@ -1428,3 +1428,7 @@ time** here either: a `steer` keeps its bound and lapses to its default as any s
+   as before; a director with no preferences written answers nothing at `conservative` but what the
+   package's defaults and written decisions cover.
+ 
++
++**The reader's bound, in numbers.**
++A reader's read of a diff is bounded at four hours unless the preset says otherwise (`REVIEW_BOUND` in
++`src/sessionorc/models.py`).

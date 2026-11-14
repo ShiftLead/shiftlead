@@ -1,0 +1,11 @@
+# the seat smoke's wait, in numbers
+pinned = "0ef0364b76e1f8bed694d341dbca4a2b1c553e57"
+
+[[defect]]
+id = "D1"
+file = "docs/design/4.3-adapter-contract.md"
+lines = [1914, 1914]
+says = "REPLY_WAIT is 600.0 seconds, ten minutes, not five."
+[[defect.refutes]]
+file = "scripts/seat_run.py"
+lines = [26, 26]
