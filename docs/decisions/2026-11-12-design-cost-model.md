@@ -12,8 +12,8 @@ $88.82). Per design it is 42% to 57%. That is above the quarter line TD-1764 pro
 
 1. **The designer is not Fable.** Every designer turn on kmaster since 2026-10-14, about 22,000 of them, ran on
    `claude-opus-5-5`, but for two `<synthetic>` lines. Fable (`claude-fable-5-1`, then `-5-2`) runs only as a design *reviewer*.
-2. **The reviewers cost twice what the designer does.** The five designs' reviewers spent $173.85, against
-   the designer's $88.82. Fable reviews alone were $118.04 of that. The designer's fix turns are 17% of a
+2. **The reviewers cost half again what the designer does.** The five designs' reviewers spent $136.76, against
+   the designer's $88.82. Fable reviews alone were $92.18 of that. The designer's fix turns are 20% of a
    design's whole spend.
 3. **Most of the designer's cost is cache reads.** Opus 5.5's cache-read weight ($0.20 per million tokens)
    is Sonnet's. Moving the same fix turns to a fresh Sonnet context therefore saves only what the smaller
@@ -66,7 +66,17 @@ and all of them still exist. A design's turns are:
   back from the design's first turn to the session's last turn on another branch, and between its turns.
 
 A design may span several sessions (TD-1543: nine). The reviewers are the subagents whose first turn falls in a
-design session's window. Their spend is counted apart from the designer's.
+design session's window, each of their turns kept only where it ran on the design's branches (one on the
+worktree's own branch, where the design's branches hold the most of that reviewer's other turns). Their spend is
+counted apart from the designer's.
+
+**Corrected 2026-11-14 (TD-1800).** The first version kept every turn of a reviewer started in the window. One
+designer session works several designs' branches in turn, so TD-1543's window took in 376 turns of the reviewers
+of TD-1550 and TD-1590, designs this model did not select: $37.09, counted as TD-1543's. They were found by the
+design trial's baseline capture (TD-1775), which keeps each turn under one design by the branch it ran on, and
+`tables.py select` now keeps a reviewer's turns the same way. Only the reviewers' figures moved: the reviewers'
+total ($173.85 to $136.76, so they cost half again what the designer does, not twice), the reviews by model,
+and what is derived from them below. The designer's own turns, and so the 51% applying share, are unchanged.
 
 **A turn** is one API response, keyed by the message id. Claude Code writes one line per content block, all with
 the same usage; one is kept. Its tokens are the four kinds the response's `usage` gives: input, cache read,
@@ -103,10 +113,11 @@ the design's entries in `ao spend --entries --window week` for the weeks of 2026
 | TD-1650 | $23.31 | $22.53 |
 | TD-1443 | $27.72 | $27.66 |
 | TD-1434 | $34.71 | $34.32 (TD-1434 $24.75 + TD-1454 $9.57) |
-| TD-1543 | $157.62 | $146.11 (TD-1543 $114 + TD-1676 $15.71 + TD-1708 $9.16 + TD-1702 $7.24) |
+| TD-1543 | $120.53 | $146.11 (TD-1543 $114 + TD-1676 $15.71 + TD-1708 $9.16 + TD-1702 $7.24) |
 
-The first four agree within 4%. TD-1543's window takes in about 8% more than its entries. Its nine sessions
-also held other claims, whose reviewers fall inside the window.
+The first four agree within 4%. TD-1543's is 18% below its entries'. Its nine sessions also worked TD-1550's and
+TD-1590's branches, whose reviewers fall inside its window and are no longer counted under it (TD-1800, below);
+how `ao spend --entries` splits those sessions' spend between their claims is not read here.
 
 **What it leaves out.** Turns a design spent on a branch not its own are not counted, for example a ledger
 fix made from another design's branch. Drafting done before a design's branch was cut, in an earlier session,
@@ -131,9 +142,9 @@ tokens (TD-1436) to 375k (TD-1443).
 A designer session carries the design before it. TD-1650's session came straight from TD-1567 and opened at
 273k tokens. TD-1443's came from TD-1453.
 
-**The reviewers** (Agent subagents), pooled: Fable 5.1 $32.60, Fable 5.2 $85.44, Sonnet 5.5 $52.99,
-Opus 5.5 $2.82, $173.85 in all. Per design: TD-1436 $12.37, TD-1650 $14.53, TD-1443 $14.89, TD-1434 $21.62,
-TD-1543 $110.44.
+**The reviewers** (Agent subagents), pooled: Fable 5.1 $32.60, Fable 5.2 $59.58, Sonnet 5.5 $42.39,
+Opus 5.5 $2.20, $136.76 in all. Per design: TD-1436 $12.37, TD-1650 $14.53, TD-1443 $14.89, TD-1434 $21.62,
+TD-1543 $73.35.
 
 ## Step 4: two estimates
 
@@ -181,7 +192,7 @@ The second row is a price, not an option today: the designer's session is Opus 5
 
 Applying fixes is 51% of the designer's spend, pooled over the sample. That is above the quarter line, so TD-1721
 is not held on Paul's decision: it is free to start once this entry closes. The three facts above go to TD-1721
-and TD-1722 as notes. Those are the designer's to weigh: the designer is Opus 5.5, the reviewers cost twice as
+and TD-1722 as notes. Those are the designer's to weigh: the designer is Opus 5.5, the reviewers cost half again as
 much, and the Sonnet saving depends on context size.
 
 ## For TD-1721: who reviews, and what the designer carries
@@ -195,9 +206,9 @@ Sonnet):
 
 | model | reviews | $ | mean $ | median $ |
 |---|---|---|---|---|
-| Fable | 33 | 118.04 | 3.58 | 3.04 |
-| Opus 5.5 | 3 | 2.82 | 0.94 | 0.95 |
-| Sonnet 5.5 | 98 | 52.99 | 0.54 | 0.45 |
+| Fable | 27 | 92.18 | 3.41 | 2.88 |
+| Opus 5.5 | 3 | 2.20 | 0.73 | 0.82 |
+| Sonnet 5.5 | 83 | 42.39 | 0.51 | 0.41 |
 
 **Design-only findings for each design review, by round**, over the 41 records (a design-only or live-use catch,
 as the analysis labels it; Fable reads first in every round):
@@ -218,12 +229,12 @@ Sonnet design reviews, 7.32 fact-checks) at the means above:
 
 | who reviews | $ for each design |
 |---|---|
-| Fable then Sonnet in every round (as run) | 21.25 |
-| Fable in round 1 alone, then Sonnet | 9.90 |
-| Sonnet alone in every round | 6.32 |
+| Fable then Sonnet in every round (as run) | 20.22 |
+| Fable in round 1 alone, then Sonnet | 9.39 |
+| Sonnet alone in every round | 5.98 |
 
-The designer's own spend is about $17.76 for each design in the five, so a design costs about $39 as run, about $28
-with Fable in round 1 alone (−29%), and about $24 with Sonnet alone (−38%). These hold the rounds' number fixed; what
+The designer's own spend is about $17.76 for each design in the five, so a design costs about $38 as run, about $27
+with Fable in round 1 alone (−28%), and about $24 with Sonnet alone (−37%). These hold the rounds' number fixed; what
 a round without Fable leaves silent, and whether that makes rounds fewer or more, is not measured here.
 
 **The designer, from a fresh run.** A design session's first turn is at a median of about 67k tokens; a fresh run is
