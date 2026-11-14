@@ -235,6 +235,12 @@ or ledgerboard got in their way, files what is new to shiftlead's ledger, and li
 to another repo's (design §4.7 *Feedback*). Like `ao team --skill`, it needs no host agent; that is the
 source, and the repo's `/shiftlead-feedback` skill points at it.
 
+At shiftlead's own home it files into the ledger and reads the feedback reports other installs submitted (file
+mode); at an install whose person cannot push to shiftlead, it writes a feedback report, with the names the scrub
+knows taken out, which you read whole and submit yourself as an issue (report mode). To start a run, ask a session
+you drive at the home to run `ao feedback --skill` and follow it, or start the session in your clone of this repo,
+where its `/shiftlead-feedback` skill is.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
