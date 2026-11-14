@@ -81,6 +81,7 @@ const out = {};
   const fresh = draw(); live = { "m-998": fresh.ask, "board:r:17": fresh.board };
   p.board.isConnected = false; p.ask.isConnected = false;
   p.board.button.dataset = { ...p.ask.button.dataset };
+  p.board.dataset = { ...p.ask.dataset };  // and its row, so a send reading the line's text late reads the ask's
   if (observe) observe();
   ids["#mailtext"].value = "Hold: drop Dismiss";
   box.close("send"); await tick(); await tick();
@@ -176,8 +177,17 @@ def test_answer_sends_to_the_item_it_was_pressed_on_across_a_reread(tmp_path):
     assert out["askTitle"] == "Reply to designer · the ask on shiftlead#TD-1529"
     # the board line gets the reply; no mail reply is posted
     assert [p["url"] for p in out["first"]] == ["/api/person/board"]
-    sent = out["first"][0]["body"]
-    assert (sent["action"], sent["line"], sent["key"], sent["reply"]) == ("reply", 17, "board:k1", "Hold: drop Dismiss")
+    # the whole body is the press-time copy's: the board file it is written to and the line it is matched against
+    # too, though the button and its row now carry the ask's data (TD-1562)
+    assert out["first"][0]["body"] == {
+        "action": "reply",
+        "board": "docs/user_attention.md",
+        "line": 17,
+        "text": "Decide the end of TD-1437's rounds",
+        "key": "board:k1",
+        "reply": "Hold: drop Dismiss",
+        "refs": [],
+    }
     # a mail item's Answer… is the ask's reply, whatever was drawn where it was
     assert out["second"] == [{"url": "/api/person/reply", "body": {"reply_to": "m-998", "text": "go wide"}}]
 
