@@ -10,7 +10,7 @@ People: paul
 
 ## Needs the user
 
-- [ ] decide 2026-11-13 (n/a) — TD-1804's design (stranded ledger-filing PRs become grinder work orders after a day) ended its four review rounds at the cap with one fix no review has read: buy one more round, go, or hold? Context: TD-1804 decision (paul). Parts: TD-1810, TD-1811. Due: 2026-11-17. Answers: One more round (default) | Go | Hold: <note>.
+- [x] decide 2026-11-13 (n/a) — TD-1804's design (stranded ledger-filing PRs become grinder work orders after a day) ended its four review rounds at the cap with one fix no review has read: buy one more round, go, or hold? Context: TD-1804 decision (paul). Parts: TD-1810, TD-1811. Due: 2026-11-17. Answers: One more round (default) | Go | Hold: <note>. Decided: Go (by paul) (2026-11-13). Closed: 2026-11-13 — lifted.
   - **Context:** TD-1804 design (PR #3777): a ledger-only PR nobody holds a day after it opened becomes a pr:<n> work order for the grinders. Four rounds (Fable then Sonnet, record docs/reviews/TD-1804.md) ended at the cap: build-changing findings per round 7, 4, 1, 1 (fact-checks 5, 2, 1, 0 apart). Not read by any review, by build: TD-1811 - F91, a filing PR stacked on another branch: the order test no longer reads the base; the taker retargets it to main (cadence 1.3). Recurring topic, is this the wrong design? the order test kept lacking an input (held key F26, kept held F42, open reads F59/F64, default branch F91); my position: no, each was a new input and the test now names them all.
   - **Question:** Go, One more round, or Hold with a note?
   - **Recommended:** One more round — One more round: one build-changing fix is unread by any review.
