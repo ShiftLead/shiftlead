@@ -985,6 +985,43 @@ def test_an_offered_answer_word_for_word_comes_before_the_not_right_form():
 
 
 @pytest.mark.unit
+def test_a_form_is_filled_never_pressed_on_a_decide():
+    """TD-1698 (§4.4 *A form's press is the decide*): any form among an item's answers is filled through
+    ledgerboard, `<head>: <words>` on one line, its head as offered whatever case was typed; a form as written,
+    its head alone or with a placeholder is refused with *<head> needs its words*. With `form`, that form alone
+    is filled, its head put back where the words lack it, never falling through to a plain answer."""
+    from sessionorc.agent_inbox import InboxMixin as A
+
+    hold = ["Go", "Hold: <note>"]
+    assert A._board_answer("decide", "Hold: drop Dismiss", hold) == "Hold: drop Dismiss"
+    assert A._board_answer("decide", "hold : x", hold) == "Hold: x"
+    assert A._board_answer("decide", "Hold: first\nsecond  line", hold) == "Hold: first second line"
+    assert A._board_answer("decide", "Go", hold) == "Go"
+    for bad in ("Hold: <note>", "Hold:", "Hold: <b>"):
+        with pytest.raises(board.Refused, match="Hold needs its words"):
+            A._board_answer("decide", bad, hold)
+    with pytest.raises(board.Refused, match="word for word"):
+        A._board_answer("decide", "Wait: a day", hold)  # no such form: a Reply
+    # a form handed with its consequence, pressed as written, is the form unfilled (review of #3894)
+    with pytest.raises(board.Refused, match="Hold needs its words"):
+        A._board_answer("decide", "Hold: <note> — pauses it", ["Go", "Hold: <note> — pauses it"])
+    assert A._board_answer("decide", "Hold: soon", ["Go", "Hold: <note> — pauses it"]) == "Hold: soon"
+    # with `form`: the head goes back, and only that form fills
+    assert A._board_answer("decide", "Holding it", hold, 1) == "Hold: Holding it"
+    assert A._board_answer("decide", "Go", hold, 1) == "Hold: Go"
+    two = ["Works", "Not right: <what>", "Hold: <note>"]
+    assert A._board_answer("decide", "Not right: x", two, 2) == "Hold: Not right: x"
+    assert A._board_answer("decide", "not right: x", two) == "Not right: x"
+    for words in ("", "<note>", "Hold:"):
+        with pytest.raises(board.Refused, match="Hold needs its words"):
+            A._board_answer("decide", words, hold, 1)
+    with pytest.raises(board.Refused, match="complete answer"):
+        A._board_answer("decide", "x", hold, 0)
+    with pytest.raises(board.Refused, match="index of one of"):
+        A._board_answer("decide", "x", hold, 5)
+
+
+@pytest.mark.unit
 def test_a_board_lines_head_is_ledgerboards_bold_head():
     """TD-585: the work order's title and the Inbox's head read ledgerboard's `bold_head` — a blank
     bold run is no head, and bold inside a reply's words is the person's, never the head; each
@@ -1356,6 +1393,39 @@ async def test_a_ledger_answer_is_the_persons_and_written_from_the_homes_reading
         got = await me.call("ledger_decide", repo=root, id="TD-134", words="Drop it — the cost is not worth it")
         assert "Decided: Drop it — the cost is not worth it (" in origin_board(repo).splitlines()[got["line"] - 1]
         await me.call("kill", id=w)
+
+
+async def test_a_ledger_entrys_form_is_filled_never_pressed(agent, repo, tmp_path, monkeypatch):
+    """TD-1698 (§4.4 *A form's press is the decide*): on a ledger entry, an answer index naming a form is
+    refused, and so are words that are the form unfilled; `form` with words puts its head back. A form marked
+    the default is no default (`ledger.answers_of`), so Go with it meets *marks no answer*."""
+    import shutil
+
+    from sessionorc import ledger as ledger_mod
+
+    labels, _cons, default = ledger_mod.answers_of("Go | Hold: <note> (default)")
+    assert labels == ["Go", "Hold: <note>"] and default is None
+    assert ledger_mod.answers_of("Go (default) | Hold: <note>")[2] == 0
+    shutil.copytree(Path(__file__).resolve().parent.parent / "scripts", repo / "scripts", dirs_exist_ok=True)
+    root = str(repo)
+
+    async def held() -> None:
+        return None
+
+    monkeypatch.setattr(agent, "_refresh_repos", held)
+    keep_ledger(agent, monkeypatch)
+    await park_ticks(agent)
+    entry = {"id": "TD-133", "title": LEDGER_TITLE, "for_page": "for-you", "answers": ["Go", "Hold: <note>"]}
+    agent._repos = {root: {"name": "repo", "root": root, "ledger": {"entries": [entry]}, "work_orders": {"orders": []}}}
+    async with LocalClient() as me:
+        for kw in ({"answer": 1}, {"words": "Hold: <note>"}, {"words": "hold:"}, {"form": 1, "words": ""}):
+            with pytest.raises(AgentError, match="Hold needs its words"):
+                await me.call("ledger_decide", repo=root, id="TD-133", **kw)
+        with pytest.raises(AgentError, match="marks no answer"):
+            await me.call("ledger_decide", repo=root, id="TD-133", go=True)
+        got = await me.call("ledger_decide", repo=root, id="TD-133", form=1, words="Holding it")
+        assert got["decided"] == "Hold: Holding it"
+        assert "Decided: Hold: Holding it (by t)" in origin_board(repo).splitlines()[got["line"] - 1]
 
 
 async def test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write_the_line(

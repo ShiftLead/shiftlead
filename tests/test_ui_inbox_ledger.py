@@ -248,6 +248,7 @@ def test_the_route_hands_an_answer_go_with_it_or_words_to_ledger_decide(tmp_path
         ({"repo": "/r", "id": "TD-1", "answer": 1}, {"answer": 1}),
         ({"repo": "/r", "id": "TD-1", "go": True}, {"go": True}),
         ({"repo": "/r", "id": "TD-1", "words": " drop it "}, {"words": "drop it"}),
+        ({"repo": "/r", "id": "TD-1", "form": 1, "words": " "}, {"form": 1, "words": ""}),  # TD-1698
     ):
         got = c.post("/api/person/ledger", json=body)
         assert got.status_code == 200 and got.json()["decided"] == "x"
