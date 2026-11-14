@@ -1,0 +1,15 @@
+● The TD-1557 replay's first run finished with exit 0. I haven't audited it yet; the next run
+  starts by running design_replay.py audit TD-1557 and checking whether --max-turns counted the
+  reviewers' turns.
+
+  The host still counts this session as over its context limit (207k against a 200k limit), and
+  the restart I declared stands. Both claims are still mine: TD-1775 with PR #3747 (pushed, next
+  step is merging the labels) and TD-1774 (audit the replay, then TD-1569 and TD-1470). The inbox
+  is empty and nothing is left uncommitted or unpushed.
+
+✻ Brewed for 15s · done 4:40 PM
+
+─────────────────────────────────────────────────────────────────────────────────── grinder-ao-1 ─
+❯
+──────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · PR #3747

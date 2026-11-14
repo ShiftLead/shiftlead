@@ -9,6 +9,8 @@ read from it at capture.
 - `panes`: the screen-rule fixtures under `tests/fixtures/screens/` (TD-015, TD-032, TD-064, TD-296),
   each recorded from a live pane, and `panes/grinder-working.txt`, `ao tail ao-shiftlead-grinder-ao-2
   -n 30` of grinder-ao-2's own pane mid-turn, with `ao`'s own trailer lines (`[shiftlead] …`) removed and an email address in a command line shown as `<redacted>`.
+  `panes/idle-composer.txt` (TD-1807) is `ao tail ao-shiftlead-grinder-ao-1 -n 15` of grinder-ao-1 resting at
+  its composer after a turn: no spinner line, an empty composer between its two rules, the upper one labelled.
   `ao tail` prints the screen without its colours, so no fixture here tells a painted composer from a
   faint suggestion; the unit tests in `tests/test_claude_adapter.py` hold that.
 - `transcripts/grinder-doorbell.jsonl`: one doorbell turn of grinder-ao-2's own transcript

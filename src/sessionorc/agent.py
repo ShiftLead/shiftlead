@@ -750,6 +750,9 @@ class HostAgent(
         # records whose emptied stack restored a screen rule's `needs-you`: the next tick asks the rules once,
         # whatever the hook's freshness (§4.2, TD-950)
         self._recheck: set[str] = set()
+        # the raw composer rows the tick read this pass for a tick-set `working` or `stalled?`, which `_stall_check`
+        # reads for the way back to `idle` (§4.2 *A tick's `working` at a waiting composer*, TD-1807)
+        self._composer_tails: dict[str, list[str]] = {}
         self._git_checked: dict[str, datetime] = {}
         # the status each record's recent files were last read at (§4.2, TD-538): `(oid, dirty, porcelain)`
         self._files_read: dict[str, tuple[Any, ...]] = {}

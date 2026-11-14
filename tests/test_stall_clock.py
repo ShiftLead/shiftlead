@@ -195,3 +195,95 @@ async def test_a_restart_keeps_the_screen_clock_the_open_call_and_the_count(agen
     s2.tool_open_at = old
     _hook(agent, s2, event="PreToolUse:Bash", call="start", tool_use_id="n", call_sig="q")
     assert s2.tool_open_at == old
+
+
+# -- a tick's `working` at a waiting composer (design §4.2, TD-1807) -----------------------------------------
+
+IDLE = (FIX / "claude-code" / "panes" / "idle-composer.txt").read_text(encoding="utf-8").splitlines()[-15:]
+
+
+def _tick_set(agent, tmp_path, state: str, sid: str = "ao-x-q") -> Session:
+    """A record the tick itself left `working` or `stalled?`, its last work-naming hook hours before."""
+    s = _rec(agent, tmp_path, "claude-code", sid=sid)
+    s.work_at = (datetime.now(UTC) - timedelta(hours=6)).isoformat().replace("+00:00", "Z")
+    s.set_state(state, confidence="tick")
+    return s
+
+
+def _composer(agent, s: Session, raw: list[str] | None) -> None:
+    if raw is None:
+        agent._composer_tails.pop(s.id, None)
+    else:
+        agent._composer_tails[s.id] = raw
+
+
+@pytest.mark.parametrize("state", ["working", "stalled?"])
+async def test_a_tick_set_state_at_an_empty_composer_with_no_spinner_reads_idle(agent, tmp_path, state):
+    s = _tick_set(agent, tmp_path, state)
+    _composer(agent, s, IDLE)
+    s = _tick(agent, s, IDLE, datetime.now(UTC))
+    assert (s.state, s.confidence, s.stalled_ticks) == ("idle", "tick", 0)
+
+
+async def test_a_spinner_on_screen_keeps_a_tick_set_state(agent, tmp_path):
+    s = _tick_set(agent, tmp_path, "stalled?")
+    _composer(agent, s, CC)  # the working pane's composer is empty too: the spinner line is what says busy
+    assert _tick(agent, s, CC, datetime.now(UTC)).state == "stalled?"
+    s = _tick_set(agent, tmp_path, "working", sid="ao-x-r")
+    interrupt = [*IDLE[:-6], "  Running the suite… esc to interrupt", *IDLE[-5:]]
+    _composer(agent, s, interrupt)
+    assert _tick(agent, s, interrupt, datetime.now(UTC)).state == "working"
+    s = _tick_set(agent, tmp_path, "stalled?", sid="ao-x-s2")
+    _composer(agent, s, CC)  # the spinner is in the composer's raw rows though the tail read misses it
+    assert _tick(agent, s, IDLE, datetime.now(UTC)).state == "stalled?"
+
+
+async def test_words_in_the_composer_or_no_composer_keep_a_tick_set_state(agent, tmp_path):
+    s = _tick_set(agent, tmp_path, "working")
+    typed = [r.replace("❯", "❯ half a sentence") if r.strip() == "❯" else r for r in IDLE]
+    _composer(agent, s, typed)
+    assert _tick(agent, s, typed, datetime.now(UTC)).state == "working"
+    s = _tick_set(agent, tmp_path, "working", sid="ao-x-r")
+    _composer(agent, s, None)  # the tick read no composer rows for it
+    assert _tick(agent, s, IDLE, datetime.now(UTC)).state == "working"
+
+
+async def test_a_hook_state_an_open_call_a_subagent_or_work_since_keep_it(agent, tmp_path):
+    now = datetime.now(UTC)
+    s = _rec(agent, tmp_path, "claude-code")  # the hook's own `working`: its next hook says when it ends
+    _composer(agent, s, IDLE)
+    assert _tick(agent, s, IDLE, now).state == "working"
+    s = _tick_set(agent, tmp_path, "stalled?", sid="ao-x-r")
+    _composer(agent, s, IDLE)
+    s.tool_open_at = (now - timedelta(minutes=30)).isoformat().replace("+00:00", "Z")
+    assert _tick(agent, s, IDLE, now).state == "stalled?"
+    s.tool_open_at = None
+    s.subagents, s.subagent_at = 1, (now - timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
+    assert _tick(agent, s, IDLE, now).state == "stalled?"
+    s = _tick_set(agent, tmp_path, "working", sid="ao-x-t")
+    s.work_at = (now + timedelta(seconds=1)).isoformat().replace("+00:00", "Z")  # a work-naming hook since
+    _composer(agent, s, IDLE)
+    assert _tick(agent, s, IDLE, now).state == "working"
+
+
+async def test_a_resize_of_the_composer_rules_moves_no_clock(agent, tmp_path):
+    t0 = datetime.now(UTC)
+    s = _rec(agent, tmp_path, "claude-code")
+    _tick(agent, s, CC, t0)
+    wider = [r.replace("─" * 8, "─" * 12) for r in CC]
+    assert wider != CC
+    assert _tick(agent, s, wider, t0 + timedelta(minutes=21)).state == "stalled?"
+
+
+def test_the_tick_reads_composer_rows_only_for_a_tick_set_working_or_stalled(agent, tmp_path):
+    cand = agent._composer_candidate
+    s = _rec(agent, tmp_path, "claude-code")
+    assert not cand(s)  # the hook's own `working`
+    s.set_state("stalled?", confidence="tick")
+    assert cand(s)
+    s.set_state("idle", confidence="tick")
+    assert not cand(s)
+    g = _rec(agent, tmp_path, "gemini", sid="ao-x-g")
+    g.set_state("stalled?", confidence="tick")
+    assert not cand(g)  # an adapter naming no busy rows keeps its stall
+    assert not cand(None)
