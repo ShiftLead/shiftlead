@@ -10,6 +10,10 @@ People: paul
 
 ## Needs the user
 
+- [ ] decide 2026-11-13 (n/a) — Does the feedback report issue form open on GitHub with its title, warnings and one Report field, from the address the procedure gives? Context: TD-1796 decision (paul). Due: 2026-11-16. Answers: Works | Not right: <what>. Lifts: Works | Not right: <what>.
+  - **Context:** Built in #3775. Open https://github.com/ShiftLead/shiftlead/issues/new?template=feedback-report.yml&title=feedback%20report%3A%20abcdef0%20%C2%B7%203%20findings while signed in and submit nothing; GitHub lists no issue forms by API and redirects a signed-out read to login.
+  - **Question:** Does the form open with the title feedback report: abcdef0 · 3 findings, its warnings and one required Report field?
+  - **Recommended:** Works.
 - [ ] decide 2026-11-13 (n/a) — Go on TD-1801's design of answering on the Queue again (PR #3771)? Its four rounds ended at the cap with nothing build-changing left. Context: TD-1801 decision (paul). Parts: TD-1808, TD-1809. Due: 2026-11-17. Answers: Go (default) — TD-1808 becomes pickable, then TD-1809 | One more round — one more Sonnet round on the design | Hold: <note> — a revision round on your note.
   - **Context:** TD-1801's design (design 4.5 screen 12, An item is answered where it is read and The Queue's words; PR #3771) brings every control back onto the Queue, keeps the Refresh bar, and rewrites the Queue's words in plain sentences. Four rounds ran, the cap, the last with nothing build-changing, so the stop rule and the cap ended them together. One topic recurred: keeping a Deny's typed reason across a redraw, settled in round 3 and read by round 4. Every build-changing fix has been read by a review; unread, all minor, round 4's six wording fixes in TD-1809 and the design. One change from the mockups: an open answer box holds its own card, not the whole Queue. The synopsis (docs/synopses/TD-1801.md) says the rest.
   - **Question:** Go on TD-1801's design, so its builds TD-1808 (the controls back) and then TD-1809 (the words) can be built?
