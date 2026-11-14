@@ -7,6 +7,8 @@ applied. An event with neither mark is read as before."""
 
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from sessionorc.agent_tick import TURNS_KEPT
@@ -96,3 +98,16 @@ async def test_a_subagents_event_and_an_event_with_no_mark_are_read_as_before(ag
         await _hook(c, sid, subagent="k1", subagent_seen=True, turn="p9", turn_start=True)
         rec = await _hook(c, sid, subagent="k1", subagent_seen=True, turn="p1", turn_end=True)
         assert agent.sessions[sid].turns == ["p1", "p2", "p3"] and rec["state"] == "working"
+
+
+async def test_a_queued_start_older_than_a_live_event_adds_nothing(agent, hookstub, tmp_path):
+    """A start replayed from the offline queue after the next turn's live start: added, it would stand newest
+    and drop the live turn's own report."""
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="t", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        await _start(c, sid, "p2")
+        old = {"state": "working", "prompt": True, "turn": "p1", "turn_start": True, "at": time.time() - 60}
+        agent._apply_event(sid, old, queued=True)
+        assert agent.sessions[sid].turns == ["p2"]
+        rec = await _end(c, sid, "p2")
+        assert rec["state"] == "idle"

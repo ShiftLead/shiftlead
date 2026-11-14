@@ -6360,7 +6360,7 @@ class TickMixin:
         return explain(s.tail) is None
 
     @staticmethod
-    def _late_turn(s: Session, event: dict[str, Any]) -> bool:
+    def _late_turn(s: Session, event: dict[str, Any], *, stale: bool = False) -> bool:
         """Read an event's neutral `turn` against the record's `turns` (design §4.2 *A turn's id*, TD-1637), and
         whether the event is to be dropped. A main-thread event that names a new `adapter_id` empties the list
         first (a `/clear`'s new conversation). `turn_start` adds its `turn`, newest last, keeping the last
@@ -6368,7 +6368,9 @@ class TickMixin:
         `turn` the turn it ends where the tool names one) is dropped where its turn is in the list but not its
         newest — a cancelled turn's, landing after the next one started — or where it names none and the
         record is already `exited`; a turn not in the list (never seen to start, or older than the list) is
-        applied. An event with neither mark is read as before."""
+        applied. A `stale` start (a queued one, older than a live event) adds nothing: drained after the next
+        turn's live start, it would stand newest and drop that turn's own report. An event with neither mark
+        is read as before."""
         if event.get("subagent"):
             return False
         aid = event.get("adapter_id")
@@ -6376,7 +6378,7 @@ class TickMixin:
             s.turns = []
         turn = event.get("turn")
         if event.get("turn_start"):
-            if isinstance(turn, str) and turn:
+            if isinstance(turn, str) and turn and not stale:
                 s.turns = [t for t in s.turns if t != turn][-(TURNS_KEPT - 1) :] + [turn]
             return False
         if not event.get("turn_end"):
@@ -6428,7 +6430,7 @@ class TickMixin:
             # the dying run's.
             log.info("%s: ignored %s on a closed record", sid, event.get("event") or event.get("state") or "a hook")
             return
-        if self._late_turn(s, event):
+        if self._late_turn(s, event, stale=stale):
             log.info("%s: dropped a turn-end report of turn %s, not the newest started", sid, event.get("turn"))
             return
         if not queued:
