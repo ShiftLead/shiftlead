@@ -288,6 +288,9 @@ def test_the_captured_child_key_and_the_kill():
     starts = [p for p in subs if p["hook_event_name"] == "SubagentStart"]
     child_ids = {p["sessionId"] for p in subs if p.get("subagentType") and p["hook_event_name"] != "SubagentStart"}
     assert {p["subagentId"] for p in starts} <= child_ids  # a child's events carry its subagentId as sessionId
+    assert all(p["sessionId"].startswith("2222") for p in starts)  # a start is on the parent's sessionId
+    stop_events = [p for p in subs if p["hook_event_name"] == "SubagentStop"]
+    assert stop_events and all(p["sessionId"] == p["subagentId"] for p in stop_events)  # a stop on the child's
     kill = next(
         p for p in subs if p["hook_event_name"] == "PostToolUse" and p["toolName"] == "kill_command_or_subagent"
     )
@@ -311,7 +314,7 @@ def test_the_question_tool_is_a_question_and_its_notification_is_dropped():
     out = translate(ask)
     assert out["state"] == "needs-you" and out["pending"] == {"kind": "question", "text": "Red or blue?"}
     note = next(p for p in subs if p.get("notificationType") == "elicitation_dialog")
-    assert translate(note) is None
+    assert translate(note) is None and subs.index(note) > subs.index(ask)  # after the PreToolUse
     after = next(p for p in subs if p["hook_event_name"] == "PostToolUse" and p["toolName"] == "ask_user_question")
     assert translate(after)["pending"] is None and translate(after)["state"] == "working"
 
