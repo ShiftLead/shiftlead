@@ -149,8 +149,12 @@ def write_layer() -> Path:
     if not same:  # whole or not at all: an overlapping launch reads the copy while it is written
         # a name of this write's own: a launch and the tick's `setup_note` thread are one pid (TD-1827)
         tmp = p.with_name(f".{p.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
-        tmp.write_text(text, encoding="utf-8")
-        os.replace(tmp, p)
+        try:
+            tmp.write_text(text, encoding="utf-8")
+            os.replace(tmp, p)
+        except BaseException:  # a name of its own is never written over again: leave none behind
+            tmp.unlink(missing_ok=True)
+            raise
     for old in p.parent.glob("*.json"):
         if old != p:
             old.unlink(missing_ok=True)
