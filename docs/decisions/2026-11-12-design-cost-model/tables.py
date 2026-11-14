@@ -126,9 +126,10 @@ def phase_of(calls: str, mode: str) -> str:
 
 
 def reviewer_rows(rs: list[dict], branches: set[str]) -> list[dict]:
-    """One reviewer's rows that are the design's, as the trial's baseline counts them (`capture.py`
-    `one_design_each`, TD-1775): a row on one of the design's branches is; a row on a launch branch is where the
-    design's branches hold the most of the reviewer's other rows, or it has none; a row on another branch is not."""
+    """One reviewer's rows that are the design's, by the branch each ran on, after the trial's baseline (`capture.py`
+    `one_design_each`, TD-1775), which votes among the designs that claim a turn; this model selects five, so: a
+    row on one of the design's branches is; a row on a launch branch is where the design's branches hold the most
+    of the reviewer's other rows, or it has none; a row on another branch is not."""
     votes: dict[str, int] = defaultdict(int)
     for x in rs:
         if x["branch"] not in LAUNCH:

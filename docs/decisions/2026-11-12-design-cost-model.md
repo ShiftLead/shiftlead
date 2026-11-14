@@ -74,7 +74,8 @@ counted apart from the designer's.
 designer session works several designs' branches in turn, so TD-1543's window took in 376 turns of the reviewers
 of TD-1550 and TD-1590, designs this model did not select: $37.09, counted as TD-1543's. They were found by the
 design trial's baseline capture (TD-1775), which keeps each turn under one design by the branch it ran on, and
-`tables.py select` now keeps a reviewer's turns the same way. Only the reviewers' figures moved: the reviewers'
+`tables.py select` now keeps a reviewer's turns by their branch too (a turn on another design's branch is never
+this design's, where the baseline, which selects every design, gives it to that design). Only the reviewers' figures moved: the reviewers'
 total ($173.85 to $136.76, so they cost half again what the designer does, not twice), the reviews by model,
 and what is derived from them below. The designer's own turns, and so the 51% applying share, are unchanged.
 
