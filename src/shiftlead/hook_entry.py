@@ -67,6 +67,8 @@ def main() -> int:
     try:
         if adapter() == "gemini":
             from shiftlead.adapters.gemini import hook
+        elif adapter() == "grok":
+            from shiftlead.adapters.grok import hook
         else:
             from shiftlead.adapters.claude_code import hook
     except Exception as e:  # noqa: BLE001 — whatever a half-replaced install raises

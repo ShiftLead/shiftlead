@@ -20,12 +20,31 @@ captured from the installed 1.0.77 (`tests/conformance/fixtures/grok/captured/ho
 
 A subagent's payload (one carrying `subagentType`) is dropped here, `SubagentStart` and `SubagentStop` with it:
 what a child's events carry is captured before the slice that forwards them (§4.3 *A subagent's events*).
-The guards, `main` and the dispatch from `shiftlead-hook --adapter grok` are later slices; nothing calls this yet.
+
+`main` is what `shiftlead-hook --adapter grok` runs (`hook_entry`): with no `SHIFTLEAD_SESSION` it exits 0 at
+once; otherwise it reports the translated event to the host agent, queued when it is down, and decides
+nothing — writing no decision and exiting 0 — but for the two guards on a `PreToolUse` (§4.3 *The kill guard
+and the wait guard*), which answer in the tool's own block form, `{"decision": "deny", "reason": …}` on
+stdout. **The kill guard** reads `toolInput.command` of `run_terminal_command` and of `monitor`, on every
+thread, and decides alone, with no call to the host agent: a main-thread event still reports `working`, a
+child's reports nothing. **The wait guard** is asked on the main thread only, for a `run_terminal_command`
+whose command `wait_guard.waits` reads as a CI watch run in the foreground: the event goes with `wait: true`,
+and the hook denies with `wait_guard.GROK_REASON` only on the reply's `refuse_wait`.
 """
 
 from __future__ import annotations
 
+import contextlib
+import json
+import os
+import sys
+import time
 from typing import Any
+
+from sessionorc.store import EventQueue
+from shiftlead import wait_guard
+from shiftlead.adapters.claude_code.hook import Refused, call_agent, capture
+from shiftlead.kill_guard import refuse
 
 # `SessionStart` sources that land at the composer: 1.0.77 writes `new` for a launch and for `/clear`, and its
 # guide `load` for a resume; `startup`, `resume` and `clear` are Claude Code's names, kept should a version
@@ -39,6 +58,9 @@ CALL_EDGE = {"PreToolUse": "start", "PostToolUse": "end", "PostToolUseFailure": 
 TURN_ENDS = {"StopFailure", "StopCancelled"}
 END_TURN = "end_turn"  # the one `Stop` reason that ends a turn; the session end's is `shutdown`
 TEXT_CAP = 200
+SHELL_TOOL = "run_terminal_command"  # the tool's shell tool, both guards' (§4.3 *The kill guard and the wait guard*)
+# tools whose `toolInput.command` runs a shell command unasked under `--always-approve`: the kill guard's
+COMMAND_TOOLS = {SHELL_TOOL, "monitor"}
 
 
 def _get(payload: dict[str, Any], camel: str, snake: str) -> Any:
@@ -115,3 +137,96 @@ def _ask(payload: dict[str, Any], tool: str) -> str:
         if isinstance(qs, list) and qs and isinstance(qs[0], dict) and isinstance(qs[0].get("question"), str):
             return qs[0]["question"].strip()[:TEXT_CAP]
     return {"enter_plan_mode": "enter plan mode?", "exit_plan_mode": "approve the plan?"}.get(tool, "a question")
+
+
+def _main_thread(payload: dict[str, Any]) -> bool:
+    """A payload of the session's own agent: a child's carries `subagentType` (§4.3 *A subagent's events*)."""
+    return not (payload.get("subagentType") or payload.get("subagent_type"))
+
+
+def _command(payload: dict[str, Any], tools: set[str] | frozenset[str]) -> tuple[str | None, dict[str, Any]]:
+    """A `PreToolUse` of one of `tools`: its `toolInput.command` (None where it is no string) and its input."""
+    if payload.get("hook_event_name") != "PreToolUse" or _get(payload, "toolName", "tool_name") not in tools:
+        return None, {}
+    ti = _get(payload, "toolInput", "tool_input")
+    ti = ti if isinstance(ti, dict) else {}
+    command = ti.get("command")
+    return (command if isinstance(command, str) else None), ti
+
+
+def refused_command(payload: dict[str, Any]) -> str | None:
+    """The kill guard's reason for a `PreToolUse` of `run_terminal_command` or `monitor`, on any thread (§4.3)."""
+    command, _ = _command(payload, COMMAND_TOOLS)
+    return refuse(command) if command is not None else None
+
+
+def in_the_background(ti: dict[str, Any]) -> bool:
+    """The call's background form: `block_until_ms` the number 0 (the 1.0.77 guide's *Background Tasks*), or
+    `background` the JSON `true` (the form the tool's other shell schema takes). Anything else — missing, a
+    string, a positive wait — is the foreground."""
+    wait = ti.get("block_until_ms")
+    return ti.get("background") is True or (isinstance(wait, int | float) and not isinstance(wait, bool) and wait == 0)
+
+
+def waits_in_the_foreground(payload: dict[str, Any]) -> bool:
+    """A main-thread `PreToolUse` of `run_terminal_command`, run in the foreground, that is a CI watch (§4.3)."""
+    command, ti = _command(payload, {SHELL_TOOL})
+    if command is None or not _main_thread(payload) or in_the_background(ti):
+        return False
+    return wait_guard.waits(command)
+
+
+def deny(reason: str) -> str:
+    """The tool's own block form for a `PreToolUse` (the guide's *Output (Blocking Hooks)*)."""
+    return json.dumps({"decision": "deny", "reason": reason})
+
+
+def report(params: dict[str, Any], session: str) -> Any:
+    """Tell the host agent, queued when it is down; its reply, None when it gave none (§4.3, as Claude Code's)."""
+    try:
+        return call_agent(params, timeout=float(os.environ.get("SHIFTLEAD_EVENT_WAIT", "3")))
+    except Refused as e:
+        print(f"shiftlead-hook: {session}: the host agent refused the event: {e}", file=sys.stderr)
+    except Exception:  # noqa: BLE001
+        # the queued copy carries no `wait`: a drained event is applied unanswered (§4.3)
+        queued = {k: v for k, v in params.items() if k not in ("session", "wait")}
+        with contextlib.suppress(OSError):
+            EventQueue().append(session, {**queued, "at": time.time()})
+    return None
+
+
+def main() -> int:
+    session = os.environ.get("SHIFTLEAD_SESSION")
+    if not session:
+        return 0  # a hand-started `grok` on the same home reports nothing (§4.3 *The hooks*)
+    try:
+        raw = sys.stdin.read()
+        payload = json.loads(raw or "{}")
+    except ValueError:  # not JSON, or not UTF-8
+        return 0
+    capture("hooks", raw)
+    if not isinstance(payload, dict):
+        return 0
+    ask_wait = False
+    if reason := refused_command(payload):
+        # the hook's own decision, before the host agent is asked anything: one it cannot reach still
+        # refuses; a main-thread event below still reports `working`, a child's nothing
+        print(deny(reason))
+        sys.stdout.flush()
+    else:
+        ask_wait = waits_in_the_foreground(payload)
+    params = translate(payload)
+    if params is None:
+        return 0
+    params["session"] = session
+    if ask_wait:
+        params["wait"] = True  # the record's mode is the host agent's to say (§4.3 *A wait the guard refuses*)
+    reply = report(params, session)
+    if ask_wait and isinstance(reply, dict) and reply.get("refuse_wait"):
+        print(deny(wait_guard.GROK_REASON))
+        sys.stdout.flush()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
