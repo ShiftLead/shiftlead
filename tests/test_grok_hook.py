@@ -309,6 +309,9 @@ def test_a_childs_stop_cancelled_is_forwarded_only_for_a_permission_and_carries_
     for reason in ("permission_rejected", "permission_cancelled"):
         assert translate({**child, "reason": reason}) == {"subagent": "c-1", "subagent_seen": True}
     assert translate({**child, "reason": "user_interrupt"}) is None
+    assert translate({"hook_event_name": "SubagentStart", "subagentType": "x", "sessionId": "p-1"}) == {
+        "subagent_delta": 1
+    }
     assert translate({**child, "reason": "permission_rejected", "subagentType": None, "subagent_type": "x"}) == {
         "subagent": "c-1",
         "subagent_seen": True,
