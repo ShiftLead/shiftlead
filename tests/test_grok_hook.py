@@ -85,6 +85,12 @@ def test_a_question_tool_is_a_question(tool, tool_input, text):
         ({"hook_event_name": "StopFailure", "promptId": "t1"}, {"state": "idle", "turn_end": True, "turn": "t1"}),
         ({"hook_event_name": "StopCancelled", "reason": "permission_rejected"}, {"state": "idle", "turn_end": True}),
         ({"hook_event_name": "Notification", "notificationType": "idle_prompt"}, {"state": "idle", "turn_end": True}),
+        (
+            {"hook_event_name": "Notification", "notificationType": "idle_prompt", "promptId": "t2"},
+            {"state": "idle", "turn_end": True, "turn": "t2"},
+        ),
+        ({"hook_event_name": "PostToolUseFailure", "toolName": "x"}, {"state": "working", "call": "end"}),
+        ({"hook_event_name": "Stop"}, None),
         ({"hook_event_name": "PermissionDenied", "toolName": "x"}, {"state": "working", "pending": None}),
         ({"hook_event_name": "SessionStart", "source": "load"}, {"state": "idle", "subagents_reset": True}),
         ({"hook_event_name": "SessionEnd", "reason": "clear"}, None),

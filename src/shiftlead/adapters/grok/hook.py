@@ -82,7 +82,7 @@ def translate(payload: dict[str, Any]) -> dict[str, Any] | None:
             text = str(payload.get("message") or "a tool asks for permission")[:TEXT_CAP]
             return {**out, "state": "needs-you", "pending": {"kind": "permission", "text": text}}
         if kind == "idle_prompt":
-            return {**out, "state": "idle", "pending": None, **_turn(None, start=False)}
+            return {**out, "state": "idle", "pending": None, **_turn(turn, start=False)}
         return None
     if ev == "Stop" and payload.get("reason") != END_TURN:
         return None  # the observe-only stop at the session's end, whatever its `promptId`
