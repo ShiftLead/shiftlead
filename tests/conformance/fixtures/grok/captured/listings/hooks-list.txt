@@ -1,0 +1,60 @@
+
+  ~/.c/aogrkp/work                                                                                                                                                           1.8K / 256K │ [Dashboard]
+
+
+     ❯ /hooks-list                                                                                                                                                                          10:16 PM
+
+
+     Loaded hooks (14):                                                                                                                                                                     10:16 PM
+       global/shiftlead:session_start[0].hooks[0]  command: /home/kmaster/shiftlead/.claude/worktrees/grinder-ao-2/.venv/bin/shiftlead-hook --adapter grok  timeout: 10s
+       global/shiftlead:user_prompt_submit[0].hooks[0]  command: /home/kmaster/shiftlead/.claude/worktrees/grinder-ao-2/.venv/bin/shiftlead-hook --adapter grok  timeout: 10s
+       global/shiftlead:pre_tool_use[0].hooks[0]  command: /home/kmaster/shiftlead/.claude/worktrees/grinder-ao-2/.venv/bin/shiftlead-hook --adapter grok  timeout: 10s
+       global/shiftlead:post_tool_use[0].hooks[0]  command: /home/kmaster/shiftlead/.claude/worktrees/grinder-ao-2/.venv/bin/shiftlead-hook --adapter grok  timeout: 10s
+       global/shiftlead:post_tool_use_failure[0].hooks[0]  command: /home/kmaster/shiftlead/.claude/worktrees/grinder-ao-2/.venv/bin/shiftlead-hook --adapter grok  timeout: 10s
+       global/shiftlead:permission_denied[0].hooks[0]  command: /home/kmaster/shiftlead/.claude/worktrees/grinder-ao-2/.venv/bin/shiftlead-hook --adapter grok  timeout: 10s
+       global/other:stop[0].hooks[0]  command: /bin/echo other  timeout: 600s
+       global/shiftlead:stop[0].hooks[0]  command: /home/kmaster/shiftlead/.claude/worktrees/grinder-ao-2/.venv/bin/shiftlead-hook --adapter grok  timeout: 10s
+       global/shiftlead:stop_failure[0].hooks[0]  command: /home/kmaster/shiftlead/.claude/worktrees/grinder-ao-2/.venv/bin/shiftlead-hook --adapter grok  timeout: 10s
+       global/shiftlead:stop_cancelled[0].hooks[0]  command: /home/kmaster/shiftlead/.claude/worktrees/grinder-ao-2/.venv/bin/shiftlead-hook --adapter grok  timeout: 10s
+       global/shiftlead:notification[0].hooks[0]  command: /home/kmaster/shiftlead/.claude/worktrees/grinder-ao-2/.venv/bin/shiftlead-hook --adapter grok  timeout: 10s
+       global/shiftlead:subagent_start[0].hooks[0]  command: /home/kmaster/shiftlead/.claude/worktrees/grinder-ao-2/.venv/bin/shiftlead-hook --adapter grok  timeout: 10s
+       global/shiftlead:subagent_stop[0].hooks[0]  command: /home/kmaster/shiftlead/.claude/worktrees/grinder-ao-2/.venv/bin/shiftlead-hook --adapter grok  timeout: 10s
+       global/shiftlead:session_end[0].hooks[0]  command: /home/kmaster/shiftlead/.claude/worktrees/grinder-ao-2/.venv/bin/shiftlead-hook --adapter grok  timeout: 10s
+
+     Worked for 0.0s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  Help improve Grok                                                                                                                                                                 [Opt out] [Opt in]
+  Off by default. Opt-in to allow SpaceXAI to retain coding data, e.g., prompts, traces, & metrics, for training and debugging purposes. Change anytime via settings.
+  Read Terms and Privacy Policy.
+
+  ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  │ ❯                                                                                                                                                                                                │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── Grok 4.7 (high) ─╯
+
+  Shift+Tab:mode  │  Ctrl+x:shortcuts
+

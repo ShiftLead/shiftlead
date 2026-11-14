@@ -473,3 +473,114 @@ def test_capture_saves_each_steps_pane_and_title(tmp_path, monkeypatch):
     out = cw.save_capture(capture, dest, "ao-walk")
     assert dest / "panes" / "4-a-permission.txt" in out
     assert (dest / "panes" / "4-a-permission.txt").read_text(encoding="utf-8") == got.read_text(encoding="utf-8")
+
+
+GROK_LISTINGS = ROOT / "tests" / "conformance" / "fixtures" / "grok" / "captured" / "listings"
+
+
+def _listing(name: str) -> list[str]:
+    return (GROK_LISTINGS / name).read_text(encoding="utf-8").splitlines()
+
+
+def test_grok_hooks_reads_the_hooks_list_block_with_each_handlers_origin():
+    cw = _load()
+    count, rows = cw.grok_hooks(_listing("hooks-list.txt"))
+    assert count == 14 and len(rows) == 14
+    assert [r for r in rows if r[0] != "global/shiftlead"] == [("global/other", "/bin/echo other")]
+    assert all(c.endswith("shiftlead-hook --adapter grok") for o, c in rows if o == "global/shiftlead")
+    assert cw.grok_hooks(_listing("mcps.txt")[50:]) is None  # no block in the pane: None, never an empty list
+
+
+def test_grok_mcps_reads_the_modals_servers_and_their_state():
+    cw = _load()
+    assert cw.grok_mcps(_listing("mcps.txt")) == [("Hosted connectors from grok.com", "Automations", "ready")]
+    assert cw.grok_mcps(_listing("mcps-disabled.txt")) == [
+        ("Hosted connectors from grok.com", "Automations", "disabled")
+    ]
+    assert cw.grok_mcps(_listing("hooks-list.txt")) == []
+
+
+class GrokFake(FakeAgent):
+    """A Grok walk's host agent: the person's keys type a slash command, and the pane shows its listing."""
+
+    def __init__(self, work: Path, hooks: list[str], *mcps: list[str]):
+        super().__init__(work, channel=False)
+        self.hooks, self.mcps, self.typed, self.keyed = hooks, list(mcps), "", []
+
+    def __call__(self, method: str, **p):
+        if method == "keys" and p["keys"] != ["Enter"] or method == "keys" and self.rec.get("state") != "needs-you":
+            self.calls.append(method)
+            self.keyed.append(p["keys"][0])
+            if p["keys"] != ["Enter"]:
+                self.typed = p["keys"][0]
+            return None
+        if method == "tail":
+            self.calls.append(method)
+            if self.typed == "/mcps":  # each read the next drawing, the last one staying
+                return self.mcps.pop(0) if len(self.mcps) > 1 else self.mcps[0]
+            return self.hooks if self.typed == "/hooks-list" else []
+        return super().__call__(method, **p)
+
+
+def test_a_grok_walks_first_hook_fails_on_a_hook_and_a_server_not_shiftleads(tmp_path, monkeypatch):
+    cw = _load()
+    monkeypatch.setattr(cw.time, "sleep", lambda _s: None)
+    fake, said, sized = GrokFake(tmp_path, _listing("hooks-list.txt"), _listing("mcps.txt")), [], []
+    walk = cw.Walk("grok", "grok-conformance", tmp_path, fake, out=said.append, resize=lambda *a: sized.append(a))
+    assert not walk.run()
+    name, ok, why = walk.results[-1]
+    assert name == "first hook" and not ok
+    assert "hook global/other: /bin/echo other" in why
+    assert "MCP server Automations [ready] (Hosted connectors from grok.com)" in why
+    assert "hooks by /hooks-list (14), MCP servers by /mcps (1)" in why
+    assert sized == [(walk.id, cw.LISTING_COLS, cw.LISTING_ROWS)]  # widened before the listing is read
+    assert fake.keyed == ["/hooks-list", "Enter", "/mcps", "Enter", "Escape"]  # the modal closed
+
+
+def test_a_grok_walks_first_hook_passes_on_shiftleads_alone_and_a_disabled_server(tmp_path, monkeypatch):
+    cw = _load()
+    monkeypatch.setattr(cw.time, "sleep", lambda _s: None)
+    hooks = [line for line in _listing("hooks-list.txt") if "global/other" not in line]
+    hooks = [line.replace("Loaded hooks (14)", "Loaded hooks (13)") for line in hooks]
+    fake = GrokFake(tmp_path, hooks, _listing("mcps-disabled.txt"))
+    walk = cw.Walk("grok", "grok-conformance", tmp_path, fake, out=lambda _s: None)
+    assert walk.step("launch", walk.launch) and walk.step("first hook", walk.first_hook)
+    assert "nothing but ShiftLead's (hooks by /hooks-list (13), MCP servers by /mcps (1))" in walk.results[-1][2]
+
+
+def test_a_hooks_list_the_pane_cuts_short_fails_the_first_hook(tmp_path, monkeypatch):
+    cw = _load()
+    monkeypatch.setattr(cw, "LISTING_WAIT", 0.0)
+    cut = _listing("hooks-list.txt")
+    cut = cut[: next(i for i, line in enumerate(cut) if "global/other" in line)]
+    walk = cw.Walk("grok", "g", tmp_path, GrokFake(tmp_path, cut, []), out=lambda _s: None)
+    assert walk.step("launch", walk.launch) and not walk.step("first hook", walk.first_hook)
+    assert "says 14 hooks loaded and the pane shows" in walk.results[-1][2]
+
+
+def test_claude_code_and_gemini_have_no_listing():
+    assert set(_load().FOREIGN) == {"grok"}
+
+
+def test_the_mcps_modal_is_read_once_its_rows_are_drawn_not_at_its_empty_frame(tmp_path, monkeypatch):
+    cw = _load()
+    monkeypatch.setattr(cw.time, "sleep", lambda _s: None)
+    hooks = [line for line in _listing("hooks-list.txt") if "global/other" not in line]
+    hooks = [line.replace("Loaded hooks (14)", "Loaded hooks (13)") for line in hooks]
+    full = _listing("mcps.txt")
+    frame = [line for line in full if "Automations" not in line and "◆" not in line]  # the box before its rows
+    walk = cw.Walk("grok", "g", tmp_path, GrokFake(tmp_path, hooks, frame, full), out=lambda _s: None)
+    assert walk.step("launch", walk.launch) and not walk.step("first hook", walk.first_hook)
+    assert "MCP server Automations [ready]" in walk.results[-1][2]
+
+
+def test_an_mcps_modal_that_never_holds_still_fails_the_first_hook(tmp_path, monkeypatch):
+    cw = _load()
+    monkeypatch.setattr(cw, "LISTING_WAIT", 0.0)
+    hooks = [line for line in _listing("hooks-list.txt") if "global/other" not in line]
+    hooks = [line.replace("Loaded hooks (14)", "Loaded hooks (13)") for line in hooks]
+    fake = GrokFake(tmp_path, hooks, _listing("mcps.txt"))
+    walk = cw.Walk("grok", "g", tmp_path, fake, out=lambda _s: None)
+    assert walk.step("launch", walk.launch) and not walk.step("first hook", walk.first_hook)
+    assert "/mcps drew no settled modal" in walk.results[-1][2]
+    assert fake.keyed[-1] == "Escape"  # closed even so

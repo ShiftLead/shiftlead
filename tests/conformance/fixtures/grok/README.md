@@ -40,3 +40,10 @@ through the state feed's `translate` as well.
   for the sessions of `captured/hooks.jsonl` (`11111111-…`, two shell commands, the mode cycled) and of the panes
   (`33333333-…`, an essay, a shell command, an `ask_user_question` answered *Blue*, a poem and a queued prompt),
   copied from their scratch homes' `sessions/<the cwd, encoded>/<id>/`.
+- `captured/listings/*.txt` (Grok Build 1.0.77 on kmaster, 2026-11-14, TD-1637 slice 16): `tmux capture-pane -p -J`
+  (trailing blanks trimmed) of a fresh scratch copy of `grok-conformance` on a private tmux server (200×60), launched
+  with the adapter's `LAUNCH_ENV` and its hook file, plus a second user hook file `hooks/other.json` (one `Stop`
+  handler, `/bin/echo other`): `hooks-list.txt` after `/hooks-list` (*Loaded hooks (14)*, `global/other` among
+  them); `mcps.txt` with `/mcps` open on the account's hosted connector *Automations* `[ready]`; `mcps-disabled.txt`
+  after Space on that row, which wrote `[disabled_mcp_tools] __managed_gateway_connectors = ["tasks"]` into the
+  scratch home's `config.toml`. The walk's Grok listing reads these (`scripts/conformance.py`'s `FOREIGN`).
