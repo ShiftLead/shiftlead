@@ -99,6 +99,28 @@ the same line, and prints it again whenever the installed copy is stale:
 sudo install -d -o root -g root -m 0755 /etc/shiftlead && sudo install -o root -g root -m 0644 ~/.shiftlead/gemini-settings/layer.json /etc/shiftlead/gemini-settings.json
 ```
 
+**A machine with a Grok profile** (an `adapter: grok` entry in `profiles.yml`) needs xAI's Grok Build
+CLI installed by you, by hand, once per machine; ShiftLead never installs it (design §4.3 *The third
+adapter: Grok Build*). Know what its install script does before you run it: it downloads the binary from
+`x.ai` (or a Google Cloud Storage bucket) into `~/.grok/downloads/` and **checks no checksum or
+signature**, only that the file is not empty and that `--version` runs; it links `grok` and `agent` in
+`~/.grok/bin`, and in `~/.local/bin` or `/usr/local/bin` where one is on `PATH` and writable; it adds
+`~/.grok/bin` to `PATH` in your shell's rc file between `# >>> grok installer >>>` markers; and it writes
+shell completions and `~/.grok/config.toml`. It needs no `sudo`. A launch runs the binary at
+`~/.grok/bin/grok` and is refused while it is missing.
+
+```bash
+curl -fsSL https://x.ai/cli/install.sh | bash
+```
+
+Each Grok profile names a home of its own as its `config_dir` (never `~/.grok`, which the load refuses),
+signed in once by you with your SuperGrok account in a browser (`--device-auth` where no browser opens);
+`ao doctor profiles` names a home that is not signed in:
+
+```bash
+GROK_HOME=~/.config/grok-reader ~/.grok/bin/grok login
+```
+
 ### Reach it from your phone
 
 Never a bare public port (design §4.5). The UI listens on two loopback ports: the **plain port**
