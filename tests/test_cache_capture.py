@@ -7,8 +7,10 @@ import gzip
 import http.server
 import importlib.util
 import json
+import shutil
 import socket
 import struct
+import subprocess
 import threading
 import time
 import urllib.error
@@ -289,3 +291,84 @@ def test_usage_of_merges_a_streams_message_delta_over_its_message_start():
     # a null in a later event never overwrites a figure an earlier one gave
     nulled = SSE_BODY + 'data: {"type":"message_delta","usage":{"cache_creation_input_tokens":null}}\n\n'
     assert cc.usage_of(nulled)["cache_creation_input_tokens"] == 27500
+
+
+ZSTD = shutil.which("zstd")
+
+
+@pytest.mark.skipif(ZSTD is None, reason="no zstd binary")
+def test_a_zstd_encoded_request_is_recorded_decoded_by_the_binary_and_forwarded_as_it_came(proxy):
+    base, out = proxy
+    request = {"model": "grok-4.7", "input": [{"role": "user", "content": "hi"}]}
+    zst = subprocess.run([ZSTD, "-cq"], input=json.dumps(request).encode(), capture_output=True, check=True).stdout
+    req = urllib.request.Request(
+        base + "/v1/json", data=zst, headers={"content-type": "application/json", "content-encoding": "zstd"}
+    )
+    with urllib.request.urlopen(req, timeout=10) as r:  # noqa: S310 — a local stub
+        r.read()
+    assert Upstream.seen[0]["body"] == zst  # the upstream got the bytes the client sent
+    assert json.loads((out / "0001-request.json").read_text()) == request  # the file holds them decoded
+
+
+def test_a_zstd_body_with_no_binary_is_kept_raw_and_stderr_says_so(monkeypatch, capsys):
+    monkeypatch.setattr(cc.shutil, "which", lambda name: None)
+    assert cc.decode(b"\x28\xb5\x2f\xfdnot-really", "zstd") == b"\x28\xb5\x2f\xfdnot-really"
+    assert "no zstd binary on PATH" in capsys.readouterr().err
+
+
+@pytest.mark.skipif(ZSTD is None, reason="no zstd binary")
+def test_a_body_the_binary_cannot_decode_is_kept_raw_and_stderr_says_why(capsys):
+    assert cc.decode(b"not zstd at all", "zstd") == b"not zstd at all"
+    assert "zstd exited" in capsys.readouterr().err
+
+
+RESPONSES_REQUEST = {
+    "model": "grok-4.7",
+    "stream": True,
+    "store": False,
+    "prompt_cache_key": "sess-1234",
+    "tools": [{"type": "function", "name": n} for n in ("bash", "read", "send_feedback")],
+    "input": [
+        {"role": "system", "content": "s" * 70},
+        {"role": "user", "content": [{"type": "input_text", "text": "env " * 5}, {"type": "input_text", "text": "go"}]},
+        {"type": "function_call", "name": "bash", "arguments": '{"cmd":"ls"}', "call_id": "c1"},
+        {"type": "function_call_output", "call_id": "c1", "output": "a b"},
+    ],
+}
+RESPONSES_SSE = (
+    'event: response.created\ndata: {"type":"response.created","response":{"id":"r1","usage":null}}\n\n'
+    'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"hi"}\n\n'
+    'event: response.completed\ndata: {"type":"response.completed","response":{"id":"r1","usage":'
+    '{"input_tokens":23800,"input_tokens_details":{"cached_tokens":1664},"output_tokens":9}}}\n\n'
+)
+
+
+@pytest.mark.parametrize(
+    "response",
+    [RESPONSES_SSE, json.dumps({"usage": {"input_tokens": 23800, "input_tokens_details": {"cached_tokens": 1664}}})],
+    ids=["sse", "json"],
+)
+def test_show_reads_a_responses_request_its_cache_key_blocks_and_cached_tokens(tmp_path, response):
+    (tmp_path / "0001-request.json").write_text(json.dumps(RESPONSES_REQUEST))
+    (tmp_path / "0001-response.txt").write_text(response)
+    text = cc.show([tmp_path / "0001-request.json"], provider="responses")
+    assert text.splitlines() == [
+        f"{tmp_path / '0001-request.json'}:",
+        "  tools: 3",
+        "  prompt_cache_key: sess-1234",
+        "  system[0]: 70 chars",
+        "  messages[0] user [0] input_text: 20 chars",
+        "  messages[0] user [1] input_text: 2 chars",
+        "  messages[1] ? [0] function_call: 91 chars",  # an item with no content: its whole JSON
+        "  messages[2] ? [0] function_call_output: 66 chars",
+        "first request's cache: read 1664, input (the read included) 23800",
+    ]
+
+
+def test_show_measures_a_null_content_item_whole_and_reads_a_string_input_as_one_message(tmp_path):
+    reasoning = {"type": "reasoning", "content": None, "summary": []}
+    (tmp_path / "0001-request.json").write_text(json.dumps({"tools": [], "input": [reasoning]}))
+    (tmp_path / "0002-request.json").write_text(json.dumps({"tools": [], "input": "hello"}))
+    lines = cc.show(sorted(tmp_path.iterdir()), provider="responses").splitlines()
+    assert f"  messages[0] ? [0] reasoning: {len(json.dumps(reasoning))} chars" in lines
+    assert lines[-2] == "  messages[0] user [0] text: 5 chars"  # the last is the first request's usage line
