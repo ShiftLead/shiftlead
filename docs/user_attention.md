@@ -10,7 +10,7 @@ People: paul
 
 ## Needs the user
 
-- [ ] decide 2026-11-14 (n/a) — Should TD-1829's builds (Lift the hold lifts your hold on the press) get one more review round? Its bought round ended with fixes to TD-1831 unread by a review. Context: TD-1829 decision (paul). Parts: TD-1831, TD-1833. Due: 2026-11-17. Answers: One more round (default) | Go | Hold: <note>.
+- [ ] decide 2026-11-14 (n/a) — Should TD-1829's builds (Lift the hold lifts your hold on the press) get one more review round? Its bought round ended with fixes to TD-1831 unread by a review. Context: TD-1829 decision (paul). Parts: TD-1831, TD-1833. Due: 2026-11-17. Answers: One more round (default) | Go | Hold: <note>. Decided: One more round (by paul) (2026-11-14).
   - **Context:** TD-1829's bought round 5 (design PR #3874, TD-1844): fact-check R15, Fable R16, Sonnet R17 (build-changing 0, 1, 3); the closing fact-check R18 corrected one fix (F138). Record: docs/reviews/TD-1829.md.
   - **Question:** One more review round on TD-1829's design before its builds, or Go now?
   - **Caveats:** Fixes no review has read, by build: TD-1831: F130 (the Lift on a covered member row is the Queue card's alone), F131 (drawn only while the row waits on a pick, the holder being the way out otherwise), F132 with its correction F138 (the guard: the row's answer is a board line waiting on a pick). TD-1833: none.
