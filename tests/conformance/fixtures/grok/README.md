@@ -1,7 +1,7 @@
 # Grok Build's conformance fixtures
 
 Captured from the real tool, never written by hand (design §4.3 *The conformance suite*). The adapter is not
-registered yet (TD-1637), so no test reads these yet; the state-feed slice reads them.
+registered yet (TD-1637); `tests/test_grok_hook.py` reads the hook capture through the state feed's `translate`.
 
 - `captured/hooks-scratch.jsonl` (Grok Build 1.0.77 `50ca579fa996` on kmaster, 2026-11-14, TD-1637 slice 9):
   every hook payload, unchanged, one per line, that a capture-only hook file (`hooks/cap.json`, the thirteen
