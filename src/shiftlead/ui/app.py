@@ -153,6 +153,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _amount_says,  # noqa: F401
     _as_session_id,  # noqa: F401
     _countdown,  # noqa: F401
+    _from_asker_html,  # noqa: F401
     _getattr,  # noqa: F401
     _icon_cache,  # noqa: F401
     _instant,  # noqa: F401
@@ -166,6 +167,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _place_asking,  # noqa: F401
     _place_cache,  # noqa: F401
     _projected,  # noqa: F401
+    _recommends_html,  # noqa: F401
     _reserve_why,  # noqa: F401
     _short_age,  # noqa: F401
     _str_list,  # noqa: F401
@@ -197,6 +199,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     org_here,  # noqa: F401
     own_repo,
     page_origin,  # noqa: F401
+    passed_question,  # noqa: F401
     paths_ctx,  # noqa: F401
     promote_reading,  # noqa: F401
     repos_of,  # noqa: F401
