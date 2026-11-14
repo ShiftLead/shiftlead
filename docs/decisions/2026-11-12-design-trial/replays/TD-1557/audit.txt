@@ -1,0 +1,233 @@
+design-replay audit · TD-1557 run 1 · transcripts 22 · flags 229
+allowed: /home/kmaster/replays/TD-1557.1 · /home/kmaster/.cache/agent-cadence/trees/473deb120951bbfb06dbd8313391caf99ada38e6/files · /home/kmaster/shiftlead/.venv · /home/kmaster/replays/TD-1557.1.tmp
+never flagged: /dev/ · /usr/ · /bin/ · /sbin/ · /lib/ · /lib64/ · Claude Code's own files under /home/kmaster/.claude-conformance/projects/-home-kmaster-replays-TD-1557-1
+cannot see: a path a script computes for itself
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-a278c053bae16c8d3.jsonl · Bash names /async outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-a278c053bae16c8d3.jsonl · Bash names /return outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-a278c053bae16c8d3.jsonl · Bash names /async outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-a278c053bae16c8d3.jsonl · Bash names /return outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-a5cb90d6267e9a1bf.jsonl · Bash names /^9[0-9][0-9]\ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-a5cb90d6267e9a1bf.jsonl · Bash names /p outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-a5cb90d6267e9a1bf.jsonl · Bash names /^9[0-9][0-9]\ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-a5cb90d6267e9a1bf.jsonl · Bash names /p outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-a6847d4dfcd4c904d.jsonl · Bash names /scripts/ledgerboard/__init__.py outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-a6847d4dfcd4c904d.jsonl · Bash names /scripts/ledgerboard/__init__.py outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-a69001645098d12d4.jsonl · Bash names /\\\\s+/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-a69001645098d12d4.jsonl · Bash names /\\\\s+/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-a69001645098d12d4.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-a69001645098d12d4.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-a8989354913065a19.jsonl · Bash names /home/kmaster/.cache/agent-cadence/trees/473deb120951bbfb06dbd8313391caf99ada38e6 outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-a8989354913065a19.jsonl · Bash names /home/kmaster/.cache/agent-cadence/trees/473deb120951bbfb06dbd8313391caf99ada38e6 outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aaaf6fc506f3f5142.jsonl · Bash names /tmp/wd.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aaaf6fc506f3f5142.jsonl · Bash names /tmp/wd.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aaaf6fc506f3f5142.jsonl · Bash names /tmp/wd.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aaaf6fc506f3f5142.jsonl · Bash names /tmp/wd.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aaaf6fc506f3f5142.jsonl · Bash names /home/kmaster/.cache/agent-cadence/trees/473deb120951bbfb06dbd8313391caf99ada38e6 outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · `Read` of /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · `Read` of /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · `Read` of /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · `Read` of /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · `Read` of /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · `Read` of /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /def outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /^def outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /p outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /def outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /^def outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /p outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /def outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /^def outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /p outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /def outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /^def outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /p outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /a outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aab672361f84a1a0f.jsonl · Bash names /a outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-abd4e13e3cda5c197.jsonl · Bash names /tmp outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-abd4e13e3cda5c197.jsonl · Bash names /tmp outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-ac4132bd258ea543a.jsonl · Bash names /home/kmaster/.cache/agent-cadence/trees/473deb120951bbfb06dbd8313391caf99ada38e6 outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-ac4132bd258ea543a.jsonl · Bash names /home/kmaster/.cache/agent-cadence/trees/473deb120951bbfb06dbd8313391caf99ada38e6 outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-ad795f97687a45f69.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-ad795f97687a45f69.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-ad795f97687a45f69.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-ad795f97687a45f69.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-ad795f97687a45f69.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-ad795f97687a45f69.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-ad795f97687a45f69.jsonl · `Read` of /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-ae1135224c8bedf8c.jsonl · Bash names /^9[0-9][0-9]\ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-ae1135224c8bedf8c.jsonl · Bash names /p outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-ae1135224c8bedf8c.jsonl · Bash names /^9[0-9][0-9]\ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-ae1135224c8bedf8c.jsonl · Bash names /p outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-ae36fded022791208.jsonl · Bash names /../scripts/ledgerboard/__init__.py outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-ae36fded022791208.jsonl · Bash names /../scripts/ledgerboard/__init__.py outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aefb471a4a6caedac.jsonl · Bash names /scripts outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aefb471a4a6caedac.jsonl · Bash names /scripts outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aefb471a4a6caedac.jsonl · Bash names /^\ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-aefb471a4a6caedac.jsonl · Bash names /^\ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-af7380a0610caab12.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-af7380a0610caab12.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-af7380a0610caab12.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-af7380a0610caab12.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-af7380a0610caab12.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-af7380a0610caab12.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-af7380a0610caab12.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-af7380a0610caab12.jsonl · Bash names /TD-1557.md/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-af7380a0610caab12.jsonl · Bash names /tmp/d.txt outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-af7380a0610caab12.jsonl · Bash names /TD-1557.md/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-af7380a0610caab12.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-af7380a0610caab12.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-af7380a0610caab12.jsonl · Bash names /\\s+/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-af7380a0610caab12.jsonl · Bash names /\\s+/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-af8cf3003fc251a4c.jsonl · Bash names /^waive/,$p outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa/subagents/agent-af8cf3003fc251a4c.jsonl · Bash names /^waive/,$p outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /^## outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /^## outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /docs/cadence.md## outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /scripts outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /docs/cadence.md## outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /scripts outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /docs/cadence.md## outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /^hold\\s* outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /i outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /^hold\\s* outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /i outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /^not outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /i, outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /^not outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /i, outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /^hold\\s* outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /i outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /^hold\\s* outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /i outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /The outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /,+3p outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /The outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /,+3p outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /\*\*A outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /\*\*A outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /send outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /send outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /\\s+/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /\\s+/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /\*\*Which outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /Inbox outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /\*\*Which outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /Inbox outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /\\\\s+/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /\\\\s+/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /\\s+/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /\\s+/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /^hold outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /\\s+/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /\\s+/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /^hold outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /\\s+/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /\\s+/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /\\s+/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /\\s+/ outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /is outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · Bash names /is outside the allowed places
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
+flag · 2f2a0a88-51aa-4802-96ec-c082b75a8afa.jsonl · `ao` run
