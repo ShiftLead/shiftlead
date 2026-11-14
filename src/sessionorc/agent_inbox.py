@@ -655,7 +655,17 @@ class InboxMixin:
         # a hand-off's subject is the board line's own text, its second line, never the relay line (TD-1660)
         own = words.split("\n", 2)[1].strip() if key and "\n" in words else ""
         sent = await self._msg(
-            PERSON, words, [seat], "ask", None, None, None, None, subject=own or None, handed=True, entry=entry
+            PERSON,
+            words,
+            [seat],
+            "ask",
+            None,
+            None,
+            None,
+            None,
+            subject=mail.clip_subject(own) if own else None,
+            handed=True,
+            entry=entry,
         )
         mid = (sent.get("entry") or {}).get("id")
         if not mid:
