@@ -212,6 +212,48 @@ async def test_a_change_to_the_filing_list_alone_is_saved(agent, tmp_path):
     assert po["orders"] == [] and po["filing"] == [3700] and po["held"] == {"3700": ["ao-w"]}
 
 
+async def test_the_tick_reads_a_filing_pr_at_the_repos_held_key_unread_or_another_key_waits(agent, tmp_path):
+    """TD-1823: the tick passes the repo's held key (`_held_keys`) to the order test, so a filing PR whose
+    `held` is not read at that key waits — never ordered as unheld — and is an order once it is."""
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    root = tmp_path / "repo"
+    root.mkdir()
+    (root / ".shiftlead.yml").write_text("held:\n  - src/sessionorc/**\n", encoding="utf-8")
+    root = str(root)
+    for unread in ({"held_head": None, "held_key": None, "held": None}, {"held_key": ["docs/briefs/**"]}):
+        agent._repos[root] = {"name": "repo", "root": root, "prs": {"open": [_filing(**unread)]}}
+        await agent._red_prs(T0 + 2 * DAY)
+        po = agent._repos[root].get("pr_orders") or {}
+        assert not po.get("orders") and not po.get("filing"), unread
+    agent._repos[root] = {"name": "repo", "root": root, "prs": {"open": [_filing()]}}  # read empty at KEY
+    await agent._red_prs(T0 + 2 * DAY)
+    po = agent._repos[root]["pr_orders"]
+    assert [o["id"] for o in po["orders"]] == ["pr:3700"] and po["filing"] == [3700]
+
+
+async def test_an_unchanged_pass_over_a_non_empty_filing_list_saves_and_pushes_nothing(agent, tmp_path, monkeypatch):
+    """TD-1823: the unchanged-pass comparison reads the saved `filing`, so a second pass over the same
+    non-empty list neither saves nor pushes a `repos` event."""
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    root = str(tmp_path / "repo")
+    agent._repos[root] = {"name": "repo", "root": root, "prs": {"open": [_filing(held_key=[])]}}
+    await agent._red_prs(T0 + DAY)
+    assert agent._repos[root]["pr_orders"]["filing"] == [3700]
+    saved, pushed = [], []
+    monkeypatch.setattr(agent.repos_store, "save", lambda v: saved.append(1))
+
+    async def _push(msg):
+        pushed.append(msg)
+
+    monkeypatch.setattr(agent, "_broadcast", _push)
+    await agent._red_prs(T0 + DAY)
+    assert saved == [] and [m for m in pushed if m.get("event") == "repos"] == []
+
+
 async def test_an_unserved_repo_has_no_filing_order_and_an_empty_filing_list(agent, tmp_path):
     from conftest import park_ticks
 
