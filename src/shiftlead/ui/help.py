@@ -664,9 +664,9 @@ HELP: tuple[Help, ...] = (
         "Have a session do it",
         "Inbox board row",
         (
-            "Asks a session to do this step: it goes to the repo's team as a work order. The session does it, "
-            "hands it to the repo it belongs to, or, if only you can do it, gives it back to you with the exact "
-            "steps to copy. Nothing runs from the press."
+            "Asks a session to do this step. If the item names who should do it, it goes straight to that repo "
+            "or team and the item closes; otherwise it goes to this repo's team as a work order, and the session "
+            "does it, hands it on, or gives it back to you with the exact steps. Nothing runs from the press."
         ),
     ),
     Help(

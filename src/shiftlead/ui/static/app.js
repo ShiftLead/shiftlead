@@ -1227,7 +1227,7 @@
   // verb a pending row shows in place of its age, one table keyed by the control's wire name (a board
   // row's by `board_<its action>`), the wire name itself the fallback; and what a refused press was not
   const PRESS_VERBS = {
-    board_done: "checking off…", board_snooze: "snoozing…", board_decide: "deciding…", board_reply: "sending…",
+    board_done: "checking off…", board_snooze: "snoozing…", board_decide: "deciding…", board_hand: "handing…", board_reply: "sending…",
     board_notright: "deciding…", board_add: "writing…", ledger: "deciding…", ledger_reply: "deciding…", ledger_start: "starting…", snooze: "snoozing…", attention_snooze: "snoozing…",
     dismiss: "dismissing…", identity_ack: "dismissing…", clear_work: "dismissing…",
     clear_mark: "dismissing…", unmail: "deleting…", allow: "sending…", deny: "sending…",
@@ -1511,7 +1511,8 @@
     const key = AO.pressKey(action, b.dataset.boardAct);
     // §4.5 screen 6 rule 4 (TD-1321): a ledger entry's decide leaves with its row (Done… and Back to design… too,
     // where they are its row's inline controls); a board line's decide and Reply stay, drawn (`drawn`)
-    const keeps = ["suspend", "board_decide", "board_reply", "board_notright", "board_add"].includes(key);
+    // Have a session do it's hand-off (TD-1660) stays pending in place until the route's one answer
+    const keeps = ["suspend", "board_decide", "board_hand", "board_reply", "board_notright", "board_add"].includes(key);
     const ledgerish = action === "ledger" || action === "ledger_reply";
     const leaves = !!row && !keeps && (PRESS_LEAVES.includes(key) || !!staterow || ledgerish);
     const drawn = !!row && ["board_decide", "board_notright", "board_reply"].includes(key);
@@ -1917,6 +1918,43 @@
         if (r.form) { say(`resume needs the form: ${r.why}`, true); location.href = r.form; return; }
         say("resumed — same name, same record, its mail came with it", true);
         location.href = `/focus/${r.id}${AO.poppedId ? "?window=1" : ""}`;
+        return;
+      }
+      // §4.5a **Have a session do it** on a line naming its `Doer:` (§4.5 screen 12, TD-1660): the row stays
+      // *handing…* in place until the route's one answer — taken, the row leaves; fallen back, it is drawn decided as
+      // the decide press draws it; possibly sent, the Done refused or the look failed, it comes back open with the
+      // words on its error line
+      if (key === "board_hand") {
+        pressed();
+        let res;
+        try {
+          res = await act(id, "board", body);
+        } catch (e) {
+          refusedOn = true;
+          const m = e.message || String(e);
+          // the ask possibly sent or the Done refused: *hand-off not finished*; the keyless and failed-look words as
+          // the route gives them; a refusal before anything was sent (no lane to fall back to either) wrote nothing
+          const words = /^(sent without its key|could not check whether this was handed)/.test(m) ? m
+            : /^(the hand-off may have been sent|handed to )/.test(m) ? `hand-off not finished: ${m}` : `not handed: ${m}`;
+          say(words);
+          if (msgOf) AO.pressErrs[msgOf] = words;
+          const r = fresh(), er = r && r.querySelector(".rowerr");
+          if (er) { er.textContent = words; er.hidden = false; }
+          if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+          return;
+        }
+        const r = fresh();
+        if (res.end === "taken") {
+          if (r) { AO.qcardOff(r, msgOf); AO.handRing(r); r.remove(); }
+          if (msgOf) AO.inflight[msgOf] = { leaves: true, verb: AO.pressVerb(key), kind: "left", until: Date.now() + 60000 };
+          left = true;
+        } else {
+          const text = `decided: have a session do it · ${AO.today()}`;
+          if (msgOf) AO.inflight[msgOf] = { leaves: false, verb: AO.pressVerb(key), kind: "decided", text, out: false, until: Date.now() + 60000 };
+          if (r) { AO.unPend(r); AO.drawDecided(r, text); AO.qcardOff(r, msgOf); }
+        }
+        say(res.toast || "handed", !res.red);
+        if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
       pressed(key === "board_decide" ? body.answer : undefined);

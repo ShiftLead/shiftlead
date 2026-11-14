@@ -588,7 +588,9 @@ templates.env.globals.update(origin_note=origin_note, origin_firsts=origin_first
 
 
 def board_reading(
-    repos: Mapping[str, Any] | None, repos_of: Mapping[str, Mapping[str, Any]] | None = None
+    repos: Mapping[str, Any] | None,
+    repos_of: Mapping[str, Mapping[str, Any]] | None = None,
+    hands: Callable[[str, str], Mapping[str, Any] | None] | None = None,
 ) -> tuple[list[dict[str, Any]], str]:
     """The Inbox's board rows (`board_rows`) from the host agent's repo readings — the `repos` RPC,
     each checkout's `boards` (§4.4 *Each reading has one owner*, *The boards*, TD-615) — and a note
@@ -605,7 +607,7 @@ def board_reading(
             if workorders_mod.board_path(str(root))[0] != "absent":  # a reading from before its first board read
                 notes.append(f"the board of {name} has not been read yet")
             continue
-        own = board_rows(got, repos_of)
+        own = board_rows(got, repos_of, hands)
         # a design's answer is routed on the stored work order (§6 rule 6 *save a design's answer*, TD-1705): the
         # row carries the join's fields, which the *pickable by* words read and never re-derive
         stored = {str(o["id"]): o for o in teamrun.work_orders(r)}
@@ -2162,7 +2164,31 @@ def board_subject_text(text: str) -> str:
     return lb.CONTEXT_RE.sub("", text[: due.start()] if due else text).strip() or text
 
 
-def board_rows(report: Any, repos_of: Mapping[str, Mapping[str, Any]] | None = None) -> list[dict[str, Any]]:
+def board_hand_of(
+    root: str, it: Mapping[str, Any], hands: Callable[[str, str], Mapping[str, Any] | None] | None
+) -> dict[str, Any]:
+    """What a board row's **Have a session do it** does with the line's `Doer:` (§4.5 screen 12 *Three verbs: Have a
+    session do it*, TD-1660): `{doer, hand, hand_to}` — `doer` the field's value as written ('' where none), `hand`
+    whether the press posts the hand-off (a `Doer:` that does not name the board's own repo or a team of it, resolved
+    or not), `hand_to` the repo it resolves to ('' where it does not, or names the board's own)."""
+    got = it.get("doer")
+    doer = str(got.get("text") or "") if isinstance(got, Mapping) else ""
+    if not doer or str(it.get("kind") or "") != "act":
+        return {"doer": doer, "hand": False, "hand_to": ""}
+    try:
+        target = hands(root, doer) if hands is not None and root else None
+    except Exception:  # noqa: BLE001 — an org that cannot be read resolves nothing: the lane test draws the row
+        target = None
+    if target is not None and target.get("own"):
+        return {"doer": doer, "hand": False, "hand_to": ""}
+    return {"doer": doer, "hand": True, "hand_to": str(target.get("repo") or "") if target is not None else ""}
+
+
+def board_rows(
+    report: Any,
+    repos_of: Mapping[str, Mapping[str, Any]] | None = None,
+    hands: Callable[[str, str], Mapping[str, Any] | None] | None = None,
+) -> list[dict[str, Any]]:
     """design §4.5a **Due strip / Inbox board row** rows, as the Inbox draws them (TD-069 step 3): one
     per open item of the report — its repo, its due words, the whole text, and the board at that
     line in the editor — with no team: the board is the repo's (TD-722, built by TD-741), so `repo`
@@ -2171,7 +2197,9 @@ def board_rows(report: Any, repos_of: Mapping[str, Mapping[str, Any]] | None = N
     `due_now` saying which are due (`board_due_now`) and `ahead` the due words of one that is not
     (TD-220). `at` is the due date, so *oldest first* in **Needs you**
     puts the longest overdue first among the states and the mail. The text is the board's, shown as
-    text: nothing here is a control built from it (TD-071 item 8)."""
+    text: nothing here is a control built from it (TD-071 item 8). `hands(root, doer)` is `doer_target` bound to
+    the org (TD-1660): where an `act` line's `Doer:` resolves to another repo's techlead seat, the row draws
+    **Have a session do it** whatever the lane test says, its press the hand-off."""
     rows: list[dict[str, Any]] = []
     today = str(report.get("today") or "") if isinstance(report, dict) else ""
     boards = report.get("boards") if isinstance(report, dict) else None
@@ -2195,6 +2223,7 @@ def board_rows(report: Any, repos_of: Mapping[str, Mapping[str, Any]] | None = N
                 continue
             line, text, tag = it.get("line"), str(it["text"]), str(it.get("due_tag") or "")
             detail = board_detail(it)
+            hand = board_hand_of(root, it, hands)
             # **Open board** is a file link at the item's line, the checkout first (§4.6, TD-689)
             url = editor_file_link(board, line=line if isinstance(line, int) else 1) if board else None
             rows.append(
@@ -2238,12 +2267,17 @@ def board_rows(report: Any, repos_of: Mapping[str, Mapping[str, Any]] | None = N
                     "kind": str(it.get("kind") or ""),
                     # §4.5a **Have a session do it** (TD-1543, built by TD-1624): on an open `act` line — its kind
                     # written `act` — with no `Decided:`, no `Answers:` and no *only you can do this* mark, where a
-                    # lane of the repo would take the work (`repo_boards`' `session_do`, the 409's function)
-                    "session_do": bool(of.get("session_do"))
+                    # lane of the repo would take the work (`repo_boards`' `session_do`, the 409's function), or where
+                    # its `Doer:` resolves to another repo's techlead seat (TD-1660, `doer_target`, the press's own)
+                    "session_do": (bool(of.get("session_do")) or bool(hand["hand_to"]))
                     and str(it.get("kind") or "") == "act"
                     and not it.get("decided")
                     and not any(str(a).strip() for a in it.get("answers") or ())
                     and not board_mod.marked_for_person(text),
+                    # the press: `hand` where the `Doer:` names another repo or a team, resolved or not (the route
+                    # falls back on one that does not), `decide` on none or the board's own; `hand_to` the repo named
+                    # in the button's title, only where it resolves (§4.5 screen 12, TD-1660)
+                    **hand,
                     # §4.5a **Works** / **Not right…** (TD-255 slice 3): a live look's pair, known
                     # by its words; `head` and `name` are what the *Not right* hand-off sends
                     "pair": live_look(it),
