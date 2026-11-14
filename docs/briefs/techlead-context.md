@@ -60,8 +60,11 @@ person is `docs/user_attention.md`. Both are written only through the helpers, `
   one entry opens as a page, §4.5 screen 6 *The rail* and *The message page*, TD-129; a message to
   the person has one shape, its first paragraph the whole of what they need, §4.10 *How a message
   to a person is written*, TD-127, and a `--subject`, a headline apart from that paragraph, §4.10
-  *A subject on every entry*, TD-561; an `ask` or `steer` to the person leads with one sentence, then what
-  each answer leads to, `ao msg` warning when it does not, §4.10 *An item leads with one sentence*, TD-916).
+  *A subject on every entry*, TD-561; what waits on the person — an `ask` or `steer`, a question passed up, a
+  board `decide` or `act` line, an entry's Ask, Answers and title — leads with one plain sentence of at most
+  25 words with no code, each answer naming who acts after its ` — `, the context in plain words, and its
+  writer refuses what breaks the rules a check can read, §4.10 *Text a person reads is checked at its writer*,
+  TD-1845).
 - **Settings** (§4.5 screen 8, §5, §4.4a *Settings, replicated*): a *definition* stays in its file;
   a *setting* lives in the home's `settings.yml`, written only by `set_settings`, replicated to
   nodes; the ADR `2026-09-25-settings-audit.md` is the inventory and the reasoning. **State and alarm marks are

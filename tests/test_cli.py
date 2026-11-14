@@ -1040,11 +1040,25 @@ SHAPE = (
 )
 
 SUBJECT = " With it a `--subject`: the entry's headline in a few words, apart from the first paragraph."
-QUESTION = (
-    " An `ask` or a `steer` to the person leads with one sentence (design §4.10 *An item leads with one sentence*): "
-    "its first paragraph is the decision or the task, readable cold; its second, what each answer leads to; then the "
-    "context. Write each `--answer` as `<label> (default) — <consequence>`, and set `--about TD-NNN` when your claim "
-    "is not what it is about."
+QUESTION = " Set `--about TD-NNN` when your claim is not what it is about. "
+# TD-1848 (§4.10 *Text a person reads is checked at its writer*, TD-1845): the rules the writers refuse on, taught
+# first, in the same words in every preset whose session writes to the person or files an entry
+RULES = (
+    "**Text the person reads is checked at its writer** (design §4.10 *Text a person reads is checked at its "
+    "writer*): an `ask` or a `steer` to the person, a question passed up to them, a board `decide` or `act` line, and "
+    "an entry's `**Ask:**`, `**Answers:**` and title catch the person up first, and their writers refuse what breaks "
+    "the rules a check can read, so meet them before you send. The sentence (a message's first paragraph, a board "
+    "line's bold head, an `**Ask:**`) is one plain sentence of at most 25 words with no code — no path, file name, "
+    "call, option, commit or `snake_case` name — and a question ends in `?`. Every answer, and a `steer`'s "
+    "`--default`, is `<label> — <consequence>` and says who acts in its consequence (*I'll…*, *you…*, *a "
+    "session…*): *Pinned, run it again* is refused, *Pinned — a session runs it again* passes; the recommended answer "
+    "comes first, marked `(default)`. The second paragraph on is the context, in plain words — what the named thing "
+    "is for and why it matters, a coined term explained or left out, files and functions behind the link — and it "
+    "need not name the larger work, which the Queue card's head already shows. An entry's title is its plain-words "
+    "summary, with no code, no id and no internal label (*B4*, *slice*, *F123*), which belong in its body. A gate's "
+    "answers are *Yes — a session lifts the gate and the entry can be picked | Not yet — nobody picks the entry until "
+    "you say*, and the end-of-rounds item's *Go — the grinders build it | One more round — a session runs one more "
+    "review round, then asks again | Hold: <note> — a session revises the design as your note says*."
 )
 
 
@@ -1056,12 +1070,52 @@ def test_the_presets_ask_for_the_shape_of_a_message_to_the_person():
         assert SHAPE in (root / name).read_text(encoding="utf-8"), name
         # TD-566 (§4.10 *A subject on every entry*): a headline beside the first-paragraph rule
         assert SHAPE + SUBJECT in (root / name).read_text(encoding="utf-8"), name
-        # TD-916 (§4.10 *An item leads with one sentence*): a question leads with one sentence, and `--about`
-        assert SHAPE + SUBJECT + QUESTION in (root / name).read_text(encoding="utf-8"), name
+        # TD-916: `--about`; TD-1848: the rules the writers check replace *its second, what each answer leads to*
+        assert SHAPE + SUBJECT + QUESTION + RULES in (root / name).read_text(encoding="utf-8"), name
+        assert "what each answer leads to" not in (root / name).read_text(encoding="utf-8"), name
     # since TD-310 the repo's designer brief is the template's `{repo}` supplement, so it says it no
     # longer: the rule is in the template around it, once (§4.9c *The designer gets a template*)
     designer = pathlib.Path(__file__).parents[1] / "docs" / "briefs" / "designer-ao-1.md"
     assert SHAPE not in designer.read_text(encoding="utf-8")
+
+
+def test_every_brief_that_writes_to_the_person_teaches_the_rules_its_writers_check():
+    """TD-1848 (§4.10 *Text a person reads is checked at its writer*): every preset whose session writes to the
+    person or files an entry states the rules in the same words; a repo's supplement and the stage fragment are
+    filled into a template that states them, so they say them no second time, and what they write conforms."""
+    repo = pathlib.Path(__file__).parents[1]
+    root = repo / "src" / "shiftlead" / "briefs"
+    for name in (
+        "techlead",
+        "manager",
+        "manager_on_call",
+        "grinder",
+        "designer",
+        "auditor",
+        "hunter",
+        "sweeper",
+        "fact-checker",
+        "entry",
+    ):
+        text = (root / f"{name}.md").read_text(encoding="utf-8")
+        assert text.count(RULES) == 1, name
+        assert "--question" not in text, name  # TD-1846 names the flag with the flag
+    assert RULES in (repo / "docs/briefs/director.md").read_text(encoding="utf-8")  # a whole brief, no template
+    for rel in (
+        "docs/briefs/grinder-ao-1.md",
+        "docs/briefs/designer-ao-1.md",
+        "docs/briefs/docs-audit.md",
+        "docs/briefs/test-audit.md",
+        "src/shiftlead/briefs/grinder.stage.md",
+    ):
+        text = (repo / rel).read_text(encoding="utf-8")
+        assert RULES not in text and "what each answer leads to" not in text, rel
+    designer = (repo / "docs/briefs/designer-ao-1.md").read_text(encoding="utf-8")
+    assert "Go — the grinders build it | One more round — a session runs one more review round" in designer
+    primer = (repo / "docs/briefs/techlead-context.md").read_text(encoding="utf-8")
+    assert "*Text a person reads is checked at its writer*" in primer and "each answer leads to" not in primer
+    skill = (repo / "src/shiftlead/skill.md").read_text(encoding="utf-8")
+    assert "- **Text the person reads is checked at its writer** (§4.10)" in skill
 
 
 def test_the_designer_preset_keeps_its_reads_small_and_names_a_waiting_design():
