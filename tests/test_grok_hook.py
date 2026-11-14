@@ -208,7 +208,9 @@ def test_what_is_no_unattended_foreground_watch_runs(hooked, capsys, payload, re
     run, sent = hooked
     run(payload, reply=reply)
     assert capsys.readouterr().out == ""
-    if reply is not None:
+    if reply is None:  # asked, and answered nothing: the record is interactive, so the watch runs
+        assert sent[-1]["wait"] is True
+    else:
         assert all("wait" not in e for e in sent)
 
 
