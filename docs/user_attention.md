@@ -10,6 +10,10 @@ People: paul
 
 ## Needs the user
 
+- [ ] decide 2026-11-14 (session `gate-sweep`) — Should a session build the Cloudflare route (TD-646 part 3) now, or leave it unbuilt until someone needs a Cloudflare tunnel? Context: TD-656 decision (paul). Due: 2026-11-14. Answers: Go | Not yet.
+  - **Context:** TD-656 (Build TD-646 (3): the Cloudflare route, its Access token check, ao connect cloudflare, its doctor line and guide) waits on decision (paul). Nobody runs the route today, and the home passkey (design 4.5b) may replace its token check.
+  - **Question:** Should a session build the Cloudflare route now, or leave it unbuilt until someone needs a Cloudflare tunnel?
+  - **Recommended:** Not yet: no device needs the route today, and the passkey may change what it checks.
 - [ ] decide 2026-11-14 (session `gate-sweep` on kmaster) — Should a `steer` a techlead passed up to you count in the Inbox's *Needs you* number (and as a Decide item on the Queue), instead of sitting uncounted under *Steering* until its default applies? Context: TD-1353 decision (paul). Due: 2026-11-14. Answers: Go | Not yet.
   - **Context:** TD-1353 (Should a passed-up `steer` be counted in *Needs you* and drawn on the Queue, rather than run uncounted under *Steering*?) waits on decision (paul), and no board item asked for it.
   - **Question:** Should a `steer` a techlead passed up to you count in the Inbox's *Needs you* number (and as a Decide item on the Queue), instead of sitting uncounted under *Steering* until its default applies?
@@ -30,7 +34,7 @@ People: paul
   - **Context:** TD-846 (Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first) waits on decision (paul), and no board item asked for it.
   - **Question:** Once the monetisation decision names a paid option, should shiftlead start the compliance work it brings: the EU Cyber Resilience Act and the supply-chain basics first, and SOC 2 or ISO 27001 only for a hosted or team edition?
   - **Recommended:** Only paul can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days.
-- [ ] decide 2026-11-14 (session `gate-sweep` on kmaster) — built when asked (Fable review, adopted by Paul 2026-10-13). Context: TD-656 decision (Paul). Due: 2026-11-14. Answers: Go | Not yet.
+- [x] decide 2026-11-14 (session `gate-sweep` on kmaster) — built when asked (Fable review, adopted by Paul 2026-10-13). Context: TD-656 decision (Paul). Due: 2026-11-14. Answers: Go | Not yet. Closed: 2026-11-14 — reworded: TD-656's Ask was a status note, not a question; asked again in the line below.
   - **Context:** TD-656 (Build TD-646 (3): the Cloudflare route — the Access token check on the route port, `ao connect cloudflare`, its doctor line and guide) waits on decision (Paul), and no board item asked for it.
   - **Question:** built when asked (Fable review, adopted by Paul 2026-10-13).
   - **Recommended:** Only Paul can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days.
