@@ -2317,7 +2317,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   that PR was current with main, which the cadence does not ask (agent-cadence's `base` row reads the
   base branch, not how far behind it the head is). So the home checks main's head itself, as CI on a
   push to main did, and since PRs are prechecked on heads behind main, this run is the one check of
-  what main actually holds.
+  what main actually holds. It is also the one run of the whole suite on a docs-only change: a PR whose every file matches a glob
+  of `docs/cadence.toml`'s `[precheck-paths]` is prechecked by that table's narrower command (`pdm run test-docs`, the host-log
+  validation, the ledger check and lint; TD-1483), so its `cadence/precheck` green says those passed, not the suite.
   - **When.** On the readings' pass, for a repo whose block has `promote:` and which sets `precheck`
     (read as below), `auto` on or off — the row offers the press with the verdict beside it, so the
     verdict is wanted either way — when live is not main's head, the reading's `precheck` is `absent` (a status read of
