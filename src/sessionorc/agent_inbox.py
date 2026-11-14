@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+import re
 import time
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
@@ -89,6 +90,9 @@ def board_refs(refs: list[str] | None) -> list[str]:
 ENTRY_ACT = (
     "add an entry to the ledger this way — a session writes one on its branch (cadence §2), or files `ao finding`"
 )
+# **Have a session do it**'s hand-off fields on `entry_add` (§4.5 screen 12, §4.10, TD-1660): the page's alone
+HAND_OFF_ONLY = "refs, key, doer and find_only are the page's hand-off alone"
+HAND_KEY_RE = re.compile(r"[^\s:]+:board:[0-9a-f]{8}")  # `<repo>:board:<8 hex>`, the stored key
 
 
 def _blocked_unreplied(e: MailEntry) -> bool:
@@ -337,6 +341,7 @@ class InboxMixin:
         answer: str = "",
         answers: list[str] | None = None,
         key: str = "",
+        why: str = "",
         caller: Any = None,
     ) -> dict[str, Any]:
         """**Snooze**, **Done** or **Decide** on a board item (design §4.4 *Board write-back*, TD-069 step 3):
@@ -359,8 +364,13 @@ class InboxMixin:
         line's `Decided:` field. `answers` is the item's own list as the reader gave it to the
         page, handed as a Reply's `refs` are, and the answer is one of them word for word — or,
         where the live look's pair is among them, `Not right:` and the person's words. Anything
-        else typed is a Reply."""
+        else typed is a Reply.
+
+        `why`, on a Done alone, is written in its `Closed:` field (`Closed: <date> — <why>.`, §4.4 *Board
+        write-back*): only **Have a session do it**'s hand-off gives it (TD-1660)."""
         agent_common.person_only(caller, "edit the board", "§4.4", self._graph())
+        if str(why or "").strip() and action != "done":
+            raise RpcError(board_mod.WHY_ON_DONE)
         root, want = self._board_root(board)
         self._board_served(root)
         if action == "reply":
@@ -376,7 +386,15 @@ class InboxMixin:
         async with self._applying_mark(root, str(key or ""), action, said):  # drawn as it lands (TD-1508)
             try:
                 done = await asyncio.to_thread(
-                    board_mod.write_back, root, line, text, action, due, answer=said, key=str(key or "")
+                    board_mod.write_back,
+                    root,
+                    line,
+                    text,
+                    action,
+                    due,
+                    answer=said,
+                    key=str(key or ""),
+                    why=str(why or "").strip(),
                 )
             except board_mod.Refused as e:
                 raise RpcError(str(e)) from None
@@ -390,6 +408,22 @@ class InboxMixin:
             **({"answer": said} if said else {}),
             **done,
         }
+
+    async def rpc_board_find(
+        self, board: str, line: int | None = None, key: str = "", caller: Any = None
+    ) -> dict[str, Any]:
+        """**`board_find`** (design §4.5 screen 12 *Three verbs: Have a session do it*, TD-1660): the act line
+        whose id is `key`, found on origin's head under the board's write lock held for the find alone, and
+        refused unless it is open, undecided, `act`, without `Answers:`, not marked for the person, and names a
+        `Doer:` — `board.find_line`'s answer. The person's own, refused to a session before its parameters are
+        read; served where the repo is registered, as `board_edit` is."""
+        agent_common.person_only(caller, "find a board line", "§4.4", self._graph())
+        root, _want = self._board_root(board)
+        self._board_served(root)
+        try:
+            return await asyncio.to_thread(board_mod.find_line, root, line, str(key or ""))
+        except board_mod.Refused as e:
+            raise RpcError(str(e)) from None
 
     @staticmethod
     def _board_answer(action: str, answer: Any, answers: Any) -> str:
@@ -468,6 +502,10 @@ class InboxMixin:
         draft: str = "",
         team: str = "",
         priority: str = "",
+        refs: list[str] | None = None,
+        key: str = "",
+        doer: str = "",
+        find_only: bool = False,
         caller: Any = None,
     ) -> dict[str, Any]:
         """**Hand to the techlead** and `ao td add` (design §4.10 *An entry handed to a seat*, §4.9
@@ -494,10 +532,70 @@ class InboxMixin:
         before the send unless it is this host's and unclaimed, then claimed for the ask
         (`claimed.json` `{by: hand:<its id>, at}`) and carried in the envelope beside `entry`.
         A session's call, for another repo only, is its own `ask` to that repo's question seat
-        (`_entry_request`, TD-995)."""
+        (`_entry_request`, TD-995).
+
+        `refs`, `key` and `doer` are **Have a session do it**'s hand-off alone (§4.5 screen 12, TD-1660): stored
+        in the ask's `entry` by the send itself, with `handed_at`. Given `key`, a handed ask from the person,
+        open or settled, whose `entry.key` it is, is answered as `{id, to, team, doer, existing: true}` and nothing
+        is sent — the look and the send under one lock per key, so two calls with one key send once; `find_only`
+        only looks (`{existing: false}` where none is), before every other check. A session's call carrying any of
+        the four is refused."""
         me = self._entry_session(caller, repo, draft)
         if me is not None:
+            if refs or str(key or "").strip() or str(doer or "").strip() or find_only:
+                raise RpcError(HAND_OFF_ONLY)
             return await self._entry_request(me, repo, type, text, team, priority)
+        key = str(key or "").strip()
+        if find_only:
+            if not key:
+                raise RpcError("find_only looks for a handed ask by its key: give key (design §4.10)")
+            return self._handed_by_key(key) or {"existing": False}
+        if key and not HAND_KEY_RE.fullmatch(key):
+            raise RpcError(f"{key!r} is not a hand-off's key: <repo>:board: and eight hex digits (design §4.10)")
+        if refs is not None and not (isinstance(refs, list) and all(isinstance(r, str) for r in refs)):
+            raise RpcError("refs is a list of entry refs, each <repo>#TD-n (design §4.10)")
+        if not key:
+            return await self._entry_send(repo, type, text, teams, draft, team, priority, refs, "", doer)
+        locks = self.__dict__.setdefault("_hand_locks", {})
+        async with locks.setdefault(key, asyncio.Lock()):
+            found = self._handed_by_key(key)
+            if found is not None:
+                return found
+            return await self._entry_send(repo, type, text, teams, draft, team, priority, refs, key, doer)
+
+    def _handed_by_key(self, key: str) -> dict[str, Any] | None:
+        """The person's handed ask whose `entry.key` is `key`, open or settled (§4.10, TD-1660): the newest copy
+        not closed `rerouted`, read from the graph `rpc_inbox` reads, as `{id, to, team, doer, existing: true}`;
+        None where there is none."""
+        best: tuple[str, str, Any] | None = None
+        for r in self._graph().values():
+            for e in r.inbox:
+                if not e.handed_entry or e.closed_reason == "rerouted":
+                    continue
+                if str((e.entry or {}).get("key") or "") != key:
+                    continue
+                if best is None or str(e.at) > best[0]:
+                    best = (str(e.at), r.id, e)
+        if best is None:
+            return None
+        _, holder, e = best
+        got = e.entry or {}
+        return {"id": e.id, "to": holder, "team": got.get("team"), "doer": got.get("doer"), "existing": True}
+
+    async def _entry_send(
+        self,
+        repo: str,
+        type: str,
+        text: str,
+        teams: list[dict[str, str]] | None,
+        draft: str,
+        team: str,
+        priority: str,
+        refs: list[str] | None,
+        key: str,
+        doer: str,
+    ) -> dict[str, Any]:
+        """`entry_add`'s send for the person (above): checked, the seat picked, the ask landed with its `entry`."""
         want = str(repo or "").strip()
         roots = hosts.local_host().repos()
         found = [r for r in roots if want and (want in (Path(r).name, r) or Path(r).resolve() == Path(want).resolve())]
@@ -542,17 +640,30 @@ class InboxMixin:
             if not seat:
                 raise RpcError(f"{team} has no techlead seat: there is nobody to hand the entry to (design §4.9b)")
         folder = await asyncio.to_thread(agent_common.draft_folder, draft, "entry_add") if draft else None
-        sent = await self._msg(PERSON, words, [seat], "ask", None, None, None, None)
+        # the debt and the envelope's fields, landed by the send itself, so no window leaves a sent handed ask
+        # without them (§4.10, TD-1660)
+        entry: dict[str, Any] = {"repo": name, "type": kind, "team": team, "priority": rank, "picked": bool(pick)}
+        if len(order) > 1 and not pick:  # one team: there is nowhere else to move it
+            entry["teams"] = order  # where a move goes when its seat cannot answer (§4.9b *A question already waiting*)
+        if refs:
+            entry["refs"] = [str(r).strip() for r in refs if str(r).strip()]
+        if key:
+            entry["key"] = key
+            entry["handed_at"] = now_iso()  # the first send's, which a move's copy keeps (§4.5 screen 12, TD-1660)
+        if str(doer or "").strip():
+            entry["doer"] = str(doer).strip()
+        # a hand-off's subject is the board line's own text, its second line, never the relay line (TD-1660)
+        own = words.split("\n", 2)[1].strip() if key and "\n" in words else ""
+        sent = await self._msg(
+            PERSON, words, [seat], "ask", None, None, None, None, subject=own or None, handed=True, entry=entry
+        )
         mid = (sent.get("entry") or {}).get("id")
         if not mid:
             raise RpcError(f"the entry was not delivered to {seat}")
         # a seat closed and started again under its name is followed to the record that took it (review of #764)
         seat = next(iter(sent.get("delivered") or ()), seat)
-        # the debt, the envelope's fields and no bound: an entry never lapses (§4.10)
-        entry: dict[str, Any] = {"repo": name, "type": kind, "team": team, "priority": rank, "picked": bool(pick)}
-        if len(order) > 1 and not pick:  # one team: there is nowhere else to move it
-            entry["teams"] = order  # where a move goes when its seat cannot answer (§4.9b *A question already waiting*)
-        self._mark(mid, handed=True, entry=entry, bound=None, draft=draft or None)
+        # no bound: an entry never lapses (§4.10)
+        self._mark(mid, bound=None, draft=draft or None)
         if folder is not None:  # the form's files are the ask's, kept `runs_keep_days` from now (§4.4, TD-630)
             try:
                 await asyncio.to_thread(agent_common.claim_draft, folder, f"hand:{mid}", datetime.now(UTC))

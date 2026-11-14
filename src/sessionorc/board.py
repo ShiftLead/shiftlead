@@ -58,13 +58,14 @@ _MARK_END_RE = re.compile(r"\b(?:Context|Parts|Doer|Hide until|Answers|Lifts|Dec
 WORD_FOR_WORD = "a decide records one of the item's own answers, word for word: anything else is a Reply (design §4.4)"
 NOT_ACTS_ANSWER = "have a session do it is an act line's answer: this item's answers are its own"
 MARKED = "this step is marked only you can do this: Done closes it once you have"
+WHY_ON_DONE = "a why is a Done's alone: it is written in the line's Closed: field (design §4.4)"
+NO_DOER = "this line names no Doer: Have a session do it hands it to this repo's lane"
 
 
-def marked_for_person(text: str) -> bool:
-    """Whether a board line is marked for the person (§4.5 screen 12 *Have a session do it*, TD-1624): its words
-    after its `(session …) —` lead (from its start where it has none) and before its first field, any reply cut
-    first, its spaces collapsed, its case folded and a trailing `.` or `!` dropped, end with *only you can do this*.
-    `text` is the item's text, or its whole `- [ ]` line."""
+def own_text(text: str) -> str:
+    """A board line's own words (§4.5 screen 12 *Have a session do it*, TD-1624, TD-1660): its words after its
+    `(session …) —` lead (from its start where it has none) and before its first field, any reply cut first, its
+    ends stripped — bold kept, never clipped. `text` is the item's text, or its whole `- [ ]` line."""
     t = str(text or "")
     if (m := ledgerboard.ITEM_RE.match(t)) is not None:
         t = m.group("text")
@@ -74,7 +75,14 @@ def marked_for_person(text: str) -> bool:
         t = t[i + 3 :]
     if f := _MARK_END_RE.search(t):
         t = t[: f.start()]
-    words = " ".join(t.split()).casefold().rstrip(".!").rstrip()
+    return t.strip()
+
+
+def marked_for_person(text: str) -> bool:
+    """Whether a board line is marked for the person (§4.5 screen 12 *Have a session do it*, TD-1624): its own
+    words (`own_text`), its spaces collapsed, its case folded and a trailing `.` or `!` dropped, end with *only
+    you can do this*. `text` is the item's text, or its whole `- [ ]` line."""
+    words = " ".join(own_text(text).split()).casefold().rstrip(".!").rstrip()
     return words.endswith(ONLY_YOU)
 
 
@@ -115,8 +123,10 @@ def edit_line(
     by: str = "",
     today: str = "",
     answer: str = "",
+    why: str = "",
 ) -> str:
-    """`line` with the item done (ticked, `Closed: <today>.`), snoozed to `due`, replied to (`reply`,
+    """`line` with the item done (ticked, `Closed: <today>.`, or `Closed: <today> — <why>.` with `why`, a Done's
+    alone), snoozed to `due`, replied to (`reply`,
     by `by` on `today`) or decided (`answer`, on `today`) — ledgerboard's `edit_line`, which re-reads
     every edit and refuses one the reader would not read back. Refused unless `line` is an open item
     whose text is exactly `text` — the item the person was shown, not whatever moved onto that line —
@@ -131,6 +141,8 @@ def edit_line(
         raise Refused(f"unknown board action {action!r}: {' or '.join(ACTIONS)}")
     if action == "reply" and not " ".join(str(reply or "").split()):
         raise Refused("a reply needs its text: what the next session should do")
+    if why and action != "done":
+        raise Refused(WHY_ON_DONE)
     if action == "decide":
         if not " ".join(str(answer or "").split()):
             raise Refused("a decide needs its answer: one of the item's Answers:")
@@ -148,7 +160,10 @@ def edit_line(
         except ValueError:
             raise Refused(f"a {action} needs a date as YYYY-MM-DD, not {due!r}") from None
     try:
-        return ledgerboard.edit_line(body, action, to=to, answer=answer, reply=reply, by=by, today=_day(today)) + end
+        got = ledgerboard.edit_line(
+            body, action, to=to, answer=answer, reply=reply, by=by, today=_day(today), why=why or None
+        )
+        return got + end
     except ledgerboard.Refused as e:
         raise Refused(str(e)) from None
 
@@ -632,6 +647,7 @@ def write_back(
     reply: str = "",
     answer: str = "",
     key: str = "",
+    why: str = "",
 ) -> dict[str, Any]:
     """Make one Snooze, Done, Reply or Decide on the board on origin's head and land it there (§4.4):
     in the host agent's own tree for the repo of the checkout `root`, which is never written.
@@ -645,11 +661,13 @@ def write_back(
     root = Path(root)
     if action not in ACTIONS:
         raise Refused(f"unknown board action {action!r}: {' or '.join(ACTIONS)}")
+    if why and action != "done":
+        raise Refused(WHY_ON_DONE)
     if action == "snooze" and not due:
         due = _day("").isoformat()
     with _EDIT:
         clock = _Clock()
-        return _twice(lambda: _write_back(root, line, text, action, due, reply, answer, clock, key))
+        return _twice(lambda: _write_back(root, line, text, action, due, reply, answer, clock, key, why))
 
 
 def _write_back(
@@ -662,6 +680,7 @@ def _write_back(
     answer: str = "",
     clock: _Clock | None = None,
     key: str = "",
+    why: str = "",
 ) -> dict[str, Any]:
     if key and not workorders.is_work_order(key):
         raise Refused(f"{key!r} is not a board line's id: board: and eight hex digits (design §4.4)")
@@ -684,7 +703,7 @@ def _write_back(
     text = ledgerboard.ITEM_RE.match(lines[at].rstrip("\n")).group("text").strip()  # type: ignore[union-attr]
     by = author(root) if action == "reply" else ""
     # ShiftLead's own checks first (the item word for word, a decide on a decided line, a field's name)
-    edit_line(lines[at], text, action, due, reply=reply, by=by, answer=answer)
+    edit_line(lines[at], text, action, due, reply=reply, by=by, answer=answer, why=why)
     lifts = None
     only = False
     if action == "decide":
@@ -696,7 +715,7 @@ def _write_back(
     plan = _plan(
         lb_board.plan_edit, str(path), action, at + 1, text,
         to=due if action in ("snooze", "due") else None, answer=answer or None, text=reply or None,
-        by=by or None, tool=TOOL, ledger=lifts, board_only=only,
+        by=by or None, tool=TOOL, ledger=lifts, board_only=only, why=why or None,
     )  # fmt: skip
     msg = message(text, action, due, answer=answer)
     if plan.info.get("left_open"):
@@ -722,6 +741,65 @@ def _write_back(
 
     landed = _land(root, t, want, msg, clock, still, also=also)
     return {**landed, "line": at + 1, "text": text, "due": due, **({"entries": plan.info["entries"]} if also else {})}
+
+
+def find_line(root: str | Path, line: int | None, key: str) -> dict[str, Any]:
+    """**`board_find`** (§4.5 screen 12 *Three verbs: Have a session do it*, TD-1660): the open line whose id is
+    `key` (`board:<key>`, §4.4 *A board line's id*), found on origin's head as the write-back finds it, under the
+    board's write lock held for the find alone, and re-read with ledgerboard. Refused unless it is open, undecided,
+    of kind `act`, without `Answers:`, not marked for the person, and names a `Doer:`; whatever the page sent.
+    Returns `{doer, text, context, session, due, context_refs, refs, key}`: `doer` the field's value as written,
+    `text` the line's own words (`own_text`), `context` the detail block's Context bullet without its label ("" where
+    none), `session` the line's session (None where it names none), `due` its `Due:`, `context_refs` every ref of its
+    `Context:` as written, `refs` its entry refs (`TD-n`, `<repo>#TD-n`), the line's id as `key`."""
+    root = Path(root)
+    if not workorders.is_work_order(str(key or "")):
+        raise Refused(f"{key!r} is not a board line's id: board: and eight hex digits (design §4.4)")
+    with _EDIT:
+        clock = _Clock()
+        t, _ = _tree(root, clock)
+        path = t / workorders.board_rel(root)
+        lines = _read_lines(path) if path.exists() else []
+        at = _find(lines, line, "", key, root)
+        if at is None:
+            raise Refused(workorders.NO_LINE.format(ref=key))
+        item = next((it for it in ledgerboard.parse_board("".join(lines), warn=False) if it.line == at + 1), None)
+    if item is None:
+        raise Refused(workorders.NO_LINE.format(ref=key))
+    text = item.text
+    if item.decided is not None:
+        raise Refused("this item is already decided: Reply says more to its session, Done closes it")
+    if item.kind != "act":
+        raise Refused(NOT_ACTS_ANSWER)
+    if item.answers:
+        raise Refused(NOT_ACTS_ANSWER)
+    if marked_for_person(text):
+        raise Refused(MARKED)
+    if item.doer is None:
+        raise Refused(NO_DOER)
+    context = ""
+    for i, ln in enumerate(item.detail):
+        m = re.match(r"^-\s+\*\*Context:\*\*\s*", ln)
+        if m is None:
+            continue
+        words = [ln[m.end() :].strip()]
+        for more in item.detail[i + 1 :]:
+            if not more.startswith(" "):
+                break
+            words.append(more.strip().removeprefix("- ").strip())
+        context = " ".join(w for w in words if w)
+        break
+    every = ledgerboard.item_refs(text)
+    return {
+        "doer": item.doer[2],
+        "text": own_text(text),
+        "context": context,
+        "session": ledgerboard.item_head(text)[0],
+        "due": item.due.isoformat() if item.due else None,
+        "context_refs": every,
+        "refs": [r for r in every if not r.startswith(("PR #", "branch "))],
+        "key": workorders.ref(root, text.strip()),
+    }
 
 
 def _lift_ledger(t: Path, text: str) -> str | None:
