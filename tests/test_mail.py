@@ -2178,6 +2178,8 @@ async def test_a_mail_form_is_filled_never_pressed(agent, tmp_path):
                 await person.call("msg", kind="reply", reply_to=asked, text="x", **bad)
         got = await person.call("msg", kind="reply", reply_to=asked, text="x\n\nand more", form=1)
         assert got["entry"]["text"] == "Hold: x\n\nand more"
+        got = await person.call("msg", kind="reply", reply_to=asked, text="hold  : z", form=1)
+        assert got["entry"]["text"] == "hold  : z"  # its head, spaced as typed, is not put back twice
         got = await person.call("msg", kind="reply", reply_to=asked, text="hold: y", form=1)
         assert got["entry"]["text"] == "hold: y"
         got = await person.call("msg", kind="reply", reply_to=asked, text="Hold: drop it")

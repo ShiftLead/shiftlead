@@ -212,7 +212,7 @@ def _form_reply(replied: MailEntry, text: str, answer: Any, form: Any) -> str:
         head = mail.form_head_as_offered(labels[form])
         first, sep, rest = text.partition("\n\n")
         before, colon, _after = first.partition(":")
-        if not (colon and before.strip().lower() == head.lower()):
+        if not (colon and " ".join(before.split()).lower() == " ".join(head.split()).lower()):
             first = f"{head}: {first}".rstrip()
         text = first + sep + rest
     elif (
@@ -1306,6 +1306,10 @@ class MailMixin:
                 )
             # a form is filled, never pressed (§4.10, TD-1698): ahead of the index check and the orphan road
             text = _form_reply(replied, text, answer, form)
+            if len(text.encode()) > mail.TEXT_CAP:  # the head put back counts too (review of #3896)
+                raise RpcError(
+                    f"message body over {mail.TEXT_CAP} bytes once the form's head is put back (design §4.10)"
+                )
             if sender == PERSON and replied.orphaned and not replied.open:
                 raise RpcError(
                     f"{reply_to} is already closed ({replied.closed_reason}): its asker is gone (design §4.10)"
