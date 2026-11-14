@@ -74,7 +74,7 @@ def ledgerboard(root: Path | str) -> dict[str, Any]:
 
 def ledger(root: Path | str) -> dict[str, Any]:
     """The ledger seam: `{path, state, major, entries, why, directory}` — `state` *ok* (it parses and its major
-    is one `ledgerboard.py` knows; `entries` its count), *absent* (neither a file nor a directory at the
+    is one `sessionorc.ledgerboard` knows; `entries` its count), *absent* (neither a file nor a directory at the
     ledger's path), *unreadable* (the file could not be read as text, `ledger:` names a path outside the repo,
     or a v2 directory is faulted: `why` its `ledger.v2_faults` words) or *newer* (its `Ledgerboard:` major —
     a directory's from its `README.md` — is past the module's), `why` the reader's reason when not *ok*;
