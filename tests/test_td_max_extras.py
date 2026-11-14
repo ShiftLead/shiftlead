@@ -184,6 +184,16 @@ def test_max_off_removes_every_held_extra_and_a_refused_removal_is_said(world, e
     assert "hunt-2: the held extra of hunt was not removed — suspended" in capsys.readouterr().err
 
 
+def test_a_held_extra_a_person_took_over_is_never_removed(world, extras_on, removes):  # noqa: F811
+    """`_surplus_extras` reads a person's session (`unattended: false`) as no extra to remove (§4.9 *A person in the
+    team*, TD-1615): past a lowered max, the person's grind-4 stays while the worker's grind-5 beside it goes."""
+    tmp_path, state = world
+    settings(tmp_path, {"ao-grind": {"max": {"grind": 3}}})
+    state["sessions"] += [{**extra("grind-4", "grind"), "unattended": False}, extra("grind-5", "grind")]
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    assert removed(state) == ["ao-shiftlead-grind-5"]
+
+
 def test_a_held_extra_with_mail_waiting_is_kept(world, extras_on, removes, capsys):  # noqa: F811
     tmp_path, state = world
     settings(tmp_path, {"ao-grind": {"max": "off"}})
