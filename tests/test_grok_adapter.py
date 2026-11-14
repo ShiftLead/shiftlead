@@ -30,6 +30,9 @@ def home(tmp_path, monkeypatch):
     binary = tmp_path / "bin" / "grok"
     binary.parent.mkdir()
     binary.write_text("#!/bin/sh\n")
+    (tmp_path / "person").mkdir()  # the launch home's source and the managed file: never the developer's (TD-1836)
+    monkeypatch.setattr(grok, "PERSON_HOME", tmp_path / "person")
+    monkeypatch.setattr(grok, "MANAGED_SETTINGS", tmp_path / "etc" / "managed-settings.json")
     return tmp_path
 
 

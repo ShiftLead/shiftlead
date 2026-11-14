@@ -7,6 +7,9 @@ event the state feed reads. A profile names a `config_dir` of its own (`own_home
 `~/.grok` is never written. Read against the installed 1.0.77 (`50ca579fa996`, 2026-11-14): `--session-id`,
 `--resume`, `--always-approve`, `--permission-mode default` and `-m` are its flags.
 
+Every launch runs with `HOME` the launch home (`launch_home`, TD-1836): the person's home by links, but Claude Code's
+two user-level settings files, whose `defaultMode` the tool would otherwise run under over the launch's flag.
+
 Registered under the `shiftlead.adapters` entry points (TD-1637 slice 13): the conformance suite tests it against
 the hook payloads and panes captured from the installed tool (`tests/conformance/fixtures/grok/`).
 """
@@ -28,6 +31,7 @@ from sessionorc.models import Confidence, State
 from sessionorc.screen import painted_text
 from sessionorc.tmux import PaneInfo
 from shiftlead import profiles as profiles_mod
+from shiftlead.adapters.grok import launch_home as launch_home_mod
 from shiftlead.adapters.grok import transcript as transcript_mod
 from shiftlead.profiles import Profile
 
@@ -73,6 +77,14 @@ LAUNCH_ENV = {
     "GROK_CODE_XAI_API_KEY": "",
 }
 NO_HOME = "a Grok profile needs a config_dir of its own"
+# The two names a test patches (§4.3 *`launch`*, as Gemini CLI's `MACHINE_LAYER`; Grok's `stub_setup` points both
+# into the case's directory): the person's home, which the launch home mirrors, is the host agent's own `HOME`; the
+# managed file is Claude Code's, which the tool reads as a project's
+PERSON_HOME = Path.home()
+MANAGED_SETTINGS = Path("/etc/claude-code/managed-settings.json")
+# a project's or the managed file's `env` block wins over the launch's own env (read on 1.0.77, TD-1836: `HOME`, a
+# switch, a cleared key and a `GROK_*` name all took the file's value), so under `all` a file naming one refuses
+ENV_KEYS = ("HOME", "GROK_", "XAI_")
 # The composer (design §4.3 `composer`, read 2026-11-14 on 1.0.77): a rounded box, `╭` its top border and `╰` its
 # bottom, its first row `│ ❯ <text>` and a pasted text's further rows under it. A submitted prompt is drawn in the
 # history above with the same `❯` and no box, and a permission or question dialog takes the box's place (`┃` rows).
@@ -155,17 +167,28 @@ class GrokAdapter:
         """The binary by absolute path, refused in words where it is missing; `--session-id` with an id of
         ShiftLead's, or `--resume <id>` from the record's directory; `-m` for the profile's model;
         `--always-approve` on an unattended launch under `permission_prompts: skip` only, `asking_args` under
-        `all`. `GROK_HOME` is the profile's `config_dir`, and the hook file is written into it first."""
+        `all`, refused where a Claude Code file the tool reads would set its mode or env (§4.3). `GROK_HOME` is the
+        profile's `config_dir`, and the hook file is written into it first; `HOME` is the launch home, made or
+        refreshed here, at create and at resume, and a launch whose launch home cannot be made is refused."""
         prof = profiles_mod.get(profile or None)
         if not prof.config_dir:
             raise ValueError(f"{NO_HOME} ({prof.name})")
         if not Path(self.binary).is_file():
             raise ValueError(f"Grok Build is not installed at {self.binary} — the person installs it: {INSTALL_LINE}")
+        if unattended and prof.permission_prompts == "all":
+            why = launch_home_mod.all_refusal(cwd, MANAGED_SETTINGS, prof.name, env_keys=ENV_KEYS)
+            if why:
+                raise ValueError(why)
         home = Path(prof.config_dir).expanduser()
         try:
             write_hook_file(home, self._hook_cmd or hook_path())
         except OSError as e:
             raise ValueError(f"cannot write the Grok hook file into {home / HOOK_FILE}: {e}") from e
+        launch_home = launch_home_mod.path_for(home)
+        try:
+            launch_home_mod.refresh(PERSON_HOME, launch_home)
+        except OSError as e:
+            raise ValueError(f"Grok's launch home {launch_home} could not be made: {e}") from e
         adapter_id = resume or str(uuid.uuid4())
         argv = [self.binary, *(["--resume", resume] if resume else ["--session-id", adapter_id])]
         if prof.model:
@@ -176,7 +199,7 @@ class GrokAdapter:
             argv += args if prof.permission_prompts == "skip" else [a for a in args if a not in ALWAYS_APPROVE]
             if prof.permission_prompts == "all":
                 argv += self.asking_args
-        env = {"GROK_HOME": str(home), **LAUNCH_ENV}
+        env = {"GROK_HOME": str(home), "HOME": str(launch_home), **LAUNCH_ENV}
         # the prompt is typed at the composer by the host agent once `SessionStart` reports (§4.1, TD-339)
         return LaunchSpec(argv=argv, env=env, adapter_id=adapter_id, first_prompt=prompt or None, model=prof.model)
 
@@ -285,12 +308,17 @@ class GrokAdapter:
         signed in (`auth.json`), with the person's login line as the cure. A profile with no `config_dir` of its
         own, or a metered one, never gets here: the load refuses it (§4.2a), and that refusal is the one row. An
         `XAI_API_KEY` or `GROK_CODE_XAI_API_KEY` in the host agent's environment is noted, since each launch clears
-        it."""
+        it; so are the person's `~/.claude` settings that no longer reach a Grok launch (its `permissions` rules for
+        every profile, its `defaultMode` for one under `ask`), and a managed file that refuses every launch of a
+        profile under `all` (TD-1836)."""
         try:
             profs, _ = profiles_mod.load()
         except (OSError, ValueError, TypeError, AttributeError) as e:
             return [{"error": f"profiles.yml: {e}"}]
         keys = [k for k in ("XAI_API_KEY", "GROK_CODE_XAI_API_KEY") if os.environ.get(k)]
+        mine = launch_home_mod.home_settings(PERSON_HOME)
+        rules = [p for p, doc in mine if _has_rules(doc)]
+        modes = [p for p, doc in mine if _has_mode(doc)]
         out: list[dict] = []
         for prof in profs.values():
             if prof.adapter != self.name:
@@ -304,8 +332,25 @@ class GrokAdapter:
                 "credentials": self.credentials_ok(prof),
                 "login": f"GROK_HOME={home} {self.binary} login" if home else None,
             }
+            notes = []
             if keys:
-                row["note"] = f"{' and '.join(keys)} set in the host agent's environment; each launch clears it"
+                notes.append(f"{' and '.join(keys)} set in the host agent's environment; each launch clears it")
+            if rules:
+                notes.append(
+                    f"the permissions rules in {' and '.join(map(str, rules))} do not reach {prof.name}: a Grok "
+                    "launch runs in its launch home, which holds neither file"
+                )
+            if prof.permission_prompts == "ask" and modes:
+                notes.append(
+                    f"the defaultMode in {' and '.join(map(str, modes))} does not reach {prof.name}: its mode is the "
+                    "managed file's or a project's defaultMode, else its home's config.toml's, else the tool's default"
+                )
+            if prof.permission_prompts == "all":
+                why = launch_home_mod.file_refusal(MANAGED_SETTINGS, prof.name, env_keys=ENV_KEYS)
+                if why:
+                    notes.append(f"every unattended launch is refused: {why}")
+            if notes:
+                row["note"] = "; ".join(notes)
             out.append(row)
         return out
 
@@ -328,6 +373,16 @@ class GrokAdapter:
             "GROK_HOME=<its config_dir> grok login (design §4.3)."
         )
         return {"key": f"missing:{self.binary}", "text": text}
+
+
+def _has_rules(doc: dict) -> bool:
+    perms = doc.get("permissions")
+    return isinstance(perms, dict) and any(perms.get(k) for k in ("allow", "deny", "ask"))
+
+
+def _has_mode(doc: dict) -> bool:
+    perms = doc.get("permissions")
+    return "defaultMode" in doc or (isinstance(perms, dict) and "defaultMode" in perms)
 
 
 def _profile(profile: Profile | str | None) -> Profile | None:
