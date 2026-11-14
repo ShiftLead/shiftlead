@@ -23,11 +23,12 @@ import uuid
 from collections.abc import Mapping
 from pathlib import Path
 
-from sessionorc.adapters import LaunchSpec, read_version
+from sessionorc.adapters import LaunchSpec, Transcript, read_version
 from sessionorc.models import Confidence, State
 from sessionorc.screen import painted_text
 from sessionorc.tmux import PaneInfo
 from shiftlead import profiles as profiles_mod
+from shiftlead.adapters.grok import transcript as transcript_mod
 from shiftlead.profiles import Profile
 
 NAME = "grok"
@@ -211,6 +212,43 @@ class GrokAdapter:
             text = parts[-1] if len(parts) >= 3 else ""
         return text.strip() or None
 
+    # -- reads (design §4.3 *Reads*) ---------------------------------------------------------------
+
+    def transcript_path(self, session_id: str, cwd: Path, profile: Profile | str | None = None) -> Path | None:
+        """The session's log under the profile's home, found by the session id's own directory
+        (`sessions/*/<id>/updates.jsonl`), never by encoding `cwd`; None where there is none or the profile names no
+        home of its own (never the person's `~/.grok`)."""
+        prof = _profile(profile)
+        if prof is None or not prof.config_dir:
+            return None
+        return transcript_mod.find(transcript_mod.sessions_root(Path(prof.config_dir).expanduser()), session_id)
+
+    def read_transcript(
+        self,
+        session_id: str,
+        cwd: Path,
+        profile: str = "",
+        *,
+        before: int | None = None,
+        turns: int = 20,
+        raw: bool = False,
+    ) -> Transcript | None:
+        """The session's log as neutral entries (design §4.3 `read_transcript`). None when there is no log, or the
+        profile is unknown."""
+        p = self.transcript_path(session_id, cwd, profile)
+        if p is None:
+            return None
+        try:
+            return transcript_mod.read(p, before=before, turns=turns, raw=raw)
+        except OSError:
+            return None
+
+    def model_in_use(self, session_id: str, cwd: Path, profile: str = "") -> str | None:
+        """`summary.json`'s model beside the session's log (design §4.3 *Reads*), so a seat with `model:` unset still
+        names its model; None where there is no log or it names none."""
+        p = self.transcript_path(session_id, cwd, profile)
+        return None if p is None else transcript_mod.model(p)
+
     def account_for(self, profile: str) -> str | None:
         """The account a profile naming this adapter runs under (§4.2a); None for any other (TD-1581)."""
         return profiles_mod.account_of(profile, NAME)
@@ -290,3 +328,13 @@ class GrokAdapter:
             "GROK_HOME=<its config_dir> grok login (design §4.3)."
         )
         return {"key": f"missing:{self.binary}", "text": text}
+
+
+def _profile(profile: Profile | str | None) -> Profile | None:
+    """The profile itself, or by name; None for one that does not resolve (never another account's home)."""
+    if isinstance(profile, Profile):
+        return profile
+    try:
+        return profiles_mod.get(profile or None)
+    except (KeyError, ValueError):
+        return None

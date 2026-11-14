@@ -175,3 +175,63 @@ def test_doctor_reads_each_grok_profiles_home_its_sign_in_and_a_key_in_the_envir
     (home / "home" / "profiles.yml").write_text("profiles:\n  bare: {adapter: grok}\n")
     (row,) = a.doctor_profiles()
     assert set(row) == {"error"} and "needs a config_dir of its own" in row["error"]
+
+
+FIX = Path(__file__).parent / "conformance" / "fixtures" / "grok" / "captured" / "transcripts"
+
+
+def _place(home: Path, sid: str, cwd_dir: str = "%2Fr") -> Path:
+    d = home / "g" / "sessions" / cwd_dir / sid
+    d.mkdir(parents=True)
+    data = (FIX / "panes.jsonl").read_bytes().replace(b"33333333-4444-4555-8666-777777777777", sid.encode())
+    (d / "updates.jsonl").write_bytes(data)
+    (d / "summary.json").write_bytes((FIX / "panes.summary.json").read_bytes())
+    return d
+
+
+def test_the_log_is_found_by_its_ids_own_directory_and_the_model_beside_it(home):
+    """§4.3 *Reads* (TD-1637 slice 15): `sessions/*/<id>/updates.jsonl` under the profile's own home, whatever the
+    cwd's directory is named; an id that could name another directory finds nothing; `summary.json`'s model."""
+    a = ad(home)
+    d = _place(home, "abc")
+    assert a.transcript_path("abc", home / "anywhere", "gk") == d / "updates.jsonl"
+    assert a.model_in_use("abc", home, "gk") == "grok-4.7"
+    for bad in ("*", "a?c", "../g", "", ".."):
+        assert a.transcript_path(bad, home, "gk") is None
+    assert a.transcript_path("abc", home, "no-such-profile") is None and a.model_in_use("nope", home, "gk") is None
+    (d / "summary.json").write_text("{}")
+    assert a.model_in_use("abc", home, "gk") is None
+    tr = a.read_transcript("abc", home, "gk")
+    tool = next(e for e in tr.entries if e.kind == "tool" and e.name == "ask_user_question")
+    assert tool.call == "Do you prefer red or blue?" and "Blue" in tool.result  # the question as its call line
+    shell = next(e for e in tr.entries if e.name == "run_terminal_command")
+    assert shell.call == "rm a.txt && mkdir made" and shell.result == "exit: 0\n"  # the terminal's own output line
+
+
+def test_chunks_of_one_kind_join_until_something_else_comes(tmp_path):
+    """A message streamed in parts reads as one entry; a chunk after another update starts a new one."""
+    from shiftlead.adapters.grok import transcript
+
+    def rec(ts, kind, text=None, **kw):
+        up = {"sessionUpdate": kind, **({"content": {"type": "text", "text": text}} if text is not None else {}), **kw}
+        return json.dumps({"timestamp": ts, "method": "session/update", "params": {"sessionId": "s", "update": up}})
+
+    lines = [
+        rec(1, "user_message_chunk", "go"),
+        rec(2, "agent_thought_chunk", "a\n"),
+        rec(3, "agent_thought_chunk", "b"),
+        rec(4, "agent_message_chunk", "one "),
+        rec(5, "agent_message_chunk", "two"),
+        rec(6, "current_mode_update", currentModeId="plan"),
+        rec(7, "agent_message_chunk", "three"),
+    ]
+    p = tmp_path / "updates.jsonl"
+    p.write_text("\n".join(lines) + "\nnot json\n")
+    tr = transcript.read(p)
+    assert [(e.kind, e.text) for e in tr.entries] == [
+        ("prompt", "go"),
+        ("thought", "a\nb"),
+        ("text", "one two"),
+        ("text", "three"),
+    ]
+    assert tr.entries[1].lines == 2 and tr.turns == 1 and tr.first_at == "1970-01-01T00:00:01Z"

@@ -35,3 +35,8 @@ through the state feed's `translate` as well.
   each step: the empty composer at launch, a typed line, a two-line bracketed paste, a turn running with an
   empty composer, with a typed line and with a queued prompt, a permission prompt (`rm a.txt && mkdir made`)
   and an `ask_user_question`. The titles' first entry is the launch's, before the tool named the session.
+- `captured/transcripts/tools.jsonl` and `captured/transcripts/panes.jsonl`, each with its `*.summary.json` (Grok
+  Build 1.0.77 on kmaster, TD-1637 slice 15): the `updates.jsonl` and `summary.json`, unchanged, that the tool wrote
+  for the sessions of `captured/hooks.jsonl` (`11111111-…`, two shell commands, the mode cycled) and of the panes
+  (`33333333-…`, an essay, a shell command, an `ask_user_question` answered *Blue*, a poem and a queued prompt),
+  copied from their scratch homes' `sessions/<the cwd, encoded>/<id>/`.

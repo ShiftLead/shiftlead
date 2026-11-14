@@ -444,9 +444,12 @@ def _rooted(p: Any) -> os.stat_result:
 class GrokHarness:
     """Grok Build reads its hooks from `<GROK_HOME>/hooks/*.json`, which its launch writes ShiftLead's file into,
     and hands each payload to `shiftlead-hook --adapter grok`, whose `translate` makes the host agent's `hook`
-    params. Its transcript is not read yet (TD-1637's later slices)."""
+    params; its transcript is `sessions/*/<id>/updates.jsonl` under that home."""
 
-    tool_fields = frozenset({"sessionId", "hookEventName", "toolName", "toolInput", "promptId", "subagentType"})
+    tool_fields = frozenset(
+        {"sessionId", "hookEventName", "toolName", "toolInput", "promptId", "subagentType"}
+        | {"sessionUpdate", "toolCallId", "rawInput", "rawOutput", "content"}
+    )
     skip_flags = ("--always-approve",)
 
     def profile(self, tmp_path: Path, monkeypatch: Any) -> str:
@@ -481,6 +484,21 @@ class GrokHarness:
         from shiftlead.adapters.grok.hook import translate
 
         return translate(payload)  # every Grok launch lands at the composer: no `at_composer` to pass
+
+    def place_transcript(self, tmp_path: Path, src: Path, session_id: str) -> Path:
+        """Put the fixture where the adapter looks for `session_id`'s log — `sessions/<a cwd's directory>/<id>/`,
+        its captured session id replaced by `session_id` throughout, and the `summary.json` captured beside it
+        (`<name>.summary.json`) where there is one; the session's cwd."""
+        cwd = tmp_path / "repo"
+        data = src.read_bytes()
+        captured = json.loads(data.split(b"\n", 1)[0])["params"]["sessionId"].encode()
+        out = tmp_path / "gk" / "sessions" / "%2Ftmp%2Frepo" / session_id
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "updates.jsonl").write_bytes(data.replace(captured, session_id.encode()))
+        summary = src.with_name(src.name.removesuffix(".jsonl") + ".summary.json")
+        if summary.is_file():
+            (out / "summary.json").write_bytes(summary.read_bytes().replace(captured, session_id.encode()))
+        return cwd
 
 
 HARNESSES: dict[str, Any] = {"claude-code": ClaudeCodeHarness(), "gemini": GeminiHarness(), "grok": GrokHarness()}

@@ -1,0 +1,26 @@
+{
+  "info": {
+    "id": "33333333-4444-4555-8666-777777777777",
+    "cwd": "/tmp/claude-1000/-home-kmaster-shiftlead--claude-worktrees-grinder-ao-2/1cb95f71-ee3c-4d78-b400-4e4309ced71d/scratchpad/gdir"
+  },
+  "agent_id": "ag1.3f92258d0da0424eb312b0dc483b837a",
+  "attempt_id": "at1.a66278fabae04a3faf630973d6844c00",
+  "session_summary": "Tmux essay, shell command, color poll, terminal poem",
+  "created_at": "2026-11-14T02:58:12.493996978Z",
+  "updated_at": "2026-11-14T03:01:59.377124779Z",
+  "num_messages": 28,
+  "num_chat_messages": 26,
+  "current_model_id": "grok-4.7",
+  "next_trace_turn": 5,
+  "chat_format_version": 1,
+  "git_root_dir": "/tmp/claude-1000/-home-kmaster-shiftlead--claude-worktrees-grinder-ao-2/1cb95f71-ee3c-4d78-b400-4e4309ced71d/scratchpad/gdir/",
+  "request_id": "ec90f76e-457c-4574-8263-de54eb7b3378",
+  "grok_home": "/tmp/claude-1000/-home-kmaster-shiftlead--claude-worktrees-grinder-ao-2/1cb95f71-ee3c-4d78-b400-4e4309ced71d/scratchpad/gh",
+  "last_active_at": "2026-11-14T03:01:52.289343576Z",
+  "generated_title": "Tmux essay, shell command, color poll, terminal poem",
+  "agent_name": "grok-build-plan",
+  "sandbox_profile": "off",
+  "reasoning_effort": "high",
+  "last_turn_summary": "hi is the entire reply, nothing more",
+  "last_turn_summary_prompt_id": "ec90f76e-457c-4574-8263-de54eb7b3378"
+}
