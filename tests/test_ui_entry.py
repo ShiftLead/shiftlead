@@ -321,6 +321,20 @@ def test_no_read_of_the_plan_blanks_a_line_or_disables_hand_while_it_waits():
     assert 'nameBox.classList.toggle("bad", !!v.name_why);' in body
 
 
+def test_each_opening_of_the_add_entry_form_clears_a_taken_names_red():
+    """TD-1244: `plan()` marks a name that is not free by a `bad` class on `#entryline` and the Name box
+    (TD-1197); the form's open clears both, with the line's text, so a *taken* name's red line and border
+    never carry into the next opening."""
+    from shiftlead.ui import app as ui
+
+    js = (Path(ui.__file__).parent / "static" / "app.js").read_text()
+    start = js.index('    $("#entrywhere").textContent = repo;')
+    opening = js[start : js.index("    nameBox.oninput = ", start)]
+    assert 'nameBox.classList.remove("bad");' in opening
+    assert '$("#entryline").classList.remove("bad");' in opening
+    assert '$("#entryline").textContent = "";' in opening
+
+
 def test_the_add_entry_dialog_alone_widens_to_720():
     """§4.5a *Add entry…* *Its layout*: the dialog's 720px is its own; `.maildlg`, which four other dialogs share,
     keeps 560px; and the Team pick keeps its `row` class, so `.maildlg .row[hidden]` still hides it."""
