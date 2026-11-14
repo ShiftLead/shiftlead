@@ -2371,3 +2371,105 @@ async def test_a_press_cancelled_during_its_first_push_leaves_no_mark(agent, rep
     with pytest.raises(asyncio.CancelledError):
         await t
     assert agent._applying == {}
+
+
+HOLD = (
+    "decide 2026-11-12 (session `designer-ao-1` on kmaster) — **End the rounds?** Say. "
+    "Due: 2026-11-20. Answers: Go | Hold: <note>."
+)
+
+
+def _hold_board(repo: Path, *items: str) -> None:
+    (repo / board.BOARD).write_text(BOARD_TEXT + "".join(f"- [ ] {i}\n" for i in items))
+    git(repo, "commit", "-qam", "asked")
+    git(repo, "push", "-q", "origin", "main")
+
+
+def test_a_reply_that_fills_a_form_decides_the_line_in_one_commit(repo):
+    """TD-1698 (§4.4 *A Reply that fills a form decides*): a Reply whose words begin with a form's head and a colon,
+    on an open undecided decide line, is that form's decide — `Decided:` by the person, the decide's subject, no
+    reply trail, `decided` answered and the callback told; any case of the head is written as offered."""
+    _hold_board(repo, HOLD)
+    told: list[str] = []
+    got = board.write_back(repo, 9, HOLD, "reply", reply="hold :  drop\nDismiss", on_decide=told.append)
+    line = origin_board(repo).splitlines()[8]
+    assert got["decided"] == "Hold: drop Dismiss" and told and set(told) == {"Hold: drop Dismiss"}
+    assert ledgerboard.DECIDED_RE.search(line).group("text") == "Hold: drop Dismiss (by t)" and " — t, " not in line
+    assert got["message"].startswith("shiftlead: decide End the rounds? Say.: Hold: drop Dismiss")
+    assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
+
+
+def test_a_reply_that_fills_no_form_stays_a_reply_and_an_empty_fill_is_refused(repo):
+    """TD-1698: words that begin with no form's head stay a Reply and leave the line due; the form as written, its
+    head alone, its head with a placeholder, or a fill ending `(by …)`, are refused with nothing written."""
+    _hold_board(repo, HOLD)
+    before = origin_board(repo)
+    for bad, why in (
+        ("Hold: <note>", "Hold needs its words"),
+        ("Hold:", "Hold needs its words"),
+        ("hold: <b>", "Hold needs its words"),
+        ("Hold: later (by x)", r"\(by"),
+    ):
+        with pytest.raises(board.Refused, match=why):
+            board.write_back(repo, 9, HOLD, "reply", reply=bad, on_decide=lambda _a: None)
+        assert origin_board(repo) == before
+    got = board.write_back(repo, 9, HOLD, "reply", reply="Wait: a day, then ask")
+    assert "decided" not in got and got["message"].startswith("shiftlead: reply")
+    line = origin_board(repo).splitlines()[8]
+    assert ": Wait: a day, then ask" in line and ledgerboard.parse_decided(line[6:]) is None
+
+
+@pytest.mark.unit
+def test_which_lines_a_replys_form_decides():
+    """TD-1698: an open undecided `decide` or `look` line offering a form, or a `watch` with the look's pair; not a
+    decided line, a line with no form, an `act` line, or a `watch` with another form. `live_look_pair` is exactly
+    *Works* and the *Not right: <what>* form on a look kind."""
+    assert board.reply_fills(HOLD, "Hold: x") == "Hold: x"
+    assert board.reply_fills(HOLD, "Go") is None and board.reply_fills(HOLD, "Later: x") is None
+    assert board.reply_fills(HOLD + " Decided: Go (by t) (2026-11-13).", "Hold: x") is None
+    assert board.reply_fills(ASKED, "Keep it: x") is None  # no form offered
+    assert board.reply_fills(LOOK, "not right: the ring is amber") == "Not right: the ring is amber"
+    look = LOOK.replace("watch ", "look ", 1).replace("Not right: <what>", "Hold: <note>")
+    assert board.reply_fills(look, "Hold: x") == "Hold: x"
+    assert board.reply_fills(LOOK.replace("Not right: <what>", "Hold: <note>"), "Hold: x") is None  # a watch, no pair
+    assert board.reply_fills(HOLD.replace("decide ", "act ", 1), "Hold: x") is None
+    assert board.live_look_pair("look", ["Works", "Not right: <what>"]) and board.live_look_pair("watch", [
+        "Works", "not right: <what>"])  # fmt: skip
+    assert not board.live_look_pair("look", ["Works", "Hold: <note>"])
+    assert not board.live_look_pair("decide", ["Works", "Not right: <what>"])
+
+
+async def test_board_reply_that_fills_a_form_answers_decided_and_mails_nobody(agent, repo, tmp_path):
+    """TD-1698: the RPC's half — a Reply that fills a form answers `decided`, its action `decide`, and writes no
+    reply trail line; a refused fill is the decide's words."""
+    _hold_board(repo, HOLD)
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (home / "repos.txt").write_text(f"{repo}\n")
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+    path = str(repo / board.BOARD)
+    async with LocalClient() as me:
+        with pytest.raises(AgentError, match="Hold needs its words"):
+            await me.call("board_reply", board=path, line=9, text=HOLD, reply="Hold: <note>")
+        got = await me.call("board_reply", board=path, line=9, text=HOLD, reply="Hold: drop Dismiss", refs=["TD-1"])
+        assert got["decided"] == "Hold: drop Dismiss" and got["action"] == "decide" and "sent" not in got
+        trail = [t for t in (await me.call("inbox"))["trail"] if t["kind"] == "board reply"]
+    assert trail == []
+    assert "Decided: Hold: drop Dismiss (by t)" in origin_board(repo).splitlines()[8]
+
+
+def test_a_reply_filling_a_lifting_form_on_a_gated_decide_lifts_it(repo):
+    """TD-1698: on a gated item, a Reply that fills `Hold:` where `Hold: <note>` is in `Lifts:` is the decide, with
+    its lift: the entry's gate lifted and the item closed in one commit, as a pressed lifting answer does."""
+    _gated(repo)
+    held = GATED.replace("Answers: Go | Not yet.", "Answers: Go | Hold: <note>. Lifts: Hold: <note>.")
+    (repo / board.BOARD).write_text(origin_board(repo).replace(GATED, held))
+    git(repo, "commit", "-qam", "a form lifts")
+    git(repo, "push", "-q", "origin", "main")
+    at = origin_board(repo).splitlines().index(f"- [ ] {held}") + 1
+    got = board.write_back(repo, at, held, "reply", reply="Hold: until the release")
+    assert got["decided"] == "Hold: until the release" and got["entries"] == ["TD-190"]
+    entry = on_origin(repo, "show", "origin/main:docs/ledger/TD-190.md")
+    assert "**Blocked by:**" not in entry and "gate lifted: decision (paul)" in entry
+    line = origin_board(repo).splitlines()[at - 1]
+    assert line.startswith("- [x] ") and "Decided: Hold: until the release" in line

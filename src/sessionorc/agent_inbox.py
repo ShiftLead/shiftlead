@@ -829,7 +829,10 @@ class InboxMixin:
         Then the mail half (TD-142 slice 2): each live record holding an unexpired declared lease
         on one of the line's `refs` (the reader's, handed in by the page) gets one `note` from the
         person, `about` that reference and marked `handed`, so it owes an outcome (§4.10 *A board
-        reply owes an outcome too*). Nobody holding one is mailed nothing. The file half is
+        reply owes an outcome too*). Nobody holding one is mailed nothing. Words that fill a form on an open,
+        undecided `decide` or `look` line (or a `watch` with the look's pair) are that form's decide instead, read
+        inside the write-back (`board.reply_fills`, §4.4 *A Reply that fills a form decides*, TD-1698): answered
+        `{decided: <answer>, action: decide, ...}`, nobody mailed, the press mark turned to the decide. The file half is
         written first; a refused send is said in `note` and `mail_refused`, never raised, since
         the line is committed and a second press would write it twice. `sent` is `[{session, id,
         ref}]`, `session` the holder's name."""
@@ -844,17 +847,27 @@ class InboxMixin:
             if not key:
                 raise RpcError("a board reply names the item's line (design §4.4)") from None
             at = None  # a line it cannot read, and the line's id: found by the id
-        async with self._applying_mark(root, str(key or ""), "reply", reply):  # drawn as it lands (TD-1508)
+        loop = asyncio.get_running_loop()
+        async with self._applying_mark(root, str(key or ""), "reply", reply) as token:  # drawn as it lands (TD-1508)
+
+            def turned(filled: str) -> None:  # from the worker thread: the reading made it a decide (TD-1698)
+                loop.call_soon_threadsafe(self._remark, token, "decide", filled)
+
             try:
                 done = await asyncio.to_thread(
-                    board_mod.write_back, root, at, text, "reply", None, reply=reply, key=str(key or "")
-                )
+                    board_mod.write_back, root, at, text, "reply", None, reply=reply, key=str(key or ""),
+                    on_decide=turned,
+                )  # fmt: skip
             except (TypeError, ValueError):
                 raise RpcError("a board reply names the item's line (design §4.4)") from None
             except board_mod.Refused as e:
                 raise RpcError(str(e)) from None
             log.info("board %s: %s", root, done["message"])
             await self._reread_board(root)
+        if done.get("decided"):
+            # the Reply filled a form and decided the line (§4.4 *A Reply that fills a form decides*, TD-1698): no
+            # lease holder is mailed and no reply trail line is written — the decided line is the work order
+            return {"board": str(want), "line": done.get("line", at), "action": "decide", **done}
         text = str(done.get("text") or text)  # the line found, by its id where the press named one
         head = ledgerboard.bold_head(text) or " ".join(text.split())
         by = await asyncio.to_thread(board_mod.author, root)
@@ -1323,14 +1336,15 @@ class InboxMixin:
         return {"repo": root, "id": id, "decided": said, "told": told, "readers": readers, **done}
 
     @contextlib.asynccontextmanager
-    async def _applying_mark(self, root: str | Path, key: str, act: str, answer: str = "") -> AsyncIterator[None]:
+    async def _applying_mark(self, root: str | Path, key: str, act: str, answer: str = "") -> AsyncIterator[int | None]:
         """A press drawn as it lands (§4.4 *A press is drawn as it lands*, TD-1508): its token `{act, answer, at}`
         added to `key`'s mark and `repos` pushed before the write-back starts; removed when the press's call
         returns — landed and re-read, refused or failed — and `repos` pushed again, so a failure never leaves a row
-        *applying*. A clear removes only its own token, the mark gone with its last. No `key`, no mark."""
+        *applying*. A clear removes only its own token, the mark gone with its last. No `key`, no mark. It yields the
+        token (None with no mark), which `_remark` changes in place."""
         root, key = str(root), str(key or "")
         if not key:
-            yield
+            yield None
             return
         self._applying_seq += 1
         token = self._applying_seq
@@ -1338,7 +1352,7 @@ class InboxMixin:
         try:  # the token is added inside: a press cancelled during the first push still clears it (review)
             self._applying.setdefault(root, {}).setdefault(key, {})[token] = mark
             await self._applying_push(root)
-            yield
+            yield token
         finally:
             marks = self._applying.get(root) or {}
             (toks := marks.get(key) or {}).pop(token, None)
@@ -1347,6 +1361,19 @@ class InboxMixin:
             if not marks:
                 self._applying.pop(root, None)
             await self._applying_push(root)
+
+    def _remark(self, token: int | None, act: str, words: str) -> None:
+        """A press's mark changed in place (TD-1698): a Reply the reading turned into a decide is drawn as the decide
+        with its filled answer from then on. Idempotent; a token already cleared changes nothing. Called on the
+        agent's loop, it pushes `repos` with the change."""
+        if token is None:
+            return
+        for root, marks in self._applying.items():
+            for toks in marks.values():
+                if (mark := toks.get(token)) is not None:
+                    mark.update(act=act, answer=" ".join(str(words or "").split()))
+                    asyncio.ensure_future(self._applying_push(root))
+                    return
 
     async def _applying_push(self, root: str) -> None:
         """A mark set or cleared: `repos` pushed with it, and the Queue read again over it (TD-1508). A surprise is

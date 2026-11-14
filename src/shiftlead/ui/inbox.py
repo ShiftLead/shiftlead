@@ -508,9 +508,9 @@ def state_rows(
 # §4.5a's answers to a board row, the `board_edit` RPC's actions: Snooze, Done, and **Decide** — one
 # of the item's own `Answers:`, or *Go with it* for the one marked default (§4.4 *Decide*, TD-255)
 BOARD_ACTS = ("snooze", "done", "decide")
-# the kinds a live look is written as: `look` since dev-cadence TD-082, `watch` before it (TD-292)
-LOOK_KINDS = ("look", "watch")
-WORKS = "Works"  # a live look's first answer, cadence §3.5's word (the second is the `Not right: <what>` form)
+# the kinds a live look is written as, and its first answer: the agent's, which reads the same pair (TD-1698)
+LOOK_KINDS = board_mod.LOOK_KINDS
+WORKS = board_mod.WORKS
 
 # the home's pull readings by repo name (`host`'s `pulls`, §6 *Pull*), kept fresh by the app as
 # `work_marks` keeps its marks: what the *behind* note's tail says
@@ -1783,13 +1783,7 @@ def live_look(it: Mapping[str, Any]) -> bool:
     `watch` written before that kind (TD-292), whose two answers are *Works* and the form *Not
     right: <what>*. Anything else — a third answer, another kind, a complete *Not right: wrong
     repo* — is ordinary answer buttons."""
-    answers = [" ".join(str(a).split()) for a in it.get("answers") or ()]
-    return (
-        str(it.get("kind") or "") in LOOK_KINDS
-        and len(answers) == 2
-        and answers[0] == WORKS
-        and ledgerboard.is_not_right_form(answers[1])
-    )
+    return board_mod.live_look_pair(str(it.get("kind") or ""), it.get("answers"))
 
 
 # §4.5a **Inbox row: a look** (§4.10 *A look*, TD-292 slice 3): the one directory a look's screenshots
