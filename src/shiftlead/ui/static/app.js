@@ -1338,7 +1338,22 @@
   // `AO.inflight["qcard:<id>"]`, holds the items' own keys per block and the card as drawn before the first press.
   // `pill()`'s format (`queue_row.html`), mirrored: *Decide n · Do n*, a nought part left out with its ` · `
   AO.qPillText = (d, n) => [d ? `Decide ${d}` : "", n ? `Do ${n}` : ""].filter(Boolean).join(" · ");
-  const Q_BLOCKS = ["decide", "do"], Q_WORD = { decide: "Decide", do: "Do" };
+  const Q_BLOCKS = ["decide", "do"];
+  // §4.5 screen 12 *The Queue's words: Counts in words* (TD-1809): a heading's count in words, the twin of
+  // `queue_row.html`'s `count_words` macro (a test holds the two to the same output) — *One* for 1, the digit for 2
+  // and more, the zero form where a press empties a Decide or Do block; "" at 0 for the Read fold and its lines
+  const Q_COUNT_WORDS = {
+    decide: ["No decision left for you", "One decision for you", " decisions for you"],
+    do: ["Nothing left for you to do", "One thing for you to do", " things for you to do"],
+    read: ["", "One to read", " to read"],
+    answered: ["", "One answered for you", " answered for you"],
+    waiting: ["", "One waiting on them", " waiting on them"],
+    fyi: ["", "One for your information", " for your information"],
+  };
+  AO.qCountWords = (block, n) => {
+    const t = Q_COUNT_WORDS[block], k = Number(n) || 0;
+    return k <= 0 ? t[0] : k === 1 ? t[1] : `${k}${t[2]}`;
+  };
   const qBlock = (card, b) => [...card.querySelectorAll(".qsec[data-sec]")].find((s) => s.dataset.sec === b && s.closest(".qcard") === card) || null;
   const qHeadLine = (card) => card.querySelector(".qhead .qright");
   // the card as drawn: the pill's numbers, each block's heading number, its status, edge and look
@@ -1347,8 +1362,9 @@
     const num = (re) => { const m = re.exec(t); return m ? Number(m[1]) : 0; };
     const hd = {};
     Q_BLOCKS.forEach((b) => {
-      const s = qBlock(card, b), h = s && s.querySelector(".qsech span"), m = h && /\((\d+)\)/.exec(h.textContent);
-      if (m) hd[b] = Number(m[1]);
+      // the heading's number is its `data-n`, never its words (TD-1809)
+      const s = qBlock(card, b), h = s && s.querySelector(".qsech span[data-n]");
+      if (h) hd[b] = Number(h.dataset.n) || 0;
     });
     return { decide: num(/Decide (\d+)/), do: num(/Do (\d+)/), hd, status: card.dataset.status || "",
       cls: card.className.split(/\s+/).filter((c) => /^(edge-|st-)/.test(c) || c === "wants") };
@@ -1358,8 +1374,11 @@
     const off = (b) => (rec.keys[b] || []).length, was = rec.was;
     const d = Math.max(0, was.decide - off("decide")), n = Math.max(0, was.do - off("do"));
     Q_BLOCKS.forEach((b) => {
-      const s = qBlock(card, b), h = s && s.querySelector(".qsech span");
-      if (h && was.hd[b] !== undefined) h.textContent = `${Q_WORD[b]} (${Math.max(0, was.hd[b] - off(b))})`;
+      const s = qBlock(card, b), h = s && s.querySelector(".qsech span[data-n]");
+      if (h && was.hd[b] !== undefined) {
+        const k = Math.max(0, was.hd[b] - off(b));
+        h.textContent = AO.qCountWords(b, k); h.dataset.n = String(k);
+      }
     });
     let pill = card.querySelector(".qwpill");
     const said = card.querySelector(".qstatus[data-qdrawn]"), lneed = card.dataset.lneed !== undefined;

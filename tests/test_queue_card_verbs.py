@@ -40,8 +40,9 @@ def test_a_decide_ask_draws_its_answer_row_and_its_controls_behind_its_dots():
     html = card(e, "decide")
     row = html[html.index('class="row gap wrap sugg qanswers"') :]
     assert '<button class="btn sm answer rec" type="button" data-act="answer"' in row  # the recommended, outlined
-    assert '<span class="alabel">work</span></button><span class="st alead">the paid seat</span>' in row
-    assert '<span class="alabel">home</span></button></span>' in row  # no consequence, nothing beside it
+    # each label starts with a capital, the value sent as written (§4.5 screen 12 *The Queue's words*, TD-1809)
+    assert '<span class="alabel">Work</span></button><span class="st alead">the paid seat</span>' in row
+    assert '<span class="alabel">Home</span></button></span>' in row  # no consequence, nothing beside it
     assert ">Answer…</button>" in row and 'data-act="reply"' in row
     assert "default</span>" not in html and "suggested by" not in html  # no caption: the outline is the convention
     assert dots(html) == ["Delete"] and 'role="menuitem" type="button" data-act="unmail"' in html
@@ -83,7 +84,8 @@ def test_a_ledger_item_answers_done_or_lift_the_hold_in_its_row_and_opens_behind
     row = {**row, "home": "queue"}
     html = card(row, "do")
     ans = html[html.index("qanswers") : html.index('class="row gap wrap mfoot"')]
-    assert 'class="btn sm answer rec" type="button" data-act="ledger"' in ans and ">later<" in ans  # the default
+    assert 'class="btn sm answer rec" type="button" data-act="ledger"' in ans and ">Later<" in ans  # the default
+    assert 'data-answer="later"' in ans  # the value sent as written (TD-1809)
     assert 'data-words="done"' in ans and ">Done</button>" in ans and 'data-act="ledger_reply"' in ans
     assert ">Answer…</button>" in ans and "Lift the hold" not in ans
     assert dots(html) == ["Open"] and not re.search(r"\bReply\b", html) and "Go with it" not in html

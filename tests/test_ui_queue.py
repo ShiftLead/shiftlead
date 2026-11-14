@@ -547,7 +547,7 @@ def test_the_page_draws_the_question_on_its_card_and_the_inbox_does_not(tmp_path
     card20 = html[html.index('data-card="s#TD-20"') : html.index('data-card="s#TD-30"')]
     assert 'class="qmail inboxrows"' in card20 and "which one?" in card20  # on its row
     assert ">mentioned in 1 item<" in html[html.index('data-card="s#TD-30"') :]
-    assert "Decide 2</span>" in card20 and "Decide (2)" in card20  # the pill, and the want in the header (m1, m9)
+    assert "Decide 2</span>" in card20 and ">2 decisions for you<" in card20  # the pill, and the want (m1, m9)
     css = c.get("/static/app.css").text
     assert ".qmail details.more:not(.qdots) { display: none; }" in css  # no Snooze on the Queue; its ⋯ drawn
     inbox = c.get("/inbox").text
@@ -726,8 +726,9 @@ def sections_of(*items: tuple[str, str, str]) -> dict:
 def test_a_cards_wants_draw_their_counts_and_none_at_zero(tmp_path, monkeypatch):
     """§4.5 screen 12 *Three wants*, §4.5a *Queue page: card*, *Queue card: Read n* (TD-911): Decide and Do in
     the header, open, counted on the pill; Read under the rows, folded with its count, its lines each with its
-    count and not drawn at 0; *Read n* on the header for a folded card; an item about a lower row says *on
-    TD-n*; Dismiss all on answered for you and fyi alone."""
+    count and not drawn at 0; *n to read* (was *Read n*) on the header for a folded card; an item about a lower row
+    says *on TD-n*; Dismiss all on answered for you and fyi alone. Each heading's count in words with its number as
+    `data-n` (§4.5 screen 12 *The Queue's words*, TD-1809)."""
     from markupsafe import Markup
 
     from shiftlead.ui.app import templates
@@ -741,16 +742,20 @@ def test_a_cards_wants_draw_their_counts_and_none_at_zero(tmp_path, monkeypatch)
     c20 = next(c for c in view["up_next"] if c["id"] == "s#TD-20")
     html = templates.env.get_template("queue_card.html").module.card(c20)
     head, body = html.split('<div class="qrows">')
-    assert "Decide (1)" in head and "Do (1)" in head and "answered for you" not in head
-    assert ">Decide 1 · Do 1</span>" in head and ">Read 3</span>" in head  # the pill; Read n, drawn when folded
-    assert head.index(">Read 3</span>") < head.index(">Decide 1 · Do 1</span>")  # the status ends the line
+    assert '<span data-n="1">One decision for you</span>' in head and "answered for you" not in head
+    assert '<span data-n="1">One thing for you to do</span>' in head
+    assert ">Decide 1 · Do 1</span>" in head and 'data-n="3">3 to read</span>' in head  # the pill; drawn when folded
+    assert head.index(">3 to read</span>") < head.index(">Decide 1 · Do 1</span>")  # the status ends the line
     assert (
-        '<details class="qread" data-fold="s#TD-20:read"><summary class="qsech">Read (3)</summary>' in body
-        and "answered for you (2)" in body
-        and "fyi (1)" in body
+        '<details class="qread" data-fold="s#TD-20:read"><summary class="qsech"><span data-n="3">3 to read</span>'
+        "</summary>"
+        in body
+        and '<span data-n="2">2 answered for you</span>' in body
+        and '<span data-n="1">One for your information</span>' in body
         and "waiting on them" not in body
     )
-    assert body.index("fyi (1)") > body.index('data-qid="s#TD-21"')  # under the rows
+    assert "(1)" not in html and "(2)" not in html and "(3)" not in html and "Read 3" not in html  # no `(n)` left
+    assert body.index("One for your information") > body.index('data-qid="s#TD-21"')  # under the rows
     assert body.count(">Dismiss all</button>") == 2 and "Dismiss all" not in head
     assert 'class="qcard edge-needs g-up_next st-needs-you wants hasrows"' in html  # amber
     assert body.count('class="qon qsub" href="#TD-21"') == 1  # a1 is about TD-21; a2 is the top entry's

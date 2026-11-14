@@ -12,10 +12,12 @@ import hashlib
 import logging
 import math
 import os
+import re
 import threading
 import time
 from collections.abc import Collection, Mapping
 from datetime import UTC, datetime
+from datetime import date as date_cls
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -235,6 +237,78 @@ def md(text: Any, origin: Any = None, *, inline: bool = False, links: bool = Tru
 
 
 templates.env.globals["md"] = md
+
+# §4.5 screen 12 *The Queue's words* (TD-1801, built by TD-1809): what the Queue and the card's page draw for a
+# person — dates in words, bare ids in the card's own repo, no raw markup — formatted where they are drawn, so the
+# reading (`ledgerboard`, `sessionorc/queue.py`) and every other page keep their words
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+_WAITS_UNTIL = re.compile(r"^waits until (\d{4}-\d\d-\d\d)$")
+
+
+def short_date(d: Any, due: bool = False, today: date_cls | None = None) -> str:
+    """An ISO date in words against the host's local today (*The Queue's words: Dates*): *Nov 19*, with its year
+    where it is not this year's (*Nov 19 2025*); with `due`, by days from today — *due today*, *due tomorrow*,
+    *due in n days* to 13, *due Nov 19* from 14, *due yesterday*, *due n days ago* — and *no due date* for none.
+    A date that does not read is "" (the caller keeps what it drew before)."""
+    s = d.isoformat() if isinstance(d, date_cls) else str(d or "").strip()
+    if not s:
+        return "no due date" if due else ""
+    try:
+        when = date_cls.fromisoformat(s[:10])
+    except ValueError:
+        return ""
+    now = today or date_cls.today()
+    words = f"{_MONTHS[when.month - 1]} {when.day}" + ("" if when.year == now.year else f" {when.year}")
+    if not due:
+        return words
+    n = (when - now).days
+    if n == 0:
+        return "due today"
+    if n == 1:
+        return "due tomorrow"
+    if 2 <= n <= 13:
+        return f"due in {n} days"
+    if n == -1:
+        return "due yesterday"
+    if n <= -2:
+        return f"due {-n} days ago"
+    return f"due {words}"
+
+
+def state_words(state: Any, today: date_cls | None = None) -> str:
+    """A row's state word as the Queue draws it: *waits until <ISO date>* with the date in words, every other state
+    passed through (the reading bakes the date into `row.state`)."""
+    s = str(state or "")
+    m = _WAITS_UNTIL.match(s)
+    got = short_date(m.group(1), today=today) if m else ""
+    return f"waits until {got}" if got else s
+
+
+def bare_id(ref: Any, own: Any) -> str:
+    """An id as the card draws it: bare in the card's own repo (`own#TD-n` → `TD-n`), another repo's qualified."""
+    s, o = str(ref or ""), str(own or "")
+    return s[len(o) + 1 :] if o and s.startswith(o + "#") else s
+
+
+def own_repo(card_id: Any) -> str:
+    """The card's own repo, the one its id names: after any `loose:`, before `#`."""
+    s = str(card_id or "")
+    return (s[len("loose:") :] if s.startswith("loose:") else s).partition("#")[0]
+
+
+def cap_first(text: Any) -> Markup:
+    """A drawn label or kind mark starting with a capital, its other letters as written."""
+    s = text if isinstance(text, Markup) else Markup.escape(str(text or ""))
+    return Markup(s[:1].upper() + s[1:])
+
+
+templates.env.globals["short_date"] = short_date
+templates.env.globals["state_words"] = state_words
+templates.env.globals["bare_id"] = bare_id
+templates.env.globals["own_repo"] = own_repo
+templates.env.globals["cap_first"] = cap_first
+templates.env.globals["plain"] = rendermod.plain
+templates.env.filters["plain"] = rendermod.plain
 # design §4.5a Sessions top bar **Inbox** and **Queue** tab (TD-931, built by TD-932): each tab's number says on
 # hover what it counts and that the other tab's holds the rest — the two add up to what waits on a person
 TOPBAR_TITLES = {

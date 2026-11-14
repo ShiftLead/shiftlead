@@ -11,6 +11,17 @@
    — where one thing ends and the next begins is never in doubt. #}
 {% import "queue_row.html" as qrow %}
 
+{#- §4.5 screen 12 *The Queue's words* (TD-1801, built by TD-1809): in `card` mode alone a kind mark and a button's
+    label start with a capital, the rest as written; a ledger item's kind line says where it comes from, *Decide ·
+    from the ledger*, *Do · from the ledger*. `own` (the card's repo, `queue_mail.html`'s context) bares its ids. -#}
+{% macro cap() -%}
+{%- if mode == 'card' %}{{ cap_first(caller()) }}{% else %}{{ caller() }}{% endif -%}
+{%- endmacro %}
+{% macro ledger_kind(e) -%}
+{%- if mode == 'card' and e.kind in ('ledger · yours', 'ledger · your decision') %}<span class="badge kindmark k-ledger">{{ 'Do' if e.kind == 'ledger · yours' else 'Decide' }}</span><span class="st">· from the ledger</span>
+{%- else %}<span class="badge kindmark k-ledger">{% call cap() %}{{ e.kind }}{% endcall %}</span>{% endif %}
+{%- endmacro %}
+
 {#- §4.5 screen 6 *An item about a design links the design's PR* (§4.5a *Queue card: what needs the person*,
     TD-1531): an item about a design — a mail item by its `about`, a board line by its `Context:`, a held entry's
     own row — ends its first line *· design #n*, the last PR its entry's `Design PR:` names (or its open design
@@ -26,7 +37,7 @@
   <span class="ref" title="{{ e['from'] }}{% if e.from_role %} · {{ e.from_role }}{% endif %}">{{ e.from_name or e['from'] }}</span>
   {%- if e.from_open %} <a class="btn sm ghost" href="/focus/{{ e.from_open }}" title="Focus on {{ e.from_name }}">Open</a>{% endif %}
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
-  <span class="badge kindmark k-{{ e.kind }}">{{ e.kind }}</span>
+  <span class="badge kindmark k-{{ e.kind }}">{% call cap() %}{{ e.kind }}{% endcall %}</span>
   {#- §4.5a *PRs waiting* (§4.9b *The reader*, TD-093): the PR a held author put in front of you, a
       structured field drawn as a link — the text stays the author's text #}
   {%- if e.pr is number %} {% if e.pr_url %}<a class="ref" href="{{ e.pr_url }}" target="_blank" rel="noopener" title="the pull request this asks you to read (design §4.9b)">#{{ e.pr }}</a>{% else %}<span class="ref" title="the pull request this asks you to read (design §4.9b)">#{{ e.pr }}</span>{% endif %}{% endif %}
@@ -95,10 +106,15 @@
 <details class="cardline" data-fold="line:{{ e.row_id or e.id }}"><summary class="row gap mhead" title="open it: the whole item and its controls">
   <span class="ref">{{ e.from_name or e['from'] or e.repo or e.name or '' }}</span>
   {%- set by_mate = e.answered and not e.row %}
-  <span class="badge kindmark k-{{ 'answered' if by_mate else (e.row or e.kind) }}">{{ 'answered for you' if by_mate else ('board · ' ~ e.kind if e.row == 'board' else (e.kind or e.row)) }}</span>
-  <span class="subj grow">{{ row_subject(e) }}</span>
-  {#- a board line says its due words, as its row does; the rest their age -#}
-  {%- if e.row == 'board' %}<span class="st" title="Due: {{ e.due }}">{{ e.due_tag }}</span>
+  {#- its kind line in *The Queue's words* (TD-1809): *Read · from <repo>'s board*, a ledger item's from the ledger,
+      every other mark capitalised; its subject, a cut title, drawn without its markup -#}
+  {%- if by_mate %}<span class="badge kindmark k-answered">Answered for you</span>
+  {%- elif e.row == 'board' %}<span class="badge kindmark k-board">Read</span><span class="st">· from {{ e.repo_name or e.repo }}'s board</span>
+  {%- elif e.row == 'ledger' %}{{ ledger_kind(e) }}
+  {%- else %}<span class="badge kindmark k-{{ e.row or e.kind }}">{{ cap_first(e.kind or e.row) }}</span>{% endif %}
+  <span class="subj grow">{{ plain(row_subject(e)) }}</span>
+  {#- a board line says its due date in words (TD-1809), as its row does; the rest their age -#}
+  {%- if e.row == 'board' %}<span class="st" title="Due: {{ e.due }}">{{ short_date(e.due, True) or e.due_tag }}</span>
   {%- else %}<span class="st age" data-since="{{ e.at or '' }}">{{ e.age or '' }}</span>{% endif %}
 </summary>{{ caller() }}</details>
 {%- else %}{{ caller() }}{% endif %}
@@ -110,7 +126,7 @@
     leads to — and the rest under *context*; a first paragraph that is not one sentence draws the subject as
     the sentence and the whole text under *context* -#}
 {%- set c = card_shape(e.text, origin) %}
-{%- if c.one %}<div class="body md sentence">{{ c.sentence }}</div>{% else %}<div class="subj sentence">{{ row_subject(e) }}</div>{% endif %}
+{%- if c.one %}<div class="body md sentence">{{ c.sentence }}</div>{% else %}<div class="subj sentence">{{ plain(row_subject(e)) }}</div>{% endif %}
 {%- if c.leads %}<div class="body md leads">{{ c.leads }}</div>{% endif %}
 {%- if c.context %}
 {{ fold('card:' ~ e.id, fold_open, 'card', e, c.context) }}
@@ -177,7 +193,7 @@
   {%- set pair = look_pair(e) %}
   {%- for a in opts %}
   {%- set form = pair and loop.index0 == 1 %}
-  <button class="btn sm answer" {% if form %}data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="Not right: " title="say what is off: your words go back to {{ by }} as a reply"{% else %}data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ loop.index0 }}"{% endif %}>{% if pair %}<span class="alabel">{{ 'Not right…' if form else 'Works' }}</span>{% else %}<span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and (a == e.default or (e.kind == 'steer' and e.recommended == loop.index0)) %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
+  <button class="btn sm answer" {% if form %}data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="Not right: " title="say what is off: your words go back to {{ by }} as a reply"{% else %}data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ loop.index0 }}"{% endif %}>{% if pair %}<span class="alabel">{{ 'Not right…' if form else 'Works' }}</span>{% else %}<span class="alabel">&ldquo;{{ cap_first(a) if mode == 'card' else a }}&rdquo;</span>{% if e.default and (a == e.default or (e.kind == 'steer' and e.recommended == loop.index0)) %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
   {%- endfor %}
 </div>
 {%- endif %}
@@ -208,7 +224,7 @@
   {%- elif how == 'board' and form %} data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-repo="{{ e.name }}" data-head="{{ e.head }}" data-name="{{ where }}" title="say what is off: your words are written on the line as Decided: Not right: …, one commit, and handed to {{ e.repo_name or e.repo }}'s techlead as an entry"
   {%- elif how == 'board' %} data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ a }}"
   {%- else %} data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-index="{{ i }}" data-answer="{{ a }}" title="{{ a }}"
-  {%- endif %}><span class="alabel">{% if pair %}{{ 'Not right…' if form else 'Works' }}{% else %}{{ a }}{% endif %}</span></button>
+  {%- endif %}><span class="alabel">{% if pair %}{{ 'Not right…' if form else 'Works' }}{% else %}{{ cap_first(a) }}{% endif %}</span></button>
   {%- set c = cs[i] if i < cs | length else '' %}{% if c is string and c.strip() %}<span class="st alead">{{ c }}</span>{% endif %}</span>
   {%- endif %}{% endfor %}
   {%- if gwi %}<button class="btn sm ghost" type="button" data-act="gowithit" data-id="person" data-msg="{{ e.id }}" data-confirm="{{ gwi }}">Go with it</button>{% endif %}
@@ -291,7 +307,7 @@
 {# The outcome itself, as a mark and never a control — `outcome · done` is what a row **is**. #}
 {% macro outcome_line(e) -%}
 {%- set o = e.outcome or {} %}
-{%- if o.state %}<div class="row gap wrap"><span class="badge kindmark k-outcome o-{{ o.state }}">outcome · {{ o.state }}</span><span class="st">{{ o.text or '—' }}{% if e.outcome_age %} · {{ e.outcome_age }} ago{% endif %}</span></div>{% endif %}
+{%- if o.state %}<div class="row gap wrap"><span class="badge kindmark k-outcome o-{{ o.state }}">{% call cap() %}outcome · {{ o.state }}{% endcall %}</span><span class="st">{{ o.text or '—' }}{% if e.outcome_age %} · {{ e.outcome_age }} ago{% endif %}</span></div>{% endif %}
 {#- §4.5a *Inbox row: `blocked` outcome* (TD-1695): the person's Reply on it, and a replaced one kept as `was` -#}
 {%- if o.state == 'blocked' and o.replied %}<div class="st dflt">you replied{% if e.replied_age %} · {{ e.replied_age }} ago{% endif %}</div>{% endif %}
 {%- if e.was_blocked %}<div class="st dflt">was blocked: {{ e.was_blocked.text or '—' }}{% if e.was_blocked.replied %} · you replied{% if e.was_blocked.replied_age %} {{ e.was_blocked.replied_age }} ago{% endif %}{% endif %}</div>{% endif %}
@@ -326,9 +342,9 @@
   {%- if e.holder_open %} <a class="btn sm ghost" href="/focus/{{ e.holder_open }}" title="Focus on {{ e.holder_name }}">Open</a>{% endif %}
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   {%- if e.look %}
-  <span class="badge kindmark k-{{ e.kind }}" title="a look you sent to be read (design §4.10 *A look*)">look</span>
+  <span class="badge kindmark k-{{ e.kind }}" title="a look you sent to be read (design §4.10 *A look*)">{% call cap() %}look{% endcall %}</span>
   {%- else %}
-  <span class="badge kindmark k-{{ e.kind }}" title="an entry you handed to be drafted into the ledger">entry{% if en.type %} · {{ en.type }}{% endif %}</span>
+  <span class="badge kindmark k-{{ e.kind }}" title="an entry you handed to be drafted into the ledger">{% call cap() %}entry{% if en.type %} · {{ en.type }}{% endif %}{% endcall %}</span>
   {%- endif %}
   {%- if en.repo %} <span class="st">for {{ en.repo }}</span>{% endif %}
   <span class="grow"></span>
@@ -343,7 +359,7 @@
     entry is drawn on its own row as a decided line is, the stuck words a line under it and its **Open** the actor's
     Focus — moved to *Needs you* (a card's Do group) while a need, under *Waiting on them* at *waiting* -#}
 {%- if e.stuck %}
-<div class="row gap wrap stuckline"><span class="badge kindmark k-stuck">stuck</span><span class="st">{{ e.stuck.text }}</span>
+<div class="row gap wrap stuckline"><span class="badge kindmark k-stuck">{% call cap() %}stuck{% endcall %}</span><span class="st">{{ e.stuck.text }}</span>
   {%- if e.stuck.waiting_until %}<span class="st" title="every reason names when it ends, within the wait (design §6 rule 13)">· waiting</span>{% endif %}
   <span class="grow"></span>
   {%- if e.stuck.open %}<a class="btn sm primary" href="/focus/{{ e.stuck.open }}" title="{{ help_title('stuck-open') }}">Open</a>{% endif %}
@@ -393,7 +409,7 @@
   {%- if e.sid %}<span class="ref" title="{{ e.sid }}">{{ e.name or e.sid }}</span>
   {%- elif e.name %}<span class="ref" title="the repo whose board was replied on">{{ e.name }}</span>{% endif %}
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
-  <span class="badge kindmark k-trail">trail</span>
+  <span class="badge kindmark k-trail">{% call cap() %}trail{% endcall %}</span>
   <span class="st">{% if e.kind == 'board reply' %}replied: {{ e.how }}{% else %}resolved: {{ e.how or 'resolved' }}{% endif %}</span>
   {%- if e.count and e.count > 1 %} <span class="st">&times;{{ e.count }}</span>{% endif %}
   <span class="grow"></span>
@@ -623,7 +639,7 @@
   <span class="ref" title="{% if by_rules %}settings.yml's permissions: — who answered{% else %}{{ e['from'] }} — who answered{% endif %}">{{ answerer }}</span>
   {%- if e.from_open %} <a class="btn sm ghost" href="/focus/{{ e.from_open }}" title="Focus on {{ e.from_name }}">Open</a>{% endif %}
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
-  <span class="badge kindmark k-answered">answered for you</span>
+  <span class="badge kindmark k-answered">{% call cap() %}answered for you{% endcall %}</span>
   {%- if e.about %} <span class="st">re {{ e.about }}</span>{% endif %}
   <span class="grow"></span>
   {%- if not fold_open %}<a class="pagelink st" href="/inbox/{{ e.id }}" title="the whole entry, with its thread (Enter)">whole entry ›</a>{% endif %}
@@ -737,7 +753,7 @@
     the actor of, a line under its own pending or stopped holder's row (after its *routed around* line), never a row
     of their own — one counted item for one cause; **Open** is this row's own -#}
 {%- for l in e.stuck_lines or () %}
-<div class="row gap wrap stuckline"><span class="badge kindmark k-stuck">stuck</span><span class="st">{{ l.text }}</span></div>
+<div class="row gap wrap stuckline"><span class="badge kindmark k-stuck">{% call cap() %}stuck{% endcall %}</span><span class="st">{{ l.text }}</span></div>
 {%- endfor %}
 {%- if section == 'snoozed' %}<div class="row">{{ snoozed_says(e) }}<span class="st">&nbsp;— the state itself is untouched</span></div>{% endif %}
 <div class="row gap wrap mfoot">
@@ -904,7 +920,7 @@
     — on a card, its anchor where the page draws it (`data-repo-href` the Repo page, which `app.js` follows where a
     pick hides that card); elsewhere the Repo page on the id. None when it holds nothing more. -#}
 {% macro holds_line(e) -%}
-{%- if e.holds %}<div class="st holds" title="the entries this line holds: its answer is theirs, and none of them draws its own question">holds {% for x in e.holds %}<a class="holdsref" href="{{ x.href if mode == 'card' else x.repo_href }}" data-repo-href="{{ x.repo_href }}">{{ x.show }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+{%- if e.holds %}<div class="st holds" title="the entries this line holds: its answer is theirs, and none of them draws its own question">holds {% for x in e.holds %}<a class="holdsref" href="{{ x.href if mode == 'card' else x.repo_href }}" data-repo-href="{{ x.repo_href }}">{{ bare_id(x.id, own) if mode == 'card' and own and x.id else x.show }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
 {%- endmacro %}
 
 {% macro board(e, section, origin_first=False) -%}
@@ -919,19 +935,19 @@
     Answer…'s title and its key is under *context* -#}
 {%- if card_whole(mode, e) %}
 <div class="row gap wrap mhead">
-  <span class="badge kindmark k-{{ e.want }}">{{ e.want }}</span>
+  <span class="badge kindmark k-{{ e.want }}">{{ cap_first(e.want) }}</span><span class="st">· from {{ e.repo_name or e.repo }}'s board</span>
   {%- if e.card and e.card.in_repo %}<b class="inrepo" title="the line's Context names {{ e.card.in_repo }}: its task is there">in {{ e.card.in_repo }}</b>{% endif %}
-  <span class="st">board line</span>
   {{- design_link(e) }}
   <span class="grow"></span>
-  <span class="st" data-slot title="Due: {{ e.due }}">{{ e.ahead if section in ('coming', 'unshown', 'snoozed') and e.ahead else e.due_tag }}</span>
+  {#- its due date in words over its `Due:` (*The Queue's words: Dates*, TD-1809), never `due_tag`'s or `ahead`'s -#}
+  <span class="st" data-slot title="Due: {{ e.due }}">{{ short_date(e.due, True) or (e.ahead if section in ('coming', 'unshown', 'snoozed') and e.ahead else e.due_tag) }}</span>
 </div>
 {%- else %}
 {#- the board is the repo's (TD-722, built by TD-741): the row names its repo — *ContractMatch ·
     samscrape* where its project has several repos — and carries no team badge -#}
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e.board }}">{{ e.repo }}</span>
-  <span class="badge kindmark k-board">board</span>
+  <span class="badge kindmark k-board">{% call cap() %}board{% endcall %}</span>
   {#- §4.5a *Inbox board row: standing* (TD-142): where a Reply goes, said before the press, beside
       the sender's name — *still on TD-122 — grinder-ao-2 holds it*, *moved on* or *gone* — from the
       records the page holds; a word, never a control. Under *Waiting on them* the *waiting on …*
@@ -944,7 +960,7 @@
   {#- §4.5a *board row: id* (§4.4 *A board line's id*, TD-603): the line's derived `board:<key>`
       before its due words; a click copies it, as Copy tmux command copies -#}
   {%- if e.key %}<button class="mono boardkey" type="button" data-copy="{{ e.key }}" data-copied="copied {{ e.key }}" title="the line's id: type it in chat or in ao board show; a click copies it">{{ e.key }}</button>{% endif %}
-  <span class="st" data-slot title="Due: {{ e.due }}">{{ e.ahead if section in ('coming', 'unshown', 'snoozed') and e.ahead else e.due_tag }}</span>
+  <span class="st" data-slot title="Due: {{ e.due }}">{{ (short_date(e.due, True) if mode == 'card' else '') or (e.ahead if section in ('coming', 'unshown', 'snoozed') and e.ahead else e.due_tag) }}</span>
 </div>
 {%- endif %}
 {#- §4.5a **Inbox board row: text** (TD-279): the line in the closed markdown subset as a message's
@@ -997,7 +1013,7 @@
     line is drawn on its own row, the stuck words a line under it and its **Open** the actor's Focus — moved to
     *Needs you* (a card's Do group) while a need, under *Waiting on them* at *waiting*, held under `applying` -#}
 {%- if e.stuck %}
-<div class="row gap wrap stuckline"><span class="badge kindmark k-stuck">stuck</span><span class="st">{{ e.stuck.text }}</span>
+<div class="row gap wrap stuckline"><span class="badge kindmark k-stuck">{% call cap() %}stuck{% endcall %}</span><span class="st">{{ e.stuck.text }}</span>
   {%- if e.stuck.waiting_until %}<span class="st" title="every reason names when it ends, within the wait (design §6 rule 13)">· waiting</span>{% endif %}
   <span class="grow"></span>
   {%- if e.stuck.open %}<a class="btn sm primary" href="/focus/{{ e.stuck.open }}" title="{{ help_title('stuck-open') }}">Open</a>{% endif %}
@@ -1018,7 +1034,7 @@
       *Works* decides at once, as any answer; the form opens the Reply composer with *Not right:*
       begun and decides with the text typed, then hands an entry to the repo's techlead. -#}
   {%- set form = e.pair and loop.index0 == 1 %}
-  <button class="btn sm answer" {% if form %}data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-repo="{{ e.name }}" data-head="{{ e.head }}" data-name="{{ e.repo_name or e.repo }}'s board" title="say what is off: your words are written on the line as Decided: Not right: …, one commit, and handed to {{ e.repo_name or e.repo }}'s techlead as an entry"{% else %}data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ a }}"{% endif %}>{% if e.pair %}<span class="alabel">{{ 'Not right…' if form else ('Go with it: Works' if e.default == a else 'Works') }}</span>{% else %}<span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
+  <button class="btn sm answer" {% if form %}data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-repo="{{ e.name }}" data-head="{{ e.head }}" data-name="{{ e.repo_name or e.repo }}'s board" title="say what is off: your words are written on the line as Decided: Not right: …, one commit, and handed to {{ e.repo_name or e.repo }}'s techlead as an entry"{% else %}data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ a }}"{% endif %}>{% if e.pair %}<span class="alabel">{{ 'Not right…' if form else ('Go with it: Works' if e.default == a else 'Works') }}</span>{% else %}<span class="alabel">&ldquo;{{ cap_first(a) if mode == 'card' else a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
   {%- endfor %}
 </div>
 {%- endif %}
@@ -1084,7 +1100,7 @@
 {% macro promote_row(e, section) -%}
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e.repo }}: its promote: block, read at the home">{{ e.repo }}</span>
-  <span class="badge kindmark k-promote">promote</span>
+  <span class="badge kindmark k-promote">{% call cap() %}promote{% endcall %}</span>
   <span class="grow"></span>
   {%- if e.at %} <span class="st age" data-since="{{ e.at }}" title="since main moved">{{ e.age or '' }}</span>{% endif %}
 </div>
@@ -1135,7 +1151,7 @@
 {% macro red_pr_row(e, section) -%}
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e.repo }}: no team services it, so its red PR is yours (design §4.4)">{{ e.repo }}</span>
-  <span class="badge kindmark k-promote">red PR</span>
+  <span class="badge kindmark k-promote">{% call cap() %}red PR{% endcall %}</span>
   <span class="grow"></span>
   {%- if e.at %} <span class="st age" data-since="{{ e.at }}" title="red since">{{ e.age or '' }}</span>{% endif %}
 </div>
@@ -1168,7 +1184,7 @@
 {% macro fork_pr_row(e, section) -%}
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e.repo }}: a fork's PR is no session's to precheck, so its line is yours (design §4.4)">{{ e.repo }}</span>
-  <span class="badge kindmark k-promote">fork's PR</span>
+  <span class="badge kindmark k-promote">{% call cap() %}fork's PR{% endcall %}</span>
   <span class="grow"></span>
   {%- if e.at %} <span class="st age" data-since="{{ e.at }}" title="opened">{{ e.age or '' }}</span>{% endif %}
 </div>
@@ -1203,7 +1219,7 @@
 {% macro ci_not_run_row(e, section) -%}
 <div class="row gap wrap mhead">
   <span class="ref" title="the GitHub account whose Actions do not start">{{ e.owner }}</span>
-  <span class="badge kindmark k-promote">CI not starting</span>
+  <span class="badge kindmark k-promote">{% call cap() %}CI not starting{% endcall %}</span>
   <span class="grow"></span>
   {%- if e.rerun_pending %} <span class="st" title="re-run asked: its runs are queued or running">re-run asked <span class="age" data-since="{{ e.rerun_at }}">{{ e.rerun_age or '' }}</span></span>
   {%- elif e.at %} <span class="st age" data-since="{{ e.at }}" title="not starting since">{{ e.age or '' }}</span>{% endif %}
@@ -1239,7 +1255,7 @@
 {% macro stuck_row(e, section) -%}
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e.actor.id if e.actor else '' }}: the first session that is not acting on it">{{ e.name }}</span>
-  <span class="badge kindmark k-stuck">stuck</span>
+  <span class="badge kindmark k-stuck">{% call cap() %}stuck{% endcall %}</span>
   <span class="grow"></span>
   {%- if e.at %} <span class="st age" data-since="{{ e.at }}" title="stuck since">{{ e.age or '' }}</span>{% endif %}
 </div>
@@ -1264,7 +1280,7 @@
 {% macro work_row(e, section) -%}
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e.team }}: {{ 'defined, with no record, and its lanes hold work — only Start starts it' if e.row == 'lanes' else ('running, and a member that finished has new work in its lane' if e.running else ('stopped, and its lanes gained work since — the rule never starts a stopped team' if e.stopped else 'wound down, and its lanes gained work since')) }} (design §6 rule 8)">{{ e.team }}</span>
-  <span class="badge kindmark k-promote">team start</span>
+  <span class="badge kindmark k-promote">{% call cap() %}team start{% endcall %}</span>
   <span class="grow"></span>
   {%- if e.at %} <span class="st age" data-since="{{ e.at }}" title="since the entries were read as waiting">{{ e.age or '' }}</span>{% endif %}
 </div>
@@ -1329,14 +1345,14 @@
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e.name }}'s ledger">{{ e.name }}</span>
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
-  <span class="badge kindmark k-ledger">{{ e.kind }}</span>
+  {{ ledger_kind(e) }}
   {#- an entry the person's own session holds (TD-1281): the word names the session, so no *held by* beside it #}
   {%- set with_you = e.want == 'with_you' and e.with_you %}
   {%- set app = e.applying if not with_you else none %}
   {%- set ans = e.answered if not (with_you or app) else none %}
   {%- if e.held and not with_you %} <span class="st">held by {{ e.held }}</span>{% endif %}
   {%- if app %} <span class="st qans">{{ e.applying_words }}</span>
-  {%- elif ans and ans.until %} <span class="st qans">waits until {{ ans.until }}</span>
+  {%- elif ans and ans.until %} <span class="st qans">waits until {{ (short_date(ans.until) if mode == 'card' else '') or ans.until }}</span>
   {%- elif ans %} <span class="st qans">answered — waiting on {{ ans.name }}</span>
   {%- elif e.home == 'queue' %} <span class="st qneed">{% if with_you %}with you in {{ e.with_you }}{% elif e.why == 'yours' %}yours to do{% else %}held until {{ e.until or 'your decision' }}{% endif %}</span>{% endif %}
   {{- design_link(e) }}
@@ -1344,8 +1360,8 @@
   <span class="st" title="Added: {{ e.at or 'not written' }} · Priority: {{ e.pri }}">{% if e.added %}{{ e.added }} · {% endif %}{{ e.pri }}</span>
 </div>
 {#- on a card its `**Ask:**` line is the sentence, else its title (§4.5 screen 12 *An item's shape*) -#}
-{%- if card_whole(mode, e) and e.ask %}<div class="body sentence">{{ e.ask }}</div>
-{%- else %}<div class="body{% if card_whole(mode, e) %} sentence{% endif %}"><b class="mono">{{ e.id }}</b> {{ e.title }}</div>{% endif %}
+{%- if card_whole(mode, e) and e.ask %}<div class="body sentence">{{ md(e.ask, origin, inline=True) }}</div>
+{%- else %}<div class="body{% if card_whole(mode, e) %} sentence{% endif %}"><b class="mono">{{ e.id }}</b> {{ md(e.title, origin, inline=True) if mode == 'card' else e.title }}</div>{% endif %}
 {%- if e.detail %}
 {{ fold(e.row_id, fold_open or (e.answers and not card_whole(mode, e)), 'ledger', e) }}
 {%- endif %}
@@ -1356,7 +1372,7 @@
 <div class="row gap wrap sugg" role="group" aria-label="this entry's answers">
   <span class="st sugglabel">its answers</span>
   {%- for a in e.answers %}
-  <button class="btn sm answer" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-index="{{ loop.index0 }}" data-answer="{{ a }}" title="{{ a }}"><span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}</button>
+  <button class="btn sm answer" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-index="{{ loop.index0 }}" data-answer="{{ a }}" title="{{ a }}"><span class="alabel">&ldquo;{{ cap_first(a) if mode == 'card' else a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}</button>
   {%- endfor %}
 </div>
 {%- endif %}
@@ -1367,7 +1383,7 @@
   {%- elif ans and ans.kind == 'board' %}
   {#- a board answer's foot (§4.5 screen 12 *Three wants*, TD-1364): its `Decided:` words and age, then the
       entry it was carried to, else its holder; a kept-waiting answer, the date it is asked again -#}
-  <span class="st">{{ ans.words }}, {{ ans.age ~ ' ago' if ans.age else 'today' }} — {% if ans.until %}it waits until {{ ans.until }}, then you are asked again{% elif ans.board.to %}carried to {{ ans.board.to | map('replace', e.name ~ '#', '') | join(' and ') }}{% else %}{{ ans.name }} acts on it{% endif %}</span>
+  <span class="st">{{ ans.words }}, {{ ans.age ~ ' ago' if ans.age else 'today' }} — {% if ans.until %}it waits until {{ (short_date(ans.until) if mode == 'card' else '') or ans.until }}, then you are asked again{% elif ans.board.to %}carried to {{ ans.board.to | map('replace', e.name ~ '#', '') | join(' and ') }}{% else %}{{ ans.name }} acts on it{% endif %}</span>
   {%- elif ans %}
   <span class="st">{{ ans.words }} · {% if ans.outcome %}{{ ans.name }}: {{ ans.outcome.text or 'done' }}{% else %}in {{ ans.name }}'s {{ ans.kind }}, {{ ans.age or 'just now' }}{% if ans.age %} ago{% endif %} — the hold goes when its PR merges{% endif %}</span>
   {%- elif with_you %}

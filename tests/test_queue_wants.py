@@ -107,9 +107,12 @@ def test_a_card_draws_decide_and_do_in_its_header_and_read_folded_under_its_rows
     v = queue_view(queue(), NOW, attach(secs, lambda e, sec: Markup(f'<div class="mailrow">{e["id"]}</div>')))
     html = templates.env.get_template("queue_card.html").module.card(v["up_next"][1])
     head, body = html.split('<div class="qrows">')
-    assert "Decide (1)" in head and "Do (1)" in head and ">Decide 1 · Do 1</span>" in head
-    assert ">Read 2</span>" in head  # *Read n*, which the page shows on a folded card alone
-    assert "waiting on them (1)" in body and "fyi (1)" in body and "answered for you" not in body
+    # the headings' counts in words, each number its `data-n` (§4.5 screen 12 *The Queue's words*, TD-1809)
+    assert ">One decision for you</span>" in head and ">One thing for you to do</span>" in head
+    assert ">Decide 1 · Do 1</span>" in head
+    assert 'data-n="2">2 to read</span>' in head  # *n to read*, which the page shows on a folded card alone
+    assert ">One waiting on them</span>" in body and ">One for your information</span>" in body
+    assert "answered for you" not in body
     # Dismiss all on fyi's line alone; waiting on them has none
     assert body.count(">Dismiss all</button>") == 1
     assert body.index('data-sec="fyi"') < body.index(">Dismiss all</button>")

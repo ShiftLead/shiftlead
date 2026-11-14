@@ -1397,6 +1397,9 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
   .qplace { font-size: calc(var(--t-body) * 1.4); }
   .qwaits .qhead, .qwaits.multi .qhead { grid-template-columns: 1.4em 6em minmax(0, 1fr); }
   .qtitle { flex: 1 1 0; min-width: 8em; }
+  /* a card's title under its id, the card's full width, never squeezed beside it (§4.5 screen 12 *The Queue's
+     words: On a phone*, TD-1809) */
+  .qhead .qtitle { flex: 1 1 100%; min-width: 0; }
   .qright { margin-left: 0; justify-content: flex-start; flex-basis: 100%; }
   .qbuilds, .qnote { padding-left: 0; }
   /* a card's items take the card's width, as the notes do: no desktop indent under the number (TD-985) */

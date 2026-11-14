@@ -67,7 +67,7 @@ def test_a_read_item_is_one_line_opening_to_its_row():
     html = card(e, "read", "fyi")
     line = re.search(r'<details class="cardline" data-fold="line:m-3"><summary[^>]*>(.*?)</summary>', html, re.S)
     assert line, html
-    assert "w1" in line.group(1) and ">note<" in line.group(1) and "the build is live" in line.group(1)
+    assert "w1" in line.group(1) and ">Note<" in line.group(1) and "the build is live" in line.group(1)
     assert "1h 0m" in line.group(1)
     # inside, the row whole with its controls
     assert 'data-act="unmail"' in html.split("</summary>", 1)[1]
@@ -84,8 +84,8 @@ def test_a_ledger_item_leads_with_its_ask_and_says_what_each_answer_leads_to(tmp
     html = card(row, "decide")
     assert '<div class="body sentence">Should the walk use the work account?</div>' in html
     # what each answer leads to stands beside its button (§4.5 screen 12 *Three verbs: Answer*, TD-914)
-    assert '<span class="alabel">work</span></button><span class="st alead">the paid seat</span>' in html
-    assert '<span class="alabel">home</span></button></span>' in html
+    assert '<span class="alabel">Work</span></button><span class="st alead">the paid seat</span>' in html
+    assert '<span class="alabel">Home</span></button></span>' in html
     # its *context* is drawn closed and read on its first open, though it has answers to press
     assert f'data-fold="{row["row_id"]}" data-lazy="1"><summary>context</summary></details>' in html
     # with no `Ask:`, its title is the sentence

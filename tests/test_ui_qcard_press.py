@@ -31,7 +31,7 @@ AO.qRecount = () => recounts.push(needing());
 const out = {};
 const item = (msg) => h("div", "mailrow", { "data-msg": msg }, [h("div", "rowerr")]);
 const block = (b, msgs) => h("div", `qsec qwant qsec-${b}`, { "data-sec": b }, [
-  h("div", "qsech", {}, [h("span", "", { text: `${b === "decide" ? "Decide" : "Do"} (${msgs.length})` })]),
+  h("div", "qsech", {}, [h("span", "", { text: AO.qCountWords(b, msgs.length), "data-n": msgs.length })]),
   h("div", "qmail inboxrows", {}, msgs.map(item))]);
 const pillOf = (d, n) => [d ? `Decide ${d}` : "", n ? `Do ${n}` : ""].filter(Boolean).join(" · ");
 // a card as the server draws it: Decide and Do in the header, its pill at the header line's end, Read under the rows
@@ -44,7 +44,7 @@ const qcard = (id, o) => {
     ...(o.with ? [h("div", "qsec qwith", { "data-sec": "with_you" }, [item(o.with)])] : [])])]);
   const waiting = { "data-sec": "waiting" };
   const rd = h("div", "qrows", {}, [h("details", "qread", {}, [h("div", "qsec qsec-waiting", waiting, [
-    h("div", "qsech", {}, [h("span", "", { text: `waiting on them (${(o.read || []).length})` })]),
+    h("div", "qsech", {}, [h("span", "", { text: "One waiting on them", "data-n": 1 })]),
     h("div", "qmail", {}, (o.read || []).map(item))])])]);
   const attrs = { "data-card": id, "data-status": "needs you" };
   if (o.lneed) attrs["data-lneed"] = "";
@@ -54,6 +54,7 @@ const look = (c) => {
   const right = c.querySelector(".qhead .qright");
   return { pill: (c.querySelector(".qwpill") || {}).textContent || null,
     hd: c.querySelectorAll(".qsech span").map((x) => x.textContent),
+    n: c.querySelectorAll(".qsech span").map((x) => x.dataset.n),
     cls: c.className.split(" ").sort().join(" "), status: c.dataset.status,
     line: right.children.map((x) => x.className + (x.textContent ? `=${x.textContent}` : "")) };
 };
@@ -65,11 +66,14 @@ const press = (c, msg) => {
 const reset = (...cards) => { AO.inflight = {}; recounts = []; page = h("div", "", {}, cards); return cards; };
 
 out.pill = [[2, 1], [0, 1], [1, 0]].map(([d, n]) => AO.qPillText(d, n));
+// *The Queue's words* (TD-1809): every heading's words for 0, 1 and 2, the twin of `count_words`
+out.words = Object.fromEntries(["decide", "do", "read", "answered", "waiting", "fyi"].map((b) => [b,
+  [0, 1, 2].map((n) => AO.qCountWords(b, n))]));
 
 // a Decide press on *Decide 2*: pill and heading one fewer, the look kept
 let [c] = reset(qcard("A", { decide: ["m1", "m2"] }));
 out.two = { key: press(c, "m1"), look: look(c), recounts };
-// *Decide 1 · Do 1* after its Decide reads *Do 1*; the emptied block's heading reads *Decide (0)*
+// *Decide 1 · Do 1* after its Decide reads *Do 1*; the emptied block's heading reads *No decision left for you*
 [c] = reset(qcard("B", { decide: ["m1"], do: ["m2"] }));
 press(c, "m1"); out.mixed = look(c);
 // the last Decide on a card with no Do: the pill, the needs-you look and the status go, the edge the group's
@@ -140,14 +144,31 @@ def test_the_scripts_pill_text_is_the_macros(drew):
         assert re.search(r">([^<]*)</span>$", html)[1] == js
 
 
+def test_the_scripts_count_words_are_the_macros(drew):
+    """§4.5 screen 12 *The Queue's words: Counts in words* (TD-1809): `AO.qCountWords` and `count_words` write the
+    same words for every key at 0, 1 and 2."""
+    count_words = templates.env.get_template("queue_row.html").module.count_words
+    assert set(drew["words"]) == {"decide", "do", "read", "answered", "waiting", "fyi"}
+    for block, js in drew["words"].items():
+        assert [str(count_words(block, n)) for n in (0, 1, 2)] == js
+    assert drew["words"]["decide"] == ["No decision left for you", "One decision for you", "2 decisions for you"]
+    assert drew["words"]["do"] == ["Nothing left for you to do", "One thing for you to do", "2 things for you to do"]
+    assert drew["words"]["read"] == ["", "One to read", "2 to read"]
+    assert drew["words"]["answered"] == ["", "One answered for you", "2 answered for you"]
+    assert drew["words"]["waiting"] == ["", "One waiting on them", "2 waiting on them"]
+    assert drew["words"]["fyi"] == ["", "One for your information", "2 for your information"]
+
+
 def test_a_decide_press_takes_one_off_the_pill_and_heading_in_the_press_frame(drew):
     assert drew["two"]["key"] == "qcard:A"
     assert drew["two"]["look"] == {
-        "pill": "Decide 1", "hd": ["Decide (1)", "waiting on them (0)"], "cls": NEEDS, "status": "needs you",
-        "line": ["qgap", f"{PILL}=Decide 1"],
+        "pill": "Decide 1", "hd": ["One decision for you", "One waiting on them"], "n": ["1", "1"], "cls": NEEDS,
+        "status": "needs you", "line": ["qgap", f"{PILL}=Decide 1"],
     }  # fmt: skip
     assert drew["two"]["recounts"] == [1]
-    assert drew["mixed"]["pill"] == "Do 1" and drew["mixed"]["hd"][:2] == ["Decide (0)", "Do (1)"]
+    assert drew["mixed"]["pill"] == "Do 1"
+    assert drew["mixed"]["hd"][:2] == ["No decision left for you", "One thing for you to do"]
+    assert drew["mixed"]["n"][:2] == ["0", "1"]  # the words and `data-n` redrawn together
 
 
 def test_the_last_one_drops_the_pill_and_draws_the_card_plain_on_the_groups_edge(drew):
@@ -166,7 +187,8 @@ def test_a_card_whose_ledger_needs_you_keeps_its_look_and_says_needs_you(drew):
 
 
 def test_the_dots_road_takes_the_ledger_item_off_its_own_block(drew):
-    assert drew["dots"]["pill"] == "Decide 1" and drew["dots"]["hd"][:2] == ["Decide (1)", "Do (0)"]
+    assert drew["dots"]["pill"] == "Decide 1"
+    assert drew["dots"]["hd"][:2] == ["One decision for you", "Nothing left for you to do"]
 
 
 def test_an_item_outside_decide_and_do_takes_nothing_off(drew):
@@ -175,7 +197,7 @@ def test_an_item_outside_decide_and_do_takes_nothing_off(drew):
 
 
 def test_a_reread_keeps_the_change_while_the_press_is_out(drew):
-    assert drew["reread"]["look"]["pill"] == "Decide 1" and drew["reread"]["look"]["hd"][0] == "Decide (1)"
+    assert drew["reread"]["look"]["pill"] == "Decide 1" and drew["reread"]["look"]["hd"][0] == "One decision for you"
     assert drew["reread"]["keys"] == {"decide": ["m1"], "do": []}
     assert drew["minute"]["pill"] == "Decide 1"
 
@@ -188,11 +210,11 @@ def test_a_reread_drawing_the_line_under_read_or_past_its_minute_lets_the_key_go
 def test_refusals_put_the_card_back_one_press_at_a_time(drew):
     assert drew["both"]["pill"] is None and drew["both"]["status"] == ""
     assert drew["back1"]["look"] == {
-        "pill": "Decide 1", "hd": ["Decide (1)", "waiting on them (0)"], "cls": NEEDS, "status": "needs you",
-        "line": ["qgap", f"{PILL}=Decide 1"],
+        "pill": "Decide 1", "hd": ["One decision for you", "One waiting on them"], "n": ["1", "1"], "cls": NEEDS,
+        "status": "needs you", "line": ["qgap", f"{PILL}=Decide 1"],
     }  # fmt: skip
     assert drew["back1"]["recounts"] == [2]  # the card counts as needing the person again, beside K
-    assert drew["back2"]["look"]["pill"] == "Decide 2" and drew["back2"]["look"]["hd"][0] == "Decide (2)"
+    assert drew["back2"]["look"]["pill"] == "Decide 2" and drew["back2"]["look"]["hd"][0] == "2 decisions for you"
     assert drew["back2"]["keep"] is False
 
 
