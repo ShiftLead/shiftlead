@@ -159,6 +159,16 @@ def test_a_held_only_mark_draws_its_own_row_start_and_snooze_alone():
         html = uiapp.templates.get_template("inbox_rows.html").render(rows=[r], section="later" if later else "needs")
         assert 'data-act="work_start"' in html and "Snooze ▾" in html and 'data-act="clear_work"' not in html
         assert "· 2 questions wait on fact-check-ao-1</div>" in html
+    # the row's section is the mark's `seats_held_by`, never `stopped.by` (TD-1614): a wound-down team (no `stopped`)
+    # whose seat a person held sits under Later; one a person stopped whose seat the stop time held, under Needs you
+    for stopped, held_by, later in ((None, "person", True), ({"by": "person", "at": STOP}, "until", False)):
+        m = {"at": AT, "members": {}, "seats_held": {"ao-g-fc": 2}, "seats_held_by": held_by}
+        if stopped:
+            m["stopped"] = stopped
+        (r,) = work_rows({"g": m}, {}, NOW, records=[FC], on_work=lambda t: "ask")
+        assert r["held_only"] and r["later"] is later, held_by
+        s = inbox_sections([], states=[r])
+        assert (len(s["later"]), s["count"]) == ((1, 0) if later else (0, 1)), held_by
 
 
 def test_a_held_only_row_without_a_stop_stamp_reads_wound_down_and_under_start_says_questions_start_nothing():
