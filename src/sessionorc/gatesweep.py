@@ -49,7 +49,7 @@ log = logging.getLogger("shiftlead.agent")
 
 LEDGER = "docs/ledger"  # a split ledger: the sweep reads no v1 file here
 SWEEP_BRANCH = "sweep/"  # the board PR's branch: sweep/<UTC date>
-LIFT_BRANCH = "lift/"  # a lift PR's: lift/TD-n/<event name> | until-<date>
+LIFT_BRANCH = reports.LIFT_PREFIX  # a lift PR's: lift/TD-n/<event name> | until-<date>
 SESSION = "gate-sweep"  # the session an item the sweep files names
 GIT_TIMEOUT = 60.0
 GH_TIMEOUT = 60.0

@@ -233,7 +233,7 @@ def _held_world(monkeypatch, review, files, reading_):
         return rec
 
     monkeypatch.setattr(cli, "call_sync", call)
-    body = json.dumps({"files": [{"path": f} for f in files]})
+    body = "".join(f"{f}\n" for f in files)  # the paginated read's lines (TD-1810)
     monkeypatch.setattr(reviewmod.subprocess, "run", lambda argv, **kw: subprocess.CompletedProcess(argv, 0, body, ""))
 
 

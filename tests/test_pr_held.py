@@ -42,11 +42,22 @@ def test_the_setting_is_filled_in_whatever_wrote_it():
         reviewmod.setting({"reader": "techlead", "held": []})
 
 
-def test_a_page_of_a_large_prs_files_is_never_judged(monkeypatch):
-    body = json.dumps({"files": [{"path": "docs/a.md"}], "changedFiles": 140})
-    monkeypatch.setattr(reviewmod.subprocess, "run", lambda argv, **kw: subprocess.CompletedProcess(argv, 0, body, ""))
-    with pytest.raises(RuntimeError, match="1 of PR #7's 140 files"):
-        reviewmod.pr_files(7)
+def test_every_page_of_a_large_prs_files_is_read_renamed_files_old_names_beside_the_new(monkeypatch):
+    """TD-1810: `ao pr held` reads the forge's paginated file list, as the repo reading does — never
+    `gh pr view`'s 100-file page — and a renamed file's old name beside its new one."""
+    asked = []
+
+    def gh(argv, **_kw):
+        asked.append(argv)
+        return subprocess.CompletedProcess(argv, 0, "".join(f"docs/{i}.md\n" for i in range(140)) + "src/old.py\n", "")
+
+    monkeypatch.setattr(reviewmod.subprocess, "run", gh)
+    files = reviewmod.pr_files(7)
+    assert len(files) == 141 and files[-1] == "src/old.py"
+    (argv,) = asked
+    assert argv[:4] == ["gh", "api", "repos/{owner}/{repo}/pulls/7/files", "--paginate"]
+    assert argv[5] == ".[] | .filename, (.previous_filename // empty)"
+    assert reviewmod.held_paths(files, {"reader": "t", "held": ["src/**"]}) == ["src/old.py"]
 
 
 def test_a_failed_read_is_said_never_taken_for_not_held(monkeypatch):
@@ -61,7 +72,7 @@ def test_a_failed_read_is_said_never_taken_for_not_held(monkeypatch):
 def _world(monkeypatch, review, files):
     monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-r-w")
     monkeypatch.setattr(cli, "call_sync", lambda method, **kw: {"id": kw["id"], "dir": "/r", "review": review})
-    body = json.dumps({"files": [{"path": f} for f in files]})
+    body = "".join(f"{f}\n" for f in files)  # the paginated read's lines (TD-1810)
     monkeypatch.setattr(reviewmod.subprocess, "run", lambda argv, **kw: subprocess.CompletedProcess(argv, 0, body, ""))
 
 

@@ -106,13 +106,45 @@ def repo_key(root: Path | str, records: Iterable[Session]) -> list[str]:
     return sorted(globs)
 
 
-def pr_read(pr: int, cwd: str | None = None) -> tuple[list[str], datetime | None]:
-    """The PR's changed files and when it merged (None while it has not), from `gh` in the checkout
-    it belongs to. A `RuntimeError` saying why when `gh` cannot say: *not held* is never guessed
-    from a failed read."""
+def paged_files(directory: Path | str | None, pr: int, timeout: float = GH_TIMEOUT) -> list[str] | str:
+    """Every file a PR changes, read whole — the forge's paginated list, never `gh pr view --json files`,
+    which stops at 100 (TD-684) — with a renamed file's old name (`previous_filename`) beside its new one, or
+    why it could not be read. The one reader of a PR's files: the repo reading's (`reports.pr_files`) and
+    `ao pr held`'s (`pr_read`), so the two never disagree (§4.4 *A filing PR nobody holds is a work order*,
+    TD-1810)."""
     try:
         cp = subprocess.run(
-            ["gh", "pr", "view", str(pr), "--json", "files,changedFiles,mergedAt"],
+            [
+                "gh", "api", f"repos/{{owner}}/{{repo}}/pulls/{pr}/files", "--paginate",
+                "--jq", ".[] | .filename, (.previous_filename // empty)",
+            ],
+            capture_output=True, text=True, timeout=timeout, cwd=None if directory is None else str(directory),
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return f"gh could not be asked: {type(e).__name__}"
+    if cp.returncode != 0:
+        return ((cp.stderr or "").strip().splitlines() or ["gh api failed"])[-1][:200]
+    return [line.strip() for line in (cp.stdout or "").splitlines() if line.strip()]
+
+
+def pr_files(pr: int, cwd: str | None = None) -> list[str]:
+    """The PR's changed files alone, as `ao pr held` reads them (`paged_files`: every page, renamed files'
+    old names too). A `RuntimeError` saying why when `gh` cannot say: *not held* is never guessed from a
+    failed read."""
+    files = paged_files(cwd, pr)
+    if isinstance(files, str):
+        raise RuntimeError(f"gh could not read PR #{pr}'s files: {files}")
+    return files
+
+
+def pr_read(pr: int, cwd: str | None = None) -> tuple[list[str], datetime | None]:
+    """The PR's changed files (`pr_files`) and when it merged (None while it has not), the merge by its own
+    `gh pr view` call, from `gh` in the checkout it belongs to. A `RuntimeError` saying why when `gh`
+    cannot say: *not held* is never guessed from a failed read."""
+    files = pr_files(pr, cwd)
+    try:
+        cp = subprocess.run(
+            ["gh", "pr", "view", str(pr), "--json", "mergedAt"],
             capture_output=True,
             text=True,
             cwd=cwd,
@@ -125,24 +157,13 @@ def pr_read(pr: int, cwd: str | None = None) -> tuple[list[str], datetime | None
         why = (cp.stderr or cp.stdout).strip().splitlines()
         raise RuntimeError(f"gh could not read PR #{pr}: {why[-1] if why else cp.returncode}")
     try:
-        got = json.loads(cp.stdout)
-        files = [str(f["path"]) for f in got.get("files") or []]
-        total = int(got.get("changedFiles") or 0)
-        at = got.get("mergedAt")
+        at = json.loads(cp.stdout).get("mergedAt")
         merged = datetime.fromisoformat(str(at).replace("Z", "+00:00")) if at else None
-    except (ValueError, KeyError, TypeError, AttributeError):
-        raise RuntimeError(f"gh gave PR #{pr}'s files in a shape this does not read") from None
-    if total > len(files):
-        # `gh` returns one page of a large PR's files: a held path past it would read as *not held*
-        raise RuntimeError(f"gh listed {len(files)} of PR #{pr}'s {total} files: too many to judge; ask the reader")
+    except (ValueError, TypeError, AttributeError):
+        raise RuntimeError(f"gh gave PR #{pr}'s merge in a shape this does not read") from None
     if merged is not None and merged.tzinfo is None:
         merged = merged.replace(tzinfo=UTC)
     return files, merged
-
-
-def pr_files(pr: int, cwd: str | None = None) -> list[str]:
-    """The PR's changed files alone, as `ao pr held` reads them."""
-    return pr_read(pr, cwd)[0]
 
 
 # ── a held PR nobody asked (§4.4 *A held PR nobody asked is marked, never ordered*, TD-789) ─────────
