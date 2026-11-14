@@ -7,14 +7,15 @@ event the state feed reads. A profile names a `config_dir` of its own (`own_home
 `~/.grok` is never written. Read against the installed 1.0.77 (`50ca579fa996`, 2026-11-14): `--session-id`,
 `--resume`, `--always-approve`, `--permission-mode default` and `-m` are its flags.
 
-Not registered under the `shiftlead.adapters` entry points yet: the conformance suite tests every registered
-agent adapter against fixtures captured from the real tool, and those land with the state feed (TD-1637).
+Registered under the `shiftlead.adapters` entry points (TD-1637 slice 13): the conformance suite tests it against
+the hook payloads and panes captured from the installed tool (`tests/conformance/fixtures/grok/`).
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import sys
 import tempfile
@@ -24,6 +25,7 @@ from pathlib import Path
 
 from sessionorc.adapters import LaunchSpec, read_version
 from sessionorc.models import Confidence, State
+from sessionorc.screen import painted_text
 from sessionorc.tmux import PaneInfo
 from shiftlead import profiles as profiles_mod
 from shiftlead.profiles import Profile
@@ -70,6 +72,18 @@ LAUNCH_ENV = {
     "GROK_CODE_XAI_API_KEY": "",
 }
 NO_HOME = "a Grok profile needs a config_dir of its own"
+# The composer (design §4.3 `composer`, read 2026-11-14 on 1.0.77): a rounded box, `╭` its top border and `╰` its
+# bottom, its first row `│ ❯ <text>` and a pasted text's further rows under it. A submitted prompt is drawn in the
+# history above with the same `❯` and no box, and a permission or question dialog takes the box's place (`┃` rows).
+COMPOSER_TOP, COMPOSER_BOTTOM = "╭", "╰"
+COMPOSER_ROW = re.compile(r"^\s*│\s*❯ ?")
+# The terminal title (read 2026-11-14 on 1.0.77): `<name> - grok` at rest, `grok` before the tool names the session,
+# `<spinner> - <activity> - <name> - grok` in a turn (a braille spinner glyph) and `⚠  Action Required - <spinner> -
+# <activity> - <name> - grok` while a permission waits. A question tool's wait shows the spinner, so the title is
+# not read as a state (§4.3 *The title as the check*: `state_in_title` False), only as the session's name.
+TITLE_SUFFIX = " - grok"
+TITLE_SPINNER = re.compile(r"^[\u2800-\u28ff] - ")
+TITLE_ACTION = re.compile(r"^⚠\s+Action Required - ")
 
 
 def hook_path() -> str:
@@ -117,7 +131,14 @@ class GrokAdapter:
     permission_channel = False  # a Grok hook cannot answer a prompt (§4.3 *No permission channel*)
     start_context = False  # no Grok hook hands the model context at the start (§4.3 `start_context`)
     asking_args = ASKING_ARGS  # added to an unattended launch under `permission_prompts: all` (§4.3, TD-823)
-    implements: frozenset[str] = frozenset()
+    # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): the reads of its
+    # transcript come with TD-1637's later slices
+    implements: frozenset[str] = frozenset({"composer", "title"})
+    # its title does not tell a question tool's wait from a turn's spinner (§4.3 *The title as the check*)
+    state_in_title = False
+    # rows its repaints move, masked from the liveness clock (design §4.3 *An adapter names its volatile rows*):
+    # the spinner line (a braille glyph) with its elapsed timer, and a running tool's `◆ <what>… 11s` line
+    volatile_rows = (r"^\s*[\u2800-\u28ff]\s", r"^\s*◆ .*…\s+(\d+[hm]\s*)*\d+(\.\d+)?m?s\s*$")
 
     def __init__(self, binary: str | None = None, hook_cmd: str | None = None):
         self.binary = binary or str(BINARY.expanduser())
@@ -160,6 +181,52 @@ class GrokAdapter:
 
     def classify(self, pane: PaneInfo | None, tail: list[str]) -> State | None:
         return None  # hook-fed: the state comes from the hooks
+
+    def composer(self, tail_raw: list[str]) -> str | None:
+        """The text in the composer (design §4.3 `composer`): the `❯` row of the last box on screen, its right
+        border and padding stripped; "" when it holds nothing; None when no box is on screen (a permission or
+        question dialog in its place) or the box holds no `❯` row. A multi-line text reads as its first row."""
+        rows = [painted_text(r) for r in tail_raw]
+        top = next((i for i in range(len(rows) - 1, -1, -1) if rows[i].lstrip().startswith(COMPOSER_TOP)), None)
+        if top is None:
+            return None
+        for row in rows[top + 1 :]:
+            if row.lstrip().startswith(COMPOSER_BOTTOM):
+                return None
+            if m := COMPOSER_ROW.match(row):
+                return row[m.end() :].rstrip().removesuffix("│").strip("\xa0 ")
+        return None
+
+    def title(self, pane_title: str) -> str | None:
+        """The session's name as the tool holds it (design §4.3 `title`): the title less its ` - grok` suffix and
+        any leading *Action Required* and spinner-and-activity parts; None for the bare `grok` the tool writes
+        before it names the session, and for a title that is not the tool's (a shell's)."""
+        text = (pane_title or "").strip()
+        if not text.endswith(TITLE_SUFFIX):
+            return None
+        text = TITLE_ACTION.sub("", text.removesuffix(TITLE_SUFFIX))
+        if TITLE_SPINNER.match(text):
+            # the name is the last part: an activity may hold ` - ` (a running command's), a name rarely does
+            parts = text.split(" - ")
+            text = parts[-1] if len(parts) >= 3 else ""
+        return text.strip() or None
+
+    def account_for(self, profile: str) -> str | None:
+        """The account a profile naming this adapter runs under (§4.2a); None for any other (TD-1581)."""
+        return profiles_mod.account_of(profile, NAME)
+
+    def profiles(self) -> list[dict]:
+        """The profiles naming this adapter, each `{name, account, billing}` (§4.3, TD-1581)."""
+        return profiles_mod.for_adapter(NAME)
+
+    def billing_for(self, profile: str) -> dict | None:
+        """How the profile is billed (design §4.2a, TD-151): `{billing, prices}` as `profiles.yml` declares it.
+        None for a profile that does not resolve."""
+        try:
+            prof = profiles_mod.get(profile or None)
+        except (KeyError, ValueError):
+            return None
+        return {"billing": prof.billing, "prices": dict(prof.prices)}
 
     def default_home(self, env: Mapping[str, str]) -> Path:
         """The home a launch would use with no `config_dir` (§4.3's Protocol block, TD-1648): `$GROK_HOME`, else

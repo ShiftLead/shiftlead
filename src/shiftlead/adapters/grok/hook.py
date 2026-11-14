@@ -2,7 +2,7 @@
 TD-1637).
 
 `translate` maps one Grok Build hook payload to the host agent's `hook` params, read against the payloads
-captured from the installed 1.0.77 (`tests/conformance/fixtures/grok/captured/hooks-scratch.jsonl`):
+captured from the installed 1.0.77 (`tests/conformance/fixtures/grok/captured/hooks.jsonl`):
 
 - `SessionStart` with `source` `new` (a launch, and a `/clear`'s new conversation) or `load` (a resume) → `idle`
   with `subagents_reset`; its `sessionId` is the record's `adapter_id`, which a `/clear` changes. Any other

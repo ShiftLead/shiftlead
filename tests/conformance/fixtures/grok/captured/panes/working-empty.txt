@@ -1,0 +1,45 @@
+[48;5;233m
+  [38;5;251m/t/c/-/1/scratchpad/gdir[39m                                                                                                           [38;5;254m1.5K / 256K[38;5;238m │ [38;5;242m[Dashboard][39m
+
+  [48;5;235m                                                                                                                                                            [48;5;233m
+  [48;5;235m   [38;5;251m❯ [38;5;254mline one[39m                                                                                                                                    [38;5;242m  7:59 PM[39m  [48;5;233m
+  [48;5;235m   [38;5;251m  [38;5;254mWrite a 400-word essay about tmux, then say done. Do not use any tools.[39m                                                                                [48;5;233m
+  [48;5;235m                                                                                                                                                            [48;5;233m
+
+     [38;5;242m◆ [1mThought[0m[38;5;242m[48;5;233m for 0.0s[39m
+
+     [38;5;251mTmux is a terminal multiplexer: a program that lets one terminal window hold many sessions, windows, and panes, and keeps them alive after[39m    [38;5;242m  7:59 PM[39m
+     [38;5;251myou detach. For people who live in the shell, it turns a fragile login into a workspace that survives network drops, laptop sleeps, and the[39m
+     [38;5;251mhabit of closing the wrong tab.[39m
+
+     [38;5;251mA session is the outermost container. You start one with a name, attach to it from any machine that can reach the host, and detach when you[39m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   [38;5;251m⠦ Responding…[38;5;242m 2.0s[39m                                                                                                                       [38;5;242m4.0s ⇣1.49k [stop][39m
+
+  [38;5;254mHelp improve Grok[39m                                                                                                                         [38;5;243m[Opt out][39m [38;5;254m[Opt in][39m
+  [38;5;243mOff by default. Opt-in to allow SpaceXAI to retain coding data, e.g., prompts, traces, & metrics, for training and debugging purposes.[39m
+  [38;5;243mChange anytime via settings.[39m
+  [38;5;242mRead [4mTerms[0m[38;5;242m[48;5;233m and [4mPrivacy Policy[0m[38;5;242m[48;5;233m.[39m
+
+  [38;5;239m╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮[39m
+  [38;5;239m│[38;5;254m [38;5;251m❯ [38;5;254m                                                                                                                                                       [38;5;239m│[39m
+  [38;5;239m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── [38;5;244mGrok 4.7 (high)[38;5;239m ─╯[39m
+
+  [1m[38;5;251mShift+Tab[0m[38;5;242m[48;5;233m:mode[2m  │  [0;1m[38;5;251m[48;5;233mCtrl+c[0m[38;5;242m[48;5;233m:cancel[2m  │  [0;1m[38;5;251m[48;5;233mCtrl+x[0m[38;5;242m[48;5;233m:shortcuts                                                                                                       [39m
+

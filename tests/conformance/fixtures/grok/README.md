@@ -1,9 +1,10 @@
 # Grok Build's conformance fixtures
 
-Captured from the real tool, never written by hand (design §4.3 *The conformance suite*). The adapter is not
-registered yet (TD-1637); `tests/test_grok_hook.py` reads the hook capture through the state feed's `translate`.
+Captured from the real tool, never written by hand (design §4.3 *The conformance suite*). `manifest.json`
+says what the adapter reads off each (TD-1637 slice 13), and `tests/test_grok_hook.py` reads the hook captures
+through the state feed's `translate` as well.
 
-- `captured/hooks-scratch.jsonl` (Grok Build 1.0.77 `50ca579fa996` on kmaster, 2026-11-14, TD-1637 slice 9):
+- `captured/hooks.jsonl` (Grok Build 1.0.77 `50ca579fa996` on kmaster, 2026-11-14, TD-1637 slice 9):
   every hook payload, unchanged, one per line, that a capture-only hook file (`hooks/cap.json`, the thirteen
   events `HOOK_EVENTS` names, `cat >>`) recorded in a scratch copy of the signed-in `grok-conformance` home,
   the tool on a private tmux server (160×45) in a scratch git directory, launched with the adapter's
@@ -28,3 +29,9 @@ registered yet (TD-1637); `tests/test_grok_hook.py` reads the hook capture throu
   `Notification` `elicitation_dialog`, answered *Blue*); a background subagent running `sleep 120`, killed by
   `kill_command_or_subagent` (its `task_id` the `subagentId`), which fired no `SubagentStop`, only the child's
   `SessionEnd`; and `/exit`.
+- `captured/panes/*.txt` and `captured/titles.json` (Grok Build 1.0.77 on kmaster, 2026-11-13 local, TD-1637 slice
+  13): `tmux capture-pane -p -e` of a fresh scratch copy of `grok-conformance` on a private tmux server (160×45),
+  launched as above with `--session-id 33333333-4444-4555-8666-777777777777`, and the pane's `#{pane_title}` at
+  each step: the empty composer at launch, a typed line, a two-line bracketed paste, a turn running with an
+  empty composer, with a typed line and with a queued prompt, a permission prompt (`rm a.txt && mkdir made`)
+  and an `ask_user_question`. The titles' first entry is the launch's, before the tool named the session.

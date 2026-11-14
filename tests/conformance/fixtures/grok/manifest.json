@@ -1,0 +1,251 @@
+{
+ "panes": [
+  {
+   "file": "captured/panes/idle-empty.txt",
+   "state": null,
+   "composer": ""
+  },
+  {
+   "file": "captured/panes/idle-typed.txt",
+   "state": null,
+   "composer": "hello there"
+  },
+  {
+   "file": "captured/panes/idle-pasted.txt",
+   "state": null,
+   "composer": "line one"
+  },
+  {
+   "file": "captured/panes/working-empty.txt",
+   "state": null,
+   "composer": ""
+  },
+  {
+   "file": "captured/panes/working-typed.txt",
+   "state": null,
+   "composer": "a queued prompt"
+  },
+  {
+   "file": "captured/panes/working-queued.txt",
+   "state": null,
+   "composer": ""
+  },
+  {
+   "file": "captured/panes/needs-you.txt",
+   "state": null,
+   "composer": null
+  },
+  {
+   "file": "captured/panes/question.txt",
+   "state": null,
+   "composer": null
+  }
+ ],
+ "titles": [
+  {
+   "file": "captured/titles.json",
+   "names": [
+    null,
+    null,
+    "Write 400-word essay about tmux",
+    "Write 400-word essay about tmux",
+    "Tmux essay and remove a.txt command",
+    "Tmux essay and remove a.txt command",
+    "Write 400-word essay about tmux",
+    "Tmux essay, shell command, color poll, t…"
+   ]
+  }
+ ],
+ "hooks": [
+  {
+   "file": "captured/hooks.jsonl",
+   "at_composer": true,
+   "reads": [
+    {
+     "state": "idle"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "idle"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "needs-you",
+     "pending": "permission"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "idle"
+    },
+    {
+     "state": "idle"
+    },
+    {
+     "state": "exited"
+    },
+    {
+     "state": null
+    },
+    {
+     "state": "exited"
+    },
+    {
+     "state": null
+    }
+   ]
+  },
+  {
+   "file": "captured/hooks-subagents.jsonl",
+   "at_composer": true,
+   "reads": [
+    {
+     "state": "idle"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": null
+    },
+    {
+     "state": null
+    },
+    {
+     "state": null
+    },
+    {
+     "state": null
+    },
+    {
+     "state": null
+    },
+    {
+     "state": null
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "idle"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "needs-you",
+     "pending": "permission"
+    },
+    {
+     "state": null
+    },
+    {
+     "state": null
+    },
+    {
+     "state": null
+    },
+    {
+     "state": "needs-you",
+     "pending": "permission"
+    },
+    {
+     "state": null
+    },
+    {
+     "state": null
+    },
+    {
+     "state": null
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "idle"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "needs-you",
+     "pending": "question"
+    },
+    {
+     "state": null
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "idle"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": null
+    },
+    {
+     "state": null
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": null
+    },
+    {
+     "state": "idle"
+    },
+    {
+     "state": "idle"
+    },
+    {
+     "state": "exited"
+    },
+    {
+     "state": null
+    }
+   ]
+  }
+ ],
+ "life": {
+  "start": 0,
+  "turn": [
+   1,
+   4
+  ],
+  "end": null,
+  "composer": "captured/panes/idle-empty.txt"
+ }
+}

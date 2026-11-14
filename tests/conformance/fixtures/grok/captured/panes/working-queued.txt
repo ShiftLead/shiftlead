@@ -1,0 +1,45 @@
+[48;5;233m
+  [38;5;251m/t/c/-/1/scratchpad/gdir[39m                                                                                                            [38;5;254m20K / 256K[38;5;238m │ [38;5;242m[Dashboard][39m
+
+  [48;5;235m                                                                                                                                                            [48;5;233m
+  [48;5;235m   [38;5;251m❯ [38;5;254mWrite a 400-word poem about terminals. No tools.[39m                                                                                            [38;5;242m  8:01 PM[39m  [48;5;233m
+  [48;5;235m                                                                                                                                                            [48;5;233m
+
+     [38;5;242m◆ [1mThought[0m[38;5;242m[48;5;233m for 0.0s[39m
+
+     [38;5;251mThe cursor blinks like a patient lighthouse[39m [38;5;251mon a black coast nobody else can see.[39m [38;5;251mYou type a name and the coast answers,[39m [38;5;251ma path unspooling[39m    [38;5;242m  8:01 PM[39m
+     [38;5;251munder your hands,[39m [38;5;251mdirectories opening the way rooms open[39m [38;5;251mwhen you already know which light switch works.[39m [38;5;251mThis is the oldest room in the new[39m
+     [38;5;251mmachine,[39m [38;5;251molder than windows[39m
+
+
+
+
+
+
+
+
+
+                                                                                                                                                               [38;5;234m[48;5;234m█
+[39m[48;5;233m                                                                                                                                                               [38;5;234m[48;5;234m█
+[39m[48;5;233m                                                                                                                                                               [38;5;234m[48;5;234m█
+[39m[48;5;233m                                                                                                                                                               [38;5;234m[48;5;234m█
+[39m[48;5;233m                                                                                                                                                               [38;5;234m[48;5;234m█
+[39m[48;5;233m                                                                                                                                                               [38;5;234m[48;5;234m█
+[39m[48;5;233m                                                                                                                                                               [38;5;234m[48;5;234m█
+[39m[48;5;233m
+   [38;5;251m⠧ Responding…[38;5;242m 1.9s[39m                                                                                                                       [38;5;242m4.0s ⇣20.3k [stop][39m
+
+  [38;5;254mHelp improve Grok[39m                                                                                                                         [38;5;243m[Opt out][39m [38;5;254m[Opt in][39m
+  [38;5;243mOff by default. Opt-in to allow SpaceXAI to retain coding data, e.g., prompts, traces, & metrics, for training and debugging purposes.[39m
+  [38;5;243mChange anytime via settings.[39m
+  [38;5;242mRead [4mTerms[0m[38;5;242m[48;5;233m and [4mPrivacy Policy[0m[38;5;242m[48;5;233m.[39m
+
+   [38;5;242m▾ [1m[38;5;243mQueued[0m[38;5;242m[48;5;233m 1[39m
+     [38;5;242m#1[39m [38;5;251mthen say hi[39m
+
+  [38;5;239m╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮[39m
+  [38;5;239m│[38;5;254m [38;5;251m❯ [38;5;254m                                                                                                                                                       [38;5;239m│[39m
+  [38;5;239m╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── [38;5;244mGrok 4.7 (high)[38;5;239m ─╯[39m
+
+  [1m[38;5;251mEnter[0m[38;5;242m[48;5;233m:send now[2m  │  [0;1m[38;5;251m[48;5;233mShift+Tab[0m[38;5;242m[48;5;233m:mode[2m  │  [0;1m[38;5;251m[48;5;233mCtrl+c[0m[38;5;242m[48;5;233m:cancel[2m  │  [0;1m[38;5;251m[48;5;233mCtrl+;[0m[38;5;242m[48;5;233m:queue[2m  │  [0;1m[38;5;251m[48;5;233mCtrl+x[0m[38;5;242m[48;5;233m:shortcuts                                                                   [39m
+

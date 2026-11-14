@@ -1,0 +1,45 @@
+[48;5;233m
+  [38;5;251m/t/c/-/1/scratchpad/gdir[39m                                                                                                            [38;5;254m19K / 256K[38;5;238m │ [38;5;242m[Dashboard][39m
+
+  [48;5;235m                                                                                                                                                            [48;5;233m
+  [48;5;235m   [38;5;251m❯ [38;5;254mRun this exact shell command with your terminal tool: rm a.txt && mkdir made[39m                                                                [38;5;242m  7:59 PM[39m  [48;5;233m
+  [48;5;235m                                                                                                                                                            [48;5;233m
+
+     [38;5;242m◆ [1mThought[0m[38;5;242m[48;5;233m for 1.8s[39m
+
+     [38;5;251mI'll run that command exactly as given.[39m                                                                                                       [38;5;242m  7:59 PM[39m
+
+     [38;5;141m◆ [1m[38;5;242mRunning [0m[38;5;242m[48;5;233mremove a.txt and create made directory[39m
+
+
+
+
+                                                                                                                                                               [38;5;234m[48;5;234m█
+[39m[48;5;233m                                                                                                                                                               [38;5;234m[48;5;234m█
+[39m[48;5;233m                                                                                                                                                               [38;5;234m[48;5;234m█
+[39m[48;5;233m                                                                                                                                                               [38;5;234m[48;5;234m█
+[39m[48;5;233m                                                                                                                                                               [38;5;234m[48;5;234m█
+[39m[48;5;233m                                                                                                                                                               [38;5;234m[48;5;234m█
+[39m[48;5;233m
+   [38;5;250m◆ [38;5;251mRemove a.txt and create made directory…[38;5;242m 11s[39m                                                                                          [38;5;242m14s ⇣19.9k [↓][stop][39m
+
+  [38;5;254mHelp improve Grok[39m                                                                                                                         [38;5;243m[Opt out][39m [38;5;254m[Opt in][39m
+  [38;5;243mOff by default. Opt-in to allow SpaceXAI to retain coding data, e.g., prompts, traces, & metrics, for training and debugging purposes.[39m
+  [38;5;243mChange anytime via settings.[39m
+  [38;5;242mRead [4mTerms[0m[38;5;242m[48;5;233m and [4mPrivacy Policy[0m[38;5;242m[48;5;233m.[39m
+
+  [38;5;251m[48;5;235m┃[39m                                                                                                                                                           [48;5;233m
+  [38;5;251m[48;5;235m┃[39m  [38;5;242m›[39m  [1;3m[38;5;251mRemove a.txt and create made directory[0m[48;5;235m                                                                                                                [48;5;233m
+  [38;5;251m[48;5;235m┃[39m  [38;5;242m│[39m [38;5;111mrm a.txt[38;5;249m [38;5;141m&&[38;5;249m [38;5;111mmkdir made[39m                                                                                                                                 [48;5;233m
+  [38;5;251m[48;5;235m┃[39m  [38;5;251m← →[2m narrow scope[0m[48;5;235m                                                                                                                                         [48;5;233m
+  [38;5;251m[48;5;235m┃[39m                                                                                                                                                           [48;5;233m
+  [38;5;251m[48;5;235m┃[39m  [3m[38;5;240mAuto-review blocked this action.[0m[48;5;235m  [38;5;251mCtrl-F[38;5;242m to view explanation[39m                                                                                             [48;5;233m
+  [38;5;251m[48;5;235m┃[39m                                                                                                                                                           [48;5;233m
+  [38;5;251m[48;5;235m┃[39m  [38;5;251m1 [38;5;242m(○) [38;5;254mYes, and don't ask again for anything (always-approve mode)[39m                                                                                        [48;5;233m
+  [38;5;251m[48;5;235m┃[39m  [38;5;251m[48;5;237m2 [1m[38;5;254m(●) Yes, proceed[0m[48;5;237m                                                                                                                                     [48;5;235m  [48;5;233m
+  [38;5;251m[48;5;235m┃[39m  [38;5;251m3 [38;5;242m(○) No, reject (type to add feedback)[39m                                                                                                                  [48;5;233m
+  [38;5;251m[48;5;235m┃[39m  [38;5;251m4 [38;5;242m(○) [38;5;254mNever allow: [38;5;111mrm a.txt[39m                                                                                                                              [48;5;233m
+  [38;5;251m[48;5;235m┃[39m                                                                                                                                                           [48;5;233m
+
+  [1m[38;5;251m1[0m[38;5;242m[48;5;233m/[1m[38;5;251m4[0m[38;5;242m[48;5;233m:select[2m  │  [0;1m[38;5;251m[48;5;233mTab[0m[38;5;242m[48;5;233m:next option[2m  │  [0;1m[38;5;251m[48;5;233m←[0m[38;5;242m[48;5;233m/[1m[38;5;251m→[0m[38;5;242m[48;5;233m:scope[2m  │  [0;1m[38;5;251m[48;5;233mCtrl+f[0m[38;5;242m[48;5;233m:expand[2m  │  [0;1m[38;5;251m[48;5;233mCtrl+o[0m[38;5;242m[48;5;233m:always-approve[2m  │  [0;1m[38;5;251m[48;5;233mCtrl+c[0m[38;5;242m[48;5;233m:cancel[2m  │  [0;1m[38;5;251m[48;5;233mEsc[0m[38;5;242m[48;5;233m:scrollback                               [39m
+
