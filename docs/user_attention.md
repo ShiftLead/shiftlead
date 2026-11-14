@@ -15,7 +15,7 @@ People: paul
   - **Question:** Should the grinders build TD-1855 as the design stands, or run one more review round first?
   - **Caveats:** Fixes no review has read, by build: TD-1855: F67 (a new per-PR read_open in ao repo --json, since asked is only the first ask), F68 (a sweep row goes to the Inbox through item_home, and screen 6 and the controls row no longer tie it by title).
   - **Recommended:** One more round — the last review's two build-changing fixes have been read by no review, so a session runs one more round first.
-- [ ] decide 2026-11-14 (session `gate-sweep`) — Should a session build the Cloudflare route (TD-646 part 3) now, or leave it unbuilt until someone needs a Cloudflare tunnel? Context: TD-656 decision (paul). Due: 2026-11-14. Answers: Go | Not yet.
+- [x] decide 2026-11-14 (session `gate-sweep`) — Should a session build the Cloudflare route (TD-646 part 3) now, or leave it unbuilt until someone needs a Cloudflare tunnel? Context: TD-656 decision (paul). Due: 2026-11-14. Answers: Go | Not yet. Decided: Not yet (by paul) (2026-11-14). Closed: 2026-11-14 — kept waiting.
   - **Context:** TD-656 (Build TD-646 (3): the Cloudflare route, its Access token check, ao connect cloudflare, its doctor line and guide) waits on decision (paul). Nobody runs the route today, and the home passkey (design 4.5b) may replace its token check.
   - **Question:** Should a session build the Cloudflare route now, or leave it unbuilt until someone needs a Cloudflare tunnel?
   - **Recommended:** Not yet: no device needs the route today, and the passkey may change what it checks.
