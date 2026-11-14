@@ -189,11 +189,15 @@
   <span class="st sugglabel">suggested by {{ by }}</span>
   {#- §4.5a **Inbox row: a look** on an `ask`: the pair drawn as a board row's live look draws it —
       **Works** replies at once (the index, as any suggested answer), **Not right…** opens the Reply
-      composer with *Not right:* begun -#}
+      composer with *Not right:* begun. §4.5a **<head>…** (TD-1557, built by TD-1699): any form — the reader's
+      `heads`, never a match here — opens the Reply composer begun with its head, sent with `form`, never as written;
+      the look's **Not right…** is this case -#}
   {%- set pair = look_pair(e) %}
+  {%- set hs = suggested_heads(e) %}
   {%- for a in opts %}
-  {%- set form = pair and loop.index0 == 1 %}
-  <button class="btn sm answer" {% if form %}data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="Not right: " title="say what is off: your words go back to {{ by }} as a reply"{% else %}data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ loop.index0 }}"{% endif %}>{% if pair %}<span class="alabel">{{ 'Not right…' if form else 'Works' }}</span>{% else %}<span class="alabel">&ldquo;{{ cap_first(a) if mode == 'card' else a }}&rdquo;</span>{% if e.default and (a == e.default or (e.kind == 'steer' and e.recommended == loop.index0)) %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
+  {%- set head = hs[loop.index0] if loop.index0 < hs | length else '' %}
+  {%- set form = (pair and loop.index0 == 1) or head %}
+  <button class="btn sm answer" {% if form %}data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="{{ head or 'Not right' }}: " data-form="{{ loop.index0 }}" title="{{ 'say what is off' if pair else 'fill it in' }}: your words go back to {{ by }} as a reply"{% else %}data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ loop.index0 }}"{% endif %}>{% if pair %}<span class="alabel">{{ 'Not right…' if form else 'Works' }}</span>{% elif head %}<span class="alabel">{{ head }}…</span>{% else %}<span class="alabel">&ldquo;{{ cap_first(a) if mode == 'card' else a }}&rdquo;</span>{% if e.default and (a == e.default or (e.kind == 'steer' and e.recommended == loop.index0)) %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
   {%- endfor %}
 </div>
 {%- endif %}
@@ -204,8 +208,9 @@
    what it leads to beside it where the reader gives `consequences` (§4.10 *The answers' split*); then its kind's
    own answers — **Go with it** on a steer, **Done** on *yours to do*, **Lift the hold** on a decision — and
    **Answer…**, a box for the person's own words. Each takes the road its kind already has (`how`): a message's
-   reply, a board line's decided line (its words written on the line, the board's Reply road), a ledger entry's
-   decided board line. A red PR has no Answer row. -#}
+   reply, a board line's Reply (its words written on the line — a decide only where they fill one of its forms,
+   `reply_decides`, the box's foot saying so), a ledger entry's decided board line. A form, of any kind, is drawn
+   **<head>…** and is filled, never pressed (TD-1557). A red PR has no Answer row. -#}
 {% macro answer_row(e, how, gwi='') -%}
 {%- set raw = e.get('answers') if how != 'owed' else [] %}{% set raw = raw if raw is sequence and raw is not string else [] %}
 {%- set cs = e.get('consequences') %}{% set cs = cs if cs is sequence and cs is not string else [] %}
@@ -215,16 +220,22 @@
 {%- set pair = look_pair(e) if how == 'mail' else (e.get('pair') if how == 'board' else false) %}
 {%- set by = e.get('passer_name') or e.get('from_name') or e.get('from') or e.get('name') or e.get('repo') %}
 {%- set where = (e.get('repo_name') or e.get('repo') or e.get('name') or 'the repo') ~ "'s board" %}
+{#- §4.5a **<head>…** (TD-1557, built by TD-1699): a form, by the reader's `heads` (parallel to the answers), is drawn
+    `<head>…` and opens its road's box begun with its head — a mail Reply, a board line's decide, a ledger entry's Reply —
+    sent with `form`, its index, never as written; a live look's **Not right…** is the board's case of it -#}
+{%- set hs = e.get('heads') %}{% set hs = hs if hs is sequence and hs is not string and hs | length == raw | length else [] %}
 <div class="row gap wrap sugg qanswers" role="group" aria-label="answer this item">
   {%- for a in raw %}{% if a is string and a.strip() %}
-  {%- set i = loop.index0 %}{% set form = pair and i == 1 %}
-  <span class="qans"><button class="btn sm answer{% if i == rec and not pair %} rec{% endif %}" type="button"
-  {%- if how == 'mail' and form %} data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ by }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="Not right: " title="say what is off: your words go back to {{ by }} as a reply"
+  {%- set i = loop.index0 %}{% set head = hs[i] if i < hs | length and hs[i] is string else '' %}
+  {%- set form = (pair and i == 1) or head %}{% set begun = (head or 'Not right') ~ ': ' %}
+  <span class="qans"><button class="btn sm answer{% if i == rec and not pair and not head %} rec{% endif %}" type="button"
+  {%- if how == 'mail' and form %} data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ by }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="{{ begun }}" data-form="{{ i }}" title="{{ 'say what is off' if pair else 'fill it in' }}: your words go back to {{ by }} as a reply"
   {%- elif how == 'mail' %} data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ i }}"
-  {%- elif how == 'board' and form %} data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-repo="{{ e.name }}" data-head="{{ e.head }}" data-name="{{ where }}" title="say what is off: your words are written on the line as Decided: Not right: …, one commit, and handed to {{ e.repo_name or e.repo }}'s techlead as an entry"
+  {%- elif how == 'board' and form %} {{ board_form(e, i, begun, where) }}
   {%- elif how == 'board' %} data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ a }}"
+  {%- elif form %} data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" data-begun="{{ begun }}" data-form="{{ i }}" title="fill it in: your words are written on {{ e.name }}'s board as your decision on {{ e.id }}"
   {%- else %} data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-index="{{ i }}" data-answer="{{ a }}" title="{{ a }}"
-  {%- endif %}><span class="alabel">{% if pair %}{{ 'Not right…' if form else 'Works' }}{% else %}{{ cap_first(a) }}{% endif %}</span></button>
+  {%- endif %}><span class="alabel">{% if pair %}{{ 'Not right…' if form else 'Works' }}{% elif head %}{{ head }}…{% else %}{{ cap_first(a) }}{% endif %}</span></button>
   {%- set c = cs[i] if i < cs | length else '' %}{% if c is string and c.strip() %}<span class="st alead">{{ c }}</span>{% endif %}</span>
   {%- endif %}{% endfor %}
   {%- if gwi %}<button class="btn sm ghost" type="button" data-act="gowithit" data-id="person" data-msg="{{ e.id }}" data-confirm="{{ gwi }}">Go with it</button>{% endif %}
@@ -249,6 +260,18 @@
 </div>
 {%- endmacro %}
 
+{#- §4.5a **<head>…** / **Not right…** on a board line (TD-1557, built by TD-1699): the press opens the box begun with
+    the form's head and sends the `decide` with the words as typed and `form`, its index; the agent puts the head back.
+    A live look's pair (`data-pair`) then hands an entry to the repo's techlead; any other form hands nothing on -#}
+{% macro board_form(e, i, begun, where) -%}
+data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-repo="{{ e.name }}" data-head="{{ e.head }}" data-name="{{ where }}" data-begun="{{ begun }}" data-form="{{ i }}"{% if e.pair %} data-pair="1" title="say what is off: your words are written on the line as Decided: Not right: …, one commit, and handed to {{ e.repo_name or e.repo }}'s techlead as an entry"{% else %} title="fill it in: your words are written on the line as Decided: {{ begun }}…, one commit"{% endif %}
+{%- endmacro %}
+{#- the reply box's foot (§4.5 screen 6 *A board line's Reply*, TD-1557, built by TD-1699): on an open, undecided line
+    whose Reply can decide (`reply_decides`, the reader's), which words decide it — the forms' heads joined by *or* -#}
+{% macro reply_foot(e) -%}
+{%- set hs = (e.heads or []) | select | list if e.reply_decides and not e.decided else [] %}
+{%- if hs %}words starting {{ hs | join(': or ') }}: decide this line; anything else is a reply{% endif %}
+{%- endmacro %}
 {#- a card's board item's **Done** — the write-back's, its *landed on origin* words its title — and **Answer…**, the
     words written on its line, its *standing* its title where the page has one (§4.5 screen 12, TD-1066) -#}
 {% macro board_done(e, cls, role='') -%}
@@ -261,7 +284,7 @@
 <button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board" data-id="person" data-board-act="decide" data-answer="have a session do it" data-answers='[]' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ help_title('board-have-a-session-do-it') }}" data-confirm="Have a session do it? &ldquo;have a session do it&rdquo; is written on {{ e.repo_name or e.repo }}'s board as your decision, and the line goes to its team as a work order.">Have a session do it</button>
 {%- endmacro %}
 {% macro board_answer(e, cls, role='') -%}
-<button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ (e.repo_name or e.repo or e.name or 'the repo') ~ "'s board" }}" title="{{ ((e.session ~ ' · ') if e.session else '') ~ e.standing.text if e.standing else help_title('card-answers') }}">Answer…</button>
+<button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ (e.repo_name or e.repo or e.name or 'the repo') ~ "'s board" }}" data-foot="{{ reply_foot(e) }}"{% if e.pair %} data-pair="1" data-repo="{{ e.name }}" data-head="{{ e.head }}"{% endif %} title="{{ ((e.session ~ ' · ') if e.session else '') ~ e.standing.text if e.standing else help_title('card-answers') }}">Answer…</button>
 {%- endmacro %}
 
 {# §4.5a **Snooze** on an `ask`: 1 h · tomorrow 08:00 · a date. The person's own bookkeeping — the
@@ -1032,9 +1055,12 @@
   {%- for a in e.answers %}
   {#- §4.5a **Works** / **Not right…** (TD-255 slice 3): a live look's pair, drawn by its words.
       *Works* decides at once, as any answer; the form opens the Reply composer with *Not right:*
-      begun and decides with the text typed, then hands an entry to the repo's techlead. -#}
-  {%- set form = e.pair and loop.index0 == 1 %}
-  <button class="btn sm answer" {% if form %}data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-repo="{{ e.name }}" data-head="{{ e.head }}" data-name="{{ e.repo_name or e.repo }}'s board" title="say what is off: your words are written on the line as Decided: Not right: …, one commit, and handed to {{ e.repo_name or e.repo }}'s techlead as an entry"{% else %}data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ a }}"{% endif %}>{% if e.pair %}<span class="alabel">{{ 'Not right…' if form else ('Go with it: Works' if e.default == a else 'Works') }}</span>{% else %}<span class="alabel">&ldquo;{{ cap_first(a) if mode == 'card' else a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
+      begun and decides with the text typed, then hands an entry to the repo's techlead. Any other form is
+      drawn **<head>…** by the reader's `heads` and opens the box begun with its head (TD-1557, built by TD-1699) -#}
+  {%- set hs = e.heads if e.heads is sequence and e.heads is not string and e.heads | length == e.answers | length else [] %}
+  {%- set head = hs[loop.index0] if loop.index0 < hs | length and hs[loop.index0] is string else '' %}
+  {%- set form = (e.pair and loop.index0 == 1) or head %}
+  <button class="btn sm answer" {% if form %}{{ board_form(e, loop.index0, (head or 'Not right') ~ ': ', (e.repo_name or e.repo) ~ "'s board") }}{% else %}data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ a }}"{% endif %}>{% if e.pair %}<span class="alabel">{{ 'Not right…' if form else ('Go with it: Works' if e.default == a else 'Works') }}</span>{% elif head %}<span class="alabel">{{ head }}…</span>{% else %}<span class="alabel">&ldquo;{{ cap_first(a) if mode == 'card' else a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
   {%- endfor %}
 </div>
 {%- endif %}
@@ -1061,7 +1087,7 @@
   {%- endif %}
   <span class="grow"></span>
   {%- if e.editor %}{% from "file_link.html" import file_link %}{{ file_link(e.editor, 'Open board', "open " ~ e.board ~ " at line " ~ e.line, "btn sm ghost") }}{% endif %}
-  <button class="btn sm ghost" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ e.repo_name or e.repo }}'s board" title="your words appended to this line of the board landed on origin; the line stays due{% if e.standing and e.standing.holder %} — and mailed to {{ e.standing.holder }} (holds {{ e.standing.ref }}){% endif %}">Reply</button>
+  <button class="btn sm ghost" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ e.repo_name or e.repo }}'s board" data-foot="{{ reply_foot(e) }}"{% if e.pair %} data-pair="1" data-repo="{{ e.name }}" data-head="{{ e.head }}"{% endif %} title="your words appended to this line of the board landed on origin; the line stays due{% if e.standing and e.standing.holder %} — and mailed to {{ e.standing.holder }} (holds {{ e.standing.ref }}){% endif %}">Reply</button>
   {#- §4.5a **Go with it** on a board row (TD-255): drawn when one answer is the default, in the
       steer row's words and place; the one press records the default — the same `decide`. -#}
   {%- if gwi %}<button class="btn sm ghost boardgo" data-act="board" data-id="person" data-board-act="decide" data-answer="{{ e.default }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ help_title('board-go-with-it') }}" data-confirm="Go with it? &ldquo;{{ e.default }}&rdquo; is written on {{ e.repo_name or e.repo }}'s board as your decision.">Go with it</button>{% endif %}
@@ -1371,8 +1397,11 @@
 {%- elif e.answers %}
 <div class="row gap wrap sugg" role="group" aria-label="this entry's answers">
   <span class="st sugglabel">its answers</span>
+  {#- a form (§4.5a **<head>…**, TD-1699): its Reply begun with its head, sent with `form` to `ledger_decide` -#}
+  {%- set hs = e.heads if e.heads is sequence and e.heads is not string and e.heads | length == e.answers | length else [] %}
   {%- for a in e.answers %}
-  <button class="btn sm answer" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-index="{{ loop.index0 }}" data-answer="{{ a }}" title="{{ a }}"><span class="alabel">&ldquo;{{ cap_first(a) if mode == 'card' else a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}</button>
+  {%- set head = hs[loop.index0] if loop.index0 < hs | length and hs[loop.index0] is string else '' %}
+  <button class="btn sm answer" {% if head %}data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" data-begun="{{ head }}: " data-form="{{ loop.index0 }}" title="fill it in: your words are written on {{ e.name }}'s board as your decision on {{ e.id }}"><span class="alabel">{{ head }}…</span>{% else %}data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-index="{{ loop.index0 }}" data-answer="{{ a }}" title="{{ a }}"><span class="alabel">&ldquo;{{ cap_first(a) if mode == 'card' else a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
   {%- endfor %}
 </div>
 {%- endif %}
