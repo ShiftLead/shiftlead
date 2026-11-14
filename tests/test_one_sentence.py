@@ -124,3 +124,6 @@ def test_the_inbox_row_shows_each_answer_whole_and_a_press_sends_its_label(tmp_p
     c = TestClient(ui.create_app())
     assert c.post("/api/person/reply", json={"reply_to": "m-1", "answer": 0}).status_code == 200
     assert calls[-1] == ("msg", {"text": "Merge it", "kind": "reply", "reply_to": "m-1", "answer": 0})
+    # a form's press forwards its index with the typed words, which the home fills (TD-1698)
+    assert c.post("/api/person/reply", json={"reply_to": "m-1", "text": "x", "form": 1}).status_code == 200
+    assert calls[-1] == ("msg", {"text": "x", "kind": "reply", "reply_to": "m-1", "answer": None, "form": 1})

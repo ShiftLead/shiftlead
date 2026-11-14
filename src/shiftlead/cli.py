@@ -23,7 +23,7 @@ from typing import Any
 from sessionorc import agent_ids as ids_mod
 from sessionorc import board as board_mod
 from sessionorc import client as clientmod
-from sessionorc import hosts, naming, paths, promote, reports, workorders
+from sessionorc import hosts, ledgerboard, naming, paths, promote, reports, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import mail as mailmod
 from sessionorc import seams as seams_mod
@@ -4746,6 +4746,9 @@ def cmd_inbox(args: argparse.Namespace) -> int:
                 leads = e.get("consequences") or []
                 for i, a in enumerate(e.get("answers") or [], 1):
                     lead = f" — {leads[i - 1]}" if i <= len(leads) and leads[i - 1] else ""
+                    if ledgerboard.is_form(a):  # a form is filled, never picked (§4.10, TD-1698)
+                        print(f"  {i}. {mailmod.form_head_as_offered(a)}…: fill it, do not pick it{lead}")
+                        continue
                     print(f"  {i}. {a}{lead}" + (" — default" if e.get("recommended") == i - 1 else ""))
             if e.get("shots"):  # a look (design §4.10 *A look*)
                 print(f"  screenshots: {', '.join(e['shots'])}")

@@ -21,7 +21,7 @@ from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timedelta
 from typing import Any
 
-from sessionorc import adapters, naming
+from sessionorc import adapters, ledgerboard, naming
 from sessionorc.models import (
     GRANTS,
     PERSON,
@@ -309,7 +309,21 @@ def read_answers(entry: dict[str, Any]) -> dict[str, Any]:
         rec = next((i for i, line in enumerate(lines) if d in (line, split_answer(line)[0], labels[i])), None)
     else:
         rec = marked[0] if len(marked) == 1 else None
+    if rec is not None and ledgerboard.is_form(labels[rec]):
+        rec = None  # a form is filled, never pressed: no default (§4.10 *A form is filled, never pressed*, TD-1698)
     return {**entry, "answers": labels, "consequences": consequences, "recommended": rec}
+
+
+def answer_labels(lines: Iterable[Any]) -> list[str]:
+    """Each stored answer's label as an offered answer is compared (§4.10 *The answers' split*): split from its
+    consequence, its ` (default)` mark taken off — never the stored line."""
+    return [answer_mark(split_answer(str(a))[0])[0] for a in lines]
+
+
+def form_head_as_offered(label: str) -> str:
+    """A form's head as offered (`Hold` of `Hold: <note>`); the label itself where it is no form (TD-1698)."""
+    m = ledgerboard.FORM_RE.fullmatch(" ".join(str(label).split()))
+    return m.group("head").strip() if m else str(label)
 
 
 def is_person(caller: Any) -> bool:
