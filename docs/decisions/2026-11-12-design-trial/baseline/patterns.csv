@@ -1,0 +1,1178 @@
+id,case,q,fact,check,fixfail
+TD-1550:F1,when,Which events clear a pending state when the answer comes elsewhere?,-,-,-
+TD-1550:F2,shape,How are lines told apart when a field is absent?,-,-,-
+TD-1550:F3,-,-,work-state,-,-
+TD-1550:F4,-,-,external,-,-
+TD-1550:F5,-,-,external,-,-
+TD-1550:F6,-,-,external,-,-
+TD-1550:F7,-,-,external,-,-
+TD-1550:F8,-,-,external,-,-
+TD-1550:F9,-,-,external,-,-
+TD-1550:F10,-,-,-,-,-
+TD-1550:F11,-,-,-,-,-
+TD-1550:F12,-,-,external,-,-
+TD-1550:F13,-,-,external,-,-
+TD-1550:F14,interaction,"How does a guard's refusal reach the tool, and in which event?",-,-,incomplete
+TD-1550:F15,interaction,What does the tool's default selection do to an automated keypress?,-,-,-
+TD-1550:F16,when,Which events clear a pending state once answered?,-,-,incomplete
+TD-1550:F17,interaction,Does the new input path break an existing contract rule?,-,-,wrong-fix
+TD-1550:F18,scope,Which of the tool's events are left unmapped?,-,-,-
+TD-1550:F19,failure,"Can the error state be observed at all, and by what?",-,-,wrong-fix
+TD-1550:F20,interaction,What does the tool read from another tool's config?,-,-,-
+TD-1550:F21,shape,Where does each reported field come from?,-,-,-
+TD-1550:F22,interaction,Where may a tool-specific rule live without leaking into core?,-,-,-
+TD-1550:F23,-,-,-,-,not-propagated
+TD-1550:F24,which,Which of two timeout statements is the rule?,-,duplicate-text,-
+TD-1550:F25,scope,Which event kinds does the rule apply to?,-,-,-
+TD-1550:F26,ends,What happens to hooks when the session id changes?,-,-,-
+TD-1550:F27,-,-,-,duplicate-text,-
+TD-1550:F28,interaction,How are automatic turns told apart from typed ones?,-,-,-
+TD-1550:F29,failure,What happens when a prerequisite binary or screen is missing?,-,-,-
+TD-1550:F30,failure,What happens when a required capability is unavailable?,-,-,-
+TD-1550:F31,which,Which repo does the smoke test serve and read?,-,-,-
+TD-1550:F32,shape,What exact lines does the first send carry?,-,-,-
+TD-1550:F33,scope,Do a child's events affect the parent's state?,-,-,-
+TD-1550:F34,interaction,What does core do with a mode the adapter cannot account for?,-,-,-
+TD-1550:F35,multi-node,Is the check once per machine or per profile?,-,-,-
+TD-1550:F36,ends,"What ends a trial or an offer, exactly?",-,-,-
+TD-1550:F37,scope,What is the cap per item and what shows when hit?,-,-,-
+TD-1550:F38,-,-,-,-,-
+TD-1550:F39,-,-,external,path-symbol,-
+TD-1550:F40,scope,Which modes does the adapter support or leave to the tool?,-,-,-
+TD-1550:F41,interaction,How do two guards on related commands differ?,-,-,-
+TD-1550:F42,shape,What id keys a child's state?,-,-,-
+TD-1550:F43,-,-,external,other,-
+TD-1550:F44,multi-node,"Is a check per profile, per machine or per host?",-,-,-
+TD-1550:F45,scope,What is the cap and how do later requests share it?,-,-,-
+TD-1550:F46,-,-,-,duplicate-text,-
+TD-1550:F47,shape,What value names the tool's own home?,-,-,new-gap
+TD-1550:F48,shape,How is an environment value cleared?,-,-,new-gap
+TD-1550:F49,shape,Where is text kept and when is it cleared?,-,-,new-gap
+TD-1550:F50,interaction,Does adding a capability undo an earlier refusal?,-,-,new-gap
+TD-1550:F51,interaction,How does an absent method behave against the suite?,-,-,-
+TD-1550:F52,shape,Which answer does the press choose and from what?,-,-,-
+TD-1550:F53,-,-,-,-,-
+TD-1550:F54,scope,Which load rules cover an unregistered adapter?,-,-,-
+TD-1550:F55,scope,When is a note unset because nothing is configured?,-,-,-
+TD-1550:F56,empty-first,What happens when a session has no first prompt?,-,-,-
+TD-1550:F57,empty-first,How are lines written before the rule read?,-,format,-
+TD-1550:F58,scope,Where does shared start-hook code run?,-,-,new-gap
+TD-1550:F59,interaction,Does a new rule match the sharing rule elsewhere?,-,duplicate-text,not-propagated
+TD-1550:F60,when,What timeout does the tool give at session end?,-,-,-
+TD-1550:F61,failure,What happens when the environment is not inherited?,-,-,-
+TD-1550:F62,shape,What keys a child's state when ids are shared?,-,-,-
+TD-1550:F63,when,When does the designer ask again after a deferral?,-,-,-
+TD-1550:F64,failure,How is a failed build parked?,-,-,-
+TD-1550:F65,-,-,-,-,-
+TD-1550:F66,-,-,-,-,-
+TD-1550:F67,scope,Which adapter kinds does the new runner reach?,-,-,incomplete
+TD-1550:F68,interaction,Is a stricter walk check consistent with the load rule?,-,duplicate-text,not-propagated
+TD-1550:F69,-,-,external,-,-
+TD-1550:F70,when,Which timeout does the tool honour?,-,-,incomplete
+TD-1550:F71,interaction,Does a clause in one place contradict the other?,-,-,not-propagated
+TD-1550:F72,when,In what order and environment does the runner act?,-,-,incomplete
+TD-1550:F73,restart,Where is event history kept across restarts?,-,-,-
+TD-1550:F74,scope,Which modes' approvals does the mapping cover?,-,-,incomplete
+TD-1550:F75,which,How is a record found when the environment is not inherited?,-,-,incomplete
+TD-1550:F76,concurrency,What does a later event do to an unanswered prompt?,-,-,-
+TD-1550:F77,ends,What happens to hooks at a clear?,-,-,incomplete
+TD-1550:F78,scope,Which start and stop events feed the delta?,-,-,-
+TD-1550:F79,scope,Which options does the build take or ignore?,-,-,-
+TD-1550:F80,interaction,Which other tool's hooks may interfere with ours?,-,-,-
+TD-1550:F81,-,-,-,-,-
+TD-1550:F82,scope,Which methods must the adapter ship?,-,-,-
+TD-1550:F83,who,Which node owns each new record field?,-,-,new-gap
+TD-1550:F84,interaction,Do the child event rules contradict the earlier drop?,-,-,new-gap
+TD-1550:F85,-,-,-,duplicate-text,not-propagated
+TD-1550:F86,failure,What happens when the fallback lookup cannot reach its inputs?,-,-,wrong-fix
+TD-1550:F87,scope,Which launches does the option apply to?,-,-,-
+TD-1550:F88,scope,Which start sources does the mapping cover?,-,-,-
+TD-1550:F89,-,-,external,-,-
+TD-1550:F90,-,-,-,-,-
+TD-1550:F91,-,-,-,entry-fields,-
+TD-1550:F92,-,-,external,-,wrong-fix
+TD-1550:F93,-,-,design-text,-,-
+TD-1550:F94,concurrency,Does a long background task block the call that starts it?,-,-,wrong-fix
+TD-1550:F95,scope,Does the stricter check still cover the existing tool's home?,-,-,overreach
+TD-1550:F96,shape,What key pairs a start with its stop?,-,-,incomplete
+TD-1550:F97,scope,Which tools does the guard cover?,-,-,-
+TD-1550:F98,shape,How does the check read the installed hooks?,-,-,incomplete
+TD-1550:F99,-,-,-,-,-
+TD-1550:F100,-,-,-,other,-
+TD-1550:F101,restart,Does a restart mid-run repeat the one-time work?,-,-,wrong-fix
+TD-1550:F102,concurrency,What does a send do while a background step is running?,-,-,new-gap
+TD-1550:F103,shape,Which environment does the later step reuse?,-,-,incomplete
+TD-1550:F104,-,-,code-behaviour,path-symbol,-
+TD-1550:F105,scope,Which tools and fields does the guard condition match?,-,-,incomplete
+TD-1550:F106,shape,Which names and tests hold the guard's words?,-,-,incomplete
+TD-1550:F107,-,-,external,-,wrong-fix
+TD-1550:F108,interaction,Does a fix overwrite text another section depends on?,-,duplicate-text,overreach
+TD-1550:F109,scope,Which central choice does the summary omit?,-,-,-
+TD-1550:F110,scope,Which risks does the summary omit?,-,-,-
+TD-1550:F111,scope,Does a summary line claim what the design does not?,-,duplicate-text,-
+TD-1550:F112,shape,Which way does the condition read?,-,-,-
+TD-1550:F113,-,-,external,-,-
+TD-1550:F114,-,-,work-state,id-ref,-
+TD-1550:F115,-,-,design-text,-,-
+TD-1550:F116,scope,Which stop conditions does the summary omit?,-,-,not-propagated
+TD-1550:F117,when,"Whose duty is a new adapter's one-off capture, and when?",-,-,-
+TD-1550:F118,-,-,-,-,-
+TD-1550:F119,-,-,code-exists,path-symbol,-
+TD-1550:F120,-,-,-,-,-
+TD-1550:F121,-,-,work-state,-,-
+TD-1550:F122,shape,What exact bytes join the pieces typed into the pane?,-,-,-
+TD-1550:F123,interaction,Which environment does the spawned process actually inherit?,-,-,wrong-fix
+TD-1550:F124,scope,Does a matcher hide cases the hook should still see?,-,-,wrong-fix
+TD-1550:F125,concurrency,What does an event arriving during a hold mark as done?,-,-,wrong-fix
+TD-1550:F126,when,"When is carried state cleared, and by which events?",-,-,wrong-fix
+TD-1550:F127,scope,Which outcomes exist beyond the two the design names?,-,-,incomplete
+TD-1550:F128,proof,Where does each check live and how is it recorded?,-,-,-
+TD-1550:F129,shape,What concrete mechanism implements the named field?,-,-,incomplete
+TD-1550:F130,-,-,-,duplicate-text,not-propagated
+TD-1550:F131,interaction,What reads back a setting the design switches?,-,-,-
+TD-1550:F132,-,-,code-behaviour,-,-
+TD-1550:F133,-,-,-,duplicate-text,not-propagated
+TD-1550:F134,concurrency,Which flags does an event during a hold leave set?,-,-,wrong-fix
+TD-1550:F135,concurrency,What if an event lands after the hold has ended?,-,-,new-gap
+TD-1550:F136,when,Where else must the clearing happen?,-,-,incomplete
+TD-1550:F137,concurrency,Under which lock is a value read and cleared?,-,-,new-gap
+TD-1550:F138,failure,What does a read fall back to when it fails?,-,-,new-gap
+TD-1550:F139,scope,When does an overlay count as the route?,-,-,new-gap
+TD-1550:F140,scope,Does the rule apply to child or sub-agent events?,-,-,new-gap
+TD-1550:F141,concurrency,Is the shared value taken under a lock its caller holds?,-,-,wrong-fix
+TD-1550:F142,concurrency,What happens when two sends occur during one hold?,-,-,wrong-fix
+TD-1550:F143,proof,Where can a check live without importing the tests?,-,-,-
+TD-1550:F144,shape,Is a thing placed in the same place in every section?,-,duplicate-text,-
+TD-1550:F145,scope,What does a child's thread do under each guard?,-,-,new-gap
+TD-1550:F146,when,How often is a by-hand capture repeated?,-,-,-
+TD-1550:F147,-,-,-,-,-
+TD-1550:F148,failure,What if the first attempt fails after partly sending?,-,-,-
+TD-1550:F149,failure,What does a failed paste leave marked as done?,-,-,wrong-fix
+TD-1550:F150,failure,Does a counter settle when the operation raises?,-,-,incomplete
+TD-1550:F151,shape,Do two mechanisms read as one trigger or two?,-,-,new-gap
+TD-1550:F152,-,-,-,count,-
+TD-1550:F153,-,-,-,-,-
+TD-1550:F154,failure,What if a failed action's effect still lands late?,-,-,incomplete
+TD-1550:F155,interaction,How does the gate combine with the tick's other lines?,-,-,-
+TD-1550:F156,failure,What bounds the launch and what does the notice say on timeout?,-,-,-
+TD-1550:F157,empty-first,What does the payload carry before its record exists?,-,-,-
+TD-1550:F158,-,-,work-state,-,-
+TD-1550:F159,interaction,Does a setting combine with another switch to widen access?,-,-,-
+TD-1550:F160,concurrency,What resources does a long run hold meanwhile?,-,-,-
+TD-1550:F161,when,What must a test wait for before it sends?,-,-,-
+TD-1550:F162,who,Who may send before the first step is done?,-,-,-
+TD-1550:F163,-,-,-,duplicate-text,not-propagated
+TD-1550:F164,failure,What does the session show when the input is never taken?,-,-,-
+TD-1550:F165,when,"Does a tick wait inline, and for how long?",-,-,-
+TD-1550:F166,which,Where in the order of checks does the refusal sit?,-,-,-
+TD-1550:F167,interaction,How does the new stop combine with existing stop paths?,-,-,-
+TD-1550:F168,shape,Which process environment does the runner read?,-,-,-
+TD-1550:F169,shape,What bytes are stripped or capped in pasted text?,-,-,-
+TD-1550:F170,-,-,design-text,-,-
+TD-1550:F171,who,Who is recorded as the caller of an automatic action?,-,-,-
+TD-1550:F172,who,"Is the action refused for the person, and what does help say?",-,-,-
+TD-1550:F173,-,-,-,duplicate-text,-
+TD-1550:F174,interaction,What if a send arrives after a step was given up?,-,-,-
+TD-1550:F175,when,How do pause and resume lines meet the gate?,-,-,-
+TD-1550:F176,concurrency,What if the holder is superseded during the run?,-,-,-
+TD-1550:F177,proof,Which live-walk step shows the size limit works?,-,-,-
+TD-1550:F178,proof,Does the build check the dependency's behaviour and say so?,-,-,-
+TD-1550:F179,ends,What does a stopped member report?,-,-,-
+TD-1550:F180,failure,Does the timeout bound every call in the run?,-,-,incomplete
+TD-1550:F181,failure,Can the chosen API kill the child's whole process group?,-,-,wrong-fix
+TD-1550:F182,-,-,code-behaviour,-,overreach
+TD-1550:F183,shape,"Which parameter carries the reason, and who shows it?",-,-,new-gap
+TD-1550:F184,display,What does a repeat press answer after the stop?,-,-,new-gap
+TD-1550:F185,-,-,code-behaviour,-,other
+TD-1550:F186,-,-,-,duplicate-text,not-propagated
+TD-1550:F187,-,-,-,duplicate-text,not-propagated
+TD-1550:F188,who,Can an internal parameter be set from the outside wire?,-,-,wrong-fix
+TD-1550:F189,-,-,external,-,wrong-fix
+TD-1550:F190,-,-,code-exists,path-symbol,-
+TD-1550:F191,-,-,code-behaviour,-,incomplete
+TD-1550:F192,-,-,-,format,-
+TD-1550:F193,shape,What goes on stdin in each mode?,-,-,new-gap
+TD-1550:F194,shape,"Which environment does the child get, and on a failed read?",-,-,incomplete
+TD-1550:F195,shape,What exactly is stripped and where is the cut made?,-,-,incomplete
+TD-1550:F196,scope,On which paths are the marks lost?,-,-,incomplete
+TD-1550:F197,scope,Which edge actions are accepted as leaks?,-,-,-
+TD-1550:F198,-,-,-,-,not-propagated
+TD-1550:F199,shape,Is injected text marked as data rather than instructions?,-,-,-
+TD-1550:F200,display,What does the toast read its words from?,-,-,incomplete
+TD-1550:F201,-,-,-,-,new-gap
+TD-1550:F202,shape,Which environment names does the tool copy?,-,-,new-gap
+TD-1550:F203,failure,Does the cache survive a timeout kill?,-,-,-
+TD-1550:F204,-,-,-,-,not-propagated
+TD-1550:F205,shape,Which predicate gates this and who reads it?,-,-,-
+TD-1550:F206,shape,Is stripping complete for multi-byte escape sequences?,-,-,wrong-fix
+TD-1550:F207,-,-,external,-,wrong-fix
+TD-1550:F208,-,-,code-behaviour,-,wrong-fix
+TD-1550:F209,display,What must the caller return for its message to read?,-,-,wrong-fix
+TD-1550:F210,display,Is the stop branch evaluated before the stamp?,-,-,wrong-fix
+TD-1550:F211,-,-,design-text,duplicate-text,incomplete
+TD-1550:F212,interaction,Do sentences about one input agree on who builds it?,-,-,not-propagated
+TD-1550:F213,shape,What signature does the shared function take for each caller?,-,-,new-gap
+TD-1550:F214,-,-,work-state,path-symbol,not-propagated
+TD-1550:F215,which,In what order do layered values override each other?,-,-,new-gap
+TD-1550:F216,failure,What part of a partial output is kept on a lapse?,-,-,new-gap
+TD-1550:F217,shape,"What bytes join the parts, and what counts as empty?",-,-,incomplete
+TD-1550:F218,-,-,-,duplicate-text,not-propagated
+TD-1550:F219,-,-,-,-,-
+TD-1550:F220,which,Which branch is evaluated first?,-,-,new-gap
+TD-1550:F221,scope,Does one predicate conflate two distinct properties?,-,-,new-gap
+TD-1550:F222,-,-,-,duplicate-text,incomplete
+TD-1550:F223,-,-,code-behaviour,-,other
+TD-1550:F224,-,-,-,entry-fields,not-propagated
+TD-1550:F225,-,-,-,-,overreach
+TD-1550:F226,who,Who is recorded as the actor of tick-driven actions?,-,-,new-gap
+TD-1550:F227,ends,Is a record that exited before its first step kept?,-,-,-
+TD-1550:F228,-,-,-,format,other
+TD-1550:F229,concurrency,In what order do the mark and the action happen?,-,-,-
+TD-1550:F230,scope,Does any caller read the returned value?,-,-,-
+TD-1550:F231,empty-first,Does the first create see the same environment?,-,-,-
+TD-1550:F232,who,Whose identity is recorded as the killer?,-,-,wrong-fix
+TD-1550:F233,failure,Is a mark rolled back when the action raises?,-,-,new-gap
+TD-1550:F234,which,After which checks and under what conditions does the branch run?,-,-,new-gap
+TD-1550:F235,-,-,-,duplicate-text,not-propagated
+TD-1550:F236,-,-,-,duplicate-text,-
+TD-1550:F237,shape,Which default list is relied on?,-,-,new-gap
+TD-1550:F238,-,-,code-behaviour,-,overreach
+TD-1550:F239,-,-,-,-,other
+TD-1550:F240,interaction,What does a keyed repeat answer after the action already stopped?,-,-,new-gap
+TD-1550:F241,concurrency,Is marking before the action safe on every path?,-,-,wrong-fix
+TD-1550:F242,scope,Is the rule keyed on the right condition at exit?,-,-,wrong-fix
+TD-1550:F243,interaction,Do two help sentences about one control agree?,-,duplicate-text,not-propagated
+TD-1550:F244,-,-,-,duplicate-text,not-propagated
+TD-1550:F245,empty-first,What does the predicate read for an unknown kind?,-,-,new-gap
+TD-1550:F246,scope,Does the refusal name every condition that triggers it?,-,-,incomplete
+TD-1550:F247,multi-node,What does a node-routed record's copy lack or hold?,-,-,new-gap
+TD-1550:F248,failure,Does a failed action leave a stale mark behind?,-,-,wrong-fix
+TD-1550:F249,concurrency,Can the tested condition flip after the exit?,-,-,wrong-fix
+TD-1550:F250,-,-,code-exists,duplicate-text,other
+TD-1550:F251,-,-,-,duplicate-text,not-propagated
+TD-1550:F252,-,-,work-state,-,other
+TD-1550:F253,-,-,-,duplicate-text,incomplete
+TD-1550:F254,-,-,-,entry-fields,not-propagated
+TD-1550:F255,-,-,code-behaviour,-,wrong-fix
+TD-1550:F256,-,-,-,path-symbol,-
+TD-1550:F257,-,-,-,-,-
+TD-1550:F258,-,-,-,duplicate-text,not-propagated
+TD-1550:F259,-,-,-,duplicate-text,-
+TD-1550:F260,-,-,-,duplicate-text,incomplete
+TD-1550:F261,scope,Does a flat rule admit exceptions the text omits?,-,duplicate-text,not-propagated
+TD-1550:F262,-,-,code-behaviour,-,wrong-fix
+TD-1550:F263,-,-,code-behaviour,-,wrong-fix
+TD-1550:F264,-,-,-,count,incomplete
+TD-1550:F265,scope,Does every place repeat the amended rule?,-,duplicate-text,not-propagated
+TD-1550:F266,shape,Where are the new help words written?,-,format,incomplete
+TD-1550:F267,concurrency,What does a reader see during the action's await?,-,-,new-gap
+TD-1550:F268,multi-node,What if a node's reply is lost after the action?,-,-,new-gap
+TD-1550:F269,ends,What if a record is forgotten early and then saved?,-,-,new-gap
+TD-1550:F270,restart,Does the tick restart a record left in this gap?,-,-,new-gap
+TD-1550:F271,-,-,-,-,-
+TD-1550:F272,-,-,-,-,-
+TD-1550:F273,scope,Does every confirm text repeat the amended rule?,-,duplicate-text,not-propagated
+TD-1550:F274,-,-,-,entry-fields,not-propagated
+TD-1550:F275,-,-,-,duplicate-text,incomplete
+TD-1550:F276,-,-,-,-,other
+TD-1550:F277,-,-,-,entry-fields,-
+TD-1550:F278,-,-,-,entry-fields,-
+TD-1550:F279,-,-,-,entry-fields,-
+TD-1573:F1,which,Which held items does a new mark apply to?,-,-,-
+TD-1573:F2,-,-,code-behaviour,-,-
+TD-1573:F3,interaction,Is a count subtracted by two rules at once?,-,-,-
+TD-1573:F4,interaction,Do a new bucket and an existing bucket still sum correctly?,-,-,-
+TD-1573:F5,when,Which stored or carried readings get re-evaluated each pass?,-,-,-
+TD-1573:F6,-,-,code-behaviour,-,-
+TD-1573:F7,empty-first,"What does the store hold on a first pass, and how is it keyed?",-,-,-
+TD-1573:F8,ends,Is a notice sent when its target record has ended or been forgotten?,-,-,-
+TD-1573:F9,scope,"Which records does one read cover, per repo?",-,-,-
+TD-1573:F10,-,-,-,path-symbol,-
+TD-1573:F11,interaction,Which older warning does a new notice replace?,-,-,-
+TD-1573:F12,scope,Does a new mark overlap a deliberate existing category?,-,-,-
+TD-1573:F13,interaction,Does a changed mark leave a subtraction elsewhere moot?,-,-,overreach
+TD-1573:F14,when,How long must a state stand before it is told?,-,-,-
+TD-1573:F15,empty-first,What does the first pass write to the store?,-,-,incomplete
+TD-1573:F16,interaction,Do two counts that differ say why they differ?,-,-,-
+TD-1573:F17,when,Does a step run before the reading is compared and stored?,-,-,-
+TD-1573:F18,shape,Where on the reading does a new field sit?,-,-,-
+TD-1573:F19,-,-,-,-,-
+TD-1573:F20,display,What reason is shown for each kind of entry?,-,-,-
+TD-1573:F21,scope,Which records make up a lane set for a start?,-,-,-
+TD-1573:F22,display,Does a segment link to a list that holds the flagged items?,-,-,-
+TD-1573:F23,-,-,-,-,-
+TD-1573:F24,multi-node,What if two checkouts share one origin?,-,-,-
+TD-1573:F25,scope,"What residue differs between two views, and is it named?",-,-,incomplete
+TD-1573:F26,display,Does a compact form show the new kind?,-,-,-
+TD-1573:F27,scope,"Is a tagged entry in anyones rest, and so tested?",-,-,-
+TD-1573:F28,concurrency,"Which store sites apply a step, and on which loop?",-,-,-
+TD-1573:F29,shape,What time base and failure handling does the store use?,-,-,new-gap
+TD-1573:F30,who,"Who counts as the taker, and how is it identified across hosts?",-,-,-
+TD-1573:F31,scope,Are teamless records included in a lane set?,-,-,-
+TD-1573:F32,shape,What are the exact words of the note template?,-,-,-
+TD-1573:F33,display,What does a line end with when an item is marked?,-,-,-
+TD-1573:F34,concurrency,Does a step edit shared structures or copies?,-,-,-
+TD-1573:F35,when,Is a derived count rebuilt each pass before marking?,-,-,-
+TD-1573:F36,when,Is a step applied before the compare that decides storage?,-,-,-
+TD-1573:F37,which,What is the reason for a team that has records but no lane?,-,-,-
+TD-1573:F38,display,Does a changed tooltip apply in every form?,-,-,incomplete
+TD-1573:F39,shape,Are comparisons case-folded and applied at every site?,-,-,-
+TD-1573:F40,multi-node,Are clocks kept per checkout or per origin?,-,-,-
+TD-1573:F41,empty-first,What happens for a defined but not started team?,-,-,-
+TD-1573:F42,scope,Is the list of residue cases complete?,-,-,incomplete
+TD-1573:F43,-,-,-,-,not-propagated
+TD-1573:F44,empty-first,What does a pass do that marks nothing?,-,-,-
+TD-1573:F45,display,What does a command print at zero and under a flag?,-,-,-
+TD-1573:F46,which,Which lanes does a reason read over?,-,-,new-gap
+TD-1573:F47,empty-first,Is a field read after its meaning changed?,-,-,not-propagated
+TD-1573:F48,-,-,-,entry-fields,-
+TD-1573:F49,when,Does a changed reason restart the clock?,-,-,-
+TD-1573:F50,which,Which lanes does the first case read?,-,-,new-gap
+TD-1573:F51,when,Which wake class does a new notice use?,-,-,-
+TD-1573:F52,scope,For which callers is an expensive read computed?,-,-,-
+TD-1573:F53,-,-,-,-,-
+TD-1573:F54,-,-,-,-,-
+TD-1573:F55,-,-,-,-,not-propagated
+TD-1573:F56,failure,What do lines show when the reading is unreadable or fails?,-,-,-
+TD-1573:F57,-,-,-,-,-
+TD-1573:F58,-,-,-,-,-
+TD-1573:F59,which,Where does a new line sit relative to an existing one?,-,-,-
+TD-1573:F60,-,-,-,entry-fields,-
+TD-1573:F61,when,Does a skipped step still advance a clock?,-,-,wrong-fix
+TD-1573:F62,multi-node,When may a shared record be pruned by one owner?,-,-,wrong-fix
+TD-1573:F63,who,What happens to a claimed entry whose note would be sent?,-,-,-
+TD-1573:F64,-,-,-,-,-
+TD-1573:F65,shape,How is a multi-entry line formatted?,-,-,-
+TD-1573:F66,shape,Which style tokens and legend words are used?,-,-,-
+TD-1573:F67,-,-,-,-,-
+TD-1573:F68,ends,What happens to a field when its source is dropped?,-,-,incomplete
+TD-1573:F69,-,-,-,-,-
+TD-1573:F70,display,Where does a flagged item go in a page list?,-,-,new-gap
+TD-1573:F71,when,What does a first pass write when a note is skipped?,-,-,wrong-fix
+TD-1573:F72,-,-,-,entry-fields,-
+TD-1573:F73,-,-,-,entry-fields,-
+TD-1573:F74,-,-,-,duplicate-text,-
+TD-1573:F75,which,Which records are selected for a repo?,-,-,-
+TD-1573:F76,shape,How is a claimed test defined on records?,-,-,-
+TD-1573:F77,shape,Is a comparison normalised like its analogue?,-,-,incomplete
+TD-1573:F78,shape,Which clause is dropped when an entry already waits?,-,-,-
+TD-1573:F79,-,-,-,path-symbol,-
+TD-1573:F80,-,-,-,-,-
+TD-1573:F81,-,-,-,-,-
+TD-1573:F82,-,-,code-behaviour,-,-
+TD-1573:F83,-,-,code-behaviour,-,-
+TD-1573:F84,display,Is a marked row flagged per row?,-,-,-
+TD-1573:F85,display,Which title and style does a rollup use?,-,-,-
+TD-1573:F86,-,-,-,-,not-propagated
+TD-1573:F87,ends,How long does an ended record count?,-,-,incomplete
+TD-1573:F88,-,-,-,path-symbol,not-propagated
+TD-1573:F89,display,What does a hover show when a line is absent?,-,-,-
+TD-1573:F90,shape,In which order are items listed in a reason?,-,-,-
+TD-1573:F91,when,Does a first pass spend notes of entries not yet correct?,-,-,wrong-fix
+TD-1573:F92,shape,What is a lists cap and order?,-,-,incomplete
+TD-1573:F93,shape,How are ids spelled and compared?,-,-,incomplete
+TD-1573:F94,-,-,-,-,incomplete
+TD-1573:F95,shape,Which fields does a creating command carry?,-,-,-
+TD-1573:F96,scope,What does a concluded team leave in a set?,-,-,incomplete
+TD-1573:F97,scope,Which case does this design leave as a named gap?,-,-,-
+TD-1573:F98,-,-,-,-,-
+TD-1573:F99,display,Where does a new list sit among the others?,-,-,new-gap
+TD-1573:F100,shape,What does a function return so a reader needs no text parsing?,-,-,incomplete
+TD-1573:F101,-,-,-,-,incomplete
+TD-1573:F102,empty-first,What does a first pass write for an entry already claimed?,-,-,incomplete
+TD-1573:F103,display,Where does the clause appear across entry points?,-,-,-
+TD-1573:F104,-,-,-,-,not-propagated
+TD-1573:F105,-,-,-,-,not-propagated
+TD-1573:F106,-,-,-,-,not-propagated
+TD-1573:F107,-,-,-,-,-
+TD-1573:F108,-,-,-,-,-
+TD-1573:F109,when,Does a claimed mark write to the store while the claim stands?,-,-,new-gap
+TD-1573:F110,-,-,-,-,incomplete
+TD-1573:F111,-,-,-,count,other
+TD-1573:F112,-,-,-,-,not-propagated
+TD-1573:F113,-,-,-,-,incomplete
+TD-1573:F114,-,-,-,-,not-propagated
+TD-1573:F115,when,Does a skipped marks clock keep running?,-,-,new-gap
+TD-1573:F116,-,-,-,path-symbol,-
+TD-1573:F117,shape,Does a list carry a case a builder might add?,-,-,-
+TD-1573:F118,-,-,-,-,not-propagated
+TD-1573:F119,interaction,Do two documents agree on when a first marked entry is noted?,-,-,not-propagated
+TD-1573:F120,multi-node,Whose stored state does each pass read?,-,-,new-gap
+TD-1573:F121,scope,Is a template wider than the case on purpose?,-,-,-
+TD-1573:F122,-,-,-,-,not-propagated
+TD-1573:F123,-,-,-,-,other
+TD-1573:F124,display,What does a count show at zero?,-,-,-
+TD-1573:F125,-,-,code-behaviour,-,-
+TD-1573:F126,when,"Is there a grace before an effect shows, and is lacking it accepted?",-,-,-
+TD-1573:F127,shape,What exactly does the store hold?,-,-,incomplete
+TD-1573:F128,-,-,-,entry-fields,other
+TD-1573:F129,-,-,-,-,incomplete
+TD-1671:F1,-,-,code-behaviour,-,-
+TD-1671:F2,-,-,code-behaviour,-,-
+TD-1671:F3,interaction,What happens when both ends of a count belong to one owner?,-,-,-
+TD-1671:F4,failure,Does a read path create state as a side effect?,-,-,-
+TD-1671:F5,-,-,-,-,-
+TD-1671:F6,-,-,-,-,-
+TD-1671:F7,concurrency,Which events other than the named one also split a record?,-,-,-
+TD-1671:F8,scope,"Which actors share one bound, and is that sharing intended?",-,-,-
+TD-1671:F9,which,Which records are marked or read when a bound is hit?,-,-,-
+TD-1671:F10,shape,Which party is named how in a refusal message?,-,-,-
+TD-1671:F11,scope,Does one sections rule agree with its siblings scope?,-,-,-
+TD-1671:F12,ends,What happens to counts when a member is dropped?,-,-,-
+TD-1671:F13,-,-,-,-,-
+TD-1671:F14,shape,How is the membership test actually expressed?,-,-,new-gap
+TD-1671:F15,which,Which records does a refusal consult: all or the refusing one?,-,-,incomplete
+TD-1671:F16,shape,How is a read done without the creating helper?,-,-,-
+TD-1671:F17,restart,Do stored keys survive a resume or rename unchanged?,-,-,-
+TD-1671:F18,shape,Is the exact refusal wording and helper pinned?,-,-,-
+TD-1671:F19,-,-,-,-,-
+TD-1671:F20,scope,"Which cases still leak past the bound, and are they accepted?",-,-,new-gap
+TD-1671:F21,-,-,code-behaviour,-,wrong-fix
+TD-1671:F22,which,Which tally still bounds a re-routed item?,-,-,incomplete
+TD-1671:F23,-,-,-,-,-
+TD-1671:F24,-,-,-,-,not-propagated
+TD-1671:F25,shape,What does a refusal name when both ends share an identity?,-,-,new-gap
+TD-1671:F26,interaction,Do two sections state the same marking rule?,-,-,not-propagated
+TD-1671:F27,interaction,"Do ""as today"" and ""gains no key"" agree?",-,-,-
+TD-1671:F28,ends,What happens to tallies on the other side when a record is forgotten?,-,-,incomplete
+TD-1671:F29,scope,What does one send to several same-owner targets cost?,-,-,-
+TD-1671:F30,-,-,-,-,-
+TD-1671:F31,-,-,-,-,-
+TD-1671:F32,scope,Can the degenerate case (self/same) occur at all?,-,-,-
+TD-1671:F33,shape,What does a changed rule now name for the unchanged case?,-,-,new-gap
+TD-1671:F34,-,-,-,-,other
+TD-1671:F35,shape,Can two same-named things read alike in output?,-,-,-
+TD-1671:F36,which,Which end comes first in a two-party output?,-,-,-
+TD-1671:F37,-,-,-,-,-
+TD-1671:F38,-,-,-,-,-
+TD-1671:F39,scope,Is each side of a two-sided check written out?,-,-,-
+TD-1671:F40,-,-,-,-,-
+TD-1671:F41,-,-,-,-,-
+TD-1671:F42,-,-,code-behaviour,-,-
+TD-1650:F1,multi-node,Which side owns each field when a node reports to the home?,-,-,-
+TD-1650:F2,-,-,code-exists,-,-
+TD-1650:F3,which,"When several records match, which one counts as newest?",-,-,-
+TD-1650:F4,multi-node,What if two hosts report different values under one key?,-,-,-
+TD-1650:F5,-,-,code-behaviour,-,-
+TD-1650:F6,-,-,-,-,-
+TD-1650:F7,interaction,Does the process see the same environment the real launch does?,-,-,-
+TD-1650:F8,-,-,-,-,-
+TD-1650:F9,empty-first,How is the default or empty value named and keyed?,-,-,-
+TD-1650:F10,when,What bounds how often a repeated notice is raised?,-,-,-
+TD-1650:F11,multi-node,Does a check run at the home speak for a node?,-,-,-
+TD-1650:F12,-,-,code-behaviour,-,-
+TD-1650:F13,interaction,How does an explicit override interact with the new step?,-,-,-
+TD-1650:F14,shape,Which stream and exact line shape counts as valid output?,-,-,-
+TD-1650:F15,-,-,-,-,-
+TD-1650:F16,failure,What is lost if a crash lands between two writes?,-,-,-
+TD-1650:F17,interaction,Does a second reader use the same inputs as the record's?,-,-,-
+TD-1650:F18,scope,Which launches does the new step apply to?,-,-,-
+TD-1650:F19,-,-,code-behaviour,-,-
+TD-1650:F20,display,What is printed before the record exists?,-,-,-
+TD-1650:F21,concurrency,Which locks are held while the new step runs?,-,-,-
+TD-1650:F22,-,-,-,-,-
+TD-1650:F23,who,Which tick or node runs the comparison?,-,-,-
+TD-1650:F24,shape,Which record field names the adapter?,-,-,-
+TD-1650:F25,scope,Do scheduled or held creations also reach the step?,-,-,-
+TD-1650:F26,failure,What happens when the tool refuses the generated command?,-,-,-
+TD-1650:F27,restart,What state survives a restart that the timer needs?,-,-,-
+TD-1650:F28,-,-,-,-,not-propagated
+TD-1650:F29,-,-,code-behaviour,-,-
+TD-1650:F30,-,-,-,-,not-propagated
+TD-1650:F31,-,-,-,-,-
+TD-1650:F32,which,Can one thing have two names or keys?,-,-,wrong-fix
+TD-1650:F33,-,-,code-behaviour,-,-
+TD-1650:F34,failure,What happens with a corrupt file or failing write?,-,-,-
+TD-1650:F35,scope,Which kinds of launch carry the extra field?,-,-,-
+TD-1650:F36,failure,What if the lookup raises for an unknown name?,-,-,-
+TD-1650:F37,shape,Which sentence of the text is the subject?,-,-,-
+TD-1650:F38,-,-,-,-,-
+TD-1650:F39,-,-,-,-,-
+TD-1650:F40,-,-,-,-,-
+TD-1650:F41,-,-,code-behaviour,-,wrong-fix
+TD-1650:F42,shape,What exact text form does the consumer parse?,-,-,-
+TD-1650:F43,-,-,-,-,-
+TD-1650:F44,shape,Where does each new constant live?,-,-,-
+TD-1650:F45,empty-first,What does the output show when the method is absent?,-,-,-
+TD-1650:F46,-,-,-,-,-
+TD-1650:F47,-,-,-,-,-
+TD-1650:F48,-,-,-,-,not-propagated
+TD-1650:F49,-,-,-,entry-fields,not-propagated
+TD-1650:F50,-,-,code-behaviour,-,wrong-fix
+TD-1650:F51,-,-,code-behaviour,-,-
+TD-1650:F52,shape,Where do the new constants live?,-,-,-
+TD-1650:F53,scope,Does the key distinguish every kind that can collide?,-,-,-
+TD-1650:F54,-,-,-,-,not-propagated
+TD-1650:F55,-,-,-,-,-
+TD-1650:F56,display,What exact words does each variant of the line show?,-,-,-
+TD-1650:F57,ends,What happens to records of things that went away?,-,-,-
+TD-1650:F58,-,-,code-behaviour,-,wrong-fix
+TD-1650:F59,-,-,-,-,not-propagated
+TD-1650:F60,-,-,-,path-symbol,incomplete
+TD-1650:F61,-,-,-,-,-
+TD-1650:F62,-,-,-,-,not-propagated
+TD-1650:F63,interaction,Can a change in place bypass the launch path?,-,-,-
+TD-1650:F64,-,-,-,-,-
+TD-1650:F65,who,How does the home tell its own host?,-,-,-
+TD-1650:F66,failure,What does the user see when the tool refuses a named profile?,-,-,-
+TD-1650:F67,empty-first,How is a missing stored time read?,-,-,-
+TD-1650:F68,when,Which time does a deferred change carry?,-,-,-
+TD-1650:F69,-,-,other,-,-
+TD-1650:F70,when,Does the read happen before or after the refusals?,-,-,-
+TD-1567:F1,display,What shows when two indicators both apply to one element?,-,-,-
+TD-1567:F2,display,Which element does a link attach to in each drawn state?,-,-,-
+TD-1567:F3,empty-first,What if the first match has no holder?,-,-,-
+TD-1567:F4,multi-node,Which receiver takes a node's derived reports at the home?,-,-,-
+TD-1567:F5,scope,Does the retire rule cover records still on the current branch?,-,-,-
+TD-1567:F6,shape,Which stored facts does the test read?,-,-,-
+TD-1567:F7,-,-,-,id-ref,-
+TD-1567:F8,-,-,-,entry-fields,-
+TD-1567:F9,interaction,Which existing convention does the rule lean on as a proxy?,-,-,-
+TD-1567:F10,ends,What does the rule do after the last part archives?,-,-,-
+TD-1567:F11,display,Does the new label hide existing content on the row?,-,-,-
+TD-1567:F12,-,-,-,duplicate-text,-
+TD-1567:F13,interaction,Do the design text and the fix name the same element?,-,-,-
+TD-1567:F14,-,-,code-exists,-,-
+TD-1567:F15,multi-node,Can the home act on a node's record the node never reports?,-,-,-
+TD-1567:F16,interaction,Does this timing agree with the other section's timing?,-,-,-
+TD-1567:F17,display,Does the new state change what a secondary page shows?,-,-,-
+TD-1567:F18,interaction,Does reusing a flag change other things it gates?,-,-,-
+TD-1567:F19,display,What does a different screen show in the same state?,-,-,-
+TD-1567:F20,concurrency,What if another actor works the same item at once?,-,-,-
+TD-1567:F21,which,How are several rows ordered when picking one?,-,-,-
+TD-1567:F22,scope,Does the rule apply to parts in another repo?,-,-,-
+TD-1567:F23,-,-,-,-,-
+TD-1567:F24,interaction,Does the ordering rule match the fix for the earlier finding?,-,-,not-propagated
+TD-1567:F25,-,-,-,duplicate-text,not-propagated
+TD-1567:F26,interaction,Does one return value gate several unrelated outputs?,-,-,-
+TD-1567:F27,multi-node,How is a node's record mapped to its repo?,-,-,-
+TD-1567:F28,-,-,-,section-ref,-
+TD-1567:F29,interaction,Do the header rules agree on what is drawn?,-,-,-
+TD-1567:F30,interaction,Does a promised road match what the other rule writes?,-,-,-
+TD-1567:F31,ends,Where does the item go after being let go?,-,-,-
+TD-1567:F32,-,-,-,path-symbol,-
+TD-1567:F33,display,Which rows on a secondary page have the needed data?,-,-,-
+TD-1567:F34,display,Which branch of the template links and which stays plain?,-,-,-
+TD-1567:F35,display,Which of two same-named indicators does the header draw?,-,-,-
+TD-1567:F36,display,Does the label hold in every state of the session?,-,-,-
+TD-1567:F37,scope,Does the new field reach the command-line view?,-,-,-
+TD-1567:F38,multi-node,Does the pass reach node records as well as local?,-,-,-
+TD-1567:F39,-,-,code-behaviour,-,-
+TD-1567:F40,-,-,-,section-ref,incomplete
+TD-1567:F41,-,-,-,-,incomplete
+TD-1567:F42,which,Which record decides when several claims differ?,-,-,new-gap
+TD-1567:F43,scope,"Does the pass run at the home, on nodes, or both?",-,-,-
+TD-1567:F44,ends,What does a fallback archive lose when a record ends?,-,-,-
+TD-1567:F45,-,-,-,duplicate-text,incomplete
+TD-1567:F46,scope,Does the new field appear in machine-readable output?,-,-,-
+TD-1567:F47,display,Does a control show both indicators at once?,-,-,-
+TD-1567:F48,scope,Which sources does the release reach?,-,-,incomplete
+TD-1567:F49,ends,Does the pass reach closed records?,-,-,-
+TD-1567:F50,which,Which record's value is drawn when several exist?,-,-,-
+TD-1567:F51,-,-,-,id-ref,-
+TD-1567:F52,-,-,design-text,-,wrong-fix
+TD-1567:F53,empty-first,What if the only parts are already archived?,-,-,-
+TD-1567:F54,-,-,-,section-ref,-
+TD-1567:F55,-,-,-,-,incomplete
+TD-1567:F56,-,-,-,path-symbol,-
+TD-1567:F57,display,Do two links on one header lead to the same record?,-,-,-
+TD-1567:F58,interaction,Does the fix agree with the documented output contract?,-,-,wrong-fix
+TD-1567:F59,-,-,-,section-ref,-
+TD-1567:F60,-,-,-,section-ref,-
+TD-1567:F61,-,-,-,duplicate-text,not-propagated
+TD-1567:F62,interaction,Does the status word agree with the other checker?,-,other,-
+TD-1567:F63,-,-,design-text,-,-
+TD-1567:F64,-,-,-,count,-
+TD-1567:F65,-,-,-,-,-
+TD-1567:F66,-,-,-,-,-
+TD-1567:F67,-,-,-,-,incomplete
+TD-1567:F68,-,-,-,-,not-propagated
+TD-1543:F1,-,-,-,-,-
+TD-1543:F2,who,Is client-sent data trusted or re-checked server-side?,-,-,-
+TD-1543:F3,-,-,-,-,-
+TD-1543:F4,display,What stops an impossible control from being drawn?,-,-,-
+TD-1543:F5,failure,What does the session do if the reply omits the created id?,-,-,-
+TD-1543:F6,interaction,Does a pointer on one kind affect another kind's wait?,-,-,-
+TD-1543:F7,scope,Does the operation on this kind trigger the lift?,-,-,-
+TD-1543:F8,-,-,-,section-ref,-
+TD-1543:F9,display,Which controls appear on an already-decided item?,-,-,-
+TD-1543:F10,shape,What exact closing text marks the case?,-,-,-
+TD-1543:F11,ends,Who holds the claim after the work is handed off?,-,-,-
+TD-1543:F12,who,"Which actor does the step, by what test?",-,-,-
+TD-1543:F13,scope,For which teams or states is the control drawn?,-,-,-
+TD-1543:F14,failure,What words and lookup does the refusal use?,-,-,-
+TD-1543:F15,ends,Does a suppression outlive its cause?,-,-,-
+TD-1543:F16,multi-node,What is the accepted cost of one hop to another repo?,-,-,-
+TD-1543:F17,shape,Where does the check live and what does it see?,-,-,-
+TD-1543:F18,ends,Does closing an item uncover entries it covered?,-,-,-
+TD-1543:F19,shape,How exactly is the text parsed and matched?,-,-,-
+TD-1543:F20,-,-,-,path-symbol,-
+TD-1543:F21,scope,Does the rule apply to a line with the extra field?,-,-,-
+TD-1543:F22,display,Is the control drawn on lines that cannot be done?,-,-,-
+TD-1543:F23,display,"What does the returned row draw, and which branch draws it?",-,-,-
+TD-1543:F24,interaction,Does skipping one step in a helper break another lookup?,-,-,new-gap
+TD-1543:F25,-,-,-,path-symbol,-
+TD-1543:F26,-,-,code-behaviour,-,-
+TD-1543:F27,-,-,-,duplicate-text,-
+TD-1543:F28,scope,Is the flag applied only where it is needed?,-,-,new-gap
+TD-1543:F29,interaction,Is the cover lost in another place that counts it?,-,-,new-gap
+TD-1543:F30,display,Which controls does the returned row offer where?,-,-,incomplete
+TD-1543:F31,interaction,Do two readers of the same fact use one source?,-,-,-
+TD-1543:F32,failure,What happens on any other refusal?,-,-,-
+TD-1543:F33,interaction,Does a stated rule contradict how the control behaves?,-,-,-
+TD-1543:F34,shape,What input does the mark read and where is it cut?,-,-,-
+TD-1543:F35,shape,What exact value counts as the kind?,-,-,-
+TD-1543:F36,scope,Whose work are the sweep's own lines?,-,-,-
+TD-1543:F37,failure,What stops a refusal from looping forever?,-,-,new-gap
+TD-1543:F38,shape,Where is the flag computed and copied?,-,-,-
+TD-1543:F39,shape,Which field names bound the leading text?,-,-,-
+TD-1543:F40,-,-,-,entry-fields,-
+TD-1543:F41,scope,Is the list of exceptions exhaustive?,-,-,-
+TD-1543:F42,display,What exact refusal words does each case use?,-,-,-
+TD-1543:F43,-,-,design-text,-,-
+TD-1543:F44,-,-,-,section-ref,-
+TD-1543:F45,-,-,code-behaviour,-,-
+TD-1543:F46,empty-first,What happens with data written in an older format?,-,-,-
+TD-1543:F47,scope,Do the new refusals apply when the line offers its own answer?,-,-,-
+TD-1543:F48,shape,Where is the help entry placed and keyed?,-,format,-
+TD-1543:F49,-,-,-,duplicate-text,-
+TD-1543:F50,interaction,Do the generated briefs agree with the new rule?,-,-,-
+TD-1543:F51,scope,Does the test see text from a later reply?,-,-,-
+TD-1543:F52,which,Which of two refusal messages wins?,-,-,-
+TD-1543:F53,-,-,code-behaviour,-,-
+TD-1543:F54,shape,Which options must each occurrence of the command carry?,-,-,-
+TD-1543:F55,shape,Does the command write the detail block the reader needs?,-,-,-
+TD-1543:F56,-,-,code-behaviour,-,wrong-fix
+TD-1543:F57,scope,Where do the new instructions go and where not?,-,-,-
+TD-1543:F58,display,Where does the control sit in each layout?,-,-,-
+TD-1543:F59,-,-,-,path-symbol,-
+TD-1543:F60,shape,What limits apply to the free-text field?,-,-,-
+TD-1543:F61,-,-,-,entry-fields,-
+TD-1543:F62,-,-,-,count,not-propagated
+TD-1543:F63,-,-,code-behaviour,-,-
+TD-1543:F64,-,-,-,-,-
+TD-1543:F65,-,-,work-state,-,-
+TD-1543:F66,-,-,-,entry-fields,-
+TD-1543:F67,which,Which step comes first when two procedures overlap?,-,-,-
+TD-1543:F68,-,-,code-behaviour,-,-
+TD-1543:F69,concurrency,What does a re-press do while the first send is in flight?,-,-,-
+TD-1543:F70,who,Does the browser or the server perform the act?,-,-,-
+TD-1543:F71,ends,Does closing at hand-off uncover entries it covered?,-,-,-
+TD-1543:F72,who,Which reader decides who does the work?,-,-,-
+TD-1543:F73,failure,What happens when the answer is lost after a send?,-,-,-
+TD-1543:F74,-,-,code-behaviour,-,incomplete
+TD-1543:F75,scope,Which seats does the call reach?,-,-,-
+TD-1543:F76,display,Is a button drawn when its press always fails?,-,-,-
+TD-1543:F77,-,-,-,-,-
+TD-1543:F78,-,-,-,duplicate-text,-
+TD-1543:F79,concurrency,Can holding a lock across a step deadlock?,-,-,wrong-fix
+TD-1543:F80,multi-node,Which process can read the config it needs?,-,-,wrong-fix
+TD-1543:F81,shape,How is the dedupe key formed and looked up?,-,-,-
+TD-1543:F82,scope,Which entries does the cover apply to?,-,-,-
+TD-1543:F83,which,Which road does an own-repo team take?,-,-,-
+TD-1543:F84,failure,Where does 'before anything is sent' end?,-,-,-
+TD-1543:F85,failure,What can the fallback session see of the refusal?,-,-,-
+TD-1543:F86,display,Can the person see where the press goes?,-,-,-
+TD-1543:F87,shape,Which inputs does the call need to identify the line?,-,-,-
+TD-1543:F88,display,What does the row show while the action lands?,-,-,-
+TD-1543:F89,-,-,code-exists,-,-
+TD-1543:F90,concurrency,What guards double presses on one line?,-,-,-
+TD-1543:F91,scope,Which kinds of references does the field carry?,-,-,-
+TD-1543:F92,-,-,code-behaviour,-,-
+TD-1543:F93,who,Which calls are the person's alone?,-,-,-
+TD-1543:F94,-,-,code-exists,-,-
+TD-1543:F95,-,-,code-exists,-,-
+TD-1543:F96,failure,Is a refused send distinguished from a lost answer?,-,-,-
+TD-1543:F97,shape,What exact format does the key take?,-,-,-
+TD-1543:F98,interaction,Does the draw call an async function from sync code?,-,-,-
+TD-1543:F99,interaction,Do all readers of the cover take the new list?,-,-,not-propagated
+TD-1543:F100,which,Which entries does the marker cover when several holds exist?,-,-,-
+TD-1543:F101,interaction,Is one term defined the same way in every place?,-,-,-
+TD-1543:F102,shape,What does the relayed text include about origin?,-,-,-
+TD-1543:F103,which,Which action does an unresolved target's button post?,-,-,-
+TD-1543:F104,concurrency,Does a second press after the send still fall back?,-,-,new-gap
+TD-1543:F105,display,What does the row show across the multi-step action?,-,-,-
+TD-1543:F106,ends,When does a marker end if no reply arrives?,-,-,new-gap
+TD-1543:F107,-,-,-,-,-
+TD-1543:F108,shape,Which fields does the relay carry and what shape is the reply?,-,-,-
+TD-1543:F109,concurrency,Is the dedupe check atomic with the send?,-,-,-
+TD-1543:F110,who,Are a session's words sent as if the person's?,-,-,-
+TD-1543:F111,ends,What ends the marker when no reply is recorded?,-,-,wrong-fix
+TD-1543:F112,ends,Does a closed item still block a repeat send?,-,-,new-gap
+TD-1543:F113,when,Is a day limit counted by timestamp or calendar day?,-,-,-
+TD-1543:F114,interaction,Do the two copies of one state test agree?,-,-,-
+TD-1543:F115,shape,How does the pass obtain the data it needs?,-,-,-
+TD-1543:F116,shape,What inputs must the lookup return for the relay?,-,-,-
+TD-1543:F117,interaction,Does the marker show over entries an open line covers?,-,-,-
+TD-1543:F118,failure,What does a retry reuse from the first attempt?,-,-,-
+TD-1543:F119,-,-,-,-,-
+TD-1543:F120,-,-,-,-,-
+TD-1543:F121,-,-,-,-,-
+TD-1543:F122,shape,What text does the action send?,-,-,-
+TD-1543:F123,concurrency,What happens to a retry after the first attempt already landed?,-,-,-
+TD-1543:F124,interaction,Does a synchronous path call a function that is async?,-,-,-
+TD-1543:F125,interaction,Does every site that filters a list apply the same filter?,-,-,new-gap
+TD-1543:F126,failure,What happens if the lookup itself fails?,-,-,-
+TD-1543:F127,scope,Does a rule for other repos' teams also cover the own repo's?,-,-,-
+TD-1543:F128,shape,"What starts the clock, and what spelling does the key take?",-,-,-
+TD-1543:F129,scope,Is the covering check applied to every entry or only gated ones?,-,-,incomplete
+TD-1543:F130,which,Which result does the later step reuse?,-,-,wrong-fix
+TD-1543:F131,interaction,Is the same field described the same way everywhere?,-,-,not-propagated
+TD-1543:F132,display,Which answers does the overflow menu keep for a handed item?,-,-,-
+TD-1543:F133,which,Which lines does the covering check read?,-,-,incomplete
+TD-1543:F134,-,-,-,duplicate-text,not-propagated
+TD-1543:F135,ends,Is a lookup bounded by a retention window that drops records?,-,-,new-gap
+TD-1543:F136,who,What does a session get when it calls with new parameters?,-,-,-
+TD-1543:F137,shape,Is a field described the same way in every place?,-,-,not-propagated
+TD-1543:F138,when,On which presses does the lookup run?,-,-,-
+TD-1543:F139,-,-,-,-,not-propagated
+TD-1543:F140,ends,"Is a settled record ever pruned, so a repeat can happen?",-,-,new-gap
+TD-1543:F141,-,-,-,duplicate-text,not-propagated
+TD-1543:F142,-,-,-,duplicate-text,not-propagated
+TD-1543:F143,-,-,code-behaviour,-,-
+TD-1543:F144,shape,"What separator joins the lines, and what of a repo-less caller?",-,-,-
+TD-1543:F145,-,-,-,-,-
+TD-1543:F146,-,-,-,entry-fields,not-propagated
+TD-1543:F147,-,-,-,count,-
+TD-1543:F148,-,-,-,entry-fields,not-propagated
+TD-1543:F149,-,-,-,entry-fields,-
+TD-1543:F150,ends,What happens to a record when its holder is forgotten or closed?,-,-,new-gap
+TD-1543:F151,which,"Which source does a lookup read, and does it include settled records?",-,-,-
+TD-1543:F152,-,-,code-behaviour,-,wrong-fix
+TD-1543:F153,failure,Can a failed answer arrive after the action already took effect?,-,-,-
+TD-1543:F154,interaction,Does a later write keep setting the older fields?,-,-,-
+TD-1543:F155,when,"When does an age clock restart, and from which timestamp?",-,-,-
+TD-1543:F156,display,What does the screen draw for a record belonging to another repo?,-,-,new-gap
+TD-1543:F157,-,-,-,count,-
+TD-1543:F158,shape,What exact fields does the answer carry?,-,-,-
+TD-1543:F159,display,What does the screen draw for the own-repo case?,-,-,incomplete
+TD-1543:F160,shape,What format does the stored timestamp take?,-,-,-
+TD-1543:F161,multi-node,What does an older peer do with unknown parameters?,-,-,-
+TD-1543:F162,-,-,-,-,incomplete
+TD-1543:F163,-,-,-,-,not-propagated
+TD-1543:F164,concurrency,Is state read per call or from a shared global?,-,-,wrong-fix
+TD-1543:F165,-,-,-,-,other
+TD-1543:F166,shape,Where does the mechanism set and reset its state?,-,-,incomplete
+TD-1543:F167,-,-,-,entry-fields,-
+TD-1543:F168,proof,What seam lets a test fake this call?,-,-,incomplete
+TD-1543:F169,proof,Is the named test seam reachable from where the code runs?,-,-,wrong-fix
+TD-1543:F170,multi-node,What does the caller do when the peer predates the feature?,-,-,incomplete
+TD-1543:F171,failure,Is a partly successful answer wrongly treated as a refusal?,-,-,wrong-fix
+TD-1543:F172,-,-,code-behaviour,-,incomplete
+TD-1543:F173,proof,What does the test's fake answer on each call?,-,-,new-gap
+TD-1543:F174,-,-,-,-,not-propagated
+TD-1543:F175,display,What does the screen show for each end state?,-,duplicate-text,new-gap
+TD-1543:F176,failure,What if a follow-up step is refused after the action took effect?,-,-,new-gap
+TD-1543:F177,-,-,code-behaviour,-,overreach
+TD-1543:F178,-,-,-,duplicate-text,not-propagated
+TD-1543:F179,failure,How does the caller tell a refusal from an outage?,-,-,new-gap
+TD-1543:F180,concurrency,Can the world change between the check and the act?,-,-,new-gap
+TD-1543:F181,which,"When two refusals apply, which one wins?",-,-,-
+TD-1543:F182,when,When is per-call state reset relative to the request?,-,-,incomplete
+TD-1543:F183,-,-,-,-,-
+TD-1543:F184,-,-,-,-,other
+TD-1543:F185,-,-,-,-,not-propagated
+TD-1543:F186,-,-,-,format,-
+TD-1543:F187,-,-,-,entry-fields,not-propagated
+TD-1543:F188,-,-,-,-,-
+TD-1543:F189,-,-,-,duplicate-text,-
+TD-1543:F190,-,-,-,-,-
+TD-1543:F191,-,-,-,duplicate-text,not-propagated
+TD-1543:F192,failure,What if the follow-up step is lost rather than refused?,-,-,incomplete
+TD-1543:F193,scope,Does a stated promise have exceptions the text omits?,-,duplicate-text,not-propagated
+TD-1543:F194,display,What words does the screen show for each failure variant?,-,-,incomplete
+TD-1543:F195,multi-node,"What does an older peer drop, and what then?",-,-,new-gap
+TD-1543:F196,display,Under which state does the screen file this outcome?,-,duplicate-text,not-propagated
+TD-1543:F197,-,-,-,-,not-propagated
+TD-1543:F198,display,Does each path show the words that fit it?,-,-,new-gap
+TD-1543:F199,shape,What exact strings does each variant show?,-,duplicate-text,incomplete
+TD-1543:F200,shape,What exact strings does each variant show?,-,duplicate-text,incomplete
+TD-1543:F201,scope,Which partial-drop cases still store the key?,-,-,incomplete
+TD-1543:F202,-,-,-,-,-
+TD-1543:F203,-,-,-,section-ref,-
+TD-1543:F204,-,-,-,entry-fields,not-propagated
+TD-1543:F205,scope,Do all sections agree on how this case is handled?,-,duplicate-text,not-propagated
+TD-1543:F206,-,-,code-behaviour,duplicate-text,incomplete
+TD-1543:F207,interaction,Does an inserted clause still make the older reason true?,-,duplicate-text,not-propagated
+TD-1543:F208,-,-,-,duplicate-text,not-propagated
+TD-1543:F209,-,-,-,duplicate-text,not-propagated
+TD-1590:F1,interaction,Do two sections describe the same state in compatible terms?,-,-,-
+TD-1590:F2,which,Which component actually has the data a computation needs?,-,-,-
+TD-1590:F3,-,-,-,id-ref,-
+TD-1590:F4,-,-,-,-,-
+TD-1590:F5,when,Is a derived match recomputed on every reading?,-,-,incomplete
+TD-1590:F6,-,-,-,-,-
+TD-1590:F7,which,Which actor counts as holder when the claimed state is rarely live?,-,-,-
+TD-1590:F8,ends,What answer does a rule give when its target is gone or finished?,-,-,-
+TD-1590:F9,scope,Which kinds of actors count as live for this rule?,-,-,-
+TD-1590:F10,display,Do every screen and reader show the changed state?,-,-,-
+TD-1590:F11,when,"Does a changed answer after a drop get told, and how often?",-,-,-
+TD-1590:F12,scope,Is the answer narrowed by every filter an entry has?,-,-,-
+TD-1590:F13,scope,Which bucket gets an item routed elsewhere?,-,-,-
+TD-1590:F14,who,Does the actor still do its earlier duties after this change?,-,-,-
+TD-1590:F15,when,When does a busy actor learn of the new item?,-,-,-
+TD-1590:F16,which,Who is told when the named actor itself drops the item?,-,-,new-gap
+TD-1590:F17,interaction,Does a lane rule and a filter rule leave any item in no lane?,-,-,new-gap
+TD-1590:F18,shape,Is a compound condition worded unambiguously?,-,-,-
+TD-1590:F19,when,Do two sections agree on the moment a baseline is written?,-,-,-
+TD-1590:F20,which,What happens when several gates match one item?,-,-,-
+TD-1590:F21,when,Is a wait bounded when the holder stays busy?,-,-,-
+TD-1590:F22,shape,"Is every branch of a new path stated, including its default?",-,-,-
+TD-1590:F23,-,-,-,-,-
+TD-1590:F24,shape,"Is a derived result stored or recomputed, and where?",-,-,-
+TD-1590:F25,who,What does a setting like ask do when the actor is gone?,-,-,-
+TD-1590:F26,-,-,-,entry-fields,not-propagated
+TD-1590:F27,-,-,-,duplicate-text,not-propagated
+TD-1590:F28,-,-,-,path-symbol,-
+TD-1590:F29,display,Does a screen show the new field beside or instead of the old?,-,-,-
+TD-1590:F30,-,-,code-behaviour,-,-
+TD-1590:F31,-,-,code-behaviour,-,-
+TD-1590:F32,when,Is a write placed before any early return that skips it?,-,-,-
+TD-1590:F33,when,How often does a computation run relative to the data it reads?,-,-,-
+TD-1590:F34,which,"Which stored state is cleared by which event, and does the baseline survive?",-,-,wrong-fix
+TD-1590:F35,shape,Are callers and defaults of a changed function listed?,-,-,-
+TD-1590:F36,restart,Does a stored reference survive a restart that supersedes the record?,-,-,-
+TD-1590:F37,which,Is an actor excluded by its own action still reachable?,-,-,incomplete
+TD-1590:F38,-,-,-,entry-fields,-
+TD-1590:F39,shape,Is the output shape of a changed function fixed?,-,-,-
+TD-1590:F40,which,Does an exclusion still allow a re-tell after a changed answer?,-,-,incomplete
+TD-1590:F41,restart,Do two rules about successor records agree on whose drop counts?,-,-,incomplete
+TD-1590:F42,when,Is a join run before the data it joins is stored?,-,-,incomplete
+TD-1590:F43,-,-,code-behaviour,-,-
+TD-1590:F44,shape,Does each carried pair identify its record?,-,-,-
+TD-1590:F45,multi-node,Can an id collide across hosts?,-,-,-
+TD-1590:F46,who,Whose action counts as the members own?,-,-,-
+TD-1590:F47,ends,Is a mark cleared when the thing it marks closes?,-,-,-
+TD-1590:F48,ends,What happens to marks when a removed record goes?,-,-,-
+TD-1590:F49,who,How is the members own action told from another?,-,-,wrong-fix
+TD-1590:F50,-,-,code-behaviour,-,-
+TD-1590:F51,shape,Do the views a function reads carry the needed field?,-,-,new-gap
+TD-1590:F52,when,Does re-telling change the baseline that decides who is told next?,-,-,wrong-fix
+TD-1590:F53,interaction,Is an old exclusion removed everywhere once replaced?,-,-,not-propagated
+TD-1590:F54,when,At which step does a told marker advance?,-,-,-
+TD-1590:F55,concurrency,Do all sites that store a result apply the same join first?,-,-,-
+TD-1590:F56,scope,Which members does a start rule never use?,-,-,-
+TD-1590:F57,multi-node,Does a node have the data its handler needs?,-,-,-
+TD-1590:F58,when,Which repeats and foreign events write a mark?,-,-,-
+TD-1590:F59,when,"Which pass removes a stale mark, and for which records?",-,-,-
+TD-1590:F60,which,Does a notice text stay right when the target moves?,-,-,-
+TD-1590:F61,which,Who is told after a re-answer by a marked actor?,-,-,-
+TD-1590:F62,ends,Is a stored marker carried across a rename?,-,-,-
+TD-1590:F63,scope,Does a silent actor still count toward a total?,-,-,-
+TD-1590:F64,-,-,design-text,-,wrong-fix
+TD-1590:F65,-,-,code-behaviour,-,other
+TD-1590:F66,who,Does every path to an end state pass the handler?,-,-,-
+TD-1590:F67,when,Is a stored result written before its comparison?,-,-,-
+TD-1590:F68,interaction,Does a downstream rule re-derive a value that was routed?,-,-,-
+TD-1590:F69,scope,Which case remains after a fix to silent counting?,-,-,incomplete
+TD-1590:F70,who,Can another session act on this records behalf?,-,-,-
+TD-1590:F71,display,Does wording still describe the new targeting?,-,-,not-propagated
+TD-1590:F72,-,-,-,duplicate-text,-
+TD-1590:F73,failure,What does a join do if its input read failed?,-,-,-
+TD-1590:F74,-,-,-,-,-
+TD-1590:F75,which,Do two sections agree whether the actor drops the item?,-,-,-
+TD-1590:F76,failure,Can a failed read wipe stored state?,-,-,-
+TD-1590:F77,multi-node,Is a forwarded caller compared in the form the home sees?,-,-,-
+TD-1590:F78,shape,Are shapes of changed readers given exactly?,-,-,-
+TD-1590:F79,interaction,Does an existing start rule loop with the new mark?,-,-,-
+TD-1590:F80,-,-,-,entry-fields,not-propagated
+TD-1590:F81,-,-,design-text,-,incomplete
+TD-1590:F82,-,-,-,-,-
+TD-1590:F83,scope,For whom does a within-tick rule apply?,-,-,-
+TD-1590:F84,-,-,-,-,-
+TD-1568:F1,interaction,Do all readers of one predicate agree on it?,-,-,-
+TD-1568:F2,interaction,Does a derived mark agree with the states it summarises?,-,-,-
+TD-1568:F3,shape,Is each input to the test derivable from the data passed?,-,-,-
+TD-1568:F4,shape,Can the string be built where the value is computed?,-,-,-
+TD-1568:F5,display,Is every drawn copy of the control covered?,-,-,-
+TD-1568:F6,interaction,Does a new class name collide with an existing one?,-,-,-
+TD-1568:F7,-,-,-,path-symbol,-
+TD-1568:F8,display,Which copy of the control does the user actually see?,-,-,wrong-fix
+TD-1568:F9,shape,Does the payload carry the data the display needs?,-,-,wrong-fix
+TD-1568:F10,display,Does the updater rewrite titles as well as text?,-,-,wrong-fix
+TD-1568:F11,scope,Does the change reach every screen that shows mode words?,-,-,-
+TD-1568:F12,display,Which forms does the line take in each state?,-,-,-
+TD-1568:F13,display,In what order are lines and hover carriers drawn?,-,-,-
+TD-1568:F14,empty-first,What shows when the actor has no team?,-,-,-
+TD-1568:F15,multi-node,What shows for a node's member or an unreachable one?,-,-,-
+TD-1568:F16,scope,Do rollups and summaries draw the new state?,-,-,-
+TD-1568:F17,-,-,code-behaviour,-,-
+TD-1568:F18,display,What exactly does the ticker rewrite?,-,-,wrong-fix
+TD-1568:F19,-,-,-,-,incomplete
+TD-1568:F20,interaction,How do existing readers change behaviour under the new rule?,-,-,new-gap
+TD-1568:F21,-,-,code-behaviour,-,-
+TD-1568:F22,-,-,-,section-ref,-
+TD-1568:F23,who,Which module passes the fields to each screen?,-,-,-
+TD-1568:F24,scope,Do sorting and filters treat the new state?,-,-,-
+TD-1568:F25,-,-,-,-,-
+TD-1568:F26,which,Which checks come before the new one?,-,-,-
+TD-1568:F27,-,-,work-state,-,-
+TD-1568:F28,scope,Does a marked card keep its usual foot and counts?,-,-,-
+TD-1568:F29,interaction,Do all places that state a rule agree?,-,duplicate-text,-
+TD-1568:F30,ends,Does the rule hold once the record has ended?,-,-,wrong-fix
+TD-1568:F31,display,What shows before the first update?,-,-,new-gap
+TD-1568:F32,-,-,-,duplicate-text,-
+TD-1568:F33,-,-,code-behaviour,-,-
+TD-1568:F34,display,Is the color contrast enough in every theme?,-,-,-
+TD-1568:F35,scope,Do captions and counts leave out the new state?,-,-,wrong-fix
+TD-1568:F36,interaction,Does a flag drive other screens that should not change?,-,-,wrong-fix
+TD-1568:F37,which,What precedence orders the competing leading actions?,-,-,-
+TD-1568:F38,which,Which button is primary when two are shown?,-,-,new-gap
+TD-1568:F39,shape,Which stamp field does each path write?,-,-,-
+TD-1568:F40,-,-,-,-,-
+TD-1568:F41,interaction,Does the rule's exception match the newly marked state?,-,-,incomplete
+TD-1568:F42,which,Which action leads when no answerable one exists?,-,-,new-gap
+TD-1568:F43,scope,Does the rule need a state check the test already makes?,-,-,-
+TD-1568:F44,scope,Can the stated case ever occur?,-,-,overreach
+TD-1568:F45,shape,Which value does each token take?,-,-,new-gap
+TD-1568:F46,display,Is each replaced title given per variant?,-,duplicate-text,incomplete
+TD-1568:F47,-,-,-,-,not-propagated
+TD-1568:F48,scope,Does the held row take the new state?,-,-,-
+TD-1568:F49,interaction,How does a caller learn a second value the function returns?,-,-,-
+TD-1568:F50,which,What does the fallback draw when the pane is gone?,-,-,-
+TD-1568:F51,-,-,external,-,wrong-fix
+TD-1568:F52,scope,Does a bare rule hit every carrier of the class?,-,-,wrong-fix
+TD-1568:F53,shape,What is the payload field's exact shape?,-,-,new-gap
+TD-1568:F54,-,-,-,-,-
+TD-1568:F55,-,-,code-behaviour,-,-
+TD-1568:F56,which,Which targets does the compact card's lead include?,-,-,new-gap
+TD-1568:F57,-,-,-,duplicate-text,not-propagated
+TD-1568:F58,-,-,-,-,-
+TD-1568:F59,interaction,Do other rows carry the exception?,-,-,not-propagated
+TD-1568:F60,shape,How are the words joined in each form?,-,-,new-gap
+TD-1568:F61,-,-,-,duplicate-text,not-propagated
+TD-1568:F62,-,-,-,-,-
+TD-1568:F63,-,-,-,-,incomplete
+TD-1568:F64,interaction,Do appended sentences conflict with neighbouring rules?,-,-,not-propagated
+TD-1568:F65,empty-first,What if the timestamp is unset when the text is built?,-,-,-
+TD-1568:F66,-,-,-,section-ref,-
+TD-1568:F67,-,-,-,-,-
+TD-1568:F68,display,Which design choices are visible but unsaid to the reader?,-,-,-
+TD-1568:F69,-,-,-,-,other
+TD-1568:F70,display,Does the rendering show elements no state carries?,-,-,-
+TD-1556:F1,which,Which id does a folded item's link point to?,-,-,-
+TD-1556:F2,interaction,Do notifications follow the new folding of an item?,-,-,-
+TD-1556:F3,-,-,code-behaviour,-,-
+TD-1556:F4,-,-,code-behaviour,-,-
+TD-1556:F5,interaction,Do two sentences about one state contradict each other?,-,-,-
+TD-1556:F6,-,-,design-text,-,-
+TD-1556:F7,display,What line does the command show for the new kind of item?,-,-,-
+TD-1556:F8,-,-,-,-,-
+TD-1556:F9,-,-,-,-,-
+TD-1556:F10,-,-,-,-,-
+TD-1556:F11,ends,What is told once the awaited item closes?,-,-,wrong-fix
+TD-1556:F12,failure,Is the person's reply recorded anywhere a reader can see?,-,-,wrong-fix
+TD-1556:F13,who,Who is told when the cause is cleared elsewhere?,-,-,wrong-fix
+TD-1556:F14,ends,Which kinds of close count as the cause being cleared?,-,-,wrong-fix
+TD-1556:F15,failure,Does the refusal's cure loop for some callers?,-,-,-
+TD-1556:F16,which,How is a rerouted copy matched to the original?,-,-,-
+TD-1556:F17,restart,Is the superseded chain read after a resume?,-,-,-
+TD-1556:F18,scope,Does the lookup cover board lines and ledger decisions?,-,-,new-gap
+TD-1556:F19,display,Is an item counted once when it appears on several cards?,-,-,new-gap
+TD-1556:F20,shape,"Which text is parsed for ids, whole or capped?",-,-,-
+TD-1556:F21,which,Which id is named when a question is asked again?,-,-,incomplete
+TD-1556:F22,shape,Which close reasons map to which words?,-,-,new-gap
+TD-1556:F23,who,Who is told when an item with no owed answer is dismissed?,-,-,-
+TD-1556:F24,interaction,Do the warning's words fit each case?,-,-,-
+TD-1556:F25,shape,Which id does the cure tell the caller to use?,-,-,-
+TD-1556:F26,which,Which replies stamp the record?,-,-,-
+TD-1556:F27,failure,What happens to a reply to a record whose asker is gone?,-,-,-
+TD-1556:F28,failure,Is a stale id refused when its thread moved on?,-,-,wrong-fix
+TD-1556:F29,which,Does matching by thread catch other senders' copies?,-,-,wrong-fix
+TD-1556:F30,-,-,work-state,-,-
+TD-1556:F31,display,Is the alternate action meaningful in every row kind?,-,-,-
+TD-1556:F32,scope,Does the new field reach every kind of row?,-,-,-
+TD-1556:F33,-,-,code-behaviour,-,-
+TD-1556:F34,-,-,-,count,-
+TD-1556:F35,-,-,work-state,-,-
+TD-1556:F36,-,-,code-behaviour,-,wrong-fix
+TD-1556:F37,failure,Is the follow-up the refusal asks for possible?,-,-,-
+TD-1556:F38,ends,When is an unreplied record pruned?,-,-,-
+TD-1556:F39,display,What words does each variant of the action tell?,-,-,new-gap
+TD-1556:F40,scope,Is a refusal given with and without a named id?,-,-,-
+TD-1556:F41,scope,Does the stamp apply to other kinds of entry?,-,-,-
+TD-1556:F42,interaction,Do two states of one entry both show controls?,-,-,-
+TD-1556:F43,-,-,-,duplicate-text,not-propagated
+TD-1556:F44,-,-,-,path-symbol,-
+TD-1556:F45,display,Does a settled row show that it was replied to?,-,-,-
+TD-1556:F46,which,Which of several matches does the refusal use?,-,-,-
+TD-1556:F47,-,-,-,duplicate-text,-
+TD-1556:F48,which,Does a later send take up the earlier outcome again?,-,-,new-gap
+TD-1556:F49,ends,What ends a hold when a newer outcome arrives?,-,-,wrong-fix
+TD-1556:F50,ends,Does the hold stand when the asker is gone?,-,-,-
+TD-1556:F51,shape,Does the function return the outcome?,-,-,-
+TD-1556:F52,ends,How long is an owing record kept?,-,-,-
+TD-1556:F53,display,Do variants of the action keep their own words?,-,-,-
+TD-1556:F54,failure,Does the refusal fire on honest text?,-,-,-
+TD-1556:F55,shape,Where are the field's words defined?,-,-,-
+TD-1556:F56,which,Which kinds of reply count?,-,-,-
+TD-1556:F57,-,-,code-behaviour,-,-
+TD-1556:F58,-,-,code-exists,-,-
+TD-1556:F59,-,-,code-behaviour,-,-
+TD-1556:F60,-,-,-,-,-
+TD-1556:F61,-,-,-,-,-
+TD-1556:F62,concurrency,Can the cited record be pruned before it is used?,-,-,-
+TD-1556:F63,-,-,code-behaviour,other,-
+TD-1556:F64,shape,Which fields does the shape name?,-,-,incomplete
+TD-1556:F65,scope,Which kinds of ask does the mark cover?,-,-,-
+TD-1556:F66,interaction,Does the replaced item become its own row?,-,-,wrong-fix
+TD-1556:F67,ends,What is written on every copy when one is dismissed?,-,-,-
+TD-1556:F68,failure,Does an orphan refusal still occur after the new state?,-,-,wrong-fix
+TD-1556:F69,which,Which question decides the hold when several exist?,-,-,-
+TD-1556:F70,ends,When does the replied hold end?,-,-,-
+TD-1556:F71,shape,Does a stamp write whole fields or merge?,-,-,-
+TD-1556:F72,scope,Which readers see the new outcome field?,-,-,-
+TD-1556:F73,display,What does the row show after dismissal in this state?,-,-,-
+TD-1556:F74,interaction,Does a dependent entry agree with the new rule?,-,duplicate-text,not-propagated
+TD-1556:F75,-,-,-,-,incomplete
+TD-1556:F76,-,-,-,-,-
+TD-1556:F77,ends,Does a day bound end a cover that should stand?,-,-,overreach
+TD-1556:F78,-,-,-,duplicate-text,not-propagated
+TD-1556:F79,-,-,-,duplicate-text,not-propagated
+TD-1556:F80,which,Which check runs first when two apply?,-,-,-
+TD-1556:F81,ends,What happens to a field when a later outcome arrives?,-,-,-
+TD-1556:F82,shape,Is the field written on every dismissal path?,-,-,-
+TD-1556:F83,concurrency,Is the problem caught in the opposite order of events?,-,-,-
+TD-1556:F84,when,Does a time bound restart after a later send?,-,-,new-gap
+TD-1556:F85,display,What word does the entry show after a dismissal?,-,-,-
+TD-1556:F86,-,-,code-exists,path-symbol,-
+TD-1556:F87,-,-,work-state,-,-
+TD-1556:F88,scope,Does the summary list every refused case?,-,-,-
+TD-1577:F1,-,-,code-behaviour,-,-
+TD-1577:F2,proof,How does a test run where the tool cannot launch?,-,-,-
+TD-1577:F3,-,-,external,-,-
+TD-1577:F4,-,-,code-exists,-,-
+TD-1577:F5,-,-,work-state,-,-
+TD-1577:F6,failure,What does a test clone do when the ref is missing?,-,-,-
+TD-1577:F7,shape,How does the seat get its role's brief?,-,-,-
+TD-1577:F8,scope,Which settings does the smoke override and keep?,-,-,-
+TD-1577:F9,shape,Which arguments does the assertion expect?,-,-,-
+TD-1577:F10,shape,What must every adapter's constructor take?,-,-,-
+TD-1577:F11,when,At which triggers does the check run?,-,-,-
+TD-1577:F12,-,-,-,-,-
+TD-1577:F13,interaction,Does the test's input meet the role's own refusal rule?,-,-,-
+TD-1577:F14,concurrency,Can the seat end before the ask arrives?,-,-,-
+TD-1577:F15,scope,Is it one seat per run or per case?,-,-,-
+TD-1577:F16,who,Who is the sender of an automated ask?,-,-,-
+TD-1577:F17,shape,What counts as one finding and how is a match scored?,-,-,-
+TD-1577:F18,proof,What are the denominators when some cases are unanswered?,-,-,-
+TD-1577:F19,shape,What exact text does the judge send?,-,-,-
+TD-1577:F20,shape,What does the brief builder take beyond the obvious input?,-,-,new-gap
+TD-1577:F21,shape,What exactly is asserted when an option is absent?,-,-,incomplete
+TD-1577:F22,shape,What surface does the stub harness offer?,-,-,-
+TD-1577:F23,shape,How does the stub learn its commands?,-,-,-
+TD-1577:F24,which,Does an override replace or extend the template?,-,-,-
+TD-1577:F25,-,-,code-behaviour,-,-
+TD-1577:F26,empty-first,What happens when the pinned commit is absent from a shallow clone?,-,-,-
+TD-1577:F27,-,-,code-behaviour,-,-
+TD-1577:F28,interaction,Can the judge pass where the reply road is unavailable?,-,-,-
+TD-1577:F29,which,Which checkout supplies the role and brief?,-,-,-
+TD-1577:F30,shape,How does the close reach the stub?,-,-,-
+TD-1577:F31,shape,What payloads make up one turn?,-,-,-
+TD-1577:F32,-,-,code-behaviour,-,-
+TD-1577:F33,scope,Which gate does the fetch setting actually serve?,-,-,-
+TD-1577:F34,proof,How many defects does the bar need to mean anything?,-,-,-
+TD-1577:F35,-,-,-,duplicate-text,-
+TD-1577:F36,ends,What is cleaned up after a smoke or case?,-,-,-
+TD-1577:F37,-,-,code-behaviour,-,-
+TD-1577:F38,concurrency,How is a late payload seen once the record is terminal?,-,-,-
+TD-1577:F39,shape,Which checkout does the launch code take as input?,-,-,-
+TD-1577:F40,-,-,-,duplicate-text,-
+TD-1577:F41,-,-,code-behaviour,-,-
+TD-1577:F42,-,-,-,id-ref,-
+TD-1577:F43,proof,How does the bar's arithmetic handle unanswered cases?,-,-,-
+TD-1577:F44,shape,Which environment and path does the send use?,-,-,-
+TD-1577:F45,scope,Which homes do the refusals shut out?,-,-,-
+TD-1577:F46,scope,Which existing lines does the rule apply to?,-,-,-
+TD-1577:F47,shape,What delimits one finding and what is unscored?,-,-,incomplete
+TD-1577:F48,shape,How is a catch cited and located?,-,-,-
+TD-1577:F49,shape,What do the fields hold when the capture is empty?,-,-,-
+TD-1577:F50,shape,Which part of a read is fixed and which varies?,-,-,-
+TD-1577:F51,shape,Which parameters does the call take and which are left out?,-,-,-
+TD-1577:F52,failure,What does the judge do when the seat stops to ask?,-,-,-
+TD-1577:F53,scope,What may the test origin hold?,-,-,-
+TD-1577:F54,-,-,-,duplicate-text,-
+TD-1577:F55,which,Which of two statements about the same setup is right?,-,duplicate-text,-
+TD-1577:F56,shape,Where does shared launch code live?,-,-,-
+TD-1577:F57,scope,Which rules must the entry's Fix restate from the design?,-,-,-
+TD-1577:F58,-,-,-,entry-fields,-
+TD-1577:F59,who,Who quotes the latest run's result?,-,-,-
+TD-1577:F60,-,-,code-behaviour,-,-
+TD-1577:F61,-,-,code-behaviour,-,-
+TD-1577:F62,interaction,Does the test input trigger the guard it claims to exercise?,-,-,-
+TD-1577:F63,-,-,code-behaviour,-,wrong-fix
+TD-1577:F64,shape,Which functions must the harness expose?,-,-,-
+TD-1577:F65,shape,What does a template slot hold for this kind of record?,-,-,-
+TD-1577:F66,shape,How is a path-and-line reference normalised?,-,-,-
+TD-1577:F67,which,Which commit's lines do the ranges refer to?,-,-,-
+TD-1577:F68,failure,How does a case end when the seat exits before replying?,-,-,-
+TD-1577:F69,scope,Can the test origin hold the answers set itself?,-,-,-
+TD-1577:F70,-,-,-,-,-
+TD-1577:F71,-,-,-,entry-fields,-
+TD-1577:F72,which,Which commit does the test clone hold?,-,-,-
+TD-1577:F73,-,-,-,-,-
+TD-1577:F74,scope,Does removing files from the head keep them in history?,-,-,-
+TD-1577:F75,-,-,-,entry-fields,-
+TD-1577:F76,which,How is a duplicate catch scored?,-,-,-
+TD-1577:F77,which,Which commit is which branch?,-,-,incomplete
+TD-1577:F78,shape,Which fields make a fixture's sha repeatable?,-,-,-
+TD-1577:F79,failure,What can a check cite in a repo with no history?,-,-,-
+TD-1577:F80,scope,Which adapters does a Protocol member apply to?,-,-,-
+TD-1577:F81,display,What do unrun cells show?,-,-,-
+TD-1577:F82,scope,Who reads a rule that lives only in the design?,-,-,-
+TD-1577:F83,scope,Which paths may a case's patch touch?,-,-,incomplete
+TD-1577:F84,-,-,-,count,-
+TD-1577:F85,-,-,-,-,-
+TD-1577:F86,-,-,code-behaviour,-,-
+TD-1577:F87,-,-,design-text,-,-
+TD-1577:F88,-,-,design-text,-,wrong-fix
+TD-1577:F89,-,-,data,count,-
+TD-1577:F90,-,-,work-state,id-ref,-
+TD-1577:F91,-,-,work-state,id-ref,-
+TD-1577:F92,-,-,work-state,-,-
+TD-1577:F93,-,-,code-behaviour,-,-
+TD-1577:F94,scope,Which adapters does the home check apply to?,-,-,-
+TD-1577:F95,-,-,design-text,-,-
+TD-1577:F96,scope,Which seats does the exemption name?,-,-,-
+TD-1577:F97,which,Which seat line applies when a role has several?,-,-,-
+TD-1577:F98,interaction,Does the check read the runner's own environment?,-,-,wrong-fix
+TD-1577:F99,shape,What makes a cited range invalid?,-,-,incomplete
+TD-1577:F100,which,What if two defects are refuted by the same code?,-,-,incomplete
+TD-1577:F101,shape,Which spellings may a location take?,-,-,incomplete
+TD-1577:F102,proof,What does the shape test hold about locations and paths?,-,-,incomplete
+TD-1577:F103,-,-,-,duplicate-text,not-propagated
+TD-1577:F104,-,-,code-behaviour,-,-
+TD-1577:F105,who,Which seat line does an answer land and who quotes proof?,-,-,incomplete
+TD-1577:F106,interaction,Is one rule written the same way in every place?,-,duplicate-text,not-propagated
+TD-1577:F107,proof,Is a scored run asked of the new profile?,-,-,-
+TD-1577:F108,-,-,-,-,-
+TD-1577:F109,interaction,How does the environment reach the home check?,-,-,wrong-fix
+TD-1577:F110,who,Whose exported environment goes unrefused?,-,-,new-gap
+TD-1577:F111,scope,Can the judge run on a candidate profile?,-,-,wrong-fix
+TD-1577:F112,shape,How is range width counted?,-,-,incomplete
+TD-1577:F113,when,Which entry adds a check when entries land in an order?,-,-,-
+TD-1577:F114,-,-,design-text,-,-
+TD-1577:F115,interaction,Does a hold on this design hold the related builds?,-,-,-
+TD-1577:F116,-,-,-,duplicate-text,not-propagated
+TD-1577:F117,-,-,-,duplicate-text,not-propagated
+TD-1577:F118,-,-,design-text,duplicate-text,not-propagated
+TD-1577:F119,scope,Which holds apply to which builds?,-,duplicate-text,-
+TD-1577:F120,-,-,-,duplicate-text,not-propagated
+TD-1577:F121,-,-,design-text,-,overreach
+TD-1577:F122,shape,What exact value does the rule hold for each adapter?,-,-,new-gap
+TD-1577:F123,when,"At what moment is the input read, and is it re-read later?",-,-,-
+TD-1577:F124,scope,Does one name mean the same thing everywhere it is used?,-,duplicate-text,-
+TD-1577:F125,which,"Which record wins when several match, and in what order?",-,-,new-gap
+TD-1577:F126,shape,What exact name or wording does the output take?,-,duplicate-text,-
+TD-1577:F127,interaction,"Which outer-environment variables leak into the child, and who strips them?",-,-,-
+TD-1577:F128,which,Which version of the files does the check read?,-,-,-
+TD-1577:F129,scope,Which other variables does the rule cover besides the one named?,-,-,incomplete
+TD-1577:F130,shape,"Is the path expanded before comparison, and by whom?",-,-,-
+TD-1577:F131,-,-,-,duplicate-text,not-propagated
+TD-1577:F132,-,-,-,-,-
+TD-1577:F133,shape,Where exactly does each named location live?,-,-,new-gap
+TD-1577:F134,scope,What does the pick do on each edge input?,-,-,new-gap
+TD-1577:F135,scope,Which other tools' variables does the removal leave alone?,-,-,-
+TD-1577:F136,which,"When two options name the same thing, which one wins?",-,-,-
+TD-1577:F137,-,-,design-text,-,-
+TD-1577:F138,-,-,work-state,entry-fields,-

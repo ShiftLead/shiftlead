@@ -1,0 +1,70 @@
+{"id": "TD-1568:F1", "case": "interaction", "q": "Do all readers of one predicate agree on it?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F2", "case": "interaction", "q": "Does a derived mark agree with the states it summarises?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F3", "case": "shape", "q": "Is each input to the test derivable from the data passed?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F4", "case": "shape", "q": "Can the string be built where the value is computed?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F5", "case": "display", "q": "Is every drawn copy of the control covered?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F6", "case": "interaction", "q": "Does a new class name collide with an existing one?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F7", "case": "-", "q": "-", "fact": "-", "check": "path-symbol", "fixfail": "-"}
+{"id": "TD-1568:F8", "case": "display", "q": "Which copy of the control does the user actually see?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1568:F9", "case": "shape", "q": "Does the payload carry the data the display needs?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1568:F10", "case": "display", "q": "Does the updater rewrite titles as well as text?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1568:F11", "case": "scope", "q": "Does the change reach every screen that shows mode words?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F12", "case": "display", "q": "Which forms does the line take in each state?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F13", "case": "display", "q": "In what order are lines and hover carriers drawn?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F14", "case": "empty-first", "q": "What shows when the actor has no team?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F15", "case": "multi-node", "q": "What shows for a node's member or an unreachable one?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F16", "case": "scope", "q": "Do rollups and summaries draw the new state?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F17", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F18", "case": "display", "q": "What exactly does the ticker rewrite?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1568:F19", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1568:F20", "case": "interaction", "q": "How do existing readers change behaviour under the new rule?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1568:F21", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F22", "case": "-", "q": "-", "fact": "-", "check": "section-ref", "fixfail": "-"}
+{"id": "TD-1568:F23", "case": "who", "q": "Which module passes the fields to each screen?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F24", "case": "scope", "q": "Do sorting and filters treat the new state?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F25", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F26", "case": "which", "q": "Which checks come before the new one?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F27", "case": "-", "q": "-", "fact": "work-state", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F28", "case": "scope", "q": "Does a marked card keep its usual foot and counts?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F29", "case": "interaction", "q": "Do all places that state a rule agree?", "fact": "-", "check": "duplicate-text", "fixfail": "-"}
+{"id": "TD-1568:F30", "case": "ends", "q": "Does the rule hold once the record has ended?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1568:F31", "case": "display", "q": "What shows before the first update?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1568:F32", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "-"}
+{"id": "TD-1568:F33", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F34", "case": "display", "q": "Is the color contrast enough in every theme?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F35", "case": "scope", "q": "Do captions and counts leave out the new state?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1568:F36", "case": "interaction", "q": "Does a flag drive other screens that should not change?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1568:F37", "case": "which", "q": "What precedence orders the competing leading actions?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F38", "case": "which", "q": "Which button is primary when two are shown?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1568:F39", "case": "shape", "q": "Which stamp field does each path write?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F40", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F41", "case": "interaction", "q": "Does the rule's exception match the newly marked state?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1568:F42", "case": "which", "q": "Which action leads when no answerable one exists?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1568:F43", "case": "scope", "q": "Does the rule need a state check the test already makes?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F44", "case": "scope", "q": "Can the stated case ever occur?", "fact": "-", "check": "-", "fixfail": "overreach"}
+{"id": "TD-1568:F45", "case": "shape", "q": "Which value does each token take?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1568:F46", "case": "display", "q": "Is each replaced title given per variant?", "fact": "-", "check": "duplicate-text", "fixfail": "incomplete"}
+{"id": "TD-1568:F47", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1568:F48", "case": "scope", "q": "Does the held row take the new state?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F49", "case": "interaction", "q": "How does a caller learn a second value the function returns?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F50", "case": "which", "q": "What does the fallback draw when the pane is gone?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F51", "case": "-", "q": "-", "fact": "external", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1568:F52", "case": "scope", "q": "Does a bare rule hit every carrier of the class?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1568:F53", "case": "shape", "q": "What is the payload field's exact shape?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1568:F54", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F55", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F56", "case": "which", "q": "Which targets does the compact card's lead include?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1568:F57", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1568:F58", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F59", "case": "interaction", "q": "Do other rows carry the exception?", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1568:F60", "case": "shape", "q": "How are the words joined in each form?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1568:F61", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1568:F62", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F63", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1568:F64", "case": "interaction", "q": "Do appended sentences conflict with neighbouring rules?", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1568:F65", "case": "empty-first", "q": "What if the timestamp is unset when the text is built?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F66", "case": "-", "q": "-", "fact": "-", "check": "section-ref", "fixfail": "-"}
+{"id": "TD-1568:F67", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F68", "case": "display", "q": "Which design choices are visible but unsaid to the reader?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1568:F69", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "other"}
+{"id": "TD-1568:F70", "case": "display", "q": "Does the rendering show elements no state carries?", "fact": "-", "check": "-", "fixfail": "-"}

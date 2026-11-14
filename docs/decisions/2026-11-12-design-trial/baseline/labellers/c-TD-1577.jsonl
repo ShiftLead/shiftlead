@@ -1,0 +1,10 @@
+{"id": "TD-1577:F121", "kind": "false-claim", "origin": "fix-induced", "catch": "design-only", "area": "adapter", "conf": "low"}
+{"id": "TD-1577:F123", "kind": "unspecified", "origin": "unsure", "catch": "builder", "area": "adapter", "conf": "low"}
+{"id": "TD-1577:F124", "kind": "contradiction", "origin": "original", "catch": "builder", "area": "adapter", "conf": "high"}
+{"id": "TD-1577:F126", "kind": "unspecified", "origin": "original", "catch": "builder", "area": "teams-lifecycle", "conf": "low"}
+{"id": "TD-1577:F128", "kind": "unspecified", "origin": "original", "catch": "builder", "area": "cadence", "conf": "high"}
+{"id": "TD-1577:F130", "kind": "wrong-mechanism", "origin": "original", "catch": "test", "area": "adapter", "conf": "high"}
+{"id": "TD-1577:F135", "kind": "unspecified", "origin": "original", "catch": "builder", "area": "adapter", "conf": "high"}
+{"id": "TD-1577:F136", "kind": "unspecified", "origin": "original", "catch": "builder", "area": "teams-lifecycle", "conf": "high"}
+{"id": "TD-1577:F137", "kind": "false-claim", "origin": "original", "catch": "pr-review", "area": "adapter", "conf": "low"}
+{"id": "TD-1577:F138", "kind": "bookkeeping", "origin": "original", "catch": "none", "area": "cadence", "conf": "low"}

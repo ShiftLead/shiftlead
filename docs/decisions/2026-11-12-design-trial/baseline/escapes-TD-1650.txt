@@ -1,0 +1,13 @@
+TD-1650: window 2026-11-12 to 2026-12-10 (first design PR #3569)
+
+TD-1726:
+  build #3571 2026-11-12 TD-1726: a seat's launch reads its tool's version through the adapter's tool_version() ont
+    finding: (1) no test of its own for a pool member or a resumed seat — the same `seat` branch, named in the PR body
+    finding: (2) the smoke's header and last line printing the version are not asserted, only `smoke_version` itself (the print sites are unchanged)
+    finding: (3) the node test calls `apply_node` directly rather than through a node report
+  fix   #3572 2026-11-12 TD-1727: the home notes the person once when a seat profile's tool version changes, asking
+  fix   #3674 2026-11-13 TD-1764: the design cost model — applying fixes is 51% of the designer's spend over five d
+
+TD-1727:
+  build #3572 2026-11-12 TD-1727: the home notes the person once when a seat profile's tool version changes, asking
+  fix   #3674 2026-11-13 TD-1764: the design cost model — applying fixes is 51% of the designer's spend over five d

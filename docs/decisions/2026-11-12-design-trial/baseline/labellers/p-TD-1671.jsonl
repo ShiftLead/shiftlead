@@ -1,0 +1,42 @@
+{"id": "TD-1671:F1", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F2", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F3", "case": "interaction", "q": "What happens when both ends of a count belong to one owner?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F4", "case": "failure", "q": "Does a read path create state as a side effect?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F5", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F6", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F7", "case": "concurrency", "q": "Which events other than the named one also split a record?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F8", "case": "scope", "q": "Which actors share one bound, and is that sharing intended?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F9", "case": "which", "q": "Which records are marked or read when a bound is hit?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F10", "case": "shape", "q": "Which party is named how in a refusal message?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F11", "case": "scope", "q": "Does one sections rule agree with its siblings scope?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F12", "case": "ends", "q": "What happens to counts when a member is dropped?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F13", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F14", "case": "shape", "q": "How is the membership test actually expressed?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1671:F15", "case": "which", "q": "Which records does a refusal consult: all or the refusing one?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1671:F16", "case": "shape", "q": "How is a read done without the creating helper?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F17", "case": "restart", "q": "Do stored keys survive a resume or rename unchanged?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F18", "case": "shape", "q": "Is the exact refusal wording and helper pinned?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F19", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F20", "case": "scope", "q": "Which cases still leak past the bound, and are they accepted?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1671:F21", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1671:F22", "case": "which", "q": "Which tally still bounds a re-routed item?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1671:F23", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F24", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1671:F25", "case": "shape", "q": "What does a refusal name when both ends share an identity?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1671:F26", "case": "interaction", "q": "Do two sections state the same marking rule?", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1671:F27", "case": "interaction", "q": "Do \"as today\" and \"gains no key\" agree?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F28", "case": "ends", "q": "What happens to tallies on the other side when a record is forgotten?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1671:F29", "case": "scope", "q": "What does one send to several same-owner targets cost?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F30", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F31", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F32", "case": "scope", "q": "Can the degenerate case (self/same) occur at all?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F33", "case": "shape", "q": "What does a changed rule now name for the unchanged case?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1671:F34", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "other"}
+{"id": "TD-1671:F35", "case": "shape", "q": "Can two same-named things read alike in output?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F36", "case": "which", "q": "Which end comes first in a two-party output?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F37", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F38", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F39", "case": "scope", "q": "Is each side of a two-sided check written out?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F40", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F41", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1671:F42", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}

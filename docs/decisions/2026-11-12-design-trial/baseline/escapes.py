@@ -9,9 +9,9 @@ labeller reads with `../trace-prompt.md` (TD-1776, at the reading).
   it became), read from the ledger at `--ref` (default `origin/main`), active and archived. A **build PR** is a
   merged PR whose title leads with the build's id, merged in the design's window; a build with none there is
   outside the half.
-- **Its review findings** are the numbered items (`1.`, `2.` …) of each review-evidence comment on a build PR: a
-  comment with a `cadence-review:` line whose verdict is not `FIXED` (a `FIXED` comment answers findings, it raises
-  none).
+- **Its review findings** are the numbered items of each review-evidence comment on a build PR (its `1.`, `2.` …
+  lines, else its inline `(1)`, `(2)` …): a comment with a `cadence-review:` line whose verdict is not `FIXED` (a
+  `FIXED` comment answers findings, it raises none).
 - **Its fix PRs** are the merged PRs, merged after the build's first build PR and within 14 days of its last, whose
   title does not lead with the build's id and whose title or body holds the build's or the design's id.
 
@@ -54,7 +54,7 @@ def field(text: str, name: str) -> str:
 
 def builds(design: str, ref: str) -> list[str]:
     out = []
-    for path in sh("git", "ls-tree", "-r", "--name-only", ref, "docs/ledger/").split():
+    for path in sh("git", "ls-tree", "-r", "--full-tree", "--name-only", ref, "docs/ledger/").split():
         m = re.fullmatch(r"docs/ledger/(?:archive/)?(TD-\d+)\.md", path)
         if not m:
             continue
@@ -90,8 +90,24 @@ def findings(pr: int) -> list[str]:
         m = re.search(r"^cadence-review:\s*(\w+)", body, re.M)
         if not m or m.group(1) == "FIXED":
             continue
-        out += [ln.strip() for ln in body.splitlines() if re.match(r"\s*\d+\.\s", ln)]
+        out += numbered(body)
     return out
+
+
+def numbered(body: str) -> list[str]:
+    """A review's numbered findings: its `1.` lines, else its inline `(1) … (2) …` items."""
+    lines = [ln.strip() for ln in body.splitlines() if re.match(r"\s*\d+\.\s", ln)]
+    if lines:
+        return lines
+    parts = re.split(r"(?<![\w)])\((\d+)\)\s", body)
+    items, want = [], 1
+    for i in range(1, len(parts) - 1, 2):
+        if int(parts[i]) != want:
+            continue
+        text = re.split(r"\n\s*\n", parts[i + 1])[0]
+        items.append(f"({want}) " + " ".join(text.split()).rstrip(";,. "))
+        want += 1
+    return items
 
 
 def escapes(design: str, ref: str) -> dict:

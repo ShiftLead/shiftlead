@@ -1,0 +1,88 @@
+{"id": "TD-1556:F1", "case": "which", "q": "Which id does a folded item's link point to?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F2", "case": "interaction", "q": "Do notifications follow the new folding of an item?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F3", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F4", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F5", "case": "interaction", "q": "Do two sentences about one state contradict each other?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F6", "case": "-", "q": "-", "fact": "design-text", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F7", "case": "display", "q": "What line does the command show for the new kind of item?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F8", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F9", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F10", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F11", "case": "ends", "q": "What is told once the awaited item closes?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1556:F12", "case": "failure", "q": "Is the person's reply recorded anywhere a reader can see?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1556:F13", "case": "who", "q": "Who is told when the cause is cleared elsewhere?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1556:F14", "case": "ends", "q": "Which kinds of close count as the cause being cleared?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1556:F15", "case": "failure", "q": "Does the refusal's cure loop for some callers?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F16", "case": "which", "q": "How is a rerouted copy matched to the original?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F17", "case": "restart", "q": "Is the superseded chain read after a resume?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F18", "case": "scope", "q": "Does the lookup cover board lines and ledger decisions?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1556:F19", "case": "display", "q": "Is an item counted once when it appears on several cards?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1556:F20", "case": "shape", "q": "Which text is parsed for ids, whole or capped?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F21", "case": "which", "q": "Which id is named when a question is asked again?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1556:F22", "case": "shape", "q": "Which close reasons map to which words?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1556:F23", "case": "who", "q": "Who is told when an item with no owed answer is dismissed?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F24", "case": "interaction", "q": "Do the warning's words fit each case?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F25", "case": "shape", "q": "Which id does the cure tell the caller to use?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F26", "case": "which", "q": "Which replies stamp the record?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F27", "case": "failure", "q": "What happens to a reply to a record whose asker is gone?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F28", "case": "failure", "q": "Is a stale id refused when its thread moved on?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1556:F29", "case": "which", "q": "Does matching by thread catch other senders' copies?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1556:F30", "case": "-", "q": "-", "fact": "work-state", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F31", "case": "display", "q": "Is the alternate action meaningful in every row kind?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F32", "case": "scope", "q": "Does the new field reach every kind of row?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F33", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F34", "case": "-", "q": "-", "fact": "-", "check": "count", "fixfail": "-"}
+{"id": "TD-1556:F35", "case": "-", "q": "-", "fact": "work-state", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F36", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1556:F37", "case": "failure", "q": "Is the follow-up the refusal asks for possible?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F38", "case": "ends", "q": "When is an unreplied record pruned?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F39", "case": "display", "q": "What words does each variant of the action tell?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1556:F40", "case": "scope", "q": "Is a refusal given with and without a named id?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F41", "case": "scope", "q": "Does the stamp apply to other kinds of entry?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F42", "case": "interaction", "q": "Do two states of one entry both show controls?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F43", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1556:F44", "case": "-", "q": "-", "fact": "-", "check": "path-symbol", "fixfail": "-"}
+{"id": "TD-1556:F45", "case": "display", "q": "Does a settled row show that it was replied to?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F46", "case": "which", "q": "Which of several matches does the refusal use?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F47", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "-"}
+{"id": "TD-1556:F48", "case": "which", "q": "Does a later send take up the earlier outcome again?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1556:F49", "case": "ends", "q": "What ends a hold when a newer outcome arrives?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1556:F50", "case": "ends", "q": "Does the hold stand when the asker is gone?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F51", "case": "shape", "q": "Does the function return the outcome?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F52", "case": "ends", "q": "How long is an owing record kept?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F53", "case": "display", "q": "Do variants of the action keep their own words?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F54", "case": "failure", "q": "Does the refusal fire on honest text?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F55", "case": "shape", "q": "Where are the field's words defined?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F56", "case": "which", "q": "Which kinds of reply count?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F57", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F58", "case": "-", "q": "-", "fact": "code-exists", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F59", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F60", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F61", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F62", "case": "concurrency", "q": "Can the cited record be pruned before it is used?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F63", "case": "-", "q": "-", "fact": "code-behaviour", "check": "other", "fixfail": "-"}
+{"id": "TD-1556:F64", "case": "shape", "q": "Which fields does the shape name?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1556:F65", "case": "scope", "q": "Which kinds of ask does the mark cover?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F66", "case": "interaction", "q": "Does the replaced item become its own row?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1556:F67", "case": "ends", "q": "What is written on every copy when one is dismissed?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F68", "case": "failure", "q": "Does an orphan refusal still occur after the new state?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1556:F69", "case": "which", "q": "Which question decides the hold when several exist?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F70", "case": "ends", "q": "When does the replied hold end?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F71", "case": "shape", "q": "Does a stamp write whole fields or merge?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F72", "case": "scope", "q": "Which readers see the new outcome field?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F73", "case": "display", "q": "What does the row show after dismissal in this state?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F74", "case": "interaction", "q": "Does a dependent entry agree with the new rule?", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1556:F75", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1556:F76", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F77", "case": "ends", "q": "Does a day bound end a cover that should stand?", "fact": "-", "check": "-", "fixfail": "overreach"}
+{"id": "TD-1556:F78", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1556:F79", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1556:F80", "case": "which", "q": "Which check runs first when two apply?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F81", "case": "ends", "q": "What happens to a field when a later outcome arrives?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F82", "case": "shape", "q": "Is the field written on every dismissal path?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F83", "case": "concurrency", "q": "Is the problem caught in the opposite order of events?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F84", "case": "when", "q": "Does a time bound restart after a later send?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1556:F85", "case": "display", "q": "What word does the entry show after a dismissal?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F86", "case": "-", "q": "-", "fact": "code-exists", "check": "path-symbol", "fixfail": "-"}
+{"id": "TD-1556:F87", "case": "-", "q": "-", "fact": "work-state", "check": "-", "fixfail": "-"}
+{"id": "TD-1556:F88", "case": "scope", "q": "Does the summary list every refused case?", "fact": "-", "check": "-", "fixfail": "-"}

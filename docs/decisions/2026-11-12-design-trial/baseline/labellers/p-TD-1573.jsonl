@@ -1,0 +1,129 @@
+{"id": "TD-1573:F1", "case": "which", "q": "Which held items does a new mark apply to?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F2", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F3", "case": "interaction", "q": "Is a count subtracted by two rules at once?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F4", "case": "interaction", "q": "Do a new bucket and an existing bucket still sum correctly?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F5", "case": "when", "q": "Which stored or carried readings get re-evaluated each pass?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F6", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F7", "case": "empty-first", "q": "What does the store hold on a first pass, and how is it keyed?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F8", "case": "ends", "q": "Is a notice sent when its target record has ended or been forgotten?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F9", "case": "scope", "q": "Which records does one read cover, per repo?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F10", "case": "-", "q": "-", "fact": "-", "check": "path-symbol", "fixfail": "-"}
+{"id": "TD-1573:F11", "case": "interaction", "q": "Which older warning does a new notice replace?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F12", "case": "scope", "q": "Does a new mark overlap a deliberate existing category?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F13", "case": "interaction", "q": "Does a changed mark leave a subtraction elsewhere moot?", "fact": "-", "check": "-", "fixfail": "overreach"}
+{"id": "TD-1573:F14", "case": "when", "q": "How long must a state stand before it is told?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F15", "case": "empty-first", "q": "What does the first pass write to the store?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1573:F16", "case": "interaction", "q": "Do two counts that differ say why they differ?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F17", "case": "when", "q": "Does a step run before the reading is compared and stored?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F18", "case": "shape", "q": "Where on the reading does a new field sit?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F19", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F20", "case": "display", "q": "What reason is shown for each kind of entry?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F21", "case": "scope", "q": "Which records make up a lane set for a start?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F22", "case": "display", "q": "Does a segment link to a list that holds the flagged items?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F23", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F24", "case": "multi-node", "q": "What if two checkouts share one origin?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F25", "case": "scope", "q": "What residue differs between two views, and is it named?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1573:F26", "case": "display", "q": "Does a compact form show the new kind?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F27", "case": "scope", "q": "Is a tagged entry in anyones rest, and so tested?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F28", "case": "concurrency", "q": "Which store sites apply a step, and on which loop?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F29", "case": "shape", "q": "What time base and failure handling does the store use?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1573:F30", "case": "who", "q": "Who counts as the taker, and how is it identified across hosts?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F31", "case": "scope", "q": "Are teamless records included in a lane set?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F32", "case": "shape", "q": "What are the exact words of the note template?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F33", "case": "display", "q": "What does a line end with when an item is marked?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F34", "case": "concurrency", "q": "Does a step edit shared structures or copies?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F35", "case": "when", "q": "Is a derived count rebuilt each pass before marking?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F36", "case": "when", "q": "Is a step applied before the compare that decides storage?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F37", "case": "which", "q": "What is the reason for a team that has records but no lane?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F38", "case": "display", "q": "Does a changed tooltip apply in every form?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1573:F39", "case": "shape", "q": "Are comparisons case-folded and applied at every site?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F40", "case": "multi-node", "q": "Are clocks kept per checkout or per origin?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F41", "case": "empty-first", "q": "What happens for a defined but not started team?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F42", "case": "scope", "q": "Is the list of residue cases complete?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1573:F43", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1573:F44", "case": "empty-first", "q": "What does a pass do that marks nothing?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F45", "case": "display", "q": "What does a command print at zero and under a flag?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F46", "case": "which", "q": "Which lanes does a reason read over?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1573:F47", "case": "empty-first", "q": "Is a field read after its meaning changed?", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1573:F48", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "-"}
+{"id": "TD-1573:F49", "case": "when", "q": "Does a changed reason restart the clock?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F50", "case": "which", "q": "Which lanes does the first case read?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1573:F51", "case": "when", "q": "Which wake class does a new notice use?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F52", "case": "scope", "q": "For which callers is an expensive read computed?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F53", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F54", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F55", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1573:F56", "case": "failure", "q": "What do lines show when the reading is unreadable or fails?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F57", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F58", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F59", "case": "which", "q": "Where does a new line sit relative to an existing one?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F60", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "-"}
+{"id": "TD-1573:F61", "case": "when", "q": "Does a skipped step still advance a clock?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1573:F62", "case": "multi-node", "q": "When may a shared record be pruned by one owner?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1573:F63", "case": "who", "q": "What happens to a claimed entry whose note would be sent?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F64", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F65", "case": "shape", "q": "How is a multi-entry line formatted?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F66", "case": "shape", "q": "Which style tokens and legend words are used?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F67", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F68", "case": "ends", "q": "What happens to a field when its source is dropped?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1573:F69", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F70", "case": "display", "q": "Where does a flagged item go in a page list?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1573:F71", "case": "when", "q": "What does a first pass write when a note is skipped?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1573:F72", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "-"}
+{"id": "TD-1573:F73", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "-"}
+{"id": "TD-1573:F74", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "-"}
+{"id": "TD-1573:F75", "case": "which", "q": "Which records are selected for a repo?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F76", "case": "shape", "q": "How is a claimed test defined on records?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F77", "case": "shape", "q": "Is a comparison normalised like its analogue?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1573:F78", "case": "shape", "q": "Which clause is dropped when an entry already waits?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F79", "case": "-", "q": "-", "fact": "-", "check": "path-symbol", "fixfail": "-"}
+{"id": "TD-1573:F80", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F81", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F82", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F83", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F84", "case": "display", "q": "Is a marked row flagged per row?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F85", "case": "display", "q": "Which title and style does a rollup use?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F86", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1573:F87", "case": "ends", "q": "How long does an ended record count?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1573:F88", "case": "-", "q": "-", "fact": "-", "check": "path-symbol", "fixfail": "not-propagated"}
+{"id": "TD-1573:F89", "case": "display", "q": "What does a hover show when a line is absent?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F90", "case": "shape", "q": "In which order are items listed in a reason?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F91", "case": "when", "q": "Does a first pass spend notes of entries not yet correct?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1573:F92", "case": "shape", "q": "What is a lists cap and order?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1573:F93", "case": "shape", "q": "How are ids spelled and compared?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1573:F94", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1573:F95", "case": "shape", "q": "Which fields does a creating command carry?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F96", "case": "scope", "q": "What does a concluded team leave in a set?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1573:F97", "case": "scope", "q": "Which case does this design leave as a named gap?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F98", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F99", "case": "display", "q": "Where does a new list sit among the others?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1573:F100", "case": "shape", "q": "What does a function return so a reader needs no text parsing?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1573:F101", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1573:F102", "case": "empty-first", "q": "What does a first pass write for an entry already claimed?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1573:F103", "case": "display", "q": "Where does the clause appear across entry points?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F104", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1573:F105", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1573:F106", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1573:F107", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F108", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F109", "case": "when", "q": "Does a claimed mark write to the store while the claim stands?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1573:F110", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1573:F111", "case": "-", "q": "-", "fact": "-", "check": "count", "fixfail": "other"}
+{"id": "TD-1573:F112", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1573:F113", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1573:F114", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1573:F115", "case": "when", "q": "Does a skipped marks clock keep running?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1573:F116", "case": "-", "q": "-", "fact": "-", "check": "path-symbol", "fixfail": "-"}
+{"id": "TD-1573:F117", "case": "shape", "q": "Does a list carry a case a builder might add?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F118", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1573:F119", "case": "interaction", "q": "Do two documents agree on when a first marked entry is noted?", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1573:F120", "case": "multi-node", "q": "Whose stored state does each pass read?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1573:F121", "case": "scope", "q": "Is a template wider than the case on purpose?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F122", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1573:F123", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "other"}
+{"id": "TD-1573:F124", "case": "display", "q": "What does a count show at zero?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F125", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F126", "case": "when", "q": "Is there a grace before an effect shows, and is lacking it accepted?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1573:F127", "case": "shape", "q": "What exactly does the store hold?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1573:F128", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "other"}
+{"id": "TD-1573:F129", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "incomplete"}

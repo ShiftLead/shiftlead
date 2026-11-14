@@ -1,0 +1,68 @@
+{"id": "TD-1567:F1", "case": "display", "q": "What shows when two indicators both apply to one element?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F2", "case": "display", "q": "Which element does a link attach to in each drawn state?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F3", "case": "empty-first", "q": "What if the first match has no holder?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F4", "case": "multi-node", "q": "Which receiver takes a node's derived reports at the home?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F5", "case": "scope", "q": "Does the retire rule cover records still on the current branch?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F6", "case": "shape", "q": "Which stored facts does the test read?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F7", "case": "-", "q": "-", "fact": "-", "check": "id-ref", "fixfail": "-"}
+{"id": "TD-1567:F8", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "-"}
+{"id": "TD-1567:F9", "case": "interaction", "q": "Which existing convention does the rule lean on as a proxy?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F10", "case": "ends", "q": "What does the rule do after the last part archives?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F11", "case": "display", "q": "Does the new label hide existing content on the row?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F12", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "-"}
+{"id": "TD-1567:F13", "case": "interaction", "q": "Do the design text and the fix name the same element?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F14", "case": "-", "q": "-", "fact": "code-exists", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F15", "case": "multi-node", "q": "Can the home act on a node's record the node never reports?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F16", "case": "interaction", "q": "Does this timing agree with the other section's timing?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F17", "case": "display", "q": "Does the new state change what a secondary page shows?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F18", "case": "interaction", "q": "Does reusing a flag change other things it gates?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F19", "case": "display", "q": "What does a different screen show in the same state?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F20", "case": "concurrency", "q": "What if another actor works the same item at once?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F21", "case": "which", "q": "How are several rows ordered when picking one?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F22", "case": "scope", "q": "Does the rule apply to parts in another repo?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F23", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F24", "case": "interaction", "q": "Does the ordering rule match the fix for the earlier finding?", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1567:F25", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1567:F26", "case": "interaction", "q": "Does one return value gate several unrelated outputs?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F27", "case": "multi-node", "q": "How is a node's record mapped to its repo?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F28", "case": "-", "q": "-", "fact": "-", "check": "section-ref", "fixfail": "-"}
+{"id": "TD-1567:F29", "case": "interaction", "q": "Do the header rules agree on what is drawn?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F30", "case": "interaction", "q": "Does a promised road match what the other rule writes?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F31", "case": "ends", "q": "Where does the item go after being let go?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F32", "case": "-", "q": "-", "fact": "-", "check": "path-symbol", "fixfail": "-"}
+{"id": "TD-1567:F33", "case": "display", "q": "Which rows on a secondary page have the needed data?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F34", "case": "display", "q": "Which branch of the template links and which stays plain?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F35", "case": "display", "q": "Which of two same-named indicators does the header draw?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F36", "case": "display", "q": "Does the label hold in every state of the session?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F37", "case": "scope", "q": "Does the new field reach the command-line view?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F38", "case": "multi-node", "q": "Does the pass reach node records as well as local?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F39", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F40", "case": "-", "q": "-", "fact": "-", "check": "section-ref", "fixfail": "incomplete"}
+{"id": "TD-1567:F41", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1567:F42", "case": "which", "q": "Which record decides when several claims differ?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1567:F43", "case": "scope", "q": "Does the pass run at the home, on nodes, or both?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F44", "case": "ends", "q": "What does a fallback archive lose when a record ends?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F45", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "incomplete"}
+{"id": "TD-1567:F46", "case": "scope", "q": "Does the new field appear in machine-readable output?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F47", "case": "display", "q": "Does a control show both indicators at once?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F48", "case": "scope", "q": "Which sources does the release reach?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1567:F49", "case": "ends", "q": "Does the pass reach closed records?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F50", "case": "which", "q": "Which record's value is drawn when several exist?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F51", "case": "-", "q": "-", "fact": "-", "check": "id-ref", "fixfail": "-"}
+{"id": "TD-1567:F52", "case": "-", "q": "-", "fact": "design-text", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1567:F53", "case": "empty-first", "q": "What if the only parts are already archived?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F54", "case": "-", "q": "-", "fact": "-", "check": "section-ref", "fixfail": "-"}
+{"id": "TD-1567:F55", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1567:F56", "case": "-", "q": "-", "fact": "-", "check": "path-symbol", "fixfail": "-"}
+{"id": "TD-1567:F57", "case": "display", "q": "Do two links on one header lead to the same record?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F58", "case": "interaction", "q": "Does the fix agree with the documented output contract?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1567:F59", "case": "-", "q": "-", "fact": "-", "check": "section-ref", "fixfail": "-"}
+{"id": "TD-1567:F60", "case": "-", "q": "-", "fact": "-", "check": "section-ref", "fixfail": "-"}
+{"id": "TD-1567:F61", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1567:F62", "case": "interaction", "q": "Does the status word agree with the other checker?", "fact": "-", "check": "other", "fixfail": "-"}
+{"id": "TD-1567:F63", "case": "-", "q": "-", "fact": "design-text", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F64", "case": "-", "q": "-", "fact": "-", "check": "count", "fixfail": "-"}
+{"id": "TD-1567:F65", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F66", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1567:F67", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1567:F68", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}

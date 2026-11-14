@@ -1,0 +1,163 @@
+{"id": "TD-1550:F117", "case": "when", "q": "Whose duty is a new adapter's one-off capture, and when?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F118", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F119", "case": "-", "q": "-", "fact": "code-exists", "check": "path-symbol", "fixfail": "-"}
+{"id": "TD-1550:F120", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F121", "case": "-", "q": "-", "fact": "work-state", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F122", "case": "shape", "q": "What exact bytes join the pieces typed into the pane?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F123", "case": "interaction", "q": "Which environment does the spawned process actually inherit?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F124", "case": "scope", "q": "Does a matcher hide cases the hook should still see?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F125", "case": "concurrency", "q": "What does an event arriving during a hold mark as done?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F126", "case": "when", "q": "When is carried state cleared, and by which events?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F127", "case": "scope", "q": "Which outcomes exist beyond the two the design names?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1550:F128", "case": "proof", "q": "Where does each check live and how is it recorded?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F129", "case": "shape", "q": "What concrete mechanism implements the named field?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1550:F130", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1550:F131", "case": "interaction", "q": "What reads back a setting the design switches?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F132", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F133", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1550:F134", "case": "concurrency", "q": "Which flags does an event during a hold leave set?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F135", "case": "concurrency", "q": "What if an event lands after the hold has ended?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F136", "case": "when", "q": "Where else must the clearing happen?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1550:F137", "case": "concurrency", "q": "Under which lock is a value read and cleared?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F138", "case": "failure", "q": "What does a read fall back to when it fails?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F139", "case": "scope", "q": "When does an overlay count as the route?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F140", "case": "scope", "q": "Does the rule apply to child or sub-agent events?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F141", "case": "concurrency", "q": "Is the shared value taken under a lock its caller holds?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F142", "case": "concurrency", "q": "What happens when two sends occur during one hold?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F143", "case": "proof", "q": "Where can a check live without importing the tests?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F144", "case": "shape", "q": "Is a thing placed in the same place in every section?", "fact": "-", "check": "duplicate-text", "fixfail": "-"}
+{"id": "TD-1550:F145", "case": "scope", "q": "What does a child's thread do under each guard?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F146", "case": "when", "q": "How often is a by-hand capture repeated?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F147", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F148", "case": "failure", "q": "What if the first attempt fails after partly sending?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F149", "case": "failure", "q": "What does a failed paste leave marked as done?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F150", "case": "failure", "q": "Does a counter settle when the operation raises?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1550:F151", "case": "shape", "q": "Do two mechanisms read as one trigger or two?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F152", "case": "-", "q": "-", "fact": "-", "check": "count", "fixfail": "-"}
+{"id": "TD-1550:F153", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F154", "case": "failure", "q": "What if a failed action's effect still lands late?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1550:F155", "case": "interaction", "q": "How does the gate combine with the tick's other lines?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F156", "case": "failure", "q": "What bounds the launch and what does the notice say on timeout?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F157", "case": "empty-first", "q": "What does the payload carry before its record exists?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F158", "case": "-", "q": "-", "fact": "work-state", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F159", "case": "interaction", "q": "Does a setting combine with another switch to widen access?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F160", "case": "concurrency", "q": "What resources does a long run hold meanwhile?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F161", "case": "when", "q": "What must a test wait for before it sends?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F162", "case": "who", "q": "Who may send before the first step is done?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F163", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1550:F164", "case": "failure", "q": "What does the session show when the input is never taken?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F165", "case": "when", "q": "Does a tick wait inline, and for how long?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F166", "case": "which", "q": "Where in the order of checks does the refusal sit?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F167", "case": "interaction", "q": "How does the new stop combine with existing stop paths?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F168", "case": "shape", "q": "Which process environment does the runner read?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F169", "case": "shape", "q": "What bytes are stripped or capped in pasted text?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F170", "case": "-", "q": "-", "fact": "design-text", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F171", "case": "who", "q": "Who is recorded as the caller of an automatic action?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F172", "case": "who", "q": "Is the action refused for the person, and what does help say?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F173", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "-"}
+{"id": "TD-1550:F174", "case": "interaction", "q": "What if a send arrives after a step was given up?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F175", "case": "when", "q": "How do pause and resume lines meet the gate?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F176", "case": "concurrency", "q": "What if the holder is superseded during the run?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F177", "case": "proof", "q": "Which live-walk step shows the size limit works?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F178", "case": "proof", "q": "Does the build check the dependency's behaviour and say so?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F179", "case": "ends", "q": "What does a stopped member report?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F180", "case": "failure", "q": "Does the timeout bound every call in the run?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1550:F181", "case": "failure", "q": "Can the chosen API kill the child's whole process group?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F182", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "overreach"}
+{"id": "TD-1550:F183", "case": "shape", "q": "Which parameter carries the reason, and who shows it?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F184", "case": "display", "q": "What does a repeat press answer after the stop?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F185", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "other"}
+{"id": "TD-1550:F186", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1550:F187", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1550:F188", "case": "who", "q": "Can an internal parameter be set from the outside wire?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F189", "case": "-", "q": "-", "fact": "external", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F190", "case": "-", "q": "-", "fact": "code-exists", "check": "path-symbol", "fixfail": "-"}
+{"id": "TD-1550:F191", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1550:F192", "case": "-", "q": "-", "fact": "-", "check": "format", "fixfail": "-"}
+{"id": "TD-1550:F193", "case": "shape", "q": "What goes on stdin in each mode?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F194", "case": "shape", "q": "Which environment does the child get, and on a failed read?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1550:F195", "case": "shape", "q": "What exactly is stripped and where is the cut made?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1550:F196", "case": "scope", "q": "On which paths are the marks lost?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1550:F197", "case": "scope", "q": "Which edge actions are accepted as leaks?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F198", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1550:F199", "case": "shape", "q": "Is injected text marked as data rather than instructions?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F200", "case": "display", "q": "What does the toast read its words from?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1550:F201", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F202", "case": "shape", "q": "Which environment names does the tool copy?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F203", "case": "failure", "q": "Does the cache survive a timeout kill?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F204", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1550:F205", "case": "shape", "q": "Which predicate gates this and who reads it?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F206", "case": "shape", "q": "Is stripping complete for multi-byte escape sequences?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F207", "case": "-", "q": "-", "fact": "external", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F208", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F209", "case": "display", "q": "What must the caller return for its message to read?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F210", "case": "display", "q": "Is the stop branch evaluated before the stamp?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F211", "case": "-", "q": "-", "fact": "design-text", "check": "duplicate-text", "fixfail": "incomplete"}
+{"id": "TD-1550:F212", "case": "interaction", "q": "Do sentences about one input agree on who builds it?", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1550:F213", "case": "shape", "q": "What signature does the shared function take for each caller?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F214", "case": "-", "q": "-", "fact": "work-state", "check": "path-symbol", "fixfail": "not-propagated"}
+{"id": "TD-1550:F215", "case": "which", "q": "In what order do layered values override each other?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F216", "case": "failure", "q": "What part of a partial output is kept on a lapse?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F217", "case": "shape", "q": "What bytes join the parts, and what counts as empty?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1550:F218", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1550:F219", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F220", "case": "which", "q": "Which branch is evaluated first?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F221", "case": "scope", "q": "Does one predicate conflate two distinct properties?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F222", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "incomplete"}
+{"id": "TD-1550:F223", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "other"}
+{"id": "TD-1550:F224", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "not-propagated"}
+{"id": "TD-1550:F225", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "overreach"}
+{"id": "TD-1550:F226", "case": "who", "q": "Who is recorded as the actor of tick-driven actions?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F227", "case": "ends", "q": "Is a record that exited before its first step kept?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F228", "case": "-", "q": "-", "fact": "-", "check": "format", "fixfail": "other"}
+{"id": "TD-1550:F229", "case": "concurrency", "q": "In what order do the mark and the action happen?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F230", "case": "scope", "q": "Does any caller read the returned value?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F231", "case": "empty-first", "q": "Does the first create see the same environment?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F232", "case": "who", "q": "Whose identity is recorded as the killer?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F233", "case": "failure", "q": "Is a mark rolled back when the action raises?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F234", "case": "which", "q": "After which checks and under what conditions does the branch run?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F235", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1550:F236", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "-"}
+{"id": "TD-1550:F237", "case": "shape", "q": "Which default list is relied on?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F238", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "overreach"}
+{"id": "TD-1550:F239", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "other"}
+{"id": "TD-1550:F240", "case": "interaction", "q": "What does a keyed repeat answer after the action already stopped?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F241", "case": "concurrency", "q": "Is marking before the action safe on every path?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F242", "case": "scope", "q": "Is the rule keyed on the right condition at exit?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F243", "case": "interaction", "q": "Do two help sentences about one control agree?", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1550:F244", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1550:F245", "case": "empty-first", "q": "What does the predicate read for an unknown kind?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F246", "case": "scope", "q": "Does the refusal name every condition that triggers it?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1550:F247", "case": "multi-node", "q": "What does a node-routed record's copy lack or hold?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F248", "case": "failure", "q": "Does a failed action leave a stale mark behind?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F249", "case": "concurrency", "q": "Can the tested condition flip after the exit?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F250", "case": "-", "q": "-", "fact": "code-exists", "check": "duplicate-text", "fixfail": "other"}
+{"id": "TD-1550:F251", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1550:F252", "case": "-", "q": "-", "fact": "work-state", "check": "-", "fixfail": "other"}
+{"id": "TD-1550:F253", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "incomplete"}
+{"id": "TD-1550:F254", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "not-propagated"}
+{"id": "TD-1550:F255", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F256", "case": "-", "q": "-", "fact": "-", "check": "path-symbol", "fixfail": "-"}
+{"id": "TD-1550:F257", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F258", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1550:F259", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "-"}
+{"id": "TD-1550:F260", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "incomplete"}
+{"id": "TD-1550:F261", "case": "scope", "q": "Does a flat rule admit exceptions the text omits?", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1550:F262", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F263", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1550:F264", "case": "-", "q": "-", "fact": "-", "check": "count", "fixfail": "incomplete"}
+{"id": "TD-1550:F265", "case": "scope", "q": "Does every place repeat the amended rule?", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1550:F266", "case": "shape", "q": "Where are the new help words written?", "fact": "-", "check": "format", "fixfail": "incomplete"}
+{"id": "TD-1550:F267", "case": "concurrency", "q": "What does a reader see during the action's await?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F268", "case": "multi-node", "q": "What if a node's reply is lost after the action?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F269", "case": "ends", "q": "What if a record is forgotten early and then saved?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F270", "case": "restart", "q": "Does the tick restart a record left in this gap?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1550:F271", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F272", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1550:F273", "case": "scope", "q": "Does every confirm text repeat the amended rule?", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1550:F274", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "not-propagated"}
+{"id": "TD-1550:F275", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "incomplete"}
+{"id": "TD-1550:F276", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "other"}
+{"id": "TD-1550:F277", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "-"}
+{"id": "TD-1550:F278", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "-"}
+{"id": "TD-1550:F279", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "-"}

@@ -1,9 +1,10 @@
 """The baseline's findings, labelled (TD-1775, design §4.9c *The baseline*, *findings*).
 
     python labels.py inputs <dir>     # <dir>/TD-<n>.jsonl: each design's findings the analysis has not labelled
+    python labels.py thirds <dir>     # <dir>/c-in-TD-<n>.jsonl: the rows the two classify labellers read differently
     python labels.py pinputs <dir>    # <dir>/p-in-TD-<n>.jsonl: the same rows with their merged labels, for the
                                       #   pattern pass (after `merge` has written labels.csv)
-    python labels.py merge <dir>      # labels.csv and patterns.csv from <dir>/{a,b,c,p}-TD-<n>.jsonl
+    python labels.py merge labellers  # labels.csv and patterns.csv from labellers/{a,b,c,p}-TD-<n>.jsonl
     python labels.py                  # prints the findings tables from labels.csv and patterns.csv
 
 Every finding of the ten records, read at RECORDS (`git show`, never the work tree), as the analysis's `tables.py`

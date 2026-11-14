@@ -1,0 +1,60 @@
+{"id": "TD-1543:F150", "case": "ends", "q": "What happens to a record when its holder is forgotten or closed?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1543:F151", "case": "which", "q": "Which source does a lookup read, and does it include settled records?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1543:F152", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1543:F153", "case": "failure", "q": "Can a failed answer arrive after the action already took effect?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1543:F154", "case": "interaction", "q": "Does a later write keep setting the older fields?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1543:F155", "case": "when", "q": "When does an age clock restart, and from which timestamp?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1543:F156", "case": "display", "q": "What does the screen draw for a record belonging to another repo?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1543:F157", "case": "-", "q": "-", "fact": "-", "check": "count", "fixfail": "-"}
+{"id": "TD-1543:F158", "case": "shape", "q": "What exact fields does the answer carry?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1543:F159", "case": "display", "q": "What does the screen draw for the own-repo case?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1543:F160", "case": "shape", "q": "What format does the stored timestamp take?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1543:F161", "case": "multi-node", "q": "What does an older peer do with unknown parameters?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1543:F162", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1543:F163", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1543:F164", "case": "concurrency", "q": "Is state read per call or from a shared global?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1543:F165", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "other"}
+{"id": "TD-1543:F166", "case": "shape", "q": "Where does the mechanism set and reset its state?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1543:F167", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "-"}
+{"id": "TD-1543:F168", "case": "proof", "q": "What seam lets a test fake this call?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1543:F169", "case": "proof", "q": "Is the named test seam reachable from where the code runs?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1543:F170", "case": "multi-node", "q": "What does the caller do when the peer predates the feature?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1543:F171", "case": "failure", "q": "Is a partly successful answer wrongly treated as a refusal?", "fact": "-", "check": "-", "fixfail": "wrong-fix"}
+{"id": "TD-1543:F172", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1543:F173", "case": "proof", "q": "What does the test's fake answer on each call?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1543:F174", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1543:F175", "case": "display", "q": "What does the screen show for each end state?", "fact": "-", "check": "duplicate-text", "fixfail": "new-gap"}
+{"id": "TD-1543:F176", "case": "failure", "q": "What if a follow-up step is refused after the action took effect?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1543:F177", "case": "-", "q": "-", "fact": "code-behaviour", "check": "-", "fixfail": "overreach"}
+{"id": "TD-1543:F178", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1543:F179", "case": "failure", "q": "How does the caller tell a refusal from an outage?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1543:F180", "case": "concurrency", "q": "Can the world change between the check and the act?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1543:F181", "case": "which", "q": "When two refusals apply, which one wins?", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1543:F182", "case": "when", "q": "When is per-call state reset relative to the request?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1543:F183", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1543:F184", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "other"}
+{"id": "TD-1543:F185", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1543:F186", "case": "-", "q": "-", "fact": "-", "check": "format", "fixfail": "-"}
+{"id": "TD-1543:F187", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "not-propagated"}
+{"id": "TD-1543:F188", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1543:F189", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "-"}
+{"id": "TD-1543:F190", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1543:F191", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1543:F192", "case": "failure", "q": "What if the follow-up step is lost rather than refused?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1543:F193", "case": "scope", "q": "Does a stated promise have exceptions the text omits?", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1543:F194", "case": "display", "q": "What words does the screen show for each failure variant?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1543:F195", "case": "multi-node", "q": "What does an older peer drop, and what then?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1543:F196", "case": "display", "q": "Under which state does the screen file this outcome?", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1543:F197", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "not-propagated"}
+{"id": "TD-1543:F198", "case": "display", "q": "Does each path show the words that fit it?", "fact": "-", "check": "-", "fixfail": "new-gap"}
+{"id": "TD-1543:F199", "case": "shape", "q": "What exact strings does each variant show?", "fact": "-", "check": "duplicate-text", "fixfail": "incomplete"}
+{"id": "TD-1543:F200", "case": "shape", "q": "What exact strings does each variant show?", "fact": "-", "check": "duplicate-text", "fixfail": "incomplete"}
+{"id": "TD-1543:F201", "case": "scope", "q": "Which partial-drop cases still store the key?", "fact": "-", "check": "-", "fixfail": "incomplete"}
+{"id": "TD-1543:F202", "case": "-", "q": "-", "fact": "-", "check": "-", "fixfail": "-"}
+{"id": "TD-1543:F203", "case": "-", "q": "-", "fact": "-", "check": "section-ref", "fixfail": "-"}
+{"id": "TD-1543:F204", "case": "-", "q": "-", "fact": "-", "check": "entry-fields", "fixfail": "not-propagated"}
+{"id": "TD-1543:F205", "case": "scope", "q": "Do all sections agree on how this case is handled?", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1543:F206", "case": "-", "q": "-", "fact": "code-behaviour", "check": "duplicate-text", "fixfail": "incomplete"}
+{"id": "TD-1543:F207", "case": "interaction", "q": "Does an inserted clause still make the older reason true?", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1543:F208", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
+{"id": "TD-1543:F209", "case": "-", "q": "-", "fact": "-", "check": "duplicate-text", "fixfail": "not-propagated"}
