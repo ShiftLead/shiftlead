@@ -1490,6 +1490,31 @@ def cmd_feedback_report(args: argparse.Namespace) -> int:
     return check["exit"]
 
 
+def cmd_feedback_intake(args: argparse.Namespace) -> int:
+    """`ao feedback intake --issues <file> --root <root> --json [--read <number>…]` (design §4.7 *Feedback*, *The
+    intake, in file mode*, TD-1795): the open reports' saved list parsed into their fixed fields, the summary, or
+    the named reports' findings. Exit 0 when the file was read, whatever was refused; 2 with `{error}` when
+    `--issues` cannot be read or is not gh's list, or `--read` names more than 5. The rules are
+    `shiftlead.feedback_intake`'s; its JSON carries no `\\u` escapes, as the report's does not."""
+    from shiftlead import feedback_intake as fi
+
+    try:
+        got = fi.intake(args.issues, args.root, args.read or ())
+    except ValueError as e:
+        return fail(args, str(e), 2, prose=f"ao feedback intake: {e}")
+    if args.json:
+        print(json.dumps(got, indent=1, ensure_ascii=False))
+        return 0
+    for r in got["reports"]:
+        n = r["findings"] if "findings" in r else len(r["new"]) + len(r["known"])
+        print(f"#{r['number']}  {r['login'] or '-'}  {r['created_at'] or '-'}  {n} findings")
+    for r in got["refused"]:
+        print(f"#{r['number']}  refused: {r['why']}")
+    if got["limit_reached"]:
+        print(f"{fi.LIST_LIMIT} reports listed: older ones first, more wait")
+    return 0
+
+
 def cmd_mode(args: argparse.Namespace) -> int:
     s = call_sync(
         "set_mode",
@@ -5804,6 +5829,12 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--out", help="the report's Markdown file")
     q.add_argument("--build", action="store_true", help="read the build this install runs, and write nothing")
     q.set_defaults(fn=cmd_feedback_report)
+    q = fsub.add_parser("intake", help="the open feedback reports' saved list, parsed into their fixed fields")
+    q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the result as JSON")
+    q.add_argument("--issues", required=True, help="gh issue list's saved JSON (number,title,body,author,createdAt)")
+    q.add_argument("--root", required=True, help="shiftlead's clone, where each report's build day is read")
+    q.add_argument("--read", nargs="+", type=int, metavar="NUMBER", help="print these reports' findings (at most 5)")
+    q.set_defaults(fn=cmd_feedback_intake)
 
     p = add("mode", help="flip a session between unattended and interactive")
     p.add_argument("id")
