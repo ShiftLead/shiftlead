@@ -792,7 +792,9 @@ def red_pr_rows(
     when the order does — green, closed, or held by a live record. A sync PR's order (TD-684) has the
     row green or red, *`<repo>` #<n> · sync · <its reason> · <author>*, and leaves when it merges,
     closes or is held. A live check's lift PR's order (TD-1450) has it whatever its checks, *`<repo>` #<n> ·
-    lift 2h · lifts TD-n event (live) · <author>*, aged from `lift_since` (TD-1578)."""
+    lift 2h · lifts TD-n event (live) · <author>*, aged from `lift_since` (TD-1578). A filing PR's order draws
+    none (§4.4 *A filing PR nobody holds is a work order*, TD-1811): the PR is the person's, its Review row
+    *nobody's*."""
     at = now or datetime.now(UTC)
     out: list[dict[str, Any]] = []
     for root, r in sorted((repos or {}).items()):
@@ -801,8 +803,8 @@ def red_pr_rows(
         repo = str(r.get("name") or Path(str(root)).name)
         for e in teamrun.pr_orders(r):
             n = e.get("pr")
-            if not isinstance(n, int):
-                continue
+            if not isinstance(n, int) or e.get("filing"):
+                continue  # a filing PR's order draws no row, so no Do item (§4.4, TD-1811)
             if e.get("sync"):
                 # a sync PR the home did not merge, green or red, its reason in place of the checks (TD-684)
                 since = str(e.get("sync_since") or "")

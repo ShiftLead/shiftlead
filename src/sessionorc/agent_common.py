@@ -163,6 +163,9 @@ HELD_MAIL = timedelta(minutes=30)
 # §4.4 *A red PR nobody holds is a work order* (TD-613): how long an open PR reads red or conflicting
 # before its idle holder is told, and again before an unheld one is a `pr:<n>` work order.
 ORPHAN_AFTER = timedelta(hours=1)
+# §4.4 *A filing PR nobody holds is a work order* (TD-1804, TD-1811): how long a filing PR is open (`created`)
+# before it can be a `pr:<n>` work order.
+FILING_AFTER = timedelta(days=1)
 # §6 rule 5 (TD-190): the context-bound line is typed again after this, while the member is still
 # idle and over its bound.
 CONTEXT_AGAIN = timedelta(minutes=20)

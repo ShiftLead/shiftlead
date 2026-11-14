@@ -178,7 +178,7 @@ def test_the_grinder_brief_takes_an_act_line_decided_have_a_session_do_it(tmp_pa
     """TD-1625 (design §4.9a *What a session does with a decided line*): the grinder's decided-line paragraph
     carries the act-line case, its three roads and the closes, and never leaves the line open on a refused send."""
     text, _ = repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder").compose()
-    start = text.index("**A decided board line comes first**")
+    start = text.index("**A decided board line comes next**")
     case = text.index("**An `act` line decided *have a session do it***", start)
     assert case < text.index("`ao progress done board:<key> --pr <n>` ends the claim.", start)
     para = text[case : text.index("ends the claim.", case)]

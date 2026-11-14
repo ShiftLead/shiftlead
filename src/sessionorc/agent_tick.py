@@ -56,6 +56,7 @@ from sessionorc.agent_common import (
     COMPOSER_LINES,
     CONTEXT_AGAIN,
     DERIVE_EVERY,
+    FILING_AFTER,
     FILL_CEILING,
     FILL_WINDOW,
     GIT_EVERY,
@@ -4637,14 +4638,17 @@ class TickMixin:
         lift PR, at its entry's priority (§4.4 *A live check's lift PR is the team's at once*, TD-1450). It
         keeps the first ask of each open PR the mail holds, `asked`, and lists the held PRs nobody
         asked, `unasked` (§4.4 *A held PR nobody asked is marked, never ordered*, TD-789), and each open
-        PR's reads, `reads`, recomputed from the mail every pass (§4.4 *The PR's reads*, TD-704). A change
-        is saved and pushed as a `repos` event."""
+        PR's reads, `reads`, recomputed from the mail every pass (§4.4 *The PR's reads*, TD-704). A filing PR
+        open `FILING_AFTER` that `workorders.is_filing_order` passes is an order the same way, after the rest, and
+        the numbers it passes, holders aside, are `filing`, which the pages list (§4.4 *A filing PR nobody holds is
+        a work order*, TD-1811); an unserved repo has none. A change is saved and pushed as a `repos` event."""
         graph = self._graph()
         records = [r for r in graph.values() if r.repo]
         found = held_mod.asks(graph, self.person_inbox, self._repos)
         fresh = held_mod.reads(graph, self.person_inbox, self._repos)  # the PR's reads (§4.4, TD-704)
         held_ids = held_mod.ask_ids(graph, self.person_inbox)
         sync_on, at = self._sync_on(), datetime.now(UTC)
+        keys = self._held_keys(list(self._repos))  # the held key the read pass reads at (§4.4, TD-1811)
         for root, r in list(self._repos.items()):
             try:
                 prs = (r.get("prs") or {}).get("open") or []
@@ -4654,20 +4658,39 @@ class TickMixin:
                 )
                 old = r.get("pr_orders") or {}
                 mine = [x for x in records if x.repo == root]
-                if seams_mod.unserved(r):  # no order in an unserved repo (§5 *The seams*, TD-1011)
+                key, pr_reads = keys.get(root) or [], fresh.get(root) or {}
+                unserved = seams_mod.unserved(r)
+                # a filing PR past `FILING_AFTER` is an order too, never in an unserved repo (§4.4, TD-1811)
+                filing_after = None if unserved else FILING_AFTER
+                if unserved:  # no order in an unserved repo (§5 *The seams*, TD-1011)
                     orders, told, notes = [], old.get("told") or {}, []
                 else:
                     # a lift order's priority is its entry's (§4.4 *A live check's lift PR*, TD-1450)
                     entries = (r.get("ledger") or {}).get("entries") or []
                     prio = {e["id"]: e.get("priority") or "" for e in entries if isinstance(e, dict) and e.get("id")}
                     told_was = old.get("told") or {}
-                    orders, told, notes = workorders.red_prs(prs, mine, now, told_was, ORPHAN_AFTER, prio)
+                    orders, told, notes = workorders.red_prs(
+                        prs, mine, now, told_was, ORPHAN_AFTER, prio, filing_after=filing_after, key=key, reads=pr_reads
+                    )
                 by_id = {x.id: x for x in mine}
                 for sid, pr in notes:
                     rec = by_id[sid]  # addressed as mail is: a node's record as `<id>@<host>`
                     self._system_note(self._address(rec), workorders.pr_note(pr), wake="uncharged", team=rec.team)
                     log.info("%s: told PR #%s is red with it idle", sid, pr["number"])
-                held = workorders.red_holders(prs, mine, now, ORPHAN_AFTER)  # the pages' *held by* (TD-652)
+                # the pages' *held by* (TD-652), a filing PR's holders too (TD-1811)
+                held = workorders.red_holders(
+                    prs, mine, now, ORPHAN_AFTER, filing_after=filing_after, key=key, reads=pr_reads
+                )
+                # the filing PRs the test passes, holders aside, which the pages list (TD-1811): none unserved
+                filing = (
+                    []
+                    if filing_after is None
+                    else [
+                        p["number"]
+                        for p in prs
+                        if isinstance(p, dict) and workorders.is_filing_order(p, now, filing_after, key, pr_reads)
+                    ]
+                )
                 # the first ask is kept past the mail's prune, and dropped once its PR closes
                 asked = {**(found.get(root) or {}), **(old.get("asked") or {})}
                 numbers: set[str] | None = None
@@ -4679,6 +4702,7 @@ class TickMixin:
                 reads = held_mod.merge_reads(fresh.get(root) or {}, old.get("reads") or {}, held_ids, numbers)
                 new = {
                     "orders": orders, "told": told, "held": held, "asked": asked, "unasked": unasked, "reads": reads,
+                    "filing": filing,
                 }  # fmt: skip
                 if new == {
                     "orders": old.get("orders") or [],
@@ -4687,6 +4711,7 @@ class TickMixin:
                     "asked": old.get("asked") or {},
                     "unasked": old.get("unasked") or [],
                     "reads": old.get("reads") or {},
+                    "filing": old.get("filing") or [],
                 }:
                     continue
                 if (cur := self._repos.get(root)) is None:

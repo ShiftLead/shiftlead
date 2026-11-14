@@ -168,8 +168,9 @@ can act on you ([ADR 2026-09-24](docs/decisions/2026-09-24-cloud-sessions.md)). 
   merge it was meant to cause. Ledger lines are fine: they land at merge, which is when they are
   read — but a cloud session writes no new entry (it has no `ao td reserve`; your PR's reader files it,
   design §4.4), and changes an entry with `agent-cadence run ledger.py set|note` only where
-  `agent-cadence` runs in your container, else leaves that to the reader too. Findings on your work
-  come back as PR comments, nowhere else.
+  `agent-cadence` runs in your container, else leaves that to the reader too. A PR of ledger or board
+  files you mean to leave open past a day is a draft, or a lane takes it (design §4.4 *A filing PR nobody
+  holds is a work order*). Findings on your work come back as PR comments, nowhere else.
 
 agent-cadence's scripts and docs are not copied into this repo: the pin in `docs/cadence.toml`
 names the commit, `agent-cadence run <script>` runs one and `agent-cadence path <name>` finds a doc.

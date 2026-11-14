@@ -245,8 +245,8 @@ One function reads the lane words against each entry's header lines (`lane_match
 - **A named lane** (`lane: [TD-041, TD-054]`) matches nothing in code: the member's brief reads it
   as `{lane}` and works it in order, and nothing else holds the member to it.
 - **Work orders are in every `free-pick` lane, whatever its `owner:` words**: every open
-  **decided** line on the board that is not `fyi` (`board:<key>`) and every red or sync PR nobody
-  holds (`pr:<n>`). `fyi` is the board's one mark that keeps a line from a team, and it is not a
+  **decided** line on the board that is not `fyi` (`board:<key>`) and every red, sync or filing PR
+  nobody holds (`pr:<n>`; a filing PR once open a day, §4.4 *A filing PR nobody holds is a work order*). `fyi` is the board's one mark that keeps a line from a team, and it is not a
   decision; nothing marks a decided line *not for a team*, so where a repo has work a team must never
   touch (a private repo, a person's own area), **the briefs are the only fence** for those lines:
   say so under *The lane* in the worker's brief.
