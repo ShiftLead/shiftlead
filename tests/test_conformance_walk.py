@@ -623,3 +623,12 @@ def test_a_shiftlead_hook_file_row_running_another_command_is_not_shiftleads(tmp
     walk = cw.Walk("grok", "g", tmp_path, GrokFake(tmp_path, hooks, _listing("mcps-disabled.txt")), out=lambda _s: None)
     assert walk.step("launch", walk.launch) and not walk.step("first hook", walk.first_hook)
     assert "hook global/shiftlead: /bin/evil" in walk.results[-1][2]
+
+
+def test_grok_walks_a_permission_with_a_command_it_asks_for_not_a_bare_touch():
+    """TD-1637: Grok Build runs a bare `touch` unasked in every mode (its guide's read-only list), so its walk's
+    permission step asks for `cp /dev/null`; every other adapter keeps the shared `touch` prompt."""
+    cw = _load()
+    assert cw.permission_prompt("claude-code") == cw.PERMISSION_PROMPT == cw.permission_prompt("gemini")
+    grok = cw.permission_prompt("grok")
+    assert "touch" not in grok and grok.endswith("cp /dev/null conformance-permission.txt")

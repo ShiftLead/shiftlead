@@ -66,6 +66,10 @@ FIRST_HOOK_WAIT = 120.0  # the tool's start, its first hook, the record `idle` b
 TURN_WAIT = 300.0  # one short turn
 SESSION_END_WAIT = 15.0  # a killed tool's own end hook
 PERMISSION_PROMPT = "Use your shell tool to run exactly this command, then stop: touch conformance-permission.txt"
+# a tool that runs a bare `touch` unasked in every mode takes a command it asks for (Grok Build, §4.3, TD-1637)
+PERMISSION_PROMPTS = {
+    "grok": "Use your shell tool to run exactly this command, then stop: cp /dev/null conformance-permission.txt"
+}
 SHORT_PROMPT = "Reply with the one word: ready. Use no tools."
 MAIL_TEXT = "The conformance walk's mail. Read it with `ao inbox`, then stop; nothing else is asked."
 
@@ -76,6 +80,11 @@ class Refused(Exception):
 
 class StepFailed(Exception):
     pass
+
+
+def permission_prompt(adapter: str) -> str:
+    """The walk's permission step's prompt: a command the adapter's tool asks for under its asking arguments."""
+    return PERMISSION_PROMPTS.get(adapter, PERMISSION_PROMPT)
 
 
 def refusal(env: dict[str, str], profile: str | None) -> str | None:
@@ -420,7 +429,7 @@ class Walk:
         return f"working → idle by hook; the send recorded as {sends[-1] if sends else 'nothing'}"
 
     def permission(self) -> str:
-        self.call("send", id=self.id, text=PERMISSION_PROMPT)
+        self.call("send", id=self.id, text=permission_prompt(self.adapter))
         # the record reads the last turn's `idle` until the prompt's own hook lands: an `idle` counts
         # as the turn's end only once something else was read since the send
         busy = False
@@ -488,7 +497,7 @@ class Walk:
         got = self.call("transcript", id=self.id, turns=20)
         entries = got.get("entries") or []
         prompts = [e.get("text") or "" for e in entries if e.get("kind") == "prompt"]
-        missing = [p for p in (SHORT_PROMPT, PERMISSION_PROMPT) if not any(p in t for t in prompts)]
+        missing = [p for p in (SHORT_PROMPT, permission_prompt(self.adapter)) if not any(p in t for t in prompts)]
         if missing:
             raise StepFailed(f"{len(entries)} entries, and the walk's prompts {missing} are not among them")
         kinds = sorted({e.get("kind") for e in entries})
