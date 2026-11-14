@@ -29,6 +29,7 @@ import shutil
 import subprocess
 import threading
 import time
+from collections.abc import Callable
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -58,6 +59,10 @@ _MARK_END_RE = re.compile(r"\b(?:Context|Parts|Doer|Hide until|Answers|Lifts|Dec
 WORD_FOR_WORD = "a decide records one of the item's own answers, word for word: anything else is a Reply (design §4.4)"
 NOT_ACTS_ANSWER = "have a session do it is an act line's answer: this item's answers are its own"
 MARKED = "this step is marked only you can do this: Done closes it once you have"
+# the kinds a live look is written as: `look` since dev-cadence TD-082, `watch` before it (TD-292); moved here from
+# the page's inbox so the Reply's form reading and the page's draw read one pair (TD-1698)
+LOOK_KINDS = ("look", "watch")
+WORKS = "Works"  # a live look's first answer, cadence §3.5's word (the second is the `Not right: <what>` form)
 WHY_ON_DONE = "a why is a Done's alone: it is written in the line's Closed: field (design §4.4)"
 NO_DOER = "this line names no Doer: Have a session do it hands it to this repo's lane"
 
@@ -168,6 +173,41 @@ def edit_line(
         raise Refused(str(e)) from None
 
 
+def live_look_pair(kind: str, answers: Any) -> bool:
+    """Whether `answers` are cadence's fixed pair for a live look (§3.5, design §4.5a **Works** / **Not right…**) on
+    a line of `kind`: a kind in `LOOK_KINDS`, and exactly *Works* and the form *Not right: <what>*. A third answer,
+    another kind, another form or a complete *Not right: wrong repo* is not the pair."""
+    said = [" ".join(str(a).split()) for a in answers or ()]
+    return (
+        str(kind or "").lower() in LOOK_KINDS
+        and len(said) == 2
+        and said[0] == WORKS
+        and ledgerboard.is_not_right_form(said[1])
+    )
+
+
+def reply_fills(text: str, reply: str) -> str | None:
+    """The answer a Reply's words write as the line's decide (§4.4 *A Reply that fills a form decides*, TD-1698), or
+    None where they stay a Reply: on an open, undecided `decide` or `look` line, or a `watch` carrying the look's
+    pair, whose `Answers:` offer a form, words that begin with one of its forms' heads and a colon (any case) are that
+    form's press, filled through ledgerboard (`<head>: <words>`, one line). An empty fill — the head alone, or the
+    head with a placeholder — is refused with *<head> needs its words*. Read from the found line's own text, never
+    from anything the page sent."""
+    if ledgerboard.parse_decided(text) is not None:
+        return None
+    km = ledgerboard.KIND_RE.match(text)
+    kind = km.group("kind").lower() if km else ""
+    answers = ledgerboard.parse_answers(text)
+    if not any(ledgerboard.is_form(a) for a in answers):
+        return None
+    if kind not in ("decide", "look") and not (kind == "watch" and live_look_pair(kind, answers)):
+        return None
+    try:
+        return ledgerboard.fill_form(" ".join(str(reply or "").split()), answers)
+    except ledgerboard.Refused as e:
+        raise Refused(str(e)) from None
+
+
 def _session_check(text: str, answer: str) -> None:
     """The kind check of a decide (§4.4 *Decide*, TD-1624), read from the found line whatever the page sent: an
     answer that is not one of the line's own `Answers:` is refused on an `act` line unless it is *have a session do
@@ -177,8 +217,8 @@ def _session_check(text: str, answer: str) -> None:
     if said in {" ".join(a.split()) for a in own}:
         return
     try:
-        if own and ledgerboard.fill_not_right(said, own):
-            return  # the pair's *Not right: <what>* form, filled, is one of the line's own answers too
+        if own and ledgerboard.fill_form(said, own):
+            return  # a form among them, filled, is one of the line's own answers too (TD-1698)
     except ledgerboard.Refused:
         pass
     km = ledgerboard.KIND_RE.match(text)
@@ -648,6 +688,7 @@ def write_back(
     answer: str = "",
     key: str = "",
     why: str = "",
+    on_decide: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """Make one Snooze, Done, Reply or Decide on the board on origin's head and land it there (§4.4):
     in the host agent's own tree for the repo of the checkout `root`, which is never written.
@@ -657,7 +698,11 @@ def write_back(
     date written; raises `Refused` with nothing changed on origin. A `snooze` sent with no date is the
     Inbox fold's *now* (§4.4 *Board write-back*, TD-1349): the host agent's own today, computed once here,
     is its `Hide until:` — the calendar its reader decides `hidden` by — and its commit subject's date. A
-    line that already said so is answered as done with origin's head, no commit and no `pr`."""
+    line that already said so is answered as done with origin's head, no commit and no `pr`.
+    A `reply` whose words fill a form on the found line (`reply_fills`, §4.4 *A Reply that fills a form decides*,
+    TD-1698) is that form's decide, read here under the lock after the fetch: written and landed as a decide, by the
+    person as its answerer, and answered with `decided`; `on_decide` is called with the filled answer when the
+    reading so turns it (idempotent: a second reading calls it again)."""
     root = Path(root)
     if action not in ACTIONS:
         raise Refused(f"unknown board action {action!r}: {' or '.join(ACTIONS)}")
@@ -667,7 +712,7 @@ def write_back(
         due = _day("").isoformat()
     with _EDIT:
         clock = _Clock()
-        return _twice(lambda: _write_back(root, line, text, action, due, reply, answer, clock, key, why))
+        return _twice(lambda: _write_back(root, line, text, action, due, reply, answer, clock, key, why, on_decide))
 
 
 def _write_back(
@@ -681,6 +726,7 @@ def _write_back(
     clock: _Clock | None = None,
     key: str = "",
     why: str = "",
+    on_decide: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     if key and not workorders.is_work_order(key):
         raise Refused(f"{key!r} is not a board line's id: board: and eight hex digits (design §4.4)")
@@ -701,6 +747,13 @@ def _write_back(
     # found by its id, the line's own text is the item's — a snooze or a reply since the page drew
     # it changes the text and never the id (§4.4 *A board line's id*)
     text = ledgerboard.ITEM_RE.match(lines[at].rstrip("\n")).group("text").strip()  # type: ignore[union-attr]
+    decided = None
+    if action == "reply" and (decided := reply_fills(text, reply)):
+        # the Reply fills a form: it is that form's decide, in this same write (§4.4 *A Reply that fills a form
+        # decides*, TD-1698) — the person its answerer, the lift and the decide's subject, no reply trail
+        action, answer, reply = "decide", decided, ""
+        if on_decide is not None:
+            on_decide(decided)
     by = author(root) if action == "reply" else ""
     # ShiftLead's own checks first (the item word for word, a decide on a decided line, a field's name)
     edit_line(lines[at], text, action, due, reply=reply, by=by, answer=answer, why=why)
@@ -740,7 +793,10 @@ def _write_back(
         return _find(_read_origin(t, want, rel), None, text) is not None
 
     landed = _land(root, t, want, msg, clock, still, also=also)
-    return {**landed, "line": at + 1, "text": text, "due": due, **({"entries": plan.info["entries"]} if also else {})}
+    return {
+        **landed, "line": at + 1, "text": text, "due": due,
+        **({"entries": plan.info["entries"]} if also else {}), **({"decided": decided} if decided else {}),
+    }  # fmt: skip
 
 
 def find_line(root: str | Path, line: int | None, key: str) -> dict[str, Any]:
