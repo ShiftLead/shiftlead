@@ -464,11 +464,17 @@ class GrokHarness:
 
     def stub_setup(self, tmp: Path, monkeypatch: Any) -> None:
         """The suite's hook first on `PATH`, and the hook file the launch writes into the case's scratch
-        `GROK_HOME` naming it (`hook_path` patched: the real one is the interpreter's own `bin/`)."""
+        `GROK_HOME` naming it (`hook_path` patched: the real one is the interpreter's own `bin/`); the person's home
+        the launch home mirrors and the managed Claude Code file the `all` refusal reads both patched into the
+        case's directory, so the suite reads no developer's home (§4.3 *The conformance suite*)."""
         from shiftlead.adapters import grok
 
         hook = suite_bin(tmp, monkeypatch) / "shiftlead-hook"
         monkeypatch.setattr(grok, "hook_path", lambda: str(hook))
+        person = tmp / "person-home"
+        person.mkdir(exist_ok=True)
+        monkeypatch.setattr(grok, "PERSON_HOME", person)
+        monkeypatch.setattr(grok, "MANAGED_SETTINGS", tmp / "etc" / "claude-code" / "managed-settings.json")
 
     def hook_command(self, argv: list[str], env: dict[str, str]) -> str:
         """The command the hook file in the launch's `GROK_HOME` names for every event."""
