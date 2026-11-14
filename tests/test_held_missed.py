@@ -189,20 +189,33 @@ def test_a_chains_kept_read_is_one_links():
 
 
 def test_the_read_of_a_pr_gives_its_files_and_its_merge(monkeypatch):
+    """The files by the paginated read, a renamed file's old name with them, and `mergedAt` by its own
+    `gh pr view` call (TD-1810)."""
     import json
     import subprocess
 
-    def gh(body):
-        return lambda argv, **kw: subprocess.CompletedProcess(argv, 0, json.dumps(body), "")
+    def gh(merged_at, files="src/x.py\n", fail=False):
+        def run(argv, **kw):
+            if argv[1] == "api":
+                return subprocess.CompletedProcess(argv, 1 if fail else 0, "" if fail else files, "HTTP 502\n")
+            assert argv[1:] == ["pr", "view", "7", "--json", "mergedAt"]
+            return subprocess.CompletedProcess(argv, 0, json.dumps({"mergedAt": merged_at}), "")
 
-    files = [{"path": "src/x.py"}]
-    monkeypatch.setattr(held.subprocess, "run", gh({"files": files, "changedFiles": 1, "mergedAt": None}))
+        return run
+
+    monkeypatch.setattr(held.subprocess, "run", gh(None))
     assert held.pr_read(7) == (["src/x.py"], None) and held.pr_files(7) == ["src/x.py"]
-    merged = {"files": files, "changedFiles": 1, "mergedAt": "2026-09-29T13:00:00Z"}
-    monkeypatch.setattr(held.subprocess, "run", gh(merged))
+    monkeypatch.setattr(held.subprocess, "run", gh("2026-09-29T13:00:00Z"))
     assert held.pr_read(7) == (["src/x.py"], MERGED)
-    monkeypatch.setattr(held.subprocess, "run", gh({**merged, "mergedAt": "yesterday"}))
+    # a file renamed out of a held path: its old name is read, so the crossing check matches it
+    monkeypatch.setattr(held.subprocess, "run", gh(None, files="docs/x.py\nsrc/sessionorc/x.py\n"))
+    files, _ = held.pr_read(7)
+    assert held.held_paths(files, {"reader": "t", "held": ["src/sessionorc/**"]}) == ["src/sessionorc/x.py"]
+    monkeypatch.setattr(held.subprocess, "run", gh("yesterday"))
     with pytest.raises(RuntimeError):
+        held.pr_read(7)
+    monkeypatch.setattr(held.subprocess, "run", gh(None, fail=True))
+    with pytest.raises(RuntimeError, match="HTTP 502"):
         held.pr_read(7)
 
 

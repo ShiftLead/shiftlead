@@ -375,6 +375,7 @@ SYNC_LOCK = cadence.LOCK
 SYNC_PIN = cadence.PIN
 # a live check's lift PR (design §4.4 *A live check's lift PR is the team's at once*, TD-1437): the event
 # runner's branch for one of the gates §4.9b reserves to a live check — `live`, `live-<digits>`, `live-td<digits>`
+LIFT_PREFIX = "lift/"  # every lift PR's head branch: lift/TD-n/<event name> | until-<date> (`gatesweep.LIFT_BRANCH`)
 LIFT_RE = re.compile(r"lift/(TD-\d+)/(live(?:-\d+|-td\d+)?)")
 
 
@@ -775,18 +776,17 @@ def _gh_prs(
 
 
 def pr_files(directory: Path | str, pr: int, timeout: float) -> list[str] | str:
-    """Every file an open PR changes, read whole — the forge's paginated list, never `gh pr view
-    --json files`, which stops at 100 — or why it could not be read (TD-684)."""
-    try:
-        cp = subprocess.run(
-            ["gh", "api", f"repos/{{owner}}/{{repo}}/pulls/{pr}/files", "--paginate", "--jq", ".[].filename"],
-            capture_output=True, text=True, timeout=timeout, cwd=str(directory),
-        )  # fmt: skip
-    except (OSError, subprocess.TimeoutExpired) as e:
-        return f"gh could not be asked: {type(e).__name__}"
-    if cp.returncode != 0:
-        return ((cp.stderr or "").strip().splitlines() or ["gh api failed"])[-1][:200]
-    return [line.strip() for line in (cp.stdout or "").splitlines() if line.strip()]
+    """Every file an open PR changes, read whole, a renamed file's old name beside its new one, or why it
+    could not be read — `held.paged_files`, the one reader `ao pr held` shares (TD-684, TD-1810)."""
+    return held.paged_files(directory, pr, timeout)
+
+
+def filing(files: Iterable[str], paths: Iterable[str]) -> bool:
+    """Whether a PR whose changed files are `files` is a filing PR's (design §4.4 *A filing PR nobody holds
+    is a work order*, TD-1810): every file one of `paths` or under one of them as a directory — false for
+    no files. `paths` are `workorders.filing_paths`, POSIX strings relative to the repo's root."""
+    files, paths = list(files), [p.rstrip("/") for p in paths if p]
+    return bool(files) and all(any(f == p or f.startswith(p + "/") for p in paths) for f in files)
 
 
 def _sync_flag(directory: Path | str, p: dict[str, Any], was: dict[str, Any], timeout: float) -> None:
@@ -813,14 +813,18 @@ def _held_flags(
     olds: dict[Any, dict[str, Any]],
     key: list[str] | None,
     timeout: float,
+    filing_paths: list[str] | None = None,
 ) -> None:
     """Sets `held` on the open PRs (design §4.4 *A held PR nobody asked is marked, never ordered*,
     TD-789): the changed files `key`'s globs name (`held.match`), with `held_head` and `held_key`, the
     head and the key they were read at — carried from `olds` as `sync_head` is, and read again for a
-    changed head or key. A sync PR is never read; a draft is. At most `held.HELD_READS` reads, of
-    the rows never read or read at another head or key, oldest first. A read that failed keeps the
-    last word, and a PR never read carries no `held`. No key (None, or empty): nothing is read, and
-    the last word is kept, so a repo whose readers are gone keeps its key and its `held`."""
+    changed head or key. A sync PR is never read; a draft is. No key (None, or empty): nothing is read
+    for `held`, and the last word is kept, so a repo whose readers are gone keeps its key and its `held`.
+    With `filing_paths` (`workorders.filing_paths`), sets `filing` (the test `filing`) and `filing_head` too, once
+    per head whatever the key, carried the same way, on every PR but a sync PR and one whose head
+    branch is under `LIFT_PREFIX` (§4.4 *A filing PR nobody holds is a work order*, TD-1810). One
+    `pr_files` read serves both when both are due. At most `held.HELD_READS` reads, of the rows due,
+    oldest first. A read that failed keeps the last word, and a PR never read carries neither."""
     todo = []
     for p in prs:
         if p.get("sync"):
@@ -828,13 +832,22 @@ def _held_flags(
         was = olds.get(p["number"]) or {}
         if isinstance(was.get("held"), list):
             p["held"], p["held_head"], p["held_key"] = was["held"], was.get("held_head"), was.get("held_key")
-        if key and p["head"] and (p.get("held_head"), p.get("held_key")) != (p["head"], key):
-            todo.append(p)
-    todo.sort(key=lambda p: p["created"] or "")
-    for p in todo[: held.HELD_READS]:
+        lift = str(p.get("branch") or "").startswith(LIFT_PREFIX)
+        if isinstance(was.get("filing"), bool) and not lift:
+            p["filing"], p["filing_head"] = was["filing"], was.get("filing_head")
+        held_due = bool(key and p["head"] and (p.get("held_head"), p.get("held_key")) != (p["head"], key))
+        filing_due = bool(filing_paths and p["head"] and not lift and p.get("filing_head") != p["head"])
+        if held_due or filing_due:
+            todo.append((p, held_due, filing_due))
+    todo.sort(key=lambda t: t[0]["created"] or "")
+    for p, held_due, filing_due in todo[: held.HELD_READS]:
         files = pr_files(directory, p["number"], timeout)
-        if not isinstance(files, str):
+        if isinstance(files, str):
+            continue
+        if held_due:
             p["held"], p["held_head"], p["held_key"] = held.match(files, key or []), p["head"], list(key or [])
+        if filing_due:
+            p["filing"], p["filing_head"] = filing(files, filing_paths or []), p["head"]
 
 
 def _gh_counts(directory: Path | str, now: datetime, timeout: float) -> dict[str, dict[str, int]] | str:
@@ -1030,6 +1043,7 @@ def pr_reading(
     held: list[str] | None = None,
     remote: str = "",
     emit: Callable[[str, str, str, datetime], None] | None = None,
+    filing: list[str] | None = None,
 ) -> dict[str, Any]:
     """The repo's pull requests as the Repo facet counts them (design §4.4 *Repo facts*, TD-176): three
     `gh` reads — the open PRs, every PR updated in the longest window, and the windows' counts — kept as `open` (oldest
@@ -1049,7 +1063,10 @@ def pr_reading(
     that never started reads `checks: not_run` with `not_run: {reason, kind, runs}`, and every red one
     keeps its jobs' verdicts as `jobs` (`classify_failing`, TD-686). `held` is the repo's held key
     (`held.repo_key`): each open PR but a sync PR carries `held`, the paths of it the key names, read
-    once per head and key (`_held_flags`, TD-789). `remote` is the checkout's origin URL: on GitLab
+    once per head and key (`_held_flags`, TD-789). `filing` is the repo's filing paths
+    (`workorders.filing_paths`): each open PR but a sync or `lift/` PR carries `filing`, whether its files
+    all are among them, and `filing_head`, read once per head in the same read (TD-1810). `remote` is the
+    checkout's origin URL: on GitLab
     the reading is `_gitlab_reading`'s, on another forge an error (`forge_of`, TD-940). `emit` is the witness
     log's `precheck-fail` writer (§4.4 *The kinds*, TD-1386): an open PR whose `cadence/precheck` changed
     since `old` (a new head, another state or `startedAt`) has its head's statuses read and each red one
@@ -1099,7 +1116,7 @@ def pr_reading(
             p["sync_since"] = (not waits and was.get("sync_since")) or now.isoformat()
         if lift_of(p["branch"]):  # a live check's lift: the team's from this reading, whatever its checks (TD-1450)
             p["lift"], p["lift_since"] = True, was.get("lift_since") or now.isoformat()
-    _held_flags(directory, open_, olds, held, timeout)
+    _held_flags(directory, open_, olds, held, timeout, filing)
     day = since.date().isoformat()
     prs = _gh_prs(directory, ["--state", "all", "--search", f"updated:>={day}", "--limit", str(limit)], timeout)
     if isinstance(prs, str):

@@ -5052,7 +5052,8 @@ class TickMixin:
             if remote and remote in by_remote:
                 prs = by_remote[remote]
             else:
-                fresh = reports.pr_reading(root, now, old=prs, held=held, remote=remote, emit=emit)
+                filing = workorders.filing_paths(root)  # the filing PRs' paths (§4.4, TD-1810)
+                fresh = reports.pr_reading(root, now, old=prs, held=held, remote=remote, emit=emit, filing=filing)
                 prs = {**(prs or {}), "error": fresh["error"], "failed_at": stamp} if "error" in fresh else fresh
                 if remote:
                     by_remote[remote] = prs

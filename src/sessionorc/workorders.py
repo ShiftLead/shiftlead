@@ -277,6 +277,18 @@ def board_rel(root: Path | str) -> Path:
     return board_path(root)[1] or BOARD
 
 
+def filing_paths(root: Path | str) -> list[str]:
+    """The paths a filing PR touches alone (design §4.4 *A filing PR nobody holds is a work order*, TD-1810),
+    POSIX strings relative to `root`: the ledger (`ledger.ledger_path`, a v2 directory with its `archive/`, or a
+    v1 file) and its archive file (`ledger.archive_path`, always, with no layout test — a path that names
+    nothing matches nothing), the board (`board_rel`) and the board's archive (`archive_rel`). The tick hands
+    them to `reports.pr_reading` as `filing=`."""
+    led = ledger.ledger_path(root)
+    board = board_rel(root)
+    archive = Path(ledger.archive_path(led)).as_posix()
+    return [Path(led).as_posix(), archive, board.as_posix(), archive_rel(board).as_posix()]
+
+
 def _stamp(rx: re.Pattern[str], content: str) -> str | None:
     """The first line of `content` that `rx` matches with a date, as `YYYY-MM-DD` — None when there is
     none, or its date is not a calendar date (it reads as absent: the sweep rewrites it)."""

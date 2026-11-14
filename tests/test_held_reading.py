@@ -139,6 +139,118 @@ def test_held_reads_are_capped_a_pass_oldest_first(tmp_path, monkeypatch):
     assert reads == [4, 6, 7] and all(p["held"] == ["src/core/a.py"] for p in second["open"])
 
 
+# ── filing (§4.4 *A filing PR nobody holds is a work order*, TD-1810) ─────────────────────────────
+
+FILING = ["docs/ledger", "docs/ledger_archive", "docs/user_attention.md", "docs/user_attention_archive.md"]
+
+
+@pytest.mark.unit
+def test_filing_paths_are_the_ledger_and_its_archive_the_board_and_its_archive_whatever_the_layout(tmp_path):
+    from sessionorc import workorders
+
+    (tmp_path / "docs" / "ledger").mkdir(parents=True)
+    assert workorders.filing_paths(tmp_path) == FILING  # v2: the directory, its archive/ under it
+    v1 = tmp_path / "v1"
+    v1.mkdir()
+    assert workorders.filing_paths(v1) == [
+        "docs/technical_debt.md",
+        "docs/technical_debt_archive.md",
+        "docs/user_attention.md",
+        "docs/user_attention_archive.md",
+    ]
+    (v1 / ".shiftlead.yml").write_text("board: notes/board.md\nledger: notes/td/\n")
+    (v1 / "notes").mkdir()
+    (v1 / "notes" / "board.md").write_text("# board\n")
+    assert workorders.filing_paths(v1) == ["notes/td", "notes/td_archive", "notes/board.md", "notes/board_archive.md"]
+
+
+@pytest.mark.unit
+def test_filing_is_every_file_among_the_paths_or_under_one_and_never_an_empty_list():
+    assert reports.filing(["docs/ledger/TD-1.md", "docs/ledger/archive/TD-2.md"], FILING)
+    assert reports.filing(["docs/ledger/TD-1.md", "docs/user_attention.md", "docs/user_attention_archive.md"], FILING)
+    assert not reports.filing(["docs/ledger/TD-1.md", "src/x.py"], FILING)
+    assert not reports.filing(["docs/ledgerx/TD-1.md"], FILING)  # a prefix is not a directory
+    assert not reports.filing(["docs/ledger/TD-1.md", "notes/old.md"], FILING)  # renamed in: its old name
+    assert not reports.filing([], FILING)
+
+
+@pytest.mark.unit
+def test_filing_is_stamped_once_per_head_whatever_the_key_and_one_read_serves_held_with_it(tmp_path, monkeypatch):
+    prs = [
+        _pr(1, T0, "h1"),  # the ledger alone
+        _pr(2, T0 + timedelta(minutes=1), "h2"),  # the ledger and the board
+        _pr(3, T0 + timedelta(minutes=2), "h3"),  # one other file
+        _pr(4, T0 + timedelta(minutes=3), "h4"),  # an entry renamed into the ledger: its old name with it
+        _pr(5, T0 + timedelta(minutes=4), "h5"),  # no files
+        _pr(6, T0, "h6", headRefName="lift/TD-9/live"),  # a live check's lift
+        _pr(7, T0, "h7", headRefName="lift/TD-9/until-2026-11-20"),  # the gate sweep's other lifts
+    ]
+    files = {
+        1: ["docs/ledger/TD-1.md"],
+        2: ["docs/ledger/TD-2.md", "docs/user_attention.md"],
+        3: ["docs/ledger/TD-3.md", "src/core/a.py"],
+        4: ["docs/ledger/TD-4.md", "notes/td4.md"],
+        5: [],
+        6: ["docs/ledger/TD-9.md"],
+        7: ["docs/ledger/TD-9.md"],
+    }
+    reads: list[int] = []
+    _gh(monkeypatch, prs, files, reads)
+    monkeypatch.setattr(held, "HELD_READS", 10)
+    key = ["src/core/**"]
+    first = reports.pr_reading(tmp_path, T0, held=key, filing=FILING)
+    by = {p["number"]: p for p in first["open"]}
+    assert {n: by[n].get("filing") for n in by} == {1: True, 2: True, 3: False, 4: False, 5: False, 6: None, 7: None}
+    assert by[1]["filing_head"] == "h1" and "filing_head" not in by[6]
+    # one read a PR serves both, and a lift PR's held is read as before
+    assert sorted(reads) == [1, 2, 3, 4, 5, 6, 7] and by[3]["held"] == ["src/core/a.py"] and by[6]["held"] == []
+    # the same heads: nothing read, the word carried
+    reads.clear()
+    second = reports.pr_reading(tmp_path, T0 + timedelta(minutes=5), old=first, held=key, filing=FILING)
+    assert reads == [] and {p["number"]: p.get("filing") for p in second["open"]} == {
+        n: by[n].get("filing") for n in by
+    }
+    # an empty key still reads for filing alone, leaving held as it was
+    prs[2]["headRefOid"] = "h3b"
+    files[3] = ["docs/ledger/TD-3.md"]
+    third = reports.pr_reading(tmp_path, T0 + timedelta(minutes=10), old=second, held=[], filing=FILING)
+    three = {p["number"]: p for p in third["open"]}[3]
+    assert reads == [3] and (three["filing"], three["filing_head"]) == (True, "h3b")
+    assert (three["held"], three["held_head"]) == (["src/core/a.py"], "h3")
+    # a changed head whose read fails keeps the last word and its head
+    reads.clear()
+    prs[0]["headRefOid"] = "h1b"
+    _gh(monkeypatch, prs, files, reads, fail={1})
+    fourth = reports.pr_reading(tmp_path, T0 + timedelta(minutes=15), old=third, held=[], filing=FILING)
+    one = {p["number"]: p for p in fourth["open"]}[1]
+    assert reads == [1] and (one["filing"], one["filing_head"]) == (True, "h1")
+    # no filing paths given: nothing read for it, and an unread PR carries no `filing`
+    reads.clear()
+    fresh = reports.pr_reading(tmp_path, T0, held=[])
+    assert reads == [] and all("filing" not in p for p in fresh["open"])
+
+
+@pytest.mark.unit
+def test_a_file_renamed_out_of_a_held_path_is_held_by_its_old_name(tmp_path, monkeypatch):
+    reads: list[int] = []
+    _gh(monkeypatch, [_pr(1, T0, "h1")], {1: ["docs/a.py", "src/core/a.py"]}, reads)
+    got = reports.pr_reading(tmp_path, T0, held=["src/core/**"], filing=FILING)["open"][0]
+    assert got["held"] == ["src/core/a.py"] and got["filing"] is False and reads == [1]
+
+
+@pytest.mark.unit
+def test_the_files_read_is_the_paginated_list_with_renamed_files_old_names(tmp_path, monkeypatch):
+    seen = []
+
+    def run(argv, **kw):
+        seen.append(argv)
+        return subprocess.CompletedProcess(argv, 0, "docs/ledger/TD-1.md\nnotes/td1.md\n", "")
+
+    monkeypatch.setattr(reports.subprocess, "run", run)
+    assert reports.pr_files(tmp_path, 4, 5.0) == ["docs/ledger/TD-1.md", "notes/td1.md"]
+    assert seen[0][4:] == ["--jq", ".[] | .filename, (.previous_filename // empty)"]
+
+
 # ── asked and unasked ────────────────────────────────────────────────────────────────────────────
 
 
