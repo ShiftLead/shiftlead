@@ -988,7 +988,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      `exited` after declaring `out_of_work` (closed by rule 9's pass, by its manager, or by itself;
      one a person closed — its `closer` names the person, §4.7 — or anyone killed — a kill writes no
      closer and destroys the pane, `pane: false` — is *stopped* and left unread while its team
-     runs on — *A team that stopped*, below, reads only a team with nobody live), while a seat or a member of its team is live (nobody live and not wound down is
+     runs on — *A team that stopped*, below, reads only a team with nobody live; one closed `why:
+     wind_down` is the presser's ending and left unread too, TD-1895), while a seat or a member of its team is live (nobody live and not wound down is
      *stopped*), whose lane holds a matching id its `lane_seen` lacks while its team is not wound
      down, is this rule's news as a wound-down team's member is: after `WORK_SETTLE` the home writes
      the same `work_waiting` mark, `members` naming it, and the team's `on_work` follows. **What a
@@ -1090,9 +1091,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        - it left on its own after a wrap-up the person sent (Wind down, Wrap up). Such a record's
          end names nobody, so the wrap-up send stamps **`wrapup_by`** beside `wrapup_at`, read
          from the caller as `closer` is.
-       - it was closed by the tick after the person's Wind down: its closer is `{by: tick, why:
-         wind_down}` and its `wind_down.by` is the person (TD-1895, rule 9 *A wind-down's close*). A
-         `wind_down` close after a session's wind-down reads as that session's, `other`.
+       - it was closed by the tick after the person wound it down: its closer's `by` is `tick` and its
+         `wind_down.by` or `wrapup_by` is the person — a member's `wind_down` close, and a manager's rule 9
+         close after the person's Wind down sent it the wrap-up (TD-1895, rule 9 *A wind-down's close*).
+         Such a close after a session's wind-down reads as that session's, `other`.
 
        Otherwise it is `until` where one's `ended.why` or `closer.why` is the stop time's own word,
        `stop time`, as the tick writes it when it ends a record at its `run_until`, or where one
@@ -1280,16 +1282,22 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      (`ao team status --json`, §4.9) and never an earlier round's; what it may not do is keep a
      finished team live by not saying so.
      **A wind-down's close** (TD-1895, §4.9a *A wind-down closes its members*). The same pass closes,
-     on every tick at the home, each live unattended record carrying a **`wind_down`** mark (written by
-     a Wind down's members' half, a person's or a manager's) that is not a seat and not its team's
-     manager, once it has settled — `idle` as this rule reads idle, and the mark's `waits` false, or a
-     turn ended at or after the mark (`turn_at`), or `WRAPUP_GRACE` past it — under `_finished_close`'s
-     check, with closer `{by: tick, why: wind_down}`, **whether or not it declared and whether or not
-     the reading holds**: the presser's word is the ending (§4.9a). One left open with work is closed
-     the tick its work reads pushed. It needs no `FINISHED_SETTLE` (the press is not a reading that
-     could stop holding), is never taken back by a member at work (that member is simply not settled
-     yet), and writes no note where the mark's `by` is the person; a manager the reading then finds
-     alone is told and closed as above.
+     on every tick at the home, each live unattended record carrying a **`wind_down`** mark (stamped by
+     a Wind down's wrap-up send, or by `mark_wind_down` on a finished member sent nothing — a person's
+     press or a session's) that is not a seat and not its team's manager, once it has settled — `idle`
+     as this rule reads idle, and the mark's `waits` false, or a turn ended after the mark (`turn_at`,
+     the same clock) with the record idle since for `SEND_STALL_SECONDS`, or `WRAPUP_GRACE` past the
+     mark — under `_finished_close`'s check, with closer `{by: tick, why: wind_down}`, **whether or not
+     it declared and whether or not the reading holds**: the presser's word is the ending (§4.9a). It
+     runs **first** in the team's pass, and the members and their views are read again after it, so a
+     member it just closed is never read as one at work. One left open with work is closed the tick its
+     work reads pushed; one on a dialog is left open and named, never killed. It needs no
+     `FINISHED_SETTLE` (the press is not a reading that could stop holding) and is never taken back by
+     a member at work (that member is simply not settled yet). Where the mark's `by` is the person this
+     rule writes no note, and owes none (`finished_sent_at`'s owed note is not written for such a team).
+     A manager the reading then finds alone is told and closed as above, the line in a wound-down
+     team's words — *your team was wound down by <presser>; its members are closed* — since its members
+     may have closed undeclared. Rules 2 and 7 pass over a record carrying the mark.
 
   10. **The cadence check** (`sessionorc.cadence`; the Inbox row from `ui/inbox.py`
      `cadence_marks`). The script's verdict needs no reader, so the home runs it, not the
