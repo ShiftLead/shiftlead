@@ -1279,7 +1279,7 @@
   };
   AO.drawOn = function (row) { row.querySelectorAll("[data-pressoff]").forEach((x) => { x.disabled = false; delete x.dataset.pressoff; }); };
   // where a drawn line goes: after the row's reply lines, before what the template draws after them
-  const drawSlot = (row) => row.querySelector(".st.decided, .st.stale, .st.waitingon, .sugg, .mfoot");
+  const drawSlot = (row) => row.querySelector(".st.decided, .st.stale, .st.waitingon, .qabar, .sugg, .mfoot");  // a card's item: before its answer bar (TD-1842)
   AO.drawDecided = function (row, text) {
     let line = row.querySelector(".st.decided[data-drawn]");
     if (!line) {

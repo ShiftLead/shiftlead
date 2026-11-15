@@ -265,7 +265,7 @@ def test_an_open_act_line_draws_have_a_session_do_it_after_done_on_a_card_and_in
     (b,) = _rows(tmp_path, monkeypatch, _item(ACT))
     assert b["session_do"] is True
     whole = card(b, "do")
-    row = whole[whole.index("qanswers") : whole.index('class="row gap wrap mfoot"')]
+    row = whole[whole.index("qanswers") : whole.index('class="row gap qabarright"')]
     assert row.index('data-board-act="done"') < row.index(BUTTON), "after Done, in the answer row"
     assert ">Have a session do it</button>" in row and 'title="Asks a session to do this step' in row
     assert row.count(BUTTON) == 1 and whole.count(BUTTON) == 1

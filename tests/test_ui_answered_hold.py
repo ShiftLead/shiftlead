@@ -170,9 +170,14 @@ def test_the_card_item_draws_no_answers_or_answer_and_lift_the_hold_in_its_dots(
     assert "answered — waiting on designer" in html and "you answered · in designer's ask" in html
     assert "Answer…" not in html and 'data-index="0"' not in html and ">Start session<" not in html
     assert 'class="st qneed"' not in html
-    dots = html.split('class="more qdots"')[1]
-    assert ">Lift the hold</button>" in dots and ">Open</a>" in dots
-    assert html.count(">Lift the hold<") == 1, "Lift the hold only in its ⋯"
+    # today's controls in its answer bar (TD-1842 step 4): Open the bar's, Lift the hold in its ⋯
+    # (where Lift the hold sits is not pinned: TD-1843 moves it into slot 1)
+    right = html.split('class="row gap qabarright"')[1]
+    assert ">Open</a>" in right
+    assert ">Open</a>" not in right.split('class="more qdots"')[-1] or 'class="more qdots"' not in right, (
+        "no Open in an item's ⋯"
+    )
+    assert html.count(">Lift the hold<") == 1, "Lift the hold drawn once"
 
 
 def test_a_second_open_question_is_its_own_decide_beside_the_word(tmp_path):
@@ -477,7 +482,10 @@ def test_a_ledger_row_under_a_press_reads_its_mark_and_draws_only_open(tmp_path)
         assert "you answered &ldquo;Yes&rdquo; — landing on r's board" in html
         assert 'data-index="0"' not in html and ">Reply<" not in html and ">Go with it<" not in html
         assert ">Start session<" not in html and ">Lift the hold<" not in html and "Answer…" not in html
-        assert ">Open</a>" in html.split('class="more qdots"')[1]
+    assert ">Open</a>" in _render(row).split('class="more qdots"')[1]  # the Inbox keeps it in its ⋯
+    # on its card Open alone, its answer bar's, and no ⋯ (TD-1842 step 4)
+    on_card = _render(row, mode="card", home="queue")
+    assert "qdots" not in on_card and ">Open</a></span></div>" in on_card.split('class="row gap qabarright"')[1]
     road = _pressed(tmp_path, act="back to design", answer="")
     assert road["applying_words"] == "applying back to design"
     assert "landing on r" in _render(road) and "you answered" not in _render(road)
