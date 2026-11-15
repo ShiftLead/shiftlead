@@ -1,0 +1,822 @@
+diff --git a/docs/design/4.5a-controls.md b/docs/design/4.5a-controls.md
+index 26bfe67..4b0921d 100644
+--- a/docs/design/4.5a-controls.md
++++ b/docs/design/4.5a-controls.md
+@@ -179,7 +179,7 @@ noted). If a control is not in this table it does not exist.
+ | Inbox row: taken up | display only | (TD-1423) an `ask` or a `steer` whose entry carries `unanswered` — a question its asker took up from a session that did not answer (§4.9b *Why it did not answer*): the row is its kind's own, with one line under the thread above it, labelled *not answered by `<name>` (as read at `<time>`):* — the stamp's `at` — and drawn as text, the home's fixed words for the state (*fills exhausted since 15:04, tripped twice running — Restart on its fills-exhausted row brings it back*). A press the words name is the one on that row (*Inbox row: restart*), never a button here; on a held PR's question the asker's two suggested answers (*Ask the reader again — I brought it back*, *I'll read it*) are the row's answer buttons (*Inbox row: suggested answers*). The Queue's mail item and the message page draw the same line (§4.9b *Why it did not answer*) |
+ | Inbox row: routed around | display only | (TD-1443) a question whose entry carries `routed` — moved from a seat that could not answer (§4.9b *A seat that cannot answer is routed around*): the row is its kind's own, with one line under the thread, *routed around <name>: <why>* (*routed around techlead-ao-1: limited, resets 08:00Z*), drawn as text; a handed entry or a question that waits on its seat instead says so under *Waiting on them* (*waits: techlead-ao-1 limited, resets 08:00Z*), and one a depth or *One open copy* holds, *waits on techlead-ao-1: <the refusal>*. The Queue's mail item and the message page draw the same line, and the Focus **Inbox** and **Sent** cards a held move's *waits on* line (TD-1505) |
+ | Sessions | **rollup** | under the title, a table with one line per row — its head line the column names in `th` cells, *Teams (n) · repos*, n the team rows, *Technical debt, by kind*, *open*, *Members*, *Last work*, *Needs you* — then a totals line (§4.5 screen 1 *The Sessions page, team-first*; TD-1203, rendered `docs/mockups/reviews/2026-10-28-rollup-A5-chosen.png`); its press and its two menus are the row below. **The counted set**: the sessions the rollup counts are `rollup_counted`'s — every session the page draws that has not ended, whatever its team's state (live, concluded, wound down or stopped, with its seats on call — an exited or closed record the definition names, counted by its pill as the header's counts are (§4.5 *One composed pill*) — the sessions in no team, and every card of the flat page that has not ended), and an exited member of a live team, the person's own included (a team is live by its unattended sessions, §4.9 *A person in the team*) — never a stopped team's or a no-team session's exited card (the flat page's included), nor a closed record that is no seat, nor a command run (`kind: command`, whose card is hidden unless the filter types `kind:command`) (TD-924). Every count below — a row's blocks and *answer needed*, Agents, *n from teams* — is over that one set, so the rows add up to the totals. **Rows**, built from the page's layout (`org_layout`) in its order (§4.9 *The Sessions page*): each team a row; a registered repo with no team a row reading *no team* (such a repo always draws its line, so the row has its line to go to); a repo's no-team strip a sub-row under its repo, *no team · n sessions*, n its counted cards, drawn only while it has one; *No repo* last, drawn only while it holds a counted card. A session in no team — the person's own, the director's — is in its repo's strip or *No repo* (§4.9 *The Sessions page*), so every counted session is in exactly one row. A second team on one repo leaves the repo, bar and open cells blank. A team whose repo this host does not read, or that is not registered, draws its repo as plain text, its bar and open count blank; a team with no repo told draws the repo cell blank. A repo whose ledger reading failed draws *could not look* in the bar cell, dimmed, the error its hover (as the Repo facet does), its open cell blank. **Cells**, left to right: the **repo** (link colour, plain text as just said) and the **team** on one line; **Technical debt, by kind** — the repo's open entries by kind, the Repo facet's own kind segments and colours (*team card: Repo facet*, the reading the layout already holds) at 14 px, the counts inside, a segment too narrow for its count drawn bare, each segment's count and kind its hover, no link of its own (the row is the press); **open** — the repo's open count, a column of its own, right-aligned with tabular figures; **Members** — one block per counted member card, in the grid's urgency order, height and colour by state: *needs you* (amber) and *working* (green) solid at 20 px, *waiting* a teal outline at 14 px, *idle* the idle blue dimmed at 9 px (the block draws the pill; the unseen mark is the card's), *on call* a dashed outline at 6 px, any other state its pill's colour at 9 px; the member's name and state its hover; then *w of n*, w the blocks working, in the working colour, n the blocks. A **stopped** team — the group's `stopped`, which is nothing live or concluded (row *team groups*: a concluded team is drawn like a stopped one) — draws its counted cards so (a concluded team's idle members and the person's own live session among them) and a 4 px stub for each seat its definition names that has no counted card, matched by the card's `name`, then its word in place of *w of n*: *concluded <t> ago* (`concluded_age`), *wound down <t> ago* (`wound_down_age`), else *stopped*; its leftover exited cards, uncounted, draw nothing. A strip and *No repo* draw their counted cards' blocks; a repo with no team draws nothing here. **Last work** — the age and doer of the team's newest kept `ao doing` row (§4.8 *the doing log*), the row's words the doer's hover; blank with no kept row, and on a strip, *No repo* or a repo with no team. **Needs you** — one number: a team's *answer needed* (its counted sessions waiting on a permission or a question in their pane) and its *asked you* line's count, added; a strip's and *No repo*'s *answer needed* alone, since a session in no team has no *asked you* line (its ask is under *in the Inbox*). Tinted amber; solid amber while *answer needed* is above 0, which also gives the row a 3 px amber left edge; its hover the split (*n answer needed · n asked you, oldest <age>*); blank at 0; a press opens the needs-you menu (next row). **⋯** — the row's menu (next row). A blank cell is blank, never a dash. **One legend**, the kind bar's, under the last row in the debt column. **Totals line** — **Agents (n)**: a plain coloured pill per state with its count in parentheses, in the grid's urgency order, no glyph; a pill filters the page to that state (the filter's `state:` word; `state:unseen` matches nothing, since *unseen* is no pill — the bare word `unseen` is the mark's) — *exited*'s filter shows every exited card, the uncounted leftovers too, so its count can be smaller than what it shows; *waiting* is a pill of its own (§4.5 *The card's anatomy*); the **unseen** mark is no state and has no pill, and the line ends with *unseen (n)* in the accent blue after the pills, filtering to the `unseen` word (row *card: unseen mark*); the ***i*** beside the word says *in urgency order, as the cards sort · a pill filters the page to that state*. **PRs**: *(n) open, w waiting on review · a opened b closed <window word>* (`COMPLETED_WORD`: *today*, *this week*, *this month*) over every live team, in the page's window — **one value per browser** for every window picker on the page, each team's Pull requests and the Repo page's, so they move together, *day* until one is picked; the totals line has no picker of its own; opens the Repo page's Open PRs of the team with the most. **Needs you**: *n from teams* (every row's number added up, the strips' and *No repo*'s among them; goes to the first counted session waiting on an answer in the grid's one order (§4.5 *One order*, `card_order`), else to the facet of the team holding the oldest ask, opening it first), *q on the Queue* (the Queue tab's number; opens the Queue) and *i in the Inbox* (the Inbox tab's number — the `home: inbox` rows, copied in by the page; an ask about a card is on the Queue's number, not here, TD-931) with *m overdue* beside it (the Needs you board items of both homes past their `Due:` date, from the same poll, so it may exceed the number beside it; an answered board row is under *Waiting on them* and so in neither; opens the Inbox). **The flat page** (§4.5a *team groups*: no badge, nothing defined) has no layout and no rows: the rollup is the totals line, over its cards; so is a page with no row to draw. **Below 720 px**, the page's narrow width, a row is three lines — the name with its needs-you number and ⋯, the bar with its open count, the members with the last work's age (the doer dropped) — and the legend and totals wrap under the rows. On a touch screen the hovers are not there; the needs-you menu's lines carry the split, and the member names and the doing words stay the team card's. The rollup sums no TDs in motion: it is each team card's facet (TD-1203). Display and links; re-rendered with the groups on every delta and on the `repos` and `doing` events (Last work reads the doing log), but for an open menu (next row) |
+-| Sessions | **rollup: press and menus** | a rollup row (row *Sessions: rollup*) is a table row, not a link: its first cell holds the **link**, named for what it goes to (*<repo> · <team>*, *<repo> · no team*, *no team · n sessions*, *No repo*), and the needs-you number and the **⋯** are buttons in cells of their own, so no control sits inside another. The link, then the two buttons, are tab stops in that order; the rows are outside the `j` / `k` ring (row *Sessions: keys*), which runs over cards and folded headers. **The press** — `Enter` on the link, or a click anywhere on the row but its two buttons, the link's target grown to the row as a team header's fold is — goes to what the row names: a team's card (`#team=<name>`), a repo with no team's line (`#repo=<name>`), a strip (`#strip=<repo>`), *No repo* (`#norepo`). When the filter box hides the target, the press clears the box first; a folded team is opened as a press on its header opens it, the opening stored (row *team card: fold*); the page scrolls the target's heading into view below the held bar (§4.5 *Browser mechanics*) and marks it with the Inbox's `landed` edge for 1.2 s (none under `prefers-reduced-motion`); the hash is written with `replaceState`. A page loaded with one of those hashes does the same once its groups are drawn; a hash naming nothing drawn is dropped, and nothing moves. **The needs-you menu**: *n answer needed* (drawn above 0 only) goes where *n from teams* goes, within the row's team or strip — its first counted session waiting on an answer: the team's Answer needed facet, or a strip's or *No repo*'s card; *n asked you · oldest <age>* opens the Inbox at `/inbox?team=<team>&sec=needs&kind=questions` (§4.5 screen 6, what the person owes an answer to); then a line per member with an open ask, *<name> · n*, opening that member's oldest (`/inbox?row=<id>`). A strip's menu holds *answer needed* alone. A press on *answer needed* clears the filter box first, since the count reads every counted session whatever the filter shows. **The ⋯ menu** holds the acts the row's card or line has, each with that control's own confirm: a live team **Add entry…** (the form with the repo, row *Add entry…*), **New session in <team>** (the + card's press, `/new?team=<team>`), **Wind down**, **Stop now**; a stopped team (the group's `stopped`, a concluded one included) **Start**, **Add entry…**, **New session in <team>**; **Add entry…** only where the row's repo has a ledger reading (row *Add entry…*: drawn on every repo that has a ledger), so a team on an unread or unregistered repo, one with no repo, and a repo whose reading failed have none; a repo with no team **Add entry…** and **New session here** — the form with the repo's root as its directory (`/new?dir=<path>`, the root from the host's repo registry); a strip **New session here**; *No repo* none. **Both menus** are disclosure buttons (`aria-expanded`, the menu a list of links and buttons): a press, `Enter` or `Space` on the button opens it, focus on its first item, never pressing the row; `↑` / `↓` move within it; `Esc` and a press outside it close it as every pop-up menu's do (row *every page: a pop-up menu*), and so does `Tab` out of it. **Choosing an item** closes the menu first, then does the item: an act runs with its control's own confirm, a link leaves the page. **A delta while a menu is open** holds the rollup's swap and applies it when the menu closes, so a menu being read is never redrawn from under the pointer; after the swap, focus returns to the same row's same button, found by the row's key (`team:<name>`, `repo:<name>`, `strip:<repo>`, `norepo`), or, when that row is gone, to the first row's link. Client-side but for the acts, which are the controls they name |
++| Sessions | **rollup: press and menus** | a rollup row (row *Sessions: rollup*) is a table row, not a link: its first cell holds the **link**, named for what it goes to (*<repo> · <team>*, *<repo> · no team*, *no team · n sessions*, *No repo*), and the needs-you number and the **⋯** are buttons in cells of their own, so no control sits inside another. The link, then the two buttons, are tab stops in that order; the rows are outside the `j` / `k` ring (row *Sessions: keys*), which runs over cards and folded headers. **The press** — `Enter` on the link, or a click anywhere on the row but its two buttons, the link's target grown to the row as a team header's fold is — goes to what the row names: a team's card (`#team=<name>`), a repo with no team's line (`#repo=<name>`), a strip (`#strip=<repo>`), *No repo* (`#norepo`). When the filter box hides the target, the press clears the box first; a folded team is opened as a press on its header opens it, the opening stored (row *team card: fold*); the page scrolls the target's heading into view below the held bar (§4.5 *Browser mechanics*) and marks it with the Inbox's `landed` edge for 1.2 s (none under `prefers-reduced-motion`); the hash is written with `replaceState`. A page loaded with one of those hashes does the same once its groups are drawn; a hash naming nothing drawn is dropped, and nothing moves. **The needs-you menu**: *n answer needed* (drawn above 0 only) goes where *n from teams* goes, within the row's team or strip — its first counted session waiting on an answer: the team's Answer needed facet, or a strip's or *No repo*'s card; *n asked you · oldest <age>* opens the Inbox at `/inbox?team=<team>&sec=needs&kind=questions` (§4.5 screen 6, what the person owes an answer to); then a line per member with an open ask, *<name> · n*, opening that member's oldest (`/inbox?row=<id>`). A strip's menu holds *answer needed* alone. A press on *answer needed* clears the filter box first, since the count reads every counted session whatever the filter shows. **The ⋯ menu** holds the acts the row's card or line has, each with that control's own confirm: a live team **Add entry…** (the form with the repo, row *Add entry…*), **New session in <team>** (the + card's press, `/new?team=<team>`), **Wind down**, **Stop now**, and on a members-down team, whose only live sessions are its seats, **Start** after them — the menu keeps a live team's order and appends Start, where the card's header leads with it (§4.9a *A Start beside a busy seat*); a stopped team (the group's `stopped`, a concluded one included) **Start**, **Add entry…**, **New session in <team>**; **Add entry…** only where the row's repo has a ledger reading (row *Add entry…*: drawn on every repo that has a ledger), so a team on an unread or unregistered repo, one with no repo, and a repo whose reading failed have none; a repo with no team **Add entry…** and **New session here** — the form with the repo's root as its directory (`/new?dir=<path>`, the root from the host's repo registry); a strip **New session here**; *No repo* none. **Both menus** are disclosure buttons (`aria-expanded`, the menu a list of links and buttons): a press, `Enter` or `Space` on the button opens it, focus on its first item, never pressing the row; `↑` / `↓` move within it; `Esc` and a press outside it close it as every pop-up menu's do (row *every page: a pop-up menu*), and so does `Tab` out of it. **Choosing an item** closes the menu first, then does the item: an act runs with its control's own confirm, a link leaves the page. **A delta while a menu is open** holds the rollup's swap and applies it when the menu closes, so a menu being read is never redrawn from under the pointer; after the swap, focus returns to the same row's same button, found by the row's key (`team:<name>`, `repo:<name>`, `strip:<repo>`, `norepo`), or, when that row is gone, to the first row's link. Client-side but for the acts, which are the controls they name |
+ | team card | **summary** | between the header and the members, **three facets** in one row — Repo, TDs in motion and Doing in 1 : 1.15 : 1.05, each facet drawn keeping its own share, so two split the row by theirs (§4.5 screen 1; one column below 1100 px, in that order; TD-1189): **Repo**, **TDs in motion** and **Answer needed / Doing** — the rows below; its links land on the Repo page. The **Repo** facet holds the repo's numbers and is drawn on every card of the repo's teams that draws a summary (row *team card: Repo facet*, §4.9 *The Sessions page*), and the team's own lanes line is the *i* beside its Technical debt heading. The header carries no state chips (the member cards say it). **A team with nothing live draws only the facets that hold something**: a facet with nothing to show — a Repo facet with no reading, *nothing claimed* with nothing completed in any window, a Doing with no kept row — is not drawn, and with all three empty no summary is (so a stopped team whose repo has a reading always draws a summary, its Repo facet at least, once unfolded), the team unfolded being its header and its members' cards; a facet that holds something is drawn as on a live team. Folded, the team is its one row and no summary is drawn. A repo's no-team strip and *No repo* have none |
+ | team card | **Repo facet** | the facet draws no name: on a team card the repo's line above says it, and on the repo's line, on either page and in either form, the line itself carries the name (a link to its page) and *open →* above the facet; **Technical debt (n open)** with its selector *open · day · week · month* — a facet's label never wraps: where the head runs out of room the selector drops to its own line at the right —: on *open*, two stacked bars — open entries by priority (High, Medium, Low; one hue darkened by priority; the counts inside — a segment too narrow for its words draws its count alone, and one too narrow for the count nothing inside, its hover keeping both) and by kind — *pickable · design · for you · live check · blocked · evaluation · other*, each entry in one as §4.4 *Repo facts* sorts them, *live check* its own teal and *blocked* hatched, the numbers inside, a legend under. **The lanes line is an *i*** beside **Technical debt (n open)**: its tooltip is the line's text, *in ao-grind's lanes: 17 pickable, 1 design · the other 4 pickable: agent-cadence 4*, the team's lanes as §4.4 *In a team's lanes* derives them; what each member's own lane holds is on its card (row *card: compact*), and a member out of work with entries in its lane is that card's count drawn solid, never a tint on the facet. Entries that wait (§4.4 *An entry says what it waits for*, TD-715) are counted after the kinds as *· 4 waiting*, its hover the ids and what each waits on, and a member out of work whose lane only waits reads *· grinder-ao-1 out of work, its lane waiting* in place of *out of work with n in its lane*. The Repo page keeps the line whole, its counts links to its lists (§4.5 screen 11). The *pickable* segment's hover says the lanes' share (*24 pickable · 20 in ao-grind's lanes · agent-cadence 4*). A team none of whose records carries a lane draws the bars alone — on a period, two sized blocks, entries *opened* and *closed* in it (§4.4 *Repo facts*, the ledger's history) — the *closed* block a link to the Repo page's **Merged** column for that window (§4.5 screen 11, TD-604), its hover the ids and titles it counts, newest first, ten at most and *… and n more*; the facet draws no list of its own: what the team closed is *TDs in motion*'s **completed** face (row *team card: TDs in motion*); **Pull requests (n open)** with the window picker *day · week · month* and two sized blocks *opened* and *closed*, and *· n red* after the open count, red, when any open PR reads red or conflicting — its hover each such PR with its age and, past `ORPHAN_AFTER`, whose it is (*nobody's — the grinders' order*, *held by grinder-ao-1*, *no order while a draft*: TD-745), TD-613; under them the oldest open PR's age, how many wait on review (*waiting on review (techlead-1)*), and when the readings were taken. Every segment and block is a link to the Repo page's list filtered to it. The entries' selector is remembered **per team** (a mode, like the fold); the window picker is the page's one value (row *rollup*). A reading that failed reads *could not look*, dimmed, the error on hover. Re-rendered on the `repos` event · **Drawn first on each team card of the repo** that draws a summary (§4.9 *The Sessions page*; TD-1189, Paul, 2026-10-28, over TD-722's once per repo): two teams on one repo draw the same numbers twice, each with its own lanes *i*. **The repo's line draws its compact form** (TD-1240) only while no card of the repo shows the facet — a repo with no team, or every one of its teams' cards folded, hidden by the filter or drawing no summary: two rows, *Technical debt* (*n open*, the priority figures with their squares, a priority at 0 not drawn, the lanes *i* where a team services the repo, **Add entry…**) and *Pull requests* (*n open*, *· n red*, *· n CI never ran*, *· oldest <age>*, *· n waiting on review*, *· read <age> ago*, the whole facet's order), each figure a link as the facet's segments are, with no bars, legend, selector or window picker (§4.9 *The Sessions page*). The server renders both forms on the line for every repo it reads, the whole facet and the compact one, and each page shows one: the Sessions page the compact, by that rule, never the whole; the Repo page the whole, never the compact. The client applies the Sessions rule re-checked where it syncs the team cards (on each fold, filter and swap of the groups). The line's lanes *i* is the repo's (§4.4 *In a team's lanes*): one line per servicing team. The entries' selector is remembered per team on a card. On the Repo page the line draws the whole facet always and the team cards none (row *Repo page: the team's facets*). |
+ | team card | **TDs in motion (n)** | one row per reference a member of the team holds (its `progress` claims), each: the **phase** — *add*, *design*, *grind*, *review* (§4.5 screen 1; derived, never declared; a design-first claim with a PR reads *review*, TD-814) — the reference, the entry's title from the ledger reading (the reference alone when the entry is not in it — a foreign or archived reference), the member's name (a link to its Focus; the person glyph on the person's own session) and its PR when it has one — the claim's own, or else an open PR whose head branch names the reference (`td186-…`), so a PR waiting for its reader after its grinder moved on still counts — (a link to GitHub, marked *merged* / *closed* once it is no longer open, the phase staying *review* until the claim is done or dropped, §4.4); a reference two members hold is one row naming both; a row links to the entry on the Repo page. The heading's line counts the phases. **Priority**: between the phase and the reference one letter, **H**, **M** or **L**, drawn as the Repo facet's priority bar draws a segment — a chip filled with that priority's colour, its letter in the bar's own text colour — with the word as its tooltip and its label for a screen reader; the slot is one fixed width and is left empty, so the references still line up, where the ledger reading has no entry for the reference, or the entry no priority or one that is not High, Medium or Low. **Columns**: the rows share one grid — phase · priority · reference · title · holders · PR and its state — in which every track but the title's is a fixed width: the phase's fits its longest word, the priority's is the slot above, the reference's, the holders' and the PR's are set by the server from the facet's own rows (the reference at most 10 characters and the holders 14, a longer value cut with an ellipsis and whole on hover; the PR's as wide as the longest of *#811* or *#712 merged*, and nothing where no row has a PR). The title takes what is left, cut with an ellipsis and whole on hover. Every cell is drawn, empty where a row has no priority or no PR, so each column starts at one x down the facet. On a phone (720 px and under) the PR goes under the title, and the holders keep their column. Rows sort by phase, then priority with High first and an unmarked row last, then reference. the Sessions rollup's count of TDs in motion is unchanged. **Completed** (TD-1189; Paul, 2026-10-28: *a "Recently completed" option on the tds in motion card … similar to the way the answer|doing option works on the doing card*): a toggle at the facet's right, *in motion · completed*, drawn as Answer needed / Doing's. Turned to *completed*, the head reads **Completed (n)** with the window picker *day · week · month* beside it — the page's one window value (row *rollup*), as Pull requests' is — and the rows are what the ledger closed in the window (§4.4 *What closed, and by which PR*, the list the Repo page's **Merged** column draws) that is **the team's**: its id, or its closing PR, is named by a claim of a record carrying the team's badge, live or ended and not yet forgotten — in the record's `progress` (a claim's `ref` or `pr`; not its `review_pr`, which the tick clears when that PR merges) or a `restarts` entry's `done` (TD-249) — so a design archived in its last build's PR counts by the PR; a close no team's record names (the person's own PR, a forgotten record's) is on no card and stays on the Repo page. Each row, newest first, on the facet's grid: the close's age in the phase's column (the Doing feed's short age, its exact time on hover), the priority's slot empty, the reference, the title (cut with an ellipsis, whole on hover), the holders' column empty, and the PR (a link to GitHub; *no PR* for a close by a commit naming none); eight rows, then *+n more*, a link to the Repo page's Merged column for the window (`?win=<w>#completed`), which lists the repo's closes, so its count may be larger than the team's. None in the window reads *nothing completed today* (*this week*, *this month*: the Repo page's window words). A close that moved an entry to another repo's ledger is listed as any close is (Paul, 2026-10-28: addressed if it becomes common). The face is the person's pick, stored per team in the browser as the fold is (TD-194), not held for a state as *answer · doing*'s flip is: a stored pick wins whatever the team then holds. Until picked, the facet opens on *in motion* while the team holds a claim, else on *completed*. Re-rendered with the summary. Display and links |
+@@ -219,14 +219,14 @@ noted). If a control is not in this table it does not exist.
+ | New session | **Where**: new worktree / the checkout itself | **Where** is worktree-first: **Worktree `<name>` · new** is selected for a git repo, its line the path and branch it will make; under it *or one nobody is in:* lists the repo's existing worktrees that hold no live session and no agent the adapters can see, as chips, and a press puts that name in Name; a typed Name that matches one says *reuses the worktree `<name>`*. **The checkout itself** is the second choice, selected by default only for *another directory…* and for a shell; when it is occupied it is greyed with the grey pill *in use by `<name>`* — the *directory field → occupancy* row's reading, said on the choice and never as a warning. For a git repo the host agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there |
+ | New session | name field → holder | as you type, the form asks the host agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The host agent composes the texts, so `ao new` prints the same ones (`_name_verdict`) |
+ | New session | directory field → occupancy | as you type, the form asks the host agent who holds the agent slot for that directory — shiftlead's own live agent sessions *and* live sessions the adapters can see outside shiftlead (Claude Code's registry) — and, when it is taken, greys *The checkout itself* with *in use by `<name>`* and keeps the worktree picked (the create RPC refuses the same way) |
+-| Sessions | **team groups** | when any session carries a `team` badge, or any team is defined, the grid is grouped: grouped project → repo → team (§4.9 *The Sessions page*, TD-722: a project heading with its `title`, its repos under it in its list's order, a repo in no project a heading of its own, each repo's teams in definition order, listed together and never combined), and a header per team, **one row** — the team, the host its sessions share (the repo is its heading's), the **flow chip** *flow: td* (its tooltip the **flow strip** — its stages in order and the person last, *design → build → review → you, through techlead-ao-1*, as the brief's `{flow}` lines read — and its press the team's card on the Settings page, `/settings#team-<team>`), *flow changed — Apply* (row below), its marks (✉ n, *answered for you*, *PRs waiting*, *n ready to close*, the needs-you count) and its controls — Wind down and Stop now, or Start; the fold, which carries the session count once (*▾ 9 sessions*); the ***i*** mark; the counts by state, only while folded (a seat with nobody in it counted as *on call*; row *team card: fold*). **The definition is in the *i* panel**, on its **Definition** line (row ***i*** mark): Members…, where the team is defined with **Open file**, a link to the flow on Settings, and the *not concluded* line; the **Flow** pick is on Settings (row *team card: Flow pick*). Under the header, while the definition cannot follow its flow, the reason and the flows it could (*td cannot be followed by samscrape-grind: no designer — add a designer, or drop td from flows:*, and under it each other listed flow it cannot follow; §4.9c; read when the page is drawn and after an Apply, never per delta) — it asks for an act, as *flow changed* does, and stays on the card; not its manager's name, state or line, which are on the manager's card (§4.5 *The card's anatomy*); a manager whose card is in another group is named *elsewhere* — the manager's card first, members after; flat otherwise. Derived each tick from the badge and the `controllers` edges, never stored (§4.9). Each group is one card holding its sessions' cards; a team with a definition carries **Wind down** and **Stop now** on that card's header beside the fold (§4.9a). A team with nothing live keeps its card: the header reads *stopped* or *wound down <t> ago* and carries **Start** when the team has a definition — and, beside it, **definition changed — Apply** when the definition renamed or dropped a member (row *flow changed — Apply*, TD-703) — the sessions' cards folded behind **▸ n sessions** — a chevron and the count, beside Start, so a team card's buttons are together; one click, remembered per team in the browser; any team folds, live or not, and by its header too (row *team card: fold*), a team with something live opening unfolded; between the header and the cards sits the **summary** (row *team card: summary*: Repo, TDs in motion and Answer needed / Doing; a team with nothing live draws only what holds something), the header carrying no state chips since the member cards say it, and a definition no session carries is the same card, empty. Order: the person's row and the director's card on top, then the headings in the org file's order (a project of one repo one heading, the repo's), under each repo its line (the Repo facet on it only while no card shows one, row *Sessions: repo line*), its teams — the live and concluded first, then those with nothing live, each in definition order — and a no-team strip of the repo's sessions with no team badge; then *No repo*, the sessions in no registered repo, a plain section and not a card (§4.9 *The Sessions page*, TD-722). Headings do not fold. The filter hides a team's card, controls included, when none of its sessions match, and a card with no sessions while any filter is set. **Concluded** is the home's reading of *finished* (§6 rule 9: `sessionorc.work.finished`, which `teamrun.concluded` returns where it holds — every live member carrying the badge `idle` and declared `out_of_work` or `restart_wanted`, seats absent or `idle` (a seat never declares; a `working` seat is answering somebody), the manager `idle`; a crashed or restart-wanting dead member blocks it, the rest of the dead are passed over, *Which members count*; a session that declared and then took a turn is `working` and not counted finished) with one word more: a team whose members have all declared `restart_wanted` reads *concluded · restart wanted*. On a live team that is not concluded a line on the *i* panel's Definition line (the reading's `why` as `not_concluded`) says **why there is no Start** — *not concluded: grinder-dc-1 working · grinder-dc-2 idle, not declared · manager-dc-1 working* — one clause per unattended session that keeps it from the reading. A **concluded** team is drawn like a stopped one **and is never folded by the page** (its idle sessions wait for a person's Close; it opens unfolded, and a person who folds it has read it); every team's header carries *n ready to close* among its marks — the `idle` sessions the checklist passes, since an exited one's act is Forget, not Close (card **Close session**). *Live* is not *running*: a Claude Code worker's `/exit` does not leave (§4.9a). A concluded team's header reads *concluded <t> ago* (the latest declaration's instant) with *· restart wanted* when any declaration, manager's or member's, is `restart`, else *· out of work*; the group sorts with the stopped ones; the control is **Start** alone — the same sequence as `ao team start`, which closes each concluded session before it creates under its name (§4.9a; the close runs the wrap-up's own check, and a session with uncommitted or unpushed work is not closed and the start is refused naming it), and the confirm names them. Until then a team with a live session that has not declared, or is not `idle`, is not concluded: *idle* without the word is merely idle (§4.9a), and **Wind down** is the right act — a paused team (§6) is that case, its sessions idle under `gated` and undeclared. **Stop now** leaves with Wind down: a concluded team has nothing to kill, and a card that outstays its declaration has Close and Forget of its own. **Who for what** is not on the header: the lines are in the team's help panel, under the ***i*** mark (row ***i*** mark, below) |
++| Sessions | **team groups** | when any session carries a `team` badge, or any team is defined, the grid is grouped: grouped project → repo → team (§4.9 *The Sessions page*, TD-722: a project heading with its `title`, its repos under it in its list's order, a repo in no project a heading of its own, each repo's teams in definition order, listed together and never combined), and a header per team, **one row** — the team, the host its sessions share (the repo is its heading's), the **flow chip** *flow: td* (its tooltip the **flow strip** — its stages in order and the person last, *design → build → review → you, through techlead-ao-1*, as the brief's `{flow}` lines read — and its press the team's card on the Settings page, `/settings#team-<team>`), *flow changed — Apply* (row below), its marks (✉ n, *answered for you*, *PRs waiting*, *n ready to close*, the needs-you count) and its controls — Wind down and Stop now, or Start, or all three on a members-down team (row *team card: Start / Wind down / Stop now*); the fold, which carries the session count once (*▾ 9 sessions*); the ***i*** mark; the counts by state, only while folded (a seat with nobody in it counted as *on call*; row *team card: fold*). **The definition is in the *i* panel**, on its **Definition** line (row ***i*** mark): Members…, where the team is defined with **Open file**, a link to the flow on Settings, and the *not concluded* line; the **Flow** pick is on Settings (row *team card: Flow pick*). Under the header, while the definition cannot follow its flow, the reason and the flows it could (*td cannot be followed by samscrape-grind: no designer — add a designer, or drop td from flows:*, and under it each other listed flow it cannot follow; §4.9c; read when the page is drawn and after an Apply, never per delta) — it asks for an act, as *flow changed* does, and stays on the card; not its manager's name, state or line, which are on the manager's card (§4.5 *The card's anatomy*); a manager whose card is in another group is named *elsewhere* — the manager's card first, members after; flat otherwise. Derived each tick from the badge and the `controllers` edges, never stored (§4.9). Each group is one card holding its sessions' cards; a team with a definition carries **Wind down** and **Stop now** on that card's header beside the fold (§4.9a). A team with nothing live keeps its card: the header reads *stopped* or *wound down <t> ago* and carries **Start** when the team has a definition — and, beside it, **definition changed — Apply** when the definition renamed or dropped a member (row *flow changed — Apply*, TD-703) — the sessions' cards folded behind **▸ n sessions** — a chevron and the count, beside Start, so a team card's buttons are together; one click, remembered per team in the browser; any team folds, live or not, and by its header too (row *team card: fold*), a team with something live opening unfolded; between the header and the cards sits the **summary** (row *team card: summary*: Repo, TDs in motion and Answer needed / Doing; a team with nothing live draws only what holds something), the header carrying no state chips since the member cards say it, and a definition no session carries is the same card, empty. Order: the person's row and the director's card on top, then the headings in the org file's order (a project of one repo one heading, the repo's), under each repo its line (the Repo facet on it only while no card shows one, row *Sessions: repo line*), its teams — the live and concluded first, then those with nothing live, each in definition order — and a no-team strip of the repo's sessions with no team badge; then *No repo*, the sessions in no registered repo, a plain section and not a card (§4.9 *The Sessions page*, TD-722). Headings do not fold. The filter hides a team's card, controls included, when none of its sessions match, and a card with no sessions while any filter is set. **Concluded** is the home's reading of *finished* (§6 rule 9: `sessionorc.work.finished`, which `teamrun.concluded` returns where it holds — every live member carrying the badge `idle` and declared `out_of_work` or `restart_wanted`, seats absent or `idle` (a seat never declares; a `working` seat is answering somebody), the manager `idle`; a crashed or restart-wanting dead member blocks it, the rest of the dead are passed over, *Which members count*; a session that declared and then took a turn is `working` and not counted finished) with one word more: a team whose members have all declared `restart_wanted` reads *concluded · restart wanted*. On a live team that is not concluded a line on the *i* panel's Definition line (the reading's `why` as `not_concluded`) says **why the team is not concluded** — and so, unless it is members down, why there is no Start — *not concluded: grinder-dc-1 working · grinder-dc-2 idle, not declared · manager-dc-1 working* — one clause per unattended session that keeps it from the reading. A **concluded** team is drawn like a stopped one **and is never folded by the page** (its idle sessions wait for a person's Close; it opens unfolded, and a person who folds it has read it); every team's header carries *n ready to close* among its marks — the `idle` sessions the checklist passes, since an exited one's act is Forget, not Close (card **Close session**). *Live* is not *running*: a Claude Code worker's `/exit` does not leave (§4.9a). A concluded team's header reads *concluded <t> ago* (the latest declaration's instant) with *· restart wanted* when any declaration, manager's or member's, is `restart`, else *· out of work*; the group sorts with the stopped ones; the control is **Start** alone — the same sequence as `ao team start`, which closes each concluded session before it creates under its name (§4.9a; the close runs the wrap-up's own check, and a session with uncommitted or unpushed work is not closed and the start is refused naming it), and the confirm names them. Until then a team with a live session that has not declared, or is not `idle`, is not concluded: *idle* without the word is merely idle (§4.9a), and **Wind down** is the right act — a paused team (§6) is that case, its sessions idle under `gated` and undeclared. **Stop now** leaves with Wind down: a concluded team has nothing to kill, and a card that outstays its declaration has Close and Forget of its own. **Who for what** is not on the header: the lines are in the team's help panel, under the ***i*** mark (row ***i*** mark, below) |
+ | Sessions | **repo line** | display and links (§4.9 *The Sessions page*, TD-722): one per repo, under its heading — the repo's name and a link to its Repo page; the **Repo facet** (row *team card: Repo facet*) is drawn on its teams' cards, and here, in its two-row compact form, only while none of them shows it (TD-1189, TD-1240). Under it the teams' cards, then the **no-team strip**, headed *n sessions, no team* and nothing else, the repo's sessions with no team badge in full cards. **A heading or a repo line hides when everything under it is hidden** by the filter, and shows again with the first thing under it that matches. A registered repo with no team draws its line and compact facet alone |
+ | team card | **fold**: the header | a click anywhere on a team card's header row that is not one of its controls, links or marks folds the card to that row, and a click on a folded row opens it — **any team, live, concluded or stopped**; the header shows the pointer and a hover tint, and the press is on `click` with no text selected, so a name can still be copied. The **▸ n sessions** button stays beside Start or Wind down, on every team with sessions: it is the same press, the control a keyboard and a screen reader reach (`aria-expanded`, `aria-controls` the card's body), and the header's click is its mouse target grown to the row. Folded, the card is the header alone: the summary and the members are hidden, nothing is unloaded, and deltas keep arriving. **Default and memory**: a team with something live, and a concluded one, opens unfolded; a team with nothing live opens folded; a press writes the choice, `fold:<team>` in the browser's storage, and a stored choice wins over the default whatever the team's state becomes — cleared by Settings' *Reset this browser*. **A folded live team's row** reads the counts by state in place of the session count, its marks — the needs-you count, *n ready to close*, *answered for you*, *PRs waiting*, ✉ n (row *team header ✉ n*) — and its controls, Wind down and Stop now included. A member in `needs-you` puts the amber ring on the row (§4.5 screen 1 *Colour*), and **the row is not unfolded for it**: the fold is the person's, and the need is counted on the row, in the rollup and in the Inbox — but by the person's own press on a rollup row, its needs-you menu's *answer needed* or the totals' *n from teams* (rows *Sessions: rollup* and *rollup: press and menus*), which opens it and stores the opening as a press on the header does. **Keys** (row *Sessions: keys*): a folded team's header takes the place of its cards in the ring; `f` folds the team of the ringed card and the ring moves to its header; `f` or `Enter` on a ringed header opens it, the ring staying on the header. The filter is unchanged: a team none of whose sessions match is hidden, folded or not. *No repo* and a repo's no-team strip are sections, not cards, and do not fold; nor does a heading. Client-side, nothing written on any record |
+ | team card | ~~**Flow** pick~~ | on the Settings page's team card (row *Settings page: Teams*), not the header, which keeps the **flow chip**, whose press opens that card (row *team groups*). The pick (§4.9c; `POST /api/settings/teams`, `teamrun.check_pick` and `pick_flow`) lists the team's `flows:`, the current marked, each it cannot follow disabled with the reason, and writes `teams.<team>.flow` through `set_settings` on **Save** and nothing more — no confirm, nothing relaunched: the setting is from then on what a team start, a **Members…** add and **Add entry** read, and a live team whose records now differ reads **flow changed — Apply** at once; the running team moves on **Apply**, the one confirm (§4.9c *Switching*). Its saved note: *flow set to td — Apply on the team card to switch the running team*, *flow set to td* where nothing running differs, and *Add entry's feature now opens a techlead* where the new flow has no design stage. A person's own; not on a node (§4.4a), as Settings is not |
+ | team card | **flow changed — Apply** | a mark beside the flow chip on a live team whose records differ from what its current flow compiles to (lane, `review`, the stage brief, the profile — TD-619 — who should run), and on any live team for a seat its definition names that the run has no record of (*techlead-ao-1: starts*; §4.9c), and on any team, live or stopped, for a member or seat the definition renamed or dropped (*grinder-dc-1 → dc-grinder: renamed*, *grinder-dc-2: removed from the definition*; §4.9 *A member renamed or removed*, TD-703 — on a stopped team beside Start, its title saying *until Apply or Start, a start by the tick brings back the old names*) — the mark reads **definition changed — Apply** where such seats, renames and removals are all that differ or the team runs no flow; the members' lines are in the mark's title and in Apply's confirm, one toast per line applied, skipped or left with a reader (the member's marks `cards.flow_mark`, read from the record and the page's last flows reading). **Apply** applies it, as `ao team flow <team> --apply`, after the one confirm a switch takes: the members' lines and what stays with a reader (*grinder-ao-1's PR #1020 stays with techlead-ao-1*). Beside it, on a member: *sits out under <flow>* (its card stays until Forget, as a removed member's does; an interactive member, never wound down, reads *sits out under <flow> — close it yourself*), and *flow changed — restarts when it next works* on a node member the tick does not restart. The *cannot be followed* mark (*td cannot be followed by samscrape-grind: no designer — add a designer, or drop td from flows:*) sits under the header while the definition lists a flow its members cannot follow |
+ | card, Inbox row | **state icon** | on a full card and an Inbox row every state pill opens with a glyph, so a page of cards is read by shape before it is read by word — **not on a team member's compact card nor on a count pill** (the Sessions rollup's, a team header's): there the word and colour carry the state. The glyphs: ▲ needs you, ◔ limited, ? stalled?, ∿ working, ›_ idle, ◌ exited, ◇ on call (a seat with nobody in it — composed as *waiting* is, from `exited` / `closed` and the definition), ✓ closed, ⌀ unreachable, ◷ scheduled (a start time not yet reached — §6 *Start time*). A glyph never looks like something to press: a pulse for running, the prompt for sitting at one, a dotted outline for something no longer there; never ▶ ‖ ■, which read as play, pause and stop. The word stays beside it — the glyph is for scanning, the word is the state. The mode toggle keeps its filled/hollow dot, and *unattended* is a fact about who answers, not a state, so it gets no state glyph; the **unseen** mark's ● is its own chip's, not a state's (row *card: unseen mark*) |
+ | card, Inbox row, Focus | **state pill hover** | the pill's title says what the state rests on, one text, the first that applies (TD-490): an unreachable host's reason (`host_note`); a *waiting* pill's reason (§4.2 *Waiting*); a *working* pill on an idle record, *working · 2 subagents — idle in every payload, its own subagents running* (§4.2 *Working on its own*), and when a wait reads too, the wait after it and the oldest shell's command and age (*working · 1 shell — idle in every payload, its own background shells running · waiting on you: TD-222 · timeout 1500 gh pr checks 2658 · 4m*, §4.2 *One order*); *a seat on call: read from its record, not from a screen*; on `exited` and `closed`, **the ending** — row 5 (b)'s words and the time, *killed by you · 12:31*, *pane gone · found 16:50 by a host agent down since 12:30*, *closed by the tick · team finished · 09:12* — never *guessed*, since both are the tick's own readings; *guessed from the screen* on a `scraped` state, whose pill is dashed; *reported by the tool* on a `hook` one; *observed by the host agent, not reported by the tool* on another of the tick's own states (`stalled?`, §4.2). The Focus terminal's end overlay draws the same ending words as its first line, and the header's slot line carries them as row 5 says. |
+-| Sessions | team card: **Start / Wind down / Stop now** per definition | every team in `org.yml` and the repos' `.shiftlead.yml`; Start runs the same sequence as `ao team start` (all checks before any create), **Wind down** the same as `ao team stop` (wrap-up members, then the manager — each finishes what it holds and exits), **Stop now** the same as `ao team stop --now` (kills). The CLI verb stays `stop`; the label, confirm and toast use the page's words (§4.9). Start is on the card of a team with nothing live, Wind down and Stop now on one with something live (row above); the definition's source file is the header's tooltip. One line above the grid, only when there is something to say: a definition that could not be read, that none is defined, or — on a node — where the org is. The wrap-up wait runs behind the response: the page reports what was sent, the state deltas show the members settling, and the manager's own outcome is reported when it comes — a failure there is logged and toasted, never dropped. On a concluded team Start is the one control and it closes first: each concluded session — `idle` and declared, an idle seat, or the idle manager — is closed under the wrap-up's own safety check and superseded under its own name, then the start runs, as `ao team start` does (§4.9a); a live session that is not concluded, or holds uncommitted or unpushed work, is the refusal it is on any start, naming it. **What the lanes hold, before the start** (`teamrun.lanes`, read by `ao team start`, the page's `/api/teams/<t>/lanes` on the press and its `start`): the confirm — and the first line `ao team start` prints — reads **every lane the start creates** against its ledger as rules 6 and 8 read it (`ledger.lane_matches` over the reading's open entries, whatever the page kind — each role's count is what its member's card draws as its own, row *card: compact*): each member role's lane once, the manager's where its role carries one (a seat with a trigger has no lane) — the lanes the team's records carry once it runs, so this line and the card's lanes line (row *Repo facet*, §4.4 *In a team's lanes*) count one set of lanes and differ only where the definition changed since the records were written. It says what each lane holds by the page's kinds (`for_page`, in the kind bar's order), *grinder: 3 pickable, 6 live check · designer: 2 design* (*0* for an empty lane; a grinder's lane takes a live check once its build is live, and the word is *live check* there, never *pickable*); when **every** lane is empty, the press opens a confirm of its own instead of starting — a modal that explains, *nothing to pick: every lane is empty, so the team will wind down as soon as it starts*, the lane line under it, and offers **Start anyway** and **Cancel** — Start anyway runs the start as any Start does, since the person may know what the ledger does not. Under `--json` the result's `roles` is one object per role, `{n, by_kind}` — `n` None for an unreadable ledger. `ao team start` prints the same line and stops there — a refusal, exit 1, `{"error": …}` under `--json` — unless `--anyway` is given: the terminal's Start anyway. A ledger that cannot be read is said and counts as unknown, never as empty, and opens no confirm. On a concluded team whose lanes are empty there is one confirm, not two: the Start anyway dialog carries the closes as its second line (*it first closes …*), in place of the one-line confirm a concluded team's Start shows on its own |
++| Sessions | team card: **Start / Wind down / Stop now** per definition | every team in `org.yml` and the repos' `.shiftlead.yml`; Start runs the same sequence as `ao team start` (all checks before any create), **Wind down** the same as `ao team stop` (wrap-up members, then the manager — each finishes what it holds and exits), **Stop now** the same as `ao team stop --now` (kills). The CLI verb stays `stop`; the label, confirm and toast use the page's words (§4.9). Start is on the card of a team with nothing live, Wind down and Stop now on one with something live (row above), and all three on a **members down** team, a live team whose only live sessions are its seats (§4.9a *A Start beside a busy seat*): its Start leaves each live seat running, its one-line confirm names every live seat from the row's `members_down` (*Start ao-grind? techlead-ao-1 (idle, shell live) and review-ao-1 (working) are left running*), the rename lines first where the definition changed, and where the lanes are empty the Start anyway dialog carries that as its second line, as a concluded team's carries its closes; the definition's source file is the header's tooltip. One line above the grid, only when there is something to say: a definition that could not be read, that none is defined, or — on a node — where the org is. The wrap-up wait runs behind the response: the page reports what was sent, the state deltas show the members settling, and the manager's own outcome is reported when it comes — a failure there is logged and toasted, never dropped. On a concluded team Start is the one control and it closes first: each concluded session — `idle` and declared, an idle seat, or the idle manager — is closed under the wrap-up's own safety check and superseded under its own name, then the start runs, as `ao team start` does (§4.9a); a live session that is not concluded, or holds uncommitted or unpushed work, is the refusal it is on any start, naming it. **What the lanes hold, before the start** (`teamrun.lanes`, read by `ao team start`, the page's `/api/teams/<t>/lanes` on the press and its `start`): the confirm — and the first line `ao team start` prints — reads **every lane the start creates** against its ledger as rules 6 and 8 read it (`ledger.lane_matches` over the reading's open entries, whatever the page kind — each role's count is what its member's card draws as its own, row *card: compact*): each member role's lane once, the manager's where its role carries one (a seat with a trigger has no lane) — the lanes the team's records carry once it runs, so this line and the card's lanes line (row *Repo facet*, §4.4 *In a team's lanes*) count one set of lanes and differ only where the definition changed since the records were written. It says what each lane holds by the page's kinds (`for_page`, in the kind bar's order), *grinder: 3 pickable, 6 live check · designer: 2 design* (*0* for an empty lane; a grinder's lane takes a live check once its build is live, and the word is *live check* there, never *pickable*); when **every** lane is empty, the press opens a confirm of its own instead of starting — a modal that explains, *nothing to pick: every lane is empty, so the team will wind down as soon as it starts*, the lane line under it, and offers **Start anyway** and **Cancel** — Start anyway runs the start as any Start does, since the person may know what the ledger does not. Under `--json` the result's `roles` is one object per role, `{n, by_kind}` — `n` None for an unreadable ledger. `ao team start` prints the same line and stops there — a refusal, exit 1, `{"error": …}` under `--json` — unless `--anyway` is given: the terminal's Start anyway. A ledger that cannot be read is said and counts as unknown, never as empty, and opens no confirm. On a concluded team whose lanes are empty there is one confirm, not two: the Start anyway dialog carries the closes as its second line (*it first closes …*), in place of the one-line confirm a concluded team's Start shows on its own |
+ | Sessions | team card: **spend** | (TD-818, built by TD-832) display and one link: the team's seat-ledger figure today in the header, `≈$41 today` (`$` where every seat's profile is metered), absent while the team spent nothing; the hover says the week's figure and the seat that spent most today with its share; the press opens the Spend page on this team (§4.5 screen 13) |
+ | Sessions | team card: **Members…** | on the team's ***i*** panel, its Definition line: the dialog of §4.9 *Add or remove a member from the team card* — the definition's manager, techlead seat and member entries, each with the session holding it, **Add member** and **Remove**, and on each member line **− / +** beside its count (*2 (file says 1)* where the size differs, §4.9 *A team's size*, TD-1149). Absent on a repo's no-team strip and on *No repo*; on a team defined in a repo's `.shiftlead.yml` it opens with Add member and Remove drawn disabled (the row after next) |
+ | Members dialog | **− / +** | on each member line: **+** writes `teams.<team>.size.<line>` one higher through `set_settings` and, on a live team, creates the line's next name under the manager as Add member creates one; **−** one lower, and on a live team winds down the line's highest-numbered kept member by the sit-out form, marked sat out — on a line that scales (td-max, §4.9 *Scaling with the work*) turned into the line's lowest extra instead, never marked sat out, and under the default ceiling the highest-placed extra removed too — its confirm naming each session it winds down — refused below 0 and below what a listed flow's stages need (*td needs a designer: drop td from flows: first*). On every team, a repo's included; writes no definition. Terminal: `ao team size` |
+@@ -253,7 +253,7 @@ noted). If a control is not in this table it does not exist.
+ | card / Focus header | **restarted** chip | display only (§6 *Keeping a team running*, §4.10 *A lapsed cache is started again, not rung*; TD-485): when the record's `restarts` holds an entry younger than `RESTART_WINDOW` (two hours) whose `why` is a restart — every `why` but `start`, a scheduled start's own create, and `fill`, a seat's (§6 rule 3) — the fixed word *restarted* and the newest such entry's words. **On the Focus header** the whole of `ending.restart_words`, the words `ao status -v` prints — *restarted · cache lapsed · idle 5h · 191k*, *restarted · brief*, *restarted · wanted*, *restarted · person*, with *· failed* where its close or replay did not take — a chip beside *brief changed*. **On the card** a badge in row 4, beside the report line (§4.5 *The card's anatomy*), in the short form — *restarted · cache lapsed*, *restarted · brief* — since the row is one line and the card clamps nothing there; the rest of the words are the hover's. Hover, as text, in both places: every entry inside the window, newest first, each in the full words with its age, and the count toward the ceiling (*2 of 3 in 2 h*). A mark, never pressable, not a state — never in the slot, which holds what needs a person, an ending or what the session says, none of which a restart is: it says where this run came from. It goes at `RESTART_WINDOW` after the newest entry, so the chip and the ceiling keep one clock, and it moves to the new record on a supersede as `restarts` does. Never on a seat, which ends and is filled by design. `ao status -v`'s `restarts:` line prints the same words |
+ | Sessions | team card: **wound down** note | a definition with nothing live whose sessions all declared `out_of_work` reads *wound down <t>* instead of *stopped* (§4.9a), re-rendered with the header (§4.5 *Live state*). All or nothing, read from the records and never from a count of ledger rows: one member's exhaustion is not the team's, and one session that never declared means the team stopped for another reason. A definition nothing has ever carried is neither. `ao team list` says the same word from the same rows. **Who, how soon, and why** (`teamrun.wound_down_note`, `wound_down_words` on the card and in `ao team list`): the note names who closed the members, from their records' closer — *· by manager-dc-1*, *· by you*, *· by the tick* (rule 9; mixed closers name the manager's when it is one of them, else the first) — says *· after 40 s* when the run, from the crew's first `created` to its last close, was under ten minutes (`SHORT_RUN`), and ends with the manager's reason, the first line of its declaration's `why` (`ao progress none --why`, §4.9a): *wound down 2m ago · after 40 s · by manager-dc-1 — nothing pickable on agent-cadence's ledger*. A manager that closed without declaring gives none; the note stops at the name |
+ | Sessions | team card: **over its line** note | display only (§6 *Balance*): on the header's second line of a team whose `balance` mark stands, amber, *over its line since <t>: 9 open PRs, line 8* — each crossed line in the mark's own numbers, *oldest PR 3d, line 2d*, *review waiting 5h, bound 2h* — its tooltip *its members take no new claim until it clears · Settings*; gone when the mark goes. Never pressable: the line is moved on the Settings page |
+-| Sessions | team card: **work waiting** note | display only (§6 rule 8): beside *wound down <t>*, or *stopped* (TD-781), on a team whose lanes gained work, *· n entries waiting since <t>* from `work_waiting`, and *· n questions wait on <seat name>* for each seat its `seats_held` names (TD-1564), its tooltip the ids by member, a question's end counted among the n and named in the tooltip; each *<t>* the age (*5m ago*), the instant on hover and never rewritten to a datetime by the page, since every header delta draws the age again; on a live team a start the rule made reads *started <t> for TD-213 and 2 more* on the header's second line until the team next winds down, from the newest `restarts` entry `why: work` on the team's live records; where a replay of that start failed, *· 2 of 3 records started — manager-ao-1 did not*, counted from the entries carrying the start's instant (`start`, `of`; a failed one keeps its entry, with `error`, on the ended record; a name live again is not named; a start whose every replay failed draws no note). Never pressable: the press is the card's Start or the Inbox row's. A defined team with no record carrying its badge (§6 rule 8 *A team with no record*) reads *· its lanes hold n entries* beside *stopped* from `teamrun.lanes`, its tooltip the line Start's *What the lanes hold, before the start* draws, and no line when the lanes are empty or cannot be read |
++| Sessions | team card: **work waiting** note | display only (§6 rule 8): beside *wound down <t>*, or *stopped* (TD-781), or *members down* on a live team whose only live sessions are its seats (§4.9a *A Start beside a busy seat*; `ao team list` draws no work note for it, its *members down:* line aside), on a team whose lanes gained work, *· n entries waiting since <t>* from `work_waiting`, and *· n questions wait on <seat name>* for each seat its `seats_held` names (TD-1564), its tooltip the ids by member, a question's end counted among the n and named in the tooltip; each *<t>* the age (*5m ago*), the instant on hover and never rewritten to a datetime by the page, since every header delta draws the age again; on a live team a start the rule made reads *started <t> for TD-213 and 2 more* on the header's second line until the team next winds down, from the newest `restarts` entry `why: work` on the team's live records; where a replay of that start failed, *· 2 of 3 records started — manager-ao-1 did not*, counted from the entries carrying the start's instant (`start`, `of`; a failed one keeps its entry, with `error`, on the ended record; a name live again is not named; a start whose every replay failed draws no note). Never pressable: the press is the card's Start or the Inbox row's. A defined team with no record carrying its badge (§6 rule 8 *A team with no record*) reads *· its lanes hold n entries* beside *stopped* from `teamrun.lanes`, its tooltip the line Start's *What the lanes hold, before the start* draws, and no line when the lanes are empty or cannot be read |
+ | Sessions | team card: **starts** note | display only (§6 *Schedule*; TD-133): on a team card with nothing live whose name carries a rule in `settings.yml` (`teams.<team>.schedule`), beside *stopped* or *wound down <t>*: *starts at the reset · Thu 07:00*, the instant the `settings` read's `starts` gives (the reset the tick last read for the rule, else the account's reading's while it is ahead), in the reader's clock, by the formatter the *stops* note uses; *· held for a node's link* while a passed reset waits for one, *starts at the reset · no reading yet* with no instant to name. Nothing on a live team's card. Not a control: the rule is set by `ao schedule` or the settings page |
+ | Sessions | team card: **stops** note | display only (§6 *Team stop time*): on a **live** team's header, on its second line beside the *over its line* and *started … for* notes, *stops 06:00* — *stops Mon 06:00* when it is not today — by the formatter the card's **stops** note uses, from `teams.<team>.until` (§5): the one instant every member and seat stops at, which the Settings page wrote and a start applies to the records it creates. Tooltip: *every member and seat stops here · Settings*. Gone when the setting is cleared or its instant has passed. Nothing on a team with nothing live: that slot is the *starts* note's (one slot, two cases). **A member's compact card** draws no stop time while it matches the team's; it draws *· stops 18:00* on its one line only when its `run_until` differs — set with `ao until` or on its Focus — and *· wrapping up* once its `wrapup_sent_at` is set. Not a control: the team's time is moved on the Settings page, a member's on its Focus |
+ | card | **team** badge | the `team` the session was started under (§4.9), a badge like `role`; click filters the grid to that team. Not drawn inside that team's own group; drawn in a repo's no-team strip, under *No repo*, and in a filtered or flat grid |
+diff --git a/docs/design/4.7-cli.md b/docs/design/4.7-cli.md
+index 0c03d69..baf02b8 100644
+--- a/docs/design/4.7-cli.md
++++ b/docs/design/4.7-cli.md
+@@ -182,7 +182,11 @@ or the repo's `.shiftlead.yml` — every check first, then the manager (one on c
+ `closed` with no pane, for the tick to fill when a reading is due, §6 rule 3), then each member with
+ `controllers: [lead]` in a worktree of its repo — refused for a team of an unserved repo, naming each lack in §5 *The seams*' words (TD-1011); its first line says what each lane the start creates
+ holds — the members' and the manager's — and when every lane is empty it stops there, a refusal (exit 1), unless `--anyway` is given (§4.5a
+-*What the lanes hold, before the start* — under `--json` the line is the result's `lanes`, and the refusal's); `ao team stop <name>` wraps members up
++*What the lanes hold, before the start* — under `--json` the line is the result's `lanes`, and the refusal's); a person's start leaves each
++standing seat of the team that holds a name it creates running and lists it under `left` (§4.9a *A Start beside a busy seat*; a session's start is
++refused there), and a start refused on a held name names each holder by its clause (§4.9a *A refused Start says why*); `ao team list`
++prints *members down: techlead-ao-1 (idle, shell live)* where it prints *concluded*, its seats joined by `, `, and `--json` carries each team's `members_down`, set on a live
++team whose only live sessions are its standing seats and that is not concluded; `ao team stop <name>` wraps members up
+ before the manager (`--now` kills; `--close` also closes each member that settled clean and
+ pushed, §4.9a); `ao team status <name>` prints the manager's Members view; `ao team list` the
+ definitions, their source and whether each is live, a manager on call as *manager: <name> (on call)* and `on_call` in `--json`; a hand-started session's `project` badge and
+diff --git a/docs/design/4.9-org-team-project.md b/docs/design/4.9-org-team-project.md
+index 86b9b95..1a29720 100644
+--- a/docs/design/4.9-org-team-project.md
++++ b/docs/design/4.9-org-team-project.md
+@@ -275,8 +275,8 @@ a session in no registered repo carries neither.
+ **Starting and stopping** (`shiftlead/teams.py` plans a start and `ao team` runs it). `ao team
+ start <name>` resolves the definition, then checks *everything before launching anything*: every
+ checkout exists on this host, every role and profile resolves (a profile that runs the shell is
+-refused, below), and every session name is free under §4.1's rule — a live holder refuses the whole start and names it, so there is never half a
+-team (a member the team's current flow sits out is not started, and is no half: §4.9c); a holder a person suspended over an identity alarm (§4.8a) refuses it for the same reason;
++refused, below), and every session name is free under §4.1's rule — a live holder refuses the whole start and names it, save a standing seat of the team,
++whose name the start leaves to it (§4.9a *A Start beside a busy seat*), so there is never half a team (a member the team's current flow sits out is not started, and is no half: §4.9c); a holder a person suspended over an identity alarm (§4.8a) refuses it for the same reason;
+ exited or closed holders are superseded as §4.1 says, which makes `ao team start`
+ after a night's exit the restart too. Then it creates the manager (its grants, profile and mode —
+ the role's `control`, the host's profile and unattended, unless the definition overrides any of
+@@ -309,8 +309,10 @@ the name's next start* (a person's Start keeps the mail, §4.10 *The name coming
+ the proof is §4.2's one measure (`git.unpushed` = 0 with a `pushed_against`); a record
+ whose git state is not known yet is left open, never assumed clean: a wrapped-up Claude Code
+ session sits `idle` rather than leaving, and `ao team start` refuses while a session holds a
+-member's name — the refusal names the cure, *… is idle as <id>: `ao team stop <team> --close` closes a settled
+-member, or Close it on its card*. `ao team status <name>` is the manager's Members view for a terminal: each member
++member's name — the refusal names each holder by the clause that keeps the team from concluded, then Close only
++for a holder safe to close and a wait for the rest, *grinder-ao-1 idle, out of work; grinder-ao-2 working — Close
++grinder-ao-1 on its card; wait for grinder-ao-2, or Wind down* (§4.9a
++*A refused Start says why*). `ao team status <name>` is the manager's Members view for a terminal: each member
+ with state, lane and report line; under `--json` each row also carries `unattended`, `seat`,
+ `out_of_work` and `restart_wanted` as the record has them, and `person` — a person's own session in the team holds no
+ seat whatever preset it runs: the team's techlead is the seat its definition names (§4.9b), and the text listing
+@@ -855,8 +857,9 @@ removal: it ends with its team's run.
+   (`succeeds`, the same carry), and each removal is marked by the sit-out form, before the members
+   are created. The result lists them (*grinder-dc-1 → dc-grinder*, *grinder-dc-2 removed*), and the
+   confirm says so first. A newcomer an earlier Apply already marked on its orphan is created succeeding
+-  that orphan too. A live team is offered Apply, never Start: a Start while an orphan still runs (the
+-  team not concluded) is refused, naming it, and so is a session's `ao team start` of a team with a
++  that orphan too. A live team is offered Apply, never Start, save a members-down one, whose only live sessions are its seats
++  (§4.9a *A Start beside a busy seat*: a standing seat is left running, and a live seat the definition renamed or dropped keeps its team from members down): a Start while an orphan still runs (the team not
++  concluded) is refused, naming it, and so is a session's `ao team start` of a team with a
+   rename or a removal, since both acts are a person's — both refused before anything is marked or created.
+ - **Not read as a rename**: a person's session; a member a flow sits out (its name is still the
+   definition's); a record already superseded. A rename the pairing cannot see — two roles swapped at
+diff --git a/docs/design/4.9a-winding-down.md b/docs/design/4.9a-winding-down.md
+index dc7a66e..0e86748 100644
+--- a/docs/design/4.9a-winding-down.md
++++ b/docs/design/4.9a-winding-down.md
+@@ -158,11 +158,149 @@ there, since a worker's `/exit` does not leave and a manager on an older brief m
+ itself. Its card offers **Start** and no wind-down, and `ao team start` on it closes each
+ concluded session — under the same check a wrap-up's close runs, so one with uncommitted or
+ unpushed work is not closed and the start is refused naming it — and supersedes the record under
+-its name before any create; a live session that is not concluded is still refused by name. A
++its name before any create; a live session that is not concluded is still refused by name, save a
++standing seat of the team, which the start leaves running (*A Start beside a busy seat*, below). A
+ suspended record is untouched: it refuses every create (§4.8a). A usage stop is no ending: the
+ §6 *Usage gate* (TD-100, built) pauses and resumes the sessions itself, so no declaration is made
+ for it.
+ 
++**A Start beside a busy seat** (TD-1569; Paul, 2026-11-10: ao-grind's card offered only Wind down and
++Stop now while its grinders and designer were down with work in their lanes, because its techlead seat
++was answering him with a background merge still running). A seat comes on a question and leaves (§4.9b);
++it is not the team's run, and a seat at work never stands between the person and the members. A live
++team is **members down** when every live unattended session carrying its badge is one of its
++**standing seats**: a seat under the name the definition gives it now — the techlead, a seat with a
++trigger, or a manager on call in the definition now whose record carries its `seat` mark (a record
++carrying the mark under a definition that now reads standing is no standing seat either; a standing manager, or one started
++before the definition read *on call*, is no seat, so a team with it live is never members down) — or
++an extra of one of those seats: a record carrying both `scale` and a `seat` mark, whose `scale.line`
++is the techlead's or a trigger seat's name in the definition now (a worker line's extra carries `scale`
++and no `seat` mark, and counts as a member, §4.9 *Scaling with the work*). The Settings switch's sweeper
++(§4.9b *The switch*) is no standing seat: which plan holds it turns on a switch the card's other
++readings do not take, so a team with it live is never members down and its live sweeper holds its
++name against a Start as any other live session does — a known gap, left for the sweeper's own design:
++its card offers Wind down and Stop now until the sweep ends and rule 3 closes it. The test is its own, `teamrun.standing_seats`, read by the card's reading and the
++Start's set-aside alone; `seat_names` and `_seat_of`, which the card's on-call slot, *wound down* and the
++concluded closes read, are unchanged. A team whose standing manager is live is never members down by
++choice: the manager is the team's run, and Wind down is its act. A live seat the definition renamed or dropped, or one running under a stale tmux session's
++suffixed name, is not a standing seat: it is a running orphan, as on any live team, and keeps its team
++from members down — Apply, or the seat's own close, is its way out (§4.9 *Start reads the same
++pairing*). None of the standing seats is suspended (a suspended seat refuses every
++create, §4.8a, so its team is never members down) — and the team is not concluded; its members are exited
++or closed however they ended (declared, crashed, killed, sat out). It is read when the card is drawn, from
++the records, as *concluded* is, and nothing is stored: `teamrun.rows` carries **`members_down`**, None
++or `{seats: [{name, id, why}]}`, one entry per live seat, `why` the finished reading's clause for it
++without the name (*idle, shell live*), else its state (*working*, *idle*). The finished reading gives
++its clauses keyed as well as listed — **`clauses: {<name>: <clause without the name>}`** beside `why`,
++the same text — so no reader matches a clause to a holder by its prefix. A concluded team is never
++members down (*concluded* wins): its seats are idle with nothing live, and its Start closes them as
++above. A
++members-down team's card offers **Start** beside Wind down and Stop now (§4.5a, its row *team card:
++Start / Wind down / Stop now*), in that order, the page drawing a third header state for it beside
++*live* and *stopped* (`stopped` stays `not live or concluded`) whose words are *members down* and its
++seats' clauses joined by ` · ` (*members down · techlead-ao-1 idle, shell live · review-ao-1 working*), the team's work note drawn as on a
++stopped card (§6 rule 8's `work_waiting`, where it stands), the *i* panel's *not concluded* line still
++drawn (it says why the team is not concluded, the header what its Start leaves), and the live team's *definition changed* (or *flow
++changed*) **Apply** mark where the records differ from the definition, as on any live team; the page
++holds `members_down` to the records as it holds `concluded` (its seats' names the live names), and
++draws neither where they disagree. Its one-line confirm names every live seat
++from `members_down.seats`, which the Start leaves whether or not it holds a name the start creates
++(*Start ao-grind? techlead-ao-1 (idle, shell live) and review-ao-1 (working) are left running*), the
++rename lines first where there are any. Start there, like a person's `ao team start` on such a team, is
++the same sequence as any Start with one difference: **a name held by a live standing seat of the team is
++left to it**. The terminal's rule is per holder and so wider than the card's: a person's `ao team
++start` sets a standing seat aside whatever else the team has live, so it starts a team the card offers
++no Start (a live run-only member, a worker line's extra) where those hold no name it creates, as it
++could before for a team whose live sessions held none. The order is fixed: the name checks run for every launch; the team's records are read (`list`), as
++every Start reads them for the pairing; where a verdict is `live` or `suspended` or the pairing found a
++rename or a removal, the reading is taken with the home's `waiting` (`waiting_of_home`, strict) as
++`_close_concluded` takes it — a Start with none of these reads no `waiting`, as today, and one whose
++`waiting` read fails is refused saying so, as today; on a concluded team the closes run as above; otherwise each `live` verdict
++whose holder is a live standing seat of the team is set aside as **left** — its
++create skipped, the seat not closed, not typed at and not superseded, and not asked `keep_mail` (`keep_mail_for` is given the verdicts without the left ones) — a
++`live` verdict whose holder that read finds dead (rule 3 closed the seat between the check and the read,
++or any holder ended in between) is read as the dead record's verdict, built from that read (`supersede`
++with its `holder_state`), the name not checked again — given to `keep_mail_for` as the dead holder it now is, which keeps
++its mail where it keeps any dead holder's (a closed one, or an exited one carrying `stop_held`) — and goes to its create, which supersedes it as §4.1 does any dead holder, and any other `live` or `suspended`
++holder refuses the whole start by name (*A refused Start says why*, below) — a `suspended` verdict
++among them, which is never rebuilt, so a suspension is lifted only by a person (§4.8a) — naming those holders and not
++the seats it would leave; only where nothing refuses so is a session's start refused for a seat (below).
++The pairing of renamed and
++dropped members then runs as on any Start (§4.9 *Start reads the same pairing*) and reads as before
++(`_pairing`, which Apply and the card's rename lines read too, is unchanged): a dead orphan is succeeded
++or marked, and a running orphan — a live seat the definition renamed or dropped, a stale-suffixed one,
++— refuses, as a members-down team never has one. The members' `{techlead}` and `{manager}`
++already name the name's id, which is the holder's (§4.1); where the left seat is the manager on call,
++its id is the lead id that every other create's `controllers` (the techlead's, each seat's, each
++member's), the held extras' controllers, the interactive-member note and the result's `manager` read, as
++a created manager's would be. A live seat under a stale tmux session's suffixed name is a running orphan
++(above), so a Start never creates the definition's name beside it.
++A left seat keeps its own launch record (brief, profile, flow) until it is next filled or the team next
++starts from nothing live; a definition changed since then reads *flow changed — Apply* on the card as
++any running session's does (§4.5a). Should the team read concluded at the press though the card drew it members down (the
++seat's shell ended in between), *concluded* wins there too: the Start closes the idle seat, and its
++result lists it under `closed`, as any concluded team's does, the toast saying what was closed. The lanes are read and an empty set opens Start anyway as on any
++Start, its second line naming the seats left. The result lists the seats whose launch was skipped under
++**`left`**, `{name, id, why}` in `members_down`'s shape, and `ao team start` prints one line per seat
++left, *left running: techlead-ao-1 (idle, shell live)*, and the card's toast after the press names them
++the same way (*started ao-grind — techlead-ao-1 left running*): the seats `left` lists, which may be
++fewer than the confirm named, since a live seat's extra, or a seat holding no name the start creates, is
++left with no create skipped; with `left` empty the toast says *started ao-grind* alone. The home's start mark (`team_start`, its usage reading at the start, §4.9a *The home's note says
++more*) passes over a live seat when it asks whether the team already runs, so a members-down Start is
++counted a start as one from nothing live is; this holds for every start — rule 8's replay of one
++member beside a live seat, with no other member live, writes it too, as the schedule's does — so a Start from nothing live,
++whose seats are created before its members, writes the mark at every create until a member is live, the
++same start's reading seconds apart. The seat goes on as it was: its turn, its background shell and its
++merge finish, and rule 3 closes it between questions and fills it again as ever, under the same id. A
++manager on call that rule 9 told to make its last acts (its `WRAPUP_GRACE`) may still close itself as
++the members come up; rule 9's take-back clears its mark on the next tick, and rule 3 fills it again,
++under the same id, when its members next need a reading. Two Starts at once are not guarded beyond the names: a left seat
++holds no name the second checks, and a seat or a manager on call created by the first is live or held
++before the members are, so the second passes its checks until the first's members exist; their creates
++then meet at the names, each create on a name the other made already live is refused as any create on a
++live name is (§4.1, the host agent's `_name_holder`), and each Start ends a `PartialStart` naming what it created — every member created
++once, by one or the other. This holds for a Start from nothing live too, where today the second meets the
++first's live techlead and is refused cleanly by name: the window is the seconds between a Start's seat
++creates and its first member's, and it is accepted; a Start clears `work_waiting` as any person's
++Start does (§6 rule 8), and rule 8's mark goes once every member it names is live again; a create that
++fails part-way is a `PartialStart` as on any start, and the seat it left is untouched either way. **It
++is a person's act**: a session's `ao team start` (its `caller` set) that would leave a seat is refused,
++after the name checks and only where nothing else refuses it, in words of its own — *team ao-grind was
++not started — techlead-ao-1 is running: a Start that leaves a seat running is a person's (design §4.9a
++A Start beside a busy seat)* — leaving a seat being a person's Start, as a rename's is (§4.9 *Start
++reads the same pairing*), so no seat starts its own team's members. Rule 8 and the
++schedule are unchanged: rule 8's member-by-member reading (*A member that finished while its team runs
++on*) still starts a finished member for lane news while a seat runs, the schedule starts only a team
++that reads wound down, and this Start is the person's press for what neither starts — work already
++seen, a member a person stopped, a team whose `on_work` is `ask` or `off`.
++
++**A refused Start says why** (TD-1569). On a team that is not concluded, a Start refused because a name
++is held (`NamesHeld`, raised where the records are read and the home's `waiting` is, as in
++`_close_concluded`) names each holder, in the launches' order and joined by `; `, by the finished
++reading's clause for it (`clauses`) — *grinder-ao-1 working*, *grinder-ao-2 idle, subagent live*,
++*designer-ao-1 waiting on the person: TD-222*, *grinder-ao-1 waiting on techlead-ao-1: #2067* — and,
++where the reading has no clause for a crew record, by its state and its declaration, *grinder-ao-1 idle,
++out of work* or *grinder-ao-1 idle, restart wanted*, else by its state and what it is, *a seat* or *the
++manager*; never by the bare state alone. A holder that is not a crew record of the team — a person's
++own session (`crew` leaves it out), another team's session, one with no badge, a tmux session no record
++holds — keeps today's holder words, *<name> is <state> as <holder>*, as a suspended holder does
++(§4.8a), on any team, one with nothing live included, and is in neither part of the cure, save the
++person's own session (a session carrying the team's badge with `unattended: false`, as `crew` leaves it
++out; one with no badge is not the team's and gets no Close), which the first part offers to close (*Close <name> on its card*) where it is
++`idle` with no subagent or shell live and passes the wrap-up's check, since it is the person's to close. Today's tail
++(*`ao team stop <team> --close` closes a settled member, or Close it on its card*) goes from every
++refusal on a team that is not concluded: the holders' words, crew and not, are joined by `; `, and the
++cure follows a single ` — ` only where it has a part, so a refusal whose holders are all outside the
++crew ends with their words. Then, after a ` — `, the cure, in two parts each said only where it has a holder:
++the holders it is **safe to close** now, each by the card's Close and never by `ao team stop --close`,
++which would wrap up every live member and seat of the team — a member of the team's crew (not the manager or a seat), `idle` and declared (`out_of_work` or `restart_wanted`), with no subagent and no shell live,
++not waiting (on the person or on a reader), and passing the wrap-up's check (no uncommitted file, no
++unpushed commit) — *Close grinder-ao-1 on its card*; and the rest of
++the crew's holders, *wait for grinder-ao-2, or Wind down*, the two parts joined by `; `. Within a part, names are joined by `, ` and
++the last by ` and ` (*Close grinder-ao-1 and grinder-ao-2 on their cards*). An idle member that has not
++declared is not safe to close: Wind down is its act (§4.5a's row *team groups*). A refusal on a concluded team
++(a suspended holder, or one not of its crew) keeps today's whole message, its tail included.
++
+ **A decided board line is work, and a team is not out of work while one is unclaimed (TD-380;
+ designed 2026-10-07; the lanes built (TD-384 slice 1) and the brief's paragraph (slice 3)).** A `free-pick` lane holds the repo's open decided lines
+ as work orders (§4.4 *Board write-back*, §6 rule 6), so *out of work* reads them as it reads
+diff --git a/docs/design/4.9b-techlead.md b/docs/design/4.9b-techlead.md
+index 0f210ce..ac7a68b 100644
+--- a/docs/design/4.9b-techlead.md
++++ b/docs/design/4.9b-techlead.md
+@@ -24,7 +24,9 @@ team has one, the techlead answers it or passes it up, and the person is the top
+   session (`ao new --role grinder`) reads `none`. `ao team list` names the seat, and a team whose
+   members all declared reads *wound down* without the seat's word: the seat is known by the name
+   its definition gives it — or that name with the numeric suffix a stale tmux session forces,
+-  unless a member is defined under it — never by a role badge.
++  unless a member is defined under it — never by a role badge. A standing seat at work never holds a Start:
++  a team whose only live sessions are its standing seats is *members down*, and its Start leaves each
++  live seat running and starts the members (§4.9a *A Start beside a busy seat*).
+ - **Seats with a trigger (TD-098).** The techlead is the first seat, and its trigger is a
+   question landing. A team definition may carry more, under **`seats:`** — each `{name, role,
+   trigger, brief, profile, home}`, an `asks` seat's `profile` replaceable by an ordered **`pool:`** of profiles
+diff --git a/docs/design/6-policies.md b/docs/design/6-policies.md
+index 994b4ce..81e22cd 100644
+--- a/docs/design/6-policies.md
++++ b/docs/design/6-policies.md
+@@ -1183,8 +1183,9 @@ block. A policy is agent code and needs no grant; a session doing the same work
+      rule is a manager that never declared — and rule 8 watches its lanes as after any wind-down. The same conclusion's closes mark each of the
+      team's run-only records, the finished live ones it closes and any dead one not yet marked,
+      `closed_for: {why: run_ended}` (rule 8, TD-1149).
+-     Seats are not this rule's to close: an idle seat closes under rule 3's grace, and a Start
+-     closes it. An interactive manager, or member, is a person's: never typed at, never closed,
++     Seats are not this rule's to close: an idle seat closes under rule 3's grace, and a concluded
++     team's Start closes it (a members-down team's Start leaves its standing seats, §4.9a *A Start beside a
++     busy seat*). An interactive manager, or member, is a person's: never typed at, never closed,
+      and not counted (§9 invariant 5). Not while a member is gated: a paused member has declared
+      nothing, so the team is not finished, and nothing here reads the gate. A node's member is
+      closed as rule 2 closes one, routed over the link, and waits for the link. **What this leaves
+diff --git a/docs/glossary.md b/docs/glossary.md
+index e690f09..60c2c9b 100644
+--- a/docs/glossary.md
++++ b/docs/glossary.md
+@@ -272,6 +272,7 @@ not mix:
+ - **restart** (a person's) — the press that puts a supervised member back into its team's run: closed if still there, replayed from its launch record unattended, its restart marks and count cleared (design §6 rule 2 *A person's restart*, TD-246). *Not:* Resume, which brings a session back attended under the person. — *proposed* 2026-09-30.
+ - **finished** — of a member: it declared *out of work*, is idle, exited or closed, and is not *waiting* (TD-271) (design §4.9a *Finished means declared, not gone*). Of a team: the home's reading that every unattended live member that is not a seat and not the manager is finished, no restart is wanted, the seats are idle or gone and the manager is idle (design §6 rule 9, TD-240) — read from the records each tick, never a manager's word. — *proposed* 2026-09-29.
+ - **concluded** — the team card's word for a live team the home reads as finished: its sessions are still there, idle, and its one control is Start (design §4.5a *team groups*, §4.9a *A person's Start on a concluded team*). *Not:* wound down, which is a team with nothing live. — *proposed* 2026-09-29.
++- **members down** — the reading (`members_down` on `ao team list --json` and the card's row) of a live team whose only live sessions are its standing seats (the techlead, a seat with a trigger, a manager on call carrying its seat mark, or such a seat's extra, each under the name the definition gives it now; never the Settings sweeper) and that is not concluded: its card offers Start beside Wind down and Stop now, and the Start leaves each live seat running (design §4.9a *A Start beside a busy seat*). *Not:* wound down, which has nothing live, nor concluded, whose Start closes its idle seats. — *proposed*
+ - **waiting** — of a live member: the person inbox holds an open `ask` or `steer` from it that names a reference; it is not finished, whatever it declared, until the answer or the bound (design §4.9a *Waiting is read, never declared*, TD-271). Read from the person inbox each tick, never declared and never a state. *Not:* out of work, the member's own word about its lane, which may stand beside it. — *proposed* 2026-10-02.
+ - **unseen** — of an interactive record: a turn of it ended after the person last looked (`turn_at > seen_at`; a visible Focus, or a control used on its card, sets `seen_at`). A **mark** beside the pill, never a pill or a state, so a session can be *working* and unseen (design §4.2 *Unseen*, TD-1222). Never on an `unattended` record. *Not:* *finished* (a declaration, §4.9a); *idle · unseen*, the composed pill it replaced. — *proposed* 2026-10-29.
+ - **out of work** — a session's own declaration that its role's test finds nothing left
+diff --git a/docs/history/TD-1569.md b/docs/history/TD-1569.md
+new file mode 100644
+index 0000000..c34dcb2
+--- /dev/null
++++ b/docs/history/TD-1569.md
+@@ -0,0 +1,11 @@
++## §4.9a
++
++- 2026-11-14 (TD-1569, designer): designed *A Start beside a busy seat* and *A refused Start says why*. On 2026-11-10 ao-grind's card offered only Wind down and Stop now while its members were down with work in their lanes, because its techlead seat was idle with a background shell (a precheck-and-merge) still running, so the team was neither wound down nor concluded; `ao team start` refused on the seat's name, said it *is idle*, and offered Close. A live team whose only live sessions are its seats now reads *members down*, and its Start leaves each live seat running and starts the members; a refusal names each holder by the finished reading's clause and offers Close only for a holder safe to close. A session's start that would leave a seat is refused: leaving a seat is a person's act, as a rename's is. Only a standing seat (one the definition names now, or such a seat's extra) is left; a renamed, dropped or stale-suffixed seat still at work stays a running orphan, so Apply and the rename pairing are unchanged, and the Settings sweeper is no standing seat: a live one holds its name, a known gap. A team whose standing manager is live is never members down, by choice: the manager is the team's run. Considered and not taken: a separate *Start members* act (the same sequence under a second name, Paul's alternative wording; the confirm says what it leaves instead); making a live seat count as not live in the wound-down reading (it would move rule 8, the schedule's start and rule 3's seat hold with it).
++
++## §4.9
++
++- 2026-11-14 (TD-1569, designer): a live seat of the team no longer refuses `ao team start`; the refusal's words follow §4.9a *A refused Start says why*.
++
++## §4.5a
++
++- 2026-11-14 (TD-1569, designer): the team card offers Start beside Wind down and Stop now on a members-down team, its confirm naming each seat it leaves.
+diff --git a/docs/ledger/TD-1569.md b/docs/ledger/TD-1569.md
+index 04b6c6e..07e1ca9 100644
+--- a/docs/ledger/TD-1569.md
++++ b/docs/ledger/TD-1569.md
+@@ -5,8 +5,9 @@
+ **Added:** 2026-11-10 (Paul, through ao-led-tds-ledger; drafted by ao-shiftlead-techlead-ao-1)
+ **Owner:** designer
+ **Kind:** design-first
+-**Status:** Open
++**Status:** Open — designed; builds TD-9001 (Start beside a busy seat), TD-9002 (the refusal says why). Class: in-repo (it changes this repo's team start, card and refusal words, nothing another repo or the cadence payload runs), cap 4. The rounds ended at the cap (round 4's reviews raised build-changing findings), with two recurring topics: which live seats a Start leaves, and the refusal's words. Trend, build-changing per round from the design reviews: 4, 7, 3, 2 (fact-checks apart: 4, 2, 3, 1). Waiting on the end-of-rounds item (Context: TD-1569 decision (paul)), which recommends One more round: F91's fix is read by no review
+ **Id take:** b81bba5d8c3f403ab8c8b09d493155f3
++**Blocked by:** decision (paul)
+ **Location:** design §4.5a *Start / Wind down / Stop now*; §4.9a *A person's Start on a concluded team*; §4.9b; src/shiftlead/teamrun.py (`NamesHeld`, `_close_concluded`, `concluded`); src/sessionorc/work.py (`finished`)
+ 
+ **Why:** A team whose workers wound down cannot be restarted from its card while one of its seats is busy. ao-grind's card offered only **Wind down** and **Stop now** while its grinders and designer were exited with work in their lanes (grinder: 3 pickable, 2 live check; designer: 11 design). `ao team start ao-grind` refused: *team ao-grind was not started — techlead-ao-1 is idle … `ao team stop ao-grind --close` closes a settled member, or Close it on its card* (Paul, through `ao-led-tds-ledger`, m-1f43099fd62f, 2026-11-10).
+@@ -17,9 +18,15 @@ So the code most likely follows the design, but the outcome is wrong in two ways
+ - **A seat stands in front of the team's work.** A seat comes on a question and leaves (§4.9b). That one is mid-answer should not keep the person from starting the members whose lanes hold work. Today only waiting for the seat to finish, or killing it, gets the team going again.
+ - **The refusal misleads.** It says the seat *is idle* and offers Close, when the seat was busy (a shell live) and closing it would cut off its merge. The concluded test's own clause (`why`) is never shown.
+ 
++**Ask:** Go on this build as written, now that TD-1569's four review rounds have ended at the cap (One more round recommended: F91's fix, the suspended verdict never rebuilt, is read by no review)?
++
+ **Fix:** Design first (§4.5a *Start / Wind down / Stop now*, §4.9 `ao team start`, §4.9a *A person's Start on a concluded team*, §4.9b seats).
+ 
+ 1. **Starting the members while a seat is live.** When every non-seat member is exited or closed, or concluded, and the lanes hold work, the card offers **Start** (*Start members*, Paul's alternative wording) beside Wind down. The start creates the members and leaves a live seat alone, never closing a seat that is working or has a shell live. Settle whether this is the existing Start with seats exempt from the name check, or a separate act, and what rule 8 does in the same case.
+ 2. **The refusal says why.** A `NamesHeld` refusal on a team that is not concluded names the concluded test's clause for that holder (*techlead-ao-1 idle, shell live*), not the bare state, and offers Close only for a holder it would be safe to close.
+ 
+ **Done when:** The design says what the card offers when only seats are live and lanes hold work, and a build makes it so: a team in ao-grind's case can be started from its card without closing a busy seat, and a refused start names the clause that kept the team from being concluded.
++
++**Log:**
++- 2026-11-14: gated (TD-1720)
++- 2026-11-15: gate added: decision (paul)
+diff --git a/docs/ledger/TD-9001.md b/docs/ledger/TD-9001.md
+new file mode 100644
+index 0000000..b6f606b
+--- /dev/null
++++ b/docs/ledger/TD-9001.md
+@@ -0,0 +1,31 @@
++## TD-9001: A team whose only live sessions are its seats offers Start, and the Start leaves each live seat running
++
++**Priority:** Medium
++**Type:** debt
++**Added:** 2026-11-14
++**Owner:** grinder
++**Kind:** build
++**Status:** Open
++**Blocked by:** decision (paul)
++**Part of:** TD-1569
++**Location:** design §4.9a A Start beside a busy seat, §4.5a team card: Start / Wind down / Stop now; src/sessionorc/work.py (finished); src/shiftlead/teamrun.py (rows, start, standing_seats, keep_mail_for); src/sessionorc/agent_tick.py (_mark_team_start); src/shiftlead/ui/repo.py, src/shiftlead/ui/templates/group_head.html (the team card), src/shiftlead/ui/app.py (the start press's toast), src/shiftlead/ui/static/app.js (the Start anyway dialog), src/shiftlead/ui/org.py (the rollup's acts), src/shiftlead/ui/help.py; src/shiftlead/cli.py (ao team list)
++
++**Why:** TD-1569's first half: a team whose members are down while a seat of it is still at work (ao-grind, 2026-11-10: the techlead idle with a background merge running, the grinders and designer down with work in their lanes) has no Start on its card, and `ao team start` refuses on the seat's name.
++
++**Ask:** Go on this build as written, now that TD-1569's four review rounds have ended at the cap (One more round recommended: F91's fix, the suspended verdict never rebuilt, is read by no review)?
++
++**Fix:** Build design §4.9a *A Start beside a busy seat*, §4.9 *Starting and stopping* and *Start reads the same pairing*, §4.5a's rows *team card: Start / Wind down / Stop now*, *team groups* and *rollup: press and menus*, §4.7 *Teams*:
++- `work.finished` returns **`clauses: {<name>: <clause without the name>}`** beside `why`, the same text keyed by the record's name (or id), for every session it gives a clause; `why` is unchanged, so the tick and the page read as before.
++- **`teamrun.standing_seats(team, mine)`**, a new function read by `members_down` and the start's set-aside alone (`seat_names` and `_seat_of` unchanged): a live crew record under the name the definition gives it now — the techlead, a seat with a trigger, the manager on call in the definition now and carrying its `seat` mark — or an extra of one of those seats (`scale` and a `seat` mark both, `scale.line` the techlead's or a trigger seat's name in the definition now). A worker line's extra (`scale`, no `seat` mark), a seat the definition renamed or dropped, one under a stale tmux suffix, and the Settings sweeper are not standing seats.
++- `teamrun.rows` carries **`members_down`**: None, or `{seats: [{name, id, why}]}` with one entry per live seat when the team has a live unattended session, every such session is a standing seat, none suspended, and `concluded` is None — `why` from `clauses`, else the record's state; None wherever `concluded` holds (concluded wins). `ao team list --json` carries it, and its text prints *members down: <seat> (<why>)*, seats joined by `, `, where it prints *concluded*.
++- `teamrun.start`, in this order: the name checks for every launch; the `list` read every Start makes for the pairing; where a verdict is `live` or `suspended` or the pairing found a rename or a removal (as today's `_close_concluded` is reached), the team's reading with `waiting_of_home(call, strict=True)` — the existing reads restructured so the left seats are decided before `keep_mail_for`; on a concluded team `_close_concluded` as today (its idle seats closed); otherwise each `live` verdict whose holder is a live standing seat is set aside as left — its create skipped, the holder not closed, typed at or superseded, and left out of `keep_mail_for`'s verdicts — a `live` verdict whose holder the read finds dead (any holder, on this path; a `suspended` verdict is never rebuilt and refuses) is rebuilt from the read as the dead record's verdict (`supersede` with its `holder_state`, no second name check), given to `keep_mail_for` as the dead holder it now is (its mail kept where any dead holder's is: closed, or exited with `stop_held`), and goes to its create (superseded as §4.1 does), and any other `live` or `suspended` holder raises `NamesHeld` (TD-9002's words), naming those holders and not the seats. `_pairing` and `_start_moves` are unchanged (Apply and the card's rename lines read them): a running orphan (a renamed, dropped or stale-suffixed live seat) refuses as today; a live Settings sweeper holds its name as any non-standing live session does. A failed strict `waiting` read refuses as today. A session's start (`caller` set) that would leave a seat is refused, only where nothing else refused, in its own words: *team <t> was not started — <seat> is running: a Start that leaves a seat running is a person's (design §4.9a A Start beside a busy seat)*. Where the left seat is the manager on call, its id is `lead_id`: the techlead's, each seat's and each member's `controllers`, `write_extras`' controllers, `out_of_reach` and the result's `manager` read it. The result gains `left: [{name, id, why}]`, the seats whose launch was skipped.
++- `agent_tick._mark_team_start` passes over a live seat (a record carrying `seat`) when it asks whether an unattended record of the team runs, so a members-down Start writes the usage mark as a start from nothing live does. It holds for every start: a Start from nothing live writes the mark at every create until a member is live, and rule 8's replay of one member beside a live seat writes it too.
++- The Sessions page (`src/shiftlead/ui/repo.py`'s team rows, `src/shiftlead/ui/templates/group_head.html`) draws a third header state for a team whose row has `members_down` — its words *members down · <seat> <why>*, seats joined by ` · `, Start, Wind down and Stop now in that order, the team's work note as on a stopped card, the *i* panel's *not concluded* line still drawn (why the team is not concluded), `stopped` staying `not live or concluded` — with the live team's existing *definition changed* / *flow changed* Apply mark where the records differ; `members_down` is held to the records as `concluded` is (its seats' names the live names), neither drawn where they disagree; the one-line confirm names every live seat from `members_down.seats` (*Start ao-grind? techlead-ao-1 (idle, shell live) and review-ao-1 (working) are left running*), the rename lines first, and the empty-lanes Start anyway dialog carries the seats as its second line, as a concluded team's carries its closes. The rollup row's ⋯ (`src/shiftlead/ui/org.py`, its `acts`) holds Start after Wind down and Stop now on such a team.
++- Two help paragraphs, each in §4.5a's list and `src/shiftlead/ui/help.py` together (`tests/test_help.py` holds them equal): **Start**'s third sentence becomes *It is not a message: a running session is mailed with Message…, a seat still at work is left running beside the members it starts, and a session holding uncommitted or unpushed work refuses the start instead of being closed.*; **not concluded**'s first sentence becomes *Says why this team is not concluded, and so has no Start unless only its seats are live: one clause for each session that keeps it from reading concluded — one that is working, one idle that has not declared, one that crashed or wants a restart, one waiting on your answer to its question.*
++- `ao team start` prints a line per left seat, *left running: techlead-ao-1 (idle, shell live)*, and `--json` carries `left`; the card's toast names them the same way (*started ao-grind — techlead-ao-1 left running*; the seats `left` lists, which may be fewer than the confirm's; *started ao-grind* alone when `left` is empty), in `src/shiftlead/ui/app.py`'s start press, and the Start anyway dialog's second line in `src/shiftlead/ui/static/app.js`.
++- Tests: a team with every member closed and its techlead seat `idle` with `shells_live` reads `members_down` and starts its members without a create for, or a close of, the seat; the same with the manager on call live gives every create that manager's id as its controller; the same started by a session is refused in its own words; a seat closed between the name check and the read is created again; a suspended closed holder still refuses; a live seat the definition renamed keeps the team from `members_down` and refuses the Start as a running orphan; a suspended live seat keeps the team from `members_down`; the same team with a non-seat member live refuses by name; a concluded team still closes its idle seat; Apply's `differences` are unchanged; a live Settings sweeper, and a live worker line's extra, keep the team from `members_down`; a team read concluded at the press though drawn members down closes its idle seat and lists it under `closed`; `members_down` is None on a concluded team; `finished` returns `clauses` matching `why`; `_mark_team_start` writes the mark on a create beside a live seat; the rollup ⋯ holds Start on a members-down team.
++
++**Done when:** On a team whose members are all exited or closed and whose techlead seat is idle with a shell live, the team card offers Start beside Wind down and Stop now, its confirm names the seat it leaves, and the press (or `ao team start`) creates every member and leaves the seat running and untouched; the result lists the seat under `left`.
++
++**Log:**
++- 2026-11-15: gate added: decision (paul)
+diff --git a/docs/ledger/TD-9002.md b/docs/ledger/TD-9002.md
+new file mode 100644
+index 0000000..b710d01
+--- /dev/null
++++ b/docs/ledger/TD-9002.md
+@@ -0,0 +1,26 @@
++## TD-9002: A refused team start names each holder by the clause that kept the team from concluded, and offers Close only where it is safe
++
++**Priority:** Medium
++**Type:** debt
++**Added:** 2026-11-14
++**Owner:** grinder
++**Kind:** build
++**Status:** Open
++**Blocked by:** TD-9001, decision (paul)
++**Part of:** TD-1569
++**Location:** design §4.9a A refused Start says why, §4.9 Starting and stopping; src/shiftlead/teamrun.py (NamesHeld, _close_concluded)
++
++**Why:** TD-1569's second half: `ao team start ao-grind` refused with *techlead-ao-1 is idle … Close it on its card* while the seat was idle with a shell live mid-merge, so the refusal both misread the seat and offered a close that would have cut off its merge.
++
++**Ask:** Go on this build as written, now that TD-1569's four review rounds have ended at the cap (One more round recommended: F91's fix, the suspended verdict never rebuilt, is read by no review)?
++
++**Fix:** Build design §4.9a *A refused Start says why* (the seats the start would leave are not named among the holders) and §4.9 *Starting and stopping*'s refusal words, on TD-9001's `clauses`:
++- `NamesHeld`, on a team that is not concluded, is raised where the records and `waiting_of_home(call, strict=True)` are read (as `_close_concluded` reads them), and names each holder in the launches' order, joined by `; `: a crew record by its clause from `clauses` (person-waiting and reader-waiting included), else by its state and its declaration (*grinder-ao-1 idle, out of work*, *… idle, restart wanted*), else by its state and what it is (*a seat*, *the manager*) — never by the bare `holder_state` alone; a holder not of the team's crew (a person's own session, another team's, no badge, an unrecorded tmux session) and a suspended one keep today's holder words (*<name> is <state> as <holder>*) and are in neither part of the cure, save a person's own session — a session carrying the team's badge with `unattended: false`; one with no badge is not the team's — offered *Close <name> on its card* in the first part where it is `idle` with no subagent or shell live and passes `_unsafe_to_close`. Today's tail (*`ao team stop <team> --close` closes a settled member, or Close it on its card*) is dropped on a team that is not concluded; any refusal on a concluded team keeps today's whole message, its tail included.
++- After a single ` — `, only where it has a part, the cure in two parts, each only where it has a holder: the holders safe to close now: each member of the team's crew (not the manager or a seat) that is `idle`, declared (`out_of_work` or `restart_wanted`), with no `subagents_live` and no `shells_live`, waiting neither on the person nor on a reader, and passing `_unsafe_to_close`; and the person's own session as above — *Close grinder-ao-1 on its card* (never `ao team stop --close`, which would wrap up every live member and seat); then the rest of the crew's holders, *wait for grinder-ao-2, or Wind down*, the two parts joined by `; `; within a part names are joined by `, ` and the last by ` and ` (*Close grinder-ao-1 and grinder-ao-2 on their cards*). A refusal whose holders are all outside the crew ends with their words.
++- The card's toast and `ao team start`'s refusal (exit 1, `{"error": …}` under `--json`) print the same words.
++- Tests: a holder idle with a shell live is named *idle, shell live* and offered no Close; a holder waiting on a reader is offered no Close; an idle undeclared holder is offered no Close; a holder idle, declared and clean is offered Close by name; one safe and one working holder give both parts; an unrecorded tmux holder alone gives today's holder words and no cure; a concluded team's refusal keeps today's tail.
++
++**Done when:** A start refused on a held name names each holder by the clause that keeps the team from concluded (*grinder-ao-1 idle, shell live*), and offers Close only for a holder that is idle with nothing live, not waiting, and clean and pushed.
++
++**Log:**
++- 2026-11-15: gate added: decision (paul)
+diff --git a/docs/reviews/TD-1569.md b/docs/reviews/TD-1569.md
+new file mode 100644
+index 0000000..5c244d0
+--- /dev/null
++++ b/docs/reviews/TD-1569.md
+@@ -0,0 +1,163 @@
++# Review record: TD-1569
++
++**Design:** docs/design/4.9a-winding-down.md §4.9a *A Start beside a busy seat*, *A refused Start says why*; docs/design/4.9-org-team-project.md *Starting and stopping*, *Start reads the same pairing*; docs/design/4.5a-controls.md rows *team card: Start / Wind down / Stop now*, *team groups*; docs/design/4.7-cli.md *Teams*; docs/design/4.9b-techlead.md
++**Class:** in-repo
++**Decided:** pending
++**Source:** rounds
++
++| review | round | role | model | tokens | date |
++|---|---|---|---|---|---|
++| R1 | 1 | fact-check | sonnet? | 105984 | 2026-11-14 |
++| R2 | 1 | fact-check | sonnet? | 72013 | 2026-11-14 |
++| R3 | 1 | fact-check | sonnet? | 41692 | 2026-11-14 |
++| R4 | 1 | design | fable? | 133028 | 2026-11-14 |
++| R5 | 1 | design | sonnet? | 85748 | 2026-11-14 |
++| R6 | 2 | fact-check | sonnet? | 118374 | 2026-11-14 |
++| R7 | 2 | fact-check | sonnet? | 48545 | 2026-11-14 |
++| R8 | 2 | fact-check | sonnet? | 33676 | 2026-11-14 |
++| R9 | 2 | design | fable? | 127515 | 2026-11-14 |
++| R10 | 2 | design | sonnet? | 128879 | 2026-11-14 |
++| R11 | 3 | fact-check | sonnet? | 113481 | 2026-11-14 |
++| R12 | 3 | fact-check | sonnet? | 44774 | 2026-11-14 |
++| R13 | 3 | design | fable? | 146974 | 2026-11-14 |
++| R14 | 3 | design | sonnet? | 111129 | 2026-11-14 |
++| R15 | 4 | fact-check | sonnet? | 71617 | 2026-11-14 |
++| R16 | 4 | design | fable? | 124564 | 2026-11-14 |
++| R17 | 4 | design | sonnet? | 123356 | 2026-11-14 |
++| R18 | 4 | fact-check | sonnet? | 94518 | 2026-11-14 |
++| R19 | 4 | fact-check | sonnet? | 44219 | 2026-11-14 |
++
++| id | round | by | topic | finding | class | status |
++|---|---|---|---|---|---|---|
++| F1 | 1 | R1 | the left manager on call | its id must be the members' controllers (`lead_id`) | build-changing | applied |
++| F2 | 1 | R1 | the confirm's seats | nothing said where the confirm reads them; `members_down.seats` | build-changing | applied |
++| F3 | 1 | R1 | `left[].why` | whether the clause keeps the name | build-changing | applied |
++| F4 | 1 | R1 | the Close cure, waiting | reader-waiting not excluded; where the clauses are built | build-changing | applied |
++| F5 | 1 | R1 | the start's order | checks, reading, closes, set-aside unordered | minor | applied |
++| F6 | 1 | R1 | `seat_names` | manager on call a seat only by its mark; glossary missed the sweeper | minor | applied |
++| F7 | 1 | R1 | `{techlead}`, `{manager}` | already the holder's id; the suffixed-id case | minor | applied |
++| F8 | 1 | R1 | side effects on a left seat | `keep_mail_for`, `_mark_team_start` | minor | applied |
++| F9 | 1 | R1 | the Start help paragraph | broke `test_help` at the design commit; moved to TD-9001 | minor | applied |
++| F10 | 1 | R1 | fallback words | an idle declared holder's wording | minor | applied |
++| F11 | 1 | R2 | the start mark | the pass-over reaches every start | minor | reopens F8 |
++| F12 | 1 | R2 | fallback words | sat-out, held extra, person's session holders | minor | reopens F10 |
++| F13 | 1 | R3 | the start mark | written at every create until a member is live | minor | reopens F11 |
++| F14 | 1 | R3 | fallback words | a seat or the manager with no clause | minor | reopens F12 |
++| F15 | 1 | R4 | the refusal's cure | some holders safe, some not: unstated | build-changing | reopens F4 |
++| F16 | 1 | R4 | the refusal's words | a holder not of the crew (unrecorded tmux, another team) | build-changing | reopens F12 |
++| F17 | 1 | R4 | fallback words | held extra and sat out cannot hold a launch name | minor | reopens F14 |
++| F18 | 1 | R4 | Apply vs Start | "a live team is offered Apply, never Start" left standing | minor | applied |
++| F19 | 1 | R4 | card vs start | team-wide reading vs per-holder rule; `left` vs `members_down.seats` | minor | applied |
++| F20 | 1 | R4 | a race | a seat closed between the name check and the read | minor | reopens F5 |
++| F21 | 1 | R4 | rule 9 | a manager on call told its last acts is a left seat | minor | applied |
++| F22 | 1 | R4 | the left manager's id | the seats' creates and the result's `manager` read it too | minor | reopens F1 |
++| F23 | 1 | R4 | card words | the not-concluded line, the glossary, `ao team list`, two seats | minor | applied |
++| F24 | 1 | R4 | the safe-to-close test | an idle undeclared holder passed it | minor | applied |
++| F25 | 1 | R4 | entry points | a session's `ao team start` on a members-down team | minor | applied |
++| F26 | 1 | R4 | `finished`'s clauses | matched to holders by prefix; `clauses` keyed by name | minor | reopens F3 |
++| F27 | 1 | R5 | live orphan seats | a renamed, suffixed or switched-off seat offered Start, then refused | build-changing | reopens F18 |
++| F28 | 1 | R5 | the refusal, mixed holders | whether a left seat is named; a session's refusal order | build-changing | reopens F15 |
++| F29 | 1 | R5 | the cure's command | `ao team stop --close` wraps up the other holders and the seat | minor | reopens F15 |
++| F30 | 1 | R5 | a suspended seat | counted members down, yet the Start refuses | minor | reopens F19 |
++| F31 | 2 | R6 | a person's session | named as crew yet `crew` leaves it out | build-changing | reopens F16 |
++| F32 | 2 | R6 | the strict `waiting` read | taken on every Start would newly fail | minor | reopens F5 |
++| F33 | 2 | R6 | "read once" | the existing reads must be restructured; `keep_mail_for` | minor | applied |
++| F34 | 2 | R6 | the suffixed seat | "creates that name as today" is not what happens | minor | applied |
++| F35 | 2 | R6 | declarations | `manager_id` not declared | minor | applied |
++| F36 | 2 | R6 | a waiver | its cited line 978 should be 980 | minor | applied |
++| F37 | 2 | R7 | the `list` read | it is every Start's; only `waiting` is conditional | build-changing | reopens F32 |
++| F38 | 2 | R7 | the suffixed seat | a dead leftover pane is a supersede, not free | minor | reopens F34 |
++| F39 | 2 | R8 | the suffixed seat | free vs supersede wording | minor | reopens F38 |
++| F40 | 2 | R8 | declarations | the supersede claim undeclared | minor | applied |
++| F41 | 2 | R9 | what a seat is | a renamed or dropped seat is not in `seat_names`; standing seats | build-changing | reopens F27 |
++| F42 | 2 | R9 | the pass-over in `_pairing` | Apply and the rename lines read it; a second seat beside the first | build-changing | reopens F27 |
++| F43 | 2 | R9 | two Starts at once | "a second Start is refused" false once seats are left | build-changing | applied |
++| F44 | 2 | R9 | non-crew holders | whether today's tail stays; the separator | build-changing | reopens F16 |
++| F45 | 2 | R9 | the rollup ⋯ menu | no Start for a members-down team | build-changing | applied |
++| F46 | 2 | R9 | a session's refusal | its words unstated | minor | reopens F28 |
++| F47 | 2 | R9 | the *not concluded* help | still says "has no Start yet" | minor | applied |
++| F48 | 2 | R10 | the sweeper | still a removal on the card; recognised how | build-changing | reopens F42 |
++| F49 | 2 | R10 | the standing-seat test | global or its own; `seat_names`' readers | build-changing | reopens F41 |
++| F50 | 2 | R10 | Apply on a members-down card | two Apply marks possible | minor | reopens F18 |
++| F51 | 2 | R10 | page gating | `stopped`, the third state, the consistency guard | minor | applied |
++| F52 | 2 | R10 | false sentences | §4.9, §4.9b, §6 rule 9 | minor | applied |
++| F53 | 2 | R10 | two Starts at once | a new failure from nothing live | minor | reopens F43 |
++| F54 | 2 | R10 | a person's session | no cure for it | minor | reopens F44 |
++| F55 | 2 | R10 | a failed `waiting` read | refuses a seats-only Start | minor | applied |
++| F56 | 2 | R10 | TD-9001's tests | gaps | minor | applied |
++| F57 | 2 | R10 | `ao team list` text | unspecified | minor | applied |
++| F58 | 2 | R10 | a standing manager | the bug stays for its team | minor | applied |
++| F59 | 3 | R11 | the sweeper on the card | the card's plan lacks the switch: a removal there | build-changing | reopens F48 (withdrawn by F66's fix: the sweeper is no standing seat) |
++| F60 | 3 | R11 | the standing sweeper | `sweep_seat`'s repo-off and own-sweeper cases | build-changing | reopens F48 (withdrawn by F66's fix) |
++| F61 | 3 | R11 | declarations | `ao team list`'s text, `_name_holder` | minor | applied |
++| F62 | 3 | R11 | `rows`' switch | how rows gets it | minor | applied |
++| F63 | 3 | R12 | the card vs the Start | Apply would sit out the sweeper the Start leaves | build-changing | reopens F59 |
++| F64 | 3 | R12 | declarations | a claim's line off by one | minor | applied |
++| F65 | 3 | R13 | a seat's extra | `scale` alone matches a worker line's extra | build-changing | reopens F41 |
++| F66 | 3 | R13 | the switch in the card's plan | contradicts §4.9b *The switch* three ways | build-changing | reopens F63 |
++| F67 | 3 | R13 | the third header state | its words and order | minor | applied |
++| F68 | 3 | R13 | the cure's joins | several holders; *wait* for a holder that will not finish | minor | reopens F15 |
++| F69 | 3 | R13 | the confirm vs the press | a team concluded by the press closes the seat | minor | applied |
++| F70 | 3 | R13 | the terminal's rule | per holder, wider than the card's | minor | applied |
++| F71 | 3 | R13 | the work note | not drawn on a live card | minor | applied |
++| F72 | 3 | R14 | §4.5a's example | still names the sweeper as left | build-changing | reopens F66 |
++| F73 | 3 | R14 | a seat closed mid-start | its mail not kept | minor | reopens F20 |
++| F74 | 3 | R14 | §4.7's members down | omits *not concluded* | minor | applied |
++| F75 | 3 | R14 | the *not concluded* line | drawn or not on a members-down card | minor | applied |
++| F76 | 3 | R14 | the glossary | looser than the rule | minor | applied |
++| F77 | 4 | R15 | the person's own session | TD-9002 dropped the cure the design keeps | build-changing | reopens F68 |
++| F78 | 4 | R15 | a working Settings sweeper | its team stays without a Start; unstated | minor | applied (stated as a known gap) |
++| F79 | 4 | R15 | a seat found dead mid-start | an exited one's mail is not kept | minor | reopens F73 |
++| F80 | 4 | R15 | the *not concluded* line | "same clauses" only roughly true | minor | reopens F75 |
++| F81 | 4 | R15 | declarations | a claim's line | minor | applied |
++| F82 | 4 | R16 | the history | still names the sweeper as left | build-changing | reopens F72 |
++| F83 | 4 | R16 | the dead-holder rebuild | its scope and how the verdict is built | minor | reopens F79 |
++| F84 | 4 | R16 | a manager on call | its record on call, its definition now standing | minor | reopens F41 |
++| F85 | 4 | R16 | the person's own session | which sessions; the safe-to-close sentence | minor | reopens F77 |
++| F86 | 4 | R16 | words | the left line, the header join, the toast, the cure's join | minor | reopens F67 |
++| F87 | 4 | R16 | the *work waiting* row | not amended | minor | reopens F71 |
++| F88 | 4 | R16 | the start mark | rule 8's single-member replay | minor | reopens F13 |
++| F89 | 4 | R16 | "live seat" | where "standing seat" is meant | minor | applied |
++| F90 | 4 | R16 | TD-9001's Location | omits app.py and app.js | minor | applied |
++| F91 | 4 | R17 | the dead-holder rebuild | would rebuild a suspended verdict and lift a suspension | build-changing | reopens F83 |
++| F92 | 4 | R17 | the controls' order | the card and the rollup ⋯ differ, unstated | minor | reopens F45 |
++| F93 | 4 | R17 | *concluded wins* | a case the definition already rules out | minor | applied |
++| F94 | 4 | R17 | the toast | may name fewer seats than the confirm | minor | reopens F86 |
++| F95 | 4 | R18 | the synopsis heading | drops the entry title's last clause | minor | rejected: the full title is over the 120 columns `tests/test_synopses.py` allows, and the test does not compare the title |
++| F96 | 4 | R18 | the synopsis | leaves out four choices; *restart wanted* | minor | applied |
++| F97 | 4 | R18 | the *work waiting* row | "`ao team list` unchanged" reads against §4.7 | minor | applied |
++| F98 | 4 | R18 | Log dates | the helper's Log lines dated 2026-11-15 | minor | rejected: `ledger.py` stamps the UTC day, the record the local one |
++
++Statuses: every `reopens F<n>` row was applied in the same round.
++
++How the rounds ended: at the cap (in-repo, 4), round 4's reviews raising build-changing findings (F82, F91). Trend, build-changing per round from the design reviews: 4, 7, 3, 2; from the fact-checks: 4, 2, 3, 1. Recurring topics: **which live seats a Start leaves** (F27 → F41, F42, F48, F49 → F59, F60, F63, F65, F66, F72 → F82), and **the refusal's words for its holders** (F15, F16, F28 → F31, F44 → F77). R8's two minor fixes (F39, F40) and R3's (F13, F14) were read by the next design review, not by a fact-check re-run. Fixes no review has read: F91, F92, F93, F94 (R17's, all TD-9001's).
++
++Decided:
++- would have sent the end-of-rounds item: a `decide` line on docs/user_attention.md, `Context: TD-1569 decision (paul). Parts: TD-9001, TD-9002.`, answers `One more round (default) | Go | Hold: <note>`, recommending One more round because F91 (TD-9001: a `suspended` verdict is never rebuilt and refuses) is a build-changing fix no review has read, naming the two recurring topics with *is this the wrong design?* — the position taken on each: a standing seat (one the definition names now, or its extra) is left and nothing else; the refusal names each holder by its clause and offers Close only where safe; detail by build: TD-9001 F91, F92, F93, F94; TD-9002 none. Not sent (replay); TD-1569, TD-9001 and TD-9002 carry `**Blocked by:** decision (paul)` and an `**Ask:**`.
++- would have posted the closing fact-check's evidence: R18 `cadence-review: BLOCK · sonnet · docs · 4 findings`, R19 `cadence-review: FIXED · sonnet · docs · 0 findings`; and would have asked `fact-check-ao-1` for the fact-check trial (outside the gate, no row).
++- would have sent no steer: the label (*Start*, not *Start members*) and a session's start refused where a seat would be left follow from what was written, taken in by the designer.
++
++Decided: replay ended — the cap (in-repo, 4 rounds; round 4's reviews raised build-changing F82 and F91, and the closing fact-check's re-run R19 raised nothing)
++
++**Rounds**
++
++- R1 · 1 · fact-check · design-prep: PASS · TD-1569 · 69c689bbf787 · base 90f56dd2090b · claims 16 · rules 3 · new 0 · waived 5
++- R2 · 1 · fact-check · design-prep: PASS · TD-1569 · 56accbce851c · base 90f56dd2090b · claims 22 · rules 3 · new 0 · waived 5
++- R3 · 1 · fact-check · design-prep: PASS · TD-1569 · 9d924b13691e · base 90f56dd2090b · claims 22 · rules 3 · new 0 · waived 5
++- R4 · 1 · design · design-prep: PASS · TD-1569 · e3f646dc32ab · base 90f56dd2090b · claims 24 · rules 3 · new 0 · waived 5
++- R5 · 1 · design · design-prep: PASS · TD-1569 · 0a7f604cc083 · base 90f56dd2090b · claims 27 · rules 3 · new 0 · waived 7
++- R6 · 2 · fact-check · design-prep: PASS · TD-1569 · c0c3f3f7eeba · base 90f56dd2090b · claims 29 · rules 3 · new 0 · waived 7
++- R7 · 2 · fact-check · design-prep: PASS · TD-1569 · 9ea734d6c91e · base 90f56dd2090b · claims 32 · rules 3 · new 0 · waived 7
++- R8 · 2 · fact-check · design-prep: PASS · TD-1569 · affd3a1f4858 · base 90f56dd2090b · claims 32 · rules 3 · new 0 · waived 7
++- R9 · 2 · design · design-prep: PASS · TD-1569 · 1e769371c5c8 · base 90f56dd2090b · claims 33 · rules 3 · new 0 · waived 7
++- R10 · 2 · design · design-prep: PASS · TD-1569 · 8c106d0a9b99 · base 90f56dd2090b · claims 38 · rules 3 · new 0 · waived 9
++- R11 · 3 · fact-check · design-prep: PASS · TD-1569 · 44f4337683eb · base 90f56dd2090b · claims 41 · rules 3 · new 0 · waived 9
++- R12 · 3 · fact-check · design-prep: PASS · TD-1569 · 4c768b0d9614 · base 90f56dd2090b · claims 44 · rules 3 · new 0 · waived 9
++- R13 · 3 · design · design-prep: PASS · TD-1569 · 43e4a3f69ddf · base 90f56dd2090b · claims 45 · rules 3 · new 0 · waived 9
++- R14 · 3 · design · design-prep: PASS · TD-1569 · 97dc6e0aecc9 · base 90f56dd2090b · claims 45 · rules 3 · new 0 · waived 10
++- R15 · 4 · fact-check · design-prep: PASS · TD-1569 · d2d3f07ffabe · base 90f56dd2090b · claims 45 · rules 4 · new 0 · waived 10
++- R16 · 4 · design · design-prep: PASS · TD-1569 · 6d02a3e54f0b · base 90f56dd2090b · claims 45 · rules 5 · new 0 · waived 10
++- R17 · 4 · design · design-prep: PASS · TD-1569 · cb72f7448a0d · base 90f56dd2090b · claims 45 · rules 5 · new 0 · waived 10
++- R18 · 4 · fact-check · design-prep: PASS · TD-1569 · da0ea52fb153 · base 90f56dd2090b · claims 46 · rules 5 · new 0 · waived 10
++- R19 · 4 · fact-check · design-prep: PASS · TD-1569 · 7aa565ff32bc · base 90f56dd2090b · claims 46 · rules 5 · new 0 · waived 10
++- final · design-prep: PASS · TD-1569 · 379adcd4ae51 · base 90f56dd2090b · claims 46 · rules 5 · new 0 · waived 10 (the result commit after it adds only these record lines, which no check reads)
+diff --git a/docs/reviews/TD-1569.prep.yml b/docs/reviews/TD-1569.prep.yml
+new file mode 100644
+index 0000000..8db2d77
+--- /dev/null
++++ b/docs/reviews/TD-1569.prep.yml
+@@ -0,0 +1,184 @@
++claims:
++  - says: the finished reading names an idle seat with a background shell *idle, shell live*
++    at: src/sessionorc/work.py:436
++    has: 'why.append(f"{name} idle, shell live")'
++  - says: the finished reading names an idle record with a subagent *idle, subagent live*
++    at: src/sessionorc/work.py:434
++    has: 'why.append(f"{name} idle, subagent live")'
++  - says: the finished reading names an undeclared idle member *idle, not declared*
++    at: src/sessionorc/work.py:454
++    has: 'why.append(f"{name} idle, not declared")'
++  - says: teamrun.seat_names reads the team's seats (techlead, seats with a trigger, the sweeper, the manager on call)
++    at: src/shiftlead/teamrun.py:419
++    has: "def seat_names"
++  - says: NamesHeld names a holder by its bare holder_state today
++    at: src/shiftlead/teamrun.py:80
++    has: "holder_state"
++  - says: today's refusal offers Close for any holder that is not suspended
++    at: src/shiftlead/teamrun.py
++    has: "closes a settled member, or Close it on its card"
++  - says: _close_concluded raises NamesHeld on a team that is not concluded
++    at: src/shiftlead/teamrun.py
++    has: "raise NamesHeld(name, still)"
++  - says: the wrap-up's check for a close is _unsafe_to_close (uncommitted or unpushed work)
++    at: src/shiftlead/teamrun.py:1941
++    has: "def _unsafe_to_close"
++  - says: a create that fails part-way is a PartialStart
++    at: src/shiftlead/teamrun.py:92
++    has: "class PartialStart"
++  - says: teamrun.rows carries concluded and not_concluded, where members_down will sit
++    at: src/shiftlead/teamrun.py
++    has: '"not_concluded": list(f["why"]) if f else [],'
++  - says: the Start help paragraph lives in help.py and test_help holds it equal to §4.5a's list
++    at: tests/test_help.py:30
++    has: "def test_help_py_is_the_designs_list_word_for_word"
++  - says: help.py's Start paragraph carries the sentence the design extends
++    at: src/shiftlead/ui/help.py
++    has: "unpushed work refuses the start instead of being closed."
++  - says: rule 8's mark is removed when every member it names is live again
++    at: docs/design/6-policies.md
++    has: "It is removed when every"
++  - says: rule 8 reads a finished member's lane news member by member while its team runs on
++    at: docs/design/6-policies.md
++    has: "**A member that finished while its team runs on.**"
++  - says: a person's Start clears work_waiting
++    at: docs/design/6-policies.md
++    has: "A person's Start, a schedule's, or Dismiss clears"
++  - says: a concluded team's Start anyway dialog carries the closes as its second line
++    at: docs/design/4.5a-controls.md
++    has: "the Start anyway dialog carries the closes as its second line"
++  - says: a manager on call is a seat only by its record's seat mark, a standing one never
++    at: src/shiftlead/teamrun.py:412
++    has: 'if base == lead and base not in named and not isinstance(s.get("seat"), dict):'
++  - says: keep_mail_for treats every live verdict as a concluded close asking keep_mail
++    at: src/shiftlead/teamrun.py:725
++    has: 'closed |= {n: v for n, v in verdicts.items() if v.get("verdict") == "live"}'
++  - says: _close_concluded reads the team with the home's waiting, strict
++    at: src/shiftlead/teamrun.py:1832
++    has: "waiting_of_home(call, strict=True)"
++  - says: the finished reading has a clause for a member waiting on a reader
++    at: src/sessionorc/work.py:361
++    has: "def held_clause"
++  - says: the home's start mark counts a start only when no other unattended record of the team runs
++    at: src/sessionorc/agent_tick.py:3484
++    has: "def _mark_team_start"
++  - says: the briefs' {techlead} and {manager} are the name's ids, worked out before the start
++    at: src/shiftlead/teams.py:358
++    has: "def seat_id"
++  - says: the finished reading passes over a sat-out member and a held extra, giving no clause
++    at: src/sessionorc/work.py
++    has: "if sat_out(r) or held_extra(r):"
++  - says: the finished reading leaves out a person's session (unattended false)
++    at: src/sessionorc/work.py
++    has: 'mine = [r for r in records if _f(r, "unattended") is not False and not _f(r, "superseded_by")]'
++  - says: a name held by a tmux session no record holds is a live verdict with holder_state unrecorded
++    at: src/sessionorc/agent.py:2152
++    has: '"holder_state": "unrecorded",'
++  - says: the schedule starts only a team that reads wound down
++    at: src/sessionorc/agent_tick.py:2535
++    has: "if work_mod.team_wound_down(records) is None:"
++  - says: rule 9 tells a live manager its last acts and closes it after WRAPUP_GRACE
++    at: docs/design/6-policies.md:1156
++    has: "`WRAPUP_GRACE` after `finished_sent_at`"
++  - says: the pairing reads a crew record the plan does not launch as an orphan
++    at: src/shiftlead/teamrun.py:1224
++    has: "def _pairing("
++  - says: ao team stop wraps up every live badged session but the lead, seats included
++    at: src/shiftlead/teamrun.py
++    has: "up = live(badged(name, call(\"list\")))"
++  - says: the briefs' {manager} is the name's id, worked out before the start
++    at: src/shiftlead/teams.py:367
++    has: "def manager_id"
++  - says: crew leaves a person's own session out
++    at: src/shiftlead/teamrun.py:131
++    has: "def crew("
++  - says: a seat under a stale tmux session's id takes a suffixed name
++    at: src/sessionorc/agent.py:1807
++    has: "shown = name if sid == base else name + sid[len(base) :]"
++  - says: a dead leftover tmux pane with no record is a supersede verdict
++    at: src/sessionorc/agent.py:2157
++    has: 'out |= {"verdict": "supersede", "holder": base, "holder_state": "unrecorded"}'
++  - says: the pairing passes over any extra (scale), a run-only and a sat-out record
++    at: src/shiftlead/teamrun.py:1246
++    has: 'r.get("run_only") or r.get("scale")'
++  - says: the rollup row's acts are Start for a stopped team, else Wind down and Stop now
++    at: src/shiftlead/ui/org.py:796
++    has: 'run = (["start"] if it.get("stopped") else ["wind-down", "stop-now"]) if it.get("defined") else []'
++  - says: the not concluded help paragraph says the team has no Start yet
++    at: src/shiftlead/ui/help.py:99
++    has: "Says why this team has no Start yet"
++  - says: today's NamesHeld tail offers ao team stop --close and Close for a non-suspended holder
++    at: src/shiftlead/teamrun.py:85
++    has: "closes a settled member, or Close it on its card"
++  - says: the page's team rows set stopped as not live or concluded
++    at: src/shiftlead/ui/repo.py:880
++    has: '"stopped": not live or concluded is not None,'
++  - says: the live team's Apply mark is drawn on any live team whose records differ
++    at: src/shiftlead/ui/templates/group_head.html:34
++    has: "{% if g.team and g.flow_changed and g.live %}"
++  - says: rule 9 says a Start closes an idle seat
++    at: docs/design/6-policies.md:1186
++    has: "Seats are not this rule's to close"
++  - says: ao team list prints concluded in its text
++    at: src/shiftlead/cli.py:1223
++  - says: the host agent refuses a create on a live name
++    at: src/sessionorc/agent.py:2213
++    has: "async def _name_holder"
++  - says: a seat's extra carries a seat mark and a worker line's does not
++    at: src/shiftlead/teams.py:1075
++    has: 'trigger={"trigger": "asks"} if base.seat else None,'
++  - says: a live extra of a worker line counts as a member
++    at: src/sessionorc/work.py:67
++    has: "a live extra of a worker line counts as a member"
++  - says: the page draws the work note only on a team with nothing live
++    at: src/shiftlead/ui/repo.py:857
++    has: "if not live and (row.get(\"wound_down\") or _stopped(mark) or _seats_held(mark))"
++  - says: a suspended verdict is reached only for a dead holder
++    at: src/sessionorc/agent.py:2169
++    has: "if holder.suspended:"
++rules:
++  - name: a Start leaves a live seat running
++    find: "(?i)(leaves? (each (live )?|the )seat running|which the start leaves running|is left running|left running beside)"
++    terms: ["seat"]
++  - name: members down
++    find: "(?i)members.down"
++    terms: ["seats", "live"]
++  - name: the refusal's Close only where safe
++    find: "(?i)safe to close"
++    terms: ["Close", "clause"]
++  - name: the members-down confirm
++    find: "(?i)are left running"
++    terms: ["techlead-ao-1", "review-ao-1", "idle, shell live"]
++  - name: the person's own session in the cure
++    find: "(?i)save (a|the) person's own session"
++    terms: ["Close", "idle"]
++new: []
++waive:
++  - check: pointers
++    file: docs/ledger/TD-1569.md
++    text: TD-1720
++    why: the `gated (TD-1720)` Log note the brief requires names the gate's design entry, which this replay's base ledger does not hold
++  - check: pointers
++    file: docs/design/4.5a-controls.md
++    text: §4.9 *The Sessions page*
++    why: an existing pointer on a line this design changed; the lead `**The Sessions page.**` is at docs/design/4.9-org-team-project.md:980, and the script's bold pairing misses it
++  - check: pointers
++    file: docs/ledger/TD-9001.md
++    text: §4.9 *Starting and stopping*
++    why: the lead `**Starting and stopping**` opens docs/design/4.9-org-team-project.md:275; the script's bold pairing misses it
++  - check: pointers
++    file: docs/ledger/TD-9002.md
++    text: §4.9 *Starting and stopping*
++    why: the lead `**Starting and stopping**` opens docs/design/4.9-org-team-project.md:275; the script's bold pairing misses it
++  - check: pointers
++    file: docs/design/4.9a-winding-down.md
++    text: §4.9 *Start reads the same pairing*
++    why: the list item's lead `**Start reads the same pairing**` is at docs/design/4.9-org-team-project.md:855; the script's bold pairing misses it
++  - check: pointers
++    file: docs/design/4.5a-controls.md
++    text: §4.5 *Browser mechanics*
++    why: an existing pointer on the rollup row this design changed; its target is the label line `Browser mechanics:` at docs/design/4.5-ui.md:3053, plain text rather than a bold lead, so the script cannot see it
++  - check: pointers
++    file: docs/design/4.9a-winding-down.md
++    text: §4.9 *Scaling with the work*
++    why: "the lead `**Scaling with the work - td-max (…)**` is at docs/design/4.9-org-team-project.md:518; its italic quote inside the bold breaks the script's bold pairing"
+diff --git a/docs/synopses/TD-1569.md b/docs/synopses/TD-1569.md
+new file mode 100644
+index 0000000..63b6ba3
+--- /dev/null
++++ b/docs/synopses/TD-1569.md
+@@ -0,0 +1,46 @@
++# TD-1569: A team whose members wound down cannot be started from its card while a seat is busy
++
++## What it does
++
++A seat such as the techlead comes on a question and leaves; it is not the team's run. When every member of a
++team is down and only its seats are still live, the team now reads members down. Its card offers Start
++beside Wind down and Stop now, and the Start brings the members back while each running seat carries on with
++what it was doing. A refused Start now says why each session stands in the way, and offers Close only where
++closing is safe.
++
++## The key choices, and why
++
++- It is the same Start, not a second button. The confirm names each seat it leaves running and what it is
++  doing, so the press says what it will not touch.
++- Only a seat the team's definition still names, or an extra of one, is left running. A seat that was renamed
++  or dropped while it ran still blocks the Start, as it does today, so Apply and renames work as before.
++- The Settings sweeper is never left running this way. While it sweeps, its team has no Start: a known gap,
++  left for the sweeper's own design.
++- A team whose idle seats have nothing running is concluded, as before, and its Start closes those seats first.
++- A team with a standing manager live is never members down, since a manager is not one of its seats. The
++  manager is the team's run, and Wind down is its act.
++- Starting with a seat left running is a person's act. A session cannot start its own team's members beside
++  itself.
++- A refusal names each session by what keeps the team from finishing, such as idle with a shell still running.
++  It offers Close only for a member that is idle, has said it is out of work or wants a restart, has nothing
++  running, waits on nobody and has its work pushed, or for your own session. For the rest it says to wait, or
++  Wind down. It no longer suggests stopping the whole team to close one session.
++- From the terminal, your own start leaves the seats running whatever else is live, so it can start a team
++  whose card offers no Start.
++- Two Starts pressed at once are not guarded beyond the session names: each may stop part-way, and every member
++  still starts once.
++- The automatic starts are unchanged. This Start is your press for work the team already saw, members you
++  stopped, or a team set not to start on its own.
++
++## What it rules out
++
++- Closing or cutting off a seat that is still answering someone.
++- A refusal that calls a busy seat idle, or suggests a close that would cut off its work.
++- Two seats doing one job: a renamed seat still running is not left beside its successor.
++
++## What you will see
++
++On ao-grind's card in the case that started this, with only its seats live: members down, the techlead
++seat's state, and Start beside Wind down and Stop now. The confirm reads that the techlead seat is left
++running. After the press the members start and the techlead finishes its merge. A refused Start lists each
++session in its way and what to do about it.

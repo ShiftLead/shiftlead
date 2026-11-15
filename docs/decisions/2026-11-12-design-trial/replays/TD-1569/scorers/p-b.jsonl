@@ -1,0 +1,44 @@
+{"id": "TD-1569:F1", "mark": "handled", "na": "-", "why": "4.9a 'A Start beside a busy seat': standing_seats by definition name, and a left manager on call's id is the lead id for every create's controllers"}
+{"id": "TD-1569:F2", "mark": "handled", "na": "-", "why": "4.9a 'The order is fixed: the name checks run for every launch; the team's records are read...' left set aside before keep_mail_for and creates"}
+{"id": "TD-1569:F3", "mark": "handled", "na": "-", "why": "4.9a: every live standing seat is left whatever its state, why from the clause else state; only suspended seats keep a team from members down"}
+{"id": "TD-1569:F4", "mark": "handled", "na": "-", "why": "4.9a 'A refused Start says why': each holder named by its clause, non-crew and suspended keep '<name> is <state> as <holder>', left seats not named"}
+{"id": "TD-1569:F5", "mark": "handled", "na": "-", "why": "4.9a refused-Start cure: 'each by the card's Close and never by ao team stop --close', only for holders passing the wrap-up check"}
+{"id": "TD-1569:F6", "mark": "handled", "na": "-", "why": "4.9a: `live` and `stopped` stay as they were, a third header state 'members down' draws beside them; nothing-live wording untouched since live is unchanged"}
+{"id": "TD-1569:F7", "mark": "handled", "na": "-", "why": "4.5a team card row: members-down team offers Start beside Wind down and Stop now, order stated"}
+{"id": "TD-1569:F9", "mark": "handled", "na": "-", "why": "4.9a: 'running under a stale tmux session's suffixed name, is not a standing seat: it is a running orphan', so a suffixed seat is not left"}
+{"id": "TD-1569:F13", "mark": "handled", "na": "-", "why": "4.9a: a verdict whose holder the read finds dead is rebuilt from that read; skipped seat closing by rule 3 covered; result and toast name left seats; confirm may name more than left lists"}
+{"id": "TD-1569:F14", "mark": "handled", "na": "-", "why": "4.9a/4.7: teamrun.rows carries members_down and ao team list --json carries it (no startable field, but the same exposure)"}
+{"id": "TD-1569:F15", "mark": "handled", "na": "-", "why": "4.9a/4.5a: live unchanged, Start drawn first beside Wind down and Stop now on a members-down team"}
+{"id": "TD-1569:F17", "mark": "handled", "na": "-", "why": "4.9a: an idle unpushed non-standing holder refuses the start by name (clause 'idle, unpushed'), a standing seat is left whatever it holds"}
+{"id": "TD-1569:F19", "mark": "handled", "na": "-", "why": "4.9a: rule 8 member-by-member replay unchanged, two Starts collide at names and end PartialStart naming what was created; whole-start checks run before any create"}
+{"id": "TD-1569:F20", "mark": "handled", "na": "-", "why": "4.9a refused-Start: Close only for idle declared member passing check, rest told 'wait for ..., or Wind down'; waiting clauses name what it waits on"}
+{"id": "TD-1569:F22", "mark": "handled", "na": "-", "why": "4.9a order: one `list` read every Start makes, handed to keep_mail_for and the verdict rebuild; _close_concluded reads the same strict waiting reading"}
+{"id": "TD-1569:F25", "mark": "handled", "na": "-", "why": "4.9a/TD-9002: holders joined by '; ' with their clauses and one two-part cure line after ' \u2014 '; settled though not per-holder fields and json holders unspecified"}
+{"id": "TD-1569:F26", "mark": "handled", "na": "-", "why": "4.9a: 'A team whose standing manager is live is never members down' so it refuses as today"}
+{"id": "TD-1569:F28", "mark": "handled", "na": "-", "why": "4.9a: result lists `left` {name,id,why}; ao team start prints 'left running:' per seat, toast 'started ao-grind \u2014 techlead-ao-1 left running'"}
+{"id": "TD-1569:F29", "mark": "silent", "na": "-", "why": "No mention of the Inbox row that offers to start a team; neither 4.9a nor 4.5a says whether it follows members_down"}
+{"id": "TD-1569:F31", "mark": "handled", "na": "-", "why": "4.9a: concluded team's closes run as before, otherwise left seats are not closed, typed at or superseded; concluded wins at the press"}
+{"id": "TD-1569:F34", "mark": "handled", "na": "-", "why": "4.9a: finished reading gains `clauses` keyed by name 'so no reader matches a clause to a holder by its prefix'"}
+{"id": "TD-1569:F35", "mark": "handled", "na": "-", "why": "4.9a: the i panel's 'not concluded' line still drawn on members-down card; toast and refusal print the same per-holder words"}
+{"id": "TD-1569:F39", "mark": "not-applicable", "na": "absent", "why": "The design offers Close as the only cure and never offers a Kill cure for a blocker"}
+{"id": "TD-1569:F40", "mark": "handled", "na": "-", "why": "4.9a: standing_seats over live crew records; an extra needs scale plus seat mark with scale.line a standing seat's name, worker-line extras are members"}
+{"id": "TD-1569:F43", "mark": "handled", "na": "-", "why": "4.9a: a live seat the definition renamed or dropped is a running orphan, not standing, so Start refused with Apply as its way out"}
+{"id": "TD-1569:F46", "mark": "handled", "na": "-", "why": "TD-9001 Fix: confirm names left seats from members_down, Start anyway dialog's second line in app.js and toast in app.py"}
+{"id": "TD-1569:F47", "mark": "handled", "na": "-", "why": "4.9a: reading taken with waiting_of_home strict as _close_concluded takes it; a failed read refuses saying so"}
+{"id": "TD-1569:F48", "mark": "handled", "na": "-", "why": "4.9a: waiting read only where a verdict is live or suspended or the pairing found a rename; a start with none reads no waiting, as today"}
+{"id": "TD-1569:F49", "mark": "silent", "na": "-", "why": "4.9a says an unsafe-to-close concluded seat refuses the start naming it, but never says a finished seat's work is pushed before its Close"}
+{"id": "TD-1569:F50", "mark": "handled", "na": "-", "why": "TD-9002: NamesHeld raised where records and strict waiting are read, as _close_concluded reads them, naming holders from clauses"}
+{"id": "TD-1569:F58", "mark": "handled", "na": "-", "why": "4.5a rollup row: 'on a members-down team ... Start after them' in the menu, keeping Wind down and Stop now"}
+{"id": "TD-1569:F60", "mark": "handled", "na": "-", "why": "4.9a: why is the finished clause without the name, e.g. 'idle, shell live'; refusal words 'idle, subagent live', 'idle, out of work'"}
+{"id": "TD-1569:F61", "mark": "handled", "na": "-", "why": "4.9a/TD-9001: clauses keyed by record name or id so a suffixed session's clause is read by key, not prefix"}
+{"id": "TD-1569:F62", "mark": "silent", "na": "-", "why": "4.9a covers person's own session and suspended holder, but gives no words for a sat-out or held extra and no fallback when no cure applies"}
+{"id": "TD-1569:F63", "mark": "handled", "na": "-", "why": "4.9a/4.5a: members-down card draws Start, Wind down, Stop now in that order, stopped staying 'not live or concluded'"}
+{"id": "TD-1569:F64", "mark": "silent", "na": "-", "why": "4.9a says a running orphan refuses but not whether that refusal precedes the concluded team's closes"}
+{"id": "TD-1569:F69", "mark": "handled", "na": "-", "why": "4.9a: 'the page holds members_down to the records as it holds concluded ... draws neither where they disagree'"}
+{"id": "TD-1569:F70", "mark": "handled", "na": "-", "why": "4.5a Start row: one-line confirm names every live seat left running, with the empty-lanes dialog carrying it as second line"}
+{"id": "TD-1569:F72", "mark": "silent", "na": "-", "why": "4.9a notes a seat's extra may be left with no create skipped, but not what an extra turning busy mid-start shows"}
+{"id": "TD-1569:F75", "mark": "handled", "na": "-", "why": "4.9a: _mark_team_start passes over a live seat so a members-down Start writes the usage mark; every start covered"}
+{"id": "TD-1569:F79", "mark": "handled", "na": "-", "why": "4.9a: Settings sweeper is no standing seat, holds its name against a Start as a known gap; card offers Wind down and Stop now"}
+{"id": "TD-1569:F82", "mark": "not-applicable", "na": "absent", "why": "Synopsis and design make no claim about when a seat closes or how long an asks seat lingers"}
+{"id": "TD-1569:F85", "mark": "not-applicable", "na": "absent", "why": "Synopsis says a seat comes on a question and leaves; it never names which seats linger after an answer"}
+{"id": "TD-1569:F86", "mark": "not-applicable", "na": "absent", "why": "No statement in the synopsis or design about a seat with unpushed work closing itself"}

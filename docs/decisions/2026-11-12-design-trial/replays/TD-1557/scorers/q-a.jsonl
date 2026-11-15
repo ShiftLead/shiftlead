@@ -1,0 +1,57 @@
+{"id": "TD-1557:F1", "mark": "handled", "na": "-", "why": "4.4 'board_reply takes no answers from the page; the reading is made inside the one locked write-back' from the found line's own kind and Answers"}
+{"id": "TD-1557:F2", "mark": "handled", "na": "-", "why": "4.4 'it is never a waiting-only answer, which stay Keep waiting and Not yet'; a form pressed as written is refused"}
+{"id": "TD-1557:F3", "mark": "handled", "na": "-", "why": "4.4 'Words that fill no form are the Reply they were, and so are any words on a line already decided... or on a line of another kind'"}
+{"id": "TD-1557:F4", "mark": "handled", "na": "-", "why": "TD-1698 / 4.5a ledger row: ledger_decide takes form, app.py ledger branch forwards form with go, answer and words"}
+{"id": "TD-1557:F5", "mark": "handled", "na": "-", "why": "4.5a row <head>...: heads list parallel to answers, answers stay strings as the page hands them back"}
+{"id": "TD-1557:F6", "mark": "silent", "na": "-", "why": "No help.py / The help text bullets change or binding test named; only glossary entry added"}
+{"id": "TD-1557:F7", "mark": "handled", "na": "-", "why": "4.10 'A form is filled, never pressed': one helper check runs ahead of the answer-index check and, for the person, ahead of _answer_orphan"}
+{"id": "TD-1557:F8", "mark": "handled", "na": "-", "why": "4.4 head 'compared in any case'; refusal '<head> needs its words', look case 'Not right needs its words'"}
+{"id": "TD-1557:F9", "mark": "handled", "na": "-", "why": "4.4 / TD-1557 Handed upstream: SPEC The board's Answers: bullet; ledgerboard release; TD-1698 'Blocked by: event (ledgerboard-forms)' with check"}
+{"id": "TD-1557:F11", "mark": "handled", "na": "-", "why": "4.5a ledger row: index naming a form refused with '<head> needs its words'; go meets 'marks no answer (default)'; row draws no Go with it"}
+{"id": "TD-1557:F12", "mark": "handled", "na": "-", "why": "4.10 'An answer index that names a form is refused whatever words follow it (--pick <n> \"words\" included)'"}
+{"id": "TD-1557:F13", "mark": "handled", "na": "-", "why": "4.4 'A form's press is the decide': agent puts head back; 4.5a card's Hold... box sends board_edit decide, Answer... box board_reply"}
+{"id": "TD-1557:F15", "mark": "handled", "na": "-", "why": "4.4 'A fill the decide refuses ... refuses the press with the decide's own words, nothing written: it never falls back to a Reply'"}
+{"id": "TD-1557:F17", "mark": "handled", "na": "-", "why": "4.4 'A filled form is its form for Lifts: in every reader' via _lifting's named callers; never a waiting-only answer"}
+{"id": "TD-1557:F18", "mark": "handled", "na": "-", "why": "4.4 head = text before first colon, any case, written '<head>: <words>', item_problem refuses same-head forms and a (default) form"}
+{"id": "TD-1557:F19", "mark": "handled", "na": "-", "why": "4.5 screen 6 Reply rule amended: 'A Reply whose words fill one of the line's forms is the line's decide instead'; only words beginning no form head are a Reply"}
+{"id": "TD-1557:F20", "mark": "handled", "na": "-", "why": "4.5a row <head>...: drawn wherever answers drawn; two forms joined by 'or' in foot; reply_decides defined"}
+{"id": "TD-1557:F21", "mark": "handled", "na": "-", "why": "4.5a Works/Not right row: Reply and Answer... controls on a live-look row carry the repo and the item's head"}
+{"id": "TD-1557:F22", "mark": "handled", "na": "-", "why": "4.5 screen 6: on decided the row redraws decided, Queue card item goes to Waiting on them and counts re-read; applying mark reads decide"}
+{"id": "TD-1557:F23", "mark": "handled", "na": "-", "why": "4.10 'The check is every replier's, a session's as much as the person's'; ao inbox prints '<head>...: fill it, do not pick it'"}
+{"id": "TD-1557:F24", "mark": "handled", "na": "-", "why": "4.4 names is_form/fill_form as in a ledgerboard release v2.8 or later, not existing code; TD-1698 gated on event"}
+{"id": "TD-1557:F28", "mark": "handled", "na": "-", "why": "4.10 / 4.4 / ledger_decide: words that are an offered form unfilled are refused '<head> needs its words', never written"}
+{"id": "TD-1557:F29", "mark": "handled", "na": "-", "why": "4.10 compared against each offered answer's label (split from consequence, (default) mark off), never the stored line"}
+{"id": "TD-1557:F30", "mark": "handled", "na": "-", "why": "4.5a: hand-off is the live-look pair's alone, a Hold... press hands nothing on; Reply/Answer... hand off on Not right decided"}
+{"id": "TD-1557:F31", "mark": "handled", "na": "-", "why": "4.4 agent, not the page, puts head back; 'Holding it' becomes 'Hold: Holding it', never 'Hold: ing it'; page parses nothing"}
+{"id": "TD-1557:F32", "mark": "handled", "na": "-", "why": "4.4 write_back callback in worker thread hops via call_soon_threadsafe to _remark(token, act, words)"}
+{"id": "TD-1557:F33", "mark": "handled", "na": "-", "why": "4.4 filled form 'words collapsed to one line (no cap but the decide's own)'; other replies unchanged"}
+{"id": "TD-1557:F34", "mark": "handled", "na": "-", "why": "4.10 check is every replier's; 4.4/ledger consistent that the person's decide path and mail check differ explicitly"}
+{"id": "TD-1557:F35", "mark": "handled", "na": "-", "why": "4.5a / TD-1698: every reader hands no default where marked answer is a form; mail read_answers clears recommended; inbox clears parse_board default"}
+{"id": "TD-1557:F37", "mark": "handled", "na": "-", "why": "4.5 screen 12: a form's press opens Answer...'s box begun with '<head>: '; ledger row opens Reply begun with head"}
+{"id": "TD-1557:F39", "mark": "handled", "na": "-", "why": "TD-1698: rpc_board_edit takes form; /api/person/board decide branch passes it; ledger and mail reply branches forward form"}
+{"id": "TD-1557:F41", "mark": "handled", "na": "-", "why": "4.4 callback 'idempotent, since a neighbour's retry (_twice) may run the reading again'; _applying_mark yields token carried by callback"}
+{"id": "TD-1557:F43", "mark": "handled", "na": "-", "why": "4.5a ledger row: reading hands no default where default is a form, so go meets 'marks no answer (default)'; no ledger check"}
+{"id": "TD-1557:F48", "mark": "handled", "na": "-", "why": "TD-1557 Handed upstream: two hand-offs, ledgerboard (release) and agent-cadence (board_edit decide), via ao td add --repo"}
+{"id": "TD-1557:F49", "mark": "handled", "na": "-", "why": "4.5a ledger row: **<head>...** sends form to ledger_decide which puts the head back and fills through fill_form"}
+{"id": "TD-1557:F50", "mark": "handled", "na": "-", "why": "4.4 'The decided redraw, its toast and a look's hand-off take the filled answer the call returns, never the words the page sent'"}
+{"id": "TD-1557:F51", "mark": "handled", "na": "-", "why": "4.10 mail form press is a typed reply carrying form, home puts head back; mail look's page regex dropped; page parses nothing"}
+{"id": "TD-1557:F52", "mark": "handled", "na": "-", "why": "4.4 board.live_look_pair in sessionorc, ui/inbox.py live_look calls it so page and agent read one predicate"}
+{"id": "TD-1557:F58", "mark": "handled", "na": "-", "why": "TD-1698: msg RPC takes form beside answer; ui/app.py mail reply branch forwards it"}
+{"id": "TD-1557:F60", "mark": "handled", "na": "-", "why": "TD-1698: bad form refused (out of range, plain answer, no answers); fill_form refuses non-string; tests listed; offered = labels"}
+{"id": "TD-1557:F62", "mark": "handled", "na": "-", "why": "TD-1698: rpc_board_reply returns before _board_reply_mail; answerer is the person not the author; _remark(token, act, words)"}
+{"id": "TD-1557:F63", "mark": "handled", "na": "-", "why": "TD-1698 Location lists modules; ledger.answers_of's return tuple gains heads as fourth member"}
+{"id": "TD-1557:F66", "mark": "handled", "na": "-", "why": "TD-1698: app.py's ledger action branch forwards form with go, answer and words"}
+{"id": "TD-1557:F67", "mark": "handled", "na": "-", "why": "TD-1698: ui/inbox.py's board item reading clears the default parse_board gives for a form"}
+{"id": "TD-1557:F69", "mark": "handled", "na": "-", "why": "TD-1557 Handed upstream: item check sits in item_problem's open-decide branch and leaves decided lines alone"}
+{"id": "TD-1557:F70", "mark": "handled", "na": "-", "why": "4.5a / TD-1698: ledger.answers_of's tuple gains heads (a fourth member) beside the string answers"}
+{"id": "TD-1557:F71", "mark": "handled", "na": "-", "why": "4.4 _applying_mark yields its token, which the callback carries, so two presses on one key never share a mark"}
+{"id": "TD-1557:F75", "mark": "handled", "na": "-", "why": "TD-1698: go on a marked form meets 'marks no answer (default)'; mail's reader clears it in read_answers' recommended"}
+{"id": "TD-1557:F77", "mark": "handled", "na": "-", "why": "4.10 / TD-1698: refusals are the msg RPC's, CLI passes them on; with form the head is prefixed to the first paragraph and the rest kept"}
+{"id": "TD-1557:F78", "mark": "handled", "na": "-", "why": "TD-1698: with form, ledger_decide and /api/person/board decide pass empty words through so refusal reads '<head> needs its words'"}
+{"id": "TD-1557:F79", "mark": "handled", "na": "-", "why": "TD-1699: mail row via answers(e) with suggested_heads(e), answer_row for cards and ledger rows"}
+{"id": "TD-1557:F80", "mark": "not-applicable", "na": "absent", "why": "Design has no local head-exclusion list; the form rule is wholly ledgerboard's is_form, nothing to agree with"}
+{"id": "TD-1557:F81", "mark": "handled", "na": "-", "why": "TD-1557 Handed upstream: agent-cadence's board_edit.py reply follows 'words beginning with a form's head are that form's press'"}
+{"id": "TD-1557:F85", "mark": "handled", "na": "-", "why": "TD-1698: action rebound to decide before edit_line, answerer the person, lift, plan_edit and commit subject from the decide; test asserts subject"}
+{"id": "TD-1557:F86", "mark": "handled", "na": "-", "why": "4.5a ledger row and TD-1698 agree: default reading cleared, go meets 'marks no answer (default)'; form sends refused '<head> needs its words'"}
+{"id": "TD-1557:F87", "mark": "handled", "na": "-", "why": "4.5a: board item check refuses, ao msg refuses form --default and form --answer (default), ledger readers hand no default; synopsis matches"}
+{"id": "TD-1557:F88", "mark": "handled", "na": "-", "why": "4.5 screen 6: drawn as a reply while it lands; form press '<head>... - landing on the board...' until the filled answer returns"}
