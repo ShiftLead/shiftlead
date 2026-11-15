@@ -137,3 +137,15 @@ def test_the_page_matches_no_form_and_reads_the_filled_answer_back():
         'id="mailfoot"'
         in (pathlib.Path(__file__).resolve().parent.parent / "src/shiftlead/ui/templates/base.html").read_text()
     )
+
+
+def test_the_answer_box_caps_no_words_and_the_form_press_sends_them_as_typed():
+    """TD-1883 (design §4.4 *A person's words are written whole*): the box a form's press and a Reply open (`#mailtext`)
+    has no `maxlength`, and the form's press sends the composer's words, whitespace folded, never sliced."""
+    base = (pathlib.Path(__file__).resolve().parent.parent / "src/shiftlead/ui/templates/base.html").read_text()
+    box = re.search(r'<textarea[^>]*id="mailtext"[^>]*>', base).group(0)
+    assert "maxlength" not in box
+    press = JS[JS.index('if (action === "board_notright")') :]
+    press = press[: press.index("return;\n      }")]
+    assert 'const said = m.text.split(/\\s+/).filter(Boolean).join(" ");' in press and "answer: said" in press
+    assert ".slice(" not in press and ".substring(" not in press

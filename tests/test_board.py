@@ -2419,6 +2419,37 @@ def test_a_reply_that_fills_no_form_stays_a_reply_and_an_empty_fill_is_refused(r
     assert ": Wait: a day, then ask" in line and ledgerboard.parse_decided(line[6:]) is None
 
 
+LONG_NOTE = (
+    "Findings aren't shrinking and this design keeps overlapping TD-1829. Leave everything about Lift (when it is "
+    "drawn, what a press may lift) to TD-1829 alone; this design puts the same answer bar on every card and calls "
+    "TD-1829's helpers. Build TD-1842 as designed. Move the one-press lift-and-reply into a follow-up entry. TD-1843 "
+    "is blocked by TD-1829's builds, and its next review round runs only after TD-1829's Go."
+)
+
+
+def test_a_long_hold_note_is_written_whole_on_the_line_and_the_ledger_log(repo):
+    """TD-1883 (design §4.4 *A person's words are written whole*): a Hold note past 300 characters, filled as the page
+    sends it (its words and `form`), reaches the line's `Decided:` and the entry's *kept waiting* Log line whole;
+    only the commit's subject is shortened, with its `…`. Paul's 2026-11-14 note was cut to 297 characters."""
+    assert len(LONG_NOTE) > 400
+    from sessionorc.agent_inbox import InboxMixin as A
+
+    _gated(repo)
+    held = GATED.replace("Answers: Go | Not yet.", "Answers: Go | Hold: <note>. Lifts: Go.")
+    (repo / board.BOARD).write_text(origin_board(repo).replace(GATED, held))
+    git(repo, "commit", "-qam", "a form")
+    git(repo, "push", "-q", "origin", "main")
+    said = A._board_answer("decide", LONG_NOTE, ["Go", "Hold: <note>"], 1)
+    assert said == f"Hold: {LONG_NOTE}"
+    at = origin_board(repo).splitlines().index(f"- [ ] {held}") + 1
+    got = board.write_back(repo, at, held, "decide", answer=said)
+    assert got["entries"] == ["TD-190"] and got["message"].endswith("… (session `grinder-ao-2`)")
+    line = origin_board(repo).splitlines()[at - 1]
+    assert f"Decided: Hold: {LONG_NOTE} (by paul)" in line
+    entry = on_origin(repo, "show", "origin/main:docs/ledger/TD-190.md")
+    assert f'kept waiting: decision (paul) — by paul; answer "Hold: {LONG_NOTE}"' in entry
+
+
 @pytest.mark.unit
 def test_which_lines_a_replys_form_decides():
     """TD-1698: an open undecided `decide` or `look` line offering a form, or a `watch` with the look's pair; not a
