@@ -13,3 +13,5 @@ The first row is not a run. It is the Gemini fact-check trial's own tally to 202
 |---|---|---|---|---|---|---|---|---|
 | 2026-11-10 | gemini-reader | — | 0 | 9 | — | 63 of 72 | — | not a run |
 | 2026-11-14 | grok-reader | grok/grok-4.7 | 11 | 0 | 0 | 0 | 60 | yes |
+| 2026-11-14 | gemini-conformance | gemini/gemini-3.5-flash-lite | 2 | 6 | 4 | 3 | 24 | no |
+| 2026-11-15 | gemini-reader | gemini/gemini-3.5-flash-lite | 4 | 5 | 2 | 2 | 24 | no |
