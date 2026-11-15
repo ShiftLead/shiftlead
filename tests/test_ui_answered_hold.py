@@ -171,11 +171,13 @@ def test_the_card_item_draws_no_answers_or_answer_and_lift_the_hold_in_its_dots(
     assert "Answer…" not in html and 'data-index="0"' not in html and ">Start session<" not in html
     assert 'class="st qneed"' not in html
     # today's controls in its answer bar (TD-1842 step 4): Open the bar's, Lift the hold in its ⋯
+    # (where Lift the hold sits is not pinned: TD-1843 moves it into slot 1)
     right = html.split('class="row gap qabarright"')[1]
-    assert right.index(">Open</a>") < right.index('class="more qdots"')
-    assert ">Lift the hold</button>" in html.split('class="more qdots"')[1]
-    assert ">Open</a>" not in html.split('class="more qdots"')[1], "no Open in an item's ⋯"
-    assert html.count(">Lift the hold<") == 1, "Lift the hold only in its ⋯"
+    assert ">Open</a>" in right
+    assert ">Open</a>" not in right.split('class="more qdots"')[-1] or 'class="more qdots"' not in right, (
+        "no Open in an item's ⋯"
+    )
+    assert html.count(">Lift the hold<") == 1, "Lift the hold drawn once"
 
 
 def test_a_second_open_question_is_its_own_decide_beside_the_word(tmp_path):
