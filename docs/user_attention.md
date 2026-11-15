@@ -10,6 +10,11 @@ People: paul
 
 ## Needs the user
 
+- [ ] decide 2026-11-14 (n/a) — Should the stuck-press part of the Queue's answer bar go to the builders now, its Lift rules moved to the Lift the hold design as you asked? Context: TD-1832 decision (paul). Parts: TD-1843. Due: 2026-11-17. Answers: Go (default) — the grinders build TD-1843 once TD-1842 and TD-1879 land | One more round — a session runs one more review round, then asks again | Hold: <note> — a session revises the design as your note says.
+  - **Context:** In shiftlead, your Hold on TD-1832 (board:ef7521de) was revised in TD-1876, design PR #3950: every rule about where Lift the hold is drawn, and the stuck answer's one-press lift-and-reply, now live in TD-1829's design and its new build TD-1879; TD-1832 draws one answer bar and reads TD-1829's marks. Three rounds (fact-check, Fable, Sonnet each) found 7, 3 and 0 build-changing findings in the reviews, and the stop rule ended them. Record: docs/reviews/TD-1832.md.
+  - **Question:** Release TD-1843 now, or one more round?
+  - **Caveats:** No build-changing fix is unread by a review. TD-1842 is released by your Go; TD-1843 also waits on TD-1879, which waits on TD-1829's next question. Your note was cut after Move the one-press lift-and-reply; it was read as to TD-1829.
+  - **Recommended:** Go — every build-changing fix has been read by a later review, and round 3 found none.
 - [x] decide 2026-11-14 (n/a) — Should the grinders build the one answer bar on every Queue item now, as your hold note on its design said? Context: TD-1842 decision (paul). Due: 2026-11-16. Answers: Go (default) — the grinders build TD-1842 now, as designed | Wait — it waits for the design's next review question. Decided: Go (by paul) (2026-11-14). Closed: 2026-11-14 — lifted.
   - **Context:** Your Hold on TD-1832 (board:ef7521de) said Build TD-1842 as designed; no unattended session may lift your hold, so this press does it. TD-1842 places today's controls in the answer bar, Lift the hold among them, with its one draw rule (none on an entry you own to do). It builds from the design as it stands today. Go releases TD-1842 alone: TD-1843 stays held for TD-1832's next question.
   - **Question:** Build TD-1842 now?
