@@ -4,7 +4,7 @@ line, the Members dialog and `ao team list`, and a live extra's *extra k of n* b
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -13,7 +13,12 @@ from shiftlead import teamrun
 
 pytestmark = pytest.mark.unit
 
-TODAY = datetime.now().astimezone().replace(hour=14, minute=2, second=0, microsecond=0)
+
+def _today() -> datetime:
+    """14:02 today in this host's clock, read when a test runs, never at import: the reader (`teamrun._clock`) adds
+    a weekday once the instant's date is not the date it formats on, so a module imported before midnight and run
+    after it would read *+1 at Sat 14:02* (TD-1884)."""
+    return datetime.now().astimezone().replace(hour=14, minute=2, second=0, microsecond=0)
 
 
 def _team(**kw) -> orgmod.TeamDef:
@@ -33,7 +38,7 @@ def _rec(name: str, state: str = "working", line: str = "", last: dict | None = 
 
 
 def _fleet() -> list[dict]:
-    fill = {"at": TODAY.isoformat(), "did": "fill", "why": "4 pickable, every grinder claimed"}
+    fill = {"at": _today().isoformat(), "did": "fill", "why": "4 pickable, every grinder claimed"}
     return [
         *(_rec(f"grinder-ao-{k}") for k in (1, 2, 3)),
         _rec("grinder-ao-4", line="grinder-ao", last=fill),
@@ -56,8 +61,8 @@ def test_each_scaling_line_reads_its_range_extras_and_newest_fill():
 
 def test_a_stop_reads_plus_zero_and_the_newest_fill_or_stop_wins():
     old = {"at": "2026-01-01T09:00:00Z", "did": "fill", "why": "old"}
-    stop = {"at": TODAY.isoformat(), "did": "stopped", "why": "host full, 30 live"}
-    hold = {"at": TODAY.replace(hour=15).isoformat(), "did": "hold", "why": "back to held: out of work"}
+    stop = {"at": _today().isoformat(), "did": "stopped", "why": "host full, 30 live"}
+    hold = {"at": _today().replace(hour=15).isoformat(), "did": "hold", "why": "back to held: out of work"}
     fleet = [
         _rec("grinder-ao-4", "closed", line="grinder-ao", last=old),
         _rec("grinder-ao-5", "closed", line="grinder-ao", last=stop),
@@ -127,3 +132,23 @@ def test_ao_team_list_says_each_scaling_line_on_a_live_team(monkeypatch, capsys)
     out = capsys.readouterr().out
     said = "td-max: techlead-ao-1 1–3 +2 idle; grinder-ao 3–6 +1 (+1 at 14:02: 4 pickable, every grinder claimed)"
     assert said in out
+
+
+def test_the_fleet_reads_today_when_it_runs_not_when_it_was_imported(monkeypatch):
+    """TD-1884: a module imported on one day and run on the next still reads *+1 at 14:02*. The clock moves past
+    midnight after the import, in both the test's `datetime` and the reader's."""
+    import sys
+
+    real = datetime
+
+    class _Tomorrow(datetime):
+        @classmethod
+        def now(cls, tz=None):  # one day on from the import, just after local midnight
+            day = real.now().astimezone().replace(hour=0, minute=0, second=30, microsecond=0) + timedelta(days=1)
+            return day if tz is None else day.astimezone(tz)
+
+    assert not hasattr(sys.modules[__name__], "TODAY")  # nothing of the day is kept from the import
+    monkeypatch.setattr(sys.modules[__name__], "datetime", _Tomorrow)
+    monkeypatch.setattr(teamrun, "datetime", _Tomorrow)
+    lines = {x["name"]: x for x in teamrun.scale_lines(_team(max={"grinder-ao": 6}), _fleet())}
+    assert lines["grinder-ao"]["last"] == "+1 at 14:02: 4 pickable, every grinder claimed"
