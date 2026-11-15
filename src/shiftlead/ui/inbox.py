@@ -28,6 +28,7 @@ from sessionorc import ledgerboard as lb
 from sessionorc import mail as mail_mod
 from sessionorc import promote as promote_mod
 from sessionorc import queue as queue_mod
+from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc import shots as shots_mod
 from sessionorc import unanswered as unanswered_mod
@@ -800,16 +801,26 @@ def red_pr_rows(
     when the order does — green, closed, or held by a live record. A sync PR's order (TD-684) has the
     row green or red, *`<repo>` #<n> · sync · <its reason> · <author>*, and leaves when it merges,
     closes or is held. A live check's lift PR's order (TD-1450) has it whatever its checks, *`<repo>` #<n> ·
-    lift 2h · lifts TD-n event (live) · <author>*, aged from `lift_since` (TD-1578). A filing PR's order draws
-    none (§4.4 *A filing PR nobody holds is a work order*, TD-1811): the PR is the person's, its Review row
-    *nobody's*."""
+    lift 2h · lifts TD-n event (live) · <author>*, aged from `lift_since` (TD-1578), and so does every lift PR and
+    the gate sweep's board PR (§4.4 *A PR the gate sweep opens is the team's at once*, TD-1854): *`<repo>` #<n> ·
+    lift 2h · lifts TD-n until 2026-11-20 · <author>*, *`<repo>` #<n> · sweep 2h · the gate sweep's board items ·
+    <author>*, aged from `sweep_since`, the row marked `sweep` so it stays on the Inbox tab (`queue.item_home`). An
+    unserved repo's rows are its `person_pr_orders`, the gate sweep's lift and sweep orders, whatever
+    `teamrun.serviced` says (§5 *The seams*). A filing PR's order draws none (§4.4 *A filing PR nobody holds is a
+    work order*, TD-1811): the PR is the person's, its Review row *nobody's*."""
     at = now or datetime.now(UTC)
     out: list[dict[str, Any]] = []
     for root, r in sorted((repos or {}).items()):
-        if not isinstance(r, dict) or teamrun.serviced(str(r.get("root") or root), records):
+        if not isinstance(r, dict):
             continue
+        if seams_mod.unserved(r):
+            orders = teamrun.person_pr_orders(r)  # the gate sweep's PRs are the person's there (TD-1854)
+        elif teamrun.serviced(str(r.get("root") or root), records):
+            continue
+        else:
+            orders = teamrun.pr_orders(r)
         repo = str(r.get("name") or Path(str(root)).name)
-        for e in teamrun.pr_orders(r):
+        for e in orders:
             n = e.get("pr")
             if not isinstance(n, int) or e.get("filing"):
                 continue  # a filing PR's order draws no row, so no Do item (§4.4, TD-1811)
@@ -818,10 +829,15 @@ def red_pr_rows(
                 since = str(e.get("sync_since") or "")
                 parts = [f"{repo} #{n}", "sync", str(e.get("reason") or ""), str(e.get("author") or "")]
             elif e.get("lift"):
-                # a live check's lift PR, an order whatever its checks: its gate in their place (TD-1578)
+                # a lift PR, an order whatever its checks: the gate it lifts in their place (TD-1578, TD-1854)
                 since = str(e.get("lift_since") or "")
                 lifts = f"lifts {e['entry']} {e.get('gate') or ''}".strip() if e.get("entry") else ""
                 parts = [f"{repo} #{n}", f"lift {_age(since, at)}".strip(), lifts, str(e.get("author") or "")]
+            elif e.get("sweep"):
+                # the gate sweep's board PR, an order whatever its checks: its board items in their place (TD-1854)
+                since = str(e.get("sweep_since") or "")
+                sweep = workorders_mod.SWEEP_CONTEXT
+                parts = [f"{repo} #{n}", f"sweep {_age(since, at)}".strip(), sweep, str(e.get("author") or "")]
             else:
                 since = str(e.get("red_since") or "")
                 word = "red" if e.get("checks") == "red" else "conflicting"
@@ -844,6 +860,7 @@ def red_pr_rows(
                     "age": _age(since, at),
                     "text": text,
                     "find": " ".join(x for x in (repo, f"#{n}", "red PR", str(e.get("title") or ""), text) if x),
+                    **({"sweep": True} if e.get("sweep") else {}),
                 }
             )
     return out
