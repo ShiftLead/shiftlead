@@ -1090,6 +1090,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        - it left on its own after a wrap-up the person sent (Wind down, Wrap up). Such a record's
          end names nobody, so the wrap-up send stamps **`wrapup_by`** beside `wrapup_at`, read
          from the caller as `closer` is.
+       - it was closed by the tick after the person's Wind down: its closer is `{by: tick, why:
+         wind_down}` and its `wind_down.by` is the person (TD-1895, rule 9 *A wind-down's close*). A
+         `wind_down` close after a session's wind-down reads as that session's, `other`.
 
        Otherwise it is `until` where one's `ended.why` or `closer.why` is the stop time's own word,
        `stop time`, as the tick writes it when it ends a record at its `run_until`, or where one
@@ -1276,6 +1279,17 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      sequence is one code path — and its brief says the reading is the records' each round
      (`ao team status --json`, §4.9) and never an earlier round's; what it may not do is keep a
      finished team live by not saying so.
+     **A wind-down's close** (TD-1895, §4.9a *A wind-down closes its members*). The same pass closes,
+     on every tick at the home, each live unattended record carrying a **`wind_down`** mark (written by
+     a Wind down's members' half, a person's or a manager's) that is not a seat and not its team's
+     manager, once it has settled — `idle` as this rule reads idle, and the mark's `waits` false, or a
+     turn ended at or after the mark (`turn_at`), or `WRAPUP_GRACE` past it — under `_finished_close`'s
+     check, with closer `{by: tick, why: wind_down}`, **whether or not it declared and whether or not
+     the reading holds**: the presser's word is the ending (§4.9a). One left open with work is closed
+     the tick its work reads pushed. It needs no `FINISHED_SETTLE` (the press is not a reading that
+     could stop holding), is never taken back by a member at work (that member is simply not settled
+     yet), and writes no note where the mark's `by` is the person; a manager the reading then finds
+     alone is told and closed as above.
 
   10. **The cadence check** (`sessionorc.cadence`; the Inbox row from `ui/inbox.py`
      `cadence_marks`). The script's verdict needs no reader, so the home runs it, not the
