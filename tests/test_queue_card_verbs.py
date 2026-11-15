@@ -68,7 +68,7 @@ def test_a_look_sent_for_review_has_send_to_reviewer_behind_its_dots():
 def test_a_steer_goes_with_it_in_its_answer_row_and_pauses_behind_its_dots():
     e = entry("m-3", "steer", text="Take the work seat?", answers=["work", "home"], default="work", recommended=0)
     html = card({**e, "bound": "2026-09-19T12:00:00Z", "left": "1h"}, "decide")
-    row = html[html.index("qanswers") : html.index('class="row gap wrap mfoot"')]
+    row = html[html.index("qanswers") : html.index('class="row gap qabarright"')]
     assert 'data-act="gowithit"' in row and ">Go with it</button>" in row and ">Answer…</button>" in row
     assert 'class="btn sm answer rec"' in row
     assert dots(html) == ["Pause"] and 'data-act="pause"' in html.split('class="qdotsbtn"', 1)[1]
@@ -83,12 +83,14 @@ def test_a_ledger_item_answers_done_or_lift_the_hold_in_its_row_and_opens_behind
     row = next(r for g in ledger_for_you(rs, [], {})["groups"] for r in g["rows"])
     row = {**row, "home": "queue"}
     html = card(row, "do")
-    ans = html[html.index("qanswers") : html.index('class="row gap wrap mfoot"')]
+    ans = html[html.index("qanswers") : html.index('class="row gap qabarright"')]
     assert 'class="btn sm answer rec" type="button" data-act="ledger"' in ans and ">Later<" in ans  # the default
     assert 'data-answer="later"' in ans  # the value sent as written (TD-1809)
     assert 'data-words="done"' in ans and ">Done</button>" in ans and 'data-act="ledger_reply"' in ans
     assert ">Answer…</button>" in ans and "Lift the hold" not in ans
-    assert dots(html) == ["Open"] and not re.search(r"\bReply\b", html) and "Go with it" not in html
+    # Open is the answer bar's, and a ledger item's ⋯, which held Open alone, is gone (TD-1842)
+    assert dots(html) == [] and not re.search(r"\bReply\b", html) and "Go with it" not in html
+    assert re.search(r'class="row gap qabarright"><a class="btn sm ghost" href="[^"]*"[^>]*>Open</a></span>', html)
     assert 'data-act="ledger_start"' not in html  # Start session is the card's header's alone (TD-912)
     decision = card({**row, "why": "decision"}, "decide")
     assert ">Lift the hold</button>" in decision[decision.index("qanswers") :]

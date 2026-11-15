@@ -32,10 +32,18 @@
 {{- qrow.synopsis(e.synopsis) }}
 {%- endmacro %}
 
+{#- on a card a Decide, Do or grey item's heading holds no button but its team badge (§4.5 screen 12 *One answer set*,
+    TD-1842): its **Open** is the answer bar's, the asker's name a link to its Focus as a holder's word is, and no
+    *whole entry ›* (its sentence opens the message page) -#}
 {% macro head(e) -%}
+{%- set whole = card_whole(mode, e) %}
 <div class="row gap wrap mhead">
+  {%- if whole and e.from_open %}
+  <a class="ref" href="/focus/{{ e.from_open }}" title="{{ e['from'] }}{% if e.from_role %} · {{ e.from_role }}{% endif %} — open its Focus">{{ e.from_name or e['from'] }}</a>
+  {%- else %}
   <span class="ref" title="{{ e['from'] }}{% if e.from_role %} · {{ e.from_role }}{% endif %}">{{ e.from_name or e['from'] }}</span>
-  {%- if e.from_open %} <a class="btn sm ghost" href="/focus/{{ e.from_open }}" title="Focus on {{ e.from_name }}">Open</a>{% endif %}
+  {%- endif %}
+  {%- if e.from_open and not whole %} <a class="btn sm ghost" href="/focus/{{ e.from_open }}" title="Focus on {{ e.from_name }}">Open</a>{% endif %}
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   <span class="badge kindmark k-{{ e.kind }}">{% call cap() %}{{ e.kind }}{% endcall %}</span>
   {#- §4.5a *PRs waiting* (§4.9b *The reader*, TD-093): the PR a held author put in front of you, a
@@ -47,7 +55,7 @@
   <span class="grow"></span>
   {#- §4.5 screen 6 *The message page* (TD-136): the entry whole, with its thread — a link, so a
       keyboard and a new tab reach it; `Enter` on the ringed row presses it. Not on the page itself. -#}
-  {%- if not fold_open %}<a class="pagelink st" href="/inbox/{{ e.id }}" title="the whole entry, with its thread (Enter)">whole entry ›</a>{% endif %}
+  {%- if not fold_open and not whole %}<a class="pagelink st" href="/inbox/{{ e.id }}" title="the whole entry, with its thread (Enter)">whole entry ›</a>{% endif %}
   <span class="st age" data-since="{{ e.at or '' }}">{{ e.age or '' }}</span>
 </div>
 {%- endmacro %}
@@ -252,10 +260,12 @@
   <button class="btn sm ghost" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="go ahead" data-answer="go ahead" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: go ahead — its session drops decision (paul) from Blocked by" data-confirm="Lift the hold? &ldquo;go ahead&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Lift the hold</button>
   {%- endif %}
   {#- an `act` line is a Do (TD-1066): **Done**, the write-back's check-off, is its one answer, outlined, and its
-      Answer… is in its ⋯; on any board item Answer…'s title is its *standing* (§4.5a *Inbox board row: standing*) -#}
+      Answer… is in slot 2 of the card's answer bar (TD-1832, built by TD-1842; the Inbox keeps it in the ⋯); on any
+      board item Answer…'s title is its *standing* (§4.5a *Inbox board row: standing*) -#}
   {%- if how == 'board' and e.kind == 'act' %}
   {{ board_done(e, 'btn sm answer rec') }}
   {%- if e.session_do %}{{ board_session(e, 'btn sm answer') }}{% endif %}
+  {{ board_answer(e, 'btn sm ghost') }}
   {%- elif how == 'board' %}
   {{ board_answer(e, 'btn sm ghost') }}
   {%- elif how == 'ledger' %}
@@ -372,10 +382,12 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
    questions come as `ask`s on the entry's thread, each a row of its own. #}
 {% macro handed(e, section) -%}
 {%- set en = e.entry or {} %}
+{%- set whole = card_whole(mode, e) %}
 <div class="row gap wrap mhead">
   <span class="ref">you</span><span class="st">→</span>
-  <span class="ref" title="{{ e.holder }}">{{ e.holder_name }}</span>
-  {%- if e.holder_open %} <a class="btn sm ghost" href="/focus/{{ e.holder_open }}" title="Focus on {{ e.holder_name }}">Open</a>{% endif %}
+  {%- if whole and e.holder_open %}<a class="ref" href="/focus/{{ e.holder_open }}" title="{{ e.holder }} — open its Focus">{{ e.holder_name }}</a>
+  {%- else %}<span class="ref" title="{{ e.holder }}">{{ e.holder_name }}</span>{% endif %}
+  {%- if e.holder_open and not whole %} <a class="btn sm ghost" href="/focus/{{ e.holder_open }}" title="Focus on {{ e.holder_name }}">Open</a>{% endif %}
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   {%- if e.look %}
   <span class="badge kindmark k-{{ e.kind }}" title="a look you sent to be read (design §4.10 *A look*)">{% call cap() %}look{% endcall %}</span>
@@ -384,7 +396,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- endif %}
   {%- if en.repo %} <span class="st">for {{ en.repo }}</span>{% endif %}
   <span class="grow"></span>
-  {%- if not fold_open %}<a class="pagelink st" href="/inbox/{{ e.id }}" title="the whole entry, with its thread (Enter)">whole entry ›</a>{% endif %}
+  {%- if not fold_open and not whole %}<a class="pagelink st" href="/inbox/{{ e.id }}" title="the whole entry, with its thread (Enter)">whole entry ›</a>{% endif %}
   <span class="st age" data-since="{{ e.at or '' }}">{{ e.age or '' }}</span>
 </div>
 {{ body(e) }}
@@ -397,10 +409,13 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {%- if e.stuck %}
 <div class="row gap wrap stuckline"><span class="badge kindmark k-stuck">{% call cap() %}stuck{% endcall %}</span><span class="st">{{ e.stuck.text }}</span>
   {%- if e.stuck.waiting_until %}<span class="st" title="every reason names when it ends, within the wait (design §6 rule 13)">· waiting</span>{% endif %}
+  {%- if not whole %}
   <span class="grow"></span>
   {%- if e.stuck.open %}<a class="btn sm primary" href="/focus/{{ e.stuck.open }}" title="{{ help_title('stuck-open') }}">Open</a>{% endif %}
+  {%- endif %}
 </div>
 {%- endif %}
+{%- set stuck = e.stuck and not e.stuck.waiting_until %}
 <div class="row gap wrap mfoot">
   {%- if section == 'needs' and not (e.stuck and not e.stuck.waiting_until) %}
   <span class="st">blocked on something only a person can move — {{ e.holder_name }}'s questions come as rows of their own</span>
@@ -409,9 +424,17 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- else %}
   <span class="st">handed · waiting on {{ e.holder_name }} to {% if e.look %}read the look and report what it found{% else %}report the entry and its PR{% endif %}</span>
   {%- endif %}
+  {%- if not whole %}
   <span class="grow"></span>
   {{ dismiss_btn(e, e.holder_name, True) }}
+  {%- endif %}
 </div>
+{#- on a card (TD-1842): a handed entry's `blocked` outcome draws Start session, **Dismiss** and **Open** (its holder's
+    Focus), no Answer… and no ⋯; a stuck one is the stuck row, its **Open** the actor's Focus alone -#}
+{%- if whole %}
+{%- if stuck %}{% set right %}{% if e.stuck.open %}<a class="btn sm ghost" href="/focus/{{ e.stuck.open }}" title="{{ help_title('stuck-open') }}">Open</a>{% endif %}{% endset %}{{ bar('', right) }}
+{%- else %}{% set right %}{{ dismiss_btn(e, e.holder_name, True) }}{{ open_focus(e.holder_open, e.holder_name) }}{% endset %}{{ bar(item_start(e), right) }}{% endif %}
+{%- endif %}
 {%- endmacro %}
 
 {# In *Needs you*, counted: `blocked`, and a debt whose asker exited without reporting. Both are
@@ -422,18 +445,22 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {{ body(e) }}
 {{ answer_given(e) }}
 {{ outcome_line(e) }}
-{%- if card_whole(mode, e) %}{{ answer_row(e, 'owed') }}{% endif %}
+{%- set whole = card_whole(mode, e) %}
 <div class="row gap wrap mfoot">
   {%- if e.asker_gone_quiet %}
   <span class="st">its asker {{ e.asker_state }} without reporting what came of your answer — only you, or its manager, can find out</span>
   {%- else %}
   <span class="st">blocked on something only a person can move — your reply is an ordinary reply and starts no new debt</span>
   {%- endif %}
+  {%- if not whole %}
   <span class="grow"></span>
   {%- if e.from_open %}<a class="btn sm ghost" href="/focus/{{ e.from_open }}" title="Focus on {{ e.from_name }}">Open</a>{% endif %}
   {{ reply_btn(e) }}
   {{ dismiss_btn(e, e.from_name or e['from']) }}
+  {%- endif %}
 </div>
+{#- on a card (TD-1842): **Answer…** where the Inbox's Reply is, Start session, then **Dismiss** and **Open**, no ⋯ -#}
+{%- if whole %}{% set right %}{{ dismiss_btn(e, e.from_name or e['from']) }}{{ open_focus(e.from_open, e.from_name) }}{% endset %}{{ bar(answer_row(e, 'owed'), right) }}{% endif %}
 {%- endmacro %}
 
 {# design §4.10 *The Inbox is a queue* (TD-079 step 1b): **the trail** — what a state row's ending
@@ -525,7 +552,26 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
    row, so after its answers and before its ⋯ (the mockup Paul agreed, `docs/mockups/reviews/2026-10-26-td1066-card-items.png`) — `e.start`, `queue.item_start`, which is empty where the item draws none. With the person's own
    session on the card it reads **Open session**: the press goes there and puts the item's id on the clipboard. #}
 {% macro item_start(e) -%}
-{%- set s = e.start %}{% if mode == 'card' and s %}<button class="btn sm qstart qistart" type="button" data-act="ledger_start" data-id="person" data-repo="{{ s.repo }}" data-ref="{{ s.ref }}" data-card="{{ s.card }}" data-item="{{ s.item }}" title="{{ ('your session on this card: go to its Focus with ' ~ s.item ~ ' on the clipboard to paste — nothing is started') if s.own else help_title('card-item-start') }}">{{ 'Open session' if s.own else 'Start session' }}</button>{% endif %}
+{%- set s = e.start %}{% if mode == 'card' and s %}<span class="qrule" aria-hidden="true"></span><button class="btn sm qstart qistart" type="button" data-act="ledger_start" data-id="person" data-repo="{{ s.repo }}" data-ref="{{ s.ref }}" data-card="{{ s.card }}" data-item="{{ s.item }}" title="{{ ('your session on this card: go to its Focus with ' ~ s.item ~ ' on the clipboard to paste — nothing is started') if s.own else help_title('card-item-start') }}">{{ 'Open session' if s.own else 'Start session' }}</button>{% endif %}
+{%- endmacro %}
+
+{# §4.5 screen 12 *One answer set* (§4.5a *Queue card: the answer bar*; TD-1832, built by TD-1842): on the Queue and a
+   card's page every Decide, Do and grey item ends in one bar, its slots in order — the item's answers (the recommended
+   outlined), **Answer…**, Start session / Open session after a thin rule (`item_start`'s `.qrule`), a gap, then the
+   right group: **Dismiss** (a `blocked` outcome or an exited asker's owed question alone), a fork's PR's **Copy**,
+   **Open**, **⋯**. `left` is the item's answer row (`answer_row`, its `.qanswers` kept so its roads and the press's
+   draw are as they were), `right` the right group; a slot the item has no use for is not drawn. The Inbox's own rows,
+   the message page, the Repo page and the Read fold's items never draw it. -#}
+{% macro bar(left='', right='') -%}
+{%- set l = left | trim %}{% set r = right | trim %}
+{%- if l or r %}
+<div class="row gap wrap qabar">{{ l }}{% if r %}<span class="row gap qabarright">{{ r }}</span>{% endif %}</div>
+{%- endif %}
+{%- endmacro %}
+{#- a mail item's **Open** in its bar's right group: the asker's session, as its Inbox row's heading Open; none where
+    the asker has none -#}
+{% macro open_focus(sid, name) -%}
+{%- if sid %}<a class="btn sm ghost" href="/focus/{{ sid }}" title="Focus on {{ name }}">Open</a>{% endif %}
 {%- endmacro %}
 
 {# §4.5a **Inbox row: `ask`** — the whole text, sender, `about`, age, and no countdown: an `ask` to
@@ -538,21 +584,23 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {{ recommends(e) }}
 {{ looked_by(e) }}
 {%- set whole = card_whole(mode, e) %}
-{%- if whole %}{{ answer_row(e, 'mail') }}{% else %}{{ answers(e) }}{% endif %}
+{%- if not whole %}{{ answers(e) }}{% endif %}
 <div class="row gap wrap mfoot">
   {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% else %}<span class="st">open · no bound — it waits until you answer it</span>{% endif %}
+  {%- if not whole %}
   <span class="grow"></span>
-  {#- on a card the item's own controls are behind its ⋯ (§4.5 screen 12 *Three verbs: ⋯*, TD-914) -#}
-  {%- if whole %}{% call qrow.dots(['Delete'] + (['Send to reviewer'] if e.review_seat else [])) %}
-  <button role="menuitem" type="button" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Delete this question? That declines it: the sender is told, and nothing else answers it.">Delete</button>
-  {%- if e.review_seat %}<button role="menuitem" type="button" data-act="hand_look" data-id="person" data-msg="{{ e.id }}" data-team="{{ e.team or '' }}" data-name="{{ e.review_name }}" title="hand this look to {{ e.review_name }}, {{ e.team }}'s techlead, to read: it is set aside until the seat reports, and comes back with its reading above the answers">Send to reviewer</button>{% endif %}
-  {%- endcall %}{% else %}
   {{ reply_btn(e) }}
   {{ review_btn(e) }}
   {{ snooze_btn(e) }}
   <button class="btn sm ghost" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Delete this question? That declines it: the sender is told, and nothing else answers it.">Delete</button>
   {%- endif %}
 </div>
+{#- on a card its answer bar (TD-1842): the item's own controls behind its ⋯ (§4.5 screen 12 *Three verbs: ⋯*, TD-914),
+    **Open** the asker's session; no Dismiss on an open question -#}
+{%- if whole %}{% set right %}{{ open_focus(e.from_open, e.from_name) }}{% call qrow.dots(['Delete'] + (['Send to reviewer'] if e.review_seat else [])) %}
+  <button role="menuitem" type="button" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Delete this question? That declines it: the sender is told, and nothing else answers it.">Delete</button>
+  {%- if e.review_seat %}<button role="menuitem" type="button" data-act="hand_look" data-id="person" data-msg="{{ e.id }}" data-team="{{ e.team or '' }}" data-name="{{ e.review_name }}" title="hand this look to {{ e.review_name }}, {{ e.team }}'s techlead, to read: it is set aside until the seat reports, and comes back with its reading above the answers">Send to reviewer</button>{% endif %}
+  {%- endcall %}{% endset %}{{ bar(answer_row(e, 'mail'), right) }}{% endif %}
 {%- endmacro %}
 
 {# §4.5a **Inbox row: `steer`** — the text, **the default it will take**, and the time left.
@@ -566,7 +614,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {%- if not (card_whole(mode, e) and passed_question(e)) %}<div class="st dflt">unless you say otherwise: {{ e.default or '—' }}</div>{% endif %}
 {{ recommends(e) }}
 {%- set whole = card_whole(mode, e) %}
-{%- if whole %}{{ answer_row(e, 'mail', 'Go with it? The sender takes its default now instead of waiting out the clock.') }}{% else %}{{ answers(e) }}{% endif %}
+{%- if not whole %}{{ answers(e) }}{% endif %}
 <div class="row gap wrap mfoot">
   {%- if e.paused_at %}
   <span class="st">paused · the clock is stopped, and the sender was told not to take its default yet</span>
@@ -576,11 +624,8 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
       moving — the `…` a row showed until its script ran is gone (TD-082). -#}
   <span class="st timeleft" data-deadline="{{ e.bound or '' }}">{% if not e.bound %}no bound{% elif e.left %}{{ e.left }} left — then it goes with its default{% else %}the time is up: the sender goes with its default{% endif %}</span>
   {%- endif %}
+  {%- if not whole %}
   <span class="grow"></span>
-  {%- if whole %}{% call qrow.dots(['Resume' if e.paused_at else 'Pause']) %}
-  {%- if e.paused_at %}<button role="menuitem" type="button" data-act="resume" data-id="person" data-msg="{{ e.id }}" title="give back the time that was left">Resume</button>
-  {%- else %}<button role="menuitem" type="button" data-act="pause" data-id="person" data-msg="{{ e.id }}" title="stop the clock: the sender is told not to take its default yet">Pause</button>{% endif %}
-  {%- endcall %}{% else %}
   {{ reply_btn(e) }}
   <button class="btn sm ghost" data-act="gowithit" data-id="person" data-msg="{{ e.id }}" data-confirm="Go with it? The sender takes its default now instead of waiting out the clock.">Go with it</button>
   {%- if e.paused_at %}
@@ -590,6 +635,12 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- endif %}
   {%- endif %}
 </div>
+{#- on a card its answer bar (TD-1842): Go with it among its answers, Pause / Resume behind its ⋯, **Open** the asker's
+    session; no Dismiss on an open steer -#}
+{%- if whole %}{% set right %}{{ open_focus(e.from_open, e.from_name) }}{% call qrow.dots(['Resume' if e.paused_at else 'Pause']) %}
+  {%- if e.paused_at %}<button role="menuitem" type="button" data-act="resume" data-id="person" data-msg="{{ e.id }}" title="give back the time that was left">Resume</button>
+  {%- else %}<button role="menuitem" type="button" data-act="pause" data-id="person" data-msg="{{ e.id }}" title="stop the clock: the sender is told not to take its default yet">Pause</button>{% endif %}
+  {%- endcall %}{% endset %}{{ bar(answer_row(e, 'mail', 'Go with it? The sender takes its default now instead of waiting out the clock.'), right) }}{% endif %}
 {%- endmacro %}
 
 {# §4.5a **Inbox row: orphaned question** (§4.10 *A question about a reference outlives its asker*;
@@ -606,7 +657,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {%- if e.kind == 'steer' and not (card_whole(mode, e) and passed_question(e)) %}<div class="st dflt">its asker would have gone with: {{ e.default or '—' }}</div>{% endif %}
 {{ recommends(e) }}
 {%- set whole = card_whole(mode, e) %}
-{%- if whole %}{{ answer_row(e, 'mail', 'Go with it? Its default is written on the board as your answer, and sent to whoever holds ' ~ e.about ~ '.' if e.kind == 'steer' else '') }}{% else %}{{ answers(e) }}{% endif %}
+{%- if not whole %}{{ answers(e) }}{% endif %}
 <div class="st standing" title="where your answer goes (design §4.10): the board always, and whoever holds the reference">{{ e.standing.text if e.standing else 'its session is gone' }}</div>
 <div class="row gap wrap mfoot">
   {%- if e.kind == 'steer' and e.bound %}
@@ -614,10 +665,8 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- else %}
   {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% else %}<span class="st">open · its asker is gone — it waits until you answer it</span>{% endif %}
   {%- endif %}
+  {%- if not whole %}
   <span class="grow"></span>
-  {%- if whole %}{% call qrow.dots(['Delete']) %}
-  <button role="menuitem" type="button" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Delete this question? That declines it: nothing is written, and there is nobody to tell.">Delete</button>
-  {%- endcall %}{% else %}
   {{ reply_btn(e) }}
   {%- if e.kind == 'steer' %}
   <button class="btn sm ghost" data-act="gowithit" data-id="person" data-msg="{{ e.id }}" data-confirm="Go with it? Its default is written on the board as your answer, and sent to whoever holds {{ e.about }}.">Go with it</button>
@@ -626,6 +675,10 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   <button class="btn sm ghost" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Delete this question? That declines it: nothing is written, and there is nobody to tell.">Delete</button>
   {%- endif %}
 </div>
+{#- on a card its answer bar (TD-1842): no Open, its asker gone; Delete behind its ⋯ -#}
+{%- if whole %}{% set right %}{% call qrow.dots(['Delete']) %}
+  <button role="menuitem" type="button" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Delete this question? That declines it: nothing is written, and there is nobody to tell.">Delete</button>
+  {%- endcall %}{% endset %}{{ bar(answer_row(e, 'mail', 'Go with it? Its default is written on the board as your answer, and sent to whoever holds ' ~ e.about ~ '.' if e.kind == 'steer' else ''), right) }}{% endif %}
 {%- endmacro %}
 
 {# §4.5a **Inbox row: FYI** → **Put on the board** (TD-140): the one door from mail to a board, on
@@ -792,6 +845,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 <div class="row gap wrap stuckline"><span class="badge kindmark k-stuck">{% call cap() %}stuck{% endcall %}</span><span class="st">{{ l.text }}</span></div>
 {%- endfor %}
 {%- if section == 'snoozed' %}<div class="row">{{ snoozed_says(e) }}<span class="st">&nbsp;— the state itself is untouched</span></div>{% endif %}
+{%- if card_whole(mode, e) %}{{ state_bar(e) }}{% else %}
 <div class="row gap wrap mfoot">
   {%- if e.row == 'permission' %}
   <span class="st">waiting on your answer — through the hook channel, not the terminal (§4.2)</span>
@@ -882,6 +936,61 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {{ open_btn(e, 'Open') }}
   {%- endif %}
 </div>
+{%- endif %}
+{%- endmacro %}
+
+{#- a state row on a card (a stopped holder's, §4.5a *Queue card: holder's state row*) draws its words as a foot and its
+    controls in the answer bar (§4.5 screen 12 *One answer set*, TD-1842): a permission's **Allow** / **Deny** and *why?*
+    in slot 1, as are the row's own answers (Restart, Resume, Reopen and push, Hand back), then the right group —
+    the Dismiss its Inbox row draws, kept as today until TD-1856, and **Open**, its session's Focus. No Snooze on the
+    Queue -#}
+{% macro state_bar(e) -%}
+<div class="row gap wrap mfoot">
+  {%- if e.row == 'permission' %}
+  <span class="st">waiting on your answer — through the hook channel, not the terminal (§4.2)</span>
+  <span class="meta countdown" data-deadline="{{ e.deadline }}">{{ e.left or 'via hook' }}</span>
+  {%- elif e.row == 'limited' %}
+  <span class="st">nothing here clears a cap (§4.2) — Switch profile… / Wait are unbuilt on the card too</span>
+  {%- elif e.row == 'restart' %}
+  <span class="st">{{ 'fills again after the hour' if e.lapses else 'the host agent will not restart it — yours now' }}</span>
+  {%- elif e.row == 'idle_open' %}
+  <span class="st" title="{{ help_title('idle-open') }}">idle · open work — its team has no manager, so it is yours to judge</span>
+  {%- elif e.row == 'held_mail' %}
+  <span class="st" title="{{ help_title('held-mail') }}">held · mail waiting — Hand back returns it to its team and its doorbell</span>
+  {%- elif e.mark == 'cadence' %}
+  <span class="st" title="{{ help_title('cadence-failed') }}">cadence check failed — the host agent told the member once; what is left is yours to judge</span>
+  {%- elif e.mark == 'held' %}
+  <span class="st" title="{{ help_title('held-missed') }}">merged without its read — the host agent undoes nothing: a revert is your word</span>
+  {%- elif e.row == 'unclosed' %}
+  <span class="st">every member is closed or declared — look at what holds it, and close it from its Focus</span>
+  {%- elif e.row == 'unpushed' %}
+  <span class="st">exited with work that is only here — the row goes when it is pushed, or the session is forgotten</span>
+  {%- else %}
+  <span class="st">{% if e.row == 'stalled' %}no output for a while: it may be thinking, or stuck{% else %}answer it in the terminal{% endif %}</span>
+  {%- endif %}
+</div>
+{%- set left %}
+  {%- if e.row == 'permission' %}
+  <button class="btn sm primary" data-act="allow" data-id="{{ e.sid }}" data-call="{{ e.call }}">Allow</button>
+  <button class="btn sm" data-act="deny" data-id="{{ e.sid }}" data-call="{{ e.call }}">Deny</button>
+  <input class="denywhy" type="text" maxlength="200" data-id="{{ e.sid }}" data-call="{{ e.call }}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it">
+  {%- elif e.row == 'restart' %}
+  {% if e.restartable %}<button class="btn sm" data-act="restart" data-id="{{ e.sid }}" title="{{ help_title('restart') }}">Restart</button>{% endif %}
+  <button class="btn sm" data-act="resume" data-id="{{ e.sid }}"{% if e.resume_confirm %} data-confirm="{{ e.resume_confirm }}"{% endif %}>Resume</button>
+  {%- elif e.row == 'held_mail' %}
+  <button class="btn sm primary" data-act="mode" data-via="inbox" data-id="{{ e.sid }}" data-unattended="0" title="{{ help_title('held-mail') }}">Hand back</button>
+  {%- elif e.row == 'unpushed' %}
+  <button class="btn sm primary" data-act="reopen-push" data-id="{{ e.sid }}" data-confirm="Reopen {{ e.name }} under its own name and ask it to push? It resumes the conversation, attended, with one prompt this page wrote — push the branch, open or update the PR, then report the outcome.{% if e.member_hold %} {{ e.member_hold }}{% endif %}">Reopen and push</button>
+  <button class="btn sm" data-act="resume" data-id="{{ e.sid }}"{% if e.resume_confirm %} data-confirm="{{ e.resume_confirm }}"{% endif %}>Resume</button>
+  {%- endif %}
+{%- endset %}
+{%- set right %}
+  {%- if e.row == 'restart' %}<button class="btn sm ghost" data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="restart" data-until="dismissed:{{ e.at }}" title="remove this row: the mark stays on the record and its card, and a new mark raises a new row">Dismiss</button>
+  {%- elif e.mark == 'cadence' %}<button class="btn sm ghost" data-act="clear_mark" data-id="person" data-sid="{{ e.sid }}" data-kind="cadence" data-pr="{{ e.pr }}" title="{{ help_title('cadence-failed') }}">Dismiss</button>
+  {%- elif e.mark == 'held' %}<button class="btn sm ghost" data-act="clear_mark" data-id="person" data-sid="{{ e.sid }}" data-kind="held" title="{{ help_title('held-missed') }}">Dismiss</button>{% endif %}
+  {%- if e.sid %}{{ open_btn(e, 'Details' if e.row == 'unpushed' else 'Open') }}{% endif %}
+{%- endset %}
+{{ bar(left, right) }}
 {%- endmacro %}
 
 {# ── design §4.5a **Inbox row: identity alarm** (§4.8a; TD-077 step 2) ──────────────────────────
@@ -1048,11 +1157,14 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {#- §4.5a **Queue card / Inbox: stuck row** (§6 rule 13 *What the person sees*, TD-1497 slice 2): a stuck decided
     line is drawn on its own row, the stuck words a line under it and its **Open** the actor's Focus — moved to
     *Needs you* (a card's Do group) while a need, under *Waiting on them* at *waiting*, held under `applying` -#}
+{%- set whole = card_whole(mode, e) %}
 {%- if e.stuck %}
 <div class="row gap wrap stuckline"><span class="badge kindmark k-stuck">{% call cap() %}stuck{% endcall %}</span><span class="st">{{ e.stuck.text }}</span>
   {%- if e.stuck.waiting_until %}<span class="st" title="every reason names when it ends, within the wait (design §6 rule 13)">· waiting</span>{% endif %}
+  {%- if not whole %}
   <span class="grow"></span>
   {%- if e.stuck.open %}<a class="btn sm primary" href="/focus/{{ e.stuck.open }}" title="{{ help_title('stuck-open') }}">Open</a>{% endif %}
+  {%- endif %}
 </div>
 {%- endif %}
 {%- if e.stale_line %}
@@ -1061,7 +1173,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {%- if waits %}
 <div class="st waitingon">{{ e.waiting_on }}</div>
 {%- elif e.decided %}
-{%- elif card_whole(mode, e) %}{{ answer_row(e, 'board') }}
+{%- elif whole %}{#- its answers are its answer bar's, below (TD-1842) #}
 {%- elif e.answers %}
 <div class="row gap wrap sugg" role="group" aria-label="this item's answers">
   <span class="st sugglabel">its answers</span>
@@ -1079,6 +1191,29 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {%- endif %}
 {#- a live look's default is its Works button, *Go with it: Works* (§4.5a) -#}
 {%- set gwi = e.default and e.answers and not e.decided and not e.pair and not waits %}
+{%- if whole %}
+{#- on a card its answer bar (§4.5 screen 12 *One answer set*, TD-1842): its answers, Done and Have a session do it on
+    an `act` line, **Answer…**, Start session, then **Open** — its row on the Repo page — and its ⋯ (Done on a line
+    that is not an `act`, Have a session do it there, Open board), none where it would hold nothing; a stuck line is
+    the stuck row, its **Open** the actor's Focus alone -#}
+{%- set act = e.kind == 'act' and not (waits or e.decided) %}
+{%- set sdo = e.session_do and not act and not (waits or e.decided) %}
+{%- set names = ([] if act else ['Done']) + (['Have a session do it'] if sdo else []) + (['Open board'] if e.editor else []) %}
+{%- if e.stuck and not e.stuck.waiting_until %}
+{%- set right %}{% if e.stuck.open %}<a class="btn sm ghost" href="/focus/{{ e.stuck.open }}" title="{{ help_title('stuck-open') }}">Open</a>{% endif %}{% endset %}
+{{ bar('', right) }}
+{%- else %}
+{%- set right %}
+  {%- if e.repo_name %}<a class="btn sm ghost" href="/repo/{{ e.repo_name }}#waiting" title="the line on {{ e.repo_name }}'s board, on the Repo page">Open</a>{% endif %}
+  {%- if names %}{% call qrow.dots(names) %}
+  {%- if not act %}{{ board_done(e, '', 'menuitem') }}{% endif %}
+  {%- if sdo %}{{ board_session(e, '', 'menuitem') }}{% endif %}
+  {%- if e.editor %}{% from "file_link.html" import file_link %}{{ file_link(e.editor, 'Open board', "open " ~ e.board ~ " at line " ~ e.line, "", role="menuitem") }}{% endif %}
+  {%- endcall %}{% endif %}
+{%- endset %}
+{{ bar(answer_row(e, 'board') if not (waits or e.decided) else '', right) }}
+{%- endif %}
+{%- else %}
 <div class="row gap wrap mfoot">
   {%- if mode == 'card' %}{# a card: no Reply word, no Snooze, no *on the board —* footer (TD-1066); an `act` line's
      Done is its answer and its Answer… behind the ⋯, any other line's Done behind the ⋯ (screen 12 *Three verbs*) #}
@@ -1122,6 +1257,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   <button class="btn sm" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-confirm="Check this item off {{ e.repo_name or e.repo }}'s board? It lands on origin by shiftlead's own pull request.">Done</button>
   {%- if e.session_do and not (waits or e.decided) %}{{ board_session(e, 'btn sm') }}{% endif %}
 </div>
+{%- endif %}
 {%- endif %}
 {%- endmacro %}
 
@@ -1196,6 +1332,8 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 </div>
 {{ subj(e) }}
 <div class="body">{{ e.text }}{% if e.title %} — {{ e.title }}{% endif %}</div>
+{#- on a card (TD-1842): no answers, no ⋯, its **Open** in its answer bar's right group -#}
+{%- if card_whole(mode, e) %}{% set right %}{% if e.url %}<a class="btn sm ghost" href="{{ e.url }}" target="_blank" rel="noopener" title="the pull request, on its forge">Open</a>{% endif %}{% endset %}{{ bar('', right) }}{% else %}
 <div class="row gap wrap mfoot">
   {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% endif %}
   <span class="grow"></span>
@@ -1213,6 +1351,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- endif %}
   {%- if e.url %}<a class="btn sm primary" href="{{ e.url }}" target="_blank" rel="noopener" title="the pull request, on its forge">Open</a>{% endif %}
 </div>
+{%- endif %}
 {%- endmacro %}
 
 {# ── design §4.5a **Inbox row: fork's PR** (§4.4 *A fork's PR is no work order*, TD-1285, built by TD-1292) ──
@@ -1230,6 +1369,8 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {{ subj(e) }}
 <div class="body">{% if drawn_on_queue %}#{{ e.pr }} fork — CI green, yours to precheck{% else %}{{ e.text }}{% endif %}{% if e.title %} — {{ e.title }}{% endif %}</div>
 <div class="body forkline"><span class="meta">yours, after reading the diff:</span> <code class="mono" title="{{ e.line_title }}">{{ e.line }}</code></div>
+{#- on a card (TD-1842): its **Copy** and **Open** in its answer bar's right group, no ⋯ -#}
+{%- if card_whole(mode, e) %}{% set right %}<button class="btn sm ghost" type="button" data-copy="{{ e.line }}" title="puts the line on the clipboard; nothing is run">Copy</button>{% if e.url %}<a class="btn sm ghost" href="{{ e.url }}" target="_blank" rel="noopener" title="the PR's diff, on its forge: read it before you run the line">Open</a>{% endif %}{% endset %}{{ bar('', right) }}{% else %}
 <div class="row gap wrap mfoot">
   {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% endif %}
   <span class="grow"></span>
@@ -1248,6 +1389,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   <button class="btn sm ghost" type="button" data-copy="{{ e.line }}" title="puts the line on the clipboard; nothing is run">Copy</button>
   {%- if e.url %}<a class="btn sm primary" href="{{ e.url }}" target="_blank" rel="noopener" title="the PR's diff, on its forge: read it before you run the line">Open</a>{% endif %}
 </div>
+{%- endif %}
 {%- endmacro %}
 
 {# ── design §4.5a **Inbox row: CI not starting** (§4.4 *CI that never started is the person's*, TD-687) ──
@@ -1300,11 +1442,17 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 </div>
 {{ subj(e) }}
 <div class="body">{{ e.text }}</div>
+{%- if card_whole(mode, e) %}
+{#- on a card (TD-1842): its one control, **Open**, in its answer bar's right group -#}
+{%- if e.waiting_until %}<div class="row gap wrap mfoot"><span class="st" title="every reason names when it ends, within the wait (design §6 rule 13)">waiting{% if e.until_words %}: its reason ends in {{ e.until_words }}{% endif %}</span></div>{% endif %}
+{%- set right %}{% if e.open %}<a class="btn sm ghost" href="/focus/{{ e.open }}" title="{{ help_title('stuck-open') }}">Open</a>{% endif %}{% endset %}{{ bar('', right) }}
+{%- else %}
 <div class="row gap wrap mfoot">
   {%- if e.waiting_until %}<span class="st" title="every reason names when it ends, within the wait (design §6 rule 13)">waiting{% if e.until_words %}: its reason ends in {{ e.until_words }}{% endif %}</span>{% endif %}
   <span class="grow"></span>
   {%- if e.open %}<a class="btn sm primary" href="/focus/{{ e.open }}" title="{{ help_title('stuck-open') }}">Open</a>{% endif %}
 </div>
+{%- endif %}
 {%- endmacro %}
 
 {# ── design §4.5a **Inbox row: team start** (§6 rule 8, TD-227 slice 3) ─────────────────────────
@@ -1409,7 +1557,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {%- endif %}
 {%- set whole = card_whole(mode, e) %}
 {%- if ans or app %}
-{%- elif whole %}{{ answer_row(e, 'ledger') }}
+{%- elif whole %}{#- its answers are its answer bar's, below (TD-1842) #}
 {%- elif e.answers %}
 <div class="row gap wrap sugg" role="group" aria-label="this entry's answers">
   <span class="st sugglabel">its answers</span>
@@ -1440,6 +1588,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- else %}
   <span class="st">in {{ e.name }}'s ledger — waits on you, with no date; an answer is written on {{ e.name }}'s board as a decided line, its session's work order</span>
   {%- endif %}
+  {%- if not whole %}
   <span class="grow"></span>
   {%- if app %}
   {%- call qrow.dots(['Open']) %}<a role="menuitem" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>{% endcall %}
@@ -1474,10 +1623,27 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {#- the row's controls, the Queue row's one macro (§4.5 screen 12 *any open row*, TD-905); on a Queue card
       its row draws them, so the card's Needs-you block does not draw them twice -#}
   {%- if e.home != 'queue' %}{{ qrow.controls({'id': e.id, 'title': e.title, 'repo': e.name, 'needs': 'owner' if e.why == 'yours' else 'decision', 'state': '', 'page': e.page, 'blocked_open': e.blocked_open, 'builds_open': e.builds_open}, e.root) }}{% endif %}
-  {%- if whole %}{% call qrow.dots(['Open']) %}<a role="menuitem" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>{% endcall %}
-  {%- else %}<a class="btn sm ghost" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>{% endif %}
+  <a class="btn sm ghost" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>
+  {%- endif %}
   {%- endif %}
 </div>
+{#- on a card its foot above, then its answer bar (§4.5 screen 12 *One answer set*, TD-1842): its answers, Done or Lift
+    the hold, **Answer…**, Start session, then **Open**, its row on the Repo page; its ⋯ is gone (Open alone today), a
+    *with you in <name>* item's too. A grey item keeps today's controls in the bar (TD-1842 step 4, until TD-1843):
+    *applying* **Open** alone; *answered — waiting on* and *waits until* **Open** and a ⋯ with **Lift the hold**, none
+    on an `Owner: paul` entry, whose Done answers it; *handed to <seat>* **Open** and a ⋯ with the entry's answer -#}
+{%- if whole %}
+{%- set lift %}<button role="menuitem" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="go ahead" data-answer="go ahead" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: go ahead — its session drops decision (paul) from Blocked by" data-confirm="Lift the hold? &ldquo;go ahead&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Lift the hold</button>{% endset %}
+{%- set right %}<a class="btn sm ghost" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>
+  {%- if app %}
+  {%- elif ans and ans.kind == 'handed' and e.why == 'yours' %}
+  {%- call qrow.dots(['Done']) %}<button role="menuitem" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="done" data-answer="done" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: done — its session archives the entry, or asks you what was done" data-confirm="Done? &ldquo;done&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Done</button>{% endcall %}
+  {%- elif ans and (ans.kind == 'handed' or e.why != 'yours') %}
+  {%- call qrow.dots(['Lift the hold']) %}{{ lift }}{% endcall %}
+  {%- endif %}
+{%- endset %}
+{{ bar('' if (ans or app) else answer_row(e, 'ledger'), right) }}
+{%- endif %}
 {%- endmacro %}
 
 {#- §4.6 *A path in the Inbox and the Queue is a link too* (TD-1108): the context a row's paths resolve
