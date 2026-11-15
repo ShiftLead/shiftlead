@@ -10,6 +10,10 @@ People: paul
 
 ## Needs the user
 
+- [ ] decide 2026-11-14 (n/a) — Should the grinders build the one answer bar on every Queue item now, as your hold note on its design said? Context: TD-1842 decision (paul). Due: 2026-11-16. Answers: Go (default) — the grinders build TD-1842 now, as designed | Wait — it waits for the design's next review question.
+  - **Context:** Your Hold on TD-1832 (board:ef7521de) said Build TD-1842 as designed; no unattended session may lift your hold, so this press does it. TD-1842 places today's controls in the answer bar and moves no Lift rule; TD-1876 revises the rest of TD-1832.
+  - **Question:** Build TD-1842 now?
+  - **Recommended:** Go — you asked for it in the Hold, and nothing in the revision changes TD-1842.
 - [ ] act 2026-11-14 (n/a) — Once TD-1788's PR is merged and the checkout ao-grind starts from is on a main that holds it, stop and start ao-grind when no member holds a claim in progress (or say when you next will), so designer-ao-1 starts at its 150k context bound; only you can do this. Context: TD-1788. Due: 2026-11-20.
   - **Context:** The bound is written on the record at a start and carried through restarts and Apply, so only a Stop and Start of the team reaches the designer, which is the person to press; the time of that start is no longer recorded, since the design trial ended at Stop (TD-1871).
 - [ ] decide 2026-11-14 (n/a) — Should TD-1856's build (a restart that waits on you is drawn on its entry's Queue card, and the rows read it instead of stalled) get one more review round? Its four rounds ended at the cap with a fix to TD-1863 unread by a review. Context: TD-1856 decision (paul). Parts: TD-1863. Due: 2026-11-17. Answers: One more round (default) — a session runs one more review round, then asks again | Go — the grinders build TD-1863, the fix marked for the builder to check | Hold: <note> — a session revises the design as your note says.
