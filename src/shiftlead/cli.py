@@ -4697,6 +4697,23 @@ def _withdraw(args: argparse.Namespace, words: list[str]) -> int:
 CARRIES_ENTRY = "carries entry: a request to file a ledger entry, a techlead seat's to file"
 
 
+# design §4.7 (TD-1889): the line `ao inbox`'s text prints under its count, a session's own `<adapter>/<model>`
+MODEL_LINE = "your model: "
+
+
+def _own_model() -> str | None:
+    """The calling session's own `<adapter>/<model>` (design §4.2 *And the model*, §4.7 `ao inbox`, TD-1889): the
+    first line of the file `AGENT_MODEL_FILE` names, else `AGENT_MODEL`, else None — read here so a Gemini seat
+    runs no command of its own for its reply's first line (§4.3 *The untrusted-flags guard*)."""
+    if path := os.environ.get("AGENT_MODEL_FILE"):
+        try:
+            if line := pathlib.Path(path).read_text(encoding="utf-8").partition("\n")[0].strip():
+                return line
+        except OSError:
+            pass
+    return os.environ.get("AGENT_MODEL") or None
+
+
 def cmd_inbox(args: argparse.Namespace) -> int:
     """`ao inbox [--unread]` (design §4.10): this session's own mailbox — reading it is what marks
     an entry read, and the host agent does that, never this command. With no `SHIFTLEAD_SESSION`
@@ -4730,6 +4747,8 @@ def cmd_inbox(args: argparse.Namespace) -> int:
             )
         whose = "person inbox" if got["id"] == "person" else got["id"]
         print(f"{whose}: {len(got['entries'])} shown, {got['unread']} unread")
+        if got["id"] != "person" and (model := _own_model()):  # a seat's reply line, no command of its own (TD-1889)
+            print(f"{MODEL_LINE}{model}")
         for e in got["entries"]:
             about = f" about {e['about']}" if e.get("about") else ""
             reply = f" re {e['reply_to']}" if e.get("reply_to") else ""

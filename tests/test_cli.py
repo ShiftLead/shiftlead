@@ -1436,6 +1436,44 @@ def test_reply_meets_the_refusals_msg_reply_to_meets(subprocess_agent, tmp_path,
         call_sync("kill", id=sid)
 
 
+@pytest.mark.parametrize(
+    ("file_text", "env_model", "want"),
+    [
+        ("gemini/gemini-3.5-flash-lite\n", "gemini/flash", "gemini/gemini-3.5-flash-lite"),
+        (None, "gemini/flash", "gemini/flash"),
+        ("", "gemini/flash", "gemini/flash"),
+        (None, None, None),
+    ],
+)
+def test_inbox_text_prints_the_sessions_own_model_under_its_count(
+    monkeypatch, capsys, tmp_path, file_text, env_model, want
+):
+    """TD-1889 (design §4.7, §4.3 *The untrusted-flags guard*): a session's `ao inbox` text prints *your model:
+    <adapter>/<model>* under its count line — the first line of the file `AGENT_MODEL_FILE` names, else
+    `AGENT_MODEL` — so a Gemini seat's reply names its model with no command of its own; no line where neither
+    is set, none in the person's read, and `--json` is unchanged."""
+    model_file = tmp_path / "shiftlead-agent-model"
+    if file_text is not None:
+        model_file.write_text(file_text)
+    monkeypatch.setenv("AGENT_MODEL_FILE", str(model_file))
+    if env_model:
+        monkeypatch.setenv("AGENT_MODEL", env_model)
+    got = {"id": "ao-seat", "entries": [], "unread": 0}
+    monkeypatch.setattr(cli, "call_sync", lambda method, **kw: got)
+    assert cli.main(["inbox"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    at = lines.index("ao-seat: 0 shown, 0 unread")
+    if want:
+        assert lines[at + 1] == f"your model: {want}"
+    else:
+        assert not any(x.startswith("your model:") for x in lines)
+    assert cli.main(["--json", "inbox"]) == 0
+    assert "your model" not in capsys.readouterr().out
+    got["id"] = "person"
+    assert cli.main(["inbox"]) == 0
+    assert "your model" not in capsys.readouterr().out
+
+
 def test_inbox_text_says_an_ask_carries_an_entry_first_under_its_head(monkeypatch, capsys):
     """TD-1576 (design §4.7): an `ask` whose `entry` is not null, open or closed, prints *carries entry: …*
     as the first indented line under its head, before the text; a note with an entry, and `--json`, do not."""
