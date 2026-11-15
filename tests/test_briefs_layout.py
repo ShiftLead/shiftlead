@@ -91,7 +91,7 @@ def test_this_repos_brief_reads_its_own_layout(role):
     for slot, words in {
         "{test}": "pdm run test",
         "{lint}": "pdm run lint",
-        "{board}": "docs/user_attention.md",
+        "{board}": "docs/user_attention/",  # split into its directory (ledgerboard v3.0, TD-1881)
         "{design_dir}": "docs/design/",
         "{cadence_rules}": f"read the file `{cadence.typed('path', 'cadence.md')}` prints, §1–§4",
     }.items():
