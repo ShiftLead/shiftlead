@@ -309,8 +309,9 @@ def test_the_gate_sweeps_prs_are_lift_and_sweep_rows_out_of_the_red_count():
     root = "/r/samscrape"
     since = _iso(now() - timedelta(hours=2))
     r = reading(root, orders=[])
-    r["prs"]["open"] += _gate_prs(since)
-    r["pr_orders"]["gate"] = [1950, 1951]
+    live = {"number": 1952, "title": "TD-78: lift live", "branch": "lift/TD-78/live", "url": "https://x/1952", "author": "eye", "checks": "green", "failing": [], "conflicting": False, "red_since": since, "lift": True, "lift_since": since}  # fmt: skip
+    r["prs"]["open"] += [*_gate_prs(since), live]
+    r["pr_orders"]["gate"] = [1950, 1951, 1952]
     r["pr_orders"]["orders"] = [workorders.pr_order(r["prs"]["open"][4])]  # the lift unheld, the sweep held
     r["pr_orders"]["held"] = {"1951": ["g2"]}
     got = {x["number"]: x for x in teamrun.red_prs(r, [rec("g1", root)], now())}
@@ -320,6 +321,7 @@ def test_the_gate_sweeps_prs_are_lift_and_sweep_rows_out_of_the_red_count():
         "nobody's — the grinders' order",
     )
     assert got[1950]["what"] == "lifts TD-77 until 2026-11-20" and not got[1950]["live"]
+    assert got[1952]["word"] == "lift" and got[1952]["live"]  # a live check's lift (TD-1888)
     assert (got[1951]["word"], got[1951]["whose"], got[1951]["what"]) == (
         "sweep",
         "held by g2",
