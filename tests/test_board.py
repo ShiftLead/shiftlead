@@ -2460,7 +2460,7 @@ def test_a_long_hold_note_is_written_whole_on_the_line_and_the_ledger_log(repo):
     said = A._board_answer("decide", LONG_NOTE, ["Go", "Hold: <note>"], 1)
     assert said == f"Hold: {LONG_NOTE}"
     got = board.write_back(repo, None, held, "decide", answer=said)  # a v3 item is found by its words (TD-1881)
-    assert got["entries"] == ["TD-190"] and got["message"].endswith("… (session grinder-ao-2)")  # v3.0 writes no backticks
+    assert got["entries"] == ["TD-190"] and got["message"].endswith("… (session grinder-ao-2)")
     it = origin_item(repo, ref_of(held))
     assert (it.decided[0], it.decided_by) == (f"Hold: {LONG_NOTE}", "paul")
     entry = on_origin(repo, "show", "origin/main:docs/ledger/TD-190.md")
