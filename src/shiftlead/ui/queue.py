@@ -72,6 +72,17 @@ HOLDER_ROWS = ("permission", "question", "needs", "limited", "stalled")
 FILTERS = {"needs-you": "Needs you"}
 
 
+def board_context(e: Mapping[str, Any]) -> str | None:
+    """A board row's `Context`, from the reader's record of the item (the row's `context`, ledgerboard v3.0,
+    TD-1881), None for none. A row with no such key — a reading an older host agent took, its `text` still the v2
+    line — has it read from its text where `CONTEXT` finds it."""
+    if "context" in e:
+        got = e.get("context")
+        return str(got) if isinstance(got, str) and got.strip() else None
+    m = CONTEXT.search(str(e.get("text") or ""))
+    return m.group(1) if m else None
+
+
 def item_home(
     e: Mapping[str, Any],
     index: Mapping[str, tuple[str, str]] | None,
@@ -135,19 +146,19 @@ def item_home(
     kind = e.get("row")
     if kind == "board":
         by = "context"
-        m = CONTEXT.search(str(e.get("text") or ""))
+        m = board_context(e)
         # a bare `TD-n` on a repo's board is that repo's entry, never another's (TD-1355, TD-1400), as
         # `asked_entries` reads it: one the repo holds on no card (archived, say) leaves the line off every card
         # rather than on another repo's that happens to share the number
         name = str(e.get("repo_name") or "")
-        named = covered(e, entries) or ([*_refs(m.group(1))] if m and not name else [])
+        named = covered(e, entries) or ([*_refs(m)] if m and not name else [])
         # its home is the first entry it covers that an open card holds — its `Context:` refs, its `Parts:`, its
         # `decision (paul)` members `Part of` a `Context:` entry (TD-1380) — the later held ones its mentions
         refs = [r for r in named if r in index]
         if not refs and not name and m:
             # a line with no repo: its refs looked up bare, by `card_index`'s one-repo rule, the later its mentions
-            refs = [r for r in _refs(m.group(1)) if r in index]
-        if not named and name and m and (pr := context_pr(m.group(1))) is not None:
+            refs = [r for r in _refs(m) if r in index]
+        if not named and name and m and (pr := context_pr(m)) is not None:
             # a `Context:` naming no entry but a PR ties by that PR (TD-1552): the entry it names stands in for one
             # the `Context:` would name — on its open card whatever `needs` is; tied, never named
             by = "pr"
@@ -320,8 +331,8 @@ def design_link(
         return {}
     kind = e.get("row")
     if kind == "board":
-        m = CONTEXT.search(str(e.get("text") or ""))
-        got, repo = (_refs(m.group(1)) if m else []), str(e.get("repo_name") or "")
+        m = board_context(e)
+        got, repo = (_refs(m) if m else []), str(e.get("repo_name") or "")
     elif kind == "ledger":
         if e.get("why") == "yours":  # the entry's own *held* row draws it, not one the person owns
             return {}
@@ -350,10 +361,10 @@ def design_link(
 def line_names(e: Mapping[str, Any]) -> set[str]:
     """The entries a board line's row names, `<repo>#TD-n`: each ref of its `Context:` and each id of its `Parts:`
     (§4.4 *The card's status*, TD-1364), a bare `TD-n` read as the line's own repo's, as `item_home` reads it."""
-    m = CONTEXT.search(str(e.get("text") or ""))
+    m = board_context(e)
     name = str(e.get("repo_name") or "")
     out: set[str] = set()
-    for r in [*(_refs(m.group(1)) if m else ()), *(x for p in e.get("parts") or () for x in _refs(p))]:
+    for r in [*(_refs(m) if m else ()), *(x for p in e.get("parts") or () for x in _refs(p))]:
         if "#" in r:
             out.add(r)
         elif name:
@@ -385,13 +396,13 @@ def covered(e: Mapping[str, Any], entries: Mapping[str, Mapping[str, Any]] | Non
     them) that carries `decision (<the person>)` and is directly `Part of` one of the `Context:` refs' entries — ref
     by ref in the `Context:`'s order, and by number within each. Qualified ids alone: a bare ref on a line with no
     repo is left out (`item_home` still looks its refs up bare). With `entries` None, no members."""
-    m = CONTEXT.search(str(e.get("text") or ""))
+    m = board_context(e)
     name = str(e.get("repo_name") or "")
 
     def own(r: str) -> str:
         return r if "#" in r else (f"{name}#{r}" if name else "")
 
-    ctx = [q for r in (_refs(m.group(1)) if m else ()) if (q := own(r))]
+    ctx = [q for r in (_refs(m) if m else ()) if (q := own(r))]
     parts = [q for p in e.get("parts") or () for r in _refs(str(p)) if (q := own(r))]
     out = list(dict.fromkeys([*ctx, *parts]))
     if entries:

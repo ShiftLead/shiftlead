@@ -244,7 +244,8 @@ def layout(cfg: RepoConfig) -> dict[str, str]:
     `there`),
     read the way the file was, `cfg.read`; in a pinned repo (`[agent-cadence]` in its `docs/cadence.toml`, no lock)
     the resolver's command as a session types it, `cadence.typed` (TD-1014), under `cfg.venv` where set —
-    and `board:` and `ledger:` where the file sets them; `{test}` and `{lint}` `commands:`'s, `{design_dir}`
+    and `board:` and `ledger:` where the file sets them (`{board}` unset, the v3 board's directory where the checkout
+    holds one, else the v2 file, TD-1881); `{test}` and `{lint}` `commands:`'s, `{design_dir}`
     the directory where the checkout holds it, each else its seam's sentence. `{merge}` is cadence step 5's
     line over the same two scripts, read from no file (`merge_line`). `{gate}` and `{merge}` still hold `{pr}`:
     the brief's text fills it last."""
@@ -305,7 +306,10 @@ def layout(cfg: RepoConfig) -> dict[str, str]:
     return {
         "{gate}": gate,
         "{merge}": merge,
-        "{board}": cfg.board or str(workorders.BOARD),
+        # unset: the v3 board's directory where the checkout holds one, else the v2 file (ledgerboard v3.0, TD-1881)
+        "{board}": cfg.board
+        or (f"{workorders.BOARD_DIR.as_posix()}/" if there(f"{workorders.BOARD_DIR.as_posix()}/README.md") else None)
+        or str(workorders.BOARD),
         "{ledger}": cfg.ledger,
         "{ledger_check}": ledger_check,
         "{test}": cfg.commands.get("test") or NO_TEST,
@@ -768,7 +772,9 @@ class RepoConfig:
     # the pinned tree's in a pinned repo (TD-1044)
     worktree_setup: str | None = None
     # §5 *The seams* `board:` (TD-587): the person's board, relative to the repo; `sessionorc.board.board_path`
-    # reads it. None: unset — the default is `docs/user_attention.md` where it exists
+    # reads it. None: unset — the default is `docs/user_attention.md` (a v3 board's stub, or a v2 file) where it
+    # exists, else the directory `docs/user_attention/` (ledgerboard v3.0, TD-1881); `layout`'s `{board}` names the
+    # directory where it exists
     board: str | None = None
     # §5 `settle:` (§4.4 *A new entry settles before it is pickable*, TD-710): Kind → duration as written,
     # read by the home (`sessionorc.settle.repo_settle`) over the install's key by key; `{}` when unset

@@ -170,10 +170,17 @@ def write_fixtures(home: Path, v2: bool = False) -> Path:
     repo = home / "repo"
     (repo / "docs").mkdir(parents=True)
     today = time.strftime("%Y-%m-%d")
-    (repo / "docs" / "user_attention.md").write_text(BOARD.format(today=today), encoding="utf-8")
     sys.path.insert(0, str(SRC))
     from sessionorc import cadence
     from sessionorc import ledgerboard as lb
+
+    # a v3 board (ledgerboard v3.0, TD-1881): the fixture's v2 text split as `board.py split` leaves it — the
+    # directory `docs/user_attention/` and the stub naming it
+    for rel, text in lb.split_board(BOARD.format(today=today), "").items():
+        (repo / "docs" / "user_attention" / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo / "docs" / "user_attention" / rel).write_text(text, encoding="utf-8")
+    stub = lb.board_stub("User attention", "user_attention")
+    (repo / "docs" / "user_attention.md").write_text(stub, encoding="utf-8")
 
     if v2:
         for rel, text in lb.split(LEDGER, "").items():

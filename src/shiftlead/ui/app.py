@@ -316,6 +316,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     board_hand_of,  # noqa: F401
     board_head,  # noqa: F401
     board_horizon,  # noqa: F401
+    board_item_file,  # noqa: F401
     board_line,  # noqa: F401
     board_reading,
     board_rows,  # noqa: F401
@@ -1102,6 +1103,15 @@ def _no_line(words: str) -> bool:
     return str(words).startswith(head) and tail in str(words)
 
 
+def _row_line(body: Mapping[str, Any]) -> int | None:
+    """A board press's `line`, where the row still sends one (a v2 board's), else None: a v3 item has no line, and
+    its `key` names it (ledgerboard v3.0, TD-1881)."""
+    try:
+        return int(body.get("line"))
+    except (TypeError, ValueError):
+        return None
+
+
 def board_root_of(board: str) -> str:
     """The registered checkout whose board `board` is, or '' (the agent's own lookup, `_board_root`, refuses it)."""
     want = Path(board).expanduser().resolve()
@@ -1130,10 +1140,7 @@ async def board_hand(call: Any, facts: Any, body: Mapping[str, Any]) -> dict[str
     back open is an HTTP error carrying its words. `call` is the page's RPC; `facts` is `Readings.repo_facts`."""
     board, key = (str(body.get(k) or "").strip() for k in ("board", "key"))
     text = str(body.get("text") or "")  # word for word, as `board_edit` matches it
-    try:
-        line = int(body.get("line"))
-    except (TypeError, ValueError):
-        raise HTTPException(400, "Have a session do it names the item's line") from None
+    line = _row_line(body)
     if not board or not text.strip() or not key:
         raise HTTPException(400, "Have a session do it names the board, the item's text and its key")
     root = await asyncio.to_thread(board_root_of, board)
@@ -5751,10 +5758,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 # edit does; `refs` are the reader's when it carries them (TD-142 slice 2)
                 board, text = str(body.get("board") or ""), str(body.get("text") or "")
                 reply = str(body.get("reply") or "").strip()
-                try:
-                    line = int(body.get("line"))
-                except (TypeError, ValueError):
-                    raise HTTPException(400, "a board reply names the item's line") from None
+                line = _row_line(body)
                 if not board or not text or not reply:
                     raise HTTPException(400, "a board reply names the board, the item's text and the reply")
                 refs = [str(r) for r in body.get("refs") or () if str(r).strip()]
@@ -5778,10 +5782,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 # **Have a session do it** on a line naming its `Doer:` (§4.5 screen 12, TD-1660): straight to
                 # the doer's techlead seat, the line closed Done naming the ask; else TD-1624's press
                 return JSONResponse(await board_hand(call, h.repo_facts, body))
-            try:
-                line = int(body.get("line"))
-            except (TypeError, ValueError):
-                raise HTTPException(400, "a board row's act names the item's line") from None
+            line = _row_line(body)
             board, text = str(body.get("board") or ""), str(body.get("text") or "")
             if not board or not text:
                 raise HTTPException(400, "a board row's act names the board and the item's text")

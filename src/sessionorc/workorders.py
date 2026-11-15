@@ -1,15 +1,17 @@
 """Work orders (design §4.4 *Board write-back*, §6 rule 6, TD-380; built — TD-384): every open
-*decided* line of a repo's attention board, listed by the repo reading beside the ledger's entries
-as **`board:<key>`** — the first eight hex digits of a sha256 of the line's `item_key()`, which a
-snooze, a reply and the decide itself leave unchanged — pickable, High, in every `free-pick` lane
-of a team servicing the repo, and counted by rule 8, until a session closes the line.
+*decided* item of a repo's attention board, listed by the repo reading beside the ledger's entries
+as **`board:<8 hex>`** — the last eight hex digits of the item's id (`YYYY-MM-DD-<8 hex>`, ledgerboard v3.0,
+TD-1881), which a snooze, a reply and the decide itself leave unchanged, and which a split v2 item keeps from its
+old `board:<key>` — pickable, High, in every `free-pick` lane of a team servicing the repo, and counted by rule 8,
+until a session closes the item.
 
 The board is read in-process through the vendored package `sessionorc.ledgerboard` (design §8 *Which side a thing
-lives on*, ADR 2026-10-12, TD-585): its `parse_board`, `item_record`, `item_key` and line shapes,
-never a second parser here and no agent-cadence script, so a repo with a board needs no agent-cadence.
+lives on*, ADR 2026-10-12, TD-585): its `load_board`, `needs_you` and `item_record`, never a second parser here and
+no agent-cadence script, so a repo with a board needs no agent-cadence. A v3 board is a directory, one file per
+item (`ref_of`, `find`); the stub `docs/user_attention.md` names it, and a v2 board file still reads.
 Origin's side is this module's own fetch (`_against_origin`, §4.5 screen 6 *Boards are read against
-origin*): a board merely behind origin is read from origin. A `fyi` line and a closed line are never
-work orders; a line whose `Decided:` is gone leaves on the next reading.
+origin*): a board merely behind origin is read from origin. A `fyi` item and a closed item are never
+work orders; an item whose `Decided` is gone leaves on the next reading.
 
 The board itself is read once, into the repo reading's `boards` (`read_boards`, design §4.4 *Each
 reading has one owner*, TD-615), and the orders are a filter over that reading (`orders`)."""
@@ -25,14 +27,15 @@ import subprocess
 import threading
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import yaml
 
 from sessionorc import gitinfo, ledger, ledgerboard, paths, reports
 
-BOARD = Path("docs") / "user_attention.md"  # `board:`'s default (§5 *The seams*)
+BOARD = Path("docs") / "user_attention.md"  # `board:`'s default (§5 *The seams*): a v3 board's stub, or a v2 file
+BOARD_DIR = Path(ledgerboard.BOARD_DIR)  # a v3 board's directory, the default where no stub names it (TD-1881)
 NO_BOARD = "no board: the Inbox is the person's channel"  # the seam's fixed words (§5)
 PREFIX = "board:"
 PR_PREFIX = "pr:"  # a red PR nobody holds (§4.4, TD-613)
@@ -49,7 +52,8 @@ NO_LINE = "no line {ref} on the board — reworded or closed"
 FETCH_CASES = ("skipped", "none", "matches", "behind", "local", "both")
 # The board's sweep stamps (cadence §3.10), the cadence reader's own (agent-cadence `nudge_user_attention.py`
 # `SWEEP_RE` and `SWEEP_DEEP_RE`), ported verbatim so the sweep seat and `/attention` never disagree on
-# whether a board is swept (design §4.9b *The sweep*, TD-1090)
+# whether a board is swept (design §4.9b *The sweep*, TD-1090); read from the board's preamble, a v3 board's
+# `README.md` (TD-1881)
 SWEEP_RE = re.compile(r"^Swept:\s*(?P<date>\d{4}-\d{2}-\d{2})\s*(?:\((?P<meta>[^)]*)\))?", re.MULTILINE)
 SWEEP_DEEP_RE = re.compile(r"^Swept-deep:\s*(?P<date>\d{4}-\d{2}-\d{2})\s*(?:\((?P<meta>[^)]*)\))?", re.MULTILINE)
 
@@ -64,8 +68,53 @@ def is_pr_order(ref: str) -> bool:
     return bool(_PR_REF_RE.fullmatch(str(ref)))
 
 
+def ref_of(item: ledgerboard.BoardItem) -> str:
+    """`board:<8 hex>` of a board item — **every board item's id** (design §4.4 *A board line's id*, TD-603;
+    ledgerboard v3.0, TD-1881): the last eight hex digits of its id, which no edit moves and which a split v2 item
+    keeps from its old `board:<key>`, so a persisted reference still names it. A v2 line with no date has no id:
+    its line's key's eight hex (the v2 derivation). Empty for an item with neither. The one derivation the Inbox's
+    board rows, the write-back's presses, `ao board show`, `ao repo` and the work orders all use."""
+    if item.id:
+        return PREFIX + item.id[-8:]
+    if not item.path and item.raw.strip():
+        try:
+            return PREFIX + ledgerboard.key_id(ledgerboard.item_key(item.raw.splitlines()[0]))
+        except Exception:  # noqa: BLE001 — a line the key cannot take has no reference
+            return ""
+    return ""
+
+
+def find(board: ledgerboard.Board, want: str) -> ledgerboard.BoardItem | None:
+    """The item of `board` whose reference (`ref_of`) is `want`, a `board:<8 hex>`: the open items first, then
+    the closed ones (the archive read before reporting none, TD-1881); None when no item holds it."""
+    if not is_work_order(want):
+        return None
+    return next((it for it in [*board.items, *board.closed] if ref_of(it) == want), None)
+
+
+def load(root: Path | str, rel: Path | str | None = None) -> ledgerboard.Board:
+    """The board of the working tree `root` at `rel` (default `board_path`'s), read whole through ledgerboard's
+    `load_board()` (v3.0, TD-1881): a stub follows to its directory, a directory reads its archive, a v2 file its
+    archive beside it. `rel` may be absolute (a write-back's tree). No board is an empty Board, `form` None."""
+    if rel is None:
+        rel = board_path(root)[1]
+        if rel is None:
+            return ledgerboard.Board(None, "", None)
+    return ledgerboard.load_board(Path(rel).as_posix(), *ledger.fs_io(root))
+
+
+def load_at(root: Path | str, at: str, rel: Path | str) -> ledgerboard.Board | None:
+    """The board at `rel` in the tree of `at` (a commit or ref) in `root`, read whole (v3.0, TD-1881), or None when
+    git cannot list that tree."""
+    rel = PurePosixPath(Path(rel).as_posix())
+    parent = rel.parent.as_posix()
+    io = ledger.git_io(root, at, "" if parent == "." else parent, rel="" if parent != "." else rel.stem)
+    return ledgerboard.load_board(rel.as_posix(), *io) if io is not None else None
+
+
 def key(text: str) -> str:
-    """`board:<key>` for an open item's text as the reading gives it — its line less the open tick."""
+    """`board:<key>` for a v2 item's text — its line less the open tick (v2's derivation, which a split v2 item's
+    id keeps: `ref_of` is every reader's now, TD-1881)."""
     return PREFIX + hashlib.sha256(ledgerboard.item_key(f"- [ ] {text}").encode("utf-8")).hexdigest()[:8]
 
 
@@ -94,15 +143,16 @@ def head(text: str) -> str:
 class Origin:
     """What one board's read against origin found: `case` (`FETCH_CASES`), `note` — the sentence for
     people, in the phrases the Inbox's origin note reads (§4.5a **origin note**) — `why` for a skip,
-    `content`/`source` when origin's copy is the one to read (*behind*), and `theirs`, origin's copy in
-    every case that read it, whichever copy is shown — the sweep stamp is read from it (§4.9b *The sweep*)."""
+    `content`/`source` when origin's copy is the one to read (*behind*: `content` origin's `Board`), and `theirs`,
+    origin's `Board` in every case that read it, whichever copy is shown — the sweep stamp is read from it (§4.9b
+    *The sweep*). A board is compared as the files it is (`board_files`), never one file's text (TD-1881)."""
 
     case: str
     note: str
     why: str | None = None
-    content: str | None = None
+    content: ledgerboard.Board | None = None
     source: str | None = None
-    theirs: str | None = None
+    theirs: ledgerboard.Board | None = None
 
 
 def _git(root: Path, args: list[str], timeout: float) -> subprocess.CompletedProcess[bytes]:
@@ -204,18 +254,77 @@ def fetch_origin(root: Path | str, branch: str | None = None, timeout: float = F
         return Fetched(False, branch or "", why=str(e))
 
 
+def board_files(rel: Path | str) -> list[str]:
+    """The paths a board at `rel` is, POSIX strings relative to the repo's root (ledgerboard v3.0, TD-1881): a
+    `.md` path is the stub or v2 file, its v2 archive beside it (`archive_rel`) and the directory its name less
+    `.md` names; any other path the directory alone. What a compare of two trees' boards, and a filing PR, reads."""
+    rel = Path(rel)
+    if rel.suffix != ".md":
+        return [rel.as_posix()]
+    return [rel.as_posix(), archive_rel(rel).as_posix(), rel.with_suffix("").as_posix()]
+
+
+def _blob_sha(data: bytes) -> str:
+    """git's blob id of `data` (sha1 of `blob <n>\\0` and the bytes): a working file compared with a tree's."""
+    return hashlib.sha1(b"blob %d\0" % len(data) + data, usedforsecurity=False).hexdigest()
+
+
+def _local_tree(root: Path, rel: Path | str) -> list[tuple[str, str]]:
+    """The board's files in the working tree of `root` (`board_files`), as sorted `(path, blob id)`."""
+    out: list[tuple[str, str]] = []
+    for name in board_files(rel):
+        p = root / name
+        files = [p] if p.is_file() else sorted(x for x in p.rglob("*") if x.is_file()) if p.is_dir() else []
+        for f in files:
+            try:
+                out.append((f.relative_to(root).as_posix(), _blob_sha(f.read_bytes())))
+            except OSError:
+                continue
+    return sorted(out)
+
+
+def board_stamp(root: Path | str) -> list[int] | None:
+    """What the checkout's board was last read at, for a clock that re-reads only a moved board (design §4.4 *Each
+    reading has one owner*, TD-615): `[newest mtime_ns, total size, file count]` over its files (`board_files`: a v3
+    board's directory too, where an edit moves an item's file and no stub, TD-1881), or None for no board."""
+    root = Path(root)
+    rel = board_path(root)[1]
+    if rel is None:
+        return None
+    newest = size = count = 0
+    for name in board_files(rel):
+        p = root / name
+        for f in [p] if p.is_file() else p.rglob("*") if p.is_dir() else []:
+            try:
+                st = f.stat()
+            except OSError:
+                continue
+            newest, size, count = max(newest, st.st_mtime_ns), size + st.st_size, count + 1
+    return [newest, size, count] if count else None
+
+
+def _tree_at(root: Path, at: str, rel: Path | str) -> list[tuple[str, str]] | None:
+    """The board's files in the tree of `at` (`board_files`), as sorted `(path, blob id)`; None where git cannot
+    list it."""
+    got = _git(root, ["ls-tree", "-r", "-z", "--full-tree", at, "--", *board_files(rel)], READ_TIMEOUT)
+    if got.returncode != 0:
+        return None
+    out: list[tuple[str, str]] = []
+    for rec in got.stdout.decode("utf-8", errors="replace").split("\0"):
+        meta, tab, path = rec.partition("\t")
+        if tab and meta.split()[1:2] == ["blob"]:
+            out.append((path, meta.split()[2]))
+    return sorted(out)
+
+
 def _against_origin(root: Path, board: Path, timeout: float = FETCH_TIMEOUT, fetched: Fetched | None = None) -> Origin:
     """The checkout's board against `origin/<default>` (§4.5 screen 6 *Boards are read against
     origin*), never raising: one fetch of the default branch alone (`fetch_origin`) — or none, where the
     caller fetched already and hands its outcome in `fetched` (the repo reading's pass, TD-1471) — then the
-    three-way compare of the checkout's file, origin's and their merge-base's. Merely behind (the checkout's
-    untouched since the merge-base) reads origin's copy; anything else reads the checkout's and says which way
-    it differs. A failed fetch reads the checkout's, *fetch skipped (<why>)*."""
-
-    def blob(at: str, rel: str) -> str | None:
-        got = _git(root, ["show", f"{at}:{rel}"], READ_TIMEOUT)
-        return got.stdout.decode("utf-8", errors="replace") if got.returncode == 0 else None
-
+    three-way compare of the checkout's board, origin's and their merge-base's, each the board's files and their
+    blobs (`board_files`: a v3 board's directory, or a v2 file and its archive, TD-1881). Merely behind (the
+    checkout's untouched since the merge-base) reads origin's copy; anything else reads the checkout's and says
+    which way it differs. A failed fetch reads the checkout's, *fetch skipped (<why>)*."""
     try:
         fetched = fetched or fetch_origin(root, timeout=timeout)
         if not fetched.ok:
@@ -223,22 +332,23 @@ def _against_origin(root: Path, board: Path, timeout: float = FETCH_TIMEOUT, fet
             return Origin("skipped", f"fetch skipped ({why})", why=why)
         branch = fetched.branch
         at = f"origin/{branch}"
-        rel = (board.relative_to(root) if board.is_relative_to(root) else board_rel(root)).as_posix()
-        theirs = blob(at, rel)
-        if theirs is None:
+        rel = board.relative_to(root) if board.is_relative_to(root) else board_rel(root)
+        theirs_tree = _tree_at(root, at, rel)
+        theirs = load_at(root, at, rel) if theirs_tree else None
+        if not theirs_tree or theirs is None or theirs.form is None:
             return Origin("none", f"fetched; no board at {at}")
-        ours = board.read_text(encoding="utf-8", errors="replace") if board.is_file() else ""
-        if theirs == ours:
+        ours = _local_tree(root, rel)
+        if theirs_tree == ours:
             return Origin("matches", f"fetched; board matches {at}", theirs=theirs)
         mb = _git(root, ["merge-base", "HEAD", at], READ_TIMEOUT)
         if mb.returncode != 0:
             note = f"fetched; board DIFFERS from {at} (no common history to compare) — showing local"
             return Origin("both", note, theirs=theirs)
-        base = blob(mb.stdout.decode().strip(), rel) or ""
+        base = _tree_at(root, mb.stdout.decode().strip(), rel) or []
         if ours == base:
             note = f"fetched; local clone is behind — showing {at}'s board"
             return Origin("behind", note, content=theirs, source=at, theirs=theirs)
-        if theirs == base:
+        if theirs_tree == base:
             return Origin("local", f"fetched; board DIFFERS from {at} (local edits not pushed)", theirs=theirs)
         return Origin("both", f"fetched; board DIFFERS from {at} (both sides changed) — showing local", theirs=theirs)
     except subprocess.TimeoutExpired:
@@ -249,10 +359,11 @@ def _against_origin(root: Path, board: Path, timeout: float = FETCH_TIMEOUT, fet
 
 def board_path(root: Path | str) -> tuple[str, Path | None]:
     """The checkout's board (§5 *The seams* `board:`, TD-587): `("set", path)` for its `.shiftlead.yml`
-    `board:`, relative to `root`; `("defaulted", BOARD)` when the key is unset and `docs/user_attention.md`
-    exists; `("absent", None)` otherwise — the person's channel is the Inbox alone. A file that cannot be
-    read, or a key that is not a non-empty string or is not a path inside the repo (absolute, or with a
-    `..`: the write-back edits it in a tree of its own), is the key unset: the clients
+    `board:`, relative to `root`; `("defaulted", BOARD)` when the key is unset and `docs/user_attention.md` (a v3
+    board's stub, or a v2 file) exists, `("defaulted", BOARD_DIR)` when only the directory `docs/user_attention/`
+    does (ledgerboard v3.0, TD-1881); `("absent", None)` otherwise — the person's channel is the Inbox alone. A
+    file that cannot be read, or a key that is not a non-empty string or is not a path inside the repo (absolute,
+    or with a `..`: the write-back edits it in a tree of its own), is the key unset: the clients
     (`shiftlead.repoconfig`) refuse such a file by name."""
     try:
         doc = yaml.safe_load(paths.repo_file(root).read_text(encoding="utf-8"))
@@ -263,6 +374,8 @@ def board_path(root: Path | str) -> tuple[str, Path | None]:
         return "set", Path(got.strip())
     if (Path(root) / BOARD).is_file():
         return "defaulted", BOARD
+    if (Path(root) / BOARD_DIR).is_dir():
+        return "defaulted", BOARD_DIR
     return "absent", None
 
 
@@ -282,11 +395,11 @@ def filing_paths(root: Path | str) -> list[str]:
     POSIX strings relative to `root`: the ledger (`ledger.ledger_path`, a v2 directory with its `archive/`, or a
     v1 file) and its archive file (`ledger.archive_path`, always, with no layout test — a path that names
     nothing matches nothing), the board (`board_rel`) and the board's archive (`archive_rel`). The tick hands
-    them to `reports.pr_reading` as `filing=`."""
+    them to `reports.pr_reading` as `filing=`. The board is
+    its files (`board_files`): a v3 board's directory too (TD-1881)."""
     led = ledger.ledger_path(root)
-    board = board_rel(root)
     archive = Path(ledger.archive_path(led)).as_posix()
-    return [Path(led).as_posix(), archive, board.as_posix(), archive_rel(board).as_posix()]
+    return [Path(led).as_posix(), archive, *board_files(board_rel(root))]
 
 
 def _stamp(rx: re.Pattern[str], content: str) -> str | None:
@@ -301,21 +414,25 @@ def _stamp(rx: re.Pattern[str], content: str) -> str | None:
         return None
 
 
-def swept(content: str) -> dict[str, str | None]:
+def swept(board: ledgerboard.Board | str) -> dict[str, str | None]:
     """A board's sweep stamps (design §4.9b *The sweep*, TD-1090): `{at, deep_at}`, each the date of
-    the first `Swept:` / `Swept-deep:` line carrying one, or None — `{at: None}` is a board never swept."""
+    the first `Swept:` / `Swept-deep:` line carrying one, or None — `{at: None}` is a board never swept. Read from
+    a `Board`'s preamble (a v3 board's `README.md`, a v2 file's text above its first item, TD-1881), or a
+    preamble's text."""
+    content = board.preamble if isinstance(board, ledgerboard.Board) else board
     return {"at": _stamp(SWEEP_RE, content), "deep_at": _stamp(SWEEP_DEEP_RE, content)}
 
 
-def board_items(content: str, today: date) -> list[dict[str, Any]]:
-    """The open items of a board's text, each ledgerboard's `item_record` with its id as `key` and its
+def board_items(board: ledgerboard.Board, today: date) -> list[dict[str, Any]]:
+    """The open items of a board, each ledgerboard's `item_record` with its reference as `key` (`ref_of`), its
     class in ledgerboard's `needs_you` as `needs` (v2.3, TD-1330) — None for an item hidden today (a
-    `Hide until:` still ahead), which the Inbox leaves out (design §4.4 *Board write-back*)."""
-    needs = {it.line: cls for it, cls, _ in ledgerboard.needs_you(content, today)}
-    out: list[dict[str, Any]] = []
-    for it in ledgerboard.parse_board(content, warn=False):
-        out.append({**ledgerboard.item_record(it, today), "key": ref("", it.text), "needs": needs.get(it.line)})
-    return out
+    `Hide until:` still ahead), which the Inbox leaves out (design §4.4 *Board write-back*) — and `at`, its place
+    among the board's items, 1 first (v3.0: an item has no line, TD-1881)."""
+    needs = {id(it): cls for it, cls, _ in ledgerboard.needs_you(board, today)}
+    return [
+        {**ledgerboard.item_record(it, today), "key": ref_of(it), "needs": needs.get(id(it)), "at": n}
+        for n, it in enumerate(board.items, 1)
+    ]
 
 
 _ID = rf"(?:{ledgerboard.REPO}#)?TD-\d+"
@@ -325,56 +442,13 @@ _ID = rf"(?:{ledgerboard.REPO}#)?TD-\d+"
 _JOIN = r"(?:\s*,\s*(?:(?:and|&)\s+)?|\s+(?:and|&)\s+)"
 CARRIED_RE = re.compile(rf"^[\s—–-]*(?:[Cc]arried to|[Ss]ee)\s+(?P<ids>{_ID}(?:{_JOIN}{_ID})*)")
 _ID_RE = re.compile(_ID)
-# the archive's file beside the board's (§4.4 *The boards*): `<board stem>_archive.md`
+# a v2 board's archive file beside the board's (§4.4 *The boards*): `<board stem>_archive.md`
 ARCHIVE_SUFFIX = "_archive"
-# an archive read, by its path: (what it was read at — its mtime and size, or origin's blob — and its text)
-_ARCHIVES: dict[str, tuple[Any, str | None]] = {}
 
 
 def archive_rel(board: Path) -> Path:
-    """The board archive's path beside `board`'s: `docs/user_attention.md` → `docs/user_attention_archive.md`."""
+    """A v2 board archive's path beside `board`'s: `docs/user_attention.md` → `docs/user_attention_archive.md`."""
     return board.with_name(f"{board.stem}{ARCHIVE_SUFFIX}{board.suffix}")
-
-
-def _archive_local(path: Path) -> str | None:
-    """The archive file's text, re-read only when its mtime or size moved; None where there is none."""
-    k = str(path)
-    try:
-        st = path.stat()
-    except OSError:
-        _ARCHIVES.pop(k, None)
-        return None
-    at = ("file", st.st_mtime_ns, st.st_size)
-    got = _ARCHIVES.get(k)
-    if got is not None and got[0] == at:
-        return got[1]
-    try:
-        text: str | None = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        text = None
-    _ARCHIVES[k] = (at, text)
-    return text
-
-
-def _archive_origin(root: Path, at: str, rel: Path) -> str | None:
-    """The archive's text at `at` (`origin/<default>`), re-read only when its blob moved; None where origin
-    holds none or git cannot say."""
-    k = f"{root}::{at}:{rel.as_posix()}"
-    try:
-        sha = _git(root, ["rev-parse", "-q", "--verify", f"{at}:{rel.as_posix()}"], READ_TIMEOUT)
-        if sha.returncode != 0:
-            _ARCHIVES.pop(k, None)
-            return None
-        blob = sha.stdout.decode().strip()
-        got = _ARCHIVES.get(k)
-        if got is not None and got[0] == ("blob", blob):
-            return got[1]
-        shown = _git(root, ["cat-file", "blob", blob], READ_TIMEOUT)
-    except (subprocess.TimeoutExpired, OSError):
-        return None
-    text = shown.stdout.decode("utf-8", errors="replace") if shown.returncode == 0 else None
-    _ARCHIVES[k] = (("blob", blob), text)
-    return text
 
 
 def carried_to(reason: str) -> list[str]:
@@ -384,40 +458,37 @@ def carried_to(reason: str) -> list[str]:
     return list(dict.fromkeys(x.group(0) for x in _ID_RE.finditer(m.group("ids")))) if m else []
 
 
-def carried(content: str, archive: str | None = None) -> list[dict[str, Any]]:
-    """The closed decided lines that may still hold a member (§4.4 *The boards* `carried`, *The card's status*,
-    TD-1368): every closed `decide` line with a `Decided:` whose `Context:` names an entry, of the board's text and
-    then its archive's, as `{key, ref, decided, decided_by, closed, to, at, refs, parts}` — `ref` the `Context:`'s
-    first entry ref, `refs` all of them (gate words after a ref read past), `parts` its `Parts:` ids, `closed`
-    `{date, why}` (the reason after the date's dash, '' for none), `to` the reason's *carried to* or *see* ids, and
-    `at` one index over every line of both files — the board's line, then the archive's after the board's last."""
+def carried(board: ledgerboard.Board) -> list[dict[str, Any]]:
+    """The closed decided items that may still hold a member (§4.4 *The boards* `carried`, *The card's status*,
+    TD-1368): every closed `decide` item with a `Decided` whose `Context` names an entry, the board's closed items
+    read whole (its archive too), as `{key, ref, decided, decided_by, closed, to, at, refs, parts}` — `ref` the
+    `Context`'s first entry ref, `refs` all of them (gate words after a ref read past), `parts` its `Parts` ids,
+    `closed` `{date, why}` (the item's `Closed` fields, ledgerboard v3.0, TD-1881: `why` '' for none), `to` the
+    reason's *carried to* or *see* ids, and `at` one index over every item of the board — the open items', then the
+    closed ones' after the last open one's."""
     out: list[dict[str, Any]] = []
-    base = 0
-    for text in (content, archive or ""):
-        lines = text.splitlines()
-        for it in ledgerboard.parse_closed_items(text):
-            if it.kind != "decide" or it.decided is None:
-                continue
-            refs = [r for r in ledgerboard.item_refs(it.text) if _ID_RE.fullmatch(r)]
-            row = ledgerboard.CLOSED_ITEM_RE.match(lines[it.line - 1]) if 0 < it.line <= len(lines) else None
-            c = ledgerboard.CLOSED_RE.search(row.group("text")) if row else None
-            if not refs or c is None:
-                continue
-            why = c.group(0)[c.end("date") - c.start() :].strip().lstrip("—–-").strip()
-            out.append(
-                {
-                    "key": ref("", it.text),
-                    "ref": refs[0],
-                    "decided": {"text": it.decided[0], "date": it.decided[1].isoformat()},
-                    "decided_by": it.decided_by,
-                    "closed": {"date": c.group("date"), "why": why},
-                    "to": carried_to(why),
-                    "at": base + it.line,
-                    "refs": refs,
-                    "parts": list(it.parts),
-                }
-            )
-        base += len(lines)
+    base = len(board.items)
+    for n, it in enumerate(board.closed, base + 1):
+        if it.kind != "decide" or it.decided is None or it.closed is None:
+            continue
+        refs = [r for r in ledgerboard.context_refs(it.context or "") if _ID_RE.fullmatch(r)]
+        if not refs:
+            continue
+        day, why = it.closed
+        why = (why or "").strip()
+        out.append(
+            {
+                "key": ref_of(it),
+                "ref": refs[0],
+                "decided": {"text": it.decided[0], "date": it.decided[1].isoformat()},
+                "decided_by": it.decided_by,
+                "closed": {"date": day.isoformat() if day else "", "why": why},
+                "to": carried_to(why),
+                "at": n,
+                "refs": refs,
+                "parts": list(it.parts),
+            }
+        )
     return out
 
 
@@ -425,21 +496,22 @@ def read_boards(
     root: str | Path, *, fetch: bool = True, board: str | Path | None = None, fetched: Fetched | None = None
 ) -> dict[str, Any]:
     """The repo's board as the host agent keeps it (design §4.4 *Each reading has one owner*, *The
-    boards*, TD-615), read in-process through ledgerboard (TD-585): `{boards: [...], today}`, each
-    board `{label, board, root, source, fetch_note, fetch_case, fetch_why, items}` — and `swept`, once
-    it was read against origin (below) — and each open item
-    ledgerboard's record of it (line, text, due, answers, decided, refs, session, detail, …) with its
-    id beside it as `key` (`board:<key>`, *A board line's id*) — or `{error}` when the board could
-    not be read. No board is no boards and no error. `fetch` reads against origin (`_against_origin`,
-    *Boards are read against origin*); a fetch that fails or passes its bound reads the checkout's
-    file, its `fetch_note` *fetch skipped (<why>)*, so the page says origin could not be reached.
+    boards*, TD-615), read in-process through ledgerboard (TD-585), whole, by `load_board()` (v3.0, TD-1881):
+    `{boards: [...], today}`, each board `{label, board, root, source, fetch_note, fetch_case, fetch_why, items}` —
+    and `swept`, once it was read against origin (below) — and each open item ledgerboard's record of it (`id`,
+    `path`, text — its words — due, answers, decided, context, refs, session, detail, …) with its reference beside
+    it as `key` (`board:<8 hex>`, `ref_of`, *A board line's id*) — or `{error}` when the board could not be read:
+    one newer than this ledgerboard reads (`version_problem`), or a stub whose directory is missing. No board is no
+    boards and no error. `fetch` reads against origin (`_against_origin`, *Boards are read against origin*); a
+    fetch that fails or passes its bound reads the checkout's board, its `fetch_note` *fetch skipped (<why>)*, so
+    the page says origin could not be reached.
 
-    `board` reads that file in place of the checkout's, named as the checkout's board read from
-    origin: the host agent's own tree after a write-back (`board.tree_dir`), which is origin's head
-    with the press landed, so the press is in the reading before the checkout pulls it.
+    `board` reads the board at that path (a stub, a v2 file or a directory) in place of the checkout's, named as
+    the checkout's board read from origin: the host agent's own tree after a write-back (`board.tree_dir`), which
+    is origin's head with the press landed, so the press is in the reading before the checkout pulls it.
 
-    `carried` (§4.4 *The boards*, TD-1368) is the board's closed decided lines and its archive's (`carried`), the
-    archive read from the same copy as the board — origin's where origin's board is the one read.
+    `carried` (§4.4 *The boards*, TD-1368) is the board's closed decided items (`carried`), read from the same copy
+    as the open ones — origin's where origin's board is the one read.
 
     `swept` (§4.9b *The sweep*, TD-1090) is the stamp of origin's copy, whichever copy is shown: written
     only by a read against origin — `{at, deep_at}` (`swept`), or None when origin holds no board — and
@@ -454,29 +526,29 @@ def read_boards(
         return {"boards": []}  # NO_BOARD (§5 *The seams*)
     checkout = root / rel
     path = Path(board) if board is not None else checkout
-    if not path.is_file():
-        return {"boards": []}
     today = datetime.now().date()  # the board's dates are civil dates, local
     found = _against_origin(root, checkout, fetched=fetched) if fetch and board is None else None
-    try:
-        content = found.content if found is not None and found.content is not None else path.read_text(encoding="utf-8")
-        items = board_items(content, today)
-    except (OSError, UnicodeDecodeError) as e:
-        return {"error": f"{path} could not be read ({type(e).__name__})"}
-    # the archive from the same copy as the board: origin's where the board is origin's (TD-1368)
-    if found is not None and found.content is not None and found.source:
-        arch = _archive_origin(root, found.source, archive_rel(rel))
+    if found is not None and found.content is not None:
+        read = found.content
     else:
-        arch = _archive_local(archive_rel(path))
+        read = load(root, path if board is not None else rel)
+        if read.form is None:
+            if read.problems:
+                return {"error": f"{path} could not be read ({read.problems[0][1]})"}
+            return {"boards": []}
+    why = ledgerboard.version_problem(read)
+    if why:
+        return {"error": f"{path} could not be read ({why})"}
+    items = board_items(read, today)
     try:
-        held = carried(content, arch)
-    except Exception:  # noqa: BLE001 — a line ledgerboard cannot read holds nothing; the board still reads
+        held = carried(read)
+    except Exception:  # noqa: BLE001 — an item ledgerboard cannot read holds nothing; the board still reads
         held = []
     b: dict[str, Any] = {
         "label": root.name,
         "board": str(checkout),
         "root": str(root),
-        "source": found.source if found is not None else None,
+        "source": found.source if found is not None and found.content is not None else None,
         "fetch_note": found.note if found is not None else None,
         "fetch_case": found.case if found is not None else None,
         "fetch_why": found.why if found is not None else None,
@@ -487,14 +559,15 @@ def read_boards(
         b["swept"] = swept(found.theirs) if found.theirs is not None else None
     if board is not None:
         # as the checkout's board, read from origin: the *behind* case (§4.5a **origin note**)
-        b.update(source="origin", fetch_case="behind", swept=swept(content))
+        b.update(source="origin", fetch_case="behind", swept=swept(read))
     return {"boards": [b], "today": today.isoformat()}
 
 
 def orders(reading: dict[str, Any]) -> list[dict[str, Any]]:
-    """The work orders of a `read_boards` reading — its open decided lines that are not `fyi`, each
-    `{id, title, text, line, decided: {text, date}, refs, session, kind}` — a filter over the one
-    reading, never a second read of the board (§4.4 *The boards*)."""
+    """The work orders of a `read_boards` reading — its open decided items that are not `fyi`, each
+    `{id, title, text, context, decided: {text, date}, refs, session, kind}` — `text` the item's words, `context`
+    its `Context` (ledgerboard v3.0, TD-1881) — a filter over the one reading, never a second read of the board
+    (§4.4 *The boards*)."""
     out: list[dict[str, Any]] = []
     for b in reading.get("boards") or []:
         for it in (b.get("items") or []) if isinstance(b, dict) else []:
@@ -507,7 +580,7 @@ def orders(reading: dict[str, Any]) -> list[dict[str, Any]]:
                     "id": it["key"],
                     "title": head(str(it["text"])),
                     "text": str(it["text"]),
-                    "line": it.get("line"),
+                    "context": it.get("context"),
                     "decided": {"text": str(it["decided"].get("text") or ""), "date": it["decided"].get("date")},
                     "refs": [str(r) for r in it.get("refs") or []],
                     "session": it.get("session"),
@@ -542,7 +615,7 @@ def entry(order: dict[str, Any]) -> dict[str, Any]:
         "decided": order.get("decided"),
         "refs": order.get("refs") or [],
         "session": order.get("session"),
-        "line": order.get("line"),
+        "context": order.get("context"),
         "text": order.get("text") or "",
     }
 
@@ -554,10 +627,11 @@ _BARE_TD_RE = re.compile(r"TD-\d+")  # this repo's own entry: another repo's des
 
 
 def design_of(order: dict[str, Any]) -> str | None:
-    """The design a decided line answers (§6 rule 6 *save a design's answer*, TD-1705): the bare `TD-n` of its
-    `Context:` where that Context names exactly one entry and exactly one gate, `decision (<any person>)` — read
-    from the line's `text` as ledgerboard reads an item's gate, since `refs` holds bare ids; else None."""
-    ref, gate = ledgerboard._item_gate(str(order.get("text") or ""))
+    """The design a decided item answers (§6 rule 6 *save a design's answer*, TD-1705): the bare `TD-n` of its
+    `Context` where that Context names exactly one entry and exactly one gate, `decision (<any person>)` — read
+    from the order's `context` as ledgerboard reads an item's gate (v3.0, TD-1881), since `refs` holds bare ids;
+    else None."""
+    ref, gate = ledgerboard._context_gate(str(order.get("context") or ""))
     if ref is None or gate is None or not gate.startswith("decision (") or not _BARE_TD_RE.fullmatch(ref):
         return None
     return ref
@@ -626,14 +700,14 @@ def carry(orders: list[dict[str, Any]], was: list[dict[str, Any]]) -> list[dict[
     return out
 
 
-def board_lines(root: str | Path, *, fetch: bool = True) -> tuple[list[str], str]:
-    """The board under the checkout `root` as lines, and where they were read: origin's default
-    branch after a fetch (`origin/<branch>`), else the checkout's file (`checkout`) — design §4.7
-    `ao board show`. No board is `([], "")`."""
+def shown_board(root: str | Path, *, fetch: bool = True) -> tuple[ledgerboard.Board | None, str]:
+    """The board under the checkout `root`, read whole, and where it was read: origin's default branch after a
+    fetch (`origin/<branch>`), else the checkout's (`checkout`) — design §4.7 `ao board show` (v3.0: a `Board`,
+    never its lines, TD-1881). No board is `(None, "")`."""
     root = Path(root)
     rel = board_path(root)[1]
     if rel is None:
-        return [], ""
+        return None, ""
     if fetch:
         try:
             # a fetch that failed leaves origin's ref as stale as the checkout: the checkout it is
@@ -647,39 +721,34 @@ def board_lines(root: str | Path, *, fetch: bool = True) -> tuple[list[str], str
             )  # fmt: skip
             heads = [cp.stdout.strip()] if cp.stdout.strip() else ["origin/main", "origin/master"]
             for head in heads if fetched.returncode == 0 else ():
-                cp = subprocess.run(
-                    ["git", "-C", str(root), "show", f"{head}:{rel.as_posix()}"],
-                    capture_output=True, text=True, errors="replace", timeout=READ_TIMEOUT,
-                )  # fmt: skip
-                if cp.returncode == 0:
-                    return cp.stdout.splitlines(), head
+                got = load_at(root, head, rel)
+                if got is not None and got.form is not None:
+                    return got, head
         except (OSError, subprocess.SubprocessError):
             pass
-    try:
-        return (root / rel).read_text(encoding="utf-8").splitlines(), "checkout"
-    except OSError:
-        return [], ""
+    got = load(root, rel)
+    return (got, "checkout") if got.form is not None else (None, "")
 
 
 def show(root: str | Path, want: str, *, fetch: bool = True) -> dict[str, Any] | None:
-    """The line of the board under `root` whose id is `want` (design §4.7 `ao board show`): `{key,
-    line, text, detail, open, source}` — `text` the whole line less its tick, `detail` its detail
-    block — open or closed, the first that holds it; None when no line does. The line shapes are
-    ledgerboard's (design §8): none is written here."""
-    lines, source = board_lines(Path(root), fetch=fetch)
-    for n, ln in enumerate(lines, 1):
-        m = ledgerboard.ITEM_RE.match(ln) or ledgerboard.CLOSED_ITEM_RE.match(ln)
-        if m is None or ref(root, m.group("text")) != want:
-            continue
-        return {
-            "key": want,
-            "line": n,
-            "text": m.group("text").strip(),
-            "detail": ledgerboard.detail_block(lines, n),
-            "open": m.re is ledgerboard.ITEM_RE,
-            "source": source,
-        }
-    return None
+    """The item of the board under `root` whose reference is `want` (design §4.7 `ao board show`, `find`): `{key,
+    id, path, text, detail, open, source}` — `text` its words, `path` its file in the board's directory ('' for a v2
+    item), `detail` its detail block — open or closed, the open ones first and the archive read before reporting
+    none (v3.0, TD-1881); None when no item holds it. The item shapes are ledgerboard's (design §8): none is
+    written here."""
+    board, source = shown_board(Path(root), fetch=fetch)
+    it = find(board, want) if board is not None else None
+    if it is None:
+        return None
+    return {
+        "key": want,
+        "id": it.id,
+        "path": it.path,
+        "text": it.words,
+        "detail": list(it.detail),
+        "open": it.closed is None,
+        "source": source,
+    }
 
 
 # -- a red PR nobody holds (design §4.4 *A red PR nobody holds is a work order*, TD-613) -----------

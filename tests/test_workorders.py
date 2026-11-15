@@ -7,6 +7,8 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from _v3board import load as load_board  # noqa: E402 — tests/ is on the path
+from _v3board import ref_of, write_board  # noqa: E402
 
 from sessionorc import ledger as ledger_mod
 from sessionorc import workorders
@@ -24,12 +26,21 @@ OPEN = "- [ ] act 2026-10-01 (session n/a) — **Rotate the token.** Context: TD
 FYI = "- [ ] fyi 2026-10-01 (session n/a) — **The mirror moved.** Due: 2026-10-02. Decided: seen (2026-10-03)."
 
 
+def _text(*lines: str) -> str:
+    return "\n".join(["# User Attention Board", "", FORMAT, "", "## Needs the user", "", *lines, ""])
+
+
 def _repo(tmp_path: Path, *lines: str) -> Path:
     root = tmp_path / "repo"
     (root / "docs").mkdir(parents=True)  # no `scripts/`: a repo with a board needs no agent-cadence
-    board = ["# User Attention Board", "", FORMAT, "", "## Needs the user", "", *lines, ""]
-    (root / "docs" / "user_attention.md").write_text("\n".join(board), encoding="utf-8")
+    write_board(root, _text(*lines))  # a v3 board: the directory and its stub (ledgerboard v3.0, TD-1881)
     return root
+
+
+def _drop(root: Path, line: str) -> None:
+    """Remove `line`'s item file from the v3 board under `root`, as a close's move out of the directory reads."""
+    (path,) = (root / "docs" / "user_attention").glob(f"*-{ref_of(line).removeprefix('board:')}.md")
+    path.unlink()
 
 
 @pytest.mark.unit
@@ -45,8 +56,9 @@ def test_a_decided_line_is_a_work_order_and_an_open_or_fyi_line_is_not(tmp_path)
 
 @pytest.mark.unit
 def test_the_key_survives_a_snooze_a_reply_and_the_decide_and_is_ledgerboards_item_key(tmp_path):
-    """`board:<key>` is the first eight hex of a sha256 of the line's `item_key()` — ledgerboard's —
-    so the tick's next read names the same line the same way."""
+    """`board:<8 hex>` is the item id's nonce (v3.0, TD-1881), which a split v2 item takes from the first eight hex
+    of a sha256 of the line's `item_key()` — ledgerboard's — so a reference persisted before the split names the
+    same item."""
     import hashlib
 
     from sessionorc import ledgerboard
@@ -66,9 +78,14 @@ def test_the_key_survives_a_snooze_a_reply_and_the_decide_and_is_ledgerboards_it
 def test_no_board_is_no_work_orders_and_a_board_that_will_not_read_says_so(tmp_path):
     assert workorders.read(tmp_path, fetch=False) == {"orders": []}
     root = _repo(tmp_path, DECIDED)
-    (root / "docs" / "user_attention.md").write_bytes(b"- [ ] \xff\xfe not text\n")
+    readme = root / "docs" / "user_attention" / "README.md"  # a board newer than this ledgerboard reads (v3.0)
+    readme.write_text(readme.read_text().replace("Ledgerboard: 3", "Ledgerboard: 4"))
     got = workorders.read(root, fetch=False)
-    assert got == {"error": f"{root / 'docs' / 'user_attention.md'} could not be read (UnicodeDecodeError)"}
+    assert set(got) == {"error"} and got["error"].startswith(f"{root / 'docs' / 'user_attention.md'} could not be read")
+    assert "declares Ledgerboard: 4" in got["error"]
+    (root / "docs" / "user_attention").rename(root / "docs" / "elsewhere")  # a stub whose directory is gone
+    got = workorders.read(root, fetch=False)
+    assert set(got) == {"error"} and "its directory, user_attention/, is missing" in got["error"]
 
 
 @pytest.mark.unit
@@ -206,85 +223,93 @@ def test_each_case_of_the_read_against_origin(tmp_path):
     _git("commit", "-qm", "first", cwd=seed)
     _git("push", "-q", "origin", "main", cwd=seed)
     _git("clone", "-q", str(origin), str(clone), cwd=tmp_path)
-    (clone / "docs").mkdir()
-    board = clone / "docs" / "user_attention.md"
-    board.write_text(f"{OPEN}\n")
+    board = write_board(clone, f"{OPEN}\n")  # a v3 board: compared as its directory, file by file (TD-1881)
 
     def case():
         (b,) = workorders.read_boards(clone)["boards"]
         return b["fetch_case"], origin_case(b["source"] or "", b["fetch_case"]), b
 
     assert case()[:2] == ("none", None)
-    (seed / "docs").mkdir()
-    (seed / "docs" / "user_attention.md").write_text(f"{OPEN}\n")
+    write_board(seed, f"{OPEN}\n")
     _git("add", "-A", cwd=seed)
     _git("commit", "-qm", "board", cwd=seed)
     _git("push", "-q", "origin", "main", cwd=seed)
-    board.unlink()
+    import shutil
+
+    shutil.rmtree(clone / "docs")
     _git("pull", "-q", "origin", "main", cwd=clone)
     assert case()[:2] == ("matches", None)
-    with (seed / "docs" / "user_attention.md").open("a") as f:
-        f.write(f"{DECIDED}\n")
-    _git("commit", "-qam", "a decided line", cwd=seed)
+    write_board(seed, f"{OPEN}\n{DECIDED}\n")  # one more item's file: the directory differs, no file's text
+    _git("add", "-A", cwd=seed)
+    _git("commit", "-qm", "a decided line", cwd=seed)
     _git("push", "-q", "origin", "main", cwd=seed)
     got, note, b = case()
     assert (got, note, b["source"]) == ("behind", "behind", "origin/main")
-    assert [it["line"] for it in b["items"]] == [1, 2] and b["items"][1]["key"] == workorders.ref("", DECIDED[6:])
+    assert [it["at"] for it in b["items"]] == [1, 2] and ref_of(DECIDED) in [it["key"] for it in b["items"]]
     _git("pull", "-q", "origin", "main", cwd=clone)
-    board.write_text(board.read_text() + f"{FYI}\n")
+    write_board(clone, f"{OPEN}\n{DECIDED}\n{FYI}\n")
     assert case()[:2] == ("local", "local")
-    with (seed / "docs" / "user_attention.md").open("a") as f:
-        f.write("- [ ] act 2026-10-02 (session n/a) — **Another.** Due: 2026-10-03.\n")
-    _git("commit", "-qam", "another", cwd=seed)
+    write_board(seed, f"{OPEN}\n{DECIDED}\n- [ ] act 2026-10-02 (session n/a) — **Another.** Due: 2026-10-03.\n")
+    _git("add", "-A", cwd=seed)
+    _git("commit", "-qm", "another", cwd=seed)
     _git("push", "-q", "origin", "main", cwd=seed)
     got, note, b = case()
     assert (got, note, b["source"]) == ("both", "both", None)
-    assert [it["text"].split("**")[1] for it in b["items"]] == [
-        "Rotate the token.",
+    assert sorted(it["text"].split("**")[1] for it in b["items"]) == [
         "Keep the nightly backup?",
+        "Rotate the token.",
         "The mirror moved.",
     ]  # the checkout's
+    # a file moved inside the directory alone (an item closed into the archive) is a difference too
+    _git("checkout", "-q", "--", ".", cwd=clone)
+    _git("clean", "-qfd", cwd=clone)
+    _git("pull", "-q", "origin", "main", cwd=clone)
+    assert case()[0] == "matches"
+    item = next((clone / "docs" / "user_attention").glob("2026-10-02-*.md"))
+    (clone / "docs" / "user_attention" / "archive").mkdir(exist_ok=True)
+    item.rename(clone / "docs" / "user_attention" / "archive" / item.name)
+    assert case()[0] == "local"
     # the write-back's tree: read as the checkout's board read from origin, no fetch
-    tree = tmp_path / "tree.md"
-    tree.write_text(f"{OPEN}\n")
+    tree = write_board(tmp_path / "tree", f"{OPEN}\n")
     (b,) = workorders.read_boards(clone, board=tree)["boards"]
     assert (b["board"], b["source"], b["fetch_case"], len(b["items"])) == (str(board), "origin", "behind", 1)
 
 
 @pytest.mark.unit
 def test_every_line_has_an_id_that_a_snooze_a_reply_a_decide_and_a_close_keep_and_a_reword_changes(tmp_path):
-    """§4.4 *A board line's id* (TD-603, TD-607): every board line, decided or not, has its id —
-    the same before and after each tool's edit, and another after a reword. `show` finds the line by
-    it, open or closed, with the reader's detail block, and is None for an id no line holds."""
+    """§4.4 *A board line's id* (TD-603, TD-607; ledgerboard v3.0, TD-1881): every board item, decided or not, has
+    its reference, the id's nonce — the same before and after each tool's edit (a split v2 line keeps its key's
+    hex through a snooze, a reply, a decide and a close), and another after a reword. `show` finds the item by it,
+    open or closed (the archive read before reporting none), with the reader's detail block, and is None for a
+    reference no item holds."""
     root = _repo(tmp_path, OPEN, "  more about the token", "  - not an item, the block's own list", DECIDED)
-    text = OPEN.removeprefix("- [ ] ")
-    key = workorders.ref(root, text)
+    key = ref_of(OPEN)
     assert workorders.is_work_order(key)
-    from sessionorc import board as board_mod
-
     edits = (
-        board_mod.edit_line(OPEN, text, "snooze", "2026-10-09"),
-        board_mod.edit_line(OPEN, text, "reply", reply="soon", by="paul", today="2026-10-03"),
-        # an `act` line's one decide is Have a session do it's fixed text (TD-1624)
-        board_mod.edit_line(OPEN, text, "decide", answer="have a session do it", today="2026-10-03"),
-        board_mod.edit_line(OPEN, text, "done") + " Closed: 2026-10-04.",
+        OPEN.replace("Due: 2026-10-02.", "Due: 2026-10-02. Hide until: 2026-10-09."),
+        OPEN + " — paul, 2026-10-03: soon",
+        OPEN + " Decided: have a session do it (2026-10-03).",
+        OPEN.replace("- [ ]", "- [x]") + " Closed: 2026-10-04.",
     )
-    assert {workorders.ref(root, e.split("] ", 1)[1]) for e in edits} == {key}
-    assert workorders.ref(root, text.replace("Rotate", "Revoke")) != key  # a reword is a new line
+    assert {ref_of(e) for e in edits} == {key}
+    assert ref_of(OPEN.replace("Rotate", "Revoke")) != key  # a reword is a new item
+    (it,) = [x for x in load_board(root).items if workorders.ref_of(x) == key]
+    assert workorders.find(load_board(root), key).id == it.id
     got = workorders.show(root, key, fetch=False)
     assert got == {
         "key": key,
-        "line": 7,
-        "text": text,
+        "id": it.id,
+        "path": f"{it.id}.md",
+        "text": "**Rotate the token.**",
         "detail": ["more about the token", "- not an item, the block's own list"],
         "open": True,
         "source": "checkout",
     }
-    board = root / "docs" / "user_attention.md"
-    board.write_text(board.read_text().replace(OPEN, OPEN.replace("- [ ]", "- [x]") + " Closed: 2026-10-04."))
+    write_board(root, _text(DECIDED), archive=edits[3] + "\n")
     closed = workorders.show(root, key, fetch=False)
-    assert closed is not None and closed["open"] is False and closed["line"] == 7
+    assert closed is not None and closed["open"] is False and closed["path"].startswith("archive/2026-10/")
     assert workorders.show(root, "board:00000000", fetch=False) is None
+    assert workorders.find(load_board(root), "TD-1") is None  # no reference at all
 
 
 @pytest.mark.unit
@@ -310,14 +335,15 @@ def test_ao_board_show_finds_a_line_by_its_id_and_refuses_one_no_line_holds(tmp_
         return real_run(argv, *a, **k)
 
     monkeypatch.setattr(subprocess, "run", run)
-    key = workorders.ref(root, OPEN.removeprefix("- [ ] "))
+    key = ref_of(OPEN)
+    path = f"2026-10-01-{key.removeprefix('board:')}.md"
     assert cli.main(["board", "show", key, "--json"]) == 0
     got = json.loads(capsys.readouterr().out)
-    assert got["key"] == key and got["line"] == 7 and got["detail"] == ["more about the token"]
+    assert got["key"] == key and got["path"] == path and got["detail"] == ["more about the token"]
     assert got["open"] is True and got["source"] == "checkout"
     assert cli.main(["board", "show", key]) == 0
     out = capsys.readouterr().out
-    assert f"{key}  line 7 of docs/user_attention.md on checkout" in out and "    more about the token" in out
+    assert f"{key}  docs/user_attention/{path} on checkout" in out and "    more about the token" in out
     assert cli.main(["board", "show", "board:00000000"]) == 1
     assert "no line board:00000000 on the board — reworded or closed" in capsys.readouterr().err
     # read from origin, the reading says so
@@ -326,11 +352,10 @@ def test_ao_board_show_finds_a_line_by_its_id_and_refuses_one_no_line_holds(tmp_
     assert json.loads(capsys.readouterr().out)["source"] == "origin"
     # a line the reading does not hold — closed since — is the checkout's
     repos[str(root)]["boards"] = {"boards": []}
-    board = root / "docs" / "user_attention.md"
-    board.write_text(board.read_text().replace(OPEN, OPEN.replace("- [ ]", "- [x]") + " Closed: 2026-10-04."))
+    write_board(root, _text(), archive=OPEN.replace("- [ ]", "- [x]") + " Closed: 2026-10-04.\n")
     assert cli.main(["board", "show", key, "--json"]) == 0
     got = json.loads(capsys.readouterr().out)
-    assert got["open"] is False and got["line"] == 7 and got["source"] == "checkout"
+    assert got["open"] is False and got["path"] == f"archive/2026-10/{path}" and got["source"] == "checkout"
     # the host agent down: the checkout's file still answers (a read is most wanted then)
     from sessionorc.client import AgentUnavailable
 
@@ -339,7 +364,7 @@ def test_ao_board_show_finds_a_line_by_its_id_and_refuses_one_no_line_holds(tmp_
 
     monkeypatch.setattr(cli, "call_sync", down)
     assert cli.main(["board", "show", key, "--json"]) == 0
-    assert json.loads(capsys.readouterr().out)["line"] == 7
+    assert json.loads(capsys.readouterr().out)["path"] == f"archive/2026-10/{path}"
     assert cli.main(["board", "show", "TD-607"]) == 2
     assert not (root / "scripts").exists()  # the line is found with no agent-cadence script in the repo
 
@@ -653,7 +678,7 @@ def test_the_board_reading_carries_every_item_with_its_id_and_the_orders_are_its
     assert len(b["items"]) == 3 and all(workorders.is_work_order(it["key"]) for it in b["items"])
     assert all(it["detail"] == [] and "due" in it for it in b["items"])  # the reader's own fields, kept
     (o,) = workorders.orders(got)
-    assert o["id"] == b["items"][0]["key"] and o["title"] == "Keep the nightly backup?"
+    assert o["id"] == ref_of(DECIDED) and o["title"] == "Keep the nightly backup?"
     assert workorders.read(root, fetch=False) == {"orders": [o]}
 
 
@@ -662,13 +687,11 @@ def test_a_write_backs_tree_is_read_as_the_checkouts_board_from_origin(tmp_path)
     """After a press the host agent reads its own tree — origin's head, the press landed — named as
     the checkout's board read from origin, so the Inbox draws the press and the *behind* note."""
     root = _repo(tmp_path, DECIDED, OPEN)
-    tree = tmp_path / "tree" / "user_attention.md"
-    tree.parent.mkdir()
-    tree.write_text((root / workorders.BOARD).read_text().replace(DECIDED + "\n", ""), encoding="utf-8")
+    tree = write_board(tmp_path / "tree", f"# User Attention Board\n\n{OPEN}\n")  # the press closed DECIDED
     (b,) = workorders.read_boards(root, fetch=False, board=tree)["boards"]
     assert (b["board"], b["root"], b["label"]) == (str(root / workorders.BOARD), str(root), "repo")
     assert b["source"] == "origin"
-    assert [it["text"] for it in b["items"]] == [OPEN.removeprefix("- [ ] ")]
+    assert [(it["key"], it["text"]) for it in b["items"]] == [(ref_of(OPEN), "**Rotate the token.**")]
 
 
 @pytest.mark.unit
@@ -694,8 +717,7 @@ def test_the_boards_clock_rereads_only_a_moved_board_and_the_full_pass_fetches(t
     assert TickMixin._read_boards(str(root), old, False, False, "t2") == (bds, wos) and calls == [False]
     TickMixin._read_boards(str(root), old, True, False, "t3")
     assert calls == [False, True]  # the full pass, against origin
-    board = root / workorders.BOARD
-    board.write_text(board.read_text().replace(OPEN + "\n", ""), encoding="utf-8")
+    _drop(root, OPEN)  # an item's file gone: the board moved, though its stub did not (TD-1881)
     moved, _ = TickMixin._read_boards(str(root), old, False, True, "t4")
     assert calls == [False, True, False] and len(moved["boards"][0]["items"]) == 1
 
@@ -731,7 +753,7 @@ def test_a_pass_for_the_board_alone_keeps_the_ledger_unread(tmp_path, monkeypatc
     full = TickMixin._read_repos([str(root)], {}, {str(root)})[str(root)]
     assert full["boards"]["boards"][0]["items"]
     monkeypatch.setattr(ledger_mod, "read", lambda *a, **kw: pytest.fail("the ledger was read"))
-    (root / workorders.BOARD).write_text((root / workorders.BOARD).read_text().replace(DECIDED + "\n", ""))
+    _drop(root, DECIDED)
     alone = TickMixin._read_repos([str(root)], {str(root): full}, set(), None, None, set(), True)[str(root)]
     assert alone["ledger"] == full["ledger"]
     assert alone["boards"]["boards"][0]["items"] == [] and alone["work_orders"]["orders"] == []
@@ -920,12 +942,13 @@ def test_in_lanes_gives_a_routed_order_to_its_for_record_alone_and_no_rest():
 
 
 def _answer_line(key: str = "1a2b3c4d", ctx: str = "TD-9 decision (paul)", decided: str = "One more round") -> dict:
-    text = f"End of rounds on TD-9: go, one more round, or hold? Context: {ctx}. Due: 2026-11-11."
+    text = "End of rounds on TD-9: go, one more round, or hold?"  # the item's words; its Context a field (v3.0)
     return workorders.entry(
         {
             "id": f"board:{key}",
             "title": "End of rounds",
             "text": text,
+            "context": ctx,
             "decided": {"text": decided, "date": "2026-11-11"},
         }
     )

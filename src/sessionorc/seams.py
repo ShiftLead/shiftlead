@@ -118,6 +118,35 @@ def ledger(root: Path | str) -> dict[str, Any]:
     return out
 
 
+BOARD_PROBLEMS_SHOWN = 3  # an unreadable board's `why` names this many of its problems, then a count
+
+
+def board(root: Path | str) -> dict[str, Any]:
+    """The board seam: `{state, value}` — `state` *set* or *defaulted* (`workorders.board_path`'s, the board
+    read whole and clean) or *absent* (no board: `value` None); *unreadable* where ledgerboard's
+    `board_dir_problems()` finds damage a hand edit or a merge did (a stub whose directory is missing, an item
+    file that does not parse, a duplicate id, …), or *newer* where its `version_problem(board)` finds a major past
+    the module's — as `v2_faults()` and `version_problem()` make the ledger (ledgerboard v3.0, TD-1881); those two
+    carry `why`, the reader's reason, and `named`, the `board_path` state it was read under (*newer* its `major`)."""
+    state, rel = workorders.board_path(root)
+    out: dict[str, Any] = {"state": state, "value": rel.as_posix() if rel is not None else None}
+    if rel is None:
+        return out
+    io = ledger_mod.fs_io(root)
+    read = lb.load_board(rel.as_posix(), *io)
+    if (why := lb.version_problem(read)) is not None:
+        return {**out, "state": "newer", "named": state, "major": read.major, "why": why}
+    if read.form is None and not read.problems:
+        return out  # a set `board:` that names nothing: the warning's *no board at*
+    problems = lb.board_dir_problems(rel.as_posix(), *io)
+    if problems:
+        said = "; ".join(f"{p}: {m}" for p, m in problems[:BOARD_PROBLEMS_SHOWN])
+        more = len(problems) - BOARD_PROBLEMS_SHOWN
+        why = said + (f"; and {more} more" if more > 0 else "")
+        return {**out, "state": "unreadable", "named": state, "why": why}
+    return out
+
+
 # agent-cadence's shim in a checkout's common hooks (dev-cadence TD-055): its per-clone setup was run
 SHIM_MARKER = "agent-cadence hook shim (TD-055)"
 # the launcher call only dev-cadence TD-129's shim makes (`agent-cadence hook "${0##*/}"`): the bare
@@ -399,6 +428,7 @@ def warnings(
 ) -> list[str]:
     """The warnings the host agent can read itself (§5 *The seams*), each one sentence: a set `ledger:` gone
     from the tree, which `led` (the ledger seam) reads in the other layout (§4.4 *Either layout*), a missing board,
+    a board newer than this build reads or one damaged (`board()`, TD-1881),
     no worktree setup, a checkout without agent-cadence's hook shim, agent-cadence's age where it could not
     be read (§5 *Which agent-cadence*), and a `served` repo missing from agent-cadence's own roster (§4.7 `ao
     repo add`, TD-1010) — never agent-cadence's source, which no sync reaches. The two per-clone cures are the
@@ -407,8 +437,12 @@ def warnings(
     out: list[str] = []
     if (led or {}).get("named"):
         out.append(f"`ledger:` names {led['named']}, which is gone: reading {led.get('path')}")
-    if board.get("state") == "absent" or (board.get("value") and not (Path(root) / board["value"]).is_file()):
+    if board.get("state") == "absent" or (board.get("value") and not (Path(root) / board["value"]).exists()):
         out.append(f"no board at {board.get('value') or workorders.BOARD}")
+    elif board.get("state") == "newer":
+        out.append(f"board is Ledgerboard {board.get('major')}, this build reads {lb.BOARD_MAJOR} (sync)")
+    elif board.get("state") == "unreadable":
+        out.append(f"the board at {board.get('value')} is damaged: {board.get('why')}")
     if setup.get("state") == "absent":
         out.append("no worktree setup")
     if shimmed(root, pinned) is False:
@@ -429,18 +463,18 @@ def warnings(
 
 def reading(root: Path | str, roster: Iterable[Path | str] = (), old: dict[str, Any] | None = None) -> dict[str, Any]:
     """The repo's seams: `{ledger, board, worktree_setup, cadence_age, serve, hook_pinned, warnings,
-    session_start, ledgerboard, source}` — `ledger` as `ledger()` gives it, `board` and `worktree_setup`
-    each `{state, value}`, `value` the board's path or the command (None when *absent*), `cadence_age` as
+    session_start, ledgerboard, source}` — `ledger` as `ledger()` gives it, `board` as `board()` does (`{state,
+    value}`, `why` beside a damaged one), `worktree_setup` `{state, value}`, `value` the board's path or the
+    command (None when *absent*), `cadence_age` as
     `age()` reads it against the `roster` (the home's checkouts; `old` the last reading, whose age it
     carries), `serve` as `serve()` gives it, `hook_pinned` as `cadence.hook_pinned` (the SessionStart line's
     mode, §4.2, which picks the per-clone cures and the clients' *predates the pin*, TD-1024),
     `ledgerboard` as `ledgerboard()` does, `source` whether the root is agent-cadence's own source (its every
     agent-cadence path under `files/`)."""
-    board_state, board_rel = workorders.board_path(root)
     state, value = gitinfo.worktree_setup(root)
     out: dict[str, Any] = {
         "ledger": ledger(root),
-        "board": {"state": board_state, "value": board_rel.as_posix() if board_rel is not None else None},
+        "board": board(root),
         "worktree_setup": {"state": state, "value": value},
     }
     led = out["ledger"]

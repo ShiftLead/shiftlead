@@ -834,7 +834,7 @@ def _board_lines(boards: Mapping[str, Iterable[Mapping[str, Any]]]) -> list[dict
                             "said": str(d.get("text") or "") if d else "",
                             "refs": [str(r) for r in it.get("refs") or () if refs(r)],
                             "parts": [str(p) for p in it.get("parts") or ()], "closed": None, "to": [],
-                            "at": int(it.get("line") or 0), "session": str(it.get("session") or "")})  # fmt: skip
+                            "at": int(it.get("at") or 0), "session": str(it.get("session") or "")})  # fmt: skip
             for c in b.get("carried") or ():
                 if not isinstance(c, Mapping) or not isinstance(c.get("decided"), Mapping):
                     continue
