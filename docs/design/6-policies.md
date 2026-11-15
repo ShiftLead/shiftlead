@@ -211,14 +211,14 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the record stays `closed` with its marks, so the row stands and the press can be made again —
      a run-only record too, since the close a restart makes writes no `run_ended` (§4.9, TD-1149).
      A member on a node is closed and created over the link as rule 1's replay is, and waits for
-     the link. **Where it is pressed**: **Restart** on the Inbox row *restart* beside Resume
+     the link. **Where it is pressed**: **Restart** on the restart row (the Inbox's, or the Queue card's of the entry the record holds, §4.5 screen 6, TD-1856) beside Resume
      (§4.5a, with the help saying which is which: *Restart puts it back in its team's run as its
      launch record started it, on a fresh prompt; Resume brings it back attended, under you*) —
      drawn for a record that is not a seat, and for a seat at the fill ceiling (the *fills
      exhausted* row: Restart there clears the mark and rule 3 fills it, TD-1422), and on a `restart_blocked` row it answers with what is left — on the
      card's **more ▾** for a supervised `idle`, `exited` or `closed` record that is not a seat, and
      `ao restart <session>` (§4.7). **A manager's board line names the control and never asks for
-     words**: *the Inbox row's Restart, or `ao restart <id>`* is what it writes beside a member it
+     words**: *its restart row's Restart, or `ao restart <id>`* is what it writes beside a member it
      puts on the board, and the press is the person's. Restart, not *Resume with changes…*, is a
      supervised member's way back into its team's run (§4.9a *One member back, today*).
   3. **Seats.** `ao team start` writes each seat's trigger on its record as **`seat: {trigger}`**
