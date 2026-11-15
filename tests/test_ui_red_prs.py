@@ -136,8 +136,8 @@ def test_a_sync_prs_row_says_sync_and_its_reason_green_or_red():
 
 @pytest.mark.parametrize("checks", ["green", "pending"])
 def test_a_lift_prs_row_says_lift_its_gate_and_its_age(checks):
-    """TD-1578, §4.5a *Inbox row: red PR*: a live check's lift PR is an order whatever its checks (§4.4 *A live
-    check's lift PR is the team's at once*); its row says *lift*, its age since `lift_since` and the gate it
+    """TD-1578, §4.5a *Inbox row: red PR*: a live check's lift PR is an order whatever its checks (§4.4 *A PR the
+    gate sweep opens is the team's at once*); its row says *lift*, its age since `lift_since` and the gate it
     lifts, never *conflicting* — the order as `workorders.pr_order` makes it from the reading."""
     from sessionorc import workorders
     from shiftlead.ui.app import red_pr_rows

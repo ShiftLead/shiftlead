@@ -417,3 +417,20 @@ def test_every_brief_of_a_session_that_files_by_pr_says_a_filing_pr_left_open_is
     for b in briefs:
         assert said in (root / b).read_text(), b
     assert "files you mean to leave open past a day is a draft, or a lane takes it" in (root / "AGENTS.md").read_text()
+
+
+@pytest.mark.unit
+def test_the_grinder_brief_carries_the_gate_sweep_takers_steps_by_head():
+    """TD-1855 step 4 (design §4.4 *A PR the gate sweep opens is the team's at once*): the taker's steps by head."""
+    from pathlib import Path
+
+    text = (Path(__file__).parents[1] / "src/shiftlead/briefs/grinder.md").read_text()
+    start = text.index("**A PR the gate sweep opens**")
+    path = text[start : text.index("**A filing PR** (a `pr:<n>` order marked *filing*", start)]
+    for step in ("`sweep/<date>`", "`notices/<repo>-sweep-<date>`", "read as a filing PR", "`read_open`",
+                 "send no second ask", "`cadence-review:`", "Where it names none, you merge it", "`ledger.py lift TD-n", "`board_edit.py replay`",
+                 "**every lift but a live one**", "**a `host-log` gate's lift**", "never re-run",
+                 "event_checks.py --json`", "never the exit code", "*impossible*", "never a drop",
+                 "*The home's gate sweep (design §4.4, TD-1376) lifts …*", "no staleness test",
+                 "replay refuses", "**A live check's lift**", "*not yet* is never merged"):  # fmt: skip
+        assert step in path, step

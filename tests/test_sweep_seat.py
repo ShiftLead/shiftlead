@@ -73,7 +73,7 @@ def test_the_sweeper_preset_is_a_seat_whose_brief_holds_every_rule_of_what_it_ma
         "an `ask` per decision with your recommendation first",
         "You answer nothing for the person, and you move no `Due:` date",
         "you never write it",  # another repo's board
-        "`sweep/<date>`",
+        "`stranded/<date>`",  # never `sweep/<date>`, the gate sweep's head (TD-1854)
         "**You declare nothing**",
     ):
         assert rule in text, rule
