@@ -121,11 +121,13 @@ def only_gated(entry: Mapping[str, Any]) -> bool:
 
 
 def until_of(blocked_raw: str | None) -> str:
-    """The words after a `decision (<who>)` item's dash, as written — what the Queue card's row reads as
-    *held until <them>* (design §4.5 screen 12, §4.5a *Queue card: what needs the person*, TD-795);
-    '' when the line has no decision, nothing after it, or a list going on past it."""
-    old = lb.parse_gates(blocked_raw)["old_form"]  # v2.4: the old form's text, read only as the last item
-    return old[1].lstrip("—–-").strip() if old else ""
+    """What the Queue card's row reads as *held until <them>* (design §4.5 screen 12, §4.5a *Queue card: what
+    needs the person*, TD-795): always '' since ledgerboard v3.0 (TD-1881). A wait on the person is the bare
+    `decision (<who>)` gate and the entry's `**Ask:**` (TD-1803's gate-alone rule, techlead m-1f51978b32fb);
+    v3.0 reads no words after a decision's dash (the old form is an unreadable item, and `parse_gates()` has no
+    `old_form`), so the card reads *held until your decision* and the Ask carries the question."""
+    del blocked_raw
+    return ""
 
 
 def answers_of(value: str) -> tuple[list[str], list[str], int | None, list[str]]:
@@ -744,13 +746,16 @@ Io = tuple[lb.Ls, lb.Read]  # (ls, read), as `lb.load()` takes them
 
 
 def fs_io(root: Path | str) -> Io:
-    """(ls, read) over the working tree of `root`, paths relative to it: `ls` a directory's file names
-    (None for anything that is not a directory), `read` a file's text (None for anything that is not one)."""
+    """(ls, read) over the working tree of `root`, paths relative to it: `ls` a directory's file names and its
+    subdirectories' names each ending `/` (ledgerboard v3.0's `ls`, which reads a board's `archive/` by it, TD-1881;
+    None for anything that is not a directory), `read` a file's text (None for anything that is not one)."""
     base = Path(root)
 
     def ls(path: str) -> list[str] | None:
         p = base / path
-        return sorted(x.name for x in p.iterdir() if x.is_file()) if p.is_dir() else None
+        if not p.is_dir():
+            return None
+        return sorted(x.name + ("/" if x.is_dir() else "") for x in p.iterdir() if x.is_file() or x.is_dir())
 
     def read(path: str) -> str | None:
         try:
@@ -794,10 +799,15 @@ def git_io(root: Path | str, ref: str, under: str = "", timeout: float = 10.0, r
         pre = f"{path.rstrip('/')}/" if path else ""
         if path in blobs or not any(p.startswith(pre) for p in blobs):
             return None
-        return sorted(p[len(pre) :] for p in blobs if p.startswith(pre) and "/" not in p[len(pre) :])
+        # a subdirectory is listed as its name and `/` (ledgerboard v3.0's `ls`, TD-1881)
+        under = (p[len(pre) :] for p in blobs if p.startswith(pre))
+        return sorted({x if "/" not in x else x.split("/", 1)[0] + "/" for x in under})
 
     def batched(name: str) -> bool:
-        return name == lb.LEDGER_README or bool(lb.ENTRY_FILE_RE.match(name))
+        # a board's item file too (`<id>.md`, ledgerboard v3.0, TD-1881): a board is read whole, its files together
+        return name == lb.LEDGER_README or bool(lb.ENTRY_FILE_RE.match(name)) or (
+            name.endswith(".md") and lb.is_item_id(name[:-3])
+        )
 
     def read(path: str) -> str | None:
         if path not in blobs:
