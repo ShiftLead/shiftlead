@@ -428,7 +428,7 @@ def test_the_grinder_brief_carries_the_gate_sweep_takers_steps_by_head():
     start = text.index("**A PR the gate sweep opens**")
     path = text[start : text.index("**A filing PR** (a `pr:<n>` order marked *filing*", start)]
     for step in ("`sweep/<date>`", "`notices/<repo>-sweep-<date>`", "read as a filing PR", "`read_open`",
-                 "send no second ask", "`cadence-review:`", "`ledger.py lift TD-n", "`board_edit.py replay`",
+                 "send no second ask", "`cadence-review:`", "Where it names none, you merge it", "`ledger.py lift TD-n", "`board_edit.py replay`",
                  "**every lift but a live one**", "**a `host-log` gate's lift**", "never re-run",
                  "event_checks.py --json`", "never the exit code", "*impossible*", "never a drop",
                  "*The home's gate sweep (design §4.4, TD-1376) lifts …*", "no staleness test",
