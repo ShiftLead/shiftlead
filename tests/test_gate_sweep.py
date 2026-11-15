@@ -392,9 +392,7 @@ def test_qualify_leaves_an_id_inside_a_path_as_written_and_qualifies_a_standalon
         "detail": {"question": "Is TD-109 done, as docs/plans/TD-109-decision-missing.md says?", "x": ["see TD-109"]},
     }
     got = gatesweep._qualify("Ledgerboard", it)
-    assert got["text"] == (
-        "Read docs/plans/TD-109-decision-missing.md and TD-109.md, then decide ledgerboard#TD-109."
-    ), got["text"]
+    assert got["text"] == ("Read docs/plans/TD-109-decision-missing.md and TD-109.md, then decide ledgerboard#TD-109.")
     assert got["detail"] == {
         "question": "Is ledgerboard#TD-109 done, as docs/plans/TD-109-decision-missing.md says?",
         "x": ["see ledgerboard#TD-109"],
@@ -402,6 +400,11 @@ def test_qualify_leaves_an_id_inside_a_path_as_written_and_qualifies_a_standalon
     assert gatesweep._qualify("x", {**it, "text": "TD-1090 and x#TD-109 and TD-109"})["text"] == (
         "TD-1090 and x#TD-109 and x#TD-109"
     )
+    # what the old pattern rightly qualified still is (review of #3935); a longer name around the id is left
+    for text in ["TD-109's", "`TD-109`", "(TD-109)", "TD-109:", "TD-109 — x", "TD-109,", "**TD-109**", "TD-109"]:
+        assert gatesweep._qualify("x", {**it, "text": text})["text"] == text.replace("TD-109", "x#TD-109"), text
+    for text in ["foo-TD-109", "a.TD-109", "TD-109/x", "TD-109-x", "TD-109.5"]:
+        assert gatesweep._qualify("x", {**it, "text": text})["text"] == text, text
 
 
 def test_unmention_puts_each_at_name_in_a_code_span_and_leaves_the_rest():
