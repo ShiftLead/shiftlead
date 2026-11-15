@@ -48,7 +48,7 @@ from sessionorc.ledgerboard import board as lb_board
 log = logging.getLogger("shiftlead.agent")
 
 LEDGER = "docs/ledger"  # a split ledger: the sweep reads no v1 file here
-SWEEP_BRANCH = "sweep/"  # the board PR's branch: sweep/<UTC date>
+SWEEP_BRANCH = reports.SWEEP_PREFIX  # the board PR's branch: sweep/<UTC date> (`reports.sweep_of`)
 LIFT_BRANCH = reports.LIFT_PREFIX  # a lift PR's: lift/TD-n/<event name> | until-<date>
 SESSION = "gate-sweep"  # the session an item the sweep files names
 GIT_TIMEOUT = 60.0
@@ -68,10 +68,10 @@ def due(last: date | None, today_utc: date) -> bool:
 
 
 def lift_branch(tid: str, gate: str) -> str:
-    """cadence §2.14's key: `lift/TD-n/<event name>`, and `…/until-<date>` for an `until` gate (TD-1751). The
-    date is the home's alone: `gate_sweep.py` still writes `…/until` for every `until`, so an entry re-gated to a
-    later day found its earlier lift's PR, closed or merged, and its branch, which a close leaves on origin, and
-    was never lifted again. A by-hand lift on `…/until` still counts while open, by the open-PR rule in `_lift`."""
+    """cadence §2.14's key: `lift/TD-n/<event name>`, and `…/until-<date>` for an `until` gate (TD-1751), so an
+    entry re-gated to a later day is lifted again on a head of its own. The pinned `gate_sweep.py` has written the
+    date too since TD-258, so a dateless `…/until` head is a legacy or by-hand one only (§4.4); it still counts
+    while open, by the open-PR rule in `_lift`. `reports.lift_of` reads every head this writes but a decision's."""
     if gate.startswith("event ("):
         return f"{LIFT_BRANCH}{tid}/{gate[len('event (') : -1]}"
     if gate.startswith("until "):
@@ -454,7 +454,7 @@ def _swept_about(root: Path | str, ctx: str) -> bool:
     """Whether a `sweep/` PR open or merged names `Context: <ctx>` in its body — an item filed since the
     clone last fetched (gate_sweep.py's `prs_naming` rule)."""
     hits = prs(root, "--search", f'"Context: {ctx}" in:body')
-    return any(q["head"].startswith(SWEEP_BRANCH) and q["state"] in ("open", "merged") for q in hits)
+    return any(reports.sweep_of(q["head"]) == "sweep" and q["state"] in ("open", "merged") for q in hits)
 
 
 def _contexts(board: str, archive: str) -> set[str]:
@@ -574,7 +574,7 @@ def _own_board(
     today_local: date,
     by: str,
 ) -> str:
-    earlier = [q for q in prs(root, state="open") if q["head"].startswith(SWEEP_BRANCH)]
+    earlier = [q for q in prs(root, state="open") if reports.sweep_of(q["head"]) == "sweep"]
     if earlier:
         return (
             f"board: an earlier sweep PR #{earlier[0]['number']} is open — {len(items)} to file, "
@@ -595,7 +595,7 @@ def _own_board(
     return f"board: opened {url}"
 
 
-NOTICES_BRANCH = "notices/"  # a PR on another repo's board: notices/<this repo>-sweep-<UTC date> (gate_sweep.py's)
+NOTICES_BRANCH = reports.NOTICES_PREFIX  # a PR on another repo's board: notices/<this repo>-sweep-<UTC date>
 # a repo's visibility on its forge, least visible first: an item never goes to a board more visible than its words' repo
 VISIBILITY = {"PRIVATE": 0, "INTERNAL": 1, "PUBLIC": 2}
 

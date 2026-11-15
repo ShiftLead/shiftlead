@@ -584,7 +584,7 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     assert row in out and out.index("pr:1728") < out.index("board:0123abcd") < out.index("pickable     pr:1573")
     assert out.count("pr:1728  High") == 1
     # a live check's lift PR is counted once, as a lift and never as a red PR too, and its line prints its
-    # entry's priority (§4.4 *A live check's lift PR is the team's at once*, TD-1450, TD-1588)
+    # entry's priority (§4.4 *A PR the gate sweep opens is the team's at once*, TD-1450, TD-1588)
     lift = {"id": "pr:1900", "title": "lift TD-1450 event (live)", "for_page": "pickable", "pickable": "yes",
             "work_order": True, "pr_order": True, "priority": "Medium", "pr": 1900, "lift": True,
             "lift_since": "2026-10-15T09:00:00Z", "entry": "TD-1450", "gate": "event (live)"}  # fmt: skip
@@ -1410,22 +1410,57 @@ def test_the_repo_reading_keeps_completed_from_the_history_and_the_prs(repo, mon
 
 
 def test_a_lift_branch_is_stamped_lift_since_at_its_first_reading_and_kept(tmp_path, monkeypatch):
-    """TD-1450, design §4.4 *A live check's lift PR is the team's at once*: an open PR on
-    `lift/TD-n/<live, live-<digits>, live-td<digits>>` carries `lift` and `lift_since`, the first reading
-    that saw it, kept while it stays open; any other branch carries neither."""
-    t0 = datetime.now(UTC)
+    """TD-1450, TD-1854, design §4.4 *A PR the gate sweep opens is the team's at once*: an open PR on any
+    lift head `lift_of` reads carries `lift` and `lift_since`, the first reading that saw it, kept while it
+    stays open — an `until-<date>` head's only from its UTC day; a sweep head carries `sweep` (its kind) and
+    `sweep_since`; a decision's head and any other branch carry neither, and are read by the filing rule."""
+    t0 = datetime(2026, 11, 15, 12, tzinfo=UTC)
     names = {5: "lift/TD-1450/live", 6: "lift/TD-1450/live-2", 7: "lift/TD-9/live-td31", 8: "lift/TD-9/livefoo",
-             9: "lift/TD-9/until", 10: "b10"}  # fmt: skip
-    prs = [_pr(n, "open", t0, headRefName=b) for n, b in names.items()]
+             9: "lift/TD-9/until", 10: "b10", 11: "lift/TD-9/until-2026-11-15", 12: "lift/TD-9/until-2026-11-16",
+             13: "lift/TD-9/decision-paul", 14: "sweep/2026-11-15", 15: "notices/shiftlead-ledgerboard-sweep-2026-11-15",
+             16: "sweep/cleanup", 17: "notices/x"}  # fmt: skip
+    prs = [_pr(n, "open", t0, headRefName=b, headRefOid=f"h{n}") for n, b in names.items()]
     _fake_gh(monkeypatch, prs, [])
-    first = reports.pr_reading(tmp_path, t0)
+    monkeypatch.setattr(reports, "pr_files", lambda d, n, t: ["docs/ledger/TD-9.md"])
+    first = reports.pr_reading(tmp_path, t0, filing=["docs/ledger"])
     by = {p["number"]: p for p in first["open"]}
-    assert all((by[n]["lift"], by[n]["lift_since"]) == (True, t0.isoformat()) for n in (5, 6, 7))
-    assert all("lift" not in by[n] and "lift_since" not in by[n] for n in (8, 9, 10))
-    second = reports.pr_reading(tmp_path, t0 + timedelta(hours=2), old=first)
-    assert {p["number"]: p.get("lift_since") for p in second["open"]}[5] == t0.isoformat()
-    assert reports.lift_of("lift/TD-1450/live-td31") == ("TD-1450", "event (live-td31)")
-    assert reports.lift_of("lift/TD-1450/decision-paul") is None and reports.lift_of(None) is None
+    assert all((by[n]["lift"], by[n]["lift_since"]) == (True, t0.isoformat()) for n in (5, 6, 7, 8, 9, 11))
+    assert by[12]["lift"] is True and "lift_since" not in by[12]  # before its day: no order yet
+    assert all("lift" not in by[n] and "lift_since" not in by[n] for n in (10, 13, 14, 15, 16, 17))
+    assert (by[14]["sweep"], by[15]["sweep"]) == ("sweep", "notices") and by[14]["sweep_since"] == t0.isoformat()
+    assert all("sweep" not in by[n] for n in (10, 13, 16, 17))
+    # the filing rule reads every head but the gate sweep's (one predicate, TD-1854)
+    assert all("filing" not in by[n] for n in (5, 9, 11, 12, 14, 15))
+    assert all("filing" in by[n] for n in (10, 13, 16, 17))
+    later = t0 + timedelta(days=1)
+    second = reports.pr_reading(tmp_path, later, old=first)
+    got = {p["number"]: p.get("lift_since") for p in second["open"]}
+    assert got[5] == t0.isoformat() and got[12] == later.isoformat()
+    assert {p["number"]: p.get("sweep_since") for p in second["open"]}[15] == t0.isoformat()
+
+
+@pytest.mark.unit
+def test_lift_of_and_sweep_of_read_each_head_the_gate_sweep_writes():
+    """TD-1854, design §4.4: `lift_of` reads `(TD-n, gate, live)` — a dated `until` the gate `until <date>`, a
+    dateless one `until`, any other name an event (`until-<not a date>` among them), live only for the reserved
+    names; a decision's head none. `sweep_of` reads the two sweep heads whole, with a calendar date."""
+    assert reports.lift_of("lift/TD-1450/live-td31") == ("TD-1450", "event (live-td31)", True)
+    assert reports.lift_of("lift/TD-1/live") == ("TD-1", "event (live)", True)
+    assert reports.lift_of("lift/TD-1/live-2") == ("TD-1", "event (live-2)", True)
+    assert reports.lift_of("lift/TD-1/livefoo") == ("TD-1", "event (livefoo)", False)
+    assert reports.lift_of("lift/TD-1/until-2026-11-20") == ("TD-1", "until 2026-11-20", False)
+    assert reports.lift_of("lift/TD-1/until") == ("TD-1", "until", False)
+    assert reports.lift_of("lift/TD-1/until-foo") == ("TD-1", "event (until-foo)", False)
+    assert reports.lift_of("lift/TD-1/until-2026-13-45") == ("TD-1", "event (until-2026-13-45)", False)
+    for none in ("lift/TD-1450/decision-paul", None, "lift/TD-1/Live", "lift/TD-1/a_b", "x/lift/TD-1/live"):
+        assert reports.lift_of(none) is None, none
+    assert reports.lift_day("lift/TD-1/until-2026-11-20") == "2026-11-20" and reports.lift_day("lift/TD-1/until") is None
+    assert reports.sweep_of("sweep/2026-11-15") == "sweep"
+    assert reports.sweep_of("notices/shiftlead-ledgerboard-sweep-2026-11-15") == "notices"
+    for none in ("sweep/cleanup", "sweep/2026-02-30", "notices/x", "notices/shiftlead-paul-person", None):
+        assert reports.sweep_of(none) is None, none
+    assert reports.gate_head("sweep/2026-11-15") and reports.gate_head("lift/TD-1/until")
+    assert not reports.gate_head("lift/TD-1/decision-paul") and not reports.gate_head("sweep/foo")
 
 
 def test_a_live_check_with_an_open_part_or_an_unreserved_live_name_is_on_no_list():
