@@ -1752,7 +1752,9 @@ def test_a_decided_lines_waiting_words_name_its_work_orders_holder_or_the_teams_
         "decide 2026-10-01 (session gone-1 on kmaster) — **Keep the nightly backup?** Context: TD-777."
         " Due: 2026-10-02. Answers: keep | drop. Decided: keep (2026-10-03)."
     )
-    ref = workorders.ref(root, text)
+    from _v3board import ref_of
+
+    ref = ref_of(text)  # the reading's reference, the split item's id's nonce (ledgerboard v3.0, TD-1881)
     assert workorders.is_work_order(ref)
     now = datetime(2026, 10, 4, 12, tzinfo=UTC)
     row = {"repo": "repo", "root": str(root), "text": text, "decided": "keep", "session": "gone-1", "refs": ["TD-777"]}
@@ -1778,9 +1780,8 @@ def test_a_decided_lines_waiting_words_name_its_work_orders_holder_or_the_teams_
     assert board_waiting_on(row, [], now) == nobody
     # a record whose repo will not resolve is passed over, never the page's error
     assert board_waiting_on(row, [{**g1, "repo": "bad\x00path"}, g1], now) == "pickable by grind"
-    # a repo no team services names nobody; the id is ledgerboard's, the same with no script in the repo
+    # a repo no team services names nobody
     assert board_waiting_on({**row, "root": str(tmp_path)}, [g1], now) == nobody
-    assert workorders.ref(tmp_path / "nowhere", text) == ref
 
 
 def test_a_decided_lines_teams_skip_a_resumed_away_record_and_read_live_from_any_one(tmp_path):
@@ -1854,10 +1855,10 @@ def test_every_board_row_draws_its_id_and_every_press_on_it_carries_it(tmp_path,
 
     repo(tmp_path, "samscrape")  # the reader beside the board, which names the line
     it = decide_item()
-    it["key"] = workorders.ref(tmp_path / "samscrape", it["text"])  # as the host agent's reading gives it
+    assert workorders.is_work_order(it["key"])  # as the host agent's reading gives it (`ref_of`, TD-1881)
     rows, html = rows_html(tmp_path, monkeypatch, it)
     key = rows[0]["key"]
-    assert workorders.is_work_order(key) and key == workorders.ref(tmp_path / "samscrape", it["text"])
+    assert key == it["key"]
     chip = re.search(r'<button class="mono boardkey"[^>]*>([^<]*)</button>', html)
     assert chip and chip.group(1) == key
     assert f'data-copy="{key}"' in chip.group(0) and f'data-copied="copied {key}"' in chip.group(0)

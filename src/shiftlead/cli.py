@@ -3750,6 +3750,8 @@ def cmd_board_edit(args: argparse.Namespace) -> int:
         got = board_mod.branch_edit(
             os.getcwd(),
             args.edit,
+            line=args.line,
+            expect=args.expect or "",
             key=args.key or "",
             why=why,
             until=args.until or "",
@@ -6088,7 +6090,10 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument(
         "edit", choices=board_mod.BRANCH_ACTIONS, help="done checks it off; snooze hides it until --until (Due: stays)"
     )
-    q.add_argument("--key", required=True, help="the item's reference, board: and eight hex digits, or its whole id")
+    q.add_argument("--key", help="the item's reference, board: and eight hex digits, or its whole id")
+    # a v2 board's line and its first words: refused by name, a v3 item is named by its id (TD-1881); no help
+    q.add_argument("--line", type=int, help=argparse.SUPPRESS)
+    q.add_argument("--expect", help=argparse.SUPPRESS)
     q.add_argument("--why", help="done: what was done, for its Closed: field")
     q.add_argument("--until", help="snooze: the date it is hidden until (its Hide until:), YYYY-MM-DD")
     q.add_argument(

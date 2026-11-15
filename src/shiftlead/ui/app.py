@@ -283,6 +283,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _held_answered,  # noqa: F401
     _hold_inputs,  # noqa: F401
     _holder_where,  # noqa: F401
+    _item_prefix,  # noqa: F401
     _needs_key,  # noqa: F401
     _next_due,  # noqa: F401
     _order_teams,  # noqa: F401

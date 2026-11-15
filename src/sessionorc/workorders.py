@@ -112,25 +112,6 @@ def load_at(root: Path | str, at: str, rel: Path | str) -> ledgerboard.Board | N
     return ledgerboard.load_board(rel.as_posix(), *io) if io is not None else None
 
 
-def key(text: str) -> str:
-    """`board:<key>` for a v2 item's text — its line less the open tick (v2's derivation, which a split v2 item's
-    id keeps: `ref_of` is every reader's now, TD-1881)."""
-    return PREFIX + hashlib.sha256(ledgerboard.item_key(f"- [ ] {text}").encode("utf-8")).hexdigest()[:8]
-
-
-def ref(root: str | Path, text: str) -> str:
-    """`board:<key>` for a line of the board under `root` — **every board line's id** (design §4.4
-    *A board line's id*, TD-603): the one derivation the Inbox's board rows, the write-back's presses,
-    `ao board show`, `ao repo` and the work orders all use, ledgerboard's `item_key` in every repo —
-    or empty for no text. `text` is the item less its tick."""
-    if not text:
-        return ""
-    try:
-        return key(text)
-    except Exception:  # noqa: BLE001 — a line the key cannot take has no reference
-        return ""
-
-
 def head(text: str) -> str:
     """A line's head text, the work order's title: its bold head where it has one, else what
     follows the `(session …) —` lead, clipped."""
