@@ -127,9 +127,10 @@ class FakeAgent:
     host agent whose loop is behind: it reads the request that long after the connection, and keeps
     whether the caller's pid was still there to be read (`alive`)."""
 
-    def __init__(self, path: Path, lag: float = 0.0):
+    def __init__(self, path: Path, lag: float = 0.0, on_accept=None):
         self.got: list[dict] = []
         self.lag = lag
+        self.on_accept = on_accept  # run as a connection is taken, before the lag (a tool's cancel, TD-1741)
         self.alive: list[bool] = []
         self.groups: list[int] = []
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -144,6 +145,8 @@ class FakeAgent:
             except OSError:
                 return
             with conn:
+                if self.on_accept is not None:
+                    self.on_accept()
                 if self.lag:
                     pid = struct.unpack("3i", conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))[0]
                     # the caller's process group, field 5 of its stat, after the `(comm)` that may hold spaces
@@ -290,6 +293,7 @@ def test_the_reporter_child_hands_the_report_its_own_bound(tmp_path, monkeypatch
         raise Exited(code)
 
     monkeypatch.setattr(hook_mod.os, "fork", lambda: 0)
+    monkeypatch.setattr(hook_mod, "placed_by_cgroup", lambda: False)
     monkeypatch.setattr(hook_mod.os, "setpgid", lambda *a: None)
     monkeypatch.setattr(hook_mod.os, "open", lambda *a, **k: -1)
     monkeypatch.setattr(hook_mod.os, "dup2", lambda *a: None)
@@ -314,7 +318,11 @@ def test_the_reporter_leaves_the_status_lines_group_and_holds_none_of_its_pipes(
     plain = tmp_path / "plain"
     plain.mkdir()
     p = {**payload(), "workspace": {"project_dir": str(plain)}}
-    code = "import sys; from shiftlead.adapters.claude_code import hook; sys.argv[1:] = ['--statusline']; hook.main()"
+    # no pane cgroup of its own, wherever the suite runs: the child is the reporter (TD-1741)
+    code = (
+        "import sys; from shiftlead.adapters.claude_code import hook; hook.placed_by_cgroup = lambda: False; "
+        "sys.argv[1:] = ['--statusline']; hook.main()"
+    )
     extra_r, extra_w = os.pipe()  # a pipe above fd 2, as a tool might hand its status line
     t0 = time.monotonic()
     try:
@@ -340,3 +348,76 @@ def test_the_reporter_leaves_the_status_lines_group_and_holds_none_of_its_pipes(
         time.sleep(0.05)
     assert [r["method"] for r in agent.got] == ["usage_report"]
     assert agent.groups and agent.groups[0] != line.pid  # the reporter was in a group of its own, not the line's
+
+
+def test_placed_by_cgroup_reads_a_panes_own_cgroup_and_nothing_else():
+    """TD-1741: the reporter leaves the status line's tree only where the home places an orphan by
+    the pane's own cgroup (design §4.8a): the installed home's `pane-<name>`, or a systemd tmux's
+    `tmux-spawn-*.scope`. A shared cgroup, a v1-only host or no reading keeps it a descendant."""
+    pane = "0::/system.slice/shiftlead-tmux.service/pane-ao-shiftlead-w1\n"
+    assert hook_mod.placed_by_cgroup(pane)
+    assert hook_mod.placed_by_cgroup("0::/user.slice/user@1000.service/tmux-spawn-1a2b.scope\n")
+    assert not hook_mod.placed_by_cgroup("0::/system.slice/shiftlead-tmux.service\n")
+    assert not hook_mod.placed_by_cgroup("0::/user.slice/user@1000.service/app.slice/tmux-spawn-1a2b\n")
+    assert not hook_mod.placed_by_cgroup("12:pids:/pane-ao-x\n")  # a v1 line is not the unified one
+    assert not hook_mod.placed_by_cgroup("")
+
+
+def _tree(root: int) -> list[int]:
+    """`root` and every process below it now, read from /proc by parent: what a tree kill reaches."""
+    kids: dict[int, list[int]] = {}
+    for d in Path("/proc").iterdir():
+        if d.name.isdigit():
+            with contextlib.suppress(OSError, IndexError, ValueError):
+                ppid = int((d / "stat").read_text().rpartition(")")[2].split()[1])
+                kids.setdefault(ppid, []).append(int(d.name))
+    out, todo = [], [root]
+    while todo:
+        pid = todo.pop()
+        out.append(pid)
+        todo.extend(kids.get(pid, []))
+    return out
+
+
+@pytest.mark.integration
+def test_the_reporter_survives_a_kill_of_the_status_lines_whole_tree(home, tmp_path):
+    """TD-1741: the tool cancels a status line by killing its process tree, which reached the reporter
+    although it had left the process group: the home found it gone at the first read, the connection
+    0.0 s old. Where the pane's own cgroup places an orphan, the reporter is no descendant of the
+    status line — the go-between exits at once — so a kill of the tree, the moment the reporter
+    connects, leaves it to be read and answered."""
+    killed: list[int] = []
+
+    def cancel() -> None:  # the tool's cancel: every process under the status line, as it is now
+        for pid in _tree(line.pid):
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.kill(pid, 9)
+                killed.append(pid)
+
+    agent = FakeAgent(home / "agent.sock", lag=1.0, on_accept=cancel)
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    p = {**payload(), "workspace": {"project_dir": str(plain)}}
+    code = (
+        "import sys, time; from shiftlead.adapters.claude_code import hook; hook.placed_by_cgroup = lambda: True; "
+        "sys.argv[1:] = ['--statusline']; hook.main(); time.sleep(5)"  # the line outlives the connect
+    )
+    line = subprocess.Popen(
+        [sys.executable, "-c", code],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        process_group=0,
+    )
+    try:
+        line.communicate(json.dumps(p).encode(), timeout=15)
+    finally:
+        with contextlib.suppress(ProcessLookupError):
+            line.kill()
+    end = time.monotonic() + 10
+    while time.monotonic() < end and not hook_mod.last_report_file("ao-x-w1").exists():
+        time.sleep(0.05)
+    assert line.pid in killed  # the cancel landed on the status line while the reporter was connected
+    assert agent.alive == [True]  # read after the kill, the reporter was still there
+    assert [r["method"] for r in agent.got] == ["usage_report"]
+    assert hook_mod.last_report_file("ao-x-w1").exists()  # answered, it remembered the report
