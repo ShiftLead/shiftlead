@@ -2456,16 +2456,13 @@ def test_a_long_hold_note_is_written_whole_on_the_line_and_the_ledger_log(repo):
 
     _gated(repo)
     held = GATED.replace("Answers: Go | Not yet.", "Answers: Go | Hold: <note>. Lifts: Go.")
-    (repo / board.BOARD).write_text(origin_board(repo).replace(GATED, held))
-    git(repo, "commit", "-qam", "a form")
-    git(repo, "push", "-q", "origin", "main")
+    push_board(repo, BOARD_TEXT.replace("## Needs", "People: paul\n\n## Needs") + f"- [ ] {held}\n", "a form")
     said = A._board_answer("decide", LONG_NOTE, ["Go", "Hold: <note>"], 1)
     assert said == f"Hold: {LONG_NOTE}"
-    at = origin_board(repo).splitlines().index(f"- [ ] {held}") + 1
-    got = board.write_back(repo, at, held, "decide", answer=said)
-    assert got["entries"] == ["TD-190"] and got["message"].endswith("… (session `grinder-ao-2`)")
-    line = origin_board(repo).splitlines()[at - 1]
-    assert f"Decided: Hold: {LONG_NOTE} (by paul)" in line
+    got = board.write_back(repo, None, held, "decide", answer=said)  # a v3 item is found by its words (TD-1881)
+    assert got["entries"] == ["TD-190"] and got["message"].endswith("… (session grinder-ao-2)")  # v3.0 writes no backticks
+    it = origin_item(repo, ref_of(held))
+    assert (it.decided[0], it.decided_by) == (f"Hold: {LONG_NOTE}", "paul")
     entry = on_origin(repo, "show", "origin/main:docs/ledger/TD-190.md")
     assert f'kept waiting: decision (paul) — by paul; answer "Hold: {LONG_NOTE}"' in entry
 
@@ -2473,14 +2470,14 @@ def test_a_long_hold_note_is_written_whole_on_the_line_and_the_ledger_log(repo):
 def test_a_long_reply_is_written_whole_and_one_filling_a_form_decides_whole(repo):
     """TD-1883: a Reply past 300 characters is written on the line whole, and one whose words begin with a form's
     head decides it with the whole fill, as a pressed form does."""
-    _hold_board(repo, HOLD, HOLD.replace("End the rounds?", "Another round?"))
-    got = board.write_back(repo, 9, HOLD, "reply", reply=f"Hold: {LONG_NOTE}")
-    assert got["decided"] == f"Hold: {LONG_NOTE}"
-    assert f"Decided: Hold: {LONG_NOTE} (by t)" in origin_board(repo).splitlines()[8]
     other = HOLD.replace("End the rounds?", "Another round?")
-    at = origin_board(repo).splitlines().index(f"- [ ] {other}") + 1
-    got = board.write_back(repo, at, other, "reply", reply=LONG_NOTE)
-    assert "decided" not in got and f": {LONG_NOTE}" in origin_board(repo).splitlines()[at - 1]
+    _hold_board(repo, HOLD, other)
+    got = board.write_back(repo, None, HOLD, "reply", reply=f"Hold: {LONG_NOTE}")
+    assert got["decided"] == f"Hold: {LONG_NOTE}"
+    it = origin_item(repo, ref_of(HOLD))
+    assert (it.decided[0], it.decided_by) == (f"Hold: {LONG_NOTE}", "t")
+    got = board.write_back(repo, None, other, "reply", reply=LONG_NOTE)
+    assert "decided" not in got and origin_item(repo, ref_of(other)).replies[-1][2] == LONG_NOTE
 
 
 @pytest.mark.unit
