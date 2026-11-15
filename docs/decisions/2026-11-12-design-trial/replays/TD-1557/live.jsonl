@@ -1,0 +1,23 @@
+{"id": "F1", "mark": "not-live", "where": "4.4 Decide", "why": "live never takes a form as a default: ledgerboard's item check refuses a marked form and readers hand no default; replay's vacuous Done-when is its own build text"}
+{"id": "F6", "mark": "not-live", "where": "4.4 Decide", "why": "page hands the item's answers as the reader gave them; live text has no 'whole string' wording"}
+{"id": "F7", "mark": "not-live", "where": "4.4 Decide; 4.10 1351", "why": "ledger_decide takes form and fills through fill_form; empty fill refused; TD-1698 refuses an index naming a form"}
+{"id": "F8", "mark": "unsure", "where": "4.4 Decide (reply paragraph)", "why": "live says a look's hand-off takes the filled answer and defines live_look_pair, but never says outright that Answer\u2026 filling Not right hands off"}
+{"id": "F9", "mark": "not-live", "where": "4.4 Decide 'The page parses nothing'", "why": "live page does no reading; agent reads through ledgerboard"}
+{"id": "F10", "mark": "not-live", "where": "4.5a Answer\u2026 row", "why": "live: a card's Hold\u2026 box sends board_edit decide, its Answer\u2026 box board_reply"}
+{"id": "F19", "mark": "not-live", "where": "4.4 Decide", "why": "live page never compares grammar; the foot is drawn from reader's heads/reply_decides"}
+{"id": "F20", "mark": "not-live", "where": "4.4 A form's press is the decide", "why": "live sends words as typed plus form index; agent puts head back"}
+{"id": "F21", "mark": "unsure", "where": "4.4 Decide", "why": "live decide checks the page's handed answers (only act is checked against line's own kind); line is matched word for word so Answers cannot differ, but the check is unsaid"}
+{"id": "F22", "mark": "not-live", "where": "4.10 A form is filled, never pressed", "why": "live refuses a form --default at the send, so no lapse to a placeholder"}
+{"id": "F23", "mark": "not-live", "where": "4.4 Decide (applying mark)", "why": "live: mark reads reply then swaps to decide via _remark callback"}
+{"id": "F30", "mark": "not-live", "where": "4.4 Decide", "why": "live: a slot of its own (Hold: <b>) is refused with <head> needs its words"}
+{"id": "F35", "mark": "not-live", "where": "4.4 Decide; 4.5a", "why": "live: a form is never marked default, no Go with it"}
+{"id": "F45", "mark": "not-live", "where": "4.10", "why": "live refuses form --default at send; no lapse rewrite"}
+{"id": "F46", "mark": "not-live", "where": "4.4 Decide", "why": "one wording: head compared in any case, colon, words past it"}
+{"id": "F47", "mark": "not-live", "where": "4.10 A form is filled", "why": "live: check runs ahead of answer index check and the orphan road, every replier"}
+{"id": "F60", "mark": "not-live", "where": "4.4 Decide", "why": "live: a fill needs head and its colon; words without it are a Reply, and Hold\u2026 box puts head back"}
+{"id": "F66", "mark": "not-live", "where": "4.5-ui 2782", "why": "live has no keptWords store for refused forms; words kept only on item change, bound by board:<key>"}
+{"id": "F79", "mark": "not-live", "where": "4.10 1429", "why": "replay build-site detail; live ao inbox prints form 'fill it, do not pick it' and TD-1698 built it"}
+{"id": "F81", "mark": "unsure", "where": "4.4 Decide", "why": "live has no NO_LINE/MOVED split or second check on handed answers; whether an altered Answers line is MOVED is unsaid"}
+{"id": "F82", "mark": "not-live", "where": "4.5-ui 2782", "why": "replay's kept-words store only; live words kept by item key with road bound to the box"}
+{"id": "F87", "mark": "not-live", "where": "4.4 3015", "why": "live says kept waiting only on the board decide road's lift; no claim for ledger road"}
+{"id": "F101", "mark": "not-live", "where": "4.5-ui 2782; 4.4", "why": "live bound fields exclude answers; page sends none, agent reads line state in the locked write-back"}

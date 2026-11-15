@@ -1,0 +1,26 @@
+{"id": "F1", "mark": "not-live", "where": "4.9a *A busy seat is left alone*, The start", "why": "live says the on-call manager's record id is the lead id members list in controllers"}
+{"id": "F2", "mark": "not-live", "where": "4.9a *A busy seat is left alone*, The card", "why": "teamrun.rows gives busy and startable{closes,leaves}; one reading shared by card, start, _close_concluded"}
+{"id": "F3", "mark": "not-live", "where": "4.9a *A busy seat is left alone*, The card", "why": "left entries carry {name,state} with the reading's words; no left[].why exists"}
+{"id": "F4", "mark": "not-live", "where": "4.9a *A refused start says why*", "why": "cure per holder: a waiting holder's cure is what it waits on; skip keeps held_asks counted; clauses built by _close_concluded"}
+{"id": "F15", "mark": "not-live", "where": "4.9a *A refused start says why*", "why": "cure is stated per holder: Close if clean and pushed, else _unsafe_to_close words, Kill for others, never team stop"}
+{"id": "F16", "mark": "not-live", "where": "4.9a *A refused start says why*", "why": "person's session, sat-out record, suspended and any other holder each have stated words/cures; stale tmux suffixed record refuses as today"}
+{"id": "F27", "mark": "not-live", "where": "4.9a *A busy seat is left alone*, One reading", "why": "orphans (renamed/dropped seats) only remove startable; early refusal in own *still running ... by Apply* words"}
+{"id": "F28", "mark": "not-live", "where": "4.9a *A refused start says why*", "why": "left seats are dropped from held names and appear only in the not-concluded tail; refusal order set by per-holder clauses"}
+{"id": "F31", "mark": "not-live", "where": "4.9a *A busy seat is left alone*", "why": "busy is read over crew(), never a person's session; a person's own session holding the name is named *your session*"}
+{"id": "F37", "mark": "not-live", "where": "4.9a *A busy seat is left alone*, The start", "why": "the list for _start_moves is read before the name check on every person's Start"}
+{"id": "F41", "mark": "not-live", "where": "4.9a *A busy seat is left alone*, One reading", "why": "seat is the record's seat field or a seat_names name; orphans defined as absent from seat_names"}
+{"id": "F42", "mark": "not-live", "where": "4.9a *A busy seat is left alone*, One reading", "why": "orphans exclude marks _pairing passes over (sat out, scale, run_only, superseded_by)"}
+{"id": "F43", "mark": "not-live", "where": "4.9a *A busy seat is left alone*, Races", "why": "live design has no 'second Start is refused' claim; races are stated"}
+{"id": "F44", "mark": "not-live", "where": "4.9a *A refused start says why*", "why": "any other holder gives bare state and cure let it finish or Kill; separator stated as the clause then the not-concluded tail"}
+{"id": "F45", "mark": "not-live", "where": "4.5a rollup: press and menus", "why": "menu lists startable team's Start in live and stopped orders"}
+{"id": "F48", "mark": "not-live", "where": "4.9a *A busy seat is left alone*", "why": "sweep seat never busy; plan depends on Settings switch; live one refuses with clause or Apply words"}
+{"id": "F49", "mark": "not-live", "where": "4.9a *A busy seat is left alone*", "why": "no standing-seat test; busy keys on seat field / seat_names, standing manager excluded"}
+{"id": "F59", "mark": "not-live", "where": "4.9a *A busy seat is left alone*", "why": "sweeper handled by the switch-dependent refusal rule; finding withdrawn in replay"}
+{"id": "F60", "mark": "not-live", "where": "4.9a *A busy seat is left alone*", "why": "sweeper cases stated; finding withdrawn in replay by F66's fix"}
+{"id": "F63", "mark": "not-live", "where": "4.9a *A busy seat is left alone*", "why": "card/press differences with sweeper and plan accepted explicitly in text"}
+{"id": "F65", "mark": "not-live", "where": "4.9a *A busy seat is left alone*", "why": "scale matched only with a seat name once suffix stripped; suffixed record without scale refuses as today"}
+{"id": "F66", "mark": "not-live", "where": "4.9a *A busy seat is left alone*", "why": "live text states the switch dependence consistent with sweeper handling; replay-draft contradiction only"}
+{"id": "F72", "mark": "not-live", "where": "replay draft", "why": "about the replay's own \u00a74.5a example; live example does not name sweeper as left"}
+{"id": "F77", "mark": "not-live", "where": "replay draft", "why": "about replay's build TD-9002; live is a different build split"}
+{"id": "F82", "mark": "not-live", "where": "replay draft", "why": "replay's history text only"}
+{"id": "F91", "mark": "not-live", "where": "4.9a *A refused start says why*", "why": "suspended holders keep their words (4.8a); no dead-holder rebuild in live design"}
