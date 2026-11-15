@@ -11,6 +11,8 @@ import subprocess
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
+from _v3board import write_board
+
 from sessionorc import workorders
 from sessionorc.ledgerboard import ledger as lb_ledger
 
@@ -161,8 +163,7 @@ def test_a_lift_through_the_writer_is_dated_utc(tmp_path, monkeypatch):
 def test_the_board_reading_dates_are_local(tmp_path, monkeypatch):
     """The board's dates are the machine's local civil date (§4.4 *Board write-back*): `read_boards`'s `today`
     is the local day where the UTC day is already the next (TD-1373)."""
-    (tmp_path / "docs").mkdir()
-    (tmp_path / "docs" / "user_attention.md").write_text("# Needs the user\n\n", encoding="utf-8")
+    write_board(tmp_path, "# Needs the user\n\n")  # a v3 board with no item (ledgerboard v3.0, TD-1881)
     monkeypatch.setattr(workorders, "datetime", _Evening)
     got = workorders.read_boards(tmp_path, fetch=False)
     assert got["today"] == "2026-11-05"
