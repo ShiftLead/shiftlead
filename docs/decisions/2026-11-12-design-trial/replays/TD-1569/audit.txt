@@ -1,0 +1,773 @@
+design-replay audit · TD-1569 run 1 · transcripts 20 · flags 769
+allowed: /home/kmaster/replays/TD-1569.1 · /home/kmaster/.cache/agent-cadence/trees/473deb120951bbfb06dbd8313391caf99ada38e6/files · /home/kmaster/shiftlead/.venv · /home/kmaster/replays/TD-1569.1.tmp
+never flagged: /dev/ · /usr/ · /bin/ · /sbin/ · /lib/ · /lib64/ · Claude Code's own files under /home/kmaster/.claude-conformance/projects/-home-kmaster-replays-TD-1569-1
+cannot see: a path a script computes for itself
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/w.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/ag.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/*.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/w.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/ag.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/*.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /^def outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /^def outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /p outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/ag.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/o.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/o.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/o.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/o.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/o.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/o.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/o.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp/o.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a00ee8be74f16edcc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/pol_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/pol_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/pol_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/pol_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/pol_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/pol_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/pol_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/pol_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/pol_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/pol_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/pol_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/pol_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/c_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/c_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/c_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/c_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/c_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/c_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/c_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/c_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/c_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/c_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /def outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /def outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/pol_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/pol_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/pol_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/teams_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/teams_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/teams_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/teams_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/teams_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/teams_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/wd_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/wd_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/wd_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/org_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/org_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/wd_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/wd_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/wd_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/org_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/org_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/wd_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a0ff6fe48f7a3d692.jsonl · Bash names /tmp/wd_1569.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_tick.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_tick.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_49a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_49.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_49a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_49.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_45a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp/td1569_45a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a3505c850ece44adc.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/te.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/te.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/te.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/te.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/te.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/te.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/w.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/w.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/w.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/w.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/w.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/w.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/w.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/w.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/w.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/r.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/g.html outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/r.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/g.html outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/r.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/g.html outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/r.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/g.html outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/p.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/p.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/p.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/p.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/p.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/p.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/p.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/p.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/p.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/p.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/p.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/p.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/c.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/c.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/c.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/c.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/c.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/c.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/o.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/o.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/o.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/o.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/c.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/c.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/o.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/c.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/c.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/o.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/c.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/c.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/c.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/c.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/c.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/c.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a44b710d663ae8ce5.jsonl · Bash names /tmp/t.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a5ffbd9edf455cf9e.jsonl · Bash names /^waive/,$p outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a5ffbd9edf455cf9e.jsonl · Bash names /^waive/,$p outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a7a058cf46a69eed6.jsonl · Bash names /^\ outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a7a058cf46a69eed6.jsonl · Bash names /^\ outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a7a058cf46a69eed6.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a7a058cf46a69eed6.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a84c4531016f9f07d.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/repo.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/repo.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/repo.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/repo.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/agent.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/agent.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/agent.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/agent.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/agent.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/agent.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/org.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/org.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/repo.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/org.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/org.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/repo.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/repo.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a86ce980d5b8c7744.jsonl · Bash names /tmp/agent.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_tick.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_tick.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_tick.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_tick.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_tick.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_tick.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_cli.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_tick.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a89bde657af15b253.jsonl · Bash names /tmp/td1569_teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tick_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tick_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tick_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tick_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tick_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tick_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tick_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tick_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tick_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tr_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/work_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tick_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tick_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tick_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/tick_1569.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/49b.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/49b.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/49b.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/49b.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/49b.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/49b.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/49b.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/49b.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-a8bd6591e65bdb213.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/teamrun.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /def outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/tick.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/tick.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/tick.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/teams.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/app.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp/app.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-abc12001756459d8b.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/tr.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/work.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/at.py outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp/p6.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-adb347d6d256b07e8.jsonl · Bash names /tmp outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-af93ff7d06140ca7f.jsonl · Bash names /tmp/45a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-af93ff7d06140ca7f.jsonl · Bash names /tmp/45a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-af93ff7d06140ca7f.jsonl · Bash names /tmp/45a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-af93ff7d06140ca7f.jsonl · Bash names /tmp/45a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-af93ff7d06140ca7f.jsonl · Bash names /tmp/45a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-af93ff7d06140ca7f.jsonl · Bash names /tmp/45a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-af93ff7d06140ca7f.jsonl · Bash names /tmp/45a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-af93ff7d06140ca7f.jsonl · Bash names /tmp/45a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-af93ff7d06140ca7f.jsonl · Bash names /tmp/45a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00/subagents/agent-af93ff7d06140ca7f.jsonl · Bash names /tmp/45a.md outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /Design outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /Design outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /new?team= outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /new?team= outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /new?team= outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /new?team= outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /b outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /b outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /b outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /b outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /b outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /b outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /b outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f2 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /b outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f2 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /b outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /b outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /b outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f2 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f2 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /b outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f2 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f2 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /b outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f2 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /b outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f2 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /b outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /b outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /f1 outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /# outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · Bash names /# outside the allowed places
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
+flag · b92c3cc1-b9df-4c7a-b26b-f9a58e7f8f00.jsonl · `ao` run
