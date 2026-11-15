@@ -1,0 +1,44 @@
+{"id": "TD-1569:F1", "mark": "handled", "na": "-", "why": "4.9a 'A seat's id is its name's (\u00a74.1), so the briefs' {techlead} and {manager} name a busy seat' and on-call record id is the lead id in controllers"}
+{"id": "TD-1569:F2", "mark": "handled", "na": "-", "why": "4.9a 'The start': the list is 'read before the name check instead', busy launches dropped from held names, keep_mail_for verdicts and creates"}
+{"id": "TD-1569:F3", "mark": "handled", "na": "-", "why": "4.9a 'Busy is read over the team's crew': live, not suspended, not idle-with-nothing-running-and-pushed, so needs-you, stalled?, limited, unreachable named"}
+{"id": "TD-1569:F4", "mark": "handled", "na": "-", "why": "4.9a 'A refused start says why': clause beginning with the record name, 'finished' with team clauses for idle declared, suspended keeps its words"}
+{"id": "TD-1569:F5", "mark": "handled", "na": "-", "why": "4.9a cure list: 'Close (ao close <id>...) for a holder' safe by `_unsafe_to_close`; 'never a team stop'; Close is per holder"}
+{"id": "TD-1569:F6", "mark": "handled", "na": "-", "why": "4.9a 'The card': 'live and concluded are unchanged' and startable governs controls; header words unchanged, not-concluded line undrawn where startable"}
+{"id": "TD-1569:F7", "mark": "handled", "na": "-", "why": "4.9a 'the card draws Start, Wind down and Stop now whatever its stopped reading'; synopsis 'Wind down and Stop now stay beside Start'"}
+{"id": "TD-1569:F9", "mark": "handled", "na": "-", "why": "4.9a busy rule: suffixed name counts only with `scale` once suffix stripped; 'a suffixed record without scale ... refuses as today'"}
+{"id": "TD-1569:F13", "mark": "handled", "na": "-", "why": "4.9a 'Races': seat busy after the reading 'refuses with its own clause'; first list governs; skipped seat closed by rule 3 accepted; result carries left_running"}
+{"id": "TD-1569:F14", "mark": "handled", "na": "-", "why": "4.9a 'The card': 'teamrun.rows gives each team busy ... and startable'; 'ao team list --json carries both fields'"}
+{"id": "TD-1569:F15", "mark": "handled", "na": "-", "why": "4.9a 'live and concluded are unchanged'; Start drawn beside Wind down and Stop now where startable, \u22ef order given"}
+{"id": "TD-1569:F17", "mark": "handled", "na": "-", "why": "4.9a busy rule: 'an idle seat with unpushed work' is busy via `_unsafe_to_close`; state words 'idle, unpushed work'"}
+{"id": "TD-1569:F19", "mark": "handled", "na": "-", "why": "4.9a 'Rule 8 is unchanged': whole-team start waits, member replay runs as today; a losing create is a PartialStart naming what started (not never-half, but stated)"}
+{"id": "TD-1569:F20", "mark": "handled", "na": "-", "why": "4.9a cure: Close only for 'idle, not declared' or finished and clean; waiting holder gets 'what it waits on'; others let finish or Kill"}
+{"id": "TD-1569:F22", "mark": "handled", "na": "-", "why": "4.9a 'One reading' is a pure function called by rows, start and _close_concluded; start's list read once feeds name check, keep_mail_for, skip ids"}
+{"id": "TD-1569:F25", "mark": "handled", "na": "-", "why": "4.9a 'Each holder in NamesHeld carries its clause and its cure ... in place of today's one cure line', carried in --json holders"}
+{"id": "TD-1569:F26", "mark": "handled", "na": "-", "why": "4.9a 'never a standing manager' busy; 'refuses as today' wording on the standing manager"}
+{"id": "TD-1569:F28", "mark": "handled", "na": "-", "why": "4.9a 'The result carries left_running, [{name, state}], beside closed, printed by ao team start, under --json, and in the toast'"}
+{"id": "TD-1569:F29", "mark": "handled", "na": "-", "why": "4.9a 'everything that reads them reads them as today (... the Inbox's team-start row)' since live unchanged"}
+{"id": "TD-1569:F31", "mark": "handled", "na": "-", "why": "4.9a 'The start': `_close_concluded` is handed skip ids and calls the reading with skip, so closes (and why) exclude the busy seat"}
+{"id": "TD-1569:F34", "mark": "handled", "na": "-", "why": "4.9a 'the clause beginning with the name of the holder's record ... and a space (grinder-ao-1 working)'"}
+{"id": "TD-1569:F35", "mark": "handled", "na": "-", "why": "4.9a 'not concluded line ... is not drawn' where startable; NamesHeld text 'the card's toast too \u2014 prints per holder'"}
+{"id": "TD-1569:F39", "mark": "handled", "na": "-", "why": "4.9a 'Kill that one session (ao kill <id>, or Kill on its card) \u2014 never a team stop'"}
+{"id": "TD-1569:F40", "mark": "handled", "na": "-", "why": "4.9a 'Busy is read over the team's crew ... for every record finished treats as a seat'; 'one with no launch (a filled extra) only goes into skip'"}
+{"id": "TD-1569:F43", "mark": "handled", "na": "-", "why": "4.9a orphans 'only take away startable'; start refuses early 'in its own still running \u2026 by Apply words' for renamed/dropped live non-idle"}
+{"id": "TD-1569:F46", "mark": "handled", "na": "-", "why": "4.9a 'group_head.html builds ... a new data-leaves'; 'app.js's nothing to pick dialog adds the same leave clause' and toast reads left_running"}
+{"id": "TD-1569:F47", "mark": "handled", "na": "-", "why": "4.9a 'needs only busy ... _close_concluded takes it strictly (waiting_of_home(strict=True))'; rows with no waiting reading sets no startable"}
+{"id": "TD-1569:F48", "mark": "handled", "na": "-", "why": "4.9a 'taken only where the crew has a live record (a start of a team with none is unchanged)'"}
+{"id": "TD-1569:F49", "mark": "handled", "na": "-", "why": "4.9a cure: for a finished holder not clean/pushed, 'what _unsafe_to_close says (2 unpushed ...), to be settled before its Close'"}
+{"id": "TD-1569:F50", "mark": "handled", "na": "-", "why": "4.9a 'put into each holder's dict by _close_concluded from its own list read and the reading before it raises (NamesHeld only formats)'"}
+{"id": "TD-1569:F58", "mark": "handled", "na": "-", "why": "4.9a 'ui/org.py's acts ... where startable reads [entry, new-team, start, wind-down, stop-now]'"}
+{"id": "TD-1569:F60", "mark": "handled", "na": "-", "why": "4.9a 'the reading's words for it: idle, shell live, idle, subagent live, idle, unpushed work'"}
+{"id": "TD-1569:F61", "mark": "handled", "na": "-", "why": "4.9a 'read from the same list by the verdict's holder id (a suffixed holder's record name is not the launch's)'"}
+{"id": "TD-1569:F62", "mark": "handled", "na": "-", "why": "4.9a cure list: your own session 'close it yourself'; suspended 'a person lifts it'; sat-out 'let it wrap up, or Close it once idle'; any other Kill"}
+{"id": "TD-1569:F63", "mark": "handled", "na": "-", "why": "4.9a 'the card draws Start, Wind down and Stop now whatever its stopped reading ... data-moved as today'; start first in \u22ef on stopped"}
+{"id": "TD-1569:F64", "mark": "handled", "na": "-", "why": "4.9a 'refuse before anything is closed, in its own still running \u2026 by Apply words' from the first list"}
+{"id": "TD-1569:F69", "mark": "handled", "na": "-", "why": "4.9a 'ui/repo.py copies it into the group ... only where the row's live equals the card's own count, as it guards concluded'"}
+{"id": "TD-1569:F70", "mark": "handled", "na": "-", "why": "4.9a 'a confirm set wherever leaves is non-empty (Start ao-grind? It leaves techlead-ao-1 running (working))' with two wordings"}
+{"id": "TD-1569:F72", "mark": "handled", "na": "-", "why": "4.9a 'Races': a filled extra that turns busy 'is no holder: it shows only in the holders' the team is not concluded tail'"}
+{"id": "TD-1569:F75", "mark": "handled", "na": "-", "why": "4.9a 'The start also writes usage_at_start ... _mark_team_start passes over live records with seat set'"}
+{"id": "TD-1569:F79", "mark": "handled", "na": "-", "why": "4.9a busy rule: sweep seat 'refuses as today \u2014 with its clause while the switch is on, and with _start_moves' Apply words while it is off'"}
+{"id": "TD-1569:F82", "mark": "handled", "na": "-", "why": "synopsis 'closes itself once it is idle and its work is pushed (... lingers about fifteen minutes)' matches tree SEAT_ASK_LINGER=15 min and \u00a76 rule 3"}
+{"id": "TD-1569:F85", "mark": "handled", "na": "-", "why": "synopsis 'a seat that comes on a question, the techlead or a fact-checker, lingers about fifteen minutes'; same in user_attention Context; tree \u00a76 asks linger agrees"}
+{"id": "TD-1569:F86", "mark": "handled", "na": "-", "why": "synopsis 'one holding unpushed work stays until its work is pushed, then closes itself'; same in user_attention Context; \u00a76 rule 3 clean-and-pushed"}
