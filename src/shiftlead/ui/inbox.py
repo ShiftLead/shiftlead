@@ -1758,15 +1758,25 @@ def board_text(body: str, it: Mapping[str, Any]) -> dict[str, Any]:
 _REPO_REF = re.compile(r"(?<![\w/.#-])(?P<repo>[A-Za-z0-9][\w.-]*)#(?:TD-\d+|\d+)\b")
 
 
+def _item_prefix(it: Mapping[str, Any]) -> str:
+    """A v3 item's prefix as a v2 line wrote it before its words — its kind, its `Added` day and *(session `<name>`
+    on <host>)* — from the record's fields (ledgerboard v3.0, TD-1881), for a card's *context*; '' with none."""
+    session = str(it.get("session") or "")
+    host = str(it.get("host") or "")
+    who = f"(session `{session}`{f' on {host}' if host else ''})" if session else ""
+    return " ".join(x for x in (str(it.get("kind") or ""), str(it.get("added") or ""), who) if x)
+
+
 def board_card(body: str, it: Mapping[str, Any], repo: str) -> dict[str, str]:
     """A board item as a Queue card draws it whole (§4.5 screen 12 *An item's shape*, *A board item says where
     its task is*; TD-1066, built by TD-1245): `sentence`, its bold head (`head_split`; a line with none, the
     line before its `Context:`); `leads`, the line's next sentence after the head where the item has no
-    `Answers:`; `context`, under *context* — the prefix (kind, date, *(session … on <host>)*), the rest of the
-    line and its `Context:`; and `in_repo`, the first repo other than `repo` the `Context:` names
-    (`<repo>#TD-n`, `<repo>#n`), else "". Display only: nothing here is a control."""
+    `Answers:`; `context`, under *context* — the prefix (kind, date, *(session … on <host>)*, from the record's
+    fields, TD-1881), the rest of the item's words and its `Context`; and `in_repo`, the first repo other than
+    `repo` the `Context:` names (`<repo>#TD-n`, `<repo>#n`), else "". Display only: nothing here is a control."""
     text, context, _ = _board_split(body, it)
     prefix, head, leads, after = rendermod.head_split(text)
+    prefix = prefix or _item_prefix(it)
     if it.get("answers"):
         leads, after = "", f"{leads} {after}".strip()
     here = repo.lower()

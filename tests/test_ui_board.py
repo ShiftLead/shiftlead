@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import re
 import shutil
 from datetime import UTC, date, datetime, timedelta
 from html.parser import HTMLParser
@@ -41,8 +42,10 @@ def repo(tmp_path, name, board=None, *, reader=True):
     root = tmp_path / name
     (root / ".git").mkdir(parents=True)
     if board is not None:
+        from _v3board import write_board
+
         (root / "docs").mkdir()
-        (root / "docs" / "user_attention.md").write_text(board)
+        write_board(root, board)  # a v3 board: the fixture's v2 text split (ledgerboard v3.0, TD-1881)
     if reader:
         (root / "scripts").mkdir()
         shutil.copy(reader_script(), root / "scripts" / "nudge_user_attention.py")
@@ -66,8 +69,27 @@ def report(root, *items):
 
 
 def item(line, text, due, tag):
-    # `answers` as a current reader gives it (dev-cadence TD-036): one without it is named (TD-278)
-    return {"line": line, "text": text, "due": due, "overdue_days": 1, "due_tag": tag, "answers": []}
+    """A board item's record as the host agent's reading gives it (ledgerboard v3.0, TD-1881): `text` written as a
+    v2 line less its tick, split as `board.py split` splits it, so the record carries the item's words, its
+    `Context` and replies as fields, its `id`, `path` and `key`; `line` is its place among the board's items
+    (`at`). `answers` as a current reader gives it (dev-cadence TD-036): one without it is named (TD-278)."""
+    from sessionorc import ledgerboard as lb
+    from sessionorc import workorders
+
+    got: dict = {"text": text, "context": None, "replies": []}
+    # a text with no date is given one, so the split can give it an id (a v2 line with none has none)
+    dated = text if re.match(r"^(?:[A-Za-z]+ )?\d{4}-\d{2}-\d{2}\b", text) else f"2026-09-01 — {text}"
+    try:
+        files = lb.split_board(f"- [ ] {dated}\n")
+    except Exception:  # noqa: BLE001 — a text the split cannot take stays as written
+        files = {}
+    for name, body in files.items():
+        it = lb.parse_item(body, name) if name.endswith(".md") and name != "README.md" else None
+        if it is not None:
+            rec = lb.item_record(it, date(2026, 9, 22))
+            got = {k: rec[k] for k in ("id", "path", "added", "text", "context", "replies", "session", "host", "refs")}
+            got["key"] = workorders.ref_of(it)
+    return {**got, "at": line, "due": due, "overdue_days": 1, "due_tag": tag, "answers": []}
 
 
 def reading(*reports, error=None):
@@ -90,10 +112,13 @@ def test_the_board_rows_are_the_host_agents_reading_and_what_it_could_not_read_i
     from shiftlead.ui.app import board_reading
 
     assert board_reading({}) == ([], "") and board_reading(None) == ([], "")
-    a, b = repo(tmp_path, "a", "- [ ] x\n"), repo(tmp_path, "b", "- [ ] y\n")
+    a, b = repo(tmp_path, "a", "- [ ] 2026-09-01 — x\n"), repo(tmp_path, "b", "- [ ] 2026-09-01 — y\n")
     one = {**item(3, "x. Due: 2026-09-20.", "2026-09-20", "2d overdue"), "key": "board:0123abcd"}
-    rows, note = board_reading(reading(report(a, one), report(b, item(4, "y.", "2026-09-21", "1d overdue"))))
-    assert [(r["repo"], r["line"], r["key"]) for r in rows] == [("a", 3, "board:0123abcd"), ("b", 4, "")]
+    two = item(4, "y.", "2026-09-21", "1d overdue")
+    rows, note = board_reading(reading(report(a, one), report(b, two)))
+    # a row is its item's reference and its place on the board, never a line (ledgerboard v3.0, TD-1881)
+    assert [(r["repo"], r["at_n"], r["key"]) for r in rows] == [("a", 3, "board:0123abcd"), ("b", 4, two["key"])]
+    assert all(r["line"] is None for r in rows)
     assert note == ""
     rows, note = board_reading(reading(report(a, one), error="the reader exited 2"))
     assert len(rows) == 1 and note == (
@@ -123,9 +148,10 @@ def test_a_board_row_carries_its_repo_due_words_text_and_the_board_at_its_line(t
     r = rows[0]
     assert r["row"] == "board" and r["repo"] == "samscrape" and r["repo_name"] == "samscrape" and r["team"] == ""
     assert r["teams"] == ["sam-grind", "sam-audit"]
-    assert r["due_tag"] == "2d overdue" and r["at"] == "2026-09-20" and r["line"] == 7
-    assert r["id"] == f"board:{root}:7"
-    assert r["editor"]["url"].startswith("vscode://file") and "user_attention.md:7" in r["editor"]["url"]
+    assert r["due_tag"] == "2d overdue" and r["at"] == "2026-09-20" and r["at_n"] == 7 and r["line"] is None
+    assert r["id"] == f"board:{root}:{r['key']}" and r["path"].endswith(".md")
+    # **Open board** opens the item's own file (ledgerboard v3.0, TD-1881)
+    assert r["editor"]["url"].startswith("vscode://file") and f"user_attention/{r['path']}:1" in r["editor"]["url"]
     assert "decide x" in r["find"] and "samscrape" in r["find"]
     # a repo no team works carries no team, named by its checkout; junk is skipped
     bare = board_rows(report(root, item(1, "t", "2026-09-20", "due")), {})[0]
@@ -247,7 +273,7 @@ def test_next_n_draws_n_per_repo_whichever_teams_work_it():
     a = [_row(i, f"2026-10-{i:02d}", root="/a", teams=["g", "h"]) for i in range(1, 6)]
     b = [_row(10 + i, f"2026-10-{i:02d}", root="/b", teams=["g"]) for i in range(1, 6)]
     got = board_horizon(a + b, "next:3")
-    assert sorted(r["line"] for r in got["ahead"]) == [1, 2, 3, 11, 12, 13]
+    assert sorted(r["at_n"] for r in got["ahead"]) == [1, 2, 3, 11, 12, 13]
     assert len(got["hidden"]) == 4
 
 
@@ -290,14 +316,16 @@ def test_a_board_row_is_text_and_its_two_answers_carry_what_the_reader_gave(tmp_
     assert 'data-repo="samscrape"' in html and "badge team" not in html and "data-team=" not in html
     assert "&lt;b&gt;Allow&lt;/b&gt;" in html and "<b>Allow</b>" not in html
     assert ">samscrape<" in html and "2d overdue" in html and ">board<" in html
-    assert "Open board" in html and "user_attention.md:9" in html
+    assert "Open board" in html and f"user_attention/{rows[0]['path']}:1" in html  # the item's own file (TD-1881)
     acts = html.count('data-act="board"')
     assert acts == 4  # +1 day, +1 week, a date, Done — and Reply (TD-142) the one other act
     assert html.count('data-act="') == acts + 1 and html.count('data-act="board_reply"') == 1
     assert html.count('data-board-act="snooze"') == 3 and html.count('data-board-act="done"') == 1
-    assert html.count('data-line="9"') == 5 and html.count(f'data-board="{root}/docs/user_attention.md"') == 5
-    # the line's text is written once, on the row, and every press reads it there (TD-738)
-    assert html.count('data-text="&lt;b&gt;Allow&lt;/b&gt; the &#34;rm&#34;. Due: 2026-09-20."') == 1
+    # each press names the item by its key (ledgerboard v3.0, TD-1881), on the board's stub
+    key = rows[0]["key"]
+    assert html.count(f'data-key="{key}"') >= 5 and html.count(f'data-board="{root}/docs/user_attention.md"') == 5
+    # the item's words are written once, on the row, and every press reads it there (TD-738); its Due a field
+    assert html.count('data-text="&lt;b&gt;Allow&lt;/b&gt; the &#34;rm&#34;."') == 1
     row = html[html.index('class="mailrow boardrow"') :].split(">")[0]
     assert 'data-text="&lt;b&gt;Allow&lt;/b&gt;' in row
     assert all("data-text=" not in t.split(">")[0] for t in html.split("<button")[1:])
@@ -377,13 +405,13 @@ def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_page_reads_no_
             {"board": board, "line": 4, "text": "x", "reply": "rebase it", "refs": ["TD-9"], "key": "board:0a1b2c3d"}
         ]
         assert len(reads) == drawn
-        for bad in ({"reply": ""}, {"line": "four"}, {"board": ""}):
+        # a line is no longer asked for: a v3 item is named by its key (ledgerboard v3.0, TD-1881)
+        for bad in ({"reply": ""}, {"board": ""}):
             body = {"action": "reply", "board": board, "line": 4, "text": "x", "reply": "y", **bad}
             assert c.post("/api/person/board", json=body).status_code == 400
         assert len(replies) == 1
         for bad in (
             {"action": "delete", "board": board, "line": 4, "text": "x"},
-            {"action": "done", "board": board, "line": "four", "text": "x"},
             {"action": "done", "board": "", "line": 4, "text": "x"},
         ):
             assert c.post("/api/person/board", json=bad).status_code == 400
@@ -402,12 +430,12 @@ def test_the_rows_of_a_real_board_read_by_the_host_agents_reader(tmp_path, monke
     past = (date.today() - timedelta(days=3)).isoformat()
     later = (date.today() + timedelta(days=7)).isoformat()
     board = (
-        "# Board\n\n"
-        f"- [ ] overdue thing. Due: {past}.\n"
-        f"- [ ] due today. Due: {date.today().isoformat()}.\n"
-        "- [ ] undated thing.\n"
-        f"- [ ] next week. Due: {later}.\n"
-        f"- [x] done already. Due: {past}.\n"
+        "# Board\n\n"  # each dated, so the split gives it an id; a v3 board is newest id first (TD-1881)
+        f"- [ ] 2026-09-05 — overdue thing. Due: {past}.\n"
+        f"- [ ] 2026-09-04 — due today. Due: {date.today().isoformat()}.\n"
+        "- [ ] 2026-09-03 — undated thing.\n"
+        f"- [ ] 2026-09-02 — next week. Due: {later}.\n"
+        f"- [x] 2026-09-01 — done already. Due: {past}. Closed: 2026-09-06.\n"
     )
     root = repo(tmp_path, "proj", board)
     host(tmp_path, monkeypatch, [root])
@@ -421,7 +449,7 @@ def test_the_rows_of_a_real_board_read_by_the_host_agents_reader(tmp_path, monke
     got = {str(root): {"name": "proj", "root": str(root), "boards": workorders.read_boards(root, fetch=False)}}
     rows, note = uiapp.board_reading(got, uiapp.repo_boards(uiapp.org_here()[0], uiapp.host_name()))
     assert note == ""
-    assert all(r["key"] == workorders.ref(root, r["text"]) and r["key"].startswith("board:") for r in rows)
+    assert all(r["key"] == "board:" + r["path"][11:19] and workorders.is_work_order(r["key"]) for r in rows)
     # every open item is read (TD-220), the ones due now marked; the closed one is not an item
     assert [(r["text"].split(".")[0], r["due_now"]) for r in rows] == [
         ("overdue thing", True),
@@ -435,7 +463,7 @@ def test_the_rows_of_a_real_board_read_by_the_host_agents_reader(tmp_path, monke
     ]
     rows = [r for r in rows if r["due_now"]]
     assert (
-        rows[0]["line"] == 3
+        rows[0]["at_n"] == 1
         and rows[0]["repo"] == "proj"
         and rows[0]["teams"] == ["proj-grind"]
         and rows[0]["team"] == ""
@@ -530,7 +558,8 @@ def _row(line, due, team="t", *, due_now=False, **kw):
     return {
         "row": "board",
         "id": f"board:r:{line}",
-        "line": line,
+        "line": None,
+        "at_n": line,  # its place among the board's items (ledgerboard v3.0, TD-1881)
         "repo": "r",
         "repo_name": "r",
         "root": "/r",
@@ -564,7 +593,7 @@ def test_the_horizon_sorts_the_rows_by_the_mode():
     from shiftlead.ui.app import board_horizon
 
     def ids(rows):
-        return [r["line"] for r in rows]
+        return [r["at_n"] for r in rows]
 
     # next:10 — a team with twelve due shows twelve and none ahead; one with two due shows eight ahead
     busy = [_row(i, "2026-09-20", "busy", due_now=True) for i in range(12)] + [_row(99, "2026-09-29", "busy")]
@@ -607,7 +636,7 @@ def test_the_horizon_sorts_the_rows_by_the_mode():
     from shiftlead.ui.app import board_rows
 
     fyi = {
-        "line": 5,
+        "at": 5,
         "text": "for your read",
         "due": "2026-09-25",
         "overdue_days": 3,
@@ -620,7 +649,7 @@ def test_the_horizon_sorts_the_rows_by_the_mode():
     got = board_horizon([row, _row(6, "2026-10-12")], "due")
     assert ids(got["hidden"]) == [5, 6] and got["next_due"] == "2026-10-12"
     # a row from before TD-220 carries no due_now: it was the --due-only read's, so it is due
-    assert ids(board_horizon([{"line": 7, "due": "2026-10-10"}], "due")["due"]) == [7]
+    assert ids(board_horizon([{"at_n": 7, "due": "2026-10-10"}], "due")["due"]) == [7]
 
 
 @pytest.mark.unit
@@ -676,8 +705,8 @@ def test_the_repo_page_cuts_the_inboxs_horizon_to_its_repo():
     ]
     h = board_horizon(rows, "next:2")  # per repo: /a's due row and 2; /b's 3 and 5
     got = horizon_of(h, "/a")
-    assert [r["line"] for r in got["due"]] == [1] and [r["line"] for r in got["ahead"]] == [2]
-    assert [r["line"] for r in got["hidden"]] == [4] and got["next_due"] == "2026-10-20"
+    assert [r["at_n"] for r in got["due"]] == [1] and [r["at_n"] for r in got["ahead"]] == [2]
+    assert [r["at_n"] for r in got["hidden"]] == [4] and got["next_due"] == "2026-10-20"
     assert h["next_due"] == "2026-10-20" and got["mode"] == "next:2"
     # the line is the repo's own: its hidden count and next date, not the Inbox's
     got = horizon_of({**h, "line": {"says": "x", "rest": "y", "n": 2}}, "/a")
@@ -697,7 +726,7 @@ def test_coming_up_the_fold_and_the_line_are_drawn_and_counted_nowhere(tmp_path,
     root = tmp_path / "proj"
 
     def ahead(line, text, due):
-        return {"line": line, "text": text, "due": due, "overdue_days": None, "due_tag": f"due {due}"}
+        return {"at": line, "text": text, "due": due, "overdue_days": None, "due_tag": f"due {due}"}
 
     items = [item(3, "decide the thing", "2026-09-20", "2d overdue")]
     items += [ahead(10 + i, f"later item {i}", f"2026-10-{i + 1:02d}") for i in range(12)]
@@ -778,7 +807,7 @@ def test_a_row_coming_up_snoozes_from_today_and_show_draws_forty_days_out(tmp_pa
     root = tmp_path / "proj"
 
     def ahead(line, text, due):
-        return {"line": line, "text": text, "due": due, "overdue_days": None, "due_tag": f"due {due}"}
+        return {"at": line, "text": text, "due": due, "overdue_days": None, "due_tag": f"due {due}"}
 
     items = [ahead(10, "next week's item", "2026-10-04"), ahead(11, "forty days out", "2026-11-07")]
     rows = uiapp.board_rows({**report(root, *items), "today": "2026-09-28"})
@@ -1120,7 +1149,7 @@ def test_a_board_items_answers_are_buttons_in_the_order_written_and_go_with_it_i
     import re
 
     rows, html = rows_html(tmp_path, monkeypatch, decide_item())
-    assert rows[0]["body"] == "**Ship it?** Pick one. Due: 2026-09-20."
+    assert rows[0]["body"] == "**Ship it?** Pick one."  # the item's words: its Due a field (v3.0, TD-1881)
     assert rows[0]["answers"] == ["approve", "hold", "ask <b>Ann</b>"] and rows[0]["default"] == "hold"
     assert '<div class="body md"><p><strong>Ship it?</strong> Pick one.</p></div>' in html
     btns = re.findall(r'<button class="btn sm answer" ([^>]*)>(.*?)</button>', html, re.S)
@@ -1128,7 +1157,8 @@ def test_a_board_items_answers_are_buttons_in_the_order_written_and_go_with_it_i
     assert ["default" in inner for _, inner in btns] == [False, True, False]
     assert "<b>Ann</b>" not in html and "&lt;b&gt;Ann&lt;/b&gt;" in html
     for attrs, _ in btns:
-        assert 'data-act="board"' in attrs and 'data-board-act="decide"' in attrs and 'data-line="9"' in attrs
+        assert 'data-act="board"' in attrs and 'data-board-act="decide"' in attrs
+        assert f'data-key="{rows[0]["key"]}"' in attrs  # the item named by its key, never a line (TD-1881)
         assert json.loads(re.search(r"data-answers='([^']*)'", attrs).group(1)) == rows[0]["answers"]
         assert "disabled" not in attrs and "data-confirm" not in attrs
     foot = html[html.index('class="row gap wrap mfoot"') :]
@@ -1168,11 +1198,12 @@ def test_a_live_looks_pair_is_drawn_by_its_words_works_and_not_right(tmp_path, m
     works, form = btns[0][0], btns[1][0]
     assert 'data-act="board"' in works and 'data-board-act="decide"' in works and 'data-answer="Works"' in works
     assert 'data-act="board_notright"' in form and "data-answer=" not in form and "data-board-act" not in form
-    assert 'data-repo="samscrape"' in form and 'data-head="One look at the ring"' in form and 'data-line="7"' in form
+    assert 'data-repo="samscrape"' in form and 'data-head="One look at the ring"' in form
+    assert f'data-key="{rows[0]["key"]}"' in form
     assert json.loads(re.search(r"data-answers='([^']*)'", form).group(1)) == ["Works", "Not right: <what>"]
     drawn = html.split('class="row gap wrap mfoot"')[0].split("its answers")[1]
     assert "&ldquo;" not in drawn and "Go with it" not in html
-    assert rows[0]["body"].endswith("Due: 2026-09-20.")
+    assert "Due:" not in rows[0]["body"]  # the item's words: its Due a field (ledgerboard v3.0, TD-1881)
 
     # the head and the text are a session's words: attributes, escaped, never markup
     bad = look_item()
@@ -1257,13 +1288,13 @@ def test_a_decided_row_reads_decided_in_place_of_the_buttons(tmp_path, monkeypat
     prints neither tail, no answer and no Go with it is offered — and **Reply** and **Done** stand."""
     rows, html = rows_html(tmp_path, monkeypatch, decide_item(decided="approve"))
     assert rows[0]["decided"] == {"text": "approve", "date": "Sep 21"} and rows[0]["due_now"]
-    assert rows[0]["body"] == "**Ship it?** Pick one. Due: 2026-09-20."
+    assert rows[0]["body"] == "**Ship it?** Pick one."  # the item's words: its Due a field (v3.0, TD-1881)
     # the *not done: … work order* words went with TD-305: the *waiting on …* line says it
     assert "decided: approve · Sep 21" in html and "work order" not in html
     assert "btn sm answer" not in html and "Go with it" not in html and 'data-board-act="decide"' not in html
     assert 'data-act="board_reply"' in html and 'data-board-act="done"' in html
-    # the acts still hand back the whole line, which the agent re-checks word for word
-    assert "Decided: approve (2026-09-21)." in html
+    # the acts hand back the item's key, by which the agent finds it (ledgerboard v3.0, TD-1881)
+    assert f'data-key="{rows[0]["key"]}"' in html
 
 
 @pytest.mark.unit
@@ -1406,7 +1437,8 @@ def test_a_board_row_draws_its_line_as_markdown_folded_after_its_head(tmp_path, 
     assert row["replies"] == [{"by": "Paul", "date": "Oct 2", "text": "This is a `wall` of text."}]
     html = templates.get_template("inbox_rows.html").render(rows=[row], section="needs")
     body = html[html.index('class="body md"') : html.index('class="row gap wrap sugg"')]
-    assert "<strong>One walk of the Org.</strong>" in body and "<code>grinder-ao-2</code>" in body
+    # its session is the record's field, no part of its words (ledgerboard v3.0, TD-1881)
+    assert "<strong>One walk of the Org.</strong>" in body and "grinder-ao-2" not in body
     assert "**" not in body and "`" not in body
     assert '<details class="fold" data-fold="board:' in body and "<p><strong>Cards:</strong>" in body
     assert "Paul, Oct 2: This is a <code>wall</code> of text." in body
@@ -1416,7 +1448,8 @@ def test_a_board_row_draws_its_line_as_markdown_folded_after_its_head(tmp_path, 
 @pytest.mark.unit
 def test_a_short_board_line_draws_whole_and_a_reader_without_replies_keeps_them(tmp_path, monkeypatch):
     """A line no longer than `FOLD_CHARS` has no *details* (§4.5a **Inbox board row: text**); a
-    `Context:` alone is still under one. A reader that gives no `replies` leaves the tail in the text."""
+    `Context:` alone is still under one. A reply is the record's field (ledgerboard v3.0, TD-1881): the v2 case of
+    a reader that gave no `replies`, its tail kept in the text, is retired with the line it was cut from."""
     host(tmp_path, monkeypatch)
     from shiftlead.ui.app import board_rows
 
@@ -1427,7 +1460,9 @@ def test_a_short_board_line_draws_whole_and_a_reader_without_replies_keeps_them(
     assert (row["lead"], row["rest"]) == ("act — Rotate it.", "Context: TD-9")
     text = "act — Rotate it. Due: 2026-09-20. — Paul, 2026-09-21: today please"
     (row,) = board_rows(report(root, item(3, text, "2026-09-20", "x")))
-    assert row["lead"] == "act — Rotate it. — Paul, 2026-09-21: today please" and row["replies"] == []
+    assert row["lead"] == "act — Rotate it." and row["replies"] == [
+        {"by": "Paul", "date": "Sep 21", "text": "today please"}
+    ]
 
 
 @pytest.mark.unit
@@ -1444,23 +1479,18 @@ def test_fold_head_cuts_after_the_bold_head_and_its_sentence():
 
 @pytest.mark.unit
 def test_a_board_rows_text_loses_nothing_on_the_odd_line(tmp_path, monkeypatch):
-    """The review's cases (TD-279): a reply the reader's `replies` missed keeps every tail in the text
-    and draws none twice; a `Context:` after the `Due:` still closes the fold. A mid-sentence
-    *Context:* is the field, as ledgerboard reads it (`CONTEXT_RE`, its `refs` too): the Inbox cuts the
-    line where ledgerboard finds the field, with no pattern of its own (TD-585)."""
+    """The review's cases (TD-279): every reply is the record's, drawn once; a `Context:` after the `Due:` still
+    closes the fold. The Inbox cuts nothing from an item's words (ledgerboard v3.0, TD-1881): its fields are the
+    record's, so the v2 cases of a line cut where ledgerboard found a field are retired with the line."""
     host(tmp_path, monkeypatch)
     from shiftlead.ui.app import board_rows
 
     root = tmp_path / "shiftlead"
     text = "act — Rotate it. Due: 2026-10-05. — Paul, 2026-10-02: hi — Paul, 2026-10-03: yo"
-    it = item(3, text, "2026-10-05", "x") | {"replies": [{"by": "Paul", "date": "2026-10-02", "text": "hi"}]}
-    (row,) = board_rows(report(root, it))
-    assert row["replies"] == [] and "hi" in row["lead"] and "yo" in row["lead"]
+    (row,) = board_rows(report(root, item(3, text, "2026-10-05", "x")))
+    assert [r["text"] for r in row["replies"]] == ["hi", "yo"] and "hi" not in row["lead"]
     (row,) = board_rows(report(root, item(3, "act — Rotate it. Due: 2026-10-05. Context: TD-9.", "2026-10-05", "x")))
     assert (row["lead"], row["rest"]) == ("act — Rotate it.", "Context: TD-9")
-    text = "act — See the Context: of this. **Context:** bold. Due: 2026-10-05."
-    (row,) = board_rows(report(root, item(3, text, "2026-10-05", "x")))
-    assert (row["lead"], row["rest"]) == ("act — See the", "Context: of this. **Context:** bold")
 
 
 @pytest.mark.unit
@@ -1518,7 +1548,7 @@ def test_board_rows_stamp_whom_the_item_waits_on_and_when_it_comes_back(tmp_path
             answered_item(7, replied="2026-09-10", waiting_on="person"),
         )
     )
-    got = {r["line"]: (r["answered"], r["answered_at"], r["stale"]) for r in rows}
+    got = {r["at_n"]: (r["answered"], r["answered_at"], r["stale"]) for r in rows}
     assert got == {
         1: ("decided", "2026-09-20", False),
         2: ("decided", "2026-09-19", True),
@@ -1528,7 +1558,7 @@ def test_board_rows_stamp_whom_the_item_waits_on_and_when_it_comes_back(tmp_path
         6: ("decided", "2026-09-21", False),
         7: ("replied", "2026-09-10", True),
     }
-    lines = {r["line"]: r["stale_line"] for r in rows}
+    lines = {r["at_n"]: r["stale_line"] for r in rows}
     assert lines[2] == "decided Sep 19 — no session has acted in 3 d"
     assert lines[7] == "replied Sep 10 — no session has acted in 12 d"
     assert lines[1] == lines[4] == lines[5] == ""
@@ -1554,19 +1584,19 @@ def test_an_answered_row_waits_on_them_in_no_count_and_a_stale_one_comes_back(tm
         )
     )
     hz = board_horizon(rows, "all")
-    assert [r["line"] for r in hz["waiting"]] == [1, 2, 5]
-    assert [r["line"] for r in hz["due"]] == [3, 4] and [r["line"] for r in hz["ahead"]] == [6]
+    assert [r["at_n"] for r in hz["waiting"]] == [1, 2, 5]
+    assert [r["at_n"] for r in hz["due"]] == [3, 4] and [r["at_n"] for r in hz["ahead"]] == [6]
     s = inbox_sections([], now=datetime(2026, 9, 22, 12, tzinfo=UTC), boards=hz["due"] + hz["waiting"])
-    assert [e["line"] for e in s["needs"]] == [3, 4]
-    assert sorted(e["line"] for e in s["waiting"]) == [1, 2, 5]
+    assert [e["at_n"] for e in s["needs"]] == [3, 4]
+    assert sorted(e["at_n"] for e in s["waiting"]) == [1, 2, 5]
     assert s["count"] == 2 and s["overdue_n"] == 2  # 3 and 4, both past Sep 20; 1 and 2 are not counted
     # a caller that hands every due row (the Org's top bar) gets the same placement
     s2 = inbox_sections([], now=datetime(2026, 9, 22, 12, tzinfo=UTC), boards=[r for r in rows if r["due_now"]])
-    assert s2["count"] == 2 and sorted(e["line"] for e in s2["waiting"]) == [1, 2]
+    assert s2["count"] == 2 and sorted(e["at_n"] for e in s2["waiting"]) == [1, 2]
     # the cache's rows are never written to
     assert all("waiting_on" not in r for r in rows)
     # under `next:1` a waiting row takes no place: the one place goes to the due row's group
-    assert [r["line"] for r in board_horizon(rows, "next:3")["ahead"]] == [6]
+    assert [r["at_n"] for r in board_horizon(rows, "next:3")["ahead"]] == [6]
 
 
 @pytest.mark.unit
@@ -1726,6 +1756,7 @@ def test_a_decided_lines_waiting_words_name_its_work_orders_holder_or_the_teams_
     assert workorders.is_work_order(ref)
     now = datetime(2026, 10, 4, 12, tzinfo=UTC)
     row = {"repo": "repo", "root": str(root), "text": text, "decided": "keep", "session": "gone-1", "refs": ["TD-777"]}
+    row["key"] = ref  # the reading's reference, which the row carries (ledgerboard v3.0, TD-1881)
     lease = {"ref": ref, "status": "claimed", "at": (now - timedelta(hours=1)).isoformat()}
     g1 = {"id": "ao-g1", "name": "g1", "state": "working", "team": "grind", "repo": str(root), "lane": ["free-pick"]}
     assert board_waiting_on(row, [{**g1, "progress": [lease]}], now) == f"waiting on g1 — holds {ref}"
@@ -1767,6 +1798,7 @@ def test_a_decided_lines_teams_skip_a_resumed_away_record_and_read_live_from_any
     )
     now = datetime(2026, 10, 4, 12, tzinfo=UTC)
     row = {"repo": "repo", "root": str(root), "text": text, "decided": "keep", "session": "gone-1", "refs": ["TD-777"]}
+    row["key"] = "board:0123abcd"
     g1 = {"id": "ao-g1", "name": "g1", "state": "working", "team": "grind", "repo": str(root), "lane": ["free-pick"]}
     old = {**g1, "id": "ao-old", "name": "old", "team": "gone", "state": "exited", "superseded_by": "ao-g1"}
     assert board_waiting_on(row, [old, g1], now) == "pickable by grind"
@@ -1783,7 +1815,7 @@ def test_a_designs_answer_is_pickable_by_the_design_first_lanes_and_names_its_de
     from shiftlead.ui.app import board_reading
     from shiftlead.ui.inbox import board_waiting_on
 
-    root = repo(tmp_path, "r", "- [ ] x\n")
+    root = repo(tmp_path, "r", "- [ ] 2026-11-01 — x\n")
     text = "decide 2026-11-10 — **Go?** Context: TD-058 decision (paul). Due: 2026-11-11. Decided: Go (2026-11-12)."
     one = {**item(3, text, "2026-11-11", "1d overdue"), "key": "board:0123abcd", "decided": {"text": "Go"}}
     routed = {"lane": "design-first", "design": "TD-058", "owner": "designer", "for": "ao-d1@node"}
@@ -1939,11 +1971,15 @@ def test_a_row_after_a_board_row_is_not_inside_it_so_a_team_pick_leaves_it_shown
 
 def _hidden_board(today, *lines):
     """The Inbox's horizon over a board of `lines`, read by the real reader on `today`."""
+    from sessionorc import ledgerboard as lb
     from sessionorc import workorders
     from shiftlead.ui.inbox import board_horizon, board_rows, with_standings
 
     text = "# User attention\n\n## Needs the user\n\n" + "".join(f"- [ ] {ln}\n" for ln in lines)
-    items = workorders.board_items(text, today)
+    # a v3 board: the text split, read through load_board() (ledgerboard v3.0, TD-1881)
+    files = lb.split_board(text, "")
+    ls = lb._dict_ls({f"b/{k}": v for k, v in files.items()})
+    items = workorders.board_items(lb.load_board("b", ls, {f"b/{k}": v for k, v in files.items()}.get), today)
     rows = board_rows({"today": today.isoformat(), "boards": [{"root": "/r", "board": "/r/b.md", "items": items}]})
     return with_standings(board_horizon(rows, "all", today.isoformat()), [])
 

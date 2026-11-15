@@ -154,7 +154,7 @@ def test_each_row_state_word(tmp_path):
         _entry(8, "after another", Priority="High", Blocked_by="TD-009"),
         _entry(9, "ready", Priority="High"),
         _entry(10, "the person's", Priority="High", Owner="paul", Blocked_by="decision (paul)"),
-        _entry(11, "a decision of the person's", Priority="High", Blocked_by="decision (paul) — when I say"),
+        _entry(11, "a decision of the person's", Priority="High", Blocked_by="decision (paul)"),  # no `— words`
         _entry(12, "stalled holder", Priority="High"),
         _entry(13, "red nobody holds", Priority="High"),
     ])  # fmt: skip

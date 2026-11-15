@@ -82,7 +82,7 @@ LEDGER = """# Technical Debt
 ## TD-014: waits on the person
 
 **Priority:** Medium
-**Blocked by:** decision (Paul) — docs/user_attention.md, the 2026-09-28 item, TD-010
+**Blocked by:** decision (Paul)
 
 ## TD-015: an unreadable item, and one after the decision's comma
 
@@ -151,7 +151,8 @@ def test_the_rule_and_another_repos_entries_through_one_registry(tmp_path):
     assert {t for t, e in home.items() if e["pickable"] == "yes"} == {"TD-010", "TD-012", "TD-016", "TD-2", "TD-019"}
     assert home["TD-2"]["type"] == home["TD-019"]["type"] == "debt", "the Type's first word, as the script splits it"
     assert home["TD-011"]["blocked_by"] == ["TD-010"] and home["TD-013"]["blocked_by"] == ["TD-777"]
-    assert home["TD-014"]["blocked_by"] == ["decision (Paul)"], "what follows the decision is its pointer"
+    # v3.0 retired the old form's words after the gate (TD-1881): the gate stands alone
+    assert home["TD-014"]["blocked_by"] == ["decision (Paul)"], "the bare gate"
     # v2.4 (ledgerboard SPEC *The ledger*): an id after a decision's comma is an id like any other
     assert home["TD-015"]["blocked_by"] == ["TD-010", "decision (Paul)", "'soon'"]
     assert home["TD-017"]["blocked_by"] == ["other#TD-003"], "archived there lifts it; open there blocks"
@@ -413,15 +414,15 @@ def test_a_wait_on_the_person_is_the_bare_gate_and_its_ask_with_no_until_words()
     assert ledger.until_of("decision (paul), TD-002") == ""
     assert ledger.until_of("TD-001") == ledger.until_of(None) == ""
 
+
 def test_a_migrated_old_form_reads_its_ask_and_the_gate_alone():
     """TD-1803 step 2 (the techlead's answer, gate alone): ledgerboard v2.8's `migrate` moves an old
     decision form's words into an `**Ask:**`, leaving `decision (paul)` bare. The entry then has no
     `until` words, so its card reads *held until your decision*, and it still leads with the Ask."""
-    old, migrated = ledger.entries(
-        "## TD-070: old\n\n**Blocked by:** TD-001, decision (paul) — will you run the trial?\n\n"
+    # the old form itself is retired with v3.0 (TD-1881), which reads no words after the gate: the migrated half
+    (migrated,) = ledger.entries(
         "## TD-071: migrated\n\n**Blocked by:** TD-001, decision (paul)\n\n**Ask:** will you run the trial?\n"
     )
-    assert old["until"] == "will you run the trial?"
     assert (migrated["until"], migrated["ask"]) == ("", "will you run the trial?")
 
 
