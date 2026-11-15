@@ -4,6 +4,7 @@ import asyncio
 import base64
 import contextlib
 import os
+import re
 import signal
 import stat
 import subprocess
@@ -1883,7 +1884,9 @@ async def test_host_occupancy_and_worktrees_here_through_a_node_and_for_a_contai
         mine = await person.call("create", name="here", dir=str(wt), adapter="shell", argv=["bash", "--norc"])
         agent.sessions[mine["id"]].adapter = "claude-code"  # an agent session, as far as the rule is concerned
         occ = await person.call("host_occupancy", host="cm", dir=str(wt))
-        assert occ["occupants"] == [f"{mine['id']} (working)", "ao-repo-w@cm (working)"]
+        # the shell's own state moves from working to idle as its prompt settles, sooner or later under load (TD-1869)
+        assert re.fullmatch(rf"{re.escape(mine['id'])} \((working|idle)\)", occ["occupants"][0]), occ
+        assert occ["occupants"][1:] == ["ao-repo-w@cm (working)"], occ
         got = await person.call("host_worktrees", host="cm", repo=str(checkout))
         assert got["worktrees"] == [{"name": "wt", "path": str(wt), "occupied": True}]
         agent.sessions[mine["id"]].adapter = "shell"
