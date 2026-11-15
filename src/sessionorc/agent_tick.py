@@ -4674,7 +4674,9 @@ class TickMixin:
                     got, got_told, got_notes = workorders.red_prs(
                         prs, mine, now, told_was, ORPHAN_AFTER, prio, key=key, reads=pr_reads
                     )
-                    gates = {str(p["number"]) for p in prs if isinstance(p, dict) and reports.gate_head(p.get("branch"))}
+                    gates = {
+                        str(p["number"]) for p in prs if isinstance(p, dict) and reports.gate_head(p.get("branch"))
+                    }
                     person = [o for o in got if o.get("lift") or o.get("sweep")]
                     told = {n: v for n, v in told_was.items() if n not in gates}
                     told |= {n: v for n, v in got_told.items() if n in gates}

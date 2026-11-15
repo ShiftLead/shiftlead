@@ -1417,7 +1417,8 @@ def test_a_lift_branch_is_stamped_lift_since_at_its_first_reading_and_kept(tmp_p
     t0 = datetime(2026, 11, 15, 12, tzinfo=UTC)
     names = {5: "lift/TD-1450/live", 6: "lift/TD-1450/live-2", 7: "lift/TD-9/live-td31", 8: "lift/TD-9/livefoo",
              9: "lift/TD-9/until", 10: "b10", 11: "lift/TD-9/until-2026-11-15", 12: "lift/TD-9/until-2026-11-16",
-             13: "lift/TD-9/decision-paul", 14: "sweep/2026-11-15", 15: "notices/shiftlead-ledgerboard-sweep-2026-11-15",
+             13: "lift/TD-9/decision-paul", 14: "sweep/2026-11-15",
+             15: "notices/shiftlead-ledgerboard-sweep-2026-11-15",
              16: "sweep/cleanup", 17: "notices/x"}  # fmt: skip
     prs = [_pr(n, "open", t0, headRefName=b, headRefOid=f"h{n}") for n, b in names.items()]
     _fake_gh(monkeypatch, prs, [])
@@ -1454,7 +1455,8 @@ def test_lift_of_and_sweep_of_read_each_head_the_gate_sweep_writes():
     assert reports.lift_of("lift/TD-1/until-2026-13-45") == ("TD-1", "event (until-2026-13-45)", False)
     for none in ("lift/TD-1450/decision-paul", None, "lift/TD-1/Live", "lift/TD-1/a_b", "x/lift/TD-1/live"):
         assert reports.lift_of(none) is None, none
-    assert reports.lift_day("lift/TD-1/until-2026-11-20") == "2026-11-20" and reports.lift_day("lift/TD-1/until") is None
+    assert reports.lift_day("lift/TD-1/until-2026-11-20") == "2026-11-20"
+    assert reports.lift_day("lift/TD-1/until") is None
     assert reports.sweep_of("sweep/2026-11-15") == "sweep"
     assert reports.sweep_of("notices/shiftlead-ledgerboard-sweep-2026-11-15") == "notices"
     for none in ("sweep/cleanup", "sweep/2026-02-30", "notices/x", "notices/shiftlead-paul-person", None):
