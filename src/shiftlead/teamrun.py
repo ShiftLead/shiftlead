@@ -1667,6 +1667,14 @@ def pr_orders(r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
     return [e for e in got if isinstance(e, dict) and e.get("id")] if isinstance(got, list) else []
 
 
+def person_pr_orders(r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """An unserved repo's orders for the PRs the gate sweep opened, the person's (§4.4 *A PR the gate sweep
+    opens is the team's at once*, §5 *The seams*, TD-1854): the reading's `pr_orders.person`, never a lane's,
+    so `pr_orders` stays empty there and nothing counts pickable."""
+    got = ((r or {}).get("pr_orders") or {}).get("person")
+    return [e for e in got if isinstance(e, dict) and e.get("id")] if isinstance(got, list) else []
+
+
 def lane_entries(r: Mapping[str, Any] | None) -> list[dict[str, Any]] | None:
     """What a team's lanes read of a repo (§4.4 *In a team's lanes*): the ledger's open entries and
     the work orders beside them — the board's decided lines (TD-384) and the red PRs nobody holds

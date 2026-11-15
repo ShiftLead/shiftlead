@@ -15,7 +15,7 @@ import os
 import re
 import subprocess
 from collections.abc import Callable, Iterable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
@@ -373,17 +373,66 @@ OPEN_PR_FIELDS = (
 SYNC_BRANCH = "cadence-sync-"
 SYNC_LOCK = cadence.LOCK
 SYNC_PIN = cadence.PIN
-# a live check's lift PR (design §4.4 *A live check's lift PR is the team's at once*, TD-1437): the event
-# runner's branch for one of the gates §4.9b reserves to a live check — `live`, `live-<digits>`, `live-td<digits>`
+# a PR the gate sweep opens (design §4.4 *A PR the gate sweep opens is the team's at once*, TD-1437, TD-1854): a
+# lift PR's head, `lift/TD-n/<g>` as `gatesweep.lift_branch` writes it, and a sweep PR's, its own board's or another
+# repo's board's — each matched whole, the dates calendar dates (`_calendar`)
 LIFT_PREFIX = "lift/"  # every lift PR's head branch: lift/TD-n/<event name> | until-<date> (`gatesweep.LIFT_BRANCH`)
-LIFT_RE = re.compile(r"lift/(TD-\d+)/(live(?:-\d+|-td\d+)?)")
+SWEEP_PREFIX = "sweep/"  # the gate sweep's PR on its own repo's board: sweep/<UTC date>
+NOTICES_PREFIX = "notices/"  # its PR on another repo's board: notices/<slug>-sweep-<UTC date>
+LIFT_RE = re.compile(r"lift/(TD-\d+)/([a-z0-9-]+)")
+LIVE_GATE_RE = re.compile(r"live(?:-\d+|-td\d+)?")  # the names §4.9b reserves to a live check
+UNTIL_RE = re.compile(r"until-(\d{4}-\d\d-\d\d)")
+SWEEP_HEAD_RE = re.compile(r"sweep/(\d{4}-\d\d-\d\d)")
+NOTICES_HEAD_RE = re.compile(r"notices/[A-Za-z0-9._-]+-sweep-(\d{4}-\d\d-\d\d)")
 
 
-def lift_of(branch: str | None) -> tuple[str, str] | None:
-    """A lift PR's entry and gate, `("TD-n", "event (live…)")`, read from its head branch, or None for
-    any other branch (`lift/TD-n/livefoo`, an `until` lift, a decision's)."""
+def _calendar(day: str) -> bool:
+    try:
+        date.fromisoformat(day)
+    except ValueError:
+        return False
+    return True
+
+
+def lift_of(branch: str | None) -> tuple[str, str, bool] | None:
+    """A lift PR's entry, gate and whether the gate is a live check's, `("TD-n", "until 2026-11-20", False)`,
+    read from its head branch as `gatesweep.lift_branch` writes it (§4.4 *A PR the gate sweep opens is the team's
+    at once*, TD-1854): `until-<a calendar date>` the gate `until <date>`, a legacy dateless `until` the gate
+    `until`, any other name the gate `event (<name>)` (`until-<not a date>` among them), live only for `live`,
+    `live-<digits>` and `live-td<digits>`. None for a `decision-…` head and any other branch."""
     m = LIFT_RE.fullmatch(branch or "")
-    return (m[1], f"event ({m[2]})") if m else None
+    if not m:
+        return None
+    tid, g = m[1], m[2]
+    if g == "until":
+        return (tid, "until", False)
+    if (d := UNTIL_RE.fullmatch(g)) and _calendar(d[1]):
+        return (tid, f"until {d[1]}", False)
+    if g.startswith("decision-"):
+        return None
+    return (tid, f"event ({g})", bool(LIVE_GATE_RE.fullmatch(g)))
+
+
+def lift_day(branch: str | None) -> str | None:
+    """The UTC day an `until-<date>` lift head names, else None: its lift is no order before it (§4.4)."""
+    got = lift_of(branch)
+    return got[1][len("until ") :] if got and got[1].startswith("until ") else None
+
+
+def sweep_of(branch: str | None) -> str | None:
+    """A sweep PR's kind from its head branch (§4.4, TD-1854): `sweep` for `sweep/<date>` (its own repo's
+    board), `notices` for `notices/<slug>-sweep-<date>` (another repo's sweep's items here), each matched
+    whole with a calendar date; None for any other branch (`sweep/cleanup`, the ledger's own notices heads)."""
+    for kind, rx in (("sweep", SWEEP_HEAD_RE), ("notices", NOTICES_HEAD_RE)):
+        if (m := rx.fullmatch(branch or "")) and _calendar(m[1]):
+            return kind
+    return None
+
+
+def gate_head(branch: str | None) -> bool:
+    """The one predicate (§4.4 *One predicate decides*): a head the gate sweep opens a PR on — `lift_of` or
+    `sweep_of` reads it. Such a PR is that rule's alone, never a red or filing order."""
+    return lift_of(branch) is not None or sweep_of(branch) is not None
 
 
 JOB_URL = re.compile(r"/actions/runs/(\d+)/job/(\d+)")  # an Actions job's check run (`detailsUrl`, TD-686)
@@ -821,8 +870,8 @@ def _held_flags(
     changed head or key. A sync PR is never read; a draft is. No key (None, or empty): nothing is read
     for `held`, and the last word is kept, so a repo whose readers are gone keeps its key and its `held`.
     With `filing_paths` (`workorders.filing_paths`), sets `filing` (the test `filing`) and `filing_head` too, once
-    per head whatever the key, carried the same way, on every PR but a sync PR and one whose head
-    branch is under `LIFT_PREFIX` (§4.4 *A filing PR nobody holds is a work order*, TD-1810). One
+    per head whatever the key, carried the same way, on every PR but a sync PR and one on a head the gate
+    sweep opens (`gate_head`, §4.4 *A filing PR nobody holds is a work order*, TD-1810, TD-1854). One
     `pr_files` read serves both when both are due. At most `held.HELD_READS` reads, of the rows due,
     oldest first. A read that failed keeps the last word, and a PR never read carries neither."""
     todo = []
@@ -832,7 +881,7 @@ def _held_flags(
         was = olds.get(p["number"]) or {}
         if isinstance(was.get("held"), list):
             p["held"], p["held_head"], p["held_key"] = was["held"], was.get("held_head"), was.get("held_key")
-        lift = str(p.get("branch") or "").startswith(LIFT_PREFIX)
+        lift = gate_head(p.get("branch"))  # the gate sweep's head: never read by the filing rule (TD-1854)
         if isinstance(was.get("filing"), bool) and not lift:
             p["filing"], p["filing_head"] = was["filing"], was.get("filing_head")
         held_due = bool(key and p["head"] and (p.get("held_head"), p.get("held_key")) != (p["head"], key))
@@ -1058,15 +1107,17 @@ def pr_reading(
     `old` (the last reading) by number and dropped the reading it is neither (TD-613); `fork`, whether
     its head is another repository's; and on a `cadence-sync-*` branch `sync`, whether it is a sync PR
     (`_sync_flag`), and for one `sync_since`, the first reading that saw it open, kept as `red_since`
-    is (TD-684); on a live check's lift branch (`lift_of`) `lift` and `lift_since`, kept the same way
-    (TD-1450). In a repo whose `origin` is GitHub, a red PR whose failing items all are Actions jobs
+    is (TD-684); on a lift head (`lift_of`) `lift` and `lift_since`, kept the same way (TD-1450, TD-1854) — an
+    `until-<date>` head's `lift_since` stamped from the first reading on or after its UTC day — and on a sweep
+    head (`sweep_of`) `sweep` (its kind) and `sweep_since`, kept the same way (TD-1854). In a repo whose
+    `origin` is GitHub, a red PR whose failing items all are Actions jobs
     that never started reads `checks: not_run` with `not_run: {reason, kind, runs}`, and every red one
     keeps its jobs' verdicts as `jobs` (`classify_failing`, TD-686). `held` is the repo's held key
     (`held.repo_key`): each open PR but a sync PR carries `held`, the paths of it the key names, read
     once per head and key (`_held_flags`, TD-789). `filing` is the repo's filing paths
-    (`workorders.filing_paths`): each open PR but a sync or `lift/` PR carries `filing`, whether its files
-    all are among them, and `filing_head`, read once per head in the same read (TD-1810). `remote` is the
-    checkout's origin URL: on GitLab
+    (`workorders.filing_paths`): each open PR but a sync PR or one on a gate head (`gate_head`) carries
+    `filing`, whether its files all are among them, and `filing_head`, read once per head in the same read
+    (TD-1810, TD-1854). `remote` is the checkout's origin URL: on GitLab
     the reading is `_gitlab_reading`'s, on another forge an error (`forge_of`, TD-940). `emit` is the witness
     log's `precheck-fail` writer (§4.4 *The kinds*, TD-1386): an open PR whose `cadence/precheck` changed
     since `old` (a new head, another state or `startedAt`) has its head's statuses read and each red one
@@ -1114,8 +1165,15 @@ def pr_reading(
             # one waiting on CI that never started counts from the reading it conflicts (TD-686)
             waits = p["checks"] == "not_run" and not p["conflicting"]
             p["sync_since"] = (not waits and was.get("sync_since")) or now.isoformat()
-        if lift_of(p["branch"]):  # a live check's lift: the team's from this reading, whatever its checks (TD-1450)
-            p["lift"], p["lift_since"] = True, was.get("lift_since") or now.isoformat()
+        # a PR the gate sweep opens: the team's from this reading, whatever its checks (TD-1450, TD-1854)
+        if lift_of(p["branch"]):
+            on = lift_day(p["branch"])
+            p["lift"] = True
+            due = not on or now.date().isoformat() >= on  # an `until-<date>` head is no order before its day
+            if stamp := was.get("lift_since") or (now.isoformat() if due else None):
+                p["lift_since"] = stamp
+        elif kind := sweep_of(p["branch"]):
+            p["sweep"], p["sweep_since"] = kind, was.get("sweep_since") or now.isoformat()
     _held_flags(directory, open_, olds, held, timeout, filing)
     day = since.date().isoformat()
     prs = _gh_prs(directory, ["--state", "all", "--search", f"updated:>={day}", "--limit", str(limit)], timeout)

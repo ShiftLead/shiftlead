@@ -1950,12 +1950,13 @@ def _repo_list(e: dict[str, Any]) -> str:
 def _lifts(r: dict[str, Any]) -> dict[str, list[int]]:
     """Each live check's open lift PRs (§4.7 `ao repo`, §4.9b, TD-1452), by entry id, from the repo reading's
     open-PR list — the list the work orders read, no new forge call: a PR whose branch is
-    `lift/TD-n/<a reserved name>`, a draft or a fork's left out as the orders leave them out."""
+    `lift/TD-n/<a reserved name>` (`reports.lift_of`'s `live`), a draft or a fork's left out as the orders leave
+    them out."""
     out: dict[str, list[int]] = {}
     for p in (r.get("prs") or {}).get("open") or []:
         if not (isinstance(p, dict) and p.get("number")) or p.get("draft") or p.get("fork"):
             continue
-        if got := reports.lift_of(p.get("branch")):
+        if (got := reports.lift_of(p.get("branch"))) and got[2]:  # a live check's gate alone (TD-1854)
             out.setdefault(got[0], []).append(int(p["number"]))
     return {k: sorted(v) for k, v in out.items()}
 

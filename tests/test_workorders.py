@@ -586,6 +586,41 @@ async def test_an_unserved_repo_has_no_red_pr_order_and_tells_no_holder(agent, t
     assert not [e for e in agent.sessions["ao-holder"].inbox if e.from_ == "system"]
 
 
+async def test_an_unserved_repo_keeps_the_gate_sweeps_orders_alone_as_the_persons(agent, tmp_path):
+    """TD-1854, design §4.4 *A PR the gate sweep opens is the team's at once*, §5 *The seams*: in an unserved
+    repo the reading keeps the lift and sweep orders, and only those, under `pr_orders.person`, never
+    `orders`, so `teamrun.pr_orders` reads none and `person_pr_orders` those; `gate` lists their numbers in
+    either repo; a red PR's holder is told nothing there, and its memory is carried as it was."""
+    from conftest import park_ticks
+
+    from shiftlead import teamrun
+
+    await park_ticks(agent)
+    root = str(tmp_path / "repo")
+    holder = _rec("ao-holder", git={"branch": "b1"}, repo=root, host=agent.host)
+    agent.sessions[holder.id] = holder
+    lacks = [{"key": "gate", "words": "unserved: no gate (no scripts/check_cadence.py) — cure"}]
+    prs = [_red(1, branch="b1"), _lift(), _sweep()]
+    told = {"1": {"red_since": "x", "at": "y"}}
+    agent._repos[root] = {
+        "name": "repo", "root": root, "prs": {"open": prs}, "seams": {"serve": {"ok": False, "lacks": lacks}},
+        "pr_orders": {"told": told},
+    }  # fmt: skip
+    await agent._red_prs(T0 + HOUR)
+    got = agent._repos[root]["pr_orders"]
+    assert got["orders"] == [] and [o["id"] for o in got["person"]] == ["pr:1900", "pr:1950"]
+    assert got["gate"] == [1900, 1950] and got["told"] == told
+    assert teamrun.pr_orders(agent._repos[root]) == []
+    assert [o["id"] for o in teamrun.person_pr_orders(agent._repos[root])] == ["pr:1900", "pr:1950"]
+    assert not [e for e in agent.sessions["ao-holder"].inbox if e.from_ == "system"]
+    # served, the same PRs are the lanes' orders, the person's list empty
+    agent._repos[root] = {"name": "repo", "root": root, "prs": {"open": prs}}
+    await agent._red_prs(T0 + HOUR)
+    got = agent._repos[root]["pr_orders"]
+    assert [o["id"] for o in got["orders"]] == ["pr:1900", "pr:1950"] and got["person"] == []
+    assert got["gate"] == [1900, 1950] and teamrun.person_pr_orders(agent._repos[root]) == []
+
+
 async def test_an_idle_holder_on_a_node_is_told_at_its_address(agent, tmp_path):
     from conftest import park_ticks
 
@@ -717,9 +752,10 @@ def _lift(n=1900, name="live", since=T0, checks="green", **kw):
 
 @pytest.mark.unit
 def test_a_lift_pr_is_an_order_from_its_first_reading_whatever_its_checks():
-    """TD-1450, design §4.4 *A live check's lift PR is the team's at once*: a `lift/TD-n/live` PR (and
+    """TD-1450, design §4.4 *A PR the gate sweep opens is the team's at once*: a `lift/TD-n/live` PR (and
     `live-2`, `live-td5`) is a `pr:` order at once, pending and not_run included, its priority its entry's,
-    its `Context` the URL and the gate; a draft, a fork and `livefoo` are not."""
+    its `Context` the URL and the gate; a draft, a fork and a decision's head are not (TD-1854: every lift head
+    `lift_of` reads is one, `livefoo` and a dateless `until` among them)."""
     prio = {"TD-1450": "medium"}
     for name in ("live", "live-2", "live-td5"):
         for checks in ("green", "pending", "not_run", "red"):
@@ -731,8 +767,11 @@ def test_a_lift_pr_is_an_order_from_its_first_reading_whatever_its_checks():
     # an entry the ledger does not hold is High, as every other order
     (o,) = workorders.red_prs([_lift()], [], T0, {}, HOUR)[0]
     assert o["priority"] == "High"
-    for pr in (_lift(name="livefoo"), _lift(draft=True), _lift(fork=True), _lift(branch="lift/TD-1450/until")):
+    for pr in (_lift(draft=True), _lift(fork=True), _lift(branch="lift/TD-1450/decision-paul")):
         assert workorders.red_prs([pr], [], T0 + 3 * HOUR, {}, HOUR, prio)[0] == [], pr
+    for name, gate in (("livefoo", "event (livefoo)"), ("until", "until"), ("until-2026-11-20", "until 2026-11-20")):
+        (o,) = workorders.red_prs([_lift(name=name)], [], T0, {}, HOUR, prio)[0]
+        assert (o["gate"], o["context"].split(" · ")[1]) == (gate, f"lifts TD-1450 {gate}"), name
     # not stamped by the reading: no order
     assert workorders.red_prs([_lift(lift=False)], [], T0 + 3 * HOUR, {}, HOUR)[0] == []
     # a red draft lift is a red draft: no order, as any draft
@@ -754,8 +793,60 @@ def test_a_held_lift_pr_is_no_order_and_its_idle_holder_is_told_then_passed_over
     assert [o["id"] for o in orders] == ["pr:1900"] and orders[0]["lift"] and notes == []
 
 
+def _sweep(n=1950, branch="sweep/2026-11-15", since=T0, checks="green", **kw):
+    pr = {"number": n, "title": "board: gate sweep 2026-11-15 — 1 filed, 0 closed (TD-1376)", "branch": branch}
+    return {**pr, "url": f"https://github.com/o/r/pull/{n}", "author": "a", "checks": checks, "failing": [],
+            "sweep": "sweep", "sweep_since": since.isoformat(), "head": "abc", **kw}  # fmt: skip
+
+
+@pytest.mark.unit
+def test_a_sweep_pr_is_one_medium_order_at_once_keyed_on_sweep_since_whatever_its_checks():
+    """TD-1854, design §4.4 *A PR the gate sweep opens is the team's at once*: a sweep PR (`sweep/<date>`, or
+    `notices/<slug>-sweep-<date>`) is one Medium `pr:` order from its first reading, red, conflicting or pending,
+    its `Context` the URL and the gate sweep's board items — never a red order beside it, and never a filing
+    order; a draft, a fork and a head `sweep_of` does not read are none."""
+    notices = "notices/shiftlead-ledgerboard-sweep-2026-11-15"
+    for pr in (_sweep(), _sweep(checks="red", red_since=T0.isoformat()), _sweep(conflicting=True, red_since="x"),
+               _sweep(checks="pending"), _sweep(branch=notices, sweep="notices"),
+               _sweep(filing=True, filing_head="abc", created=(T0 - 30 * HOUR).isoformat())):  # fmt: skip
+        (o,) = workorders.red_prs([pr], [], T0, {}, HOUR, filing_after=HOUR)[0]
+        assert (o["id"], o["sweep"], o["sweep_since"], o["priority"]) == ("pr:1950", True, T0.isoformat(), "Medium")
+        assert o["context"] == "https://github.com/o/r/pull/1950 · the gate sweep's board items"
+        assert "lift" not in o and "filing" not in o
+    for pr in (_sweep(draft=True), _sweep(fork=True), _sweep(sweep=None)):
+        assert workorders.red_prs([pr], [], T0 + 3 * HOUR, {}, HOUR)[0] == [], pr
+    # a head under the prefix that sweep_of does not read is the filing rule's, never this one's
+    other = _sweep(branch="sweep/cleanup", sweep=None, sweep_since=None, checks="red", red_since=T0.isoformat())
+    (o,) = workorders.red_prs([other], [], T0 + 3 * HOUR, {}, HOUR)[0]
+    assert "sweep" not in o and "conflicting" not in o["context"]
+    holder = _rec(progress=[ProgressEntry(ref="pr:1950")])
+    orders, told, notes = workorders.red_prs([_sweep()], [holder], T0 + HOUR, {}, HOUR)
+    assert orders == [] and workorders.pr_note(notes[0][1]).startswith("sweep PR #1950 has been open since")
+    assert "the gate sweep's board items — take it or say why" in workorders.pr_note(notes[0][1])
+    assert workorders.red_holders([_sweep(checks="red", red_since="x")], [holder], T0, HOUR) == {"1950": ["ao-g1"]}
+
+
+@pytest.mark.unit
+def test_a_gate_head_that_is_no_order_now_is_never_a_red_or_filing_order():
+    """TD-1854 (*One predicate decides*): an `until-<date>` lift before its day (no `lift_since`) red past
+    `ORPHAN_AFTER` is no red order, and a held sweep PR with a read open is none either, nor listed held."""
+    early = _lift(name="until-2026-11-20", lift_since=None, checks="red", red_since=T0.isoformat())
+    assert workorders.red_prs([early], [], T0 + 30 * HOUR, {}, HOUR)[0] == []
+    assert not workorders.is_gate_order(early)
+    holder = _rec(progress=[ProgressEntry(ref="pr:1900")])
+    assert workorders.red_holders([early], [holder], T0 + 30 * HOUR, HOUR) == {}
+    held = _sweep(held=["docs/user_attention.md"], held_head="abc")
+    reads = {"1950": [{"state": "open", "to": "techlead"}]}
+    assert workorders.is_gate_order(held) and not workorders.is_gate_order(held, reads)
+    assert workorders.read_open(held, reads) and not workorders.read_open(held, {"1950": [{"state": "closed"}]})
+    assert workorders.red_prs([held], [], T0, {}, HOUR, reads=reads)[0] == []
+    # a held of another head counts as empty: still an order while the read is open
+    assert workorders.is_gate_order({**held, "held_head": "old"}, reads)
+    assert not workorders.filing_row(_sweep(filing=True))
+
+
 async def test_the_tick_gives_a_lift_order_its_entrys_priority_from_the_ledger(agent, tmp_path):
-    """TD-1588, design §4.4 *A live check's lift PR is the team's at once* (TD-1450): the tick's `_red_prs`
+    """TD-1588, design §4.4 *A PR the gate sweep opens is the team's at once* (TD-1450): the tick's `_red_prs`
     reads each entry's priority from the repo's ledger reading, so a lift PR whose entry is Medium is a
     Medium order, and one whose entry the ledger does not hold is High."""
     from conftest import park_ticks

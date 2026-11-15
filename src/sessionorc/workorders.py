@@ -713,10 +713,16 @@ def red_holders(
     `holds_pr` finds, for the pages' *held by <name>* (TD-652; the reading carries them, so no page
     re-derives the test). A PR nobody holds, or not yet red for `after`, is not listed. With
     `filing_after`, a filing row is gated by `is_filing_order` in place of `red_since` (§4.4 *A filing PR
-    nobody holds is a work order*, TD-1811); absent, no filing row is read."""
+    nobody holds is a work order*, TD-1811); absent, no filing row is read. A PR the gate sweep opened
+    (`reports.gate_head`) is listed while `is_gate_order` passes it, keyed on its stamp with no `after` and
+    whatever its checks, in an unserved repo too, and is never read as red or filing (TD-1854)."""
     out: dict[str, list[str]] = {}
     for pr in open_prs:
         if not isinstance(pr, dict) or not isinstance(pr.get("number"), int):
+            continue
+        if reports.gate_head(pr.get("branch")):
+            if is_gate_order(pr, reads) and (held := [str(r.name or r.id) for r in records if holds_pr(r, pr)]):
+                out[str(pr["number"])] = held
             continue
         if filing_after is not None and is_filing_order(pr, now, filing_after, key, reads):
             if held := [str(r.name or r.id) for r in records if holds_pr(r, pr)]:
@@ -750,12 +756,42 @@ def is_sync_order(pr: dict[str, Any]) -> bool:
 
 
 def is_lift_order(pr: dict[str, Any]) -> bool:
-    """A live check's lift PR (design §4.4 *A live check's lift PR is the team's at once*, TD-1437): its
-    head branch `lift/TD-n/<live, live-<digits> or live-td<digits>>` (the reading's `lift`, stamped
-    `lift_since`), not a draft and not a fork. Whatever its checks, red and pending included: its taker
-    runs its precheck and re-runs the check (§4.9b)."""
+    """A lift PR the gate sweep opened (design §4.4 *A PR the gate sweep opens is the team's at once*, TD-1437,
+    TD-1854): a head `reports.lift_of` reads (the reading's `lift`, stamped `lift_since` — an `until-<date>`
+    head's only from its day), not a draft and not a fork. Whatever its checks, red and pending included:
+    its taker runs its precheck and takes the step its head names. Pure: the row's stamps alone."""
     lift = bool(pr.get("lift")) and bool(pr.get("lift_since")) and reports.lift_of(pr.get("branch")) is not None
     return lift and not pr.get("draft") and not pr.get("fork")
+
+
+def is_sweep_order(pr: dict[str, Any]) -> bool:
+    """A sweep PR the gate sweep opened (§4.4, TD-1854): a head `reports.sweep_of` reads (the reading's `sweep`,
+    stamped `sweep_since`), not a draft and not a fork, whatever its checks. Pure, as `is_lift_order`."""
+    sweep = bool(pr.get("sweep")) and bool(pr.get("sweep_since")) and reports.sweep_of(pr.get("branch")) is not None
+    return sweep and not pr.get("draft") and not pr.get("fork")
+
+
+def read_open(pr: dict[str, Any], reads: dict[str, list[dict[str, Any]]] | None) -> bool:
+    """Whether any addressee's read of the PR is open in `reads` (the pass's reads by PR number, the person's
+    included, §4.4 *The PR's reads*): an order that waits on its reader is none meanwhile (TD-1811, TD-1854)."""
+    got = (reads or {}).get(str(pr.get("number"))) or []
+    return any(isinstance(x, dict) and x.get("state") == "open" for x in got)
+
+
+def _held_names_a_path(pr: dict[str, Any]) -> bool:
+    """`held` read at the PR's head and naming a path; an unread one, or one read at another head, counts as
+    empty, and one kept from an earlier key as read (§4.4 *What the taker does*, TD-1854)."""
+    held = pr.get("held")
+    return isinstance(held, list) and bool(held) and bool(pr.get("head")) and pr.get("held_head") == pr.get("head")
+
+
+def is_gate_order(pr: dict[str, Any], reads: dict[str, list[dict[str, Any]]] | None = None) -> bool:
+    """The one test of a PR the gate sweep opened (§4.4 *A PR the gate sweep opens is the team's at once*,
+    TD-1854), which `red_prs`, `red_holders` and the reading's `pr_orders.gate` all call: `is_lift_order` or
+    `is_sweep_order`, and, where its `held` names a path, no read of it open (`read_open`)."""
+    if not isinstance(pr, dict) or not (is_lift_order(pr) or is_sweep_order(pr)):
+        return False
+    return not (_held_names_a_path(pr) and read_open(pr, reads))
 
 
 def _instant(stamp: Any) -> datetime | None:
@@ -769,9 +805,10 @@ def _instant(stamp: Any) -> datetime | None:
 
 def filing_row(pr: dict[str, Any]) -> bool:
     """A row the filing rule reads rather than the red rule (§4.4 *A filing PR nobody holds is a work order*,
-    TD-1811): stamped `filing` true, not a sync or lift PR, its checks neither *red* nor `not_run`, and not
-    conflicting — a red or conflicting filing PR is the red rule's alone, one order, never two."""
-    if pr.get("filing") is not True or pr.get("sync") or is_lift_order(pr):
+    TD-1811): stamped `filing` true, not a sync PR nor one on a head the gate sweep opens (`reports.gate_head`,
+    TD-1854), its checks neither *red* nor `not_run`, and not conflicting — a red or conflicting filing PR is
+    the red rule's alone, one order, never two."""
+    if pr.get("filing") is not True or pr.get("sync") or reports.gate_head(pr.get("branch")):
         return False
     return pr.get("checks") not in ("red", "not_run") and not pr.get("conflicting")
 
@@ -803,12 +840,15 @@ def is_filing_order(
     created = _instant(pr.get("created")) if pr.get("created") else None
     if created is None or now - created < after:
         return False
-    return not any(isinstance(x, dict) and x.get("state") == "open" for x in (reads or {}).get(str(pr["number"])) or [])
+    return not read_open(pr, reads)
+
+
+SWEEP_CONTEXT = "the gate sweep's board items"  # a sweep order's words beside its URL (§4.4, TD-1854)
 
 
 def lift_context(pr: dict[str, Any]) -> str:
-    """A lift order's words beside its URL: the gate it lifts on its entry, `lifts TD-n event (live)`."""
-    tid, gate = reports.lift_of(pr.get("branch")) or ("", "")
+    """A lift order's words beside its URL: the gate it lifts on its entry, `lifts TD-n until 2026-11-20`."""
+    tid, gate, _ = reports.lift_of(pr.get("branch")) or ("", "", False)
     return f"lifts {tid} {gate}" if tid else ""
 
 
@@ -832,6 +872,9 @@ def pr_note(pr: dict[str, Any]) -> str:
     if is_lift_order(pr):
         since = pr.get("lift_since")
         return f"lift PR #{pr['number']} has been open since {since}: {lift_context(pr)} — take it or say why"
+    if is_sweep_order(pr):
+        since = pr.get("sweep_since")
+        return f"sweep PR #{pr['number']} has been open since {since}: {SWEEP_CONTEXT} — take it or say why"
     if filing_row(pr):
         return f"filing PR #{pr['number']} has been open since {pr.get('created')}: merge it or say why"
     why = ", ".join(pr.get("failing") or []) or ("conflicting with its base" if pr.get("conflicting") else "red")
@@ -843,22 +886,25 @@ def pr_order(pr: dict[str, Any], priorities: dict[str, str] | None = None) -> di
     pickable, its `Context` the URL and the failing checks. `pr_order` marks it, and every `free-pick`
     lane takes it: the grinders' pick list (§4.9b *No anchor seat*, TD-757). A sync PR's (TD-684) is marked `sync`, with
     `sync_since` and its `reason` (`sync_reason`), which is its `Context` beside the URL. A lift PR's
-    (TD-1450) is marked `lift`, with `lift_since`, its `entry` and `gate`; its priority is its entry's, from
-    `priorities` (the repo's ledger, by id, lower-case as the reading keeps it), High where it is not there,
-    and its `Context` the URL and the gate."""
+    (TD-1450, TD-1854) is marked `lift`, with `lift_since`, its `entry` and `gate`; its priority is its entry's,
+    from `priorities` (the repo's ledger, by id, lower-case as the reading keeps it), High where it is not there,
+    and its `Context` the URL and the gate. A sweep PR's (TD-1854) is marked `sweep`, with `sweep_since`,
+    Medium, its `Context` the URL and *the gate sweep's board items*."""
     failing = list(pr.get("failing") or [])
     sync = is_sync_order(pr)
     lift = not sync and is_lift_order(pr)
-    filing = not sync and not lift and filing_row(pr)
+    sweep = not sync and not lift and is_sweep_order(pr)
+    filing = not sync and not lift and not sweep and filing_row(pr)
     since = str(pr.get("created") or "")
-    why = sync_reason(pr) if sync else lift_context(pr) if lift else ""
+    why = sync_reason(pr) if sync else lift_context(pr) if lift else SWEEP_CONTEXT if sweep else ""
     if filing:
         why = f"filing, open since {since[:10]}, nobody holds it: review and merge it, or close it if superseded"
-    tid, gate = (reports.lift_of(pr.get("branch")) or ("", "")) if lift else ("", "")
-    priority = str((priorities or {}).get(tid) or "high").capitalize() if lift else "Medium" if filing else "High"
+    tid, gate, _ = (reports.lift_of(pr.get("branch")) or ("", "", False)) if lift else ("", "", False)
+    priority = str((priorities or {}).get(tid) or "high").capitalize() if lift else "High"
+    priority = "Medium" if filing or sweep else priority
     red = [", ".join(failing), "conflicting" * bool(pr.get("conflicting"))]
     red += ["CI never ran"] if pr.get("checks") == "not_run" else []  # ordered by its conflict alone (TD-686)
-    context = " · ".join(filter(None, [str(pr.get("url") or ""), *([why] if sync or lift or filing else red)]))
+    context = " · ".join(filter(None, [str(pr.get("url") or ""), *([why] if sync or lift or sweep or filing else red)]))
     return {
         "id": f"{PR_PREFIX}{pr['number']}",
         "title": str(pr.get("title") or ""),
@@ -883,6 +929,7 @@ def pr_order(pr: dict[str, Any], priorities: dict[str, str] | None = None) -> di
         "text": "",
         **({"sync": True, "sync_since": pr.get("sync_since"), "reason": why} if sync else {}),
         **({"lift": True, "lift_since": pr.get("lift_since"), "entry": tid, "gate": gate} if lift else {}),
+        **({"sweep": True, "sweep_since": pr.get("sweep_since")} if sweep else {}),
         **({"filing": True, "filing_since": since} if filing else {}),
     }
 
@@ -910,9 +957,11 @@ def red_prs(
     at once, whatever its checks but *pending*; its idle holders are told and passed over as a red
     PR's, keyed on `sync_since` in place of `red_since`. Sync orders come first in the list.
 
-    A live check's lift PR (`is_lift_order`, TD-1450) is one the same way, keyed on `lift_since`, whatever
-    its checks, pending included; its priority its entry's in `priorities` (`pr_order`). A PR with none of
-    the three stamps is skipped.
+    A PR the gate sweep opened (`is_gate_order`, TD-1450, TD-1854) is one the same way, keyed on `lift_since`
+    or `sweep_since`, whatever its checks, pending included; a lift's priority its entry's in `priorities`
+    (`pr_order`). A PR on a head the gate sweep opens (`reports.gate_head`) that `is_gate_order` does not pass
+    is no order of any rule, red or filing (§4.4 *One predicate decides*). A PR with none of the stamps is
+    skipped.
 
     A draft (the reading's `draft`) that `is_sync_order` does not order is no order and no note, however
     long it is red (design §4.4 *A draft is no work order*, TD-745); its spell's memory is kept, so a PR
@@ -933,10 +982,14 @@ def red_prs(
         if not isinstance(pr, dict) or not isinstance(pr.get("number"), int):
             continue
         sync = is_sync_order(pr)
-        lift = not sync and is_lift_order(pr)
-        filing = not sync and not lift and filing_after is not None and filing_row(pr)
+        gate = not sync and reports.gate_head(pr.get("branch"))
+        if gate and not is_gate_order(pr, reads):
+            continue  # the gate sweep's head, not its order now: never a red or filing order (TD-1854)
+        lift = gate and is_lift_order(pr)
+        sweep = gate and not lift
+        filing = not sync and not gate and filing_after is not None and filing_row(pr)
         since = pr.get("sync_since") if sync else pr.get("lift_since") if lift else pr.get("red_since")
-        since = pr.get("created") if filing else since
+        since = pr.get("sweep_since") if sweep else pr.get("created") if filing else since
         if not since:
             continue
         try:
@@ -957,7 +1010,7 @@ def red_prs(
         if filing and not is_filing_order(pr, now, filing_after or after, key, reads):
             continue  # not yet, or not now: its spell's memory kept while it is a filing row (TD-1811)
         holders = [r for r in records if holds_pr(r, pr)]
-        if not holders and (sync or lift):
+        if not holders and (sync or gate):
             orders.append(pr_order(pr, priorities))
             continue
         if not filing and now - red_since < after:

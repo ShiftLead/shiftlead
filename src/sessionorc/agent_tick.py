@@ -4635,8 +4635,10 @@ class TickMixin:
         records of that repo — an unheld one is a `pr:<n>` order under the reading's `pr_orders`, an
         idle holder is told once per red spell (a `system` note, outside the wake budget), and `after`
         that, still idle, no longer holds it. A sync PR is an order from the first reading that sees
-        it, first in the list (§4.4 *A sync PR is the team's at once*, TD-684), and so is a live check's
-        lift PR, at its entry's priority (§4.4 *A live check's lift PR is the team's at once*, TD-1450). It
+        it, first in the list (§4.4 *A sync PR is the team's at once*, TD-684), and so is a PR the gate sweep
+        opened, a lift at its entry's priority (§4.4 *A PR the gate sweep opens is the team's at once*, TD-1450,
+        TD-1854); its numbers the test passes, holders aside, are `gate`, and in an unserved repo its orders alone
+        are kept, under `person` and never `orders` (the person's, §5 *The seams*). It
         keeps the first ask of each open PR the mail holds, `asked`, and lists the held PRs nobody
         asked, `unasked` (§4.4 *A held PR nobody asked is marked, never ordered*, TD-789), and each open
         PR's reads, `reads`, recomputed from the mail every pass (§4.4 *The PR's reads*, TD-704). A filing PR
@@ -4663,13 +4665,24 @@ class TickMixin:
                 unserved = seams_mod.unserved(r)
                 # a filing PR past `FILING_AFTER` is an order too, never in an unserved repo (§4.4, TD-1811)
                 filing_after = None if unserved else FILING_AFTER
-                if unserved:  # no order in an unserved repo (§5 *The seams*, TD-1011)
-                    orders, told, notes = [], old.get("told") or {}, []
+                # a lift order's priority is its entry's (§4.4 *A PR the gate sweep opens*, TD-1450)
+                entries = (r.get("ledger") or {}).get("entries") or []
+                prio = {e["id"]: e.get("priority") or "" for e in entries if isinstance(e, dict) and e.get("id")}
+                told_was = old.get("told") or {}
+                person: list[dict[str, Any]] = []
+                if unserved:  # no order in an unserved repo but the gate sweep's, the person's (§5, TD-1011, TD-1854)
+                    got, got_told, got_notes = workorders.red_prs(
+                        prs, mine, now, told_was, ORPHAN_AFTER, prio, key=key, reads=pr_reads
+                    )
+                    gates = {
+                        str(p["number"]) for p in prs if isinstance(p, dict) and reports.gate_head(p.get("branch"))
+                    }
+                    person = [o for o in got if o.get("lift") or o.get("sweep")]
+                    told = {n: v for n, v in told_was.items() if n not in gates}
+                    told |= {n: v for n, v in got_told.items() if n in gates}
+                    notes = [(sid, p) for sid, p in got_notes if str(p["number"]) in gates]
+                    orders = []
                 else:
-                    # a lift order's priority is its entry's (§4.4 *A live check's lift PR*, TD-1450)
-                    entries = (r.get("ledger") or {}).get("entries") or []
-                    prio = {e["id"]: e.get("priority") or "" for e in entries if isinstance(e, dict) and e.get("id")}
-                    told_was = old.get("told") or {}
                     orders, told, notes = workorders.red_prs(
                         prs, mine, now, told_was, ORPHAN_AFTER, prio, filing_after=filing_after, key=key, reads=pr_reads
                     )
@@ -4692,6 +4705,8 @@ class TickMixin:
                         if isinstance(p, dict) and workorders.is_filing_order(p, now, filing_after, key, pr_reads)
                     ]
                 )
+                # the gate sweep's PRs the test passes, holders aside, which the pages draw (TD-1854)
+                gate = [p["number"] for p in prs if isinstance(p, dict) and workorders.is_gate_order(p, pr_reads)]
                 # the first ask is kept past the mail's prune, and dropped once its PR closes
                 asked = {**(found.get(root) or {}), **(old.get("asked") or {})}
                 numbers: set[str] | None = None
@@ -4703,7 +4718,7 @@ class TickMixin:
                 reads = held_mod.merge_reads(fresh.get(root) or {}, old.get("reads") or {}, held_ids, numbers)
                 new = {
                     "orders": orders, "told": told, "held": held, "asked": asked, "unasked": unasked, "reads": reads,
-                    "filing": filing,
+                    "filing": filing, "gate": gate, "person": person,
                 }  # fmt: skip
                 if new == {
                     "orders": old.get("orders") or [],
@@ -4713,6 +4728,8 @@ class TickMixin:
                     "unasked": old.get("unasked") or [],
                     "reads": old.get("reads") or {},
                     "filing": old.get("filing") or [],
+                    "gate": old.get("gate") or [],
+                    "person": old.get("person") or [],
                 }:
                     continue
                 if (cur := self._repos.get(root)) is None:
