@@ -171,6 +171,8 @@ def edit_item(
         raise Refused(f"unknown board action {action!r}: {' or '.join(ACTIONS)}")
     if item.closed is not None:
         raise Refused(MOVED)
+    if not item.path:
+        raise Refused("a v2 board's item: ledgerboard v3.0 writes item files alone — split the board first")
     if action == "reply" and not " ".join(str(reply or "").split()):
         raise Refused("a reply needs its text: what the next session should do")
     if why and action != "done":
@@ -815,6 +817,8 @@ def _write_back(
     rel = workorders.board_rel(root)
     stub = t / rel
     old = _board(t, rel)
+    if old.form == "file":  # the writer refuses a v2 board, in its own words (*split first*, TD-1881)
+        _plan(lb_board.load_v3, str(stub))
     it = _find(old, key, text)
     if it is None:
         if (key or text) and _ahead(root, want, key, text):
@@ -831,6 +835,7 @@ def _write_back(
         if on_decide is not None:
             on_decide(decided)
     by = author(root) if action == "reply" else ""
+    reply = " ".join(str(reply or "").split())  # a reply typed over several lines is one Log line (§4.4, TD-142)
     # ShiftLead's own checks first (a closed item, a decide on a decided item, its kind), then ledgerboard's
     edit_item(it, action, due, reply=reply, by=by, answer=answer, why=why)
     lifts = None
@@ -1197,7 +1202,7 @@ def branch_edit(
     files = [p for p in board_files(rel_path) if (root / p).exists()]
     if files and _git(root, "status", "--porcelain", "--", *files).stdout.strip():
         raise Refused(f"{rel_path} has uncommitted changes: the commit would carry them")
-    b = ledgerboard.load_board(str(path), lb_board.fs_ls, lb_board.fs_read)
+    b = _plan(lb_board.load_v3, str(path))  # a v2 board is refused here, in the writer's words (TD-1881)
     it = _find(b, key)
     if it is None:
         raise _none_open(b, key)

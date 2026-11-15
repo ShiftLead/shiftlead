@@ -385,7 +385,7 @@ class InboxMixin:
             raise RpcError("a reply on a board line is board_reply, which says where it went (design §4.4)")
         if action == "add":
             return await self._board_add(root, want, text, due, entry, caller)
-        if line is None and not key:
+        if line is None and not key and not str(text or "").strip():  # its words name it too (TD-1881)
             raise RpcError(f"a board {action or 'edit'} names the item's line or its id (design §4.4)")
         try:
             said = self._board_answer(action, answer, answers, form)
@@ -839,7 +839,7 @@ class InboxMixin:
         agent_common.person_only(caller, "reply on the board", "§4.4", self._graph())
         root, want = self._board_root(board)
         self._board_served(root)
-        if line is None and not key:
+        if line is None and not key and not str(text or "").strip():  # its words name it too (TD-1881)
             raise RpcError("a board reply names the item's line or its id (design §4.4)")
         try:
             at: int | None = int(line) if line is not None else None
