@@ -590,7 +590,9 @@ async def test_an_unserved_repo_keeps_the_gate_sweeps_orders_alone_as_the_person
     """TD-1854, design §4.4 *A PR the gate sweep opens is the team's at once*, §5 *The seams*: in an unserved
     repo the reading keeps the lift and sweep orders, and only those, under `pr_orders.person`, never
     `orders`, so `teamrun.pr_orders` reads none and `person_pr_orders` those; `gate` lists their numbers in
-    either repo; a red PR's holder is told nothing there, and its memory is carried as it was."""
+    either repo; a red PR's holder is told nothing there, and its memory is carried as it was. A red PR nobody
+    holds, an order in a served repo, is in neither list (TD-1885), and a gate PR's idle holder is told once there,
+    its memory kept from this reading."""
     from conftest import park_ticks
 
     from shiftlead import teamrun
@@ -598,9 +600,10 @@ async def test_an_unserved_repo_keeps_the_gate_sweeps_orders_alone_as_the_person
     await park_ticks(agent)
     root = str(tmp_path / "repo")
     holder = _rec("ao-holder", git={"branch": "b1"}, repo=root, host=agent.host)
-    agent.sessions[holder.id] = holder
+    lifter = _rec("ao-lifter", git={"branch": "lift/TD-1450/live-2"}, repo=root, host=agent.host)
+    agent.sessions[holder.id], agent.sessions[lifter.id] = holder, lifter
     lacks = [{"key": "gate", "words": "unserved: no gate (no scripts/check_cadence.py) — cure"}]
-    prs = [_red(1, branch="b1"), _lift(), _sweep()]
+    prs = [_red(1, branch="b1"), _red(2, branch="b2"), _lift(), _lift(1901, name="live-2"), _sweep()]
     told = {"1": {"red_since": "x", "at": "y"}}
     agent._repos[root] = {
         "name": "repo", "root": root, "prs": {"open": prs}, "seams": {"serve": {"ok": False, "lacks": lacks}},
@@ -609,16 +612,19 @@ async def test_an_unserved_repo_keeps_the_gate_sweeps_orders_alone_as_the_person
     await agent._red_prs(T0 + HOUR)
     got = agent._repos[root]["pr_orders"]
     assert got["orders"] == [] and [o["id"] for o in got["person"]] == ["pr:1900", "pr:1950"]
-    assert got["gate"] == [1900, 1950] and got["told"] == told
+    assert got["told"].pop("1901") and got["told"] == told  # the lift's holder told, the red PR's memory as it was
+    (note,) = [e for e in agent.sessions["ao-lifter"].inbox if e.from_ == "system"]
+    assert "#1901" in note.text
+    assert got["gate"] == [1900, 1901, 1950]  # its numbers, holders aside
     assert teamrun.pr_orders(agent._repos[root]) == []
     assert [o["id"] for o in teamrun.person_pr_orders(agent._repos[root])] == ["pr:1900", "pr:1950"]
     assert not [e for e in agent.sessions["ao-holder"].inbox if e.from_ == "system"]
-    # served, the same PRs are the lanes' orders, the person's list empty
+    # served, the same PRs are the lanes' orders, the unheld red PR's with them, the person's list empty
     agent._repos[root] = {"name": "repo", "root": root, "prs": {"open": prs}}
     await agent._red_prs(T0 + HOUR)
     got = agent._repos[root]["pr_orders"]
-    assert [o["id"] for o in got["orders"]] == ["pr:1900", "pr:1950"] and got["person"] == []
-    assert got["gate"] == [1900, 1950] and teamrun.person_pr_orders(agent._repos[root]) == []
+    assert [o["id"] for o in got["orders"]] == ["pr:2", "pr:1900", "pr:1950"] and got["person"] == []
+    assert got["gate"] == [1900, 1901, 1950] and teamrun.person_pr_orders(agent._repos[root]) == []
 
 
 async def test_an_idle_holder_on_a_node_is_told_at_its_address(agent, tmp_path):
