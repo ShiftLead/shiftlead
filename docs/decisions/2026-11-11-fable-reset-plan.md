@@ -35,7 +35,8 @@ on the account page.
 
 - **Reset 1** goes to shiftlead: the first hit after the new design shape has passed its trial. If the trial
   has not passed by mid-December, the next hit outside a week's last two days is pressed anyway, on the
-  shape as it then stands. *Proposed.*
+  shape as it then stands. *Proposed.* 2026-11-14: the trial ended at Stop (TD-1871), the shape not passing, so
+  reset 1 falls to the mid-December rule, on the way of designing that then stands; Paul's to decide again.
 - **Reset 2** goes to Paul's other projects: a hit once the target repo has a team, a full lane and its
   decisions cleared; from mid-January the next hit is pressed whatever the state. *Proposed.*
 
