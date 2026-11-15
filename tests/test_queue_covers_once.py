@@ -321,7 +321,8 @@ def test_a_line_that_is_no_open_decide_or_do_hides_no_for_you_row(tmp_path, monk
     assert html.count('class="brow"') > 1, "and its own row, not the column's plain row"
 
 
-AHEAD = {"at": 5, "context": "TD-060 decision (paul)", "kind": "decide", "decided": None, "due": "2026-12-01", "due_tag": "due in 20d",
+AHEAD = {"at": 5, "context": "TD-060 decision (paul)", "kind": "decide", "decided": None, "due": "2026-12-01",
+         "due_tag": "due in 20d",
          "text": "decide 2026-11-01 — **Ship TD-060?** Context: TD-060 decision (paul). Parts: TD-061.",
          "answers": ["Go", "Not yet"], "default": "Go", "refs": ["TD-060"], "parts": ["TD-061"],
          "key": "board:def67890"}  # fmt: skip

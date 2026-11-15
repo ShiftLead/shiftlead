@@ -805,8 +805,10 @@ def git_io(root: Path | str, ref: str, under: str = "", timeout: float = 10.0, r
 
     def batched(name: str) -> bool:
         # a board's item file too (`<id>.md`, ledgerboard v3.0, TD-1881): a board is read whole, its files together
-        return name == lb.LEDGER_README or bool(lb.ENTRY_FILE_RE.match(name)) or (
-            name.endswith(".md") and lb.is_item_id(name[:-3])
+        return (
+            name == lb.LEDGER_README
+            or bool(lb.ENTRY_FILE_RE.match(name))
+            or (name.endswith(".md") and lb.is_item_id(name[:-3]))
         )
 
     def read(path: str) -> str | None:

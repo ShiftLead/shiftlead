@@ -247,7 +247,7 @@
   {%- if how == 'mail' and form %} data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ by }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="{{ begun }}" data-form="{{ i }}" title="{{ 'say what is off' if pair else 'fill it in' }}: your words go back to {{ by }} as a reply"
   {%- elif how == 'mail' %} data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ i }}"
   {%- elif how == 'board' and form %} {{ board_form(e, i, begun, where) }}
-  {%- elif how == 'board' %} data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ a }}"
+  {%- elif how == 'board' %} data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %} title="{{ a }}"
   {%- elif form %} data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" data-begun="{{ begun }}" data-form="{{ i }}" title="fill it in: your words are written on {{ e.name }}'s board as your decision on {{ e.id }}"
   {%- else %} data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-index="{{ i }}" data-answer="{{ a }}" title="{{ a }}"
   {%- endif %}><span class="alabel">{% if pair %}{{ 'Not right…' if form else 'Works' }}{% elif head %}{{ head }}…{% else %}{{ cap_first(a) }}{% endif %}</span></button>
@@ -281,7 +281,7 @@
     the form's head and sends the `decide` with the words as typed and `form`, its index; the agent puts the head back.
     A live look's pair (`data-pair`) then hands an entry to the repo's techlead; any other form hands nothing on -#}
 {% macro board_form(e, i, begun, where) -%}
-data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-repo="{{ e.name }}" data-head="{{ e.head }}" data-name="{{ where }}" data-begun="{{ begun }}" data-form="{{ i }}"{% if e.pair %} data-pair="1" title="say what is off: your words are written on the line as Decided: Not right: …, one commit, and handed to {{ e.repo_name or e.repo }}'s techlead as an entry"{% else %} title="fill it in: your words are written on the line as Decided: {{ begun }}…, one commit"{% endif %}
+data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %} data-repo="{{ e.name }}" data-head="{{ e.head }}" data-name="{{ where }}" data-begun="{{ begun }}" data-form="{{ i }}"{% if e.pair %} data-pair="1" title="say what is off: your words are written on the line as Decided: Not right: …, one commit, and handed to {{ e.repo_name or e.repo }}'s techlead as an entry"{% else %} title="fill it in: your words are written on the line as Decided: {{ begun }}…, one commit"{% endif %}
 {%- endmacro %}
 {#- the reply box's foot (§4.5 screen 6 *A board line's Reply*, TD-1557, built by TD-1699): on an open, undecided line
     whose Reply can decide (`reply_decides`, the reader's), which words decide it — the forms' heads joined by *or* -#}
@@ -292,7 +292,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {#- a card's board item's **Done** — the write-back's, its *landed on origin* words its title — and **Answer…**, the
     words written on its line, its *standing* its title where the page has one (§4.5 screen 12, TD-1066) -#}
 {% macro board_done(e, cls, role='') -%}
-<button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="checks the line off {{ e.repo_name or e.repo }}'s board: one edit landed on its origin by shiftlead's own pull request" data-confirm="Check this item off {{ e.repo_name or e.repo }}'s board? It lands on origin by shiftlead's own pull request.">Done</button>
+<button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %} title="checks the line off {{ e.repo_name or e.repo }}'s board: one edit landed on its origin by shiftlead's own pull request" data-confirm="Check this item off {{ e.repo_name or e.repo }}'s board? It lands on origin by shiftlead's own pull request.">Done</button>
 {%- endmacro %}
 {#- §4.5a **Have a session do it** (TD-1543, built by TD-1624; §4.5 screen 12 *Three verbs: Have a session do it*):
     after an open `act` line's Done where a lane of its repo would take the work, or where its `Doer:` resolves to
@@ -301,13 +301,13 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
     (`e.hand`, TD-1660), the hand-off, its title naming where it goes where the doer resolves (`e.hand_to`) -#}
 {% macro board_session(e, cls, role='') -%}
 {%- if e.hand %}
-<button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board" data-id="person" data-board-act="hand" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ ("goes to " ~ e.hand_to ~ "'s techlead seat; this item closes") if e.hand_to else help_title('board-have-a-session-do-it') }}" data-confirm="Have a session do it? {% if e.hand_to %}The step goes to {{ e.hand_to }}'s techlead seat, and the item closes on {{ e.repo_name or e.repo }}'s board.{% else %}It is handed to {{ e.doer }} where it can be; otherwise &ldquo;have a session do it&rdquo; is written on {{ e.repo_name or e.repo }}'s board as your decision, and the line goes to its team as a work order.{% endif %}">Have a session do it</button>
+<button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board" data-id="person" data-board-act="hand" data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %} title="{{ ("goes to " ~ e.hand_to ~ "'s techlead seat; this item closes") if e.hand_to else help_title('board-have-a-session-do-it') }}" data-confirm="Have a session do it? {% if e.hand_to %}The step goes to {{ e.hand_to }}'s techlead seat, and the item closes on {{ e.repo_name or e.repo }}'s board.{% else %}It is handed to {{ e.doer }} where it can be; otherwise &ldquo;have a session do it&rdquo; is written on {{ e.repo_name or e.repo }}'s board as your decision, and the line goes to its team as a work order.{% endif %}">Have a session do it</button>
 {%- else %}
-<button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board" data-id="person" data-board-act="decide" data-answer="have a session do it" data-answers='[]' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ help_title('board-have-a-session-do-it') }}" data-confirm="Have a session do it? &ldquo;have a session do it&rdquo; is written on {{ e.repo_name or e.repo }}'s board as your decision, and the line goes to its team as a work order.">Have a session do it</button>
+<button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board" data-id="person" data-board-act="decide" data-answer="have a session do it" data-answers='[]' data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %} title="{{ help_title('board-have-a-session-do-it') }}" data-confirm="Have a session do it? &ldquo;have a session do it&rdquo; is written on {{ e.repo_name or e.repo }}'s board as your decision, and the line goes to its team as a work order.">Have a session do it</button>
 {%- endif %}
 {%- endmacro %}
 {% macro board_answer(e, cls, role='') -%}
-<button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ (e.repo_name or e.repo or e.name or 'the repo') ~ "'s board" }}" data-foot="{{ reply_foot(e) }}"{% if e.pair %} data-pair="1" data-repo="{{ e.name }}" data-head="{{ e.head }}"{% endif %} title="{{ ((e.session ~ ' · ') if e.session else '') ~ e.standing.text if e.standing else help_title('card-answers') }}">Answer…</button>
+<button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %} data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ (e.repo_name or e.repo or e.name or 'the repo') ~ "'s board" }}" data-foot="{{ reply_foot(e) }}"{% if e.pair %} data-pair="1" data-repo="{{ e.name }}" data-head="{{ e.head }}"{% endif %} title="{{ ((e.session ~ ' · ') if e.session else '') ~ e.standing.text if e.standing else help_title('card-answers') }}">Answer…</button>
 {%- endmacro %}
 
 {# §4.5a **Snooze** on an `ask`: 1 h · tomorrow 08:00 · a date. The person's own bookkeeping — the
@@ -1185,7 +1185,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- set hs = e.heads if e.heads is sequence and e.heads is not string and e.heads | length == e.answers | length else [] %}
   {%- set head = hs[loop.index0] if loop.index0 < hs | length and hs[loop.index0] is string else '' %}
   {%- set form = (e.pair and loop.index0 == 1) or head %}
-  <button class="btn sm answer" {% if form %}{{ board_form(e, loop.index0, (head or 'Not right') ~ ': ', (e.repo_name or e.repo) ~ "'s board") }}{% else %}data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ a }}"{% endif %}>{% if e.pair %}<span class="alabel">{{ 'Not right…' if form else ('Go with it: Works' if e.default == a else 'Works') }}</span>{% elif head %}<span class="alabel">{{ head }}…</span>{% else %}<span class="alabel">&ldquo;{{ cap_first(a) if mode == 'card' else a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
+  <button class="btn sm answer" {% if form %}{{ board_form(e, loop.index0, (head or 'Not right') ~ ': ', (e.repo_name or e.repo) ~ "'s board") }}{% else %}data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %} title="{{ a }}"{% endif %}>{% if e.pair %}<span class="alabel">{{ 'Not right…' if form else ('Go with it: Works' if e.default == a else 'Works') }}</span>{% elif head %}<span class="alabel">{{ head }}…</span>{% else %}<span class="alabel">&ldquo;{{ cap_first(a) if mode == 'card' else a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
   {%- endfor %}
 </div>
 {%- endif %}
@@ -1208,7 +1208,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- if names %}{% call qrow.dots(names) %}
   {%- if not act %}{{ board_done(e, '', 'menuitem') }}{% endif %}
   {%- if sdo %}{{ board_session(e, '', 'menuitem') }}{% endif %}
-  {%- if e.editor %}{% from "file_link.html" import file_link %}{{ file_link(e.editor, 'Open board', "open " ~ e.board ~ " at line " ~ e.line, "", role="menuitem") }}{% endif %}
+  {%- if e.editor %}{% from "file_link.html" import file_link %}{{ file_link(e.editor, 'Open board', ("open " ~ e.board ~ " at line " ~ e.line) if e.line is not none else ("open the item's file on " ~ e.board), "", role="menuitem") }}{% endif %}
   {%- endcall %}{% endif %}
 {%- endset %}
 {{ bar(answer_row(e, 'board') if not (waits or e.decided) else '', right) }}
@@ -1223,7 +1223,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- call qrow.dots((['Answer…'] if act else ['Done']) + (['Have a session do it'] if sdo else []) + (['Open board'] if e.editor else [])) %}
   {%- if act %}{{ board_answer(e, '', 'menuitem') }}{% else %}{{ board_done(e, '', 'menuitem') }}{% endif %}
   {%- if sdo %}{{ board_session(e, '', 'menuitem') }}{% endif %}
-  {%- if e.editor %}{% from "file_link.html" import file_link %}{{ file_link(e.editor, 'Open board', "open " ~ e.board ~ " at line " ~ e.line, "", role="menuitem") }}{% endif %}
+  {%- if e.editor %}{% from "file_link.html" import file_link %}{{ file_link(e.editor, 'Open board', ("open " ~ e.board ~ " at line " ~ e.line) if e.line is not none else ("open the item's file on " ~ e.board), "", role="menuitem") }}{% endif %}
   {%- endcall %}
 </div>
 {%- else %}
@@ -1234,27 +1234,27 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   <span class="st">on the board — Reply writes on its line, Snooze hides it until a date and Done checks it off, each one edit landed on {{ e.repo_name or e.repo }}'s origin by shiftlead's own pull request</span>
   {%- endif %}
   <span class="grow"></span>
-  {%- if e.editor %}{% from "file_link.html" import file_link %}{{ file_link(e.editor, 'Open board', "open " ~ e.board ~ " at line " ~ e.line, "btn sm ghost") }}{% endif %}
-  <button class="btn sm ghost" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ e.repo_name or e.repo }}'s board" data-foot="{{ reply_foot(e) }}"{% if e.pair %} data-pair="1" data-repo="{{ e.name }}" data-head="{{ e.head }}"{% endif %} title="your words appended to this line of the board landed on origin; the line stays due{% if e.standing and e.standing.holder %} — and mailed to {{ e.standing.holder }} (holds {{ e.standing.ref }}){% endif %}">Reply</button>
+  {%- if e.editor %}{% from "file_link.html" import file_link %}{{ file_link(e.editor, 'Open board', ("open " ~ e.board ~ " at line " ~ e.line) if e.line is not none else ("open the item's file on " ~ e.board), "btn sm ghost") }}{% endif %}
+  <button class="btn sm ghost" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %} data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ e.repo_name or e.repo }}'s board" data-foot="{{ reply_foot(e) }}"{% if e.pair %} data-pair="1" data-repo="{{ e.name }}" data-head="{{ e.head }}"{% endif %} title="your words appended to this line of the board landed on origin; the line stays due{% if e.standing and e.standing.holder %} — and mailed to {{ e.standing.holder }} (holds {{ e.standing.ref }}){% endif %}">Reply</button>
   {#- §4.5a **Go with it** on a board row (TD-255): drawn when one answer is the default, in the
       steer row's words and place; the one press records the default — the same `decide`. -#}
-  {%- if gwi %}<button class="btn sm ghost boardgo" data-act="board" data-id="person" data-board-act="decide" data-answer="{{ e.default }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ help_title('board-go-with-it') }}" data-confirm="Go with it? &ldquo;{{ e.default }}&rdquo; is written on {{ e.repo_name or e.repo }}'s board as your decision.">Go with it</button>{% endif %}
+  {%- if gwi %}<button class="btn sm ghost boardgo" data-act="board" data-id="person" data-board-act="decide" data-answer="{{ e.default }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %} title="{{ help_title('board-go-with-it') }}" data-confirm="Go with it? &ldquo;{{ e.default }}&rdquo; is written on {{ e.repo_name or e.repo }}'s board as your decision.">Go with it</button>{% endif %}
   {%- if not waits %}
   {%- if not drawn_on_queue %}
   <details class="more"><summary class="btn sm ghost" title="hide it until a date: its Hide until: on the board, its Due: left as it is">Snooze</summary>
     <div class="menu">
       {#- *now* first in the fold (§4.5a, TD-1349): the write-back with no date, which shows the line again -#}
       {%- if section == 'snoozed' %}
-      <button data-act="board" data-id="person" data-board-act="snooze" data-when="now" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="show it again: its Hide until: set to today, back in its section">now</button>
+      <button data-act="board" data-id="person" data-board-act="snooze" data-when="now" data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %} title="show it again: its Hide until: set to today, back in its section">now</button>
       {%- endif %}
-      <button data-act="board" data-id="person" data-board-act="snooze" data-when="1d" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}">+1 day</button>
-      <button data-act="board" data-id="person" data-board-act="snooze" data-when="1w" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}">+1 week</button>
-      <button data-act="board" data-id="person" data-board-act="snooze" data-when="pick" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}">a date…</button>
+      <button data-act="board" data-id="person" data-board-act="snooze" data-when="1d" data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %}>+1 day</button>
+      <button data-act="board" data-id="person" data-board-act="snooze" data-when="1w" data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %}>+1 week</button>
+      <button data-act="board" data-id="person" data-board-act="snooze" data-when="pick" data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %}>a date…</button>
     </div>
   </details>
   {%- endif %}
   {%- endif %}
-  <button class="btn sm" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-confirm="Check this item off {{ e.repo_name or e.repo }}'s board? It lands on origin by shiftlead's own pull request.">Done</button>
+  <button class="btn sm" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %} data-confirm="Check this item off {{ e.repo_name or e.repo }}'s board? It lands on origin by shiftlead's own pull request.">Done</button>
   {%- if e.session_do and not (waits or e.decided) %}{{ board_session(e, 'btn sm') }}{% endif %}
 </div>
 {%- endif %}
