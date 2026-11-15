@@ -30,7 +30,7 @@
 # sessions; one they cannot (no backend yet, or no state on this machine) is reported as
 # "cannot see", never as nobody here (TD-100). Without "claude", the memory guard skips the
 # checks that guard Claude Code's auto-memory (TD-095).
-# agents = "claude"
+agents = "claude,gemini,grok"  # this repo's fact-check seats run Gemini CLI and Grok Build (TD-1894)
 
 # Where `agent-cadence run open_worktree.sh` puts worktrees, relative to the clone root (§1, TD-101). The
 # anchor guard, the hydrate scan and the workspace generator follow it. The default is where
