@@ -2450,6 +2450,19 @@ def test_a_long_hold_note_is_written_whole_on_the_line_and_the_ledger_log(repo):
     assert f'kept waiting: decision (paul) — by paul; answer "Hold: {LONG_NOTE}"' in entry
 
 
+def test_a_long_reply_is_written_whole_and_one_filling_a_form_decides_whole(repo):
+    """TD-1883: a Reply past 300 characters is written on the line whole, and one whose words begin with a form's
+    head decides it with the whole fill, as a pressed form does."""
+    _hold_board(repo, HOLD, HOLD.replace("End the rounds?", "Another round?"))
+    got = board.write_back(repo, 9, HOLD, "reply", reply=f"Hold: {LONG_NOTE}")
+    assert got["decided"] == f"Hold: {LONG_NOTE}"
+    assert f"Decided: Hold: {LONG_NOTE} (by t)" in origin_board(repo).splitlines()[8]
+    other = HOLD.replace("End the rounds?", "Another round?")
+    at = origin_board(repo).splitlines().index(f"- [ ] {other}") + 1
+    got = board.write_back(repo, at, other, "reply", reply=LONG_NOTE)
+    assert "decided" not in got and f": {LONG_NOTE}" in origin_board(repo).splitlines()[at - 1]
+
+
 @pytest.mark.unit
 def test_which_lines_a_replys_form_decides():
     """TD-1698: an open undecided `decide` or `look` line offering a form, or a `watch` with the look's pair; not a

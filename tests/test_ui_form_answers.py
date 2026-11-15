@@ -149,3 +149,8 @@ def test_the_answer_box_caps_no_words_and_the_form_press_sends_them_as_typed():
     press = press[: press.index("return;\n      }")]
     assert 'const said = m.text.split(/\\s+/).filter(Boolean).join(" ");' in press and "answer: said" in press
     assert ".slice(" not in press and ".substring(" not in press
+    # a Reply and a ledger entry's Reply send the composer's words as typed
+    reply = JS[JS.index('if (action === "board_reply")') :]
+    reply = reply[: reply.index('if (action === "board_notright")')]
+    assert "reply: m.text" in reply and ".slice(" not in reply and ".substring(" not in reply
+    assert "want.words = m.text;" in JS
