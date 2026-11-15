@@ -2199,10 +2199,14 @@ async def test_the_homes_settings_reach_a_node_on_each_write_and_on_the_next_dia
         return v
 
     async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
-        assert await wait_for(node.home_reachable, timeout=10.0, step=0.05), node.home_link
+        assert await wait_for(node.home_reachable, timeout=10.0, step=0.05), ("first dial", node.home_link)
         async with LocalClient(sock=home.dir / "agent.sock") as person:
             await person.call("set_settings", profile="", reserves={"5h": 30})
-        assert await wait_for(lambda: held(replica, "usage_gate", KEY, "5h") == 30, timeout=10.0, step=0.05)
+        assert await wait_for(lambda: held(replica, "usage_gate", KEY, "5h") == 30, timeout=10.0, step=0.05), (
+            "the home's write reaching the replica",
+            settings.load(replica),
+            node.home_link,
+        )
         # the reserve the home set pauses the node's session on the node's own tick
         async with LocalClient() as c:
             w = await c.call(
@@ -2211,31 +2215,42 @@ async def test_the_homes_settings_reach_a_node_on_each_write_and_on_the_next_dia
             )  # fmt: skip
         node._usage[""] = {"windows": [{"label": "5h", "pct": 75, "resets": None}], "reason": "ok"}
         await node._enforce_usage_gate(datetime.now(UTC))
-        assert (node.sessions[w["id"]].gated or {}).get("line") == 70
+        assert (node.sessions[w["id"]].gated or {}).get("line") == 70, ("the node's tick", node.sessions[w["id"]].gated)
         # asked at the node: forwarded, written at the home, and the replica follows
         async with LocalClient() as at_node:
             await at_node.call("set_settings", teams={"ao-grind": {"reserve": 10}})
-        assert held(home.dir / "settings.yml", "teams", "ao-grind", "reserve") == 10
-        assert await wait_for(lambda: held(replica, "teams", "ao-grind", "reserve") == 10, timeout=10.0, step=0.05)
+        assert held(home.dir / "settings.yml", "teams", "ao-grind", "reserve") == 10, (
+            "the node's write forwarded to the home",
+            settings.load(home.dir / "settings.yml"),
+        )
+        assert await wait_for(lambda: held(replica, "teams", "ao-grind", "reserve") == 10, timeout=10.0, step=0.05), (
+            "the forwarded write coming back to the replica",
+            settings.load(replica),
+            node.home_link,
+        )
         # offline: refused at the node in the home-owned edits' words, and the home's write waits
         home.write_hosts([])
         node._home_mux.close("the lid closed")
-        assert await wait_for(lambda: not node.home_reachable(), timeout=10.0, step=0.05)
+        assert await wait_for(lambda: not node.home_reachable(), timeout=10.0, step=0.05), ("the lid", node.home_link)
         async with LocalClient() as at_node:
             with pytest.raises(AgentError, match="set_settings edits what the home owns, so it waits for the link"):
                 await at_node.call("set_settings", teams={"ao-grind": {"reserve": 20}})
         async with LocalClient(sock=home.dir / "agent.sock") as person:
             await person.call("set_settings", profile="", reserves={"5h": 40})
-        assert held(replica, "usage_gate", KEY, "5h") == 30  # the last frame stays in force offline
+        assert held(replica, "usage_gate", KEY, "5h") == 30, ("offline", settings.load(replica))  # the last frame stays
         home.write_hosts(["laptop"])
-        assert await wait_for(lambda: held(replica, "usage_gate", KEY, "5h") == 40, timeout=20.0, step=0.1)
+        assert await wait_for(lambda: held(replica, "usage_gate", KEY, "5h") == 40, timeout=20.0, step=0.1), (
+            "the next dial carrying the home's write",
+            settings.load(replica),
+            node.home_link,
+        )
         # a home file that cannot be read is not settings: nothing is sent, and the node keeps its replica
         (home.dir / "settings.yml").write_text("usage_gate: {broken\n")
         node._home_mux.close("a blip")
-        assert await wait_for(lambda: not node.home_reachable(), timeout=10.0, step=0.05)
-        assert await wait_for(node.home_reachable, timeout=20.0, step=0.1)
+        assert await wait_for(lambda: not node.home_reachable(), timeout=10.0, step=0.05), ("the blip", node.home_link)
+        assert await wait_for(node.home_reachable, timeout=20.0, step=0.1), ("the redial", node.home_link)
         await asyncio.sleep(1.0)  # the frame, had one been sent, lands just after the snapshot
-        assert held(replica, "usage_gate", KEY, "5h") == 40
+        assert held(replica, "usage_gate", KEY, "5h") == 40, ("an unreadable home file sent", settings.load(replica))
         async with LocalClient() as c:
             await c.call("kill", id=w["id"])
 
