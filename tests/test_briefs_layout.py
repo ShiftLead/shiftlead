@@ -149,6 +149,10 @@ def test_the_fact_checker_briefs_road_carries_no_word_the_guard_stops_on():
         if span.startswith(("ao reply", "ao msg person")) and "'" in span and span.count("'") != 2:
             bad.append((span, "a text is one single-quoted word holding no '"))
     assert bad == []
+    # TD-1889: its model line is `ao inbox`'s, so it names no command of its own to read the model file, and
+    # `ao inbox` is read with no option at all (two judged Gemini seats stopped on each)
+    assert not [s for s in spans if s.startswith(("head ", "echo "))]
+    assert not [s for s in spans if s.startswith("ao inbox ")]
 
 
 @pytest.mark.parametrize("role", ("grinder", "designer", "manager"))

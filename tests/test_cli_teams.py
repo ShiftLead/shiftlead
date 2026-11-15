@@ -1857,7 +1857,7 @@ def test_a_fact_checker_seat_starts_on_the_built_in_brief_filled_by_an_ask(world
     prompt = made["prompt"]
     assert prompt.startswith("You are a **fact-checker**")
     for rule in (
-        "`ao inbox` (text) — every open ask, not the unread alone",
+        "`ao inbox` (text, never with an option: its text holds every field this brief reads) — every open ask,",
         "**An ask that is not a fact-check**",
         "**Answer only an open ask.**",
         "closed (`expired`)",
@@ -1871,9 +1871,9 @@ def test_a_fact_checker_seat_starts_on_the_built_in_brief_filled_by_an_ask(world
         "carries entry",
         "asks nobody a question",
         "`cadence-review: SHIP|BLOCK · <adapter>/<model> · docs · <n> findings`",
-        "`$AGENT_MODEL_FILE`",
-        "else `$AGENT_MODEL`, used unchanged",
-        "else `<adapter>/default`",
+        "is what `ao inbox` prints under its count, *your model: …*, used unchanged",
+        "run no command of your own to read it",
+        "it is `<adapter>/default`",
         "the claim, where it bites (file:line), and what the repo says",
         "**You declare nothing**",
     ):
