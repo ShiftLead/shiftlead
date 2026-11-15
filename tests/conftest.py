@@ -235,7 +235,8 @@ def _scratch_factory(tmp_path_factory):
 def scratch_dir(name: str = "scratch") -> Path:
     """A new directory under this run's pytest base temp, for a helper that has no `tmp_path` (TD-1053).
 
-    pytest keeps the last three runs' base temps and removes the rest, so nothing piles up in `/tmp`
+    pytest keeps the newest run's base temp alone (`tmp_path_retention_count = 1`, TD-1890) and removes the rest,
+    so nothing piles up in `/tmp`
     the way `tempfile.mkdtemp()` did (about 105,000 directories by 2026-10-26, kmaster's whole
     inode table). `tests/test_no_temp_leaks.py` refuses a bare `mkdtemp` in the tests."""
     assert _SCRATCH is not None, "scratch_dir() is for test time, after the session fixtures are set up"

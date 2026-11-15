@@ -108,6 +108,11 @@ judge = "python scripts/judge.py"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# TD-1890: keep one run's `tmp_path` directories, not pytest's default three. A run of this suite leaves 97k–148k
+# inodes there, and kmaster's `/tmp` is a tmpfs of 1M inodes every session shares: three runs filled it on
+# 2026-11-15 and failed the next with *No space left on device*. Not `tmp_path_retention_policy = "failed"`: it
+# removes a passing test's directory at once, so a later test whose name starts the same gets the same path.
+tmp_path_retention_count = 1
 # **A hang must fail, and say where** (TD-063, TD-078). Twice a job has died with no output at
 # all: 26 minutes on PR #192, unattributed to this day, and 14 minutes on 2026-09-20 whose last
 # line was the test *before* the one that hung. The bound is **per test item** — setup, call and
