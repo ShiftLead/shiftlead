@@ -501,6 +501,31 @@ def test_a_closed_lift_asked_about_in_a_sweep_pr_not_yet_fetched_is_not_asked_ag
     )
 
 
+@pytest.mark.parametrize("head", ["sweep/cleanup", "notices/x-sweep-sweep-2026-11-05"])
+def test_a_closed_lift_named_by_a_pr_on_another_head_is_asked_about_still(repo, head):
+    """TD-1886 (#3959): only a PR on the sweep's own `sweep/<date>` head counts as having asked about a closed
+    lift (`reports.sweep_of(head) == "sweep"`): an open PR on `sweep/cleanup` or a `notices/…` head that names
+    the same Context in its body is not the sweep's, so the act item is still filed."""
+    root, _ = repo
+    gatesweep.sweep(root, [], today_utc=UTC, today_local=LOCAL, by="kmaster")
+    state_file = root.parent / "r-origin.git" / "fake-gh.json"
+    state = json.loads(state_file.read_text())
+    state["prs"]["1"]["state"], state["prs"]["2"]["state"] = "closed", "closed"
+    state["prs"]["3"] = {
+        "base": "main",
+        "head": head,
+        "title": "t",
+        "body": "- file: [act] … — Context: TD-7 event (x-merged) lift",
+        "state": "open",
+    }
+    state_file.write_text(json.dumps(state))
+    _git("--git-dir", str(root.parent / "r-origin.git"), "branch", "-D", f"sweep/{UTC.isoformat()}")
+    got, _ = gatesweep.sweep(root, [], today_utc=UTC, today_local=LOCAL, by="kmaster")
+    assert got["applied"][0] == (
+        "lift TD-7 event (x-merged): its PR #1 was closed unmerged — not reopened; an act item asks why"
+    )
+
+
 # ── host-log: the home runs agent-cadence's reader per gate (§4.4 *The check*, TD-1388) ─────────
 
 HOSTLOG = """## TD-9: Waits on a press
