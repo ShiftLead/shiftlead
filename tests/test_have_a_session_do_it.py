@@ -10,8 +10,9 @@ import re
 from pathlib import Path
 
 import pytest
+from _v3board import item, ref_of, write_board
 from markupsafe import Markup
-from test_board import BOARD_TEXT, GATED_ENTRY, git, on_origin, origin_board, repo  # noqa: F401 — `repo` a fixture
+from test_board import BOARD_TEXT, GATED_ENTRY, git, on_origin, origin_item, repo  # noqa: F401 — `repo` a fixture
 from test_queue_card_verbs import dots
 from test_queue_item_shape import card, inbox
 
@@ -64,9 +65,20 @@ def test_the_agent_passes_the_fixed_text_only_where_the_line_offers_no_answers()
 
 
 @pytest.mark.unit
-def test_the_kind_is_checked_on_the_found_line_whatever_the_page_sent():
-    got = board.edit_line(open_(ACT), ACT, "decide", answer=FIXED, today="2026-11-07")
-    assert got.startswith("- [ ] ") and "Decided: have a session do it" in got
+def _it(tmp_path, text: str):
+    """`text` (a v2 line) split into a v3 board under `tmp_path`, read back as its item (TD-1881)."""
+    write_board(tmp_path, f"# User attention\n\n- [ ] {text}\n")
+    return item(tmp_path, ref_of(text))
+
+
+def _decided(text: str) -> tuple:
+    got = board.ledgerboard.parse_item(text)
+    return got.closed, got.decided[0] if got.decided else None
+
+
+def test_the_kind_is_checked_on_the_found_item_whatever_the_page_sent(tmp_path):
+    got = board.edit_item(_it(tmp_path, ACT), "decide", answer=FIXED, today="2026-11-07")
+    assert _decided(got) == (None, "have a session do it")
     cases = {
         # any other answer on an `act` line
         (ACT, "now"): board.WORD_FOR_WORD,
@@ -81,30 +93,31 @@ def test_the_kind_is_checked_on_the_found_line_whatever_the_page_sent():
     }
     for (text, answer), words in cases.items():
         with pytest.raises(board.Refused, match=re.escape(words)):
-            board.edit_line(open_(text), text, "decide", answer=answer, today="2026-11-07")
-    # an answer the line offers is decided as today, whatever its words or kind
+            board.edit_item(_it(tmp_path, text), "decide", answer=answer, today="2026-11-07")
+    # an answer the item offers is decided as today, whatever its words or kind
     own = ACT.replace("Due: 2026-11-06.", "Due: 2026-11-06. Answers: Yes | No.")
-    assert "Decided: Yes" in board.edit_line(open_(own), own, "decide", answer="Yes", today="2026-11-07")
-    assert "Decided: Go" in board.edit_line(open_(DECIDE), DECIDE, "decide", answer="Go", today="2026-11-07")
+    assert _decided(board.edit_item(_it(tmp_path, own), "decide", answer="Yes", today="2026-11-07"))[1] == "Yes"
+    assert _decided(board.edit_item(_it(tmp_path, DECIDE), "decide", answer="Go", today="2026-11-07"))[1] == "Go"
     pair = ACT.replace("Due: 2026-11-06.", "Due: 2026-11-06. Answers: Works | Not right: <what>.")
-    got = board.edit_line(open_(pair), pair, "decide", answer="Not right: too slow", today="2026-11-07")
-    assert "Decided: Not right: too slow" in got, "the pair's filled form is the line's own answer"
+    got = board.edit_item(_it(tmp_path, pair), "decide", answer="Not right: too slow", today="2026-11-07")
+    assert _decided(got)[1] == "Not right: too slow", "the pair's filled form is the item's own answer"
 
 
 # -- the write: the board half alone -----------------------------------------------------------------------------------
 
 
-def _on_board(repo: Path, text: str, ledger: bool = True) -> int:  # noqa: F811 — the fixture's name
-    """`text` as an open line on origin's board, with the v2 ledger of a gated TD-190 beside it; its line number."""
+def _on_board(repo: Path, text: str, ledger: bool = True) -> str:  # noqa: F811 — the fixture's name
+    """`text` (a v2 line) as an open item on origin's v3 board, with the v2 ledger of a gated TD-190 beside it; its
+    reference."""
     if ledger:
         (repo / "docs" / "ledger").mkdir()
         (repo / "docs" / "ledger" / "README.md").write_text("# Ledger\n\nLedgerboard: 2\n")
         (repo / "docs" / "ledger" / "TD-190.md").write_text(GATED_ENTRY)
-    (repo / board.BOARD).write_text(BOARD_TEXT.replace("## Needs", "People: paul\n\n## Needs") + f"- [ ] {text}\n")
+    write_board(repo, BOARD_TEXT.replace("## Needs", "People: paul\n\n## Needs") + f"- [ ] {text}\n")
     git(repo, "add", "-A")
     git(repo, "commit", "-qm", "act")
     git(repo, "push", "-q", "origin", "main")
-    return origin_board(repo).splitlines().index(f"- [ ] {text}") + 1
+    return ref_of(text)
 
 
 @pytest.mark.parametrize(
@@ -114,23 +127,23 @@ def _on_board(repo: Path, text: str, ledger: bool = True) -> int:  # noqa: F811 
 )
 def test_the_press_writes_decided_on_the_board_alone_and_the_line_stays_open(repo, context):  # noqa: F811
     text = ACT.replace("Context: TD-190.", f"Context: {context}.")
-    at = _on_board(repo, text)
-    got = board.write_back(repo, at, text, "decide", answer=FIXED)
+    ref = _on_board(repo, text)
+    got = board.write_back(repo, None, "", "decide", answer=FIXED, key=ref)
     assert "entries" not in got
     files = on_origin(repo, "show", "--name-only", "--format=", "origin/main").split()
-    assert files == ["docs/user_attention.md"], "no lift runs, no ledger file changes"
-    line = origin_board(repo).splitlines()[at - 1]
-    assert line.startswith("- [ ] ") and "Decided: have a session do it (by " in line
+    assert files == [f"docs/user_attention/{got['id']}.md"], "no lift runs, no ledger file changes"
+    it = origin_item(repo, ref)
+    assert it.closed is None and it.decided[0] == FIXED and it.decided_by
     assert "**Blocked by:** decision (paul)" in on_origin(repo, "show", "origin/main:docs/ledger/TD-190.md")
-    # and the line is a work order `board:<key>`: open and decided
-    key = workorders.ref(repo, line.removeprefix("- [ ] "))
-    assert workorders.is_work_order(key)
+    # and the item is a work order `board:<key>`: open and decided
+    assert workorders.is_work_order(got["key"]) and got["key"] == ref
 
 
 def test_the_press_on_a_board_with_no_ledger_writes_the_board_alone(repo):  # noqa: F811
-    at = _on_board(repo, ACT, ledger=False)
-    board.write_back(repo, at, ACT, "decide", answer=FIXED)
-    assert origin_board(repo).splitlines()[at - 1].startswith("- [ ] ")
+    ref = _on_board(repo, ACT, ledger=False)
+    board.write_back(repo, None, ACT, "decide", answer=FIXED)  # found by its v2 text's reference
+    it = origin_item(repo, ref)
+    assert it.closed is None and it.decided[0] == FIXED
 
 
 def test_a_board_only_decide_ledgerboard_leaves_open_is_answered_with_what_it_left(repo, monkeypatch):  # noqa: F811
@@ -138,22 +151,23 @@ def test_a_board_only_decide_ledgerboard_leaves_open_is_answered_with_what_it_le
     entry still carrying the gate writes nothing and reports `left_open`. The write-back lands nothing and answers
     with those ids and the gate, never as the plain done of a press that changed nothing (TD-1349)."""
     text = ACT.replace("Context: TD-190.", "Context: TD-190 decision (paul).")
-    at = _on_board(repo, text)
+    ref = _on_board(repo, text)
     head = on_origin(repo, "rev-parse", "origin/main").strip()
+    before = origin_item(repo, ref)
     real = board.lb_board.plan_edit
 
     def left_open(*args, **kw):  # the plan v2.7 gives such a press: no subject, no change, the ids left open
         assert kw.get("board_only") is True, "the press reaches ledgerboard as a board-only decide"
         got = real(*args, **kw)
-        info = {"line": got.info["line"], "entries": [], "board_only": True, "left_open": ["TD-190"]}
+        info = {"id": got.info["id"], "entries": [], "board_only": True, "left_open": ["TD-190"]}
         return board.lb_board.Plan("decide", None, {}, info, ["left open: TD-190 still carry decision (paul)"])
 
     monkeypatch.setattr(board.lb_board, "plan_edit", left_open)
-    got = board.write_back(repo, at, text, "decide", answer=FIXED)
+    got = board.write_back(repo, None, "", "decide", answer=FIXED, key=ref)
     assert got["left_open"] == ["TD-190"] and got["gate"] == "decision (paul)"
-    assert "pr" not in got and got["line"] == at
+    assert "pr" not in got and got["key"] == ref
     assert on_origin(repo, "rev-parse", "origin/main").strip() == head, "nothing landed"
-    assert origin_board(repo).splitlines()[at - 1] == f"- [ ] {text}", "the line is as it was"
+    assert origin_item(repo, ref).raw == before.raw, "the item is as it was"
 
 
 # -- the free-pick test: one function for the draw and the 409 ---------------------------------------------------------
