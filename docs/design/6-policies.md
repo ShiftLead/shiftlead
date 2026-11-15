@@ -211,7 +211,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the record stays `closed` with its marks, so the row stands and the press can be made again —
      a run-only record too, since the close a restart makes writes no `run_ended` (§4.9, TD-1149).
      A member on a node is closed and created over the link as rule 1's replay is, and waits for
-     the link. **Where it is pressed**: **Restart** on the restart row (the Inbox's, or the Queue card's of the entry the record holds, §4.5 screen 6, TD-1856) beside Resume
+     the link. **Where it is pressed**: **Restart** on the restart row (the Inbox's, or the Queue card's of the entry the record holds, §4.5 screen 6, TD-1856) beside Resume in the Inbox and beside Open on the card
      (§4.5a, with the help saying which is which: *Restart puts it back in its team's run as its
      launch record started it, on a fresh prompt; Resume brings it back attended, under you*) —
      drawn for a record that is not a seat, and for a seat at the fill ceiling (the *fills
