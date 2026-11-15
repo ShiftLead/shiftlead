@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "done",
+  "refused": "board: no open item has the id 2026-01-09-ffffffff"
+ }
+}

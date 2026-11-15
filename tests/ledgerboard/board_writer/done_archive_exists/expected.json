@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "done",
+  "refused": "board: archive/2026-01/2026-01-10-a1000001.md exists"
+ }
+}

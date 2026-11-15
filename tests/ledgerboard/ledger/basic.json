@@ -7,20 +7,12 @@
  ],
  "check": [
   {
-   "field": "location",
-   "id": "TD-001",
-   "kind": "retired",
-   "level": "info",
-   "standing": false,
-   "text": "ℹ TD-001: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
-  },
-  {
    "field": "blocked by",
    "id": "TD-002",
-   "kind": "retired",
-   "level": "info",
+   "kind": "blocked-item",
+   "level": "error",
    "standing": false,
-   "text": "ℹ TD-002: Blocked by item 'decision (the owner) — the board, 2026-01-03 item' is retired — write decision (<person>), with the text in an **Ask:** section; it keeps the block (SPEC *Retired words*)"
+   "text": "⚠ TD-002: cannot read Blocked by item 'decision (the owner)' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
   },
   {
    "field": "blocked by",
@@ -89,20 +81,12 @@
  ],
  "check_since_empty": [
   {
-   "field": "location",
-   "id": "TD-001",
-   "kind": "retired",
-   "level": "error",
-   "standing": false,
-   "text": "⚠ TD-001: a new or changed Location line — the header field is retired; write the **Location:** body section, or run migrate, which moves it (SPEC *Retired words*)"
-  },
-  {
    "field": "blocked by",
    "id": "TD-002",
-   "kind": "retired",
-   "level": "info",
+   "kind": "blocked-item",
+   "level": "error",
    "standing": false,
-   "text": "ℹ TD-002: Blocked by item 'decision (the owner) — the board, 2026-01-03 item' is retired — write decision (<person>), with the text in an **Ask:** section; it keeps the block (SPEC *Retired words*)"
+   "text": "⚠ TD-002: cannot read Blocked by item 'decision (the owner)' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
   },
   {
    "field": "blocked by",
@@ -182,13 +166,13 @@
  "entries": [
   {
    "blocked_by": [
-    "decision (the owner)"
+    "'decision (the owner)'"
    ],
    "card_key": "1|0|000002",
    "cross_repo": [],
    "fields": {
     "added": "2026-01-03",
-    "blocked by": "decision (the owner) — the board, 2026-01-03 item",
+    "blocked by": "decision (the owner)",
     "priority": "High",
     "status": "Open"
    },
@@ -238,7 +222,6 @@
    "fields": {
     "added": "2026-01-02",
     "kind": "build",
-    "location": "`src/thing.py`",
     "owner": "builder",
     "priority": "Medium",
     "status": "Open",
@@ -344,18 +327,11 @@
  ],
  "flags": [
   {
-   "field": "location",
-   "id": "TD-001",
-   "kind": "retired",
-   "level": "info",
-   "text": "ℹ TD-001: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
-  },
-  {
    "field": "blocked by",
    "id": "TD-002",
-   "kind": "retired",
-   "level": "info",
-   "text": "ℹ TD-002: Blocked by item 'decision (the owner) — the board, 2026-01-03 item' is retired — write decision (<person>), with the text in an **Ask:** section; it keeps the block (SPEC *Retired words*)"
+   "kind": "blocked-item",
+   "level": "error",
+   "text": "⚠ TD-002: cannot read Blocked by item 'decision (the owner)' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
   },
   {
    "field": "blocked by",

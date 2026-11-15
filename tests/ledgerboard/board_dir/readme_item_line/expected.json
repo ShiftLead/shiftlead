@@ -1,0 +1,78 @@
+{
+ "board_dir_problems": [],
+ "closed": [],
+ "form": "dir",
+ "items": [
+  {
+   "added": "2026-01-05",
+   "answers": [],
+   "closed": null,
+   "consequences": [],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-01-05"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-05-4a000001",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "2026-01-05-4a000001.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "Rotate the key.",
+   "waiting_on": "person"
+  }
+ ],
+ "keys": [
+  "2026-01-05-4a000001"
+ ],
+ "major": 3,
+ "needs_you": [
+  [
+   "2026-01-05-4a000001",
+   "due",
+   -5
+  ]
+ ],
+ "path": "board",
+ "people": [
+  "pat"
+ ],
+ "problems": [],
+ "version_problem": null
+}

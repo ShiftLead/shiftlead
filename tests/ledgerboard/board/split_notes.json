@@ -1,0 +1,96 @@
+{
+ "answers": [],
+ "basic": [
+  [
+   "2026-01-09-0031ee69.md",
+   6,
+   "**Due:** 2026-01-20",
+   "due: an fyi carries no `Due`; read as fyi_due"
+  ],
+  [
+   "2026-01-05-fdda4eca.md",
+   5,
+   "**Session:** ab12cd34 on box-1",
+   "head text not carried: branch feature/x"
+  ]
+ ],
+ "closed_words": [
+  [
+   "README.md",
+   1,
+   "# Needs the user",
+   "names Needs the user: the board is now this directory"
+  ]
+ ],
+ "doer": [
+  [
+   "2026-01-07-5ca1d3d2.md",
+   7,
+   "**Doer:** team ops",
+   "doer: a decide carries no `Doer`; read as written"
+  ],
+  [
+   "2026-01-07-8b73eeb1.md",
+   7,
+   "**Doer:** two words",
+   "doer: `Doer` names no repo, `<repo>` not ending in `.`, and no team, `team <name>`; read as no doer"
+  ],
+  [
+   "2026-01-08-101cfc21.md",
+   7,
+   "**Doer:** Team ops",
+   "doer: `Doer` names no repo, `<repo>` not ending in `.`, and no team, `team <name>`; read as no doer"
+  ],
+  [
+   "2026-01-08-a05d1166.md",
+   7,
+   "**Doer:** acme.",
+   "doer: `Doer` names no repo, `<repo>` not ending in `.`, and no team, `team <name>`; read as no doer"
+  ],
+  [
+   "2026-01-09-39e7902c.md",
+   7,
+   "**Doer:** acme .",
+   "doer: `Doer` names no repo, `<repo>` not ending in `.`, and no team, `team <name>`; read as no doer"
+  ],
+  [
+   "2026-01-09-6429e574.md",
+   7,
+   "**Doer:** team  ops",
+   "doer: written with more than one space, or a tab, after `team`; read as the team ops"
+  ]
+ ],
+ "hidden": [],
+ "lifts_parts": [
+  [
+   "2026-01-08-b687dd7a.md",
+   8,
+   "**Answers:** done | not yet",
+   "answers: an act carries no `Answers`; read as written"
+  ],
+  [
+   "2026-01-09-19b5835a.md",
+   7,
+   "**Parts:** TD-23",
+   "parts: a fyi carries no `Parts`; read as written"
+  ]
+ ],
+ "people": [],
+ "reply_ref": [
+  [
+   "README.md",
+   1,
+   "# Needs the user",
+   "names Needs the user: the board is now this directory"
+  ]
+ ],
+ "shared_part_left_open": [],
+ "twins_across": [
+  [
+   "README.md",
+   1,
+   "# Needs the user",
+   "names Needs the user: the board is now this directory"
+  ]
+ ]
+}

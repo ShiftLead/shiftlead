@@ -4,11 +4,11 @@
   "action": "decide",
   "board_only": true,
   "entries": [],
+  "id": "2026-01-12-a0000013",
   "item_notes": [],
-  "line": 19,
   "paths": [
-   "board.md"
+   "board/2026-01-12-a0000013.md"
   ],
-  "subject": "ledgerboard: decide Go on the tool repo's exporter?: Go (session n/a)"
+  "subject": "ledgerboard: decide 2026-01-12-a0000013 Go on the tool repo's exporter?: Go (session n/a)"
  }
 }

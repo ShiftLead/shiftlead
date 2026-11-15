@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "add",
+  "refused": "board: 2026-01-15-5eed0001 is held"
+ }
+}

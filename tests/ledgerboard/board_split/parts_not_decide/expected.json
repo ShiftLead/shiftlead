@@ -1,0 +1,21 @@
+{
+ "files": {
+  "2026-01-05-6c68168b.md": "## Build it.\n\n**Kind:** act\n**Added:** 2026-01-05\n**Context:** TD-1\n**Parts:** TD-2\n**Due:** 2026-01-20\n",
+  "README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat, sam.lee\n"
+ },
+ "notes": [
+  [
+   "README.md",
+   1,
+   "# Needs the user",
+   "names Needs the user: the board is now this directory"
+  ],
+  [
+   "2026-01-05-6c68168b.md",
+   6,
+   "**Parts:** TD-2",
+   "parts: an act carries no `Parts`; read as written"
+  ]
+ ],
+ "persisted_keys_found": true
+}

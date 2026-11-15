@@ -1,0 +1,18 @@
+{
+ "argv": [
+  "add",
+  "--board",
+  "board",
+  "--id",
+  "2026-01-02-a1000003",
+  "--kind",
+  "act",
+  "--text",
+  "Tag v1.1",
+  "--context",
+  "none",
+  "--today",
+  "2026-01-02",
+  "--json"
+ ]
+}

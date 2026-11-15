@@ -1,0 +1,38 @@
+*2026-01-14-a1000006 · overdue*
+## Rotate the cert
+
+**Kind:** act
+**Added:** 2026-01-14
+**Session:** w-4
+**Context:** TD-8
+**Due:** 2026-01-14
+
+*2026-01-11-a1000002 · due*
+## Pick a cache?
+
+**Kind:** decide
+**Added:** 2026-01-11
+**Session:** w-2
+**Context:** TD-7
+**Due:** 2026-01-18
+**Answers:** Memory (default) | Disk
+
+- **Context:** Two caches fit.
+- **Question:** Which one?
+- **Recommended:** Memory — it is faster.
+
+*2026-01-10-a1000001 · due*
+## Merge the parser fix
+
+**Kind:** act
+**Added:** 2026-01-10
+**Session:** w-1 on host-a
+**Context:** PR #12
+**Due:** 2026-01-20
+
+*2026-01-13-a1000005 · fyi*
+## The mirror moved
+
+**Kind:** fyi
+**Added:** 2026-01-13
+**Context:** none

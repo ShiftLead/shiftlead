@@ -2,11 +2,12 @@
  "exit": 0,
  "out": {
   "action": "decide",
+  "id": "2026-01-12-a000001c",
   "item_notes": [],
-  "line": 28,
   "paths": [
-   "board.md"
+   "board/archive/2026-01/2026-01-12-a000001c.md",
+   "board/2026-01-12-a000001c.md"
   ],
-  "subject": "ledgerboard: decide Is the vendor's tool out?: Keep waiting (session n/a)"
+  "subject": "ledgerboard: decide 2026-01-12-a000001c Is the vendor's tool out?: Keep waiting (session n/a)"
  }
 }

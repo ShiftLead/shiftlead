@@ -7,21 +7,15 @@
    },
    {
     "accepted": false,
-    "why": [
-     "Added comment → Log"
-    ]
+    "why": null
    },
    {
     "accepted": false,
-    "why": [
-     "Added 2026-01-01.: not a date"
-    ]
+    "why": null
    },
    {
     "accepted": false,
-    "why": [
-     "Added soon: not a date"
-    ]
+    "why": null
    }
   ],
   "date": [
@@ -31,9 +25,7 @@
    },
    {
     "accepted": false,
-    "why": [
-     "Added 2026-1-31: not a date"
-    ]
+    "why": null
    }
   ],
   "digit": [
@@ -43,9 +35,7 @@
    },
    {
     "accepted": false,
-    "why": [
-     "Added 2026-1O-09: not a date"
-    ]
+    "why": null
    }
   ]
  },
@@ -577,45 +567,15 @@
    }
   ]
  },
- "item-line": {
-  "act-item": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": true,
-    "why": null
-   },
+ "item-file": {
+  "added-field": [
    {
     "accepted": true,
     "why": null
    },
    {
     "accepted": false,
-    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
-   },
-   {
-    "accepted": false,
-    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
-   },
-   {
-    "accepted": false,
-    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`; doer: no period after its value"
-   },
-   {
-    "accepted": false,
-    "why": "text: names a field (Doer:): say it in other words"
-   }
-  ],
-  "answer": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": "answers: each answer has its own label"
+    "why": "added: 'soon' is not a date as YYYY-MM-DD"
    }
   ],
   "answer-sep": [
@@ -625,27 +585,27 @@
    },
    {
     "accepted": false,
-    "why": "answers: a decide carries two or more answers"
+    "why": "answers: an empty answer between bars; answers: each answer has its own label"
    }
   ],
-  "answers": [
+  "answers-field": [
    {
     "accepted": true,
     "why": null
    },
    {
     "accepted": false,
-    "why": "answers: no period after its answers; answers: `Decided:` stands after `Answers:`; text: names a field (Decided:) where none is read; answers: an act carries no answers: a question with answers is a decide"
+    "why": "header: written `**Answers:** <value>`, one space after the name and none at the line's end, not '**Answers:**Go | No'"
    }
   ],
-  "any-head": [
+  "body-line": [
    {
     "accepted": true,
     "why": null
    },
    {
     "accepted": false,
-    "why": "head: `(someone)` is not `(session `<name>` on <host>)`, `(session `<name>`)`, `(n/a)` or `(person)`"
+    "why": "body: 'Plain prose line.' is no detail bullet (`- ` at column 0, or nested under one)"
    }
   ],
   "char": [
@@ -654,36 +614,28 @@
     "why": null
    },
    {
-    "accepted": true,
-    "why": null
-   },
-   {
     "accepted": false,
-    "why": "open: not an open item"
+    "why": "header: 'more words' is no field"
    }
   ],
-  "choices": [
+  "closed-field": [
    {
     "accepted": true,
     "why": null
    },
    {
     "accepted": false,
-    "why": "answers: no period after its answers"
+    "why": "closed: `Closed` is `<date>` or `<date> — <why>`"
    }
   ],
-  "context": [
+  "context-field": [
    {
     "accepted": true,
     "why": null
    },
    {
     "accepted": false,
-    "why": "context: does not end with its period"
-   },
-   {
-    "accepted": false,
-    "why": "context: empty"
+    "why": "context: empty, or opening or ending in whitespace"
    }
   ],
   "date": [
@@ -693,71 +645,17 @@
    },
    {
     "accepted": false,
-    "why": "head: '2026-1-5' is not a date as YYYY-MM-DD"
+    "why": "added: '2026-11-1' is not a date as YYYY-MM-DD"
    }
   ],
-  "dated-due": [
+  "decided-field": [
    {
     "accepted": true,
     "why": null
    },
    {
     "accepted": false,
-    "why": "context: does not end with its period; due: an fyi carries no `Due:`"
-   }
-  ],
-  "decide-item": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": "answers: a decide carries two or more answers"
-   }
-  ],
-  "decided": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": "text: names a field (Decided:) where none is read"
-   },
-   {
-    "accepted": false,
-    "why": "text: names a field (Decided:) where none is read"
-   }
-  ],
-  "decided-item": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": "head: `(person)` stands only on a decided line"
+    "why": "decided: `Decided` is `<date>[ by <person>] — <label>`"
    }
   ],
   "digit": [
@@ -767,33 +665,17 @@
    },
    {
     "accepted": false,
-    "why": "due: '2026-0x-20' is not a date as YYYY-MM-DD"
+    "why": "added: '2026-11-1١' is not a date as YYYY-MM-DD"
    }
   ],
-  "doer": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": true,
-    "why": null
-   },
+  "doer-field": [
    {
     "accepted": true,
     "why": null
    },
    {
     "accepted": false,
-    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
-   },
-   {
-    "accepted": false,
-    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
-   },
-   {
-    "accepted": false,
-    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`; doer: no period after its value"
+    "why": "doer: written `team <name>`, one space after `team`"
    }
   ],
   "doer-part": [
@@ -802,16 +684,8 @@
     "why": null
    },
    {
-    "accepted": true,
-    "why": null
-   },
-   {
     "accepted": false,
-    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
-   },
-   {
-    "accepted": false,
-    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
+    "why": "doer: `Doer` names a repo, `<repo>` not ending in `.`, or a team, `team <name>`"
    }
   ],
   "doer-repo": [
@@ -821,31 +695,17 @@
    },
    {
     "accepted": false,
-    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
+    "why": "doer: `Doer` names a repo, `<repo>` not ending in `.`, or a team, `team <name>`"
    }
   ],
-  "due": [
+  "due-field": [
    {
     "accepted": true,
     "why": null
    },
    {
     "accepted": false,
-    "why": "due: no period after its date"
-   },
-   {
-    "accepted": false,
-    "why": "due: spelled 'due', not `Due:`"
-   }
-  ],
-  "due-name": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": "due: spelled 'DUE', not `Due:`"
+    "why": "due: 'soon' is not a date as YYYY-MM-DD"
    }
   ],
   "entry-id": [
@@ -855,61 +715,7 @@
    },
    {
     "accepted": false,
-    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
-   }
-  ],
-  "field-at": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": "context: `Context:` stands more than once; text: does not end a sentence (`.`, `?` or `!`)"
-   }
-  ],
-  "field-name": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": "context: does not end with its period; due: `Due:` stands after `Closed:`; it follows Context; text: names a field (Closed:) where none is read"
-   }
-  ],
-  "fyi-item": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": "due: an fyi carries no `Due:`"
-   }
-  ],
-  "fyi-reply": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": "context: does not end with its period; due: an fyi carries no `Due:`"
-   }
-  ],
-  "head": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": "head: `(session w-1 on box-1)` is not `(session `<name>` on <host>)`, `(session `<name>`)`, `(n/a)` or `(person)`"
+    "why": "parts: `Parts` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
    }
   ],
   "head-name": [
@@ -919,45 +725,97 @@
    },
    {
     "accepted": false,
-    "why": "head: `(session `w;1`)` is not `(session `<name>` on <host>)`, `(session `<name>`)`, `(n/a)` or `(person)`"
+    "why": "session: 'w-9 on host;a' is not `<name>` or `<name> on <host>`"
    }
   ],
-  "hide": [
+  "hide-field": [
    {
     "accepted": true,
     "why": null
    },
    {
     "accepted": false,
-    "why": "hide: no period after its date"
+    "why": "hide: 'later' is not a date as YYYY-MM-DD"
    }
   ],
-  "item-line": [
+  "item-answer": [
    {
     "accepted": true,
     "why": null
    },
    {
     "accepted": false,
-    "why": "open: not an open item"
-   },
-   {
-    "accepted": false,
-    "why": "open: an item line opens `- [ ] ` at column 0, single-spaced"
-   },
-   {
-    "accepted": false,
-    "why": "open: an item line opens `- [ ] ` at column 0, single-spaced"
+    "why": "header: written `**Answers:** <value>`, one space after the name and none at the line's end, not '**Answers:**  Go | No'"
    }
   ],
-  "label": [
+  "item-body": [
    {
     "accepted": true,
     "why": null
    },
    {
     "accepted": false,
-    "why": "answers: each answer has its own label"
+    "why": "body: the detail block is one part, with no blank line inside it"
+   }
+  ],
+  "item-file": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "file: ends in one newline"
+   }
+  ],
+  "item-header": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "header: Context stands after Due; the fields' order is Kind, Added, Session, Context, Parts, Doer, Due, Hide until, Answers, Lifts, Decided, Closed"
+   }
+  ],
+  "item-label": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "answers: an empty answer between bars; answers: each answer has its own label"
+   }
+  ],
+  "item-log": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "log: `**Log:**` holds a reply or more"
+   }
+  ],
+  "item-text": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "heading: the file opens `## <text>`, the text neither empty nor opening or ending in whitespace"
+   }
+  ],
+  "kind-field": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "kind: 'banana' is not a kind: one of decide, act, look, watch, fyi, in lower case"
    }
   ],
   "label-char": [
@@ -967,17 +825,7 @@
    },
    {
     "accepted": false,
-    "why": "answers: each answer has its own label"
-   }
-  ],
-  "label-chars": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": "context: `Context:` stands more than once; answers: no period after its answers; answers: `Context:` stands after `Answers:`; answers: a decide carries two or more answers"
+    "why": "header: 'it' is no field"
    }
   ],
   "label-start": [
@@ -987,71 +835,37 @@
    },
    {
     "accepted": false,
-    "why": "answers: each answer has its own label"
+    "why": "answers: an empty answer between bars; answers: each answer has its own label"
    }
   ],
-  "lifts": [
+  "lifts-field": [
    {
     "accepted": true,
     "why": null
    },
    {
     "accepted": false,
-    "why": "lifts: no period after its answers"
+    "why": "lifts: `Lifts` names one or more of the answers"
    }
   ],
-  "look-answers": [
+  "nonspace": [
    {
     "accepted": true,
     "why": null
    },
    {
     "accepted": false,
-    "why": "answers: a look carries exactly `Works | Not right: <what>`, `Works` marked ` (default)` or not"
-   },
-   {
-    "accepted": false,
-    "why": "answers: a look carries exactly `Works | Not right: <what>`, `Works` marked ` (default)` or not"
+    "why": "context: empty, or opening or ending in whitespace"
    }
   ],
-  "look-item": [
+  "parts-field": [
    {
     "accepted": true,
     "why": null
    },
    {
     "accepted": false,
-    "why": "answers: a look carries exactly `Works | Not right: <what>`, `Works` marked ` (default)` or not"
-   }
-  ],
-  "non-word": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": "answers: no period after its answers; lifts: not one of the item's answers: it, Drop it; answers: a decide carries two or more answers"
-   }
-  ],
-  "other-item": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": "due: no `Due:` (every kind but fyi carries one)"
-   }
-  ],
-  "parts": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
+    "why": "parts: `Parts` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
    }
   ],
   "person": [
@@ -1061,7 +875,7 @@
    },
    {
     "accepted": false,
-    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
+    "why": "decided: `Decided` is `<date>[ by <person>] — <label>`"
    }
   ],
   "person-part": [
@@ -1071,31 +885,27 @@
    },
    {
     "accepted": false,
-    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
-   },
-   {
-    "accepted": false,
-    "why": "doer: `Doer:` names a repo, `<repo>`, or a team, `team <name>`"
+    "why": "decided: `Decided` is `<date>[ by <person>] — <label>`"
    }
   ],
-  "reply": [
+  "reply-by": [
    {
     "accepted": true,
     "why": null
    },
    {
     "accepted": false,
-    "why": "extra: '— Pat, 2026-01-06 later.' after `Due:`"
+    "why": "log: '- 2026-11-12: a:b: words' is no reply, `- YYYY-MM-DD: <name>: <words>`"
    }
   ],
-  "reply-name": [
+  "reply-line": [
    {
     "accepted": true,
     "why": null
    },
    {
     "accepted": false,
-    "why": "extra: '— Pat, Lee, 2026-01-06: later.' after `Due:`"
+    "why": "log: '- 2026-11-12 pat: words' is no reply, `- YYYY-MM-DD: <name>: <words>`"
    }
   ],
   "repo": [
@@ -1104,28 +914,8 @@
     "why": null
    },
    {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
     "accepted": false,
-    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
-   },
-   {
-    "accepted": false,
-    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
-   },
-   {
-    "accepted": false,
-    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
-   },
-   {
-    "accepted": false,
-    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
+    "why": "parts: `Parts` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
    }
   ],
   "repo-part": [
@@ -1134,58 +924,18 @@
     "why": null
    },
    {
-    "accepted": true,
-    "why": null
-   },
-   {
     "accepted": false,
-    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
-   },
-   {
-    "accepted": false,
-    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
-   },
-   {
-    "accepted": false,
-    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
+    "why": "parts: `Parts` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
    }
   ],
-  "text": [
+  "session-field": [
    {
     "accepted": true,
     "why": null
    },
    {
     "accepted": false,
-    "why": "text: does not end a sentence (`.`, `?` or `!`)"
-   }
-  ],
-  "undated": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": "context: does not end with its period; due: an fyi carries no `Due:`"
-   }
-  ],
-  "words": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": "text: names a field (Answers:): say it in other words"
+    "why": "session: 'w 9' is not `<name>` or `<name> on <host>`"
    }
   ]
  },
@@ -1631,7 +1381,7 @@
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Dropped, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Dropped, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "digit": [
@@ -1641,7 +1391,7 @@
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Dropped, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Dropped, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "status-dropped": [
@@ -1651,15 +1401,15 @@
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Dropped, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Dropped, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Dropped, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Dropped, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Dropped, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Dropped, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ]
  },
@@ -1671,15 +1421,15 @@
    },
    {
     "accepted": false,
-    "why": "an open entry's Status is Open alone — this one is Open, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an open entry's Status is Open alone — this one is Open, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "accepted": false,
-    "why": "an open entry's Status is Open alone — this one is open, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an open entry's Status is Open alone — this one is open, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "accepted": false,
-    "why": "an open entry's Status is Open alone — this one is Open, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an open entry's Status is Open alone — this one is Open, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ]
  },
@@ -1691,7 +1441,7 @@
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "digit": [
@@ -1701,7 +1451,7 @@
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "status-resolved": [
@@ -1711,15 +1461,15 @@
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ]
  },
@@ -1731,7 +1481,7 @@
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "digit": [
@@ -1741,7 +1491,7 @@
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "entry-id": [
@@ -1751,7 +1501,7 @@
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "repo": [
@@ -1761,7 +1511,7 @@
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "repo-part": [
@@ -1771,7 +1521,7 @@
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "status-superseded": [
@@ -1781,15 +1531,15 @@
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "accepted": false,
-    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "why": "an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ]
  }

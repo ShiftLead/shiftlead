@@ -5,13 +5,14 @@
   "entries": [
    "TD-001"
   ],
+  "id": "2026-01-12-a0000008",
   "item_notes": [],
-  "line": 8,
   "notes": [],
   "paths": [
-   "board.md",
+   "board/archive/2026-01/2026-01-12-a0000008.md",
+   "board/2026-01-12-a0000008.md",
    "ledger/TD-001.md"
   ],
-  "subject": "ledgerboard: decide Go on the export format?: Go (session n/a)"
+  "subject": "ledgerboard: decide 2026-01-12-a0000008 Go on the export format?: Go (session n/a)"
  }
 }

@@ -1,0 +1,10 @@
+{
+ "argv": [
+  "migrate",
+  "--release",
+  "2.8",
+  "--ledger",
+  "ledger",
+  "--json"
+ ]
+}

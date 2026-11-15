@@ -26,16 +26,17 @@ Fields: Owner = builder | designer; Kind = build | design-first
 **Owner:** builder
 **Kind:** build
 **Status:** Open
-**Location:** `src/thing.py`
 
 **Why:** a reason.
+
+**Location:** `src/thing.py`
 
 ## TD-002: A high entry blocked on a decision
 
 **Priority:** High
 **Added:** 2026-01-03
 **Status:** Open
-**Blocked by:** decision (the owner) — the board, 2026-01-03 item
+**Blocked by:** decision (the owner)
 
 ## TD-003: Low debt first in its rank
 

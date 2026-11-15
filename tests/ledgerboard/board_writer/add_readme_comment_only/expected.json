@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "add",
+  "refused": "board: not a v3 board: README.md declares no Ledgerboard"
+ }
+}

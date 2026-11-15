@@ -1,0 +1,12 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "done",
+  "id": "2026-01-10-a1000001",
+  "paths": [
+   "board/archive/2026-01/2026-01-10-a1000001.md",
+   "board/2026-01-10-a1000001.md"
+  ],
+  "subject": "ledgerboard: done 2026-01-10-a1000001 Merge the parser fix (session w-1)"
+ }
+}

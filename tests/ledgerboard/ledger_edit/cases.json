@@ -1221,7 +1221,8 @@
       }
      }
     }
-   ]
+   ],
+   "today": "2026-01-20"
   },
   {
    "name": "set_migrates_old_form",
@@ -2241,6 +2242,30 @@
    "name": "misplaced_names_with_fields",
    "ledger": "check/misplaced_fields.md",
    "archive": ""
+  },
+  {
+   "name": "taken_by_untouched",
+   "ledger": "check/taken_by.md",
+   "archive": "",
+   "old": "check/taken_by.md"
+  },
+  {
+   "name": "resolved_header_untouched",
+   "ledger": "check/resolved_header.md",
+   "archive": "",
+   "old": "check/resolved_header.md"
+  },
+  {
+   "name": "old_form_untouched",
+   "ledger": "check/old_form.md",
+   "archive": "",
+   "old": "check/old_form.md"
+  },
+  {
+   "name": "taken_by_archived_untouched",
+   "ledger": "check/retired_archived.md",
+   "archive": "check/retired_archived.archive.md",
+   "old": "check/retired_archived.md"
   }
  ],
  "log": [

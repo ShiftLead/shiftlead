@@ -1,0 +1,1235 @@
+{
+ "board_dir_problems": [
+  [
+   "2026-01-03-5c000001.md",
+   "closed: a `Closed` on a file outside archive/; read as closed"
+  ],
+  [
+   "2026-01-05-5a000001.md",
+   "added: 2026-01-06 is not the id's date, 2026-01-05"
+  ],
+  [
+   "2026-01-05-5a000002.md",
+   "added: no `Added`; the item is read with no date added"
+  ],
+  [
+   "2026-01-05-5a000003.md",
+   "added: `Added` is no day; the item is read with no date added"
+  ],
+  [
+   "2026-01-05-5a000004.md",
+   "closed: `Closed` is not `<date>[ — <why>]`; read as no close"
+  ],
+  [
+   "2026-01-05-5a000006.md",
+   "no item: its first non-blank line does not open `## `, or the next non-blank line is no header field; skipped"
+  ],
+  [
+   "2026-01-05-5a000007.md",
+   "header: 'a note in the header' is no field; it is kept, in no field"
+  ],
+  [
+   "2026-01-05-5a000008.md",
+   "unreadable: the file could not be read; skipped"
+  ],
+  [
+   "2026-01-05-5b000001.md",
+   "kind: 'banana' is not one of decide, act, look, watch, fyi; read as a to-do, shown"
+  ],
+  [
+   "2026-01-05-5b000002.md",
+   "hide: 'someday' is no day; read as not hidden"
+  ],
+  [
+   "2026-01-05-5b000003.md",
+   "parts: `Parts` is not entry ids separated by `, `; read as no parts"
+  ],
+  [
+   "2026-01-05-5b000004.md",
+   "doer: `Doer` names no repo, `<repo>` not ending in `.`, and no team, `team <name>`; read as no doer"
+  ],
+  [
+   "2026-01-05-5b000005.md",
+   "doer: written with more than one space, or a tab, after `team`; read as the team ops"
+  ],
+  [
+   "2026-01-05-5b000006.md",
+   "doer: a decide carries no `Doer`; read as written"
+  ],
+  [
+   "2026-01-05-5b000007.md",
+   "kind: 'ACT' is not in lower case; read as act"
+  ],
+  [
+   "2026-02-30-abcd1234.md",
+   "name: not an item file, `<id>.md`; not read"
+  ],
+  [
+   "archive/2025-12/2025-12-02-5c000002.md",
+   "closed: filed under archive/2025-12/, but its `Closed` is 2026-01-04; read as closed"
+  ],
+  [
+   "archive/2025-12/2025-12-03-5c000003.md",
+   "closed: an archived file with no `Closed` in its form; read as closed, with no date"
+  ],
+  [
+   "archive/2026-01/2025-12-01-5f000002.md",
+   "duplicate: 2025-12-01-5f000002 is held by 2 files (archive/2025-12/2025-12-01-5f000002.md, archive/2026-01/2025-12-01-5f000002.md); this archived copy is read"
+  ],
+  [
+   "archive/2026-01/2026-01-02-5f000001.md",
+   "duplicate: 2026-01-02-5f000001 is held by 2 files (2026-01-02-5f000001.md, archive/2026-01/2026-01-02-5f000001.md); this archived copy is read"
+  ],
+  [
+   "archive/2026-01/extra/",
+   "name: a directory in a month; not read"
+  ],
+  [
+   "archive/2026-13/",
+   "name: not a month, `YYYY-MM`, under archive/; not read"
+  ],
+  [
+   "archive/misc/",
+   "name: not a month, `YYYY-MM`, under archive/; not read"
+  ],
+  [
+   "archive/stray.md",
+   "name: a file directly in archive/, outside a month; not read"
+  ],
+  [
+   "notes.md",
+   "name: not an item file, `<id>.md`; not read"
+  ],
+  [
+   "notes/",
+   "name: a directory other than archive/; not read"
+  ]
+ ],
+ "closed": [
+  {
+   "added": "2026-01-03",
+   "answers": [],
+   "closed": {
+    "date": "2026-01-09",
+    "why": "done"
+   },
+   "consequences": [],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-01-03"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ],
+    [
+     "Closed",
+     "2026-01-09 — done"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-03-5c000001",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "2026-01-03-5c000001.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "Closed but left outside archive.",
+   "waiting_on": "person"
+  },
+  {
+   "added": "2026-01-02",
+   "answers": [],
+   "closed": {
+    "date": "2026-01-08",
+    "why": "done"
+   },
+   "consequences": [],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-01-02"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ],
+    [
+     "Closed",
+     "2026-01-08 — done"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-02-5f000001",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "archive/2026-01/2026-01-02-5f000001.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "One id, open and archived.",
+   "waiting_on": "person"
+  },
+  {
+   "added": "2025-12-03",
+   "answers": [],
+   "closed": {
+    "date": null,
+    "why": null
+   },
+   "consequences": [],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2025-12-03"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2025-12-03-5c000003",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "archive/2025-12/2025-12-03-5c000003.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "Archived with no Closed.",
+   "waiting_on": "person"
+  },
+  {
+   "added": "2025-12-02",
+   "answers": [],
+   "closed": {
+    "date": "2026-01-04",
+    "why": "done"
+   },
+   "consequences": [],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2025-12-02"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ],
+    [
+     "Closed",
+     "2026-01-04 — done"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2025-12-02-5c000002",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "archive/2025-12/2025-12-02-5c000002.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "Filed in the wrong month.",
+   "waiting_on": "person"
+  },
+  {
+   "added": "2025-12-01",
+   "answers": [],
+   "closed": {
+    "date": "2026-01-03",
+    "why": "done again"
+   },
+   "consequences": [],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2025-12-01"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ],
+    [
+     "Closed",
+     "2026-01-03 — done again"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2025-12-01-5f000002",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "archive/2026-01/2025-12-01-5f000002.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "One id, archived twice.",
+   "waiting_on": "person"
+  }
+ ],
+ "form": "dir",
+ "items": [
+  {
+   "added": "2026-01-05",
+   "answers": [],
+   "closed": null,
+   "consequences": [],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "ACT"
+    ],
+    [
+     "Added",
+     "2026-01-05"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-05-5b000007",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "2026-01-05-5b000007.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "A kind in capitals.",
+   "waiting_on": "person"
+  },
+  {
+   "added": "2026-01-05",
+   "answers": [
+    "Go",
+    "Not yet"
+   ],
+   "closed": null,
+   "consequences": [
+    "",
+    ""
+   ],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": "Go",
+   "detail": [
+    "- **Context:** the store.",
+    "- **Question:** Go?",
+    "- **Recommended:** Go — it is ready."
+   ],
+   "doer": {
+    "kind": "team",
+    "name": "ops",
+    "text": "team ops"
+   },
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "decide"
+    ],
+    [
+     "Added",
+     "2026-01-05"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Doer",
+     "team ops"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ],
+    [
+     "Answers",
+     "Go (default) | Not yet"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-05-5b000006",
+   "kind": "decide",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "2026-01-05-5b000006.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "A doer on a decide.",
+   "waiting_on": "person"
+  },
+  {
+   "added": "2026-01-05",
+   "answers": [],
+   "closed": null,
+   "consequences": [],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": {
+    "kind": "team",
+    "name": "ops",
+    "text": "team  ops"
+   },
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-01-05"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Doer",
+     "team  ops"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-05-5b000005",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "2026-01-05-5b000005.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "A team spelled with two spaces.",
+   "waiting_on": "person"
+  },
+  {
+   "added": "2026-01-05",
+   "answers": [],
+   "closed": null,
+   "consequences": [],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-01-05"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Doer",
+     "acme."
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-05-5b000004",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "2026-01-05-5b000004.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "A doer not in its form.",
+   "waiting_on": "person"
+  },
+  {
+   "added": "2026-01-05",
+   "answers": [
+    "Go",
+    "Not yet"
+   ],
+   "closed": null,
+   "consequences": [
+    "",
+    ""
+   ],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": "Go",
+   "detail": [
+    "- **Context:** the store.",
+    "- **Question:** Go?",
+    "- **Recommended:** Go — it is ready."
+   ],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "decide"
+    ],
+    [
+     "Added",
+     "2026-01-05"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Parts",
+     "TD-2 and TD-3"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ],
+    [
+     "Answers",
+     "Go (default) | Not yet"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-05-5b000003",
+   "kind": "decide",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "2026-01-05-5b000003.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "Parts not in their form.",
+   "waiting_on": "person"
+  },
+  {
+   "added": "2026-01-05",
+   "answers": [],
+   "closed": null,
+   "consequences": [],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-01-05"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ],
+    [
+     "Hide until",
+     "someday"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-05-5b000002",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "2026-01-05-5b000002.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "A hide that is no day.",
+   "waiting_on": "person"
+  },
+  {
+   "added": "2026-01-05",
+   "answers": [],
+   "closed": null,
+   "consequences": [],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "banana"
+    ],
+    [
+     "Added",
+     "2026-01-05"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-05-5b000001",
+   "kind": null,
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "2026-01-05-5b000001.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "A banana kind.",
+   "waiting_on": "person"
+  },
+  {
+   "added": "2026-01-05",
+   "answers": [],
+   "closed": null,
+   "consequences": [],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-01-05"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-05-5a000007",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "2026-01-05-5a000007.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "A header line that is no field.",
+   "waiting_on": "person"
+  },
+  {
+   "added": "2026-01-05",
+   "answers": [],
+   "closed": null,
+   "consequences": [],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-01-05"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ],
+    [
+     "Closed",
+     "soon"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-05-5a000004",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "2026-01-05-5a000004.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "A Closed not in its form.",
+   "waiting_on": "person"
+  },
+  {
+   "added": null,
+   "answers": [],
+   "closed": null,
+   "consequences": [],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-02-30"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-05-5a000003",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "2026-01-05-5a000003.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "An Added that is no day.",
+   "waiting_on": "person"
+  },
+  {
+   "added": null,
+   "answers": [],
+   "closed": null,
+   "consequences": [],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-05-5a000002",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "2026-01-05-5a000002.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "No Added at all.",
+   "waiting_on": "person"
+  },
+  {
+   "added": "2026-01-06",
+   "answers": [],
+   "closed": null,
+   "consequences": [],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-01-06"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-05-5a000001",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "2026-01-05-5a000001.md",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "Added not the id's date.",
+   "waiting_on": "person"
+  }
+ ],
+ "keys": [
+  "2026-01-05-5b000007",
+  "2026-01-05-5b000006",
+  "2026-01-05-5b000005",
+  "2026-01-05-5b000004",
+  "2026-01-05-5b000003",
+  "2026-01-05-5b000002",
+  "2026-01-05-5b000001",
+  "2026-01-05-5a000007",
+  "2026-01-05-5a000004",
+  "2026-01-05-5a000003",
+  "2026-01-05-5a000002",
+  "2026-01-05-5a000001",
+  "2026-01-03-5c000001",
+  "2026-01-02-5f000001",
+  "2025-12-03-5c000003",
+  "2025-12-02-5c000002",
+  "2025-12-01-5f000002"
+ ],
+ "major": 3,
+ "needs_you": [
+  [
+   "2026-01-05-5b000007",
+   "due",
+   -5
+  ],
+  [
+   "2026-01-05-5b000006",
+   "due",
+   -5
+  ],
+  [
+   "2026-01-05-5b000005",
+   "due",
+   -5
+  ],
+  [
+   "2026-01-05-5b000004",
+   "due",
+   -5
+  ],
+  [
+   "2026-01-05-5b000003",
+   "due",
+   -5
+  ],
+  [
+   "2026-01-05-5b000002",
+   "due",
+   -5
+  ],
+  [
+   "2026-01-05-5b000001",
+   "due",
+   -5
+  ],
+  [
+   "2026-01-05-5a000007",
+   "due",
+   -5
+  ],
+  [
+   "2026-01-05-5a000004",
+   "due",
+   -5
+  ],
+  [
+   "2026-01-05-5a000003",
+   "due",
+   -5
+  ],
+  [
+   "2026-01-05-5a000002",
+   "due",
+   -5
+  ],
+  [
+   "2026-01-05-5a000001",
+   "due",
+   -5
+  ]
+ ],
+ "path": "board",
+ "people": [
+  "pat"
+ ],
+ "problems": [
+  [
+   "2026-01-05-5a000002.md",
+   "added: no `Added`; the item is read with no date added"
+  ],
+  [
+   "2026-01-05-5a000003.md",
+   "added: `Added` is no day; the item is read with no date added"
+  ],
+  [
+   "2026-01-05-5a000006.md",
+   "no item: its first non-blank line does not open `## `, or the next non-blank line is no header field; skipped"
+  ],
+  [
+   "2026-01-05-5a000008.md",
+   "unreadable: the file could not be read; skipped"
+  ],
+  [
+   "archive/2025-12/2025-12-03-5c000003.md",
+   "closed: an archived file with no `Closed` in its form; read as closed, with no date"
+  ],
+  [
+   "archive/2026-01/2025-12-01-5f000002.md",
+   "duplicate: 2025-12-01-5f000002 is held by 2 files (archive/2025-12/2025-12-01-5f000002.md, archive/2026-01/2025-12-01-5f000002.md); this archived copy is read"
+  ],
+  [
+   "archive/2026-01/2026-01-02-5f000001.md",
+   "duplicate: 2026-01-02-5f000001 is held by 2 files (2026-01-02-5f000001.md, archive/2026-01/2026-01-02-5f000001.md); this archived copy is read"
+  ]
+ ],
+ "version_problem": null
+}

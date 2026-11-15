@@ -112,67 +112,14 @@
     ]
    ]
   ],
-  "transition_a_doubly_given_id_names_each_by_once": [
-   [
-    [
-     "id-taken-by",
-     "TD-131 was handed to sam, lee, not zz — an id is the session's the counter handed it to; take this entry its own"
-    ]
-   ],
-   []
-  ],
-  "transition_a_fields_line_asks_for_no_taken_by": [
-   [],
-   []
-  ],
-  "transition_a_matching_nonce_needs_no_taken_by": [
-   [],
-   []
-  ],
-  "transition_a_matching_taken_by_warns": [
-   [],
+  "taken_by_only_no_take": [
    [
     [
      "id-no-take",
-     "a matching **Taken by:** but no **Id take:** on TD-125 — write its take's nonce in the header"
-    ]
-   ]
-  ],
-  "transition_a_wrong_nonce_beside_a_matching_taken_by_fails": [
-   [
-    [
-     "id-take",
-     "TD-125's Id take is the take of TD-126, TD-127 (grinder-z on 2026-01-12 (2222222)), not one of TD-125's (a1b2c3d4e5f6 on 2026-01-11 (1111111)) — write the Id take of the take that gave this id"
+     "no **Id take:** on TD-125 (handed out by a1b2c3d4e5f6 on 2026-01-11 (1111111)) — write its take's nonce in the header"
     ]
    ],
    []
-  ],
-  "transition_another_taken_by_fails": [
-   [
-    [
-     "id-taken-by",
-     "TD-125 was handed to a1b2c3d4e5f6, not b — an id is the session's the counter handed it to; take this entry its own"
-    ]
-   ],
-   []
-  ],
-  "transition_either_by_of_a_doubly_given_id_warns": [
-   [],
-   [
-    [
-     "id-no-take",
-     "a matching **Taken by:** but no **Id take:** on TD-131 — write its take's nonce in the header"
-    ]
-   ]
-  ],
-  "transition_neither_warns": [
-   [],
-   [
-    [
-     "id-no-taken-by",
-     "no **Id take:** or **Taken by:** on TD-125 — write its take's nonce in the header"
-    ]
-   ]
   ]
  },
  "next_id": [

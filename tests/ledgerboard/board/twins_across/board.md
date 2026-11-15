@@ -1,0 +1,6 @@
+# Needs the user
+
+People: pat
+
+- [ ] act 2026-01-05 (session w-9) — Rotate the key. Context: TD-1. Due: 2026-01-20.
+- [ ] act 2026-01-06 (session w-9) — Still open. Context: TD-2. Due: 2026-01-20.

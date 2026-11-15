@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "add",
+  "refused": "--by 'pat: the lead' is a Log name: no `:`, at most 40 characters"
+ }
+}

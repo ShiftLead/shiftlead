@@ -1,0 +1,2291 @@
+{
+ "canonical": {
+  "crlf": {
+   "ok": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n\n- **Context:** kept.\n"
+  },
+  "refused_not_a_field": {
+   "refused": "header: 'not a field' is no field: make it one, or move it out of the header block"
+  },
+  "refused_repeated": {
+   "refused": "header: Due stands twice: keep one"
+  },
+  "reordered_respelled": {
+   "ok": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Context:** TD-1\n**Due:** 2026-11-20\n\n- **Context:** kept.\n"
+  },
+  "unchanged": {
+   "ok": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+  },
+  "unknown_after_known": {
+   "ok": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Context:** TD-1\n**Due:** 2026-11-20\n**Owner:** sam.lee\n"
+  }
+ },
+ "compose": {
+  "act": {
+   "ok": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-12\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+  },
+  "act_doer": {
+   "ok": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-12\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Doer:** acme/widgets\n**Due:** 2026-11-20\n"
+  },
+  "decide": {
+   "ok": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-12\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Parts:** TD-15, TD-16\n**Due:** 2026-11-20\n**Answers:** Go (default) — the split stands | Change | Hold: <note>\n**Lifts:** Go | Hold: <note>\n\n- **Context:** The key is old.\n- **Question:** Rotate it now?\n- **Recommended:** Go — it is due.\n"
+  },
+  "decided_by": {
+   "ok": "## Ship the release\n\n**Kind:** decide\n**Added:** 2026-11-12\n**Context:** TD-12\n**Due:** 2026-11-12\n**Answers:** Go (default) | Hold\n**Decided:** 2026-11-12 by pat — Go\n"
+  },
+  "decided_by_words": {
+   "ok": "## Ship the release\n\n**Kind:** decide\n**Added:** 2026-11-12\n**Context:** TD-12\n**Due:** 2026-11-12\n**Answers:** Go | Hold\n**Decided:** 2026-11-12 — Go (by x)\n"
+  },
+  "decided_default_form": {
+   "ok": "## Ship the release\n\n**Kind:** decide\n**Added:** 2026-11-12\n**Context:** TD-12\n**Due:** 2026-11-12\n**Answers:** Go | Hold: <note>\n**Decided:** 2026-11-12 — Hold: after the freeze\n"
+  },
+  "decided_no_by": {
+   "ok": "## Ship the release\n\n**Kind:** decide\n**Added:** 2026-11-12\n**Context:** TD-12\n**Due:** 2026-11-12\n**Decided:** 2026-11-12 — Go\n"
+  },
+  "decided_said_fields": {
+   "ok": "## Ship the release\n\n**Kind:** decide\n**Added:** 2026-11-12\n**Context:** TD-12\n**Due:** 2026-11-12\n**Answers:** Go | Hold\n**Decided:** 2026-11-12 — Context: TD-1 and Lifts: Go\n"
+  },
+  "field_words": {
+   "ok": "## Ask whether Context: TD-9 Lifts: Go\n\n**Kind:** decide\n**Added:** 2026-11-12\n**Session:** w-9 on host-a\n**Context:** TD-1, Due: soon. Lifts: all\n**Due:** 2026-11-20\n**Answers:** Go — Lifts: all of it | Change — Context: later\n\n- **Context:** The key is old.\n- **Question:** Does Context: TD-9 stand?\n- **Caveats:** Lifts: none.\n  - Decided: never\n- **Recommended:** it is due.\n"
+  },
+  "fyi": {
+   "ok": "## Rotate the key\n\n**Kind:** fyi\n**Added:** 2026-11-12\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Hide until:** 2026-11-15\n"
+  },
+  "look": {
+   "ok": "## Check the page\n\n**Kind:** look\n**Added:** 2026-11-12\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n**Answers:** Works (default) | Not right: <what>\n"
+  },
+  "refused_decide_one_answer": {
+   "refused": "a decide offers two or more answers"
+  },
+  "refused_default_form": {
+   "refused": "a form cannot be the default: pressing it sends no words"
+  },
+  "refused_doer_dot": {
+   "refused": "a doer is a repo, `<repo>` not ending in `.`, or a team, `team <name>` with one space, not 'acme.'"
+  },
+  "refused_doer_on_decide": {
+   "refused": "only an act names who does its step (doer), not a decide"
+  },
+  "refused_empty_text": {
+   "refused": "an item's text is empty"
+  },
+  "refused_fyi_due": {
+   "refused": "an fyi carries no Due date — give due as None"
+  },
+  "refused_host_no_session": {
+   "refused": "a host is written only with its session: give the session too"
+  },
+  "refused_lifts_waiting": {
+   "refused": "'Not yet' only keeps the gate waiting — it never lifts (v2.4)"
+  },
+  "refused_look_answers": {
+   "refused": "a look's answers are the writer's (Works | Not right: <what>): give none"
+  },
+  "refused_parts_on_act": {
+   "refused": "only a decide lists its parts (parts), not an act"
+  },
+  "refused_two_forms_one_head": {
+   "refused": "two answers are forms with one head, Hold: a fill could not say which"
+  },
+  "refused_two_lines": {
+   "refused": "an item's text is one line: put the rest on that line"
+  },
+  "todo": {
+   "ok": "## Rotate the key\n\n**Added:** 2026-11-12\n**Session:** w-9 on host-a\n**Context:** none\n**Due:** 2026-11-20\n"
+  },
+  "watch": {
+   "ok": "## Rotate the key\n\n**Kind:** watch\n**Added:** 2026-11-12\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+  }
+ },
+ "edits": {
+  "crlf_reply": {
+   "ok": "## Rotate the key\r\n\r\n**Kind:** act\r\n**Added:** 2026-11-11\r\n**Session:** w-9 on host-a\r\n**Context:** TD-1\r\n**Due:** 2026-11-20\r\n\r\n- **Context:** kept.\r\n\r\n**Log:**\r\n- 2026-11-12: pat: ok\r\n"
+  },
+  "crlf_snooze": {
+   "ok": "## Rotate the key\r\n\r\n**Kind:** act\r\n**Added:** 2026-11-11\r\n**Session:** w-9 on host-a\r\n**Context:** TD-1\r\n**Due:** 2026-11-20\r\n**Hide until:** 2026-11-15\r\n\r\n- **Context:** kept.\r\n"
+  },
+  "decide": {
+   "ok": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n**Decided:** 2026-11-12 by pat — Change\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n"
+  },
+  "decide_answer_by_words": {
+   "ok": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n**Decided:** 2026-11-12 — Change (by Friday)\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n"
+  },
+  "decide_close_lifting": {
+   "ok": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n**Decided:** 2026-11-12 — Go\n**Closed:** 2026-11-12 — lifted\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n"
+  },
+  "decide_close_waiting": {
+   "ok": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n**Decided:** 2026-11-12 — Not yet\n**Closed:** 2026-11-12 — kept waiting\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n"
+  },
+  "decide_form_fill": {
+   "ok": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n**Decided:** 2026-11-12 — Hold: not yet\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n"
+  },
+  "decide_form_fill_close": {
+   "ok": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n**Decided:** 2026-11-12 — Hold: not yet\n**Closed:** 2026-11-12 — lifted\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n"
+  },
+  "decide_replaces": {
+   "ok": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n**Decided:** 2026-11-12 — Go\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n"
+  },
+  "done": {
+   "ok": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Owner:** sam.lee\n**Due:** 2026-11-20\n**Closed:** 2026-11-12\n\n- **Context:** kept as written.\n  - nested\n"
+  },
+  "done_why": {
+   "ok": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Owner:** sam.lee\n**Due:** 2026-11-20\n**Closed:** 2026-11-12 — rotated, Context: TD-1\n\n- **Context:** kept as written.\n  - nested\n"
+  },
+  "due": {
+   "ok": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Owner:** sam.lee\n**Due:** 2026-11-30\n\n- **Context:** kept as written.\n  - nested\n"
+  },
+  "due_added_past_unknown": {
+   "ok": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Context:** TD-1\n**Due:** 2026-11-30\n**Owner:** sam.lee\n**Hide until:** 2026-11-15\n"
+  },
+  "refused_close_work_order": {
+   "refused": "'Change' neither lifts nor only keeps waiting — a work order stays open"
+  },
+  "refused_closed": {
+   "refused": "the item is closed: an edit changes an open item"
+  },
+  "refused_form_head_alone": {
+   "refused": "Hold needs its words"
+  },
+  "refused_form_unfilled": {
+   "refused": "Hold needs its words"
+  },
+  "refused_reply_blank": {
+   "refused": "the reply is empty — a reply needs its words"
+  },
+  "refused_reply_by_colon": {
+   "refused": "who replied is a name of at most 40 characters holding no `:`, not 'a:b'"
+  },
+  "reply_appends": {
+   "ok": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n\n**Log:**\n- 2026-11-12: pat: first\n- 2026-11-12: sam.lee: second\n"
+  },
+  "reply_opens_log": {
+   "ok": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Owner:** sam.lee\n**Due:** 2026-11-20\n\n- **Context:** kept as written.\n  - nested\n\n**Log:**\n- 2026-11-12: pat: rotated, Due: tomorrow\n"
+  },
+  "snooze": {
+   "ok": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Owner:** sam.lee\n**Due:** 2026-11-20\n**Hide until:** 2026-11-15\n\n- **Context:** kept as written.\n  - nested\n"
+  }
+ },
+ "gate": {
+  "a README holding a - [ ] line above People": {
+   "ok": []
+  },
+  "a README whose People is faulted": {
+   "ok": [
+    [
+     "README.md",
+     "people: named twice: pat"
+    ]
+   ]
+  },
+  "a new decide whose gate's person is not on People": {
+   "ok": [
+    [
+     "2026-01-06-5e6f7a8b.md",
+     "context: the gate's person sam is not on the board's `People:`"
+    ]
+   ]
+  },
+  "a v2 board refused": {
+   "refused": "the gate judges a board read from a directory (v3), and this one was read from a file (a v2 board): its items are lines, not item files"
+  },
+  "an added item faulted": {
+   "ok": [
+    [
+     "2026-01-06-5e6f7a8b.md",
+     "header: Context stands after Due; the fields' order is Kind, Added, Session, Context, Parts, Doer, Due, Hide until, Answers, Lifts, Decided, Closed"
+    ]
+   ]
+  },
+  "an edited item not judged": {
+   "ok": []
+  },
+  "old None: every open item judged": {
+   "ok": [
+    [
+     "2026-01-06-5e6f7a8b.md",
+     "header: Context stands after Due; the fields' order is Kind, Added, Session, Context, Parts, Doer, Due, Hide until, Answers, Lifts, Decided, Closed"
+    ]
+   ]
+  },
+  "old a v2 board: the split PR, nothing new": {
+   "ok": []
+  },
+  "two forms with one head, and a form marked default": {
+   "ok": [
+    [
+     "2026-01-06-0000000b.md",
+     "answers: a form cannot be the default: pressing it sends no words"
+    ],
+    [
+     "2026-01-06-0000000a.md",
+     "answers: two answers are forms with one head, Hold: a fill could not say which"
+    ]
+   ]
+  }
+ },
+ "ids": {
+  "is_item_id": {
+   "2026-02-30-abcd1234": false,
+   "2026-11-11-3F9A2C1D": false,
+   "2026-11-11-3f9a2c1d": true,
+   "2026-11-11-3f9a2c1d\n": false,
+   "2026-11-1١-3f9a2c1d": false
+  },
+  "item_id": [
+   {
+    "ok": "2026-11-11-3f9a2c1d"
+   },
+   {
+    "raises": "ValueError"
+   },
+   {
+    "raises": "ValueError"
+   },
+   {
+    "raises": "ValueError"
+   }
+  ],
+  "item_path": [
+   {
+    "ok": "2026-11-11-3f9a2c1d.md"
+   },
+   {
+    "ok": "archive/2026-11/2026-11-11-3f9a2c1d.md"
+   },
+   {
+    "ok": "archive/2026-12/2026-11-11-3f9a2c1d.md"
+   },
+   {
+    "raises": "ValueError"
+   },
+   {
+    "raises": "ValueError"
+   },
+   {
+    "raises": "ValueError"
+   }
+  ],
+  "key_id": [
+   {
+    "as_persisted": true,
+    "key_id": "1d32ec91"
+   }
+  ]
+ },
+ "parse": {
+  "act": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "answers_empty_piece": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [
+     "Go",
+     "No"
+    ],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": "Go",
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "decide",
+    "parts": [],
+    "replies": [],
+    "words": "Say Go"
+   },
+   "fields": [
+    [
+     "Kind",
+     "decide"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ],
+    [
+     "Answers",
+     "Go (default) | | No |"
+    ]
+   ]
+  },
+  "closed_archived": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": [
+     "2026-11-12",
+     "done"
+    ],
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Closed",
+     "2026-11-12 — done"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "closed_bare": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": [
+     "2026-11-12",
+     null
+    ],
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Closed",
+     "2026-11-12"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "closed_not_form": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Closed",
+     "soon"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "closed_open": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": [
+     "2026-11-12",
+     "done"
+    ],
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Closed",
+     "2026-11-12 — done"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "closed_why": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": [
+     "2026-11-12",
+     "done it"
+    ],
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Closed",
+     "2026-11-12 — done it"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "context_line_breaks": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1 and TD-2\fand TD-3",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": null,
+    "parts": [],
+    "replies": [],
+    "words": "Ping sam"
+   },
+   "fields": [
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Context",
+     "TD-1 and TD-2\fand TD-3"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "crlf": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [
+     [
+      "pat",
+      "2026-11-12",
+      "ok"
+     ]
+    ],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "decide_doer": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [
+     "Go",
+     "No"
+    ],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": [
+     "team",
+     "ops",
+     "team ops"
+    ],
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "decide",
+    "parts": [],
+    "replies": [],
+    "words": "Say Go"
+   },
+   "fields": [
+    [
+     "Kind",
+     "decide"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Doer",
+     "team ops"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ],
+    [
+     "Answers",
+     "Go | No"
+    ]
+   ]
+  },
+  "decide_whole": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [
+     "Go",
+     "Change"
+    ],
+    "bad_due": null,
+    "closed": [
+     "2026-11-12",
+     "lifted"
+    ],
+    "context": "TD-70 decision (pat)",
+    "decided": [
+     "Go",
+     "2026-11-12"
+    ],
+    "decided_by": "pat",
+    "default": "Go",
+    "doer": null,
+    "due": "2026-11-18",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "decide",
+    "parts": [],
+    "replies": [
+     [
+      "pat",
+      "2026-11-12",
+      "does S4 cover the archive's months?"
+     ]
+    ],
+    "words": "Say Go to the board scope"
+   },
+   "fields": [
+    [
+     "Kind",
+     "decide"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "s-alpha on host-a"
+    ],
+    [
+     "Context",
+     "TD-70 decision (pat)"
+    ],
+    [
+     "Due",
+     "2026-11-18"
+    ],
+    [
+     "Answers",
+     "Go (default) — the scope stands | Change — reply with what changes"
+    ],
+    [
+     "Decided",
+     "2026-11-12 by pat — Go"
+    ],
+    [
+     "Closed",
+     "2026-11-12 — lifted"
+    ]
+   ]
+  },
+  "decided_by": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": [
+     "Go",
+     "2026-11-12"
+    ],
+    "decided_by": "pat",
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Decided",
+     "2026-11-12 by pat — Go"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "decided_by_friday": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": [
+     "Go (by Friday)",
+     "2026-11-12"
+    ],
+    "decided_by": "pat",
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Decided",
+     "2026-11-12 by pat — Go (by Friday)"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "decided_label_by_person": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": [
+     "Go (by pat)",
+     "2026-11-12"
+    ],
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Decided",
+     "2026-11-12 — Go (by pat)"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "decided_no_by": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": [
+     "Go",
+     "2026-11-12"
+    ],
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Decided",
+     "2026-11-12 — Go"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "decided_no_person": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Decided",
+     "2026-11-12 by pat smith — Go"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "decided_not_form": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Decided",
+     "Go (2026-11-12)"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "doer_repo": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": [
+     "repo",
+     "acme/widgets",
+     "acme/widgets"
+    ],
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Doer",
+     "acme/widgets"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "doer_team": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": [
+     "team",
+     "ops",
+     "team ops"
+    ],
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Doer",
+     "team ops"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "doer_team_spaced": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": [
+     "team",
+     "ops",
+     "team  ops"
+    ],
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Doer",
+     "team  ops"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "due_no_day": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": "2026-02-30",
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": null,
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-02-30"
+    ]
+   ]
+  },
+  "due_soon": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": "soon",
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": null,
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "soon"
+    ]
+   ]
+  },
+  "empty_due": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": "",
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": null,
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     ""
+    ]
+   ]
+  },
+  "field_words": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [
+     "Go",
+     "Change"
+    ],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1, Due: 2026-01-01. Decided: no",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "decide",
+    "parts": [],
+    "replies": [
+     [
+      "pat",
+      "2026-11-12",
+      "Context: TD-3, Due: 2026-02-01, Decided: no"
+     ]
+    ],
+    "words": "Ask whether Context: TD-9 Due: 2026-01-01 Decided: Go stands"
+   },
+   "fields": [
+    [
+     "Kind",
+     "decide"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Context",
+     "TD-1, Due: 2026-01-01. Decided: no"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ],
+    [
+     "Answers",
+     "Go — Context: kept, Decided: later | Change"
+    ]
+   ]
+  },
+  "fyi": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": null,
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "fyi",
+    "parts": [],
+    "replies": [],
+    "words": "Read the notes"
+   },
+   "fields": [
+    [
+     "Kind",
+     "fyi"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ]
+   ]
+  },
+  "fyi_due": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": null,
+    "fyi_due": true,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "fyi",
+    "parts": [],
+    "replies": [],
+    "words": "Read the notes"
+   },
+   "fields": [
+    [
+     "Kind",
+     "fyi"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "fyi_parts": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": null,
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "fyi",
+    "parts": [
+     "TD-23"
+    ],
+    "replies": [],
+    "words": "Read it"
+   },
+   "fields": [
+    [
+     "Kind",
+     "fyi"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Parts",
+     "TD-23"
+    ]
+   ]
+  },
+  "heading_then_prose": null,
+  "kind_upper": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "ACT"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "log_shapes": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [
+     [
+      "pat",
+      "2026-11-12",
+      "first"
+     ],
+     [
+      "sam.lee",
+      "2026-11-13",
+      "second"
+     ]
+    ],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "look": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [
+     "Works",
+     "Not right: <what>"
+    ],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": "Works",
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "look",
+    "parts": [],
+    "replies": [],
+    "words": "Check the page"
+   },
+   "fields": [
+    [
+     "Kind",
+     "look"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ],
+    [
+     "Answers",
+     "Works (default) | Not right: <what>"
+    ]
+   ]
+  },
+  "no_blank_after_heading": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "none",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": null,
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": null,
+    "parts": [],
+    "replies": [],
+    "words": "Ping sam."
+   },
+   "fields": [
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Context",
+     "none"
+    ]
+   ]
+  },
+  "no_closed_archived": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": [
+     null,
+     null
+    ],
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "no_closed_open": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "no_heading": null,
+  "path_not_id": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": null,
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "repeated": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ],
+    [
+     "Due",
+     "2026-12-01"
+    ]
+   ]
+  },
+  "respelled": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": "2026-11-15",
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "due",
+     "2026-11-20"
+    ],
+    [
+     "hide-until",
+     "2026-11-15"
+    ]
+   ]
+  },
+  "todo": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": null,
+    "parts": [],
+    "replies": [],
+    "words": "Ping sam"
+   },
+   "fields": [
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "unknown_owner": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "words": "Rotate the key"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Owner",
+     "sam.lee"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  },
+  "watch": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-1",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-20",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "watch",
+    "parts": [],
+    "replies": [],
+    "words": "Watch the deploy"
+   },
+   "fields": [
+    [
+     "Kind",
+     "watch"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Session",
+     "w-9 on host-a"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ],
+    [
+     "Due",
+     "2026-11-20"
+    ]
+   ]
+  }
+ },
+ "problems": {
+  "body_not_bullet": "body: 'Some prose, not a bullet.' is no detail bullet (`- ` at column 0, or nested under one)",
+  "crlf": "file: each line ends in `\\n` alone",
+  "doer_on_decide": "doer: a decide carries no `Doer`: only an act names who does its step",
+  "due_respelled": "header: written `**Due:** <value>`, one space after the name and none at the line's end, not '**due:** 2026-11-20'",
+  "log_not_last": "log: the Log is the file's last part",
+  "marked_form_closed": null,
+  "marked_form_decided": null,
+  "marked_form_open": "answers: a form cannot be the default: pressing it sends no words",
+  "no_blank_line": "heading: one blank line, then the header block",
+  "out_of_order": "header: Context stands after Due; the fields' order is Kind, Added, Session, Context, Parts, Doer, Due, Hide until, Answers, Lifts, Decided, Closed",
+  "parts_on_act": "parts: an act carries no `Parts`: only a decide asks about a parent's parts",
+  "twice": "header: Due stands twice",
+  "two_forms_closed": null,
+  "two_forms_decided": null,
+  "two_forms_open": "answers: two answers are forms with one head, Hold: a fill could not say which",
+  "unknown_field": "header: Owner is no field of an item file"
+ },
+ "strings": {
+  "a line's text after its tick": {
+   "closes": {
+    "Go": {
+     "refused": "not an item file: an item is a BoardItem or an item file's text (v3.0; a v2 line is read through load_board())"
+    },
+    "Later": {
+     "refused": "not an item file: an item is a BoardItem or an item file's text (v3.0; a v2 line is read through load_board())"
+    },
+    "Not yet": {
+     "refused": "not an item file: an item is a BoardItem or an item file's text (v3.0; a v2 line is read through load_board())"
+    }
+   },
+   "parts_problems": []
+  },
+  "a v2 board's text opening with a section heading": {
+   "closes": {
+    "Go": {
+     "refused": "not an item file: an item is a BoardItem or an item file's text (v3.0; a v2 line is read through load_board())"
+    },
+    "Later": {
+     "refused": "not an item file: an item is a BoardItem or an item file's text (v3.0; a v2 line is read through load_board())"
+    },
+    "Not yet": {
+     "refused": "not an item file: an item is a BoardItem or an item file's text (v3.0; a v2 line is read through load_board())"
+    }
+   },
+   "parts_problems": []
+  },
+  "a v2 line": {
+   "closes": {
+    "Go": {
+     "refused": "not an item file: an item is a BoardItem or an item file's text (v3.0; a v2 line is read through load_board())"
+    },
+    "Later": {
+     "refused": "not an item file: an item is a BoardItem or an item file's text (v3.0; a v2 line is read through load_board())"
+    },
+    "Not yet": {
+     "refused": "not an item file: an item is a BoardItem or an item file's text (v3.0; a v2 line is read through load_board())"
+    }
+   },
+   "parts_problems": []
+  },
+  "an item file": {
+   "closes": {
+    "Go": {
+     "ok": true
+    },
+    "Later": {
+     "ok": false
+    },
+    "Not yet": {
+     "ok": true
+    }
+   },
+   "parts_problems": [
+    "TD-4: missing",
+    "TD-9: missing",
+    "TD-10: missing"
+   ]
+  },
+  "an item file whose Context names two entries": {
+   "closes": {
+    "Go": {
+     "ok": false
+    }
+   },
+   "parts_problems": [
+    "item: context: not one entry and one decision"
+   ]
+  }
+ },
+ "subjects": {
+  "edit_actions": {
+   "board: append 2026-11-11-3f9a2c1d Ping sam (session n/a)": null,
+   "board: decide 2026-11-11-3f9a2c1d Say Go: Go (session lb-x)": "decide",
+   "board: snooze 2026-11-11-3f9a2c1d Rotate the key now to 2026-11-20 (session w-9)": "snooze",
+   "board_edit: done Ship it (session s-1)": "done",
+   "board_edit: due Rotate. to 2026-01-30 (session s-1)": "due",
+   "board_edit: snooze Rotate. to 2026-01-20 (session s-1)": "snooze",
+   "ledgerboard: archive 2 closed items (session n/a)": null,
+   "not a subject": null,
+   "queue: rank TD-1 (shiftlead)": null,
+   "shiftlead: append Ship it (session n/a)": null
+  },
+  "subject_ids": {
+   "board: append 2026-02-30-abcd1234 Ping sam (session n/a)": null,
+   "board: append 2026-11-11-3f9a2c1d Ping sam (session n/a)": "2026-11-11-3f9a2c1d",
+   "board: decide 2026-11-11-3f9a2c1d Say Go: Go (session lb-x)": "2026-11-11-3f9a2c1d",
+   "board: snooze 2026-11-11-3f9a2c1d Rotate the key now to 2026-11-20 (session w-9)": "2026-11-11-3f9a2c1d",
+   "board_edit: done Ship it (session s-1)": null,
+   "shiftlead: append Ship it (session n/a)": null,
+   "shiftlead: board A new item (from TD-12)": null
+  },
+  "subject_kinds": {
+   "Fix the parser (#12)": null,
+   "board: append 2026-11-11-3f9a2c1d Ping sam (session n/a)": "append",
+   "board: decide 2026-11-11-3f9a2c1d Say Go: Go (session lb-x)": "edit",
+   "board: snooze 2026-11-11-3f9a2c1d Rotate the key now to 2026-11-20 (session w-9)": "edit",
+   "board_edit: done Ship it (session s-1)": "edit",
+   "board_edit: due Rotate. to 2026-01-30 (session s-1)": "edit",
+   "board_edit: finish Ship it (session s-1)": null,
+   "queue: join TD-7 (shiftlead)": "queue",
+   "queue: prune TD-1, TD-2 (a-tool)": "queue",
+   "queue: rank TD-3": null,
+   "queue: rank TD-3 (shiftlead) extra": null,
+   "queue: rank TD-3 TD-12 (shiftlead)": null,
+   "queue: rank TD-3, TD-12 (shiftlead)": "queue",
+   "queue: respace TD-3, TD-4 (shiftlead)": "queue",
+   "queue: sort TD-3 (shiftlead)": null,
+   "shiftlead: answer A question (from TD-12)": "append",
+   "shiftlead: append A new item (session w-1)": "append",
+   "shiftlead: archive 0 closed items (session w-1)": null,
+   "shiftlead: archive 1 closed item (session n/a)": "archive",
+   "shiftlead: archive 1 closed items (session w-1)": null,
+   "shiftlead: archive 3 closed items (session w-1)": "archive",
+   "shiftlead: board A new item (from TD-12)": "append",
+   "shiftlead: board decide TD-12 (person)": "append",
+   "shiftlead: reply on Pick a name (session w-1)": "edit"
+  },
+  "subjects": [
+   {
+    "ok": "board: snooze 2026-11-11-3f9a2c1d Rotate the key now to 2026-11-20 (session w-9)"
+   },
+   {
+    "ok": "board: due 2026-11-11-3f9a2c1d Rotate — the key, Context: TD-1 Due: soon to 2026-11-30 (session n/a)"
+   },
+   {
+    "ok": "board: done 2026-11-11-3f9a2c1d Rotate the key (session w-9)"
+   },
+   {
+    "ok": "board: decide 2026-11-11-3f9a2c1d Say Go to the split: Go now (session lb-x)"
+   },
+   {
+    "ok": "board: reply 2026-11-11-3f9a2c1d Ask sam (session w-9)"
+   },
+   {
+    "ok": "board: append 2026-11-11-3f9a2c1d A very long item heading that goes well past the sixty char… (session w-9)"
+   },
+   {
+    "refused": "an item's id is YYYY-MM-DD-<8 hex>, a day of the calendar, not '2026-02-30-abcd1234'"
+   }
+  ]
+ },
+ "written": {
+  "act": null,
+  "act_doer": null,
+  "decide": null,
+  "decided_by": null,
+  "decided_by_words": null,
+  "decided_default_form": null,
+  "decided_no_by": null,
+  "decided_said_fields": null,
+  "field_words": null,
+  "fyi": null,
+  "look": null,
+  "todo": null,
+  "watch": null
+ }
+}

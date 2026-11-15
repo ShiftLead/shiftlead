@@ -1,0 +1,9 @@
+{
+ "argv": [
+  "show",
+  "--board",
+  "board.md",
+  "--today",
+  "2026-01-15"
+ ]
+}

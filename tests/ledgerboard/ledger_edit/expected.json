@@ -79,7 +79,7 @@
  "canonical": {
   "already": {
    "idempotent": true,
-   "ok": "## TD-041: An entry already in canonical form\n\n**Priority:** Low\n**Type:** debt\n**Added:** 2026-01-11\n**Owner:** designer\n**Kind:** design-first\n**Status:** Open\n**Taken by:** a-session\n**Id take:** 0123456789abcdef0123456789abcdef\n**Blocked by:** TD-012, decision (the owner)\n**Part of:** TD-030\n**Waits:** the next run\n**Location:** `docs/x.md`\n**Escaped from:** other-repo#TD-007\n**Resolved:** kept where the file has it\n\n**Why:** a reason.\n"
+   "ok": "## TD-041: An entry already in canonical form\n\n**Priority:** Low\n**Type:** debt\n**Added:** 2026-01-11\n**Owner:** designer\n**Kind:** design-first\n**Status:** Open\n**Id take:** 0123456789abcdef0123456789abcdef\n**Blocked by:** TD-012, decision (the owner)\n**Part of:** TD-030\n**Taken by:** a-session\n**Waits:** the next run\n**Location:** `docs/x.md`\n**Escaped from:** other-repo#TD-007\n**Resolved:** kept where the file has it\n\n**Why:** a reason.\n"
   },
   "crlf": {
    "idempotent": true,
@@ -212,7 +212,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-301: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-301: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -220,7 +220,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-302: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-302: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -228,7 +228,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-303: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-303: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -236,7 +236,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-304: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-304: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -244,7 +244,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-305: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-305: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -252,7 +252,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-306: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-306: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -260,7 +260,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-307: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-307: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -268,7 +268,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-308: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-308: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -276,7 +276,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-309: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-309: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -284,7 +284,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-310: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-310: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -292,7 +292,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-311: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-311: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -300,7 +300,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-312: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-312: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -308,7 +308,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-313: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-313: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -316,7 +316,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-314: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-314: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -324,7 +324,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-315: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-315: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -332,7 +332,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-316: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-316: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "host_log_no_old": [
@@ -366,7 +366,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-301: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-301: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -374,7 +374,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-302: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-302: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -382,7 +382,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-303: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-303: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -390,7 +390,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-304: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-304: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -398,7 +398,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-305: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-305: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -406,7 +406,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-306: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-306: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -414,7 +414,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-307: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-307: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -422,7 +422,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-308: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-308: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -430,7 +430,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-309: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-309: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -438,7 +438,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-310: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-310: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -446,7 +446,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-311: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-311: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -454,7 +454,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-312: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-312: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -462,7 +462,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-313: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-313: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -470,7 +470,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-314: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-314: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -478,7 +478,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-315: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-315: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -486,7 +486,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-316: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-316: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "location_no_old": [
@@ -494,41 +494,41 @@
     "field": "location",
     "id": "TD-411",
     "kind": "retired",
-    "level": "info",
+    "level": "error",
     "standing": false,
-    "text": "ℹ TD-411: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
+    "text": "⚠ TD-411: the Location field is retired — write the **Location:** body section (SPEC *Retired words*); v3.0 reads no such form: on an open entry move its value with edit --section Location, then remove it with set; on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "location",
     "id": "TD-412",
     "kind": "retired",
-    "level": "info",
+    "level": "error",
     "standing": false,
-    "text": "ℹ TD-412: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
+    "text": "⚠ TD-412: the Location field is retired — write the **Location:** body section (SPEC *Retired words*); v3.0 reads no such form: on an open entry move its value with edit --section Location, then remove it with set; on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "location",
     "id": "TD-413",
     "kind": "retired",
-    "level": "info",
+    "level": "error",
     "standing": false,
-    "text": "ℹ TD-413: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
+    "text": "⚠ TD-413: the Location field is retired — write the **Location:** body section (SPEC *Retired words*); v3.0 reads no such form: on an open entry move its value with edit --section Location, then remove it with set; on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "location",
     "id": "TD-414",
     "kind": "retired",
-    "level": "info",
+    "level": "error",
     "standing": false,
-    "text": "ℹ TD-414: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
+    "text": "⚠ TD-414: the Location field is retired — write the **Location:** body section (SPEC *Retired words*); v3.0 reads no such form: on an open entry move its value with edit --section Location, then remove it with set; on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "location",
     "id": "TD-416",
     "kind": "retired",
-    "level": "info",
+    "level": "error",
     "standing": false,
-    "text": "ℹ TD-416: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
+    "text": "⚠ TD-416: the Location field is retired — write the **Location:** body section (SPEC *Retired words*); v3.0 reads no such form: on an open entry move its value with edit --section Location, then remove it with set; on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "location_written_is_an_error": [
@@ -536,17 +536,17 @@
     "field": "location",
     "id": "TD-411",
     "kind": "retired",
-    "level": "info",
-    "standing": true,
-    "text": "ℹ TD-411: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-411: the Location field is retired — write the **Location:** body section (SPEC *Retired words*); v3.0 reads no such form: on an open entry move its value with edit --section Location, then remove it with set; on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "location",
     "id": "TD-412",
     "kind": "retired",
-    "level": "info",
+    "level": "error",
     "standing": false,
-    "text": "ℹ TD-412: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
+    "text": "⚠ TD-412: the Location field is retired — write the **Location:** body section (SPEC *Retired words*); v3.0 reads no such form: on an open entry move its value with edit --section Location, then remove it with set; on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "location",
@@ -554,7 +554,7 @@
     "kind": "retired",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-413: a new or changed Location line — the header field is retired; write the **Location:** body section, or run migrate, which moves it (SPEC *Retired words*)"
+    "text": "⚠ TD-413: the Location field is retired — write the **Location:** body section (SPEC *Retired words*); v3.0 reads no such form: on an open entry move its value with edit --section Location, then remove it with set; on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "location",
@@ -562,7 +562,7 @@
     "kind": "retired",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-414: a new or changed Location line — the header field is retired; write the **Location:** body section, or run migrate, which moves it (SPEC *Retired words*)"
+    "text": "⚠ TD-414: the Location field is retired — write the **Location:** body section (SPEC *Retired words*); v3.0 reads no such form: on an open entry move its value with edit --section Location, then remove it with set; on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "location",
@@ -570,7 +570,7 @@
     "kind": "retired",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-416: a new or changed Location line — the header field is retired; write the **Location:** body section, or run migrate, which moves it (SPEC *Retired words*)"
+    "text": "⚠ TD-416: the Location field is retired — write the **Location:** body section (SPEC *Retired words*); v3.0 reads no such form: on an open entry move its value with edit --section Location, then remove it with set; on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "log_flags_no_old": [
@@ -610,14 +610,6 @@
    }
   ],
   "misplaced_names": [
-   {
-    "field": "location",
-    "id": "TD-605",
-    "kind": "retired",
-    "level": "info",
-    "standing": false,
-    "text": "ℹ TD-605: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
-   },
    {
     "field": "status",
     "id": "TD-601",
@@ -672,7 +664,15 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-601: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-601: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
+   },
+   {
+    "field": "location",
+    "id": "TD-605",
+    "kind": "retired",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-605: the Location field is retired — write the **Location:** body section (SPEC *Retired words*); v3.0 reads no such form: on an open entry move its value with edit --section Location, then remove it with set; on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "misplaced_names_with_fields": [
@@ -716,7 +716,7 @@
     "kind": "status",
     "level": "info",
     "standing": false,
-    "text": "ℹ TD-020: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "ℹ TD-020: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -724,7 +724,7 @@
     "kind": "status",
     "level": "info",
     "standing": false,
-    "text": "ℹ TD-030: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "ℹ TD-030: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -732,7 +732,7 @@
     "kind": "status",
     "level": "info",
     "standing": false,
-    "text": "ℹ TD-031: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "ℹ TD-031: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "nothing_left": [],
@@ -767,7 +767,7 @@
     "kind": "status",
     "level": "info",
     "standing": false,
-    "text": "ℹ TD-020: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "ℹ TD-020: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -775,7 +775,7 @@
     "kind": "status",
     "level": "info",
     "standing": false,
-    "text": "ℹ TD-030: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "ℹ TD-030: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -783,7 +783,7 @@
     "kind": "status",
     "level": "info",
     "standing": false,
-    "text": "ℹ TD-031: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "ℹ TD-031: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "status_after_archive_open_parts": [
@@ -809,7 +809,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-552: an open entry's Status is Open alone — this one is Built (retired: Open, the stage in Kind) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-552: an open entry's Status is Open alone — this one is Built (retired: Open, the stage in Kind) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -817,7 +817,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-549: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-549: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "status_outside_the_set_no_old": [
@@ -835,7 +835,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-502: an open entry's Status is Open alone — this one is Open, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-502: an open entry's Status is Open alone — this one is Open, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -843,7 +843,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-503: an open entry's Status is Open alone — this one is Open, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-503: an open entry's Status is Open alone — this one is Open, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -851,7 +851,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-504: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-504: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -859,7 +859,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-505: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-505: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -867,7 +867,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-506: an open entry's Status is Open alone — this one is Designed (retired: Open, the stage in Kind) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-506: an open entry's Status is Open alone — this one is Designed (retired: Open, the stage in Kind) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -875,7 +875,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-507: an open entry's Status is Open alone — this one is Done (retired: archive it, or Open) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-507: an open entry's Status is Open alone — this one is Done (retired: archive it, or Open) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -883,7 +883,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-508: an open entry's Status is Open alone — this one is Resolved (archived: archive it, or Open) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-508: an open entry's Status is Open alone — this one is Resolved (archived: archive it, or Open) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -891,7 +891,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-509: an open entry's Status is Open alone — this one is resolved (archived: archive it, or Open) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-509: an open entry's Status is Open alone — this one is resolved (archived: archive it, or Open) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -899,7 +899,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-510: an open entry's Status is Open alone — this one is Resolved** (archived: archive it, or Open) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-510: an open entry's Status is Open alone — this one is Resolved** (archived: archive it, or Open) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -907,7 +907,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-511: an open entry's Status is Open alone — this one is Superseded (archived: archive it, or Open) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-511: an open entry's Status is Open alone — this one is Superseded (archived: archive it, or Open) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -915,7 +915,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-512: an open entry's Status is Open alone — this one is Dropped (archived: archive it, or Open) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-512: an open entry's Status is Open alone — this one is Dropped (archived: archive it, or Open) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -923,7 +923,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-513: an open entry's Status is Open alone — this one is Blocked — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-513: an open entry's Status is Open alone — this one is Blocked — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -931,7 +931,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-524: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-524: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -939,7 +939,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-525: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-525: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -947,7 +947,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-526: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-526: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -955,7 +955,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-527: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-527: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -963,7 +963,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-528: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-528: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -971,7 +971,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-529: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-529: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -979,7 +979,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-530: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-530: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -987,7 +987,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-531: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Open — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-531: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Open — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -995,7 +995,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-532: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Done (retired: Resolved) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-532: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Done (retired: Resolved) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1003,7 +1003,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-533: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Moved (retired: Superseded or Dropped) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-533: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Moved (retired: Superseded or Dropped) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1011,7 +1011,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-534: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Built (retired: Resolved) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-534: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Built (retired: Resolved) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1019,7 +1019,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-535: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-535: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "status_outside_the_set_standing_is_still_an_error": [
@@ -1037,7 +1037,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-502: an open entry's Status is Open alone — this one is Open, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-502: an open entry's Status is Open alone — this one is Open, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1045,7 +1045,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-503: an open entry's Status is Open alone — this one is Open, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-503: an open entry's Status is Open alone — this one is Open, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1053,7 +1053,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-504: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-504: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1061,7 +1061,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-505: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-505: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1069,7 +1069,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-506: an open entry's Status is Open alone — this one is Designed (retired: Open, the stage in Kind) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-506: an open entry's Status is Open alone — this one is Designed (retired: Open, the stage in Kind) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1077,7 +1077,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-507: an open entry's Status is Open alone — this one is Done (retired: archive it, or Open) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-507: an open entry's Status is Open alone — this one is Done (retired: archive it, or Open) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1085,7 +1085,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-508: an open entry's Status is Open alone — this one is Resolved (archived: archive it, or Open) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-508: an open entry's Status is Open alone — this one is Resolved (archived: archive it, or Open) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1093,7 +1093,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-509: an open entry's Status is Open alone — this one is resolved (archived: archive it, or Open) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-509: an open entry's Status is Open alone — this one is resolved (archived: archive it, or Open) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1101,7 +1101,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-510: an open entry's Status is Open alone — this one is Resolved** (archived: archive it, or Open) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-510: an open entry's Status is Open alone — this one is Resolved** (archived: archive it, or Open) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1109,7 +1109,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-511: an open entry's Status is Open alone — this one is Superseded (archived: archive it, or Open) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-511: an open entry's Status is Open alone — this one is Superseded (archived: archive it, or Open) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1117,7 +1117,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-512: an open entry's Status is Open alone — this one is Dropped (archived: archive it, or Open) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-512: an open entry's Status is Open alone — this one is Dropped (archived: archive it, or Open) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1125,7 +1125,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-513: an open entry's Status is Open alone — this one is Blocked — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-513: an open entry's Status is Open alone — this one is Blocked — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1133,7 +1133,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-524: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-524: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1141,7 +1141,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-525: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-525: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1149,7 +1149,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-526: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-526: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1157,7 +1157,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-527: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-527: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1165,7 +1165,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-528: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-528: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Superseded, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1173,7 +1173,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-529: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-529: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1181,7 +1181,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-530: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-530: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1189,7 +1189,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-531: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Open — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-531: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Open — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1197,7 +1197,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-532: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Done (retired: Resolved) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-532: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Done (retired: Resolved) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1205,7 +1205,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-533: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Moved (retired: Superseded or Dropped) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-533: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Moved (retired: Superseded or Dropped) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1213,7 +1213,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-534: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Built (retired: Resolved) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-534: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Built (retired: Resolved) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1221,7 +1221,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-535: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-535: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "status_v1_is_info": [
@@ -1231,7 +1231,7 @@
     "kind": "status",
     "level": "info",
     "standing": false,
-    "text": "ℹ TD-542: an open entry's Status is Open alone — this one is Built (retired: Open, the stage in Kind) — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "ℹ TD-542: an open entry's Status is Open alone — this one is Built (retired: Open, the stage in Kind) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1239,57 +1239,17 @@
     "kind": "status",
     "level": "info",
     "standing": false,
-    "text": "ℹ TD-543: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "ℹ TD-543: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "waits_no_old": [
    {
-    "field": "waits",
-    "id": "TD-401",
-    "kind": "retired",
-    "level": "info",
-    "standing": false,
-    "text": "ℹ TD-401: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
-   },
-   {
-    "field": "waits",
-    "id": "TD-402",
-    "kind": "retired",
-    "level": "info",
-    "standing": false,
-    "text": "ℹ TD-402: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
-   },
-   {
-    "field": "waits",
-    "id": "TD-403",
-    "kind": "retired",
-    "level": "info",
-    "standing": false,
-    "text": "ℹ TD-403: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
-   },
-   {
-    "field": "waits",
-    "id": "TD-404",
-    "kind": "retired",
-    "level": "info",
-    "standing": false,
-    "text": "ℹ TD-404: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
-   },
-   {
-    "field": "waits",
-    "id": "TD-406",
-    "kind": "retired",
-    "level": "info",
-    "standing": false,
-    "text": "ℹ TD-406: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
-   },
-   {
     "field": "status",
     "id": "TD-401",
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-401: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-401: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1297,7 +1257,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-402: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-402: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1305,7 +1265,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-403: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-403: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1313,7 +1273,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-404: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-404: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1321,7 +1281,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-405: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-405: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1329,57 +1289,57 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-406: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-406: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
+   },
+   {
+    "field": "waits",
+    "id": "TD-401",
+    "kind": "retired",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-401: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+   },
+   {
+    "field": "waits",
+    "id": "TD-402",
+    "kind": "retired",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-402: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+   },
+   {
+    "field": "waits",
+    "id": "TD-403",
+    "kind": "retired",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-403: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+   },
+   {
+    "field": "waits",
+    "id": "TD-404",
+    "kind": "retired",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-404: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+   },
+   {
+    "field": "waits",
+    "id": "TD-406",
+    "kind": "retired",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-406: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
    }
   ],
   "waits_written_is_an_error": [
    {
-    "field": "waits",
-    "id": "TD-401",
-    "kind": "retired",
-    "level": "info",
-    "standing": true,
-    "text": "ℹ TD-401: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
-   },
-   {
-    "field": "waits",
-    "id": "TD-402",
-    "kind": "retired",
-    "level": "info",
-    "standing": false,
-    "text": "ℹ TD-402: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
-   },
-   {
-    "field": "waits",
-    "id": "TD-403",
-    "kind": "retired",
-    "level": "error",
-    "standing": false,
-    "text": "⚠ TD-403: a new or changed Waits line — the field is retired and no reader takes it as a gate; write the wait in Blocked by as until YYYY-MM-DD, or as event (<name>) with its **Event (<name>):** section (SPEC *Retired words*)"
-   },
-   {
-    "field": "waits",
-    "id": "TD-404",
-    "kind": "retired",
-    "level": "error",
-    "standing": false,
-    "text": "⚠ TD-404: a new or changed Waits line — the field is retired and no reader takes it as a gate; write the wait in Blocked by as until YYYY-MM-DD, or as event (<name>) with its **Event (<name>):** section (SPEC *Retired words*)"
-   },
-   {
-    "field": "waits",
-    "id": "TD-406",
-    "kind": "retired",
-    "level": "error",
-    "standing": false,
-    "text": "⚠ TD-406: a new or changed Waits line — the field is retired and no reader takes it as a gate; write the wait in Blocked by as until YYYY-MM-DD, or as event (<name>) with its **Event (<name>):** section (SPEC *Retired words*)"
-   },
-   {
     "field": "status",
     "id": "TD-401",
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-401: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-401: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1387,7 +1347,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-402: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-402: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1395,7 +1355,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-403: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-403: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1403,7 +1363,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-404: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-404: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1411,7 +1371,7 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-405: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-405: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
    },
    {
     "field": "status",
@@ -1419,7 +1379,87 @@
     "kind": "status",
     "level": "error",
     "standing": false,
-    "text": "⚠ TD-406: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+    "text": "⚠ TD-406: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
+   },
+   {
+    "field": "waits",
+    "id": "TD-401",
+    "kind": "retired",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-401: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+   },
+   {
+    "field": "waits",
+    "id": "TD-402",
+    "kind": "retired",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-402: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+   },
+   {
+    "field": "waits",
+    "id": "TD-403",
+    "kind": "retired",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-403: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+   },
+   {
+    "field": "waits",
+    "id": "TD-404",
+    "kind": "retired",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-404: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+   },
+   {
+    "field": "waits",
+    "id": "TD-406",
+    "kind": "retired",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-406: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+   }
+  ],
+  "old_form_untouched": [
+   {
+    "field": "blocked by",
+    "id": "TD-423",
+    "kind": "retired",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-423: Blocked by item 'decision (Kim) — after the review' is in the old decision form — write decision (<person>), with the text in an **Ask:** section (SPEC *Retired words*); v3.0 reads no such form: on an open entry write its text with edit --section Ask, then rewrite it decision (<person>) with set; on an archived one by hand, then ledger.py fmt TD-n"
+   }
+  ],
+  "resolved_header_untouched": [
+   {
+    "field": "resolved",
+    "id": "TD-422",
+    "kind": "retired",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-422: the Resolved field is retired — write the **Resolved:** body line of an archived entry (SPEC *Retired words*); v3.0 reads no such form: on an open entry move its value with edit --section Resolved, then remove it with set; on an archived one by hand, then ledger.py fmt TD-n"
+   }
+  ],
+  "taken_by_archived_untouched": [
+   {
+    "field": "taken by",
+    "id": "TD-432",
+    "kind": "retired",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-432: the Taken by field is retired — write Id take, the counter take's nonce (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+   }
+  ],
+  "taken_by_untouched": [
+   {
+    "field": "taken by",
+    "id": "TD-421",
+    "kind": "retired",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-421: the Taken by field is retired — write Id take, the counter take's nonce (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
    }
   ]
  },
@@ -1446,7 +1486,7 @@
    "refused": "a dropped entry keeps its Why and Fix, and nothing replaces it: no pr, pointer, as_is or superseded_by"
   },
   "archive_header_resolved": {
-   "ok": "## TD-063: Archived the old way, its Resolved a header field\n\n**Priority:** Low\n**Status:** Resolved 2026-01-20\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-20 (PR #16)\n\n**Log:**\n- 2026-01-06: built\n- 2026-01-20: archived: Resolved — built again\n"
+   "refused": "it holds a Resolved header field, a retired error (v3.0) — move it with edit --section Resolved, then remove it with set"
   },
   "archive_inserts_its_resolved_line_before_the_log": {
    "ok": "## TD-081: Notes written into the Status before the Log\n\n**Priority:** Low\n**Added:** 2026-01-02 found while building TD-80\n**Status:** Resolved 2026-01-20\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-20 (PR #12) — `src/thing.py`\n\n**Log:**\n- 2026-01-02: was: Open\n- 2026-01-03: an earlier line\n- 2026-01-03: was: Resolved 2026-01-03: done too soon\n- 2026-01-04: half built 2026-01-06: the rest built\n- 2026-01-05: a later line\n- 2026-01-20: archived: Resolved — all built\n"
@@ -1677,13 +1717,13 @@
    "ok": "## TD-062: An archived entry\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-05 (PR #7) — `docs/thing.md`\n\n**Log:**\n- 2026-01-05: built\n- 2026-01-20: reopened — it broke\n"
   },
   "reopen_header_resolved": {
-   "ok": "## TD-063: Archived the old way, its Resolved a header field\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** a reason.\n\n**Fix:** the steps.\n\n**Resolved:** 2026-01-06 (PR #8) — `src/old.py`\n\n**Log:**\n- 2026-01-06: built\n- 2026-01-20: reopened — it broke\n"
+   "ok": "## TD-063: Archived the old way, its Resolved a header field\n\n**Priority:** Low\n**Status:** Open\n**Resolved:** 2026-01-06 (PR #8) — `src/old.py`\n\n**Why:** a reason.\n\n**Fix:** the steps.\n\n**Log:**\n- 2026-01-06: built\n- 2026-01-20: reopened — it broke\n"
   },
   "reopen_no_status": {
    "ok": "## TD-061: No Status, and only a qualified Fix\n\n**Priority:** Low\n**Added:** 2026-01-03\n**Status:** Open\n\n**Why:** a reason.\n\n**Fix (to design):** the shape first.\n\n**Log:**\n- 2026-01-20: reopened — not done\n"
   },
   "reopen_refused_both_resolved": {
-   "refused": "it has both a Resolved field and a **Resolved:** section — merge them by hand, then reopen"
+   "ok": "## TD-064: A Resolved field and a Resolved section both\n\n**Priority:** Low\n**Status:** Open\n**Resolved:** 2026-01-07 (PR #9)\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-07 (PR #9) — `src/new.py`\n\n**Log:**\n- 2026-01-07: built\n- 2026-01-20: reopened — it broke\n"
   },
   "reopen_undated_status_takes_the_resolved_date": {
    "ok": "## TD-083: An archived Status with no date of its own\n\n**Priority:** Low\n**Added:** 2026-01-02\n**Status:** Open\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-09 (PR #5)\n\n**Log:**\n- 2026-01-09: built in the first pass\n- 2026-01-20: reopened — not done\n"
@@ -1713,10 +1753,10 @@
    "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-012, decision (kim)\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n\n**Log:**\n- 2026-01-20: gate added: decision (kim)\n"
   },
   "set_migrates_old_form": {
-   "ok": "## TD-120: An entry in the old form\n\n**Priority:** Medium\n**Blocked by:** TD-3, decision (pat), until 2026-02-01\n\n**Why:** w\n\n**Ask:** the board's 2026-01-03 item\n\n**Log:**\n- 2026-01-20: gate added: until 2026-02-01\n"
+   "ok": "## TD-120: An entry in the old form\n\n**Priority:** Medium\n**Blocked by:** TD-3, decision (pat), until 2026-02-01\n\n**Why:** w\n\n**Ask:** the board's 2026-01-03 item\n\n**Log:**\n- 2026-01-20: gate added: decision (pat)\n- 2026-01-20: gate added: until 2026-02-01\n"
   },
   "set_migrates_old_form_no_today": {
-   "ok": "## TD-120: An entry in the old form\n\n**Priority:** Medium\n**Blocked by:** TD-3, decision (pat)\n\n**Why:** w\n\n**Ask:** the board's 2026-01-03 item\n"
+   "refused": "set adds decision (pat), which the Log dates — pass today (v2.5)"
   },
   "set_no_gate_with_today": {
    "ok": "## TD-121: An entry with a gate\n\n**Priority:** High\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** TD-3, Decision (kim)\n\n**Why:** w\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n"
@@ -1740,7 +1780,7 @@
    "refused": "a section follows the entry's Log, which is the body's last — move it above the Log, by hand"
   },
   "set_refused_gate_on_old_form": {
-   "refused": "the entry's Blocked by is in the old form, whose text would swallow until 2026-02-01 — migrate it first: set decision (<person>) alone, with its text in an **Ask:** section"
+   "ok": "## TD-120: An entry in the old form\n\n**Priority:** Medium\n**Blocked by:** TD-3, decision (pat), until 2026-02-01\n\n**Why:** w\n\n**Log:**\n- 2026-01-20: gate added: decision (pat)\n- 2026-01-20: gate added: until 2026-02-01\n"
   },
   "set_refused_gate_without_today": {
    "refused": "set adds until 2026-02-01, which the Log dates — pass today (v2.5)"
@@ -1749,7 +1789,7 @@
    "refused": "the Log is a section its writers write, never a header field"
   },
   "set_refused_old_form": {
-   "refused": "Blocked by in the old form (decision (kim) with text after it) is read but never written — write decision (<person>) and put the text in an **Ask:** section"
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** decision (kim) — after the review\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
   },
   "set_refused_title_field": {
    "refused": "the title is the heading: use set --title"
@@ -1856,7 +1896,7 @@
    "refused": "an entry with sections needs at least one field: the paragraph after the heading is the header block"
   },
   "refused_old_form": {
-   "refused": "Blocked by in the old form (decision (pat) with text after it) is read but never written — write decision (<person>) and put the text in an **Ask:** section"
+   "ok": "## TD-122: t\n\n**Priority:** Low\n**Blocked by:** TD-3, decision (pat) — once the layout is agreed\n\n**Why:** w\n"
   },
   "refused_title": {
    "refused": "an entry needs its title, on one line"

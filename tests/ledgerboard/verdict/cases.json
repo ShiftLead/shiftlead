@@ -6,173 +6,233 @@
    "name": "a lift, closed in the same write",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a Decided one day ahead of both UTC dates",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a Decided two days ahead",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a Log date two days after the PR opened",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-17"
+   "merged_at": "2026-01-17",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a Decided one day behind the PR's opening",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a Decided two days behind the PR's opening",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a board with CRLF line endings",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a CRLF board whose answered line drops its CR",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a lift not yet merged",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": null
+   "merged_at": null,
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a lift with another file changed",
    "files": [
     "docs/ledger/TD-100.md",
     "docs/ledger/TD-150.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a ledger change that is not decide_lift's",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a base board with no People",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a subject that is not a decide",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: reply Warm the cache nightly? (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "two commits",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 2,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a waiting-only answer, closed kept waiting",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Not yet (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a work order, left open and decided",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: One more round (session w-1)",
    "commits": 1,
@@ -183,18 +243,22 @@
    "name": "a work order closed under the carve-out",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: One more round (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a finished lift left open",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 1,
@@ -206,27 +270,35 @@
    "files": [
     "docs/ledger/TD-111.md",
     "docs/ledger/TD-112.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-d6f09cf2.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-d6f09cf2.md"
    ],
    "subject": "board: decide Go on the parts?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-d6f09cf2.md"
+   ]
   },
   {
    "name": "a lifting answer that logs nothing",
    "files": [
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-f8aa36c9.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-f8aa36c9.md"
    ],
    "subject": "board: decide Go on the late one?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-f8aa36c9.md"
+   ]
   },
   {
    "name": "another repo's entry, on the board alone",
    "files": [
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-be7088b5.md"
    ],
    "subject": "board: decide Go on the other repo's entry?: Go (session w-1)",
    "commits": 1,
@@ -237,7 +309,7 @@
    "name": "another repo's entry, with a ledger file",
    "files": [
     "docs/ledger/TD-150.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-be7088b5.md"
    ],
    "subject": "board: decide Go on the other repo's entry?: Go (session w-1)",
    "commits": 1,
@@ -248,68 +320,92 @@
    "name": "a re-answer",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a Decided that names no answerer",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "an event item answered by anyone listed",
    "files": [
     "docs/ledger/TD-140.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-f2eaab8c.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-f2eaab8c.md"
    ],
    "subject": "board: decide Still waiting on event (vendor-ships) for TD-140?: Drop the gate (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-f2eaab8c.md"
+   ]
   },
   {
    "name": "a teammate's answer on an owner board",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a teammate's answer on an any board",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
    ],
    "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "a decide lift with an archived part",
    "files": [
     "docs/ledger/TD-160.md",
     "docs/ledger/TD-161.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-37630303.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-37630303.md"
    ],
    "subject": "board: decide Go on the archived set?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-37630303.md"
+   ]
   },
   {
    "name": "a decide lift that edits the archived part",
@@ -317,74 +413,384 @@
     "docs/ledger/TD-160.md",
     "docs/ledger/TD-161.md",
     "docs/ledger/archive/TD-162.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-37630303.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-37630303.md"
    ],
    "subject": "board: decide Go on the archived set?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-37630303.md"
+   ]
   },
   {
    "name": "a decide lift with a Resolved part in the open directory",
    "files": [
     "docs/ledger/TD-160.md",
     "docs/ledger/TD-161.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-37630303.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-37630303.md"
    ],
    "subject": "board: decide Go on the archived set?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-37630303.md"
+   ]
   },
   {
    "name": "a decide lift whose Context is archived",
    "files": [
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-37630303.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-37630303.md"
    ],
    "subject": "board: decide Go on the archived set?: Go (session w-1)",
    "commits": 1,
    "created_at": "2026-01-15",
-   "merged_at": "2026-01-15"
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-37630303.md"
+   ]
   },
   {
    "name": "a lift by a form's fill",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-2e983982.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-2e983982.md"
    ],
    "commits": 1,
    "created_at": "2026-01-15",
    "merged_at": "2026-01-15",
-   "subject": "board: decide Warm the cache nightly?: Hold: wait (session w-1)"
+   "subject": "board: decide Warm the cache nightly?: Hold: wait (session w-1)",
+   "delete_base": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ],
+   "delete": [
+    "docs/user_attention/2026-01-06-2e983982.md"
+   ]
   },
   {
    "name": "a lift writing an unfilled form",
    "files": [
     "docs/ledger/TD-100.md",
-    "docs/user_attention.md"
+    "docs/user_attention/2026-01-06-2e983982.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-2e983982.md"
    ],
    "commits": 1,
    "created_at": "2026-01-15",
    "merged_at": "2026-01-15",
-   "subject": "board: decide Warm the cache nightly?: Hold: <note> (session w-1)"
+   "subject": "board: decide Warm the cache nightly?: Hold: <note> (session w-1)",
+   "delete_base": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ],
+   "delete": [
+    "docs/user_attention/2026-01-06-2e983982.md"
+   ]
+  },
+  {
+   "name": "v3_lift_closes",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "v3_lift_closes_listed_once",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "v3_lift_ledger",
+   "files": [
+    "docs/ledger/TD-111.md",
+    "docs/ledger/TD-112.md",
+    "docs/user_attention/2026-01-06-d6f09cf2.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-d6f09cf2.md"
+   ],
+   "subject": "board: decide Go on the parts?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-d6f09cf2.md"
+   ]
+  },
+  {
+   "name": "v3_lift_open",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: One more round (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "v3_lift_work_order_archived",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: One more round (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "v3_other_repo",
+   "files": [
+    "docs/user_attention/2026-01-06-be7088b5.md"
+   ],
+   "subject": "board: decide Go on the other repo's entry?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "v3_lift_two_items",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/2026-01-06-be7088b5.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "v3_lift_wrong_month",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-02/2026-01-06-85a7b461.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "v3_lift_wrong_bytes",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "v3_lift_stray_board_path",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md",
+    "docs/user_attention/notes/plan.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "v3_lift_outside_path",
+   "files": [
+    "README.md",
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "v3_lift_open_and_archive",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-be7088b5.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: One more round (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "v3_lift_no_board",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/2026-01-06-be7088b5.md",
+    "docs/user_attention/2026-01-06-d6f09cf2.md",
+    "docs/user_attention/2026-01-06-f2eaab8c.md",
+    "docs/user_attention/2026-01-06-f8aa36c9.md",
+    "docs/user_attention/README.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/"
+   ]
+  },
+  {
+   "name": "v3_head_v2",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md",
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/2026-01-06-be7088b5.md",
+    "docs/user_attention/2026-01-06-d6f09cf2.md",
+    "docs/user_attention/2026-01-06-f2eaab8c.md",
+    "docs/user_attention/2026-01-06-f8aa36c9.md",
+    "docs/user_attention/README.md",
+    "docs/user_attention_archive.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/"
+   ]
+  },
+  {
+   "name": "v3_stub_only_head",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md",
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/2026-01-06-be7088b5.md",
+    "docs/user_attention/2026-01-06-d6f09cf2.md",
+    "docs/user_attention/2026-01-06-f2eaab8c.md",
+    "docs/user_attention/2026-01-06-f8aa36c9.md",
+    "docs/user_attention/README.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/"
+   ]
+  },
+  {
+   "name": "v2_lift",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete_base": [
+    "docs/user_attention/"
+   ]
+  },
+  {
+   "name": "split_pr",
+   "files": [
+    "docs/user_attention.md",
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/2026-01-06-be7088b5.md",
+    "docs/user_attention/2026-01-06-d6f09cf2.md",
+    "docs/user_attention/2026-01-06-f2eaab8c.md",
+    "docs/user_attention/2026-01-06-f8aa36c9.md",
+    "docs/user_attention/README.md",
+    "docs/user_attention_archive.md"
+   ],
+   "subject": "ledgerboard: split the board (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete_base": [
+    "docs/user_attention/"
+   ],
+   "delete": [
+    "docs/user_attention_archive.md"
+   ]
   }
  ],
  "tripwire": [
   {
    "name": "a decide lift",
-   "subject": "board: decide Warm the cache nightly?: Go (session w-1)"
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "set by= with the board's Decided",
-   "subject": "ledger: set TD-150 (session w-1)"
+   "subject": "ledger: set TD-150 (session w-1)",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
   },
   {
    "name": "no board item, but the base had one (read the head alone and it passes)",
-   "subject": "ledger: set TD-150 (session w-1)"
+   "subject": "ledger: set TD-150 (session w-1)",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
   },
   {
    "name": "the item closed with no Decided",
-   "subject": "ledger: set TD-150 (session w-1)"
+   "subject": "ledger: set TD-150 (session w-1)",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
   },
   {
    "name": "a gate removed by hand",
@@ -404,10 +810,10 @@
   },
   {
    "name": "an entry the diff archives",
+   "subject": "ledger: archive TD-150 (session w-1)",
    "delete": [
     "docs/ledger/TD-150.md"
-   ],
-   "subject": "ledger: archive TD-150 (session w-1)"
+   ]
   },
   {
    "name": "no board item, and none at base or head",
@@ -435,23 +841,52 @@
   },
   {
    "name": "the last part of a shared item lifted, the item newly closed",
-   "subject": "ledger: set TD-112 (session w-1)"
+   "subject": "ledger: set TD-112 (session w-1)",
+   "delete": [
+    "docs/user_attention/2026-01-06-d6f09cf2.md"
+   ]
   },
   {
    "name": "the last part of a shared item lifted, undecided at the base",
-   "subject": "ledger: set TD-112 (session w-1)"
+   "subject": "ledger: set TD-112 (session w-1)",
+   "delete": [
+    "docs/user_attention/2026-01-06-d6f09cf2.md"
+   ]
   },
   {
    "name": "a lift by someone other than the gate's person, owner board",
-   "subject": "ledger: set TD-150 (session w-1)"
+   "subject": "ledger: set TD-150 (session w-1)",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
   },
   {
    "name": "a teammate's lift on an any board",
-   "subject": "board: decide Warm the cache nightly?: Go (session w-1)"
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
   },
   {
    "name": "no board item, on a board with no People",
    "subject": "ledger: set TD-150 (session w-1)"
+  },
+  {
+   "name": "split_pr",
+   "subject": "ledgerboard: split the board (session w-1)",
+   "delete_base": [
+    "docs/user_attention/"
+   ],
+   "delete": [
+    "docs/user_attention_archive.md"
+   ]
+  },
+  {
+   "name": "v3_tripwire_lifted",
+   "subject": "ledger: set TD-112 (session w-1)",
+   "delete": [
+    "docs/user_attention/2026-01-06-d6f09cf2.md"
+   ]
   }
  ],
  "uncovered": [
@@ -469,8 +904,7 @@
     {
      "url": "git@example.com:acme/kim.git",
      "basename": "kim",
-     "board": "kim.md",
-     "archive": null
+     "board": "kim"
     }
    ]
   },
@@ -480,8 +914,7 @@
     {
      "url": "git@example.com:acme/kim.git",
      "basename": "kim",
-     "board": "empty.md",
-     "archive": null
+     "board": "empty.md"
     }
    ]
   },
@@ -502,7 +935,11 @@
    "boards": []
   },
   {
-   "name": "migrate_old_form_not_gained",
+   "name": "old_form_rewrite_gained",
+   "boards": []
+  },
+  {
+   "name": "v3_uncovered_new_decide",
    "boards": []
   }
  ]

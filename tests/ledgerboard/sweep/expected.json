@@ -4,56 +4,56 @@
   [
    [
     "example.com/acme/widgets",
-    "decide 2026-10-02 (n/a) — Should the parser accept tabs, for each part? Context: TD-210 decision (pat). Parts: TD-204. Due: 2026-11-10. Answers: Go | Not yet.",
+    "2026-10-02-b5b3d369",
     "open"
    ]
   ],
   [
    [
     "example.com/acme/widgets",
-    "decide 2026-10-02 (n/a) — Still waiting on event (gamma-ready) for TD-207? Context: TD-207 event (gamma-ready). Due: 2026-10-06. Answers: Keep waiting (default) | Drop the gate | Rewrite the check. Lifts: Drop the gate. Decided: Keep waiting (by pat) (2026-10-05).",
+    "2026-10-02-2adafd41",
     "closed-decided"
    ]
   ],
   [
    [
     "example.com/acme/widgets",
-    "decide 2026-10-02 (n/a) — Should the cache be cleared nightly? Context: TD-211 decision (pat). Due: 2026-10-20. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-20).",
+    "2026-10-02-5a9244c9",
     "closed-decided"
    ]
   ],
   [
    [
     "example.com/acme/widgets",
-    "decide 2026-10-02 (n/a) — Should the report be weekly? Context: TD-213 decision (pat). Due: 2026-11-10. Answers: Go | Not yet | Drop it. Decided: Drop it (by pat) (2026-10-12).",
+    "2026-10-02-bd6f3cb6",
     "decided"
    ]
   ],
   [
    [
     "example.com/acme/widgets",
-    "decide 2026-10-02 (n/a) — An invented question? Context: TD-224 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-25).",
+    "2026-10-02-2ae25e10",
     "closed-decided"
    ]
   ],
   [
    [
     "example.com/acme/widgets",
-    "decide 2026-10-02 (n/a) — An invented question? Context: TD-225 decision (pat). Parts: TD-226, TD-227, TD-228, TD-229. Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-28).",
+    "2026-10-02-44d994fb",
     "closed-decided"
    ]
   ],
   [
    [
     "gitlab.example/acme/alpha",
-    "decide 2026-10-02 (n/a) — An invented question? Context: acme/widgets#TD-259 decision (pat). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by kim) (2026-10-25).",
+    "2026-10-02-aa614ff3",
     "closed-decided"
    ]
   ],
   [
    [
     "github.com/acme/beta",
-    "decide 2026-10-02 (n/a) — An invented question? Context: acme/widgets#TD-262 decision (kim). Due: 2026-11-10. Answers: Go | Not yet. Decided: Go (by kim) (2026-10-27).",
+    "2026-10-02-9591ad12",
     "closed-decided"
    ]
   ]
@@ -150,18 +150,16 @@
     "refused": "TD-1111111111111111111, the item's Context entry, is not among the entries given"
    },
    "problems": [
-    "line: context: not one entry and one decision"
+    "item: context: not one entry and one decision"
    ]
   },
   "line-19-digit-part": {
    "problems": [
-    "line: TD-1111111111111111111: not an id"
+    "item: TD-1111111111111111111: not an id"
    ]
   },
   "line-arabic-part": {
-   "problems": [
-    "line: TD-١٢: not an id"
-   ]
+   "problems": []
   },
   "line-event": {
    "lift": {
@@ -175,12 +173,12 @@
     }
    },
    "problems": [
-    "line: context: not one entry and one decision"
+    "item: context: not one entry and one decision"
    ]
   },
   "line-twice": {
    "problems": [
-    "line: TD-009: twice"
+    "item: TD-009: twice"
    ]
   },
   "line-two-entries": {
@@ -188,7 +186,7 @@
     "refused": "the item's Context names no one entry and one gate, decision (<person>) or event (<name>)"
    },
    "problems": [
-    "line: context: not one entry and one decision"
+    "item: context: not one entry and one decision"
    ]
   },
   "line-words-after-gate": {
@@ -207,7 +205,7 @@
     }
    },
    "problems": [
-    "line: context: not one entry and one decision"
+    "item: context: not one entry and one decision"
    ]
   },
   "line-words-after-gate-pr": {
@@ -226,7 +224,7 @@
     }
    },
    "problems": [
-    "line: context: not one entry and one decision"
+    "item: context: not one entry and one decision"
    ]
   },
   "line-xrepo-context": {
@@ -234,7 +232,7 @@
     "refused": "other#TD-4 is another repo's entry — its lift is a tool PR there, through lift_gate"
    },
    "problems": [
-    "line: context: not one entry and one decision"
+    "item: context: not one entry and one decision"
    ]
   },
   "line-xrepo-part": {
@@ -242,7 +240,7 @@
     "refused": "other#TD-9 is another repo's entry — a part is Part of its parent, in the same ledger"
    },
    "problems": [
-    "line: other#TD-9: another repo's entry"
+    "item: other#TD-9: another repo's entry"
    ]
   },
   "match": {
@@ -612,14 +610,14 @@
    ],
    "to_close": {
     "example.com/acme/widgets": [
-     "- [ ] decide 2026-10-02 (n/a) — Should the search be fuzzy? Context: TD-214 decision (pat). Answers: Go | Not yet",
-     "- [ ] act 2026-10-26 (n/a) — Event check broken on TD-216: the check for event (zeta-ready) errors. Context: TD-216 event (zeta-ready)",
-     "- [ ] decide 2026-10-02 (n/a) — Still waiting on event (eta-ready) for TD-217? Context: TD-217 event (eta-ready). Answers: Keep waiting (default) | Drop the gate | Rewrite the check. Lifts: Drop the gate",
-     "- [ ] decide 2026-10-02 (n/a) — Should the old form go? Context: TD-220 decision (pat). Answers: Go | Not yet",
-     "- [ ] act 2026-10-29 (n/a) — TD-215's decision (kim) was lifted by an answer on acme/beta's board, which holds no decided item for TD-215. Context: TD-215 decision (kim) board acme/beta",
-     "- [ ] act 2026-10-29 (n/a) — decision (pat) on TD-233 was answered with a lift on 2026-10-28 but still stands on TD-234: lift it. Context: TD-233 decision (pat) lift",
-     "- [ ] act 2026-10-29 (n/a) — Lift of decision (pat) on TD-269 was closed unmerged. Context: TD-269 decision (pat) lift",
-     "- [ ] decide 2026-10-02 (n/a) — Go or hold? Context: TD-281 decision (pat). Answers: Go | Hold: <note>. Lifts: Hold: <note>"
+     "2026-10-02-f15357db",
+     "2026-10-26-4fb00329",
+     "2026-10-02-4c2831a4",
+     "2026-10-02-5822729d",
+     "2026-10-29-e02da962",
+     "2026-10-29-df2800f4",
+     "2026-10-29-10f3a817",
+     "2026-10-02-86739a83"
     ]
    },
    "to_file": {
@@ -1353,14 +1351,14 @@
    ],
    "to_close": {
     "example.com/acme/widgets": [
-     "- [ ] decide 2026-10-02 (n/a) — Should the search be fuzzy? Context: TD-214 decision (pat). Answers: Go | Not yet",
-     "- [ ] act 2026-10-26 (n/a) — Event check broken on TD-216: the check for event (zeta-ready) errors. Context: TD-216 event (zeta-ready)",
-     "- [ ] decide 2026-10-02 (n/a) — Still waiting on event (eta-ready) for TD-217? Context: TD-217 event (eta-ready). Answers: Keep waiting (default) | Drop the gate | Rewrite the check. Lifts: Drop the gate",
-     "- [ ] decide 2026-10-02 (n/a) — Should the old form go? Context: TD-220 decision (pat). Answers: Go | Not yet",
-     "- [ ] act 2026-10-29 (n/a) — TD-215's decision (kim) was lifted by an answer on acme/beta's board, which holds no decided item for TD-215. Context: TD-215 decision (kim) board acme/beta",
-     "- [ ] act 2026-10-29 (n/a) — decision (pat) on TD-233 was answered with a lift on 2026-10-28 but still stands on TD-234: lift it. Context: TD-233 decision (pat) lift",
-     "- [ ] act 2026-10-29 (n/a) — Lift of decision (pat) on TD-269 was closed unmerged. Context: TD-269 decision (pat) lift",
-     "- [ ] decide 2026-10-02 (n/a) — Go or hold? Context: TD-281 decision (pat). Answers: Go | Hold: <note>. Lifts: Hold: <note>"
+     "2026-10-02-f15357db",
+     "2026-10-26-4fb00329",
+     "2026-10-02-4c2831a4",
+     "2026-10-02-5822729d",
+     "2026-10-29-e02da962",
+     "2026-10-29-df2800f4",
+     "2026-10-29-10f3a817",
+     "2026-10-02-86739a83"
     ]
    },
    "to_file": {
@@ -1933,14 +1931,14 @@
    ],
    "to_close": {
     "example.com/acme/widgets": [
-     "- [ ] decide 2026-10-02 (n/a) — Should the search be fuzzy? Context: TD-214 decision (pat). Answers: Go | Not yet",
-     "- [ ] act 2026-10-26 (n/a) — Event check broken on TD-216: the check for event (zeta-ready) errors. Context: TD-216 event (zeta-ready)",
-     "- [ ] decide 2026-10-02 (n/a) — Still waiting on event (eta-ready) for TD-217? Context: TD-217 event (eta-ready). Answers: Keep waiting (default) | Drop the gate | Rewrite the check. Lifts: Drop the gate",
-     "- [ ] decide 2026-10-02 (n/a) — Should the old form go? Context: TD-220 decision (pat). Answers: Go | Not yet",
-     "- [ ] act 2026-10-29 (n/a) — TD-215's decision (kim) was lifted by an answer on acme/beta's board, which holds no decided item for TD-215. Context: TD-215 decision (kim) board acme/beta",
-     "- [ ] act 2026-10-29 (n/a) — decision (pat) on TD-233 was answered with a lift on 2026-10-28 but still stands on TD-234: lift it. Context: TD-233 decision (pat) lift",
-     "- [ ] act 2026-10-29 (n/a) — Lift of decision (pat) on TD-269 was closed unmerged. Context: TD-269 decision (pat) lift",
-     "- [ ] decide 2026-10-02 (n/a) — Go or hold? Context: TD-281 decision (pat). Answers: Go | Hold: <note>. Lifts: Hold: <note>"
+     "2026-10-02-f15357db",
+     "2026-10-26-4fb00329",
+     "2026-10-02-4c2831a4",
+     "2026-10-02-5822729d",
+     "2026-10-29-e02da962",
+     "2026-10-29-df2800f4",
+     "2026-10-29-10f3a817",
+     "2026-10-02-86739a83"
     ]
    },
    "to_file": {
@@ -2512,5 +2510,31 @@
     ]
    }
   }
+ },
+ "sets": {
+  "head_in_reply": {
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     "decision (lee) on TD-202 has no board: no board read lists lee in its People."
+    ]
+   }
+  },
+  "undated_close": {
+   "to_close": {
+    "example.com/acme/widgets": [
+     "2026-10-29-afb451df"
+    ]
+   },
+   "to_file": {
+    "example.com/acme/widgets": [
+     "TD-214's decision (pat) was lifted by an answer on acme/beta's board, which holds no decided item for TD-214."
+    ]
+   }
+  }
+ },
+ "split": {
+  "board_dir_problems": [],
+  "same": true
  }
 }

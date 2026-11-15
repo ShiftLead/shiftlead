@@ -1,17 +1,71 @@
 {
  "closed": [
-  "- [x] 2026-01-02 (session s-13) — Closed twin left open by a merge. Due: 2026-01-03. Closed: 2026-01-04 — shipped."
+  {
+   "added": "2026-01-02",
+   "answers": [],
+   "closed": {
+    "date": "2026-01-04",
+    "why": "shipped"
+   },
+   "consequences": [],
+   "context": null,
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-03",
+   "due_error": null,
+   "due_tag": "12d overdue",
+   "fields": [
+    [
+     "Added",
+     "2026-01-02"
+    ],
+    [
+     "Session",
+     "s-13"
+    ],
+    [
+     "Due",
+     "2026-01-03"
+    ],
+    [
+     "Closed",
+     "2026-01-04 — shipped"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-02-713d6174",
+   "kind": null,
+   "lifts": null,
+   "notes": [],
+   "overdue_days": 12,
+   "parts": [],
+   "path": "",
+   "raw": "- [x] 2026-01-02 (session s-13) — Closed twin left open by a merge. Due: 2026-01-03. Closed: 2026-01-04 — shipped.",
+   "refs": [],
+   "replies": [],
+   "session": "s-13",
+   "text": "Closed twin left open by a merge.",
+   "waiting_on": "person"
+  }
  ],
  "items": [
   {
+   "added": "2026-01-05",
    "answers": [
     "alpha",
     "beta"
    ],
+   "closed": null,
    "consequences": [
     "",
     ""
    ],
+   "context": "TD-004 / PR #12",
    "decided": {
     "date": "2026-01-14",
     "text": "beta"
@@ -23,27 +77,61 @@
    "due": "2026-01-12",
    "due_error": null,
    "due_tag": "3d overdue",
+   "fields": [
+    [
+     "Kind",
+     "decide"
+    ],
+    [
+     "Added",
+     "2026-01-05"
+    ],
+    [
+     "Session",
+     "ab12cd34 on box-1"
+    ],
+    [
+     "Context",
+     "TD-004 / PR #12"
+    ],
+    [
+     "Due",
+     "2026-01-12"
+    ],
+    [
+     "Answers",
+     "alpha | beta (default)"
+    ],
+    [
+     "Decided",
+     "2026-01-14 — beta"
+    ]
+   ],
    "hidden": false,
    "hide_until": null,
    "host": "box-1",
+   "id": "2026-01-05-fdda4eca",
    "kind": "decide",
    "lifts": null,
-   "line": 8,
    "notes": [],
    "overdue_days": 3,
    "parts": [],
+   "path": "",
    "refs": [
     "TD-004",
     "PR #12"
    ],
    "replies": [],
    "session": "ab12cd34",
-   "text": "decide 2026-01-05 (session `ab12cd34` on box-1, branch feature/x) — **Pick a name** for the tool. Context: TD-004 / PR #12. Due: 2026-01-12. Answers: alpha | beta (default). Decided: beta (2026-01-14).",
+   "text": "**Pick a name** for the tool.",
    "waiting_on": "session"
   },
   {
+   "added": "2026-01-06",
    "answers": [],
+   "closed": null,
    "consequences": [],
+   "context": "other-repo#TD-020, PRs #30/#31",
    "decided": null,
    "decided_by": null,
    "default": null,
@@ -55,15 +143,38 @@
    "due": "2026-01-15",
    "due_error": null,
    "due_tag": "due today",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-01-06"
+    ],
+    [
+     "Session",
+     "worker-2 on box-2"
+    ],
+    [
+     "Context",
+     "other-repo#TD-020, PRs #30/#31"
+    ],
+    [
+     "Due",
+     "2026-01-15"
+    ]
+   ],
    "hidden": false,
    "hide_until": null,
    "host": "box-2",
+   "id": "2026-01-06-7cb9577f",
    "kind": "act",
    "lifts": null,
-   "line": 9,
    "notes": [],
    "overdue_days": 0,
    "parts": [],
+   "path": "",
    "refs": [
     "other-repo#TD-020",
     "PR #30",
@@ -77,18 +188,21 @@
     }
    ],
    "session": "worker-2",
-   "text": "act 2026-01-06 (session worker-2 on box-2) — Rotate the key. Context: other-repo#TD-020, PRs #30/#31. Due: 2026-01-15. — Sam, 2026-01-14: done on staging only",
+   "text": "Rotate the key.",
    "waiting_on": "person"
   },
   {
+   "added": "2026-01-07",
    "answers": [
     "Works",
     "Not right: <what>"
    ],
+   "closed": null,
    "consequences": [
     "",
     ""
    ],
+   "context": "none",
    "decided": null,
    "decided_by": null,
    "default": null,
@@ -97,24 +211,50 @@
    "due": "2026-02-01",
    "due_error": null,
    "due_tag": "due 2026-02-01",
+   "fields": [
+    [
+     "Kind",
+     "look"
+    ],
+    [
+     "Added",
+     "2026-01-07"
+    ],
+    [
+     "Context",
+     "none"
+    ],
+    [
+     "Due",
+     "2026-02-01"
+    ],
+    [
+     "Answers",
+     "Works | Not right: <what>"
+    ]
+   ],
    "hidden": false,
    "hide_until": null,
    "host": null,
+   "id": "2026-01-07-2f170057",
    "kind": "look",
    "lifts": null,
-   "line": 12,
    "notes": [],
    "overdue_days": null,
    "parts": [],
+   "path": "",
    "refs": [],
    "replies": [],
    "session": null,
-   "text": "look 2026-01-07 (session n/a) — Does the page render? Context: none. Due: 2026-02-01. Answers: Works | Not right: <what>.",
+   "text": "Does the page render?",
    "waiting_on": "person"
   },
   {
+   "added": "2026-01-08",
    "answers": [],
+   "closed": null,
    "consequences": [],
+   "context": null,
    "decided": null,
    "decided_by": null,
    "default": null,
@@ -123,24 +263,46 @@
    "due": "2026-01-01",
    "due_error": null,
    "due_tag": "14d overdue",
+   "fields": [
+    [
+     "Kind",
+     "watch"
+    ],
+    [
+     "Added",
+     "2026-01-08"
+    ],
+    [
+     "Session",
+     "s-9"
+    ],
+    [
+     "Due",
+     "2026-01-01"
+    ]
+   ],
    "hidden": false,
    "hide_until": null,
    "host": null,
+   "id": "2026-01-08-3441717b",
    "kind": "watch",
    "lifts": null,
-   "line": 13,
    "notes": [],
    "overdue_days": 14,
    "parts": [],
+   "path": "",
    "refs": [],
    "replies": [],
    "session": "s-9",
-   "text": "watch 2026-01-08 (session s-9) — Re-check the import after a week. Due: 2026-01-01.",
+   "text": "Re-check the import after a week.",
    "waiting_on": "person"
   },
   {
+   "added": "2026-01-09",
    "answers": [],
+   "closed": null,
    "consequences": [],
+   "context": null,
    "decided": null,
    "decided_by": null,
    "default": null,
@@ -149,24 +311,46 @@
    "due": null,
    "due_error": null,
    "due_tag": "no due date",
+   "fields": [
+    [
+     "Kind",
+     "fyi"
+    ],
+    [
+     "Added",
+     "2026-01-09"
+    ],
+    [
+     "Session",
+     "s-10"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ]
+   ],
    "hidden": false,
    "hide_until": null,
    "host": null,
+   "id": "2026-01-09-0031ee69",
    "kind": "fyi",
    "lifts": null,
-   "line": 14,
    "notes": [],
    "overdue_days": null,
    "parts": [],
+   "path": "",
    "refs": [],
    "replies": [],
    "session": "s-10",
-   "text": "fyi 2026-01-09 (session s-10) — The mirror moved. Due: 2026-01-20.",
+   "text": "The mirror moved.",
    "waiting_on": "person"
   },
   {
+   "added": "2026-01-09",
    "answers": [],
+   "closed": null,
    "consequences": [],
+   "context": null,
    "decided": null,
    "decided_by": null,
    "default": null,
@@ -175,24 +359,38 @@
    "due": null,
    "due_error": null,
    "due_tag": "no due date",
+   "fields": [
+    [
+     "Added",
+     "2026-01-09"
+    ],
+    [
+     "Session",
+     "s-11"
+    ]
+   ],
    "hidden": false,
    "hide_until": null,
    "host": null,
+   "id": "2026-01-09-42eb15e3",
    "kind": null,
    "lifts": null,
-   "line": 15,
    "notes": [],
    "overdue_days": null,
    "parts": [],
+   "path": "",
    "refs": [],
    "replies": [],
    "session": "s-11",
-   "text": "2026-01-09 (session s-11) — Undated and unmarked.",
+   "text": "Undated and unmarked.",
    "waiting_on": "person"
   },
   {
+   "added": "2026-01-09",
    "answers": [],
+   "closed": null,
    "consequences": [],
+   "context": null,
    "decided": null,
    "decided_by": null,
    "default": null,
@@ -201,66 +399,80 @@
    "due": null,
    "due_error": "2026-1-9",
    "due_tag": "no due date",
+   "fields": [
+    [
+     "Added",
+     "2026-01-09"
+    ],
+    [
+     "Session",
+     "s-12"
+    ],
+    [
+     "Due",
+     "2026-1-9"
+    ]
+   ],
    "hidden": false,
    "hide_until": null,
    "host": null,
+   "id": "2026-01-09-d31dda94",
    "kind": null,
    "lifts": null,
-   "line": 16,
    "notes": [],
    "overdue_days": null,
    "parts": [],
+   "path": "",
    "refs": [],
    "replies": [],
    "session": "s-12",
-   "text": "2026-01-09 (session s-12) — A typo'd date. Due: 2026-1-9.",
+   "text": "A typo'd date.",
    "waiting_on": "person"
   }
  ],
  "keys": [
-  "- [ ] decide 2026-01-05 (session `ab12cd34` on box-1, branch feature/x) — **Pick a name** for the tool. Context: TD-004 / PR #12. Answers: alpha | beta (default)",
-  "- [ ] act 2026-01-06 (session worker-2 on box-2) — Rotate the key. Context: other-repo#TD-020, PRs #30/#31",
-  "- [ ] look 2026-01-07 (session n/a) — Does the page render? Context: none. Answers: Works | Not right: <what>",
-  "- [ ] watch 2026-01-08 (session s-9) — Re-check the import after a week",
-  "- [ ] fyi 2026-01-09 (session s-10) — The mirror moved",
-  "- [ ] 2026-01-09 (session s-11) — Undated and unmarked",
-  "- [ ] 2026-01-09 (session s-12) — A typo'd date. Due: 2026-1-9",
-  "- [ ] 2026-01-02 (session s-13) — Closed twin left open by a merge",
-  "- [ ] 2026-01-02 (session s-13) — Closed twin left open by a merge"
+  "2026-01-05-fdda4eca",
+  "2026-01-06-7cb9577f",
+  "2026-01-07-2f170057",
+  "2026-01-08-3441717b",
+  "2026-01-09-0031ee69",
+  "2026-01-09-42eb15e3",
+  "2026-01-09-d31dda94",
+  "2026-01-02-713d6174"
  ],
  "needs_you": [
   [
-   8,
+   "2026-01-05-fdda4eca",
    "decided",
    1
   ],
   [
-   9,
+   "2026-01-06-7cb9577f",
    "due",
    0
   ],
   [
-   12,
+   "2026-01-07-2f170057",
    "due",
    -17
   ],
   [
-   16,
+   "2026-01-09-d31dda94",
    "bad_due",
    null
   ],
   [
-   15,
+   "2026-01-09-42eb15e3",
    "undated",
    null
   ],
   [
-   13,
+   "2026-01-08-3441717b",
    "watch",
    14
   ],
   [
-   14,
+   "2026-01-09-0031ee69",
    "fyi",
    null
   ]

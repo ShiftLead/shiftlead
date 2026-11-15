@@ -1,7 +1,0 @@
-{
- "exit": 2,
- "out": {
-  "action": "migrate",
-  "unusable": "--as names TD-009, which is not among the entries the run reads"
- }
-}

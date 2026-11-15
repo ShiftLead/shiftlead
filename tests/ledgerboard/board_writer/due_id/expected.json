@@ -1,0 +1,12 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "due",
+  "id": "2026-01-10-a1000001",
+  "item_notes": [],
+  "paths": [
+   "board/2026-01-10-a1000001.md"
+  ],
+  "subject": "ledgerboard: due 2026-01-10-a1000001 Merge the parser fix to 2026-01-29 (session w-1)"
+ }
+}

@@ -4,8 +4,12 @@
   "action": "decide",
   "changes": [
    {
-    "path": "board.md",
-    "text": "# Attention board\n\nPeople: robin, sam\n\n## Needs the user\n\n- [x] decide 2026-01-12 (n/a) — Go on the export format? Context: TD-1 decision (robin). Due: 2026-01-20. Answers: Go (default) | Not yet. Decided: Go (by robin) (2026-01-15). Closed: 2026-01-15 — lifted.\n  - **Context:** The gate waits on you.\n  - **Question:** Go?\n  - **Recommended:** Go — it is ready.\n- [ ] decide 2026-01-12 (n/a) — Which format first? Context: TD-1 decision (robin). Due: 2026-01-20. Answers: CSV (default) | JSON | Not yet. Lifts: CSV | JSON.\n  - **Context:** The gate waits on you.\n  - **Question:** Go?\n  - **Recommended:** CSV — it is ready.\n- [ ] decide 2026-01-12 (n/a) — Go on the report suite? Context: TD-8 decision (robin). Parts: TD-9, TD-10. Due: 2026-01-20. Answers: Go (default) | Not yet.\n  - **Context:** The gate waits on you.\n  - **Question:** Go?\n  - **Recommended:** Go — it is ready.\n- [ ] decide 2026-01-12 (n/a) — Go on the tool repo's exporter? Context: tools#TD-4 decision (robin). Due: 2026-01-20. Answers: Go (default) | Not yet.\n  - **Context:** The gate waits on you.\n  - **Question:** Go?\n  - **Recommended:** Go — it is ready.\n- [ ] decide 2026-01-12 (n/a) — Did the vendor ship? Context: TD-1 event (ships). Due: 2026-01-20. Answers: Go (default) | Keep waiting.\n  - **Context:** The gate waits on you.\n  - **Question:** Go?\n  - **Recommended:** Go — it is ready.\n- [ ] act 2026-01-12 (n/a) — Tag the release. Context: none. Due: 2026-01-20.\n"
+    "path": "board/archive/2026-01/2026-01-12-a0000007.md",
+    "text": "## Go on the export format?\n\n**Kind:** decide\n**Added:** 2026-01-12\n**Context:** TD-1 decision (robin)\n**Due:** 2026-01-20\n**Answers:** Go (default) | Not yet\n**Decided:** 2026-01-15 by robin — Go\n**Closed:** 2026-01-15 — lifted\n\n- **Context:** The gate waits on you.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+   },
+   {
+    "path": "board/2026-01-12-a0000007.md",
+    "text": null
    },
    {
     "path": "ledger/TD-001.md",
@@ -15,9 +19,9 @@
   "entries": [
    "TD-001"
   ],
+  "id": "2026-01-12-a0000007",
   "item_notes": [],
-  "line": 7,
   "notes": [],
-  "subject": "ledgerboard: decide Go on the export format?: Go (session n/a)"
+  "subject": "ledgerboard: decide 2026-01-12-a0000007 Go on the export format?: Go (session n/a)"
  }
 }

@@ -2,11 +2,11 @@
  "exit": 0,
  "out": {
   "action": "add",
+  "id": "2026-01-15-5eed0001",
   "item_notes": [],
-  "line": 7,
   "paths": [
-   "board.md"
+   "board/2026-01-15-5eed0001.md"
   ],
-  "subject": "ledgerboard: append Keep the old export? (session n/a)"
+  "subject": "ledgerboard: append 2026-01-15-5eed0001 Keep the old export? (session n/a)"
  }
 }

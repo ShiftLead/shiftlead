@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "add",
+  "refused": "--id 2026-01-14-5eed0001: its date is not the item's Added, 2026-01-15"
+ }
+}

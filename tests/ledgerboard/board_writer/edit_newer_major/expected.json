@@ -2,6 +2,6 @@
  "exit": 1,
  "out": {
   "action": "done",
-  "refused": "board.md: this file declares Ledgerboard: 9, newer than this ledgerboard.py reads (2) — vendor a newer release; nothing was read"
+  "refused": "board/README.md: this board declares Ledgerboard: 9, newer than this ledgerboard.py reads (3) — vendor a newer release; nothing was read"
  }
 }

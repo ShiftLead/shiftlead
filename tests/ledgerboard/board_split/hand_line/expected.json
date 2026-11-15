@@ -1,0 +1,19 @@
+{
+ "files": {
+  "2026-01-05-5dd56931.md": "## Ping the team. also ping sam.\n\n**Kind:** act\n**Added:** 2026-01-05\n**Context:** TD-1\n**Due:** 2026-11-08\n",
+  "2026-01-06-a0d33e74.md": "## Wait a bit. then look.\n\n**Kind:** act\n**Added:** 2026-01-06\n**Context:** TD-2\n**Due:** 2026-11-09\n**Hide until:** 2026-11-01\n",
+  "2026-01-07-26881de5.md": "## **Bold head:** keep it.\n\n**Kind:** act\n**Added:** 2026-01-07\n**Context:** TD-3 and more\n",
+  "README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat, sam.lee\n",
+  "archive/2026-01/2026-01-03-9ff79ef2.md": "## Lifted one.\n\n**Kind:** act\n**Added:** 2026-01-03\n**Context:** TD-4\n**Closed:** 2026-01-09 — lifted\n",
+  "archive/2026-01/2026-01-04-8e581980.md": "## Lifted two. lifted.\n\n**Kind:** act\n**Added:** 2026-01-04\n**Context:** TD-5\n**Closed:** 2026-01-10\n"
+ },
+ "notes": [
+  [
+   "README.md",
+   1,
+   "# Needs the user",
+   "names Needs the user: the board is now this directory"
+  ]
+ ],
+ "persisted_keys_found": true
+}

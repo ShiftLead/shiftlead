@@ -1,0 +1,10 @@
+{
+ "argv": [
+  "split",
+  "--board",
+  "board.md",
+  "--archive",
+  "old.md",
+  "--json"
+ ]
+}

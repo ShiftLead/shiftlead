@@ -1,0 +1,72 @@
+{
+ "closed": [],
+ "items": [
+  {
+   "added": "2026-01-05",
+   "answers": [],
+   "closed": null,
+   "consequences": [],
+   "context": "TD-1",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": null,
+   "due_error": null,
+   "due_tag": "no due date",
+   "fields": [
+    [
+     "Kind",
+     "fyi"
+    ],
+    [
+     "Added",
+     "2026-01-05"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-1"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-05-d666b1d9",
+   "kind": "fyi",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "",
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [
+    {
+     "by": "pat",
+     "date": "2026-01-06",
+     "text": "see TD-9 now"
+    }
+   ],
+   "session": "w-9",
+   "text": "The mirror moved.",
+   "waiting_on": "person"
+  }
+ ],
+ "keys": [
+  "2026-01-05-d666b1d9"
+ ],
+ "needs_you": [
+  [
+   "2026-01-05-d666b1d9",
+   "fyi",
+   null
+  ]
+ ],
+ "people": null
+}

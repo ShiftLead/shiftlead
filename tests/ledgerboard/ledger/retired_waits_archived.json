@@ -1,0 +1,50 @@
+{
+ "blocked": [],
+ "check": [
+  {
+   "field": "waits",
+   "id": "TD-002",
+   "kind": "retired",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-002: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+  }
+ ],
+ "check_since_empty": [
+  {
+   "field": "waits",
+   "id": "TD-002",
+   "kind": "retired",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-002: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+  }
+ ],
+ "declared": {},
+ "entries": [
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000001",
+   "cross_repo": [],
+   "fields": {
+    "added": "2026-01-02",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-001",
+   "key": "3|0|000001",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "An open entry, nothing retired",
+   "type": "debt"
+  }
+ ],
+ "flags": [],
+ "pickable": [
+  "TD-001"
+ ],
+ "rows": []
+}

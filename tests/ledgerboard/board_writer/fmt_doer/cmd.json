@@ -1,8 +1,0 @@
-{
- "argv": [
-  "fmt",
-  "--board",
-  "board.md",
-  "--json"
- ]
-}

@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "split",
+  "refused": "board: already a v3 board"
+ }
+}

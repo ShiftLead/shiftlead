@@ -2,14 +2,6 @@
  "blocked": [],
  "check": [
   {
-   "field": "location",
-   "id": "TD-002",
-   "kind": "retired",
-   "level": "info",
-   "standing": false,
-   "text": "ℹ TD-002: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
-  },
-  {
    "field": "area",
    "id": "TD-004",
    "kind": "undeclared-field",
@@ -23,18 +15,18 @@
    "kind": "status",
    "level": "info",
    "standing": false,
-   "text": "ℹ TD-001: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
-  }
- ],
- "check_since_empty": [
+   "text": "ℹ TD-001: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
+  },
   {
    "field": "location",
    "id": "TD-002",
    "kind": "retired",
-   "level": "error",
+   "level": "info",
    "standing": false,
-   "text": "⚠ TD-002: a new or changed Location line — the header field is retired; write the **Location:** body section, or run migrate, which moves it (SPEC *Retired words*)"
-  },
+   "text": "ℹ TD-002: the Location field is retired — write the **Location:** body section (SPEC *Retired words*); v3.0 reads no such form: on an open entry move its value with edit --section Location, then remove it with set; on an archived one by hand, then ledger.py fmt TD-n"
+  }
+ ],
+ "check_since_empty": [
   {
    "field": "area",
    "id": "TD-004",
@@ -49,7 +41,15 @@
    "kind": "status",
    "level": "info",
    "standing": false,
-   "text": "ℹ TD-001: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "ℹ TD-001: an archived entry's Status is Resolved D, Superseded D by <id> or Dropped D — this one is Resolved, not in that form — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
+  },
+  {
+   "field": "location",
+   "id": "TD-002",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-002: the Location field is retired — write the **Location:** body section (SPEC *Retired words*); v3.0 reads no such form: on an open entry move its value with edit --section Location, then remove it with set; on an archived one by hand, then ledger.py fmt TD-n"
   }
  ],
  "declared": {
@@ -122,15 +122,7 @@
    "type": "debt"
   }
  ],
- "flags": [
-  {
-   "field": "location",
-   "id": "TD-002",
-   "kind": "retired",
-   "level": "info",
-   "text": "ℹ TD-002: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
-  }
- ],
+ "flags": [],
  "pickable": [
   "TD-002",
   "TD-003",

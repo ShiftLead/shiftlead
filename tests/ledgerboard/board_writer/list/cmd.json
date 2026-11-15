@@ -2,7 +2,7 @@
  "argv": [
   "list",
   "--board",
-  "board.md",
+  "board",
   "--today",
   "2026-01-15",
   "--json"

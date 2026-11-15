@@ -7,15 +7,16 @@
    "TD-009",
    "TD-010"
   ],
+  "id": "2026-01-12-a000000f",
   "item_notes": [],
-  "line": 15,
   "notes": [],
   "paths": [
-   "board.md",
+   "board/archive/2026-01/2026-01-12-a000000f.md",
+   "board/2026-01-12-a000000f.md",
    "ledger/TD-008.md",
    "ledger/TD-009.md",
    "ledger/TD-010.md"
   ],
-  "subject": "ledgerboard: decide Go on the report suite?: Go (session n/a)"
+  "subject": "ledgerboard: decide 2026-01-12-a000000f Go on the report suite?: Go (session n/a)"
  }
 }

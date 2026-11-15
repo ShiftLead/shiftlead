@@ -48,22 +48,6 @@
    "text": "ℹ TD-105: Blocked by names decision (Pat), decision (pat) and the entry has no **Ask:** — say what the person owes, a go included"
   },
   {
-   "field": "taken by",
-   "id": "TD-106",
-   "kind": "retired",
-   "level": "info",
-   "standing": false,
-   "text": "ℹ TD-106: the Taken by field is retired — write Id take, the counter take's nonce (SPEC *Retired words*)"
-  },
-  {
-   "field": "waits",
-   "id": "TD-106",
-   "kind": "retired",
-   "level": "info",
-   "standing": false,
-   "text": "ℹ TD-106: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
-  },
-  {
    "field": "blocked by",
    "id": "TD-106",
    "kind": "retired",
@@ -130,18 +114,18 @@
   {
    "field": "blocked by",
    "id": "TD-115",
-   "kind": "retired",
-   "level": "info",
+   "kind": "blocked-item",
+   "level": "error",
    "standing": false,
-   "text": "ℹ TD-115: Blocked by item 'Decision (kim) — waits on the vendor, then TD-101' is retired — write decision (<person>), with the text in an **Ask:** section; it keeps the block (SPEC *Retired words*)"
+   "text": "⚠ TD-115: cannot read Blocked by item 'Decision (kim) — waits on the vendor' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
   },
   {
-   "field": "waits",
-   "id": "TD-116",
-   "kind": "retired",
-   "level": "info",
+   "field": "blocked by",
+   "id": "TD-115",
+   "kind": "blocked-item",
+   "level": "error",
    "standing": false,
-   "text": "ℹ TD-116: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
+   "text": "⚠ TD-115: cannot read Blocked by item 'then TD-101' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
   },
   {
    "field": "blocked by",
@@ -205,7 +189,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-101: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-101: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -213,7 +197,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-102: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-102: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -221,7 +205,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-103: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-103: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -229,7 +213,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-104: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-104: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -237,7 +221,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-105: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-105: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -245,7 +229,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-106: an open entry's Status is Open alone — this one is Built (retired: Open, the stage in Kind) — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-106: an open entry's Status is Open alone — this one is Built (retired: Open, the stage in Kind) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -253,7 +237,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-107: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-107: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -261,7 +245,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-108: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-108: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -269,7 +253,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-110: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-110: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -277,7 +261,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-111: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-111: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -285,7 +269,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-112: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-112: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -293,7 +277,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-113: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-113: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -301,7 +285,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-114: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-114: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -309,7 +293,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-115: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-115: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -317,7 +301,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-116: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-116: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -325,7 +309,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-117: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-117: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -333,7 +317,39 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-118: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-118: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
+  },
+  {
+   "field": "taken by",
+   "id": "TD-106",
+   "kind": "retired",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-106: the Taken by field is retired — write Id take, the counter take's nonce (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+  },
+  {
+   "field": "waits",
+   "id": "TD-106",
+   "kind": "retired",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-106: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-115",
+   "kind": "retired",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-115: Blocked by item 'Decision (kim) — waits on the vendor, then TD-101' is in the old decision form — write decision (<person>), with the text in an **Ask:** section (SPEC *Retired words*); v3.0 reads no such form: on an open entry write its text with edit --section Ask, then rewrite it decision (<person>) with set; on an archived one by hand, then ledger.py fmt TD-n"
+  },
+  {
+   "field": "waits",
+   "id": "TD-116",
+   "kind": "retired",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-116: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
   }
  ],
  "check_since_empty": [
@@ -368,22 +384,6 @@
    "level": "error",
    "standing": false,
    "text": "⚠ TD-105: Blocked by names decision (Pat), decision (pat) and the entry has no **Ask:** — say what the person owes, a go included"
-  },
-  {
-   "field": "taken by",
-   "id": "TD-106",
-   "kind": "retired",
-   "level": "info",
-   "standing": false,
-   "text": "ℹ TD-106: the Taken by field is retired — write Id take, the counter take's nonce (SPEC *Retired words*)"
-  },
-  {
-   "field": "waits",
-   "id": "TD-106",
-   "kind": "retired",
-   "level": "error",
-   "standing": false,
-   "text": "⚠ TD-106: a new or changed Waits line — the field is retired and no reader takes it as a gate; write the wait in Blocked by as until YYYY-MM-DD, or as event (<name>) with its **Event (<name>):** section (SPEC *Retired words*)"
   },
   {
    "field": "blocked by",
@@ -452,18 +452,18 @@
   {
    "field": "blocked by",
    "id": "TD-115",
-   "kind": "retired",
-   "level": "info",
-   "standing": false,
-   "text": "ℹ TD-115: Blocked by item 'Decision (kim) — waits on the vendor, then TD-101' is retired — write decision (<person>), with the text in an **Ask:** section; it keeps the block (SPEC *Retired words*)"
-  },
-  {
-   "field": "waits",
-   "id": "TD-116",
-   "kind": "retired",
+   "kind": "blocked-item",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-116: a new or changed Waits line — the field is retired and no reader takes it as a gate; write the wait in Blocked by as until YYYY-MM-DD, or as event (<name>) with its **Event (<name>):** section (SPEC *Retired words*)"
+   "text": "⚠ TD-115: cannot read Blocked by item 'Decision (kim) — waits on the vendor' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-115",
+   "kind": "blocked-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-115: cannot read Blocked by item 'then TD-101' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
   },
   {
    "field": "blocked by",
@@ -527,7 +527,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-101: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-101: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -535,7 +535,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-102: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-102: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -543,7 +543,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-103: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-103: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -551,7 +551,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-104: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-104: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -559,7 +559,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-105: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-105: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -567,7 +567,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-106: an open entry's Status is Open alone — this one is Built (retired: Open, the stage in Kind) — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-106: an open entry's Status is Open alone — this one is Built (retired: Open, the stage in Kind) — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -575,7 +575,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-107: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-107: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -583,7 +583,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-108: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-108: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -591,7 +591,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-110: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-110: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -599,7 +599,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-111: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-111: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -607,7 +607,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-112: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-112: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -615,7 +615,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-113: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-113: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -623,7 +623,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-114: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-114: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -631,7 +631,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-115: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-115: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -639,7 +639,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-116: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-116: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -647,7 +647,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-117: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-117: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -655,7 +655,39 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-118: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-118: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
+  },
+  {
+   "field": "taken by",
+   "id": "TD-106",
+   "kind": "retired",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-106: the Taken by field is retired — write Id take, the counter take's nonce (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+  },
+  {
+   "field": "waits",
+   "id": "TD-106",
+   "kind": "retired",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-106: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-115",
+   "kind": "retired",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-115: Blocked by item 'Decision (kim) — waits on the vendor, then TD-101' is in the old decision form — write decision (<person>), with the text in an **Ask:** section (SPEC *Retired words*); v3.0 reads no such form: on an open entry write its text with edit --section Ask, then rewrite it decision (<person>) with set; on an archived one by hand, then ledger.py fmt TD-n"
+  },
+  {
+   "field": "waits",
+   "id": "TD-116",
+   "kind": "retired",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-116: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
   }
  ],
  "declared": {},
@@ -996,7 +1028,8 @@
    "blocked_by": [
     "until 2026-02-01",
     "event (y)",
-    "decision (kim)"
+    "'Decision (kim) — waits on the vendor'",
+    "'then TD-101'"
    ],
    "card_key": "3|0|000115",
    "cross_repo": [],
@@ -1063,20 +1096,6 @@
    "text": "ℹ TD-105: Blocked by names decision (Pat), decision (pat) and the entry has no **Ask:** — say what the person owes, a go included"
   },
   {
-   "field": "taken by",
-   "id": "TD-106",
-   "kind": "retired",
-   "level": "info",
-   "text": "ℹ TD-106: the Taken by field is retired — write Id take, the counter take's nonce (SPEC *Retired words*)"
-  },
-  {
-   "field": "waits",
-   "id": "TD-106",
-   "kind": "retired",
-   "level": "info",
-   "text": "ℹ TD-106: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
-  },
-  {
    "field": "blocked by",
    "id": "TD-106",
    "kind": "retired",
@@ -1135,16 +1154,16 @@
   {
    "field": "blocked by",
    "id": "TD-115",
-   "kind": "retired",
-   "level": "info",
-   "text": "ℹ TD-115: Blocked by item 'Decision (kim) — waits on the vendor, then TD-101' is retired — write decision (<person>), with the text in an **Ask:** section; it keeps the block (SPEC *Retired words*)"
+   "kind": "blocked-item",
+   "level": "error",
+   "text": "⚠ TD-115: cannot read Blocked by item 'Decision (kim) — waits on the vendor' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
   },
   {
-   "field": "waits",
-   "id": "TD-116",
-   "kind": "retired",
-   "level": "info",
-   "text": "ℹ TD-116: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
+   "field": "blocked by",
+   "id": "TD-115",
+   "kind": "blocked-item",
+   "level": "error",
+   "text": "⚠ TD-115: cannot read Blocked by item 'then TD-101' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
   },
   {
    "field": "blocked by",

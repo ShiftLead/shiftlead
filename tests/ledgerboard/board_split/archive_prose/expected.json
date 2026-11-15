@@ -1,0 +1,22 @@
+{
+ "files": {
+  "2026-01-05-7ceaa639.md": "## Keep going.\n\n**Kind:** act\n**Added:** 2026-01-05\n**Context:** TD-1\n**Due:** 2026-01-20\n",
+  "README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat, sam.lee\n\n## Older\n- (none)\n",
+  "archive/2026-01/2026-01-02-a303be17.md": "## Done before.\n\n**Kind:** act\n**Added:** 2026-01-02\n**Context:** TD-3\n**Closed:** 2026-01-04 — done\n"
+ },
+ "notes": [
+  [
+   "README.md",
+   1,
+   "# Needs the user",
+   "names Needs the user: the board is now this directory"
+  ],
+  [
+   "(archive)",
+   3,
+   "Moved here by hand, see the board.",
+   "archive preamble not carried"
+  ]
+ ],
+ "persisted_keys_found": true
+}

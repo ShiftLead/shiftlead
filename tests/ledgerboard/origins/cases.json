@@ -34,7 +34,7 @@
     "a/../b#TD-1",
     "-x#TD-1, TD-2"
   ],
-  "item_problem": [
-    "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: Acme/Tools#TD-3, acme/tools#TD-3. Due: 2026-01-20. Answers: Go | Not yet."
+  "item_file_problem": [
+    "## Go on the parts?\n\n**Kind:** decide\n**Added:** 2026-01-05\n**Context:** TD-12\n**Parts:** Acme/Tools#TD-3, acme/tools#TD-3\n**Due:** 2026-01-20\n**Answers:** Go | Not yet\n"
   ]
 }

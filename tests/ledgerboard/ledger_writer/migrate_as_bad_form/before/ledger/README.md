@@ -1,3 +1,0 @@
-# Ledger
-
-Ledgerboard: 2

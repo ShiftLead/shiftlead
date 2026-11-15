@@ -1,23 +1,23 @@
 {
  "today": "2026-01-15",
- "lines": {
-  "go_parts": "- [ ] decide 2026-01-06 (session `w-1`) — **Go on the parts?** Context: TD-500 decision (pat). Parts: TD-501, TD-502. Due: 2026-01-20. Answers: Go (default) | Not yet | One more round.",
-  "two_lifts": "- [ ] decide 2026-01-06 (session `w-1`) — Which store? Context: TD-521 decision (Pat). Due: 2026-01-20. Answers: Files | Db | Not yet. Lifts: Files | Db.",
-  "parent_no_gate": "- [ ] decide 2026-01-06 (session `w-1`) — Go on the part? Context: TD-520 decision (pat). Parts: TD-521. Due: 2026-01-20. Answers: Go | Not yet.",
-  "mismatched": "- [ ] decide 2026-01-06 (session `w-1`) — Go on the parts? Context: TD-500 decision (pat). Parts: TD-501, TD-503. Due: 2026-01-20. Answers: Go | Not yet.",
-  "event": "- [ ] decide 2026-01-06 (session `w-1`) — Still waiting on the vendor? Context: TD-530 event (vendor-ships). Due: 2026-01-20. Answers: Drop the gate | Keep waiting | Rewrite the check. Lifts: Drop the gate.",
-  "archived": "- [ ] decide 2026-01-06 (session `w-1`) — Go? Context: TD-550 decision (pat). Due: 2026-01-20. Answers: Go | Not yet.",
-  "missing_part": "- [ ] decide 2026-01-06 (session `w-1`) — Go on the parts? Context: TD-500 decision (pat). Parts: TD-501, TD-599. Due: 2026-01-20. Answers: Go | Not yet.",
-  "cross_repo": "- [ ] decide 2026-01-06 (session `w-1`) — Go? Context: acme/app#TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Not yet.",
-  "act": "- [ ] act 2026-01-06 (session `w-1`) — Look at it. Context: TD-500. Due: 2026-01-20.",
-  "go_parts_archived": "- [ ] decide 2026-01-06 (session `w-1`) — Go on the parts? Context: TD-500 decision (pat). Parts: TD-501, TD-506. Due: 2026-01-20. Answers: Go | Not yet.",
-  "go_event_archived": "- [ ] decide 2026-01-06 (session `w-1`) — Did the release ship? Context: TD-508 event (ships). Parts: TD-509. Due: 2026-01-20. Answers: Drop the gate | Keep waiting. Lifts: Drop the gate.",
-  "go_parts_spelled": "- [ ] decide 2026-01-06 (session `w-1`) — Go on the parts? Context: TD-500 decision (pat). Parts: TD-501, TD-6. Due: 2026-01-20. Answers: Go | Not yet.",
-  "hold_form": "- [ ] decide 2026-01-06 (session `w-1`) — Go on the build? Context: TD-580 decision (pat). Due: 2026-01-20. Answers: Go | Hold: <note>. Lifts: Hold: <note>.",
-  "hold_unlisted": "- [ ] decide 2026-01-06 (session `w-1`) — Go on the build? Context: TD-580 decision (pat). Due: 2026-01-20. Answers: Go | Hold: <note>.",
-  "hold_later": "- [ ] decide 2026-01-06 (session `w-1`) — Go on the build? Context: TD-580 decision (pat). Due: 2026-01-20. Answers: Go | Hold: <note> | Hold: later. Lifts: Hold: <note>.",
-  "hold_shared_head": "- [ ] decide 2026-01-06 (session `w-1`) — Go on the build? Context: TD-580 decision (pat). Due: 2026-01-20. Answers: Hold: <a> | Hold:. Lifts: Hold:.",
-  "waiting_form": "- [ ] decide 2026-01-06 (session `w-1`) — Go on the build? Context: TD-580 decision (pat). Due: 2026-01-20. Answers: Go | Not yet: <why>."
+ "items": {
+  "go_parts": "## **Go on the parts?**\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-500 decision (pat)\n**Parts:** TD-501, TD-502\n**Due:** 2026-01-20\n**Answers:** Go (default) | Not yet | One more round\n",
+  "two_lifts": "## Which store?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-521 decision (Pat)\n**Due:** 2026-01-20\n**Answers:** Files | Db | Not yet\n**Lifts:** Files | Db\n",
+  "parent_no_gate": "## Go on the part?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-520 decision (pat)\n**Parts:** TD-521\n**Due:** 2026-01-20\n**Answers:** Go | Not yet\n",
+  "mismatched": "## Go on the parts?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-500 decision (pat)\n**Parts:** TD-501, TD-503\n**Due:** 2026-01-20\n**Answers:** Go | Not yet\n",
+  "event": "## Still waiting on the vendor?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-530 event (vendor-ships)\n**Due:** 2026-01-20\n**Answers:** Drop the gate | Keep waiting | Rewrite the check\n**Lifts:** Drop the gate\n",
+  "archived": "## Go?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-550 decision (pat)\n**Due:** 2026-01-20\n**Answers:** Go | Not yet\n",
+  "missing_part": "## Go on the parts?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-500 decision (pat)\n**Parts:** TD-501, TD-599\n**Due:** 2026-01-20\n**Answers:** Go | Not yet\n",
+  "cross_repo": "## Go?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** acme/app#TD-12 decision (pat)\n**Due:** 2026-01-20\n**Answers:** Go | Not yet\n",
+  "act": "## Look at it.\n\n**Kind:** act\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-500\n**Due:** 2026-01-20\n",
+  "go_parts_archived": "## Go on the parts?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-500 decision (pat)\n**Parts:** TD-501, TD-506\n**Due:** 2026-01-20\n**Answers:** Go | Not yet\n",
+  "go_event_archived": "## Did the release ship?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-508 event (ships)\n**Parts:** TD-509\n**Due:** 2026-01-20\n**Answers:** Drop the gate | Keep waiting\n**Lifts:** Drop the gate\n",
+  "go_parts_spelled": "## Go on the parts?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-500 decision (pat)\n**Parts:** TD-501, TD-6\n**Due:** 2026-01-20\n**Answers:** Go | Not yet\n",
+  "hold_form": "## Go on the build?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-580 decision (pat)\n**Due:** 2026-01-20\n**Answers:** Go | Hold: <note>\n**Lifts:** Hold: <note>\n",
+  "hold_unlisted": "## Go on the build?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-580 decision (pat)\n**Due:** 2026-01-20\n**Answers:** Go | Hold: <note>\n",
+  "hold_later": "## Go on the build?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-580 decision (pat)\n**Due:** 2026-01-20\n**Answers:** Go | Hold: <note> | Hold: later\n**Lifts:** Hold: <note>\n",
+  "hold_shared_head": "## Go on the build?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-580 decision (pat)\n**Due:** 2026-01-20\n**Answers:** Hold: <a> | Hold:\n**Lifts:** Hold:\n",
+  "waiting_form": "## Go on the build?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-580 decision (pat)\n**Due:** 2026-01-20\n**Answers:** Go | Not yet: <why>\n"
  },
  "decide_lift": [
   {
@@ -1228,7 +1228,7 @@
   "# Board\n\nPeople: pat\nAnswered by: everyone\nAnswered by: any\n",
   "# Board\n\nPeople: pat\n\n- [ ] act 2026-01-06 (n/a) — x. Context: none. Due: 2026-01-20.\nAnswered by: any\n"
  ],
- "item_lines": [
+ "item_files": [
   {
    "text": "Go?",
    "due": "2026-01-20",
@@ -1252,7 +1252,7 @@
    ]
   }
  ],
- "item_problems": [
-  "- [ ] decide 2026-01-06 (session `w-1`) — Go? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Keep waiting. Lifts: Go | Keep waiting."
+ "item_file_problems": [
+  "## Go?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-12 decision (pat)\n**Due:** 2026-01-20\n**Answers:** Go | Keep waiting\n**Lifts:** Go | Keep waiting\n"
  ]
 }

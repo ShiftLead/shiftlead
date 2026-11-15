@@ -1,0 +1,150 @@
+{
+ "board_dir_problems": [],
+ "closed": [],
+ "form": "dir",
+ "items": [
+  {
+   "added": "2026-01-06",
+   "answers": [
+    "Go",
+    "Not yet"
+   ],
+   "closed": null,
+   "consequences": [
+    "",
+    ""
+   ],
+   "context": "none. Hide until: 2026-02-01",
+   "decided": null,
+   "decided_by": null,
+   "default": "Go",
+   "detail": [
+    "- **Context:** the store.",
+    "- **Question:** Go?",
+    "- **Recommended:** Go — it is ready."
+   ],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "decide"
+    ],
+    [
+     "Added",
+     "2026-01-06"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "none. Hide until: 2026-02-01"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ],
+    [
+     "Answers",
+     "Go (default) | Not yet"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-06-2a000002",
+   "kind": "decide",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "2026-01-06-2a000002.md",
+   "refs": [],
+   "replies": [],
+   "session": "w-9",
+   "text": "Answers: Go | No is a heading. Lifts: Go.",
+   "waiting_on": "person"
+  },
+  {
+   "added": "2026-01-05",
+   "answers": [],
+   "closed": null,
+   "consequences": [],
+   "context": "TD-5, its Due: and Closed: words",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-01-05"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-5, its Due: and Closed: words"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-05-2a000001",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "2026-01-05-2a000001.md",
+   "refs": [
+    "TD-5"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "Check the Context: and Due: 2026-01-30 words. Decided: nothing.",
+   "waiting_on": "person"
+  }
+ ],
+ "keys": [
+  "2026-01-06-2a000002",
+  "2026-01-05-2a000001"
+ ],
+ "major": 3,
+ "needs_you": [
+  [
+   "2026-01-06-2a000002",
+   "due",
+   -5
+  ],
+  [
+   "2026-01-05-2a000001",
+   "due",
+   -5
+  ]
+ ],
+ "path": "board",
+ "people": [
+  "pat"
+ ],
+ "problems": [],
+ "version_problem": null
+}

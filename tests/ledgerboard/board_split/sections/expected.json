@@ -1,0 +1,21 @@
+{
+ "files": {
+  "2026-01-05-9c1c99f4.md": "## Do a thing.\n\n**Kind:** act\n**Added:** 2026-01-05\n**Context:** TD-1\n**Due:** 2026-01-20\n",
+  "README.md": "# The board\n\nLedgerboard: 3\nWhat waits on [the ledger](../ledger/), with ![a chart](../img/chart.png).\n\n## Earlier\n\nRead [the notes](../notes.md#top \"Notes\") and [the plan](<../plans/a plan.md>) and [here](../here.md), not [this](#anchor),\n[the site](https://example.com/x), [mail](mailto:pat@example.com), [root](/abs.md) or `[code](code.md)`.\n\n[ref]: ../docs/ref.md\n\nFormat: `- [ ] YYYY-MM-DD (n/a) — what. Due: YYYY-MM-DD.`, as user_attention.md has it.\n\n## In-flight\n- (none)\n"
+ },
+ "notes": [
+  [
+   "README.md",
+   13,
+   "Format: `- [ ] YYYY-MM-DD (n/a) — what. Due: YYYY-MM-DD.`, as user_attention.md has it.",
+   "names user_attention.md: the board is now this directory"
+  ],
+  [
+   "README.md",
+   15,
+   "## In-flight",
+   "names In-flight: the board is now this directory"
+  ]
+ ],
+ "persisted_keys_found": true
+}

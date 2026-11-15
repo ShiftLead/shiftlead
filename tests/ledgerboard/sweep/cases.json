@@ -4,20 +4,17 @@
   {
    "url": "git@example.com:acme/widgets.git",
    "basename": "widgets",
-   "board": "widgets.md",
-   "archive": null
+   "board": "widgets.md"
   },
   {
    "url": "https://user:tok@github.com:443/acme/beta.git",
    "basename": "beta",
-   "board": "beta.md",
-   "archive": "beta.archive.md"
+   "board": "beta.md"
   },
   {
    "url": "git@gitlab.example:acme/alpha",
    "basename": "alpha",
-   "board": "alpha.md",
-   "archive": null
+   "board": "alpha.md"
   }
  ],
  "results": [
@@ -940,5 +937,38 @@
    "line": 5,
    "entries": {}
   }
- ]
+ ],
+ "sets": [
+  {
+   "name": "undated_close",
+   "boards": [
+    {
+     "url": "git@example.com:acme/widgets.git",
+     "basename": "widgets",
+     "board": "undated_close.md"
+    }
+   ],
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03",
+   "about": "TD-214"
+  },
+  {
+   "name": "head_in_reply",
+   "boards": [
+    {
+     "url": "git@example.com:acme/widgets.git",
+     "basename": "widgets",
+     "board": "head_in_reply.md"
+    }
+   ],
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03",
+   "about": "TD-202"
+  }
+ ],
+ "split": {
+  "run": "today",
+  "basename": "alpha",
+  "dir": "alpha"
+ }
 }
