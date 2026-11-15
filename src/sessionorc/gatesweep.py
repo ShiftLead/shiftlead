@@ -640,11 +640,12 @@ def _held_by_notices(there: Path | str, mark: re.Pattern[str], ctx: str, today_u
 
 def _qualify(repo: str, it: dict[str, Any]) -> dict[str, Any]:
     """The item with a bare `TD-n` in its words and detail written `<repo>#TD-n`, the id its `Context:` names:
-    on another repo's board a bare id is that repo's own (gate_sweep.py's rule)."""
+    on another repo's board a bare id is that repo's own (gate_sweep.py's rule). An id inside a path or a longer
+    name (`docs/plans/TD-109-x.md`, `TD-109.md`) is left as written (TD-1868)."""
     m = re.match(r"\S+#(TD-\d+)\b", str(it.get("context") or ""))
     if not m:
         return it
-    bare = re.compile(rf"(?<![#\w]){re.escape(m.group(1))}\b")
+    bare = re.compile(rf"(?<![#\w/.-]){re.escape(m.group(1))}(?![\w/-]|\.\w)")
 
     def fix(x: str) -> str:
         return bare.sub(f"{repo.lower()}#{m.group(1)}", x)
