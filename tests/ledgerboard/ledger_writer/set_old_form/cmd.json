@@ -3,7 +3,7 @@
   "set",
   "TD-1",
   "--blocked-by",
-  "event (ships)",
+  "event (ships), decision (Robin) pick a format first",
   "--ledger",
   "ledger",
   "--today",

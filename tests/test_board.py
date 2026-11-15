@@ -7,13 +7,15 @@ from __future__ import annotations
 import asyncio
 import json
 import subprocess
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
+from _v3board import item, load, ref_of, write_board
 from conftest import copy_pinned_ledgerboard, park_ticks, pinned_script, served
 
 from sessionorc import board, ledgerboard
+from sessionorc import ledger as ledger_mod
 from sessionorc.agent import RpcError
 from sessionorc.client import AgentError, LocalClient
 
@@ -21,7 +23,9 @@ ITEM = (
     "2026-09-20 (session `grinder-ao-1` on kmaster) — **Merged, live check pending: the doorbell.** Look. "
     "Due: 2026-09-22."
 )
-BOARD_TEXT = f"# User attention\n\nFormat: `- [ ] …`\n\n## Needs the user\n\n- [ ] {ITEM}\n- [ ] n/a — undated.\n"
+UNDATED = "2026-09-21 (n/a) — undated."  # dated: ledgerboard v3.0's split gives every item an id from its date
+BOARD_TEXT = f"# User attention\n\nFormat: `- [ ] …`\n\n## Needs the user\n\n- [ ] {ITEM}\n- [ ] {UNDATED}\n"
+REF, UNDATED_REF = ref_of(ITEM), ref_of(UNDATED)  # the references the split items keep (TD-1881)
 
 
 def _own(tmp_path, name: str) -> str:
@@ -42,7 +46,7 @@ def repo(tmp_path, forge) -> Path:
     git(root, "init", "-q", "-b", "main")
     git(root, "config", "user.email", "t@example.com")
     git(root, "config", "user.name", "t")
-    (root / board.BOARD).write_text(BOARD_TEXT)
+    write_board(root, BOARD_TEXT)  # a v3 board, the directory and its stub (ledgerboard v3.0, TD-1881)
     (root / "other.txt").write_text("x\n")
     served(root)  # registered by the tests that talk to the home, which reads it once a tick comes (TD-1040)
     git(root, "add", "-A")
@@ -57,8 +61,35 @@ def on_origin(root: Path, *args: str) -> str:
     return git(root, *args)
 
 
-def origin_board(root: Path) -> str:
-    return on_origin(root, "show", f"origin/main:{board.BOARD.as_posix()}") + "\n"
+def origin(root: Path) -> ledgerboard.Board:
+    """Origin's board after a landed edit, as `load_board()` reads it at `origin/main` (TD-1881)."""
+    git(root, "fetch", "-q", "origin")
+    return ledgerboard.load_board(board.BOARD.as_posix(), *ledger_mod.git_io(root, "origin/main", under="docs"))
+
+
+def origin_item(root: Path, ref: str) -> ledgerboard.BoardItem | None:
+    """Origin's item whose id ends with `ref`'s eight hex digits, open or closed, else None."""
+    nonce = ref.removeprefix("board:")
+    b = origin(root)
+    return next((it for it in [*b.items, *b.closed] if it.id and it.id.endswith("-" + nonce)), None)
+
+
+def push_board(root: Path, text: str, msg: str = "the board", archive: str = "") -> None:
+    """The checkout's board rewritten from the v2 `text` (`write_board`), committed whole and pushed to origin."""
+    write_board(root, text, archive)
+    git(root, "add", "-A")
+    git(root, "commit", "-qm", msg)
+    git(root, "push", "-q", "origin", "main")
+
+
+def origin_docs(root: Path) -> str:
+    """The tree id of origin's `docs/`: the board's files and stub unchanged while it is."""
+    return on_origin(root, "rev-parse", "origin/main:docs")
+
+
+def board_files(root: Path, rev: str = "origin/main") -> set[str]:
+    """The paths of the board's files a commit at `rev` touched."""
+    return set(on_origin(root, "show", "--no-renames", "--name-only", "--format=", rev).splitlines())
 
 
 def keep_ledger(agent, monkeypatch) -> None:
@@ -67,58 +98,76 @@ def keep_ledger(agent, monkeypatch) -> None:
     monkeypatch.setattr(agent, "_read_ledger", lambda root, old_led, *a, **kw: (dict(old_led), []))
 
 
-def test_a_line_is_done_or_snoozed_only_while_it_holds_the_item():
-    line = f"- [ ] {ITEM}\n"
-    # Done ticks it and closes it today: ledgerboard's edit (TD-585; was a tick alone)
-    assert board.edit_line(line, ITEM, "done", today="2026-10-13") == f"- [x] {ITEM} Closed: 2026-10-13.\n"
+def _items(tmp_path) -> dict[str, ledgerboard.BoardItem]:
+    """The fixture's two items, split into a v3 board under `tmp_path` and read back, by their references."""
+    write_board(tmp_path, BOARD_TEXT)
+    return {r: item(tmp_path, r) for r in (REF, UNDATED_REF)}
+
+
+def test_an_item_is_done_or_snoozed_only_while_it_is_open(tmp_path):
+    its = _items(tmp_path)
+    it = its[REF]
+
+    def read(text: str) -> ledgerboard.BoardItem:
+        return ledgerboard.parse_item(text, it.path)
+
+    # Done closes it today: ledgerboard's edit (TD-585; v3.0 writes the item file's `Closed:`, TD-1881)
+    assert read(board.edit_item(it, "done", today="2026-10-13")).closed == (datetime(2026, 10, 13).date(), None)
     # ledgerboard v2.3 (TD-1330): Snooze hides the item until the date and leaves its Due: alone; `due` moves it
-    assert board.edit_line(line, ITEM, "snooze", "2026-10-01") == f"- [ ] {ITEM} Hide until: 2026-10-01.\n"
-    assert board.edit_line(line, ITEM, "due", "2026-10-01") == f"- [ ] {ITEM.replace('2026-09-22', '2026-10-01')}\n"
-    # an undated item gains a date by `due`; a snooze of a line with no Due: and no Context: is refused
-    assert board.edit_line("- [ ] n/a — undated.", "n/a — undated.", "due", "2026-10-01") == (
-        "- [ ] n/a — undated. Due: 2026-10-01."
-    )
-    with pytest.raises(board.Refused, match="Hide until"):
-        board.edit_line("- [ ] n/a — undated.", "n/a — undated.", "snooze", "2026-10-01")
+    got = read(board.edit_item(it, "snooze", "2026-10-01"))
+    assert got.hide_until.isoformat() == "2026-10-01" and got.due.isoformat() == "2026-09-22"
+    assert read(board.edit_item(it, "due", "2026-10-01")).due.isoformat() == "2026-10-01"
+    # an undated item gains a date by `due`
+    assert read(board.edit_item(its[UNDATED_REF], "due", "2026-10-01")).due.isoformat() == "2026-10-01"
+    shut = read(board.edit_item(it, "done", today="2026-10-13"))
     for bad in (
-        lambda: board.edit_line("- [ ] something else\n", ITEM, "done"),  # another item moved onto the line
-        lambda: board.edit_line(f"- [x] {ITEM}\n", ITEM, "done"),  # already done
-        lambda: board.edit_line(line, ITEM, "snooze", "next week"),
-        lambda: board.edit_line(line, ITEM, "delete"),
+        lambda: board.edit_item(shut, "done"),  # already done
+        lambda: board.edit_item(it, "snooze", "next week"),
+        lambda: board.edit_item(it, "delete"),
     ):
         with pytest.raises(board.Refused):
             bad()
+    # retired (TD-1881): v2's refusal of a snooze on a line with no Due: and no Context: — an item file's
+    # `Hide until:` is a field of its own, which no reader takes for the item's words
 
 
-def test_the_message_names_the_item_and_the_session_that_raised_it():
-    assert board.message(ITEM, "snooze", "2026-10-01") == (
-        "shiftlead: snooze Merged, live check pending: the doorbell. Look. to 2026-10-01 (session `grinder-ao-1`)"
-    )  # ledgerboard's subject (TD-585): the head is `edit_head`'s, the session as written
-    assert board.message("n/a — undated.", "done") == "shiftlead: done undated. (session n/a)"
-    assert board.message(ITEM, "append").startswith("shiftlead: append Merged")
-    named = ITEM.replace("grinder-ao-1", "g" * 300)  # the subject is the PR's title: 256 at most
-    long = board.message(named, "snooze", "2026-10-01")
-    assert len(long) <= board.SUBJECT_MAX and long.startswith("shiftlead: snooze Merged") and long.endswith(")")
+def test_the_message_names_the_item_its_id_and_the_session_that_raised_it():
+    iid = "2026-09-20-aced0c18"
+    words = "**Merged, live check pending: the doorbell.** Look."
+    assert board.message(words, "snooze", "2026-10-01", id=iid, session="grinder-ao-1") == (
+        f"shiftlead: snooze {iid} Merged, live check pending: the doorbell. Look. to 2026-10-01 (session grinder-ao-1)"
+    )  # ledgerboard v3.0's subject (TD-1881): the id after the action, the head the words', the session as given
+    assert board.message("undated.", "done", id=iid) == f"shiftlead: done {iid} undated. (session n/a)"
+    assert board.message(words, "append", id=iid).startswith(f"shiftlead: append {iid} Merged")
+    long = board.message(words, "snooze", "2026-10-01", id=iid, session="g" * 300)  # the PR's title: 256 at most
+    assert len(long) <= board.SUBJECT_MAX and long.startswith("shiftlead: snooze") and long.endswith(")")
 
 
-def test_write_back_lands_the_one_line_on_origin_and_leaves_the_checkout_alone(repo):
+def test_write_back_lands_the_one_item_on_origin_and_leaves_the_checkout_alone(repo):
     """TD-264 (design §4.4): the edit is made in the host agent's own tree at origin's head and lands
-    there by a PR it opens and squash-merges — one file, the fixed message as its title — and the
+    there by a PR it opens and squash-merges — the item's file, the fixed message as its title — and the
     person's checkout, its own edits included, is never written."""
     (repo / "other.txt").write_text("the anchor's own edit, uncommitted\n")
     head = git(repo, "rev-parse", "HEAD")
-    got = board.write_back(repo, 7, ITEM, "snooze", "2026-10-01")
-    assert (
-        got["pr"] == 1 and got["line"] == 7 and got["commit"] == on_origin(repo, "rev-parse", "--short", "origin/main")
-    )
+    mine = load(repo)
+    got = board.write_back(repo, None, "", "snooze", "2026-10-01", key=REF)
+    assert got["pr"] == 1 and got["key"] == REF and got["id"].endswith(REF[-8:])
+    assert got["commit"] == on_origin(repo, "rev-parse", "--short", "origin/main")
     assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#1)"
-    assert on_origin(repo, "show", "--name-only", "--format=", "origin/main") == str(board.BOARD)
-    assert "Due: 2026-09-22. Hide until: 2026-10-01." in origin_board(repo)  # v2.3: Due: stays (TD-1330)
-    assert (repo / board.BOARD).read_text() == BOARD_TEXT and git(repo, "rev-parse", "HEAD") == head
+    assert board_files(repo) == {f"docs/user_attention/{got['id']}.md"}
+    it = origin_item(repo, REF)
+    assert it.due.isoformat() == "2026-09-22" and it.hide_until.isoformat() == "2026-10-01"  # v2.3: Due: stays
+    assert load(repo) == mine and git(repo, "rev-parse", "HEAD") == head
     assert git(repo, "status", "--porcelain") == "M other.txt"  # someone else's edit, untouched
     assert "board/" not in git(repo, "ls-remote", "--heads", "origin")  # the PR's branch is deleted
-    board.write_back(repo, 8, "n/a — undated.", "done")
-    assert "- [x] n/a — undated." in origin_board(repo)
+    # found by a v2 line's text alone, as a press from before the split names it; done moves the file to archive/
+    done = board.write_back(repo, 8, UNDATED, "done")
+    assert origin_item(repo, UNDATED_REF).closed is not None
+    month = date.today().isoformat()[:7]
+    assert board_files(repo) == {
+        f"docs/user_attention/{done['id']}.md",
+        f"docs/user_attention/archive/{month}/{done['id']}.md",
+    }
     assert board.tree_dir(repo).exists()  # kept between presses
 
 
@@ -128,32 +177,36 @@ def test_the_checkouts_state_refuses_nothing(repo, state):
     if state == "branch":
         git(repo, "checkout", "-q", "-b", "td-feature")
     elif state == "dirty":
-        (repo / board.BOARD).write_text(BOARD_TEXT + "- [ ] a line being written. Due: 2026-09-30.\n")
+        write_board(repo, BOARD_TEXT + "- [ ] 2026-09-29 (n/a) — an item being written. Due: 2026-09-30.\n")
     elif state == "rebase":
         (Path(git(repo, "rev-parse", "--absolute-git-dir")) / "rebase-merge").mkdir()
-    before = (repo / board.BOARD).read_text()
+    before = load(repo)
     board.write_back(repo, 7, ITEM, "done")
-    assert f"- [x] {ITEM}" in origin_board(repo) and (repo / board.BOARD).read_text() == before
+    assert origin_item(repo, REF).closed is not None and load(repo) == before
 
 
-def test_a_line_moved_on_origin_is_found_by_its_text_and_a_line_only_the_checkout_holds_is_named(repo):
-    """§4.4: the reader's line is a hint — origin's item is found by its text wherever it sits; a
-    line the checkout alone holds is *not on origin yet*; an item origin no longer holds open is
-    the moved-line refusal. Nothing lands for either refusal."""
-    (repo / board.BOARD).write_text(BOARD_TEXT.replace("## Needs the user\n\n", "## Needs the user\n\n- [ ] new.\n"))
-    git(repo, "commit", "-qam", "a line above")
+def test_an_item_only_the_checkout_holds_is_named_and_one_done_on_origin_is_the_moved_refusal(repo):
+    """§4.4: origin's item is found by its reference wherever its file is (a v3 board has no lines, TD-1881); an
+    item the checkout alone holds is *not on origin yet*; an item origin no longer holds open is the closed,
+    moved-item refusal. Nothing lands for either refusal."""
+    write_board(
+        repo, BOARD_TEXT.replace("## Needs the user\n\n", "## Needs the user\n\n- [ ] 2026-09-19 (n/a) — new.\n")
+    )
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "an item above")
     git(repo, "push", "-q", "origin", "main")
-    got = board.write_back(repo, 7, ITEM, "done")  # the reader read line 7; origin's item is on 8
-    assert got["line"] == 8 and f"- [x] {ITEM}" in origin_board(repo)
+    got = board.write_back(repo, 7, ITEM, "done")  # the reader read line 7; the item is found by its key
+    assert got["key"] == REF and origin_item(repo, REF).closed is not None
     before = on_origin(repo, "rev-parse", "origin/main")
     with pytest.raises(board.Refused, match="no longer holds this item"):
         board.write_back(repo, 8, ITEM, "done")  # done on origin; the checkout, behind, still shows it
-    (repo / board.BOARD).write_text(BOARD_TEXT + "- [ ] unpushed. Due: 2026-09-30.\n")
+    write_board(repo, BOARD_TEXT + "- [ ] 2026-09-29 (n/a) — unpushed. Due: 2026-09-30.\n")
     with pytest.raises(board.Refused, match="not on origin yet: push the checkout first"):
-        board.write_back(repo, 9, "unpushed. Due: 2026-09-30.", "done")  # uncommitted
-    git(repo, "commit", "-qam", "unpushed")
+        board.write_back(repo, 9, "2026-09-29 (n/a) — unpushed. Due: 2026-09-30.", "done")  # uncommitted
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "unpushed")
     with pytest.raises(board.Refused, match="not on origin yet: push the checkout first"):
-        board.write_back(repo, 9, "unpushed. Due: 2026-09-30.", "done")  # committed, not pushed
+        board.write_back(repo, None, "unpushed.", "done")  # committed, not pushed; named by its words
     assert on_origin(repo, "rev-parse", "origin/main") == before
 
 
@@ -247,9 +300,9 @@ def test_a_merge_the_forge_refuses_closes_the_pr_and_names_a_moved_line(repo, mo
     def land(root, t, want, msg, clock, still, **kw):
         other = Path(str(t) + "-other")
         git(repo, "clone", "-q", str(bare), str(other))
-        b = other / board.BOARD
-        b.write_text(b.read_text().replace(f"- [ ] {ITEM}", f"- [x] {ITEM}"))
-        git(other, "-c", "user.name=o", "-c", "user.email=o@x", "commit", "-qam", "done elsewhere")
+        write_board(other, BOARD_TEXT.replace(f"- [ ] {ITEM}", f"- [x] {ITEM} Closed: 2026-10-01."))
+        git(other, "add", "-A")
+        git(other, "-c", "user.name=o", "-c", "user.email=o@x", "commit", "-qm", "done elsewhere")
         git(other, "push", "-q", "origin", "main")
         return real(root, t, want, msg, clock, still, **kw)
 
@@ -269,19 +322,19 @@ def test_a_merge_the_forge_refuses_closes_the_pr_and_names_a_moved_line(repo, mo
 
     monkeypatch.setattr(board, "_land", land_elsewhere)
     git(repo, "fetch", "-q", "origin")
-    board.write_back(repo, 8, "n/a — undated.", "done")
-    assert (
-        "- [x] n/a — undated." in origin_board(repo) and on_origin(repo, "show", "origin/main:other.txt") == "moved on"
-    )
+    board.write_back(repo, 8, UNDATED, "done")
+    assert origin_item(repo, UNDATED_REF).closed is not None
+    assert on_origin(repo, "show", "origin/main:other.txt") == "moved on"
 
 
 def test_a_failed_commit_leaves_the_board_as_it_was(repo):
     hook = repo / ".git" / "hooks" / "pre-commit"
     hook.write_text("#!/bin/sh\necho 'no commits today' >&2\nexit 1\n")
     hook.chmod(0o755)
+    before = origin_docs(repo)
     with pytest.raises(board.Refused, match="no commits today"):
         board.write_back(repo, 7, ITEM, "done")
-    assert origin_board(repo) == BOARD_TEXT and git(board.tree_dir(repo), "status", "--porcelain") == ""
+    assert origin_docs(repo) == before and git(board.tree_dir(repo), "status", "--porcelain") == ""
 
 
 def test_a_commit_that_does_not_finish_leaves_the_board_as_it_was(repo, monkeypatch):
@@ -290,9 +343,10 @@ def test_a_commit_that_does_not_finish_leaves_the_board_as_it_was(repo, monkeypa
     hook.write_text("#!/bin/sh\nsleep 5\n")
     hook.chmod(0o755)
     monkeypatch.setattr(board, "GIT_TIMEOUT", 0.5)
+    before = origin_docs(repo)
     with pytest.raises(board.Refused, match="did not finish"):
         board.write_back(repo, 7, ITEM, "done")
-    assert origin_board(repo) == BOARD_TEXT
+    assert origin_docs(repo) == before
 
 
 def test_two_edits_at_once_are_made_one_after_the_other(repo):
@@ -301,10 +355,9 @@ def test_two_edits_at_once_are_made_one_after_the_other(repo):
 
     with concurrent.futures.ThreadPoolExecutor(2) as pool:
         a = pool.submit(board.write_back, repo, 7, ITEM, "done")
-        b = pool.submit(board.write_back, repo, 8, "n/a — undated.", "done")
+        b = pool.submit(board.write_back, repo, 8, UNDATED, "done")
         a.result(), b.result()
-    text = origin_board(repo)
-    assert f"- [x] {ITEM}" in text and "- [x] n/a — undated." in text
+    assert origin_item(repo, REF).closed is not None and origin_item(repo, UNDATED_REF).closed is not None
 
 
 async def test_board_edit_is_the_persons_and_only_on_a_known_board(agent, repo, tmp_path):
@@ -322,59 +375,50 @@ async def test_board_edit_is_the_persons_and_only_on_a_known_board(agent, repo, 
         with pytest.raises(AgentError, match="no longer holds this item"):
             await me.call("board_edit", board=path, line=7, text="something else", action="done")
         got = await me.call("board_edit", board=path, line=7, text=ITEM, action="snooze", due="2026-10-01")
-    assert got["action"] == "snooze" and got["message"].startswith("shiftlead: snooze Merged")
+    assert got["action"] == "snooze" and got["message"].startswith(f"shiftlead: snooze {got['id']} Merged")
     assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
 
 
 def _key(root: Path) -> str:
-    """The id of origin's first item, the line ITEM is on (§4.4 *A board line's id*)."""
-    from datetime import date
-
-    from sessionorc import workorders
-
-    return workorders.board_items(origin_board(root), date.today())[0]["key"]
+    """The reference of the item ITEM is (§4.4 *A board line's id*): its v2 key's eight hex, kept by the split."""
+    return REF
 
 
-def test_now_writes_the_host_agents_today_and_the_next_reading_draws_the_line(repo):
-    """The Snoozed fold's *now* (§4.4 *Board write-back*, §4.5a, TD-1349): a `snooze` with no date writes
-    the host agent's today as the line's `Hide until:`, in the line and its commit subject, and answers
-    the date written; the next reading draws the line, no longer hidden. A *now* on a line whose hide is
-    past writes today and commits too."""
-    from datetime import date, timedelta
-
-    from sessionorc import workorders
+def test_now_writes_the_host_agents_today_and_the_next_reading_draws_the_item(repo):
+    """The Snoozed fold's *now* (§4.4 *Board write-back*, TD-1349): a `snooze` with no date writes the host agent's
+    today as the item's `Hide until:`, in the item and its commit subject, and answers the date written; the next
+    reading draws the item, no longer hidden. A *now* on an item whose hide is past writes today and commits too."""
+    from datetime import timedelta
 
     today = date.today()
     later = (today + timedelta(days=5)).isoformat()
     board.write_back(repo, 7, ITEM, "snooze", later)
-    [hidden] = [i for i in workorders.board_items(origin_board(repo), today) if i["line"] == 7]
-    assert hidden["needs"] is None and hidden["hidden"] and hidden["hide_until"] == later
+    hidden = origin_item(repo, REF)
+    assert hidden.hidden(today) and hidden.hide_until.isoformat() == later
     got = board.write_back(repo, None, "", "snooze", key=_key(repo))
     assert got["due"] == today.isoformat() and got["pr"]
-    assert got["message"].endswith(f"to {today.isoformat()} (session `grinder-ao-1`)")
+    assert got["message"].endswith(f"to {today.isoformat()} (session grinder-ao-1)")
     assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
-    assert f"Due: 2026-09-22. Hide until: {today.isoformat()}." in origin_board(repo)  # one field, rewritten
-    [shown] = [i for i in workorders.board_items(origin_board(repo), today) if i["line"] == 7]
-    assert shown["needs"] is not None and not shown["hidden"]
-    # a hide already past (a line hidden until a day gone): *now* writes today and lands it
+    shown = origin_item(repo, REF)
+    assert shown.hide_until == today and shown.due.isoformat() == "2026-09-22"  # one field, rewritten
+    assert not shown.hidden(today) and sum(1 for f, _ in shown.fields if f == "Hide until") == 1
+    # a hide already past (an item hidden until a day gone): *now* writes today and lands it
     board.write_back(repo, None, "", "snooze", "2026-01-05", key=_key(repo))
     got = board.write_back(repo, None, "", "snooze", key=_key(repo))
-    assert got["pr"] and f"Hide until: {today.isoformat()}." in origin_board(repo)
+    assert got["pr"] and origin_item(repo, REF).hide_until == today
 
 
-def test_now_on_a_line_that_already_says_today_lands_nothing(repo):
-    """§4.4 *Board write-back* (TD-1349): a *now* whose filled date already stands on the line — the day
+def test_now_on_an_item_that_already_says_today_lands_nothing(repo):
+    """§4.4 *Board write-back* (TD-1349): a *now* whose filled date already stands on the item — the day
     turned under an open page — changes nothing: answered as done with origin's head, its subject and the
     date, no `pr`, and no commit or branch on origin."""
-    from datetime import date
-
     board.write_back(repo, 7, ITEM, "snooze", date.today().isoformat())
     before = on_origin(repo, "rev-parse", "origin/main")
     got = board.write_back(repo, None, "", "snooze", key=_key(repo))
-    assert "pr" not in got and got["due"] == date.today().isoformat() and got["line"] == 7
+    assert "pr" not in got and got["due"] == date.today().isoformat() and got["key"] == REF
     assert got["commit"] == on_origin(repo, "rev-parse", "--short", "origin/main")
     assert on_origin(repo, "rev-parse", "origin/main") == before
-    assert got["message"].startswith("shiftlead: snooze Merged") and got["text"].startswith("2026-09-20")
+    assert got["message"].startswith(f"shiftlead: snooze {got['id']} Merged") and got["text"].startswith("**Merged")
     assert "board/" not in git(repo, "ls-remote", "--heads", "origin")
     tree = board.tree_dir(repo)
     assert git(tree, "status", "--porcelain") == ""  # the tree left at origin's head
@@ -399,38 +443,43 @@ async def test_board_edit_answers_a_now_with_the_date_it_wrote(agent, repo, tmp_
     assert again["due"] == today and "pr" not in again and again["action"] == "snooze"
 
 
-def test_put_on_the_board_writes_one_line_at_the_top_of_the_items_and_commits_it(repo):
-    """TD-140 (design §4.4, §4.5a): the one add — a line in the board's own format above the first
-    item, committed with the message naming the entry, nothing else in the file touched."""
+def test_put_on_the_board_writes_one_item_file_and_commits_it(repo):
+    """TD-140 (design §4.4, §4.5a): the one add — an item file in the board's own format (ledgerboard v3.0's
+    `item_file`, its id drawn, TD-1881), committed with the message naming it, no other file touched."""
+    before = load(repo)
     got = board.add(
         repo, "Check the fetcher Friday.", "2026-10-02", session="grinder-ao-2", host="kmaster",
         context="TD-900", today="2026-09-25",
     )  # fmt: skip
-    line = (
-        "- [ ] 2026-09-25 (session `grinder-ao-2` on kmaster) — Check the fetcher Friday. Context: TD-900. "
-        "Due: 2026-10-02.\n"
+    it = origin_item(repo, got["key"])
+    assert (it.words, it.session, it.host, it.context) == (
+        "Check the fetcher Friday.",
+        "grinder-ao-2",
+        "kmaster",
+        "TD-900",
     )
-    text = origin_board(repo)
-    assert text == BOARD_TEXT.replace(f"- [ ] {ITEM}", line.rstrip("\n") + f"\n- [ ] {ITEM}")
-    assert got["line"] == 7 and got["message"] == "shiftlead: append Check the fetcher Friday. (session `grinder-ao-2`)"
+    assert it.due == date(2026, 10, 2) and it.added == date(2026, 9, 25) and got["id"] == it.id
+    assert got["id"].startswith("2026-09-25-") and got["key"] == "board:" + got["id"][-8:]
+    assert got["message"] == f"shiftlead: append {got['id']} Check the fetcher Friday. (session grinder-ao-2)"
+    assert board_files(repo) == {f"docs/user_attention/{got['id']}.md"}
     assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
-    assert (repo / board.BOARD).read_text() == BOARD_TEXT  # the checkout catches up by the pull
-    # no sender, no about: `n/a` and `none`
-    assert board.item_line("x", "2026-10-02", "2026-09-25", None, None, None) == (
-        "- [ ] 2026-09-25 (n/a) — x. Context: none. Due: 2026-10-02.\n"
-    )
+    assert load(repo) == before  # the checkout catches up by the pull
+    # no sender, no about: none of either
+    bare = ledgerboard.parse_item(board.item_file("x", "2026-10-02", "2026-09-25", None, None, None))
+    assert (bare.words, bare.session, bare.context, bare.due) == ("x", None, "none", date(2026, 10, 2))
     for bad in (("", "2026-10-02"), ("two\nlines", "2026-10-02"), ("x", "Friday")):
         with pytest.raises(board.Refused):
             board.add(repo, *bad)
     assert on_origin(repo, "rev-list", "--count", "origin/main") == "2"
 
 
-def test_the_add_on_a_board_with_no_items_goes_under_its_heading(repo):
-    (repo / board.BOARD).write_text("# User attention\n\n## Needs the user\n\n## Later\n")
-    git(repo, "commit", "-qam", "empty")
+def test_the_add_on_a_board_with_no_items_writes_its_one_file(repo):
+    write_board(repo, "# User attention\n\n## Needs the user\n\n## Later\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "empty")
     git(repo, "push", "-q", "origin", "main")
-    board.add(repo, "First", "2026-10-02", today="2026-09-25")
-    assert origin_board(repo).splitlines()[4] == ("- [ ] 2026-09-25 (n/a) — First. Context: none. Due: 2026-10-02.")
+    got = board.add(repo, "First", "2026-10-02", today="2026-09-25")
+    assert [(it.id, it.words) for it in origin(repo).items] == [(got["id"], "First")]
 
 
 def test_the_add_is_refused_touching_nothing_where_an_edit_is(repo, monkeypatch):
@@ -444,7 +493,7 @@ def test_the_add_is_refused_touching_nothing_where_an_edit_is(repo, monkeypatch)
 
 
 async def test_put_on_the_board_is_the_persons_from_an_fyi_row_and_dismisses_it(agent, repo, tmp_path, monkeypatch):
-    """TD-140: `board_edit` with `action: add` takes an FYI row — a `note` here — writes the line
+    """TD-140: `board_edit` with `action: add` takes an FYI row — a `note` here — writes the item
     naming its sender and `about`, commits, then dismisses the row; an open question is refused, as
     is an entry the person inbox does not hold, a session, and a refused commit, which leaves the
     row where it was."""
@@ -476,25 +525,16 @@ async def test_put_on_the_board_is_the_persons_from_an_fyi_row_and_dismisses_it(
         got = await me.call(
             "board_edit", board=path, action="add", text="Check the fetcher", due="2026-10-02", entry=note["id"]
         )
-        assert got["dismissed"] == [note["id"]] and got["message"].startswith("shiftlead: append Check the fetcher")
-        line = origin_board(repo).splitlines()[got["line"] - 1]
-        assert line.startswith("- [ ] ") and "(session `w` on " in line and "Context: TD-900. Due: 2026-10-02." in line
+        assert got["dismissed"] == [note["id"]]
+        assert got["message"].startswith(f"shiftlead: append {got['id']} Check the fetcher")
+        it = origin_item(repo, got["key"])
+        assert it.closed is None and it.session == "w" and it.context == "TD-900" and it.due == date(2026, 10, 2)
         assert note["id"] not in [e["id"] for e in (await me.call("inbox"))["entries"]]
         await me.call("kill", id=w)
 
 
-def test_the_add_lands_in_needs_the_user_never_above_another_sections_items(repo):
-    """Review of PR #578: with *Needs the user* empty and a parked in-flight item below it, the
-    line goes under *Needs the user*, not above the parked item."""
-    (repo / board.BOARD).write_text(
-        "# User attention\n\n## Needs the user\n\n## In-flight (parked by a session)\n\n- [ ] 2026-09-20 parked.\n"
-    )
-    git(repo, "commit", "-qam", "parked only")
-    git(repo, "push", "-q", "origin", "main")
-    got = board.add(repo, "First", "2026-10-02", today="2026-09-25")
-    lines = origin_board(repo).splitlines()
-    assert got["line"] == 5 and lines[4].startswith("- [ ] 2026-09-25 (n/a) — First.")
-    assert lines[5] == "## In-flight (parked by a session)"
+# retired (TD-1881): test_the_add_lands_in_needs_the_user_never_above_another_sections_items — a v3 board is a
+# directory of item files with no sections, so an add has no place among other items to land in
 
 
 async def test_put_on_the_board_twice_at_once_writes_one_line_and_a_refused_dismiss_is_said(
@@ -524,7 +564,7 @@ async def test_put_on_the_board_twice_at_once_writes_one_line_and_a_refused_dism
         # refused while the first is under way — or, had it already finished, because the row is gone
         refused = str(next(g for g in got if not isinstance(g, dict)))
         assert "already being put on the board" in refused or "holds no entry" in refused
-        assert origin_board(repo).count("Check it") == 1
+        assert sum(it.words == "Check it" for it in origin(repo).items) == 1
 
         async def refuse(**_):
             from sessionorc.agent import RpcError
@@ -537,43 +577,46 @@ async def test_put_on_the_board_twice_at_once_writes_one_line_and_a_refused_dism
         await me.call("kill", id=w)
 
 
-def test_a_reply_is_appended_to_the_items_own_line_signed_and_committed(repo):
-    """TD-142 slice 1 (design §4.4): Reply appends ` — <name>, <date>: <reply>` to the item's line,
-    the name the checkout's git `user.name`, one commit with the fixed message, the line still open."""
+def test_a_reply_is_appended_to_the_items_log_signed_and_committed(repo):
+    """TD-142 slice 1 (design §4.4): Reply appends a Log line `- <date>: <name>: <reply>` to the item's file
+    (ledgerboard v3.0, TD-1881), the name the checkout's git `user.name`, one commit with the fixed message, the
+    item still open."""
     git(repo, "config", "user.name", "Paul")
     got = board.write_back(repo, 7, ITEM, "reply", reply="  rebase it,\nthen merge  ")
-    today = __import__("datetime").date.today().isoformat()
-    line = origin_board(repo).splitlines()[6]
-    assert line == f"- [ ] {ITEM} — Paul, {today}: rebase it, then merge"
-    assert got["message"] == "shiftlead: reply Merged, live check pending: the doorbell. Look. (session `grinder-ao-1`)"
+    today = date.today().isoformat()
+    it = origin_item(repo, REF)
+    assert it.replies == [("Paul", today, "rebase it, then merge")] and it.closed is None
+    assert got["message"] == (
+        f"shiftlead: reply {got['id']} Merged, live check pending: the doorbell. Look. (session grinder-ao-1)"
+    )
     assert (
         on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
         and git(repo, "status", "--porcelain") == ""
     )
-    # the line still holds an open item, so a second reply or a Done finds it by its new text
-    board.write_back(repo, 7, line[len("- [ ] ") :], "done")
-    assert origin_board(repo).splitlines()[6].startswith("- [x] ")
+    # the item is still open, so a second reply or a Done finds it by its words
+    board.write_back(repo, None, got["text"], "done")
+    assert origin_item(repo, REF).closed is not None
 
 
-def test_a_reply_is_refused_touching_nothing_where_an_edit_is(repo):
+def test_a_reply_is_refused_touching_nothing_where_an_edit_is(repo, tmp_path):
+    before = origin_docs(repo)
     for args, why in (
         ((7, ITEM, "reply"), "needs its text"),
         ((8, "not an item", "reply"), "no longer holds this item"),
     ):
         with pytest.raises(board.Refused, match=why):
             board.write_back(repo, *args, reply="" if why == "needs its text" else "x")
-    assert origin_board(repo) == BOARD_TEXT
-    with pytest.raises(board.Refused, match="no Due: date"):  # the reply's date would become the item's
-        board.edit_line("- [ ] x\n", "x", "reply", reply="push Due: 2026-10-01", by="p", today="2026-09-25")
-    assert "Due: 2026-10-01" in board.edit_line(f"- [ ] {ITEM}\n", ITEM, "reply", reply="Due: 2026-10-01", by="p")
-    assert board.edit_line("- [ ] x\n", "x", "reply", reply="y", by="the person", today="2026-09-25") == (
-        "- [ ] x — the person, 2026-09-25: y\n"
-    )
+    assert origin_docs(repo) == before
+    # retired (TD-1881): v2's refusal of a reply carrying `Due:` on an item with none — a v3 reply is a Log line of
+    # its own, which no reader takes for the item's Due
+    it = _items(tmp_path / "b")[REF]
+    signed = ledgerboard.parse_item(board.edit_item(it, "reply", reply="y", by="the person", today="2026-09-25"))
+    assert signed.replies == [("the person", "2026-09-25", "y")]
 
 
 async def test_board_reply_is_the_persons_and_mails_nobody_without_a_holder(agent, repo, tmp_path):
     """The RPC (§4.4): person-only, a known board only, the file half written and, with nobody
-    holding a lease on the line's refs, `sent` empty — and `board_edit` will not take a reply,
+    holding a lease on the item's refs, `sent` empty — and `board_edit` will not take a reply,
     which is `board_reply`'s."""
     home = tmp_path / "home"
     home.mkdir(exist_ok=True)
@@ -591,13 +634,12 @@ async def test_board_reply_is_the_persons_and_mails_nobody_without_a_holder(agen
         with pytest.raises(AgentError, match="no longer holds this item"):
             await me.call("board_reply", board=path, line=8, text="not an item", reply="x")
         with pytest.raises(AgentError, match="names the item's line"):
-            await me.call("board_reply", board=path, text=ITEM, reply="x")
+            await me.call("board_reply", board=path, text="", reply="x")  # neither its id nor its words
         got = await me.call("board_reply", board=path, line=7, text=ITEM, reply="rebase it", refs=["TD-122"])
     assert got["action"] == "reply" and got["sent"] == [] and got["note"] == "written on the board"
-    assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})" and got[
-        "message"
-    ].startswith("shiftlead: reply Merged")
-    assert origin_board(repo).splitlines()[6].endswith(": rebase it")
+    assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
+    assert got["message"].startswith(f"shiftlead: reply {got['id']} Merged")
+    assert origin_item(repo, REF).replies[-1][2] == "rebase it"
     async with LocalClient() as me:  # no holder: no mail, and the trail line is still owed (§4.5a)
         trail = [t for t in (await me.call("inbox"))["trail"] if t["kind"] == "board reply"]
     assert [t["how"] for t in trail] == ["written on the board"]
@@ -630,7 +672,7 @@ async def test_board_reply_hands_a_note_to_each_live_lease_holder(agent, repo, t
         )
         assert sorted((x["session"], x["ref"]) for x in got["sent"]) == [("both", "#1020"), ("holder", "TD-122")]
         assert got["note"].startswith("written on the board · sent to ") and "holder (holds TD-122)" in got["note"]
-        assert origin_board(repo).splitlines()[6].endswith(": rebase it")  # the file half first
+        assert origin_item(repo, REF).replies[-1][2] == "rebase it"  # the file half first
         for sid in (h, both):
             notes = [e for e in (await me.call("inbox", id=sid))["entries"] if e["from"] == "person"]
             assert len(notes) == 1 and notes[0]["kind"] == "note" and notes[0]["handed"]
@@ -666,8 +708,8 @@ def _registry(tmp_path, repo):
 
 async def test_an_answer_to_an_orphaned_question_is_written_on_the_board_and_sent_to_its_holder(agent, repo, tmp_path):
     """TD-216 (design §4.10 *A question about a reference outlives its asker*, §4.4 the second add):
-    with no holder the answer is one line on the asker's repo's board and nothing is mailed; with a
-    holder it is the line and one `handed` note that owes an outcome; *Go with it* writes the
+    with no holder the answer is one item on the asker's repo's board and nothing is mailed; with a
+    holder it is the item and one `handed` note that owes an outcome; *Go with it* writes the
     default; the entry closes, its own debt settled, since nobody is left to report it."""
     _registry(tmp_path, repo)
     async with LocalClient() as me:
@@ -680,16 +722,17 @@ async def test_an_answer_to_an_orphaned_question_is_written_on_the_board_and_sen
         # the closed asker's own record keeps the handed note for the name's next create (TD-271)
         left = [e for e in (await me.call("inbox", id=got["asker"]))["entries"] if e["from"] == "person"]
         assert len(left) == 1 and left[0]["handed"] and left[0]["text"].startswith("the DIU one")
-        assert got["message"] == "shiftlead: append Which fetcher first? (session `asker`)"  # the answer stays off it
-        line = origin_board(repo).splitlines()[got["line"] - 1]
-        assert line.startswith("- [ ] ") and "(session `asker` on " in line
-        assert "— Which fetcher first? — t, " in line and ": the DIU one. Context: TD-149. Due: " in line
-        assert "The reading" not in line  # the first paragraph only
+        # the answer stays off the subject
+        assert got["message"] == f"shiftlead: append {got['id']} Which fetcher first? (session asker)"
+        it = origin_item(repo, got["key"])
+        assert it.session == "asker" and it.words == "Which fetcher first?" and it.context == "TD-149"
+        assert [(by, words) for by, _, words in it.replies] == [("t", "the DIU one")] and it.due is not None
+        assert "The reading" not in it.raw  # the first paragraph only
         e = [e for e in (await me.call("inbox"))["entries"] if e["id"] == q][0]
         assert e["closed_reason"] == "replied" and e["outcome"]["state"] == "asker_gone"  # owes nothing
         assert git(repo, "status", "--porcelain") == ""  # committed, never left dirty
 
-        # with a holder: the line, and one handed note to the session that holds the reference
+        # with a holder: the item, and one handed note to the session that holds the reference
         h = (await me.call("create", name="holder", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"]))[
             "id"
         ]
@@ -700,7 +743,8 @@ async def test_an_answer_to_an_orphaned_question_is_written_on_the_board_and_sen
         assert (
             got["sent"] == [h] and got["closed_reason"] == "go_with_it" and f"sent to {h} (holds TD-149)" in got["note"]
         )
-        assert ": go with the default: drop it. Context: td-149." in origin_board(repo)
+        it = origin_item(repo, got["key"])
+        assert it.context == "td-149" and it.replies[0][2] == "go with the default: drop it"
         handed = [e for e in (await me.call("inbox", id=h))["entries"] if e["from"] == "person"]
         assert len(handed) == 1 and handed[0]["handed"] and handed[0]["about"] == "TD-149"
         assert handed[0]["text"].startswith("go with the default: drop it")
@@ -763,7 +807,7 @@ async def test_an_answer_to_an_orphaned_question_is_refused_touching_nothing_whe
         assert sum(isinstance(g, dict) for g in got) == 1
         refused = str(next(g for g in got if not isinstance(g, dict)))
         assert "already being answered" in refused or "already closed" in refused
-        assert origin_board(repo).count(": this. Context: #702.") == 1
+        assert sum(it.context == "#702" and it.replies[0][2] == "this" for it in origin(repo).items) == 1
         e = [e for e in (await me.call("inbox"))["entries"] if e["id"] == q][0]
         assert e["answer"] == 0
 
@@ -784,7 +828,7 @@ async def test_an_orphaned_question_is_answered_by_its_label_or_its_whole_line(a
         assert got["closed"] == q
         e = [e for e in (await me.call("inbox"))["entries"] if e["id"] == q][0]
         assert e["closed_reason"] == "replied" and e["answer"] == 1
-        assert origin_board(repo).count(": Lift it. Context: TD-190.") == 1
+        assert sum(it.context == "TD-190" and it.replies[0][2] == "Lift it" for it in origin(repo).items) == 1
 
         whole = await _orphan(me, repo, tmp_path, "Which window again?", "TD-191", kind="ask", answers=answers)
         got = await me.call("msg", text=answers[0], kind="reply", reply_to=whole, answer=0)
@@ -825,7 +869,7 @@ async def test_a_refused_note_to_the_holder_is_said_beside_the_committed_line_an
         assert e["closed_reason"] == "replied" and "its mailbox is full" in e["outcome"]["text"]
         with pytest.raises(AgentError, match="already closed"):
             await me.call("msg", text="again", kind="reply", reply_to=q)
-        assert origin_board(repo).count(": this one. Context: TD-5.") == 1
+        assert sum(it.context == "TD-5" and it.replies[0][2] == "this one" for it in origin(repo).items) == 1
         await me.call("kill", id=h)
 
 
@@ -839,88 +883,62 @@ LOOK = (
 )
 
 
-def test_a_decide_writes_the_field_at_the_lines_end_and_its_message():
-    """TD-255 slice 1 (design §4.4 *Decide*): the edit `board_edit.py decide` makes."""
-    line = f"- [ ] {ASKED}\n"
-    got = board.edit_line(line, ASKED, "decide", answer="Lift  it", today="2026-10-01")
-    assert got == f"- [ ] {ASKED} Decided: Lift it (2026-10-01).\n"
-    assert ledgerboard.DECIDED_RE.search(got.rstrip("\n")).group("text", "date") == ("Lift it", "2026-10-01")
-    # an item that ends no sentence is ended first: the field starts one, as the reader asks
-    assert board.edit_line("- [ ] n/a — undated", "n/a — undated", "decide", answer="Yes", today="2026-10-01") == (
-        "- [ ] n/a — undated. Decided: Yes (2026-10-01)."
+def test_a_decide_writes_the_items_decided_field_and_its_message(tmp_path):
+    """TD-255 slice 1 (design §4.4 *Decide*): the edit `board_edit.py decide` makes, on an item file (TD-1881)."""
+    write_board(tmp_path, BOARD_TEXT + f"- [ ] {ASKED}\n")
+    it = item(tmp_path, ref_of(ASKED))
+    got = ledgerboard.parse_item(board.edit_item(it, "decide", answer="Lift it", today="2026-10-01"), it.path)
+    assert got.decided == ("Lift it", date(2026, 10, 1)) and got.closed is None
+    assert board.message(it.words, "decide", answer="Lift it", id=it.id, session=it.session) == (
+        f"shiftlead: decide {it.id} Which window? Say.: Lift it (session grinder-ao-1)"
     )
-    assert board.message(ASKED, "decide", answer="Lift it") == (
-        "shiftlead: decide Which window? Say.: Lift it (session `grinder-ao-1`)"
-    )
-    long = board.message(ASKED, "decide", answer="Not right: " + "the ring is amber " * 9)  # a sentence is clipped
-    assert long.endswith("… (session `grinder-ao-1`)") and len(long) < 160
+    long = board.message(it.words, "decide", answer="Not right: " + "the ring is amber " * 9, id=it.id, session="g")
+    assert long.endswith("… (session g)") and len(long) < 160  # a sentence is clipped
     for bad in (
-        lambda: board.edit_line(line, ASKED, "decide", answer="  "),  # no answer
-        lambda: board.edit_line(got, ASKED, "decide", answer="Keep it"),  # the line moved: it is decided
-        lambda: board.edit_line(got, got[6:].strip(), "decide", answer="Keep it"),  # already decided
-        lambda: board.edit_line(line, ASKED, "decide", answer="No. Decided: yes"),  # the reader would misread it
-        lambda: board.edit_line(line, ASKED, "decide", answer="Not right: bad. Answers: z"),  # review of PR #861
-        lambda: board.edit_line(line, ASKED, "reply", reply="x. Decided: yes (2026-01-01)", by="t"),
-        lambda: board.edit_line("- [ ] n/a — undated.", "n/a — undated.", "reply", reply="x. Answers: a | b", by="t"),
+        lambda: board.edit_item(it, "decide", answer="  "),  # no answer
+        lambda: board.edit_item(got, "decide", answer="Keep it"),  # already decided
     ):
         with pytest.raises(board.Refused):
             bad()
+    # retired (TD-1881): v2's refusals of an answer or a reply carrying a field's name (`Decided:`, `Answers:`) — an
+    # item file writes each field on a line of its own, so no words are read as one
 
 
-def read_back(tmp_path: Path, line: str) -> dict:
-    """What agent-cadence's own reader makes of `line`: the fields the Inbox draws."""
-    import json
-    import sys
-
-    (tmp_path / "docs").mkdir(exist_ok=True)
-    path = tmp_path / board.BOARD
-    path.write_text(f"# b\n\n## Needs the user\n\n{line}\n")
-    out = subprocess.run(
-        [sys.executable, str(pinned_script("nudge_user_attention.py")), "--board", str(path), "--report", "--json"],
-        capture_output=True, text=True, check=True,
-    ).stdout  # fmt: skip
-    return json.loads(out)["boards"][0]["items"][0]
+# retired (TD-1881): read_back(), agent-cadence's v2 reader of one board line — a v3 item is read back by
+# ledgerboard's own `parse_item()`
 
 
 def test_a_reply_and_a_decide_compose_in_either_order(tmp_path):
-    """§4.4 *The two compose*: a reply goes ahead of the line's `Answers:` and `Decided:` fields,
-    which stay at its end and readable — by the board's own reader — and a decide after a reply
-    is still the line's last field."""
-    decided = f"{ASKED} Decided: Lift it (2026-10-01)."
-    got = board.edit_line(f"- [ ] {decided}", decided, "reply", reply="the node first", by="Paul", today="2026-10-02")
-    assert got == (
-        "- [ ] decide 2026-09-27 (session `grinder-ao-1` on kmaster) — **Which window?** Say. Context: TD-190. "
-        "Due: 2026-10-04. — Paul, 2026-10-02: the node first. Answers: Keep it (default) | Lift it. "
-        "Decided: Lift it (2026-10-01)."
-    )
-    read = read_back(tmp_path, got)
-    assert read["decided"] == {"text": "Lift it", "date": "2026-10-01"}
-    assert (read["answers"], read["default"], read["due"]) == (["Keep it", "Lift it"], "Keep it", "2026-10-04")
-    replied = board.edit_line(f"- [ ] {ASKED}", ASKED, "reply", reply="say more", by="Paul", today="2026-10-02")[6:]
-    assert replied.endswith("— Paul, 2026-10-02: say more. Answers: Keep it (default) | Lift it.")
-    got = board.edit_line(f"- [ ] {replied}", replied, "decide", answer="Keep it", today="2026-10-03")
-    read = read_back(tmp_path, got)
-    assert read["decided"] == {"text": "Keep it", "date": "2026-10-03"} and read["answers"] == ["Keep it", "Lift it"]
-    # with no fields on the line a reply is its tail, and a decide follows it
-    bare = "n/a — undated."
-    replied = board.edit_line(f"- [ ] {bare}", bare, "reply", reply="go on", by="Paul", today="2026-10-02")[6:]
-    assert board.edit_line(f"- [ ] {replied}", replied, "decide", answer="Yes", today="2026-10-03") == (
-        "- [ ] n/a — undated. — Paul, 2026-10-02: go on. Decided: Yes (2026-10-03)."
-    )
+    """§4.4 *The two compose*: a reply is a Log line of the item's file and a decide its `Decided:` field
+    (ledgerboard v3.0, TD-1881), so each leaves the other, the `Answers:` and the `Due:` as they were, in either
+    order."""
+    write_board(tmp_path, BOARD_TEXT + f"- [ ] {ASKED}\n")
+    it = item(tmp_path, ref_of(ASKED))
+
+    def read(text: str) -> ledgerboard.BoardItem:
+        return ledgerboard.parse_item(text, it.path)
+
+    decided = read(board.edit_item(it, "decide", answer="Lift it", today="2026-10-01"))
+    both = read(board.edit_item(decided, "reply", reply="the node first", by="Paul", today="2026-10-02"))
+    assert both.decided == ("Lift it", date(2026, 10, 1)) and both.replies == [("Paul", "2026-10-02", "the node first")]
+    assert (both.answers, both.default, both.due) == (["Keep it", "Lift it"], "Keep it", date(2026, 10, 4))
+    replied = read(board.edit_item(it, "reply", reply="say more", by="Paul", today="2026-10-02"))
+    both = read(board.edit_item(replied, "decide", answer="Keep it", today="2026-10-03"))
+    assert both.decided == ("Keep it", date(2026, 10, 3)) and both.answers == ["Keep it", "Lift it"]
+    assert both.replies == [("Paul", "2026-10-02", "say more")]
 
 
 def test_a_decide_is_committed_and_refused_where_every_edit_is(repo):
-    (repo / board.BOARD).write_text(BOARD_TEXT + f"- [ ] {ASKED}\n")
-    git(repo, "commit", "-qam", "asked")
-    git(repo, "push", "-q", "origin", "main")
+    push_board(repo, BOARD_TEXT + f"- [ ] {ASKED}\n", "asked")
     got = board.write_back(repo, 9, ASKED, "decide", answer="Keep it")
-    assert got["message"] == "shiftlead: decide Which window? Say.: Keep it (session `grinder-ao-1`)"
+    assert got["message"] == f"shiftlead: decide {got['id']} Which window? Say.: Keep it (session grinder-ao-1)"
     assert (
         on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
         and git(repo, "status", "--porcelain") == ""
     )
-    # v2.3 (TD-1330): who answered is on the line — a board with no People: names the checkout's user
-    assert ledgerboard.DECIDED_RE.search(origin_board(repo).splitlines()[8]).group("text") == "Keep it (by t)"
+    # v2.3 (TD-1330): who answered is on the item — a board with no People: names the checkout's user
+    it = origin_item(repo, ref_of(ASKED))
+    assert it.decided[0] == "Keep it" and it.decided_by == "t"
     head = on_origin(repo, "rev-parse", "origin/main")
     git(repo, "pull", "-q", "--ff-only", "origin", "main")  # the checkout catches up (§6 *Pull*)
     for line, text in ((9, ASKED), (6, "not an item")):  # already decided; moved
@@ -932,9 +950,7 @@ def test_a_decide_is_committed_and_refused_where_every_edit_is(repo):
 async def test_board_edit_decides_only_with_one_of_the_items_answers(agent, repo, tmp_path):
     """The RPC's half: the answer is one of the reader's `answers` word for word, or `Not right:`
     and words where the pair is among them; anything else is a Reply, and a session is refused."""
-    (repo / board.BOARD).write_text(BOARD_TEXT + f"- [ ] {ASKED}\n- [ ] {LOOK}\n")
-    git(repo, "commit", "-qam", "asked")
-    git(repo, "push", "-q", "origin", "main")
+    push_board(repo, BOARD_TEXT + f"- [ ] {ASKED}\n- [ ] {LOOK}\n", "asked")
     path, answers, pair = str(repo / board.BOARD), ["Keep it", "Lift it"], ["Works", "Not right: <what>"]
     home = tmp_path / "home"
     home.mkdir(exist_ok=True)
@@ -954,13 +970,14 @@ async def test_board_edit_decides_only_with_one_of_the_items_answers(agent, repo
                 await me.call("board_edit", board=path, line=10, text=LOOK, action="decide", answer=bad, answers=pair)
         got = await me.call("board_edit", board=path, line=9, text=ASKED, action="decide", answer="Keep it",
                             answers=["Keep  it", "Lift it"])  # fmt: skip
-        assert got["answer"] == "Keep it" and got["message"].startswith("shiftlead: decide Which window? Say.: Keep it")
+        assert got["answer"] == "Keep it"
+        assert got["message"].startswith(f"shiftlead: decide {got['id']} Which window? Say.: Keep it")
         got = await me.call("board_edit", board=path, line=10, text=LOOK, action="decide",
                             answer="Not right: the ring is amber", answers=pair)  # fmt: skip
         assert got["answer"] == "Not right: the ring is amber"
-    lines = origin_board(repo).splitlines()
-    assert ledgerboard.DECIDED_RE.search(lines[8]).group("text") == "Keep it (by t)"  # v2.3: who answered
-    assert ledgerboard.DECIDED_RE.search(lines[9]).group("text") == "Not right: the ring is amber (by t)"
+    asked, look = origin_item(repo, ref_of(ASKED)), origin_item(repo, ref_of(LOOK))
+    assert (asked.decided[0], asked.decided_by) == ("Keep it", "t")  # v2.3: who answered
+    assert (look.decided[0], look.decided_by) == ("Not right: the ring is amber", "t")
 
 
 @pytest.mark.unit
@@ -1071,7 +1088,7 @@ async def test_a_node_writes_the_board_and_hands_the_mail_to_the_home(agent, rep
         monkeypatch.setitem(agent.home_link, "up", False)
         got = await agent.rpc_board_reply(board=path, line=7, text=ITEM, reply="rebase it", refs=["TD-122"])
         assert got["sent"] == [] and "mail is the home's: kmaster (home) is unreachable" in got["note"]
-        assert origin_board(repo).splitlines()[6].endswith(": rebase it")
+        assert origin_item(repo, REF).replies[-1][2] == "rebase it"
         forwarded = []
 
         async def forward(rid, name, params, caller):
@@ -1083,7 +1100,7 @@ async def test_a_node_writes_the_board_and_hands_the_mail_to_the_home(agent, rep
 
         monkeypatch.setattr(agent, "_forward", forward)
         monkeypatch.setitem(agent.home_link, "up", True)
-        line = origin_board(repo).splitlines()[6][len("- [ ] ") :]
+        line = origin_item(repo, REF).words  # the item named by its words now (TD-1881)
         got = await agent.rpc_board_reply(board=path, line=7, text=line, reply="and push", refs=["TD-122"])
         assert got["note"] == "written on the board · sent to holder (holds TD-122)"
         assert [(n, p["head"], p["reply"], p["repo"], c) for n, p, c in forwarded] == [
@@ -1091,7 +1108,6 @@ async def test_a_node_writes_the_board_and_hands_the_mail_to_the_home(agent, rep
         ]
         assert not [e for e in agent.sessions[h].inbox if e.from_ == "person"]  # the node's store untouched
         # the trail is the home's too (§4.10): handed over with no refs as well, never written here
-        line = origin_board(repo).splitlines()[6][len("- [ ] ") :]
         await agent.rpc_board_reply(board=path, line=7, text=line, reply="thanks", refs=[])
         assert forwarded[-1][1]["refs"] == [] and forwarded[-1][1]["repo"] == repo.name
         assert not [t for t in agent.trail if t["kind"] == "board reply"]
@@ -1100,11 +1116,9 @@ async def test_a_node_writes_the_board_and_hands_the_mail_to_the_home(agent, rep
             return {"id": rid, "error": "link dropped"}
 
         monkeypatch.setattr(agent, "_forward", broken)  # a failed hand with nobody to mail: nothing to say
-        line = origin_board(repo).splitlines()[6][len("- [ ] ") :]
         got = await agent.rpc_board_reply(board=path, line=7, text=line, reply="once more", refs=[])
         assert got["note"] == "written on the board"
         monkeypatch.setitem(agent.home_link, "up", False)  # down, and nobody to mail: nothing to say
-        line = origin_board(repo).splitlines()[6][len("- [ ] ") :]
         got = await agent.rpc_board_reply(board=path, line=7, text=line, reply="again", refs=None)
         assert got["note"] == "written on the board"
         monkeypatch.setattr(agent, "mode", "home")
@@ -1119,9 +1133,9 @@ def test_a_merge_that_landed_though_the_forge_said_otherwise_is_a_landed_edit(re
     monkeypatch.setenv("FAKE_GH_FAIL", "merge-after")
     monkeypatch.setenv("FAKE_GH_VIEW_FAIL", "1")
     got = board.add(repo, "Once only", "2026-10-02", today="2026-09-25")
-    assert got["pr"] == 1 and origin_board(repo).count("Once only") == 1
+    assert got["pr"] == 1 and sum(it.words == "Once only" for it in origin(repo).items) == 1
     board.write_back(repo, 8, ITEM, "done")
-    assert f"- [x] {ITEM}" in origin_board(repo)
+    assert origin_item(repo, REF).closed is not None
 
 
 def test_a_merge_the_forge_took_while_origins_board_moved_elsewhere_is_a_landed_edit(repo, monkeypatch):
@@ -1131,10 +1145,10 @@ def test_a_merge_the_forge_took_while_origins_board_moved_elsewhere_is_a_landed_
     its line twice)."""
     monkeypatch.setenv("FAKE_GH_FAIL", "merge-after-moved")
     got = board.add(repo, "Once only", "2026-10-02", today="2026-09-25")
-    assert got["pr"] == 1 and origin_board(repo).count("Once only") == 1
-    assert "A neighbour's edit." in origin_board(repo)
+    assert got["pr"] == 1 and sum(it.words == "Once only" for it in origin(repo).items) == 1
+    assert "A neighbour's edit." in on_origin(repo, "show", f"origin/main:{board.BOARD.as_posix()}")
     board.write_back(repo, 8, ITEM, "done")
-    assert f"- [x] {ITEM}" in origin_board(repo)
+    assert origin_item(repo, REF).closed is not None
 
 
 def test_a_landing_whose_fetch_fails_lands_the_press_and_reports_the_reread_failing(repo, monkeypatch):
@@ -1159,10 +1173,10 @@ def test_a_landing_whose_fetch_fails_lands_the_press_and_reports_the_reread_fail
     got = board.write_back(repo, 7, ITEM, "done")
     assert got["pr"] == 1 and got["commit"] == ""
     assert got["reread_error"].startswith(board.REREAD_FAILED) and "unable to access origin" in got["reread_error"]
-    assert f"- [x] {ITEM}" in origin_board(repo)
+    assert origin_item(repo, REF).closed is not None
     merged.clear()
     monkeypatch.setattr(board, "_fetch", real)
-    got = board.write_back(repo, 8, "n/a — undated.", "done")
+    got = board.write_back(repo, 8, UNDATED, "done")
     assert "reread_error" not in got and got["commit"] == on_origin(repo, "rev-parse", "--short", "origin/main")
 
 
@@ -1178,40 +1192,42 @@ async def test_the_home_writes_the_trail_line_a_node_handed_it(agent):
 
 
 def _push_elsewhere(repo: Path, other: Path, edit) -> None:
-    """Another writer's commit on origin's board, made between the press's fetch and its merge."""
+    """Another writer's commit on origin's board, made between the press's fetch and its merge: `edit(clone)`."""
     git(repo, "clone", "-q", git(repo, "remote", "get-url", "origin"), str(other))
-    b = other / board.BOARD
-    b.write_text(edit(b.read_text()))
-    git(other, "-c", "user.name=o", "-c", "user.email=o@x", "commit", "-qam", "a neighbour")
+    edit(other)
+    git(other, "add", "-A")
+    git(other, "-c", "user.name=o", "-c", "user.email=o@x", "commit", "-qm", "a neighbour")
     git(other, "push", "-q", "origin", "main")
 
 
 @pytest.mark.parametrize("press", ["done", "add"])
-def test_a_squash_refused_for_a_neighbouring_lines_change_is_made_again_on_origins_new_head(
+def test_a_squash_refused_for_a_neighbouring_change_is_made_again_on_origins_new_head(
     repo, monkeypatch, tmp_path, press
 ):
-    """TD-264 (c), §4.4: origin moving in between refuses nothing unless the item's own line moved —
-    so a squash the forge refuses because a neighbouring line changed (git cannot merge adjacent
-    lines) is made once more on origin's new head, and both edits stand."""
+    """TD-264 (c), §4.4: origin moving in between refuses nothing unless the item itself closed — so a squash the
+    forge refuses because the item's own file changed under it (another's reply on it: v3.0 writes one file per
+    item, TD-1881) is made once more on origin's new head, and both edits stand. An add writes a file of its own,
+    so a neighbour's change never refuses its squash: it lands at once."""
     real, calls = board._land, []
-    # the line beside the edit: the next item for a Done on the first, the first item for an add above it
-    near, edited = ("- [ ] n/a — undated.", "n/a — undated, edited.") if press == "done" else (ITEM, "Look again.")
+
+    def reply(other: Path) -> None:
+        f = next((other / "docs" / "user_attention").glob(f"*-{REF[-8:]}.md"))
+        f.write_text(ledgerboard.edit_item(f.read_text(), "reply", reply="Look again.", by="o", today=date.today()))
 
     def land(root, t, want, msg, clock, still, **kw):
         calls.append(msg)
         if len(calls) == 1:
-            new = f"{near} {edited}" if press == "add" else f"- [ ] {edited}"
-            _push_elsewhere(repo, tmp_path / "other", lambda s: s.replace(near, new))
+            _push_elsewhere(repo, tmp_path / "other", reply)
         return real(root, t, want, msg, clock, still, **kw)
 
     monkeypatch.setattr(board, "_land", land)
     if press == "done":
         board.write_back(repo, 7, ITEM, "done")
-        assert f"- [x] {ITEM}" in origin_board(repo)
+        assert len(calls) == 2 and origin_item(repo, REF).closed is not None
     else:
         board.add(repo, "Next to it", "2026-10-02", today="2026-09-25")
-        assert origin_board(repo).count("Next to it") == 1
-    assert len(calls) == 2 and edited in origin_board(repo)
+        assert len(calls) == 1 and sum(it.words == "Next to it" for it in origin(repo).items) == 1
+    assert origin_item(repo, REF).replies[-1][2] == "Look again."
     assert "board/" not in git(repo, "ls-remote", "--heads", "origin")
 
 
@@ -1235,7 +1251,7 @@ def test_the_trees_commit_is_authored_by_the_identity_the_checkout_resolves(repo
 
     monkeypatch.setattr(board, "_git", spy)
     board.write_back(repo, 7, ITEM, "done")
-    assert f"- [x] {ITEM}" in origin_board(repo)
+    assert origin_item(repo, REF).closed is not None
     assert seen and "user.name=Inc" in seen[0] and "user.email=inc@example.com" in seen[0]
 
 
@@ -1250,7 +1266,7 @@ def test_no_second_press_when_the_forge_cannot_say_or_origin_moved_off_the_board
     monkeypatch.setenv("FAKE_GH_VIEW_FAIL", "1")
     with pytest.raises(board.Refused, match="origin could not be reached"):
         board.add(repo, "Once only", "2026-10-02", today="2026-09-25")
-    assert origin_board(repo).count("Once only") == 1
+    assert sum(it.words == "Once only" for it in origin(repo).items) == 1
     monkeypatch.delenv("FAKE_GH_VIEW_FAIL")
     monkeypatch.setenv("FAKE_GH_FAIL", "merge")
     real, calls = board._land, []
@@ -1266,7 +1282,7 @@ def test_no_second_press_when_the_forge_cannot_say_or_origin_moved_off_the_board
 
     monkeypatch.setattr(board, "_land", land)
     with pytest.raises(board.Refused, match="origin could not be reached"):
-        board.write_back(repo, 8, "n/a — undated.", "done")
+        board.write_back(repo, 8, UNDATED, "done")
     bare = Path(git(repo, "remote", "get-url", "origin"))
     assert len(calls) == 1 and len(json.loads((bare / "fake-gh.json").read_text())["prs"]) == 2
 
@@ -1274,51 +1290,63 @@ def test_no_second_press_when_the_forge_cannot_say_or_origin_moved_off_the_board
 LEDGER_TITLE = "When should a team start on its own?"
 
 
-def test_a_ledger_answer_is_one_decided_line_the_reader_reads_as_a_work_order(tmp_path):
+def test_a_ledger_answer_is_one_decided_item_the_reader_reads_as_a_work_order(tmp_path):
     """TD-565 (design §4.5 screen 6 *The ledger's entries that wait on you*): the person's answer to a
-    ledger entry is a decided `decide` line — the title, `Context:` the id, due today, the entry's
-    answers with its default marked, the words as `Decided:` — which the repo's own reader lists as a
-    work order naming the id; empty words, a field's name in them, are refused."""
+    ledger entry is a decided `decide` item — the title, `Context:` the id, due today, the entry's
+    answers with its default marked, the words as `Decided:` (ledgerboard v3.0's `decided_file`, TD-1881) — which
+    the repo's own reader lists as a work order naming the id; empty words are refused."""
     import shutil
 
     from sessionorc import workorders
 
-    line = board.decided_line(
+    text = board.decided_file(
         LEDGER_TITLE + ".", "TD-133", ["At the reset", "At 9|10"], 0, "At  the reset", "2026-10-12"
     )
-    assert line == (
-        f"- [ ] decide 2026-10-12 (person) — {LEDGER_TITLE} Context: TD-133. Due: 2026-10-12. "
-        "Answers: At the reset (default) | At 9\\|10. Decided: At the reset (2026-10-12).\n"
+    it = ledgerboard.parse_item(text)
+    assert (it.kind, it.words, it.context, it.due, it.session) == (
+        "decide",
+        LEDGER_TITLE + ".",
+        "TD-133",
+        date(2026, 10, 12),
+        None,
     )
-    bare = board.decided_line(LEDGER_TITLE, "TD-133", [], None, "Not this quarter", "2026-10-12")
-    assert "Answers:" not in bare and bare.endswith("Due: 2026-10-12. Decided: Not this quarter (2026-10-12).\n")
+    assert it.answers == ["At the reset", "At 9|10"] and it.default == "At the reset"
+    assert it.decided == ("At the reset", date(2026, 10, 12))
+    bare = ledgerboard.parse_item(
+        board.decided_file(LEDGER_TITLE, "TD-133", [], None, "Not this quarter", "2026-10-12")
+    )
+    assert bare.answers == [] and bare.decided == ("Not this quarter", date(2026, 10, 12))
     root = tmp_path / "r"
     (root / "docs").mkdir(parents=True)
     (root / "scripts").mkdir()
     shutil.copy2(pinned_script("nudge_user_attention.py"), root / "scripts")
     copy_pinned_ledgerboard(root / "scripts")
-    (root / board.BOARD).write_text(BOARD_TEXT.replace("## Needs the user\n\n", f"## Needs the user\n\n{line}"))
+    write_board(root, BOARD_TEXT)
+    (root / "docs" / "user_attention" / "2026-10-12-0000abcd.md").write_text(text)
     (o,) = workorders.read(root, fetch=False)["orders"]
     assert o["decided"] == {"text": "At the reset", "date": "2026-10-12"} and "TD-133" in o["refs"]
-    # a field's name in the title or an answer stays words: the line still reads back its id (review of #1542)
-    odd = board.decided_line("Add a Context: field. Due: soon", "TD-9", ["Due: Friday", "No"], 0, "No", "2026-10-12")
-    assert "— Add a Context field. Due soon. Context: TD-9. Due: 2026-10-12. Answers: Due Friday (default) | No." in odd
-    (root / board.BOARD).write_text(BOARD_TEXT.replace("## Needs the user\n\n", f"## Needs the user\n\n{odd}"))
+    # a field's name in the title or an answer stays words: each field is a line of its own (review of #1542)
+    odd = board.decided_file("Add a Context: field. Due: soon", "TD-9", ["Due: Friday", "No"], 0, "No", "2026-10-12")
+    got = ledgerboard.parse_item(odd)
+    assert got.context == "TD-9" and got.words == "Add a Context: field. Due: soon" and got.answers[0] == "Due: Friday"
+    (root / "docs" / "user_attention" / "2026-10-12-0000abcd.md").write_text(odd)
     (o,) = workorders.read(root, fetch=False)["orders"]
     assert o["refs"] == ["TD-9"] and o["decided"]["text"] == "No"
-    for words in ("", "  ", "keep it. Decided: drop"):
+    for words in ("", "  "):
         with pytest.raises(board.Refused):
-            board.decided_line(LEDGER_TITLE, "TD-133", [], None, words, "2026-10-12")
+            board.decided_file(LEDGER_TITLE, "TD-133", [], None, words, "2026-10-12")
 
 
-def test_the_third_add_lands_the_decided_line_at_the_top_committed_by_the_id(repo):
-    line = board.decided_line(LEDGER_TITLE, "TD-133", ["Yes", "No"], 1, "No", "2026-10-12")
+def test_the_third_add_lands_the_decided_item_committed_by_its_id(repo):
+    before = load(repo)
     got = board.add_decided(repo, LEDGER_TITLE, "TD-133", ["Yes", "No"], 1, "No", "2026-10-12")
     # ledgerboard's plan_add writes it, naming who answered (v2.3, TD-1330): the checkout's user, as no People: does
-    assert origin_board(repo).splitlines()[got["line"] - 1] == line.rstrip("\n").replace("No (2026", "No (by t) (2026")
-    assert got["line"] == 7 and got["message"] == "shiftlead: append When should a team start on its own? (session n/a)"
+    it = origin_item(repo, got["key"])
+    assert (it.words, it.context, it.answers, it.default) == (LEDGER_TITLE, "TD-133", ["Yes", "No"], "No")
+    assert it.decided == ("No", date(2026, 10, 12)) and it.decided_by == "t" and it.kind == "decide"
+    assert got["message"] == f"shiftlead: append {got['id']} When should a team start on its own? (session n/a)"
     assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
-    assert (repo / board.BOARD).read_text() == BOARD_TEXT  # the checkout is never written
+    assert load(repo) == before  # the checkout is never written
 
 
 async def test_a_ledger_answer_is_the_persons_and_written_from_the_homes_reading(agent, repo, tmp_path, monkeypatch):
@@ -1377,21 +1405,21 @@ async def test_a_ledger_answer_is_the_persons_and_written_from_the_homes_reading
         refused = [x for x in both if isinstance(x, AgentError)]
         assert len(refused) == 1 and "already" in str(refused[0])
         got = next(x for x in both if isinstance(x, dict))
-        assert origin_board(repo).count("Context: TD-133.") == 1
+        assert sum(it.context == "TD-133" for it in origin(repo).items) == 1
         assert (
             got["decided"] == "At the reset"
-            and got["message"] == "shiftlead: append When should a team start on its own? (session n/a)"
+            and got["message"] == f"shiftlead: append {got['id']} When should a team start on its own? (session n/a)"
         )
-        line = origin_board(repo).splitlines()[got["line"] - 1]
-        assert line.startswith("- [ ] decide ") and "(person) — When should a team start on its own? Context:" in line
-        assert "Context: TD-133." in line and line.endswith("Decided: At the reset (by t) (" + line[-12:])
+        it = origin_item(repo, got["key"])
+        assert it.kind == "decide" and it.session is None and it.words == "When should a team start on its own?"
+        assert it.context == "TD-133" and it.decided[0] == "At the reset" and it.decided_by == "t"
         # the home read the board again: the line is a work order naming the id, and a second press is refused
         orders = agent._repos[root]["work_orders"]["orders"]
         assert [o["decided"]["text"] for o in orders] == ["At the reset"] and "TD-133" in orders[0]["refs"]
         with pytest.raises(AgentError, match="already decided"):
             await me.call("ledger_decide", repo=root, id="TD-133", answer=1)
         got = await me.call("ledger_decide", repo=root, id="TD-134", words="Drop it — the cost is not worth it")
-        assert "Decided: Drop it — the cost is not worth it (" in origin_board(repo).splitlines()[got["line"] - 1]
+        assert origin_item(repo, got["key"]).decided[0] == "Drop it — the cost is not worth it"
         await me.call("kill", id=w)
 
 
@@ -1425,7 +1453,8 @@ async def test_a_ledger_entrys_form_is_filled_never_pressed(agent, repo, tmp_pat
             await me.call("ledger_decide", repo=root, id="TD-133", go=True)
         got = await me.call("ledger_decide", repo=root, id="TD-133", form=1, words="Holding it")
         assert got["decided"] == "Hold: Holding it"
-        assert "Decided: Hold: Holding it (by t)" in origin_board(repo).splitlines()[got["line"] - 1]
+        it = origin_item(repo, got["key"])
+        assert (it.decided[0], it.decided_by) == ("Hold: Holding it", "t")
 
 
 async def test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write_the_line(
@@ -1489,25 +1518,17 @@ async def test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write
         monkeypatch.setattr(agent, "_msg", refuse)
         with pytest.raises(AgentError, match="nothing was written: could not tell ao-gw: gw's inbox is full"):
             await me.call("ledger_decide", repo=root, id="TD-20", road="design", words="split it")
-        assert "TD-20" not in origin_board(repo)
+        assert not [it for it in origin(repo).items if it.context == "TD-20"]
         monkeypatch.setattr(agent, "_msg", real)
-        # words the board refuses refuse the press before anyone is told (review of #2162)
-        with pytest.raises(AgentError, match=r"(carries a field's name \(|may not carry )Context:"):
-            await me.call("ledger_decide", repo=root, id="TD-20", road="design", words="see Context: TD-1")
-        with pytest.raises(
-            AgentError, match=r"(carries a field's name \(|may not carry )Context:"
-        ):  # past the guard: an open part counts
-            await me.call("ledger_decide", repo=root, id="TD-26", road="design", words="see Context: TD-1")
+        # retired (TD-1881): words carrying a field's name (`see Context: TD-1`) refused before anyone is told — an
+        # item file writes each field on a line of its own, so v3.0 refuses no field's name in words
         assert not [e for e in w.inbox if e.about == "TD-20"], "nobody was told"
         got = await me.call("ledger_decide", repo=root, id="TD-20", road="design", words=" split  it ")
         assert got["decided"] == "back to design — split it" and got["told"] == ["ao-gw"]
-        assert "Context: TD-20. Due:" in origin_board(repo) and "Decided: back to design — split it (" in origin_board(
-            repo
-        )
+        it = origin_item(repo, got["key"])
+        assert it.context == "TD-20" and it.due is not None and it.decided[0] == "back to design — split it"
         notes = [e.text for e in w.inbox if e.from_ == PERSON and e.about == "TD-20"]
         assert notes and notes[0].startswith("TD-20 goes back to design — split it: stop at the step in hand")
-        with pytest.raises(AgentError, match="carries a field's name|may not carry"):
-            await me.call("ledger_decide", repo=root, id="TD-24", road="done", words="Decided: x")
         got = await me.call("ledger_decide", repo=root, id="TD-24", road="done")
         assert got["decided"] == "done" and got["told"] == []
         assert "held" not in json.dumps(settle._load()), "the clock records no hold"
@@ -1581,7 +1602,7 @@ async def test_a_ledger_answer_finds_its_repo_by_path_and_the_reading_after_it_l
             monkeypatch.setattr(workorders, "read_boards", read)
             id = "TD-8" if isinstance(failing, dict) else "TD-9"
             got = await me.call("ledger_decide", repo=str(link), id=id, go=True)
-            assert got["repo"] == root and f"Context: {id}." in origin_board(repo)
+            assert got["repo"] == root and origin_item(repo, got["key"]).context == id
             assert agent._repos[root]["work_orders"] is stale
             # the press mark's own pushes alone (TD-1508): the reading in them is the one before the line
             assert events and all(e["repo"]["work_orders"] == stale for e in events)
@@ -1622,7 +1643,7 @@ def keyed(tmp_path, forge) -> Path:
     git(root, "init", "-q", "-b", "main")
     git(root, "config", "user.email", "t@example.com")
     git(root, "config", "user.name", "t")
-    (root / board.BOARD).write_text(BOARD_TEXT)
+    write_board(root, BOARD_TEXT)
     served(root)
     git(root, "add", "-A")
     git(root, "commit", "-q", "-m", "init")
@@ -1630,71 +1651,62 @@ def keyed(tmp_path, forge) -> Path:
     return root
 
 
-def test_a_press_with_the_lines_id_finds_it_moved_and_snoozed_and_a_stale_id_is_refused(keyed):
-    """§4.4 *A board line's id* (TD-603, TD-607): with `key`, the write-back finds the open line whose
-    id it is before the line and its text — on another line, its `Due:` moved since the page drew it —
-    and edits the line as it is now; an id no open line holds is refused in its words, nothing landed."""
-    from sessionorc import workorders
-
-    key = workorders.ref(keyed, ITEM)
-    assert workorders.is_work_order(key)
+def test_a_press_with_the_items_id_finds_it_moved_and_snoozed_and_a_stale_id_is_refused(keyed):
+    """§4.4 *A board line's id* (TD-603, TD-607): with `key`, the write-back finds the open item whose id ends with
+    it (ledgerboard v3.0, TD-1881) whatever the page sent — its `Due:` moved since the page drew it — and edits the
+    item as it is now; an id no open item holds is refused in its words, nothing landed."""
+    key = REF
     moved = ITEM.replace("2026-09-22", "2026-09-30")
-    (keyed / board.BOARD).write_text(BOARD_TEXT.replace(f"- [ ] {ITEM}", f"- [ ] new.\n- [ ] {moved}"))
-    git(keyed, "commit", "-qam", "a line above, and the item snoozed")
-    git(keyed, "push", "-q", "origin", "main")
-    assert workorders.ref(keyed, moved) == key  # a snooze never changes the id
+    push_board(keyed, BOARD_TEXT.replace(f"- [ ] {ITEM}", f"- [ ] 2026-09-19 (n/a) — new.\n- [ ] {moved}"), "moved")
+    assert ref_of(moved) == key  # a snooze never changes the id
     got = board.write_back(keyed, 7, ITEM, "reply", reply="still on it", key=key)  # the page's stale line and text
-    assert got["line"] == 8 and got["text"] == moved
-    line = origin_board(keyed).splitlines()[7]
-    assert "Due: 2026-09-30" in line and "still on it" in line
+    assert got["key"] == key and got["text"] == item(keyed, key).words
+    it = origin_item(keyed, key)
+    assert it.due == date(2026, 9, 30) and it.replies[-1][2] == "still on it"
     before = on_origin(keyed, "rev-parse", "origin/main")
     with pytest.raises(board.Refused, match="no line board:00000000 on the board — reworded or closed"):
         board.write_back(keyed, None, "", "done", key="board:00000000")
     with pytest.raises(board.Refused, match="not a board line's id"):
         board.write_back(keyed, None, "", "done", key="TD-607")
     board.write_back(keyed, None, "", "done", key=key)  # by its id alone
-    with pytest.raises(board.Refused, match=f"no line {key} on the board"):
-        board.write_back(keyed, None, "", "done", key=key)  # closed: no open line holds it
+    with pytest.raises(board.Refused, match=f"{key} was closed"):
+        board.write_back(keyed, None, "", "done", key=key)  # closed: no open item holds it, the closed one says so
     assert on_origin(keyed, "rev-parse", "origin/main") != before
 
 
-async def test_board_edit_and_board_reply_find_the_line_by_its_id_alone(agent, keyed, tmp_path):
-    """§4.4 *A board line's id* (TD-607): the RPCs take `key` in place of the line and its text —
-    the reply's head is the found line's — and refuse an id no open line holds in its words."""
-    from sessionorc import workorders
-
+async def test_board_edit_and_board_reply_find_the_item_by_its_id_alone(agent, keyed, tmp_path):
+    """§4.4 *A board line's id* (TD-607): the RPCs take `key` in place of the item's words — the reply's head is
+    the found item's — and refuse an id no open item holds in its words."""
     home = tmp_path / "home"
     home.mkdir(exist_ok=True)
     (home / "repos.txt").write_text(f"{keyed}\n")
     (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
     path = str(keyed / board.BOARD)
-    key = workorders.ref(keyed, ITEM)
+    key = REF
     async with LocalClient() as me:
         got = await me.call("board_reply", board=path, reply="on it", key=key)
-        assert got["line"] == 7 and "the doorbell" in got["message"]
+        assert got["key"] == key and "the doorbell" in got["message"]
         got = await me.call("board_edit", board=path, action="snooze", due="2026-10-01", key=key)
-        assert got["line"] == 7 and got["action"] == "snooze"
+        assert got["key"] == key and got["action"] == "snooze"
         with pytest.raises(AgentError, match="no line board:00000000 on the board — reworded or closed"):
             await me.call("board_edit", board=path, action="done", key="board:00000000")
         with pytest.raises(AgentError, match="names the item's line or its id"):
             await me.call("board_edit", board=path, action="done")
-    line = origin_board(keyed).splitlines()[6]
-    assert "on it" in line and "Hide until: 2026-10-01" in line
+    it = origin_item(keyed, key)
+    assert it.replies[-1][2] == "on it" and it.hide_until == date(2026, 10, 1)
 
 
-def test_of_two_open_lines_sharing_an_id_the_one_shown_word_for_word_is_found(keyed):
-    """Review of #1606: two open lines share an id only when date, session and words do — a `Due:`
-    or a reply tail apart. With the id, the line whose text is the one the person was shown is
-    found before the first; with a text neither holds, the first."""
-    from sessionorc import workorders
-
-    other = ITEM.replace("2026-09-22", "2026-09-29")
-    lines = [f"- [ ] {ITEM}\n", f"- [ ] {other}\n"]
-    key = workorders.ref(keyed, ITEM)
-    assert workorders.ref(keyed, other) == key
-    assert board._find(lines, None, other, key, keyed) == 1
-    assert board._find(lines, None, ITEM, key, keyed) == 0
-    assert board._find(lines, None, "", key, keyed) == 0
+def test_of_two_open_items_sharing_a_reference_the_one_shown_word_for_word_is_found():
+    """Review of #1606: two open items share a reference only when their ids' eight hex digits do (two days'
+    items, TD-1881). With the reference, the item whose words are the ones the person was shown is found before
+    the first; with words neither holds, the first."""
+    a = ledgerboard.BoardItem(due=None, id="2026-09-20-abcd1234", words="first")
+    b = ledgerboard.BoardItem(due=None, id="2026-09-21-abcd1234", words="second")
+    bd = ledgerboard.Board(form="dir", path="docs/user_attention.md", major=3, items=[a, b])
+    assert board._find(bd, "board:abcd1234", "second") is b
+    assert board._find(bd, "board:abcd1234", "first") is a
+    assert board._find(bd, "board:abcd1234", "") is a
+    assert board._find(bd, "board:00000000", "second") is b  # a stale key falls back to the words
 
 
 async def test_a_persons_session_presses_done_and_back_to_design_but_answers_no_decision(
@@ -1742,14 +1754,14 @@ async def test_a_persons_session_presses_done_and_back_to_design_but_answers_no_
 
     got = await agent.rpc_ledger_decide(repo=root, id="TD-30", road="done", words="built", caller="ao-me")
     assert got["decided"] == "done — built" and got["told"] == ["ao-gw"] and got["readers"] == []
-    assert got["message"] == "shiftlead: append a build. (session me)"
+    assert got["message"] == f"shiftlead: append {got['id']} a build (session me)"
     assert notes("TD-30") == [
         "TD-30 is closed by the person's session me — built: stop at the step in hand, push, leave its PR open and "
         'unmerged, and drop the entry: `ao progress drop TD-30 --why "closed by the person\'s session me — built"`.'
     ]
     with pytest.raises(RpcError, match="TD-31 waits on the person's decision"):
         await agent.rpc_ledger_decide(repo=root, id="TD-31", road="done", caller="ao-me")
-    assert "TD-31" not in origin_board(repo)
+    assert not [it for it in origin(repo).items if it.context == "TD-31"]
     with pytest.raises(RpcError, match="ao-me cannot answer a ledger entry"):
         await agent.rpc_ledger_decide(repo=root, id="TD-31", words="yes", caller="ao-me")
     got = await agent.rpc_ledger_decide(repo=root, id="TD-31", road="done", caller="ao-sh")
@@ -1771,30 +1783,34 @@ async def test_a_persons_session_presses_done_and_back_to_design_but_answers_no_
     assert got["message"].endswith("(session lap)")
 
 
-def test_the_inbox_reads_needs_you_so_a_hidden_item_is_the_snoozed_folds_alone():
+def test_the_inbox_reads_needs_you_so_a_hidden_item_is_the_snoozed_folds_alone(tmp_path):
     """TD-1330 (ledgerboard v2.3): a Snooze writes `Hide until:`; `board_items` carries each item's
     `needs_you` class as `needs`, None while hidden, and the Inbox's `board_rows` keeps it as a `hidden`
     row (TD-1349), which `board_horizon` puts under `snoozed` alone — until the date, when it is back
-    with its Due: as it was."""
-    from datetime import date
-
+    with its Due: as it was. Read from the v3 board the snooze leaves (`load_board()`, TD-1881)."""
     from sessionorc import workorders
     from shiftlead.ui.inbox import board_horizon, board_rows
 
-    hidden = board.edit_line(f"- [ ] {ITEM}\n", ITEM, "snooze", "2026-10-01")
-    text = f"# User attention\n\n## Needs the user\n\n{hidden}- [ ] n/a — undated.\n"
+    it = _items(tmp_path)[REF]
+    hidden = board.edit_item(it, "snooze", "2026-10-01")
+    (tmp_path / "docs" / "user_attention" / it.path).write_text(hidden)
+
+    def snoozed_first(xs: list[dict]) -> list[dict]:  # the snoozed item, then the undated one, whatever the order
+        return sorted(xs, key=lambda x: "doorbell" not in str(x.get("text")))
+
     for today, shown in ((date(2026, 9, 25), 1), (date(2026, 10, 1), 2)):
-        items = workorders.board_items(text, today)
+        items = snoozed_first(workorders.board_items(load(tmp_path), today))
         assert [i["needs"] is None for i in items] == [shown == 1, False]
         report = {"today": today.isoformat(), "boards": [{"root": "/r", "board": "/r/b.md", "items": items}]}
-        rows = board_rows(report)
+        rows = snoozed_first(board_rows(report))
         assert [r["hidden"] for r in rows] == [shown == 1, False]
         assert rows[0]["hide_until"] == ("2026-10-01" if shown == 1 else "")
         hz = board_horizon(rows, "all")
         drawn = hz["due"] + hz["ahead"] + hz["hidden"] + hz["waiting"]
-        assert len(drawn) == shown and drawn[-1]["text"].startswith("n/a — undated")
+        assert len(drawn) == shown and any(str(d["text"]).startswith("undated") for d in drawn)
         assert len(hz["snoozed"]) == 2 - shown
-    assert "Due: 2026-09-22. Hide until: 2026-10-01." in hidden  # its deadline stands
+    got = ledgerboard.parse_item(hidden)
+    assert got.due == date(2026, 9, 22) and got.hide_until == date(2026, 10, 1)  # its deadline stands
 
 
 GATED = (
@@ -1820,7 +1836,7 @@ def _gated(repo: Path) -> None:
     (repo / "docs" / "ledger").mkdir()
     (repo / "docs" / "ledger" / "README.md").write_text("# Ledger\n\nLedgerboard: 2\n")
     (repo / "docs" / "ledger" / "TD-190.md").write_text(GATED_ENTRY)
-    (repo / board.BOARD).write_text(BOARD_TEXT.replace("## Needs", "People: paul\n\n## Needs") + f"- [ ] {GATED}\n")
+    write_board(repo, BOARD_TEXT.replace("## Needs", "People: paul\n\n## Needs") + f"- [ ] {GATED}\n")
     git(repo, "add", "-A")
     git(repo, "commit", "-qm", "gated")
     git(repo, "push", "-q", "origin", "main")
@@ -1831,32 +1847,40 @@ def test_a_go_on_a_gated_decide_lifts_the_gate_in_the_same_write(repo):
     and one gate is ledgerboard v2.4's decide lift — the board line closed and the entry's gate lifted, its Log
     dated the UTC day, landed as one commit; the checkout is never written."""
     _gated(repo)
-    at = origin_board(repo).splitlines().index(f"- [ ] {GATED}") + 1
+    at = None  # a v3 board has no lines: found by its text (TD-1881)
     got = board.write_back(repo, at, GATED, "decide", answer="Go")
     assert got["entries"] == ["TD-190"]
     assert git(repo, "status", "--porcelain") == ""
-    files = on_origin(repo, "show", "--name-only", "--format=", "origin/main").split()
-    assert sorted(files) == ["docs/ledger/TD-190.md", "docs/user_attention.md"]
+    month = date.today().isoformat()[:7]
+    assert board_files(repo) == {
+        "docs/ledger/TD-190.md",
+        f"docs/user_attention/{got['id']}.md",
+        f"docs/user_attention/archive/{month}/{got['id']}.md",
+    }
     entry = on_origin(repo, "show", "origin/main:docs/ledger/TD-190.md")
     assert "**Blocked by:**" not in entry
     day = datetime.now(UTC).date().isoformat()
     assert f"- {day}: gate lifted: decision (paul)" in entry
-    line = origin_board(repo).splitlines()[at - 1]
-    assert line.startswith("- [x] ") and "Decided: Go" in line  # the lift closes the item (ledgerboard's closes())
+    it = origin_item(repo, ref_of(GATED))
+    assert it.closed is not None and it.decided[0] == "Go"  # the lift closes the item (ledgerboard's closes())
 
 
 def test_a_not_yet_on_a_gated_decide_keeps_it_waiting_in_the_same_write(repo):
     """A waiting-only answer logs *kept waiting* on the entry, which keeps its gate, and closes the item."""
     _gated(repo)
-    at = origin_board(repo).splitlines().index(f"- [ ] {GATED}") + 1
+    at = None  # a v3 board has no lines: found by its text (TD-1881)
     got = board.write_back(repo, at, GATED, "decide", answer="Not yet")
     assert got["entries"] == ["TD-190"]
-    files = on_origin(repo, "show", "--name-only", "--format=", "origin/main").split()
-    assert sorted(files) == ["docs/ledger/TD-190.md", "docs/user_attention.md"]
+    month = date.today().isoformat()[:7]
+    assert board_files(repo) == {
+        "docs/ledger/TD-190.md",
+        f"docs/user_attention/{got['id']}.md",
+        f"docs/user_attention/archive/{month}/{got['id']}.md",
+    }
     entry = on_origin(repo, "show", "origin/main:docs/ledger/TD-190.md")
     assert "**Blocked by:** decision (paul)" in entry and "kept waiting: decision (paul)" in entry
-    line = origin_board(repo).splitlines()[at - 1]
-    assert line.startswith("- [x] ") and "Decided: Not yet" in line and "kept waiting" in line
+    it = origin_item(repo, ref_of(GATED))
+    assert it.closed is not None and it.decided[0] == "Not yet" and "kept waiting" in (it.closed[1] or "")
 
 
 async def test_a_go_lifts_the_entrys_card_at_once_and_it_stays_lifted_on_the_stale_checkout(
@@ -1895,7 +1919,7 @@ async def test_a_go_lifts_the_entrys_card_at_once_and_it_stays_lifted_on_the_sta
 
     assert (await tick())["for_page"] == "for-you"
     pushed.clear()
-    at = origin_board(repo).splitlines().index(f"- [ ] {GATED}") + 1
+    at = None  # a v3 board has no lines: found by its text (TD-1881)
     async with LocalClient() as me:
         got = await me.call(
             "board_edit", board=str(repo / board.BOARD), line=at, text=GATED, action="decide", answer="Go",
@@ -1957,7 +1981,7 @@ async def _press_go_meanwhile(agent, repo: Path, tmp_path: Path, monkeypatch):
 
     def press_meanwhile(*args):
         got = real(*args)  # read before the press: the gate stands on origin still
-        at = origin_board(repo).splitlines().index(f"- [ ] {GATED}") + 1
+        at = None  # a v3 board has no lines: found by its text (TD-1881)
         board.write_back(repo, at, GATED, "decide", answer="Go")
         asyncio.run_coroutine_threadsafe(agent._reread_board(root), loop).result(60)
         return got
@@ -1986,7 +2010,7 @@ async def _press_go(agent, repo: Path, tmp_path: Path, monkeypatch, text: str):
         return {e["id"]: e for e in agent._repos[str(repo)]["ledger"]["entries"]}
 
     await tick()
-    at = origin_board(repo).splitlines().index(f"- [ ] {text}") + 1
+    at = None  # a v3 board has no lines: found by its text (TD-1881)
     async with LocalClient() as me:
         got = await me.call(
             "board_edit", board=str(repo / board.BOARD), line=at, text=text, action="decide", answer="Go",
@@ -2050,7 +2074,7 @@ async def test_a_reread_resolves_and_settles_as_the_ticks_reading_does(agent, re
     git(other, "add", "-A")
     git(other, "-c", "user.name=o", "-c", "user.email=o@x", "commit", "-qm", "new")
     git(other, "push", "-q", "origin", "main")
-    at = origin_board(repo).splitlines().index(f"- [ ] {ITEM}") + 1
+    at = None  # a v3 board has no lines: found by its text (TD-1881)
     async with LocalClient() as me:
         await me.call(
             "board_edit", board=str(repo / board.BOARD), line=at, text=ITEM, action="snooze", due="2099-01-01"
@@ -2123,8 +2147,7 @@ async def test_a_go_on_a_design_and_its_parts_lifts_every_entry_it_wrote_at_once
             "**Blocked by:** decision (paul)", "**Blocked by:** decision (paul)\n**Part of:** TD-190"
         )
         (repo / "docs" / "ledger" / f"TD-{n}.md").write_text(part)
-    b = repo / board.BOARD
-    b.write_text(b.read_text().replace(GATED, GATED_PARTS))
+    write_board(repo, BOARD_TEXT.replace("## Needs", "People: paul\n\n## Needs") + f"- [ ] {GATED_PARTS}\n")
     git(repo, "add", "-A")
     git(repo, "commit", "-qm", "parts")
     git(repo, "push", "-q", "origin", "main")
@@ -2145,15 +2168,12 @@ def test_a_go_on_another_repos_gated_entry_is_answered_on_the_board_alone(repo):
     there (ledgerboard's `_decide_ledger`), so no ledger is passed and nothing beside the board lands."""
     _gated(repo)
     other = GATED.replace("Context: TD-190", "Context: other#TD-190")
-    (repo / board.BOARD).write_text(origin_board(repo).replace(GATED, other))
-    git(repo, "commit", "-qam", "another repo's")
-    git(repo, "push", "-q", "origin", "main")
-    at = origin_board(repo).splitlines().index(f"- [ ] {other}") + 1
+    push_board(repo, BOARD_TEXT.replace("## Needs", "People: paul\n\n## Needs") + f"- [ ] {other}\n", "another's")
+    at = None  # a v3 board has no lines: found by its text (TD-1881)
     got = board.write_back(repo, at, other, "decide", answer="Go")
     assert "entries" not in got
-    files = on_origin(repo, "show", "--name-only", "--format=", "origin/main").split()
-    assert files == ["docs/user_attention.md"]
-    assert origin_board(repo).splitlines()[at - 1].startswith("- [ ] ")
+    assert board_files(repo) == {f"docs/user_attention/{got['id']}.md"}
+    assert origin_item(repo, ref_of(other)).closed is None
 
 
 async def _registered(agent, repo: Path, tmp_path: Path, monkeypatch) -> list[dict]:
@@ -2232,7 +2252,7 @@ async def test_a_decide_press_reads_answered_applying_until_it_lands(agent, repo
     item = next(
         it for b in agent._repos[str(repo)]["boards"]["boards"] for it in b["items"] if it.get("kind") == "decide"
     )
-    key, at = item["key"], item["line"]
+    key, at = item["key"], item.get("line")
     release, started = threading.Event(), threading.Event()
     real = agent_inbox.board_mod.write_back
 
@@ -2284,11 +2304,11 @@ async def test_a_failed_or_refused_press_leaves_no_mark(agent, repo, tmp_path, m
     monkeypatch.setattr(agent_inbox.board_mod, "write_back", boom)
     with pytest.raises(OSError):
         await agent.rpc_board_edit(
-            board=path, line=item["line"], text=GATED, action="snooze", due="2099-01-01", key=key
+            board=path, line=item.get("line"), text=GATED, action="snooze", due="2099-01-01", key=key
         )
     assert agent._applying == {} and not _item(pushed[-1], key).get("applying")
     with pytest.raises(RpcError):
-        await agent.rpc_board_edit(board=path, line=item["line"], text=GATED, action="decide", answer="Maybe",
+        await agent.rpc_board_edit(board=path, line=item.get("line"), text=GATED, action="decide", answer="Maybe",
                                    answers=["Go", "Not yet"], key=key)  # fmt: skip
     assert agent._applying == {}
 
@@ -2300,17 +2320,19 @@ async def test_a_failed_or_refused_press_leaves_no_mark(agent, repo, tmp_path, m
 
         monkeypatch.setattr(agent_inbox.board_mod, "write_back", refused)
         with pytest.raises(RpcError, match="the line moved"):
-            await agent.rpc_board_edit(board=path, line=item["line"], text=GATED, action="done", key=key)
+            await agent.rpc_board_edit(board=path, line=item.get("line"), text=GATED, action="done", key=key)
         assert _item(pushed[-1], key)["applying"] == {**_item(pushed[-1], key)["applying"], "act": "decide"}
     assert agent._applying == {} and not _item(pushed[-1], key).get("applying")
 
     async def reread_fails(root, **kw):
         raise RuntimeError("origin unreachable")
 
-    monkeypatch.setattr(agent_inbox.board_mod, "write_back", lambda *a, **kw: {"message": "m", "line": item["line"]})
+    monkeypatch.setattr(
+        agent_inbox.board_mod, "write_back", lambda *a, **kw: {"message": "m", "line": item.get("line")}
+    )
     monkeypatch.setattr(agent, "_reread_board", reread_fails)
     with pytest.raises(RuntimeError):
-        await agent.rpc_board_edit(board=path, line=item["line"], text=GATED, action="done", key=key)
+        await agent.rpc_board_edit(board=path, line=item.get("line"), text=GATED, action="done", key=key)
     assert agent._applying == {}
 
 
@@ -2380,9 +2402,7 @@ HOLD = (
 
 
 def _hold_board(repo: Path, *items: str) -> None:
-    (repo / board.BOARD).write_text(BOARD_TEXT + "".join(f"- [ ] {i}\n" for i in items))
-    git(repo, "commit", "-qam", "asked")
-    git(repo, "push", "-q", "origin", "main")
+    push_board(repo, BOARD_TEXT + "".join(f"- [ ] {i}\n" for i in items), "asked")
 
 
 def test_a_reply_that_fills_a_form_decides_the_line_in_one_commit(repo):
@@ -2392,10 +2412,10 @@ def test_a_reply_that_fills_a_form_decides_the_line_in_one_commit(repo):
     _hold_board(repo, HOLD)
     told: list[str] = []
     got = board.write_back(repo, 9, HOLD, "reply", reply="hold :  drop\nDismiss", on_decide=told.append)
-    line = origin_board(repo).splitlines()[8]
+    it = origin_item(repo, ref_of(HOLD))
     assert got["decided"] == "Hold: drop Dismiss" and told and set(told) == {"Hold: drop Dismiss"}
-    assert ledgerboard.DECIDED_RE.search(line).group("text") == "Hold: drop Dismiss (by t)" and " — t, " not in line
-    assert got["message"].startswith("shiftlead: decide End the rounds? Say.: Hold: drop Dismiss")
+    assert (it.decided[0], it.decided_by, it.replies) == ("Hold: drop Dismiss", "t", [])
+    assert got["message"].startswith(f"shiftlead: decide {got['id']} End the rounds? Say.: Hold: drop Dismiss")
     assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
 
 
@@ -2403,20 +2423,20 @@ def test_a_reply_that_fills_no_form_stays_a_reply_and_an_empty_fill_is_refused(r
     """TD-1698: words that begin with no form's head stay a Reply and leave the line due; the form as written, its
     head alone, its head with a placeholder, or a fill ending `(by …)`, are refused with nothing written."""
     _hold_board(repo, HOLD)
-    before = origin_board(repo)
+    before = origin_docs(repo)
     for bad, why in (
         ("Hold: <note>", "Hold needs its words"),
         ("Hold:", "Hold needs its words"),
         ("hold: <b>", "Hold needs its words"),
-        ("Hold: later (by x)", r"\(by"),
+        # retired (TD-1881): a fill ending `(by …)` — v3.0's `Decided` value reads such an answer as words
     ):
         with pytest.raises(board.Refused, match=why):
             board.write_back(repo, 9, HOLD, "reply", reply=bad, on_decide=lambda _a: None)
-        assert origin_board(repo) == before
+        assert origin_docs(repo) == before
     got = board.write_back(repo, 9, HOLD, "reply", reply="Wait: a day, then ask")
     assert "decided" not in got and got["message"].startswith("shiftlead: reply")
-    line = origin_board(repo).splitlines()[8]
-    assert ": Wait: a day, then ask" in line and ledgerboard.parse_decided(line[6:]) is None
+    it = origin_item(repo, ref_of(HOLD))
+    assert it.replies[-1][2] == "Wait: a day, then ask" and it.decided is None
 
 
 LONG_NOTE = (
@@ -2436,16 +2456,13 @@ def test_a_long_hold_note_is_written_whole_on_the_line_and_the_ledger_log(repo):
 
     _gated(repo)
     held = GATED.replace("Answers: Go | Not yet.", "Answers: Go | Hold: <note>. Lifts: Go.")
-    (repo / board.BOARD).write_text(origin_board(repo).replace(GATED, held))
-    git(repo, "commit", "-qam", "a form")
-    git(repo, "push", "-q", "origin", "main")
+    push_board(repo, BOARD_TEXT.replace("## Needs", "People: paul\n\n## Needs") + f"- [ ] {held}\n", "a form")
     said = A._board_answer("decide", LONG_NOTE, ["Go", "Hold: <note>"], 1)
     assert said == f"Hold: {LONG_NOTE}"
-    at = origin_board(repo).splitlines().index(f"- [ ] {held}") + 1
-    got = board.write_back(repo, at, held, "decide", answer=said)
-    assert got["entries"] == ["TD-190"] and got["message"].endswith("… (session `grinder-ao-2`)")
-    line = origin_board(repo).splitlines()[at - 1]
-    assert f"Decided: Hold: {LONG_NOTE} (by paul)" in line
+    got = board.write_back(repo, None, held, "decide", answer=said)  # a v3 item is found by its words (TD-1881)
+    assert got["entries"] == ["TD-190"] and got["message"].endswith("… (session grinder-ao-2)")
+    it = origin_item(repo, ref_of(held))
+    assert (it.decided[0], it.decided_by) == (f"Hold: {LONG_NOTE}", "paul")
     entry = on_origin(repo, "show", "origin/main:docs/ledger/TD-190.md")
     assert f'kept waiting: decision (paul) — by paul; answer "Hold: {LONG_NOTE}"' in entry
 
@@ -2453,14 +2470,14 @@ def test_a_long_hold_note_is_written_whole_on_the_line_and_the_ledger_log(repo):
 def test_a_long_reply_is_written_whole_and_one_filling_a_form_decides_whole(repo):
     """TD-1883: a Reply past 300 characters is written on the line whole, and one whose words begin with a form's
     head decides it with the whole fill, as a pressed form does."""
-    _hold_board(repo, HOLD, HOLD.replace("End the rounds?", "Another round?"))
-    got = board.write_back(repo, 9, HOLD, "reply", reply=f"Hold: {LONG_NOTE}")
-    assert got["decided"] == f"Hold: {LONG_NOTE}"
-    assert f"Decided: Hold: {LONG_NOTE} (by t)" in origin_board(repo).splitlines()[8]
     other = HOLD.replace("End the rounds?", "Another round?")
-    at = origin_board(repo).splitlines().index(f"- [ ] {other}") + 1
-    got = board.write_back(repo, at, other, "reply", reply=LONG_NOTE)
-    assert "decided" not in got and f": {LONG_NOTE}" in origin_board(repo).splitlines()[at - 1]
+    _hold_board(repo, HOLD, other)
+    got = board.write_back(repo, None, HOLD, "reply", reply=f"Hold: {LONG_NOTE}")
+    assert got["decided"] == f"Hold: {LONG_NOTE}"
+    it = origin_item(repo, ref_of(HOLD))
+    assert (it.decided[0], it.decided_by) == (f"Hold: {LONG_NOTE}", "t")
+    got = board.write_back(repo, None, other, "reply", reply=LONG_NOTE)
+    assert "decided" not in got and origin_item(repo, ref_of(other)).replies[-1][2] == LONG_NOTE
 
 
 @pytest.mark.unit
@@ -2499,7 +2516,8 @@ async def test_board_reply_that_fills_a_form_answers_decided_and_mails_nobody(ag
         assert got["decided"] == "Hold: drop Dismiss" and got["action"] == "decide" and "sent" not in got
         trail = [t for t in (await me.call("inbox"))["trail"] if t["kind"] == "board reply"]
     assert trail == []
-    assert "Decided: Hold: drop Dismiss (by t)" in origin_board(repo).splitlines()[8]
+    it = origin_item(repo, ref_of(HOLD))
+    assert (it.decided[0], it.decided_by) == ("Hold: drop Dismiss", "t")
 
 
 def test_a_reply_filling_a_lifting_form_on_a_gated_decide_lifts_it(repo):
@@ -2507,13 +2525,11 @@ def test_a_reply_filling_a_lifting_form_on_a_gated_decide_lifts_it(repo):
     its lift: the entry's gate lifted and the item closed in one commit, as a pressed lifting answer does."""
     _gated(repo)
     held = GATED.replace("Answers: Go | Not yet.", "Answers: Go | Hold: <note>. Lifts: Hold: <note>.")
-    (repo / board.BOARD).write_text(origin_board(repo).replace(GATED, held))
-    git(repo, "commit", "-qam", "a form lifts")
-    git(repo, "push", "-q", "origin", "main")
-    at = origin_board(repo).splitlines().index(f"- [ ] {held}") + 1
+    push_board(repo, BOARD_TEXT.replace("## Needs", "People: paul\n\n## Needs") + f"- [ ] {held}\n", "a form lifts")
+    at = None  # a v3 board has no lines: found by its text (TD-1881)
     got = board.write_back(repo, at, held, "reply", reply="Hold: until the release")
     assert got["decided"] == "Hold: until the release" and got["entries"] == ["TD-190"]
     entry = on_origin(repo, "show", "origin/main:docs/ledger/TD-190.md")
     assert "**Blocked by:**" not in entry and "gate lifted: decision (paul)" in entry
-    line = origin_board(repo).splitlines()[at - 1]
-    assert line.startswith("- [x] ") and "Decided: Hold: until the release" in line
+    it = origin_item(repo, ref_of(held))
+    assert it.closed is not None and it.decided[0] == "Hold: until the release"

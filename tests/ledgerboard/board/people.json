@@ -2,14 +2,17 @@
  "closed": [],
  "items": [
   {
+   "added": "2026-01-05",
    "answers": [
     "files",
     "db"
    ],
+   "closed": null,
    "consequences": [
     "",
     ""
    ],
+   "context": "TD-7 decision (pat)",
    "decided": {
     "date": "2026-01-14",
     "text": "files"
@@ -21,32 +24,66 @@
    "due": "2026-01-12",
    "due_error": null,
    "due_tag": "3d overdue",
+   "fields": [
+    [
+     "Kind",
+     "decide"
+    ],
+    [
+     "Added",
+     "2026-01-05"
+    ],
+    [
+     "Session",
+     "w-1 on box-1"
+    ],
+    [
+     "Context",
+     "TD-7 decision (pat)"
+    ],
+    [
+     "Due",
+     "2026-01-12"
+    ],
+    [
+     "Answers",
+     "files (default) | db"
+    ],
+    [
+     "Decided",
+     "2026-01-14 by pat — files"
+    ]
+   ],
    "hidden": false,
    "hide_until": null,
    "host": "box-1",
+   "id": "2026-01-05-a4a424a8",
    "kind": "decide",
    "lifts": null,
-   "line": 8,
    "notes": [],
    "overdue_days": 3,
    "parts": [],
+   "path": "",
    "refs": [
     "TD-7"
    ],
    "replies": [],
    "session": "w-1",
-   "text": "decide 2026-01-05 (session `w-1` on box-1) — **Pick a store.** Context: TD-7 decision (pat). Due: 2026-01-12. Answers: files (default) | db. Decided: files (by pat) (2026-01-14).",
+   "text": "**Pick a store.**",
    "waiting_on": "session"
   },
   {
+   "added": "2026-01-06",
    "answers": [
     "Go",
     "Wait"
    ],
+   "closed": null,
    "consequences": [
     "",
     ""
    ],
+   "context": "TD-8",
    "decided": {
     "date": "2026-01-13",
     "text": "Go"
@@ -58,32 +95,66 @@
    "due": "2026-01-12",
    "due_error": null,
    "due_tag": "3d overdue",
+   "fields": [
+    [
+     "Kind",
+     "decide"
+    ],
+    [
+     "Added",
+     "2026-01-06"
+    ],
+    [
+     "Session",
+     "w-2"
+    ],
+    [
+     "Context",
+     "TD-8"
+    ],
+    [
+     "Due",
+     "2026-01-12"
+    ],
+    [
+     "Answers",
+     "Go | Wait"
+    ],
+    [
+     "Decided",
+     "2026-01-13 by Friday — Go"
+    ]
+   ],
    "hidden": false,
    "hide_until": null,
    "host": null,
+   "id": "2026-01-06-cb40b6a6",
    "kind": "decide",
    "lifts": null,
-   "line": 9,
    "notes": [],
    "overdue_days": 3,
    "parts": [],
+   "path": "",
    "refs": [
     "TD-8"
    ],
    "replies": [],
    "session": "w-2",
-   "text": "decide 2026-01-06 (session `w-2`) — Ship on Friday? Context: TD-8. Due: 2026-01-12. Answers: Go | Wait. Decided: Go (by Friday) (2026-01-13).",
+   "text": "Ship on Friday?",
    "waiting_on": "session"
   },
   {
+   "added": "2026-01-07",
    "answers": [
     "this",
     "next"
    ],
+   "closed": null,
    "consequences": [
     "",
     ""
    ],
+   "context": "TD-9",
    "decided": {
     "date": "2026-01-13",
     "text": "next (by next week)"
@@ -95,32 +166,66 @@
    "due": "2026-01-12",
    "due_error": null,
    "due_tag": "3d overdue",
+   "fields": [
+    [
+     "Kind",
+     "decide"
+    ],
+    [
+     "Added",
+     "2026-01-07"
+    ],
+    [
+     "Session",
+     "w-2"
+    ],
+    [
+     "Context",
+     "TD-9"
+    ],
+    [
+     "Due",
+     "2026-01-12"
+    ],
+    [
+     "Answers",
+     "this | next"
+    ],
+    [
+     "Decided",
+     "2026-01-13 — next (by next week)"
+    ]
+   ],
    "hidden": false,
    "hide_until": null,
    "host": null,
+   "id": "2026-01-07-baf5d24d",
    "kind": "decide",
    "lifts": null,
-   "line": 10,
    "notes": [],
    "overdue_days": 3,
    "parts": [],
+   "path": "",
    "refs": [
     "TD-9"
    ],
    "replies": [],
    "session": "w-2",
-   "text": "decide 2026-01-07 (session `w-2`) — Which week? Context: TD-9. Due: 2026-01-12. Answers: this | next. Decided: next (by next week) (2026-01-13).",
+   "text": "Which week?",
    "waiting_on": "session"
   },
   {
+   "added": "2026-01-08",
    "answers": [
     "yes",
     "no"
    ],
+   "closed": null,
    "consequences": [
     "",
     ""
    ],
+   "context": "TD-10",
    "decided": {
     "date": "2026-01-13",
     "text": "(by sam.lee)"
@@ -132,26 +237,60 @@
    "due": "2026-01-12",
    "due_error": null,
    "due_tag": "3d overdue",
+   "fields": [
+    [
+     "Kind",
+     "decide"
+    ],
+    [
+     "Added",
+     "2026-01-08"
+    ],
+    [
+     "Session",
+     "w-3"
+    ],
+    [
+     "Context",
+     "TD-10"
+    ],
+    [
+     "Due",
+     "2026-01-12"
+    ],
+    [
+     "Answers",
+     "yes | no"
+    ],
+    [
+     "Decided",
+     "2026-01-13 — (by sam.lee)"
+    ]
+   ],
    "hidden": false,
    "hide_until": null,
    "host": null,
+   "id": "2026-01-08-ec683cf3",
    "kind": "decide",
    "lifts": null,
-   "line": 11,
    "notes": [],
    "overdue_days": 3,
    "parts": [],
+   "path": "",
    "refs": [
     "TD-10"
    ],
    "replies": [],
    "session": "w-3",
-   "text": "decide 2026-01-08 (session `w-3`) — Name it? Context: TD-10. Due: 2026-01-12. Answers: yes | no. Decided: (by sam.lee) (2026-01-13).",
+   "text": "Name it?",
    "waiting_on": "session"
   },
   {
+   "added": "2026-01-09",
    "answers": [],
+   "closed": null,
    "consequences": [],
+   "context": "TD-11",
    "decided": null,
    "decided_by": null,
    "default": null,
@@ -160,54 +299,77 @@
    "due": "2026-01-20",
    "due_error": null,
    "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-01-09"
+    ],
+    [
+     "Session",
+     "w-3"
+    ],
+    [
+     "Context",
+     "TD-11"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ]
+   ],
    "hidden": false,
    "hide_until": null,
    "host": null,
+   "id": "2026-01-09-09f8fccc",
    "kind": "act",
    "lifts": null,
-   "line": 12,
    "notes": [],
    "overdue_days": null,
    "parts": [],
+   "path": "",
    "refs": [
     "TD-11"
    ],
    "replies": [],
    "session": "w-3",
-   "text": "act 2026-01-09 (session `w-3`) — Rotate the key. Context: TD-11. Due: 2026-01-20.",
+   "text": "Rotate the key.",
    "waiting_on": "person"
   }
  ],
  "keys": [
-  "- [ ] decide 2026-01-05 (session `w-1` on box-1) — **Pick a store.** Context: TD-7 decision (pat). Answers: files (default) | db",
-  "- [ ] decide 2026-01-06 (session `w-2`) — Ship on Friday? Context: TD-8. Answers: Go | Wait",
-  "- [ ] decide 2026-01-07 (session `w-2`) — Which week? Context: TD-9. Answers: this | next",
-  "- [ ] decide 2026-01-08 (session `w-3`) — Name it? Context: TD-10. Answers: yes | no",
-  "- [ ] act 2026-01-09 (session `w-3`) — Rotate the key. Context: TD-11"
+  "2026-01-05-a4a424a8",
+  "2026-01-06-cb40b6a6",
+  "2026-01-07-baf5d24d",
+  "2026-01-08-ec683cf3",
+  "2026-01-09-09f8fccc"
  ],
  "needs_you": [
   [
-   9,
+   "2026-01-06-cb40b6a6",
    "decided",
    2
   ],
   [
-   10,
+   "2026-01-07-baf5d24d",
    "decided",
    2
   ],
   [
-   11,
+   "2026-01-08-ec683cf3",
    "decided",
    2
   ],
   [
-   8,
+   "2026-01-05-a4a424a8",
    "decided",
    1
   ],
   [
-   12,
+   "2026-01-09-09f8fccc",
    "due",
    -5
   ]

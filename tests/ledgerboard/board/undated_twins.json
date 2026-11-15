@@ -1,0 +1,106 @@
+{
+ "closed": [
+  {
+   "added": null,
+   "answers": [],
+   "closed": {
+    "date": "2026-01-12",
+    "why": "pinged"
+   },
+   "consequences": [],
+   "context": "none",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Context",
+     "none"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ],
+    [
+     "Closed",
+     "2026-01-12 — pinged"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": null,
+   "kind": null,
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "",
+   "raw": "- [x] Ping sam about the logs. Context: none. Due: 2026-01-20. Closed: 2026-01-12 — pinged.",
+   "refs": [],
+   "replies": [],
+   "session": null,
+   "text": "Ping sam about the logs.",
+   "waiting_on": "person"
+  }
+ ],
+ "items": [
+  {
+   "added": null,
+   "answers": [],
+   "closed": null,
+   "consequences": [],
+   "context": "none",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "fields": [
+    [
+     "Context",
+     "none"
+    ],
+    [
+     "Due",
+     "2026-01-20"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": null,
+   "kind": null,
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "",
+   "refs": [],
+   "replies": [],
+   "session": null,
+   "text": "Ping pat about the disk.",
+   "waiting_on": "person"
+  }
+ ],
+ "keys": [
+  null,
+  null
+ ],
+ "needs_you": [
+  [
+   null,
+   "due",
+   -5
+  ]
+ ],
+ "people": null
+}

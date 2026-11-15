@@ -4,12 +4,12 @@
   "action": "add",
   "changes": [
    {
-    "path": "board.md",
-    "text": "# Attention board\n\nPeople: robin, sam\n\n## Needs the user\n\n- [ ] decide 2026-01-15 (n/a) — Go on the report suite's builds? Context: TD-4 decision (robin). Parts: TD-9, TD-10. Due: 2026-01-20. Answers: Go (default) | Not yet.\n  - **Context:** The report suite's design is done.\n  - **Question:** Go on its two builds.\n  - **Recommended:** Go — its rounds ended.\n- [ ] act 2026-01-12 (n/a) — Tag the release. Context: none. Due: 2026-01-20.\n"
+    "path": "board/2026-01-15-5eed0001.md",
+    "text": "## Go on the report suite's builds?\n\n**Kind:** decide\n**Added:** 2026-01-15\n**Context:** TD-4 decision (robin)\n**Parts:** TD-9, TD-10\n**Due:** 2026-01-20\n**Answers:** Go (default) | Not yet\n\n- **Context:** The report suite's design is done.\n- **Question:** Go on its two builds.\n- **Recommended:** Go — its rounds ended.\n"
    }
   ],
+  "id": "2026-01-15-5eed0001",
   "item_notes": [],
-  "line": 7,
-  "subject": "ledgerboard: append Go on the report suite's builds? (session n/a)"
+  "subject": "ledgerboard: append 2026-01-15-5eed0001 Go on the report suite's builds? (session n/a)"
  }
 }

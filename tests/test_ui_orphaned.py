@@ -143,9 +143,10 @@ def test_the_inbox_row_and_the_reply_route_for_an_orphaned_question(subprocess_a
     _git(repo, "init", "-q", "-b", "main")
     _git(repo, "config", "user.email", "t@example.com")
     _git(repo, "config", "user.name", "t")
-    (repo / "docs" / "user_attention.md").write_text(
-        "# User attention\n\n## Needs the user\n\n- [ ] x. Due: 2026-09-22.\n"
-    )
+    from _v3board import write_board
+
+    # a v3 board, the directory committed with its stub (ledgerboard v3.0, TD-1881)
+    write_board(repo, "# User attention\n\n## Needs the user\n\n- [ ] 2026-09-01 — x. Due: 2026-09-22.\n")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "init")
     with_origin(repo)  # the write-back lands on origin's head (§4.4, TD-264); the child has the fake gh
@@ -176,7 +177,10 @@ def test_the_inbox_row_and_the_reply_route_for_an_orphaned_question(subprocess_a
         # read on origin's head, where the write-back landed: a pull of the checkout here raced the
         # home's own pull of it (§6 *Pull*) and once exited 128 in CI (TD-659)
         origin = pathlib.Path(_git(repo, "remote", "get-url", "origin"))
-        assert ": the DIU one. Context: TD-149." in _git(origin, "show", "main:docs/user_attention.md")
+        # a new item's file in the board's directory (ledgerboard v3.0, TD-1881)
+        (path,) = _git(origin, "grep", "-l", "the DIU one", "main", "--", "docs/user_attention").split()
+        shown = _git(origin, "show", path)
+        assert "the DIU one" in shown and "TD-149" in shown
         # `ao msg --reply-to` by a person takes the same road, and says where the answer went
         w = call_sync("create", name="asker", dir=str(repo), adapter="agentshell", argv=["bash", "--norc"])["id"]
         q2 = call_sync("msg", caller=w, to="person", text="Drop it?", about="#702", kind="ask")["entry"]["id"]

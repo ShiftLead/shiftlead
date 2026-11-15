@@ -1,0 +1,58 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "split",
+  "files": [
+   "board/README.md",
+   "board/2026-01-05-7cf71222.md",
+   "board/2026-01-06-623f74c4.md",
+   "board/archive/2026-01/2026-01-04-e7a1df46.md",
+   "board/archive/2026-01/2026-01-02-6b249041.md"
+  ],
+  "paths": [
+   "board/README.md",
+   "board/2026-01-05-7cf71222.md",
+   "board/2026-01-06-623f74c4.md",
+   "board/archive/2026-01/2026-01-04-e7a1df46.md",
+   "board/archive/2026-01/2026-01-02-6b249041.md",
+   "board.md",
+   "board_archive.md"
+  ],
+  "removed": [
+   "board_archive.md"
+  ],
+  "subject": null,
+  "warnings": [
+   {
+    "line": 1,
+    "path": "board/README.md",
+    "text": "# Needs the user",
+    "why": "names Needs the user: the board is now this directory"
+   },
+   {
+    "line": 6,
+    "path": "board/README.md",
+    "text": "## In-flight",
+    "why": "names In-flight: the board is now this directory"
+   },
+   {
+    "line": 3,
+    "path": "board_archive.md",
+    "text": "Old note.",
+    "why": "archive preamble not carried"
+   },
+   {
+    "line": 6,
+    "path": "board/2026-01-06-623f74c4.md",
+    "text": "**Due:** 2026-01-22",
+    "why": "due: an fyi carries no `Due`; read as fyi_due"
+   },
+   {
+    "line": 5,
+    "path": "board/2026-01-05-7cf71222.md",
+    "text": "**Session:** w-9 on host-a",
+    "why": "head text not carried: branch x"
+   }
+  ]
+ }
+}

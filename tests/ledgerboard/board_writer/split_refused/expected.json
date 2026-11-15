@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "split",
+  "refused": "board.md: the board's line 3 has no date, or a date that is no day of the calendar: no id can be given it; date it first"
+ }
+}

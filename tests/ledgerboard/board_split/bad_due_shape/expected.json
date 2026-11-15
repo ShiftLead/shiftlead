@@ -1,0 +1,18 @@
+{
+ "files": {
+  "2026-01-05-b867d8d0.md": "## Slash date.\n\n**Kind:** act\n**Added:** 2026-01-05\n**Context:** TD-1\n**Due:** 3/4\n",
+  "2026-01-06-ae4912e8.md": "## Slash no colon.\n\n**Kind:** act\n**Added:** 2026-01-06\n**Due:** 3/4\n",
+  "2026-01-07-7e4e74d5.md": "## Short month.\n\n**Kind:** act\n**Added:** 2026-01-07\n**Context:** TD-3\n**Due:** 2026-1-9\n",
+  "2026-01-08-e6142457.md": "## Fix soon. Due: 2026-02-30.\n\n**Kind:** act\n**Added:** 2026-01-08\n**Context:** TD-4\n**Due:** 3/4\n",
+  "README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat, sam.lee\n"
+ },
+ "notes": [
+  [
+   "README.md",
+   1,
+   "# Needs the user",
+   "names Needs the user: the board is now this directory"
+  ]
+ ],
+ "persisted_keys_found": true
+}

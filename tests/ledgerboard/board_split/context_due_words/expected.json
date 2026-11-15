@@ -1,0 +1,15 @@
+{
+ "files": {
+  "2026-01-05-cd7a6b92.md": "## Words.\n\n**Kind:** act\n**Added:** 2026-01-05\n**Context:** TD-1 Due 3/4 in words\n**Due:** 2026-11-20\n",
+  "README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat, sam.lee\n"
+ },
+ "notes": [
+  [
+   "README.md",
+   1,
+   "# Needs the user",
+   "names Needs the user: the board is now this directory"
+  ]
+ ],
+ "persisted_keys_found": true
+}

@@ -7,6 +7,7 @@ passed over."""
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from _v3board import ref_of  # the reference a v2 line's split item keeps (ledgerboard v3.0, TD-1881)
 from conftest import park_ticks
 
 from sessionorc import hosts, mail, models, stuck, workorders
@@ -210,13 +211,13 @@ async def test_the_pass_reads_no_steer_and_keeps_a_board_entry_as_stored(agent, 
 
 ROOT = "/repos/fx"
 LINE = "decide 2026-11-11 (n/a) — **Keep it?** Context: TD-7. Due: 2026-11-11. Decided: keep (2026-11-11)."
-KEY = workorders.key(LINE)
+KEY = ref_of(LINE)
 OWAIT = mail.STUCK_ORDER_AFTER
 
 
 def board(*, case: str | None = "current", lines: tuple[str, ...] = (LINE,), carried: tuple[str, ...] = ()) -> dict:
     items = [
-        {"key": workorders.key(t), "text": t, "decided": {"text": "keep"}, "kind": "decide", "refs": lb.item_refs(t)}
+        {"key": ref_of(t), "text": t, "decided": {"text": "keep"}, "kind": "decide", "refs": lb.item_refs(t)}
         for t in lines
     ]
     b = {"fetch_case": case, "items": items, "carried": [{"key": k} for k in carried]}
@@ -376,8 +377,8 @@ async def test_a_team_held_at_day_reads_that_reason_and_a_line_no_lane_takes_rea
 
 @pytest.mark.integration
 async def test_an_unread_or_fallback_repo_keeps_its_lines_and_a_repo_off_the_roster_drops_them(home):
-    gone = workorders.key("act 2026-11-11 (n/a) — **Gone.** Due: 2026-11-11.")
-    arch = workorders.key("act 2026-11-11 (n/a) — **Archived.** Due: 2026-11-11.")
+    gone = ref_of("act 2026-11-11 (n/a) — **Gone.** Due: 2026-11-11.")
+    arch = ref_of("act 2026-11-11 (n/a) — **Archived.** Due: 2026-11-11.")
     stored = {"since": "2026-11-11T09:00:00Z", "reason": {"state": "limited"}, "repo": "fx"}
     opened = {"at": "2026-11-11T08:00:00Z", "repo": "fx", "holder": True}
     other = {**stored, "repo": "other"}

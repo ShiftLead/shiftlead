@@ -2,11 +2,11 @@
  "exit": 0,
  "out": {
   "action": "decide",
+  "id": "2026-01-11-a0000009",
   "item_notes": [],
-  "line": 9,
   "paths": [
-   "board.md"
+   "board/2026-01-11-a0000009.md"
   ],
-  "subject": "ledgerboard: decide Pick a cache.: Disk (session w-9)"
+  "subject": "ledgerboard: decide 2026-01-11-a0000009 Pick a cache.: Disk (session w-9)"
  }
 }

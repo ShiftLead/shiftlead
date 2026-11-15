@@ -1,0 +1,12 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "add",
+  "id": "2026-01-15-0000beef",
+  "item_notes": [],
+  "paths": [
+   "board/2026-01-15-0000beef.md"
+  ],
+  "subject": "ledgerboard: append 2026-01-15-0000beef The mirror moved (session n/a)"
+ }
+}

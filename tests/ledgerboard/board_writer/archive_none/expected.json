@@ -1,7 +1,0 @@
-{
- "exit": 1,
- "out": {
-  "action": "archive",
-  "refused": "the board has no closed item to archive"
- }
-}

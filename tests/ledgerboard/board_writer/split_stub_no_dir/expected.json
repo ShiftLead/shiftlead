@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "split",
+  "refused": "board.md: a v3 stub whose directory is missing"
+ }
+}

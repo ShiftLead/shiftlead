@@ -1,0 +1,32 @@
+{
+ "argv": [
+  "add",
+  "--board",
+  "board",
+  "--id",
+  "2026-01-15-5eed0001",
+  "--kind",
+  "decide",
+  "--text",
+  "Ship on Friday?",
+  "--context",
+  "TD-6",
+  "--due",
+  "2026-01-16",
+  "--answer",
+  "Yes",
+  "--answer",
+  "No",
+  "--default",
+  "0",
+  "--detail",
+  "{\"context\": \"The branch is green.\", \"question\": \"Ship Friday or wait?\", \"recommended\": \"the week is quiet\"}",
+  "--session",
+  "w-9",
+  "--host",
+  "host-a",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

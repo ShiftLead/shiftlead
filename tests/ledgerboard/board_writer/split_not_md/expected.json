@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "split",
+  "refused": "board.txt: not a v2 board file (.md)"
+ }
+}

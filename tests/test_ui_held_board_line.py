@@ -72,7 +72,9 @@ def _client(tmp_path, monkeypatch, *, due: bool):
              "blocked_by": ["decision (paul)"], "answers": ["Lift", "Keep"], "default": 0}  # fmt: skip
     when = NOW.date() if due else NOW.date() + timedelta(days=7)
     text = f"decide 2026-11-01 — **Say Go or Hold on TD-060.** Context: TD-060 / PR #74. Due: {when.isoformat()}."
-    item = {"line": 3, "text": text, "kind": "decide", "decided": None, "due": when.isoformat(),
+    # a record's `context` is its field (ledgerboard v3.0, TD-1881), what the row homes it by
+    item = {"at": 3, "text": text, "context": "TD-060 / PR #74", "kind": "decide", "decided": None,
+            "due": when.isoformat(),
             "answers": ["Go", "Hold"], "default": "Go", "refs": ["TD-060", "PR #74"], "key": "board:abc12345",
             **({"overdue_days": 0, "due_tag": "due today"} if due else {"due_tag": "due in 7d"})}  # fmt: skip
     repos = {

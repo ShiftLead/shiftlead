@@ -141,7 +141,14 @@ def test_held_reads_are_capped_a_pass_oldest_first(tmp_path, monkeypatch):
 
 # ── filing (§4.4 *A filing PR nobody holds is a work order*, TD-1810) ─────────────────────────────
 
-FILING = ["docs/ledger", "docs/ledger_archive", "docs/user_attention.md", "docs/user_attention_archive.md"]
+# the board is its files (ledgerboard v3.0, TD-1881): the stub or v2 file, a v2 archive, and a v3 board's directory
+FILING = [
+    "docs/ledger",
+    "docs/ledger_archive",
+    "docs/user_attention.md",
+    "docs/user_attention_archive.md",
+    "docs/user_attention",
+]
 
 
 @pytest.mark.unit
@@ -157,17 +164,27 @@ def test_filing_paths_are_the_ledger_and_its_archive_the_board_and_its_archive_w
         "docs/technical_debt_archive.md",
         "docs/user_attention.md",
         "docs/user_attention_archive.md",
+        "docs/user_attention",
     ]
     (v1 / ".shiftlead.yml").write_text("board: notes/board.md\nledger: notes/td/\n")
     (v1 / "notes").mkdir()
     (v1 / "notes" / "board.md").write_text("# board\n")
-    assert workorders.filing_paths(v1) == ["notes/td", "notes/td_archive", "notes/board.md", "notes/board_archive.md"]
+    assert workorders.filing_paths(v1) == [
+        "notes/td",
+        "notes/td_archive",
+        "notes/board.md",
+        "notes/board_archive.md",
+        "notes/board",
+    ]
 
 
 @pytest.mark.unit
 def test_filing_is_every_file_among_the_paths_or_under_one_and_never_an_empty_list():
     assert reports.filing(["docs/ledger/TD-1.md", "docs/ledger/archive/TD-2.md"], FILING)
     assert reports.filing(["docs/ledger/TD-1.md", "docs/user_attention.md", "docs/user_attention_archive.md"], FILING)
+    assert reports.filing(
+        ["docs/user_attention/2026-11-01-0123abcd.md", "docs/user_attention/archive/2026-11/x.md"], FILING
+    )
     assert not reports.filing(["docs/ledger/TD-1.md", "src/x.py"], FILING)
     assert not reports.filing(["docs/ledgerx/TD-1.md"], FILING)  # a prefix is not a directory
     assert not reports.filing(["docs/ledger/TD-1.md", "notes/old.md"], FILING)  # renamed in: its old name

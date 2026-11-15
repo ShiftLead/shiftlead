@@ -82,7 +82,7 @@ LEDGER = """# Technical Debt
 ## TD-014: waits on the person
 
 **Priority:** Medium
-**Blocked by:** decision (Paul) — docs/user_attention.md, the 2026-09-28 item, TD-010
+**Blocked by:** decision (Paul)
 
 ## TD-015: an unreadable item, and one after the decision's comma
 
@@ -151,7 +151,8 @@ def test_the_rule_and_another_repos_entries_through_one_registry(tmp_path):
     assert {t for t, e in home.items() if e["pickable"] == "yes"} == {"TD-010", "TD-012", "TD-016", "TD-2", "TD-019"}
     assert home["TD-2"]["type"] == home["TD-019"]["type"] == "debt", "the Type's first word, as the script splits it"
     assert home["TD-011"]["blocked_by"] == ["TD-010"] and home["TD-013"]["blocked_by"] == ["TD-777"]
-    assert home["TD-014"]["blocked_by"] == ["decision (Paul)"], "what follows the decision is its pointer"
+    # v3.0 retired the old form's words after the gate (TD-1881): the gate stands alone
+    assert home["TD-014"]["blocked_by"] == ["decision (Paul)"], "the bare gate"
     # v2.4 (ledgerboard SPEC *The ledger*): an id after a decision's comma is an id like any other
     assert home["TD-015"]["blocked_by"] == ["TD-010", "decision (Paul)", "'soon'"]
     assert home["TD-017"]["blocked_by"] == ["other#TD-003"], "archived there lifts it; open there blocks"
@@ -397,22 +398,20 @@ def test_a_for_you_entry_carries_added_answers_and_detail():
     assert (bare["added"], bare["answers"], bare["default"], bare["detail"]) == ("", [], None, [])
 
 
-def test_a_decisions_words_after_its_dash_are_what_it_is_held_until():
-    """§4.5a *Queue card: what needs the person* (TD-795): *held until <the words after the dash, as
-    written>* — `until` on a *for you* entry's reading, '' where the decision has no words after it."""
+def test_a_wait_on_the_person_is_the_bare_gate_and_its_ask_with_no_until_words():
+    """§4.5a *Queue card: what needs the person* (TD-795): since ledgerboard v3.0 (TD-1881) a wait on the person
+    is the bare `decision (paul)` gate and the entry's `**Ask:**` (TD-1803's gate-alone rule), so `until` is ''
+    and the Ask carries the question; the old form's words after a dash are never read (v3.0 has no `old_form`)."""
     text = (
-        "## TD-060: trial\n\n**Blocked by:** decision (paul) — after the trial\n\n"
         "## TD-061: bare\n\n**Blocked by:** TD-001, Decision (Paul)\n\n"
+        "**Ask:** Should the trial run?\n\n**Answers:** Yes — a session runs it | No — nobody runs it\n\n"
         "## TD-062: a build\n\n**Owner:** grinder\n"
     )
-    trial, bare, build = ledger.entries(text)
-    assert trial["until"] == "after the trial" and bare["until"] == ""
+    bare, build = ledger.entries(text)
+    assert bare["until"] == "" and bare["ask"] == "Should the trial run?"
     assert "until" not in build  # not *for you*: no row reads it
-    assert (
-        ledger.until_of("decision (paul) – snoozed to 2026-10-21 (Paul); ask m-1")
-        == "snoozed to 2026-10-21 (Paul); ask m-1"
-    )
-    assert ledger.until_of("decision (paul), TD-002") == ""  # a list going on past it: no words of its own
+    assert ledger.until_of("decision (paul) – snoozed to 2026-10-21 (Paul); ask m-1") == ""
+    assert ledger.until_of("decision (paul), TD-002") == ""
     assert ledger.until_of("TD-001") == ledger.until_of(None) == ""
 
 
@@ -420,11 +419,10 @@ def test_a_migrated_old_form_reads_its_ask_and_the_gate_alone():
     """TD-1803 step 2 (the techlead's answer, gate alone): ledgerboard v2.8's `migrate` moves an old
     decision form's words into an `**Ask:**`, leaving `decision (paul)` bare. The entry then has no
     `until` words, so its card reads *held until your decision*, and it still leads with the Ask."""
-    old, migrated = ledger.entries(
-        "## TD-070: old\n\n**Blocked by:** TD-001, decision (paul) — will you run the trial?\n\n"
+    # the old form itself is retired with v3.0 (TD-1881), which reads no words after the gate: the migrated half
+    (migrated,) = ledger.entries(
         "## TD-071: migrated\n\n**Blocked by:** TD-001, decision (paul)\n\n**Ask:** will you run the trial?\n"
     )
-    assert old["until"] == "will you run the trial?"
     assert (migrated["until"], migrated["ask"]) == ("", "will you run the trial?")
 
 

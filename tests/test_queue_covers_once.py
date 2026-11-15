@@ -251,7 +251,9 @@ def _client(
     when = NOW.date() if due else NOW.date() + timedelta(days=7)
     text = (f"{kind} 2026-11-01 — **One more round on TD-050?** Context: TD-050 decision (paul). "
             f"Parts: TD-051, TD-052. Due: {when.isoformat()}.")  # fmt: skip
-    item = {"line": 3, "text": text, "kind": kind, "decided": None, "due": when.isoformat(),
+    # a record's `context` is its field (ledgerboard v3.0, TD-1881), what the row homes it by
+    item = {"at": 3, "text": text, "context": "TD-050 decision (paul)", "kind": kind, "decided": None,
+            "due": when.isoformat(),
             "answers": ["Go", "Not yet"], "default": "Go", "refs": ["TD-050"], "parts": ["TD-051", "TD-052"],
             "key": "board:abc12345", **(more or {}),
             **({"overdue_days": 0, "due_tag": "due today"} if due else {"due_tag": "due in 7d"})}  # fmt: skip
@@ -319,7 +321,8 @@ def test_a_line_that_is_no_open_decide_or_do_hides_no_for_you_row(tmp_path, monk
     assert html.count('class="brow"') > 1, "and its own row, not the column's plain row"
 
 
-AHEAD = {"line": 5, "kind": "decide", "decided": None, "due": "2026-12-01", "due_tag": "due in 20d",
+AHEAD = {"at": 5, "context": "TD-060 decision (paul)", "kind": "decide", "decided": None, "due": "2026-12-01",
+         "due_tag": "due in 20d",
          "text": "decide 2026-11-01 — **Ship TD-060?** Context: TD-060 decision (paul). Parts: TD-061.",
          "answers": ["Go", "Not yet"], "default": "Go", "refs": ["TD-060"], "parts": ["TD-061"],
          "key": "board:def67890"}  # fmt: skip

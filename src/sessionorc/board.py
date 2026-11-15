@@ -18,6 +18,12 @@ it opens and squash-merges at once — cadence §4.5's tool-made board edit. The
 never written, so its branch, a dirty file or a rebase under way refuses nothing; it catches up by
 the pull (design §6 *Pull*). Origin unreachable, a line only the checkout holds, and a line that
 moved are each refused in words, with nothing landed.
+
+Since ledgerboard v3.0 (TD-1881) the board is a directory, one file per item (`docs/user_attention/<id>.md`,
+closed ones under `archive/<YYYY-MM>/`, the stub `docs/user_attention.md` naming it): every read is the `Board`
+`load_board()` gives, an item is found by its reference (`board:<8 hex>`, its id's last eight) and written by its
+id (`plan_edit(board, action, id, …)`), and a commit stages the board's directory and stub whole. The writer
+refuses a v2 board file, and that refusal is the press's, in its words.
 """
 
 from __future__ import annotations
@@ -67,10 +73,25 @@ WHY_ON_DONE = "a why is a Done's alone: it is written in the line's Closed: fiel
 NO_DOER = "this line names no Doer: Have a session do it hands it to this repo's lane"
 
 
-def own_text(text: str) -> str:
-    """A board line's own words (§4.5 screen 12 *Have a session do it*, TD-1624, TD-1660): its words after its
-    `(session …) —` lead (from its start where it has none) and before its first field, any reply cut first, its
-    ends stripped — bold kept, never clipped. `text` is the item's text, or its whole `- [ ]` line."""
+def item_ref(item: ledgerboard.BoardItem) -> str:
+    """`board:<8 hex>` of a board item (§4.4 *A board line's id*, TD-1881): its id's last eight hex digits, the
+    reference every reader and press names it by. A split v2 item's nonce is its old line's `board:<key>`, so a
+    reference persisted before the split names it still; "" for an item with no id."""
+    return workorders.PREFIX + item.id[-8:] if item.id else ""
+
+
+def _words(text: str | ledgerboard.BoardItem) -> str:
+    """An item's words: a BoardItem's `words` (an item file's heading, ledgerboard v3.0), else `text` as given."""
+    return text.words if isinstance(text, ledgerboard.BoardItem) else str(text or "")
+
+
+def own_text(text: str | ledgerboard.BoardItem) -> str:
+    """A board item's own words (§4.5 screen 12 *Have a session do it*, TD-1624, TD-1660): a BoardItem's `words`
+    (ledgerboard v3.0, TD-1881: an item file's heading holds no lead, field or reply), its ends stripped. A string
+    is read as a v2 line was: its words after its `(session …) —` lead (from its start where it has none) and
+    before its first field, any reply cut first — bold kept, never clipped."""
+    if isinstance(text, ledgerboard.BoardItem):
+        return text.words.strip()
     t = str(text or "")
     if (m := ledgerboard.ITEM_RE.match(t)) is not None:
         t = m.group("text")
@@ -83,19 +104,30 @@ def own_text(text: str) -> str:
     return t.strip()
 
 
-def marked_for_person(text: str) -> bool:
-    """Whether a board line is marked for the person (§4.5 screen 12 *Have a session do it*, TD-1624): its own
+def marked_for_person(text: str | ledgerboard.BoardItem) -> bool:
+    """Whether a board item is marked for the person (§4.5 screen 12 *Have a session do it*, TD-1624): its own
     words (`own_text`), its spaces collapsed, its case folded and a trailing `.` or `!` dropped, end with *only
-    you can do this*. `text` is the item's text, or its whole `- [ ]` line."""
+    you can do this*. `text` is the item (TD-1881), or a v2 item's text or whole `- [ ]` line."""
     words = " ".join(own_text(text).split()).casefold().rstrip(".!").rstrip()
     return words.endswith(ONLY_YOU)
 
 
-def session_do(text: str, answer: str) -> bool:
+def _answers(item: str | ledgerboard.BoardItem) -> list[str]:
+    return list(item.answers) if isinstance(item, ledgerboard.BoardItem) else ledgerboard.parse_answers(item)
+
+
+def _kind(item: str | ledgerboard.BoardItem) -> str | None:
+    if isinstance(item, ledgerboard.BoardItem):
+        return item.kind.lower() if item.kind else None
+    km = ledgerboard.KIND_RE.match(item)
+    return km.group("kind").lower() if km else None
+
+
+def session_do(text: str | ledgerboard.BoardItem, answer: str) -> bool:
     """Whether a decide of `answer` on the item `text` is **Have a session do it**'s (TD-1624): the fixed text, and
-    not one of the line's own `Answers:` (an answer the line offers is decided as any other)."""
+    not one of the item's own `Answers:` (an answer the item offers is decided as any other)."""
     said = " ".join(str(answer or "").split())
-    own = {" ".join(a.split()) for a in ledgerboard.parse_answers(text)}
+    own = {" ".join(a.split()) for a in _answers(text)}
     return said == HAVE_A_SESSION and said not in own
 
 
@@ -104,10 +136,10 @@ class Refused(Exception):
 
 
 def reply_tail(reply: str, by: str, today: str) -> str:
-    """The words **Reply** appends to an item's own line (design §4.4, TD-142): ` — <by>, <date>:
-    <reply>`. On the line, not under it: an item is one line, and the reader and the SessionStart
-    hook read lines, so a reply typed over several lines is joined onto it with spaces. Refused for
-    a reply that is empty."""
+    """The words **Reply** appends to an item (design §4.4, TD-142), as a v2 line wrote them: ` — <by>, <date>:
+    <reply>`; ledgerboard v3.0 writes them as a Log line of the item's file (TD-1881), so this is now the check
+    and the words an add's answer is read by. A reply typed over several lines is joined with spaces. Refused
+    for a reply that is empty."""
     words = " ".join(str(reply or "").split())
     if not words:
         raise Refused("a reply needs its text: what the next session should do")
@@ -118,9 +150,8 @@ def _day(today: str) -> date:
     return date.fromisoformat(today) if today else date.today()
 
 
-def edit_line(
-    line: str,
-    text: str,
+def edit_item(
+    item: ledgerboard.BoardItem,
     action: str,
     due: str | None = None,
     *,
@@ -130,20 +161,18 @@ def edit_line(
     answer: str = "",
     why: str = "",
 ) -> str:
-    """`line` with the item done (ticked, `Closed: <today>.`, or `Closed: <today> — <why>.` with `why`, a Done's
-    alone), snoozed to `due`, replied to (`reply`,
-    by `by` on `today`) or decided (`answer`, on `today`) — ledgerboard's `edit_line`, which re-reads
-    every edit and refuses one the reader would not read back. Refused unless `line` is an open item
-    whose text is exactly `text` — the item the person was shown, not whatever moved onto that line —
-    and, in front of the call, a decide on a line already decided (§4.4 *Decide*), which ledgerboard
-    would rewrite, or with an answer carrying a field's name."""
-    m = ledgerboard.ITEM_RE.match(line.rstrip("\n"))
-    if m is None or m.group("text").strip() != text.strip():
-        raise Refused(MOVED)
-    end = "\n" if line.endswith("\n") else ""
-    body = line.rstrip("\n")
+    """The item file of `item` with the item done (`Closed: <today>`, or `Closed: <today> — <why>` with `why`, a
+    Done's alone), snoozed to `due` (`Hide until:`), its `Due:` moved (`due`), replied to (`reply`, by `by` on
+    `today`, a Log line) or decided (`answer`, on `today`) — ledgerboard v3.0's `edit_item`, which re-reads every
+    edit and refuses one the reader would not read back (TD-1881; v2's `edit_line` of one line). Refused, in front
+    of the call, for an item that is closed (§4.4 *Board write-back*), a decide on an item already decided (§4.4
+    *Decide*), which ledgerboard would rewrite, and a decide its kind refuses (`_session_check`)."""
     if action not in ACTIONS:
         raise Refused(f"unknown board action {action!r}: {' or '.join(ACTIONS)}")
+    if item.closed is not None:
+        raise Refused(MOVED)
+    if not item.path:
+        raise Refused("a v2 board's item: ledgerboard v3.0 writes item files alone — split the board first")
     if action == "reply" and not " ".join(str(reply or "").split()):
         raise Refused("a reply needs its text: what the next session should do")
     if why and action != "done":
@@ -151,13 +180,9 @@ def edit_line(
     if action == "decide":
         if not " ".join(str(answer or "").split()):
             raise Refused("a decide needs its answer: one of the item's Answers:")
-        if ledgerboard.FIELD_NAME_RE.search(answer):
-            # ledgerboard v1.0 reads such a line back unchanged, but the next reader of the words would
-            # take the field for one (review of PR #861): refused here, in front of the call
-            raise Refused("an answer may not carry Context:, Answers:, Decided: or Closed: — say it in other words")
-        if ledgerboard.parse_decided(m.group("text")) is not None:
+        if item.decided is not None:
             raise Refused("this item is already decided: Reply says more to its session, Done closes it")
-        _session_check(m.group("text"), answer)
+        _session_check(item, answer)
     to = None
     if action in ("snooze", "due"):
         try:
@@ -165,10 +190,10 @@ def edit_line(
         except ValueError:
             raise Refused(f"a {action} needs a date as YYYY-MM-DD, not {due!r}") from None
     try:
-        got = ledgerboard.edit_line(
-            body, action, to=to, answer=answer, reply=reply, by=by, today=_day(today), why=why or None
-        )
-        return got + end
+        return ledgerboard.edit_item(
+            item.raw, action, to=to, answer=answer or None, reply=reply or None, by=by or None,
+            today=_day(today), why=why or None,
+        )  # fmt: skip
     except ledgerboard.Refused as e:
         raise Refused(str(e)) from None
 
@@ -199,16 +224,20 @@ def reply_decides(kind: str, answers: Any, decided: bool) -> bool:
     )
 
 
-def reply_fills(text: str, reply: str) -> str | None:
-    """The answer a Reply's words write as the line's decide (§4.4 *A Reply that fills a form decides*, TD-1698), or
-    None where they stay a Reply: on an open, undecided `decide` or `look` line, or a `watch` carrying the look's
+def reply_fills(text: str | ledgerboard.BoardItem, reply: str) -> str | None:
+    """The answer a Reply's words write as the item's decide (§4.4 *A Reply that fills a form decides*, TD-1698), or
+    None where they stay a Reply: on an open, undecided `decide` or `look` item, or a `watch` carrying the look's
     pair, whose `Answers:` offer a form, words that begin with one of its forms' heads and a colon (any case) are that
     form's press, filled through ledgerboard (`<head>: <words>`, one line). An empty fill — the head alone, or the
-    head with a placeholder — is refused with *<head> needs its words*. Read from the found line's own text, never
-    from anything the page sent."""
-    km = ledgerboard.KIND_RE.match(text)
-    answers = ledgerboard.parse_answers(text)
-    if not reply_decides(km.group("kind") if km else "", answers, ledgerboard.parse_decided(text) is not None):
+    head with a placeholder — is refused with *<head> needs its words*. Read from the found item itself (a
+    BoardItem, TD-1881; a v2 line's text is still read), never from anything the page sent."""
+    answers = _answers(text)
+    decided = (
+        text.decided is not None
+        if isinstance(text, ledgerboard.BoardItem)
+        else ledgerboard.parse_decided(text) is not None
+    )
+    if not reply_decides(_kind(text) or "", answers, decided):
         return None
     try:
         return ledgerboard.fill_form(" ".join(str(reply or "").split()), answers)
@@ -216,23 +245,22 @@ def reply_fills(text: str, reply: str) -> str | None:
         raise Refused(str(e)) from None
 
 
-def _session_check(text: str, answer: str) -> None:
-    """The kind check of a decide (§4.4 *Decide*, TD-1624), read from the found line whatever the page sent: an
-    answer that is not one of the line's own `Answers:` is refused on an `act` line unless it is *have a session do
-    it* on one with no `Answers:` that is not marked for the person; the fixed text on any other line is refused."""
+def _session_check(text: str | ledgerboard.BoardItem, answer: str) -> None:
+    """The kind check of a decide (§4.4 *Decide*, TD-1624), read from the found item whatever the page sent: an
+    answer that is not one of the item's own `Answers:` is refused on an `act` item unless it is *have a session do
+    it* on one with no `Answers:` that is not marked for the person; the fixed text on any other item is refused."""
     said = " ".join(str(answer or "").split())
-    own = ledgerboard.parse_answers(text)
+    own = _answers(text)
     if said in {" ".join(a.split()) for a in own}:
         return
     try:
         if own and ledgerboard.fill_form(said, own):
-            return  # a form among them, filled, is one of the line's own answers too (TD-1698)
+            return  # a form among them, filled, is one of the item's own answers too (TD-1698)
     except ledgerboard.Refused:
         pass
-    km = ledgerboard.KIND_RE.match(text)
-    kind = km.group("kind").lower() if km else None
+    kind = _kind(text)
     if said == HAVE_A_SESSION:
-        if kind != "act" or ledgerboard.parse_answers(text):
+        if kind != "act" or own:
             raise Refused(NOT_ACTS_ANSWER)
         if marked_for_person(text):
             raise Refused(MARKED)
@@ -240,15 +268,16 @@ def _session_check(text: str, answer: str) -> None:
         raise Refused(WORD_FOR_WORD)
 
 
-def message(text: str, action: str, due: str | None = None, *, answer: str = "", session: str = "") -> str:
-    """The fixed commit message (design §4.4, cadence §4's carve-out): ledgerboard's
-    `subject("shiftlead", …)` — the action, the item's head and the session that raised it, what a
-    reviewer greps for; `append` for an add."""
+def message(text: str, action: str, due: str | None = None, *, id: str, answer: str = "", session: str = "") -> str:
+    """The fixed commit message (design §4.4, cadence §4's carve-out): ledgerboard v3.0's
+    `subject("shiftlead", …)` — the action, the item's `id` (TD-1881), its words' head and the session (`session`:
+    the press's, else the item's own `Session`, else *n/a*), what a reviewer greps for; `append` for an add.
+    `text` is the item's words."""
     said = " ".join(str(answer or "").split())
     if len(said) > ANSWER_MAX:  # a *Not right:* carries a sentence; the subject is also the PR's title
         said = said[: ANSWER_MAX - 1].rstrip() + "…"
     try:
-        got = ledgerboard.subject(TOOL, action, text, to=due, answer=said, session=session or None)
+        got = ledgerboard.subject(TOOL, action, text, id=id, to=due, answer=said, session=session or None)
     except ledgerboard.Refused as e:
         raise Refused(str(e)) from None
     # a forge's title holds 256 characters: a session name past that clips, keeping `(session …)` whole
@@ -305,12 +334,13 @@ def author(root: Path) -> str:
     return name or "the person"
 
 
-def answerer(root: Path, board_text: str) -> str | None:
+def answerer(root: Path, board: ledgerboard.Board) -> str | None:
     """Who a decide's answer is from (ledgerboard v2.3's `who_answered`): None on a board whose `People:`
     names one person, who is then the answerer; else the checkout's git `user.name` as a person's name
     (spaces joined by `-`) — on a `People:` of several names, that name or its first word as listed — or
-    `person`. ledgerboard refuses a name its `People:` does not list, in its own words."""
-    people = ledgerboard.board_people(board_text)
+    `person`. ledgerboard refuses a name its `People:` does not list, in its own words. `board` is the
+    `Board` `load_board()` gives (ledgerboard v3.0, TD-1881: its `README.md` holds `People:`)."""
+    people = ledgerboard.board_people(board)
     if people is not None and len(people) == 1:
         return None
     words = author(root).split()
@@ -485,37 +515,73 @@ def _reset(t: Path, want: str) -> None:
         _git(t, "reset", "-q", "--hard", f"origin/{want}")
 
 
-def _find(lines: list[str], line: int | None, text: str, key: str = "", root: Path | None = None) -> int | None:
-    """The index of the open item the press is about: with a `key` (§4.4 *A board line's id*), the
-    open item whose id it is, by the repo's own reader under `root`; then the item whose text is
-    `text`, word for word — the reader's line first, then the whole file, since origin's lines may
-    sit elsewhere than the checkout's (§4.4)."""
-    if key and root is not None:
-        found = []
-        for i, ln in enumerate(lines):
-            m = ledgerboard.ITEM_RE.match(ln.rstrip("\n"))
-            if m is not None and workorders.ref(root, m.group("text").strip()) == key:
-                found.append((i, m.group("text").strip()))
-        # two open lines share an id only when their date, session and words do: the one the
-        # person was shown, word for word, before the first (review of #1606)
-        same = [i for i, t in found if text.strip() and t == text.strip()]
-        if same or found:
-            return (same or [found[0][0]])[0]
-
-    def holds(ln: str) -> bool:
-        m = ledgerboard.ITEM_RE.match(ln.rstrip("\n"))
-        return m is not None and bool(text.strip()) and m.group("text").strip() == text.strip()
-
-    if isinstance(line, int) and 1 <= line <= len(lines) and holds(lines[line - 1]):
-        return line - 1
-    return next((i for i, ln in enumerate(lines) if holds(ln)), None)
+def board_files(rel: Path | str) -> list[str]:
+    """The paths a v3 board is under `rel` (the stub or the directory, ledgerboard v3.0, TD-1881), POSIX: the
+    directory — its `README.md`, every open item file and `archive/<YYYY-MM>/` — and the stub beside it, what a
+    write's commit stages whole (`git add -A`: a closing `done` moves an item's file into the archive)."""
+    r = Path(rel).as_posix().rstrip("/")
+    if r.endswith(".md"):
+        return [r[:-3], r]
+    return [r]
 
 
-def _read_lines(path: Path) -> list[str]:
+def _board(at: Path, rel: Path | str) -> ledgerboard.Board:
+    """The board at `rel` under `at` (a checkout or the host agent's tree) as `load_board()` reads it (ledgerboard
+    v3.0, TD-1881): through the stub into its directory, or a v2 file read-only."""
+    return ledgerboard.load_board(Path(rel).as_posix(), *ledger_mod.fs_io(at))
+
+
+def _text_ref(text: str) -> str:
+    """The `board:<8 hex>` a v2 item's `text` keeps once split (ledgerboard v3.0's `key_id` of its `item_key`,
+    TD-1881), or "" for none: a press sent with a v2 line's text still finds the item it was."""
+    t = str(text or "").strip()
+    if not t:
+        return ""
     try:
-        return path.read_text(encoding="utf-8").splitlines(keepends=True)
-    except OSError as e:
-        raise Refused(f"cannot read {path}: {e}") from None
+        return workorders.PREFIX + ledgerboard.key_id(ledgerboard.item_key(f"- [ ] {t}"))
+    except Exception:  # noqa: BLE001 — a text the key cannot take names no item
+        return ""
+
+
+def _by_ref(items: list[ledgerboard.BoardItem], ref: str) -> list[ledgerboard.BoardItem]:
+    nonce = str(ref or "").removeprefix(workorders.PREFIX)
+    return [it for it in items if nonce and it.id and it.id.endswith("-" + nonce)]
+
+
+def _find(board: ledgerboard.Board, key: str = "", text: str = "") -> ledgerboard.BoardItem | None:
+    """The open item the press is about (§4.4 *A board line's id*, TD-1881): with a `key` (`board:<8 hex>`), the
+    open item whose id ends with its eight hex digits — of two, the one whose words are `text`, word for word —;
+    else (or when no open item has it) the open item whose words are `text`, or whose v2 reference `text`
+    derives (`_text_ref`). None when no open item is it."""
+    want = " ".join(str(text or "").split())
+    if key:
+        got = _by_ref(board.items, key)
+        same = [it for it in got if want and " ".join(it.words.split()) == want]
+        if same or got:
+            return (same or got)[0]
+    if not want:
+        return None
+    same = [it for it in board.items if " ".join(it.words.split()) == want]
+    if same:
+        return same[0]
+    derived = _by_ref(board.items, _text_ref(text))
+    return derived[0] if derived else None
+
+
+def _closed(board: ledgerboard.Board, key: str = "", text: str = "") -> ledgerboard.BoardItem | None:
+    """The closed item `key` (else `text`'s v2 reference) names, when no open one does (contract 2, TD-1881)."""
+    got = _by_ref(board.closed, key) or _by_ref(board.closed, _text_ref(text))
+    return got[0] if got else None
+
+
+def _none_open(board: ledgerboard.Board, key: str, text: str = "") -> Refused:
+    """The refusal for a press whose item no open item of `board` is: closed, said so with its date; else the
+    reader's *no line* for a `key`, the moved-item words for a text."""
+    shut = _closed(board, key, text)
+    if shut is not None:
+        day = shut.closed[0].isoformat() if shut.closed and shut.closed[0] else "already"
+        return Refused(f"{item_ref(shut)} was closed {day}: {MOVED}")
+    return Refused(workorders.NO_LINE.format(ref=key) if key else MOVED)
 
 
 def _gh(t: Path, clock: _Clock, step: str, *args: str) -> subprocess.CompletedProcess[str]:
@@ -545,27 +611,29 @@ def _land(
     prefix: str = "board",
     also: list[str] | tuple[str, ...] = (),
 ) -> dict[str, Any]:
-    """Commit the tree's board (or the file at `rel`: a rank file, §4.4 *A move lands*), and the files `also`
-    names beside it (a decide lift's ledger entries, TD-1375), and land them on
+    """Commit the tree's board — its directory and stub whole (`board_files`, `git add -A`: an item file added,
+    edited or moved into the archive, ledgerboard v3.0, TD-1881) — or the file at `rel` (a rank file, §4.4 *A move
+    lands*), and the files `also` names beside it (a decide lift's ledger entries, TD-1375), and land them on
     `origin/<want>` by the one road the forge's rule allows (§4.4): a branch of the host agent's own, a PR
     it opens and squash-merges at once. A refused merge closes the PR and deletes the branch, and refuses
     the press as a moved line when `still()` — origin's board read again — no longer holds the item, else
     as unreachable."""
     base = _git(t, "rev-parse", "HEAD").stdout.strip()
-    rel = rel or str(workorders.board_rel(root))
-    cp = _git(
-        t,
-        *_identity(root),
-        "commit",
-        "--quiet",
-        "-m",
-        msg,
-        "--only",
-        "--",
-        rel,
-        *also,
-        timeout=clock.left("git commit"),
-    )
+    paths = [rel] if rel else [p for p in board_files(workorders.board_rel(root)) if (t / p).exists()]
+    paths += [p for p in also if p not in paths]
+    cp = _git(t, "add", "-A", "--", *paths, timeout=clock.left("git add"))
+    if cp.returncode == 0:
+        cp = _git(
+            t,
+            *_identity(root),
+            "commit",
+            "--quiet",
+            "-m",
+            msg,
+            "--",
+            *paths,
+            timeout=clock.left("git commit"),
+        )
     if cp.returncode != 0:
         _reset(t, want)
         raise Refused(f"the commit failed, and the board is as it was: {_why(cp, 'git commit')}")
@@ -616,13 +684,13 @@ def _land(
             moved = shifted = False
             with contextlib.suppress(Refused):
                 if not landed and _fetch(root, t, want, GIT_TIMEOUT).returncode == 0:
-                    landed = _git(t, "diff", "--quiet", sha, f"origin/{want}", "--", rel).returncode == 0
+                    landed = _git(t, "diff", "--quiet", sha, f"origin/{want}", "--", *paths).returncode == 0
                     moved = not landed and not still()
                     # the forge's own word that it did not merge, and origin's board changed under it: never a
                     # retry on a forge that could not be asked (an add might write twice) or a move elsewhere
                     shifted = (
                         state in ("OPEN", "CLOSED")
-                        and _git(t, "diff", "--quiet", base, f"origin/{want}", "--", rel).returncode != 0
+                        and _git(t, "diff", "--quiet", base, f"origin/{want}", "--", *paths).returncode != 0
                     )
             if not landed:
                 _gh_quiet(t, "pr", "close", str(n))
@@ -700,14 +768,17 @@ def write_back(
 ) -> dict[str, Any]:
     """Make one Snooze, Done, Reply or Decide on the board on origin's head and land it there (§4.4):
     in the host agent's own tree for the repo of the checkout `root`, which is never written.
-    `key` is the line's id (`board:<key>`, §4.4 *A board line's id*), tried before the line and
-    its text, and refused in its own words when no open line holds it.
-    Returns `{commit, message, pr, line, text, due}` — `commit` origin's head after the merge, `due` the
-    date written; raises `Refused` with nothing changed on origin. A `snooze` sent with no date is the
-    Inbox fold's *now* (§4.4 *Board write-back*, TD-1349): the host agent's own today, computed once here,
-    is its `Hide until:` — the calendar its reader decides `hidden` by — and its commit subject's date. A
-    line that already said so is answered as done with origin's head, no commit and no `pr`.
-    A `reply` whose words fill a form on the found line (`reply_fills`, §4.4 *A Reply that fills a form decides*,
+    The item is named by `key`, its reference (`board:<8 hex>`, §4.4 *A board line's id*): the open item whose
+    id ends with it (ledgerboard v3.0, TD-1881), else by `text` — the item's words, or a v2 line's text, whose
+    reference the split item keeps — and refused in its own words when no open item is it (a closed one is said
+    so). `line` is kept for its callers and read no more: a v3 board has no line numbers.
+    Returns `{commit, message, pr, id, key, text, due}` — `commit` origin's head after the merge, `id` the item's,
+    `key` its reference, `text` its words, `due` the date written; raises `Refused` with nothing changed on
+    origin. A `snooze` sent with no date is the Inbox fold's *now* (§4.4 *Board write-back*, TD-1349): the host
+    agent's own today, computed once here, is its `Hide until:` — the calendar its reader decides `hidden` by —
+    and its commit subject's date. An item that already said so is answered as done with origin's head, no commit
+    and no `pr`.
+    A `reply` whose words fill a form on the found item (`reply_fills`, §4.4 *A Reply that fills a form decides*,
     TD-1698) is that form's decide, read here under the lock after the fetch: written and landed as a decide, by the
     person as its answerer, and answered with `decided`; `on_decide` is called with the filled answer when the
     reading so turns it (idempotent: a second reading calls it again)."""
@@ -720,12 +791,11 @@ def write_back(
         due = _day("").isoformat()
     with _EDIT:
         clock = _Clock()
-        return _twice(lambda: _write_back(root, line, text, action, due, reply, answer, clock, key, why, on_decide))
+        return _twice(lambda: _write_back(root, text, action, due, reply, answer, clock, key, why, on_decide))
 
 
 def _write_back(
     root: Path,
-    line: int,
     text: str,
     action: str,
     due: str | None,
@@ -738,110 +808,121 @@ def _write_back(
 ) -> dict[str, Any]:
     if key and not workorders.is_work_order(key):
         raise Refused(f"{key!r} is not a board line's id: board: and eight hex digits (design §4.4)")
-    if not isinstance(line, int) and not key:
+    if not key and not str(text or "").strip():
         raise Refused(MOVED)
     clock = clock or _Clock()
     if shutil.which("gh") is None:
         raise unreachable("gh is not installed")
     t, want = _tree(root, clock)
     rel = workorders.board_rel(root)
-    path = t / rel
-    lines = _read_lines(path) if path.exists() else []
-    at = _find(lines, line, text, key, root)
-    if at is None:
-        if text and _ahead(root, want, line, text):
+    stub = t / rel
+    old = _board(t, rel)
+    if old.form == "file":  # the writer refuses a v2 board, in its own words (*split first*, TD-1881)
+        _plan(lb_board.load_v3, str(stub))
+    it = _find(old, key, text)
+    if it is None:
+        if (key or text) and _ahead(root, want, key, text):
             raise Refused(NOT_ON_ORIGIN)
-        raise Refused(workorders.NO_LINE.format(ref=key) if key else MOVED)
-    # found by its id, the line's own text is the item's — a snooze or a reply since the page drew
-    # it changes the text and never the id (§4.4 *A board line's id*)
-    text = ledgerboard.ITEM_RE.match(lines[at].rstrip("\n")).group("text").strip()  # type: ignore[union-attr]
+        raise _none_open(old, key, text)
+    # found by its id, the item's own words are its words now — a snooze or a reply since the page drew it
+    # changes the file and never the id (§4.4 *A board line's id*)
+    text = it.words
     decided = None
-    if action == "reply" and (decided := reply_fills(text, reply)):
+    if action == "reply" and (decided := reply_fills(it, reply)):
         # the Reply fills a form: it is that form's decide, in this same write (§4.4 *A Reply that fills a form
         # decides*, TD-1698) — the person its answerer, the lift and the decide's subject, no reply trail
         action, answer, reply = "decide", decided, ""
         if on_decide is not None:
             on_decide(decided)
     by = author(root) if action == "reply" else ""
-    # ShiftLead's own checks first (the item word for word, a decide on a decided line, a field's name)
-    edit_line(lines[at], text, action, due, reply=reply, by=by, answer=answer, why=why)
+    reply = " ".join(str(reply or "").split())  # a reply typed over several lines is one Log line (§4.4, TD-142)
+    # ShiftLead's own checks first (a closed item, a decide on a decided item, its kind), then ledgerboard's
+    edit_item(it, action, due, reply=reply, by=by, answer=answer, why=why)
     lifts = None
     only = False
     if action == "decide":
-        by = answerer(root, "".join(lines)) or ""
-        lifts = _lift_ledger(t, text)
+        by = answerer(root, old) or ""
+        lifts = _lift_ledger(t, it)
         # Have a session do it writes the board half alone, never the decide lift, whatever the Context names, so
-        # the line stays open (§4.4 *Decide*, TD-1624): the ledger passed with `board_only` where a gate would lift
-        only = session_do(text, answer) and lifts is not None
+        # the item stays open (§4.4 *Decide*, TD-1624): the ledger passed with `board_only` where a gate would lift
+        only = session_do(it, answer) and lifts is not None
     plan = _plan(
-        lb_board.plan_edit, str(path), action, at + 1, text,
+        lb_board.plan_edit, str(stub), action, it.id,
         to=due if action in ("snooze", "due") else None, answer=answer or None, text=reply or None,
         by=by or None, tool=TOOL, ledger=lifts, board_only=only, why=why or None,
     )  # fmt: skip
-    msg = message(text, action, due, answer=answer)
+    msg = message(text, action, due, id=it.id or "", answer=answer, session=it.session or "")
+    found = {"id": it.id, "key": item_ref(it), "text": text, "due": due}
     if plan.info.get("left_open"):
         # ledgerboard v2.7: a board-only decide whose lifting answer leaves a listed entry still carrying the gate
         # writes nothing, and says which (its TD-067 *Consumers*): nothing is landed, and the press is answered
         # with what it left open, never as a plain done (TD-1709)
         head = _git(t, "rev-parse", "--short", f"origin/{want}").stdout.strip()
         _reset(t, want)
-        gate = ledgerboard._item_gate(text)[1]
-        return {"commit": head, "message": msg, "line": at + 1, "text": text, "due": due,
-                "left_open": list(plan.info["left_open"]), "gate": gate,
+        gate = ledgerboard._item_gate(it)[1]
+        return {"commit": head, "message": msg, **found, "left_open": list(plan.info["left_open"]), "gate": gate,
                 **({"decided": decided} if decided else {})}  # fmt: skip
-    _apply(plan)
-    also = sorted(os.path.relpath(p, t) for p in plan.changes if Path(p).resolve() != path.resolve())
-    if _read_lines(path)[at] == lines[at]:
-        # the edit changed nothing — a *now* whose date the line already holds (the day turned under an open
+    if all(v is not None and _same(Path(p), v) for p, v in plan.changes.items()):
+        # the edit changed nothing — a *now* whose date the item already holds (the day turned under an open
         # page, so it was no longer hidden): nothing is landed, and the press is answered as done (TD-1349)
         head = _git(t, "rev-parse", "--short", f"origin/{want}").stdout.strip()
         _reset(t, want)
-        return {
-            "commit": head, "message": msg, "line": at + 1, "text": text, "due": due,
-            **({"decided": decided} if decided else {}),
-        }  # fmt: skip
+        return {"commit": head, "message": msg, **found, **({"decided": decided} if decided else {})}
+    _apply(plan)
+    under = [(t / p).resolve() for p in board_files(rel)]
+    also = sorted(
+        os.path.relpath(p, t)
+        for p in plan.changes
+        if not any(Path(p).resolve() == u or Path(p).resolve().is_relative_to(u) for u in under)
+    )
+    open_file = f"{board_files(rel)[0]}/{it.path}"
 
     def still() -> bool:
-        return _find(_read_origin(t, want, rel), None, text) is not None
+        # origin's board still holds the item open: its file is where the press found it (TD-1881)
+        return _git(t, "cat-file", "-e", f"origin/{want}:{open_file}").returncode == 0
 
     landed = _land(root, t, want, msg, clock, still, also=also)
     return {
-        **landed, "line": at + 1, "text": text, "due": due,
+        **landed, **found,
         **({"entries": plan.info["entries"]} if also else {}), **({"decided": decided} if decided else {}),
     }  # fmt: skip
 
 
+def _same(path: Path, text: str) -> bool:
+    try:
+        return path.read_text(encoding="utf-8") == text
+    except OSError:
+        return False
+
+
 def find_line(root: str | Path, line: int | None, key: str) -> dict[str, Any]:
-    """**`board_find`** (§4.5 screen 12 *Three verbs: Have a session do it*, TD-1660): the open line whose id is
-    `key` (`board:<key>`, §4.4 *A board line's id*), found on origin's head as the write-back finds it, under the
-    board's write lock held for the find alone, and re-read with ledgerboard. Refused unless it is open, undecided,
-    of kind `act`, without `Answers:`, not marked for the person, and names a `Doer:`; whatever the page sent.
-    Returns `{doer, text, context, session, due, context_refs, refs, key}`: `doer` the field's value as written,
-    `text` the line's own words (`own_text`), `context` the detail block's Context bullet without its label ("" where
-    none), `session` the line's session (None where it names none), `due` its `Due:`, `context_refs` every ref of its
-    `Context:` as written, `refs` its entry refs (`TD-n`, `<repo>#TD-n`), the line's id as `key`."""
+    """**`board_find`** (§4.5 screen 12 *Three verbs: Have a session do it*, TD-1660): the open item whose
+    reference is `key` (`board:<8 hex>`, §4.4 *A board line's id*: its id ends with them, ledgerboard v3.0,
+    TD-1881), found on origin's head as the write-back finds it, under the board's write lock held for the find
+    alone, and read with ledgerboard's `load_board`. Refused unless it is open, undecided, of kind `act`, without
+    `Answers:`, not marked for the person, and names a `Doer:`; whatever the page sent. `line` is kept for its
+    callers and read no more. Returns `{doer, text, context, session, due, context_refs, refs, key, id}`: `doer`
+    the field's value as written, `text` the item's words (`own_text`), `context` the detail block's Context bullet
+    without its label ("" where none), `session` the item's session (None where it names none), `due` its `Due:`,
+    `context_refs` every ref of its `Context:` as written, `refs` its entry refs (`TD-n`, `<repo>#TD-n`), the
+    item's reference as `key` and its id as `id`."""
     root = Path(root)
     if not workorders.is_work_order(str(key or "")):
         raise Refused(f"{key!r} is not a board line's id: board: and eight hex digits (design §4.4)")
     with _EDIT:
         clock = _Clock()
         t, _ = _tree(root, clock)
-        path = t / workorders.board_rel(root)
-        lines = _read_lines(path) if path.exists() else []
-        at = _find(lines, line, "", key, root)
-        if at is None:
-            raise Refused(workorders.NO_LINE.format(ref=key))
-        item = next((it for it in ledgerboard.parse_board("".join(lines), warn=False) if it.line == at + 1), None)
+        b = _board(t, workorders.board_rel(root))
+        item = _find(b, key)
     if item is None:
-        raise Refused(workorders.NO_LINE.format(ref=key))
-    text = item.text
+        raise _none_open(b, key)
     if item.decided is not None:
         raise Refused("this item is already decided: Reply says more to its session, Done closes it")
     if item.kind != "act":
         raise Refused(NOT_ACTS_ANSWER)
     if item.answers:
         raise Refused(NOT_ACTS_ANSWER)
-    if marked_for_person(text):
+    if marked_for_person(item):
         raise Refused(MARKED)
     if item.doer is None:
         raise Refused(NO_DOER)
@@ -857,62 +938,57 @@ def find_line(root: str | Path, line: int | None, key: str) -> dict[str, Any]:
             words.append(more.strip().removeprefix("- ").strip())
         context = " ".join(w for w in words if w)
         break
-    every = ledgerboard.item_refs(text)
+    every = ledgerboard.context_refs(item.context or "")
     return {
         "doer": item.doer[2],
-        "text": own_text(text),
+        "text": own_text(item),
         "context": context,
-        "session": ledgerboard.item_head(text)[0],
+        "session": item.session,
         "due": item.due.isoformat() if item.due else None,
         "context_refs": every,
         "refs": [r for r in every if not r.startswith(("PR #", "branch "))],
-        "key": workorders.ref(root, text.strip()),
+        "key": item_ref(item),
+        "id": item.id,
     }
 
 
-def _lift_ledger(t: Path, text: str) -> str | None:
-    """The ledger a decide on the item `text` writes beside its board line (§4.4 *Board write-back*, TD-1375):
+def _lift_ledger(t: Path, item: ledgerboard.BoardItem) -> str | None:
+    """The ledger a decide on `item` writes beside its board item (§4.4 *Board write-back*, TD-1375):
     the tree's ledger, where the item's Context names one of this repo's entries and one gate — ledgerboard
     v2.4's decide lift, which lifts the gate on a lifting answer, or logs *kept waiting*, in the same write as
-    the board line — else None, a decide on the board alone. A v1 ledger is passed as it is, and ledgerboard
+    the board item — else None, a decide on the board alone. A v1 ledger is passed as it is, and ledgerboard
     refuses the lift there in its own words."""
-    ref, gate = ledgerboard._item_gate(text)
+    ref, gate = ledgerboard._item_gate(item)
     if ref is None or gate is None or "#" in ref:
         return None
     return str(t / ledger_mod.ledger_path(t))
 
 
-def _ahead(root: Path, want: str, line: int | None, text: str) -> bool:
+def _ahead(root: Path, want: str, key: str, text: str) -> bool:
     """Whether the checkout holds the item where origin does not because the checkout's board is
     *ahead* — an uncommitted edit, or a board commit origin lacks — rather than behind: a checkout
-    that has not pulled still shows a line origin has since done or replied to, which is a moved
-    line, not an unpushed one."""
+    that has not pulled still shows an item origin has since done or replied to, which is a moved
+    item, not an unpushed one. Read through `load_board()` (TD-1881); the board's every file is looked at."""
     rel = workorders.board_rel(root)
-    mine = _read_lines(root / rel) if (root / rel).exists() else []
-    if _find(mine, line, text) is None:
+    if _find(_board(root, rel), key, text) is None:
         return False
-    if _git(root, "status", "--porcelain", "--", str(rel)).stdout.strip():
+    files = [p for p in board_files(rel) if (root / p).exists()]
+    if not files:
+        return False
+    if _git(root, "status", "--porcelain", "--", *files).stdout.strip():
         return True
-    last = _git(root, "log", "-1", "--format=%H", "--", str(rel)).stdout.strip()
+    last = _git(root, "log", "-1", "--format=%H", "--", *files).stdout.strip()
     return bool(last) and _git(root, "merge-base", "--is-ancestor", last, f"origin/{want}").returncode != 0
 
 
-def _read_origin(t: Path, want: str, rel: Path) -> list[str]:
-    cp = _git(t, "show", f"origin/{want}:{rel.as_posix()}")
-    return cp.stdout.splitlines(keepends=True) if cp.returncode == 0 else []
-
-
-def item_line(text: str, due: str, today: str, session: str | None, host: str | None, context: str | None) -> str:
-    """The one line *Put on the board* writes (design §4.5a), in the board's own `Format:` —
-    ledgerboard's `item_line`: `- [ ] <today> (session `<name>` on <host>, or n/a) — <text>. Context:
-    <about>. Due: <date>.` Refused for text that is empty or more than one line: an item is one line."""
+def item_file(text: str, due: str, today: str, session: str | None, host: str | None, context: str | None) -> str:
+    """The item file *Put on the board* writes (design §4.5a): ledgerboard v3.0's `item_file` (TD-1881; v2's
+    `item_line`) — `## <text>`, then `Added: <today>`, its `Session` (`<name> on <host>`) where there is one, its
+    `Context` and its `Due`. Refused for text that is empty or more than one line."""
     try:
-        return ledgerboard.item_line(text, due, today, session, host, context)
+        return ledgerboard.item_file(text, due or None, today, session, host, context)
     except ledgerboard.Refused as e:
         raise Refused(str(e)) from None
-
-
-NEEDS = "## Needs the user"  # the board's section for the person's lines (cadence §3), a heading's words
 
 
 def add(
@@ -926,31 +1002,29 @@ def add(
     today: str | None = None,
     answer: str | None = None,
 ) -> dict[str, Any]:
-    """**Put on the board** (design §4.4, the write-back's first add; TD-140): one new line at the top
-    of the open items of the board on origin's head for the checkout `root`'s repo, committed in the
-    host agent's own tree as ledgerboard's `shiftlead: append <item head> (session <name>)` and landed
-    by its own PR, as an edit is; the checkout is never written. Refused on the same conditions as an
-    edit, touching nothing on origin. Returns `{commit, message, pr, line}` — `line` the new item's
-    line number.
+    """**Put on the board** (design §4.4, the write-back's first add; TD-140): one new item file (ledgerboard
+    v3.0's `plan_add`, its id drawn, TD-1881) on the board on origin's head for the checkout `root`'s repo,
+    committed in the host agent's own tree as ledgerboard's `shiftlead: append <id> <head> (session <name>)` and
+    landed by its own PR, as an edit is; the checkout is never written. Refused on the same conditions as an
+    edit, touching nothing on origin; a v2 board is refused by the writer, in its words (*split first*). Returns
+    `{commit, message, pr, id, key}` — the new item's id and its reference.
 
     With `answer`, the **second add** (§4.4, §4.10 *A question about a reference outlives its asker*,
-    TD-216): `text` is the orphaned question's first paragraph and the person's answer follows it on
-    the line as a reply does (` — <name>, <date>: <answer>`), committed by the same `append`."""
+    TD-216): `text` is the orphaned question's first paragraph and the person's answer is the item's first
+    Log line (`- <date>: <name>: <answer>`), committed by the same `append`."""
     root = Path(root)
     today = today or date.today().isoformat()
     by = None
     if answer is not None:
         reply_tail(answer, "x", today)  # an empty answer is refused in our words, before the tree is touched
         by = author(root)
-    # the line first, so words the board refuses refuse the press before origin is fetched
-    bare = item_line(text, due, today, session, host, context)
-    # the subject is the line's without the answer: a person's words stay on the board (ledgerboard's `subject`)
-    msg = message(ledgerboard.ITEM_RE.match(bare.rstrip("\n"))["text"], "append")
+    # the file first, so words the board refuses refuse the press before origin is fetched
+    item_file(text, due, today, session, host, context)
     return _insert(
         root,
-        lambda path: _plan(
+        lambda stub: _plan(
             lb_board.plan_add,
-            str(path),
+            str(stub),
             text,
             due=due or None,
             context=context,
@@ -958,23 +1032,22 @@ def add(
             host=host,
             said=answer,
             by=by,
-            under=NEEDS,
             today=today,
             tool=TOOL,
         ),  # fmt: skip
-        msg,
+        # the subject is the item's words without the answer: a person's words stay on the board
+        lambda p: message(text, "append", id=p.info["id"], session=session or ""),
     )
 
 
-def decided_line(title: str, ref: str, answers: list[str], default: int | None, words: str, today: str) -> str:
-    """The one line the person's answer to a ledger entry writes (design §4.5 screen 6 *The ledger's
-    entries that wait on you*, TD-565): ledgerboard's `decided_line`, a decided `decide` line in the
-    board's own format, its `Answers:` the entry's with `(default)` on the one marked —
-    `- [ ] decide <today> (person) — <title>. Context: <ref>. Due: <today>. Answers: a | b (default).
-    Decided: <words> (<today>).` — so it is a work order at once (§4.4, §6 rule 6). Refused for empty
-    words, words carrying a field's name, or a line the board's reader would not read back."""
+def decided_file(title: str, ref: str, answers: list[str], default: int | None, words: str, today: str) -> str:
+    """The item file the person's answer to a ledger entry writes (design §4.5 screen 6 *The ledger's
+    entries that wait on you*, TD-565): ledgerboard v3.0's `decided_file` (TD-1881; v2's `decided_line`), a
+    decided `decide` item, its `Context` the ref, `Due` today, its `Answers:` the entry's with `(default)` on the
+    one marked and `Decided: <today> — <words>` — so it is a work order at once (§4.4, §6 rule 6). Refused for
+    empty words, a value of more than one line, or a file the board's reader would not read back."""
     try:
-        return ledgerboard.decided_line(title, ref, answers, default, words, today)
+        return ledgerboard.decided_file(title, ref, answers, default, words, today)
     except ledgerboard.Refused as e:
         raise Refused(str(e)) from None
 
@@ -989,32 +1062,29 @@ def add_decided(
     today: str,
     session: str = "",
 ) -> dict[str, Any]:
-    """The third add (design §4.4 *Board write-back*, TD-565): the decided line `decided_line` gives for
-    these fields, written by ledgerboard's `plan_add` (its `decided`, who answered as `answerer` says) at
-    the top of the open items of the board on origin's head, by the second add's road, committed by the
-    same `append` — its session *n/a*, the person's, or `session`'s name for a road a person's session
-    pressed (§4.8 *A person's session passes one of them*, TD-1117). Returns `{commit, message, pr, line}`."""
+    """The third add (design §4.4 *Board write-back*, TD-565): the decided item `decided_file` gives for
+    these fields, written by ledgerboard's `plan_add` (its `decided`, who answered as `answerer` says) on the
+    board on origin's head, by the second add's road, committed by the same `append` — its session *n/a*, the
+    person's, or `session`'s name for a road a person's session pressed (§4.8 *A person's session passes one of
+    them*, TD-1117). Returns `{commit, message, pr, id, key}`."""
     root = Path(root)
-    line = decided_line(title, ref, answers, default, words, today)  # refused in our words before origin
-    text = ledgerboard.ITEM_RE.match(line.rstrip("\n"))["text"]
+    decided_file(title, ref, answers, default, words, today)  # refused in our words before origin
+    head = " ".join(str(title or "").split()) or ref
 
-    def plan(path: Path) -> lb_board.Plan:
-        try:
-            board_text = path.read_text(encoding="utf-8")
-        except OSError as e:
-            raise Refused(f"cannot read {path}: {e}") from None
+    def plan(stub: Path) -> lb_board.Plan:
+        b = ledgerboard.load_board(str(stub), lb_board.fs_ls, lb_board.fs_read)
         return _plan(
-            lb_board.plan_add, str(path), title, context=ref, answers=list(answers), default=default,
-            decided=words, by=answerer(root, board_text), under=NEEDS, today=today, tool=TOOL,
+            lb_board.plan_add, str(stub), title, context=ref, answers=list(answers), default=default,
+            decided=words, by=answerer(root, b), today=today, tool=TOOL,
         )  # fmt: skip
 
-    return _insert(root, plan, message(text, "append", session=session))
+    return _insert(root, plan, lambda p: message(head, "append", id=p.info["id"], session=session))
 
 
-def _insert(root: Path, plan: Any, msg: str) -> dict[str, Any]:
-    """An add's press: `plan(path)` — ledgerboard's `plan_add` on the board at `path` in the host
-    agent's own tree, reset to origin's head — written there, committed and landed by its own PR as an
-    edit is."""
+def _insert(root: Path, plan: Any, msg: Callable[[lb_board.Plan], str]) -> dict[str, Any]:
+    """An add's press: `plan(stub)` — ledgerboard's `plan_add` on the board whose stub is `stub` in the host
+    agent's own tree, reset to origin's head — written there, committed under `msg(plan)` (the subject carries
+    the drawn id, TD-1881) and landed by its own PR as an edit is."""
     with _EDIT:
         clock = _Clock()
         if shutil.which("gh") is None:
@@ -1022,11 +1092,13 @@ def _insert(root: Path, plan: Any, msg: str) -> dict[str, Any]:
 
         def press() -> dict[str, Any]:
             t, want = _tree(root, clock)
-            path = t / workorders.board_rel(root)
-            p = plan(path)
+            p = plan(t / workorders.board_rel(root))
+            subject = msg(p)
             _apply(p)
-            # an add moves no line, so a refused merge is never a moved line: unreachable, or made once more
-            return {**_land(root, t, want, msg, clock, lambda: True), "line": p.info["line"]}
+            new = str(p.info["id"])
+            # an add moves no item, so a refused merge is never a moved one: unreachable, or made once more
+            landed = _land(root, t, want, subject, clock, lambda: True)
+            return {**landed, "id": new, "key": workorders.PREFIX + new[-8:]}
 
         return _twice(press)
 
@@ -1062,15 +1134,17 @@ def branch_edit(
     board: str | Path | None = None,
     today: str = "",
 ) -> dict[str, Any]:
-    """`ao board edit done|snooze` (design §4.7, TD-587): a session's own edit of one line of the board
-    **on the branch it is on**, in the tree `cwd` is in — ledgerboard's `edit_line` (`done` with `why`,
+    """`ao board edit done|snooze` (design §4.7, TD-587): a session's own edit of one item of the board
+    **on the branch it is on**, in the tree `cwd` is in — ledgerboard's `plan_edit` (`done` with `why`,
     `snooze` to `until`), committed on that branch with ledgerboard's `subject("shiftlead", …)`,
-    touching nothing else, never pushed. The line is `line` opening with `expect` (its text or the
-    raw line), or the open line whose id is `key` (§4.4 *A board line's id*). Refused on origin's
-    default branch or a detached head (a session's board edit is a PR, never a commit to main), with
-    a staged change or an uncommitted edit of the board (the commit would carry it), and for
-    `decide` and `reply`, the person's words (cadence §3.5). Returns `{board, line, action, key,
-    text, commit, message}`; needs no host agent."""
+    touching nothing else, never pushed. The item is the open one whose reference is `key` (`board:<8 hex>`, or
+    its whole id, §4.4 *A board line's id*); ledgerboard v3.0 names an item by its id alone, so `line` and
+    `expect` are refused by name (TD-1881). Refused on origin's default branch or a detached head (a session's
+    board edit is a PR, never a commit to main), with a staged change or an uncommitted edit of the board's files
+    (the commit would carry it), on a v2 board (the writer's *split first*), and for `decide` and `reply`, the
+    person's words (cadence §3.5). The commit stages the board's directory and stub whole (`board_files`): a
+    `done` moves the item's file into `archive/<YYYY-MM>/`. Returns `{board, line, id, action, key, text, commit,
+    message, branch}` — `line` None, `text` the item's words; needs no host agent."""
     if action not in BRANCH_ACTIONS:
         raise Refused(
             f"ao board edit makes {' or '.join(BRANCH_ACTIONS)}: {action!r} is the person's words, "
@@ -1086,11 +1160,17 @@ def branch_edit(
         raise Refused("--until is for snooze only")
     if action != "done" and why:
         raise Refused("--why is for done only")
-    if key and (line is not None or expect):
-        raise Refused("name the line by --key, or by --line and --expect, not both")
-    if not key and (line is None or not str(expect).strip()):
-        raise Refused('name the line: --line <n> --expect "<its first words>", or --key board:<key>')
-    if key and not workorders.is_work_order(key):
+    if line is not None or str(expect or "").strip():
+        raise Refused(
+            "a board item is named by its id since ledgerboard v3.0, not by --line and --expect: "
+            "--key board:<8 hex>, as `ao board show` prints it"
+        )
+    key = str(key or "").strip()
+    if not key:
+        raise Refused("name the item: --key board:<8 hex>")
+    if ledgerboard.is_item_id(key):
+        key = workorders.PREFIX + key[-8:]
+    if not workorders.is_work_order(key):
         raise Refused(f"{key!r} is not a board line's id: board: and eight hex digits (design §4.4)")
     top = _git(Path(cwd), "rev-parse", "--show-toplevel")
     if top.returncode != 0:
@@ -1117,49 +1197,43 @@ def branch_edit(
             "the work, never a commit to it (design §4.7)"
         )
     if _git(root, "diff", "--cached", "--quiet").returncode != 0:
-        raise Refused("the index has staged changes: the board edit commits one file — commit or unstage them first")
-    if _git(root, "status", "--porcelain", "--", str(path)).stdout.strip():
-        raise Refused(f"{path.relative_to(root.resolve())} has uncommitted changes: the commit would carry them")
-    try:
-        raw = path.read_bytes()
-    except OSError as e:
-        raise Refused(f"cannot read {path}: {e}") from None
-    lines = raw.decode("utf-8", errors="surrogateescape").splitlines(keepends=True)
-    if key:
-        at = _find(lines, None, "", key, root)
-        if at is None:
-            raise Refused(workorders.NO_LINE.format(ref=key))
-    else:
-        if not 1 <= int(line) <= len(lines):
-            raise Refused(f"line {line} is outside the board ({len(lines)} lines)")
-        at = int(line) - 1
-    body = lines[at].rstrip("\r\n")
-    m = ledgerboard.ITEM_RE.match(body)
-    if m is None:
-        raise Refused(f"line {at + 1} is not an open item: {body[:80]!r}")
-    text = m.group("text").strip()
-    exp = str(expect).strip()
-    if exp and not (text.startswith(exp) or body.lstrip().startswith(exp)):
-        raise Refused(f"line {at + 1} no longer starts with the expected item — the board moved; re-read it. "
-                      f"Line {at + 1} is: {body[:80]!r}")  # fmt: skip
+        raise Refused("the index has staged changes: the board edit commits the board alone — commit or unstage them")
+    rel_path = path.relative_to(root.resolve())
+    files = [p for p in board_files(rel_path) if (root / p).exists()]
+    if files and _git(root, "status", "--porcelain", "--", *files).stdout.strip():
+        raise Refused(f"{rel_path} has uncommitted changes: the commit would carry them")
+    b = _plan(lb_board.load_v3, str(path))  # a v2 board is refused here, in the writer's words (TD-1881)
+    it = _find(b, key)
+    if it is None:
+        raise _none_open(b, key)
     plan = _plan(
-        lb_board.plan_edit, str(path), action, at + 1, text, to=to.isoformat() if to else None, why=why or None,
+        lb_board.plan_edit, str(path), action, it.id, to=to.isoformat() if to else None, why=why or None,
         today=_day(today), tool=TOOL,
     )  # fmt: skip
-    new = plan.changes[str(path)].splitlines(keepends=True)[at].rstrip("\r\n")
-    msg = message(text, action, to.isoformat() if to else None)
+    msg = message(it.words, action, to.isoformat() if to else None, id=it.id or "", session=it.session or "")
+    olds = {p: (Path(p).read_bytes() if Path(p).exists() else None) for p in plan.changes}
     _apply(plan)
-    cp = _git(root, "commit", "-q", "-m", msg, "--", str(path))
+    files = [p for p in board_files(rel_path) if (root / p).exists()]
+    cp = _git(root, "add", "-A", "--", *files)
+    if cp.returncode == 0:
+        cp = _git(root, "commit", "-q", "-m", msg, "--", *files)
     if cp.returncode != 0:
-        path.write_bytes(raw)
+        _git(root, "reset", "-q", "--", *files)
+        for p, old in olds.items():
+            if old is None:
+                Path(p).unlink(missing_ok=True)
+            else:
+                Path(p).parent.mkdir(parents=True, exist_ok=True)
+                Path(p).write_bytes(old)
         raise Refused(f"{_why(cp, 'git commit failed')} — the board is restored")
     sha = _git(root, "rev-parse", "--short", "HEAD").stdout.strip()
     return {
         "board": str(path),
-        "line": at + 1,
+        "line": None,
+        "id": it.id,
         "action": action,
-        "key": workorders.ref(root, text),
-        "text": new,
+        "key": item_ref(it),
+        "text": it.words,
         "commit": sha,
         "message": msg,
         "branch": branch,

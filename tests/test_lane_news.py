@@ -933,12 +933,13 @@ async def test_a_designs_answer_is_its_designers_news_and_never_the_grinders(age
 
     await park_ticks(agent)
     now = datetime.now(UTC)
-    text = "End of rounds on TD-9: go, one more round, or hold? Context: TD-9 decision (paul). Due: 2026-11-11."
+    text = "End of rounds on TD-9: go, one more round, or hold?"  # the item's words; its Context a field (v3.0)
     line = workorders.entry(
         {
             "id": "board:1a2b3c4d",
             "title": "End",
             "text": text,
+            "context": "TD-9 decision (paul)",
             "decided": {"text": "One more round", "date": "2026-11-11"},
         }
     )
@@ -978,8 +979,9 @@ async def test_a_designs_answer_is_joined_before_either_store_of_a_fresh_board_r
     from sessionorc import hosts, workorders
 
     await park_ticks(agent)
-    text = "End of rounds on TD-9? Context: TD-9 decision (paul). Due: 2026-11-11."
-    fresh = {"id": "board:1a2b3c4d", "title": "End", "text": text, "decided": {"text": "Go", "date": "2026-11-11"}}
+    text = "End of rounds on TD-9?"  # the item's words; its Context a field (ledgerboard v3.0, TD-1881)
+    fresh = {"id": "board:1a2b3c4d", "title": "End", "text": text, "context": "TD-9 decision (paul)"}
+    fresh["decided"] = {"text": "Go", "date": "2026-11-11"}
     led = {"entries": [_e("TD-001"), {**_e("TD-9", pickable="no", kind="design-first"), "owner": "designer"}]}
     root = str(tmp_path)
     reg = hosts.default_repos_registry()

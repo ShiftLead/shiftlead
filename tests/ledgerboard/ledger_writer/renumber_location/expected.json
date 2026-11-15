@@ -2,6 +2,6 @@
  "exit": 1,
  "out": {
   "action": "renumber",
-  "refused": "⚠ TD-012: a new or changed Location line — the header field is retired; write the **Location:** body section, or run migrate, which moves it (SPEC *Retired words*)"
+  "refused": "⚠ TD-012: the Location field is retired — write the **Location:** body section (SPEC *Retired words*); v3.0 reads no such form: on an open entry move its value with edit --section Location, then remove it with set; on an archived one by hand, then ledger.py fmt TD-n"
  }
 }

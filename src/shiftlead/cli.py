@@ -3671,9 +3671,10 @@ def _doctor_org(files: dict[str, Any], node: bool) -> list[dict[str, Any]]:
 
 
 def _board_line(repos: Any, root: str, want: str) -> dict[str, Any] | None:
-    """The open line `want` in the host agent's `boards` reading of the checkout `root` (§4.4 *The
-    boards*), as `ao board show` gives it — `{key, line, text, detail, open, source}`, `source` the
-    side it was read from (`origin`, or `checkout`) — or None when the reading holds no such line."""
+    """The open item `want` in the host agent's `boards` reading of the checkout `root` (§4.4 *The
+    boards*), as `ao board show` gives it — `{key, id, path, text, detail, open, source}` (ledgerboard v3.0, TD-1881:
+    `text` its words, `path` its file in the board's directory), `source` the side it was read from (`origin`, or
+    `checkout`) — or None when the reading holds no such item."""
     here = str(pathlib.Path(root).resolve())
     for r in (repos or {}).values() if isinstance(repos, dict) else ():
         if not isinstance(r, dict) or str(pathlib.Path(str(r.get("root") or "")).resolve()) != here:
@@ -3684,7 +3685,8 @@ def _board_line(repos: Any, root: str, want: str) -> dict[str, Any] | None:
                 if isinstance(it, dict) and it.get("key") == want:
                     return {
                         "key": want,
-                        "line": it.get("line"),
+                        "id": it.get("id"),
+                        "path": str(it.get("path") or ""),
                         "text": str(it.get("text") or "").strip(),
                         "detail": [str(d) for d in it.get("detail") or []],
                         "open": True,
@@ -3695,9 +3697,9 @@ def _board_line(repos: Any, root: str, want: str) -> dict[str, Any] | None:
 
 def cmd_board_show(args: argparse.Namespace) -> int:
     """`ao board show <board:key> [--repo <name>]` (design §4.7, §4.4 *A board line's id*; TD-603,
-    built by TD-607): the line whose id it is — its line number, its whole text and its detail
-    block, from the host agent's `boards` reading (§4.4 *Each reading has one owner*, TD-615), else
-    the checkout's file, where a closed line is — or *no line board:<key> on the board — reworded or
+    built by TD-607): the item whose reference it is — its file, its words and its detail block (ledgerboard
+    v3.0, TD-1881), from the host agent's `boards` reading (§4.4 *Each reading has one owner*, TD-615), else
+    the checkout's board, read whole, where a closed item is — or *no line board:<key> on the board — reworded or
     closed*, exit 1. Read-only; `ao` runs no reader and fetches nothing."""
     want = str(args.key or "").strip()
     if not workorders.is_work_order(want):
@@ -3725,7 +3727,9 @@ def cmd_board_show(args: argparse.Namespace) -> int:
 
     def prose() -> None:
         state = "" if got["open"] else " (closed)"
-        print(f"{got['key']}  line {got['line']} of {workorders.board_rel(root)} on {got['source']}{state}")
+        rel = workorders.board_rel(root)
+        where = f"{rel.with_suffix('') if rel.suffix == '.md' else rel}/{got['path']}" if got.get("path") else rel
+        print(f"{got['key']}  {where} on {got['source']}{state}")
         print(got["text"])
         for d in got["detail"]:
             print(f"    {d}")
@@ -3734,8 +3738,8 @@ def cmd_board_show(args: argparse.Namespace) -> int:
 
 
 def cmd_board_edit(args: argparse.Namespace) -> int:
-    """`ao board edit done|snooze --line <n> --expect "<start>" | --key board:<key> [--why … | --until …]
-    [--board <path>]` (design §4.7, TD-587): a session's own edit of one board line on the branch it is
+    """`ao board edit done|snooze --key board:<key> [--why … | --until …] [--board <path>]` (design §4.7, TD-587;
+    ledgerboard v3.0 names an item by its id alone, TD-1881): a session's own edit of one board item on the branch it is
     on, committed there by `sessionorc.board.branch_edit` — ledgerboard's edit and subject, nothing
     pushed, no host agent. `decide` and `reply` are the person's words, and not offered. `--carried-to`
     (TD-1528, `done` alone) composes the reason the Queue reads, *carried to TD-n*, its ids checked here first."""
@@ -3757,7 +3761,7 @@ def cmd_board_edit(args: argparse.Namespace) -> int:
         return fail(args, f"refused: {e}", 1)
 
     def prose() -> None:
-        print(f"{got['action']} line {got['line']} of {got['board']} — committed {got['commit']} on {got['branch']}")
+        print(f"{got['action']} {got['key']} on {got['board']} — committed {got['commit']} on {got['branch']}")
         print(f"  {got['message']}")
         print("  not pushed: it lands with this branch's PR")
 
@@ -6086,9 +6090,10 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument(
         "edit", choices=board_mod.BRANCH_ACTIONS, help="done checks it off; snooze hides it until --until (Due: stays)"
     )
-    q.add_argument("--line", type=int, help="the line's 1-based number on the board")
-    q.add_argument("--expect", help="the line's first words, as last read: refused when line n does not open with them")
-    q.add_argument("--key", help="the line's id, board: and eight hex digits, in place of --line and --expect")
+    q.add_argument("--key", help="the item's reference, board: and eight hex digits, or its whole id")
+    # a v2 board's line and its first words: refused by name, a v3 item is named by its id (TD-1881); no help
+    q.add_argument("--line", type=int, help=argparse.SUPPRESS)
+    q.add_argument("--expect", help=argparse.SUPPRESS)
     q.add_argument("--why", help="done: what was done, for its Closed: field")
     q.add_argument("--until", help="snooze: the date it is hidden until (its Hide until:), YYYY-MM-DD")
     q.add_argument(
@@ -6099,7 +6104,7 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--board", help="the board file (default: .shiftlead.yml's board:, else docs/user_attention.md)")
     q.add_argument(
         "--json", action="store_true", default=argparse.SUPPRESS,
-        help="{board, line, action, key, text, commit, message, branch}",
+        help="{board, id, action, key, text, commit, message, branch}",
     )  # fmt: skip
     q.set_defaults(fn=cmd_board_edit)
 

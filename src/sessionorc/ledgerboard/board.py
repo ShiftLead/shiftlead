@@ -1,38 +1,43 @@
-# ledgerboard v2.8 sha256:85a92178acf046d2651ac4b5cf2633e6aba4e8acc1ad043aeea60012c46e3d4b
+# ledgerboard v3.0 sha256:5a32c2a0a1dd8fb1824753db9f71a5195bab828601980fa777c70c4c318d2eab
 # SYNCED FILE — canonical copy: ShiftLead/ledgerboard ledgerboard/board.py (vendored by agent-cadence as files/scripts/ledgerboard/board.py)
 # Edit it there and release; an edit made in a consumer's copy is overwritten by the next vendor or sync.
 """The board and rank writer: the module's board edits, read from and written to files (SPEC *The board writer*).
 
     python3 -m ledgerboard.board list    --board PATH [--today D]
-    python3 -m ledgerboard.board add     --board PATH --text T [--due D] [--context C] [--kind K]
+    python3 -m ledgerboard.board show    --board PATH [--today D] [--hidden]
+    python3 -m ledgerboard.board add     --board PATH --text T [--id ID] [--due D] [--context C] [--kind K]
                                          [--answer A]... [--default N] [--lift A]... [--detail JSON]
                                          [--session S [--host H]] [--said WORDS --by NAME]
-                                         [--decided WORDS [--by NAME]] [--under HEADING]
+                                         [--decided WORDS [--by NAME]]
                                          [--parts TD-a,TD-b]... [--ledger DIR]   (a decide's snapshot)
                                          [--doer REPO | --doer "team NAME"]       (an act's doer)
-    python3 -m ledgerboard.board snooze  --board PATH --line N --expect HEAD --to D   (hide until D)
-    python3 -m ledgerboard.board due     --board PATH --line N --expect HEAD --to D   (move Due: to D)
-    python3 -m ledgerboard.board done    --board PATH --line N --expect HEAD [--why TEXT]
-    python3 -m ledgerboard.board decide  --board PATH --line N --expect HEAD --answer TEXT [--by NAME]
-                                         [--ledger DIR | --board-only]
-    python3 -m ledgerboard.board reply   --board PATH --line N --expect HEAD --text TEXT --by NAME
-    python3 -m ledgerboard.board archive --board PATH --archive PATH
+    python3 -m ledgerboard.board snooze  --board PATH --id ID --to D   (hide until D)
+    python3 -m ledgerboard.board due     --board PATH --id ID --to D   (move Due: to D)
+    python3 -m ledgerboard.board done    --board PATH --id ID [--why TEXT]
+    python3 -m ledgerboard.board decide  --board PATH --id ID --answer TEXT [--by NAME] [--ledger DIR | --board-only]
+    python3 -m ledgerboard.board reply   --board PATH --id ID --text TEXT --by NAME
     python3 -m ledgerboard.board fmt     --board PATH
+    python3 -m ledgerboard.board split   --board PATH.md [--archive PATH]   (a v2 board into its directory)
     python3 -m ledgerboard.board rank    --rank PATH --action rank|join|prune [--set TD-n=KEY]... [--drop TD-n]...
     python3 -m ledgerboard.board rank    --rank PATH --action respace --ledger PATH [--fixed KEY]... [--repo NAME]
         [--tool NAME] [--session NAME] [--today D] [--plan] [--json]
 
-Every write reads its files, applies the module's edit (``edit_line``, ``item_line``, ``decided_line``,
-``archive_closed``, ``canonical_item``, ``set_rank``), and writes the files back, both or neither. It
-prints the commit subject the module gives and the paths it changed (``--json``: one object);
-``--plan`` prints the changes as JSON (each path with its new text) and writes nothing. It never runs
-git, the network or anything of a consumer's: the caller passes who replies or answers (``--by``), the date
-(``--today``, default the local clock) and the tool and session the subject names, and makes the
-commit itself. A write that leaves an open line (``add``, ``snooze``, ``due``, ``decide``, ``reply``) also reports
-that line's notes (``item_notes()`` at ``--today``): ``item_notes`` in ``--json`` and ``--plan``, and on stderr as
-``line n: ℹ <note>`` otherwise; a note never changes the exit code. A ``decide --board-only`` whose lifting
-answer leaves a listed entry still carrying the gate writes nothing (v2.7): it reports ``left_open`` and prints
-``left open: <ids> still carry <gate>`` on stderr in every mode.
+The board is a v3 directory of item files (``--board`` the directory, or the stub beside it); ``list`` and ``show``
+also read a v2 board file, and every write refuses one. Every write reads the board (``load_board()``), applies the
+module's edit (``item_file``, ``decided_file``, ``edit_item``, ``canonical_item_file``, ``set_rank``), and writes the
+files back, all or none: ``done``, and a ``decide`` that closes, write the item's archived file
+(``archive/<YYYY-MM>/<id>.md``) and remove its open one. A write prints the commit subject the module gives and the
+paths it changed (``--json``: one object, naming the item's ``id``); ``--plan`` prints the changes as JSON (each path
+with its new text, or null for a removal) and writes nothing. It never runs git, the network or anything of a
+consumer's: the caller passes who replies or answers (``--by``), the date (``--today``, default the local clock), the
+id (``add --id``, else drawn at random) and the tool and session the subject names, and makes the commit itself. A
+write that leaves an open item (``add``, ``snooze``, ``due``, ``decide``, ``reply``) also reports its notes
+(``item_notes()`` at ``--today``): ``item_notes`` in ``--json`` and ``--plan``, and on stderr as ``<id>: ℹ <note>``
+otherwise; a note never changes the exit code. A ``decide --board-only`` whose lifting answer leaves a listed entry
+still carrying the gate writes nothing (v2.7): it reports ``left_open`` and prints ``left open: <ids> still carry
+<gate>`` on stderr in every mode. ``split`` (v3.0) is the one write that needs a v2 board: it writes the directory
+beside it (``split_board()``), replaces the v2 file with ``board_stub()`` and removes its archive, as one write, and
+prints ``split_board_notes()``'s lines as warnings (``warnings`` in ``--json``).
 
 Exit, the package's one table (``ledger.py`` shares it): 0 written (or nothing to change); 1 refused; 2 usage
 (a bad ``--today`` among it), or (``decide`` and ``add --parts``) the ledger cannot be used as asked; 4 a write failed (every file restored). 3 is ``ledger.py``'s
@@ -45,6 +50,7 @@ import argparse
 import json
 import os
 import re
+import secrets
 import sys
 import tempfile
 from collections.abc import Mapping, Sequence
@@ -52,49 +58,55 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from . import (
-    ITEM_RE,
+    BOARD_ARCHIVE,
+    BOARD_MAJOR,
+    BOARD_README,
     QUEUE_ACTIONS,
+    Board,
+    BoardItem,
     Refused,
     _carried,
+    _declared_major,
     _item_gate,
     _lifting,
     _num,
     answered_by,
-    archive_closed,
-    archive_subject,
+    archive_path,
     board_people,
     board_problems,
-    canonical_item,
-    closed_items,
+    board_stub,
+    canonical_item_file,
     closes,
     decide_lift,
-    decided_line,
-    edit_line,
+    decided_file,
+    edit_item,
     entries,
     fill_form,
-    is_item,
+    is_item_id,
     is_person,
-    item_line,
+    item_file,
+    item_id,
     item_notes,
+    item_path,
     item_record,
     load,
-    parse_answers,
-    parse_board,
-    parse_lifts,
-    parse_parts,
+    load_board,
+    parse_item,
     parts_problems,
     people_problems,
     queue_subject,
     respace,
     set_rank,
+    show_board,
+    split_board,
+    split_board_notes,
     subject,
     version_problem,
 )
 
-ACTIONS = ("list", "add", "snooze", "due", "done", "decide", "reply", "archive", "fmt", "rank")
+ACTIONS = ("list", "show", "add", "snooze", "due", "done", "decide", "reply", "fmt", "split", "rank")
 EDITS = ("snooze", "due", "done", "decide", "reply")
 TOOL = "ledgerboard"
-NEEDS = "## Needs the user"  # where an add goes by default (cadence's board convention), a heading's words
 
 
 @dataclass
@@ -203,6 +215,137 @@ def write(changes: Mapping[str, str | None]) -> list[str]:
     return list(changes)
 
 
+# -- the board on disk ---------------------------------------------------------------------------------
+
+def fs_ls(path: str) -> list[str] | None:
+    """A directory's entries, sorted, each subdirectory's name ending `/` (the ``ls`` ``load_board()`` takes);
+    None when ``path`` is no directory."""
+    if not os.path.isdir(path):
+        return None
+    return sorted(n + "/" if os.path.isdir(os.path.join(path, n)) else n for n in os.listdir(path))
+
+
+def fs_read(path: str) -> str | None:
+    """A file's text, line endings as written; None when it is missing or cannot be read."""
+    try:
+        with open(path, encoding="utf-8", errors="surrogateescape", newline="") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def _norm(board: str) -> str:
+    """``--board`` as one path: ``docs/user_attention/`` and ``docs/user_attention`` name one board (v3.0)."""
+    return os.path.normpath(board)
+
+
+def board_dir(board: str) -> str:
+    """The directory a v3 board's files are in: ``board`` itself, or the directory beside a stub."""
+    path = _norm(board)
+    return path if os.path.isdir(path) or not path.endswith(".md") else path[:-3]
+
+
+def _load(board: str, ls=fs_ls, rd=fs_read) -> Board:
+    """The board at ``board`` read whole (``load_board()``), Refused when it declares a newer major."""
+    path = _norm(board)
+    got = load_board(path, ls, rd)
+    why = version_problem(got)
+    if why:
+        where = os.path.join(board_dir(path), BOARD_README) if got.form == "dir" else path
+        raise Refused(f"{where}: {why}")
+    return got
+
+
+def read_board(board: str) -> Board:
+    """The board for a read (``list``, ``show``): a v3 board or a v2 one; Refused only when there is none."""
+    got = _load(board)
+    if got.form is None:
+        raise Refused(f"{_norm(board)}: no such board")
+    return got
+
+
+def v3_problem(board: Board, ls=fs_ls) -> str | None:
+    """Why a write may not go to ``board`` (v3.0, SPEC *The board writer*), or None: a write needs a v3 board, a
+    directory whose `README.md` exists and itself declares `Ledgerboard: 3`."""
+    if board.form is None:
+        return "no such board"
+    if board.form != "dir":
+        return "a v2 board (split first: board.py split)"
+    if BOARD_README not in (ls(board_dir(board.path)) or []):
+        return f"no {BOARD_README}"
+    if any(p == BOARD_README and why.startswith("unreadable") for p, why in board.problems):
+        return f"{BOARD_README} unreadable"
+    declared = _declared_major(board.preamble, False)
+    if declared is None:
+        return f"{BOARD_README} declares no Ledgerboard"
+    if declared != BOARD_MAJOR:
+        return f"{BOARD_README} declares Ledgerboard: {declared}"
+    return None
+
+
+def load_v3(board: str, ls=fs_ls, rd=fs_read) -> Board:
+    """The board for a write: read (``_load()``), then Refused unless it is a v3 board (``v3_problem()``)."""
+    got = _load(board, ls, rd)
+    why = v3_problem(got, ls)
+    if why:
+        raise Refused(f"{_norm(board)}: not a v3 board: {why}")
+    return got
+
+
+def held(board: Board, ls=fs_ls) -> set[str]:
+    """Every id whose name is taken on ``board`` (v3.0, D3): an open or closed item's id, and the stem of every
+    `<id>.md` in the directory or under any `archive/<YYYY-MM>/`, read or not."""
+    out = {it.id for it in [*board.items, *board.closed] if it.id is not None}
+    d = board_dir(board.path)
+    names = [n for n in ls(d) or [] if not n.endswith("/")]
+    for month in ls(os.path.join(d, BOARD_ARCHIVE)) or []:
+        if month.endswith("/"):
+            names += [n for n in ls(os.path.join(d, BOARD_ARCHIVE, month[:-1])) or [] if not n.endswith("/")]
+    return out | {n[:-3] for n in names if n.endswith(".md") and is_item_id(n[:-3])}
+
+
+def _overlay(changes: Mapping[str, str | None], ls=fs_ls, rd=fs_read):
+    """An ``ls`` and a ``read`` of the disk with ``changes`` (path to text, None removed) put in, nothing written."""
+    want = {os.path.abspath(p): t for p, t in changes.items()}
+
+    def read2(path: str) -> str | None:
+        p = os.path.abspath(path)
+        return want[p] if p in want else rd(path)
+
+    def ls2(path: str) -> list[str] | None:
+        p = os.path.abspath(path)
+        names = set(ls(path) or [])
+        there = ls(path) is not None
+        for q, t in want.items():
+            if os.path.dirname(q) == p:
+                there = there or t is not None
+                (names.add if t is not None else names.discard)(os.path.basename(q))
+            elif t is not None and q.startswith(p + os.sep):
+                there = True
+                names.add(q[len(p) + 1:].split(os.sep, 1)[0] + "/")
+        return sorted(names) if there else None
+    return ls2, read2
+
+
+def _gate(board: str, old: Board, changes: Mapping[str, str | None]) -> None:
+    """Refused when the write leaves an open item the writers would not write (``board_problems()`` of the board
+    the write leaves, against ``old``); its notes (``ℹ``) are no fault. Each fault is named by its path in the
+    board's directory."""
+    ls2, rd2 = _overlay(changes)
+    new = load_board(old.path, ls2, rd2)
+    bad = [(p, why) for p, why in board_problems(new, old) if not why.startswith("ℹ")]
+    if bad:
+        raise Refused(f"{_norm(board)}: " + "; ".join(f"{p}: {why}" for p, why in bad))
+
+
+def _find(board: Board, id: str) -> BoardItem:
+    """The open item ``id`` names, Refused when no open item has it."""
+    got = next((it for it in board.items if it.id == id), None)
+    if got is None:
+        raise Refused(f"{_norm(board.path)}: no open item has the id {id}")
+    return got
+
+
 # -- the actions, each a Plan ---------------------------------------------------------------------------
 
 class BadToday(Refused):
@@ -223,51 +366,32 @@ def _today(today: str | date | None) -> date:
 
 
 def items(board: str, today: str | date | None = None) -> list[dict]:
-    """Every open item's record (``item_record()``) at `today`, in board order."""
-    return [item_record(i, _today(today)) for i in parse_board(read(board), warn=False)]
+    """Every open item's record (``item_record()``) at `today`, in the board's order: a v3 board or a v2 one."""
+    day = _today(today)
+    return [item_record(i, day) for i in read_board(board).items]
 
 
-def _under(lines: list[str], heading: str | None) -> int:
-    """Where an add goes: above the first item of the section `heading` opens (a line whose words begin
-    with the heading's), or right under the heading and its blank lines when that section holds none;
-    with no such heading, above the board's first item; with no item, at the end."""
-    want = heading.split() if heading else []
-    head = next((i for i, ln in enumerate(lines) if want and ln.split()[:len(want)] == want), None)
-    if head is None:
-        return next((i for i, ln in enumerate(lines) if is_item(ln)), len(lines))
-    end = next((i for i in range(head + 1, len(lines)) if lines[i].startswith("#")), len(lines))
-    first = next((i for i in range(head + 1, end) if is_item(lines[i])), None)
-    if first is not None:
-        return first
-    at = head + 1
-    while at < end and not lines[at].strip():
-        at += 1
-    return at
+def show(board: str, today: str | date | None = None, hidden: bool = False) -> str:
+    """The board for a person (``show_board()``): a v3 board or a v2 one."""
+    day = _today(today)
+    return show_board(read_board(board), day, hidden=hidden)
 
 
-def _gate(path: str, old: str, new: str) -> None:
-    """Refused when the write adds an open line the writers would not write (``board_problems()``); its
-    notes (``ℹ``, a board with no ``People:``) are no fault."""
-    bad = [(n, why) for n, why in board_problems(new, old) if not why.startswith("ℹ")]
-    if bad:
-        raise Refused(f"{path}: " + "; ".join(f"line {n}: {why}" for n, why in bad))
-
-
-def who_answered(board_text: str, by: str | None) -> str:
+def who_answered(board: Board, by: str | None) -> str:
     """Who gave an answer on this board (v2.3, target design §6.2): on a board whose ``People:`` lists one
     name, `by` defaults to it; otherwise `by` is required. A `by` off the ``People:`` list (compared
     case-insensitively) is refused, and one on it is written as ``People:`` spells it. On a board with no
     ``People:`` line, `by` is checked against the person grammar only. A ``People:`` line the gate faults
     (``people_problems()``) refuses every answer: nobody can be checked against it."""
     by = " ".join((by or "").split()) or None
-    people = board_people(board_text)
+    people = board_people(board)
     if people is None:
         if by is None:
             raise Refused("this board has no People: line, so an answer needs --by, who gave it")
         if not is_person(by):
             raise Refused(f"--by {by!r} is not a person's name (letters, digits, `_`, `-`, dot-separated)")
         return by
-    bad = [why for _, why in people_problems(board_text) if not why.startswith("ℹ")]
+    bad = [why for _, why in people_problems(board) if not why.startswith("ℹ")]
     if bad:
         raise Refused("the board's People: line is not one the writers read: " + "; ".join(bad))
     if by is None:
@@ -281,24 +405,53 @@ def who_answered(board_text: str, by: str | None) -> str:
 
 
 DOER_DECIDED = "--doer is an act's, who does its step: a decided item is a decide and takes none"
+DRAWS = 8  # an add draws a nonce at most this many times in all (D3)
+
+
+def _draw() -> str:
+    return secrets.token_hex(4)
+
+
+def _new_id(board: Board, day: str, given: str | None) -> str:
+    """The new item's id: ``given`` (``--id``), refused when it is no id, its date is not the item's `Added`, or
+    it is held; else a nonce drawn (``secrets.token_hex(4)``) and drawn again while the id is held, at most
+    ``DRAWS`` times in all."""
+    taken = held(board)
+    name = _norm(board.path)
+    if given is not None:
+        if not is_item_id(given):
+            raise Refused(f"--id {given!r} is no item id: YYYY-MM-DD-<8 hex>, a day of the calendar")
+        if given[:10] != day:
+            raise Refused(f"--id {given}: its date is not the item's Added, {day}")
+        if given in taken:
+            raise Refused(f"{name}: {given} is held")
+        return given
+    for _ in range(DRAWS):
+        got = item_id(day, _draw())
+        if got not in taken:
+            return got
+    raise Refused(f"{name}: no free id after {DRAWS} draws")
+
+
+def _one_line(value: str) -> bool:
+    """Whether ``value`` holds no character ``str.splitlines()`` splits on."""
+    return not value or value.splitlines() == [value]
 
 
 def plan_add(board: str, text: str, *, due: str | None = None, context: str | None = None,
              kind: str | None = None, answers: Sequence[str] | None = None, default: int | None = None,
              detail: Mapping | None = None, session: str | None = None, host: str | None = None,
              decided: str | None = None, said: str | None = None, by: str | None = None,
-             under: str | None = NEEDS, today: str | date | None = None, tool: str = TOOL,
+             today: str | date | None = None, tool: str = TOOL, id: str | None = None,
              hide_until: str | None = None, lifts: Sequence[str] | None = None,
              parts: Sequence[str] | None = None, ledger: str | None = None, doer: str | None = None) -> Plan:
-    """A new item at the top of the section `under` names (``item_line()``); with `said`, a question that
-    was already answered, `by` and its words following the text as ` — <by>, <today>: <said>` (the
-    subject keeps them out); with `decided`, an item already decided by the person (``decided_line()``:
-    `text` its title, `context` its ref, `by` who answered, as ``who_answered()`` resolves it). With `parts`
-    (v2.6), a decide's `Parts:` snapshot (``item_line(parts=)``), checked against the ledger (`ledger`, else
-    ``ledger/`` beside the board when it is a directory) by ``parts_problems()`` before the board's gate. With
-    `doer` (v2.8), an act's `Doer:` (``item_line(doer=)``)."""
+    """A new item file at ``<board>/<id>.md`` (``item_file()``), its id ``id`` or drawn (``_new_id()``); with
+    `said`, a question that was already answered, `said` its first reply, a Log line ``- <today>: <by>: <said>``;
+    with `decided`, an item already decided by the person (``decided_file()``: `text` its title, `context` its ref,
+    `by` who answered, as ``who_answered()`` resolves it). With `parts` (v2.6), a decide's `Parts:` snapshot
+    (``item_file(parts=)``), checked against the ledger (`ledger`, else ``ledger/`` beside the board when it is a
+    directory) by ``parts_problems()`` before the board's gate. With `doer` (v2.8), an act's `Doer:`."""
     day = _today(today).isoformat()
-    bare = None
     if ledger is not None and parts is None:
         raise Refused("--ledger on an add is the ledger a --parts snapshot is checked against: give --parts too")
     if decided is not None:
@@ -308,40 +461,45 @@ def plan_add(board: str, text: str, *, due: str | None = None, context: str | No
             raise Refused(DOER_DECIDED)
         if any(v is not None for v in (due, kind, detail, session, host, said, hide_until, lifts)):
             raise Refused("a decided item takes its title, context, answers, default, words and who gave them alone")
-        new = decided_line(text, context or "", list(answers or []), default, decided, day,
-                           by=who_answered(read(board), by))
+    elif said is not None or by is not None:
+        if said is None or by is None:
+            raise Refused("an answered item needs both --said, the answer's words, and --by, who said it")
+    old = load_v3(board)
+    new_id = _new_id(old, day, id)
+    if decided is not None:
+        new = decided_file(text, context or "", list(answers or []), default, decided, day,
+                           by=who_answered(old, by))
     else:
-        words = text
-        if said is not None or by is not None:
-            said_words = " ".join(str(said or "").split())
-            if not said_words or not (by and by.strip()):
-                raise Refused("an answered item needs both --said, the answer's words, and --by, who said it")
-            words = " ".join(str(text or "").split()).rstrip(".") + f" — {' '.join(by.split())}, {day}: {said_words}"
-        def compose(t: str) -> str:
-            return item_line(t, due, day, session, host, context, kind=kind,
-                             answers=list(answers) if answers is not None else None, default=default, detail=detail,
-                             hide_until=hide_until, lifts=list(lifts) if lifts is not None else None,
-                             parts=list(parts) if parts is not None else None, doer=doer)
-
-        new = compose(words)
+        new = item_file(text, due, day, session, host, context, kind=kind,
+                        answers=list(answers) if answers is not None else None, default=default, detail=detail,
+                        hide_until=hide_until, lifts=list(lifts) if lifts is not None else None,
+                        parts=list(parts) if parts is not None else None, doer=doer)
         if said is not None:
-            bare = compose(text)
+            if not _one_line(said):
+                raise Refused("--said is one line: it holds a line break")
+            said_words = " ".join(said.split())
+            who = " ".join(by.split())
+            if not said_words or not who:
+                raise Refused("an answered item needs both --said, the answer's words, and --by, who said it")
+            if ":" in who or len(who) > 40:
+                raise Refused(f"--by {who!r} is a Log name: no `:`, at most 40 characters")
+            new = edit_item(new, "reply", reply=said_words, by=who, today=_today(today))
         if parts is not None:
             _check_parts(board, new, ledger)
-    old = read(board)
-    lines = old.splitlines(keepends=True)
-    nl = "\r\n" if "\r\n" in old else "\n"
-    if nl != "\n":
-        new = new.replace("\n", nl)
-    at = _under(lines, under)
-    if lines and not lines[-1].endswith("\n") and at == len(lines):
-        lines[-1] += nl
-    lines.insert(at, new)
-    out = "".join(lines)
-    _gate(board, old, out)
-    first = (bare or new).split("\n", 1)[0].rstrip("\r")  # a person's words stay on the board, never in the subject
-    msg = subject(tool, "append", ITEM_RE.match(first).group("text"))
-    return Plan("add", msg, {board: out}, {"line": at + 1, "item_notes": _line_notes(out, at + 1, _today(today))})
+    d = board_dir(old.path)
+    path = os.path.join(d, item_path(new_id))
+    changes: dict[str, str | None] = {path: new}
+    _gate(board, old, changes)
+    got = parse_item(new, item_path(new_id))
+    msg = subject(tool, "append", got.words, session=session, id=new_id)
+    after = load_board(old.path, *_overlay(changes))
+    return Plan("add", msg, changes, {"id": new_id, "item_notes": _id_notes(after, new_id, _today(today))})
+
+
+def _ledger_beside(board_path: str) -> str | None:
+    """``ledger/`` beside the board (its normalised path), when it is a directory."""
+    beside = os.path.normpath(os.path.join(os.path.dirname(_norm(board_path)) or ".", "ledger"))
+    return beside if os.path.isdir(beside) else None
 
 
 def _check_parts(board_path: str, new: str, ledger: str | None) -> None:
@@ -351,18 +509,19 @@ def _check_parts(board_path: str, new: str, ledger: str | None) -> None:
     Context entry and of each part handed to ``parts_problems()``, the archived ones named in ``archived``;
     Refused, with every problem, when it names any."""
     from . import ledger as L  # the ledger writer imports this module, so it is loaded here, when needed
-    beside = os.path.join(os.path.dirname(board_path) or ".", "ledger")
-    path = ledger or (beside if os.path.isdir(beside) else None)
+    path = ledger or _ledger_beside(board_path)
     if path is None:
         raise Refused("a --parts snapshot is checked against the ledger: pass --ledger (the v2 directory), or "
                       "keep it as ledger/ beside the board")
     led = L.Ledger.open(path)
     L._writable(led)
-    text = ITEM_RE.match(new.split("\n", 1)[0]).group("text")
-    ref, _ = _item_gate(text)
+    it = parse_item(new)
+    ref, _ = _item_gate(it)
     texts: dict[str, str] = {}
     gone: list[str] = []
-    for x in [ref, *parse_parts(text)]:
+    for x in [ref, *it.parts]:
+        if x is None:
+            continue
         try:
             p, archived = led.entry_file(L.tid_of(x))
         except Refused:
@@ -377,40 +536,22 @@ def _check_parts(board_path: str, new: str, ledger: str | None) -> None:
         raise Refused("the snapshot does not match the ledger: " + "; ".join(problems))
 
 
-def _line_notes(board: str, line: int, today: date) -> list[dict]:
-    """The notes (``item_notes()`` at `today`) of open item `line` as the write leaves the board, each naming its
-    line; ``[]`` when that line is no open item (a decide that closed it)."""
-    got = next((it for it in parse_board(board, warn=False) if it.line == line), None)
-    return [{"line": line, "note": n} for n in item_notes(got, today)] if got else []
+def _id_notes(board: Board, id: str, today: date) -> list[dict]:
+    """The notes (``item_notes()`` at `today`) of the open item ``id`` as the write leaves the board, each
+    naming the id; ``[]`` when no open item has it (a close)."""
+    got = next((it for it in board.items if it.id == id), None)
+    return [{"id": id, "note": n} for n in item_notes(got, today)] if got else []
 
 
-def _find(lines: list[str], line: int, expect: str) -> tuple[str, str]:
-    """(body, line ending) of open item `line` (1-based), Refused when it is not one or no longer starts with `expect`."""
-    if not expect or not expect.strip():
-        raise Refused("--expect is empty: pass the item's text as it was last shown")
-    if not 1 <= line <= len(lines):
-        raise Refused(f"line {line} is outside the board ({len(lines)} lines)")
-    raw = lines[line - 1]
-    body = raw.rstrip("\r\n")
-    m = ITEM_RE.match(body)
-    if not m:
-        raise Refused(f"line {line} is not an open item: {body[:80]!r}")
-    exp = expect.strip()
-    if not (m.group("text").strip().startswith(exp) or body.lstrip().startswith(exp)):
-        raise Refused(f"line {line} no longer starts with the expected item (the board moved; read it again). "
-                      f"Line {line} is: {body[:80]!r}")
-    return body, raw[len(body):]
-
-
-def plan_edit(board: str, action: str, line: int, expect: str, *, to: str | None = None,
+def plan_edit(board: str, action: str, id: str, *, to: str | None = None,
               why: str | None = None, answer: str | None = None, text: str | None = None,
               by: str | None = None, today: str | date | None = None, tool: str = TOOL,
               session: str | None = None, ledger: str | None = None, board_only: bool = False) -> Plan:
-    """One of the five edits (``edit_line()``) of open item `line`, which must still start with `expect`; a
-    decide's `by`, who answered, as ``who_answered()`` resolves it. A decide on an item naming one entry and
-    one gate is the two-file decide lift (``_decide_ledger()``): the board line, closed per ``closes()``, and
-    the entries ``decide_lift()`` changes in ``ledger``, both or neither; ``board_only`` writes the board half
-    alone."""
+    """One of the five edits (``edit_item()``) of the open item ``id``; a decide's `by`, who answered, as
+    ``who_answered()`` resolves it. A decide on an item naming one entry and one gate is the two-file decide lift
+    (``_decide_ledger()``): the item file, closed per ``closes()``, and the entries ``decide_lift()`` changes in
+    ``ledger``, both or neither; ``board_only`` writes the board half alone. ``done``, and a decide that closes,
+    write the archived file (``item_path(id, closed)``) and remove the open one in one write."""
     if action not in EDITS:
         raise Refused(f"an edit is one of {', '.join(EDITS)}, not {action!r}")
     day = _today(today)
@@ -419,41 +560,54 @@ def plan_edit(board: str, action: str, line: int, expect: str, *, to: str | None
         if not to:
             raise Refused(f"a {action} needs --to")
         when = _today(to)
-    if action == "reply" and not (by and by.strip()):
+    old = load_v3(board)
+    it = _find(old, id)
+    if action == "reply" and not (by and by.strip()):  # the edit's own refusals, after the id's (D7)
         raise Refused("a reply needs --by, who says it")
-    old = read(board)
-    lines = old.splitlines(keepends=True)
-    body, eol = _find(lines, line, expect)
     if (ledger is not None or board_only) and action != "decide":
         raise Refused("--ledger and --board-only are a decide's")
+    if action == "done" and why is not None:
+        why = re.sub(r"[\s.?!]+\Z", "", " ".join(why.split()))  # collapsed, then stripped, as v2.x's edit_line() did (D7)
+    if action == "decide" and isinstance(answer, str) and answer.strip():
+        answer = fill_form(answer, it.answers) or answer  # v2.8: filled once, so board, ledger and subject agree
+    if action == "decide":
+        by = who_answered(old, by)
+    edit_item(it.raw, action, to=when, answer=answer, why=why or None, reply=text, by=by, today=day)  # its refusals first
     changes: dict[str, str | None] = {}
-    info: dict = {"line": line}
+    info: dict = {"id": id}
     close = False
     if action == "decide":
-        if isinstance(answer, str) and answer.strip():  # v2.8: filled once, so board, ledger and subject agree
-            answer = fill_form(answer, parse_answers(ITEM_RE.match(body).group("text"))) or answer
-        by = who_answered(old, by)
-        close, changes, info = _decide_ledger(board, old, body, answer, by, day, ledger, board_only, today)
-        info = {"line": line, **info}
+        close, changes, extra = _decide_ledger(board, old, it, answer, by, day, ledger, board_only, today)
+        info = {"id": id, **extra}
         if "left_open" in info:  # v2.7: a --board-only lift that does not close the item writes nothing
             gate_ = info.pop("gate")
-            info["item_notes"] = _line_notes(old, line, day)
+            info["item_notes"] = _id_notes(old, id, day)
             return Plan("decide", None, {}, info,
                         [f"left open: {', '.join(info['left_open'])} still carry {gate_}"])
-    new = edit_line(body, action, to=when, answer=answer, why=why, reply=text, by=by, today=day, close=close)
-    lines[line - 1] = new + eol
-    out = "".join(lines)
-    if action != "done":  # a done leaves no open line
-        info["item_notes"] = _line_notes(out, line, day)
-    msg = subject(tool, action, ITEM_RE.match(body).group("text").strip(),
-                  to=when, answer=answer, session=session)
-    return Plan(action, msg, {board: out, **changes}, info)
+    new = edit_item(it.raw, action, to=when, answer=answer, why=why or None, reply=text, by=by, today=day,
+                    close=close)
+    d = board_dir(old.path)
+    here = os.path.join(d, it.path)
+    shut = parse_item(new).closed
+    if shut is not None:
+        there = os.path.join(d, item_path(id, shut[0].isoformat()))
+        if os.path.exists(there):
+            raise Refused(f"{_norm(board)}: {item_path(id, shut[0].isoformat())} exists")
+        files: dict[str, str | None] = {there: new, here: None}  # the archived file first, then the removal
+    else:
+        files = {here: new}
+    changes = {**files, **changes}
+    _gate(board, old, changes)
+    if action != "done":  # a done leaves no open item; a decide that closes reports [] (D7)
+        info["item_notes"] = _id_notes(load_board(old.path, *_overlay(changes)), id, day)
+    msg = subject(tool, action, it.words, to=when, answer=answer, session=session or it.session, id=id)
+    return Plan(action, msg, changes, info)
 
 
-def _may_answer(board_text: str, gate_: str, by: str) -> None:
+def _may_answer(board: Board, gate_: str, by: str) -> None:
     """``decide_lift()``'s People: and Answered by: checks, for an item it does not lift (another repo's entry):
     the gate's person and who answered are on `People:`, and under `owner` a decision is answered by its person."""
-    people = board_people(board_text)
+    people = board_people(board)
     if people is None:
         return
     on = {x.lower() for x in people}
@@ -462,39 +616,42 @@ def _may_answer(board_text: str, gate_: str, by: str) -> None:
         raise Refused(f"the gate's person {person} is not on the board's People: ({', '.join(people)})")
     if by.lower() not in on:
         raise Refused(f"{by} is not on the board's People: ({', '.join(people)}) — only a listed person answers")
-    if person is not None and (answered_by(board_text) or "owner").lower() == "owner" and by.lower() != person.lower():
+    if person is not None and (answered_by(board) or "owner").lower() == "owner" and by.lower() != person.lower():
         raise Refused(f"only {person} answers for {gate_} on a board whose Answered by is owner, not {by}")
 
 
-def _decide_ledger(board_path: str, board_text: str, body: str, label: str | None, by: str, day: date, ledger: str | None,
-                   board_only: bool, today: str | date | None) -> tuple[bool, dict[str, str | None], dict]:
+def _decide_ledger(board_path: str, board: Board, item: BoardItem, label: str | None, by: str, day: date,
+                   ledger: str | None, board_only: bool, today: str | date | None
+                   ) -> tuple[bool, dict[str, str | None], dict]:
     """A decide's ledger half (v2.4, SPEC *The board writer*): (whether the answer closes the item, the ledger
     files it changes, what it reports). An item whose Context names one bare ``TD-n`` and one gate is the
     decide lift: ``decide_lift()`` on the ledger's base texts of that entry and its `Parts:` (a listed id only the
-    archive holds passed as an id in ``archived``, never as a text, v2.6), judged as the ledger writer judges a write, then ``closes()`` on the texts after. With ``board_only`` (the ``set by=``
-    route, which has written the ledger already) nothing is written there, and ``closes()`` reads the ledger as
-    it stands; a lifting answer that does not close the item (a listed entry still carries the gate) reports
-    ``left_open``, those ids as the item spells them in its order, and the gate, and the board is not written (v2.7). An item naming another repo's entry is answered on the board alone and stays open."""
-    ref, gate_ = _item_gate(ITEM_RE.match(body).group("text").strip())
+    archive holds passed as an id in ``archived``, never as a text, v2.6), judged as the ledger writer judges a
+    write, then ``closes()`` on the texts after. With ``board_only`` (the ``set by=`` route, which has written the
+    ledger already) nothing is written there, and ``closes()`` reads the ledger as it stands; a lifting answer
+    that does not close the item (a listed entry still carries the gate) reports ``left_open``, those ids as the
+    item spells them in its order, and the gate, and the board is not written (v2.7). An item naming another
+    repo's entry is answered on the board alone and stays open."""
+    file = item.raw
+    ref, gate_ = _item_gate(item)
     if ref is None or gate_ is None:
         if ledger is not None or board_only:
             raise Refused("--ledger and --board-only are for a decide item whose Context names one entry and one gate")
-        return closes(body, label or "", {}), {}, {}  # a waiting-only answer on a gate item still closes it
+        return closes(file, label or "", {}), {}, {}  # a waiting-only answer on a gate item still closes it
     if "#" in ref:
         if ledger is not None:
             raise Refused(f"{ref} is another repo's entry: its lift is a tool PR there, so no --ledger here")
-        _may_answer(board_text, gate_, by)
-        return closes(body, label or "", {}), {}, {"entries": [], "board_only": True}
+        _may_answer(board, gate_, by)
+        return closes(file, label or "", {}), {}, {"entries": [], "board_only": True}
     from . import ledger as L  # the ledger writer imports this module, so it is loaded here, when needed
-    beside = os.path.join(os.path.dirname(board_path) or ".", "ledger")
-    path = ledger or (beside if os.path.isdir(beside) else None)
+    path = ledger or _ledger_beside(board_path)
     if path is None:
         raise Refused(f"the item lifts {gate_} on {ref}: pass --ledger (the v2 directory), or --board-only when "
                       "the ledger is written already")
     try:
         led = L.Ledger.open(path)
         L._writable(led)
-        ids = [ref, *[x for x in parse_parts(ITEM_RE.match(body).group("text")) if "#" not in x]]
+        ids = [ref, *[x for x in item.parts if "#" not in x]]
         found = {}
         gone = []  # each listed id only the archive holds, as its heading spells it: an id, never a text (v2.6)
         for x in ids:
@@ -509,15 +666,14 @@ def _decide_ledger(board_path: str, board_text: str, body: str, label: str | Non
                 found[tid] = p
         base = {tid: led.files[p] for tid, p in found.items()}
         if board_only:
-            shut = closes(body, label or "", base)
-            text = ITEM_RE.match(body).group("text")
-            if not shut and _lifting(label or "", parse_lifts(text), parse_answers(text)):  # v2.7: write the line only when it closes
+            shut = closes(file, label or "", base)
+            if not shut and _lifting(label or "", item.lifts, item.answers):  # v2.7: write it only when it closes
                 by_num = {_num(t): x for t, x in base.items()}
                 left = [x for x in ids if _carried(by_num.get(_num(x)), gate_) is not None]
                 return False, {}, {"entries": [], "board_only": True, "left_open": left, "gate": gate_}
             return shut, {}, {"entries": [], "board_only": True}
         ledger_day = L._today(today)
-        got = decide_lift(body, base, label or "", by, ledger_day, board_people(board_text), answered_by(board_text),
+        got = decide_lift(file, base, label or "", by, ledger_day, board_people(board), answered_by(board),
                           archived=gone)
         changes: dict[str, str | None] = {found[tid]: text for tid, text in got.items()}
         notes = L.gate(led, changes, today=ledger_day) if changes else []
@@ -526,42 +682,92 @@ def _decide_ledger(board_path: str, board_text: str, body: str, label: str | Non
     except Refused as e:
         raise Refused(f"the ledger half: {e}") from None
     after = {**base, **got}
-    return closes(body, label or "", after), changes, {"entries": sorted(got), "notes": notes}
-
-
-def plan_archive(board: str, archive: str, *, tool: str = TOOL, session: str | None = None) -> Plan:
-    """Every closed item, with its detail block and any open twin, moved to the archive's end (``archive_closed()``)."""
-    if os.path.abspath(board) == os.path.abspath(archive):
-        raise Refused("the board and its archive are one file")
-    old = read(board)
-    arch = read(archive, missing_ok=True)
-    count = len(closed_items(old))
-    new_board, new_arch = archive_closed(old, arch)
-    # the archive is written first: a crash between the renames leaves an item twice, never nowhere
-    return Plan("archive", archive_subject(tool, count, session), {archive: new_arch, board: new_board},
-                {"moved": count})
+    return closes(file, label or "", after), changes, {"entries": sorted(got), "notes": notes}
 
 
 def plan_fmt(board: str) -> Plan:
-    """Every open item line at column 0 rewritten into the writers' form where ``canonical_item()`` can do it
-    without changing its key; the lines it cannot are reported, each with why, and kept as they are.
-    A format pass has no commit subject of its own: the caller names its commit."""
-    old = read(board)
-    lines = old.splitlines(keepends=True)
+    """Every open item file (each ``*.md`` directly in the board's directory but `README.md`) rewritten into the
+    writers' form (``canonical_item_file()``); a file it cannot, and an ``*.md`` whose name is no id, reported
+    with why and kept. A format pass has no commit subject of its own: the caller names its commit."""
+    old = load_v3(board)
+    d = board_dir(old.path)
+    changes: dict[str, str | None] = {}
     fixed, refused = [], []
-    for n, ln in enumerate(lines, 1):
-        if not ln.startswith("- [ ]"):
+    for n in fs_ls(d) or []:
+        if n.endswith("/") or not n.endswith(".md") or n == BOARD_README:
+            continue
+        stem = n[:-3]
+        if not is_item_id(stem):
+            refused.append({"id": stem, "why": "not an item file name"})
+            continue
+        text = fs_read(os.path.join(d, n))
+        if text is None:
+            refused.append({"id": stem, "why": "unreadable"})
             continue
         try:
-            new = canonical_item(ln)
+            new = canonical_item_file(text)
         except Refused as e:
-            refused.append({"line": n, "why": str(e)})
+            refused.append({"id": stem, "why": str(e)})
             continue
-        if new != ln:
-            lines[n - 1] = new
-            fixed.append(n)
-    out = "".join(lines)
-    return Plan("fmt", None, {board: out} if fixed else {}, {"fixed": fixed, "refused": refused})
+        if new != text:
+            changes[os.path.join(d, n)] = new
+            fixed.append(stem)
+    return Plan("fmt", None, changes, {"fixed": fixed, "refused": refused})
+
+
+def _title(text: str, path: str) -> str:
+    """A v2 board's title: its first `# ` line's text, else the file's name without `.md`."""
+    for ln in text.splitlines():
+        if ln.startswith("# "):
+            return ln[2:].strip()
+    return os.path.basename(path).removesuffix(".md")
+
+
+def plan_split(board_path: str, archive_path_: str | None = None, read=fs_read, exists=os.path.exists) -> Plan:
+    """A v2 board split into its directory (v3.0, SPEC *The board writer*, ``split``): every file
+    ``split_board()`` gives written into the directory beside the board, named the board's name less `.md`, the
+    v2 file replaced by ``board_stub()`` and the archive (``archive_path_``, default ``<stem>_archive.md`` beside
+    it, none when that is absent) removed, as one write. Its gate is the reverse of a write's, each Refused before
+    anything is written: a newer major, a stub whose directory is missing, no board, a v3 board, a ``--board`` not
+    ending `.md`, an ``--archive`` given that does not exist, ``split_board()``'s refusals, then the directory
+    existing. ``split_board_notes()``'s lines are warnings."""
+    path = _norm(board_path)
+    got = _load(path, rd=read)
+    if got.form is None and got.major is not None and got.problems:
+        raise Refused(f"{path}: a v3 stub whose directory is missing")
+    if got.form is None:
+        raise Refused(f"{path}: no such board")
+    if got.form == "dir":
+        raise Refused(f"{path}: already a v3 board")
+    if not path.endswith(".md"):
+        raise Refused(f"{path}: not a v2 board file (.md)")
+    default = archive_path(path)
+    arch = _norm(archive_path_) if archive_path_ is not None else default
+    if archive_path_ is not None and not exists(arch):
+        raise Refused(f"{arch}: no such file")
+    text = read(path) or ""
+    archive = read(arch) if exists(arch) else None
+    try:
+        files = split_board(text, archive or "")
+        notes = split_board_notes(files, text, archive or "")
+    except Refused as e:
+        raise Refused(f"{path}: {e}") from None
+    d = path[:-3]
+    if exists(d):
+        raise Refused(f"{path}: {d}/ exists")
+    changes: dict[str, str | None] = {os.path.join(d, rel): t for rel, t in files.items()}
+    written = list(changes)
+    changes[path] = board_stub(_title(text, path), os.path.basename(d))
+    if archive is not None:
+        changes[arch] = None
+    warnings = [{"path": arch if p == "(archive)" else os.path.join(d, p), "line": n, "text": ln, "why": why}
+                for p, n, ln, why in notes]
+    if arch != default and exists(default):
+        warnings.append({"path": default, "line": None, "text": "", "why": "default archive left in place"})
+    warn = [f"{w['path']}:{w['line']}: ⚠ {w['why']}" if w["line"] is not None else f"{w['path']}: ⚠ {w['why']}"
+            for w in warnings]
+    return Plan("split", None, changes, {"files": written, "removed": [arch] if archive is not None else [],
+                                         "warnings": warnings}, warn)
 
 
 def read_ledger(path: str) -> str:
@@ -660,19 +866,19 @@ def build(a: argparse.Namespace) -> Plan:
                 raise Refused("--detail is a JSON object")
         return plan_add(a.board, a.text, due=a.due, context=a.context, kind=a.kind, hide_until=a.hide_until,
                         answers=a.answer or None, default=a.default, lifts=a.lift or None, detail=detail, session=a.session,
-                        host=a.host, decided=a.decided, said=a.said, by=a.by, under=a.under,
+                        host=a.host, decided=a.decided, said=a.said, by=a.by, id=a.id,
                         today=a.today, tool=a.tool, parts=parts, ledger=a.ledger, doer=a.doer)
     if a.action in EDITS:
         if a.action == "decide" and len(a.answer) != 1:
             raise Refused("decide takes one --answer, the person's")
         answer = a.answer[0] if a.action == "decide" else None
-        return plan_edit(a.board, a.action, a.line, a.expect, to=a.to, why=a.why, answer=answer,
+        return plan_edit(a.board, a.action, a.id, to=a.to, why=a.why, answer=answer,
                          text=a.text, by=a.by, today=a.today, tool=a.tool, session=a.session,
                          ledger=a.ledger, board_only=a.board_only or False)
-    if a.action == "archive":
-        return plan_archive(a.board, a.archive, tool=a.tool, session=a.session)
     if a.action == "fmt":
         return plan_fmt(a.board)
+    if a.action == "split":
+        return plan_split(a.board, a.archive)
     if a.queue == "respace":
         if a.set or a.drop:
             raise Refused("a respace sets and drops no lines: it rewrites the keys itself")
@@ -687,34 +893,36 @@ def build(a: argparse.Namespace) -> Plan:
 # Which options each action takes; any other given is a usage error (exit 2).
 TAKES = {
     "list": {"board", "today"},
+    "show": {"board", "today", "hidden"},
     "add": {"board", "text", "due", "context", "kind", "answer", "default", "detail", "session", "host",
-            "decided", "said", "by", "under", "today", "tool", "hide_until", "lift", "parts", "ledger",
+            "decided", "said", "by", "id", "today", "tool", "hide_until", "lift", "parts", "ledger",
             "doer"},
-    "snooze": {"board", "line", "expect", "to", "today", "tool", "session"},
-    "due": {"board", "line", "expect", "to", "today", "tool", "session"},
-    "done": {"board", "line", "expect", "why", "today", "tool", "session"},
-    "decide": {"board", "line", "expect", "answer", "by", "today", "tool", "session", "ledger", "board_only"},
-    "reply": {"board", "line", "expect", "text", "by", "today", "tool", "session"},
-    "archive": {"board", "archive", "tool", "session"},
+    "snooze": {"board", "id", "to", "today", "tool", "session"},
+    "due": {"board", "id", "to", "today", "tool", "session"},
+    "done": {"board", "id", "why", "today", "tool", "session"},
+    "decide": {"board", "id", "answer", "by", "today", "tool", "session", "ledger", "board_only"},
+    "reply": {"board", "id", "text", "by", "today", "tool", "session"},
     "fmt": {"board"},
+    "split": {"board", "archive"},
     "rank": {"rank", "queue", "set", "drop", "tool", "ledger", "fixed", "repo"},
 }
 NEEDS_OPT = {
-    "list": ("board",), "add": ("board", "text"), "snooze": ("board", "line", "expect", "to"),
-    "due": ("board", "line", "expect", "to"),
-    "done": ("board", "line", "expect"), "decide": ("board", "line", "expect", "answer"),
-    "reply": ("board", "line", "expect", "text", "by"), "archive": ("board", "archive"),
-    "fmt": ("board",), "rank": ("rank", "queue"),
+    "list": ("board",), "show": ("board",), "add": ("board", "text"), "snooze": ("board", "id", "to"),
+    "due": ("board", "id", "to"), "done": ("board", "id"), "decide": ("board", "id", "answer"),
+    "reply": ("board", "id", "text", "by"),
+    "fmt": ("board",), "split": ("board",), "rank": ("rank", "queue"),
 }
-DEFAULTS = {"under": NEEDS, "tool": TOOL, "answer": [], "lift": [], "parts": [], "set": [], "drop": [],
+DEFAULTS = {"tool": TOOL, "hidden": False, "answer": [], "lift": [], "parts": [], "set": [], "drop": [],
             "fixed": [], "board_only": False}
 
 
 def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="ledgerboard.board", description=__doc__.split("\n", 1)[0])
     ap.add_argument("action", choices=ACTIONS)
-    ap.add_argument("--board", help="the board file")
-    ap.add_argument("--archive", help="archive: the board's archive file (created when missing)")
+    ap.add_argument("--board", help="the board: a v3 directory, or the stub beside it (list and show: a v2 file too)")
+    ap.add_argument("--archive", help="split: the v2 board's archive (default: <board>_archive.md beside it)")
+    ap.add_argument("--id", help="an edit: the open item's id; add: the new item's id (default: drawn at random)")
+    ap.add_argument("--hidden", action="store_true", help="show: the hidden open items too, after the rest")
     ap.add_argument("--rank", help="rank: the rank file (created when missing)")
     ap.add_argument("--action", dest="queue", help="rank: rank, join, prune or respace")
     ap.add_argument("--set", action="append", default=[], help="rank: TD-n=KEY, a line to set")
@@ -727,8 +935,6 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--fixed", action="append", default=[],
                     help="rank --action respace: another repo's key sorted beside this file's (repeat)")
     ap.add_argument("--repo", help="rank --action respace: the last component of this repo's implicit keys")
-    ap.add_argument("--line", type=int, help="an edit: the item's 1-based line")
-    ap.add_argument("--expect", help="an edit: the start of the item's text as last shown")
     ap.add_argument("--to", help="snooze: the Hide until: date; due: the new Due: date")
     ap.add_argument("--why", help="done: why, for the Closed: field")
     ap.add_argument("--answer", action="append", default=[],
@@ -742,7 +948,7 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--text", help="add: the item's text; reply: the reply's words")
     ap.add_argument("--by", help="reply, add --said: who says it; decide, add --decided: who answered (the one name "
                     "on the board's People: when it lists one)")
-    ap.add_argument("--said", help="add: the answer already given, which follows the text on the line")
+    ap.add_argument("--said", help="add: the answer already given, the item's first reply in its Log")
     ap.add_argument("--due", help="add: the item's Due: date")
     ap.add_argument("--hide-until", dest="hide_until", help="add: hide the new item until this date")
     ap.add_argument("--context", help="add: what the item refers to (TD-n, PR #n)")
@@ -753,8 +959,7 @@ def parser() -> argparse.ArgumentParser:
                                          "Recommended with '<label> — ' itself, so recommended gives only the words after it")
     ap.add_argument("--host", help="add: the host the item's session runs on")
     ap.add_argument("--decided", help="add: the person's words, for an item already decided")
-    ap.add_argument("--under", default=NEEDS, help=f"add: the heading whose section takes the item ({NEEDS!r})")
-    ap.add_argument("--session", help="add: the item's session; an edit or archive: the session the subject names")
+    ap.add_argument("--session", help="add: the item's session; an edit: the session the subject names")
     ap.add_argument("--tool", default=TOOL, help="the tool the commit subject names")
     ap.add_argument("--today", help="the date the write records, YYYY-MM-DD (default: the local clock)")
     ap.add_argument("--plan", action="store_true", help="print the changes as JSON and write nothing")
@@ -765,6 +970,8 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     ap = parser()
     a = ap.parse_args(argv)
+    if a.action == "show" and (a.json or a.plan):
+        ap.error("show prints the board as text: it takes no --json or --plan")
     given = {k for k, v in vars(a).items()
              if k not in ("action", "plan", "json") and v is not None and v != DEFAULTS.get(k)}
     extra = sorted(given - TAKES[a.action])
@@ -780,7 +987,10 @@ def main(argv: list[str] | None = None) -> int:
                 print(json.dumps({"action": "list", "items": got}, ensure_ascii=False, default=str))
             else:
                 for r in got:
-                    print(f"{r['line']}\t{r['due_tag'] or '-'}\t{r['text']}")
+                    print(f"{r['id'] or '-'}\t{r['due_tag'] or '-'}\t{r['text']}")
+            return 0
+        if a.action == "show":
+            sys.stdout.write(show(a.board, a.today, a.hidden))
             return 0
         plan = build(a)
     except Refused as e:
@@ -810,9 +1020,9 @@ def main(argv: list[str] | None = None) -> int:
         for p in paths:
             print(p)
         for r in plan.info.get("refused", []):
-            print(f"line {r['line']}: kept: {r['why']}", file=sys.stderr)
+            print(f"{r['id']}: kept: {r['why']}", file=sys.stderr)
         for r in plan.info.get("item_notes", []):
-            print(f"line {r['line']}: ℹ {r['note']}", file=sys.stderr)
+            print(f"{r['id']}: ℹ {r['note']}", file=sys.stderr)
     return 0
 
 

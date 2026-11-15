@@ -1,0 +1,1133 @@
+{
+  "today": "2026-11-12",
+  "parse": [
+    {
+      "name": "decide_whole",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Say Go to the board scope\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** s-alpha on host-a\n**Context:** TD-70 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the scope stands | Change — reply with what changes\n**Decided:** 2026-11-12 by pat — Go\n**Closed:** 2026-11-12 — lifted\n\n- **Context:** TD-70 asks about the scope.\n- **Question:** Does it stand?\n- **Recommended:** Go — it covers the archive.\n\n**Log:**\n- 2026-11-12: pat: does S4 cover the archive's months?\n"
+    },
+    {
+      "name": "act",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "look",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Check the page\n\n**Kind:** look\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n**Answers:** Works (default) | Not right: <what>\n"
+    },
+    {
+      "name": "watch",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Watch the deploy\n\n**Kind:** watch\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "fyi",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Read the notes\n\n**Kind:** fyi\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n"
+    },
+    {
+      "name": "todo",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Ping sam\n\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "field_words",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Ask whether Context: TD-9 Due: 2026-01-01 Decided: Go stands\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Context:** TD-1, Due: 2026-01-01. Decided: no\n**Due:** 2026-11-20\n**Answers:** Go — Context: kept, Decided: later | Change\n\n- **Context:** Due: 2026-01-01 and Decided: Go are words here.\n\n**Log:**\n- 2026-11-12: pat: Context: TD-3, Due: 2026-02-01, Decided: no\n"
+    },
+    {
+      "name": "respelled",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Context:** TD-1\n**due:** 2026-11-20\n**hide-until:** 2026-11-15\n"
+    },
+    {
+      "name": "repeated",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n**Due:** 2026-12-01\n"
+    },
+    {
+      "name": "unknown_owner",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Owner:** sam.lee\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "decided_by",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Decided:** 2026-11-12 by pat — Go\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "decided_no_by",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Decided:** 2026-11-12 — Go\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "decided_by_friday",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Decided:** 2026-11-12 by pat — Go (by Friday)\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "decided_label_by_person",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Decided:** 2026-11-12 — Go (by pat)\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "empty_due",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:**\n"
+    },
+    {
+      "name": "closed_why",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Closed:** 2026-11-12 — done it\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "closed_bare",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Closed:** 2026-11-12\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "decided_not_form",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Decided:** Go (2026-11-12)\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "closed_not_form",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Closed:** soon\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "decided_no_person",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Decided:** 2026-11-12 by pat smith — Go\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "answers_empty_piece",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Say Go\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n**Answers:** Go (default) | | No |\n"
+    },
+    {
+      "name": "doer_repo",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Doer:** acme/widgets\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "doer_team",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Doer:** team ops\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "doer_team_spaced",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Doer:** team  ops\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "log_shapes",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n\n**Log:**\n- 2026-11-12: pat: first\n- 2026-11-12 pat no colon\n- 2026-11-12: sam:   \n- 2026-11-13: sam.lee: second\n"
+    },
+    {
+      "name": "crlf",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\r\n\r\n**Kind:** act\r\n**Added:** 2026-11-11\r\n**Session:** w-9 on host-a\r\n**Context:** TD-1\r\n**Due:** 2026-11-20\r\n\r\n**Log:**\r\n- 2026-11-12: pat: ok\r\n"
+    },
+    {
+      "name": "no_heading",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "**Kind:** act\n**Added:** 2026-11-11\n**Context:** TD-1\n"
+    },
+    {
+      "name": "heading_then_prose",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Ping sam\n\nSome prose.\n\n**Added:** 2026-11-11\n"
+    },
+    {
+      "name": "no_blank_after_heading",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Ping sam.\n**Added:** 2026-11-11\n**Context:** none\n"
+    },
+    {
+      "name": "kind_upper",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** ACT\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "due_no_day",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-02-30\n"
+    },
+    {
+      "name": "due_soon",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** soon\n"
+    },
+    {
+      "name": "fyi_due",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Read the notes\n\n**Kind:** fyi\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "decide_doer",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Say Go\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Doer:** team ops\n**Due:** 2026-11-20\n**Answers:** Go | No\n"
+    },
+    {
+      "name": "fyi_parts",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Read it\n\n**Kind:** fyi\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Parts:** TD-23\n"
+    },
+    {
+      "name": "context_line_breaks",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Ping sam\n\n**Added:** 2026-11-11\n**Context:** TD-1 and TD-2\fand TD-3\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "no_closed_archived",
+      "path": "archive/2026-11/2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "no_closed_open",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "closed_archived",
+      "path": "archive/2026-11/2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Closed:** 2026-11-12 — done\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "closed_open",
+      "path": "2026-11-11-3f9a2c1d.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Closed:** 2026-11-12 — done\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "path_not_id",
+      "path": "2026-02-30-abcd1234.md",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+    }
+  ],
+  "compose": [
+    {
+      "name": "decide",
+      "fn": "item_file",
+      "text": "Say Go to the split",
+      "due": "2026-11-20",
+      "session": "w-9",
+      "host": "host-a",
+      "context": "TD-5 decision (pat)",
+      "kind": "decide",
+      "answers": [
+        "Go — the split stands",
+        "Change",
+        "Hold: <note>"
+      ],
+      "default": 0,
+      "detail": {
+        "context": "The key is old.",
+        "question": "Rotate it now?",
+        "recommended": "it is due."
+      },
+      "lifts": [
+        "Go",
+        "Hold: <note>"
+      ],
+      "parts": [
+        "TD-16",
+        "TD-15"
+      ]
+    },
+    {
+      "name": "act",
+      "fn": "item_file",
+      "text": "Rotate the key",
+      "due": "2026-11-20",
+      "session": "w-9",
+      "host": "host-a",
+      "context": "TD-1.",
+      "kind": "act"
+    },
+    {
+      "name": "act_doer",
+      "fn": "item_file",
+      "text": "Rotate the key",
+      "due": "2026-11-20",
+      "session": "w-9",
+      "host": "host-a",
+      "context": "TD-1.",
+      "kind": "act",
+      "doer": "acme/widgets"
+    },
+    {
+      "name": "look",
+      "fn": "item_file",
+      "text": "Check the page",
+      "due": "2026-11-20",
+      "session": "w-9",
+      "host": "host-a",
+      "context": "TD-1.",
+      "kind": "look",
+      "default": 0
+    },
+    {
+      "name": "watch",
+      "fn": "item_file",
+      "text": "Rotate the key",
+      "due": "2026-11-20",
+      "session": null,
+      "host": null,
+      "context": "TD-1.",
+      "kind": "watch"
+    },
+    {
+      "name": "fyi",
+      "fn": "item_file",
+      "text": "Rotate the key",
+      "due": null,
+      "session": "w-9",
+      "host": "host-a",
+      "context": "TD-1.",
+      "kind": "fyi",
+      "hide_until": "2026-11-15"
+    },
+    {
+      "name": "todo",
+      "fn": "item_file",
+      "text": "Rotate the key",
+      "due": "2026-11-20",
+      "session": "w-9",
+      "host": "host-a",
+      "context": ""
+    },
+    {
+      "name": "field_words",
+      "fn": "item_file",
+      "text": "Ask whether Context: TD-9 Lifts: Go",
+      "due": "2026-11-20",
+      "session": "w-9",
+      "host": "host-a",
+      "context": "TD-1, Due: soon. Lifts: all",
+      "kind": "decide",
+      "answers": [
+        "Go — Lifts: all of it",
+        "Change — Context: later"
+      ],
+      "detail": {
+        "context": "The key is old.",
+        "question": "Does Context: TD-9 stand?",
+        "recommended": "it is due.",
+        "caveats": [
+          "Lifts: none",
+          "Decided: never"
+        ]
+      }
+    },
+    {
+      "name": "refused_two_lines",
+      "fn": "item_file",
+      "text": "Rotate\nthe key",
+      "due": "2026-11-20",
+      "session": "w-9",
+      "host": "host-a",
+      "context": "TD-1."
+    },
+    {
+      "name": "refused_host_no_session",
+      "fn": "item_file",
+      "text": "Rotate the key",
+      "due": "2026-11-20",
+      "session": null,
+      "host": "host-a",
+      "context": "TD-1."
+    },
+    {
+      "name": "refused_empty_text",
+      "fn": "item_file",
+      "text": "  ",
+      "due": "2026-11-20",
+      "session": "w-9",
+      "host": "host-a",
+      "context": "TD-1."
+    },
+    {
+      "name": "refused_decide_one_answer",
+      "fn": "item_file",
+      "text": "Rotate the key",
+      "due": "2026-11-20",
+      "session": "w-9",
+      "host": "host-a",
+      "context": "TD-1.",
+      "kind": "decide",
+      "answers": [
+        "Go"
+      ],
+      "detail": {
+        "context": "The key is old.",
+        "question": "Rotate it now?",
+        "recommended": "it is due."
+      }
+    },
+    {
+      "name": "refused_look_answers",
+      "fn": "item_file",
+      "text": "Rotate the key",
+      "due": "2026-11-20",
+      "session": "w-9",
+      "host": "host-a",
+      "context": "TD-1.",
+      "kind": "look",
+      "answers": [
+        "Works",
+        "No"
+      ]
+    },
+    {
+      "name": "refused_fyi_due",
+      "fn": "item_file",
+      "text": "Rotate the key",
+      "due": "2026-11-20",
+      "session": "w-9",
+      "host": "host-a",
+      "context": "TD-1.",
+      "kind": "fyi"
+    },
+    {
+      "name": "refused_lifts_waiting",
+      "fn": "item_file",
+      "text": "Rotate the key",
+      "due": "2026-11-20",
+      "session": "w-9",
+      "host": "host-a",
+      "context": "TD-5 decision (pat)",
+      "kind": "decide",
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "lifts": [
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The key is old.",
+        "question": "Rotate it now?",
+        "recommended": "it is due."
+      }
+    },
+    {
+      "name": "refused_parts_on_act",
+      "fn": "item_file",
+      "text": "Rotate the key",
+      "due": "2026-11-20",
+      "session": "w-9",
+      "host": "host-a",
+      "context": "TD-1.",
+      "kind": "act",
+      "parts": [
+        "TD-15"
+      ]
+    },
+    {
+      "name": "refused_doer_on_decide",
+      "fn": "item_file",
+      "text": "Rotate the key",
+      "due": "2026-11-20",
+      "session": "w-9",
+      "host": "host-a",
+      "context": "TD-1.",
+      "kind": "decide",
+      "answers": [
+        "Go",
+        "No"
+      ],
+      "detail": {
+        "context": "The key is old.",
+        "question": "Rotate it now?",
+        "recommended": "it is due."
+      },
+      "doer": "acme/widgets"
+    },
+    {
+      "name": "refused_doer_dot",
+      "fn": "item_file",
+      "text": "Rotate the key",
+      "due": "2026-11-20",
+      "session": "w-9",
+      "host": "host-a",
+      "context": "TD-1.",
+      "kind": "act",
+      "doer": "acme."
+    },
+    {
+      "name": "refused_two_forms_one_head",
+      "fn": "item_file",
+      "text": "Rotate the key",
+      "due": "2026-11-20",
+      "session": "w-9",
+      "host": "host-a",
+      "context": "TD-1.",
+      "kind": "decide",
+      "answers": [
+        "Go",
+        "Hold: <note>",
+        "hold: <why>"
+      ],
+      "detail": {
+        "context": "The key is old.",
+        "question": "Rotate it now?",
+        "recommended": "it is due."
+      }
+    },
+    {
+      "name": "refused_default_form",
+      "fn": "item_file",
+      "text": "Rotate the key",
+      "due": "2026-11-20",
+      "session": "w-9",
+      "host": "host-a",
+      "context": "TD-1.",
+      "kind": "decide",
+      "answers": [
+        "Go",
+        "Hold: <note>"
+      ],
+      "default": 1,
+      "detail": {
+        "context": "The key is old.",
+        "question": "Rotate it now?",
+        "recommended": "it is due."
+      }
+    },
+    {
+      "name": "decided_default_form",
+      "fn": "decided_file",
+      "title": "Ship the release",
+      "ref": "TD-12",
+      "answers": [
+        "Go",
+        "Hold: <note>"
+      ],
+      "default": 1,
+      "words": "Hold: after the freeze"
+    },
+    {
+      "name": "decided_by",
+      "fn": "decided_file",
+      "title": "Ship the release",
+      "ref": "TD-12",
+      "answers": [
+        "Go (default)",
+        "Hold"
+      ],
+      "default": 0,
+      "words": "Go",
+      "by": "pat"
+    },
+    {
+      "name": "decided_no_by",
+      "fn": "decided_file",
+      "title": "Ship the release",
+      "ref": "TD-12",
+      "answers": [],
+      "default": null,
+      "words": "Go"
+    },
+    {
+      "name": "decided_by_words",
+      "fn": "decided_file",
+      "title": "Ship the release",
+      "ref": "TD-12",
+      "answers": [
+        "Go",
+        "Hold"
+      ],
+      "default": null,
+      "words": "Go (by x)"
+    },
+    {
+      "name": "decided_said_fields",
+      "fn": "decided_file",
+      "title": "Ship the release",
+      "ref": "TD-12",
+      "answers": [
+        "Go",
+        "Hold"
+      ],
+      "default": null,
+      "words": "Context: TD-1 and Lifts: Go"
+    }
+  ],
+  "edits": [
+    {
+      "name": "snooze",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Owner:** sam.lee\n**Due:** 2026-11-20\n\n- **Context:** kept as written.\n  - nested\n",
+      "action": "snooze",
+      "to": "2026-11-15"
+    },
+    {
+      "name": "due",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Owner:** sam.lee\n**Due:** 2026-11-20\n\n- **Context:** kept as written.\n  - nested\n",
+      "action": "due",
+      "to": "2026-11-30"
+    },
+    {
+      "name": "due_added_past_unknown",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Context:** TD-1\n**Owner:** sam.lee\n**Hide until:** 2026-11-15\n",
+      "action": "due",
+      "to": "2026-11-30"
+    },
+    {
+      "name": "done",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Owner:** sam.lee\n**Due:** 2026-11-20\n\n- **Context:** kept as written.\n  - nested\n",
+      "action": "done"
+    },
+    {
+      "name": "done_why",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Owner:** sam.lee\n**Due:** 2026-11-20\n\n- **Context:** kept as written.\n  - nested\n",
+      "action": "done",
+      "why": "rotated, Context: TD-1"
+    },
+    {
+      "name": "decide",
+      "text": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n",
+      "action": "decide",
+      "answer": "Change",
+      "by": "pat"
+    },
+    {
+      "name": "decide_replaces",
+      "text": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n**Decided:** 2026-11-11 — Change\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n",
+      "action": "decide",
+      "answer": "Go"
+    },
+    {
+      "name": "decide_close_lifting",
+      "text": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n",
+      "action": "decide",
+      "answer": "Go",
+      "close": true
+    },
+    {
+      "name": "decide_close_waiting",
+      "text": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n",
+      "action": "decide",
+      "answer": "Not yet",
+      "close": true
+    },
+    {
+      "name": "decide_form_fill",
+      "text": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n",
+      "action": "decide",
+      "answer": "Hold: not yet"
+    },
+    {
+      "name": "decide_form_fill_close",
+      "text": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n",
+      "action": "decide",
+      "answer": "Hold: not yet",
+      "close": true
+    },
+    {
+      "name": "decide_answer_by_words",
+      "text": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n",
+      "action": "decide",
+      "answer": "Change (by Friday)"
+    },
+    {
+      "name": "reply_opens_log",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Owner:** sam.lee\n**Due:** 2026-11-20\n\n- **Context:** kept as written.\n  - nested\n",
+      "action": "reply",
+      "reply": "rotated, Due: tomorrow",
+      "by": "pat"
+    },
+    {
+      "name": "reply_appends",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n\n**Log:**\n- 2026-11-12: pat: first\n",
+      "action": "reply",
+      "reply": "second",
+      "by": "sam.lee"
+    },
+    {
+      "name": "crlf_snooze",
+      "text": "## Rotate the key\r\n\r\n**Kind:** act\r\n**Added:** 2026-11-11\r\n**Session:** w-9 on host-a\r\n**Context:** TD-1\r\n**Due:** 2026-11-20\r\n\r\n- **Context:** kept.\r\n",
+      "action": "snooze",
+      "to": "2026-11-15"
+    },
+    {
+      "name": "crlf_reply",
+      "text": "## Rotate the key\r\n\r\n**Kind:** act\r\n**Added:** 2026-11-11\r\n**Session:** w-9 on host-a\r\n**Context:** TD-1\r\n**Due:** 2026-11-20\r\n\r\n- **Context:** kept.\r\n",
+      "action": "reply",
+      "reply": "ok",
+      "by": "pat"
+    },
+    {
+      "name": "refused_closed",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Closed:** 2026-11-12 — done\n**Due:** 2026-11-20\n",
+      "action": "snooze",
+      "to": "2026-11-15"
+    },
+    {
+      "name": "refused_reply_by_colon",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Owner:** sam.lee\n**Due:** 2026-11-20\n\n- **Context:** kept as written.\n  - nested\n",
+      "action": "reply",
+      "reply": "ok",
+      "by": "a:b"
+    },
+    {
+      "name": "refused_reply_blank",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Owner:** sam.lee\n**Due:** 2026-11-20\n\n- **Context:** kept as written.\n  - nested\n",
+      "action": "reply",
+      "reply": "   ",
+      "by": "pat"
+    },
+    {
+      "name": "refused_close_work_order",
+      "text": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n",
+      "action": "decide",
+      "answer": "Change",
+      "close": true
+    },
+    {
+      "name": "refused_form_unfilled",
+      "text": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n",
+      "action": "decide",
+      "answer": "Hold: <note>"
+    },
+    {
+      "name": "refused_form_head_alone",
+      "text": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n",
+      "action": "decide",
+      "answer": "Hold:"
+    }
+  ],
+  "problems": [
+    {
+      "name": "out_of_order",
+      "text": "## Ping sam\n\n**Kind:** act\n**Added:** 2026-11-11\n**Due:** 2026-11-20\n**Context:** TD-1\n"
+    },
+    {
+      "name": "twice",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n**Due:** 2026-11-21\n"
+    },
+    {
+      "name": "unknown_field",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Owner:** sam.lee\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "due_respelled",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**due:** 2026-11-20\n"
+    },
+    {
+      "name": "parts_on_act",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Parts:** TD-15\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "doer_on_decide",
+      "text": "## Rotate the key\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Doer:** team ops\n**Due:** 2026-11-20\n**Answers:** Go | No\n"
+    },
+    {
+      "name": "two_forms_open",
+      "text": "## Rotate the key\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n**Answers:** Go | Hold: <note> | hold: <why>\n"
+    },
+    {
+      "name": "marked_form_open",
+      "text": "## Rotate the key\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n**Answers:** Go | Hold: <note> (default)\n"
+    },
+    {
+      "name": "two_forms_decided",
+      "text": "## Rotate the key\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n**Answers:** Go | Hold: <note> | hold: <why>\n**Decided:** 2026-11-12 — Go\n"
+    },
+    {
+      "name": "marked_form_decided",
+      "text": "## Rotate the key\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n**Answers:** Go | Hold: <note> (default)\n**Decided:** 2026-11-12 — Go\n"
+    },
+    {
+      "name": "two_forms_closed",
+      "text": "## Rotate the key\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n**Answers:** Go | Hold: <note> | hold: <why>\n**Closed:** 2026-11-12\n"
+    },
+    {
+      "name": "marked_form_closed",
+      "text": "## Rotate the key\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n**Answers:** Go | Hold: <note> (default)\n**Closed:** 2026-11-12\n"
+    },
+    {
+      "name": "log_not_last",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n\n**Log:**\n- 2026-11-12: pat: ok\n\n- **Context:** after the Log.\n"
+    },
+    {
+      "name": "body_not_bullet",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n\nSome prose, not a bullet.\n"
+    },
+    {
+      "name": "crlf",
+      "text": "## Rotate the key\r\n\r\n**Kind:** act\r\n**Added:** 2026-11-11\r\n**Session:** w-9 on host-a\r\n**Context:** TD-1\r\n**Due:** 2026-11-20\r\n\r\n- **Context:** kept.\r\n"
+    },
+    {
+      "name": "no_blank_line",
+      "text": "## Ping sam\n**Added:** 2026-11-11\n**Context:** none\n"
+    }
+  ],
+  "canonical": [
+    {
+      "name": "reordered_respelled",
+      "text": "## Rotate the key\n\n**added:** 2026-11-11\n**KIND:** ACT\n**due:** 2026-11-20\n**Context:** TD-1\n\n- **Context:** kept.\n"
+    },
+    {
+      "name": "unknown_after_known",
+      "text": "## Rotate the key\n\n**Owner:** sam.lee\n**Kind:** act\n**Added:** 2026-11-11\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "crlf",
+      "text": "## Rotate the key\r\n\r\n**Kind:** act\r\n**Added:** 2026-11-11\r\n**Session:** w-9 on host-a\r\n**Context:** TD-1\r\n**Due:** 2026-11-20\r\n\r\n- **Context:** kept.\r\n"
+    },
+    {
+      "name": "unchanged",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "refused_not_a_field",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\nnot a field\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+    },
+    {
+      "name": "refused_repeated",
+      "text": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n**Due:** 2026-11-21\n"
+    }
+  ],
+  "ids": {
+    "item_id": [
+      [
+        "2026-11-11",
+        "3f9a2c1d"
+      ],
+      [
+        "2026-02-30",
+        "3f9a2c1d"
+      ],
+      [
+        "2026-11-11",
+        "3F9A2C1D"
+      ],
+      [
+        "2026-11-11",
+        "3f9a2c1"
+      ]
+    ],
+    "is_item_id": [
+      "2026-11-11-3f9a2c1d",
+      "2026-02-30-abcd1234",
+      "2026-11-11-3F9A2C1D",
+      "2026-11-11-3f9a2c1d\n",
+      "2026-11-1١-3f9a2c1d"
+    ],
+    "item_path": [
+      [
+        "2026-11-11-3f9a2c1d",
+        null
+      ],
+      [
+        "2026-11-11-3f9a2c1d",
+        "2026-11-30"
+      ],
+      [
+        "2026-11-11-3f9a2c1d",
+        "2026-12-01"
+      ],
+      [
+        "2026-02-30-abcd1234",
+        null
+      ],
+      [
+        "2026-11-11-3f9a2c1d",
+        "2026-02-30"
+      ],
+      [
+        "2026-11-11-3f9a2c1d",
+        "20261130"
+      ]
+    ],
+    "key_id": [
+      {
+        "text": "act 2026-01-05 (session w-9) — Rotate the key. Context: TD-1. Due: 2026-01-10.",
+        "hex": "1d32ec91"
+      }
+    ]
+  },
+  "subjects": {
+    "subjects": [
+      {
+        "tool": "board",
+        "action": "snooze",
+        "id": "2026-11-11-3f9a2c1d",
+        "text": "**Rotate the key** now",
+        "to": "2026-11-20",
+        "session": "w-9"
+      },
+      {
+        "tool": "board",
+        "action": "due",
+        "id": "2026-11-11-3f9a2c1d",
+        "text": "Rotate — the key, Context: TD-1 Due: soon",
+        "to": "2026-11-30"
+      },
+      {
+        "tool": "board",
+        "action": "done",
+        "id": "2026-11-11-3f9a2c1d",
+        "text": "Rotate the key",
+        "session": "w-9"
+      },
+      {
+        "tool": "board",
+        "action": "decide",
+        "id": "2026-11-11-3f9a2c1d",
+        "text": "Say Go to   the split",
+        "answer": "Go   now",
+        "session": "lb-x"
+      },
+      {
+        "tool": "board",
+        "action": "reply",
+        "id": "2026-11-11-3f9a2c1d",
+        "text": "Ask sam",
+        "session": "w-9"
+      },
+      {
+        "tool": "board",
+        "action": "append",
+        "id": "2026-11-11-3f9a2c1d",
+        "text": "A very long item heading that goes well past the sixty character limit of a head",
+        "session": "w-9"
+      },
+      {
+        "tool": "board",
+        "action": "append",
+        "id": "2026-02-30-abcd1234",
+        "text": "Not an id"
+      }
+    ],
+    "subject_kinds": [
+      "board_edit: done Ship it (session s-1)",
+      "shiftlead: reply on Pick a name (session w-1)",
+      "shiftlead: append A new item (session w-1)",
+      "shiftlead: board A new item (from TD-12)",
+      "shiftlead: answer A question (from TD-12)",
+      "shiftlead: board decide TD-12 (person)",
+      "Fix the parser (#12)",
+      "board_edit: finish Ship it (session s-1)",
+      "queue: rank TD-3, TD-12 (shiftlead)",
+      "queue: join TD-7 (shiftlead)",
+      "queue: prune TD-1, TD-2 (a-tool)",
+      "queue: rank TD-3 TD-12 (shiftlead)",
+      "queue: sort TD-3 (shiftlead)",
+      "queue: rank TD-3",
+      "queue: rank TD-3 (shiftlead) extra",
+      "shiftlead: archive 3 closed items (session w-1)",
+      "shiftlead: archive 1 closed item (session n/a)",
+      "shiftlead: archive 1 closed items (session w-1)",
+      "shiftlead: archive 0 closed items (session w-1)",
+      "board_edit: due Rotate. to 2026-01-30 (session s-1)",
+      "queue: respace TD-3, TD-4 (shiftlead)",
+      "board: snooze 2026-11-11-3f9a2c1d Rotate the key now to 2026-11-20 (session w-9)",
+      "board: append 2026-11-11-3f9a2c1d Ping sam (session n/a)",
+      "board: decide 2026-11-11-3f9a2c1d Say Go: Go (session lb-x)"
+    ],
+    "edit_actions": [
+      "board_edit: due Rotate. to 2026-01-30 (session s-1)",
+      "board_edit: snooze Rotate. to 2026-01-20 (session s-1)",
+      "board_edit: done Ship it (session s-1)",
+      "shiftlead: append Ship it (session n/a)",
+      "queue: rank TD-1 (shiftlead)",
+      "ledgerboard: archive 2 closed items (session n/a)",
+      "not a subject",
+      "board: snooze 2026-11-11-3f9a2c1d Rotate the key now to 2026-11-20 (session w-9)",
+      "board: append 2026-11-11-3f9a2c1d Ping sam (session n/a)",
+      "board: decide 2026-11-11-3f9a2c1d Say Go: Go (session lb-x)"
+    ],
+    "subject_ids": [
+      "board: snooze 2026-11-11-3f9a2c1d Rotate the key now to 2026-11-20 (session w-9)",
+      "board: append 2026-11-11-3f9a2c1d Ping sam (session n/a)",
+      "board: decide 2026-11-11-3f9a2c1d Say Go: Go (session lb-x)",
+      "board_edit: done Ship it (session s-1)",
+      "shiftlead: board A new item (from TD-12)",
+      "shiftlead: append Ship it (session n/a)",
+      "board: append 2026-02-30-abcd1234 Ping sam (session n/a)"
+    ]
+  },
+  "gate": [
+    {
+      "name": "an added item faulted",
+      "board": {
+        "path": "user_attention",
+        "files": {
+          "user_attention/README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat\n",
+          "user_attention/2026-01-05-1a2b3c4d.md": "## Rotate the key.\n\n**Kind:** act\n**Added:** 2026-01-05\n**Session:** w-9\n**Context:** TD-1\n**Due:** 2026-01-20\n",
+          "user_attention/2026-01-06-5e6f7a8b.md": "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-01-06\n**Session:** w-9\n**Due:** 2026-01-21\n**Context:** TD-2\n"
+        }
+      },
+      "old": {
+        "path": "user_attention",
+        "files": {
+          "user_attention/README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat\n",
+          "user_attention/2026-01-05-1a2b3c4d.md": "## Rotate the key.\n\n**Kind:** act\n**Added:** 2026-01-05\n**Session:** w-9\n**Context:** TD-1\n**Due:** 2026-01-20\n"
+        }
+      }
+    },
+    {
+      "name": "an edited item not judged",
+      "board": {
+        "path": "user_attention",
+        "files": {
+          "user_attention/README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat\n",
+          "user_attention/2026-01-05-1a2b3c4d.md": "## Rotate the key.\n\n**Kind:** act\n**Added:** 2026-01-05\n**Session:** w-9\n**Context:** TD-1\n**Due:** 2026-01-25\n"
+        }
+      },
+      "old": {
+        "path": "user_attention",
+        "files": {
+          "user_attention/README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat\n",
+          "user_attention/2026-01-05-1a2b3c4d.md": "## Rotate the key.\n\n**Kind:** act\n**Added:** 2026-01-05\n**Session:** w-9\n**Context:** TD-1\n**Due:** 2026-01-20\n"
+        }
+      }
+    },
+    {
+      "name": "a new decide whose gate's person is not on People",
+      "board": {
+        "path": "user_attention",
+        "files": {
+          "user_attention/README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat\n",
+          "user_attention/2026-01-05-1a2b3c4d.md": "## Rotate the key.\n\n**Kind:** act\n**Added:** 2026-01-05\n**Session:** w-9\n**Context:** TD-1\n**Due:** 2026-01-20\n",
+          "user_attention/2026-01-06-5e6f7a8b.md": "## Go on the store?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-9\n**Context:** TD-4 decision (sam)\n**Due:** 2026-01-21\n**Answers:** Go (default) | Not yet\n\n- **Context:** the store.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+        }
+      },
+      "old": {
+        "path": "user_attention",
+        "files": {
+          "user_attention/README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat\n",
+          "user_attention/2026-01-05-1a2b3c4d.md": "## Rotate the key.\n\n**Kind:** act\n**Added:** 2026-01-05\n**Session:** w-9\n**Context:** TD-1\n**Due:** 2026-01-20\n"
+        }
+      }
+    },
+    {
+      "name": "a README holding a - [ ] line above People",
+      "board": {
+        "path": "user_attention",
+        "files": {
+          "user_attention/README.md": "# Needs the user\n\nLedgerboard: 3\n\n- [ ] prose shaped like an item\n\nPeople: sam\n",
+          "user_attention/2026-01-06-5e6f7a8b.md": "## Go on the store?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-9\n**Context:** TD-4 decision (sam)\n**Due:** 2026-01-21\n**Answers:** Go (default) | Not yet\n\n- **Context:** the store.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+        }
+      },
+      "old": null
+    },
+    {
+      "name": "old a v2 board: the split PR, nothing new",
+      "board": {
+        "path": "user_attention",
+        "files": {
+          "user_attention/README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat\n",
+          "user_attention/2026-01-05-1d32ec91.md": "## Rotate the key.\n\n**Kind:** act\n**Added:** 2026-01-05\n**Session:** w-9\n**Context:** TD-1\n**Due:** 2026-01-20\n",
+          "user_attention/archive/2026-01/2026-01-04-a9306ea1.md": "## Ping lee.\n\n**Kind:** act\n**Added:** 2026-01-04\n**Session:** w-9\n**Context:** TD-3\n**Due:** 2026-01-20\n**Closed:** 2026-01-08 — done\n"
+        }
+      },
+      "old": {
+        "path": "user_attention.md",
+        "files": {
+          "user_attention.md": "# Needs the user\n\nPeople: pat\n\n- [ ] act 2026-01-05 (session w-9) — Rotate the key. Context: TD-1. Due: 2026-01-20.\n- [x] act 2026-01-04 (session w-9) — Ping lee. Context: TD-3. Due: 2026-01-20. Closed: 2026-01-08 — done.\n"
+        }
+      }
+    },
+    {
+      "name": "old None: every open item judged",
+      "board": {
+        "path": "user_attention",
+        "files": {
+          "user_attention/README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat\n",
+          "user_attention/2026-01-05-1a2b3c4d.md": "## Rotate the key.\n\n**Kind:** act\n**Added:** 2026-01-05\n**Session:** w-9\n**Context:** TD-1\n**Due:** 2026-01-20\n",
+          "user_attention/2026-01-06-5e6f7a8b.md": "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-01-06\n**Session:** w-9\n**Due:** 2026-01-21\n**Context:** TD-2\n"
+        }
+      },
+      "old": null
+    },
+    {
+      "name": "two forms with one head, and a form marked default",
+      "board": {
+        "path": "user_attention",
+        "files": {
+          "user_attention/README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat\n",
+          "user_attention/2026-01-06-0000000a.md": "## Hold or go?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Context:** TD-4\n**Due:** 2026-01-21\n**Answers:** Go | Hold: <note> | hold: <why>\n\n- **Context:** the store.\n- **Question:** Go?\n- **Recommended:** Go — it is ready\n",
+          "user_attention/2026-01-06-0000000b.md": "## Which way?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Context:** TD-4\n**Due:** 2026-01-21\n**Answers:** Go | Other: <what> (default)\n\n- **Context:** the store.\n- **Question:** Go?\n- **Recommended:** Other — it is ready\n"
+        }
+      },
+      "old": {
+        "path": "user_attention",
+        "files": {
+          "user_attention/README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat\n",
+          "user_attention/2026-01-05-1a2b3c4d.md": "## Rotate the key.\n\n**Kind:** act\n**Added:** 2026-01-05\n**Session:** w-9\n**Context:** TD-1\n**Due:** 2026-01-20\n"
+        }
+      }
+    },
+    {
+      "name": "a README whose People is faulted",
+      "board": {
+        "path": "user_attention",
+        "files": {
+          "user_attention/README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat, pat\n",
+          "user_attention/2026-01-05-1a2b3c4d.md": "## Rotate the key.\n\n**Kind:** act\n**Added:** 2026-01-05\n**Session:** w-9\n**Context:** TD-1\n**Due:** 2026-01-20\n"
+        }
+      },
+      "old": null
+    },
+    {
+      "name": "a v2 board refused",
+      "board": {
+        "path": "user_attention.md",
+        "files": {
+          "user_attention.md": "# Needs the user\n\nPeople: pat\n\n- [ ] act 2026-01-05 (session w-9) — Rotate the key. Context: TD-1. Due: 2026-01-20.\n- [x] act 2026-01-04 (session w-9) — Ping lee. Context: TD-3. Due: 2026-01-20. Closed: 2026-01-08 — done.\n"
+        }
+      },
+      "old": null
+    }
+  ],
+  "strings": [
+    {
+      "name": "an item file",
+      "text": "## Go on the parts?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-4 decision (pat)\n**Parts:** TD-9, TD-10\n**Due:** 2026-01-20\n**Answers:** Go | Not yet\n",
+      "labels": [
+        "Go",
+        "Not yet",
+        "Later"
+      ]
+    },
+    {
+      "name": "a v2 line",
+      "text": "- [ ] decide 2026-01-06 (session w-1) — Go on the parts? Context: TD-4 decision (pat). Parts: TD-9, TD-10. Due: 2026-01-20. Answers: Go | Not yet.",
+      "labels": [
+        "Go",
+        "Not yet",
+        "Later"
+      ]
+    },
+    {
+      "name": "a line's text after its tick",
+      "text": "decide 2026-01-06 (session w-1) — Go on the parts? Context: TD-4 decision (pat). Parts: TD-9, TD-10. Due: 2026-01-20. Answers: Go | Not yet.",
+      "labels": [
+        "Go",
+        "Not yet",
+        "Later"
+      ]
+    },
+    {
+      "name": "a v2 board's text opening with a section heading",
+      "text": "## Needs the user\n\n- [ ] decide 2026-01-06 (session w-1) — Go on the parts? Context: TD-4 decision (pat). Parts: TD-9, TD-10. Due: 2026-01-20. Answers: Go | Not yet.\n",
+      "labels": [
+        "Go",
+        "Not yet",
+        "Later"
+      ]
+    },
+    {
+      "name": "an item file whose Context names two entries",
+      "text": "## Go on the parts?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-4, TD-5 decision (pat)\n**Parts:** TD-9, TD-10\n**Due:** 2026-01-20\n**Answers:** Go | Not yet\n",
+      "labels": [
+        "Go"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "list",
+  "refused": "board: no such board"
+ }
+}

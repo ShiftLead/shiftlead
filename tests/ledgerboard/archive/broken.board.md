@@ -1,9 +1,0 @@
-# User Attention Board
-
-Items that need the person.
-
-- [x] 2026-01-01 (session `w-1` on box-1) — Merge the docs PR. Context: TD-7. Due: 2026-01-20. Closed: 2026-01-10 — done.
-  - **Context:** first half.
-
-  - **Question:** second half.
-- [ ] 2026-01-03 (session `w-1` on box-1) — Pick a region. Context: TD-7. Due: 2026-01-20.

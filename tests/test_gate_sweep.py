@@ -15,6 +15,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from _v3board import write_board  # noqa: E402 — tests/ is on the path
 from conftest import fake_gh_bin, park_ticks, with_origin
 
 from sessionorc import cadence, gatesweep
@@ -53,9 +54,15 @@ UTC, LOCAL = date(2026, 11, 5), date(2026, 11, 5)
 PASSED = {"id": "TD-7", "name": "x-merged", "outcome": "passed", "evidence": "o/r#5", "why": None}
 
 
+def _v3(text: str, archive: str = "") -> lb.Board:
+    """A v2 board's text split as `board.py split` splits it, read whole as a v3 Board (ledgerboard v3.0, TD-1881)."""
+    files = {f"b/{k}": v for k, v in lb.split_board(text, archive).items()}
+    return lb.load_board("b", lb._dict_ls(files), files.get)
+
+
 def _sweep(results: dict, board: str = BOARD) -> dict:
     return lb.sweep(
-        [EVENT + "\n" + PERSON], [("git@github.com:o/r.git", "r", board, "")], results, UTC, LOCAL, repo="o/r"
+        [EVENT + "\n" + PERSON], [("git@github.com:o/r.git", "r", _v3(board))], results, UTC, LOCAL, repo="o/r"
     )
 
 
@@ -135,7 +142,7 @@ def repo(real, monkeypatch, tmp_path):
     (root / "docs" / "ledger" / "README.md").write_text("# Ledger\n\nLedgerboard: 2\n")
     (root / "docs" / "ledger" / "TD-7.md").write_text(EVENT)
     (root / "docs" / "ledger" / "TD-8.md").write_text(PERSON)
-    (root / "docs" / "user_attention.md").write_text(BOARD)
+    write_board(root, BOARD)  # a v3 board, committed whole (ledgerboard v3.0, TD-1881)
     _git("init", "-q", "-b", "main", str(root))
     _git("-C", str(root), "add", "-A")
     _git("-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "seed")
@@ -158,7 +165,12 @@ def repo(real, monkeypatch, tmp_path):
 
 
 def _branch(root: Path, branch: str, path: str) -> str:
+    """`path` at `branch` on `root`'s origin; for the board's stub, every file of the board's directory there, joined
+    (a v3 board is one file per item, ledgerboard v3.0, TD-1881)."""
     bare = root.parent / f"{root.name}-origin.git"
+    if path == "docs/user_attention.md":
+        names = _git("--git-dir", str(bare), "ls-tree", "-r", "--name-only", branch, "--", "docs/user_attention")
+        return "\n".join(_git("--git-dir", str(bare), "show", f"{branch}:{n}") for n in names.split())
     return _git("--git-dir", str(bare), "show", f"{branch}:{path}")
 
 
@@ -175,7 +187,7 @@ def test_a_sweep_opens_a_lift_pr_and_a_board_pr_and_merges_neither(repo):
     assert "gate lifted: event (x-merged)" in lifted and "o/r#5" in lifted, "logged, with the check's evidence"
     assert ran[1][:7] == ("ledger.py", "lift", "TD-7", "--gate", "event (x-merged)", "--by", "kmaster")
     board = _branch(root, f"sweep/{UTC.isoformat()}", "docs/user_attention.md")
-    assert "Context: TD-8 decision (paul)" in board and "Should it go?" in board
+    assert "**Context:** TD-8 decision (paul)" in board and "Should it go?" in board
     state = json.loads((root.parent / "r-origin.git" / "fake-gh.json").read_text())
     assert [p["state"] for p in state["prs"].values()] == ["open", "open"], "the home opens them, never merges"
     assert _git("-C", str(root), "show", "main:docs/ledger/TD-7.md") == EVENT, "main is untouched"
@@ -206,7 +218,7 @@ def test_a_lift_whose_pr_was_closed_is_never_reopened_and_asked_about(repo, tmp_
         "lift TD-7 event (x-merged): its PR #1 was closed unmerged — not reopened; an act item asks why"
     )
     board = _branch(root, f"sweep/{UTC.isoformat()}", "docs/user_attention.md")
-    assert "Lift of event (x-merged) on TD-7 was closed" in board and "Context: TD-7 event (x-merged) lift" in board
+    assert "Lift of event (x-merged) on TD-7 was closed" in board and "**Context:** TD-7 event (x-merged) lift" in board
 
 
 def test_an_until_regated_after_its_lift_was_closed_is_lifted_on_a_branch_of_its_own(repo):
@@ -251,12 +263,13 @@ def other(repo, tmp_path):
     """`repo` with no `People:` on its own board, and a second registered repo `x` whose board names the person:
     sweep() files `r`'s uncovered person gate there (TD-229)."""
     root, _ = repo
-    (root / "docs" / "user_attention.md").write_text("# Needs\n\n## Needs the user\n\n")
-    _git("-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qam", "no people")
+    write_board(root, "# Needs\n\n## Needs the user\n\n")
+    _git("-C", str(root), "add", "-A")
+    _git("-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", "no people")
     _git("-C", str(root), "push", "-q", "origin", "main")
     x = tmp_path / "x"
     (x / "docs").mkdir(parents=True)
-    (x / "docs" / "user_attention.md").write_text(BOARD)
+    write_board(x, BOARD)
     _git("init", "-q", "-b", "main", str(x))
     _git("-C", str(x), "add", "-A")
     _git("-C", str(x), "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "seed")
@@ -285,7 +298,7 @@ def test_another_repos_board_gets_one_notices_pr_there_with_qualified_ids(other)
     assert pr["head"] == f"notices/{slug}-sweep-{UTC.isoformat()}"
     assert pr["state"] == "open", "opened there, merged by none"
     board = _branch(x, pr["head"], "docs/user_attention.md")
-    assert f"Context: {got['repo']}#TD-8" in board, board
+    assert f"**Context:** {got['repo']}#TD-8" in board, board
     assert _git("-C", str(x), "branch", "--list", "notices/*") == "", "no local branch is left in that clone"
     assert len(_git("-C", str(x), "worktree", "list").splitlines()) == 1, "no worktree is left there"
 

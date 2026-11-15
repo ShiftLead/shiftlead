@@ -3819,17 +3819,18 @@ def test_every_row_the_home_builds_carries_its_kinds_subject(tmp_path, monkeypat
     assert promote[0]["subject"] == "promote · shiftlead"
     work = work_rows({"ao-grind": {"at": "2026-10-12T10:00:00Z", "members": {"ao-g": ["TD-1", "TD-2", "TD-3"]}}}, {})
     assert work[0]["subject"] == "lanes gained 3 entries · ao-grind"
-    item = {
-        "line": 7,
+    item = {  # a record's words: its Context and Due its fields (ledgerboard v3.0, TD-1881)
+        "at": 7,
         "due": "2026-10-12",
-        "text": "**Pick the font for the Inbox** — two shapes drawn. Context: TD-9. Due: 2026-10-12",
+        "context": "TD-9",
+        "text": "**Pick the font for the Inbox** — two shapes drawn.",
     }
     report = {"today": "2026-10-12", "boards": [{"root": "/w", "board": "/w/docs/user_attention.md", "items": [item]}]}
     board = board_rows(report)[0]
     assert board["subject"] == "Pick the font for the Inbox" and "pick the font" in row_find(board)
-    bare = {"line": 8, "due": "2026-10-20", "text": "Decide the font. Due: 2026-10-20"}
+    bare = {"at": 8, "due": "2026-10-20", "text": "Decide the font."}
     report["boards"][0]["items"] = [bare]
-    assert board_rows(report)[0]["subject"] == "Decide the font."  # no bold head: the line before its `Due:`
+    assert board_rows(report)[0]["subject"] == "Decide the font."  # no bold head: the item's words
     assert row_subject({"row": "trail", "how": "answered in the terminal"}) == "answered in the terminal"
     assert row_subject({"row": "ledger", "id": "TD-9", "title": "Pick the font"}) == "Pick the font"  # TD-565's row
 

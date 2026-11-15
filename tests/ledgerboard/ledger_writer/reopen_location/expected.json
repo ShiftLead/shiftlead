@@ -1,7 +1,18 @@
 {
- "exit": 1,
+ "exit": 0,
  "out": {
   "action": "reopen",
-  "refused": "⚠ TD-005: a new or changed Location line — the header field is retired; write the **Location:** body section, or run migrate, which moves it (SPEC *Retired words*)"
+  "id": "TD-005",
+  "moved": {
+   "from": "ledger/archive/TD-005.md",
+   "to": "ledger/TD-005.md"
+  },
+  "notes": [],
+  "paths": [
+   "ledger/archive/TD-005.md",
+   "ledger/TD-005.md",
+   "notes.md"
+  ],
+  "subject": null
  }
 }

@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from _v3board import ref_of, write_board  # noqa: E402 — tests/ is on the path
 
 from sessionorc import ledger as ledger_mod
 from sessionorc import workorders
@@ -34,9 +35,8 @@ OPEN = "- [ ] act 2026-10-01 (session n/a) — **Rotate the token.** Context: TD
 def _repo(tmp_path: Path, board: list[str], archive: list[str] | None = None) -> Path:
     root = tmp_path / "repo"
     (root / "docs").mkdir(parents=True)
-    (root / "docs" / "user_attention.md").write_text("\n".join(["# Board", "", *board, ""]), encoding="utf-8")
-    if archive is not None:
-        (root / "docs" / "user_attention_archive.md").write_text("\n".join(["# Archive", "", *archive, ""]))
+    # a v3 board (ledgerboard v3.0, TD-1881): a closed item's file, on the board or in its archive, is under archive/
+    write_board(root, "\n".join(["# Board", "", *board, ""]), "\n".join(["# Archive", "", *(archive or []), ""]))
     return root
 
 
@@ -79,47 +79,42 @@ def test_carried_reads_each_closed_decided_decide_line_that_names_an_entry_with_
     (b,) = workorders.read_boards(root, fetch=False)["boards"]
     first, second = b["carried"]
     assert first == {
-        "key": workorders.ref("", CARRIED[6:]),
+        "key": ref_of(CARRIED),
         "ref": "TD-50",
         "decided": {"text": "One more round", "date": "2026-11-03"},
         "decided_by": None,
-        "closed": {"date": "2026-11-03", "why": "carried to TD-61 and TD-62."},
+        "closed": {"date": "2026-11-03", "why": "carried to TD-61 and TD-62"},  # its final period dropped (v3.0)
         "to": ["TD-61", "TD-62"],
-        "at": 4,
+        "at": 2,  # one index over the board's items, the open one first
         "refs": ["TD-50"],
         "parts": [],
     }
     assert (second["ref"], second["refs"], second["parts"]) == ("TD-70", ["TD-70", "TD-71"], ["TD-72", "TD-73"])
     assert (second["decided"], second["decided_by"]) == ({"text": "Not yet", "date": "2026-11-04"}, "paul")
-    assert (second["closed"], second["to"], second["at"]) == ({"date": "2026-11-04", "why": "kept waiting."}, [], 7)
+    assert (second["closed"], second["to"], second["at"]) == ({"date": "2026-11-04", "why": "kept waiting"}, [], 4)
     # the key is the open line's: the decide and the close move no key (§4.4 *A board line's id*)
-    assert first["key"] == workorders.ref("", CARRIED[6:].split(" Decided:")[0].replace("[x]", "[ ]"))
+    assert first["key"] == ref_of(CARRIED.split(" Decided:")[0].replace("[x]", "[ ]"))
 
 
 @pytest.mark.unit
-def test_the_archive_beside_the_board_is_read_after_it_and_at_runs_on_over_both_files(tmp_path):
+def test_the_archive_is_read_with_the_board_and_at_runs_on_over_both(tmp_path):
+    """A closed item filed from the v2 archive is the board's closed item like one closed on the board (v3.0: both
+    are files under archive/, TD-1881); `at` runs on after the open items. The v2 archive's own re-read on a moved
+    file is retired: a v3 board's archive is a directory read whole with it."""
     root = _repo(tmp_path, [OPEN, CARRIED], archive=[OTHER])
     (b,) = workorders.read_boards(root, fetch=False)["boards"]
-    board_lines = len((root / "docs" / "user_attention.md").read_text().splitlines())
-    assert [(c["ref"], c["at"]) for c in b["carried"]] == [("TD-50", 4), ("TD-70", board_lines + 3)]
-    assert b["items"][0]["line"] == 3  # an open item's `line` is its index on the same scale
-    # an archive re-read once its file moves, and none at all once it is gone
-    (root / "docs" / "user_attention_archive.md").write_text(f"# Archive\n\n{CARRIED}\n{OTHER}\n")
+    assert [(c["ref"], c["at"]) for c in b["carried"]] == [("TD-50", 2), ("TD-70", 3)]
+    assert b["items"][0]["at"] == 1  # an open item's `at` is its index on the same scale
+    write_board(root, f"# Board\n\n{OPEN}\n")
     (b,) = workorders.read_boards(root, fetch=False)["boards"]
-    assert [c["ref"] for c in b["carried"]] == ["TD-50", "TD-50", "TD-70"]
-    (root / "docs" / "user_attention_archive.md").unlink()
-    (b,) = workorders.read_boards(root, fetch=False)["boards"]
-    assert [c["ref"] for c in b["carried"]] == ["TD-50"]
+    assert b["carried"] == []
 
 
 @pytest.mark.unit
 def test_a_write_back_trees_board_reads_the_archive_beside_it(tmp_path):
     root = _repo(tmp_path, [OPEN])
-    tree = tmp_path / "tree" / "docs"
-    tree.mkdir(parents=True)
-    (tree / "user_attention.md").write_text(f"{OPEN}\n{CARRIED}\n")
-    (tree / "user_attention_archive.md").write_text(f"{OTHER}\n")
-    (b,) = workorders.read_boards(root, board=tree / "user_attention.md")["boards"]
+    tree = write_board(tmp_path / "tree", f"{OPEN}\n{CARRIED}\n", f"{OTHER}\n")
+    (b,) = workorders.read_boards(root, board=tree)["boards"]
     assert [(c["ref"], c["at"]) for c in b["carried"]] == [("TD-50", 2), ("TD-70", 3)]
 
 
@@ -135,21 +130,19 @@ def test_a_board_read_from_origin_reads_origins_archive(tmp_path):
     _git("clone", "-q", str(origin), str(seed), cwd=tmp_path)
     _git("config", "user.email", "t@t", cwd=seed)
     _git("config", "user.name", "t", cwd=seed)
-    (seed / "docs").mkdir()
-    (seed / "docs" / "user_attention.md").write_text(f"{OPEN}\n")
+    write_board(seed, f"{OPEN}\n")
     _git("add", "-A", cwd=seed)
     _git("commit", "-qm", "board", cwd=seed)
     _git("push", "-q", "origin", "main", cwd=seed)
     _git("clone", "-q", str(origin), str(clone), cwd=tmp_path)
-    (seed / "docs" / "user_attention.md").write_text(f"{OPEN}\n{CARRIED}\n")
-    (seed / "docs" / "user_attention_archive.md").write_text(f"{OTHER}\n")
+    write_board(seed, f"{OPEN}\n{CARRIED}\n", f"{OTHER}\n")
     _git("add", "-A", cwd=seed)
     _git("commit", "-qm", "closed and archived", cwd=seed)
     _git("push", "-q", "origin", "main", cwd=seed)
     (b,) = workorders.read_boards(clone)["boards"]
     assert b["fetch_case"] == "behind"
     assert [c["ref"] for c in b["carried"]] == ["TD-50", "TD-70"]
-    assert not (clone / "docs" / "user_attention_archive.md").exists()  # nothing written into the checkout
+    assert not (clone / "docs" / "user_attention" / "archive").exists()  # nothing written into the checkout
     plain = workorders.read_boards(clone, fetch=False)["boards"][0]
     assert plain["carried"] == []  # the checkout's own copy holds neither
 

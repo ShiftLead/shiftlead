@@ -1,0 +1,17 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "snooze",
+  "id": "2026-01-10-a1000001",
+  "item_notes": [
+   {
+    "id": "2026-01-10-a1000001",
+    "note": "hide-late: Hide until: 2026-01-29 is after Due: 2026-01-20, so the item stays hidden past its deadline"
+   }
+  ],
+  "paths": [
+   "board/2026-01-10-a1000001.md"
+  ],
+  "subject": "ledgerboard: snooze 2026-01-10-a1000001 Merge the parser fix to 2026-01-29 (session w-1)"
+ }
+}

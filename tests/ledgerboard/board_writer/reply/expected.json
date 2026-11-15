@@ -2,11 +2,11 @@
  "exit": 0,
  "out": {
   "action": "reply",
+  "id": "2026-01-11-a0000008",
   "item_notes": [],
-  "line": 8,
   "paths": [
-   "board.md"
+   "board/2026-01-11-a0000008.md"
   ],
-  "subject": "ledgerboard: reply Pick a cache. (session `w-2`)"
+  "subject": "ledgerboard: reply 2026-01-11-a0000008 Pick a cache. (session w-2)"
  }
 }

@@ -27,9 +27,7 @@
     "type": "feature"
    }
   ],
-  "flags": [
-   "ℹ TD-001: the Location field is retired — write the **Location:** body section — run migrate, which moves it (SPEC *Retired words*)"
-  ],
+  "flags": [],
   "pickable": [
    {
     "blocked_by": [],

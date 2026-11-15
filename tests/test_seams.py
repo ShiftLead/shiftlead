@@ -42,6 +42,38 @@ def test_a_repo_with_only_a_ledger_has_every_other_seam_absent(tmp_path):
 
 
 @pytest.mark.unit
+def test_a_v3_boards_damage_makes_it_unreadable_and_a_newer_major_newer(tmp_path):
+    """ledgerboard v3.0 (TD-1881): the board seam reads the board whole — `board_dir_problems()` makes it
+    *unreadable*, `version_problem(board)` *newer*, as `v2_faults()` and `version_problem()` make the ledger — and
+    each is a warning; a clean v3 board, its stub naming the directory, is *defaulted*."""
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).parent))
+    from _v3board import write_board
+
+    root = make(tmp_path)
+    write_board(root, "# Board\n\n- [ ] act 2026-11-01 (session n/a) — **Do it.** Due: 2026-11-02.\n")
+    assert seams.board(root) == {"state": "defaulted", "value": "docs/user_attention.md"}
+    assert not [w for w in seams.reading(root)["warnings"] if "board" in w]
+    d = root / "docs" / "user_attention"
+    (d / "2026-11-01-0000000g.md").write_text("not an item\n")  # no id: a file the directory should not hold
+    got = seams.board(root)
+    assert (got["state"], got["named"]) == ("unreadable", "defaulted") and "2026-11-01-0000000g.md" in got["why"]
+    said = seams.reading(root)["warnings"]
+    assert any(w.startswith("the board at docs/user_attention.md is damaged: ") for w in said)
+    (d / "2026-11-01-0000000g.md").unlink()
+    readme = d / "README.md"
+    readme.write_text(readme.read_text().replace("Ledgerboard: 3", "Ledgerboard: 4"))
+    got = seams.board(root)
+    assert (got["state"], got["major"]) == ("newer", 4) and "Ledgerboard: 4" in got["why"]
+    assert "board is Ledgerboard 4, this build reads 3 (sync)" in seams.reading(root)["warnings"]
+    # the directory alone, no stub: the default is the directory itself
+    (root / "docs" / "user_attention.md").unlink()
+    readme.write_text(readme.read_text().replace("Ledgerboard: 4", "Ledgerboard: 3"))
+    assert seams.board(root) == {"state": "defaulted", "value": "docs/user_attention"}
+
+
+@pytest.mark.unit
 def test_agent_cadences_files_are_the_defaults_and_shiftlead_yml_sets_each(tmp_path):
     root = make(tmp_path)
     (root / workorders.BOARD).write_text("# Board\n")

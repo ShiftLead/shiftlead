@@ -1,0 +1,51 @@
+{
+ "blocked": [],
+ "check": [
+  {
+   "field": "taken by",
+   "id": "TD-001",
+   "kind": "retired",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-001: the Taken by field is retired — write Id take, the counter take's nonce (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+  }
+ ],
+ "check_since_empty": [
+  {
+   "field": "taken by",
+   "id": "TD-001",
+   "kind": "retired",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-001: the Taken by field is retired — write Id take, the counter take's nonce (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
+  }
+ ],
+ "declared": {},
+ "entries": [
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000001",
+   "cross_repo": [],
+   "fields": {
+    "added": "2026-01-02",
+    "priority": "Low",
+    "status": "Open",
+    "taken by": "a-session"
+   },
+   "id": "TD-001",
+   "key": "3|0|000001",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "An open entry, its Taken by kept",
+   "type": "debt"
+  }
+ ],
+ "flags": [],
+ "pickable": [
+  "TD-001"
+ ],
+ "rows": []
+}

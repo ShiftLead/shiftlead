@@ -5,13 +5,13 @@
   "entries": [
    "TD-001"
   ],
+  "id": "2026-01-12-a000000b",
   "item_notes": [],
-  "line": 11,
   "notes": [],
   "paths": [
-   "board.md",
+   "board/2026-01-12-a000000b.md",
    "ledger/TD-001.md"
   ],
-  "subject": "ledgerboard: decide Which format first?: Ask again in March (session n/a)"
+  "subject": "ledgerboard: decide 2026-01-12-a000000b Which format first?: Ask again in March (session n/a)"
  }
 }

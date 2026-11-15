@@ -2,11 +2,11 @@
  "exit": 0,
  "out": {
   "action": "add",
+  "id": "2026-01-15-5eed0001",
   "item_notes": [],
-  "line": 7,
   "paths": [
-   "board.md"
+   "board/2026-01-15-5eed0001.md"
   ],
-  "subject": "ledgerboard: append Who owns the export? (session `w-4`)"
+  "subject": "ledgerboard: append 2026-01-15-5eed0001 Who owns the export? (session w-4)"
  }
 }

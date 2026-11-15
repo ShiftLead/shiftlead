@@ -667,7 +667,7 @@ def board_choices(roots: Collection[str | Path] | None = None) -> list[dict[str,
     for r in roots:
         root = Path(r).expanduser().resolve()
         rel = workorders_mod.board_path(root)[1]
-        if rel is not None and (root / rel).is_file():
+        if rel is not None and (root / rel).exists():
             out.append({"label": root.name, "root": str(root), "board": str((root / rel).resolve())})
     return out
 
@@ -1717,45 +1717,23 @@ def board_due_now(it: Mapping[str, Any]) -> bool:
 
 
 def board_body(text: str, it: Mapping[str, Any]) -> str:
-    """A board row's body (§4.5a *answers*, TD-255): the item's text without its `Answers:` and
-    `Decided:` tails where the reader read them as fields — those are drawn as the row's buttons and
-    its *decided* line, so the body does not print them twice. The reader's fields decide, never the
-    prose: an item the reader gave no `answers` and no `decided` keeps its whole text."""
-    fields = (it.get("answers") and lb.ANSWERS_RE, it.get("decided") and lb.DECIDED_RE)
-    due = lb.DUE_RE.search(text)
-    off = due.end() if due else 0  # the reader looks for the fields after the item's `Due:`
-    starts = [m.start() for m in (f.search(text[off:]) for f in fields if f) if m]
-    return text[: off + min(starts)].rstrip() if starts else text
-
-
-# a board line's fields — its `Context:`, `Due:` and reply tails — are ledgerboard's to find (TD-585): the
-# text drawn here is cut where ledgerboard's own patterns find them, never by a second pattern of ours
+    """A board row's body (§4.5a *answers*, TD-255): the item's words as the reader gives them (its record's
+    `text`). Its `Answers`, `Decided`, `Due`, `Context` and replies are the record's own fields (ledgerboard v3.0,
+    TD-1881), drawn as the row's buttons, its *decided* line, its due words and its details, so the words carry
+    none of them: nothing is cut from the prose here."""
+    return text
 
 
 def _board_split(body: str, it: Mapping[str, Any]) -> tuple[str, str, list[dict[str, str]]]:
-    """A board line's `(text, context, replies)`: its words with the `Due:` and the `Context:` cut out, what
-    the `Context:` says, and the person's replies from the reader's field — a reader that gives none, or a
-    tail after the `Due:` that is more than those replies, leaves them in the text."""
+    """A board item's `(text, context, replies)`: its words, its `Context` and the person's replies, each from the
+    reader's record of the item (ledgerboard v3.0, TD-1881) — never cut out of a line."""
     replies = [
         {"by": str(r.get("by") or ""), "date": str(r.get("date") or ""), "text": str(r.get("text") or "")}
         for r in it.get("replies") or ()
         if isinstance(r, dict) and str(r.get("text") or "").strip()
     ]
-    text, tail = body, ""
-    due = lb.DUE_RE.search(body)
-    if due:
-        text, tail = body[: due.start()].rstrip(), body[due.end() :].lstrip(" .")
-        if replies and tail.startswith("—") and len(lb.REPLY_TAIL_RE.findall(f" {tail}")) == len(replies):
-            tail = ""  # the reader's replies, drawn from its field — every one of them, or none
-        elif tail:
-            replies = []  # what follows the `Due:` is not just the reader's replies: the text keeps it all, once
-    if tail:
-        text = f"{text} {tail}"
-    ctx = lb.CONTEXT_RE.search(text)
-    context = ctx.group("ctx").rstrip(" .") if ctx else ""
-    if ctx:
-        text = (text[: ctx.start()] + text[ctx.end() :]).rstrip()
-    return text, context, replies
+    context = str(it.get("context") or "").strip().rstrip(" .")
+    return body.strip(), context, replies
 
 
 def board_text(body: str, it: Mapping[str, Any]) -> dict[str, Any]:
@@ -1780,15 +1758,25 @@ def board_text(body: str, it: Mapping[str, Any]) -> dict[str, Any]:
 _REPO_REF = re.compile(r"(?<![\w/.#-])(?P<repo>[A-Za-z0-9][\w.-]*)#(?:TD-\d+|\d+)\b")
 
 
+def _item_prefix(it: Mapping[str, Any]) -> str:
+    """A v3 item's prefix as a v2 line wrote it before its words — its kind, its `Added` day and *(session `<name>`
+    on <host>)* — from the record's fields (ledgerboard v3.0, TD-1881), for a card's *context*; '' with none."""
+    session = str(it.get("session") or "")
+    host = str(it.get("host") or "")
+    who = f"(session `{session}`{f' on {host}' if host else ''})" if session else ""
+    return " ".join(x for x in (str(it.get("kind") or ""), str(it.get("added") or ""), who) if x)
+
+
 def board_card(body: str, it: Mapping[str, Any], repo: str) -> dict[str, str]:
     """A board item as a Queue card draws it whole (§4.5 screen 12 *An item's shape*, *A board item says where
     its task is*; TD-1066, built by TD-1245): `sentence`, its bold head (`head_split`; a line with none, the
     line before its `Context:`); `leads`, the line's next sentence after the head where the item has no
-    `Answers:`; `context`, under *context* — the prefix (kind, date, *(session … on <host>)*), the rest of the
-    line and its `Context:`; and `in_repo`, the first repo other than `repo` the `Context:` names
-    (`<repo>#TD-n`, `<repo>#n`), else "". Display only: nothing here is a control."""
+    `Answers:`; `context`, under *context* — the prefix (kind, date, *(session … on <host>)*, from the record's
+    fields, TD-1881), the rest of the item's words and its `Context`; and `in_repo`, the first repo other than
+    `repo` the `Context:` names (`<repo>#TD-n`, `<repo>#n`), else "". Display only: nothing here is a control."""
     text, context, _ = _board_split(body, it)
     prefix, head, leads, after = rendermod.head_split(text)
+    prefix = prefix or _item_prefix(it)
     if it.get("answers"):
         leads, after = "", f"{leads} {after}".strip()
     here = repo.lower()
@@ -2051,7 +2039,7 @@ def _board_order(r: Mapping[str, Any]) -> str:
     decided line that is not `fyi` is one."""
     if not r.get("decided") or r.get("kind") == "fyi" or not r.get("root"):
         return ""
-    return str(r.get("key") or "") or workorders_mod.ref(str(r["root"]), str(r.get("text") or ""))
+    return str(r.get("key") or "")
 
 
 def _team_wound(team: str, records: Collection[Mapping[str, Any]]) -> bool:
@@ -2181,10 +2169,9 @@ def board_detail(it: Mapping[str, Any]) -> str:
 
 
 def board_subject_text(text: str) -> str:
-    """A board line's text before its `Due:` and without its `Context:` — what a head-less line's
-    subject is cut from, so a headline never carries the due date or the answers after it."""
-    due = lb.DUE_RE.search(text)
-    return lb.CONTEXT_RE.sub("", text[: due.start()] if due else text).strip() or text
+    """A board item's words, what a head-less item's subject is cut from: its `Due` and `Context` are the record's
+    fields (ledgerboard v3.0, TD-1881), so a headline never carries the due date or the answers after it."""
+    return " ".join(text.split()) or text
 
 
 def board_hand_of(
@@ -2205,6 +2192,15 @@ def board_hand_of(
     if target is not None and target.get("own"):
         return {"doer": doer, "hand": False, "hand_to": ""}
     return {"doer": doer, "hand": True, "hand_to": str(target.get("repo") or "") if target is not None else ""}
+
+
+def board_item_file(board: str, path: str) -> str:
+    """The file an item lives in (ledgerboard v3.0, TD-1881): `path` in the board's directory — the stub's path
+    less `.md`, or the directory itself — for a v3 item; the board's own file for a v2 item (`path` empty)."""
+    if not path:
+        return board
+    b = Path(board)
+    return str((b.with_suffix("") if b.suffix == ".md" else b) / path)
 
 
 def board_rows(
@@ -2244,15 +2240,16 @@ def board_rows(
             hidden = "needs" in it and it["needs"] is None
             if hidden and not it.get("hidden"):
                 continue
-            line, text, tag = it.get("line"), str(it["text"]), str(it.get("due_tag") or "")
+            text, tag = str(it["text"]), str(it.get("due_tag") or "")
             detail = board_detail(it)
             hand = board_hand_of(root, it, hands)
-            # **Open board** is a file link at the item's line, the checkout first (§4.6, TD-689)
-            url = editor_file_link(board, line=line if isinstance(line, int) else 1) if board else None
+            # **Open board** is a file link to the item's own file, the checkout first (§4.6, TD-689); a v2 board's
+            # item, which has no file, the board's (ledgerboard v3.0, TD-1881)
+            url = editor_file_link(board_item_file(board, str(it.get("path") or "")), line=1) if board else None
             rows.append(
                 {
                     "row": "board",
-                    "id": f"board:{root}:{line}",
+                    "id": f"board:{root}:{it.get('key') or it.get('at')}",
                     # §4.4 *A board line's id* (TD-603): `board:<key>`, the host agent's reading's own
                     # (TD-615), drawn on the row and sent as `key` with every press; empty where none
                     "key": str(it.get("key") or ""),
@@ -2260,7 +2257,11 @@ def board_rows(
                     "repo_name": repo_name,
                     "root": root,
                     "board": board,
-                    "line": line,
+                    "line": None,  # a v3 item has no line: its `key` names it (ledgerboard v3.0, TD-1881)
+                    "path": str(it.get("path") or ""),
+                    "at_n": it.get("at"),  # its place among the board's items, the sort's last tie-break
+                    # its `Context`, the record's field (ledgerboard v3.0, TD-1881): what the Queue homes it by
+                    "context": str(it.get("context") or ""),
                     "team": "",
                     "teams": teams,
                     "text": text,
@@ -2372,7 +2373,7 @@ def board_horizon(rows: Collection[dict[str, Any]], mode: str | None = None, tod
     due = [r for r in rows if r.get("due_now", True)]
     rest = sorted(
         (r for r in rows if not r.get("due_now", True)),
-        key=lambda r: (not r.get("due"), str(r.get("due") or ""), str(r.get("repo") or ""), r.get("line") or 0),
+        key=lambda r: (not r.get("due"), str(r.get("due") or ""), str(r.get("repo") or ""), r.get("at_n") or 0),
     )
     ahead: list[dict[str, Any]] = []
     if mode == "all":

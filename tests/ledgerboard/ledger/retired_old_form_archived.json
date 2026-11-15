@@ -1,0 +1,50 @@
+{
+ "blocked": [],
+ "check": [
+  {
+   "field": "blocked by",
+   "id": "TD-002",
+   "kind": "retired",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-002: Blocked by item 'decision (Kim) — after the review' is in the old decision form — write decision (<person>), with the text in an **Ask:** section (SPEC *Retired words*); v3.0 reads no such form: on an open entry write its text with edit --section Ask, then rewrite it decision (<person>) with set; on an archived one by hand, then ledger.py fmt TD-n"
+  }
+ ],
+ "check_since_empty": [
+  {
+   "field": "blocked by",
+   "id": "TD-002",
+   "kind": "retired",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-002: Blocked by item 'decision (Kim) — after the review' is in the old decision form — write decision (<person>), with the text in an **Ask:** section (SPEC *Retired words*); v3.0 reads no such form: on an open entry write its text with edit --section Ask, then rewrite it decision (<person>) with set; on an archived one by hand, then ledger.py fmt TD-n"
+  }
+ ],
+ "declared": {},
+ "entries": [
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000001",
+   "cross_repo": [],
+   "fields": {
+    "added": "2026-01-02",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-001",
+   "key": "3|0|000001",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "An open entry, nothing retired",
+   "type": "debt"
+  }
+ ],
+ "flags": [],
+ "pickable": [
+  "TD-001"
+ ],
+ "rows": []
+}

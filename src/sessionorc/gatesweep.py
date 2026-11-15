@@ -124,16 +124,27 @@ def origin_url(root: Path | str) -> str:
     return cp.stdout.strip() if cp.returncode == 0 else ""
 
 
-def board_of(root: Path | str) -> tuple[str, str, str, str] | None:
-    """`(origin_url, basename, text, archive_text)` of the board at `root`'s `origin/<default>`, as `sweep()`
-    takes it; None where it has no such ref or no board there."""
+def board_at(io: ledger_mod.Io) -> lb.Board | None:
+    """The board in the tree `io` reads, whole, as ledgerboard's `load_board()` gives it (v3.0, TD-1881; agent-cadence
+    `gate_sweep.py`'s `board_at`): at `BOARD_DIR` where the tree holds that directory, else at `BOARD_V2_PATH` (a v2
+    board and its archive, or a stub naming the directory); None where it has none."""
+    ls, read = io
+    path = lb.BOARD_DIR if ls(lb.BOARD_DIR) is not None else lb.BOARD_V2_PATH
+    board = lb.load_board(path, ls, read)
+    return None if board.form is None else board
+
+
+def board_of(root: Path | str) -> tuple[str, str, lb.Board] | None:
+    """`(origin_url, basename, Board)` of the board at `root`'s `origin/<default>`, read whole through
+    `load_board()`, as `sweep()` takes it (v3.0); None where it has no such ref or no board there."""
     ref = ledger_mod.default_ref(root)
     if ref is None:
         return None
-    text = _show(root, ref, lb.BOARD_PATH)
-    if text is None:
+    io = ledger_mod.git_io(root, ref, "docs")
+    board = board_at(io) if io is not None else None
+    if board is None:
         return None
-    return origin_url(root), Path(root).name, text, _show(root, ref, lb.BOARD_ARCHIVE_PATH) or ""
+    return origin_url(root), Path(root).name, board
 
 
 class Tree:
@@ -344,7 +355,10 @@ def plan(
         raise SweepError(ledger_mod.fault_words(LEDGER, faults) if faults else f"no {LEDGER} on {base}")
     own = board_of(root)
     if own is None:
-        raise SweepError(f"no {lb.BOARD_PATH} on {base}: the sweep's event items go on this repo's own board")
+        raise SweepError(
+            f"no board at {lb.BOARD_DIR}/ or {lb.BOARD_V2_PATH} on {base}: the sweep's event items go on this repo's "
+            "own board"
+        )
     url = own[0]
     repo = lb.origin_path(url) or Path(root).name
     boards, seen = [own], {lb.origin_key(url) or str(Path(root).resolve())}
@@ -457,15 +471,9 @@ def _swept_about(root: Path | str, ctx: str) -> bool:
     return any(reports.sweep_of(q["head"]) == "sweep" and q["state"] in ("open", "merged") for q in hits)
 
 
-def _contexts(board: str, archive: str) -> set[str]:
-    """Every item's `Context:` on the board and its archive, open or closed, folded as `gate_sweep.py` does."""
-    text = board + "\n" + archive
-    return {
-        " ".join(c.group("ctx").split()).rstrip(".").lower()
-        for it in lb.parse_board(text, warn=False) + lb.parse_closed_items(text)
-        for c in [lb.CONTEXT_RE.search(it.text)]
-        if c
-    }
+def _contexts(board: lb.Board) -> set[str]:
+    """Every item's `Context:` on the board, open or closed (the board read whole), folded as `gate_sweep.py` does."""
+    return {" ".join(it.context.split()).rstrip(".").lower() for it in [*board.items, *board.closed] if it.context}
 
 
 def _lift(
@@ -527,9 +535,24 @@ def _lift(
     return f"lift {tid} {gate}: opened {url}"
 
 
-def _write_board(path: str, items: list[dict], keys: list[str], today_local: date, by: str, why: str) -> int:
-    """File `items` on, and close the open items keyed `keys` on, the board at `path` through the vendored
-    writer, each item due today under the session `SESSION`; how many it closed."""
+def _writable(path: str, name: str) -> None:
+    """SweepError naming `name`'s split where the board at `path` cannot take a v3.0 write (a v2 board: the writers
+    refuse it), else nothing — what a sweep skips is said, never a silent no-op (agent-cadence `gate_sweep.py`)."""
+    why = lb_board.v3_problem(lb_board._load(path))
+    if why:
+        raise SweepError(
+            f"{name}'s board cannot be written: {why}"
+            + (f" — {name} splits its board first, in its own v3.0 bump" if "v2" in why else "")
+        )
+
+
+def _write_board(
+    path: str, items: list[dict], ids: list[str], today_local: date, by: str, why: str, *, name: str = "the repo"
+) -> int:
+    """File `items` on, and close the open items whose ids are `ids` on, the v3 board at `path` (the stub, which
+    names the directory) through the vendored writer, each item due today under the session `SESSION`; how many it
+    closed. A v2 board is refused before anything is written (`_writable`)."""
+    _writable(path, name)  # the repo's name: `path` is in a tree of the sweep's own
     for it in items:
         lb_board.apply(
             lb_board.plan_add(
@@ -548,20 +571,11 @@ def _write_board(path: str, items: list[dict], keys: list[str], today_local: dat
                 tool="gate-sweep",
             )
         )
+    open_ = {it.id for it in lb_board.load_v3(path).items}
     closed = 0
-    for key in keys:  # one at a time: each close may move the lines below it
-        text = lb_board.read(path)
-        lines = text.splitlines()
-        for it in lb.parse_board(text, warn=False):
-            raw = lines[it.line - 1]
-            if lb.item_key(raw) == key:
-                m = lb.ITEM_RE.match(raw)
-                expect = m.group("text")[:60] if m else raw.strip()[:60]
-                lb_board.apply(
-                    lb_board.plan_edit(path, "done", it.line, expect, today=today_local, why=why, tool="gate-sweep")
-                )
-                closed += 1
-                break
+    for item in [i for i in ids if i in open_]:  # by id: no close moves another item (v3.0)
+        lb_board.apply(lb_board.plan_edit(path, "done", item, today=today_local, why=why, tool="gate-sweep"))
+        closed += 1
     return closed
 
 
@@ -582,8 +596,10 @@ def _own_board(
         )
     branch = f"{SWEEP_BRANCH}{today_utc.isoformat()}"
     with Tree(root, p["base"], branch) as tree:
-        board = str(tree / lb.BOARD_PATH)
-        closed = _write_board(board, items, keys, today_local, by, "the gate sweep: its condition no longer holds")
+        board = str(tree / lb.BOARD_V2_PATH)  # the stub names the directory; a v2 board is refused (split first)
+        closed = _write_board(
+            board, items, keys, today_local, by, "the gate sweep: its condition no longer holds", name=Path(root).name
+        )
         subject = f"board: gate sweep {today_utc.isoformat()} — {len(items)} filed, {closed} closed (TD-1376)"
         body = "\n".join(
             ["The home's gate sweep (design §4.4, TD-1376) on this repo's own board.", ""]
@@ -702,9 +718,9 @@ def _other_board(
         return f"board {board}: not done — its clone has no origin/<default> ({n})"
     branch = f"{prefix}{today_utc.isoformat()}"
     with Tree(there, base, branch) as tree:
-        path = str(tree / lb.BOARD_PATH)
+        path = str(tree / lb.BOARD_V2_PATH)  # the stub names the directory; a v2 board is refused (split first)
         closed = _write_board(path, [_qualify(p["repo"], it) for it in items], keys, today_local, by,
-                              f"the gate sweep of {p['repo']}: its condition no longer holds")  # fmt: skip
+                              f"the gate sweep of {p['repo']}: its condition no longer holds", name=board)  # fmt: skip
         subject = f"board: {p['repo']}'s gate sweep {today_utc.isoformat()} — {len(items)} filed, {closed} closed"
         body = "\n".join(
             [
@@ -749,7 +765,7 @@ def _apply_own(
     except (SweepError, OSError, subprocess.SubprocessError) as e:
         return [f"not done — {e}"]
     own = board_of(root)
-    asked = _contexts(own[2], own[3]) if own else set()
+    asked = _contexts(own[2]) if own else set()
     extra: list[dict] = []
     for x in p["lifts"]:
         try:

@@ -109,7 +109,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-201: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-201: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -117,7 +117,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-202: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-202: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -125,7 +125,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-203: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-203: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -133,7 +133,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-204: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-204: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -141,7 +141,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-205: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-205: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -149,7 +149,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-206: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-206: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   }
  ],
  "check_since_empty": [
@@ -255,7 +255,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-201: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-201: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -263,7 +263,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-202: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-202: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -271,7 +271,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-203: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-203: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -279,7 +279,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-204: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-204: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -287,7 +287,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-205: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-205: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   },
   {
    "field": "status",
@@ -295,7 +295,7 @@
    "kind": "status",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-206: an open entry's Status is Open alone — it has none — run migrate, which maps it, lists it, or names what a person decides"
+   "text": "⚠ TD-206: an open entry's Status is Open alone — it has none — v3.0 reads no other form: on an open entry write Open with set, on an archived one by hand, then ledger.py fmt TD-n"
   }
  ],
  "declared": {},

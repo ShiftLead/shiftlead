@@ -25,12 +25,12 @@
    []
   ]
  },
+ "item_file_problem": [
+  "parts: an id stands twice"
+ ],
  "item_key": {
   "- [ ] decide 2026-01-05 (n/a) — Go on the tools build? Context: Acme/Tools#TD-4. Due: 2026-01-20. Answers: Go | Not yet.": "- [ ] decide 2026-01-05 (n/a) — Go on the tools build? Context: Acme/Tools#TD-4. Answers: Go | Not yet",
   "- [ ] decide 2026-01-05 (n/a) — Go on the tools build? Context: acme/tools#TD-4. Due: 2026-01-20. Answers: Go | Not yet.": "- [ ] decide 2026-01-05 (n/a) — Go on the tools build? Context: acme/tools#TD-4. Answers: Go | Not yet"
- },
- "item_problem": {
-  "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: Acme/Tools#TD-3, acme/tools#TD-3. Due: 2026-01-20. Answers: Go | Not yet.": "parts: an id stands twice"
  },
  "item_refs": {
   "- [ ] act 2026-01-05 (n/a) — After other punctuation a ref reads. Context: x—o/r#TD-1, “o/r#TD-2”, a=o/r#TD-3, `o/r#TD-4`, [o/r#TD-5](https://forge.example). Due: 2026-01-20.": [

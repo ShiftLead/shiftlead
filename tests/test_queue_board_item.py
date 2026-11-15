@@ -91,9 +91,11 @@ def test_the_inbox_board_row_is_unchanged(tmp_path, monkeypatch):
 
 
 def test_a_line_with_no_bold_head_is_its_own_sentence():
-    got = inbox_mod.board_card("act 2026-10-26 — run the setup once. Context: TD-9.", {}, "samscrape")
-    assert got["sentence"] == "act 2026-10-26 — run the setup once." and got["leads"] == "" and got["in_repo"] == ""
-    assert got["context"] == "Context: TD-9"
+    # the item's words and its fields (ledgerboard v3.0, TD-1881): its prefix composed from them, under *context*
+    it = {"kind": "act", "added": "2026-10-26", "context": "TD-9"}
+    got = inbox_mod.board_card("run the setup once.", it, "samscrape")
+    assert got["sentence"] == "run the setup once." and got["leads"] == "" and got["in_repo"] == ""
+    assert got["context"] == "act 2026-10-26\n\nContext: TD-9"
 
 
 def test_a_bold_word_past_the_heads_reach_is_no_head():

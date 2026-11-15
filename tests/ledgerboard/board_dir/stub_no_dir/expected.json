@@ -1,0 +1,23 @@
+{
+ "board_dir_problems": [
+  [
+   "user_attention.md",
+   "stub: declares Ledgerboard: 3 and holds no item, but its directory, user_attention/, is missing; nothing was read"
+  ]
+ ],
+ "closed": [],
+ "form": null,
+ "items": [],
+ "keys": [],
+ "major": 3,
+ "needs_you": [],
+ "path": "board/user_attention.md",
+ "people": null,
+ "problems": [
+  [
+   "user_attention.md",
+   "stub: declares Ledgerboard: 3 and holds no item, but its directory, user_attention/, is missing; nothing was read"
+  ]
+ ],
+ "version_problem": null
+}

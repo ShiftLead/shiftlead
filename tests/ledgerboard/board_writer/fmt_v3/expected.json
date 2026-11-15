@@ -1,0 +1,21 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "fmt",
+  "fixed": [
+   "2026-01-10-d0000001",
+   "2026-01-11-d0000002"
+  ],
+  "paths": [
+   "board/2026-01-10-d0000001.md",
+   "board/2026-01-11-d0000002.md"
+  ],
+  "refused": [
+   {
+    "id": "2026-01-12-d0000003",
+    "why": "header: Doer stands twice: keep one"
+   }
+  ],
+  "subject": null
+ }
+}

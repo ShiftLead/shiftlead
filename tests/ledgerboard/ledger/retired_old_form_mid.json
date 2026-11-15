@@ -1,0 +1,61 @@
+{
+ "blocked": [
+  "TD-001"
+ ],
+ "check": [
+  {
+   "field": "blocked by",
+   "id": "TD-001",
+   "kind": "blocked-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-001: cannot read Blocked by item 'TD-1 decision (Lee) x' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  }
+ ],
+ "check_since_empty": [
+  {
+   "field": "blocked by",
+   "id": "TD-001",
+   "kind": "blocked-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-001: cannot read Blocked by item 'TD-1 decision (Lee) x' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  }
+ ],
+ "declared": {},
+ "entries": [
+  {
+   "blocked_by": [
+    "'TD-1 decision (Lee) x'"
+   ],
+   "card_key": "3|0|000001",
+   "cross_repo": [],
+   "fields": {
+    "added": "2026-01-02",
+    "blocked by": "TD-1 decision (Lee) x",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-001",
+   "key": "3|0|000001",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "A decision's words mid item",
+   "type": "debt"
+  }
+ ],
+ "flags": [
+  {
+   "field": "blocked by",
+   "id": "TD-001",
+   "kind": "blocked-item",
+   "level": "error",
+   "text": "⚠ TD-001: cannot read Blocked by item 'TD-1 decision (Lee) x' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  }
+ ],
+ "pickable": [],
+ "rows": []
+}

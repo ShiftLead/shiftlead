@@ -2,6 +2,6 @@
  "exit": 1,
  "out": {
   "action": "set",
-  "refused": "the Blocked by holds decision (Robin) in the old form, which set cannot lift or drop — migrate it first (decision (Robin) with its text in **Ask:**), then lift it"
+  "refused": "⚠ TD-001: cannot read Blocked by item 'decision (Robin) pick a format first' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>); ⚠ TD-001: Blocked by item 'decision (Robin) pick a format first' is in the old decision form — write decision (<person>), with the text in an **Ask:** section (SPEC *Retired words*); v3.0 reads no such form: on an open entry write its text with edit --section Ask, then rewrite it decision (<person>) with set; on an archived one by hand, then ledger.py fmt TD-n"
  }
 }

@@ -1,0 +1,19 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "fmt",
+  "fixed": [],
+  "paths": [],
+  "refused": [
+   {
+    "id": "2026-02-30-a1000009",
+    "why": "not an item file name"
+   },
+   {
+    "id": "notes",
+    "why": "not an item file name"
+   }
+  ],
+  "subject": null
+ }
+}

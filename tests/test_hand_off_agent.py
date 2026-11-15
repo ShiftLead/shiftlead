@@ -10,11 +10,12 @@ import asyncio
 from pathlib import Path
 
 import pytest
+from _v3board import item, ref_of, write_board
 from conftest import park_ticks
-from test_board import BOARD_TEXT, git, origin_board, repo  # noqa: F401 — `repo` a fixture
+from test_board import BOARD_TEXT, git, origin_item, repo  # noqa: F401 — `repo` a fixture
 from test_handed_entry import _registry, _seat_session
 
-from sessionorc import board, mail, workorders
+from sessionorc import board, mail
 from sessionorc.agent_inbox import HAND_OFF_ONLY
 from sessionorc.client import AgentError, AgentStuck, LocalClient
 
@@ -25,13 +26,13 @@ ACT = (
 DETAIL = "  - **Context:** agent-cadence vendors v2.8 first.\n"
 
 
-def _put(repo: Path, text: str, detail: str = "") -> int:  # noqa: F811 — the fixture's name
-    """`text` as an open line on origin's board, `detail` under it; its line number."""
-    (repo / board.BOARD).write_text(BOARD_TEXT + f"- [ ] {text}\n{detail}")
+def _put(repo: Path, text: str, detail: str = "") -> str:  # noqa: F811 — the fixture's name
+    """`text` (a v2 line) as an open item on origin's v3 board, `detail` its detail block; its reference."""
+    write_board(repo, BOARD_TEXT + f"- [ ] {text}\n{detail}")
     git(repo, "add", "-A")
     git(repo, "commit", "-qm", "act")
     git(repo, "push", "-q", "origin", "main")
-    return origin_board(repo).splitlines().index(f"- [ ] {text}") + 1
+    return ref_of(text)
 
 
 # -- own_text and the Done's why ---------------------------------------------------------------------------------------
@@ -45,11 +46,13 @@ def test_own_text_is_the_lines_words_bold_kept_and_marked_for_person_reads_it():
 
 
 @pytest.mark.unit
-def test_a_done_writes_its_why_and_any_other_edit_refuses_one():
-    got = board.edit_line(f"- [ ] {ACT}\n", ACT, "done", today="2026-11-14", why="handed to agent-cadence: m-1")
-    assert got.endswith("Closed: 2026-11-14 — handed to agent-cadence: m-1.\n")
+def test_a_done_writes_its_why_and_any_other_edit_refuses_one(tmp_path):
+    write_board(tmp_path, BOARD_TEXT + f"- [ ] {ACT}\n")
+    it = item(tmp_path, ref_of(ACT))
+    got = board.edit_item(it, "done", today="2026-11-14", why="handed to agent-cadence: m-1")
+    assert "**Closed:** 2026-11-14 — handed to agent-cadence: m-1\n" in got
     with pytest.raises(board.Refused, match="a why is a Done's alone"):
-        board.edit_line(f"- [ ] {ACT}\n", ACT, "snooze", "2026-11-30", why="x")
+        board.edit_item(it, "snooze", "2026-11-30", why="x")
     with pytest.raises(board.Refused, match="a why is a Done's alone"):
         board.write_back(Path("/nowhere"), 1, ACT, "decide", answer="have a session do it", why="x")
 
@@ -58,9 +61,9 @@ def test_a_done_writes_its_why_and_any_other_edit_refuses_one():
 
 
 def test_board_find_reads_the_act_line_on_origin(repo):  # noqa: F811
-    at = _put(repo, ACT, DETAIL)
-    key = workorders.ref(repo, ACT)
+    key = _put(repo, ACT, DETAIL)
     got = board.find_line(repo, None, key)
+    assert got.pop("id").endswith(key[-8:])
     assert got == {
         "doer": "agent-cadence",
         "text": "**Bump the pin.**",
@@ -71,7 +74,7 @@ def test_board_find_reads_the_act_line_on_origin(repo):  # noqa: F811
         "refs": ["TD-190", "agent-cadence#TD-7"],
         "key": key,
     }
-    assert board.find_line(repo, at, key)["doer"] == "agent-cadence", "the line number is a hint, the key decides"
+    assert board.find_line(repo, 99, key)["doer"] == "agent-cadence", "a line number is read no more, the key decides"
 
 
 @pytest.mark.parametrize(
@@ -85,18 +88,18 @@ def test_board_find_reads_the_act_line_on_origin(repo):  # noqa: F811
     ],
 )
 def test_board_find_refuses_what_may_not_be_handed_as_found_on_origin(repo, text, words):  # noqa: F811
-    _put(repo, text)
     with pytest.raises(board.Refused, match=words):
-        board.find_line(repo, None, workorders.ref(repo, text))
+        board.find_line(repo, None, _put(repo, text))
 
 
 def test_board_find_refuses_a_closed_line_and_a_key_that_is_none(repo):  # noqa: F811
-    _put(repo, ACT)
-    key = workorders.ref(repo, ACT)
+    key = _put(repo, ACT)
     board.write_back(repo, None, ACT, "done", key=key, why="handed to agent-cadence: m-1")
-    assert "— handed to agent-cadence: m-1." in origin_board(repo)
-    with pytest.raises(board.Refused, match="reworded or closed"):
+    assert origin_item(repo, key).closed[1] == "handed to agent-cadence: m-1"
+    with pytest.raises(board.Refused, match=f"{key} was closed"):  # a closed item is said closed (TD-1881)
         board.find_line(repo, None, key)
+    with pytest.raises(board.Refused, match="reworded or closed"):
+        board.find_line(repo, None, "board:00000000")
     with pytest.raises(board.Refused, match="not a board line's id"):
         board.find_line(repo, None, "TD-1")
 

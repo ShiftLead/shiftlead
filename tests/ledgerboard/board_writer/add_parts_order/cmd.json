@@ -2,7 +2,9 @@
  "argv": [
   "add",
   "--board",
-  "board.md",
+  "board",
+  "--id",
+  "2026-01-15-5eed0001",
   "--kind",
   "decide",
   "--text",

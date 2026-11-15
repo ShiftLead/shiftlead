@@ -355,10 +355,10 @@ class InboxMixin:
         the one line edited on origin's head in the host agent's own tree, committed with the fixed
         message and landed by its own PR (`board.write_back`); the checkout is never written.
         `board` must be the board of a checkout this host's repos registry names;
-        `line` and `text` are what agent-cadence's reader gave the Inbox, and the edit is refused
-        unless the line still holds that text. `key` is the line's id (`board:<key>`, §4.4 *A board
-        line's id*, TD-603): the open line whose id it is is found first, wherever it now sits and
-        whatever a snooze or a reply has added to it, and refused in its own words when none is.
+        `key` is the item's reference (`board:<8 hex>`, §4.4 *A board line's id*, TD-603): the open item
+        whose id ends with it (ledgerboard v3.0, TD-1881), whatever a snooze or a reply has added to it, and
+        refused in its own words when none is; `text` (its words) finds it where no key is sent, and `line`
+        is read no more — a v3 board has no line numbers.
         A person's only, as every act on the Inbox is.
 
         `action: add` is **Put on the board** (§4.5a, TD-140): `entry` an FYI row of the person's
@@ -385,7 +385,7 @@ class InboxMixin:
             raise RpcError("a reply on a board line is board_reply, which says where it went (design §4.4)")
         if action == "add":
             return await self._board_add(root, want, text, due, entry, caller)
-        if line is None and not key:
+        if line is None and not key and not str(text or "").strip():  # its words name it too (TD-1881)
             raise RpcError(f"a board {action or 'edit'} names the item's line or its id (design §4.4)")
         try:
             said = self._board_answer(action, answer, answers, form)
@@ -454,7 +454,7 @@ class InboxMixin:
                 return said
             if not offered and said == board_mod.HAVE_A_SESSION:
                 # **Have a session do it** (TD-1624): an `act` line's fixed answer, checked against the line's own
-                # kind where `board.edit_line` finds it on origin's head — never a kind the page sent (§4.4 *Decide*)
+                # kind where `board.edit_item` finds it on origin's head — never a kind the page sent (§4.4 *Decide*)
                 return said
         try:
             filled = ledgerboard.fill_form(said, offered, form)
@@ -839,7 +839,7 @@ class InboxMixin:
         agent_common.person_only(caller, "reply on the board", "§4.4", self._graph())
         root, want = self._board_root(board)
         self._board_served(root)
-        if line is None and not key:
+        if line is None and not key and not str(text or "").strip():  # its words name it too (TD-1881)
             raise RpcError("a board reply names the item's line or its id (design §4.4)")
         try:
             at: int | None = int(line) if line is not None else None
@@ -1299,7 +1299,7 @@ class InboxMixin:
             raise RpcError(f"{id} is already being decided")
         today = datetime.now().date().isoformat()
         try:  # the line is made before anyone is told, so words the board refuses refuse the press whole
-            board_mod.decided_line(str(e.get("title") or ""), id, [], None, said, today)
+            board_mod.decided_file(str(e.get("title") or ""), id, [], None, said, today)
         except board_mod.Refused as err:
             raise RpcError(str(err)) from None
         rec = None if mine else graph.get(str(caller))
@@ -1405,7 +1405,7 @@ class InboxMixin:
         if old is None:
             return False
         tree = board_mod.tree_dir(Path(root)) / workorders.board_rel(root)
-        here = tree if tree.is_file() and not fetch else None
+        here = tree if tree.exists() and not fetch else None  # the stub, or a bare v3 directory
         live = self._live_commits() if self._promotes_read else None
         fetched = None
         if fetch:  # the merge moved origin: fetched first, and a fetch that fails is the re-read failing (TD-1508)

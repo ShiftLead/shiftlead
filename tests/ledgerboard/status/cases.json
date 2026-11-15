@@ -1,0 +1,154 @@
+{
+ "status_problem": [
+  {
+   "name": "open_in_place",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n\n**Why:** a reason.\n",
+   "archived": false
+  },
+  {
+   "name": "open_archived",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "resolved_in_place",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-03\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "resolved_open",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-03\n\n**Why:** a reason.\n",
+   "archived": false
+  },
+  {
+   "name": "superseded_in_place",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Superseded 2026-10-03 by TD-5\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "superseded_other_repo",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Superseded 2026-10-03 by acme#TD-5\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "dropped_in_place",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Dropped 2026-10-03\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "dropped_open",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Dropped 2026-10-03\n\n**Why:** a reason.\n",
+   "archived": false
+  },
+  {
+   "name": "open_dated",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open 2026-10-01\n\n**Why:** a reason.\n",
+   "archived": false
+  },
+  {
+   "name": "resolved_dot",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-03.\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "resolved_lower",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** resolved 2026-10-03\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "resolved_bare",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "resolved_tail",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-10-03: shipped\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "resolved_unreal",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Resolved 2026-02-30\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "superseded_no_by",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Superseded 2026-10-03\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "superseded_bad_id",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Superseded 2026-10-03 by #5\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "dropped_by",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Dropped 2026-10-03 by TD-5\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "open_none",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n\n**Why:** a reason.\n",
+   "archived": false
+  },
+  {
+   "name": "archived_empty",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:**\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "open_done",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Done 2026-10-01\n\n**Why:** a reason.\n",
+   "archived": false
+  },
+  {
+   "name": "open_designed",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Designed 2026-10-01\n\n**Why:** a reason.\n",
+   "archived": false
+  },
+  {
+   "name": "archived_done",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Done 2026-10-01\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "archived_moved",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Moved to TD-5\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "archived_obe",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** OBE\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "archived_partly",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Partly\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "archived_open",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "open_bold_resolved_dot",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** **Resolved**.\n\n**Why:** a reason.\n",
+   "archived": false
+  },
+  {
+   "name": "open_held",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open, held\n\n**Why:** a reason.\n",
+   "archived": false
+  },
+  {
+   "name": "archived_prose",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Gone quiet\n\n**Why:** a reason.\n",
+   "archived": true
+  },
+  {
+   "name": "open_two_spaces",
+   "text": "## TD-7: An invented entry\n\n**Priority:** Low\n**Added:** 2026-09-01\n**Status:** Open \n\n**Why:** a reason.\n",
+   "archived": false
+  }
+ ]
+}

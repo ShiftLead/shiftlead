@@ -1,417 +1,4 @@
 {
-  "item-line": {
-    "item-line": {
-      "accept": [
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [x] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20.",
-        "  - [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20.",
-        "- [ ] \tact 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20."
-      ]
-    },
-    "decide-item": {
-      "accept": [
-        "- [ ] decide 2026-01-05 (session `w-1`) — Ship it? Context: TD-12. Due: 2026-01-20. Answers: Go (default) | Not yet."
-      ],
-      "refuse": [
-        "- [ ] decide 2026-01-05 (session `w-1`) — Ship it? Context: TD-12. Due: 2026-01-20. Answers: Go."
-      ]
-    },
-    "look-item": {
-      "accept": [
-        "- [ ] look 2026-01-05 (n/a) — Check the page. Context: PR #4. Due: 2026-01-20. Answers: Works | Not right: <what>."
-      ],
-      "refuse": [
-        "- [ ] look 2026-01-05 (n/a) — Check the page. Context: PR #4. Due: 2026-01-20. Answers: Works | Broken."
-      ]
-    },
-    "fyi-item": {
-      "accept": [
-        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none."
-      ],
-      "refuse": [
-        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none. Due: 2026-01-20."
-      ]
-    },
-    "other-item": {
-      "accept": [
-        "- [ ] watch 2026-01-05 (n/a) — Recheck the job. Context: none. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] watch 2026-01-05 (n/a) — Recheck the job. Context: none."
-      ]
-    },
-    "decided-item": {
-      "accept": [
-        "- [ ] decide 2026-01-05 (person) — Ship it. Context: TD-12. Due: 2026-01-05. Answers: Go | Not yet. Decided: Go (by pat) (2026-01-05).",
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. Decided: done (2026-01-06).",
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team ops. Due: 2026-01-20. Decided: done (2026-01-06)."
-      ],
-      "refuse": [
-        "- [ ] decide 2026-01-05 (person) — Ship it. Context: TD-12. Due: 2026-01-05. Answers: Go | Not yet."
-      ]
-    },
-    "head": {
-      "accept": [
-        "- [ ] act 2026-01-05 (session `w-1`) — Rotate the key. Context: TD-7. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (session w-1 on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20."
-      ]
-    },
-    "any-head": {
-      "accept": [
-        "- [ ] decide 2026-01-05 (person) — Ship it. Context: TD-12. Due: 2026-01-05. Answers: Go | Not yet. Decided: Go (by pat) (2026-01-05)."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (someone) — Rotate the key. Context: TD-7. Due: 2026-01-20. Decided: done (2026-01-06)."
-      ]
-    },
-    "head-name": {
-      "accept": [
-        "- [ ] act 2026-01-05 (session `w.1/x` on box_1) — Rotate the key. Context: TD-7. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (session `w;1`) — Rotate the key. Context: TD-7. Due: 2026-01-20."
-      ]
-    },
-    "date": {
-      "accept": [
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] act 2026-1-5 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20."
-      ]
-    },
-    "digit": {
-      "accept": [
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-0x-20."
-      ]
-    },
-    "text": {
-      "accept": [
-        "- [ ] act 2026-01-05 (n/a) — Why now? Context: TD-7. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (n/a) — Rotate the key Context: TD-7. Due: 2026-01-20."
-      ]
-    },
-    "context": {
-      "accept": [
-        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7, PR #3 and branch `fix-1`. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7 Due: 2026-01-20.",
-        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: .. Due: 2026-01-20."
-      ]
-    },
-    "parts": {
-      "accept": [
-        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-20. Answers: Go | Not yet."
-      ],
-      "refuse": [
-        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15 TD-16. Due: 2026-01-20. Answers: Go | Not yet."
-      ]
-    },
-    "entry-id": {
-      "accept": [
-        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: TD-15, other#TD-3. Due: 2026-01-20. Answers: Go | Not yet."
-      ],
-      "refuse": [
-        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: TD-15, td-16. Due: 2026-01-20. Answers: Go | Not yet."
-      ]
-    },
-    "repo": {
-      "accept": [
-        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: acme/tools#TD-3. Due: 2026-01-20. Answers: Go | Not yet.",
-        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: a/b/c#TD-3. Due: 2026-01-20. Answers: Go | Not yet.",
-        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: owner/.github#TD-3. Due: 2026-01-20. Answers: Go | Not yet."
-      ],
-      "refuse": [
-        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: a//b#TD-3. Due: 2026-01-20. Answers: Go | Not yet.",
-        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: a/../b#TD-3. Due: 2026-01-20. Answers: Go | Not yet.",
-        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: ./x#TD-3. Due: 2026-01-20. Answers: Go | Not yet.",
-        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: https://h/o/r#TD-3. Due: 2026-01-20. Answers: Go | Not yet."
-      ]
-    },
-    "repo-part": {
-      "accept": [
-        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: my.repo_2#TD-3. Due: 2026-01-20. Answers: Go | Not yet.",
-        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: ...x#TD-3. Due: 2026-01-20. Answers: Go | Not yet."
-      ],
-      "refuse": [
-        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: my repo#TD-3. Due: 2026-01-20. Answers: Go | Not yet.",
-        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: -x#TD-3. Due: 2026-01-20. Answers: Go | Not yet.",
-        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: ..#TD-3. Due: 2026-01-20. Answers: Go | Not yet."
-      ]
-    },
-    "due": {
-      "accept": [
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20",
-        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7. due: 2026-01-20."
-      ]
-    },
-    "hide": {
-      "accept": [
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. Hide until: 2026-01-12."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. Hide until: 2026-01-12"
-      ]
-    },
-    "reply": {
-      "accept": [
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. — Pat, 2026-01-06: later, see Due: 2026-02-01."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. — Pat, 2026-01-06 later."
-      ]
-    },
-    "fyi-reply": {
-      "accept": [
-        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none. — sam, 2026-01-06: noted."
-      ],
-      "refuse": [
-        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none. — sam, 2026-01-06: moved to Due: 2026-02-01."
-      ]
-    },
-    "undated": {
-      "accept": [
-        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none. — sam, 2026-01-06: no date here.",
-        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none. — sam, 2026-01-06: see Due: now."
-      ],
-      "refuse": [
-        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none. — sam, 2026-01-06: due: 2026-02-01."
-      ]
-    },
-    "reply-name": {
-      "accept": [
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. — Pat Lee, 2026-01-06: later."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. — Pat, Lee, 2026-01-06: later."
-      ]
-    },
-    "choices": {
-      "accept": [
-        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: A | B | C (default)."
-      ],
-      "refuse": [
-        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: A | B"
-      ]
-    },
-    "answers": {
-      "accept": [
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. Answers: done. Decided: done (2026-01-06)."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. Answers: done Decided: done (2026-01-06)."
-      ]
-    },
-    "look-answers": {
-      "accept": [
-        "- [ ] look 2026-01-05 (n/a) — Check the page. Context: PR #4. Due: 2026-01-20. Answers: Works (default) | Not right: <what>."
-      ],
-      "refuse": [
-        "- [ ] look 2026-01-05 (n/a) — Check the page. Context: PR #4. Due: 2026-01-20. Answers: Works | Not right.",
-        "- [ ] look 2026-01-05 (n/a) — Check the page. Context: PR #4. Due: 2026-01-20. Answers: Works (Default) | Not right: <what>."
-      ]
-    },
-    "answer": {
-      "accept": [
-        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: Keep (default) — nothing changes | Drop — the entry is archived."
-      ],
-      "refuse": [
-        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: Keep | ."
-      ]
-    },
-    "label": {
-      "accept": [
-        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: A \\| B | C."
-      ],
-      "refuse": [
-        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: A |  | C."
-      ]
-    },
-    "label-chars": {
-      "accept": [
-        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: Keep it | Drop it."
-      ],
-      "refuse": [
-        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: Keep Context: it | Drop it."
-      ]
-    },
-    "label-char": {
-      "accept": [
-        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: x\\|y | z."
-      ],
-      "refuse": [
-        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: x || z."
-      ]
-    },
-    "answer-sep": {
-      "accept": [
-        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: A|B."
-      ],
-      "refuse": [
-        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: A / B."
-      ]
-    },
-    "lifts": {
-      "accept": [
-        "- [ ] decide 2026-01-05 (n/a) — Go on it? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Go with care | Not yet. Lifts: Go | Go with care."
-      ],
-      "refuse": [
-        "- [ ] decide 2026-01-05 (n/a) — Go on it? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Go with care | Not yet. Lifts: Go | Go with care"
-      ]
-    },
-    "decided": {
-      "accept": [
-        "- [ ] decide 2026-01-05 (person) — Ship it. Context: TD-12. Due: 2026-01-05. Answers: Go | Not yet. Decided: Go (by pat) (2026-01-05).",
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. Decided: done (2026-01-06)",
-        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20. Decided:done (2026-01-06).",
-        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20. Decided: do(2026-01-06)."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. Decided: done.",
-        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20. Decided: done (2026-01-06) now."
-      ]
-    },
-    "words": {
-      "accept": [
-        "- [ ] act 2026-01-05 (n/a) — Read the context notes. Context: TD-7. Due: 2026-01-20.",
-        "- [ ] fyi 2026-01-05 (n/a) — The page moContext:ed. Context: noContext:ne."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (n/a) — Read it, Answers: soon. Context: TD-7. Due: 2026-01-20."
-      ]
-    },
-    "field-name": {
-      "accept": [
-        "- [ ] act 2026-01-05 (n/a) — Answer the mail. Context: TD-7. Due: 2026-01-20.",
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: acme. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (n/a) — Rotate it. Context: TD-7 Closed: soon. Due: 2026-01-20."
-      ]
-    },
-    "due-name": {
-      "accept": [
-        "- [ ] act 2026-01-05 (n/a) — Fix the overdue job. Context: TD-7. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (n/a) — Rotate it. Context: TD-7. DUE: 2026-01-20."
-      ]
-    },
-    "char": {
-      "accept": [
-        "- [ ] act 2026-01-05 (n/a) — Rotate the key — all of it. Context: TD-7. Due: 2026-01-20.",
-        "- [ ] act 2026-01-05 (n/a) — Rotate the key\rnow. Context: TD-7. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (n/a) — Rotate the key\nnow. Context: TD-7. Due: 2026-01-20."
-      ]
-    },
-    "label-start": {
-      "accept": [
-        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: \\|x | y."
-      ],
-      "refuse": [
-        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: x |   | y."
-      ]
-    },
-    "field-at": {
-      "accept": [
-        "- [ ] watch 2026-01-05 (n/a) — Recheck theContext:job. Context: none. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] watch 2026-01-05 (n/a) — Recheck (Context: the job). Context: none. Due: 2026-01-20."
-      ]
-    },
-    "non-word": {
-      "accept": [
-        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: Keep xLifts: it | Drop it."
-      ],
-      "refuse": [
-        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: Keep (Lifts: it | Drop it."
-      ]
-    },
-    "dated-due": {
-      "accept": [
-        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none. — sam, 2026-01-06: overdue: 2026-02-01."
-      ],
-      "refuse": [
-        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none. — sam, 2026-01-06: (Due:2026-02-01)."
-      ]
-    },
-    "act-item": {
-      "accept": [
-        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20.",
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: acme/widgets. Due: 2026-01-20.",
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team ops. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: Team ops. Due: 2026-01-20.",
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: acme.. Due: 2026-01-20.",
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: Due: 2026-01-20.",
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Doer: acme. Context: TD-7. Due: 2026-01-20."
-      ]
-    },
-    "doer": {
-      "accept": [
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: acme/widgets. Due: 2026-01-20.",
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team ops. Due: 2026-01-20.",
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: Team ops. Due: 2026-01-20.",
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: acme.. Due: 2026-01-20.",
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: Due: 2026-01-20."
-      ]
-    },
-    "doer-repo": {
-      "accept": [
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: acme/widgets. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: acme/x.. Due: 2026-01-20."
-      ]
-    },
-    "doer-part": {
-      "accept": [
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: widgets. Due: 2026-01-20.",
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: .x. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: x.. Due: 2026-01-20.",
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: ... Due: 2026-01-20."
-      ]
-    },
-    "person": {
-      "accept": [
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team web.grind. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team web..grind. Due: 2026-01-20."
-      ]
-    },
-    "person-part": {
-      "accept": [
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team ops. Due: 2026-01-20."
-      ],
-      "refuse": [
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team web... Due: 2026-01-20.",
-        "- [ ] act 2026-01-05 (session `w-1`) — Bump the pin. Context: TD-7. Doer: team a b. Due: 2026-01-20."
-      ]
-    }
-  },
   "rank-file": {
     "rank-file": {
       "accept": [
@@ -1204,6 +791,304 @@
       ],
       "refuse": [
         "- 2026-01-05: gate added: decision (a+b)"
+      ]
+    }
+  },
+  "item-file": {
+    "item-file": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20"
+      ]
+    },
+    "item-text": {
+      "accept": [
+        "## Ping sam, Context: TD-9 Due: 2026-01-01.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ],
+      "refuse": [
+        "## Ping sam. \n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ]
+    },
+    "item-header": {
+      "accept": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Parts:** TD-15, TD-16\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n**Lifts:** Go | Split\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Due:** 2026-11-20\n**Context:** TD-1\n"
+      ]
+    },
+    "kind-field": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** watch\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** banana\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ]
+    },
+    "added-field": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** soon\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ]
+    },
+    "session-field": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w 9\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ]
+    },
+    "context-field": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1 decision (pat), Due: 2026-01-01\n**Due:** 2026-11-20\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** \n**Due:** 2026-11-20\n"
+      ]
+    },
+    "parts-field": {
+      "accept": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Parts:** TD-15\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ],
+      "refuse": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Parts:** TD-15,TD-16\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ]
+    },
+    "doer-field": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Doer:** team ops\n**Due:** 2026-11-20\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Doer:** team  ops\n**Due:** 2026-11-20\n"
+      ]
+    },
+    "doer-repo": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Doer:** acme/widgets\n**Due:** 2026-11-20\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Doer:** acme/widgets.\n**Due:** 2026-11-20\n"
+      ]
+    },
+    "doer-part": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Doer:** .github\n**Due:** 2026-11-20\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Doer:** acme.\n**Due:** 2026-11-20\n"
+      ]
+    },
+    "due-field": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** soon\n"
+      ]
+    },
+    "hide-field": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n**Hide until:** 2026-11-15\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n**Hide until:** later\n"
+      ]
+    },
+    "answers-field": {
+      "accept": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ],
+      "refuse": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:**Go | No\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ]
+    },
+    "lifts-field": {
+      "accept": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n**Lifts:** Split\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ],
+      "refuse": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n**Lifts:** \n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ]
+    },
+    "decided-field": {
+      "accept": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n**Decided:** 2026-11-12 by pat — Go (by Friday)\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ],
+      "refuse": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n**Decided:** 2026-11-12 by pat smith — Go\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ]
+    },
+    "closed-field": {
+      "accept": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n**Decided:** 2026-11-12 — Go\n**Closed:** 2026-11-12 — lifted\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ],
+      "refuse": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n**Decided:** 2026-11-12 — Go\n**Closed:** 2026-11-12 —\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ]
+    },
+    "item-answer": {
+      "accept": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the scope stands | Change — reply with what changes\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ],
+      "refuse": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:**  Go | No\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ]
+    },
+    "item-label": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** look\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n**Answers:** Works | Not right: <what>\n"
+      ],
+      "refuse": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go | No |\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ]
+    },
+    "item-body": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n\n- **Context:** the key is old.\n  - nested, Context: words.\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n\n- **Context:** a.\n\n- **Question:** b?\n"
+      ]
+    },
+    "body-line": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n\n- **Context:** a.\n  - more.\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n\nPlain prose line.\n"
+      ]
+    },
+    "item-log": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n\n- **Context:** the key is old.\n  - nested, Context: words.\n\n**Log:**\n- 2026-11-12: pat: does S4 cover it?\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n\n- **Context:** the key is old.\n  - nested, Context: words.\n\n**Log:**\n"
+      ]
+    },
+    "reply-line": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n\n**Log:**\n- 2026-11-12: pat: does S4 cover it?\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n\n**Log:**\n- 2026-11-12 pat: words\n"
+      ]
+    },
+    "reply-by": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n\n**Log:**\n- 2026-11-12: sam.lee: ok\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n\n**Log:**\n- 2026-11-12: a:b: words\n"
+      ]
+    },
+    "date": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-1\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ]
+    },
+    "digit": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-1١\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ]
+    },
+    "char": {
+      "accept": [
+        "## Ping — sam: ok? «yes»\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\nmore words\n**Due:** 2026-11-20\n"
+      ]
+    },
+    "nonspace": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1 \n**Due:** 2026-11-20\n"
+      ]
+    },
+    "head-name": {
+      "accept": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ],
+      "refuse": [
+        "## Ping sam.\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host;a\n**Context:** TD-1\n**Due:** 2026-11-20\n"
+      ]
+    },
+    "entry-id": {
+      "accept": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Parts:** acme/widgets#TD-15, TD-16\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ],
+      "refuse": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Parts:** TD-x\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ]
+    },
+    "repo": {
+      "accept": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Parts:** acme/widgets#TD-15\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ],
+      "refuse": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Parts:** acme//widgets#TD-15\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ]
+    },
+    "repo-part": {
+      "accept": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Parts:** .github#TD-15\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ],
+      "refuse": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Parts:** -x#TD-15\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ]
+    },
+    "person": {
+      "accept": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n**Decided:** 2026-11-12 by sam.lee — Go\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ],
+      "refuse": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n**Decided:** 2026-11-12 by sam..lee — Go\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ]
+    },
+    "person-part": {
+      "accept": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n**Decided:** 2026-11-12 by pat_2 — Go\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ],
+      "refuse": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n**Decided:** 2026-11-12 by pat! — Go\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ]
+    },
+    "answer-sep": {
+      "accept": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go|Split\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ],
+      "refuse": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go || Split\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ]
+    },
+    "label-start": {
+      "accept": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** \\|x | Split\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ],
+      "refuse": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go | | Split\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ]
+    },
+    "label-char": {
+      "accept": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go — now | Hold: wait a bit\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ],
+      "refuse": [
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go | Spl\nit\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
       ]
     }
   }

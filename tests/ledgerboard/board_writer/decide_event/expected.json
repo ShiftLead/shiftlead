@@ -5,13 +5,14 @@
   "entries": [
    "TD-001"
   ],
+  "id": "2026-01-12-a0000017",
   "item_notes": [],
-  "line": 23,
   "notes": [],
   "paths": [
-   "board.md",
+   "board/archive/2026-01/2026-01-12-a0000017.md",
+   "board/2026-01-12-a0000017.md",
    "ledger/TD-001.md"
   ],
-  "subject": "ledgerboard: decide Did the vendor ship?: Go (session n/a)"
+  "subject": "ledgerboard: decide 2026-01-12-a0000017 Did the vendor ship?: Go (session n/a)"
  }
 }

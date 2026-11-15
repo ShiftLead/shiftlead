@@ -2,11 +2,9 @@
  "argv": [
   "done",
   "--board",
-  "board.md",
-  "--line",
-  "7",
-  "--expect",
-  "act",
+  "board",
+  "--id",
+  "2026-01-10-a0000007",
   "--plan",
   "--today",
   "2026-01-15"

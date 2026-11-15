@@ -1,0 +1,123 @@
+{
+ "closed": [
+  {
+   "added": "2026-01-07",
+   "answers": [],
+   "closed": {
+    "date": null,
+    "why": null
+   },
+   "consequences": [],
+   "context": "TD-3",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": null,
+   "due_error": null,
+   "due_tag": "no due date",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-01-07"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-3"
+    ],
+    [
+     "Closed",
+     "2026-02-30 — lifted"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-07-aab58e63",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "",
+   "raw": "- [x] act 2026-01-07 (session w-9) — Check the logs. Context: TD-3. Closed: 2026-02-30 — lifted.",
+   "refs": [
+    "TD-3"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "Check the logs.",
+   "waiting_on": "person"
+  },
+  {
+   "added": "2026-01-08",
+   "answers": [],
+   "closed": {
+    "date": null,
+    "why": null
+   },
+   "consequences": [],
+   "context": "TD-4",
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "doer": null,
+   "due": null,
+   "due_error": null,
+   "due_tag": "no due date",
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-01-08"
+    ],
+    [
+     "Session",
+     "w-9"
+    ],
+    [
+     "Context",
+     "TD-4"
+    ]
+   ],
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "id": "2026-01-08-fa3021df",
+   "kind": "act",
+   "lifts": null,
+   "notes": [],
+   "overdue_days": null,
+   "parts": [],
+   "path": "",
+   "raw": "- [x] act 2026-01-08 (session w-9) — Check the disk. Context: TD-4. Closed: soon.",
+   "refs": [
+    "TD-4"
+   ],
+   "replies": [],
+   "session": "w-9",
+   "text": "Check the disk. Closed: soon.",
+   "waiting_on": "person"
+  }
+ ],
+ "items": [],
+ "keys": [
+  "2026-01-07-aab58e63",
+  "2026-01-08-fa3021df"
+ ],
+ "needs_you": [],
+ "people": null
+}

@@ -5238,7 +5238,7 @@ class TickMixin:
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """The checkout's board and the work orders derived from it (§4.4 *Each reading has one owner*,
         *The boards*, TD-615): `boards` — `workorders.read_boards`' reading, with `file` the checkout's
-        board as last read (its mtime and size), `today` the reading's day and `at` — and the lanes'
+        board as last read (`workorders.board_stamp`), `today` the reading's day and `at` — and the lanes'
         `work_orders`, its decided open lines (TD-384), never a second read.
 
         `due` (the `REPOS_EVERY` pass) reads against origin (`workorders._against_origin`); `clock`
@@ -5250,11 +5250,7 @@ class TickMixin:
         of the same board (`root` and `label`) forward: only a read against origin writes it (§4.9b
         *The sweep*, TD-1090). `fetched` is the pass's own fetch, which a read against origin reuses (TD-1471)."""
         bds, wos = old.get("boards"), old.get("work_orders")
-        try:
-            st = (Path(root) / workorders.board_rel(root)).stat()
-            file: list[int] | None = [st.st_mtime_ns, st.st_size]
-        except OSError:
-            file = None
+        file = workorders.board_stamp(root)  # a v3 board's every file, not its stub alone (TD-1881)
         today = datetime.now().date().isoformat()  # the reading's own day, local
         new_day = bds is not None and bds.get("today") != today
         moved = bds is None or "error" in bds or bds.get("file") != file or new_day

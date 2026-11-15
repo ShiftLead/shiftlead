@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "add",
+  "refused": "an answered item needs both --said, the answer's words, and --by, who said it"
+ }
+}

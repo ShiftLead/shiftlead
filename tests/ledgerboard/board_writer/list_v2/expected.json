@@ -1,0 +1,82 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "list",
+  "items": [
+   {
+    "added": "2026-01-10",
+    "answers": [],
+    "closed": null,
+    "consequences": [],
+    "context": "PR #12",
+    "decided": null,
+    "decided_by": null,
+    "default": null,
+    "detail": [],
+    "doer": null,
+    "due": "2026-01-20",
+    "due_error": null,
+    "due_tag": "due 2026-01-20",
+    "hidden": false,
+    "hide_until": null,
+    "host": "host-a",
+    "id": "2026-01-10-dbb28a40",
+    "kind": "act",
+    "lifts": null,
+    "notes": [],
+    "overdue_days": null,
+    "parts": [],
+    "path": "",
+    "refs": [
+     "PR #12"
+    ],
+    "replies": [],
+    "session": "w-1",
+    "text": "Merge the parser fix.",
+    "waiting_on": "person"
+   },
+   {
+    "added": "2026-01-11",
+    "answers": [
+     "Memory",
+     "Disk"
+    ],
+    "closed": null,
+    "consequences": [
+     "",
+     ""
+    ],
+    "context": "TD-7",
+    "decided": null,
+    "decided_by": null,
+    "default": "Memory",
+    "detail": [
+     "- **Context:** Two caches fit.",
+     "- **Question:** Which one?",
+     "- **Recommended:** Memory — it is faster."
+    ],
+    "doer": null,
+    "due": "2026-01-18",
+    "due_error": null,
+    "due_tag": "due 2026-01-18",
+    "hidden": false,
+    "hide_until": null,
+    "host": null,
+    "id": "2026-01-11-766afb35",
+    "kind": "decide",
+    "lifts": null,
+    "notes": [],
+    "overdue_days": null,
+    "parts": [],
+    "path": "",
+    "refs": [
+     "TD-7"
+    ],
+    "replies": [],
+    "session": "w-2",
+    "text": "**Pick a cache.**",
+    "waiting_on": "person"
+   }
+  ]
+ }
+}

@@ -2,6 +2,6 @@
  "exit": 1,
  "out": {
   "action": "add",
-  "refused": "board.md: line 8: context: the gate's person lee is not on the board's `People:`"
+  "refused": "board: 2026-01-15-5eed0001.md: context: the gate's person lee is not on the board's `People:`"
  }
 }
