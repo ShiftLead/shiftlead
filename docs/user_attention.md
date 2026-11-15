@@ -10,7 +10,7 @@ People: paul
 
 ## Needs the user
 
-- [ ] decide 2026-11-14 (n/a) — Should the grinders build the one answer bar on every Queue item now, as your hold note on its design said? Context: TD-1842 decision (paul). Due: 2026-11-16. Answers: Go (default) — the grinders build TD-1842 now, as designed | Wait — it waits for the design's next review question.
+- [x] decide 2026-11-14 (n/a) — Should the grinders build the one answer bar on every Queue item now, as your hold note on its design said? Context: TD-1842 decision (paul). Due: 2026-11-16. Answers: Go (default) — the grinders build TD-1842 now, as designed | Wait — it waits for the design's next review question. Decided: Go (by paul) (2026-11-14). Closed: 2026-11-14 — lifted.
   - **Context:** Your Hold on TD-1832 (board:ef7521de) said Build TD-1842 as designed; no unattended session may lift your hold, so this press does it. TD-1842 places today's controls in the answer bar, Lift the hold among them, with its one draw rule (none on an entry you own to do). It builds from the design as it stands today. Go releases TD-1842 alone: TD-1843 stays held for TD-1832's next question.
   - **Question:** Build TD-1842 now?
   - **Recommended:** Go — you asked for it in the Hold; the revision (TD-1876) states TD-1842's one Lift rule in TD-1829 unchanged.
