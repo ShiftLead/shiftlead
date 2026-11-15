@@ -383,6 +383,27 @@ def test_every_gh_call_names_its_repo_and_an_at_name_reaches_the_pr_body_in_a_co
     assert "@someone?" in _branch(x, pr["head"], "docs/user_attention.md"), "the board keeps the words as written"
 
 
+def test_qualify_leaves_an_id_inside_a_path_as_written_and_qualifies_a_standalone_one():
+    # TD-1868: #3913's item for ledgerboard's TD-109 named docs/plans/ledgerboard#TD-109-decision-missing.md
+    it = {
+        "kind": "decide",
+        "context": "ledgerboard#TD-109 decision (paul)",
+        "text": "Read docs/plans/TD-109-decision-missing.md and TD-109.md, then decide TD-109.",
+        "detail": {"question": "Is TD-109 done, as docs/plans/TD-109-decision-missing.md says?", "x": ["see TD-109"]},
+    }
+    got = gatesweep._qualify("Ledgerboard", it)
+    assert got["text"] == (
+        "Read docs/plans/TD-109-decision-missing.md and TD-109.md, then decide ledgerboard#TD-109."
+    ), got["text"]
+    assert got["detail"] == {
+        "question": "Is ledgerboard#TD-109 done, as docs/plans/TD-109-decision-missing.md says?",
+        "x": ["see ledgerboard#TD-109"],
+    }, got["detail"]
+    assert gatesweep._qualify("x", {**it, "text": "TD-1090 and x#TD-109 and TD-109"})["text"] == (
+        "TD-1090 and x#TD-109 and x#TD-109"
+    )
+
+
 def test_unmention_puts_each_at_name_in_a_code_span_and_leaves_the_rest():
     assert gatesweep.unmention("ask @paul and @org/team, not a@b.c or `@kept`") == (
         "ask `@paul` and `@org/team`, not a@b.c or `@kept`"
