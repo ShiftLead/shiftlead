@@ -91,7 +91,8 @@ def test_the_guard_passes_what_is_removed(source):
 def test_a_run_keeps_only_the_newest_runs_temporary_directories(pytestconfig):
     """pytest keeps one run's `pytest-N` base temp, not its default three (TD-1890, TD-1892).
 
-    Three passing runs' directories in the shared `/tmp` filled its inode table on 2026-11-15. Read through pytest's own
-    config, so a deleted line (its default is 3) fails here, and so does an option pytest no longer knows (`getini` raises).
+    Three passing runs' directories in the shared `/tmp` filled its inode table on 2026-11-15. Read through pytest's
+    own config, so a deleted line (its default is 3) fails here, and so does an option pytest no longer knows
+    (`getini` raises).
     """
     assert int(pytestconfig.getini("tmp_path_retention_count")) == 1
