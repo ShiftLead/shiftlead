@@ -124,14 +124,15 @@ full conventions in `docs/cadence.md` (the pinned tree's: `agent-cadence path ca
    writes the ledger and the board only through the helpers*): a change to an entry is
    `agent-cadence run ledger.py set|note|edit|archive|reopen|renumber`; a new entry takes its id from
    `ao td reserve` and is filed under it with `agent-cadence run ledger.py new --id TD-n` (its header
-   fields as flags, `--why`, `--fix` and `--done-when` from files). A board line is `agent-cadence run board_edit.py
-   add --board docs/user_attention.md --no-commit` (with a `Due:` or a `Context:`; `add --help` lists the
-   rest), and a change to one its `done`, `snooze` or `due` with `--no-commit`, or `ao board edit
-   done|snooze`; a `decide` or a `reply` is Paul's. Commit a helper's result in your own PR — but a `done` that
-   archives (the board already holds nine closed items) runs without `--no-commit`, the board committed first. A
-   conflict on the board resolves by `agent-cadence run board_edit.py replay --board docs/user_attention.md`, then
-   `git rebase --continue`, run by the PR's author before the re-precheck (a cloud session's PR, its reader;
-   design §4.4 *Two PRs' records merge in either order*). Due items are printed
+   fields as flags, `--why`, `--fix` and `--done-when` from files). The board is a directory since ledgerboard v3.0
+   (`docs/user_attention/`, one file per item, closed ones under `archive/<YYYY-MM>/`; `docs/user_attention.md`
+   is a stub naming it). A board item is `agent-cadence run board_edit.py add --board docs/user_attention.md
+   --no-commit` (with a `Due:` or a `Context:`; `add --help` lists the rest), and a change to one its `done`,
+   `snooze` or `due --id <id>` with `--no-commit` (the id from `board_edit.py list`), or `ao board edit
+   done|snooze`; a `decide` or a `reply` is Paul's. Commit a helper's result in your own PR. A conflict on the
+   board keeps both sides' item files; an edit of one item that conflicts is re-done through the writer after
+   the rebase, by the PR's author before the re-precheck (a cloud session's PR, its reader; design §4.4 *Two PRs'
+   records merge in either order*). Due items are printed
    into the context of every session started in a repo that wires the SessionStart hook (this
    repo does, via `.claude/settings.json`). If parked work has a branch, push it and name it.
 2. **Periodic sweep.** Run `/stranded-work` weekly or whenever in doubt; `/attention` is the
@@ -212,6 +213,6 @@ Fix them upstream in agent-cadence and bump the pin (`agent-cadence bump`, a rev
 | Working cadence (sessions, reviews, TD flow) | `cadence.md` in the pinned agent-cadence (`agent-cadence path cadence.md`; edit it in agent-cadence, never here) |
 | Which agent-cadence this repo runs | [docs/cadence.toml](docs/cadence.toml) — its `[agent-cadence]` table pins the commit (TD-129); `agent-cadence bump` moves it |
 | Known issues and deferred work | [docs/ledger/](docs/ledger/README.md), one `TD-NNN.md` per entry |
-| What is waiting on Paul / parked work | [docs/user_attention.md](docs/user_attention.md) |
+| What is waiting on Paul / parked work | [docs/user_attention/](docs/user_attention/README.md), one file per item (`docs/user_attention.md` is its stub) |
 | Durable cross-session memory | [docs/claude-memory/MEMORY.md](docs/claude-memory/MEMORY.md) |
 | Resume a past session | `agent-cadence run list_sessions.py` |
