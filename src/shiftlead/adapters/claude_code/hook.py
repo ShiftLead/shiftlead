@@ -395,13 +395,33 @@ def report_usage(session: str, payload: dict[str, Any], now: float, timeout: flo
     tmp.replace(f)
 
 
+def placed_by_cgroup(text: str | None = None) -> bool:
+    """Whether this process runs in a pane's own cgroup — the installed home's `pane-<name>`, or a
+    systemd tmux's `tmux-spawn-*.scope` — where the home places an orphan by that cgroup (design §4.8a,
+    the fourth signal). `text` is `/proc/self/cgroup`'s, read when not given; a host with none of
+    either (a dev run, a container) answers False, and there an orphan would be read as outside."""
+    if text is None:
+        try:
+            text = Path("/proc/self/cgroup").read_text(encoding="utf-8")
+        except OSError:
+            return False
+    for line in text.splitlines():
+        if line.startswith("0::"):
+            leaf = line[3:].rstrip("/").rpartition("/")[2]
+            return leaf.startswith("pane-") or (leaf.startswith("tmux-spawn-") and leaf.endswith(".scope"))
+    return False
+
+
 def aside(fn: Any, wait: float = REPORT_TIMEOUT) -> None:
-    """Run `fn` in a child, waiting at most `wait` for it (design §4.4 *A report*, TD-1589). A home that
-    answers in time is answered while this process — the child's parent, its link to the pane — still
-    runs; one that lags finds the child alive past this process's exit, out of the status line's
-    process group (so the tool's cancel of the group does not reach it) and holding none of its pipes
-    (so the tool does not wait for it). `fn` takes the bound it may wait: `REPORT_WAIT` in the child,
-    and `wait` where there is no fork and it runs here."""
+    """Run `fn` in a child, waiting at most `wait` for it (design §4.4 *A report*, TD-1589, TD-1741).
+    The tool cancels a status line by killing its whole process tree, a child outside its process
+    group too, so where the pane's own cgroup places an orphan (`placed_by_cgroup`) the child forks
+    again and exits at once: the reporter, in a session of its own (`setsid`), is no descendant of
+    the status line, and the tree's kill does not reach it. Elsewhere the child is the reporter, out
+    of the status line's process group, and its parent — this process, its link to the pane while it
+    runs — waits for it. Either way the reporter holds none of the status line's pipes (so the tool
+    does not wait for it). `fn` takes the bound it may wait: `REPORT_WAIT` in the reporter, and
+    `wait` where there is no fork and it runs here."""
     try:
         pid = os.fork()
     except (AttributeError, OSError):
@@ -409,8 +429,16 @@ def aside(fn: Any, wait: float = REPORT_TIMEOUT) -> None:
         return
     if pid == 0:  # the child: never returns
         try:
-            with contextlib.suppress(OSError):
-                os.setpgid(0, 0)
+            detached = False
+            if placed_by_cgroup():
+                with contextlib.suppress(OSError):
+                    if os.fork():
+                        os._exit(0)  # the go-between: the reporter is orphaned the moment it exits
+                    os.setsid()  # the reporter: no group leader, so a session of its own
+                    detached = True
+            if not detached:
+                with contextlib.suppress(OSError):
+                    os.setpgid(0, 0)
             null = os.open(os.devnull, os.O_RDWR)
             for fd in (0, 1, 2):
                 os.dup2(null, fd)
