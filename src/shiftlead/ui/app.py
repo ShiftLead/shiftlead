@@ -1099,9 +1099,12 @@ HAND_UNCHECKED = "could not check whether this was handed: {words}"
 
 
 def _no_line(words: str) -> bool:
-    """Whether a refusal is `workorders.NO_LINE`'s: the line closed or reworded since it was read."""
+    """Whether a refusal is `workorders.NO_LINE`'s, or a closed item's (ledgerboard v3.0, TD-1881): the line closed
+    or reworded since it was read."""
     head, _, tail = workorders.NO_LINE.partition("{ref}")
-    return str(words).startswith(head) and tail in str(words)
+    words = str(words)
+    # a v3 board reads the archive first: an item a first press closed is refused *<ref> was closed <date>: …*
+    return (words.startswith(head) and tail in words) or (" was closed " in words and board_mod.MOVED in words)
 
 
 def _row_line(body: Mapping[str, Any]) -> int | None:

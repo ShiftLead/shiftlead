@@ -1405,7 +1405,7 @@ class InboxMixin:
         if old is None:
             return False
         tree = board_mod.tree_dir(Path(root)) / workorders.board_rel(root)
-        here = tree if tree.is_file() and not fetch else None
+        here = tree if tree.exists() and not fetch else None  # the stub, or a bare v3 directory
         live = self._live_commits() if self._promotes_read else None
         fetched = None
         if fetch:  # the merge moved origin: fetched first, and a fetch that fails is the re-read failing (TD-1508)

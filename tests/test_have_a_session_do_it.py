@@ -356,3 +356,14 @@ def test_the_waiting_line_covers_its_entry_on_its_card():
     other = {**pressed, "decided": {"text": "Go", "date": "Nov 7"}, "kind": "decide"}
     got = attach({"waiting": [other]}, drawn, [_ledger_row(50)])
     assert [m["html"] for m in got["cards"]["r#TD-050"]["needs"]] == ["ledger:r:TD-050"]
+
+
+def test_a_second_press_reads_the_item_a_first_press_archived_as_taken():
+    """TD-1708 on a v3 board (TD-1881): the writer reads the archive first, so the item a first Done moved there
+    is refused *<ref> was closed <date>: …*, which the hand-off's retry takes as taken, as it took *no line*."""
+    from shiftlead.ui import app as app_mod
+
+    closed = str(board.Refused(f"board:0123abcd was closed 2026-11-15: {board.MOVED}"))
+    assert app_mod._no_line(closed)
+    assert app_mod._no_line(workorders.NO_LINE.format(ref="board:0123abcd"))
+    assert not app_mod._no_line("origin could not be reached: the edit was not made")

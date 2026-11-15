@@ -546,11 +546,13 @@ def _writable(path: str, name: str) -> None:
         )
 
 
-def _write_board(path: str, items: list[dict], ids: list[str], today_local: date, by: str, why: str) -> int:
+def _write_board(
+    path: str, items: list[dict], ids: list[str], today_local: date, by: str, why: str, *, name: str = "the repo"
+) -> int:
     """File `items` on, and close the open items whose ids are `ids` on, the v3 board at `path` (the stub, which
     names the directory) through the vendored writer, each item due today under the session `SESSION`; how many it
     closed. A v2 board is refused before anything is written (`_writable`)."""
-    _writable(path, Path(path).parent.parent.name)
+    _writable(path, name)  # the repo's name: `path` is in a tree of the sweep's own
     for it in items:
         lb_board.apply(
             lb_board.plan_add(
@@ -595,7 +597,9 @@ def _own_board(
     branch = f"{SWEEP_BRANCH}{today_utc.isoformat()}"
     with Tree(root, p["base"], branch) as tree:
         board = str(tree / lb.BOARD_V2_PATH)  # the stub names the directory; a v2 board is refused (split first)
-        closed = _write_board(board, items, keys, today_local, by, "the gate sweep: its condition no longer holds")
+        closed = _write_board(
+            board, items, keys, today_local, by, "the gate sweep: its condition no longer holds", name=Path(root).name
+        )
         subject = f"board: gate sweep {today_utc.isoformat()} — {len(items)} filed, {closed} closed (TD-1376)"
         body = "\n".join(
             ["The home's gate sweep (design §4.4, TD-1376) on this repo's own board.", ""]
@@ -716,7 +720,7 @@ def _other_board(
     with Tree(there, base, branch) as tree:
         path = str(tree / lb.BOARD_V2_PATH)  # the stub names the directory; a v2 board is refused (split first)
         closed = _write_board(path, [_qualify(p["repo"], it) for it in items], keys, today_local, by,
-                              f"the gate sweep of {p['repo']}: its condition no longer holds")  # fmt: skip
+                              f"the gate sweep of {p['repo']}: its condition no longer holds", name=board)  # fmt: skip
         subject = f"board: {p['repo']}'s gate sweep {today_utc.isoformat()} — {len(items)} filed, {closed} closed"
         body = "\n".join(
             [
