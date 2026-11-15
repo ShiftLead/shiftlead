@@ -191,6 +191,7 @@ def test_ao_repo_prints_the_tag_and_its_reader_for_a_session_and_its_json_carrie
     r = _repo_world(monkeypatch, tmp_path, fleet)
     r["pr_orders"]["asked"] = {"811": {"at": "2026-10-16T10:00:00Z", "to": "ao-r-techlead-1"}}
     r["pr_orders"]["unasked"] = [805]
+    r["pr_orders"]["reads"] = {"811": [{"state": "open"}], "805": [{"state": "closed"}]}
     assert cli.main(["repo", "r"]) == 0
     out = capsys.readouterr().out
     assert "         unasked 17h — post its review, then ao msg --kind ask --pr 805 techlead-1" in out
@@ -199,6 +200,8 @@ def test_ao_repo_prints_the_tag_and_its_reader_for_a_session_and_its_json_carrie
     prs = {p["number"]: p for p in json.loads(capsys.readouterr().out)[0]["prs"]["open"]}
     assert (prs[805]["held"], prs[805]["asked"], prs[805]["unasked"]) == (["docs/briefs/designer.md"], None, True)
     assert prs[811]["asked"] == {"at": "2026-10-16T10:00:00Z", "to": "ao-r-techlead-1"} and prs[811]["unasked"] is False
+    # `read_open`: any addressee's read of it open (§4.7, TD-1854)
+    assert prs[811]["read_open"] is True and prs[805]["read_open"] is False
 
 
 def test_ao_repo_orders_two_teams_as_the_org_does(tmp_path, monkeypatch, capsys):

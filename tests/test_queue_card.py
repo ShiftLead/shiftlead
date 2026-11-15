@@ -30,8 +30,13 @@ def test_item_home_says_how_each_item_found_its_entry():
     assert item_home(board, idx)["tied"] == {"by": "context", "ref": "TD-030"}
     # a bare ref on another repo's board is that repo's: qualified with the line's own repo
     assert item_home({**board, "repo_name": "s"}, idx)["tied"] == {"by": "context", "ref": "s#TD-030"}
-    red = {"row": "red_pr", "id": "red_pr:s:5", "repo": "s", "title": "slice 2", "branch": "TD-10-thing"}
+    red = {"row": "red_pr", "id": "red_pr:s:5", "repo": "s", "title": "TD-10: slice 2"}
     assert item_home(red, idx)["tied"] == {"by": "pr", "ref": "s#TD-010"}
+    # by its title alone: the row carries no branch (TD-1854)
+    assert item_home({**red, "title": "slice 2", "branch": "TD-10-thing"}, idx)["tied"] is None
+    # the gate sweep's board PR stays on the Inbox tab whatever its title names (TD-1854)
+    sweep = item_home({**red, "title": "Gate sweep (TD-10): board items", "sweep": True}, idx, needs=True)
+    assert (sweep["home"], sweep["tied"]) == ("inbox", None)
     fork = {"row": "fork_pr", "id": "fork_pr:s:6", "title": "fix TD-20", "repo": "s", "pr": 6}
     assert item_home(fork, idx)["tied"] == {"by": "title", "ref": "s#TD-020"}  # its own repo's (TD-1509)
     assert item_home(mail("m3", "about nothing"), idx)["tied"] is None

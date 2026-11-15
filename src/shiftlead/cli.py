@@ -1812,11 +1812,15 @@ def _repo_line(r: dict[str, Any]) -> str:
         # a red PR nobody holds is a work order too (§4.4, TD-613), counted pickable as a decided line is
         reds = teamrun.pr_orders(r)
         syncs = [e for e in reds if e.get("sync")]  # a sync PR's order, counted apart (TD-684)
-        lifts = [e for e in reds if e.get("lift")]  # and a live check's lift PR (TD-1450)
+        # the gate sweep's lift and sweep PRs, counted apart, an unserved repo's the person's (TD-1450, TD-1854)
+        gates = [*reds, *teamrun.person_pr_orders(r)]
+        lifts = [e for e in gates if e.get("lift")]
+        sweeps = [e for e in gates if e.get("sweep")]
         filings = [e for e in reds if e.get("filing")]  # and a filing PR's, apart from the red ones (TD-1811)
-        n = len(reds) - len(syncs) - len(lifts) - len(filings)
+        n = len(reds) - len(syncs) - len([e for e in reds if e.get("lift") or e.get("sweep")]) - len(filings)
         decided += f", {len(syncs)} sync PR{'' if len(syncs) == 1 else 's'} to land" if syncs else ""
         decided += f", {len(lifts)} lift PR{'' if len(lifts) == 1 else 's'} to take" if lifts else ""
+        decided += f", {len(sweeps)} sweep PR{'' if len(sweeps) == 1 else 's'} to take" if sweeps else ""
         decided += f", {n} red PR{'' if n == 1 else 's'} nobody holds" if n else ""
         decided += f", {len(filings)} filing PR{'' if len(filings) == 1 else 's'} nobody holds" if filings else ""
         orders = [*orders, *reds]
@@ -1910,7 +1914,8 @@ def _unserved_lanes(r: dict[str, Any]) -> None:
     """An unserved repo's lanes read empty (§5 *The seams*, TD-1011): no entry of `r`'s reading is
     pickable, design or a live check — each is `for_page: unserved`, `pickable: no`, and the counts say
     so — so a member reading its lane here finds nothing in it, and the first line's *unserved: <the
-    lack>* is its lane note. The PRs, the board and the doing log are read as in any repo."""
+    lack>* is its lane note. The PRs, the board and the doing log are read as in any repo. The gate sweep's lift
+    and sweep orders there are the person's, carried as `person_orders`, each `for_page: unserved` (TD-1854)."""
     led = r.get("ledger") or {}
     kinds = led.get("by_kind")
     for e in led.get("entries") or []:
@@ -1919,6 +1924,8 @@ def _unserved_lanes(r: dict[str, Any]) -> None:
             if isinstance(kinds, dict):
                 kinds[page] = max(0, int(kinds.get(page) or 0) - 1)
                 kinds["unserved"] = int(kinds.get("unserved") or 0) + 1
+    # but for the gate sweep's lift and sweep orders, the person's there, never pickable (§4.7, TD-1854)
+    r["person_orders"] = [{**e, "for_page": "unserved", "pickable": "no"} for e in teamrun.person_pr_orders(r)]
 
 
 LIVE_GATE = re.compile(r"event \(live(?:-\d+|-td\d+)?\)")  # the gates §4.9b reserves to a live check
@@ -2151,6 +2158,8 @@ def cmd_repo(args: argparse.Namespace) -> int:
                 if not isinstance(p, dict) or not isinstance(p.get("number"), int):
                     continue
                 p["asked"] = asked.get(str(p["number"]))
+                # true while any addressee's read of it is open (§4.7, §4.4 *The PR's reads*, TD-1854)
+                p["read_open"] = workorders.read_open(p, (r.get("pr_orders") or {}).get("reads"))
                 p["unasked"] = p["number"] in ((r.get("pr_orders") or {}).get("unasked") or [])
                 p.setdefault("held", None)
                 if str(p["number"]) not in r["standing"] and (tag := reviewmod.unasked(r, p["number"], by_team)):
@@ -2234,12 +2243,20 @@ def cmd_repo(args: argparse.Namespace) -> int:
                     continue
                 why = ", ".join(e.get("failing") or []) or ("conflicting" if e.get("conflicting") else "red")
                 said = f" · red since {e.get('red_since') or '?'}: {why}"
-                if e.get("lift"):  # a live check's lift PR, at its entry's priority (§4.4, TD-1450)
+                if e.get("lift"):  # a lift PR, at its entry's priority (§4.4, TD-1450, TD-1854)
                     said = f" · lift since {e.get('lift_since') or '?'}: lifts {e.get('entry')} {e.get('gate')}"
+                if e.get("sweep"):  # the gate sweep's board PR (§4.4, TD-1854)
+                    said = f" · sweep since {e.get('sweep_since') or '?'}: {workorders.SWEEP_CONTEXT}"
                 if e.get("filing"):  # a filing PR nobody holds, after the red and lift ones (§4.4, TD-1811)
                     said = f" · filing, open since {str(e.get('filing_since') or '?')[:10]}: nobody holds it"
                 prio = str(e.get("priority") or "High")
                 print(f"  {'pickable':<12} {e['id']}  {prio:<6}  {'grinders':<11}  {e.get('title') or ''}{said}")
+            # an unserved repo's gate sweep PRs are the person's, never a lane's (§4.7, §5 *The seams*, TD-1854)
+            for e in teamrun.person_pr_orders(r):
+                said = f"lift since {e.get('lift_since') or '?'}: lifts {e.get('entry')} {e.get('gate')}"
+                if e.get("sweep"):
+                    said = f"sweep since {e.get('sweep_since') or '?'}: {workorders.SWEEP_CONTEXT}"
+                print(f"  the person's · {e['id']}  {e.get('title') or ''} · {said}")
             lifts = _lifts(r)
             for kind in ("pickable", "design", "live-check"):
                 ids = [e for e in (r.get("ledger") or {}).get("entries") or [] if _repo_list(e) == kind]

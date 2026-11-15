@@ -25,7 +25,9 @@ from typing import Any
 from sessionorc import balance as balance_mod
 from sessionorc import hosts, naming
 from sessionorc import ledger as ledger_mod
+from sessionorc import reports as reports_mod
 from sessionorc import seams as seams_mod
+from sessionorc import workorders as workorders_mod
 from sessionorc.agent_common import ORPHAN_AFTER
 from sessionorc.client import AgentError
 from sessionorc.gitinfo import work_left
@@ -1844,6 +1846,12 @@ def red_prs(
     A filing PR the reading lists in `pr_orders.filing` (§4.4 *A filing PR nobody holds is a work order*, TD-1811)
     is a row too, never tested again here (TD-652): `word` *filing*, `filing_since` and `since` its `created`, and
     `whose` *nobody's — the grinders' order* or *held by <names>*; the facet leaves it out of its red count.
+    A PR the gate sweep opened that the reading lists in `pr_orders.gate` (§4.4 *A PR the gate sweep opens is the
+    team's at once*, TD-1854) is a row whatever its checks, winning over a red or conflicting one: `word` *lift* or
+    *sweep*, `since` its `lift_since` or `sweep_since`, `what` the gate a lift lifts (*lifts TD-n until …*) or a
+    sweep's *the gate sweep's board items*, `live` whether a lift's gate is a live check's, and `whose` *nobody's —
+    the grinders' order* or *held by <names>*, *the person's* in an unserved repo; the facet leaves it out of its
+    red count too.
     `sessions` the records, or the pages' views."""
     r = r or {}
     mine = in_repo(sessions, str(r.get("root") or "")) if r.get("root") else []
@@ -1851,9 +1859,34 @@ def red_prs(
     holders = ((r.get("pr_orders") or {}).get("held")) or {}
     nobody = "nobody's — the grinders' order" if any(s.get("team") for s in mine) else "nobody's"
     filing = {n for n in ((r.get("pr_orders") or {}).get("filing") or []) if isinstance(n, int)}
+    gate = {n for n in ((r.get("pr_orders") or {}).get("gate") or []) if isinstance(n, int)}
+    person = {e.get("pr") for e in person_pr_orders(r)}
     out = []
     for p in ((r.get("prs") or {}).get("open")) or []:
         if not isinstance(p, dict) or not isinstance(p.get("number"), int):
+            continue
+        if p["number"] in gate and (word := "lift" if p.get("lift") else "sweep" if p.get("sweep") else ""):
+            since = str(p.get(f"{word}_since") or "")
+            held = [str(x) for x in holders.get(str(p["number"])) or []]
+            if p["number"] in person:
+                whose = "the person's"  # an unserved repo's: no lane takes it (§5 *The seams*, TD-1854)
+            else:
+                whose = nobody if p["number"] in orders else f"held by {', '.join(held)}" if held else ""
+            out.append(
+                {
+                    "number": p["number"],
+                    "title": str(p.get("title") or ""),
+                    "url": str(p.get("url") or ""),
+                    "author": str(p.get("author") or ""),
+                    "word": word,
+                    "failing": [],
+                    "what": workorders_mod.lift_context(p) if word == "lift" else workorders_mod.SWEEP_CONTEXT,
+                    "live": bool(word == "lift" and (reports_mod.lift_of(p.get("branch")) or ("", "", False))[2]),
+                    f"{word}_since": since,
+                    "since": since,
+                    "whose": whose,
+                }
+            )
             continue
         if p["number"] in filing and not p.get("red_since"):
             held = [str(x) for x in holders.get(str(p["number"])) or []]

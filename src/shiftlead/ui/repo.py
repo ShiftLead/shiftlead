@@ -232,7 +232,9 @@ def pr_rows(
     (`standing`, by number; nothing when no entry names it), and `red` for one that reads red or
     conflicting — its word, how long, and past `ORPHAN_AFTER` whose it is among `fleet`'s records
     (`teamrun.red_prs`, TD-613), or a filing PR the reading lists, its word *filing* and its age since `created`
-    (§4.4 *A filing PR nobody holds is a work order*, TD-1811); `not_run` for one whose CI never started
+    (§4.4 *A filing PR nobody holds is a work order*, TD-1811), or a PR the gate sweep opened that the reading
+    lists, its word *lift* or *sweep*, its age since its stamp and the gate it lifts in its tag's title (§4.4 *A PR
+    the gate sweep opens is the team's at once*, TD-1854); `not_run` for one whose CI never started
     (TD-686), drawn *CI never ran*;
     `unasked` for a held PR nobody asked, in the standing's place (§4.4, TD-790): `teams` the servicing
     teams' members in the Org's order, whose reader the tag names (`review.unasked`); `fork` for a fork's PR,

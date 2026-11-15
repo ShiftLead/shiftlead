@@ -258,3 +258,95 @@ def test_ao_repo_lists_no_order_for_a_draft_and_says_why_on_its_line(tmp_path, m
     assert f"red, nobody's (draft · red since {since}: no order while a draft)" in out
     assert "red, young (draft)" in out
     assert "pr:802" not in out and "red PR" not in out.splitlines()[0]
+
+
+# -- every PR the gate sweep opens (design §4.4 *A PR the gate sweep opens is the team's at once*, TD-1854) ------
+
+
+def _gate_prs(since: str) -> list[dict]:
+    """A dated lift and a sweep PR as the reading stamps them, both red: an order whatever its checks."""
+    return [
+        {"number": 1950, "title": "TD-77: lift until 2026-11-20", "branch": "lift/TD-77/until-2026-11-20", "url": "https://x/1950", "author": "eye", "checks": "red", "failing": ["test"], "conflicting": False, "red_since": since, "lift": True, "lift_since": since},
+        {"number": 1951, "title": "Gate sweep 2026-11-15 (TD-1376)", "branch": "sweep/2026-11-15", "url": "https://x/1951", "author": "eye", "checks": "green", "failing": [], "conflicting": True, "red_since": since, "sweep": "sweep", "sweep_since": since},
+    ]  # fmt: skip
+
+
+def test_a_dated_lift_and_a_sweep_prs_rows_say_their_word_in_a_repo_no_team_services():
+    from sessionorc import workorders
+    from shiftlead.ui.app import red_pr_rows
+
+    root = "/r/samscrape"
+    since = _iso(now() - timedelta(hours=2))
+    orders = [workorders.pr_order(p) for p in _gate_prs(since)]
+    lift, sweep = red_pr_rows({root: reading(root, orders=orders)}, [], now())
+    assert lift["text"] == f"samscrape #1950 · lift {lift['age']} · lifts TD-77 until 2026-11-20 · eye"
+    assert sweep["text"] == f"samscrape #1951 · sweep {sweep['age']} · the gate sweep's board items · eye"
+    assert sweep["at"] == since and sweep["sweep"] and "sweep" not in lift
+    assert "conflicting" not in sweep["text"]
+    assert red_pr_rows({root: reading(root, orders=orders)}, [rec("g1", root)], now()) == []  # serviced: a lane's
+
+
+def test_an_unserved_repos_rows_are_its_person_orders_whoever_services_it():
+    from sessionorc import workorders
+    from shiftlead.ui.app import red_pr_rows
+
+    root = "/r/samscrape"
+    since = _iso(now() - timedelta(hours=2))
+    r = reading(root, orders=[])
+    r["seams"] = {"serve": {"ok": False, "lacks": [{"key": "gate", "words": "unserved: no gate"}]}}
+    r["pr_orders"]["person"] = [workorders.pr_order(p) for p in _gate_prs(since)]
+    # a red order the reading might still hold is never drawn there: only the person's
+    r["pr_orders"]["orders"] = [order(802)]
+    got = red_pr_rows({root: r}, [rec("g1", root)], now())
+    assert [x["pr"] for x in got] == [1950, 1951]
+
+
+def test_the_gate_sweeps_prs_are_lift_and_sweep_rows_out_of_the_red_count():
+    from sessionorc import workorders
+    from shiftlead import teamrun
+    from shiftlead.ui.app import repo_facet
+
+    root = "/r/samscrape"
+    since = _iso(now() - timedelta(hours=2))
+    r = reading(root, orders=[])
+    r["prs"]["open"] += _gate_prs(since)
+    r["pr_orders"]["gate"] = [1950, 1951]
+    r["pr_orders"]["orders"] = [workorders.pr_order(r["prs"]["open"][4])]  # the lift unheld, the sweep held
+    r["pr_orders"]["held"] = {"1951": ["g2"]}
+    got = {x["number"]: x for x in teamrun.red_prs(r, [rec("g1", root)], now())}
+    assert (got[1950]["word"], got[1950]["since"], got[1950]["whose"]) == (
+        "lift",
+        since,
+        "nobody's — the grinders' order",
+    )
+    assert got[1950]["what"] == "lifts TD-77 until 2026-11-20" and not got[1950]["live"]
+    assert (got[1951]["word"], got[1951]["whose"], got[1951]["what"]) == (
+        "sweep",
+        "held by g2",
+        "the gate sweep's board items",
+    )
+    f = repo_facet(r, now(), fleet=[rec("g1", root)])["prs"]
+    assert [x["number"] for x in f["red"]] == [802, 803, 804]  # the facet's red count leaves them out
+    # a PR not in `pr_orders.gate` (its read open, say) reads as its checks say
+    r["pr_orders"]["gate"] = [1950]
+    assert {x["number"]: x["word"] for x in teamrun.red_prs(r, [], now())}[1951] == "conflicting"
+    # an unserved repo's are the person's
+    r["pr_orders"]["gate"] = [1950, 1951]
+    r["pr_orders"]["person"] = [workorders.pr_order(p) for p in _gate_prs(since)]
+    r["seams"] = {"serve": {"ok": False, "lacks": [{"key": "gate", "words": "unserved: no gate"}]}}
+    got = {x["number"]: x["whose"] for x in teamrun.red_prs(r, [rec("g1", root)], now())}
+    assert got[1950] == got[1951] == "the person's"
+
+
+def test_the_repo_page_tags_a_lift_and_a_sweep_pr(tmp_path, monkeypatch):
+    root = str(tmp_path / "samscrape")
+    since = _iso(now() - timedelta(hours=2))
+    r = reading(root)
+    r["prs"]["open"] += _gate_prs(since)
+    r["pr_orders"]["gate"] = [1950, 1951]
+    c = client(monkeypatch, tmp_path, fake({root: r}, [rec("g1", root, git={"branch": "td9"})]))
+    html = c.get("/repo/samscrape").text
+    assert 'class="tag gate" title="lifts TD-77 until 2026-11-20, open since' in html
+    assert ">lift 2h 0m · held by" not in html and ">lift 2h 0m</span>" in html
+    assert "the gate sweep&#39;s board items, open since" in html and ">sweep 2h 0m</span>" in html
+    assert ">· 3 red</span>" in c.get("/").text

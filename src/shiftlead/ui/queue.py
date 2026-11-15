@@ -83,12 +83,13 @@ def item_home(
     card*): `{home, on_card, on_row, mentions}` — `queue` with the card and row its entry is on, for a question,
     steer or note one of whose refs an open card holds (the first held — `about`'s refs, then its subject and
     text's — the later held ones its mentions, TD-1467), a board line whose `Context:` names one, and a red PR
-    whose title or branch names one; `inbox` for the rest — a state row, a promote or team-start row, mail about no
-    entry, an entry on a completed card or found nowhere. `tied` says how its entry was found (screen 6 *What
-    tied it*, TD-1411): `{by, ref}`, `by` where its first held ref — the one that sets `on_card` — was read
-    (`context` for a board line; `about`, else `words`, the subject and text read as one, for mail; `pr` for a red
-    PR, its title and branch read as one; `title` for a fork's PR) and `ref` that ref as the card's index matched it;
-    None for an `inbox` home. Nothing on the page draws it.
+    whose title names one (the row carries no branch); `inbox` for the rest — a state row, a promote or team-start
+    row, mail about no entry, an entry on a completed card or found nowhere, and the gate sweep's board PR's row
+    (`sweep`), which stays on the Inbox tab whatever its title names (TD-1854). `tied` says how its entry was found
+    (screen 6 *What tied it*, TD-1411): `{by, ref}`, `by` where its first held ref — the one that sets `on_card` —
+    was read (`context` for a board line; `about`, else `words`, the subject and text read as one, for mail; `pr`
+    for a red PR, its title; `title` for a fork's PR) and `ref` that ref as the card's index matched it; None for
+    an `inbox` home. Nothing on the page draws it.
 
     A bare `TD-n` is its own repo's wherever the row names one (screen 6 *A bare ref elsewhere*, TD-1509): a board
     line's `repo_name`, a red PR's or a fork PR's `repo`, a mail item's sender's repo (`askers`, `{mail id: repo}`,
@@ -153,7 +154,9 @@ def item_home(
             entry = pr_entry(index, name, pr)
             refs = [entry] if entry and entry in index else []
     elif kind == "red_pr":
-        refs, by = own_refs(_refs(f"{e.get('branch') or ''} {e.get('title') or ''}"), e.get("repo")), "pr"
+        if e.get("sweep"):
+            return inbox  # the gate sweep's board PR stays on the Inbox tab, never a card by its title (TD-1854)
+        refs, by = own_refs(_refs(str(e.get("title") or "")), e.get("repo")), "pr"
     elif kind == "fork_pr":  # by its title alone: a fork's branch is a stranger's name (TD-1292)
         refs, by = own_refs(_refs(str(e.get("title") or "")), e.get("repo")), "title"
     elif kind == "stuck":
