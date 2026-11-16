@@ -88,6 +88,7 @@ def test_one_record_one_part_with_the_index_and_the_wait(tmp_path):
                 "failed": None,
             }
         ],
+        "not_clear": {"read": False, "presses": []},  # the test's home has no witness store
     }
     assert (tmp_path / "r1.txt").read_text() == (
         "## a · p · 2026-11-04 09:00 → 2026-11-04 10:00\n=== 2026-11-04 ===\n09:00 > hi\n09:01 < done\n  more\n"
@@ -460,3 +461,75 @@ async def test_ao_feedback_digest_over_a_scratch_homes_record(agent, tmp_path, m
     async with LocalClient() as person:
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
+
+
+# ── the window's Not clear presses (design §4.7 `ao feedback`, step 2; TD-1853) ──────────────────────────────
+
+
+def _press(root: Path, at: str, text: str, kind: str = "press") -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    f = root / f"{at[:7]}.jsonl"
+    rec = {"id": f"w-{at}", "at": at, "kind": kind, "repo": "shiftlead/shiftlead", "text": text}
+    with f.open("a") as fh:
+        fh.write(json.dumps(rec) + "\n")
+
+
+def test_not_clear_counts_the_window_by_week_writer_and_kind(tmp_path):
+    root = tmp_path / "witnessed"
+    _press(root, "2026-11-03T23:59:59Z", "not-clear ask -:m-0 grinder-ao-1")  # before the window
+    _press(root, "2026-11-04T00:00:00Z", "not-clear ask -:m-1 grinder-ao-1")  # since is in
+    _press(root, "2026-11-04T09:00:00Z", "not-clear ask shiftlead:m-2 grinder-ao-1")
+    _press(root, "2026-11-04T10:00:00Z", "not-clear steer -:m-3 techlead-ao-1")
+    _press(root, "2026-11-04T11:00:00Z", "not-clear decide shiftlead:board:ab12 -")
+    _press(root, "2026-11-04T12:00:00Z", "not-clear entry shiftlead:TD-9 -")
+    _press(root, "2026-11-04T13:00:00Z", "apply shiftlead")  # another press word
+    _press(root, "2026-11-04T14:00:00Z", "not-clear")  # too few words: no count
+    _press(root, "2026-11-04T15:00:00Z", "not-clear ask -:m-9 x", kind="precheck-fail")  # not a press
+    _press(root, "2026-11-05T00:00:00Z", "not-clear ask -:m-4 grinder-ao-1")  # until is out
+    got = feedback.not_clear(SINCE, UNTIL, root)
+    assert got == {
+        "read": True,
+        "presses": [
+            {"writer": "-", "kind": "decide", "week": "2026-W45", "n": 1},
+            {"writer": "-", "kind": "entry", "week": "2026-W45", "n": 1},
+            {"writer": "grinder-ao-1", "kind": "ask", "week": "2026-W45", "n": 2},
+            {"writer": "techlead-ao-1", "kind": "steer", "week": "2026-W45", "n": 1},
+        ],
+    }
+
+
+def test_not_clear_splits_iso_weeks_in_utc(tmp_path):
+    root = tmp_path / "witnessed"
+    _press(root, "2026-11-08T23:30:00Z", "not-clear ask -:m-1 w")  # a Sunday: week 45
+    _press(root, "2026-11-09T00:30:00Z", "not-clear ask -:m-2 w")  # the Monday: week 46
+    got = feedback.not_clear(datetime(2026, 11, 1, tzinfo=UTC), datetime(2026, 11, 15, tzinfo=UTC), root)
+    assert [(p["week"], p["n"]) for p in got["presses"]] == [("2026-W45", 1), ("2026-W46", 1)]
+
+
+def test_not_clear_is_read_and_empty_where_the_log_has_none(tmp_path):
+    root = tmp_path / "witnessed"
+    root.mkdir()
+    assert feedback.not_clear(SINCE, UNTIL, root) == {"read": True, "presses": []}
+    assert feedback.not_clear(SINCE, UNTIL, tmp_path / "absent") == {"read": False, "presses": []}
+
+
+def test_the_index_carries_not_clear_in_the_digest_and_the_listing(tmp_path):
+    root = tmp_path / "witnessed"
+    _press(root, "2026-11-04T09:00:00Z", "not-clear act shiftlead:board:cd34 -")
+    want = {"read": True, "presses": [{"writer": "-", "kind": "act", "week": "2026-W45", "n": 1}]}
+    for list_only in (False, True):
+        fake = Fake({"r1": []}, {})
+        out = tmp_path / f"out{list_only}"
+        out.mkdir()
+        index = go(fake, [("grinder", "r1")], out, list_only=list_only, witness_root=root)
+        assert index["not_clear"] == want
+
+
+def test_not_clear_reads_the_homes_store_by_default(tmp_path, monkeypatch):
+    from sessionorc import witness
+
+    monkeypatch.setattr(witness, "directory", lambda: tmp_path / "w")
+    _press(tmp_path / "w", "2026-11-04T09:00:00Z", "not-clear steer -:m-1 grinder-ao-2")
+    assert feedback.not_clear(SINCE, UNTIL)["presses"] == [
+        {"writer": "grinder-ao-2", "kind": "steer", "week": "2026-W45", "n": 1}
+    ]

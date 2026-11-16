@@ -495,3 +495,18 @@ def test_the_feedback_report_issue_form():
         assert phrase in warning, phrase
     # TD-1816: short enough to read at a glance — a lead and a few headed points, not paragraphs
     assert len(warning.split()) < 140, len(warning.split())
+
+
+def test_step_seven_states_the_not_clear_count_and_report_mode_reads_none():
+    """TD-1853 (design §4.7 `ao feedback`, step 2): file mode's report states the window's Not clear presses from
+    the index's `not_clear`; report mode's steps, and step 2 that report mode shares, never read it."""
+    s7 = section(7)
+    for phrase in (
+        "**the Not clear count**: the digest index's `not_clear`",
+        "as a table of week, writer, kind and count",
+        "Where its `read` is false, say the count was not read because the run is not at the home",
+        "say the log holds no Not clear press in the window",
+    ):
+        assert phrase in s7, phrase
+    assert "not_clear" not in part("Report mode")
+    assert "not_clear" not in section(2)

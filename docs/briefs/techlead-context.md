@@ -64,7 +64,8 @@ person is `docs/user_attention.md`. Both are written only through the helpers, `
   board `decide` or `act` line, an entry's Ask, Answers and title — leads with one plain sentence of at most
   25 words with no code, each answer naming who acts after its ` — `, the context in plain words, and its
   writer refuses what breaks the rules a check can read, §4.10 *Text a person reads is checked at its writer*,
-  TD-1845).
+  TD-1845; the person's **Not clear** on one sends it back to its writer to rewrite — a pass-up so marked is
+  undone, back in the passer's inbox to rewrite its `--question` and pass up again — and is counted, TD-1853).
 - **Settings** (§4.5 screen 8, §5, §4.4a *Settings, replicated*): a *definition* stays in its file;
   a *setting* lives in the home's `settings.yml`, written only by `set_settings`, replicated to
   nodes; the ADR `2026-09-25-settings-audit.md` is the inventory and the reasoning. **State and alarm marks are
