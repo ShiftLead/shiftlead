@@ -95,6 +95,7 @@ def test_no_lift_on_a_persons_entry_an_ungated_one_an_applying_row_or_an_archive
     # under a press's mark the row reads *applying lift* and draws no second Lift, in the reading and held back
     root2, r2 = _setup(tmp_path / "a", [_entry(1, "the held one", **HELD)], _open("TD-001"))
     before = _read({root2: r2})
+    assert _row(before, "r#TD-001")["lift_here"] is True
     marked = queue.lay_applying(r2, {"ledger:r#TD-001": {"t": {"act": "lift", "at": "x"}}}, "r")
     row = _row(_read({root2: marked}), "r#TD-001")
     assert row["state"] == "applying lift" and row["lift_here"] is False
