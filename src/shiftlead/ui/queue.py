@@ -18,6 +18,7 @@ from urllib.parse import quote
 
 from sessionorc import board as board_mod
 from sessionorc import ledger as ledger_mod
+from sessionorc import mail as mail_mod
 from sessionorc.queue import (  # noqa: F401 — the home's
     DESIGN_KEY,
     HOLDER,
@@ -666,6 +667,17 @@ def item_id(e: Mapping[str, Any]) -> str:
     return str(e.get("id") or "")
 
 
+def _head_words(e: Mapping[str, Any], n: int, *, whole_subject: bool = False) -> str:
+    """An item's words as a loose card's head (`whole_subject`: its subject whole, else its text's first `n` words,
+    TD-1468) or a mention names it (the first `n` words of its subject, else its text). A question passed up to the
+    person with the passer's question is headed by it (`mail.heading`, §4.9b, TD-1846), cut to `n` words."""
+    if not e.get("row") and mail_mod.passed_question(e):
+        return " ".join(mail_mod.heading(e).split()[:n])
+    if whole_subject and e.get("subject"):
+        return str(e["subject"])
+    return " ".join(str(e.get("subject") or e.get("text") or "").split()[:n])
+
+
 def _repo_of(e: Mapping[str, Any]) -> str:
     """An attached item's repo (TD-1411): a board line's `repo_name`, a ledger row's `name`, a PR row's `repo`;
     "" for mail."""
@@ -763,11 +775,7 @@ def attach(
                 "want": want,
                 # on a loose card its first words, the card's head (TD-1468); `_cut_item` drops them from a read
                 # with no words
-                **(
-                    {"subject": str(e.get("subject") or "") or " ".join(str(e.get("text") or "").split()[:12])}
-                    if card.startswith(LOOSE)
-                    else {}
-                ),
+                **({"subject": _head_words(e, 12, whole_subject=True)} if card.startswith(LOOSE) else {}),
                 "red": e.get("row") == "red_pr",
                 "fork": e.get("row") == "fork_pr",  # a fork's PR: no Start session, as a red PR's (TD-1292)
                 # a stopped holder's state row: its own controls, no Start session and outside the header's count
@@ -785,7 +793,7 @@ def attach(
         )
 
     def mention(e: Mapping[str, Any]) -> None:
-        words = " ".join(str(e.get("subject") or e.get("text") or "").split()[:8])
+        words = _head_words(e, 8)
         for m in e.get("mentions") or ():
             mentioned.setdefault(m, {}).setdefault(str(e.get("id") or words), words)
             if raw:

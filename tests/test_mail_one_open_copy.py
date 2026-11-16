@@ -143,7 +143,9 @@ async def test_a_passed_up_copy_is_its_askers_open_question(agent, tmp_path):
         async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
             # sent to the seat with no --subject: the copy stores none, and is read by its text's
             q = (await wc.call("msg", to=tl, text="Rename the flag? It reads badly.", kind="ask"))["entry"]["id"]
-            await tc.call("pass_up", id=q, recommend="keep it")  # the seat's act, never the asker's send
+            await tc.call(
+                "pass_up", question="Should it go ahead?", id=q, recommend="keep it"
+            )  # the seat's act, never the asker's send
             assert not next(e for e in agent.person_inbox if e.id == q).subject
             with pytest.raises(AgentError, match=re.escape(f'you have {q} open to the person, "Rename the flag?"')):
                 await wc.call("msg", to="person", text="Rename the flag? It reads badly.", kind="ask")

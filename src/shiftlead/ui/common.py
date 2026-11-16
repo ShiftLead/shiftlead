@@ -207,11 +207,8 @@ templates.env.globals["shaped"] = shaped
 def passed_question(e: Any) -> str:
     """The passer's own question on a question passed up to the person (§4.9b, §4.5 screen 12 *An item's shape*,
     TD-1845): `recommend.question`, which TD-1846's pass-up stores; "" on any other entry, and on a pass made
-    before it, which is drawn as before."""
-    if not isinstance(e, Mapping) or not e.get("passed_up"):
-        return ""
-    rec = e.get("recommend")
-    return str(rec.get("question") or "").strip() if isinstance(rec, Mapping) else ""
+    before it, which is drawn as before. `mail.passed_question` on a mapping."""
+    return mail.passed_question(e) if isinstance(e, Mapping) else ""
 
 
 def _recommends_html(e: Mapping[str, Any]) -> str:

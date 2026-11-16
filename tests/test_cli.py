@@ -1099,7 +1099,6 @@ def test_every_brief_that_writes_to_the_person_teaches_the_rules_its_writers_che
     ):
         text = (root / f"{name}.md").read_text(encoding="utf-8")
         assert text.count(RULES) == 1, name
-        assert "--question" not in text, name  # TD-1846 names the flag with the flag
     assert RULES in (repo / "docs/briefs/director.md").read_text(encoding="utf-8")  # a whole brief, no template
     for rel in (
         "docs/briefs/grinder-ao-1.md",
@@ -2307,13 +2306,22 @@ def test_msg_pass_up_and_the_inbox_line_that_shows_it(subprocess_agent, tmp_path
     assert "leave the text out" in capsys.readouterr().err
     assert cli.main(["msg", "--pass-up", q["id"]]) == 2
     assert "--recommend" in capsys.readouterr().err
-    assert cli.main(["msg", "--pass-up", q["id"], "--recommend", "keep it", "--answer", "delete it"]) == 0
+    assert cli.main(["msg", "--pass-up", q["id"], "--recommend", "keep it"]) == 1  # no --question (TD-1846)
+    assert "carries --question" in capsys.readouterr().err
+    assert cli.main(["msg", passer, "x", "--question", "Keep it?"]) == 2  # --question goes with --pass-up
+    assert "--question goes with --pass-up" in capsys.readouterr().err
+    up = ["msg", "--pass-up", q["id"], "--recommend", "keep it", "--answer", "delete it"]
+    assert cli.main([*up, "--question", "Should the old branch be deleted?\n\nIt is merged."]) == 0
     out = capsys.readouterr().out
     assert f"{q['id']} passed up → person, recommending: keep it" in out and "  2. delete it" in out
     monkeypatch.delenv("SHIFTLEAD_SESSION")
     assert cli.main(["inbox"]) == 0
     out = capsys.readouterr().out
-    assert "delete the old branch?" in out and f"passed up by {passer}, who recommends: keep it" in out
+    # headed by the passer's question, which leads; the asker's text under *from <asker>* (§4.9b, TD-1846)
+    assert '"Should the old branch be deleted?"' in out
+    _, _, under = out.partition("  Should the old branch be deleted?\n  \n  It is merged.\n  from ")
+    assert under.startswith(f"{asker}:\n    delete the old branch?\n"), out
+    assert f"passed up by {passer}, who recommends: keep it" in out
     assert "  1. keep it" in out and "  2. delete it" in out
     for sid in (asker, passer):
         call_sync("kill", id=sid)

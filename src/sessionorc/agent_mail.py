@@ -192,6 +192,19 @@ def _replaces(outcome: dict[str, Any], intent: str) -> bool:
     return outcome.get("state") == "blocked" and intent in ("done", "dropped", "thread")
 
 
+PASS_UP_QUESTION = (
+    "a pass to the person carries --question: the asker's question in one plain sentence, then its context "
+    "(design §4.9b)"
+)
+
+
+def _clean_question(question: Any) -> str:
+    """A pass-up's `--question`, cleaned as an entry's text is with its paragraph breaks kept (§4.9b, TD-1846):
+    each line `_clean`ed of ANSI and control bytes, never cut here — the caller refuses past `TEXT_CAP`."""
+    lines = str(question or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    return "\n".join(_clean(line, cap=len(line)).rstrip() for line in lines).strip()
+
+
 FORM_NO_DEFAULT = "a form is filled, never pressed: it is no default — mark a complete answer (design §4.10)"
 
 
@@ -2310,7 +2323,12 @@ class MailMixin:
             self._poke_waits()
 
     async def rpc_pass_up(
-        self, id: str, recommend: str, answers: list[str] | str | None = None, caller: Any = None
+        self,
+        id: str,
+        recommend: str,
+        answers: list[str] | str | None = None,
+        question: str | None = None,
+        caller: Any = None,
     ) -> dict[str, Any]:
         """`ao msg --pass-up <id> --recommend "<line>" [--answer …]` (design §4.9b *Passing up
         keeps the thread and the asker*, TD-075 step 3): the addressee of an open `ask` or `steer`
@@ -2323,7 +2341,13 @@ class MailMixin:
         the person answered. On that copy the passer's suggested answers are its `answers`, the
         recommendation first, so the person's part is one press; the recommendation itself is
         `recommend`, labelled as the passer's. Open to the entry's addressee only — a copy
-        recipient did not receive the question — and never to the person."""
+        recipient did not receive the question — and never to the person.
+
+        **A pass to the person carries the passer's question** (TD-1846): `question`, the asker's question restated
+        for the person — its first paragraph one plain sentence, the rest the passer's context — cleaned as an
+        entry's text is with its paragraph breaks kept, refused past `TEXT_CAP` bytes, never cut, and held with the
+        copy's answers to §4.10 *Text a person reads is checked at its writer* before the depths: a problem of rules
+        1 and 2 refuses the pass, rule 4's lines come back as `warnings`. Stored as `recommend.question`."""
         if mail.is_person(caller):
             raise RpcError("the person is the top of the ladder: there is nobody to pass a question up to (§4.9b)")
         me = self._graph().get(self._addr(str(caller)))
@@ -2361,9 +2385,20 @@ class MailMixin:
                 f"a question carries at most four answers, the recommendation among them: {len(picks)} given "
                 "(design §4.10)"
             )
+        asked = _clean_question(question)
+        if not asked:
+            raise RpcError(PASS_UP_QUESTION)
+        if len(asked.encode()) > mail.TEXT_CAP:
+            raise RpcError(f"--question is over {mail.TEXT_CAP} bytes: say it shorter, never cut (design §4.9b)")
+        warnings: list[str] = []
+        if mail.PERSON_TEXT_CHECK:  # rules 1, 2 and 4 of §4.10 *Text a person reads is checked at its writer*
+            problems = mail.person_text_problems(asked, kind="ask", answers=picks)
+            if refused := [p.line for p in problems if p.refuse]:
+                raise RpcError("\n".join(refused))
+            warnings = [p.line for p in problems if not p.refuse]
         self._check_person_depth(e.from_, question=True)  # it is the asker's question in the person inbox
         at = now_iso()
-        rec = {"by": me.id, "text": line}
+        rec = {"by": me.id, "text": line, "question": asked}
         up = self._copy(e)
         up.read_at = None
         up.answers = picks
@@ -2372,7 +2407,10 @@ class MailMixin:
         self.person_inbox.append(up)
         self.person_store.save(self.person_inbox)
         await self._push_changes()
-        return {"id": PERSON, "msg": id, "passed_up": at, "recommend": rec, "answers": picks}
+        got: dict[str, Any] = {"id": PERSON, "msg": id, "passed_up": at, "recommend": rec, "answers": picks}
+        if warnings:
+            got["warnings"] = warnings
+        return got
 
     async def rpc_msg_withdraw(self, id: str, caller: Any = None) -> dict[str, Any]:
         """`ao msg --withdraw <id>` (design §4.10 *Withdrawing a question*, TD-1382): a sender takes

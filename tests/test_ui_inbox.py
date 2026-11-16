@@ -2904,7 +2904,13 @@ def test_a_question_passed_up_reaches_the_page_as_the_askers_with_the_passers_re
         w, tl = ids
         async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
             q = (await wc.call("msg", to=tl, text="rename the flag?", kind="ask"))["entry"]
-            await tc.call("pass_up", id=q["id"], recommend="keep the old name", answers=["rename it"])
+            await tc.call(
+                "pass_up",
+                question="Should it go ahead?",
+                id=q["id"],
+                recommend="keep the old name",
+                answers=["rename it"],
+            )
         return w, q["id"]
 
     w, qid = asyncio.run(setup())
@@ -2943,7 +2949,13 @@ def test_a_passed_up_ask_and_steer_are_each_drawn_under_their_own_heading_and_co
             a = (await wc.call("msg", to=tl, text="rename the flag?", kind="ask"))["entry"]
             s = (await wc.call("msg", to=tl, text="split the module", kind="steer", default="keep it whole"))["entry"]
             for q in (a, s):
-                await tc.call("pass_up", id=q["id"], recommend="keep the old shape", answers=["change it"])
+                await tc.call(
+                    "pass_up",
+                    question="Should it go ahead?",
+                    id=q["id"],
+                    recommend="keep the old shape",
+                    answers=["change it"],
+                )
         return a["id"], s["id"]
 
     aid, sid = asyncio.run(setup())

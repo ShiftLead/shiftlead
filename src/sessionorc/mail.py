@@ -328,6 +328,29 @@ def subject_of(text: str) -> str:
     return clip_subject(m.group(1) if m else flat)
 
 
+def passed_question(entry: Any) -> str:
+    """The passer's own question on a question passed up to the person (§4.9b *Passing up keeps the thread and the
+    asker*, TD-1846): `recommend.question`, stripped, on a stored entry's mapping or a `MailEntry`; "" on any other
+    entry, and on a pass made before TD-1846, which carries none."""
+    get = entry.get if isinstance(entry, Mapping) else lambda k: getattr(entry, k, None)
+    if not get("passed_up"):
+        return ""
+    rec = get("recommend")
+    return str(rec.get("question") or "").strip() if isinstance(rec, Mapping) else ""
+
+
+def heading(entry: Any) -> str:
+    """What heads an entry wherever one is headed (§4.9b, §4.10 *A subject on every entry*, TD-1846): on a stored
+    entry's mapping or a `MailEntry`, the first paragraph of the passer's question (`recommend.question`) folded
+    and clipped by `clip_subject` where the entry was passed up with one, else its `subject`, else `subject_of`
+    its text. The Inbox's row, the Queue's heads and mentions and the person's `ao inbox` all read it."""
+    if question := passed_question(entry):
+        split = paragraph_break(question)
+        return clip_subject(split[0] if split is not None else question)
+    get = entry.get if isinstance(entry, Mapping) else lambda k: getattr(entry, k, None)
+    return str(get("subject") or "") or subject_of(str(get("text") or ""))
+
+
 def split_answer(line: str) -> tuple[str, str]:
     """One answer as its reader reads it (§4.10 *The answers' split*, TD-913): `(label, consequence)`, split
     on the first ` — `, the label capped at `ANSWER_CAP`; a line with no dash is all label, consequence ''.

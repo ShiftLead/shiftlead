@@ -2589,13 +2589,20 @@ async def test_a_question_passed_up_reaches_the_person_as_the_askers_and_the_ans
                 "msg", to=tl, text="rename the flag?", kind="steer", default="keep --pass-up", answers=["keep it"]
             )
             q = st["entry"]
-            got = await tc.call("pass_up", id=q["id"], recommend="rename it --escalate", answers=["keep --pass-up"])
+            got = await tc.call(
+                "pass_up",
+                question="Should it go ahead?",
+                id=q["id"],
+                recommend="rename it --escalate",
+                answers=["keep --pass-up"],
+            )
             assert got["answers"] == ["rename it --escalate", "keep --pass-up"]
             up = [e for e in agent.person_inbox if e.id == q["id"]]
             assert len(up) == 1 and up[0].from_ == w and up[0].kind == "steer" and up[0].text == "rename the flag?"
             assert up[0].default == "keep --pass-up" and up[0].bound == q["bound"]  # passing up buys no time
             assert up[0].answers == ["rename it --escalate", "keep --pass-up"] and up[0].read_at is None
-            assert up[0].recommend == {"by": tl, "text": "rename it --escalate"} and up[0].passed_up
+            assert up[0].recommend == {"by": tl, "text": "rename it --escalate", "question": "Should it go ahead?"}
+            assert up[0].passed_up
             # the person's to answer now: no seat need be filled for it (§4.9b, TD-075 step 4)
             assert (await person.call("get", id=tl))["asks_waiting"] == 0
             # every copy says it went up; the asker's keeps its own answers
@@ -2604,27 +2611,27 @@ async def test_a_question_passed_up_reaches_the_person_as_the_askers_and_the_ans
 
             # once, and only by the addressee
             with pytest.raises(AgentError, match="once"):
-                await tc.call("pass_up", id=q["id"], recommend="again")
+                await tc.call("pass_up", question="Should it go ahead?", id=q["id"], recommend="again")
             with pytest.raises(AgentError, match="holds no entry"):
-                await wc.call("pass_up", id=q["id"], recommend="mine")
+                await wc.call("pass_up", question="Should it go ahead?", id=q["id"], recommend="mine")
             note = (await wc.call("msg", to=tl, text="fyi"))["entry"]
             with pytest.raises(AgentError, match="only an ask or a steer"):
-                await tc.call("pass_up", id=note["id"], recommend="x")
+                await tc.call("pass_up", question="Should it go ahead?", id=note["id"], recommend="x")
             ask2 = (await wc.call("msg", to=tl, text="?", kind="ask"))["entry"]
             with pytest.raises(AgentError, match="recommendation"):
-                await tc.call("pass_up", id=ask2["id"], recommend="  ")
+                await tc.call("pass_up", question="Should it go ahead?", id=ask2["id"], recommend="  ")
             await tc.call("msg", reply_to=ask2["id"], kind="reply", text="answered")
             with pytest.raises(AgentError, match="already closed"):
-                await tc.call("pass_up", id=ask2["id"], recommend="late")
+                await tc.call("pass_up", question="Should it go ahead?", id=ask2["id"], recommend="late")
             with pytest.raises(AgentError, match="top of the ladder"):
-                await person.call("pass_up", id=q["id"], recommend="x")
+                await person.call("pass_up", question="Should it go ahead?", id=q["id"], recommend="x")
             # a copy recipient did not receive the question: a manager's mail about its member is
             # copied to the member's other controllers, and none of them may pass it up
             await person.call("set_controllers", id=w, add=[tl])
             about = (await mc.call("msg", to=w, text="which step?", kind="ask", about=w))["entry"]
             assert tl in about["copies"]
             with pytest.raises(AgentError, match="copied to you"):
-                await tc.call("pass_up", id=about["id"], recommend="x")
+                await tc.call("pass_up", question="Should it go ahead?", id=about["id"], recommend="x")
 
             # the person picks the recommendation: to the asker, copied to the passer, closing it
             r = await person.call("msg", reply_to=q["id"], kind="reply", text="rename it --escalate", answer=0)
@@ -2641,7 +2648,7 @@ async def test_a_question_passed_up_reaches_the_person_as_the_askers_and_the_ans
             assert q["id"] in [e.id for e in agent.person_inbox]
             monkeypatch.setattr(mail, "MAIL_RETENTION", timedelta(hours=12))
             ask3 = (await wc.call("msg", to=tl, text="and this?", kind="ask"))["entry"]
-            await tc.call("pass_up", id=ask3["id"], recommend="yes")
+            await tc.call("pass_up", question="Should it go ahead?", id=ask3["id"], recommend="yes")
             await person.call("msg", reply_to=ask3["id"], kind="reply", text="yes")
             await person.call("inbox_delete", id=tl, msg=ask3["id"])  # nothing owed on the passer's copy
             assert ask3["id"] not in [e.id for e in agent.sessions[tl].inbox]
@@ -2750,7 +2757,7 @@ async def test_a_copy_follows_a_resume_as_an_addressee_does(agent, tmp_path):
         w, tl, tl2 = [await mk(n, team="ao-grind", unattended=True) for n in ("w", "tl", "tl2")]
         async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
             q = (await wc.call("msg", to=tl, text="rename it?", kind="ask"))["entry"]
-            await tc.call("pass_up", id=q["id"], recommend="yes")
+            await tc.call("pass_up", question="Should it go ahead?", id=q["id"], recommend="yes")
         old = agent.sessions[tl]
         old.state, old.superseded_by = "closed", tl2  # resumed as tl2, as `_supersede` leaves it
         r = await person.call("msg", reply_to=q["id"], kind="reply", text="yes")
@@ -2790,7 +2797,7 @@ async def test_an_ask_a_techlead_left_unanswered_is_taken_to_the_person_on_its_t
             assert late["closed"] is None and held[0].open
 
             q2 = (await wc.call("msg", to=tl, text="squash?", kind="ask"))["entry"]
-            await tc.call("pass_up", id=q2["id"], recommend="squash")
+            await tc.call("pass_up", question="Should it go ahead?", id=q2["id"], recommend="squash")
             with pytest.raises(AgentError, match="passed up"):
                 await wc.call("msg", to="person", text="squash?", kind="ask", thread=q2["id"])
             q3 = (await wc.call("msg", to=tl, text="tag it?", kind="ask"))["entry"]

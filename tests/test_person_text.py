@@ -208,3 +208,46 @@ def test_the_first_paragraph_is_the_sentence_and_the_rest_the_context():
     assert [(p.rule, p.refuse) for p in got] == [(4, False)]
     assert mail.paragraph_break("a\n\n```\nb\n\nc\n```") == ("a", "```\nb\n\nc\n```")
     assert mail.paragraph_break("```\na\n\nb\n```") is None  # a blank line inside a fence breaks nothing
+
+
+async def test_a_pass_up_to_the_person_carries_a_question_held_to_the_rules(agent, tmp_path):
+    """Slice 2 (Fix step 4, design §4.9b *Passing up keeps the thread and the asker*): a pass to the person is
+    refused without `question`, refused on rules 1 and 2 — its `--recommend`, the copy's first answer, among the
+    answers — and over `TEXT_CAP`, none of which files a copy; one written to the rules files, its question stored as
+    `recommend.question` with its paragraph breaks kept, rule 4's line in `warnings`, and `mail.heading` heads the
+    person's copy with the question's first paragraph while an ordinary entry keeps its subject."""
+    async with LocalClient() as person:
+        w, tl = await _worker(person, tmp_path, "w", team="up"), await _worker(person, tmp_path, "tl", team="up")
+        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
+            q = (await wc.call("msg", to=tl, kind="ask", text="may I drop `x`? it is in a.py", subject="drop x?"))[
+                "entry"
+            ]
+            ok = "Drop it — a session drops the flag"
+            with pytest.raises(AgentError, match="carries --question"):
+                await tc.call("pass_up", id=q["id"], recommend=ok)
+            with pytest.raises(AgentError, match="carries --question"):
+                await tc.call("pass_up", id=q["id"], recommend=ok, question="  \n ")
+            long = " ".join(["word"] * 30) + "?"
+            with pytest.raises(AgentError) as e:  # both refusing rules, the recommendation held to rule 2
+                await tc.call("pass_up", id=q["id"], recommend="yes", question=long)
+            assert [ln.split(":")[0] for ln in str(e.value).splitlines()] == ["rule 1", "rule 2"]
+            with pytest.raises(AgentError, match="rule 2: answer 2"):
+                await tc.call("pass_up", id=q["id"], recommend=ok, answers=["keep it"], question=GOOD)
+            with pytest.raises(AgentError, match="over 4096 bytes"):
+                await tc.call("pass_up", id=q["id"], recommend=ok, question=f"{GOOD}\n\n" + "x" * mail.TEXT_CAP)
+            assert [e for e in agent.person_inbox if e.id == q["id"]] == [], "a refused pass files nothing"
+            assert not [e for e in agent.sessions[tl].inbox if e.id == q["id"]][0].passed_up
+
+            asked = "Should the old flag be dropped?\x1b[31m\r\n\r\nIt lives in `a.py`, which nothing reads."
+            got = await tc.call("pass_up", id=q["id"], recommend=ok, question=asked)
+            assert [ln.split(":")[0] for ln in got["warnings"]] == ["rule 4"]
+            want = "Should the old flag be dropped?\n\nIt lives in `a.py`, which nothing reads."
+            assert got["recommend"] == {"by": tl, "text": ok, "question": want}
+            up = [e for e in agent.person_inbox if e.id == q["id"]][0]
+            assert up.recommend["question"] == want and up.subject == "drop x?"  # the copy keeps the asker's subject
+            assert mail.heading(up) == mail.heading(up.to_dict()) == "Should the old flag be dropped?"
+            mine = [e for e in agent.sessions[w].outbox if e.id == q["id"]][0]
+            assert mine.recommend["question"] == want  # every copy says what went up
+        plain = (await person.call("msg", to=w, kind="note", text="Merged today. More later."))["entry"]
+        assert mail.heading(plain) == "Merged today."
+        assert mail.heading({**plain, "subject": "merged"}) == "merged"
