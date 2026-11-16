@@ -1260,8 +1260,12 @@ def _lift_on_press(
     except OSError as e:
         _reset(t, want)
         raise Refused(f"the ledger could not be written, and is as it was: {e}") from None
-    for it in closes:
-        _apply(_plan(lb_board.plan_edit, str(stub), "done", it.id, why=LIFTED, tool=TOOL))
+    try:
+        for it in closes:
+            _apply(_plan(lb_board.plan_edit, str(stub), "done", it.id, why=LIFTED, tool=TOOL))
+    except Refused:
+        _reset(t, want)  # the ledger's half is written already: the tree goes back whole
+        raise
     msg = f"{TOOL}: lift decision ({p}) on {tid} (session n/a)"
     entry_rel = os.path.relpath(path, t)
 
