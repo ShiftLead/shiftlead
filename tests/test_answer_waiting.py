@@ -62,7 +62,7 @@ def test_an_unread_answer_to_the_seats_own_question_counts_by_the_questions_id_u
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("reason", ["lapsed", "go_with_it", "declined"])
+@pytest.mark.parametrize("reason", ["lapsed", "go_with_it", "declined", "not_clear"])
 def test_the_homes_note_ending_the_question_counts_and_any_other_note_does_not(reason):
     s = _seat()
     q = _asked(s, kind="ask" if reason == "declined" else "steer")

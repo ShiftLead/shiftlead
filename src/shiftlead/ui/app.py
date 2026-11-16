@@ -2877,6 +2877,27 @@ def _drafted(got: Any) -> dict[str, str]:
     return {"draft": got["draft"]} if isinstance(got, dict) and got.get("draft") else {}
 
 
+async def press_witnessed(call: Callable[..., Any], word: str, target: str, dir: str = "") -> None:
+    """A person's press, witnessed at the home (§4.4 *The home keeps a log of what it witnesses*, `witness_press`,
+    TD-1386) after its act succeeded — the New session form's Start, and the person route's **Not clear** (TD-1853,
+    no `dir`); a refusal is swallowed, since the act stands whether or not it is recorded."""
+    try:
+        await call("witness_press", word=word, target=target, dir=dir)
+    except Exception:  # noqa: BLE001 — the press is recorded or not; the act stands
+        log.info("%s %s: the press was not witnessed", word, target)
+
+
+# **Not clear** on a ledger entry (§4.10 rule 6, *a ledger entry*; TD-1853): the fixed words `ledger_decide` writes
+LEDGER_NOT_CLEAR = "Not clear: rewrite it — the person could not follow it."
+
+
+def _repo_of_board(board: str) -> str:
+    """The registry name of the checkout whose board `board` is, or `-` where no registered checkout holds it."""
+    want = Path(board).expanduser().resolve()
+    roots = [Path(r) for r in hosts.local_host().repos()]
+    return next((r.name for r in roots if (r / workorders.board_rel(r)).resolve() == want), "-")
+
+
 def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """New session: the form, its checks, and a shell (design §4.5a *New session*)."""
     call = h.call
@@ -3216,12 +3237,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         return RedirectResponse("/" if s.get("state") == "scheduled" else f"/focus/{s['id']}", status_code=303)
 
     async def witness_press(word: str, target: str, dir: str) -> None:
-        """The New session form's Start, witnessed at the home (§4.4 *The home keeps a log of what it
-        witnesses*, `witness_press`, TD-1386), after the session was created; a refusal is swallowed."""
-        try:
-            await call("witness_press", word=word, target=target, dir=dir)
-        except Exception:  # noqa: BLE001 — the press is recorded or not; the session stands
-            log.info("new-session %s: the press was not witnessed", target)
+        await press_witnessed(call, word, target, dir)
 
     async def member_submit(
         team: str, line: str, keep: bool, name: str, prompt: str, lane: str, profile: str
@@ -5695,7 +5711,12 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
     # so each calls its RPC **caller-less** — a person is not a session, and every one of these is
     # refused to every session by the agent. The UI adds no rule of its own: a refusal comes back
     # as the toast every other RPC error on the page does.
-    PERSON_ACTS = {"pause": "inbox_pause", "resume": "inbox_resume", "gowithit": "inbox_go_with_it"}
+    PERSON_ACTS = {
+        "pause": "inbox_pause",
+        "resume": "inbox_resume",
+        "gowithit": "inbox_go_with_it",
+        "notclear": "inbox_not_clear",  # **Not clear** (§4.10 rule 6, TD-1853): back to its writer, then counted
+    }
 
     @app.post("/api/settings/person")
     async def api_settings_person(request: Request):
@@ -5735,6 +5756,9 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 got = await call("inbox_snooze", msg=ref, until=until)
             else:
                 got = await call(PERSON_ACTS[action], msg=ref)
+            if action == "notclear":  # the count (§4.10 rule 6): `<kind> <repo>:<ref> <writer>`, no `dir`
+                kind, repo, writer = (str(got.get(k) or "-") for k in ("kind", "repo", "writer"))
+                await press_witnessed(call, "not-clear", f"{kind} {repo}:{ref} {writer}")
             return JSONResponse({"ok": True, **got})
         if action == "hand_look":
             # design §4.5a **Send to reviewer** (§4.10 *A look*, TD-292 slice 4b): one press, no
@@ -5793,7 +5817,12 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             due = str(body.get("due") or "").strip() or None
             # a snooze with no date is the fold's *now* (§4.5a, TD-1349): the agent writes its own today
             more: dict[str, Any] = {}
-            if what == "decide":
+            if what == "decide" and body.get("not_clear"):
+                # **Not clear** (§4.10 rule 6, TD-1853): the fixed answer, whatever the line offers; the agent checks
+                # the kind on the line it finds on origin's head, never one the page sent
+                answers = body.get("answers")
+                more = {"answer": board_mod.NOT_CLEAR, "answers": [str(a) for a in answers or ()]}
+            elif what == "decide":
                 # §4.5a **answers** / **Go with it** (§4.4 *Decide*, TD-255): the answer pressed and
                 # the item's `answers` as the reader gave them to the row, as a Reply's `refs` are
                 # handed; the agent refuses an answer that is not one of them word for word
@@ -5823,6 +5852,11 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         raise HTTPException(409, why)
             key = str(body.get("key") or "").strip()  # the row's id (§4.4 *A board line's id*, TD-603)
             got = await call("board_edit", board=board, line=line, text=text, action=what, due=due, key=key, **more)
+            if what == "decide" and body.get("not_clear"):  # the count: `<decide|act> <repo>:board:<key> -`
+                found = got if isinstance(got, dict) else {}
+                kind = "act" if str(body.get("kind") or "").lower() == "act" else "decide"  # the row's, for the count
+                ref, name = str(found.get("key") or key or "-"), await asyncio.to_thread(_repo_of_board, board)
+                await press_witnessed(call, "not-clear", f"{kind} {name}:{ref} -")
             return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
         if action == "ledger":
             # design §4.5a **Inbox row: ledger entry** (§4.5 screen 6, TD-565): an answer by its index,
@@ -5849,6 +5883,12 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 if why := await asyncio.to_thread(road_refusal, org, repo, road, host_name()):
                     raise HTTPException(409, why)
                 got = await call("ledger_decide", repo=repo, id=ref, road=road, words=str(body.get("words") or ""))
+                return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
+            if body.get("not_clear"):
+                # **Not clear** (§4.10 rule 6, TD-1853): the fixed words as every Reply on an entry, then the count
+                got = await call("ledger_decide", repo=repo, id=ref, words=LEDGER_NOT_CLEAR)
+                name = Path(repo).expanduser().name or "-"
+                await press_witnessed(call, "not-clear", f"entry {name}:{ref} -")
                 return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
             if body.get("go"):
                 more["go"] = True

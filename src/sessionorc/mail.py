@@ -220,6 +220,7 @@ PERSON_ONLY = frozenset(
         "inbox_pause",
         "inbox_resume",
         "inbox_go_with_it",
+        "inbox_not_clear",
         "thread",
         "identity_ack",
         "identity_log",

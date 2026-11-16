@@ -72,7 +72,11 @@ CLOSED_REASONS = (
     "rerouted",  # moved from a seat that could not answer, a copy landing elsewhere (§4.9b, TD-1480)
     "merged",  # its PR merged in its repo (§4.10 *A question the work settled closes itself*, TD-1469)
     "settled",  # the entry its `about` names was archived after it was asked (same section, TD-1469)
+    "not_clear",  # the person marked it Not clear: back to its writer (§4.10 *Text a person reads…*, TD-1853)
 )
+
+# the closes whose `system` note is an answer waiting in a seat's mailbox (§4.9b, TD-1051; `not_clear` TD-1853)
+NOTE_ENDS = ("lapsed", "go_with_it", "declined", "not_clear")
 
 # Who owns which field of a record (design §4.4a, §9 invariant 15): the node observes and enforces
 # on its host, the home holds the graph and intent, and identity is set once at create. Merges go
@@ -1654,7 +1658,7 @@ class Session:
             if e.read_at or q is None or q.id in found or q.root in owing:
                 continue
             if (e.kind == "reply" and q.closed_reason == "replied" and q.closed_by == e.id) or (
-                e.kind == "note" and e.from_ == SYSTEM and q.closed_reason in ("lapsed", "go_with_it", "declined")
+                e.kind == "note" and e.from_ == SYSTEM and q.closed_reason in NOTE_ENDS
             ):
                 found.append(q.id)
         return found

@@ -22,6 +22,7 @@ from sessionorc import (
     hosts,
     ledgerboard,
     mail,
+    naming,
     workorders,
 )
 from sessionorc import board as board_mod
@@ -451,6 +452,10 @@ class InboxMixin:
                 label = ledgerboard.split_answer(said)[0]
                 if ledgerboard.is_form(label):  # a form as offered, its consequence and all, says nothing
                     raise board_mod.Refused(f"{_offered_head(label)} needs its words")
+                return said
+            if said == board_mod.NOT_CLEAR:
+                # **Not clear** (TD-1853): the person's fixed answer, taken whatever answers the line offers, its kind
+                # checked against the line `board.edit_item` finds on origin's head (§4.10 rule 6)
                 return said
             if not offered and said == board_mod.HAVE_A_SESSION:
                 # **Have a session do it** (TD-1624): an `act` line's fixed answer, checked against the line's own
@@ -1572,6 +1577,85 @@ class InboxMixin:
         self._system_note(e.from_, f"steer {msg} — the person says: go with your default", wake="person", ends=e)
         await self._push_changes()
         return {"id": PERSON, "msg": msg, "closed_reason": "go_with_it"}
+
+    async def rpc_inbox_not_clear(self, msg: str, caller: Any = None) -> dict[str, Any]:
+        """**Not clear** (design §4.10 *Text a person reads is checked at its writer*, rule 6; §4.5a row
+        **Not clear**; TD-1853): the person sends a question back to the writer of the words it shows.
+
+        Read in order: **an orphaned question** (its asker's record gone) is closed `not_clear` with no note,
+        and a passer is told nothing. **A passed-up copy** undoes the pass — the person's copy dropped,
+        `passed_up` and `recommend` cleared on every copy, a paused `steer` resumed as `inbox_resume` resumes
+        it — and its passer, followed along `superseded_by`, is filed a `system` note that wakes it as a reply
+        does; a passer with no record left at the end of that chain leaves nobody to rewrite it, so the
+        question closes as one its writer asked. **A question its writer asked** closes on every copy
+        (`not_clear`: a `steer` takes no default, nothing is owed) and its asker is filed a `system` note on
+        the thread, which wakes it as a person's reply does. Refused on a withdrawn entry first, then a note,
+        a reply and a closed entry. Returns `{writer, kind, repo}`, each `-` where it has none."""
+        e = self._person_entry(msg, caller, "answer")
+        if gone := mail.withdrawn_refusal(e):  # first, before its own checks (§4.10 *Withdrawing a question*)
+            raise RpcError(gone)
+        if e.kind not in ("ask", "steer"):
+            raise RpcError(f"Not clear sends a question back to its writer: {msg} is a {e.kind} (design §4.10)")
+        if not e.open:
+            raise RpcError(f"{msg} is already closed ({e.closed_reason})")
+        if msg in self._board_adding:  # an orphan's answer is being written (`_answer_orphan`)
+            raise RpcError(f"{msg} is already being answered")
+        records = self._graph()
+
+        def name_of(sid: str) -> str:
+            r = records.get(sid)
+            return (r.name if r is not None and r.name else "") or naming.split_address(sid)[0] or "-"
+
+        got = {"kind": e.kind, "repo": e.repo or "-"}
+        if e.orphaned:  # read first: nobody is left to rewrite it, and a passer is told nothing (§4.10)
+            self._close_entry(msg, "not_clear", now_iso())
+            await self._push_changes()
+            return {**got, "writer": str(e.orphaned.get("name") or "") or "-"}
+        passer = str((e.recommend or {}).get("by") or "") if e.passed_up else ""
+        if passer:
+            sid, seen = passer, {passer}
+            while (r := records.get(sid)) is not None and r.state == "closed" and r.superseded_by:
+                sid = r.superseded_by
+                if sid in seen:
+                    break
+                seen.add(sid)
+            if records.get(sid) is not None:  # every other passer, closed or unable among them, gets it back
+                await self._not_clear_undo(e, sid)
+                return {**got, "writer": name_of(sid)}
+        self._close_entry(msg, "not_clear", now_iso())
+        self._system_note(
+            e.from_,
+            f"{e.kind} {msg} — the person marked this Not clear: rewrite it for them and ask again.",
+            wake="person",
+            ends=e,
+        )
+        await self._push_changes()
+        return {**got, "writer": name_of(e.from_)}
+
+    async def _not_clear_undo(self, e: MailEntry, passer: str) -> None:
+        """A passed-up copy marked **Not clear** (design §4.10): the pass is undone, so the question is open
+        again in the passer's inbox as it was; its passer (`passer`, its live successor) is told to rewrite
+        its `--question`, and a paused `steer` runs again on a bound moved later by the time it was held."""
+        msg = e.id
+        self.person_inbox = [x for x in self.person_inbox if x.id != msg]
+        self.person_store.save(self.person_inbox)
+        self._mark(msg, passed_up=None, recommend=None)
+        if e.paused_at:  # resumed as `inbox_resume` resumes it, so its bound runs again
+            held = datetime.now(UTC) - _parse(e.paused_at)
+            bound = (
+                (_parse(e.bound) + held).replace(microsecond=0).isoformat().replace("+00:00", "Z") if e.bound else None
+            )
+            self._mark(msg, bound=bound, paused_at=None)
+            self._system_note(e.from_, f"steer {msg} resumed by the person: the clock runs again, until {bound}")
+        asked = (e.recommend or {}).get("question")
+        text = (
+            f"{e.kind} {msg} — the person marked your pass-up Not clear: rewrite your --question and pass it up again."
+            if asked
+            else f"{e.kind} {msg} — the person could not follow the question you passed up: pass it up again with "
+            "--question."
+        )
+        self._system_note(passer, text, wake="person", ends=e)
+        await self._push_changes()
 
     async def _sweep_mail(self, now: datetime) -> None:
         """Once a tick: an `ask` past its bound expires on every copy and a `steer` past its bound
