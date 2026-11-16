@@ -1231,7 +1231,7 @@
     board_notright: "deciding…", board_add: "writing…", ledger: "deciding…", ledger_reply: "deciding…", ledger_start: "starting…", snooze: "snoozing…", attention_snooze: "snoozing…",
     dismiss: "dismissing…", identity_ack: "dismissing…", clear_work: "dismissing…",
     clear_mark: "dismissing…", unmail: "deleting…", allow: "sending…", deny: "sending…",
-    reply: "sending…", answer: "sending…", gowithit: "sending…", hand_look: "sending…", identity_log: "logging…",
+    reply: "sending…", answer: "sending…", gowithit: "sending…", notclear: "sending back…", hand_look: "sending…", identity_log: "logging…",
     suspend: "suspending…", promote: "promoting…", ci_rerun: "re-running…", work_start: "starting…", restart: "restarting…",
     resume: "resuming…", "reopen-push": "resuming…", "resume-form": "resuming…", pause: "pausing…",
     mode: "switching…",  // the held row's Hand back (§4.5a *Inbox row: held · mail waiting*, TD-1440)
@@ -1240,12 +1240,12 @@
     board_done: "checked off", board_snooze: "snoozed", snooze: "snoozed", attention_snooze: "snoozed",
     dismiss: "dismissed", identity_ack: "dismissed", clear_work: "dismissed",
     clear_mark: "dismissed", unmail: "deleted", allow: "allowed", deny: "denied",
-    gowithit: "sent", identity_log: "logged", restart: "restarted", resume: "resumed", "reopen-push": "resumed",
+    gowithit: "sent", notclear: "sent back", identity_log: "logged", restart: "restarted", resume: "resumed", "reopen-push": "resumed",
   };
   // the presses that take their row away: it leaves as the request leaves (rule 3); a state or board
   // row leaves on any answer but Suspend and a decide, as it did on the answer before
   const PRESS_LEAVES = ["board_done", "board_snooze", "snooze", "attention_snooze", "dismiss", "identity_ack",
-    "clear_work", "clear_mark", "unmail", "allow", "deny", "gowithit", "identity_log", "restart", "resume",
+    "clear_work", "clear_mark", "unmail", "allow", "deny", "gowithit", "notclear", "identity_log", "restart", "resume",
     "reopen-push"];
   AO.pressKey = (action, boardAct) => (action === "board" ? `board_${boardAct || ""}` : action);
   AO.pressVerb = (key) => PRESS_VERBS[key] || key;
@@ -1491,7 +1491,11 @@
         () => AO.toast(b.dataset.copied || "copied", true), () => AO.toast("clipboard blocked (needs https or localhost)", false));
       return;
     }
-    const id = b.dataset.id, action = b.dataset.act;
+    // **Not clear** (§4.10 rule 6, TD-1853): one control, its road the item's — mail's `notclear`, a board line's
+    // decide, a ledger entry's decide — each sent marked `not_clear`, the server writing the fixed words
+    const notClear = b.dataset.act === "not-clear" ? b.dataset.via || "mail" : "";
+    const id = b.dataset.id;
+    const action = notClear === "board" ? "board" : notClear === "ledger" ? "ledger" : notClear ? "notclear" : b.dataset.act;
     // §4.5 screen 12 *Three verbs: Answer* (TD-1555): what an Answer… sends is read from the button **when it is
     // pressed** — a copy of its data and its line, never the button again after the box closes
     const at = { ...b.dataset }, atLine = lineText(b), atItem = AO.answerItem(b);
@@ -1713,7 +1717,7 @@
       // design §4.5a **Inbox row** controls (§4.10, TD-069 step 1): the person's own acts on their
       // own inbox. Each posts to `/api/person/<action>`, which calls the RPC caller-less; the agent
       // is the one that decides what may be done, and its refusal comes back as a toast.
-      if (["pause", "resume", "gowithit"].includes(action)) body = { msg: b.dataset.msg };
+      if (["pause", "resume", "gowithit", "notclear"].includes(action)) body = { msg: b.dataset.msg };
       // §4.5a **Send to reviewer** (TD-292 slice 4b): the look and its sender's team — the server
       // reads that team's techlead seat from `org.yml`, and the host agent's refusal is the toast
       if (action === "hand_look") body = { msg: b.dataset.msg, team: b.dataset.team };
@@ -1743,6 +1747,8 @@
         // **answers** / **Go with it** (§4.4 *Decide*, TD-255): the answer pressed, and the item's
         // answers as the reader gave them to the row — the agent holds the one to the other
         if (body.action === "decide") { body.answer = b.dataset.answer; body.answers = JSON.parse(b.dataset.answers || "[]"); }
+        // **Not clear** (TD-1853): the fixed answer whatever the line offers, and the line's kind for the count
+        if (notClear) { body.not_clear = true; body.kind = b.dataset.kind || "decide"; }
       }
       // §4.5a **Inbox row: state**: a state row's snooze. It is keyed on the record **and the row
       // kind** — the home has no mail entry to hang it on — and no `until` is the clear.
@@ -1866,7 +1872,8 @@
           want.words = m.text;
           // a form's Reply (§4.5a **<head>…**, TD-1699): its index beside the words, the head put back by the agent
           if (at.form) { AO.formFilled(m.text, at.begun); want.form = Number(at.form); }
-        } else if (b.dataset.words) want.words = b.dataset.words;  // Done, Lift the hold: fixed words (TD-771)
+        } else if (notClear) want.not_clear = true;  // **Not clear** (TD-1853): the server writes its fixed words
+        else if (b.dataset.words) want.words = b.dataset.words;  // Done, Lift the hold: fixed words (TD-771)
         else if (b.dataset.go) want.go = true;
         else want.answer = Number(b.dataset.index);
         pressed();
@@ -2003,6 +2010,8 @@
       if (action === "pause") say("paused — the sender is told not to take its default yet", true);
       if (action === "resume") say("resumed — the clock runs again, with what was left", true);
       if (action === "gowithit" && !orphanNote) say("go with it — the sender takes its default now", true);
+      // **Not clear** (TD-1853): back to the writer the reply names — the asker, or the session that passed it up
+      if (action === "notclear") say(`marked Not clear — back to ${res.writer && res.writer !== "-" ? res.writer : "its writer"} to rewrite`, true);
       // the wire name stays `identity_ack`; the control is **Dismiss** (§4.5a, renamed 2026-09-20)
       if (action === "identity_ack") say("dismissed — the agent's log keeps every alarm, a line each", true);
       if (action === "identity_log") say(`logged → ${(res.to && (res.to.name || res.to.id)) || b.dataset.to || "its controller"}: it owes you an outcome on them`, true);  // `to` is {id, name}
@@ -2225,6 +2234,7 @@
         : e.closed_reason === "asker_gone" ? "closed · the asker is gone"
         : e.closed_reason === "asked_person" ? "closed · the asker took it to the person"
         : e.closed_reason === "rerouted" ? "closed · routed around a seat that could not answer"
+        : e.closed_reason === "not_clear" ? `marked Not clear — back to ${esc(e.from_name || e.from)}`
         : e.closed_reason === "withdrawn" ? "withdrawn"
         : e.closed_reason === "merged" || e.closed_reason === "settled" ? esc(AO.settledWords(e))
         : e.closed_by ? `answered by ${esc(e.closed_by)}`
@@ -7152,6 +7162,7 @@
       : r === "withdrawn" ? "withdrawn"
       : r === "asked_person" ? "passed to the person"
       : r === "rerouted" ? "routed around"
+      : r === "not_clear" ? "marked Not clear — back to be rewritten"
       : r === "merged" || r === "settled" ? AO.settledWords(e)
       : r ? r
       : "waiting";

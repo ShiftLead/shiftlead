@@ -272,12 +272,16 @@ the hold stays{% if e.home == 'queue' and e.why != 'yours' %}; Lift the hold lif
   {%- if how == 'board' and e.kind == 'act' %}
   {{ board_done(e, 'btn sm answer rec') }}
   {%- if e.session_do %}{{ board_session(e, 'btn sm answer') }}{% endif %}
+  {{ not_clear(e, how, 'btn sm answer') }}
   {{ board_answer(e, 'btn sm ghost') }}
   {%- elif how == 'board' %}
+  {{ not_clear(e, how, 'btn sm answer') }}
   {{ board_answer(e, 'btn sm ghost') }}
   {%- elif how == 'ledger' %}
+  {{ not_clear(e, how, 'btn sm answer') }}
   <button class="btn sm ghost" type="button" data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" title="{{ help_title('card-answers') }}">Answer…</button>
   {%- elif e['from'] not in ('person', 'system') %}
+  {%- if how == 'mail' %}{{ not_clear(e, how, 'btn sm answer') }}{% endif %}
   <button class="btn sm ghost" type="button" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" title="{{ help_title('card-answers') }}">Answer…</button>
   {%- endif %}
   {{- item_start(e) }}
@@ -315,6 +319,20 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {%- endmacro %}
 {% macro board_answer(e, cls, role='') -%}
 <button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %} data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ (e.repo_name or e.repo or e.name or 'the repo') ~ "'s board" }}" data-foot="{{ reply_foot(e) }}"{% if e.pair %} data-pair="1" data-repo="{{ e.name }}" data-head="{{ e.head }}"{% endif %} title="{{ ((e.session ~ ' · ') if e.session else '') ~ e.standing.text if e.standing else help_title('card-answers') }}">Answer…</button>
+{%- endmacro %}
+
+{#- §4.5a **Not clear** (§4.10 *Text a person reads is checked at its writer*, rule 6; TD-1845, built by TD-1853): sends
+    the item back to the writer of its words, by its own road — mail's `inbox_not_clear`, a board line's decide with
+    the fixed `NOT_CLEAR` (the line's kind beside it, for the count), a ledger entry's decide with its fixed words —
+    on the kinds `not_clear_on` names alone; never outlined, never a default or a lift, no confirm -#}
+{% macro not_clear(e, how, cls) -%}
+{%- if not_clear_on(e, how) %}
+<button class="{{ cls }} notclear" type="button" data-act="not-clear" data-via="{{ how }}" data-id="person"
+{%- if how == 'mail' %} data-msg="{{ e.id }}"
+{%- elif how == 'board' %} data-board-act="decide" data-answer="{{ not_clear_board }}" data-answers='{{ (e.answers or [])|tojson }}' data-kind="{{ e.kind }}" data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %}
+{%- else %} data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-answer="{{ not_clear_ledger }}"
+{%- endif %} title="the writer rewrites it">Not clear</button>
+{%- endif %}
 {%- endmacro %}
 
 {# §4.5a **Snooze** on an `ask`: 1 h · tomorrow 08:00 · a date. The person's own bookkeeping — the
@@ -509,6 +527,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {%- elif e.closed_reason == 'asker_gone' %}closed · the asker is gone
 {%- elif e.closed_reason == 'asked_person' %}closed · the asker took it to the person
 {%- elif e.closed_reason == 'rerouted' %}closed · routed around a seat that could not answer
+{%- elif e.closed_reason == 'not_clear' %}marked Not clear — back to {{ sender or e.from_name or e['from'] }}
 {%- elif e.closed_reason == 'replied' or e.closed_by %}answered by {{ e.closed_by or 'your reply' }}
 {%- elif e.closed_reason == 'expired' or e.expired_at %}expired
 {%- endif %}
@@ -597,6 +616,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- if not whole %}
   <span class="grow"></span>
   {{ reply_btn(e) }}
+  {%- if mode != 'card' %}{{ not_clear(e, 'mail', 'btn sm ghost') }}{% endif %}
   {{ review_btn(e) }}
   {{ snooze_btn(e) }}
   <button class="btn sm ghost" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Delete this question? That declines it: the sender is told, and nothing else answers it.">Delete</button>
@@ -634,6 +654,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- if not whole %}
   <span class="grow"></span>
   {{ reply_btn(e) }}
+  {%- if mode != 'card' %}{{ not_clear(e, 'mail', 'btn sm ghost') }}{% endif %}
   <button class="btn sm ghost" data-act="gowithit" data-id="person" data-msg="{{ e.id }}" data-confirm="Go with it? The sender takes its default now instead of waiting out the clock.">Go with it</button>
   {%- if e.paused_at %}
   <button class="btn sm ghost" data-act="resume" data-id="person" data-msg="{{ e.id }}" title="give back the time that was left">Resume</button>
@@ -675,6 +696,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- if not whole %}
   <span class="grow"></span>
   {{ reply_btn(e) }}
+  {%- if mode != 'card' %}{{ not_clear(e, 'mail', 'btn sm ghost') }}{% endif %}
   {%- if e.kind == 'steer' %}
   <button class="btn sm ghost" data-act="gowithit" data-id="person" data-msg="{{ e.id }}" data-confirm="Go with it? Its default is written on the board as your answer, and sent to whoever holds {{ e.about }}.">Go with it</button>
   {%- endif %}
@@ -1243,6 +1265,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   <span class="grow"></span>
   {%- if e.editor %}{% from "file_link.html" import file_link %}{{ file_link(e.editor, 'Open board', ("open " ~ e.board ~ " at line " ~ e.line) if e.line is not none else ("open the item's file on " ~ e.board), "btn sm ghost") }}{% endif %}
   <button class="btn sm ghost" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %} data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ e.repo_name or e.repo }}'s board" data-foot="{{ reply_foot(e) }}"{% if e.pair %} data-pair="1" data-repo="{{ e.name }}" data-head="{{ e.head }}"{% endif %} title="your words appended to this line of the board landed on origin; the line stays due{% if e.standing and e.standing.holder %} — and mailed to {{ e.standing.holder }} (holds {{ e.standing.ref }}){% endif %}">Reply</button>
+  {%- if not waits %}{{ not_clear(e, 'board', 'btn sm ghost') }}{% endif %}
   {#- §4.5a **Go with it** on a board row (TD-255): drawn when one answer is the default, in the
       steer row's words and place; the one press records the default — the same `decide`. -#}
   {%- if gwi %}<button class="btn sm ghost boardgo" data-act="board" data-id="person" data-board-act="decide" data-answer="{{ e.default }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %} title="{{ help_title('board-go-with-it') }}" data-confirm="Go with it? &ldquo;{{ e.default }}&rdquo; is written on {{ e.repo_name or e.repo }}'s board as your decision.">Go with it</button>{% endif %}
@@ -1607,6 +1630,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- else %}
   {%- if not whole %}
   <button class="btn sm ghost" data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" title="your words written on {{ e.name }}'s board as your decision on {{ e.id }}, one line landed on origin by shiftlead's own pull request">Reply</button>
+  {{ not_clear(e, 'ledger', 'btn sm ghost') }}
   {%- if e.default %}
   <button class="btn sm ghost" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-go="1" data-answer="{{ e.default }}" title="{{ hold_stays(e) }}" data-confirm="Go with it? &ldquo;{{ e.default }}&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Go with it</button>
   {%- endif %}

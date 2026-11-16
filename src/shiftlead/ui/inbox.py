@@ -3116,10 +3116,38 @@ def rail_counts(rows: Collection[Mapping[str, Any]], picks: Mapping[str, Any]) -
     }
 
 
+# **Not clear** on a ledger entry (§4.10 rule 6, *a ledger entry*; TD-1853): the fixed words `ledger_decide` writes
+LEDGER_NOT_CLEAR = "Not clear: rewrite it — the person could not follow it."
+
+
+def not_clear_on(e: Mapping[str, Any], how: str) -> bool:
+    """Whether an item draws **Not clear** (design §4.5a row **Not clear**, §4.10 rule 6; TD-1853): an open `ask` or
+    `steer` to the person (a passed-up one among them, an orphan's too), a board `decide` or `act` line not yet
+    decided, and a ledger entry that waits on the person — but never a look (an entry carrying `shots`, a board line
+    drawn as a live look's pair) nor a question rerouted or routed around to the person (its `routed` envelope),
+    and no other item. `how` is the row's road, as `answer_row` names it: `mail`, `board` or `ledger`; the caller
+    draws it only where the item's answers are drawn, so an answered entry or a waiting line never reaches here."""
+    if how == "mail":
+        shots = e.get("shots")
+        return (
+            e.get("kind") in ("ask", "steer")
+            and e.get("from") not in ("person", "system")
+            and not e.get("closed_reason")
+            and not (isinstance(shots, list) and any(isinstance(x, str) and x.strip() for x in shots))
+            and not e.get("routed")
+        )
+    if how == "board":
+        return e.get("kind") in ("decide", "act") and not e.get("decided") and not e.get("pair")
+    return how == "ledger"
+
+
 # the page computes its rail from its sections when a caller did not (a test rendering the template
 # directly, as the rows are shaped by `shaped` and `suggested_answers` whoever renders them)
 templates.env.globals["rail_picks"] = rail_picks
 templates.env.globals["look_pair"] = look_pair
+templates.env.globals["not_clear_on"] = not_clear_on
+templates.env.globals["not_clear_board"] = board_mod.NOT_CLEAR
+templates.env.globals["not_clear_ledger"] = LEDGER_NOT_CLEAR
 templates.env.globals["rail_rows"] = rail_rows
 templates.env.globals["rail_counts"] = rail_counts
 
