@@ -1575,7 +1575,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {% macro press_line(e, app, ans) -%}
 {%- set s -%}
 {%- if app %}{{ e.applying_words or 'answered — applying' }}: {% if app.answer %}you {{ 'answered' if app.act == 'decide' else 'wrote' }} &ldquo;{{ app.answer }}&rdquo; — {% endif %}landing on {{ e.name }}'s board
-{%- elif ans.kind == 'handed' %}handed to {{ ans.name }}{% if ans.age %}, {{ ans.age }} ago{% endif %} — {% if ans.outcome %}{{ ans.name }} could not do it: {{ ans.outcome.text or 'blocked' }}{% else %}its outcome ends this hold{% endif %}
+{%- elif ans.kind == 'handed' and not ans.until %}handed to {{ ans.name }}{% if ans.age %}, {{ ans.age }} ago{% endif %} — {% if ans.outcome %}{{ ans.name }} could not do it: {{ ans.outcome.text or 'blocked' }}{% else %}its outcome ends this hold{% endif %}
 {%- elif ans.kind == 'board' %}{{ ans.words }}, {{ ans.age ~ ' ago' if ans.age else 'today' }} — {% if ans.until %}it waits until {{ short_date(ans.until) or ans.until }}, then you are asked again{% elif ans.board.to %}carried to {{ ans.board.to | map('replace', e.name ~ '#', '') | join(' and ') }}{% else %}{{ ans.name }} acts on it{% endif %}
 {%- else %}{{ ans.words }} in {{ ans.name }}'s {{ ans.kind or 'question' }}, {{ ans.age ~ ' ago' if ans.age else 'just now' }} — {% if ans.outcome %}{{ ans.name }}: {{ ans.outcome.text or 'done' }}{% else %}the hold goes when its PR merges{% endif %}
 {%- endif %}
