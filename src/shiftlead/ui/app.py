@@ -3835,7 +3835,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         elif card is not None:  # every Decide and Do item, by its id (§4.5 screen 12 *Started from an item*)
             with contextlib.suppress(Exception):  # unread, *waits on me* is the card's ledger entries
                 index = card_index(reading)
-                got = (await card_mail(h, records, index))[1]
+                # with the card, so an *answered — waiting on <asker>* item counts as the page drew it (TD-1843)
+                got = (await card_mail(h, records, index, None, [card]))[1]
                 wants = card_wants((got.get("cards") or {}).get(str(card.get("id"))), "", False)
                 mine = waits_on_me(mine, wants)
                 # counted afresh at the press, whatever the page drew: with two or more the walk sentence, and

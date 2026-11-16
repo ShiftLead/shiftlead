@@ -943,8 +943,9 @@ def test_the_message_dialog_is_wired_with_each_callers_addressee():
     assert 'id: action === "reply" ? at.from || "" : at.seat ? "" : id,' in js
     assert 'data-act="reply" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-from="${esc(e.from)}"' in js
     rows = (UI / "templates" / "inbox_row.html").read_text()
-    # Reply, a look's Not right…, Overrule, and a card's Answer row: Not right… and Answer… (TD-914)
-    assert rows.count('data-act="reply"') == rows.count("data-from=") == 5
+    # Reply, a look's Not right…, Overrule, a card's Answer row: Not right… and Answer… (TD-914), and an answered
+    # held entry's Answer… to its asker (TD-1843)
+    assert rows.count('data-act="reply"') == rows.count("data-from=") == 6
     assert 'data-from="{{ a.asker or \'\' }}" data-name="{{ asker }}"' in rows  # Overrule: the asker
     card = (UI / "templates" / "card.html").read_text()
     assert card.count('data-act="message"') == card.count('{% if s.seat %} data-seat="1"{% endif %}') == 2

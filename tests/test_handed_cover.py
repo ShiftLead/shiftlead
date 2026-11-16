@@ -233,5 +233,5 @@ def test_the_persons_own_session_on_the_entry_keeps_it_with_you(tmp_path):
 def test_on_a_card_the_handed_item_is_grey_with_its_answer_in_its_dots(tmp_path):
     (row,) = _rows(_ui_repos(tmp_path), [_handed("r#TD-60")])
     html = _render(row, mode="card", home="queue")
-    assert "handed to techlead" in html and "Answer…" not in html and ">Start session<" not in html
+    assert "Handed to techlead" in html and "Answer…" not in html and ">Start session<" not in html
     assert html.count(">Lift the hold<") == 1

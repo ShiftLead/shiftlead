@@ -153,7 +153,8 @@ def test_a_ledger_items_kind_line_title_and_kept_wait(tmp_path, monkeypatch):
            "name": "techlead"}  # fmt: skip
     kept = card({**row, "kind": "ledger · your decision", "answered": ans}, "decide")
     words = short_date("2026-12-01")
-    assert f">waits until {words}</span>" in kept and f"it waits until {words}, then you are asked again" in kept
+    # on its card in its press line alone (TD-1843, §4.5 screen 12 *A press is never left stranded*)
+    assert f">waits until {words}</span>" not in kept and f"it waits until {words}, then you are asked again" in kept
     assert "2026-12-01" not in kept.replace('data-at="2026-12-01"', "")
     page = inbox({**row, "home": "inbox", "kind": "ledger · your decision", "answered": ans})
     assert ">ledger · your decision</span>" in page and "waits until 2026-12-01" in page

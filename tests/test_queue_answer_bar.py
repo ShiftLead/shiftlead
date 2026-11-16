@@ -202,35 +202,80 @@ def test_a_with_you_item_draws_no_dots(tmp_path, monkeypatch):
     bare_heading(html)
 
 
-def test_an_answered_item_draws_open_and_its_dots_none_on_an_entry_you_own(tmp_path):
-    (row,) = _rows(_repos(tmp_path, "r"), [_ask()])
+def press(html: str) -> str:
+    """The item's press line's words (TD-1843), '' where it draws none."""
+    m = re.search(r'<div class="qpress (qp-\w+)" role="status">(.*?)</div>', html, re.S)
+    return f"{m.group(1)}: {m.group(2)}" if m else ""
+
+
+# ── the grey kinds (TD-1843, §4.5 screen 12 *A press is never left stranded*: still with a session) ──
+
+
+def test_an_answered_item_draws_lift_answer_and_start_session_then_open(tmp_path):
+    (row,) = _rows(_repos(tmp_path, "r"), [_ask(answer_given="Yes")])
+    assert row["lift_item"], "a held entry's stamp is set (TD-1879)"
     html = _render(row, mode="card", home="queue")
-    assert slots(html)[:2] == [RIGHT, "Open"] and "Answer…" not in html and "Start session" not in html
-    assert ">Open<" not in html.split('class="more qdots"')[1]
+    assert slots(html) == ["Lift the hold", "Answer…", RIGHT, "Open"] and "qdots" not in html
+    started = _render({**row, "start": {**START, "item": "r#TD-60"}}, mode="card", home="queue")
+    assert slots(started) == ["Lift the hold", "Answer…", RULE, "Start session", RIGHT, "Open"]
+    # Answer… goes to the asker on the question's thread, its refusal kept by the item row's own data-msg
+    ans = re.search(r"<button[^>]*>Answer…</button>", bar(html)).group(0)
+    assert 'data-act="reply"' in ans and 'data-msg="m-1"' in ans and 'data-from="ao-r-designer"' in ans
+    assert 'data-name="designer"' in ans
+    assert 'data-msg="ledger:' in html.split("<button")[0], "the row's own key, where AO.pressErrs keeps a refusal"
+    # the press line is its only status sentence: the heading names no state
+    assert press(html) == ("qp-idle: You answered “Yes” in designer's ask, 30m ago — the hold goes when its PR merges.")
+    assert "answered — waiting on" not in html and 'class="row gap wrap mfoot"' not in html
     bare_heading(html)
-    # an `Owner: paul` entry: its Done answers it, so no Lift the hold, and no ⋯ to hold it (TD-1829)
-    assert row["lift_item"] and "Lift the hold" in html, "a held entry's stamp is set (TD-1879)"
+    # an `Owner: paul` entry: its Done answers it, so no Lift the hold (TD-1829)
     owned = _render({**row, "why": "yours", "lift_item": False}, mode="card", home="queue")
-    assert slots(owned) == [RIGHT, "Open"] and "Lift the hold" not in owned
+    assert slots(owned) == ["Answer…", RIGHT, "Open"] and "Lift the hold" not in owned
 
 
-def test_a_waits_until_item_draws_open_and_its_dots_none_on_an_entry_you_own(tmp_path):
+def test_a_board_answer_draws_no_answer_and_a_done_outcome_its_line(tmp_path):
     (row,) = _rows(_repos(tmp_path, "r"), [_ask()])
-    until = {**row, "answered": {**row["answered"], "until": "2026-11-20"}}
+    board = {**row, "lift_item": False, "answered": {**row["answered"], "kind": "board", "mid": "",
+             "words": "you answered “Go” on the board", "board": {"key": "k1", "open": False, "to": []}}}  # fmt: skip
+    html = _render(board, mode="card", home="queue")
+    assert slots(html) == [RIGHT, "Open"], "a board answer has no thread to reply on"
+    assert press(html) == "qp-idle: You answered “Go” on the board, 30m ago — designer acts on it."
+    done = {**row, "answered": {**row["answered"], "outcome": {"text": "#2900 drops the hold"}}}
+    assert press(_render(done, mode="card", home="queue")) == (
+        "qp-idle: You answered in designer's ask, 30m ago — designer: #2900 drops the hold."
+    )
+
+
+def test_a_waits_until_item_draws_lift_where_stamped_and_open(tmp_path):
+    (row,) = _rows(_repos(tmp_path, "r"), [_ask()])
+    words = "you answered “Not yet” on the board"
+    until = {**row, "answered": {**row["answered"], "kind": "board", "mid": "", "until": "2026-11-20",
+             "words": words, "board": {"key": "k", "open": False, "to": []}}}  # fmt: skip
     html = _render(until, mode="card", home="queue")
-    assert "waits until" in html and slots(html)[:2] == [RIGHT, "Open"]
+    assert slots(html) == ["Lift the hold", RIGHT, "Open"] and "Answer…" not in html
+    assert press(html).startswith("qp-idle: You answered “Not yet” on the board, 30m ago — it waits until ")
+    assert press(html).endswith(", then you are asked again.")
     bare_heading(html)
     assert slots(_render({**until, "why": "yours", "lift_item": False}, mode="card", home="queue")) == [RIGHT, "Open"]
 
 
 def test_a_handed_item_and_an_applying_item(tmp_path):
     (row,) = _rows(_repos(tmp_path, "r"), [_ask()])
-    handed = {**row, "answered": {**row["answered"], "kind": "handed", "name": "tl", "words": "handed"}}
+    handed = {
+        **row,
+        "answered": {**row["answered"], "kind": "handed", "name": "tl", "words": "you handed this step on"},
+    }
     html = _render(handed, mode="card", home="queue")
-    assert "handed to tl" in html and slots(html)[:2] == [RIGHT, "Open"]
+    assert slots(html) == ["Lift the hold", RIGHT, "Open"], "its entry's own answer in slot 1"
+    assert press(html) == "qp-idle: Handed to tl, 30m ago — its outcome ends this hold."
+    assert slots(_render({**handed, "why": "yours", "lift_item": False}, mode="card", home="queue")) == [
+        "Done",
+        RIGHT,
+        "Open",
+    ]
     bare_heading(html)
     applying = _render(_pressed(tmp_path), mode="card", home="queue")
     assert slots(applying) == [RIGHT, "Open"], "Open alone"
+    assert press(applying) == "qp-idle: Answered — applying: you answered &ldquo;Yes&rdquo; — landing on r's board."
     bare_heading(applying)
 
 

@@ -121,8 +121,9 @@ def test_the_inbox_and_repo_row_reads_answered_with_no_answers_and_lift_the_hold
     assert "qans" not in plain and "its answers" in plain and ">Reply<" in plain and ">Start session<" in plain
 
 
-def _world(tmp_path, inbox, asks=()):
-    """A card whose only member, `r#TD-60`, is held for the person, with its ledger item attached."""
+def _world(tmp_path, inbox, asks=(), fleet=FLEET):
+    """A card whose only member, `r#TD-60`, is held for the person, with its ledger item attached; `fleet` the
+    sessions its items' Start session meets."""
     from shiftlead.ui.app import _with_you
 
     (row,) = _rows(_repos(tmp_path, "r"), inbox)
@@ -140,20 +141,34 @@ def _world(tmp_path, inbox, asks=()):
         {"needs": [item, *asks]},
         lambda e, sec: drawn.append(e) or Markup(f'<div class="mailrow">{e.get("id")}</div>'),
         (),
-        lambda c, i, on_row: item_start(card, i, FLEET, on_row),
+        lambda c, i, on_row: item_start(card, i, fleet, on_row),
         lambda c, i: _with_you(card, i),
     )
-    return queue_view(reading, NOW, got, fleet=FLEET), drawn
+    return queue_view(reading, NOW, got, fleet=fleet), drawn
 
 
-def test_the_card_draws_the_item_grey_uncounted_with_no_start_session(tmp_path):
+def test_the_card_draws_the_item_grey_and_counts_it_only_where_it_draws_start_session(tmp_path):
+    """TD-1843 (§4.5 screen 12 *A press is never left stranded*): an item *answered — waiting on <asker>* draws Start
+    session where no other session holds its entry, and only then counts for the header's rule and its walk; held
+    by its asker (the usual case) it draws none and counts for neither."""
+    from shiftlead.ui.queue import items_n, walk_mine
+
     v, drawn = _world(tmp_path, [_ask()])
     (c,) = v["up_next"]
     assert c["wants"]["n"] == {"decide": 0, "do": 0, "read": 0} and len(c["wants"]["answered"]) == 1
     assert v["n"]["needs_you"] == 0 and c["edge"] != "needs"
-    assert c["items_start"] is False, "it draws no Start session, so the header may draw its own"
+    (e,) = drawn
+    assert e["want"] == "answered" and e["start"]["item"] == "r#TD-060"
+    assert c["wants"]["answered"][0]["starts"] is True and c["items_start"] is True and c["items_n"] == 1
+    assert walk_mine(["r#TD-060"], c["wants"]) == ["r#TD-060"], "in the walk while it draws its button"
+    # its asker holds it: no button, no count, out of the walk
+    held = [{**FLEET[0], "unattended": True, "progress": [{"ref": "TD-60", "status": "claimed"}]}]
+    v, drawn = _world(tmp_path, [_ask()], fleet=held)
+    (c,) = v["up_next"]
     (e,) = drawn
     assert e["want"] == "answered" and e["start"] == {} and c["wants"]["answered"][0]["kind"] == ""
+    assert "starts" not in c["wants"]["answered"][0] and c["items_start"] is False and items_n(c["wants"]) == 0
+    assert walk_mine(["r#TD-060"], c["wants"]) == []
     from shiftlead.ui.app import templates
 
     html = templates.env.get_template("queue_card.html").module.card(c)
@@ -164,20 +179,15 @@ def test_the_card_draws_the_item_grey_uncounted_with_no_start_session(tmp_path):
     assert branch(c["top"]) == "open"
 
 
-def test_the_card_item_draws_no_answers_or_answer_and_lift_the_hold_in_its_dots(tmp_path):
+def test_the_card_item_draws_no_answers_and_lift_the_hold_in_slot_one(tmp_path):
     (row,) = _rows(_repos(tmp_path, "r"), [_ask()])
     html = _render(row, mode="card", home="queue")
-    assert "answered — waiting on designer" in html and "you answered · in designer's ask" in html
-    assert "Answer…" not in html and 'data-index="0"' not in html and ">Start session<" not in html
-    assert 'class="st qneed"' not in html
-    # today's controls in its answer bar (TD-1842 step 4): Open the bar's, Lift the hold in its ⋯
-    # (where Lift the hold sits is not pinned: TD-1843 moves it into slot 1)
+    assert "You answered in designer's ask, 30m ago" in html and 'class="qpress qp-idle"' in html
+    assert 'data-index="0"' not in html and 'class="st qneed"' not in html, "none of the question's answers"
     right = html.split('class="row gap qabarright"')[1]
-    assert ">Open</a>" in right
-    assert ">Open</a>" not in right.split('class="more qdots"')[-1] or 'class="more qdots"' not in right, (
-        "no Open in an item's ⋯"
-    )
+    assert ">Open</a>" in right and "qdots" not in html, "no ⋯: Lift the hold is in slot 1"
     assert html.count(">Lift the hold<") == 1, "Lift the hold drawn once"
+    assert html.index(">Lift the hold<") < html.index(">Answer…<") < html.index('class="row gap qabarright"')
 
 
 def test_a_second_open_question_is_its_own_decide_beside_the_word(tmp_path):
@@ -267,7 +277,8 @@ def test_the_queue_cards_item_reads_answered(tmp_path, monkeypatch):
     card = {"id": q, "group": "up_next", "status": "", "top": top, "rows": [], "order": [q], "start": q}
     html = _route_client(tmp_path, monkeypatch, queue={"at": NOW.isoformat(), "cards": [card]}).get("/queue").text
     item = html[html.index(f'data-card="{q}"') :]
-    assert "you answered · in designer's ask" in item, "the card's item is the answered row, from card_mail"
+    # its press line (TD-1843): the foot it carried, a capital first
+    assert "You answered in designer's ask" in item, "the card's item is the answered row, from card_mail"
 
 
 def test_the_repo_pages_for_you_reads_answered_and_an_unread_inbox_draws_it_as_before(tmp_path, monkeypatch):
@@ -478,10 +489,11 @@ def test_a_ledger_row_under_a_press_reads_its_mark_and_draws_only_open(tmp_path)
     row = _pressed(tmp_path)
     assert row["applying"]["act"] == "decide" and row["applying_words"] == "answered — applying"
     for html in (_render(row), _render(row, mode="card", home="queue")):
-        assert '<span class="st qans">answered — applying</span>' in html and "waiting on designer" not in html
+        assert "nswered — applying" in html and "waiting on designer" not in html  # a capital first on its card
         assert "you answered &ldquo;Yes&rdquo; — landing on r's board" in html
         assert 'data-index="0"' not in html and ">Reply<" not in html and ">Go with it<" not in html
         assert ">Start session<" not in html and ">Lift the hold<" not in html and "Answer…" not in html
+    assert '<span class="st qans">answered — applying</span>' in _render(row), "the Inbox's word in its heading"
     assert ">Open</a>" in _render(row).split('class="more qdots"')[1]  # the Inbox keeps it in its ⋯
     # on its card Open alone, its answer bar's, and no ⋯ (TD-1842 step 4)
     on_card = _render(row, mode="card", home="queue")

@@ -1568,6 +1568,22 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
    entry, else **Lift the hold** where `lift_item` is set. A row a press is landing on (`e.applying`, §4.4 *A press is drawn as it lands*, TD-1508) reads its
    mark's words — *answered — applying*, or *applying <act>* — after *with you*, before an answer's hold, and draws
    no answers nor any press until it lands: its foot what was pressed, and **Open** in its ⋯. #}
+{#- §4.5 screen 12 *A press is never left stranded* (§4.5a *Queue card: press line*; TD-1832, built by TD-1843): a grey
+    item's one status sentence on its card, above its bar — still with a session (`--idle`): *answered — waiting on
+    <asker>* (the foot it carried, its board and `done`-outcome forms), *waits until <date>*, *answered — applying*
+    (or *applying <act>*) and *handed to <seat>* — a capital first and a full stop, the item's only status words -#}
+{% macro press_line(e, app, ans) -%}
+{%- set s -%}
+{%- if app %}{{ e.applying_words or 'answered — applying' }}: {% if app.answer %}you {{ 'answered' if app.act == 'decide' else 'wrote' }} &ldquo;{{ app.answer }}&rdquo; — {% endif %}landing on {{ e.name }}'s board
+{%- elif ans.kind == 'handed' and not ans.until %}handed to {{ ans.name }}{% if ans.age %}, {{ ans.age }} ago{% endif %} — {% if ans.outcome %}{{ ans.name }} could not do it: {{ ans.outcome.text or 'blocked' }}{% else %}its outcome ends this hold{% endif %}
+{%- elif ans.kind == 'board' %}{{ ans.words }}, {{ ans.age ~ ' ago' if ans.age else 'today' }} — {% if ans.until %}it waits until {{ short_date(ans.until) or ans.until }}, then you are asked again{% elif ans.board.to %}carried to {{ ans.board.to | map('replace', e.name ~ '#', '') | join(' and ') }}{% else %}{{ ans.name }} acts on it{% endif %}
+{%- else %}{{ ans.words }} in {{ ans.name }}'s {{ ans.kind or 'question' }}, {{ ans.age ~ ' ago' if ans.age else 'just now' }} — {% if ans.outcome %}{{ ans.name }}: {{ ans.outcome.text or 'done' }}{% else %}the hold goes when its PR merges{% endif %}
+{%- endif %}
+{%- endset %}
+{%- set s = s | trim %}
+<div class="qpress qp-idle" role="status">{{ cap_first(s) }}{% if not s.endswith(('.', '?', '!')) %}.{% endif %}</div>
+{%- endmacro %}
+
 {% macro ledger(e, section) -%}
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e.name }}'s ledger">{{ e.name }}</span>
@@ -1577,8 +1593,11 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- set with_you = e.want == 'with_you' and e.with_you %}
   {%- set app = e.applying if not with_you else none %}
   {%- set ans = e.answered if not (with_you or app) else none %}
+  {#- a grey item on its card says its state in its press line alone (TD-1843) -#}
+  {%- set grey = card_whole(mode, e) and (ans or app) %}
   {%- if e.held and not with_you %} <span class="st">held by {{ e.held }}</span>{% endif %}
-  {%- if app %} <span class="st qans">{{ e.applying_words }}</span>
+  {%- if grey %}
+  {%- elif app %} <span class="st qans">{{ e.applying_words }}</span>
   {%- elif ans and ans.until %} <span class="st qans">waits until {{ (short_date(ans.until) if mode == 'card' else '') or ans.until }}</span>
   {%- elif ans and ans.kind == 'handed' %} <span class="st qans">handed to {{ ans.name }}{% if ans.age %} · {{ ans.age }}{% endif %}</span>
   {%- elif ans %} <span class="st qans">answered — waiting on {{ ans.name }}</span>
@@ -1607,6 +1626,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- endfor %}
 </div>
 {%- endif %}
+{%- if grey %}{{ press_line(e, app, ans) }}{% else %}
 <div class="row gap wrap mfoot">
   {%- if app %}
   {#- a press landing (§4.4 *A press is drawn as it lands*, TD-1508): what was pressed, and where it lands -#}
@@ -1668,23 +1688,35 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- endif %}
   {%- endif %}
 </div>
+{%- endif %}
 {#- on a card its foot above, then its answer bar (§4.5 screen 12 *One answer set*, TD-1842): its answers, Done or Lift
     the hold, **Answer…**, Start session, then **Open**, its row on the Repo page; its ⋯ is gone (Open alone today), a
-    *with you in <name>* item's too. A grey item keeps today's controls in the bar (TD-1842 step 4, until TD-1843):
-    *applying* **Open** alone; *answered — waiting on* and *waits until* **Open** and a ⋯ with **Lift the hold** where
-    the row's `lift_item` is set (§4.4 *Where Lift the hold is drawn*, TD-1879: never on an `Owner: paul` entry, whose
-    Done answers it, nor where case (d) holds); *handed to <seat>* **Open** and a ⋯ with the entry's answer -#}
+    *with you in <name>* item's too. A grey item's bar by its case (§4.5 screen 12 *A press is never left stranded*,
+    TD-1843), no ⋯: *answered — waiting on <asker>* **Lift the hold** in slot 1 where the row's `lift_item` is set (§4.4
+    *Where Lift the hold is drawn*, TD-1879), **Answer…** to the asker on the question's thread (a mail answer alone:
+    `answered.mid` set, no `board`, not `handed`; its refusal kept by this row's `data-msg`), Start session where no
+    other session holds the entry, then **Open**; *waits until* **Lift the hold** where set and **Open**; *applying*
+    **Open** alone; *handed to <seat>* its entry's own answer in slot 1 — **Done** on an `Owner: paul` entry, else
+    **Lift the hold** where set — and **Open** -#}
 {%- if whole %}
-{%- set lift %}<button role="menuitem" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="go ahead" data-answer="go ahead" data-lift="1" title="lifts the hold on {{ e.id }}" data-confirm="Lift the hold on {{ e.id }}? Its decision (paul) is lifted now, and the entry can be picked.">Lift the hold</button>{% endset %}
-{%- set right %}<a class="btn sm ghost" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>
-  {%- if app %}
-  {%- elif ans and ans.kind == 'handed' and e.why == 'yours' %}
-  {%- call qrow.dots(['Done']) %}<button role="menuitem" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="done" data-answer="done" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: done — its session archives the entry, or asks you what was done" data-confirm="Done? &ldquo;done&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Done</button>{% endcall %}
-  {%- elif ans and e.lift_item %}
-  {%- call qrow.dots(['Lift the hold']) %}{{ lift }}{% endcall %}
+{%- set lift %}<button class="btn sm answer qentry" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="go ahead" data-answer="go ahead" data-lift="1" title="lifts the hold on {{ e.id }}" data-confirm="Lift the hold on {{ e.id }}? Its decision (paul) is lifted now, and the entry can be picked.">Lift the hold</button>{% endset %}
+{%- set done %}<button class="btn sm answer qentry" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="done" data-answer="done" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: done — its session archives the entry, or asks you what was done" data-confirm="Done? &ldquo;done&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Done</button>{% endset %}
+{%- set right %}<a class="btn sm ghost" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>{% endset %}
+{%- if app %}{{ bar('', right) }}
+{%- elif ans %}
+{%- set left %}
+  {%- if ans.kind == 'handed' and e.why == 'yours' %}{{ done }}
+  {%- elif e.lift_item %}{{ lift }}{% endif %}
+  {%- if not ans.until and ans.kind != 'handed' %}
+  {%- if ans.mid and not ans.board %}<button class="btn sm ghost" type="button" data-act="reply" data-id="person" data-msg="{{ ans.mid }}" data-from="{{ ans.asker }}" data-name="{{ ans.name }}" data-quote="{{ e.id }} {{ e.title }}" title="your words go to {{ ans.name }} on its question's thread">Answer…</button>{% endif %}
+  {{- item_start(e) }}
   {%- endif %}
 {%- endset %}
-{{ bar('' if (ans or app) else answer_row(e, 'ledger'), right) }}
+{%- set l = left | trim %}
+{%- set group %}{% if l %}<div class="row gap wrap sugg qanswers" role="group" aria-label="answer this item">{{ l }}</div>{% endif %}{% endset %}
+{{ bar(group, right) }}
+{%- else %}{{ bar(answer_row(e, 'ledger'), right) }}
+{%- endif %}
 {%- endif %}
 {%- endmacro %}
 

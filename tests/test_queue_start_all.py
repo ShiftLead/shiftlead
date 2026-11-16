@@ -141,6 +141,32 @@ def test_a_header_press_leaves_an_answered_entry_out_of_waits_on_me(tmp_path, mo
     assert "samscrape#TD-012" not in prompt.split("the rest — ")[0], "the answered entry waits on its asker"
 
 
+def test_a_header_press_counts_an_answered_item_that_draws_its_start_session(tmp_path, monkeypatch):
+    """TD-1843: the road reads the card's items with the card itself, so an item *answered — waiting on <asker>*
+    that draws its own Start session (`starts`, its entry free) counts at the press as the page counted it, and
+    stays in *waits on me*; read without the card, no item would carry `starts` and the counts would differ."""
+    import shiftlead.ui.app as app
+
+    wants, attach = app.card_wants, app.attach
+    seen: list[bool] = []
+
+    def spy(*a, **k):  # the road must hand `attach` its items' Start session (the card's `item_start`)
+        seen.append((a[3] if len(a) > 3 else k.get("start")) is not None)
+        return attach(*a, **k)
+
+    def answered(*a):
+        w = wants(*a)
+        out = [{**m, "starts": seen[-1]} for m in w.get("decide") or () if m.get("item") == "samscrape#TD-012"]
+        assert out, "the world's card carries TD-12 as a Decide item"
+        return {**w, "decide": [m for m in w["decide"] if m.get("item") != "samscrape#TD-012"], "answered": out}
+
+    monkeypatch.setattr(app, "attach", spy)
+    monkeypatch.setattr(app, "card_wants", answered)
+    _, prompt = _press(tmp_path, monkeypatch, [], card=CID)
+    assert seen and seen[-1], "the road's read builds each item's Start session"
+    assert "Its entries are: waits on me — samscrape#TD-012, samscrape#TD-009; the rest — " in prompt
+
+
 def test_with_one_left_at_the_press_the_why_key_sentence_stands(tmp_path, monkeypatch):
     """A page drawn with two, pressed once one of them is settled (TD-9 no longer a Do item at the press): the road
     counts one, so the `why_key` sentence; with the inbox unread it cannot count, and the same."""

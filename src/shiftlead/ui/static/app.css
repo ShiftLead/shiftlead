@@ -1296,6 +1296,11 @@ a.qstate:hover, a.qstatus:hover { text-decoration: none; color: var(--link); }
    edge; the answer row's buttons sit in the bar itself (`display: contents`), so the bar wraps as one row of buttons and
    its right group wraps whole, still at the right */
 .qabar { row-gap: 4px; }
+/* §4.5 screen 12 *A press is never left stranded* (TD-1832, built by TD-1843): one sentence above an item's bar, a left
+   rule and a tint of its case — still with a session (idle), could not be done (needs), refused (stalled) */
+.qpress { margin: 6px 0 2px; padding: 6px 10px; border-left: 3px solid var(--idle); background: var(--idle-bg); color: var(--idle-fg); font-size: var(--t-small); border-radius: 0 4px 4px 0; white-space: normal; }
+.qpress.qp-needs { border-left-color: var(--needs); background: var(--needs-bg); color: var(--needs-fg); }
+.qpress.qp-stalled { border-left-color: var(--stalled); background: var(--stalled-bg); color: var(--stalled-fg); }
 .qabar > .qanswers:not([hidden]) { display: contents; }
 .qabar .qrule { align-self: stretch; border-left: 1px solid var(--line); }
 .qabar .qrule:first-child { display: none; }
