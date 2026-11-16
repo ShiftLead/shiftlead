@@ -25,7 +25,7 @@ import re
 from html import escape
 from urllib.parse import urlsplit
 
-from sessionorc.mail import SENTENCE
+from sessionorc.mail import _FENCE, SENTENCE, paragraph_break  # noqa: F401 — re-exported (§4.10, TD-1846)
 
 # §4.5a *Inbox row: details*: the backstop for text nobody shaped — no blank line and longer than this.
 FOLD_CHARS = 300
@@ -33,7 +33,6 @@ FOLD_CHARS = 300
 # the first paragraph is more than the person reads before deciding, and `ao msg` says so.
 FIRST_PARA_WORDS = 60
 
-_FENCE = re.compile(r"^[ \t]*```")
 _UL = re.compile(r"^[ \t]*-[ \t]+(.*)$")
 _OL = re.compile(r"^[ \t]*(\d{1,9})[.)][ \t]+(.*)$")
 _INLINE = re.compile(
@@ -181,21 +180,6 @@ def render(text: str, origin: str | None = None, links: bool = True) -> str:
         out.append(f"<pre><code>{escape(chr(10).join(fence))}</code></pre>")
     out.extend(_block(block, origin, links))
     return "".join(out)
-
-
-def paragraph_break(text: str) -> tuple[str, str] | None:
-    """`(first paragraph, the rest)` split at the first blank line — one inside a code block does
-    not count, and `\r\n` is a line break — or None when the text has no such line. The one
-    definition of *a blank line* that `fold` and `ao msg`'s shape warning share (design §4.10)."""
-    t = (text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
-    lines = t.split("\n")
-    fenced = False
-    for i, line in enumerate(lines):
-        if _FENCE.match(line):
-            fenced = not fenced
-        elif not fenced and not line.strip():
-            return "\n".join(lines[:i]).rstrip(), "\n".join(lines[i + 1 :]).strip()
-    return None
 
 
 def fold(text: str) -> tuple[str, str]:

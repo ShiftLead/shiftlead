@@ -1,0 +1,15 @@
+{
+ "argv": [
+  "set",
+  "TD-2",
+  "--priority",
+  "High",
+  "--ask",
+  "empty.md",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

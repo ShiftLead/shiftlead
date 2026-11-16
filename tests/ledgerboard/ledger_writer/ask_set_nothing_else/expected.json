@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "set",
+  "unusable": "give at least one field, or --title, to set"
+ }
+}

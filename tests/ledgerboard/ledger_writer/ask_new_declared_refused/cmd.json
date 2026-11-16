@@ -1,0 +1,22 @@
+{
+ "argv": [
+  "new",
+  "--id",
+  "TD-10",
+  "--title",
+  "A new entry that asks pat",
+  "--priority",
+  "Medium",
+  "--why",
+  "why.md",
+  "--blocked-by",
+  "decision (pat)",
+  "--ask",
+  "ask.md",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

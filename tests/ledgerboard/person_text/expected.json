@@ -1,0 +1,909 @@
+{
+ "code_tokens: bare-url-dropped": [],
+ "code_tokens: call": [
+  "one_sentence()"
+ ],
+ "code_tokens: call-dotted": [
+  "os.path.join()"
+ ],
+ "code_tokens: call-plural-s": [],
+ "code_tokens: camel": [
+  "camelCase"
+ ],
+ "code_tokens: commit": [
+  "abc1234",
+  "0f1e2d3c4b5a"
+ ],
+ "code_tokens: commit-letters-only": [],
+ "code_tokens: commit-six": [],
+ "code_tokens: crlf-blank-line-span-plain": [
+  "foo_bar"
+ ],
+ "code_tokens: crlf-fence": [
+  "a code block",
+  "foo_bar"
+ ],
+ "code_tokens: dotted": [
+  "a_b.c_d.e"
+ ],
+ "code_tokens: double-backtick-span": [
+  "``a`b``"
+ ],
+ "code_tokens: fence": [
+  "a code block"
+ ],
+ "code_tokens: fence-info-spaces": [
+  "a code block"
+ ],
+ "code_tokens: fence-longer-close": [
+  "a code block",
+  "foo_bar"
+ ],
+ "code_tokens: fence-spaces-blank-line": [
+  "a code block"
+ ],
+ "code_tokens: file-line": [
+  "foo.py:42"
+ ],
+ "code_tokens: file-line-stop": [
+  "foo.py:42"
+ ],
+ "code_tokens: file-name": [
+  "profiles.yml",
+  "README.md"
+ ],
+ "code_tokens: file-name-case": [
+  "NOTES.TXT"
+ ],
+ "code_tokens: fp-a-n": [
+  "a()"
+ ],
+ "code_tokens: fp-abc": [
+  "A/B/C"
+ ],
+ "code_tokens: fp-abc-dotted": [
+  "a.b.c"
+ ],
+ "code_tokens: fp-and-or-else": [
+  "and/or/else"
+ ],
+ "code_tokens: fp-camel": [
+  "iPhone",
+  "iOS",
+  "macOS"
+ ],
+ "code_tokens: fp-days": [
+  "Mon/Wed/Fri"
+ ],
+ "code_tokens: fp-he-she-they": [
+  "he/she/they"
+ ],
+ "code_tokens: fp-host-dotted": [
+  "docs.github.com"
+ ],
+ "code_tokens: fp-node-js": [
+  "Node.js"
+ ],
+ "code_tokens: fp-us-eu-uk": [
+  "US/EU/UK"
+ ],
+ "code_tokens: fp-usa": [
+  "U.S.A"
+ ],
+ "code_tokens: fp-yes-no-maybe": [
+  "yes/no/maybe"
+ ],
+ "code_tokens: gap-command": [],
+ "code_tokens: gap-dunder": [],
+ "code_tokens: gap-file-line-range": [],
+ "code_tokens: gap-file-two-lines": [],
+ "code_tokens: gap-misc": [],
+ "code_tokens: gap-misc-2": [],
+ "code_tokens: gap-two-part-path": [],
+ "code_tokens: ids-none": [],
+ "code_tokens: link-target-dropped": [],
+ "code_tokens: lone-marks-none": [],
+ "code_tokens: option": [
+  "--write"
+ ],
+ "code_tokens: order-once": [
+  "foo_bar",
+  "`x`"
+ ],
+ "code_tokens: path-backslash": [
+  "C:\\Users\\me"
+ ],
+ "code_tokens: path-dot": [
+  "./go",
+  "../up"
+ ],
+ "code_tokens: path-file-line": [
+  "src/foo.py:42"
+ ],
+ "code_tokens: path-home": [
+  "~/notes"
+ ],
+ "code_tokens: path-root": [
+  "/etc/hosts"
+ ],
+ "code_tokens: path-three": [
+  "docs/plans/x"
+ ],
+ "code_tokens: path-three-digits": [],
+ "code_tokens: possessive-file": [
+  "foo.py"
+ ],
+ "code_tokens: range": [
+  "main..feature"
+ ],
+ "code_tokens: snake": [
+  "snake_case"
+ ],
+ "code_tokens: span": [
+  "`make test`"
+ ],
+ "code_tokens: span-blank-line-plain": [],
+ "code_tokens: span-not-fence": [
+  "```x```"
+ ],
+ "code_tokens: standin-chars-in-text": [
+  "foo_bar"
+ ],
+ "code_tokens: standin-word-two-spans": [
+  "`a`",
+  "`b`"
+ ],
+ "code_tokens: tilde-fence": [
+  "a code block"
+ ],
+ "code_tokens: two-kinds-once": [
+  "src/foo_bar.py"
+ ],
+ "code_tokens: unclosed-fence": [
+  "a code block"
+ ],
+ "code_tokens: unmatched-backtick": [
+  "foo_bar"
+ ],
+ "code_tokens: upper": [
+  "ACTOR_WORDS"
+ ],
+ "code_tokens: url-in-span": [
+  "`curl https://x.io/a`"
+ ],
+ "code_tokens: whole-word": [],
+ "code_tokens: www-dotted": [
+  "www.example.com"
+ ],
+ "constant: actor-words": [
+  "me",
+  "my",
+  "myself",
+  "you",
+  "you'll",
+  "you're",
+  "you've",
+  "you'd",
+  "your",
+  "yourself",
+  "we",
+  "we'll",
+  "we're",
+  "we've",
+  "we'd",
+  "us",
+  "our",
+  "nobody",
+  "no one"
+ ],
+ "constant: code-exts": [
+  "py",
+  "md",
+  "yml",
+  "yaml",
+  "toml",
+  "json",
+  "jsonl",
+  "sh",
+  "js",
+  "ts",
+  "html",
+  "css",
+  "txt",
+  "cfg",
+  "ini",
+  "lock",
+  "log",
+  "sql",
+  "csv"
+ ],
+ "constant: sentence-words": 25,
+ "person_text_problems: actor-I": [],
+ "person_text_problems: actor-Id": [],
+ "person_text_problems: actor-Ill": [],
+ "person_text_problems: actor-Im": [],
+ "person_text_problems: actor-Ive": [],
+ "person_text_problems: actor-curly-ill": [],
+ "person_text_problems: actor-word-me": [],
+ "person_text_problems: actor-word-my": [],
+ "person_text_problems: actor-word-myself": [],
+ "person_text_problems: actor-word-no-one": [],
+ "person_text_problems: actor-word-nobody": [],
+ "person_text_problems: actor-word-our": [],
+ "person_text_problems: actor-word-us": [],
+ "person_text_problems: actor-word-we": [],
+ "person_text_problems: actor-word-wed": [],
+ "person_text_problems: actor-word-well": [],
+ "person_text_problems: actor-word-were": [],
+ "person_text_problems: actor-word-weve": [],
+ "person_text_problems: actor-word-you": [],
+ "person_text_problems: actor-word-youd": [],
+ "person_text_problems: actor-word-youll": [],
+ "person_text_problems: actor-word-your": [],
+ "person_text_problems: actor-word-youre": [],
+ "person_text_problems: actor-word-yourself": [],
+ "person_text_problems: actor-word-youve": [],
+ "person_text_problems: actors-carriage-return": {
+  "error": "ValueError"
+ },
+ "person_text_problems: actors-collapsed": [],
+ "person_text_problems: actors-empty-entry": {
+  "error": "ValueError"
+ },
+ "person_text_problems: actors-line-break": {
+  "error": "ValueError"
+ },
+ "person_text_problems: actors-literal-plus": [],
+ "person_text_problems: actors-noun": [],
+ "person_text_problems: actors-phrase": [],
+ "person_text_problems: actors-phrase-plural": [],
+ "person_text_problems: actors-phrase-split-no": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…, or session…"
+  ]
+ ],
+ "person_text_problems: actors-plural": [],
+ "person_text_problems: actors-possessive": [],
+ "person_text_problems: actors-spaces-only": {
+  "error": "ValueError"
+ },
+ "person_text_problems: ask-lead-left-in": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: this has 26 words"
+  ]
+ ],
+ "person_text_problems: ask-text-after-lead": [],
+ "person_text_problems: bounds-agent-cadence": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…, or agent…"
+  ]
+ ],
+ "person_text_problems: bounds-i-o": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…, or agent…"
+  ]
+ ],
+ "person_text_problems: bounds-my-app": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…, or agent…"
+  ]
+ ],
+ "person_text_problems: bounds-us-east-1": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…, or agent…"
+  ]
+ ],
+ "person_text_problems: cure-with-actors": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…, or seat…"
+  ]
+ ],
+ "person_text_problems: default-equal-label": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: default-equal-marked": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: default-mark-dropped": [
+  [
+   2,
+   true,
+   "rule 2: answer 2 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: default-no-answers": [
+  [
+   2,
+   true,
+   "rule 2: the default names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: default-unequal-actor": [],
+ "person_text_problems: default-unequal-actorless": [
+  [
+   2,
+   true,
+   "rule 2: the default names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: form-alone-hold": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: form-alone-not-right": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: form-alone-other": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: form-label-not-read": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: form-with-consequence": [],
+ "person_text_problems: me-you-gap": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: no-actor-Ie": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: no-actor-ie": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: no-actor-is": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: no-actor-lower-i": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: no-actors-session": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: not-right-label-read": [],
+ "person_text_problems: people-carriage-return": {
+  "error": "ValueError"
+ },
+ "person_text_problems: people-case": [],
+ "person_text_problems: people-empty-entry": {
+  "error": "ValueError"
+ },
+ "person_text_problems: people-line-break": {
+  "error": "ValueError"
+ },
+ "person_text_problems: people-none": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: people-none-names": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: people-possessive": [],
+ "person_text_problems: people-space-entry": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: people-will-gap": [],
+ "person_text_problems: rule-order": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: this has a sentence end inside it (write it without the stop)"
+  ],
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ],
+  [
+   2,
+   true,
+   "rule 2: the default names nobody who acts — say who: I'll…, you…"
+  ],
+  [
+   4,
+   false,
+   "rule 4: the person reads the context in plain words: foo.py go behind the link"
+  ]
+ ],
+ "person_text_problems: rule1-all-parts": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: this has 27 words; this has a sentence end inside it (write it without the stop); this does not end in ?; the code tokens profiles.yml and one_sentence()"
+  ]
+ ],
+ "person_text_problems: rule1-empty-alone": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: it is empty"
+  ]
+ ],
+ "person_text_problems: rule1-pass": [],
+ "person_text_problems: rule1-statement": [
+  [
+   1,
+   true,
+   "rule 1: the sentence is one plain sentence of at most 25 words: this has a sentence end inside it (write it without the stop)"
+  ]
+ ],
+ "person_text_problems: rule1-statement-code": [
+  [
+   1,
+   true,
+   "rule 1: the sentence is one plain sentence of at most 25 words: the code token foo.py"
+  ]
+ ],
+ "person_text_problems: rule4-empty": [],
+ "person_text_problems: rule4-five": [
+  [
+   4,
+   false,
+   "rule 4: the person reads the context in plain words: grammar.py, one_sentence(), profiles.yml and 2 more go behind the link"
+  ]
+ ],
+ "person_text_problems: rule4-four": [
+  [
+   4,
+   false,
+   "rule 4: the person reads the context in plain words: a.py, b.py, c.py and 1 more go behind the link"
+  ]
+ ],
+ "person_text_problems: rule4-one": [
+  [
+   4,
+   false,
+   "rule 4: the person reads the context in plain words: foo.py go behind the link"
+  ]
+ ],
+ "person_text_problems: rule4-plain": [],
+ "person_text_problems: rule4-three": [
+  [
+   4,
+   false,
+   "rule 4: the person reads the context in plain words: grammar.py, one_sentence() and profiles.yml go behind the link"
+  ]
+ ],
+ "person_text_problems: rule4-two": [
+  [
+   4,
+   false,
+   "rule 4: the person reads the context in plain words: foo.py and bar.md go behind the link"
+  ]
+ ],
+ "person_text_problems: say-no-gap": [],
+ "person_text_problems: sentence-none": [],
+ "person_text_problems: spec-example-rule1": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: this has 26 words; this does not end in ?; the code tokens profiles.yml and one_sentence()"
+  ]
+ ],
+ "person_text_problems: spec-example-rule2": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…, or session…"
+  ]
+ ],
+ "person_text_problems: us-market-gap": [],
+ "person_text_problems: well-pin-it": [],
+ "person_text_problems: you-in-link-target-not-read": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: you-in-span-not-read": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "person_text_problems: you-in-url-not-read": [
+  [
+   2,
+   true,
+   "rule 2: answer 1 names nobody who acts — say who: I'll…, you…"
+  ]
+ ],
+ "sentence_problems: 25-words": [],
+ "sentence_problems: 25-words-with-dash": [],
+ "sentence_problems: 26-words": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: this has 26 words"
+  ]
+ ],
+ "sentence_problems: abbrev-a.m": [],
+ "sentence_problems: abbrev-approx": [],
+ "sentence_problems: abbrev-cf": [],
+ "sentence_problems: abbrev-dr": [],
+ "sentence_problems: abbrev-e.g": [],
+ "sentence_problems: abbrev-est": [],
+ "sentence_problems: abbrev-etc": [],
+ "sentence_problems: abbrev-i.e": [],
+ "sentence_problems: abbrev-jr": [],
+ "sentence_problems: abbrev-mr": [],
+ "sentence_problems: abbrev-mrs": [],
+ "sentence_problems: abbrev-ms": [],
+ "sentence_problems: abbrev-no": [],
+ "sentence_problems: abbrev-p.m": [],
+ "sentence_problems: abbrev-sr": [],
+ "sentence_problems: abbrev-st": [],
+ "sentence_problems: abbrev-vs": [],
+ "sentence_problems: apostrophe-fold": [],
+ "sentence_problems: blank": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: it is empty"
+  ]
+ ],
+ "sentence_problems: code-token-no-problem": [],
+ "sentence_problems: curly-quotes": [],
+ "sentence_problems: curly-single": [],
+ "sentence_problems: dr-lee": [],
+ "sentence_problems: ellipsis": [],
+ "sentence_problems: ellipsis-char": [],
+ "sentence_problems: emphasis-question": [],
+ "sentence_problems: empty": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: it is empty"
+  ]
+ ],
+ "sentence_problems: empty-question-alone": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: it is empty"
+  ]
+ ],
+ "sentence_problems: id-stop-false-positive": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: this has a sentence end inside it (write it without the stop)"
+  ]
+ ],
+ "sentence_problems: line-break-stop": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: this has a sentence end inside it (write it without the stop)"
+  ]
+ ],
+ "sentence_problems: marks-only-empty": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: it is empty"
+  ]
+ ],
+ "sentence_problems: month-apr": [],
+ "sentence_problems: month-aug": [],
+ "sentence_problems: month-dec": [],
+ "sentence_problems: month-feb": [],
+ "sentence_problems: month-jan": [],
+ "sentence_problems: month-jul": [],
+ "sentence_problems: month-jun": [],
+ "sentence_problems: month-mar": [],
+ "sentence_problems: month-nov": [],
+ "sentence_problems: month-oct": [],
+ "sentence_problems: month-sep": [],
+ "sentence_problems: month-sept": [],
+ "sentence_problems: nov-20": [],
+ "sentence_problems: paren-question-inside": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: this has a sentence end inside it (write it without the stop)"
+  ]
+ ],
+ "sentence_problems: phd-false-positive": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: this has a sentence end inside it (write it without the stop)"
+  ]
+ ],
+ "sentence_problems: pm-tonight": [],
+ "sentence_problems: question-no-mark": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: this does not end in ?"
+  ]
+ ],
+ "sentence_problems: say-no-gap": [],
+ "sentence_problems: span-end": [],
+ "sentence_problems: span-one-line": [],
+ "sentence_problems: span-one-word": [],
+ "sentence_problems: span-possessive-count": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 3 words ending in ?: this has 4 words"
+  ]
+ ],
+ "sentence_problems: span-possessive-four-words": [],
+ "sentence_problems: statement-ends-bang": [],
+ "sentence_problems: statement-ends-colon": [],
+ "sentence_problems: statement-ends-dot": [],
+ "sentence_problems: statement-ends-nothing": [],
+ "sentence_problems: statement-line": [
+  [
+   1,
+   true,
+   "rule 1: the sentence is one plain sentence of at most 25 words: this has a sentence end inside it (write it without the stop)"
+  ]
+ ],
+ "sentence_problems: stop-inside": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: this has a sentence end inside it (write it without the stop)"
+  ]
+ ],
+ "sentence_problems: three-parts": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: this has 28 words; this has a sentence end inside it (write it without the stop); this does not end in ?"
+  ]
+ ],
+ "sentence_problems: trailing-closers": [],
+ "sentence_problems: trailing-stop-not-inside": [],
+ "sentence_problems: two-parts": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: this has 26 words; this does not end in ?"
+  ]
+ ],
+ "sentence_problems: url-question": [],
+ "sentence_problems: url-stop-inside": [
+  [
+   1,
+   true,
+   "rule 1: the question is one plain sentence of at most 25 words ending in ?: this has a sentence end inside it (write it without the stop)"
+  ]
+ ],
+ "title_problems: b4-once": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: B4 belong in the body"
+  ]
+ ],
+ "title_problems: code-token": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: profiles.yml belong in the body"
+  ]
+ ],
+ "title_problems: coined-case": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: Slice belong in the body"
+  ]
+ ],
+ "title_problems: coined-empty": {
+  "error": "ValueError"
+ },
+ "title_problems: coined-es": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: seames belong in the body"
+  ]
+ ],
+ "title_problems: coined-line-break": {
+  "error": "ValueError"
+ },
+ "title_problems: coined-s": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: slices belong in the body"
+  ]
+ ],
+ "title_problems: coined-space": {
+  "error": "ValueError"
+ },
+ "title_problems: four-labels": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: TD-1, TD-2, TD-3 and 2 more belong in the body"
+  ]
+ ],
+ "title_problems: id-in-words": [],
+ "title_problems: label-dotted-repo-td": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: my.repo#TD-5 belong in the body"
+  ]
+ ],
+ "title_problems: label-in-span": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: `TD-5` belong in the body"
+  ]
+ ],
+ "title_problems: label-owner-repo-td": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: acme/tools#TD-5 belong in the body"
+  ]
+ ],
+ "title_problems: label-repo-td": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: ledgerboard#TD-12 belong in the body"
+  ]
+ ],
+ "title_problems: label-td": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: TD-078 belong in the body"
+  ]
+ ],
+ "title_problems: label-td-possessive": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: TD-5 belong in the body"
+  ]
+ ],
+ "title_problems: labels-b4": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: B4 belong in the body"
+  ]
+ ],
+ "title_problems: labels-bad-regex": {
+  "error": "ValueError"
+ },
+ "title_problems: labels-empty": {
+  "error": "ValueError"
+ },
+ "title_problems: labels-line-break": {
+  "error": "ValueError"
+ },
+ "title_problems: labels-p0-false-positive": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: P0 belong in the body"
+  ]
+ ],
+ "title_problems: labels-pr": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: #42 belong in the body"
+  ]
+ ],
+ "title_problems: plain": [],
+ "title_problems: possessive-file": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: foo.py belong in the body"
+  ]
+ ],
+ "title_problems: s3-no-labels": [],
+ "title_problems: span-label-span": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: `foo`, B4 and `x` belong in the body"
+  ]
+ ],
+ "title_problems: span-pair-one-word": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: `a` and `b` belong in the body"
+  ]
+ ],
+ "title_problems: spec-example-rule3": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: TD-078, B4 and profiles.yml belong in the body"
+  ]
+ ],
+ "title_problems: us-eu-uk": [
+  [
+   3,
+   true,
+   "rule 3: a title is plain words: US/EU/UK belong in the body"
+  ]
+ ]
+}

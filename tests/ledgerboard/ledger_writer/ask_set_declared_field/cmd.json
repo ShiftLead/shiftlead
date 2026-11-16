@@ -1,0 +1,15 @@
+{
+ "argv": [
+  "set",
+  "TD-1",
+  "--blocked-by",
+  "decision (pat)",
+  "--field",
+  "Ask=pat says which way.",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

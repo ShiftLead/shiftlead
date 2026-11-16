@@ -1,0 +1,17 @@
+{
+ "argv": [
+  "lift",
+  "TD-2",
+  "--gate",
+  "decision (pat)",
+  "--by",
+  "pat",
+  "--answer",
+  "Go",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

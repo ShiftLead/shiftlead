@@ -1,0 +1,68 @@
+{
+ "blocked": [],
+ "check": [
+  {
+   "field": "blocked by",
+   "id": "TD-001",
+   "kind": "decision-missing",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-001: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-001 --section Ask --remove"
+  }
+ ],
+ "check_since_empty": [
+  {
+   "field": "blocked by",
+   "id": "TD-001",
+   "kind": "decision-missing",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-001: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-001 --section Ask --remove"
+  }
+ ],
+ "declared": {},
+ "entries": [
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000001",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-001",
+   "key": "2|0|000001",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "An Ask with no gate, on a v1 ledger",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000002",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-002",
+   "key": "2|0|000002",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "An answered Ask, on a v1 ledger",
+   "type": "debt"
+  }
+ ],
+ "flags": [],
+ "pickable": [
+  "TD-001",
+  "TD-002"
+ ],
+ "rows": []
+}

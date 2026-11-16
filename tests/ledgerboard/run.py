@@ -82,7 +82,10 @@ Fixtures, each an invented input and its expected JSON:
   (``plan/``: a supersede, its chain, each refusal, a chain ending in a Status word this reader does not know
   among them), the Dropped archive, and ``rename_ref`` keeping one copy. From v3.0, ``check()``'s ``retired``
   errors (``check/waits_*``, ``check/location_*``, ``check/*_untouched``): an error on every entry holding a retired
-  field or the old decision form, whatever the edit, never ℹ.
+  field or the old decision form, whatever the edit, never ℹ. From v3.1, ``decision-missing`` given a base
+  (``check/asks_*.md``: standing, a note, a lift, a direct drop, a new Ask, and an answered entry noted, respaced,
+  relinked, renumbered and reopened), and ``edit_entry()``'s Ask refusals, its wider ``remove`` and ``set``'s
+  header ``Ask``.
 - ``ledger/supersede.md`` (v2.4): an archived blocker's Status read — Resolved, Superseded (by an open entry, a
   Resolved one, another repo's, a chain ending in Dropped, a loop, no successor) and Dropped, here and through the
   resolver's ``status`` and ``successor``.
@@ -109,9 +112,16 @@ Fixtures, each an invented input and its expected JSON:
   none): an empty board is ``tests/``'.
 - ``ledger_writer/<case>/`` (v2.4): the ledger writer, ``ledger.py`` — laid out as ``board_writer/``'s cases, each
   ``argv`` carrying ``--json`` so what it prints is one object: a report, the paths written, the plan, why it
-  refused, or the ids it ``needs``.
+  refused, or the ids it ``needs``. From v3.1, ``ask_*``: ``set --ask`` and ``new --ask`` and their refusals, the
+  old two writes each refused, the writes over an ungated Ask (a standing one passes, a ``renumber`` or ``reopen``
+  is refused), and ``--check`` of the ledger a decide lift left (``ask_check_after_decide``).
 - ``status/cases.json`` → ``status/expected.json`` (v2.7; ``migrate/``'s ``status_problem`` group until v3.0, which
   removed ``migrate_entry()``): ``status_problem()`` of each form, in its place and out of it.
+- ``person_text/cases.json`` → ``person_text/expected.json`` (v3.2): *Text a person reads* — each case a call
+  (``fn``, ``args``, ``kwargs``) of ``code_tokens()``, ``sentence_problems()``, ``person_text_problems()`` or
+  ``title_problems()``, its result the tokens, the problems as ``[rule, refuse, line]`` lists, or
+  ``{"error": "ValueError"}``; or ``{"constant": name}``, its result the constant's value. The expected results
+  are written from SPEC's text and its examples, never from the module's output.
 - ``grammar/cases.json`` → ``grammar/expected.json`` (v2.3): SPEC's grammar appendix — per start symbol and
   production, strings that production's EBNF accepts and refuses, and the module's verdict on each:
   ``item_file_problem()`` of a whole item file (v3.0; v3.0 retired the ``item-line`` start, whose judge was
@@ -126,7 +136,12 @@ Fixtures, each an invented input and its expected JSON:
 - ``ledger/gates.md`` (v2.4): ``Blocked by``'s gates at ``TODAY`` — an ``until`` past, reached and ahead, an
   ``event``, a decision with and without its Ask, each gate repeated, the retired words (``hold``, ``decision
   (designer)``, the old form, ``Waits``, ``Taken by``, a stage word in Status), a Priority outside the three,
-  items the grammar does not read, the words in any case, and a parent's ``parts_gates``.
+  items the grammar does not read, the words in any case, and a parent's ``parts_gates``. From v3.1 (TD-112),
+  ``decision-missing``: an Ask with no gate, only an ``until`` or an ``event``, or held in the header (each ℹ);
+  answered by a lift or an override, or by one of two decisions with the other still carried (none); lifted and
+  added again, a lift above a later-dated ``gate added``, or a Log with an unreadable line (ℹ); a retired item
+  (``retired`` only), an unreadable ``decision (…)`` (beside ``blocked-item``), a qualified ``Ask (…)``, a lead in a
+  code fence, and an archived entry (none); ``ledger/decision_missing_v1.md`` the same on a v1 ledger.
 - ``ledger/events.md`` (v2.4): ``check()``'s events — a section whose text holds quotes, a gate with no section,
   sections whose gates are gone (one explained by its ``gate lifted`` Log line), a name twice, and each section
   the reader refuses.
@@ -827,7 +842,8 @@ def ledger_edit_cases(L, spec: dict, root: Path = HERE) -> dict:
                                                      today=spec["today"])
                                   if r["kind"] in ("archive-open-parts", "part-of-archived", "part-of-unknown",
                                                    "log-not-last", "log-line", "event-undated", "status",  # status: v2.7
-                                                   "misplaced-name")  # v2.8
+                                                   "misplaced-name",  # v2.8
+                                                   "decision-missing")  # v3.1
                                   or r["kind"] == "retired"]  # v3.0: every retired kind
                       for c in spec["check"]},
             "entry_text": {c["name"]: _refused(lambda c=c: L.entry_text(
@@ -1270,6 +1286,24 @@ def v2_expected(want: dict | None) -> dict | None:
     return dict(want, rows="(the v1 twin's)", v2={"split_matches_dir": True, "rows": [], "problems": []})
 
 
+def person_text_cases(L, spec: list) -> dict:
+    """Text a person reads (v3.2): each case a call of ``code_tokens()``, ``sentence_problems()``,
+    ``person_text_problems()`` or ``title_problems()`` and its result — the tokens, or each problem as
+    ``[rule, refuse, line]``, or ``{"error": "ValueError"}`` — or a constant's value (``{"constant": name}``)."""
+    out = {}
+    for case in spec:
+        if "constant" in case:
+            out[case["name"]] = getattr(L, case["constant"])
+            continue
+        try:
+            got = getattr(L, case["fn"])(*case.get("args", []), **case.get("kwargs", {}))
+        except ValueError:
+            out[case["name"]] = {"error": "ValueError"}
+            continue
+        out[case["name"]] = [list(p) for p in got] if case["fn"] != "code_tokens" else got
+    return out
+
+
 def cases(L, root: Path):
     for md in sorted((root / "ledger").glob("*.md")):
         if not md.name.endswith(".archive.md"):
@@ -1318,6 +1352,8 @@ def cases(L, root: Path):
     yield root / "verdict" / "expected.json", verdict_cases(L, spec, root)
     spec = json.loads((root / "status" / "cases.json").read_text(encoding="utf-8"))
     yield root / "status" / "expected.json", status_cases(L, spec)
+    spec = json.loads((root / "person_text" / "cases.json").read_text(encoding="utf-8"))
+    yield root / "person_text" / "expected.json", person_text_cases(L, spec)  # v3.2
 
 
 def main(argv: list[str] | None = None) -> int:

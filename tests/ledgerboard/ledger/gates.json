@@ -12,7 +12,13 @@
   "TD-106",
   "TD-107",
   "TD-114",
-  "TD-115"
+  "TD-115",
+  "TD-120",
+  "TD-121",
+  "TD-126",
+  "TD-127",
+  "TD-128",
+  "TD-131"
  ],
  "check": [
   {
@@ -144,6 +150,30 @@
    "text": "ℹ TD-118: Blocked by item 'decision (designer)' is retired — write decision (<person>): designer is a role, reserved by name; it keeps the block (SPEC *Retired words*)"
   },
   {
+   "field": "blocked by",
+   "id": "TD-126",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-126: Blocked by item 'decision (designer)' is retired — write decision (<person>): designer is a role, reserved by name; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-127",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-127: Blocked by item 'hold' is retired — write decision (<person>), with an **Ask:**; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-128",
+   "kind": "blocked-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-128: cannot read Blocked by item 'decision (the owner)' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  },
+  {
    "field": "event",
    "id": "TD-103",
    "kind": "event-section",
@@ -182,6 +212,78 @@
    "level": "error",
    "standing": false,
    "text": "⚠ TD-117: Blocked by names event (x) and the entry has no **Event (x):** section — its words, then check: <type> <args>"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-119",
+   "kind": "decision-missing",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-119: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-119 --section Ask --remove"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-120",
+   "kind": "decision-missing",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-120: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-120 --section Ask --remove"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-121",
+   "kind": "decision-missing",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-121: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-121 --section Ask --remove"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-122",
+   "kind": "decision-missing",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-122: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the field with an empty set value (--field 'Ask=')"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-124",
+   "kind": "decision-missing",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-124: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-124 --section Ask --remove"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-128",
+   "kind": "decision-missing",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-128: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-128 --section Ask --remove"
+  },
+  {
+   "field": "log",
+   "id": "TD-132",
+   "kind": "log-line",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-132: its Log line '- an undated line' is not `- YYYY-MM-DD: words`"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-132",
+   "kind": "decision-missing",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-132: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-132 --section Ask --remove"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-133",
+   "kind": "decision-missing",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-133: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-133 --section Ask --remove"
   },
   {
    "field": "status",
@@ -482,6 +584,30 @@
    "text": "ℹ TD-118: Blocked by item 'decision (designer)' is retired — write decision (<person>): designer is a role, reserved by name; it keeps the block (SPEC *Retired words*)"
   },
   {
+   "field": "blocked by",
+   "id": "TD-126",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-126: Blocked by item 'decision (designer)' is retired — write decision (<person>): designer is a role, reserved by name; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-127",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-127: Blocked by item 'hold' is retired — write decision (<person>), with an **Ask:**; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-128",
+   "kind": "blocked-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-128: cannot read Blocked by item 'decision (the owner)' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  },
+  {
    "field": "event",
    "id": "TD-103",
    "kind": "event-section",
@@ -520,6 +646,78 @@
    "level": "error",
    "standing": false,
    "text": "⚠ TD-117: Blocked by names event (x) and the entry has no **Event (x):** section — its words, then check: <type> <args>"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-119",
+   "kind": "decision-missing",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-119: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-119 --section Ask --remove"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-120",
+   "kind": "decision-missing",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-120: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-120 --section Ask --remove"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-121",
+   "kind": "decision-missing",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-121: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-121 --section Ask --remove"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-122",
+   "kind": "decision-missing",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-122: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the field with an empty set value (--field 'Ask=')"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-124",
+   "kind": "decision-missing",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-124: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-124 --section Ask --remove"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-128",
+   "kind": "decision-missing",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-128: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-128 --section Ask --remove"
+  },
+  {
+   "field": "log",
+   "id": "TD-132",
+   "kind": "log-line",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-132: its Log line '- an undated line' is not `- YYYY-MM-DD: words`"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-132",
+   "kind": "decision-missing",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-132: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-132 --section Ask --remove"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-133",
+   "kind": "decision-missing",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-133: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-133 --section Ask --remove"
   },
   {
    "field": "status",
@@ -1064,6 +1262,295 @@
    "priority": "Low",
    "title": "Waits alone is never a gate",
    "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000119",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-119",
+   "key": "3|0|000119",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "An Ask with no Blocked by",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "until 2026-02-01"
+   ],
+   "card_key": "3|0|000120",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "until 2026-02-01",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-120",
+   "key": "3|0|000120",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "An Ask waiting only on a date",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "event (shipped)"
+   ],
+   "card_key": "3|0|000121",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "event (shipped)",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-121",
+   "key": "3|0|000121",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "An Ask waiting only on an event",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000122",
+   "cross_repo": [],
+   "fields": {
+    "ask": "pat says which way.",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-122",
+   "key": "3|0|000122",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "An Ask held in the header, no gate",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000123",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-123",
+   "key": "3|0|000123",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "An Ask answered by its lift",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000124",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-124",
+   "key": "3|0|000124",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "An Ask lifted, then its decision added again and dropped by hand",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000125",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-125",
+   "key": "3|0|000125",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "An Ask answered by an override",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "decision (designer)"
+   ],
+   "card_key": "3|0|000126",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "decision (designer)",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-126",
+   "key": "3|0|000126",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "An Ask waiting on a role",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "'hold'"
+   ],
+   "card_key": "3|0|000127",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "hold",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-127",
+   "key": "3|0|000127",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "An Ask held by the retired hold",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "'decision (the owner)'"
+   ],
+   "card_key": "3|0|000128",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "decision (the owner)",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-128",
+   "key": "3|0|000128",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "An Ask whose decision names no person",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000129",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-129",
+   "key": "3|0|000129",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "A qualified Ask lead, no gate",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000130",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-130",
+   "key": "3|0|000130",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "An Ask lead inside a code fence, no gate",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "decision (kim)"
+   ],
+   "card_key": "3|0|000131",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "decision (kim)",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-131",
+   "key": "3|0|000131",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "Two decisions, one lifted and one still carried",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000132",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-132",
+   "key": "3|0|000132",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "An answered Ask whose Log has a line no reader reads",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000133",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-133",
+   "key": "3|0|000133",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "A lift written above a later-dated gate added line",
+   "type": "debt"
   }
  ],
  "flags": [
@@ -1178,13 +1665,43 @@
    "kind": "retired",
    "level": "info",
    "text": "ℹ TD-118: Blocked by item 'decision (designer)' is retired — write decision (<person>): designer is a role, reserved by name; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-126",
+   "kind": "retired",
+   "level": "info",
+   "text": "ℹ TD-126: Blocked by item 'decision (designer)' is retired — write decision (<person>): designer is a role, reserved by name; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-127",
+   "kind": "retired",
+   "level": "info",
+   "text": "ℹ TD-127: Blocked by item 'hold' is retired — write decision (<person>), with an **Ask:**; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-128",
+   "kind": "blocked-item",
+   "level": "error",
+   "text": "⚠ TD-128: cannot read Blocked by item 'decision (the owner)' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
   }
  ],
  "pickable": [
   "TD-101",
   "TD-113",
   "TD-108",
-  "TD-116"
+  "TD-116",
+  "TD-119",
+  "TD-122",
+  "TD-123",
+  "TD-124",
+  "TD-125",
+  "TD-129",
+  "TD-130",
+  "TD-132",
+  "TD-133"
  ],
  "rows": []
 }

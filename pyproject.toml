@@ -132,6 +132,7 @@ timeout_method = "thread"
 markers = [
     "unit: no tmux, sockets, or subprocesses; sub-second",
     "integration: spawns tmux, a host agent, git, or the hook script",
+    "person_text: the home checks text a person reads at its writer (§4.10, TD-1846), off in every other test",
 ]
 filterwarnings = [
     # TD-007 (archived): starlette's TestClient keeps a portal thread alive, so ptyprocess's

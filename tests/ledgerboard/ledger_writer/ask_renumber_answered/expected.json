@@ -1,0 +1,19 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "renumber",
+  "id": "TD-010",
+  "mentions": [],
+  "moved": {
+   "from": "ledger/TD-004.md",
+   "to": "ledger/TD-010.md"
+  },
+  "notes": [],
+  "paths": [
+   "ledger/TD-004.md",
+   "ledger/TD-010.md"
+  ],
+  "subject": null,
+  "was": "TD-004"
+ }
+}

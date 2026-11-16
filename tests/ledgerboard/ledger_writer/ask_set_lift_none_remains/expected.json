@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "set",
+  "refused": "TD-002 names no decision (<person>): an Ask is what a decision waits on — if it waits on a person, write them together with set --blocked-by \"…, decision (<person>)\" --ask FILE; if it waits on no one, remove the Ask with edit --section Ask --remove"
+ }
+}

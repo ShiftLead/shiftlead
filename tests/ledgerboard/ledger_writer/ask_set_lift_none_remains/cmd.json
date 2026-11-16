@@ -1,0 +1,17 @@
+{
+ "argv": [
+  "set",
+  "TD-2",
+  "--blocked-by",
+  "",
+  "--by",
+  "pat",
+  "--ask",
+  "ask.md",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

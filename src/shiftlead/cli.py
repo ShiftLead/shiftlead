@@ -4315,13 +4315,13 @@ def shape_warning(text: str, question: bool = False) -> str | None:
     runs past the Inbox's `FOLD_CHARS`, where the row cuts it at a sentence for them. It warns and
     never refuses: mail is never lost to a style rule. The blank line is the Inbox row's own
     (`paragraph_break`, which `fold` uses), so what is counted here is what the row draws. A
-    `question` — an `ask` or `steer` to the person, never a `--source` reply — is held to the
-    stricter rule first (§4.10 *An item leads with one sentence*, TD-916): its first paragraph is
-    one sentence (`render.one_sentence`), and a long one fails that too, so one line is said."""
-    from shiftlead.ui.render import FIRST_PARA_WORDS, FOLD_CHARS, one_sentence, paragraph_break
+    `question` — an `ask` or `steer` to the person, never a `--source` reply — is warned of nothing
+    here: the home checks it and refuses one that fails (§4.10 *Text a person reads is checked at its
+    writer*, TD-1846), and prints its problems, so a second line here would only repeat them."""
+    from shiftlead.ui.render import FIRST_PARA_WORDS, FOLD_CHARS, paragraph_break
 
-    if question and not one_sentence(text):
-        return "the person reads one sentence first: this paragraph is not one"
+    if question:
+        return None
 
     split = paragraph_break(text)
     if split is None:  # no blank line: the whole text is its first paragraph
