@@ -189,6 +189,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     host_name,  # noqa: F401
     identity_note,  # noqa: F401
     ledger_link,
+    lifts_hold,  # noqa: F401
     live_divider,  # noqa: F401
     live_unknown,  # noqa: F401
     log,  # noqa: F401
@@ -6039,7 +6040,9 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 # an orphaned question's answer (§4.10, TD-216): no reply entry — it went on the board
                 # and to the holders, and `note` is the toast's sentence, the standing as a result
                 return JSONResponse({"ok": True, **got})
-            return JSONResponse({"ok": True, "id": got["entry"]["id"], "delivered": got["delivered"]})
+            # a lifting answer (§4.10 *An `ask` that lifts the person's gate*, TD-1833): the toast's *hold lifted…*
+            lifted = {k: got[k] for k in ("lifted", "lifted_before") if got.get(k)}
+            return JSONResponse({"ok": True, "id": got["entry"]["id"], "delivered": got["delivered"], **lifted})
         if action == "unmail":
             ref = str(body.get("msg") or "").strip()
             if not ref:

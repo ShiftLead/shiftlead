@@ -81,6 +81,7 @@ LEDGER = """# Technical debt
 | TD-001 | A fixture entry | Medium | Open |
 | TD-002 | A fixture entry for you | Low | Open |
 | TD-003 | A fixture entry that waits on an event | Low | Open |
+| TD-004 | A fixture entry held for the person | Low | Open |
 
 ## TD-001: A fixture entry
 
@@ -129,6 +130,24 @@ LEDGER = """# Technical debt
 
 **Event (fixture-event):** the fixture's event happens
 check: pr-merged o/fixture#1
+
+**Done when:** never.
+
+## TD-004: A fixture entry held for the person
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-11-16
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** decision (paul)
+**Location:** nowhere
+
+**Why:** an entry the person's hold keeps out of the lanes, so a row draws **Lift the hold** and an `ask --lift`
+about it has a gate to lift (TD-1831, TD-1833).
+
+**Ask:** May the fixture entry go ahead?
 
 **Done when:** never.
 """

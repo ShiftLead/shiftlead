@@ -186,6 +186,24 @@ def settled_by_work(e: Any) -> str | None:
 templates.env.globals["settled_by_work"] = settled_by_work
 
 
+def lifts_hold(e: Any, answer: Any) -> str:
+    """The entry an answer button lifts the hold on (design §4.10 *An `ask` that lifts the person's gate*, §4.5a
+    *Inbox row: suggested answers*, TD-1833): its `about`'s `TD-n` where `e` is an `ask` that is not orphaned and
+    whose `lift` names `answer`'s label (`mail.answer_labels`, whole line or label alike), else ''. Such a button is
+    drawn as **Lift the hold** is, its title and its confirm; an orphaned ask's answer lifts nothing."""
+    if not isinstance(e, Mapping) or e.get("kind") != "ask" or e.get("orphaned"):
+        return ""
+    lift = e.get("lift")
+    if not isinstance(lift, list) or not lift or not isinstance(answer, str):
+        return ""
+    if mail.answer_labels([answer])[0] not in lift:
+        return ""
+    return str(e.get("about") or "").rpartition("#")[2]
+
+
+templates.env.globals["lifts_hold"] = lifts_hold
+
+
 def shaped(text: Any, origin: Any = None) -> dict[str, Markup]:
     """A mail row's text as the row draws it (design §4.5a **Inbox row: details**, §4.10 *How a
     message to a person is written*; TD-138): `lead`, the first paragraph, and `rest`, what goes

@@ -566,6 +566,14 @@ class MailEntry:
     # The PR that archived the entry a question closed `settled` names (§4.10 *A question the work settled closes
     # itself*, TD-1469): the closing commit's number, None where the archive names none (a direct push, a drop).
     settled_by: int | None = None
+    # An `ask` that lifts the person's gate (design §4.10 *An `ask` that lifts the person's gate*, TD-1829, built by
+    # TD-1833): the labels of its answers that lift its `about` entry's `decision (<p>)` on the person's press (`ao
+    # msg --lift`), as §4.10's split reads them; None on any other entry. A copy handed to a seat carries none.
+    lift: list[str] | None = None
+    # The person's lifting reply to such an ask: `<repo>#TD-n` whose hold its press lifted (`lifted`), or found
+    # already gone (`lifted_before`). Written only by the reply's lift road — never taken from a caller.
+    lifted: str | None = None
+    lifted_before: str | None = None
 
     def __post_init__(self) -> None:
         self.root = self.root or self.id  # a message replying to nothing is its own thread's root

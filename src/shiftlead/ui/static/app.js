@@ -1996,6 +1996,10 @@
       if (orphanNote) say(orphanNote, true);
       else if (action === "message" || action === "reply") say(`mailed to ${(res.delivered || []).join(", ")} — lands in the inbox, nothing typed`, true);
       if (action === "answer" && !orphanNote) say(`answered ${(res.delivered || []).join(", ")} — the reply is the answer you pressed`, true);
+      // a lifting answer to an `ask --lift` (§4.10 *An `ask` that lifts the person's gate*, TD-1833)
+      const liftedRef = (r) => String(r || "").split("#").pop();
+      if (["answer", "reply"].includes(action) && res.lifted) say(`hold lifted on ${liftedRef(res.lifted)}`, true);
+      else if (["answer", "reply"].includes(action) && res.lifted_before) say(`${liftedRef(res.lifted_before)} was no longer held`, true);
       if (action === "unmail") {
         say(res.declined ? "declined — the sender is told (design §4.10)"
           : res.closed_reason === "withdrawn" ? "withdrawn by its sender — removed"

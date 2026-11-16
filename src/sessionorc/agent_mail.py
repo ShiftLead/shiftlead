@@ -27,6 +27,7 @@ from sessionorc import (
     unanswered,
 )
 from sessionorc import held as held_mod
+from sessionorc import ledger as ledger_mod
 from sessionorc import queue as queue_mod
 from sessionorc import work as work_mod
 from sessionorc.agent_common import (
@@ -207,6 +208,29 @@ def _clean_question(question: Any) -> str:
 
 FORM_NO_DEFAULT = "a form is filled, never pressed: it is no default — mark a complete answer (design §4.10)"
 
+# §4.10 *An `ask` that lifts the person's gate* (TD-1829, built by TD-1833): the send's refusals, in its words
+LIFT_SECTION = "(design §4.10 *An `ask` that lifts the person's gate*)"
+LIFT_TO_PERSON = f"a lifting ask is put to the person directly — ao msg person --kind ask --lift … {LIFT_SECTION}"
+_LIFT_ABOUT_RE = re.compile(r"(?:(?P<repo>[^#\s]+)#)?(?P<id>TD-\d+)", re.IGNORECASE)
+
+
+def lift_lines(lift: Any) -> list[str]:
+    """`--lift`'s labels as given: one string or a list of strings, each stripped; anything else is refused."""
+    given = [lift] if isinstance(lift, str) else lift
+    if not isinstance(given, list) or any(not isinstance(x, str) for x in given):
+        raise RpcError(f"--lift names an answer's label, one per --lift {LIFT_SECTION}")
+    return [x.strip() for x in given]
+
+
+def lift_closing(lifted: str | None, before: str | None) -> str:
+    """The closing line a lifting reply's text gains (§4.10): *— the hold on TD-n is lifted*, or *— TD-n was no
+    longer held*; '' on any other reply."""
+    if lifted:
+        return f"— the hold on {lifted.rpartition('#')[2]} is lifted"
+    if before:
+        return f"— {before.rpartition('#')[2]} was no longer held"
+    return ""
+
 
 def _form_reply(replied: MailEntry, text: str, answer: Any, form: Any) -> str:
     """A reply's form check (§4.10 *A form is filled, never pressed*, TD-1698), for every replier: with `form` (the
@@ -286,6 +310,7 @@ class MailMixin:
         shots_at: Any = None,
         shots_ref: Any = None,
         form: Any = None,
+        lift: Any = None,
     ) -> dict[str, Any]:
         """`ao msg <to>… "…" [--kind] [--about] [--reply-to]` (design §4.10): put an attributed
         entry in each addressee's inbox. Nothing is typed anywhere. Gated by §4.10's graph, never
@@ -305,7 +330,9 @@ class MailMixin:
         `ask` unless given. `form` is the index of the form a reply's press filled (§4.10 *A form is filled, never
         pressed*, TD-1698): the form's head is put back on the reply's first paragraph; an `answer` index naming a
         form, and a reply whose first paragraph is an offered form unfilled, are refused with *<head> needs its
-        words*, and a form is never a steer's `default` nor an answer marked ` (default)`."""
+        words*, and a form is never a steer's `default` nor an answer marked ` (default)`. `lift` is the labels of an
+        `ask`'s answers that lift its `about` entry's `decision (<p>)` on the person's press (§4.10 *An `ask` that
+        lifts the person's gate*, TD-1833): such an ask is put to the person directly, never to a team or a repo."""
         sender = PERSON if mail.is_person(caller) else str(caller)
         kind = kind or ("ask" if team or repo else "note")
         key = (sender, str(nonce)) if nonce else None
@@ -321,6 +348,8 @@ class MailMixin:
                     raise RpcError("a team or a repo is the whole address: name no addressee beside it (design §4.10)")
                 if team and repo:
                     raise RpcError("--team or --repo, not both: each is the whole address (design §4.10)")
+                if lift:
+                    raise RpcError(LIFT_TO_PERSON)
                 to = [self._address(await self._question_seat(team=team, repo=repo))]
             self._no_pr_to_a_fact_check_seat(kind, pr, to)
             said = await self._checks_at_ask(sender, kind, pr)
@@ -357,6 +386,7 @@ class MailMixin:
                 shots_ref,
                 routed,
                 form=form,
+                lift=lift,
             )
         except RpcError as e:
             if key:
@@ -383,6 +413,92 @@ class MailMixin:
             s = self._graph().get(self._addr(x))
             if s is not None and s.role == "fact-checker":
                 raise RpcError(FACT_CHECK_NO_PR)
+
+    def _being_answered(self, id: str) -> None:
+        """The one test the roads that answer or take back a question to the person make first — a reply,
+        `_answer_orphan`, Not clear, a withdraw and a Delete — while a lifting answer (`_lifting_reply`) or an
+        orphan's answer holds its id: refused, *<id> is already being answered* (§4.10, TD-1833)."""
+        if id in self._board_adding:
+            raise RpcError(f"{id} is already being answered")
+
+    def _lift_send(
+        self, lift: Any, kind: str, named: list[str], picks: list[str], about: str | None, repo: str | None
+    ) -> list[str] | None:
+        """`--lift`'s send checks (§4.10 *An `ask` that lifts the person's gate*, TD-1833), in the section's order:
+        the labels kept (each `--lift` read as its answer's label, `mail.answer_labels`), else the refusal saying
+        which. `about` is the one given — never derived from a claim — and `repo` the sender's stamped repo, a bare
+        `TD-n`'s. Nothing is lifted here: the person's press on a lifting answer lifts (`_lifting_reply`)."""
+        lines = lift_lines(lift)
+        if not lines:
+            return None
+        if kind != "ask":
+            raise RpcError(f"only an ask lifts the person's gate: a {kind} carries no --lift {LIFT_SECTION}")
+        if named != [PERSON]:
+            raise RpcError(LIFT_TO_PERSON)
+        labels = mail.answer_labels(picks)
+        if len(set(labels)) != len(labels):
+            raise RpcError(f"a lifting ask's answers are told apart by their labels: two of them read the same "
+                           f"{LIFT_SECTION}")  # fmt: skip
+        kept: list[str] = []
+        for x in lines:
+            lab = mail.answer_labels([x])[0]
+            if lab not in labels:
+                raise RpcError(f"--lift {x!r} is not the label of one of the answers {LIFT_SECTION}")
+            if lab in kept:
+                raise RpcError(f"--lift {lab!r} is named twice {LIFT_SECTION}")
+            if ledgerboard.is_form(lab):
+                raise RpcError(f"--lift {lab!r} is a form, filled and never pressed: it lifts nothing {LIFT_SECTION}")
+            if ledgerboard.waiting_only(lab):
+                raise RpcError(f"--lift {lab!r} reads as waiting, which never lifts {LIFT_SECTION}")
+            kept.append(lab)
+        if not str(about or "").strip():
+            raise RpcError(
+                f"a lifting ask names the entry it lifts: --about TD-n (a claim's is never read) {LIFT_SECTION}"
+            )
+        t = queue_mod.lift_ask_target(self._repos, str(about), repo)
+        if t is None:
+            raise RpcError(f"--about {about} names no entry of a repo this home reads {LIFT_SECTION}")
+        e, tid = t["entry"], t["id"]
+        if e is None:
+            raise RpcError(f"{tid} is no open entry of {t['name']}'s ledger {LIFT_SECTION}")
+        p = ledger_mod.PERSON_OWNER
+        if not ledger_mod.decided_by(e, p):
+            raise RpcError(f"{tid} carries no decision ({p}): there is no hold of the person's to lift {LIFT_SECTION}")
+        if str(e.get("owner") or "").lower() == p:
+            raise RpcError(f"{tid} is yours to do: its Done answers it")
+        if t["asked"]:
+            raise RpcError(f"{tid}'s hold is asked on {t['asked']}: answer it there")
+        return kept
+
+    async def _lifting_reply(self, call: dict[str, Any], replied: MailEntry, label: str) -> dict[str, Any]:
+        """The person's answer `label` to an open `ask --lift` that names it (§4.10 *An `ask` that lifts the person's
+        gate*, TD-1833), holding the ask's id throughout (`_being_answered`): (1) every check of the reply, landing
+        nothing (`_msg`'s `_dry`); (2) the lift, `_press_lift` with the label as its answer and the asker's own
+        claims left out — a refusal there refuses the reply in its words, and a gate already gone gives
+        `lifted_before`; (3) the checks again on the ask as it now stands, and the store, carrying `lifted`. A
+        failure after a landed lift says the hold is lifted and the answer was not sent."""
+        self._being_answered(replied.id)
+        self._board_adding.add(replied.id)
+        try:
+            await self._msg(**call, _dry=True)
+            t = queue_mod.lift_ask_target(self._repos, replied.about or "", replied.repo)
+            if t is None:
+                raise RpcError(
+                    f"{replied.about} names no entry of a repo this home reads: nothing is lifted {LIFT_SECTION}"
+                )
+            ref = f"{t['name']}#{t['id']}"
+            done = await self._press_lift(t["root"], t["id"], answer=label, asker=replied.from_)
+            mark = {"lifted_before": ref} if done.get("gone") else {"lifted": ref}
+            try:
+                return await self._msg(**call, _lifting=mark)
+            except Exception as err:  # noqa: BLE001 — the lift stands, being the person's press: said, never lost
+                if "lifted" not in mark:
+                    raise
+                why = str(err) if isinstance(err, RpcError) else f"{type(err).__name__}: {err}"
+                log.exception("lifting reply to %s: the store failed after the lift", replied.id)
+                raise RpcError(f"the hold on {t['id']} is lifted; the answer was not sent: {why}") from None
+        finally:
+            self._board_adding.discard(replied.id)
 
     def _route_around(
         self, sender: str, to: Any, kind: str, pr: Any, reply_to: str | None, thread: str | None
@@ -1195,13 +1311,20 @@ class MailMixin:
         handed: bool = False,
         entry: dict[str, Any] | None = None,
         form: Any = None,
+        lift: Any = None,
+        _dry: bool = False,
+        _lifting: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """One message, every rule of §4.10 in the order it applies. Long on purpose: the order is
         the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land).
         The records are the org's one graph (§4.4a, step 5): an addressee on another host is its
         record here, its inbox the home's copy — landed whether or not its link is up, and said so.
         `handed` and `entry` are a handed entry's mark and fields (§4.10 *An entry handed to a seat*), written
-        into the envelope it lands, so no copy is ever without them (TD-1660)."""
+        into the envelope it lands, so no copy is ever without them (TD-1660). `lift` is an `ask`'s lifting labels
+        (`_lift_send`, §4.10 *An `ask` that lifts the person's gate*, TD-1833); the person's reply picking one runs
+        `_lifting_reply`, which calls this twice more: `_dry` runs every check and lands nothing, and `_lifting`
+        (`{lifted}` or `{lifted_before}`) lands the reply the lift's press made."""
+        call = {k: v for k, v in locals().items() if k not in ("self", "_dry", "_lifting")}  # the lift's re-calls
         carried = dict(entry) if entry else None
         records = self._graph()
         if kind in FOLDED_KINDS:
@@ -1232,7 +1355,9 @@ class MailMixin:
         if sender != PERSON and me is None:
             raise RpcError(f"{sender} cannot send mail: this host agent has no record of it (design §4.10)")
         # the sender's repo for the envelope (§4.10, TD-1467), read here, before any count or gate is checked: from
-        # the first check to the landing no `await` falls, so two sends can never both pass a cap one of them fills
+        # the first check to the landing no `await` falls, so two sends can never both pass a cap one of them fills —
+        # save a lifting reply's, whose lift is an `await` between two runs of these checks, the second landing it
+        # (`_lifting_reply`, TD-1833)
         stamped_repo = await self._record_repo(me)
         named = [self._addr(x) for x in ([to] if isinstance(to, str) else list(to or [])) if str(x).strip()]
         named = list(dict.fromkeys(named))
@@ -1302,6 +1427,7 @@ class MailMixin:
             bare, marked = mail.answer_mark(mail.split_answer(pick)[0])
             if marked and ledgerboard.is_form(bare):
                 raise RpcError(FORM_NO_DEFAULT)
+        lifts = self._lift_send(lift, kind, named, picks, about, stamped_repo) if lift else None
         # -- a reply belongs to its root's thread, and answers an entry the replier holds ----------
         replied: MailEntry | None = None
         copies: list[str] = []
@@ -1309,6 +1435,8 @@ class MailMixin:
         if kind == "reply" and not reply_to:
             raise RpcError("a reply names the entry it answers: --reply-to <id> (design §4.10)")
         if reply_to:
+            if _lifting is None and not _dry:
+                self._being_answered(reply_to)  # a lifting answer's road holds it (§4.10, TD-1833)
             held = [e for e in me.inbox if e.id == reply_to] if me is not None else self._person_holds(reply_to)
             if not held:
                 raise RpcError(
@@ -1352,6 +1480,8 @@ class MailMixin:
                     or not mail.picks_answer(text, replied.answers[answer])
                 ):
                     raise RpcError("that is not one of the suggested answers, word for word (design §4.10)")
+                if _lifting is not None or _dry:  # its asker went away during the lift: never the orphan road
+                    raise RpcError(f"{reply_to}'s asker is gone (design §4.10)")
                 return await self._answer_orphan(replied, text, "replied", answer)
             if not named and replied.answered:
                 # A reply to an *answered for you* FYI (§4.9b) — the Overrule path — goes to the
@@ -1394,6 +1524,22 @@ class MailMixin:
             if not mail.picks_answer(text.split("\n\n", 1)[0], said):
                 raise RpcError(f"{no}: the text of a picked answer is that answer, word for word (design §4.10)")
             picked = answer
+        # -- the person's lifting answer (§4.10 *An `ask` that lifts the person's gate*, TD-1833): an open ask's
+        # answer whose label its `lift` names lifts the gate before the reply is stored, the checks run on each side --
+        if (
+            _lifting is None
+            and not _dry
+            and sender == PERSON
+            and kind == "reply"
+            and replied is not None
+            and replied.kind == "ask"
+            and replied.open
+            and not replied.orphaned
+            and replied.lift
+            and picked is not None
+            and (label := mail.answer_labels([replied.answers[picked]])[0]) in replied.lift
+        ):
+            return await self._lifting_reply(call, replied, label)
         # -- a reader's verdict on a PR's ask (§4.9c, TD-315 slice 1): a word, never read from the text ----
         reads_pr = kind == "reply" and replied is not None and replied.kind == "ask" and replied.pr is not None
         three = " | ".join(VERDICTS)
@@ -1691,6 +1837,14 @@ class MailMixin:
             entry.handed = True
         if carried is not None:
             entry.entry = carried
+        if lifts:
+            entry.lift = lifts
+        if _dry:
+            return {}  # every check held; nothing lands (`_lifting_reply`'s first run)
+        if _lifting is not None:
+            entry.lifted = _lifting.get("lifted")
+            entry.lifted_before = _lifting.get("lifted_before")
+            entry.text = f"{entry.text}\n\n{lift_closing(entry.lifted, entry.lifted_before)}"
         landed: list[str] = []
         failed: list[str] = []
         for sid in copies:
@@ -1858,6 +2012,8 @@ class MailMixin:
             # its own sentence (a handed entry's, with no bound) reads §4.10's scaled-seat rows as the send does
             "seat_choice": {to: {"seat": own, "extras": seat_words.get(to)} for to, own in seat_of.items()},
             "closed": replied.id if closes and replied is not None else None,
+            "lifted": entry.lifted,  # the person's lifting answer (§4.10, TD-1833): `<repo>#TD-n`, else None
+            "lifted_before": entry.lifted_before,
             "answered_for_you": fyi_id,  # the FYI filed to the person for a reply with a source (§4.9b)
             "warnings": warnings,  # §4.10 *A subject on every entry*: said on a line, never refused
             # advice, not a refusal: the id comes back either way (design §4.10)
@@ -2437,6 +2593,7 @@ class MailMixin:
                 "expires (design §4.10 *Withdrawing a question*)"
             )
         e = held[0]
+        self._being_answered(id)  # a lifting answer is being written (§4.10, TD-1833)
         mine = {k for k in records if caller_key in mail.chain(records, k, self._successor)}
         if e.orphaned or e.from_ not in mine:
             raise RpcError(f"{id} is {e.from_}'s question: only its asker withdraws it (design §4.10)")
@@ -2671,6 +2828,7 @@ class MailMixin:
             held = [e for e in self.person_inbox if e.id == msg]
             if not held:
                 raise RpcError(f"the person inbox holds no entry {msg}")
+            self._being_answered(msg)  # a lifting answer is being written (§4.10, TD-1833)
             if held[0].open:
                 e = held[0]
                 self._close_entry(msg, "declined", now_iso())

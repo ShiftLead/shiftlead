@@ -174,3 +174,14 @@ def test_a_row_case_d_holds_for_draws_no_lift(tmp_path):
     root3, r3 = _setup(tmp_path / "o", entries, _open("TD-001"))
     other, o = _setup(tmp_path / "o", [_entry(9, "theirs", Priority="Low")], _ask("TD-001 decision (paul)"), name="x")
     assert _row(_read({root3: r3, other: o}), "r#TD-001")["lift_here"] is True
+
+
+@pytest.mark.unit
+def test_case_d_item_names_the_asking_item_for_an_ask_lifts_refusal(tmp_path):
+    """`lift_case_d_item` (TD-1833): the `board:<key>` an `ask --lift`'s refusal names; None where none asks."""
+    root = tmp_path / "r"
+    (root / "docs").mkdir(parents=True)
+    boards = _board(str(root), _ask("TD-001 decision (paul)", ""), people=True)["boards"]
+    key = queue.lift_case_d_item(_member(), {"r": boards}, _gated(1), "o/r")
+    assert key is not None and key.startswith("board:") and len(key) == len("board:") + 8
+    assert queue.lift_case_d_item(_member(), {"o": boards}, _gated(1), "o/r") is None
