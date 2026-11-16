@@ -1176,3 +1176,18 @@ def test_a_pressed_board_row_reads_applying_and_is_no_need():
     assert secs["count"] == 0 and [e["waiting_on"] for e in secs["waiting"]] == ["answered — applying"]
     secs = inbox_sections([], now=NOW, boards=[{**row, "applying": {"act": "snooze", "answer": "", "at": "t"}}])
     assert [e["waiting_on"] for e in secs["waiting"]] == ["applying snooze"]
+
+
+def test_a_tree_rows_lift_resolves_its_bare_repo_name_and_sends_lift_alone(tmp_path, monkeypatch):
+    """TD-1831 slice 3, §4.4 *Where Lift the hold is drawn*: a Queue tree row's ⋯ **Lift the hold** names its repo
+    by its name alone; the route resolves it to the registered checkout and sends `lift`, its words ignored."""
+    from sessionorc import hosts
+
+    checkout = tmp_path / "s"
+    checkout.mkdir()
+    monkeypatch.setattr(type(hosts.local_host()), "repos", lambda self: [str(checkout)])
+    calls: list = []
+    c = client(monkeypatch, tmp_path, fake(queue(), [], ledger_repos(), calls))
+    got = c.post("/api/person/ledger", json={"repo": "s", "id": "TD-20", "words": "go ahead", "lift": True})
+    assert got.status_code == 200
+    assert calls == [{"repo": str(checkout), "id": "TD-20", "lift": True}]
