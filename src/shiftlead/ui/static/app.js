@@ -1911,7 +1911,9 @@
           if (res.failed) {
             const words = `The hold on ${at.ref} is lifted; telling ${at.name || "its asker"} failed: ${res.failed}`;
             // the item comes back on the re-read, unreplied and without its Lift, carrying these words
-            if (msgOf) { AO.pressErrs[msgOf] = AO.pressErr(words, true, atSig); delete AO.inflight[msgOf]; }
+            // …in the refused case's lifetime: the card's hold ends with it, as a refusal's does
+            if (msgOf) { AO.pressErrs[msgOf] = AO.pressErr(words, true, atSig); delete AO.inflight[msgOf]; AO.qcardBack(msgOf); }
+            refusedOn = true;
             say(words, false);
           } else say(res.gone ? `${at.ref} is no longer held — ${at.name || "its asker"} is told` : `hold lifted on ${at.ref} — ${at.name || "its asker"} is told`, true);
           if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();

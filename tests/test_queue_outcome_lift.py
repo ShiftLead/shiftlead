@@ -118,3 +118,21 @@ def test_an_unstamped_outcome_draws_no_lift_and_its_answered_item_still_gives_wa
     drawn.clear()
     attach({"needs": [led, {**mail, "handed": True}]}, lambda e, sec: drawn.append(e) or Markup(""))
     assert sorted(e["id"] for e in drawn) == ["TD-1", "m-1"]
+
+
+def test_an_outcome_in_the_inbox_alone_or_on_another_card_hides_nothing():
+    from markupsafe import Markup
+
+    from shiftlead.ui.queue import HIDDEN, attach
+
+    led = {"row": "ledger", "id": "TD-1", "name": "r", "home": "queue", "on_card": "c", "on_row": "c",
+           "answered": {"mid": "m-1", "asker": "a", "kind": "ask", "lift": {"root": "/x/r", "id": "TD-1"}}}  # fmt: skip
+    mail = {"id": "m-1", "kind": "ask", "outcome": {"state": "blocked", "text": "no"}}
+    for other in ({**mail, "home": "inbox"}, {**mail, "home": "queue", "on_card": "d", "on_row": "d"}):
+        got = attach({"needs": [led, other]}, lambda e, sec: Markup(""))
+        assert HIDDEN not in got["cards"].get("c", {}) and got["cards"]["c"]["needs"][0]["item"] == "r#TD-001"
+
+
+def test_a_failed_reply_after_the_lift_ends_the_cards_hold_as_a_refusal():
+    branch = APP_JS.split("if (lifting && at.liftReply) {")[1].split("if (lifting) {")[0]
+    assert "AO.qcardBack(msgOf)" in branch and "refusedOn = true;" in branch

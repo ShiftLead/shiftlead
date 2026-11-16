@@ -642,7 +642,7 @@ def outcome_lifts(rows: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, str]
     for e in rows:
         a = e.get("answered") if e.get("row") == "ledger" else None
         lift = a.get("lift") if isinstance(a, Mapping) else None
-        if isinstance(lift, Mapping) and lift.get("id") and a.get("mid"):
+        if isinstance(lift, Mapping) and lift.get("id") and lift.get("root") and a.get("mid"):
             out[str(a["mid"])] = {"root": str(lift.get("root") or ""), "id": str(lift["id"])}
     return out
 
@@ -805,12 +805,17 @@ def attach(
     # the entry's *answered — waiting on <asker>* item gives way to it (*One press, one item*); read, never computed
     every = [e for sec in CARD_SECTIONS for e in sections.get(sec) or ()] + list(later or ())
     lifts = outcome_lifts(every)
-    unreplied = {str(e.get("id") or "") for e in every if blocked_unreplied(e)}
+    # an outcome the Queue draws, on the card it is drawn on: one in the Inbox alone, or on another card, hides nothing
+    unreplied = {
+        (str(e.get("on_card") or ""), str(e.get("id") or ""))
+        for e in every
+        if e.get("home") == "queue" and blocked_unreplied(e)
+    }
 
     def put(e: Mapping[str, Any], sec: str, drawn_as: str, mid: Any, kind: str) -> None:
         want, kind, mine = rewrite(e, sec, kind)
         card, ref = str(e.get("on_card") or ""), item_ref(e)
-        if gives_way(e, want, unreplied):
+        if gives_way(e, want, {m for c, m in unreplied if c == card}):
             # not drawn, out of every count and the walk, its entry out of the walk's own entries (TD-1843)
             cards.setdefault(card, {}).setdefault(HIDDEN, []).append(ref)
             return
