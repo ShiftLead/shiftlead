@@ -37,7 +37,7 @@ def _held(agent, sender: str) -> list:
 
 
 async def test_an_ask_that_breaks_rules_one_and_two_is_refused_listing_every_problem_and_filing_nothing(
-    agent, tmp_path
+    agent, tmp_path, monkeypatch
 ):
     async with LocalClient() as person:
         w = await _worker(person, tmp_path)
@@ -58,7 +58,11 @@ async def test_an_ask_that_breaks_rules_one_and_two_is_refused_listing_every_pro
             lines = str(e.value).splitlines()
             assert [ln.split(":")[0] for ln in lines] == ["rule 1", "rule 2"]
         assert _held(agent, w) == [], "a refused send files nothing"
-        assert agent.sessions[w].sends == [] or all(s.verdict != "submitted" for s in agent.sessions[w].sends)
+        # and counts nothing: with the sender's depth at one open question, a good ask still files
+        monkeypatch.setattr(mail, "PERSON_SENDER_DEPTH", 1)
+        async with LocalClient(caller=w) as c:
+            assert (await c.call("msg", to="person", kind="ask", text=GOOD, answers=ANSWERS))["entry"]["to"] == [PERSON]
+        assert len(_held(agent, w)) == 1
 
 
 async def test_an_ask_written_to_the_rules_files_with_or_without_a_context(agent, tmp_path):
