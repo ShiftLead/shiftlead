@@ -1,0 +1,12 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "new",
+  "id": "TD-010",
+  "notes": [],
+  "paths": [
+   "ledger/TD-010.md"
+  ],
+  "subject": null
+ }
+}

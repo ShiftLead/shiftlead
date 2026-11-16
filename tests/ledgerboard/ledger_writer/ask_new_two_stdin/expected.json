@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "new",
+  "unusable": "only one section can come from stdin"
+ }
+}

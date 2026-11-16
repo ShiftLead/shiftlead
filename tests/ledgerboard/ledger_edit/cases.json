@@ -513,7 +513,7 @@
   },
   {
    "name": "edit_adds_after_why",
-   "file": "reordered.md",
+   "file": "reordered_gated.md",
    "steps": [
     {
      "action": "edit",
@@ -2147,6 +2147,212 @@
      }
     }
    ]
+  },
+  {
+   "name": "edit_ask_refused_ungated_reordered",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Ask",
+      "words": "which way?"
+     }
+    }
+   ],
+   "file": "reordered.md"
+  },
+  {
+   "name": "remove_ask_ungated",
+   "text": "## TD-801: An Ask with no decision\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n\n**Ask:** pat says which way.\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Ask",
+      "remove": true
+     }
+    }
+   ]
+  },
+  {
+   "name": "remove_ask_refused_gated",
+   "text": "## TD-802: An Ask with its decision\n\n**Priority:** Low\n**Status:** Open\n**Blocked by:** decision (pat)\n\n**Why:** w\n\n**Ask:** pat says which way.\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Ask",
+      "remove": true
+     }
+    }
+   ]
+  },
+  {
+   "name": "remove_ask_qualified_refused",
+   "text": "## TD-803: A qualified Ask, no decision\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n\n**Ask (old):** pat said go.\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Ask (old)",
+      "remove": true
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_ask_refused_ungated_replace",
+   "text": "## TD-804: An Ask with no decision\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n\n**Ask:** pat says which way.\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Ask",
+      "words": "pat says the other way."
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_ask_refused_ungated_add",
+   "text": "## TD-805: No Ask and no decision\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n\n**Fix:** f\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Ask",
+      "words": "pat says which way."
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_ask_gated",
+   "text": "## TD-806: No Ask yet, its decision carried\n\n**Priority:** Low\n**Status:** Open\n**Blocked by:** decision (pat)\n\n**Why:** w\n\n**Fix:** f\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Ask",
+      "words": "pat says which way."
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_ask_refused_answered",
+   "text": "## TD-807: An answered Ask\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n\n**Ask:** pat says which way.\n\n**Log:**\n- 2026-01-03: gate added: decision (pat)\n- 2026-01-05: gate lifted: decision (pat) — by pat; answer \"Go\"\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Ask",
+      "words": "pat says go again."
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_ask_role",
+   "text": "## TD-808: An Ask waiting on a role\n\n**Priority:** Low\n**Status:** Open\n**Blocked by:** decision (designer)\n\n**Why:** w\n\n**Ask:** pat says which way.\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Ask",
+      "words": "the designer says which way."
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_ask_hold",
+   "text": "## TD-809: An Ask held by hold\n\n**Priority:** Low\n**Status:** Open\n**Blocked by:** hold\n\n**Why:** w\n\n**Ask:** pat says which way.\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Ask",
+      "words": "someone says which way."
+     }
+    }
+   ]
+  },
+  {
+   "name": "remove_ask_declared_with_header",
+   "text": "## TD-810: A body Ask beside a header Ask, Ask declared\n\n**Priority:** Low\n**Status:** Open\n**Blocked by:** decision (pat)\n**Ask:** pat says which way.\n\n**Why:** w\n\n**Ask:** pat says which way, in the body.\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Ask",
+      "remove": true,
+      "declared_fields": [
+       "Ask"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "remove_ask_declared_set_first",
+   "text": "## TD-811: A body Ask and no header Ask, Ask declared\n\n**Priority:** Low\n**Status:** Open\n**Blocked by:** decision (pat)\n\n**Why:** w\n\n**Ask:** pat says which way.\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Ask",
+      "remove": true,
+      "declared_fields": [
+       "Ask"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_ask_field_refused_ungated",
+   "text": "## TD-812: No Ask, no decision\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n\n**Fix:** f\n",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Ask": "pat says which way."
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_ask_field_with_gate",
+   "text": "## TD-813: No Ask, no decision\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n\n**Fix:** f\n",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Blocked by": "decision (pat)",
+       "Ask": "pat says which way."
+      }
+     }
+    }
+   ],
+   "today": "2026-01-15"
+  },
+  {
+   "name": "set_ask_field_emptied",
+   "text": "## TD-814: A header Ask, no decision\n\n**Priority:** Low\n**Status:** Open\n**Ask:** pat says which way.\n\n**Why:** w\n\n**Fix:** f\n",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Ask": ""
+      }
+     }
+    }
+   ]
   }
  ],
  "check": [
@@ -2266,6 +2472,17 @@
    "ledger": "check/retired_archived.md",
    "archive": "check/retired_archived.archive.md",
    "old": "check/retired_archived.md"
+  },
+  {
+   "name": "decision_missing_scope",
+   "ledger": "check/asks_after.md",
+   "archive": "",
+   "old": "check/asks_before.md"
+  },
+  {
+   "name": "decision_missing_no_old",
+   "ledger": "check/asks_after.md",
+   "archive": ""
   }
  ],
  "log": [

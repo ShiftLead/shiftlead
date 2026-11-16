@@ -1461,6 +1461,74 @@
     "standing": false,
     "text": "⚠ TD-421: the Taken by field is retired — write Id take, the counter take's nonce (SPEC *Retired words*); v3.0 reads no such form: on an open entry remove it with set (an empty value); on an archived one by hand, then ledger.py fmt TD-n"
    }
+  ],
+  "decision_missing_no_old": [
+   {
+    "field": "blocked by",
+    "id": "TD-701",
+    "kind": "decision-missing",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-701: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-701 --section Ask --remove"
+   },
+   {
+    "field": "blocked by",
+    "id": "TD-702",
+    "kind": "decision-missing",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-702: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-702 --section Ask --remove"
+   },
+   {
+    "field": "blocked by",
+    "id": "TD-704",
+    "kind": "decision-missing",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-704: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-704 --section Ask --remove"
+   },
+   {
+    "field": "blocked by",
+    "id": "TD-706",
+    "kind": "decision-missing",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-706: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-706 --section Ask --remove"
+   }
+  ],
+  "decision_missing_scope": [
+   {
+    "field": "blocked by",
+    "id": "TD-701",
+    "kind": "decision-missing",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-701: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-701 --section Ask --remove"
+   },
+   {
+    "field": "blocked by",
+    "id": "TD-702",
+    "kind": "decision-missing",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-702: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-702 --section Ask --remove"
+   },
+   {
+    "field": "blocked by",
+    "id": "TD-704",
+    "kind": "decision-missing",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-704: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-704 --section Ask --remove"
+   },
+   {
+    "field": "blocked by",
+    "id": "TD-706",
+    "kind": "decision-missing",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-706: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-706 --section Ask --remove"
+   }
   ]
  },
  "edit_entry": {
@@ -1531,7 +1599,7 @@
    "ok": "## TD-081: Notes written into the Status before the Log\n\n**Priority:** Low\n**Added:** 2026-01-02 found while building TD-80\n**Status:** Open 2026-01-04: half built 2026-01-06: the rest built — was: Resolved 2026-01-03: done too soon — was: Open\n\n**Why:** a reason.\n\n**Related:** TD-80.\n\n**Log:**\n- 2026-01-03: an earlier line\n- 2026-01-05: a later line\n"
   },
   "edit_adds_after_why": {
-   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Ask:** which way?\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+   "ok": "## TD-040: An entry written by hand, its fields out of order, waiting on a person\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-012, decision (pat)\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Ask:** which way?\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
   },
   "edit_adds_after_why_beside_a_qualified_fix": {
    "ok": "## TD-061: No Status, and only a qualified Fix\n\n**Priority:** Low\n**Added:** 2026-01-03\n\n**Why:** a reason.\n\n**Fix:** choose, then build.\n\n**Fix (to design):** the shape first.\n"
@@ -1588,13 +1656,13 @@
    "refused": "the body has no section named 'Title' to remove"
   },
   "edit_remove_refused_location": {
-   "refused": "Location is not misplaced: only a section named Title or as a header field is removed"
+   "refused": "Location is not misplaced: only a section named Title or as a header field, or the Ask of an entry with no decision, is removed"
   },
   "edit_remove_refused_no_header": {
    "refused": "set Status first: removing it would lose its only words"
   },
   "edit_remove_refused_why": {
-   "refused": "Why is not misplaced: only a section named Title or as a header field is removed"
+   "refused": "Why is not misplaced: only a section named Title or as a header field, or the Ask of an entry with no decision, is removed"
   },
   "edit_remove_refused_words": {
    "refused": "remove takes no words"
@@ -1838,6 +1906,51 @@
   },
   "set_title_same": {
    "ok": "## TD-082: An entry whose gates were added, lifted and added again\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** decision (Kim), until 2026-03-01, event (tool-v3), event (docs), event (late)\n\n**Why:** a reason.\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n- 2026-01-04: gate added: until 2026-03-01\n- 2026-01-05: gate added: decision (Kim)\n- 2026-01-06: gate added: event (tool-v3)\n- 2026-01-07: gate lifted: event (tool-v3) — by box-1; pr-merged passed; tool#31\n- 2026-01-07: gate added: event (tool-v3)\n- 2026-01-08: gate added: event (docs)\n- 2026-01-09: gate lifted: event (docs) — by Kim; answer \"Go\"\n- 2026-01-09: kept waiting: until 2026-03-01 — by Kim; answer \"Keep waiting\"\n- 2026-01-12: gate added: event (late)\n- 2026-01-10: gate added: event (late)\n- 2026-01-11: kept waiting: event (none-added) — by Kim; answer \"Keep waiting\"\n"
+  },
+  "edit_ask_gated": {
+   "ok": "## TD-806: No Ask yet, its decision carried\n\n**Priority:** Low\n**Status:** Open\n**Blocked by:** decision (pat)\n\n**Why:** w\n\n**Ask:** pat says which way.\n\n**Fix:** f\n"
+  },
+  "edit_ask_hold": {
+   "ok": "## TD-809: An Ask held by hold\n\n**Priority:** Low\n**Status:** Open\n**Blocked by:** hold\n\n**Why:** w\n\n**Ask:** someone says which way.\n"
+  },
+  "edit_ask_refused_answered": {
+   "refused": "TD-807 names no decision (<person>): an Ask is what a decision waits on — if it waits on a person, write them together with set --blocked-by \"…, decision (<person>)\" --ask FILE; if it waits on no one, remove the Ask with edit --section Ask --remove"
+  },
+  "edit_ask_refused_ungated_add": {
+   "refused": "TD-805 names no decision (<person>): an Ask is what a decision waits on — if it waits on a person, write them together with set --blocked-by \"…, decision (<person>)\" --ask FILE; if it waits on no one, remove the Ask with edit --section Ask --remove"
+  },
+  "edit_ask_refused_ungated_reordered": {
+   "refused": "TD-040 names no decision (<person>): an Ask is what a decision waits on — if it waits on a person, write them together with set --blocked-by \"…, decision (<person>)\" --ask FILE; if it waits on no one, remove the Ask with edit --section Ask --remove"
+  },
+  "edit_ask_refused_ungated_replace": {
+   "refused": "TD-804 names no decision (<person>): an Ask is what a decision waits on — if it waits on a person, write them together with set --blocked-by \"…, decision (<person>)\" --ask FILE; if it waits on no one, remove the Ask with edit --section Ask --remove"
+  },
+  "edit_ask_role": {
+   "ok": "## TD-808: An Ask waiting on a role\n\n**Priority:** Low\n**Status:** Open\n**Blocked by:** decision (designer)\n\n**Why:** w\n\n**Ask:** the designer says which way.\n"
+  },
+  "remove_ask_declared_set_first": {
+   "refused": "set Ask first: removing it would lose its only words"
+  },
+  "remove_ask_declared_with_header": {
+   "ok": "## TD-810: A body Ask beside a header Ask, Ask declared\n\n**Priority:** Low\n**Status:** Open\n**Blocked by:** decision (pat)\n**Ask:** pat says which way.\n\n**Why:** w\n"
+  },
+  "remove_ask_qualified_refused": {
+   "refused": "Ask (old) is not misplaced: only a section named Title or as a header field, or the Ask of an entry with no decision, is removed"
+  },
+  "remove_ask_refused_gated": {
+   "refused": "TD-802's Blocked by names a decision (or a retired item standing for one): its Ask is what the decision waits on (ask-missing would follow) — lift or remove the decision first"
+  },
+  "remove_ask_ungated": {
+   "ok": "## TD-801: An Ask with no decision\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n"
+  },
+  "set_ask_field_emptied": {
+   "ok": "## TD-814: A header Ask, no decision\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n\n**Fix:** f\n"
+  },
+  "set_ask_field_refused_ungated": {
+   "refused": "TD-812 names no decision (<person>): an Ask is what a decision waits on, so the gate comes first — set it beside the gate: set --blocked-by \"…, decision (<person>)\" --field 'Ask=…'"
+  },
+  "set_ask_field_with_gate": {
+   "ok": "## TD-813: No Ask, no decision\n\n**Priority:** Low\n**Status:** Open\n**Blocked by:** decision (pat)\n**Ask:** pat says which way.\n\n**Why:** w\n\n**Fix:** f\n\n**Log:**\n- 2026-01-15: gate added: decision (pat)\n"
   }
  },
  "entry_text": {

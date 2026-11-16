@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "reopen",
+  "refused": "⚠ TD-009: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-009 --section Ask --remove"
+ }
+}

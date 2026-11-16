@@ -1,0 +1,2795 @@
+[
+ {
+  "name": "code_tokens: file-line",
+  "fn": "code_tokens",
+  "args": [
+   "see foo.py:42 now"
+  ]
+ },
+ {
+  "name": "code_tokens: file-line-stop",
+  "fn": "code_tokens",
+  "args": [
+   "see foo.py:42."
+  ]
+ },
+ {
+  "name": "code_tokens: path-file-line",
+  "fn": "code_tokens",
+  "args": [
+   "see src/foo.py:42 now"
+  ]
+ },
+ {
+  "name": "code_tokens: gap-file-two-lines",
+  "fn": "code_tokens",
+  "args": [
+   "see foo.py:42:7 now"
+  ]
+ },
+ {
+  "name": "code_tokens: gap-file-line-range",
+  "fn": "code_tokens",
+  "args": [
+   "see foo.py:42-50 now"
+  ]
+ },
+ {
+  "name": "code_tokens: path-root",
+  "fn": "code_tokens",
+  "args": [
+   "under /etc/hosts here"
+  ]
+ },
+ {
+  "name": "code_tokens: path-home",
+  "fn": "code_tokens",
+  "args": [
+   "under ~/notes here"
+  ]
+ },
+ {
+  "name": "code_tokens: path-dot",
+  "fn": "code_tokens",
+  "args": [
+   "run ./go and ../up"
+  ]
+ },
+ {
+  "name": "code_tokens: path-three",
+  "fn": "code_tokens",
+  "args": [
+   "in docs/plans/x here"
+  ]
+ },
+ {
+  "name": "code_tokens: path-three-digits",
+  "fn": "code_tokens",
+  "args": [
+   "on 11/15/2026 then"
+  ]
+ },
+ {
+  "name": "code_tokens: path-backslash",
+  "fn": "code_tokens",
+  "args": [
+   "in C:\\Users\\me here"
+  ]
+ },
+ {
+  "name": "code_tokens: file-name",
+  "fn": "code_tokens",
+  "args": [
+   "edit profiles.yml and README.md"
+  ]
+ },
+ {
+  "name": "code_tokens: file-name-case",
+  "fn": "code_tokens",
+  "args": [
+   "edit NOTES.TXT now"
+  ]
+ },
+ {
+  "name": "code_tokens: call",
+  "fn": "code_tokens",
+  "args": [
+   "call one_sentence(x) here"
+  ]
+ },
+ {
+  "name": "code_tokens: call-dotted",
+  "fn": "code_tokens",
+  "args": [
+   "call os.path.join(a, b) here"
+  ]
+ },
+ {
+  "name": "code_tokens: call-plural-s",
+  "fn": "code_tokens",
+  "args": [
+   "the file(s) and item(es) here"
+  ]
+ },
+ {
+  "name": "code_tokens: snake",
+  "fn": "code_tokens",
+  "args": [
+   "the snake_case name"
+  ]
+ },
+ {
+  "name": "code_tokens: dotted",
+  "fn": "code_tokens",
+  "args": [
+   "the a_b.c_d.e name"
+  ]
+ },
+ {
+  "name": "code_tokens: upper",
+  "fn": "code_tokens",
+  "args": [
+   "the ACTOR_WORDS list"
+  ]
+ },
+ {
+  "name": "code_tokens: camel",
+  "fn": "code_tokens",
+  "args": [
+   "the camelCase name"
+  ]
+ },
+ {
+  "name": "code_tokens: range",
+  "fn": "code_tokens",
+  "args": [
+   "the main..feature range"
+  ]
+ },
+ {
+  "name": "code_tokens: commit",
+  "fn": "code_tokens",
+  "args": [
+   "commit abc1234 and 0f1e2d3c4b5a"
+  ]
+ },
+ {
+  "name": "code_tokens: commit-six",
+  "fn": "code_tokens",
+  "args": [
+   "commit abc123 here"
+  ]
+ },
+ {
+  "name": "code_tokens: commit-letters-only",
+  "fn": "code_tokens",
+  "args": [
+   "deadbeef and added here"
+  ]
+ },
+ {
+  "name": "code_tokens: option",
+  "fn": "code_tokens",
+  "args": [
+   "pass --write here"
+  ]
+ },
+ {
+  "name": "code_tokens: span",
+  "fn": "code_tokens",
+  "args": [
+   "run `make test` now"
+  ]
+ },
+ {
+  "name": "code_tokens: fence",
+  "fn": "code_tokens",
+  "args": [
+   "before\n```\ncode here\n```\nafter"
+  ]
+ },
+ {
+  "name": "code_tokens: ids-none",
+  "fn": "code_tokens",
+  "args": [
+   "TD-1845, #3878, F12 and v2.7.1 here"
+  ]
+ },
+ {
+  "name": "code_tokens: lone-marks-none",
+  "fn": "code_tokens",
+  "args": [
+   "a -- b — c / d ~/ e"
+  ]
+ },
+ {
+  "name": "code_tokens: whole-word",
+  "fn": "code_tokens",
+  "args": [
+   "GitHub, PowerPoint and PhD"
+  ]
+ },
+ {
+  "name": "code_tokens: two-kinds-once",
+  "fn": "code_tokens",
+  "args": [
+   "edit src/foo_bar.py now"
+  ]
+ },
+ {
+  "name": "code_tokens: link-target-dropped",
+  "fn": "code_tokens",
+  "args": [
+   "see [the plan](docs/plans/x.md) now"
+  ]
+ },
+ {
+  "name": "code_tokens: bare-url-dropped",
+  "fn": "code_tokens",
+  "args": [
+   "see https://x.io/a_b/c.py now"
+  ]
+ },
+ {
+  "name": "code_tokens: url-in-span",
+  "fn": "code_tokens",
+  "args": [
+   "run `curl https://x.io/a` now"
+  ]
+ },
+ {
+  "name": "code_tokens: double-backtick-span",
+  "fn": "code_tokens",
+  "args": [
+   "the ``a`b`` span"
+  ]
+ },
+ {
+  "name": "code_tokens: unmatched-backtick",
+  "fn": "code_tokens",
+  "args": [
+   "a ` alone and foo_bar"
+  ]
+ },
+ {
+  "name": "code_tokens: tilde-fence",
+  "fn": "code_tokens",
+  "args": [
+   "x\n~~~\ncode\n~~~\ny"
+  ]
+ },
+ {
+  "name": "code_tokens: unclosed-fence",
+  "fn": "code_tokens",
+  "args": [
+   "x\n```py\ncode\nmore foo_bar"
+  ]
+ },
+ {
+  "name": "code_tokens: fence-info-spaces",
+  "fn": "code_tokens",
+  "args": [
+   "x\n``` py title here\ncode\n```\ny"
+  ]
+ },
+ {
+  "name": "code_tokens: fence-longer-close",
+  "fn": "code_tokens",
+  "args": [
+   "x\n```\ncode\n`````\ny foo_bar"
+  ]
+ },
+ {
+  "name": "code_tokens: fence-spaces-blank-line",
+  "fn": "code_tokens",
+  "args": [
+   "x\n```\n  a b\n\n  c d\n```\ny"
+  ]
+ },
+ {
+  "name": "code_tokens: span-not-fence",
+  "fn": "code_tokens",
+  "args": [
+   "```x``` is y"
+  ]
+ },
+ {
+  "name": "code_tokens: order-once",
+  "fn": "code_tokens",
+  "args": [
+   "foo_bar then `x` then foo_bar then `x`"
+  ]
+ },
+ {
+  "name": "code_tokens: span-blank-line-plain",
+  "fn": "code_tokens",
+  "args": [
+   "a `b\n\nc` d"
+  ]
+ },
+ {
+  "name": "code_tokens: standin-word-two-spans",
+  "fn": "code_tokens",
+  "args": [
+   "`a`/`b` here"
+  ]
+ },
+ {
+  "name": "code_tokens: possessive-file",
+  "fn": "code_tokens",
+  "args": [
+   "foo.py's output"
+  ]
+ },
+ {
+  "name": "code_tokens: fp-yes-no-maybe",
+  "fn": "code_tokens",
+  "args": [
+   "yes/no/maybe"
+  ]
+ },
+ {
+  "name": "code_tokens: fp-he-she-they",
+  "fn": "code_tokens",
+  "args": [
+   "he/she/they"
+  ]
+ },
+ {
+  "name": "code_tokens: fp-abc",
+  "fn": "code_tokens",
+  "args": [
+   "A/B/C"
+  ]
+ },
+ {
+  "name": "code_tokens: fp-us-eu-uk",
+  "fn": "code_tokens",
+  "args": [
+   "US/EU/UK"
+  ]
+ },
+ {
+  "name": "code_tokens: fp-and-or-else",
+  "fn": "code_tokens",
+  "args": [
+   "and/or/else"
+  ]
+ },
+ {
+  "name": "code_tokens: fp-days",
+  "fn": "code_tokens",
+  "args": [
+   "Mon/Wed/Fri"
+  ]
+ },
+ {
+  "name": "code_tokens: fp-a-n",
+  "fn": "code_tokens",
+  "args": [
+   "a(n) answer"
+  ]
+ },
+ {
+  "name": "code_tokens: fp-node-js",
+  "fn": "code_tokens",
+  "args": [
+   "Node.js here"
+  ]
+ },
+ {
+  "name": "code_tokens: fp-host-dotted",
+  "fn": "code_tokens",
+  "args": [
+   "docs.github.com here"
+  ]
+ },
+ {
+  "name": "code_tokens: fp-usa",
+  "fn": "code_tokens",
+  "args": [
+   "the U.S.A here"
+  ]
+ },
+ {
+  "name": "code_tokens: fp-abc-dotted",
+  "fn": "code_tokens",
+  "args": [
+   "a.b.c here"
+  ]
+ },
+ {
+  "name": "code_tokens: fp-camel",
+  "fn": "code_tokens",
+  "args": [
+   "iPhone, iOS and macOS"
+  ]
+ },
+ {
+  "name": "code_tokens: gap-command",
+  "fn": "code_tokens",
+  "args": [
+   "git rebase main"
+  ]
+ },
+ {
+  "name": "code_tokens: gap-dunder",
+  "fn": "code_tokens",
+  "args": [
+   "__init__ here"
+  ]
+ },
+ {
+  "name": "code_tokens: gap-two-part-path",
+  "fn": "code_tokens",
+  "args": [
+   "docs/plans here"
+  ]
+ },
+ {
+  "name": "code_tokens: gap-misc",
+  "fn": "code_tokens",
+  "args": [
+   "$HOME -f Makefile src/lib:42 .gitignore Foo.java UserService.getName"
+  ]
+ },
+ {
+  "name": "code_tokens: gap-misc-2",
+  "fn": "code_tokens",
+  "args": [
+   "NullPointerException localhost:8080 DEBUG=1 dev@example.com example.com"
+  ]
+ },
+ {
+  "name": "code_tokens: standin-chars-in-text",
+  "fn": "code_tokens",
+  "args": [
+   "999 x and x7 foo_bar"
+  ]
+ },
+ {
+  "name": "code_tokens: crlf-fence",
+  "fn": "code_tokens",
+  "args": [
+   "```\r\nx\r\n```\r\ny foo_bar"
+  ]
+ },
+ {
+  "name": "code_tokens: crlf-blank-line-span-plain",
+  "fn": "code_tokens",
+  "args": [
+   "a `b\r\n\r\nc` foo_bar"
+  ]
+ },
+ {
+  "name": "code_tokens: www-dotted",
+  "fn": "code_tokens",
+  "args": [
+   "www.example.com here"
+  ]
+ },
+ {
+  "name": "sentence_problems: empty",
+  "fn": "sentence_problems",
+  "args": [
+   ""
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: blank",
+  "fn": "sentence_problems",
+  "args": [
+   "   \n "
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: marks-only-empty",
+  "fn": "sentence_problems",
+  "args": [
+   "— ?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: 25-words",
+  "fn": "sentence_problems",
+  "args": [
+   "word word word word word word word word word word word word word word word word word word word word word word word word ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: 26-words",
+  "fn": "sentence_problems",
+  "args": [
+   "word word word word word word word word word word word word word word word word word word word word word word word word word ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: 25-words-with-dash",
+  "fn": "sentence_problems",
+  "args": [
+   "word word word word word word word word word word word word — word word word word word word word word word word word word ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: span-one-word",
+  "fn": "sentence_problems",
+  "args": [
+   "word word word word word word word word word word word word word word word word word word word word word word word `a b c d` ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: code-token-no-problem",
+  "fn": "sentence_problems",
+  "args": [
+   "Should I edit foo.py now?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: stop-inside",
+  "fn": "sentence_problems",
+  "args": [
+   "It broke. Which fix do we take?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: abbrev-e.g",
+  "fn": "sentence_problems",
+  "args": [
+   "Is e.g. this ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: abbrev-i.e",
+  "fn": "sentence_problems",
+  "args": [
+   "Is i.e. this ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: abbrev-vs",
+  "fn": "sentence_problems",
+  "args": [
+   "Is vs. this ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: abbrev-etc",
+  "fn": "sentence_problems",
+  "args": [
+   "Is etc. this ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: abbrev-cf",
+  "fn": "sentence_problems",
+  "args": [
+   "Is cf. this ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: abbrev-mr",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Mr. this ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: abbrev-mrs",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Mrs. this ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: abbrev-ms",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Ms. this ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: abbrev-dr",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Dr. this ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: abbrev-jr",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Jr. this ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: abbrev-sr",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Sr. this ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: abbrev-st",
+  "fn": "sentence_problems",
+  "args": [
+   "Is St. this ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: abbrev-no",
+  "fn": "sentence_problems",
+  "args": [
+   "Is No. this ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: abbrev-approx",
+  "fn": "sentence_problems",
+  "args": [
+   "Is approx. this ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: abbrev-est",
+  "fn": "sentence_problems",
+  "args": [
+   "Is est. this ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: abbrev-a.m",
+  "fn": "sentence_problems",
+  "args": [
+   "Is a.m. this ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: abbrev-p.m",
+  "fn": "sentence_problems",
+  "args": [
+   "Is p.m. this ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: month-jan",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Jan. 20 ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: month-feb",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Feb. 20 ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: month-mar",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Mar. 20 ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: month-apr",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Apr. 20 ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: month-jun",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Jun. 20 ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: month-jul",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Jul. 20 ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: month-aug",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Aug. 20 ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: month-sep",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Sep. 20 ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: month-sept",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Sept. 20 ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: month-oct",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Oct. 20 ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: month-nov",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Nov. 20 ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: month-dec",
+  "fn": "sentence_problems",
+  "args": [
+   "Is Dec. 20 ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: question-no-mark",
+  "fn": "sentence_problems",
+  "args": [
+   "Should I merge it"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: statement-ends-dot",
+  "fn": "sentence_problems",
+  "args": [
+   "I merge it."
+  ],
+  "kwargs": {
+   "question": false,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: statement-ends-bang",
+  "fn": "sentence_problems",
+  "args": [
+   "I merge it!"
+  ],
+  "kwargs": {
+   "question": false,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: statement-ends-colon",
+  "fn": "sentence_problems",
+  "args": [
+   "I merge it:"
+  ],
+  "kwargs": {
+   "question": false,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: statement-ends-nothing",
+  "fn": "sentence_problems",
+  "args": [
+   "I merge it"
+  ],
+  "kwargs": {
+   "question": false,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: trailing-closers",
+  "fn": "sentence_problems",
+  "args": [
+   "Should I merge (it?)]\"'*"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: emphasis-question",
+  "fn": "sentence_problems",
+  "args": [
+   "_Is it ok?_"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: curly-quotes",
+  "fn": "sentence_problems",
+  "args": [
+   "Should I “ship it?”"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: curly-single",
+  "fn": "sentence_problems",
+  "args": [
+   "Should I ‘ship it?’"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: apostrophe-fold",
+  "fn": "sentence_problems",
+  "args": [
+   "Is it Dana’s call?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: span-one-line",
+  "fn": "sentence_problems",
+  "args": [
+   "Should I run `make test`?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: span-end",
+  "fn": "sentence_problems",
+  "args": [
+   "Should I run `make\ntest`?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: url-question",
+  "fn": "sentence_problems",
+  "args": [
+   "Should I follow https://x.io/guide?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: url-stop-inside",
+  "fn": "sentence_problems",
+  "args": [
+   "(see https://x.io/a). Then merge?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: paren-question-inside",
+  "fn": "sentence_problems",
+  "args": [
+   "Say (really?) what you think?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: nov-20",
+  "fn": "sentence_problems",
+  "args": [
+   "Shall we meet Nov. 20?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: dr-lee",
+  "fn": "sentence_problems",
+  "args": [
+   "Should Dr. Lee read it?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: pm-tonight",
+  "fn": "sentence_problems",
+  "args": [
+   "Is 9 p.m. tonight ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: ellipsis",
+  "fn": "sentence_problems",
+  "args": [
+   "Wait... really?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: ellipsis-char",
+  "fn": "sentence_problems",
+  "args": [
+   "Wait… really?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: phd-false-positive",
+  "fn": "sentence_problems",
+  "args": [
+   "Is the Ph.D. thesis done?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: id-stop-false-positive",
+  "fn": "sentence_problems",
+  "args": [
+   "It is TD-909. Which one?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: span-possessive-four-words",
+  "fn": "sentence_problems",
+  "args": [
+   "Is `foo`'s output ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: span-possessive-count",
+  "fn": "sentence_problems",
+  "args": [
+   "Is `foo`'s output ok?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 3
+  }
+ },
+ {
+  "name": "sentence_problems: empty-question-alone",
+  "fn": "sentence_problems",
+  "args": [
+   ""
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: two-parts",
+  "fn": "sentence_problems",
+  "args": [
+   "word word word word word word word word word word word word word word word word word word word word word word word word word ok"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: three-parts",
+  "fn": "sentence_problems",
+  "args": [
+   "It broke. word word word word word word word word word word word word word word word word word word word word word word word word word ok"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: statement-line",
+  "fn": "sentence_problems",
+  "args": [
+   "It broke. I fix it."
+  ],
+  "kwargs": {
+   "question": false,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: say-no-gap",
+  "fn": "sentence_problems",
+  "args": [
+   "Say no. Then what?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: line-break-stop",
+  "fn": "sentence_problems",
+  "args": [
+   "It broke.\nWhich fix?"
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "sentence_problems: trailing-stop-not-inside",
+  "fn": "sentence_problems",
+  "args": [
+   "Is it done? "
+  ],
+  "kwargs": {
+   "question": true,
+   "max_words": 25
+  }
+ },
+ {
+  "name": "person_text_problems: actor-I",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — I merge it"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-Ill",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — I'll merge it"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-Im",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — I'm merge it"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-Ive",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — I've merge it"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-Id",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — I'd merge it"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-curly-ill",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — I’ll merge it"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: no-actor-is",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it is merged"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: no-actor-ie",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — i.e. merged"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: no-actor-Ie",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — I.e. merged"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: no-actor-lower-i",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — i merge it"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-me",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to ME today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-my",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to MY today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-myself",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to MYSELF today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-you",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to YOU today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-youll",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to YOU'LL today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-youre",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to YOU'RE today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-youve",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to YOU'VE today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-youd",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to YOU'D today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-your",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to YOUR today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-yourself",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to YOURSELF today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-we",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to WE today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-well",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to WE'LL today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-were",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to WE'RE today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-weve",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to WE'VE today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-wed",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to WE'D today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-us",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to US today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-our",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to OUR today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-nobody",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to NOBODY today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actor-word-no-one",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it goes to NO ONE today"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: well-pin-it",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "We'll pin it"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: you-in-span-not-read",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — run `you`"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: you-in-url-not-read",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — see https://x.io/you"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: you-in-link-target-not-read",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — see [it](you)"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: actors-noun",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — a session merges it"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "session",
+    "the host agent",
+    "c++ dev"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: actors-plural",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — the sessions merge it"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "session",
+    "the host agent",
+    "c++ dev"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: actors-possessive",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — the session's turn"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "session",
+    "the host agent",
+    "c++ dev"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: actors-phrase",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — the host agent runs it"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "session",
+    "the host agent",
+    "c++ dev"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: actors-phrase-plural",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — the host agents run it"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "session",
+    "the host agent",
+    "c++ dev"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: actors-literal-plus",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — a c++ dev runs it"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "session",
+    "the host agent",
+    "c++ dev"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: actors-phrase-split-no",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — the host runs it"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "session",
+    "the host agent",
+    "c++ dev"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: bounds-agent-cadence",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — agent-cadence runs it"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "agent"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: bounds-us-east-1",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — us-east-1 runs it"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "agent"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: bounds-i-o",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — I/O runs it"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "agent"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: bounds-my-app",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — my-app runs it"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "agent"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: us-market-gap",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — the US market takes it"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: me-you-gap",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — me/you"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: no-actors-session",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — a session pins it"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: cure-with-actors",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it pins"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "seat",
+    "session"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: people-case",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — DANA merges it"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "people": [
+    "Dana"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: people-possessive",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — Dana's turn"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "people": [
+    "Dana"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: people-will-gap",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it will be built"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "people": [
+    "Will"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: people-none",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — Dana merges it"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "people": null
+  }
+ },
+ {
+  "name": "person_text_problems: form-with-consequence",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Hold: <note> — a session revises it"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "session"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: form-alone-hold",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Hold: <note>"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: form-alone-not-right",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Not right: <what>"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: form-alone-other",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Other:"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: form-label-not-read",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Hold: <you> — it waits"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: not-right-label-read",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Not right: you pick — it waits"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: default-mark-dropped",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go (default) — I merge it",
+    "Wait (default)"
+   ]
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: default-equal-label",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it is merged"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "default": "Go"
+  }
+ },
+ {
+  "name": "person_text_problems: default-equal-marked",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go (default) — it is merged"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "default": "Go (default) — it is merged"
+  }
+ },
+ {
+  "name": "person_text_problems: default-unequal-actorless",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — I merge it"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "default": "Wait — it waits"
+  }
+ },
+ {
+  "name": "person_text_problems: default-unequal-actor",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — I merge it"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "default": "Wait — you wait"
+  }
+ },
+ {
+  "name": "person_text_problems: default-no-answers",
+  "fn": "person_text_problems",
+  "args": [
+   null
+  ],
+  "kwargs": {
+   "question": true,
+   "default": "Wait — it waits"
+  }
+ },
+ {
+  "name": "person_text_problems: rule4-one",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [],
+   "see foo.py"
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: rule4-two",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [],
+   "see foo.py and bar.md"
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: rule4-three",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [],
+   "see grammar.py, one_sentence() and profiles.yml"
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: rule4-four",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [],
+   "a.py b.py c.py d.py"
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: rule4-five",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [],
+   "grammar.py, one_sentence(), profiles.yml, x.py and y.py"
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: rule4-plain",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [],
+   "plain words, no code, as long as it likes"
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: rule4-empty",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [],
+   ""
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: rule1-statement",
+  "fn": "person_text_problems",
+  "args": [
+   "It broke. I fix it."
+  ],
+  "kwargs": {
+   "question": false
+  }
+ },
+ {
+  "name": "person_text_problems: rule1-statement-code",
+  "fn": "person_text_problems",
+  "args": [
+   "I fix foo.py"
+  ],
+  "kwargs": {
+   "question": false
+  }
+ },
+ {
+  "name": "person_text_problems: rule1-all-parts",
+  "fn": "person_text_problems",
+  "args": [
+   "It broke. word word word word word word word word word word word word word word word word word word word word word word word profiles.yml one_sentence(x)"
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: spec-example-rule1",
+  "fn": "person_text_problems",
+  "args": [
+   "word word word word word word word word word word word word word word word word word word word word word word word word profiles.yml one_sentence(x)"
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: rule1-empty-alone",
+  "fn": "person_text_problems",
+  "args": [
+   ""
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: rule1-pass",
+  "fn": "person_text_problems",
+  "args": [
+   "Should I merge it?"
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: ask-text-after-lead",
+  "fn": "person_text_problems",
+  "args": [
+   "word word word word word word word word word word word word word word word word word word word word word word word word ok?"
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: ask-lead-left-in",
+  "fn": "person_text_problems",
+  "args": [
+   "**Ask:** word word word word word word word word word word word word word word word word word word word word word word word word ok?"
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: sentence-none",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [],
+   null
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "person_text_problems: rule-order",
+  "fn": "person_text_problems",
+  "args": [
+   "It broke. Fix?",
+   [
+    "Go — it merges",
+    "Wait — I wait"
+   ],
+   "see foo.py"
+  ],
+  "kwargs": {
+   "question": true,
+   "default": "Hold — it holds"
+  }
+ },
+ {
+  "name": "person_text_problems: spec-example-rule2",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it merges"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "session"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: actors-empty-entry",
+  "fn": "person_text_problems",
+  "args": [
+   "Should I merge it?"
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    ""
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: actors-line-break",
+  "fn": "person_text_problems",
+  "args": [
+   "Should I merge it?"
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "a\nb"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: actors-carriage-return",
+  "fn": "person_text_problems",
+  "args": [
+   "Should I merge it?"
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "a\rb"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: people-empty-entry",
+  "fn": "person_text_problems",
+  "args": [
+   "Should I merge it?"
+  ],
+  "kwargs": {
+   "question": true,
+   "people": [
+    ""
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: people-line-break",
+  "fn": "person_text_problems",
+  "args": [
+   "Should I merge it?"
+  ],
+  "kwargs": {
+   "question": true,
+   "people": [
+    "a\nb"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: people-carriage-return",
+  "fn": "person_text_problems",
+  "args": [
+   "Should I merge it?"
+  ],
+  "kwargs": {
+   "question": true,
+   "people": [
+    "a\rb"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: actors-spaces-only",
+  "fn": "person_text_problems",
+  "args": [
+   "Should I merge it?"
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "   "
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: actors-collapsed",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — the host agent runs it"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "actors": [
+    "the  host\tagent"
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: people-none-names",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — Dana runs it"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "people": null
+  }
+ },
+ {
+  "name": "person_text_problems: people-space-entry",
+  "fn": "person_text_problems",
+  "args": [
+   null,
+   [
+    "Go — it merges"
+   ]
+  ],
+  "kwargs": {
+   "question": true,
+   "people": [
+    " "
+   ]
+  }
+ },
+ {
+  "name": "person_text_problems: say-no-gap",
+  "fn": "person_text_problems",
+  "args": [
+   "Say no. Then what?"
+  ],
+  "kwargs": {
+   "question": true
+  }
+ },
+ {
+  "name": "constant: actor-words",
+  "constant": "ACTOR_WORDS"
+ },
+ {
+  "name": "constant: sentence-words",
+  "constant": "SENTENCE_WORDS"
+ },
+ {
+  "name": "constant: code-exts",
+  "constant": "CODE_EXTS"
+ },
+ {
+  "name": "title_problems: label-td",
+  "fn": "title_problems",
+  "args": [
+   "Fix the thing for TD-078"
+  ],
+  "kwargs": {}
+ },
+ {
+  "name": "title_problems: label-td-possessive",
+  "fn": "title_problems",
+  "args": [
+   "TD-5's fix"
+  ],
+  "kwargs": {}
+ },
+ {
+  "name": "title_problems: label-repo-td",
+  "fn": "title_problems",
+  "args": [
+   "Mirror ledgerboard#TD-12 here"
+  ],
+  "kwargs": {}
+ },
+ {
+  "name": "title_problems: label-owner-repo-td",
+  "fn": "title_problems",
+  "args": [
+   "Mirror acme/tools#TD-5 here"
+  ],
+  "kwargs": {}
+ },
+ {
+  "name": "title_problems: label-dotted-repo-td",
+  "fn": "title_problems",
+  "args": [
+   "Mirror my.repo#TD-5 here"
+  ],
+  "kwargs": {}
+ },
+ {
+  "name": "title_problems: code-token",
+  "fn": "title_problems",
+  "args": [
+   "Fix profiles.yml"
+  ],
+  "kwargs": {}
+ },
+ {
+  "name": "title_problems: spec-example-rule3",
+  "fn": "title_problems",
+  "args": [
+   "TD-078: B4 reads profiles.yml"
+  ],
+  "kwargs": {
+   "labels": [
+    "[A-Z]{1,2}\\d+",
+    "#\\d+"
+   ]
+  }
+ },
+ {
+  "name": "title_problems: labels-b4",
+  "fn": "title_problems",
+  "args": [
+   "Build B4 now"
+  ],
+  "kwargs": {
+   "labels": [
+    "[A-Z]{1,2}\\d+",
+    "#\\d+"
+   ]
+  }
+ },
+ {
+  "name": "title_problems: labels-p0-false-positive",
+  "fn": "title_problems",
+  "args": [
+   "A P0 bug"
+  ],
+  "kwargs": {
+   "labels": [
+    "[A-Z]{1,2}\\d+",
+    "#\\d+"
+   ]
+  }
+ },
+ {
+  "name": "title_problems: labels-pr",
+  "fn": "title_problems",
+  "args": [
+   "Land #42 soon"
+  ],
+  "kwargs": {
+   "labels": [
+    "[A-Z]{1,2}\\d+",
+    "#\\d+"
+   ]
+  }
+ },
+ {
+  "name": "title_problems: labels-bad-regex",
+  "fn": "title_problems",
+  "args": [
+   "Plain title"
+  ],
+  "kwargs": {
+   "labels": [
+    "[unclosed"
+   ]
+  }
+ },
+ {
+  "name": "title_problems: labels-empty",
+  "fn": "title_problems",
+  "args": [
+   "Plain title"
+  ],
+  "kwargs": {
+   "labels": [
+    ""
+   ]
+  }
+ },
+ {
+  "name": "title_problems: labels-line-break",
+  "fn": "title_problems",
+  "args": [
+   "Plain title"
+  ],
+  "kwargs": {
+   "labels": [
+    "a\nb"
+   ]
+  }
+ },
+ {
+  "name": "title_problems: coined-case",
+  "fn": "title_problems",
+  "args": [
+   "Cut the Slice"
+  ],
+  "kwargs": {
+   "coined": [
+    "slice",
+    "seam"
+   ]
+  }
+ },
+ {
+  "name": "title_problems: coined-s",
+  "fn": "title_problems",
+  "args": [
+   "Cut two slices"
+  ],
+  "kwargs": {
+   "coined": [
+    "slice"
+   ]
+  }
+ },
+ {
+  "name": "title_problems: coined-es",
+  "fn": "title_problems",
+  "args": [
+   "Mind the seames"
+  ],
+  "kwargs": {
+   "coined": [
+    "seam"
+   ]
+  }
+ },
+ {
+  "name": "title_problems: coined-space",
+  "fn": "title_problems",
+  "args": [
+   "Plain title"
+  ],
+  "kwargs": {
+   "coined": [
+    "two words"
+   ]
+  }
+ },
+ {
+  "name": "title_problems: coined-empty",
+  "fn": "title_problems",
+  "args": [
+   "Plain title"
+  ],
+  "kwargs": {
+   "coined": [
+    ""
+   ]
+  }
+ },
+ {
+  "name": "title_problems: coined-line-break",
+  "fn": "title_problems",
+  "args": [
+   "Plain title"
+  ],
+  "kwargs": {
+   "coined": [
+    "a\nb"
+   ]
+  }
+ },
+ {
+  "name": "title_problems: s3-no-labels",
+  "fn": "title_problems",
+  "args": [
+   "Store it in S3"
+  ],
+  "kwargs": {}
+ },
+ {
+  "name": "title_problems: us-eu-uk",
+  "fn": "title_problems",
+  "args": [
+   "Ship to US/EU/UK"
+  ],
+  "kwargs": {}
+ },
+ {
+  "name": "title_problems: b4-once",
+  "fn": "title_problems",
+  "args": [
+   "B4 B4 and B4s"
+  ],
+  "kwargs": {
+   "labels": [
+    "[A-Z]{1,2}\\d+",
+    "#\\d+"
+   ]
+  }
+ },
+ {
+  "name": "title_problems: possessive-file",
+  "fn": "title_problems",
+  "args": [
+   "What foo.py's output says"
+  ],
+  "kwargs": {}
+ },
+ {
+  "name": "title_problems: label-in-span",
+  "fn": "title_problems",
+  "args": [
+   "Read `TD-5` first"
+  ],
+  "kwargs": {}
+ },
+ {
+  "name": "title_problems: span-label-span",
+  "fn": "title_problems",
+  "args": [
+   "Fix `foo` B4 and `x`"
+  ],
+  "kwargs": {
+   "labels": [
+    "[A-Z]{1,2}\\d+",
+    "#\\d+"
+   ]
+  }
+ },
+ {
+  "name": "title_problems: span-pair-one-word",
+  "fn": "title_problems",
+  "args": [
+   "Read `a`/`b` first"
+  ],
+  "kwargs": {}
+ },
+ {
+  "name": "title_problems: id-in-words",
+  "fn": "title_problems",
+  "args": [
+   "Fix the ledger entry one hundred and eleven"
+  ],
+  "kwargs": {}
+ },
+ {
+  "name": "title_problems: four-labels",
+  "fn": "title_problems",
+  "args": [
+   "TD-1 TD-2 TD-3 TD-4 TD-5"
+  ],
+  "kwargs": {}
+ },
+ {
+  "name": "title_problems: plain",
+  "fn": "title_problems",
+  "args": [
+   "A shared check for text a person reads"
+  ],
+  "kwargs": {}
+ }
+]

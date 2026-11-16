@@ -1,0 +1,19 @@
+{
+ "argv": [
+  "set",
+  "TD-2",
+  "--blocked-by",
+  "decision (kim)",
+  "--by",
+  "pat",
+  "--why",
+  "kim owns it now",
+  "--ask",
+  "ask.md",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

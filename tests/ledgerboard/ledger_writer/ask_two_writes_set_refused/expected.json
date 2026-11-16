@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "set",
+  "refused": "⚠ TD-001: Blocked by names decision (pat) and the entry has no **Ask:** — say what the person owes, a go included"
+ }
+}

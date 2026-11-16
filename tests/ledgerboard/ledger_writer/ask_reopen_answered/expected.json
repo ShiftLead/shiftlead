@@ -1,0 +1,17 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "reopen",
+  "id": "TD-005",
+  "moved": {
+   "from": "ledger/archive/TD-005.md",
+   "to": "ledger/TD-005.md"
+  },
+  "notes": [],
+  "paths": [
+   "ledger/archive/TD-005.md",
+   "ledger/TD-005.md"
+  ],
+  "subject": null
+ }
+}

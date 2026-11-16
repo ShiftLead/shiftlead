@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "new",
+  "refused": "--ask is empty: an Ask with no words asks nothing"
+ }
+}

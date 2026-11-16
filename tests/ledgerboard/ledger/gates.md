@@ -103,3 +103,147 @@ Ledgerboard: 2
 **Priority:** Low
 **Part of:** TD-110
 **Blocked by:** decision (designer)
+
+## TD-119: An Ask with no Blocked by
+
+**Priority:** Low
+**Status:** Open
+
+**Ask:** pat says which way.
+
+## TD-120: An Ask waiting only on a date
+
+**Priority:** Low
+**Status:** Open
+**Blocked by:** until 2026-02-01
+
+**Ask:** pat says which way, once the date comes.
+
+## TD-121: An Ask waiting only on an event
+
+**Priority:** Low
+**Status:** Open
+**Blocked by:** event (shipped)
+
+**Ask:** pat says whether the shipped build is right.
+
+**Event (shipped):** the tools PR is merged.
+check: pr-merged acme/tools#40
+
+## TD-122: An Ask held in the header, no gate
+
+**Priority:** Low
+**Status:** Open
+**Ask:** pat says which way.
+
+## TD-123: An Ask answered by its lift
+
+**Priority:** Low
+**Status:** Open
+
+**Ask:** pat says go.
+
+**Log:**
+- 2026-01-02: gate added: decision (pat)
+- 2026-01-05: gate lifted: decision (pat) — by pat; answer "Go"
+
+## TD-124: An Ask lifted, then its decision added again and dropped by hand
+
+**Priority:** Low
+**Status:** Open
+
+**Ask:** pat says go, again.
+
+**Log:**
+- 2026-01-02: gate added: decision (pat)
+- 2026-01-05: gate lifted: decision (pat) — by pat; answer "Go"
+- 2026-01-07: gate added: decision (pat)
+
+## TD-125: An Ask answered by an override
+
+**Priority:** Low
+**Status:** Open
+
+**Ask:** pat says go.
+
+**Log:**
+- 2026-01-02: gate added: decision (pat)
+- 2026-01-05: gate lifted: decision (pat) — by kim; override: pat is away and the date is fixed
+
+## TD-126: An Ask waiting on a role
+
+**Priority:** Low
+**Status:** Open
+**Blocked by:** decision (designer)
+
+**Ask:** the designer says which way.
+
+## TD-127: An Ask held by the retired hold
+
+**Priority:** Low
+**Status:** Open
+**Blocked by:** hold
+
+**Ask:** someone says which way.
+
+## TD-128: An Ask whose decision names no person
+
+**Priority:** Low
+**Status:** Open
+**Blocked by:** decision (the owner)
+
+**Ask:** the owner says which way.
+
+## TD-129: A qualified Ask lead, no gate
+
+**Priority:** Low
+**Status:** Open
+
+**Ask (earlier):** pat said go.
+
+## TD-130: An Ask lead inside a code fence, no gate
+
+**Priority:** Low
+**Status:** Open
+
+**Why:** the lead below is quoted, not written.
+
+```
+**Ask:** pat says go.
+```
+
+## TD-131: Two decisions, one lifted and one still carried
+
+**Priority:** Low
+**Status:** Open
+**Blocked by:** decision (kim)
+
+**Ask:** pat and kim each say go.
+
+**Log:**
+- 2026-01-02: gate added: decision (pat)
+- 2026-01-02: gate added: decision (kim)
+- 2026-01-05: gate lifted: decision (pat) — by pat; answer "Go"
+
+## TD-132: An answered Ask whose Log has a line no reader reads
+
+**Priority:** Low
+**Status:** Open
+
+**Ask:** pat says go.
+
+**Log:**
+- 2026-01-02: gate added: decision (pat)
+- 2026-01-05: gate lifted: decision (pat) — by pat; answer "Go"
+- an undated line
+
+## TD-133: A lift written above a later-dated gate added line
+
+**Priority:** Low
+**Status:** Open
+
+**Ask:** pat says go.
+
+**Log:**
+- 2026-01-09: gate lifted: decision (pat) — by pat; answer "Go"
+- 2026-01-03: gate added: decision (pat)
