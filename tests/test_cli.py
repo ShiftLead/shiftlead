@@ -1063,10 +1063,11 @@ RULES = (
 
 # TD-1853 (§4.10 rule 6): what the person's Not clear does, in the same place, after the rules
 NOT_CLEAR = (
-    " **Not clear**, the person's answer on any of these but a look, sends the item back to its writer to rewrite "
+    " **Not clear**, the person's answer on any of these but a look or a question rerouted to "
+    "them, sends the item back to its writer to rewrite "
     "(design §4.10 *Text a person reads is checked at its writer*, rule 6): a question is closed and its asker noted "
     "to rewrite it and ask again; a board line or an entry is decided *Not clear*, a work order to rewrite it; and "
-    "each press is counted against its writer in the feedback review."
+    "each press is counted in the feedback review."
 )
 PASSED_UP = (
     " A pass-up of yours the person marks Not clear is undone, open again in your inbox: rewrite your `--question` "
