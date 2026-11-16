@@ -3719,7 +3719,7 @@ def test_every_inbox_control_has_its_verb_under_way():
         'action === "board" ? '
         "`${what} — landing on the board…` : `${what}…`, true, null, true);" in js
     )
-    assert "const text = kept[msg] || AO.pressErrs[msg];" in js
+    assert "const err = AO.pressErrs[msg] || kept[msg];" in js
     # `say` is the handler's own, declared partway down it: nothing above the declaration may call it
     handler = js[js.index('const b = ev.target.closest("[data-act], [data-copy]");') :]
     assert "say(" not in handler[: handler.index("const say = ")]

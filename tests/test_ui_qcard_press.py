@@ -228,8 +228,11 @@ def test_the_click_handler_and_the_queue_are_wired():
     assert "AO.qcardOff(r, qled); AO.handRing(r); r.remove();" in JS  # the ⋯ road, per removed row
     # the two refusal branches alone give the press's one back
     assert JS.count("AO.qcardBack(") == 2
-    assert "AO.pressErrs[qled] = words; delete AO.inflight[qled];\n        AO.qcardBack(qled);" in JS
-    assert "AO.pressErrs[msgOf] = words;\n          AO.qcardBack(msgOf);" in JS
+    assert (
+        "AO.pressErrs[qled] = AO.pressErr(words, AO.maySent(e), atSig); delete AO.inflight[qled];\n"
+        "        AO.qcardBack(qled);" in JS
+    )
+    assert "AO.pressErrs[msgOf] = AO.pressErr(words, AO.maySent(e), atSig);\n          AO.qcardBack(msgOf);" in JS
     # the Queue's re-read reapplies the keep before the items' own keep takes a left row out
     q = JS[JS.index("AO.queue = function") :]
     assert q.index("AO.qcardReapply(lists);") < q.index("AO.restoreRowErrs(lists, errs);")

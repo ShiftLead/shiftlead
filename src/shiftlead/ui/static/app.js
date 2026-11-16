@@ -1249,7 +1249,46 @@
     "reopen-push"];
   AO.pressKey = (action, boardAct) => (action === "board" ? `board_${boardAct || ""}` : action);
   AO.pressVerb = (key) => PRESS_VERBS[key] || key;
-  AO.pressErrs = {};  // a refused press's words by entry id, until that row's next press or a reload
+  // a refused press by entry id, until that row's next press or a reload (TD-340): its words, whether anything may
+  // have been sent (`sent`), the item's bar as drawn when pressed (`was`) and whether a re-read has drawn it otherwise
+  // since (`changed`) — §4.5 screen 12 *A press is never left stranded*, case *refused* (TD-1843)
+  AO.pressErrs = {};
+  AO.pressErr = (words, sent, was) => ({ words, sent: !!sent, was: was || "", changed: false });
+  // whether a refused request may still have reached the home: no answer at all, or a verdict unknown (TD-806)
+  AO.maySent = (e) => !e || !e.status || e.status === 503;
+  // what a re-read may change on an item: its bar's controls and its press line, its ages aside
+  AO.itemSig = (row) => (row ? [...row.querySelectorAll(".qabar button, .qabar a, .qabar summary, .qpress:not(.qp-err)")]
+    .map((n) => `${n.dataset.act || ""}:${n.disabled ? "off" : ""}:${n.textContent.replace(/\b(\d+\s*[a-z]*\s+ago|just now)\b/gi, "#").replace(/\d+/g, "#").replace(/\s+/g, " ").trim()}`).join("|") : "");
+  // the refused press line's words: the stored words, the client's prefix kept, a capital first; *Nothing was sent.*
+  // only where the press wrote nothing; *It now reads as above…* once a re-read drew the item otherwise
+  AO.pressErrLine = (err) => {
+    const w = String(err.words || "").trim(), s = w.charAt(0).toUpperCase() + w.slice(1);
+    return [/[.?!]$/.test(s) ? s : `${s}.`, err.sent ? "" : "Nothing was sent.",
+      err.changed ? "It now reads as above; press again to answer it." : ""].filter(Boolean).join(" ");
+  };
+  // a refusal on its row: on a Queue card's item with a bar, its press line (red, replacing the item's other press
+  // line while it stands); anywhere else, the row's error line as before
+  AO.drawPressErr = function (row, err) {
+    if (!row || !err) return;
+    const er = row.querySelector(".rowerr"), bar = row.querySelector(".qabar");
+    if (!bar || !row.closest(".qcard")) { if (er) { er.textContent = err.words; er.hidden = false; } return; }
+    if (er) { er.textContent = ""; er.hidden = true; }
+    let line = row.querySelector(".qpress.qp-err");
+    if (!line) {
+      line = document.createElement("div"); line.className = "qpress qp-stalled qp-err"; line.setAttribute("role", "alert");
+      const at = row.querySelector(".qpress:not(.qp-err)") || bar;
+      at.parentNode.insertBefore(line, at);
+    }
+    row.querySelectorAll(".qpress:not(.qp-err)").forEach((p) => { p.hidden = true; });
+    line.dataset.words = err.words; line.dataset.sent = err.sent ? "1" : "";
+    line.textContent = AO.pressErrLine(err);
+  };
+  AO.clearPressErr = function (row) {
+    if (!row) return;
+    const er = row.querySelector(".rowerr"); if (er) { er.hidden = true; er.textContent = ""; }
+    row.querySelectorAll(".qpress.qp-err").forEach((l) => l.remove());
+    row.querySelectorAll(".qpress[hidden]").forEach((p) => { p.hidden = false; });
+  };
   // the presses still in flight, by entry id: a poll's swap must not draw back a row the press took
   // away, nor draw one that stays as pressable, while its request is out (review of #1144)
   AO.inflight = {};
@@ -1532,6 +1571,8 @@
     const qt = !row && (road || lifting) ? b.closest(".qrow[data-qid]") || b.closest(".qhead[data-qid]") : null;
     const qkey = qt ? AO.qKey(qt) : "", qled = qt ? `ledger:${b.dataset.repo}:${b.dataset.ref}` : "";
     let waiting = null, left = false;
+    // the item as drawn at the press, so a refusal can tell when a re-read draws it otherwise (TD-1843)
+    const atSig = AO.itemSig(row || (qled ? document.querySelector(`.mailrow[data-msg="${CSS.escape(qled)}"]`) : null));
     const say = (text, ok, href) => {
       if (!waiting) return AO.toast(text, ok, href);
       const w = waiting; waiting = null;
@@ -1544,7 +1585,7 @@
       // a Queue card's own state follows the press (TD-1461): taken before the row leaves; a board Reply takes nothing
       if (r4 && key !== "board_reply") AO.qcardOff(row, msgOf);
       delete AO.pressErrs[row.dataset.msg];
-      const err = row.querySelector(".rowerr"); if (err) { err.hidden = true; err.textContent = ""; }
+      AO.clearPressErr(row);
       const verb = AO.pressVerb(key);
       if (drawn) {
         // drawn in the press's frame, the row kept and not dimmed (rule 4)
@@ -1957,9 +1998,10 @@
           const words = /^(sent without its key|could not check whether this was handed)/.test(m) ? m
             : /^(the hand-off may have been sent|handed to )/.test(m) ? `hand-off not finished: ${m}` : `not handed: ${m}`;
           say(words);
-          if (msgOf) AO.pressErrs[msgOf] = words;
-          const r = fresh(), er = r && r.querySelector(".rowerr");
-          if (er) { er.textContent = words; er.hidden = false; }
+          // only a refusal before anything was sent wrote nothing
+          const err = AO.pressErr(words, !/^not handed: /.test(words), atSig);
+          if (msgOf) AO.pressErrs[msgOf] = err;
+          AO.drawPressErr(fresh(), err);
           if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
           return;
         }
@@ -2066,7 +2108,7 @@
         const words = `${r4[1]}: ${e.message}`;
         say(words);
         const t = AO.qFind(qkey); if (t) AO.unDrawQState(t);
-        AO.pressErrs[qled] = words; delete AO.inflight[qled];
+        AO.pressErrs[qled] = AO.pressErr(words, AO.maySent(e), atSig); delete AO.inflight[qled];
         AO.qcardBack(qled);  // the card's pill, look and summary back at once (TD-1461)
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
@@ -2079,10 +2121,10 @@
         const words = `${r4[1]}: ${e.message}`;
         say(words);
         if (msgOf) {
-          AO.pressErrs[msgOf] = words;
+          AO.pressErrs[msgOf] = AO.pressErr(words, AO.maySent(e), atSig);
           AO.qcardBack(msgOf);  // the card's pill, look and summary back at once (TD-1461)
           const r = fresh();
-          if (r && drawn) { AO.unDraw(r); const er = r.querySelector(".rowerr"); if (er) { er.textContent = words; er.hidden = false; } }
+          if (r && drawn) { AO.unDraw(r); AO.drawPressErr(r, AO.pressErrs[msgOf]); }
         }
         if ((staterow || left) && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();  // put the row back
         return;
@@ -2093,11 +2135,11 @@
       // Only the presses that write the board line are writes (TD-234): a failed Snooze or Delete
       // wrote nothing, and its toast says so in its own words
       const writes = ["reply", "answer", "gowithit", "ledger", "ledger_reply"].includes(action);
-      const rowerr = writes && b.closest(".mailrow") && b.closest(".mailrow").querySelector(".rowerr");
-      if (rowerr) { rowerr.textContent = `not written: ${e.message}`; rowerr.hidden = false; }
+      const err = AO.pressErr(writes ? `not written: ${e.message}` : `not ${PRESS_NOT[key] || AO.pressVerb(key).replace(/…$/, "")}: ${e.message}`, AO.maySent(e), atSig);
+      if (writes) AO.drawPressErr(b.closest(".mailrow"), err);
       // a row the press took away comes back with the next refresh, carrying the refusal on its error
       // line until its next press or a reload — the page holds it, nothing at the home does (TD-340)
-      if (row && row.dataset.msg && (left || writes)) AO.pressErrs[row.dataset.msg] = writes ? `not written: ${e.message}` : `not ${PRESS_NOT[key] || AO.pressVerb(key).replace(/…$/, "")}: ${e.message}`;
+      if (row && row.dataset.msg && (left || writes)) AO.pressErrs[row.dataset.msg] = err;
       if ((staterow || left) && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();  // put the row back
     } finally {
       // a rule 4 press that was answered keeps its entry a minute (`until`), so a lagging board reading does not draw
@@ -4071,9 +4113,9 @@
   // — so the words are carried across the poll's swap, by the row's entry id, as a Deny reason is
   AO.rowErrs = function (root) {
     const kept = {};
-    if (root) root.querySelectorAll(".rowerr:not([hidden])").forEach((el) => {
-      const row = el.closest(".mailrow");
-      if (row && row.dataset.msg) kept[row.dataset.msg] = el.textContent;
+    if (root) root.querySelectorAll(".rowerr:not([hidden]), .qpress.qp-err").forEach((el) => {
+      const row = el.closest(".mailrow"), m = row && row.dataset.msg;
+      if (m) kept[m] = AO.pressErrs[m] || AO.pressErr(el.dataset.words || el.textContent, el.dataset.sent === "1", "");
     });
     return kept;
   };
@@ -4094,9 +4136,13 @@
       if (f && f.kind === "qrow") AO.drawQState(t, f.text, true);
     });
     if (root) root.querySelectorAll(".mailrow[data-msg] .rowerr").forEach((el) => {
-      const msg = el.closest(".mailrow").dataset.msg;
-      const text = kept[msg] || AO.pressErrs[msg];  // a refused press's words, held by the page (TD-340)
-      if (text) { el.textContent = text; el.hidden = false; }
+      const r = el.closest(".mailrow"), msg = r.dataset.msg;
+      const err = AO.pressErrs[msg] || kept[msg];  // a refused press, held by the page (TD-340)
+      if (!err) return;
+      AO.pressErrs[msg] = err;  // one drawn from the row alone is held from here, so a later re-read can mark it
+      // the re-read drew the item otherwise than it was pressed: say so, from now until it goes (TD-1843)
+      if (err.was && !err.changed && AO.itemSig(r) !== err.was) err.changed = true;
+      AO.drawPressErr(r, err);
     });
   };
   AO.restoreDenyWhys = function (root, kept) {
