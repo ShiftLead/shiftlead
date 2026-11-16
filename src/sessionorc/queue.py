@@ -790,6 +790,35 @@ def covers(
     return out
 
 
+def open_decided_lines(
+    boards: Mapping[str, Iterable[Mapping[str, Any]]],
+    entries: Mapping[str, Mapping[str, Any]],
+    refs_open: Mapping[str, str],
+    *,
+    person_only: bool = False,
+) -> list[tuple[dict[str, Any], set[str]]]:
+    """Every open decided board line the home reads (`boards` by repo name, each `{items}`) but an `fyi`, of any
+    kind, beside the entries it covers (`covers`): `[({repo, key, session, decided, by}, covered)]` — the one
+    enumerator `open_decided_covers` and `lift_here` read (§4.4 *Where Lift the hold is drawn*, TD-1831). A decided
+    `fyi` line is no work order and covers nothing; any other decided line is a work order whoever wrote it, as the
+    home's own press writes `(by <its person>)` — save with `person_only`, the rows' read, which skips a line
+    `Decided:` by someone else as `board_hold` does."""
+    out: list[tuple[dict[str, Any], set[str]]] = []
+    for repo, bl in boards.items():
+        for b in bl or ():
+            for it in (b.get("items") or ()) if isinstance(b, Mapping) else ():
+                if not isinstance(it, Mapping) or not it.get("decided") or it.get("kind") == "fyi":
+                    continue
+                by = str(it.get("decided_by") or "").strip().lower()
+                if person_only and by and by != PERSON:
+                    continue
+                d = it.get("decided") if isinstance(it.get("decided"), Mapping) else {}
+                line = {"repo": repo, "key": str(it.get("key") or ""), "session": str(it.get("session") or ""),
+                        "decided": str(d.get("date") or ""), "by": it.get("decided_by")}  # fmt: skip
+                out.append((line, covers(it.get("refs") or (), it.get("parts") or (), repo, entries, refs_open)))
+    return out
+
+
 def open_decided_covers(
     boards: Mapping[str, Iterable[Mapping[str, Any]]],
     entries: Mapping[str, Mapping[str, Any]],
@@ -799,21 +828,109 @@ def open_decided_covers(
 ) -> set[str]:
     """Every entry an open decided board line covers (`covers`), over every board the home reads (`boards` by repo
     name, each `{items}`): such an entry's line is its row now, *Waiting on them* while it waits on its session
-    (§4.5 screen 6, TD-565, TD-1364). A decided `fyi` line is no work order and covers nothing; any other decided
-    line is a work order whoever wrote it, as the home's own press writes `(by <its person>)` — save with
-    `person_only`, the rows' read, which skips a line `Decided:` by someone else as `board_hold` does, so the
-    Inbox hides no row the Queue still asks about."""
+    (§4.5 screen 6, TD-565, TD-1364). The union of `open_decided_lines`' covers, so the two never disagree;
+    `person_only` as there, so the Inbox hides no row the Queue still asks about."""
     out: set[str] = set()
-    for repo, bl in boards.items():
-        for b in bl or ():
-            for it in (b.get("items") or ()) if isinstance(b, Mapping) else ():
-                if not isinstance(it, Mapping) or not it.get("decided") or it.get("kind") == "fyi":
-                    continue
-                by = str(it.get("decided_by") or "").strip().lower()
-                if person_only and by and by != PERSON:
-                    continue
-                out |= covers(it.get("refs") or (), it.get("parts") or (), repo, entries, refs_open)
+    for _, covered in open_decided_lines(boards, entries, refs_open, person_only=person_only):
+        out |= covered
     return out
+
+
+def line_holder(
+    key: str, session: str, covered: Iterable[str], claims: Mapping[str, str], live: Mapping[str, str]
+) -> str | None:
+    """Who holds an open decided line, as `board_hold` reads a holder (§4.4 *The card's status*, TD-1368; factored
+    for `lift_here`, TD-1831): an unexpired claim on the line (`board:<key>`), else on a covered entry (`covered`
+    in order, the member first), else the live recorded session the line names — its id, or None."""
+    return (
+        claims.get(key)
+        or next((claims[q] for q in covered if q in claims), None)
+        or (live.get(session) if session else None)
+    )
+
+
+def lift_case_d(
+    member: Mapping[str, Any],
+    boards: Mapping[str, Iterable[Mapping[str, Any]]],
+    entries: Mapping[str, Mapping[str, Any]],
+    repo_key: str,
+) -> bool:
+    """Whether case (d) holds for `member` (an open entry with its `repo`; §4.4 *Lift the hold is a lift on the
+    press*, TD-1831): an open, undecided `decide` item on the entry's own repo's board (`boards[member["repo"]]`,
+    each with its `People:` names as `people`) covers it as ledgerboard's `covers()` reads one — its `Context:`
+    naming exactly one entry ref and the gate `decision (<p>)` of the entry's person, no qualifier after the gate,
+    the ref the entry (a bare id, or a `<repo>#TD-n` whose repo is `repo_key`), or its `Part of` parent with the
+    entry among the item's `Parts:`; the board's `People:` listing the person — and lists no other gated entry: no
+    `Context:` entry (the parent, where it covers through `Part of`) nor `Parts:` id, a bare id of that repo, open
+    in `entries`, not the member, and carrying `decision (<p>)`. The press refuses a lift there, so the row draws
+    none."""
+    repo = str(member.get("repo") or "")
+    try:
+        num = lb._num(str(member.get("id") or ""))
+    except (ValueError, IndexError, TypeError, AttributeError):
+        return False
+    me = qid(repo, str(member.get("id") or ""))
+    par = lb.parse_part_of(member.get("part_of_raw"))[0] if member.get("part_of_raw") else member.get("part_of")
+    parent = lb._num(str(par)) if par and lb._is_id(str(par)) else None
+    key = lb._gate_key(_GATE)
+
+    def other_gated(ref: str) -> bool:
+        if "#" in ref or not lb._is_id(ref):
+            return False  # a `<repo>#TD-n` never counts here, as the tripwire's shared case keeps bare ids alone
+        q = qid(repo, ref.upper())
+        return q != me and q in entries and bool(ledger_mod.decided_by(dict(entries[q]), PERSON))
+
+    for b in boards.get(repo) or ():
+        if not isinstance(b, Mapping) or PERSON not in {str(n).lower() for n in b.get("people") or ()}:
+            continue
+        for it in b.get("items") or ():
+            if not isinstance(it, Mapping) or it.get("kind") != "decide" or it.get("decided"):
+                continue
+            ctx = str(it.get("context") or "")
+            ref, gate = lb._context_gate(ctx)
+            if ref is None or gate is None or lb._gate_key(gate) != key:
+                continue
+            g = lb.CONTEXT_ANY_GATE_RE.search(ctx)
+            if g and " ".join(ctx[g.end() :].strip().rstrip(".").split()):
+                continue  # a `lift` or `board <repo>` qualifier: not the sweep's ask
+            at = lb._ours(ref, True, repo_key)
+            parts = [str(p) for p in it.get("parts") or ()]
+            if at == num:
+                listed = list(parts)
+            elif parent is not None and at == parent and any(lb._ours(p, True, repo_key) == num for p in parts):
+                listed = [ref, *parts]
+            else:
+                continue
+            if not any(other_gated(r) for r in listed):
+                return True
+    return False
+
+
+def lift_here(
+    member: Mapping[str, Any],
+    lines: Iterable[tuple[Mapping[str, Any], Collection[str]]],
+    claims: Mapping[str, str],
+    live: Mapping[str, str],
+    boards: Mapping[str, Iterable[Mapping[str, Any]]],
+    entries: Mapping[str, Mapping[str, Any]],
+    repo_key: str,
+) -> bool:
+    """Whether a Queue row draws **Lift the hold** in its ⋯ (§4.4 *Where Lift the hold is drawn*, TD-1831): the
+    entry still carries `decision (paul)`, is not the person's own (`Owner:` the person: **Done** answers it), an open
+    decided line covers it (`lines`, `open_decided_lines(..., person_only=True)`, the very set that hides its item),
+    no holder (`line_holder`) holds any such line, the entry or another entry it covers, and case (d) does not hold
+    (`lift_case_d`). The caller clears it on a *with you*, an applying or an archived row."""
+    if not ledger_mod.decided_by(dict(member), PERSON) or str(member.get("owner") or "").lower() == PERSON:
+        return False
+    me = qid(str(member.get("repo") or ""), str(member.get("id") or ""))
+    mine = [(ln, cov) for ln, cov in lines if me in cov]
+    if not mine:
+        return False
+    for ln, cov in mine:
+        covered = [me, *sorted(q for q in cov if q != me)]
+        if line_holder(str(ln.get("key") or ""), str(ln.get("session") or ""), covered, claims, live):
+            return False
+    return not lift_case_d(member, boards, entries, repo_key)
 
 
 def _board_lines(boards: Mapping[str, Iterable[Mapping[str, Any]]]) -> list[dict[str, Any]]:
@@ -976,7 +1093,7 @@ def board_hold(
     line = {"key": ln["key"], "open": ln["open"], "to": list(ln["to"]), "said": ln["said"]}
     held = next((claims[q] for q in covered if q in claims), None)  # a covered member's holder, the member first
     if ln["open"]:
-        asker = claims.get(ln["key"]) or held or live.get(ln["session"]) or "a pick"
+        asker = line_holder(ln["key"], ln["session"], covered, claims, live) or "a pick"
         return {"kind": "board", "asker": asker, "closed_at": ln["decided"], "outcome": None, "line": line}
     why = str((ln["closed"] or {}).get("why") or "").strip().lower()
     if ln["to"]:
@@ -1209,7 +1326,8 @@ def lay_held(queue: Mapping[str, Any], repos: Mapping[str, Mapping[str, Any]]) -
             return row
         if (applying := pressing.get(str(row.get("qid") or ""))) is None:
             return row
-        return {**row, "state": applying_words(applying), "needs": None, "answered": None, "applying": applying}
+        return {**row, "state": applying_words(applying), "needs": None, "answered": None, "applying": applying,
+                "lift_here": False}  # fmt: skip
 
     def card(c: Any) -> Any:
         if not isinstance(c, Mapping):
@@ -1419,6 +1537,8 @@ def reading(
         live.setdefault(str(getattr(rec, "name", "") or rec.id), str(rec.id))
 
     pressing = _pressing(open_, boards, linked)
+    # the open decided lines that hide an entry's item, each with what it covers: a row's ⋯ Lift reads them (TD-1831)
+    decided_lines = open_decided_lines(boards, open_, linked, person_only=True)
     # the design PR an item about each entry links (TD-1531), with its synopsis (TD-1536)
     synopses = {n: r.get("synopses") for n, r in rs.by_name.items() if isinstance(r.get("synopses"), Mapping)}
     designs = design_prs(rs.roots, {n: r.get("prs") for n, r in rs.by_name.items()}, open_, archived, synopses)
@@ -1467,6 +1587,15 @@ def reading(
             applying = pressing.get(q) if not mine else None  # *with you* first, then the mark (TD-1508)
             if applying:
                 st, needs, answered = applying_words(applying), None, None  # the mark is no need of the person
+            # **Lift the hold** in the row's ⋯ (§4.4 *Where Lift the hold is drawn*, TD-1831): read on its own,
+            # whichever answer's word the row draws; never on a *with you* row or under a press's mark
+            lift = (
+                not mine
+                and not applying
+                and lift_here(
+                    e, decided_lines, claims, live, boards, open_, rs.origins.get(e["repo"]) or str(e["repo"]).lower()
+                )
+            )
             return {
                 "qid": q,
                 "repo": e["repo"],
@@ -1482,6 +1611,7 @@ def reading(
                 "with_you": mine["name"] if mine else None,
                 "answered": answered,
                 "applying": applying,
+                "lift_here": bool(lift),
                 # what the row's controls read (§4.5 screen 12 *any open row*, TD-905): its page kind, an open
                 # id in its `Blocked by:` or an open part, and a design's open builds (`ledger.builds_open`, TD-1130)
                 "page": str(e.get("for_page") or ""),
@@ -1509,6 +1639,7 @@ def reading(
             "with_you": None,
             "answered": None,
             "applying": None,
+            "lift_here": False,
             "page": "",
             "after": [],
             "blocked_open": False,

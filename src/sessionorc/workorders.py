@@ -478,10 +478,11 @@ def read_boards(
 ) -> dict[str, Any]:
     """The repo's board as the host agent keeps it (design §4.4 *Each reading has one owner*, *The
     boards*, TD-615), read in-process through ledgerboard (TD-585), whole, by `load_board()` (v3.0, TD-1881):
-    `{boards: [...], today}`, each board `{label, board, root, source, fetch_note, fetch_case, fetch_why, items}` —
-    and `swept`, once it was read against origin (below) — and each open item ledgerboard's record of it (`id`,
-    `path`, text — its words — due, answers, decided, context, refs, session, detail, …) with its reference beside
-    it as `key` (`board:<8 hex>`, `ref_of`, *A board line's id*) — or `{error}` when the board could not be read:
+    `{boards: [...], today}`, each board `{label, board, root, source, fetch_note, fetch_case, fetch_why, items,
+    people}` — and `swept`, once it was read against origin (below) — `people` its `People:` names (`board_people`,
+    None for no such line, TD-1831), and each open item ledgerboard's record of it (`id`, `path`, text — its words —
+    due, answers, decided, context, refs, session, detail, …) with its reference beside it as `key` (`board:<8 hex>`,
+    `ref_of`, *A board line's id*) — or `{error}` when the board could not be read:
     one newer than this ledgerboard reads (`version_problem`), or a stub whose directory is missing. No board is no
     boards and no error. `fetch` reads against origin (`_against_origin`, *Boards are read against origin*); a
     fetch that fails or passes its bound reads the checkout's board, its `fetch_note` *fetch skipped (<why>)*, so
@@ -535,6 +536,8 @@ def read_boards(
         "fetch_why": found.why if found is not None else None,
         "items": items,
         "carried": held,
+        # its `People:` names (TD-1831): a row's case (d) reads them as ledgerboard's `covers()` does
+        "people": ledgerboard.board_people(read),
     }
     if found is not None and found.case != "skipped":
         b["swept"] = swept(found.theirs) if found.theirs is not None else None
