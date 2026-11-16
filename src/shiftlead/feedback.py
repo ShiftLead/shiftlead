@@ -18,6 +18,7 @@ from datetime import UTC, datetime, tzinfo
 from pathlib import Path
 from typing import Any
 
+from sessionorc import witness
 from sessionorc.adapters import instant
 from sessionorc.agent_common import DIGEST_TIMEOUT
 from sessionorc.client import CALL_TIMEOUT, AgentError
@@ -326,6 +327,31 @@ def digest_record(
     ]
 
 
+def not_clear(since: datetime, until: datetime, root: Path | None = None) -> dict[str, Any]:
+    """The window's `not-clear` presses (design §4.7 `ao feedback`, step 2; §4.10 rule 6, TD-1853), read from the
+    home's witness store in this process: `{read, presses: [{writer, kind, week, n}]}` — `read` whether the store
+    is there (it is not on a node), `week` the ISO week of `at` in UTC (`2026-W46`), `n` per `(week, writer,
+    kind)`, sorted by them, the window `since <= at < until`. A record's text is `not-clear <kind> <repo>:<ref>
+    <writer>`, split on spaces."""
+    d = root or witness.directory()
+    if not d.is_dir():
+        return {"read": False, "presses": []}
+    lo, hi = since.astimezone(UTC), until.astimezone(UTC)
+    counts: dict[tuple[str, str, str], int] = {}
+    for r in witness.records(d):
+        words = str(r.get("text") or "").split()
+        if r.get("kind") != "press" or len(words) < 4 or words[0] != "not-clear":
+            continue
+        at = datetime.fromisoformat(str(r["at"]).replace("Z", "+00:00")).astimezone(UTC)  # `records()` parsed it
+        if not lo <= at < hi:
+            continue
+        y, w, _ = at.isocalendar()
+        key = (f"{y}-W{w:02d}", words[3], words[1])
+        counts[key] = counts.get(key, 0) + 1
+    presses = [{"writer": wr, "kind": k, "week": wk, "n": n} for (wk, wr, k), n in sorted(counts.items())]
+    return {"read": True, "presses": presses}
+
+
 def run(
     call: Call,
     records: list[tuple[str, str]],
@@ -338,8 +364,10 @@ def run(
     own: str | None,
     bound: int = PART_BYTES,
     list_only: bool = False,
+    witness_root: Path | None = None,
 ) -> dict[str, Any]:
-    """The run: the `--list` listing, or the digest and its index (design §4.7 *Feedback*)."""
+    """The run: the `--list` listing, or the digest and its index (design §4.7 *Feedback*), the window's
+    `not_clear` presses with it."""
     leave = set(skip) | ({own} if own else set())
     index_records: list[dict[str, Any]] = []
     claimed: set[str] = set()
@@ -388,7 +416,12 @@ def run(
                     "failed": r.failed,
                 }
             )
-    return {"since": utc(since), "until": utc(until), "records": index_records}
+    return {
+        "since": utc(since),
+        "until": utc(until),
+        "records": index_records,
+        "not_clear": not_clear(since, until, witness_root),
+    }
 
 
 def list_table(index: dict[str, Any], zone: tzinfo) -> list[str]:

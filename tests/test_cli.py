@@ -1061,6 +1061,18 @@ RULES = (
     "review round, then asks again | Hold: <note> — a session revises the design as your note says*."
 )
 
+# TD-1853 (§4.10 rule 6): what the person's Not clear does, in the same place, after the rules
+NOT_CLEAR = (
+    " **Not clear**, the person's answer on any of these but a look, sends the item back to its writer to rewrite "
+    "(design §4.10 *Text a person reads is checked at its writer*, rule 6): a question is closed and its asker noted "
+    "to rewrite it and ask again; a board line or an entry is decided *Not clear*, a work order to rewrite it; and "
+    "each press is counted against its writer in the feedback review."
+)
+PASSED_UP = (
+    " A pass-up of yours the person marks Not clear is undone, open again in your inbox: rewrite your `--question` "
+    "and pass it up again."
+)
+
 
 def test_the_presets_ask_for_the_shape_of_a_message_to_the_person():
     """TD-139 (design §4.10 *How a message to a person is written*): the rule lives with the writers,
@@ -1099,7 +1111,10 @@ def test_every_brief_that_writes_to_the_person_teaches_the_rules_its_writers_che
     ):
         text = (root / f"{name}.md").read_text(encoding="utf-8")
         assert text.count(RULES) == 1, name
-    assert RULES in (repo / "docs/briefs/director.md").read_text(encoding="utf-8")  # a whole brief, no template
+        assert text.count(RULES + NOT_CLEAR) == 1, name  # TD-1853: Not clear, in the same place
+        assert (PASSED_UP in text) == (name == "techlead"), name  # the passer's road is the techlead's
+    director = (repo / "docs/briefs/director.md").read_text(encoding="utf-8")
+    assert RULES + NOT_CLEAR in director  # a whole brief, no template
     for rel in (
         "docs/briefs/grinder-ao-1.md",
         "docs/briefs/designer-ao-1.md",
@@ -1115,6 +1130,9 @@ def test_every_brief_that_writes_to_the_person_teaches_the_rules_its_writers_che
     assert "*Text a person reads is checked at its writer*" in primer and "each answer leads to" not in primer
     skill = (repo / "src/shiftlead/skill.md").read_text(encoding="utf-8")
     assert "- **Text the person reads is checked at its writer** (§4.10)" in skill
+    assert "the person's **Not clear** on one sends it back to its writer to rewrite" in primer
+    assert "back in the passer's inbox to rewrite its `--question` and pass up again" in primer
+    assert "The person's **Not clear** on one sends it back to its writer to rewrite." in skill
 
 
 def test_the_designer_preset_keeps_its_reads_small_and_names_a_waiting_design():

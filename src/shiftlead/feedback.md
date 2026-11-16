@@ -271,6 +271,12 @@ Write the report to the scratch directory as `feedback-report.md`, a name no dig
   record sharing its directory, and each conversation a run again skipped, under its failed record's seat);
 - the seats with `marks_errors: false`, and the repos *not deduped against <repo>*;
 - the counts by outcome and the noise;
+- **the Not clear count**: the digest index's `not_clear` — the window's presses of the person's **Not clear**,
+  each an item they could not follow and sent back to its writer (design §4.10 *Text a person reads is checked
+  at its writer*) — as a table of week, writer, kind and count, the weeks in order, a writer `-` being a board
+  line's or an entry's, whose author the reference finds. Where its `read` is false, say the count was not read
+  because the run is not at the home (a node keeps no witness log); where it is true and `presses` is empty,
+  say the log holds no Not clear press in the window;
 - the **groups**, each with its findings, seats, counts and evidence, its title, and the parts it proposes,
   one for each repo it touches (a merged group may hold more than one for one repo): each part's repo, its
   title (the group's, unless you or the person's *edit* gives it another), Why, Fix and Done when, with the
