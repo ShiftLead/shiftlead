@@ -254,6 +254,12 @@ the hold stays{% if e.home == 'queue' and e.lift_item %}; Lift the hold lifts it
     sent with `form`, its index, never as written; a live look's **Not right…** is the board's case of it -#}
 {%- set hs = e.get('heads') %}{% set hs = hs if hs is sequence and hs is not string and hs | length == raw | length else [] %}
 <div class="row gap wrap sugg qanswers" role="group" aria-label="answer this item">
+  {#- a `blocked` outcome's entry's **Lift the hold** first (§4.4 *The outcome's lift and reply*, TD-1879; the wants'
+      `lift_reply`, joined by its question's id to the entry's stamp, TD-1843): one press lifts and tells the asker -#}
+  {%- set lr = e.get('lift_reply') if how == 'owed' and mode == 'card' else none %}
+  {%- if lr and lr.id and lr.root %}
+  <button class="btn sm answer qentry" type="button" data-act="ledger" data-id="person" data-repo="{{ lr.root }}" data-ref="{{ lr.id }}" data-words="go ahead" data-answer="go ahead" data-lift="1" data-lift-reply="{{ e.id }}" data-name="{{ by }}" title="lifts the hold on {{ lr.id }}" data-confirm="Lift the hold on {{ lr.id }}? Its decision (paul) is lifted now, and the entry can be picked.">Lift the hold</button>
+  {%- endif %}
   {%- for a in raw %}{% if a is string and a.strip() %}
   {%- set i = loop.index0 %}{% set head = hs[i] if i < hs | length and hs[i] is string else '' %}
   {%- set form = (pair and i == 1) or head %}{% set begun = (head or 'Not right') ~ ': ' %}
@@ -1604,7 +1610,8 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 
 {#- *Could not be done* (`--needs`, TD-1843): a `blocked` outcome — *You answered "<answer>". <seat> could not do it:
     <text>.* — or an exited asker's owed question — *… <asker> exited without reporting what came of it.* — then what
-    the bar offers. *You answered.* for a typed reply, *You let it go with its default.* for a steer's default -#}
+    the bar offers: *Lift the hold, reply, …* where it draws its entry's Lift (`lift_reply`), else *Reply, …*. *You
+    answered.* for a typed reply, *You let it go with its default.* for a steer's default -#}
 {% macro owed_press(e) -%}
 {%- set who = e.from_name or e['from'] %}
 {%- set o = e.outcome or {} %}
@@ -1613,7 +1620,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {%- if o.state == 'blocked' %} {{ who }} could not do it: {{ o.text or 'blocked' }}{% else %} {{ who }} {{ e.asker_state or 'exited' }} without reporting what came of it{% endif %}
 {%- endset %}
 {%- set s = s | trim %}
-<div class="qpress qp-needs" role="status">{{ s }}{% if not s.endswith(('.', '?', '!')) %}.{% endif %} Reply, start a session, or dismiss it.</div>
+<div class="qpress qp-needs" role="status">{{ s }}{% if not s.endswith(('.', '?', '!')) %}.{% endif %} {% if o.state == 'blocked' and e.lift_reply and e.lift_reply.id and e.lift_reply.root %}Lift the hold, reply, start a session, or dismiss it.{% else %}Reply, start a session, or dismiss it.{% endif %}</div>
 {%- endmacro %}
 
 {% macro ledger(e, section) -%}

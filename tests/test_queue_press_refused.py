@@ -104,7 +104,8 @@ def test_an_items_drawing_changes_with_its_bar_and_not_with_an_age():
 def test_every_refusal_is_stored_with_its_flag_and_drawn_by_the_one_drawer():
     # each writer stores the one shape, its `sent` flag false but where a hand-off may have gone
     for rhs in re.findall(r"AO\.pressErrs\[[^\]]+\] = ([^;]+);", JS):
-        assert rhs in ("err", "AO.pressErr(words, AO.maySent(e), atSig)"), rhs
+        # …and the lift whose reply failed after it, which was written (TD-1843 step 5): sent
+        assert rhs in ("err", "AO.pressErr(words, AO.maySent(e), atSig)", "AO.pressErr(words, true, atSig)"), rhs
     assert "const err = AO.pressErr(words, !/^not handed: /.test(words), atSig);" in JS
     assert "AO.pressErrs[qled] = AO.pressErr(words, AO.maySent(e), atSig);" in JS
     assert "AO.pressErrs[msgOf] = AO.pressErr(words, AO.maySent(e), atSig);" in JS
