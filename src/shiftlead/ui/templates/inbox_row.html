@@ -234,9 +234,10 @@
    **<head>…** and is filled, never pressed (TD-1557). A red PR has no Answer row. -#}
 {#- a gated entry's answer and its Go with it lift nothing (§4.4 *Lift the hold is a lift on the press*, §4.5a *Inbox
     row: ledger entry*, TD-1831): their title says the hold stays, and where the row draws **Lift the hold** (a Queue
-    card's decision item), that it lifts it — never on a *ledger · yours* row nor an Inbox *Later* row -#}
+    card's decision item whose `lift_item` is set, §4.4 *Where Lift the hold is drawn*, TD-1879), that it lifts it —
+    never on a *ledger · yours* row nor an Inbox *Later* row -#}
 {% macro hold_stays(e) -%}
-the hold stays{% if e.home == 'queue' and e.why != 'yours' %}; Lift the hold lifts it{% endif %}
+the hold stays{% if e.home == 'queue' and e.lift_item %}; Lift the hold lifts it{% endif %}
 {%- endmacro %}
 
 {% macro answer_row(e, how, gwi='') -%}
@@ -269,7 +270,7 @@ the hold stays{% if e.home == 'queue' and e.why != 'yours' %}; Lift the hold lif
   {%- if gwi %}<button class="btn sm ghost" type="button" data-act="gowithit" data-id="person" data-msg="{{ e.id }}" data-confirm="{{ gwi }}">Go with it</button>{% endif %}
   {%- if how == 'ledger' and e.home == 'queue' and e.why == 'yours' %}
   <button class="btn sm ghost" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="done" data-answer="done" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: done — its session archives the entry, or asks you what was done" data-confirm="Done? &ldquo;done&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Done</button>
-  {%- elif how == 'ledger' and e.home == 'queue' %}
+  {%- elif how == 'ledger' and e.home == 'queue' and e.lift_item %}
   <button class="btn sm ghost" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="go ahead" data-answer="go ahead" data-lift="1" title="lifts the hold on {{ e.id }}" data-confirm="Lift the hold on {{ e.id }}? Its decision (paul) is lifted now, and the entry can be picked.">Lift the hold</button>
   {%- endif %}
   {#- an `act` line is a Do (TD-1066): **Done**, the write-back's check-off, is its one answer, outlined, and its
@@ -1558,12 +1559,13 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
    **Open session** while a member holds it, that session's Focus. **Open** is the Repo page on the id.
    A `decision (paul)` row whose question the person answered (`e.answered`, §4.4 *The card's status*, TD-1316)
    reads *answered — waiting on <asker>*, its foot the answer as the question's row says it and its age, and
-   draws no answers, Reply, Go with it or Start session: **Lift the hold** and **Open** are in its ⋯. A board
+   draws no answers, Reply, Go with it or Start session: **Open** is in its ⋯, and **Lift the hold** where its
+   `lift_item` is set (§4.4 *Where Lift the hold is drawn*, TD-1879). A board
    answer (`ans.kind == 'board'`, TD-1364) is the same row, its foot *you answered "<Decided: words>" on the
    board, <age> ago* then *carried to TD-m* or *<holder> acts on it*; a kept-waiting one reads *waits until
    <date>*. A step handed by **Have a session do it** (`ans.kind == 'handed'`, TD-1660) reads *handed to <seat> ·
    <age>*, its foot the seat and what ends the hold, its ⋯ the entry's own answer — **Done** on an `Owner: paul`
-   entry, else **Lift the hold**. A row a press is landing on (`e.applying`, §4.4 *A press is drawn as it lands*, TD-1508) reads its
+   entry, else **Lift the hold** where `lift_item` is set. A row a press is landing on (`e.applying`, §4.4 *A press is drawn as it lands*, TD-1508) reads its
    mark's words — *answered — applying*, or *applying <act>* — after *with you*, before an answer's hold, and draws
    no answers nor any press until it lands: its foot what was pressed, and **Open** in its ⋯. #}
 {% macro ledger(e, section) -%}
@@ -1631,8 +1633,10 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- elif ans and ans.kind == 'handed' and e.why == 'yours' %}
   {#- the entry's own answer kept in its ⋯ (TD-1660): **Done** on an `Owner: paul` entry -#}
   {%- call qrow.dots(['Done', 'Open']) %}<button role="menuitem" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="done" data-answer="done" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: done — its session archives the entry, or asks you what was done" data-confirm="Done? &ldquo;done&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Done</button><a role="menuitem" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>{% endcall %}
-  {%- elif ans %}
+  {%- elif ans and e.lift_item %}
   {%- call qrow.dots(['Lift the hold', 'Open']) %}<button role="menuitem" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="go ahead" data-answer="go ahead" data-lift="1" title="lifts the hold on {{ e.id }}" data-confirm="Lift the hold on {{ e.id }}? Its decision (paul) is lifted now, and the entry can be picked.">Lift the hold</button><a role="menuitem" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>{% endcall %}
+  {%- elif ans %}
+  {%- call qrow.dots(['Open']) %}<a role="menuitem" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>{% endcall %}
   {%- else %}
   {%- if not whole %}
   <button class="btn sm ghost" data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" title="your words written on {{ e.name }}'s board as your decision on {{ e.id }}, one line landed on origin by shiftlead's own pull request">Reply</button>
@@ -1646,7 +1650,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
       no Start session -#}
   {%- if e.home == 'queue' and e.why == 'yours' %}
   <button class="btn sm ghost" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="done" data-answer="done" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: done — its session archives the entry, or asks you what was done" data-confirm="Done? &ldquo;done&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Done</button>
-  {%- elif e.home == 'queue' %}
+  {%- elif e.home == 'queue' and e.lift_item %}
   <button class="btn sm ghost" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="go ahead" data-answer="go ahead" data-lift="1" title="lifts the hold on {{ e.id }}" data-confirm="Lift the hold on {{ e.id }}? Its decision (paul) is lifted now, and the entry can be picked.">Lift the hold</button>
   {%- endif %}
   {%- endif %}
@@ -1667,15 +1671,16 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {#- on a card its foot above, then its answer bar (§4.5 screen 12 *One answer set*, TD-1842): its answers, Done or Lift
     the hold, **Answer…**, Start session, then **Open**, its row on the Repo page; its ⋯ is gone (Open alone today), a
     *with you in <name>* item's too. A grey item keeps today's controls in the bar (TD-1842 step 4, until TD-1843):
-    *applying* **Open** alone; *answered — waiting on* and *waits until* **Open** and a ⋯ with **Lift the hold**, none
-    on an `Owner: paul` entry, whose Done answers it; *handed to <seat>* **Open** and a ⋯ with the entry's answer -#}
+    *applying* **Open** alone; *answered — waiting on* and *waits until* **Open** and a ⋯ with **Lift the hold** where
+    the row's `lift_item` is set (§4.4 *Where Lift the hold is drawn*, TD-1879: never on an `Owner: paul` entry, whose
+    Done answers it, nor where case (d) holds); *handed to <seat>* **Open** and a ⋯ with the entry's answer -#}
 {%- if whole %}
 {%- set lift %}<button role="menuitem" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="go ahead" data-answer="go ahead" data-lift="1" title="lifts the hold on {{ e.id }}" data-confirm="Lift the hold on {{ e.id }}? Its decision (paul) is lifted now, and the entry can be picked.">Lift the hold</button>{% endset %}
 {%- set right %}<a class="btn sm ghost" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>
   {%- if app %}
   {%- elif ans and ans.kind == 'handed' and e.why == 'yours' %}
   {%- call qrow.dots(['Done']) %}<button role="menuitem" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="done" data-answer="done" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: done — its session archives the entry, or asks you what was done" data-confirm="Done? &ldquo;done&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Done</button>{% endcall %}
-  {%- elif ans and (ans.kind == 'handed' or e.why != 'yours') %}
+  {%- elif ans and e.lift_item %}
   {%- call qrow.dots(['Lift the hold']) %}{{ lift }}{% endcall %}
   {%- endif %}
 {%- endset %}

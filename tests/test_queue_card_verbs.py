@@ -92,7 +92,7 @@ def test_a_ledger_item_answers_done_or_lift_the_hold_in_its_row_and_opens_behind
     assert dots(html) == [] and not re.search(r"\bReply\b", html) and "Go with it" not in html
     assert re.search(r'class="row gap qabarright"><a class="btn sm ghost" href="[^"]*"[^>]*>Open</a></span>', html)
     assert 'data-act="ledger_start"' not in html  # Start session is the card's header's alone (TD-912)
-    decision = card({**row, "why": "decision"}, "decide")
+    decision = card({**row, "why": "decision", "lift_item": True}, "decide")  # the stamp draws it (TD-1879)
     assert ">Lift the hold</button>" in decision[decision.index("qanswers") :]
     # the Inbox's own ledger row keeps Reply, Go with it and its controls inline (§4.5a *Inbox row: ledger entry*)
     page = inbox({**row, "home": "inbox"})
@@ -303,12 +303,13 @@ def test_a_gated_entrys_answers_and_go_with_it_say_the_hold_stays(tmp_path, monk
     led = rs[next(iter(rs))]["ledger"]["entries"][0]
     led.update(owner="paul", answers=["now", "later"], default=1)
     row = next(r for g in ledger_for_you(rs, [], {})["groups"] for r in g["rows"])
-    decision = card({**row, "home": "queue", "why": "decision"}, "decide")
+    decision = card({**row, "home": "queue", "why": "decision", "lift_item": True}, "decide")
     ans = decision[decision.index("qanswers") :]
     assert ans.count('title="the hold stays; Lift the hold lifts it"') == 2 and ">Lift the hold</button>" in ans
     yours = card({**row, "home": "queue"}, "do")
     assert 'title="the hold stays"' in yours and "Lift the hold lifts it" not in yours
-    page = inbox({**row, "home": "inbox", "why": "decision"})  # an Inbox Later row draws no Lift the hold
+    # an Inbox Later row draws no Lift the hold, stamped or not (the template's `home == 'queue'` test)
+    page = inbox({**row, "home": "inbox", "why": "decision", "lift_item": True})
     gwi = re.search(r'<button[^>]*data-go="1"[^>]*>Go with it</button>', page)
     assert gwi and 'title="the hold stays"' in gwi.group(0)
     assert page.count('title="the hold stays"') == 3 and "Lift the hold lifts it" not in page

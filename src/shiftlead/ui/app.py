@@ -5877,6 +5877,11 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     repo = next((str(p) for p in hosts.local_host().repos() if Path(p).expanduser().name == repo), repo)
                 got = await call("ledger_decide", repo=repo, id=ref, lift=True)
                 return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
+            if lift_msg := str(body.get("lift_reply") or "").strip():
+                # a `blocked` outcome's **Lift the hold** (§4.4 *The outcome's lift and reply*, TD-1879): one request,
+                # the entry's lift and then the person's reply to the question `lift_reply` names
+                got = await call("ledger_lift_reply", repo=repo, id=ref, msg=lift_msg)
+                return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
             if road := str(body.get("road") or ""):
                 # **Done…** / **Back to design…** (§4.5 screen 12 *any open row*, TD-905): refused here where
                 # nobody would read the line; the home tells and writes it

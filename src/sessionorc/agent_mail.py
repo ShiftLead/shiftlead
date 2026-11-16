@@ -311,6 +311,7 @@ class MailMixin:
         shots_ref: Any = None,
         form: Any = None,
         lift: Any = None,
+        lift_first: Any = None,
     ) -> dict[str, Any]:
         """`ao msg <to>… "…" [--kind] [--about] [--reply-to]` (design §4.10): put an attributed
         entry in each addressee's inbox. Nothing is typed anywhere. Gated by §4.10's graph, never
@@ -333,6 +334,10 @@ class MailMixin:
         words*, and a form is never a steer's `default` nor an answer marked ` (default)`. `lift` is the labels of an
         `ask`'s answers that lift its `about` entry's `decision (<p>)` on the person's press (§4.10 *An `ask` that
         lifts the person's gate*, TD-1833): such an ask is put to the person directly, never to a team or a repo."""
+        if lift_first is not None:
+            # §4.4 *The outcome's lift and reply* (TD-1879): the home's own input, which `ledger_lift_reply` alone
+            # passes — named here so the dispatcher's skew rule never drops it into a plain reply
+            raise RpcError("lift_first is the outcome's lift and reply's own: press Lift the hold (ledger_lift_reply)")
         sender = PERSON if mail.is_person(caller) else str(caller)
         kind = kind or ("ask" if team or repo else "note")
         key = (sender, str(nonce)) if nonce else None
@@ -497,6 +502,23 @@ class MailMixin:
                 why = str(err) if isinstance(err, RpcError) else f"{type(err).__name__}: {err}"
                 log.exception("lifting reply to %s: the store failed after the lift", replied.id)
                 raise RpcError(f"the hold on {t['id']} is lifted; the answer was not sent: {why}") from None
+        finally:
+            self._board_adding.discard(replied.id)
+
+    async def _lift_first_reply(self, call: dict[str, Any], replied: MailEntry, box: dict[str, Any]) -> dict[str, Any]:
+        """The outcome's lift and reply (§4.4 *The outcome's lift and reply*, TD-1879), on TD-1833's steps: the
+        question's id held throughout (`_being_answered`); (1) every check of the reply, landing nothing; (2) the
+        entry's lift, `_press_lift` handed the asker, whose own claims case (b) leaves out — a refusal refuses the
+        whole request with nothing sent; (3) the checks again on the question as it now stands, and the store, its
+        text chosen by `box`'s `landed` or `gone`, which the caller reads when this raises after the lift."""
+        self._being_answered(replied.id)
+        self._board_adding.add(replied.id)
+        box["held"] = True
+        try:
+            await self._msg(**call, _dry=True)
+            done = await self._press_lift(str(box.get("root") or ""), str(box.get("id") or ""), asker=replied.from_)
+            box["gone" if done.get("gone") else "landed"] = True
+            return await self._msg(**call)
         finally:
             self._board_adding.discard(replied.id)
 
@@ -1312,6 +1334,7 @@ class MailMixin:
         entry: dict[str, Any] | None = None,
         form: Any = None,
         lift: Any = None,
+        lift_first: dict[str, Any] | None = None,
         _dry: bool = False,
         _lifting: dict[str, str] | None = None,
     ) -> dict[str, Any]:
@@ -1323,7 +1346,11 @@ class MailMixin:
         into the envelope it lands, so no copy is ever without them (TD-1660). `lift` is an `ask`'s lifting labels
         (`_lift_send`, §4.10 *An `ask` that lifts the person's gate*, TD-1833); the person's reply picking one runs
         `_lifting_reply`, which calls this twice more: `_dry` runs every check and lands nothing, and `_lifting`
-        (`{lifted}` or `{lifted_before}`) lands the reply the lift's press made."""
+        (`{lifted}` or `{lifted_before}`) lands the reply the lift's press made. `lift_first` (`{root, id}`) is the
+        outcome's lift and reply alone (`ledger_lift_reply`, §4.4 *The outcome's lift and reply*, TD-1879), never a
+        `msg` RPC's: the person's plain reply to a `blocked` outcome's question, the entry's gate lifted first on
+        TD-1833's hold, lift and re-check (`_lift_first_reply`), which fills it with `landed` or `gone`; its text is
+        chosen after the lift and lifts nothing."""
         call = {k: v for k, v in locals().items() if k not in ("self", "_dry", "_lifting")}  # the lift's re-calls
         carried = dict(entry) if entry else None
         records = self._graph()
@@ -1434,8 +1461,9 @@ class MailMixin:
         overrule = ""  # the answerer, when this replies to an *answered for you* FYI (§4.9b)
         if kind == "reply" and not reply_to:
             raise RpcError("a reply names the entry it answers: --reply-to <id> (design §4.10)")
+        held_first = lift_first is not None and bool(lift_first.get("held"))  # the outcome's lift holds the key
         if reply_to:
-            if _lifting is None and not _dry:
+            if _lifting is None and not _dry and not held_first:
                 self._being_answered(reply_to)  # a lifting answer's road holds it (§4.10, TD-1833)
             held = [e for e in me.inbox if e.id == reply_to] if me is not None else self._person_holds(reply_to)
             if not held:
@@ -1480,7 +1508,7 @@ class MailMixin:
                     or not mail.picks_answer(text, replied.answers[answer])
                 ):
                     raise RpcError("that is not one of the suggested answers, word for word (design §4.10)")
-                if _lifting is not None or _dry:  # its asker went away during the lift: never the orphan road
+                if _lifting is not None or _dry or lift_first is not None:  # never the orphan road from a lift
                     raise RpcError(f"{reply_to}'s asker is gone (design §4.10)")
                 return await self._answer_orphan(replied, text, "replied", answer)
             if not named and replied.answered:
@@ -1524,6 +1552,12 @@ class MailMixin:
             if not mail.picks_answer(text.split("\n\n", 1)[0], said):
                 raise RpcError(f"{no}: the text of a picked answer is that answer, word for word (design §4.10)")
             picked = answer
+        # -- the outcome's lift and reply (§4.4 *The outcome's lift and reply*, TD-1879): the person's plain reply to
+        # a `blocked` outcome's question, its entry's gate lifted first on the lifting answer's hold and re-check --
+        if lift_first is not None and not _dry and not held_first:
+            if sender != PERSON or kind != "reply" or replied is None or answer is not None or form is not None:
+                raise RpcError("the outcome's lift and reply is the person's plain reply to its question alone")
+            return await self._lift_first_reply(call, replied, lift_first)
         # -- the person's lifting answer (§4.10 *An `ask` that lifts the person's gate*, TD-1833): an open ask's
         # answer whose label its `lift` names lifts the gate before the reply is stored, the checks run on each side --
         if (
@@ -1841,6 +1875,14 @@ class MailMixin:
             entry.lift = lifts
         if _dry:
             return {}  # every check held; nothing lands (`_lifting_reply`'s first run)
+        if lift_first is not None:
+            # the text chosen after the lift (TD-1879): a plain reply, no `lifted`, no closing line
+            tid = str(lift_first.get("id") or "")
+            entry.text = (
+                f"I lifted the hold on {tid} myself"
+                if lift_first.get("landed")
+                else f"{tid} was no longer held when I pressed Lift the hold"
+            )
         if _lifting is not None:
             entry.lifted = _lifting.get("lifted")
             entry.lifted_before = _lifting.get("lifted_before")

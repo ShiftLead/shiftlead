@@ -172,7 +172,7 @@ def _ledger(tmp_path, monkeypatch, **kw):
 
 def test_a_ledger_decision_draws_its_answers_lift_answer_start_then_open_and_no_dots(tmp_path, monkeypatch):
     row = _ledger(tmp_path, monkeypatch)
-    html = card({**row, "why": "decision"}, "decide")
+    html = card({**row, "why": "decision", "lift_item": True}, "decide")
     assert slots(html) == [
         "Now",
         "Later",
@@ -186,13 +186,17 @@ def test_a_ledger_decision_draws_its_answers_lift_answer_start_then_open_and_no_
     ]
     assert "qdots" not in html, "a ledger item's ⋯ held Open alone: it is gone"
     bare_heading(html)
+    # the stamp alone decides Lift (§4.4 *Where Lift the hold is drawn*, TD-1879): unset, none is drawn
+    unstamped = card({**row, "why": "decision", "lift_item": False}, "decide")
+    assert "Lift the hold" not in slots(unstamped) and "lifts it" not in unstamped
     yours = card({**row, "why": "yours"}, "do")
     assert slots(yours) == ["Now", "Later", "Done", "Not clear", "Answer…", RULE, "Start session", RIGHT, "Open"]
 
 
 def test_a_with_you_item_draws_no_dots(tmp_path, monkeypatch):
     row = _ledger(tmp_path, monkeypatch)
-    html = card({**row, "why": "decision", "with_you": "my-session", "start": {**START, "own": True}}, "with_you")
+    own = {"why": "decision", "lift_item": True, "with_you": "my-session", "start": {**START, "own": True}}
+    html = card({**row, **own}, "with_you")
     assert slots(html) == ["Now", "Later", "Lift the hold", "Not clear", "Answer…", RULE, "Open session", RIGHT, "Open"]
     assert "qdots" not in html
     bare_heading(html)
@@ -205,7 +209,8 @@ def test_an_answered_item_draws_open_and_its_dots_none_on_an_entry_you_own(tmp_p
     assert ">Open<" not in html.split('class="more qdots"')[1]
     bare_heading(html)
     # an `Owner: paul` entry: its Done answers it, so no Lift the hold, and no ⋯ to hold it (TD-1829)
-    owned = _render({**row, "why": "yours"}, mode="card", home="queue")
+    assert row["lift_item"] and "Lift the hold" in html, "a held entry's stamp is set (TD-1879)"
+    owned = _render({**row, "why": "yours", "lift_item": False}, mode="card", home="queue")
     assert slots(owned) == [RIGHT, "Open"] and "Lift the hold" not in owned
 
 
@@ -215,7 +220,7 @@ def test_a_waits_until_item_draws_open_and_its_dots_none_on_an_entry_you_own(tmp
     html = _render(until, mode="card", home="queue")
     assert "waits until" in html and slots(html)[:2] == [RIGHT, "Open"]
     bare_heading(html)
-    assert slots(_render({**until, "why": "yours"}, mode="card", home="queue")) == [RIGHT, "Open"]
+    assert slots(_render({**until, "why": "yours", "lift_item": False}, mode="card", home="queue")) == [RIGHT, "Open"]
 
 
 def test_a_handed_item_and_an_applying_item(tmp_path):

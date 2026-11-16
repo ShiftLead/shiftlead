@@ -34,6 +34,8 @@ from sessionorc.mail import as_person, self_decide_refusal
 # where the repos registry holds the repo and hands this half on (review of PR #1019).
 # **`ledger_decide`** (§4.5a *Inbox row: ledger entry*, TD-565): the entry is read from the home's repo
 # facts, which a node holds none of, and the line lands on the board of a checkout the home's registry names.
+# **`ledger_lift_reply`** (§4.4 *The outcome's lift and reply*, TD-1879): a `blocked` outcome's lift and reply, the
+# lift on a checkout the home's registry names and the reply in the home's mailbox, forwarded as `ledger_decide`.
 # **`set_settings`** (§4.4a *Settings, replicated*, TD-147): `settings.yml` is the home's, and a node
 # holds the replica the home last sent, which the next frame overwrites. **`set_reach`** (§4.7 `ao connect`,
 # TD-648) writes the same file's `reach:` key, and the route is the home's.
@@ -71,6 +73,7 @@ HOME_EDITS = frozenset(
         "entry_add",
         "board_reply_hand",
         "ledger_decide",
+        "ledger_lift_reply",
         "clear_work",
         "work_start",
         "clear_mark",
