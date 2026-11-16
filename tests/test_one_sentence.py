@@ -3,7 +3,7 @@ test of a first paragraph; an answer read as its label and what it leads to; a l
 
 from __future__ import annotations
 
-from sessionorc import ledger, mail
+from sessionorc import ledger, ledgerboard, mail
 from shiftlead import cli
 from shiftlead.ui import render
 
@@ -14,13 +14,29 @@ def test_one_sentence_is_the_first_paragraph_matched_whole():
     assert render.one_sentence("Which\n  account   signs in?")  # folded first
     assert render.one_sentence("Run `a.b. c` before the merge?")  # a stop inside a code span ends nothing
     assert not render.one_sentence("Merge it. Then tag it.")
-    assert not render.one_sentence("which account")  # no stop at all
     assert not render.one_sentence("")
     long = " ".join(["word"] * render.FIRST_PARA_WORDS) + " more?"
     assert not render.one_sentence(long) and render.one_sentence(" ".join(["word"] * 59) + " more?")
-    # the false warnings the design names: an id or an abbreviation followed by a space
-    assert not render.one_sentence("TD-909. Which card first?")
-    assert not render.one_sentence("Keep it, e.g. this one?")
+    assert not render.one_sentence("TD-909. Which card first?")  # a stop then a capital ends a sentence
+
+
+# TD-1846 Fix step 6: texts the writers' check (`ledgerboard.sentence_problems`) accepts are one sentence on the card
+WRITERS_ACCEPT = [
+    "Keep it, e.g. this one?",  # an abbreviation's stop
+    "The fix lands, i.e. tomorrow.",
+    'It ships Friday.")',  # trailing closers
+    "Merge it (default).)",
+    "Ship it after the merge",  # a statement ending bare
+    "which account",
+    "Run `a.b. c` before the merge?",  # a code span holding a stop
+]
+
+
+def test_what_the_writers_check_accepts_is_one_sentence_on_the_card():
+    for text in WRITERS_ACCEPT:
+        assert not ledgerboard.sentence_problems(text, question=False, max_words=render.FIRST_PARA_WORDS), text
+        assert render.one_sentence(text), text
+        assert render.one_sentence(f"{text}\n\nThe context, in plain words. Two sentences."), text
 
 
 def test_first_para_words_lives_in_render_and_ao_msg_reads_it():

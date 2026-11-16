@@ -157,7 +157,7 @@ async def test_withdrawing_a_passed_up_question_closes_the_seats_copy_and_its_re
         w, tl = await mk("w", team="t", unattended=True), await mk("tl", team="t", unattended=True)
         async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
             q = (await wc.call("msg", to=tl, text="rename the flag?", kind="ask"))["entry"]["id"]
-            await tc.call("pass_up", id=q, recommend="keep it")
+            await tc.call("pass_up", question="Should it go ahead?", id=q, recommend="keep it")
             with pytest.raises(AgentError, match=f"{q} is {w}'s question"):
                 await tc.call("msg_withdraw", id=q)  # the passer is not the asker
             await wc.call("msg_withdraw", id=q)

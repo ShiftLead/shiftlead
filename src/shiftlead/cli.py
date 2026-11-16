@@ -4367,6 +4367,8 @@ def cmd_msg(args: argparse.Namespace) -> int:
         return _pass_up(args, words)
     if args.recommend:
         return fail(args, "--recommend goes with --pass-up <id>: it is your line on a question you pass up", 2)
+    if args.question:
+        return fail(args, "--question goes with --pass-up <id>: the asker's question restated for the person", 2)
     answer: int | None = None
     if args.pick is not None:
         if not args.reply_to:
@@ -4599,8 +4601,10 @@ def _sent(args: argparse.Namespace) -> int:
 
 def _subj(e: dict[str, Any]) -> str:
     """An entry's subject on its head line, after the kind (design §4.10 *A subject on every entry*,
-    §4.7 `ao inbox`, TD-561), or nothing for one sent without."""
-    return f' · "{e["subject"]}"' if e.get("subject") else ""
+    §4.7 `ao inbox`, TD-561), or nothing for one sent without. A question passed up with the passer's question is
+    headed by it (`mail.heading`, §4.9b, TD-1846)."""
+    subject = mailmod.heading(e) if mailmod.passed_question(e) else e.get("subject")
+    return f' · "{subject}"' if subject else ""
 
 
 def _thread(args: argparse.Namespace) -> int:
@@ -4635,16 +4639,21 @@ def _thread(args: argparse.Namespace) -> int:
 
 
 def _pass_up(args: argparse.Namespace, words: list[str]) -> int:
-    """`ao msg --pass-up <id> --recommend "<line>" [--answer …]` (design §4.9b): a question you
-    were asked goes to the person as the asker's, with your recommendation first among its
-    answers. It carries no text of its own — the asker's words are the question."""
+    """`ao msg --pass-up <id> --recommend "<line>" --question "<text>" [--answer …]` (design §4.9b): a question
+    you were asked goes to the person as the asker's, with your recommendation first among its answers and your
+    `--question` — the asker's question restated for the person — leading it (TD-1846). It carries no text of its
+    own: the asker's words stay under the question, folded."""
     if words:
         return fail(args, "--pass-up sends the asker's own question: leave the text out, say yours with --recommend", 2)
     if extra := [f for f, v in (("--reply-to", args.reply_to), ("--kind", args.kind), ("--about", args.about)) if v]:
         return fail(args, f"--pass-up keeps the asker's question as it was: {', '.join(extra)} does not apply", 2)
     if not args.recommend:
         return fail(args, '--pass-up needs your recommendation: --recommend "<one line>"', 2)
-    got = call_sync("pass_up", id=args.pass_up, recommend=args.recommend, answers=args.answer or None)
+    got = call_sync(
+        "pass_up", id=args.pass_up, recommend=args.recommend, answers=args.answer or None, question=args.question
+    )
+    for warn in got.get("warnings") or []:  # rule 4 of §4.10 *Text a person reads is checked at its writer*
+        print(warn, file=sys.stderr)
 
     def prose() -> None:
         print(f"{got['msg']} passed up → person, recommending: {got['recommend']['text']}")
@@ -4674,6 +4683,7 @@ _WITHDRAW_ALONE = (
     ("--for", "for_"),
     ("--pass-up", "pass_up"),
     ("--recommend", "recommend"),
+    ("--question", "question"),
     ("--thread", "thread"),
     ("--source", "source"),
 )
@@ -4762,8 +4772,12 @@ def cmd_inbox(args: argparse.Namespace) -> int:
                 print(f"  {CARRIES_ENTRY}")
             if st := standing.get(e["id"]):
                 print(f"  {st['text']}")
+            if asked := mailmod.passed_question(e):  # the passer's question first, the asker's under it (§4.9b)
+                for line in asked.splitlines():
+                    print(f"  {line}")
+                print(f"  from {e.get('from_name') or e['from']}:")
             for line in str(e["text"]).splitlines() or [""]:
-                print(f"  {line}")
+                print(f"  {'  ' if asked else ''}{line}")
             if isinstance(e.get("unanswered"), dict):  # a question taken up: why it was not answered (§4.9b)
                 print(f"  {_unanswered_line(e['unanswered'])}")
             if routed := mailmod.routed_line(e.get("routed")):  # moved from a seat that could not answer (§4.9b)
@@ -6241,7 +6255,16 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="ID",
         help="pass a question you were asked to the person, as the asker's, with --recommend (once)",
     )
-    p.add_argument("--recommend", metavar="LINE", help="with --pass-up: your one-line recommendation")
+    p.add_argument(
+        "--recommend",
+        metavar="LINE",
+        help='with --pass-up: your recommendation, its first answer: "<label> — <who does what>"',
+    )
+    p.add_argument(
+        "--question",
+        metavar="TEXT",
+        help="with --pass-up: the asker's question restated for the person, one plain sentence, then its context",
+    )
     # design §4.10 *Withdrawing a question* (TD-1382): a sender takes back its own question to the person
     p.add_argument(
         "--withdraw",

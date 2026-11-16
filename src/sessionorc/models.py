@@ -519,8 +519,9 @@ class MailEntry:
     draft: str | None = None
     # Passed up (design §4.9b *Passing up keeps the thread and the asker*, TD-075 step 3): when the
     # addressee of an open `ask` or `steer` handed it to the person — once — with its own
-    # recommendation. `passed_up` is the time, written on every copy; `recommend` is `{by, text}`,
-    # the passer's one line, drawn as text and labelled as the passer's, never the asker's. The
+    # recommendation. `passed_up` is the time, written on every copy; `recommend` is `{by, text, question}`,
+    # the passer's one line, drawn as text and labelled as the passer's, never the asker's, and its
+    # question restated for the person (`question`, TD-1846; absent on a pass made before it). The
     # person-inbox copy carries the passer's suggested answers as its `answers`, the recommendation
     # first; the asker's and the passer's copies keep their own.
     passed_up: str | None = None

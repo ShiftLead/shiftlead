@@ -25,6 +25,7 @@ import re
 from html import escape
 from urllib.parse import urlsplit
 
+from sessionorc import ledgerboard
 from sessionorc.mail import _FENCE, SENTENCE, paragraph_break  # noqa: F401 — re-exported (§4.10, TD-1846)
 
 # §4.5a *Inbox row: details*: the backstop for text nobody shaped — no blank line and longer than this.
@@ -43,7 +44,6 @@ _INLINE = re.compile(
 )
 # the end of a sentence, for the backstop: a stop and then white space or the end
 _SENTENCE_END = re.compile(r"[.!?][)\"'”’]*(?=\s|$)")
-_CODE_SPAN = re.compile(r"(`+).+?\1")
 
 
 def _netloc(url: str) -> str:
@@ -199,19 +199,14 @@ def fold(text: str) -> tuple[str, str]:
 
 
 def one_sentence(text: str) -> bool:
-    """design §4.10 *An item leads with one sentence* (TD-913): whether the text's first paragraph
-    (`paragraph_break`, else the whole text), folded, is one sentence — within `FIRST_PARA_WORDS` and
-    matched whole by the subject rule's sentence pattern (`sessionorc.mail.SENTENCE`), its inline code
-    spans skipped first so a stop inside one ends nothing. An id or an abbreviation followed by a space
-    (*TD-909. Which…*, *e.g. this*) fails it: a false warning, and a warning is all it is."""
+    """design §4.10 *An item leads with one sentence* (TD-913, TD-1846): whether the text's first paragraph
+    (`paragraph_break`, else the whole text) is one sentence within `FIRST_PARA_WORDS`, read by the vendored
+    `ledgerboard.sentence_problems` — the writers' own reading, so a first paragraph the home's check accepts (an
+    abbreviation's stop, trailing closers, a statement ending bare, a code span holding a stop) is one sentence on
+    the card too."""
     split = paragraph_break(text)
     first = split[0] if split is not None else (text or "")
-    flat = " ".join(first.split())
-    if not flat or len(flat.split()) > FIRST_PARA_WORDS:
-        return False
-    bare = " ".join(_CODE_SPAN.sub("code", flat).split())
-    m = SENTENCE.match(bare)
-    return m is not None and m.group(1) == bare
+    return not ledgerboard.sentence_problems(first, question=False, max_words=FIRST_PARA_WORDS)
 
 
 # §4.5a *Inbox board row: text* (TD-279): how far into a board line its bold head may start — past

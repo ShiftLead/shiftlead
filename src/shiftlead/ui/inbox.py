@@ -93,11 +93,9 @@ def row_subject(e: Mapping[str, Any]) -> str:
     builder set; else mail's — the envelope's, or, on an entry written before the field (or by a
     build that did not set it), derived from its text as `ao msg` derives one; a trail row its *how*. A question
     passed up to the person with the passer's own question (`recommend.question`, §4.9b, TD-1847) is headed by
-    that question's first paragraph, folded and clipped as a subject is, not the asker's subject."""
-    rec = e.get("recommend")
-    if not e.get("row") and e.get("passed_up") and isinstance(rec, Mapping) and str(rec.get("question") or "").strip():
-        lead = re.split(r"\n[ \t]*\n", str(rec["question"]).strip(), maxsplit=1)[0]
-        return mail_mod.clip_subject(" ".join(lead.split()))
+    that question's first paragraph, folded and clipped as a subject is, not the asker's subject (`mail.heading`)."""
+    if not e.get("row") and mail_mod.passed_question(e):
+        return mail_mod.heading(e)
     if e.get("subject"):
         return str(e["subject"])
     if e.get("row") == "trail":
