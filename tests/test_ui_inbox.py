@@ -3703,7 +3703,8 @@ def test_every_inbox_control_has_its_verb_under_way():
         "      const res = await act(id, action2 || action, body);" in js
     )
     assert (
-        'waiting = AO.toast(r4 ? `${r4[0]} — writing on the board…` : action === "board" ? '
+        'waiting = AO.toast(lifting ? "lifting the hold…" : r4 ? `${r4[0]} — writing on the board…` : '
+        'action === "board" ? '
         "`${what} — landing on the board…` : `${what}…`, true, null, true);" in js
     )
     assert "const text = kept[msg] || AO.pressErrs[msg];" in js
