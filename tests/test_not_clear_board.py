@@ -53,7 +53,7 @@ def test_a_gated_line_so_decided_is_written_on_the_board_alone_and_its_gate_stan
     assert workorders.is_work_order(got["key"]) and got["key"] == ref
 
 
-# -- the person route: each road, then the count ------------------------------------------------------------------------
+# -- the person route: each road, then the count -----------------------------------------------------------------------
 
 
 def _route(tmp_path, monkeypatch, reply):
