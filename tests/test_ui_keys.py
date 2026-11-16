@@ -223,8 +223,9 @@ def test_the_digits_yield_to_a_row_with_answer_buttons_and_g_is_go_with_it():
     assert e["inbox_g"] == "Go with it"
     assert [k["keys"] for k in got["keys"] if k.get("nth")] == [["1", "2", "3", "4"]]
     row = (UI / "templates" / "inbox_row.html").read_text()
-    # the `answers` macro, the board row's and the ledger row's (TD-565), no fourth shape
-    assert row.count('class="btn sm answer"') == 3
+    # the `answers` macro, the board row's and the ledger row's (TD-565), and a could-not-be-done item's answers drawn
+    # again as plain replies on the card (TD-1843), no fifth shape
+    assert row.count('class="btn sm answer"') == 4
     assert "AO.keyAnswers(ringed(page))" in js and "if (a && !a.disabled) a.click()" in js
 
 
