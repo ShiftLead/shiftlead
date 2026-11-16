@@ -274,3 +274,41 @@ def test_the_dots_keyboard_model_opens_moves_and_closes_back_on_the_mark(tmp_pat
         "off": False,
         "off_open": False,
     }
+
+
+def test_a_row_the_reading_marks_lift_here_draws_lift_the_hold_first_in_its_dots():
+    """TD-1831 slice 3, §4.4 *Where Lift the hold is drawn*: the row's (and the header's) ⋯ draws **Lift the hold**
+    first where the reading's `lift_here` is set — `lift` sent alone, the tree row's press taking the `qt` path —
+    and none where it is not, nor on an archived row."""
+    q = templates.get_template("queue_row.html").module
+    r = {"id": "TD-5", "title": "t", "repo": "s", "page": "for-you", "state": "answered — waiting on a pick",
+         "needs": "decision", "lift_here": True}  # fmt: skip
+    html = str(q.menu(r))
+    assert dots(html) == ["Lift the hold, Done…, Open"] and 'title="Lift the hold · Done… · Open"' in html
+    lift = re.search(r'<button role="menuitem"[^>]*data-lift="1"[^>]*>Lift the hold</button>', html)
+    assert lift and 'data-repo="s"' in lift.group(0) and 'data-ref="TD-5"' in lift.group(0)
+    assert 'title="lifts the hold on TD-5"' in lift.group(0) and "Its decision (paul) is lifted now" in lift.group(0)
+    assert html.index("Lift the hold</button>") < html.index('data-road="done"')
+    for off in ({**r, "lift_here": False}, {**r, "archived": True}, {k: v for k, v in r.items() if k != "lift_here"}):
+        assert "Lift the hold" not in str(q.menu(off)), off
+    # the press: a `data-lift` button in a `.qrow` or `.qhead` takes the tree row's path, whatever the road
+    js = (UI / "static" / "app.js").read_text(encoding="utf-8")
+    assert 'const qt = !row && (road || lifting) ? b.closest(".qrow[data-qid]") || b.closest(".qhead[data-qid]")' in js
+
+
+def test_a_gated_entrys_answers_and_go_with_it_say_the_hold_stays(tmp_path, monkeypatch):
+    """TD-1831 slice 3, §4.5a *Inbox row: ledger entry*: an answer to a gated entry lifts nothing, so its buttons and
+    Go with it say *the hold stays*; where the row draws Lift the hold (a Queue decision item), that it lifts it."""
+    rs, _ = _fold_world(tmp_path, monkeypatch)
+    led = rs[next(iter(rs))]["ledger"]["entries"][0]
+    led.update(owner="paul", answers=["now", "later"], default=1)
+    row = next(r for g in ledger_for_you(rs, [], {})["groups"] for r in g["rows"])
+    decision = card({**row, "home": "queue", "why": "decision"}, "decide")
+    ans = decision[decision.index("qanswers") :]
+    assert ans.count('title="the hold stays; Lift the hold lifts it"') == 2 and ">Lift the hold</button>" in ans
+    yours = card({**row, "home": "queue"}, "do")
+    assert 'title="the hold stays"' in yours and "Lift the hold lifts it" not in yours
+    page = inbox({**row, "home": "inbox", "why": "decision"})  # an Inbox Later row draws no Lift the hold
+    gwi = re.search(r'<button[^>]*data-go="1"[^>]*>Go with it</button>', page)
+    assert gwi and 'title="the hold stays"' in gwi.group(0)
+    assert page.count('title="the hold stays"') == 3 and "Lift the hold lifts it" not in page

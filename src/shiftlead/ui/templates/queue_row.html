@@ -36,16 +36,20 @@
    puts focus back on the mark (`AO.qDots`). Its menu is the page's `details.more`, placed by the same script. #}
 {% macro dots(names) %}<details class="more qdots"><summary class="qdotsbtn" role="button" aria-haspopup="menu" title="{{ names | join(' · ') }}" aria-label="the team's controls: {{ names | join(', ') }}">⋯</summary><div class="menu" role="menu" title="{{ help_title('card-dots') }}">{{ caller() }}</div></details>{% endmacro %}
 
-{# a Queue row's ⋯, and the card header's on its top entry (§4.5 screen 12 *Three verbs: ⋯*): the row's controls
+{# a Queue row's ⋯, and the card header's on its top entry (§4.5 screen 12 *Three verbs: ⋯*): **Lift the hold** where
+   the row's `lift_here` is set (§4.4 *Where Lift the hold is drawn*, TD-1831), the row's controls
    (`controls`, the Inbox's ledger row draws them inline) and **Open**, the Repo page on the id. An archived row has its Open alone. #}
 {% macro menu(r) %}{% if r and r.id %}
   {%- set names = [] %}
   {%- if not r.archived %}
+    {#- **Lift the hold** first, where the reading's `lift_here` is set (§4.4 *Where Lift the hold is drawn*, TD-1831) #}
+    {%- if r.lift_here %}{% set _ = names.append('Lift the hold') %}{% endif %}
     {%- if r.page in ('pickable', 'live-check') or (r.page == 'blocked' and r.blocked_open) %}{% set _ = names.append('Back to design…') %}{% endif %}
     {%- if r.needs != 'owner' and not r.builds_open %}{% set _ = names.append('Done…') %}{% endif %}
   {%- endif %}
   {%- set _ = names.append('Open') %}
   {%- call dots(names) %}
+    {%- if r.lift_here and not r.archived %}<button role="menuitem" type="button" data-act="ledger" data-id="person" data-repo="{{ r.repo }}" data-ref="{{ r.id }}" data-words="go ahead" data-answer="go ahead" data-lift="1" title="lifts the hold on {{ r.id }}" data-confirm="Lift the hold on {{ r.id }}? Its decision (paul) is lifted now, and the entry can be picked.">Lift the hold</button>{% endif %}
     {{- controls(r, in_menu=True) }}
     <a href="/repo/{{ r.repo }}#{{ r.id }}" role="menuitem" title="{{ r.id }} on the {{ r.repo }} Repo page">Open</a>
   {%- endcall %}
