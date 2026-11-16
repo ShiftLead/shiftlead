@@ -1164,15 +1164,14 @@ def test_msg_to_the_person_warns_on_an_unshaped_message_and_sends_it(subprocess_
     assert "the person reads" not in capsys.readouterr().err
     assert cli.main(["msg", other, long]) == 0
     assert "the person reads" not in capsys.readouterr().err
-    # TD-916 (§4.10 *An item leads with one sentence*): a steer to the person is held to one sentence, and sent
+    # TD-1846 (§4.10 *Text a person reads is checked at its writer*): a steer or an ask to the person is the
+    # home's to check, so `ao msg` prints no shape line of its own for it (this child runs the check off)
     assert cli.main(["msg", "person", "Merge it. Then tag it.", "--kind", "steer", "--default", "merge"]) == 0
     got = capsys.readouterr()
-    assert "steer → person" in got.out and "the person reads one sentence first" in got.err
-    assert cli.main(["msg", "person", "Merge #9 today?\n\nIt ships.", "--kind", "steer", "--default", "merge"]) == 0
-    assert "the person reads" not in capsys.readouterr().err
+    assert "steer → person" in got.out and "the person reads" not in got.err
     # another text than the open steer's, which is on no `about` (§4.10 *One open copy of a question*)
     assert cli.main(["msg", "person", "Merge it. Then ship it.", "--kind", "ask"]) == 0
-    assert "the person reads one sentence first" in capsys.readouterr().err
+    assert "the person reads" not in capsys.readouterr().err
     assert cli.main(["msg", "person", "Merged it. Then tagged it.", "--kind", "note"]) == 0  # a note: TD-127's rule
     assert "the person reads" not in capsys.readouterr().err
     for x in (sid, other):
