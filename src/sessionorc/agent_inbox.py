@@ -1052,8 +1052,7 @@ class InboxMixin:
         entry at a time, as *Put on the board*."""
         if not e.open:
             raise RpcError(f"{e.id} is already closed ({e.closed_reason})")
-        if e.id in self._board_adding:
-            raise RpcError(f"{e.id} is already being answered")
+        self._being_answered(e.id)
         self._board_adding.add(e.id)
         try:
             return await self._answer_orphan_one(e, answer, reason, picked)
@@ -1598,8 +1597,7 @@ class InboxMixin:
             raise RpcError(f"Not clear sends a question back to its writer: {msg} is a {e.kind} (design §4.10)")
         if not e.open:
             raise RpcError(f"{msg} is already closed ({e.closed_reason})")
-        if msg in self._board_adding:  # an orphan's answer is being written (`_answer_orphan`)
-            raise RpcError(f"{msg} is already being answered")
+        self._being_answered(msg)  # an orphan's answer, or a lifting one, is being written (TD-1833)
         records = self._graph()
 
         def name_of(sid: str) -> str:

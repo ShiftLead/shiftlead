@@ -4415,6 +4415,8 @@ def cmd_msg(args: argparse.Namespace) -> int:
         # of the one a `--pick` reply chose. The home cleans, bounds and re-checks both.
         "answers": args.answer or None,
         "answer": answer,
+        # design §4.10 *An `ask` that lifts the person's gate* (TD-1833): the answers whose press lifts --about's hold
+        "lift": args.lift or None,
         # design §4.10 *Outcomes* (TD-079): what became of an answer the person gave, and a
         # follow-up on the same thread when more direction is needed. The home verifies both ids.
         "outcome": args.outcome,
@@ -4677,6 +4679,7 @@ _WITHDRAW_ALONE = (
     ("--subject", "subject"),
     ("--verdict", "verdict"),
     ("--answer", "answer"),
+    ("--lift", "lift"),
     ("--pick", "pick"),
     ("--shot", "shot"),
     ("--outcome", "outcome"),
@@ -6227,6 +6230,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         metavar="LINE",
         help="a question: one likely answer, repeatable (up to four, 80 characters each)",
+    )
+    # design §4.10 *An `ask` that lifts the person's gate* (TD-1829, built by TD-1833)
+    p.add_argument(
+        "--lift",
+        action="append",
+        metavar="LABEL",
+        help="an ask to the person: one --answer's label whose press lifts the decision (<person>) gate on "
+        "--about's entry (given, never a claim's), repeatable",
     )
     p.add_argument(
         "--pick",

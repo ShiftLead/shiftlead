@@ -855,20 +855,30 @@ def lift_case_d(
     entries: Mapping[str, Mapping[str, Any]],
     repo_key: str,
 ) -> bool:
-    """Whether case (d) holds for `member` (an open entry with its `repo`; §4.4 *Lift the hold is a lift on the
-    press*, TD-1831): an open, undecided `decide` item on the entry's own repo's board (`boards[member["repo"]]`,
-    each with its `People:` names as `people`) covers it as ledgerboard's `covers()` reads one — its `Context:`
-    naming exactly one entry ref and the gate `decision (<p>)` of the entry's person, no qualifier after the gate,
-    the ref the entry (a bare id, or a `<repo>#TD-n` whose repo is `repo_key`), or its `Part of` parent with the
-    entry among the item's `Parts:`; the board's `People:` listing the person — and lists no other gated entry: no
-    `Context:` entry (the parent, where it covers through `Part of`) nor `Parts:` id, a bare id of that repo, open
-    in `entries`, not the member, and carrying `decision (<p>)`. The press refuses a lift there, so the row draws
-    none."""
+    """Whether case (d) holds for `member`: `lift_case_d_item` names an item."""
+    return lift_case_d_item(member, boards, entries, repo_key) is not None
+
+
+def lift_case_d_item(
+    member: Mapping[str, Any],
+    boards: Mapping[str, Iterable[Mapping[str, Any]]],
+    entries: Mapping[str, Mapping[str, Any]],
+    repo_key: str,
+) -> str | None:
+    """The `board:<key>` of the item for which case (d) holds for `member` (an open entry with its `repo`; §4.4
+    *Lift the hold is a lift on the press*, TD-1831): an open, undecided `decide` item on the entry's own repo's board
+    (`boards[member["repo"]]`, each with its `People:` names as `people`) covers it as ledgerboard's `covers()` reads
+    one — its `Context:` naming exactly one entry ref and the gate `decision (<p>)` of the entry's person, no qualifier
+    after the gate, the ref the entry (a bare id, or a `<repo>#TD-n` whose repo is `repo_key`), or its `Part of` parent
+    with the entry among the item's `Parts:`; the board's `People:` listing the person — and lists no other gated entry:
+    no `Context:` entry (the parent, where it covers through `Part of`) nor `Parts:` id, a bare id of that repo, open in
+    `entries`, not the member, and carrying `decision (<p>)`. The press refuses a lift there, so the row draws none;
+    §4.10's `ask --lift` is refused there too, naming the item (TD-1833). None where no item asks."""
     repo = str(member.get("repo") or "")
     try:
         num = lb._num(str(member.get("id") or ""))
     except (ValueError, IndexError, TypeError, AttributeError):
-        return False
+        return None
     me = qid(repo, str(member.get("id") or ""))
     par = lb.parse_part_of(member.get("part_of_raw"))[0] if member.get("part_of_raw") else member.get("part_of")
     parent = lb._num(str(par)) if par and lb._is_id(str(par)) else None
@@ -902,8 +912,47 @@ def lift_case_d(
             else:
                 continue
             if not any(other_gated(r) for r in listed):
-                return True
-    return False
+                k = str(it.get("key") or "")
+                return k if k.startswith("board:") else f"board:{k}"
+    return None
+
+
+_LIFT_REF_RE = re.compile(r"(?:(?P<repo>[^#\s]+)#)?(?P<id>TD-\d+)", re.IGNORECASE)
+
+
+def lift_ask_target(repos: Mapping[str, Mapping[str, Any]], ref: str, repo: str | None) -> dict[str, Any] | None:
+    """The entry an `ask --lift`'s `about` names (§4.10 *An `ask` that lifts the person's gate*, TD-1833), read from
+    the home's repo readings (`repos`, by root) as the press reads it: `{root, name, id, entry, asked}` — `root` the
+    reading's key, `entry` the open entry (with its `repo`) or None where the reading holds none open, `asked` the
+    `board:<key>` case (d) names (`lift_case_d_item`) or None. A bare `TD-n` is `repo`'s (the asker's record's repo,
+    as its envelope stamps it), a `<repo>#TD-n` the reading `<repo>` names. None where `ref` is no entry reference or
+    names no reading the home has."""
+    m = _LIFT_REF_RE.fullmatch(str(ref or "").strip())
+    if m is None:
+        return None
+    rs = _Repos(repos)
+    want = m.group("repo") or repo
+    if not want:
+        return None
+    name = want if want in rs.by_name else rs.resolve(want)
+    if name is None:
+        return None
+    root = next(
+        (k for k, r in repos.items() if isinstance(r, Mapping) and str(r.get("name") or Path(str(k)).name) == name),
+        None,
+    )
+    if root is None:
+        return None
+    tid = m.group("id").upper()
+    open_: dict[str, dict[str, Any]] = {}
+    for n, r in rs.by_name.items():
+        for e in r["ledger"]["entries"]:
+            if isinstance(e, Mapping) and e.get("id"):
+                open_.setdefault(qid(n, e["id"]), {**e, "repo": n})
+    e = open_.get(qid(name, tid))
+    boards = {n: list((r.get("boards") or {}).get("boards") or ()) for n, r in rs.by_name.items()}
+    asked = lift_case_d_item(e, boards, open_, rs.origins.get(name) or name.lower()) if e is not None else None
+    return {"root": root, "name": name, "id": tid, "entry": e, "asked": asked}
 
 
 def lift_here(

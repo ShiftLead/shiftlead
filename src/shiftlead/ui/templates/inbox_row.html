@@ -196,6 +196,12 @@
    `ask`, which keeps every control its kind has (TD-373). #}
 {#- A question **passed up** (§4.9b, TD-075 step 3) carries the passer's answers, not the asker's
     — the recommendation first — so the group names the passer: whose words they are is the point. -#}
+{#- an `ask --lift`'s lifting answer (§4.10 *An `ask` that lifts the person's gate*, §4.5a *Inbox row: suggested
+    answers*, TD-1833): drawn as **Lift the hold** is, its title and its confirm; none on an orphaned ask -#}
+{% macro lift_attrs(e, a) -%}
+{%- set lh = lifts_hold(e, a) %}{% if lh %} data-lift="{{ lh }}" title="lifts the hold on {{ lh }}" data-confirm="Lift the hold on {{ lh }}? Its decision (paul) is lifted now, and the entry can be picked."{% endif %}
+{%- endmacro %}
+
 {% macro answers(e) -%}
 {%- set opts = suggested_answers(e) %}
 {%- set by = e.passer_name or e.from_name or e['from'] %}
@@ -212,7 +218,7 @@
   {%- for a in opts %}
   {%- set head = hs[loop.index0] if loop.index0 < hs | length else '' %}
   {%- set form = (pair and loop.index0 == 1) or head %}
-  <button class="btn sm answer" {% if form %}data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="{{ head or 'Not right' }}: " data-form="{{ loop.index0 }}" title="{{ 'say what is off' if pair else 'fill it in' }}: your words go back to {{ by }} as a reply"{% else %}data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ loop.index0 }}"{% endif %}>{% if pair %}<span class="alabel">{{ 'Not right…' if form else 'Works' }}</span>{% elif head %}<span class="alabel">{{ head }}…</span>{% else %}<span class="alabel">&ldquo;{{ cap_first(a) if mode == 'card' else a }}&rdquo;</span>{% if e.default and (a == e.default or (e.kind == 'steer' and e.recommended == loop.index0)) %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
+  <button class="btn sm answer" {% if form %}data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="{{ head or 'Not right' }}: " data-form="{{ loop.index0 }}" title="{{ 'say what is off' if pair else 'fill it in' }}: your words go back to {{ by }} as a reply"{% else %}data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ loop.index0 }}"{{ lift_attrs(e, a) }}{% endif %}>{% if pair %}<span class="alabel">{{ 'Not right…' if form else 'Works' }}</span>{% elif head %}<span class="alabel">{{ head }}…</span>{% else %}<span class="alabel">&ldquo;{{ cap_first(a) if mode == 'card' else a }}&rdquo;</span>{% if e.default and (a == e.default or (e.kind == 'steer' and e.recommended == loop.index0)) %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
   {%- endfor %}
 </div>
 {%- endif %}
@@ -252,7 +258,7 @@ the hold stays{% if e.home == 'queue' and e.why != 'yours' %}; Lift the hold lif
   {%- set form = (pair and i == 1) or head %}{% set begun = (head or 'Not right') ~ ': ' %}
   <span class="qans"><button class="btn sm answer{% if i == rec and not pair and not head %} rec{% endif %}" type="button"
   {%- if how == 'mail' and form %} data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ by }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="{{ begun }}" data-form="{{ i }}" title="{{ 'say what is off' if pair else 'fill it in' }}: your words go back to {{ by }} as a reply"
-  {%- elif how == 'mail' %} data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ i }}"
+  {%- elif how == 'mail' %} data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ i }}"{{ lift_attrs(e, a) }}
   {%- elif how == 'board' and form %} {{ board_form(e, i, begun, where) }}
   {%- elif how == 'board' %} data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}"{% if e.line is not none %} data-line="{{ e.line }}"{% endif %} title="{{ a }}"
   {%- elif form %} data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" data-begun="{{ begun }}" data-form="{{ i }}" title="fill it in: your words are written on {{ e.name }}'s board as your decision on {{ e.id }}"
