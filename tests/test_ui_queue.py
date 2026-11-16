@@ -1162,7 +1162,7 @@ def test_a_card_dots_done_or_back_to_design_draws_its_state_on_the_press():
     assert ".qstate.s-pressed { color: var(--fg); }" in css  # a state word, not dimmed
     # a refusal: the cell as it was, the ledger item's error line kept by the page; a re-read redraws one still out
     assert "const t = AO.qFind(qkey); if (t) AO.unDrawQState(t);" in js
-    assert "AO.pressErrs[qled] = words; delete AO.inflight[qled];" in js
+    assert "AO.pressErrs[qled] = AO.pressErr(words, false, atSig); delete AO.inflight[qled];" in js
     assert 'if (f && f.kind === "qrow") AO.drawQState(t, f.text, true);' in js
 
 
