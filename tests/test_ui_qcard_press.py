@@ -226,8 +226,8 @@ def test_the_click_handler_and_the_queue_are_wired():
     pressed = JS[JS.index("const pressed = (text) => {") :]
     assert pressed.index('if (r4 && key !== "board_reply") AO.qcardOff(row, msgOf);') < pressed.index("row.remove()")
     assert "AO.qcardOff(r, qled); AO.handRing(r); r.remove();" in JS  # the ⋯ road, per removed row
-    # the two refusal branches alone give the press's one back
-    assert JS.count("AO.qcardBack(") == 2
+    # the two refusal branches give the press's one back, and a lift whose reply failed after it (TD-1843 step 5)
+    assert JS.count("AO.qcardBack(") == 3
     assert (
         "AO.pressErrs[qled] = AO.pressErr(words, AO.maySent(e), atSig); delete AO.inflight[qled];\n"
         "        AO.qcardBack(qled);" in JS
