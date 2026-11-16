@@ -1695,7 +1695,10 @@
         body = { until: when.trim() };
       }
       // design §4.5a **Message**, Focus Inbox **Reply** and delete (§4.10): mail, never a send
-      if (action === "message" || action === "reply") {
+      // an answer drawn again as a plain reply (§4.5 screen 12 *A press is never left stranded*, TD-1843): its words
+      // sent as they are, with no box
+      if (action === "reply" && at.says) body = { reply_to: at.msg, text: at.says };
+      else if (action === "message" || action === "reply") {
         const m = await AO.compose({
           to: at.name || id, reply: action === "reply", quote: at.quote, line: at.line || "",
           // the addressee's session for Attach (TD-531): a Message's own card, a Reply's sender — none on a seat

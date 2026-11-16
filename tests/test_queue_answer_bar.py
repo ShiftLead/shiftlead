@@ -102,23 +102,26 @@ def test_a_look_draws_works_and_not_right_in_slot_one():
 
 def _blocked():
     return entry(
-        "m-5", "ask", text="Merge it?", answers=["yes", "no"], closed_reason="replied", answer_given="yes",
+        "m-5", "ask", text="Merge it?", answers=["yes", "no"], closed_reason="replied", answer=0, answer_given="yes",
         outcome={"state": "blocked", "text": "the PR is red"}, start=START,
     )  # fmt: skip
 
 
 def test_a_blocked_outcome_draws_answer_start_dismiss_open_and_no_dots():
     html = card(_blocked(), "do")
-    assert slots(html) == ["Answer…", RULE, "Start session", RIGHT, "Dismiss", "Open"]
+    # its answers again as plain replies, the taken one ticked (TD-1843)
+    assert slots(html) == ["✓ Yes", "No", "Answer…", RULE, "Start session", RIGHT, "Dismiss", "Open"]
     assert "qdots" not in html
     bare_heading(html)
 
 
 def test_an_exited_askers_owed_question_draws_dismiss_too():
-    e = entry("m-6", "ask", text="Merge it?", answers=["yes", "no"], closed_reason="replied", answer_given="yes")
+    e = entry(
+        "m-6", "ask", text="Merge it?", answers=["yes", "no"], closed_reason="replied", answer=0, answer_given="yes"
+    )
     e.update(owes=True, asker_gone_quiet=True, asker_state="exited", from_open=None)
     html = card(e, "do")
-    assert slots(html) == ["Answer…", RIGHT, "Dismiss"]
+    assert slots(html) == ["✓ Yes", "No", "Answer…", RIGHT, "Dismiss"]
     assert "exited without reporting" in html
     bare_heading(html)
 

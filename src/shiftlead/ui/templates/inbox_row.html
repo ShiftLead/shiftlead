@@ -267,6 +267,21 @@ the hold stays{% if e.home == 'queue' and e.lift_item %}; Lift the hold lifts it
   {%- endif %}><span class="alabel">{% if pair %}{{ 'Not right…' if form else 'Works' }}{% elif head %}{{ head }}…{% else %}{{ cap_first(a) }}{% endif %}</span></button>
   {%- set c = cs[i] if i < cs | length else '' %}{% if c is string and c.strip() %}<span class="st alead">{{ c }}</span>{% endif %}</span>
   {%- endif %}{% endfor %}
+  {#- §4.5 screen 12 *A press is never left stranded*, case *could not be done* (TD-1832, built by TD-1843): a `blocked`
+      outcome's, or an exited asker's owed question's, answers drawn again as plain replies on its thread — the one
+      taken ticked and not pressable, each other one its words sent as a reply, none of them a lift -#}
+  {%- if how == 'owed' and mode == 'card' %}
+  {%- set qs = e.get('answers') %}{% set qs = qs if qs is sequence and qs is not string else [] %}
+  {%- for a in qs %}{% if a is string and a.strip() %}
+  {%- set ai = e.get('answer') %}
+  {#- the taken one: the pressed answer's index, else a steer let go with its default -#}
+  {%- if loop.index0 == ai or (ai is none and e.get('closed_reason') == 'go_with_it' and a == e.get('default')) %}
+  <span class="qans"><button class="btn sm answer taken" type="button" disabled aria-pressed="true" title="your answer"><span class="alabel">✓ {{ cap_first(a) }}</span></button></span>
+  {%- else %}
+  <span class="qans"><button class="btn sm answer" type="button" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ by }}" data-says="{{ a }}" title="sends &ldquo;{{ a }}&rdquo; to {{ by }} as a reply on this question"><span class="alabel">{{ cap_first(a) }}</span></button></span>
+  {%- endif %}
+  {%- endif %}{% endfor %}
+  {%- endif %}
   {%- if gwi %}<button class="btn sm ghost" type="button" data-act="gowithit" data-id="person" data-msg="{{ e.id }}" data-confirm="{{ gwi }}">Go with it</button>{% endif %}
   {%- if how == 'ledger' and e.home == 'queue' and e.why == 'yours' %}
   <button class="btn sm ghost" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="done" data-answer="done" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: done — its session archives the entry, or asks you what was done" data-confirm="Done? &ldquo;done&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Done</button>
@@ -473,11 +488,12 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
    work that stopped on something only a person can move (§4.10). A person's **Reply** here is an
    ordinary reply and starts no new debt; one begins only if the session asks again. #}
 {% macro owed(e, section) -%}
+{%- set whole = card_whole(mode, e) %}
 {{ head(e) }}
 {{ body(e) }}
+{%- if whole %}{{ owed_press(e) }}{% else %}
 {{ answer_given(e) }}
 {{ outcome_line(e) }}
-{%- set whole = card_whole(mode, e) %}
 <div class="row gap wrap mfoot">
   {%- if e.asker_gone_quiet %}
   <span class="st">its asker {{ e.asker_state }} without reporting what came of your answer — only you, or its manager, can find out</span>
@@ -491,7 +507,9 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {{ dismiss_btn(e, e.from_name or e['from']) }}
   {%- endif %}
 </div>
-{#- on a card (TD-1842): **Answer…** where the Inbox's Reply is, Start session, then **Dismiss** and **Open**, no ⋯ -#}
+{%- endif %}
+{#- on a card (TD-1842): the question's answers again as plain replies (TD-1843), **Answer…** where the Inbox's Reply
+    is, Start session, then **Dismiss** and **Open**, no ⋯ -#}
 {%- if whole %}{% set right %}{{ dismiss_btn(e, e.from_name or e['from']) }}{{ open_focus(e.from_open, e.from_name) }}{% endset %}{{ bar(answer_row(e, 'owed'), right) }}{% endif %}
 {%- endmacro %}
 
@@ -1582,6 +1600,20 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {%- endset %}
 {%- set s = s | trim %}
 <div class="qpress qp-idle" role="status">{{ cap_first(s) }}{% if not s.endswith(('.', '?', '!')) %}.{% endif %}</div>
+{%- endmacro %}
+
+{#- *Could not be done* (`--needs`, TD-1843): a `blocked` outcome — *You answered "<answer>". <seat> could not do it:
+    <text>.* — or an exited asker's owed question — *… <asker> exited without reporting what came of it.* — then what
+    the bar offers. *You answered.* for a typed reply, *You let it go with its default.* for a steer's default -#}
+{% macro owed_press(e) -%}
+{%- set who = e.from_name or e['from'] %}
+{%- set o = e.outcome or {} %}
+{%- set s -%}
+{%- if e.answer_given %}You answered &ldquo;{{ e.answer_given }}&rdquo;.{% elif e.closed_reason == 'go_with_it' %}You let it go with its default.{% else %}You answered.{% endif %}
+{%- if o.state == 'blocked' %} {{ who }} could not do it: {{ o.text or 'blocked' }}{% else %} {{ who }} {{ e.asker_state or 'exited' }} without reporting what came of it{% endif %}
+{%- endset %}
+{%- set s = s | trim %}
+<div class="qpress qp-needs" role="status">{{ s }}{% if not s.endswith(('.', '?', '!')) %}.{% endif %} Reply, start a session, or dismiss it.</div>
 {%- endmacro %}
 
 {% macro ledger(e, section) -%}

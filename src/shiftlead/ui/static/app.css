@@ -1287,6 +1287,8 @@ a.qstate:hover, a.qstatus:hover { text-decoration: none; color: var(--link); }
 /* the three verbs (§4.5 screen 12 *Three verbs*, TD-914): the Answer row's buttons, the recommended one outlined
    with no caption, what each leads to beside it; the ⋯, one mark always drawn, its menu the page's `details.more` */
 .qanswers .qans { display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; }
+/* the answer a could-not-be-done item was given, ticked and not pressable (TD-1843) */
+.qanswers .answer.taken:disabled { opacity: 1; cursor: default; border-style: dashed; }
 .qanswers .btn.answer { max-width: 30ch; }
 .qanswers .btn.answer .alabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qanswers .btn.answer.rec { border: 2px solid var(--link); }
