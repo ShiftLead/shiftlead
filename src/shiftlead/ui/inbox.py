@@ -3202,7 +3202,12 @@ def ledger_for_you(
     every open entry of `every` by `<repo>#TD-n`, each `{repo, part_of, part_of_raw, blocked_by}`: what a board
     line covers is read through it (`ui.queue.covered`, TD-1380). `handed` is the `inbox` read's `handed` list: a
     row its open hand-off's `refs` name, not *with you*, carries `answered` of kind `handed`, *handed to <seat>*
-    (`queue.handed_hold`, §4.5 screen 12 *Three verbs: Have a session do it*, TD-1660), when no answer holds it."""
+    (`queue.handed_hold`, §4.5 screen 12 *Three verbs: Have a session do it*, TD-1660), when no answer holds it.
+
+    `lift_item` is every row's one stamp for **Lift the hold** on the entry's own item and rows (§4.4 *Where Lift the
+    hold is drawn*, TD-1879): the entry carries `decision (<p>)`, `<p>` the home's person, is not theirs to do, no
+    press is landing on it, and case (d) does not hold (`queue.lift_case_d`); a holder clears nothing. A mail
+    answer's `answered` then carries `lift: {root, id}`, which a `blocked` outcome on its question draws."""
     from .repo import PRIORITY_RANK  # repo imports this module: read at call time
 
     now = now or datetime.now(UTC)
@@ -3250,6 +3255,9 @@ def ledger_for_you(
         opened = {str(e.get("id")) for e in every}
         here = Path(str(r.get("root") or root)).resolve()
         mine = [s for s in live if Path(str(s["repo"])).resolve() == here]
+        # the repo's key a board line's `<repo>#TD-n` is read against, as the press reads it (TD-1831)
+        here_root = str(r.get("root") or root)
+        repo_key = lb.origin_path(str(r.get("remote") or "")) or Path(here_root).name.lower()
         tally: dict[str, int] = {}
         for s in mine:
             if s.get("team"):
@@ -3295,6 +3303,16 @@ def ledger_for_you(
             if got_q is None and handed and not any(not s.get("unattended") for s in holders):
                 # a step handed by Have a session do it, its ask open, and the entry not *with you* (TD-1660)
                 got_q = queue_mod.handed_hold({**e, "repo": name}, handed, boards, linked, now)
+            applying = dict(e["applying"]) if isinstance(e.get("applying"), Mapping) else None
+            # **Lift the hold** on the entry's own item and rows (§4.4 *Where Lift the hold is drawn*, TD-1829, built
+            # by TD-1879): it carries the person's gate, is not theirs to do, no press is landing on it, and no open
+            # undecided line asks its hold (case (d)); a session holding it clears nothing (*No holder test*)
+            lift_item = bool(
+                not owner
+                and applying is None
+                and ledger_mod.decided_by(dict(e), ledger_mod.PERSON_OWNER)
+                and not queue_mod.lift_case_d({**e, "repo": name}, boards, opens, repo_key)
+            )
             rows.append(
                 {
                     "row": "ledger",
@@ -3331,9 +3349,14 @@ def ledger_for_you(
                     "parent": (queue_mod.parent_qid({**e, "repo": name}) or "")
                     if ledger_mod.decided_by(dict(e), queue_mod.PERSON)
                     else "",
-                    "answered": _held_answered(got_q, questions, names, now) if got_q else None,
+                    "answered": _held_answered(
+                        got_q, questions, names, now, lift={"root": here_root, "id": e["id"]} if lift_item else None
+                    )
+                    if got_q
+                    else None,
+                    "lift_item": lift_item,
                     # a press landing on it (§4.4 *A press is drawn as it lands*, TD-1508): no need of the person
-                    "applying": dict(e["applying"]) if isinstance(e.get("applying"), Mapping) else None,
+                    "applying": applying,
                     "applying_words": queue_mod.applying_words(e["applying"])
                     if isinstance(e.get("applying"), Mapping)
                     else "",
@@ -3399,13 +3422,20 @@ def _board_age(day: Any, now: datetime) -> str:
 
 
 def _held_answered(
-    got: Mapping[str, Any], questions: list[Mapping[str, Any]], names: Mapping[str, str], now: datetime
+    got: Mapping[str, Any],
+    questions: list[Mapping[str, Any]],
+    names: Mapping[str, str],
+    now: datetime,
+    lift: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """A ledger row's `answered` (§4.5 screen 12 *Three wants*, TD-1316) from `answered_hold`'s: its asker's name,
     the question's kind, `words` — what the question's row says of the answer (`_owing`'s `answer_given`, else its
     `answer_how`) — `age`, the answer's, and `outcome`, its `done` outcome where one is sent. A board answer's
     (`kind: board`, TD-1368) carries `board`, the line's `{key, open, to}`, and `words` *you answered "<its
-    `Decided:` words>" on the board*, its age the `Decided:` date's; a kept-waiting one `until`, its date."""
+    `Decided:` words>" on the board*, its age the `Decided:` date's; a kept-waiting one `until`, its date. A mail
+    answer's carries `lift`, `{root, id}`, where the row's `lift_item` is set (the caller passes it then): a `blocked`
+    outcome on its question draws the entry's **Lift the hold**, whose press is `ledger_lift_reply` (§4.4 *Where Lift
+    the hold is drawn*, TD-1879); the board and handed answers carry none."""
     if got.get("kind") == "handed":
         # a step handed by Have a session do it (§4.5 screen 12, TD-1660): its seat and the first send's age
         asker = str(got.get("asker") or "")
@@ -3449,6 +3479,7 @@ def _held_answered(
         "words": f"you answered \u201c{given}\u201d" if given else str(q.get("answer_how") or "you answered"),
         "age": _age(got.get("closed_at"), now),
         "outcome": {"text": str(outcome.get("text") or "")} if outcome else None,
+        "lift": {"root": str(lift.get("root") or ""), "id": str(lift.get("id") or "")} if lift else None,
     }
 
 

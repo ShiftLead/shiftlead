@@ -233,6 +233,9 @@ class InboxMixin:
         if not ids:
             raise RpcError("dismiss names the entries to dismiss, by id (design §4.10)")
         held = {e.id: e for e in self.person_inbox}
+        for i in ids:  # a `blocked` outcome's lift and reply may be being written on it (§4.4, TD-1879)
+            if i in held and _blocked_unreplied(held[i]):
+                self._being_answered(i)
         if still_open := [i for i in ids if i in held and held[i].open]:
             raise RpcError(
                 f"{', '.join(still_open)} is still open: a question is answered, declined or snoozed, never "
@@ -1303,6 +1306,63 @@ class InboxMixin:
         finally:
             self._board_adding.discard(key)
         return {"repo": root, "id": id, "lifted": True}
+
+    async def rpc_ledger_lift_reply(self, repo: str, id: str, msg: str, caller: Any = None) -> dict[str, Any]:
+        """A `blocked` outcome's **Lift the hold** (§4.4 *The outcome's lift and reply*, TD-1829, built by TD-1879):
+        one request, the entry's lift and then the person's plain reply to the question `msg`, through `_msg`'s
+        `lift_first`. A person's own act. Refused unless `msg`'s outcome is `blocked` and unreplied, and unless
+        `{repo, id}` is the entry the home itself links to `msg` as `queue._mail_hold` does (*reload the Queue*).
+        Returns the reply's result with `{repo, id, lifted}` or `{gone}`; a reply that fails after a written lift
+        returns `{repo, id, lifted: true, failed: <the bare reason>}`, never a refusal, since the hold is lifted."""
+        agent_common.person_only(caller, "lift the hold and reply", "§4.4", self._graph())
+        mid = str(msg or "").strip()
+        tid = str(id or "").strip().upper()
+        root = next(
+            (r for r in self._repos if r == repo or str(Path(r).resolve()) == str(Path(str(repo or "")).resolve())),
+            None,
+        )
+        q = next((e for e in self.person_inbox if e.id == mid), None)
+        if q is None or q.handed or not _blocked_unreplied(q):
+            raise RpcError(f"{mid} has no blocked outcome waiting on your reply: reload the Queue")
+        if root is None or self._lift_reply_target(q) != (root, tid):
+            raise RpcError(f"{tid} is not the entry {mid} is about as the home reads it now: reload the Queue")
+        box: dict[str, Any] = {"root": root, "id": tid}
+        try:
+            got = await self._msg(PERSON, "Lift the hold", None, "reply", None, mid, None, None, lift_first=box)
+        except Exception as err:  # noqa: BLE001 — a written lift stands, being the person's press: said, never lost
+            if not box.get("landed"):
+                raise
+            why = str(err) if isinstance(err, RpcError) else f"{type(err).__name__}: {err}"
+            log.exception("lift and reply on %s: the reply failed after the lift", mid)
+            return {"repo": root, "id": tid, "msg": mid, "lifted": True, "failed": why}
+        landed = bool(box.get("landed"))
+        return {**got, "repo": root, "id": tid, "msg": mid, "lifted": landed, "gone": not landed}
+
+    def _lift_reply_target(self, q: Any) -> tuple[str, str] | None:
+        """The `(root, TD-n)` a question's `blocked` outcome stamps for its Lift, as the Inbox's reading links it
+        (`queue._mail_hold`: `first_ref` of its `about`, else its words, a bare one its asker's repo's, through
+        `open_refs` over every open entry the home reads), or None where it names no open entry."""
+        readings = {str(r.get("name") or Path(k).name): (k, r) for k, r in self._repos.items() if isinstance(r, dict)}
+        opens = {
+            queue_mod.qid(n, str(e.get("id"))): {**e, "repo": n}
+            for n, (_k, r) in readings.items()
+            for e in (r.get("ledger") or {}).get("entries") or ()
+            if isinstance(e, dict) and e.get("id")
+        }
+        origins = {
+            n: o for n, (_k, r) in readings.items() if (o := ledgerboard.origin_path(str(r.get("remote") or "")))
+        }
+        linked = queue_mod.open_refs(opens, origins)
+        own = str(q.repo or "").strip() or queue_mod.asker_repos(
+            [q], self._graph().values(), queue_mod.repo_roots(self._repos), self.host
+        ).get(q.id)
+        ref = queue_mod.first_ref(q.about, f"{q.subject or ''} {q.text or ''}", own)
+        hit = linked.get(ref) if ref else None
+        if not hit:
+            return None
+        name, _, tid = hit.rpartition("#")
+        got = readings.get(name)
+        return (got[0], tid.upper()) if got else None
 
     def _decided_covers(self) -> set[str]:
         """Every `<repo>#TD-n` an open decided line on any board the home reads covers — names it, names the entry

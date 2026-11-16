@@ -62,7 +62,7 @@ def test_every_name_in_the_list_is_an_rpc_that_refuses_a_session_before_reading_
     never constructed: a check that touched `self` before refusing would fail here too."""
     rpcs = _rpcs()
     # inbox_not_clear (TD-1853); witness_press (TD-1386); clear_promote gone (TD-1559); board_find (TD-1660)
-    assert len(mail.PERSON_ONLY) == 38
+    assert len(mail.PERSON_ONLY) == 39
     assert set(rpcs) >= mail.PERSON_ONLY, sorted(mail.PERSON_ONLY - set(rpcs))
     bare = HostAgent.__new__(HostAgent)
     bare.sessions = {}  # the one thing the check reads: a caller this host does not hold is a session
