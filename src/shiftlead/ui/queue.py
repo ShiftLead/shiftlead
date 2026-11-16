@@ -605,6 +605,21 @@ def stuck_line(e: Mapping[str, Any]) -> bool:
     )
 
 
+def answered_case(e: Mapping[str, Any]) -> str:
+    """Which of the four grey kinds sharing the `answered` want a ledger row is (§4.5 screen 12 *A press is never left
+    stranded*, TD-1843): `applying` (a press landing, TD-1508), `until` (a kept-waiting board answer), `handed` (a step
+    handed by Have a session do it, TD-1660), else `waiting` — *answered — waiting on <asker>*, the only one that draws
+    **Answer…** and Start session and counts for the header where it draws its button; '' for a row none of them."""
+    if e.get("applying"):
+        return "applying"
+    a = e.get("answered")
+    if not isinstance(a, Mapping) or not a:
+        return ""
+    if a.get("until"):
+        return "until"
+    return "handed" if a.get("kind") == "handed" else "waiting"
+
+
 def item_ref(e: Mapping[str, Any]) -> str:
     """An attached item's id as **Start session** names it (§4.5 screen 12 *Started from an item*, TD-1246): a board
     line `board:<key>`, a mail item its `m-…`, a ledger row `<repo>#TD-n`, a red PR `<repo>#<n>`; '' for any other
@@ -625,22 +640,23 @@ def items_n(wants: Mapping[str, Any]) -> int:
     """The items on a card that count for the header's **Start session** (§4.5 screen 12 *Started from the header
     on a card with items*, TD-1338, built by TD-1340): every Decide and Do item but a red PR or a fork's PR, one
     whose entry another session holds included, and every item *with you in <name>*; an item *answered — waiting
-    on <asker>* is outside them, in `wants['answered']`. With one the item's button is the header's; with two or
-    more the header draws its own beside them, and its press walks them all. A stopped holder's
-    state row and a stuck row are outside them (TD-1468, TD-1497)."""
+    on <asker>*, in `wants['answered']`, only where it draws its Start session (`starts`, no other session holding
+    its entry, TD-1843) — an *applying*, *waits until* or *handed to <seat>* item never. With one the item's button is
+    the header's; with two or more the header draws its own beside them, and its press walks them all. A stopped
+    holder's state row and a stuck row are outside them (TD-1468, TD-1497)."""
     n = sum(
         1
         for w in WANTS
         for m in wants.get(w) or ()
         if not (m.get("red") or m.get("fork") or m.get("holder") or m.get("stuck"))
     )
-    return n + len(wants.get("with_you") or ())
+    return n + len(wants.get("with_you") or ()) + sum(1 for m in wants.get("answered") or () if m.get("starts"))
 
 
 def walk_mine(mine: Iterable[str], wants: Mapping[str, Any]) -> list[str]:
-    """*waits on me* on the header's press that walks the card (TD-1340): the same ids but an entry *answered —
-    waiting on <asker>*, which waits on its asker, not the person."""
-    gone = {str(m.get("item") or "") for m in wants.get("answered") or ()}
+    """*waits on me* on the header's press that walks the card (TD-1340): the same ids but an entry whose item is
+    in `wants['answered']` and draws no Start session (TD-1843), which waits on its asker, not the person."""
+    gone = {str(m.get("item") or "") for m in wants.get("answered") or () if not m.get("starts")}
     return [m for m in mine if m not in gone]
 
 
@@ -759,9 +775,11 @@ def attach(
             return  # only the entry's own question goes: *with you* and *answered* are no question to draw over
         # starts no session (TD-1246, TD-1292, TD-1468, TD-1497)
         pr_row = e.get("row") in ("red_pr", "fork_pr", "stuck", *HOLDER_ROWS) or stuck_line(e)
+        # an item *answered — waiting on <asker>* draws one too, where no other session holds its entry (TD-1843)
+        waiting = want == "answered" and answered_case(e) == "waiting"
         go = (
             start(card, ref, str(e.get("on_row") or ""))
-            if start is not None and want in (*WANTS, "with_you") and not pr_row
+            if start is not None and (want in (*WANTS, "with_you") or waiting) and not pr_row
             else {}
         )
         cards.setdefault(card, {}).setdefault(sec, []).append(
@@ -784,6 +802,8 @@ def attach(
                 # …and a decided line moved there while stuck, drawn as the stuck row (TD-1497 slice 2)
                 **({"stuck": True} if e.get("row") == "stuck" or stuck_line(e) else {}),
                 "running": sec == "steering",
+                # an *answered — waiting on <asker>* item that draws its Start session counts (TD-1843)
+                **({"starts": True} if waiting and go else {}),
                 "on_row": e["on_row"],
                 # the design PR it links, *· design #n* (TD-1531), and its synopsis (TD-1536)
                 **({"design_pr": e["design_pr"]} if e.get("design_pr") else {}),
