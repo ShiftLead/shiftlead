@@ -274,7 +274,8 @@ the hold stays{% if e.home == 'queue' and e.lift_item %}; Lift the hold lifts it
   {%- set qs = e.get('answers') %}{% set qs = qs if qs is sequence and qs is not string else [] %}
   {%- for a in qs %}{% if a is string and a.strip() %}
   {%- set ai = e.get('answer') %}
-  {%- if loop.index0 == ai or (ai is none and a == e.get('answer_given')) %}
+  {#- the taken one: the pressed answer's index, else a steer let go with its default -#}
+  {%- if loop.index0 == ai or (ai is none and e.get('closed_reason') == 'go_with_it' and a == e.get('default')) %}
   <span class="qans"><button class="btn sm answer taken" type="button" disabled aria-pressed="true" title="your answer"><span class="alabel">✓ {{ cap_first(a) }}</span></button></span>
   {%- else %}
   <span class="qans"><button class="btn sm answer" type="button" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ by }}" data-says="{{ a }}" title="sends &ldquo;{{ a }}&rdquo; to {{ by }} as a reply on this question"><span class="alabel">{{ cap_first(a) }}</span></button></span>

@@ -44,6 +44,8 @@ def test_a_typed_reply_and_a_steers_default_have_their_own_first_sentence():
     assert press_line(typed).startswith("You answered. w1 could not do it: no.")
     steer = _owed(kind="steer", closed_reason="go_with_it", default="yes", outcome={"state": "blocked", "text": "no"})
     assert press_line(card(steer, "do")).startswith("You let it go with its default. w1 could not do it: no.")
+    # its default is the answer taken: ticked, and never sent back as a reply
+    assert slots(card(steer, "do"))[:2] == ["✓ Yes", "No"]
 
 
 def test_an_exited_asker_is_named_with_its_state():
