@@ -1556,6 +1556,15 @@ class MailMixin:
         now = datetime.now(UTC)
         if counts and (mail.THREAD_BOUND is not None or mail.PAIR_BOUND is not None):
             self._check_bounds(sender, named, root, now)
+        # -- text a person reads is checked at its writer (§4.10, TD-1846): an `ask` or `steer` the sender named to
+        # the person, never one `_route_around` turned to the person (a seat's text, drawn folded); after the
+        # sender, addressee and bounds checks and before the owed outcomes, the depths and one open copy, so one
+        # reply lists every problem and a refused send counts nothing --
+        if mail.PERSON_TEXT_CHECK and PERSON in named and kind in ("ask", "steer") and not routed and sender != PERSON:
+            problems = mail.person_text_problems(text, kind=kind, answers=picks, default=line or None, look=bool(looks))
+            if refused := [p.line for p in problems if p.refuse]:
+                raise RpcError("\n".join(refused))
+            warnings_ahead.extend(p.line for p in problems if not p.refuse)
         advice = None
         if PERSON in named:
             if kind in ("ask", "steer") and me is not None and mail.OUTCOMES_OWED_MAX is not None:

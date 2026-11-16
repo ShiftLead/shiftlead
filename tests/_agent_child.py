@@ -17,7 +17,7 @@ from datetime import timedelta
 
 from _stubs import AgentShellStub, HookFedStub
 
-from sessionorc import adapters, gatesweep, hosts
+from sessionorc import adapters, gatesweep, hosts, mail
 from sessionorc import agent_common as agent_mod
 from sessionorc.agent import HostAgent, serve_until_signal
 from sessionorc.tmux import Tmux
@@ -29,6 +29,8 @@ async def _run(socket_name: str) -> None:
     hosts.AGENT_CADENCE_ROSTER = os.path.join(os.environ["SHIFTLEAD_HOME"], "no-roster", "repos.txt")
     # never the real gate sweep (TD-1376), which opens PRs on the forge: conftest's `_no_real_gate_sweep`
     gatesweep.eligible = lambda root: (False, "tests run no gate sweep")
+    # never the person-text check (TD-1846) but in a test marked for it: conftest's `_person_text_off_unless_marked`
+    mail.PERSON_TEXT_CHECK = False
     adapters.load_all()
     adapters.register(HookFedStub())  # test-only, hook-fed: see _stubs.py
     adapters.register(AgentShellStub())  # test-only, a shell that counts as an agent

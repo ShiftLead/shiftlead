@@ -74,6 +74,69 @@ SUBJECT_CHARS = 80
 # end. Public, since `shiftlead.ui.render.one_sentence` matches a first paragraph by it (§4.10 *An item leads
 # with one sentence*, TD-913) and `sessionorc` never imports `shiftlead`.
 SENTENCE = re.compile(r"(.+?[.?!])(?:\s|$)")
+# Text a person reads is checked at its writer (§4.10, TD-1846): the actors a person-text check reads beside the
+# plain-English ones ledgerboard holds (`ACTOR_WORDS`) — the role nouns and two phrases, which ledgerboard's
+# contract leaves to the caller (its TD-111, plan D1) and design §4.10 lists. ShiftLead's copy until agent-cadence
+# and ShiftLead read one data file (agent-cadence TD-268); a test holds it to the design's list.
+PERSON_ACTORS = (
+    "session",
+    "seat",
+    "techlead",
+    "grinder",
+    "designer",
+    "manager",
+    "director",
+    "reviewer",
+    "builder",
+    "lead",
+    "worker",
+    "agent",
+    "the home",
+    "the host agent",
+)
+# whether the home runs the check at all: always in a home; the suite's fixtures turn it off for tests not
+# marked `person_text`, as they turn off identity and the gate sweep (tests/conftest.py)
+PERSON_TEXT_CHECK = True
+# a fenced block's opening or closing line: a blank line inside one is no paragraph break
+_FENCE = re.compile(r"^[ \t]*```")
+
+
+def paragraph_break(text: str) -> tuple[str, str] | None:
+    """`(first paragraph, the rest)` split at the first blank line — one inside a code block does
+    not count, and `\r\n` is a line break — or None when the text has no such line. The one
+    definition of *a blank line* that the home's person-text check, `fold` and `ao msg`'s shape warning
+    share (design §4.10); here, not in `shiftlead.ui.render`, since `sessionorc` never imports `shiftlead`."""
+    t = (text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    lines = t.split("\n")
+    fenced = False
+    for i, line in enumerate(lines):
+        if _FENCE.match(line):
+            fenced = not fenced
+        elif not fenced and not line.strip():
+            return "\n".join(lines[:i]).rstrip(), "\n".join(lines[i + 1 :]).strip()
+    return None
+
+
+def person_text_problems(
+    text: str, *, kind: str, answers: Iterable[str] = (), default: str | None = None, look: bool = False
+) -> list[ledgerboard.PersonTextProblem]:
+    """Rules 1, 2 and 4 of §4.10 *Text a person reads is checked at its writer* (TD-1846) on an `ask` or a `steer`
+    to the person: its first paragraph (`paragraph_break`, else the whole text) the sentence — a question for an
+    `ask` — the rest the context, its cleaned answers and a steer's `default`. A look (`shots`) reads no rule 2:
+    its row reads its answers word for word. In rule order; a problem with `refuse` true refuses the send."""
+    split = paragraph_break(text)
+    sentence, context = split if split is not None else (str(text or "").strip(), None)
+    return ledgerboard.person_text_problems(
+        sentence,
+        () if look else list(answers),
+        context or None,
+        question=kind == "ask",
+        people=(),
+        actors=PERSON_ACTORS,
+        default=None if look else default,
+    )
+
+
 # Suggested answers (§4.10 *Suggested answers*, 2026-09-20, TD-070): how many an `ask` or a `steer`
 # may carry, and how long each may be. They are a field of their own and do not
 # count toward `TEXT_CAP`. Each is cleaned **more strictly than displayed text is** (the tail's

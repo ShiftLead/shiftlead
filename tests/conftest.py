@@ -88,6 +88,17 @@ def _no_real_gate_sweep(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _person_text_off_unless_marked(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Design §4.10 *Text a person reads is checked at its writer* (TD-1846): the home refuses an `ask` or `steer`
+    to the person that fails the check. A test of something else sends the person whatever text it needs to drive
+    its road, so the check runs only in a test marked `person_text`, which tests the check itself."""
+    from sessionorc import mail
+
+    if request.node.get_closest_marker("person_text") is None:
+        monkeypatch.setattr(mail, "PERSON_TEXT_CHECK", False)
+
+
+@pytest.fixture(autouse=True)
 def _no_extras_unless_asked(monkeypatch: pytest.MonkeyPatch) -> None:
     """A team with no `max` key is on td-max's default ceilings (§4.9 *Scaling with the work*, TD-1545), so
     every Start would write two held extras per line and seat beside the sessions a test counts. A test
