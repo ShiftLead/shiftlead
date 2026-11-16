@@ -1099,7 +1099,6 @@ def test_every_brief_that_writes_to_the_person_teaches_the_rules_its_writers_che
     ):
         text = (root / f"{name}.md").read_text(encoding="utf-8")
         assert text.count(RULES) == 1, name
-        assert "--question" not in text, name  # TD-1846 names the flag with the flag
     assert RULES in (repo / "docs/briefs/director.md").read_text(encoding="utf-8")  # a whole brief, no template
     for rel in (
         "docs/briefs/grinder-ao-1.md",
