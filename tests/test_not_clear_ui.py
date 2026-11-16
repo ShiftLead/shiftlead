@@ -35,15 +35,36 @@ def _mail(kind: str = "ask", **kw) -> dict:
 
 
 def _board(kind: str = "decide", **kw) -> dict:
-    e = {"row": "board", "id": "b1", "kind": kind, "text": "**Pick** one?", "board": "/r/docs/user_attention/",
-         "key": "abcd1234", "line": 3, "repo": "s", "repo_name": "s", "name": "s", "answers": ["a", "b"]}
+    e = {
+        "row": "board",
+        "id": "b1",
+        "kind": kind,
+        "text": "**Pick** one?",
+        "board": "/r/docs/user_attention/",
+        "key": "abcd1234",
+        "line": 3,
+        "repo": "s",
+        "repo_name": "s",
+        "name": "s",
+        "answers": ["a", "b"],
+    }
     e.update(kw)
     return e
 
 
 def _ledger(**kw) -> dict:
-    e = {"row": "ledger", "id": "TD-7", "title": "a thing", "root": "/r", "name": "s", "url": "/repo/s#TD-7",
-         "pri": "Medium", "home": "queue", "why": "decision", "answers": ["Yes", "No"]}
+    e = {
+        "row": "ledger",
+        "id": "TD-7",
+        "title": "a thing",
+        "root": "/r",
+        "name": "s",
+        "url": "/repo/s#TD-7",
+        "pri": "Medium",
+        "home": "queue",
+        "why": "decision",
+        "answers": ["Yes", "No"],
+    }
     e.update(kw)
     return e
 
@@ -62,6 +83,7 @@ def test_it_is_drawn_on_the_named_kinds_alone():
     assert not not_clear_on(_mail("note"), "mail") and not not_clear_on(_mail("reply"), "mail")
     assert not not_clear_on(_mail(shots=["a.png"]), "mail"), "a look"
     assert not not_clear_on(_mail(routed={"name": "techlead-ao-1", "why": "limited"}), "mail"), "routed around"
+    assert not_clear_on(_mail(routed={"name": "t1", "why": "limited"}, passed_up=True), "mail"), "then passed up"
     assert not not_clear_on(_mail(**{"from": "system"}), "mail") and not not_clear_on(_mail(closed_reason="x"), "mail")
     assert not_clear_on(_board("decide"), "board") and not_clear_on(_board("act"), "board")
     for no in (_board("watch"), _board("look"), _board(pair=True), _board(decided={"text": "a", "date": "d"})):

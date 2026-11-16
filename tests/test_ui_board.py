@@ -1166,7 +1166,7 @@ def test_a_board_items_answers_are_buttons_in_the_order_written_and_go_with_it_i
     gwi = foot[: foot.index(">Go with it<")].rsplit("<button", 1)[1]
     assert 'data-board-act="decide"' in gwi and 'data-answer="hold"' in gwi
     assert "Go with it? &ldquo;hold&rdquo; is written on samscrape" in gwi
-    assert html.count('data-board-act="decide"') == 4
+    assert html.count('data-board-act="decide"') == 5  # with Not clear (TD-1853)
 
 
 def look_item(default="", kind="watch", answers=("Works", "Not right: <what>")):
@@ -1665,7 +1665,9 @@ def test_a_board_rows_detail_block_is_drawn_in_its_fold_nested_and_as_text(tmp_p
     assert '<details class="fold"' in html and " open><summary>details</summary>" in html
     assert "<ul><li><strong>Context:</strong> The backup &lt;script&gt;x&lt;/script&gt; stopped.<ul><li>nightly" in html
     assert "<script>x" not in html and "Back it up? Answers: Never | Always." in html
-    assert html.count('data-board-act="decide"') == 4  # the three answers and Go with it: none from the block
+    assert (
+        html.count('data-board-act="decide"') == 5
+    )  # the three answers, Go with it and Not clear: none from the block
 
 
 @pytest.mark.unit

@@ -1231,7 +1231,7 @@
     board_notright: "deciding…", board_add: "writing…", ledger: "deciding…", ledger_reply: "deciding…", ledger_start: "starting…", snooze: "snoozing…", attention_snooze: "snoozing…",
     dismiss: "dismissing…", identity_ack: "dismissing…", clear_work: "dismissing…",
     clear_mark: "dismissing…", unmail: "deleting…", allow: "sending…", deny: "sending…",
-    reply: "sending…", answer: "sending…", gowithit: "sending…", notclear: "sending back…", hand_look: "sending…", identity_log: "logging…",
+    reply: "sending…", answer: "sending…", gowithit: "sending…", notclear: "sending back…", "not-clear": "sending back…", hand_look: "sending…", identity_log: "logging…",
     suspend: "suspending…", promote: "promoting…", ci_rerun: "re-running…", work_start: "starting…", restart: "restarting…",
     resume: "resuming…", "reopen-push": "resuming…", "resume-form": "resuming…", pause: "pausing…",
     mode: "switching…",  // the held row's Hand back (§4.5a *Inbox row: held · mail waiting*, TD-1440)
@@ -2083,7 +2083,7 @@
         if ((staterow || left) && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();  // put the row back
         return;
       }
-      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…", ledger: "Decide", ledger_reply: "Reply", ledger_start: "Start session", "shell-here": "Open shell here" };
+      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…", ledger: "Decide", ledger_reply: "Reply", ledger_start: "Start session", "shell-here": "Open shell here", notclear: "Not clear" };
       say(`${named[action] || action} failed: ${e.message}`);  // a control is not its wire name
       // §4.5a *Inbox row: orphaned question* (TD-216): a refused write is drawn on the row, which stays.
       // Only the presses that write the board line are writes (TD-234): a failed Snooze or Delete
@@ -9360,7 +9360,8 @@
   // `answers`: the ringed row has answer buttons, so a digit is the row's (`nth`) and not the page's
   AO.keyEntry = (page, name, answers) => AO.KEYS.find((k) => (k.page === "all" || k.page === page) && k.keys.includes(name) && (!answers || k.nth || !/^[1-4]$/.test(name))) || null;
   // A row's own answer buttons, in the order written — never those of a row drawn inside it
-  AO.keyAnswers = (row) => (row ? $$(".btn.answer", row).filter((el) => el.closest(RINGS.inbox) === row) : []);
+  // **Not clear** (TD-1853) is no numbered answer: a sender's answers are, and a stray digit never sends an item back
+  AO.keyAnswers = (row) => (row ? $$(".btn.answer:not(.notclear)", row).filter((el) => el.closest(RINGS.inbox) === row) : []);
   const shown = (el) => el.getClientRects().length > 0;
   const ringables = (page) => (RINGS[page] ? $$(RINGS[page]).filter(shown) : []);
   const ringed = (page) => (RINGS[page] && document.activeElement && document.activeElement.closest ? document.activeElement.closest(RINGS[page]) : null);

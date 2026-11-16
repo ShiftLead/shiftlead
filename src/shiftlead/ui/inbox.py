@@ -3134,7 +3134,7 @@ def not_clear_on(e: Mapping[str, Any], how: str) -> bool:
             and e.get("from") not in ("person", "system")
             and not e.get("closed_reason")
             and not (isinstance(shots, list) and any(isinstance(x, str) and x.strip() for x in shots))
-            and not e.get("routed")
+            and not (e.get("routed") and not e.get("passed_up"))  # a pass-up is the passer's words
         )
     if how == "board":
         return e.get("kind") in ("decide", "act") and not e.get("decided") and not e.get("pair")
