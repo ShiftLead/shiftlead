@@ -787,6 +787,17 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "not-clear",
+        "Not clear",
+        "Queue card / Inbox row",
+        (
+            "Sends this item back to whoever wrote it, to rewrite it for you: a question is closed and its asker "
+            "told, a pass-up goes back to the session that passed it up, and a board line or a ledger entry is "
+            "decided with fixed words its session acts on. Press it when you cannot follow what is asked. It "
+            "chooses none of the item's answers and takes no default; each press is counted for the feedback review."
+        ),
+    ),
+    Help(
         "card-dots",
         "⋯",
         "Queue card",
@@ -1000,6 +1011,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "card-start-all",
             "card-item-start",
             "card-answers",
+            "not-clear",
             "card-dots",
             "card-open-card",
             "live-mark",

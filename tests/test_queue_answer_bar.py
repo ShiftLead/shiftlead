@@ -73,21 +73,21 @@ def bare_heading(html: str) -> None:
 def test_an_ask_draws_its_answers_answer_start_then_open_and_its_dots():
     e = entry("m-1", "ask", text="Which account?", answers=["work", "home"], recommended=0, start=START)
     html = card(e, "decide")
-    assert slots(html) == ["Work", "Home", "Answer…", RULE, "Start session", RIGHT, "Open", DOTS]
+    assert slots(html) == ["Work", "Home", "Not clear", "Answer…", RULE, "Start session", RIGHT, "Open", DOTS]
     assert '<button class="btn sm answer rec"' in bar(html)  # the recommended one outlined
     assert "Dismiss" not in html, "an open ask is declined by Delete, in its ⋯, never dismissed"
     bare_heading(html)
     # the asker's name opens its Focus, as a holder's word does; the heading's Open is the bar's
     assert '<a class="ref" href="/focus/ao-w1"' in headings(html)[0]
     # an asker with no session: no Open
-    assert slots(card({**e, "from_open": None}, "decide")) == ["Work", "Home", "Answer…", RULE, "Start session",
-                                                               RIGHT, DOTS]  # fmt: skip
+    no_open = card({**e, "from_open": None}, "decide")
+    assert slots(no_open) == ["Work", "Home", "Not clear", "Answer…", RULE, "Start session", RIGHT, DOTS]
 
 
 def test_a_steer_draws_go_with_it_among_its_answers_and_no_dismiss():
     e = entry("m-3", "steer", text="Take the work seat?", answers=["work", "home"], default="work", recommended=0)
     html = card({**e, "bound": "2026-09-19T12:00:00Z", "left": "1h"}, "decide")
-    assert slots(html) == ["Work", "Home", "Go with it", "Answer…", RIGHT, "Open", DOTS]
+    assert slots(html) == ["Work", "Home", "Go with it", "Not clear", "Answer…", RIGHT, "Open", DOTS]
     assert "Dismiss" not in html
     assert html.index("1h left") < html.index('class="row gap wrap qabar"'), "its foot above the bar"
     bare_heading(html)
@@ -139,7 +139,7 @@ def test_a_handed_entrys_blocked_outcome_draws_start_dismiss_open_less_answer():
 def test_a_board_decide_draws_its_answers_answer_then_open_and_its_dots(tmp_path, monkeypatch):
     _, d = board_world(tmp_path, monkeypatch)
     html = card({**d, "start": START}, "decide")
-    assert slots(html) == ["Alpha", "Beta", "Answer…", RULE, "Start session", RIGHT, "Open", DOTS]
+    assert slots(html) == ["Alpha", "Beta", "Not clear", "Answer…", RULE, "Start session", RIGHT, "Open", DOTS]
     assert 'href="/repo/samscrape#waiting"' in bar(html)  # its row on the Repo page's board
     menu = bar(html).split('class="more qdots"')[1]
     assert ">Done</button>" in menu and ">Open<" not in menu
@@ -149,11 +149,11 @@ def test_a_board_decide_draws_its_answers_answer_then_open_and_its_dots(tmp_path
 def test_an_act_lines_answer_leaves_its_dots_for_slot_two(tmp_path, monkeypatch):
     a, _ = board_world(tmp_path, monkeypatch)
     html = card(a, "do")
-    assert slots(html) == ["Done", "Answer…", RIGHT, "Open", DOTS]
+    assert slots(html) == ["Done", "Not clear", "Answer…", RIGHT, "Open", DOTS]
     assert re.findall(r'role="menuitem"[^>]*>([^<]*)<', bar(html)) == ["Open board"], "Answer… left its ⋯"
     bare_heading(html)
     # with no editor link its ⋯ would hold nothing, so none is drawn
-    assert slots(card({**a, "editor": None}, "do")) == ["Done", "Answer…", RIGHT, "Open"]
+    assert slots(card({**a, "editor": None}, "do")) == ["Done", "Not clear", "Answer…", RIGHT, "Open"]
     # the Inbox's own row keeps its Reply and Done in its footer, no bar
     page = inbox(a)
     assert "qabar" not in page and ">Reply</button>" in page
@@ -173,17 +173,27 @@ def _ledger(tmp_path, monkeypatch, **kw):
 def test_a_ledger_decision_draws_its_answers_lift_answer_start_then_open_and_no_dots(tmp_path, monkeypatch):
     row = _ledger(tmp_path, monkeypatch)
     html = card({**row, "why": "decision"}, "decide")
-    assert slots(html) == ["Now", "Later", "Lift the hold", "Answer…", RULE, "Start session", RIGHT, "Open"]
+    assert slots(html) == [
+        "Now",
+        "Later",
+        "Lift the hold",
+        "Not clear",
+        "Answer…",
+        RULE,
+        "Start session",
+        RIGHT,
+        "Open",
+    ]
     assert "qdots" not in html, "a ledger item's ⋯ held Open alone: it is gone"
     bare_heading(html)
     yours = card({**row, "why": "yours"}, "do")
-    assert slots(yours) == ["Now", "Later", "Done", "Answer…", RULE, "Start session", RIGHT, "Open"]
+    assert slots(yours) == ["Now", "Later", "Done", "Not clear", "Answer…", RULE, "Start session", RIGHT, "Open"]
 
 
 def test_a_with_you_item_draws_no_dots(tmp_path, monkeypatch):
     row = _ledger(tmp_path, monkeypatch)
     html = card({**row, "why": "decision", "with_you": "my-session", "start": {**START, "own": True}}, "with_you")
-    assert slots(html) == ["Now", "Later", "Lift the hold", "Answer…", RULE, "Open session", RIGHT, "Open"]
+    assert slots(html) == ["Now", "Later", "Lift the hold", "Not clear", "Answer…", RULE, "Open session", RIGHT, "Open"]
     assert "qdots" not in html
     bare_heading(html)
 

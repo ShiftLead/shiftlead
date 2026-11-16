@@ -351,6 +351,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     look_review,  # noqa: F401
     look_shots,  # noqa: F401
     needs_person,  # noqa: F401
+    not_clear_on,  # noqa: F401
     origin_case,  # noqa: F401
     origin_firsts,  # noqa: F401
     origin_note,  # noqa: F401
@@ -2887,8 +2888,9 @@ async def press_witnessed(call: Callable[..., Any], word: str, target: str, dir:
         log.info("%s %s: the press was not witnessed", word, target)
 
 
-# **Not clear** on a ledger entry (§4.10 rule 6, *a ledger entry*; TD-1853): the fixed words `ledger_decide` writes
-LEDGER_NOT_CLEAR = "Not clear: rewrite it — the person could not follow it."
+# **Not clear** on a ledger entry (§4.10 rule 6, *a ledger entry*; TD-1853): the fixed words `ledger_decide` writes,
+# `inbox.py`'s, which the row draws too
+LEDGER_NOT_CLEAR = inbox_mod.LEDGER_NOT_CLEAR
 
 
 def _repo_of_board(board: str) -> str:

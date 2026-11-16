@@ -52,9 +52,13 @@ def test_an_act_line_is_a_do_and_its_card_item_leads_with_its_task(tmp_path, mon
     sentence = re.search(r'class="body md sentence">(.*?)</div>', html, re.S).group(1)
     assert "File one entry in agent-cadence" in sentence and "act 2026-10-26" not in sentence
     assert "Until it is filed, auto cannot promote this repo." in html  # the next sentence, its consequence
-    # the Answer row: Done, outlined, then Answer… in slot 2 of the answer bar, its title the standing (TD-1842)
+    # the Answer row: Done, outlined, Not clear (TD-1853), then Answer… in slot 2 of the answer bar, its title the
+    # standing (TD-1842)
     ans = html[html.index("qanswers") : html.index("</div>", html.index("qanswers"))]
-    assert re.findall(r">([^<>]+)</button>", ans) == ["Done", "Answer…"] and 'class="btn sm answer rec"' in ans
+    assert (
+        re.findall(r">([^<>]+)</button>", ans) == ["Done", "Not clear", "Answer…"]
+        and 'class="btn sm answer rec"' in ans
+    )
     assert "landed on its origin by shiftlead's own pull request" in ans  # the footer's words, Done's title
     assert dots(html) == ["Open board"]
     assert re.search(r'class="btn sm ghost" type="button" data-act="board_reply"[^>]*title="designer-ao-1 · still', ans)
