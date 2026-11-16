@@ -203,6 +203,27 @@ async def test_a_gone_gate_a_refused_lift_and_a_failed_store(agent, repo, monkey
         assert _person_copy(agent, owned).open and not _replies(agent, owned)
 
 
+async def test_a_failed_store_after_a_gone_gate_refuses_in_its_own_words(agent, repo, monkeypatch):
+    """TD-1902: only a store that fails after a landed lift says *the hold is lifted*; where the gate was already
+    gone (`lifted_before`) the press lifted nothing, so the store's own error is the refusal, and no reply lands."""
+    await _home(agent, repo, monkeypatch, [_entry(190)])
+    state: dict[str, str] = {}
+
+    async def press(root, id, **kw):
+        _person_copy(agent, state["mid"]).orphaned = {"how": "closed", "ref": "repo#TD-190"}  # the store then fails
+        return {"repo": root, "id": id, "gone": True}
+
+    async with LocalClient() as person:
+        w = await _worker(person, repo)
+        async with LocalClient(caller=w) as c:
+            state["mid"] = await _ask(c)
+        monkeypatch.setattr(agent, "_press_lift", press)
+        with pytest.raises(AgentError, match="asker is gone") as err:
+            await person.call("msg", kind="reply", reply_to=state["mid"], text="Lift it", answer=0)
+        assert "is lifted" not in str(err.value) and "the answer was not sent" not in str(err.value)
+        assert not _replies(agent, state["mid"])
+
+
 async def test_a_withdraw_a_delete_and_a_second_reply_racing_the_lift_are_refused(agent, repo, monkeypatch):
     """The lifting road holds the ask's id: a withdraw, a Delete and a second reply during it are refused with
     *<id> is already being answered*, and the reply lands after."""
