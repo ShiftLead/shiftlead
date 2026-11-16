@@ -559,6 +559,8 @@ def _row(r: Mapping[str, Any], one_repo: bool, mentioned: Mapping[str, Any] | No
 
 # the Inbox's sections a card gathers its items from, in the Inbox's order (§4.5 screen 12 *Three wants*)
 CARD_SECTIONS = ("needs", "steering", "waiting", "answered", "fyi")
+# a card's key in `attach` for the items not drawn (§4.5 screen 12 *One press, one item*, TD-1843): no section of it
+HIDDEN = "_hidden"
 # a card's three wants (§4.5 screen 12 *Three wants*, TD-909, built by TD-911): Decide and Do drawn in the header,
 # open and counted on the pill; Read under the rows, folded, its lines the Inbox's three it gathers
 WANTS = {"decide": "Decide", "do": "Do"}
@@ -620,6 +622,40 @@ def answered_case(e: Mapping[str, Any]) -> str:
     return "handed" if a.get("kind") == "handed" else "waiting"
 
 
+def blocked_unreplied(e: Mapping[str, Any]) -> bool:
+    """A mail row whose outcome is `blocked` and carries no `replied` (§4.10 *Outcomes*), a handed entry's aside: the
+    outcome item that draws its entry's Lift and that an *answered* item gives way to (TD-1843)."""
+    o = e.get("outcome")
+    return (
+        not e.get("row")
+        and not e.get("handed")
+        and isinstance(o, Mapping)
+        and o.get("state") == "blocked"
+        and not o.get("replied")
+    )
+
+
+def outcome_lifts(rows: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, str]]:
+    """`{question id: {root, id}}` from every ledger row whose `answered.lift` is stamped (§4.4 *Where Lift the hold is
+    drawn*, TD-1879): the wants join a `blocked` outcome's mail row to its entry's Lift by `mid` (TD-1843)."""
+    out: dict[str, dict[str, str]] = {}
+    for e in rows:
+        a = e.get("answered") if e.get("row") == "ledger" else None
+        lift = a.get("lift") if isinstance(a, Mapping) else None
+        if isinstance(lift, Mapping) and lift.get("id") and a.get("mid"):
+            out[str(a["mid"])] = {"root": str(lift.get("root") or ""), "id": str(lift["id"])}
+    return out
+
+
+def gives_way(e: Mapping[str, Any], want: str, unreplied: set[str]) -> bool:
+    """An *answered — waiting on <asker>* item whose question's `blocked` outcome is unreplied (§4.5 screen 12 *One
+    press, one item*, TD-1843): the outcome item says what became of the same press, so this one is not drawn."""
+    if e.get("row") != "ledger" or want != "answered" or answered_case(e) != "waiting":
+        return False
+    a = e.get("answered")
+    return isinstance(a, Mapping) and bool(a.get("mid")) and str(a["mid"]) in unreplied
+
+
 def item_ref(e: Mapping[str, Any]) -> str:
     """An attached item's id as **Start session** names it (§4.5 screen 12 *Started from an item*, TD-1246): a board
     line `board:<key>`, a mail item its `m-…`, a ledger row `<repo>#TD-n`, a red PR `<repo>#<n>`; '' for any other
@@ -657,6 +693,7 @@ def walk_mine(mine: Iterable[str], wants: Mapping[str, Any]) -> list[str]:
     """*waits on me* on the header's press that walks the card (TD-1340): the same ids but an entry whose item is
     in `wants['answered']` and draws no Start session (TD-1843), which waits on its asker, not the person."""
     gone = {str(m.get("item") or "") for m in wants.get("answered") or () if not m.get("starts")}
+    gone |= set(wants.get("hidden") or ())  # an item given way to its outcome (TD-1843)
     return [m for m in mine if m not in gone]
 
 
@@ -763,10 +800,22 @@ def attach(
         if e.get("row") == "board" and (want_of(e, sec) in WANTS or session_asks(e)):
             strip_rows.add(str(e.get("on_row") or ""))
             strip |= set(e["covers"]) if "covers" in e else line_names(e)
+    # §4.5 screen 12 *A press is never left stranded* (TD-1843): a `blocked` outcome joined by its question's id to the
+    # entry row whose `answered.lift` TD-1879 stamped draws that entry's Lift (`lift_reply`), and while it is unreplied
+    # the entry's *answered — waiting on <asker>* item gives way to it (*One press, one item*); read, never computed
+    every = [e for sec in CARD_SECTIONS for e in sections.get(sec) or ()] + list(later or ())
+    lifts = outcome_lifts(every)
+    unreplied = {str(e.get("id") or "") for e in every if blocked_unreplied(e)}
 
     def put(e: Mapping[str, Any], sec: str, drawn_as: str, mid: Any, kind: str) -> None:
         want, kind, mine = rewrite(e, sec, kind)
         card, ref = str(e.get("on_card") or ""), item_ref(e)
+        if gives_way(e, want, unreplied):
+            # not drawn, out of every count and the walk, its entry out of the walk's own entries (TD-1843)
+            cards.setdefault(card, {}).setdefault(HIDDEN, []).append(ref)
+            return
+        if not e.get("row") and (lift := lifts.get(str(e.get("id") or ""))) and blocked_unreplied(e):
+            e = {**e, "lift_reply": lift}
         if (
             e.get("row") == "ledger"
             and want in WANTS
@@ -854,6 +903,8 @@ def card_wants(got: Mapping[str, list[Any]] | None, top: str, one_repo: bool) ->
     `do` (the pill's, a red PR in it) and `read`. Each item carries `on` — the row it is about, written as the page
     writes ids, where that is not the top entry (*on TD-n*, a link to the row)."""
     out: dict[str, Any] = {"decide": [], "do": [], "read": {}, "with_you": [], "answered": []}
+    # the entries whose *answered* item gave way to its `blocked` outcome (TD-1843): drawn nowhere, kept for the walk
+    out["hidden"] = [str(r) for r in (got or {}).get(HIDDEN) or () if r]
     for sec in CARD_SECTIONS:
         for m in (got or {}).get(sec) or ():
             m = {**m, "on": "" if m.get("on_row") == top else _show(str(m.get("on_row") or ""), one_repo)}

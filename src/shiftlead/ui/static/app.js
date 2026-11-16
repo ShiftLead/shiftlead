@@ -1900,6 +1900,23 @@
           if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
           return;
         }
+        if (lifting && at.liftReply) {
+          // a `blocked` outcome's **Lift the hold** (§4.4 *The outcome's lift and reply*, TD-1879, drawn by TD-1843):
+          // one request, the entry's lift and then the plain reply on the question; a reply that fails after a
+          // written lift is no refusal, so its words are the refused case's with nothing claimed unsent
+          want.lift_reply = at.liftReply;
+          pressed();
+          const res = await act("person", "ledger", want);
+          answered();
+          if (res.failed) {
+            const words = `The hold on ${at.ref} is lifted; telling ${at.name || "its asker"} failed: ${res.failed}`;
+            // the item comes back on the re-read, unreplied and without its Lift, carrying these words
+            if (msgOf) { AO.pressErrs[msgOf] = AO.pressErr(words, true, atSig); delete AO.inflight[msgOf]; }
+            say(words, false);
+          } else say(res.gone ? `${at.ref} is no longer held — ${at.name || "its asker"} is told` : `hold lifted on ${at.ref} — ${at.name || "its asker"} is told`, true);
+          if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+          return;
+        }
         if (lifting) {
           // the fixed-words branch's lift: `lift` alone, no words (TD-1831); a tree row's ⋯ takes the `qt` path
           want.lift = true;
