@@ -100,6 +100,7 @@ MAILBOX = frozenset(
         "inbox_pause",
         "inbox_resume",
         "inbox_go_with_it",
+        "inbox_not_clear",
     }
 )
 # Reports are home-owned, and a claim is a lease checked against every sibling (TD-056). `doing` is

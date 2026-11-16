@@ -48,6 +48,7 @@ PRESS_WORDS: dict[str, bool] = {
     "host-rebuild": False,
     "send-to-reviewer": True,
     "push-on": False,
+    "not-clear": False,  # the person's Not clear: `<kind> <repo>:<ref> <writer>` (§4.10 rule 6, TD-1853)
 }
 
 ID_RE = re.compile(r"[A-Za-z0-9_.@/-]+")

@@ -60,6 +60,10 @@ _EDIT = threading.Lock()
 # *Decide*): the fixed answer an open `act` line's press writes, exactly as the page sends it, and the asker's mark
 # that a step is the person's alone, which the page's draw and the agent's check both read by `marked_for_person`
 HAVE_A_SESSION = "have a session do it"
+# **Not clear** (TD-1853; design §4.10 *Text a person reads is checked at its writer*, rule 6): the second fixed answer,
+# taken on a `decide` and an `act` line whatever answers it offers, written to the board alone — no gate lifted
+NOT_CLEAR = "Not clear: rewrite this line — the person could not follow it."
+NOT_CLEAR_KINDS = ("decide", "act")
 ONLY_YOU = "only you can do this"
 # where a line's own words end (§4.5 screen 12): ledgerboard's field names, `Doer:` (TD-1661's) and `Due:` in any case
 _MARK_END_RE = re.compile(r"\b(?:Context|Parts|Doer|Hide until|Answers|Lifts|Decided|Closed):|\b(?i:due):")
@@ -130,6 +134,14 @@ def session_do(text: str | ledgerboard.BoardItem, answer: str) -> bool:
     said = " ".join(str(answer or "").split())
     own = {" ".join(a.split()) for a in _answers(text)}
     return said == HAVE_A_SESSION and said not in own
+
+
+def not_clear(text: str | ledgerboard.BoardItem, answer: str) -> bool:
+    """Whether a decide of `answer` on the item `text` is **Not clear**'s (TD-1853): the fixed text, and not one of
+    the item's own `Answers:`."""
+    said = " ".join(str(answer or "").split())
+    own = {" ".join(a.split()) for a in _answers(text)}
+    return said == NOT_CLEAR and said not in own
 
 
 class Refused(Exception):
@@ -260,6 +272,10 @@ def _session_check(text: str | ledgerboard.BoardItem, answer: str) -> None:
     except ledgerboard.Refused:
         pass
     kind = _kind(text)
+    if said == NOT_CLEAR:  # the person's Not clear, on a decide or an act line whatever it offers (TD-1853)
+        if kind not in NOT_CLEAR_KINDS:
+            raise Refused(f"Not clear answers a decide or an act line: this is a {kind or 'kindless'} line")
+        return
     if said == HAVE_A_SESSION:
         if kind != "act" or own:
             raise Refused(NOT_ACTS_ANSWER)
@@ -844,9 +860,9 @@ def _write_back(
     if action == "decide":
         by = answerer(root, old) or ""
         lifts = _lift_ledger(t, it)
-        # Have a session do it writes the board half alone, never the decide lift, whatever the Context names, so
-        # the item stays open (§4.4 *Decide*, TD-1624): the ledger passed with `board_only` where a gate would lift
-        only = session_do(it, answer) and lifts is not None
+        # Have a session do it and Not clear (TD-1853) write the board half alone, never the decide lift, whatever the
+        # Context names, so the item stays open (§4.4 *Decide*, TD-1624): the ledger passed with `board_only`
+        only = (session_do(it, answer) or not_clear(it, answer)) and lifts is not None
     plan = _plan(
         lb_board.plan_edit, str(stub), action, it.id,
         to=due if action in ("snooze", "due") else None, answer=answer or None, text=reply or None,
