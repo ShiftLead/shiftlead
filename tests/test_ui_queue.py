@@ -1144,13 +1144,16 @@ def test_a_card_dots_done_or_back_to_design_draws_its_state_on_the_press():
     js = (Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     css = (Path(__file__).parents[1] / "src/shiftlead/ui/static/app.css").read_text()
     # the target: a row's ⋯, else the header's — never a bare `[data-qid]`, which a board row carries too
-    assert 'const qt = !row && road ? b.closest(".qrow[data-qid]") || b.closest(".qhead[data-qid]") : null;' in js
+    assert (
+        'const qt = !row && (road || lifting) ? b.closest(".qrow[data-qid]") || b.closest(".qhead[data-qid]") : null;'
+        in js
+    )
     assert 'qled = qt ? `ledger:${b.dataset.repo}:${b.dataset.ref}` : ""' in js
     assert 'AO.qKey = (t) => `${t.classList.contains("qhead") ? "qhead" : "qrow"}:${t.dataset.qid}`;' in js
     # its own ⋯, not an item's in the header's Decide or Do
     assert '!d.closest(".mailrow") && d.closest(".qrow[data-qid], .qhead[data-qid]") === t' in js
     assert "if (qt) qpressed(); else pressed();" in js and "if (qt) qanswered(); else answered();" in js
-    assert "AO.drawQState(t, `${r4[0]} — written on the board`, false);" in js
+    assert 'AO.drawQState(t, lifting ? "hold lifted" : `${r4[0]} — written on the board`, false);' in js
     # an off ⋯: no pointer, no keys, a native toggle closed again
     assert 'mark.setAttribute("aria-disabled", "true"); mark.tabIndex = -1;' in js
     assert '$("summary", d).getAttribute("aria-disabled") === "true") return false;' in js

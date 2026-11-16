@@ -1518,11 +1518,14 @@
     const drawn = !!row && ["board_decide", "board_notright", "board_reply"].includes(key);
     // rule 4's words, from the road where there is one: what the waiting toast says, and what a refusal was not
     const road = b.dataset.road;
+    // **Lift the hold** (§4.4 *Lift the hold is a lift on the press*, TD-1829): the gate lifted on the press, no line
+    const lifting = ledgerish && !!b.dataset.lift;
     const r4 = road === "done" ? ["done", "not done"] : road === "design" ? ["back to design", "not sent back to design"]
+      : lifting ? ["lifting the hold", "hold not lifted"]
       : key === "board_reply" ? ["replying", "not replied"] : ledgerish || drawn ? ["deciding", "not decided"] : null;
     const msgOf = row && row.dataset.msg;
     // a Queue card's ⋯ (TD-1321 slice 2): no row, so the press finds its target — a row's, else the header's
-    const qt = !row && road ? b.closest(".qrow[data-qid]") || b.closest(".qhead[data-qid]") : null;
+    const qt = !row && (road || lifting) ? b.closest(".qrow[data-qid]") || b.closest(".qhead[data-qid]") : null;
     const qkey = qt ? AO.qKey(qt) : "", qled = qt ? `ledger:${b.dataset.repo}:${b.dataset.ref}` : "";
     let waiting = null, left = false;
     const say = (text, ok, href) => {
@@ -1560,11 +1563,11 @@
       if (row.contains(document.activeElement)) document.activeElement.blur();
       AO.handRing(row); row.remove(); left = true;
       const what = verb.replace(/…$/, "");
-      waiting = AO.toast(r4 ? `${r4[0]} — writing on the board…` : action === "board" ? `${what} — landing on the board…` : `${what}…`, true, null, true);
+      waiting = AO.toast(lifting ? "lifting the hold…" : r4 ? `${r4[0]} — writing on the board…` : action === "board" ? `${what} — landing on the board…` : `${what}…`, true, null, true);
     };
     // the ⋯'s press: the target's state cell and its ⋯ off; the card's *ledger · your decision* row for the entry leaves
     const qpressed = () => {
-      const text = `${r4[0]} — writing on the board…`;
+      const text = lifting ? "lifting the hold…" : `${r4[0]} — writing on the board…`;
       AO.drawQState(qt, text, true);
       AO.inflight[qkey] = { kind: "qrow", text };
       delete AO.pressErrs[qled];
@@ -1574,7 +1577,7 @@
     };
     const qanswered = () => {
       const t = AO.qFind(qkey);
-      if (t) AO.drawQState(t, `${r4[0]} — written on the board`, false);
+      if (t) AO.drawQState(t, lifting ? "hold lifted" : `${r4[0]} — written on the board`, false);
       const f = AO.inflight[qled];
       if (f) f.until = Date.now() + 60000;
     };
@@ -1844,6 +1847,16 @@
           if (qt) qanswered(); else answered();
           const told = (res.told || []).length ? ` · told ${res.told.join(", ")}` : "";
           say(`decided: ${res.decided || at.road} — written on the board on origin, ${at.ref}'s work order${told}`, true);
+          if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+          return;
+        }
+        if (lifting) {
+          // the fixed-words branch's lift: `lift` alone, no words (TD-1831); a tree row's ⋯ takes the `qt` path
+          want.lift = true;
+          if (qt) qpressed(); else pressed();
+          const res = await act("person", "ledger", want);
+          if (qt) qanswered(); else answered();
+          say(res.gone ? `${at.ref} is no longer held` : `hold lifted on ${at.ref}`, true);
           if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
           return;
         }

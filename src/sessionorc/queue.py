@@ -1061,6 +1061,39 @@ class _Repos:
         return None
 
 
+_CLAIM_REF_RE = re.compile(r"(?:(?P<repo>[^#\s]+)#)?(?P<id>TD-\d+)", re.IGNORECASE)
+
+
+def held_claims(records: Iterable[Any], repos: Mapping[str, Mapping[str, Any]], now: datetime) -> dict[str, str]:
+    """The one claims helper (§4.4 *The press's checks*, *Where Lift the hold is drawn*; TD-1851, built by TD-1831):
+    `{ref: session id}` of every unexpired `claimed` progress row (by `LEASE_TTL`) of a live `unattended` record (not
+    `exited` or `closed`, not superseded) — the person's own records, which are not `unattended`, left out. A
+    `board:<key>` claim counts from any repo's record, as it is; an entry id only from a record of the entry's repo
+    (`_Repos.of_record`), keyed `<repo>#TD-n` (`qid`, the ledger's normalised id), a `<repo>#TD-n` ref counted where
+    its repo is the record's own. Records are read in id order, the first claim on a ref keeping it; `repos` are the
+    home's readings by root, a remote host's records counted as the reading counts them."""
+    rs = _Repos(repos)
+    out: dict[str, str] = {}
+    for rec in sorted(records, key=lambda r: str(r.id)):
+        if getattr(rec, "state", "") in ("exited", "closed") or getattr(rec, "superseded_by", None):
+            continue
+        if not getattr(rec, "unattended", False):
+            continue
+        home = rs.of_record(rec)
+        for p in rec.progress:
+            at = _aware(p.at)
+            if p.status != "claimed" or at is None or now - at >= LEASE_TTL:
+                continue
+            ref = str(p.ref or "")
+            if ref.startswith(workorders.PREFIX):
+                out.setdefault(ref, str(rec.id))
+            elif home and (m := _CLAIM_REF_RE.fullmatch(ref)):
+                if m.group("repo") and rs.resolve(m.group("repo")) != home:
+                    continue
+                out.setdefault(qid(home, m.group("id").upper()), str(rec.id))
+    return out
+
+
 def design_done(e: Mapping[str, Any]) -> bool:
     """§4.8 *A finished design lets go of its derived claim* (TD-1567): an open `design-first` entry that some entry,
     open or archived, names in `Part of:` (`parts_open`, `parts_archived` — an archived part keeps it done after its
@@ -1379,22 +1412,11 @@ def reading(
     # what a board answer's hold reads (§4.4 *The card's status*, TD-1368): the boards by repo, each live record's
     # unexpired claims — the person's own sessions left out — and the live records by id and name
     boards = {n: list((r.get("boards") or {}).get("boards") or ()) for n, r in rs.by_name.items()}
-    claims: dict[str, str] = {}
+    claims = held_claims(recs, repos, now)
     live: dict[str, str] = {}
     for rec in sorted(recs, key=lambda r: str(r.id)):
         live.setdefault(str(rec.id), str(rec.id))
         live.setdefault(str(getattr(rec, "name", "") or rec.id), str(rec.id))
-        if not getattr(rec, "unattended", False):
-            continue
-        home = rs.of_record(rec)
-        for p in rec.progress:
-            at = _aware(p.at)
-            if p.status != "claimed" or at is None or now - at >= LEASE_TTL:
-                continue
-            if p.ref.startswith(workorders.PREFIX):
-                claims.setdefault(p.ref, str(rec.id))
-            elif home and re.fullmatch(r"TD-\d+", p.ref):
-                claims.setdefault(qid(home, p.ref), str(rec.id))
 
     pressing = _pressing(open_, boards, linked)
     # the design PR an item about each entry links (TD-1531), with its synopsis (TD-1536)

@@ -43,6 +43,7 @@ from typing import Any
 from sessionorc import gitinfo, ledgerboard, paths, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc.ledgerboard import board as lb_board
+from sessionorc.ledgerboard import ledger as lb_ledger
 
 BOARD = workorders.BOARD
 ACTIONS = ("snooze", "due", "done", "reply", "decide")  # `due` (v2.3) moves Due:; `snooze` writes `Hide until:`
@@ -1101,6 +1102,179 @@ def _insert(root: Path, plan: Any, msg: Callable[[lb_board.Plan], str]) -> dict[
             return {**landed, "id": new, "key": workorders.PREFIX + new[-8:]}
 
         return _twice(press)
+
+
+# -- Lift the hold is a lift on the press (design §4.4 *Board write-back*, TD-1829, built by TD-1831) -----------
+
+LIFT_BODY = (
+    "shiftlead's lift on the press: the person's Lift the hold lifts `decision (<p>)` on one entry (design §4.4 "
+    "*Board write-back*: *Lift the hold is a lift on the press*)."
+)
+# the why a covering decided item is closed with (`Closed: … — lifted.`, ledgerboard's `_lifted_close`)
+LIFTED = "lifted"
+
+
+def only_lifts(p: str) -> str:
+    return f"only {p} lifts {p}'s hold"
+
+
+def _held_words(key: str, holder: dict[str, Any]) -> str:
+    name = str(holder.get("name") or holder.get("id") or "a session")
+    return f"{key} is being acted on by {name}: lift the hold once it lands, or tell {name}"
+
+
+def _person_gate(text: str) -> str | None:
+    """The `decision (<p>)` the open entry `text` carries for the home's person, as it spells it, else None."""
+    ents = ledgerboard.entries(text)
+    if not ents or ledgerboard.first_word(ents[0]["fields"].get("status")) in ledgerboard.ARCHIVED_WORDS:
+        return None
+    for g in ledgerboard.gate_items(ledgerboard.parse_gates(ents[0]["blocked_raw"])):
+        m = ledgerboard.GATE_DECISION_RE.match(g)
+        if m and m.group("who").strip().lower() == ledger_mod.PERSON_OWNER:
+            return g
+    return None
+
+
+def _lists_other(it: ledgerboard.BoardItem, tid: str, gate: str, led: Any) -> bool:
+    """Whether a covering item lists another entry that still carries the gate (§4.4 *The suffix*): its `Context:`
+    entry (the parent, where it covers through `Part of`) or a `Parts:` id — a bare id, this repo's, never a
+    `<repo>#TD-n` — open in the tree's ledger, not the pressed entry, carrying the same gate."""
+    ref, _ = ledgerboard._item_gate(it)
+    want = ledgerboard._num(tid)
+    for x in [ref, *it.parts]:
+        if not x or "#" in x:
+            continue
+        try:
+            if ledgerboard._num(x) == want:
+                continue
+            path, archived = led.entry_file(lb_ledger.tid_of(x))
+        except (ledgerboard.Refused, ValueError):
+            continue
+        if not archived and ledgerboard._carried(led.read(path), gate) is not None:
+            return True
+    return False
+
+
+def lift_on_press(
+    root: str | Path,
+    id: str,
+    answer: str = "go ahead",
+    held: dict[str, dict[str, Any]] | None = None,
+    entry_holder: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """**Lift the hold** (design §4.4 *Board write-back*: *Lift the hold is a lift on the press*, TD-1829): the
+    entry `id`'s `decision (<p>)` (`<p>` the home's person) lifted by ledgerboard's `plan_lift`, `answer` its Log's
+    answer (*go ahead* from the press, the picked label from §4.10's lifting answer), and any covering decided
+    item closed `— lifted.` beside it, in one commit of the host agent's tree on origin's head, landed by its own
+    PR as every press's — subject and title `shiftlead: lift decision (<p>) on TD-n (session n/a)`. No work order
+    is written. `held` maps each `board:<key>` a live session holds to its holder (`{id, name}`), and
+    `entry_holder` is the pressed entry's, read in case (b) alone.
+
+    Returns `{gone: true}` (nothing written) where the entry is archived or no longer carries the gate, else
+    `{lifted: true, commit, message, pr, suffix}`; raises `Refused` in its words — *only <p> lifts <p>'s hold*,
+    case (d)'s *TD-n's hold is asked on board:<key>: answer it there*, case (b)'s holder, or ledgerboard's own."""
+    root = Path(root)
+    try:
+        tid = lb_ledger.tid_of(str(id or "").upper())
+    except ledgerboard.Refused as e:
+        raise Refused(str(e)) from None
+    if shutil.which("gh") is None:
+        raise unreachable("gh is not installed")
+    with _EDIT:
+        clock = _Clock()
+        return _twice(lambda: _lift_on_press(root, tid, answer, dict(held or {}), entry_holder, clock))
+
+
+def _lift_on_press(
+    root: Path,
+    tid: str,
+    answer: str,
+    held: dict[str, dict[str, Any]],
+    entry_holder: dict[str, Any] | None,
+    clock: _Clock,
+) -> dict[str, Any]:
+    t, want = _tree(root, clock)
+    try:
+        led = lb_ledger.Ledger.open(str(t / ledger_mod.ledger_path(t)))
+    except ledgerboard.Refused as e:
+        _reset(t, want)
+        raise Refused(str(e)) from None
+
+    def gone() -> dict[str, Any]:
+        _reset(t, want)
+        return {"gone": True}
+
+    try:
+        path, archived = led.entry_file(tid)
+    except ledgerboard.Refused:
+        return gone()
+    text = led.read(path) or ""
+    gate = None if archived else _person_gate(text)
+    if gate is None:
+        return gone()
+    p = ledgerboard.GATE_DECISION_RE.match(gate).group("who").strip()
+    rel = workorders.board_rel(root)
+    stub = t / rel
+    b = _board(t, rel)
+    try:
+        by = lb_board.who_answered(b, answerer(root, b))
+    except ledgerboard.Refused as e:
+        _reset(t, want)
+        raise Refused(str(e)) from None
+    if by.lower() != p.lower():
+        _reset(t, want)
+        raise Refused(only_lifts(p))
+    url = _git(root, "remote", "get-url", "origin").stdout.strip()
+    repo = ledgerboard.origin_path(url) or root.name
+    try:
+        cov = [
+            (it, state) for _, it, state in ledgerboard.covers(text, gate, [(url, root.name, b)], repo)
+            if state in ("open", "decided")
+        ]  # fmt: skip
+    except ledgerboard.Refused as e:
+        _reset(t, want)
+        raise Refused(str(e)) from None
+    shared = [it for it, _ in cov if _lists_other(it, tid, gate, led)]
+    alone = [(it, s) for it, s in cov if not any(it is x for x in shared)]
+    asked = [it for it, s in alone if s == "open"]
+    if asked:  # (d)
+        _reset(t, want)
+        raise Refused(f"{tid}'s hold is asked on {item_ref(asked[0])}: answer it there")
+    closes = [it for it, s in alone if s == "decided"]
+    suffix = None
+    if closes:  # (b)
+        for it in closes:
+            if (h := held.get(item_ref(it))) is not None:
+                _reset(t, want)
+                raise Refused(_held_words(item_ref(it), h))
+        if entry_holder is not None:
+            _reset(t, want)
+            raise Refused(_held_words(item_ref(closes[0]), entry_holder))
+    elif shared:  # (c)
+        suffix = "shared board item left open"
+    else:  # (a)
+        suffix = "no board item"
+    plan = _plan(lb_ledger.plan_lift, led, tid, gate, by, answer=answer, suffix=suffix)
+    try:
+        lb_ledger.apply(plan)
+    except OSError as e:
+        _reset(t, want)
+        raise Refused(f"the ledger could not be written, and is as it was: {e}") from None
+    try:
+        for it in closes:
+            _apply(_plan(lb_board.plan_edit, str(stub), "done", it.id, why=LIFTED, tool=TOOL))
+    except Refused:
+        _reset(t, want)  # the ledger's half is written already: the tree goes back whole
+        raise
+    msg = f"{TOOL}: lift decision ({p}) on {tid} (session n/a)"
+    entry_rel = os.path.relpath(path, t)
+
+    def still() -> bool:
+        # origin's ledger still holds the entry open where the press found it
+        return _git(t, "cat-file", "-e", f"origin/{want}:{entry_rel}").returncode == 0
+
+    landed = _land(root, t, want, msg, clock, still, body=LIFT_BODY, also=[entry_rel])
+    return {**landed, "lifted": True, "suffix": suffix or "", "closed": [item_ref(it) for it in closes]}
 
 
 # -- a session's own edit, on its branch (design §4.7 `ao board edit`, TD-587) --------------------------

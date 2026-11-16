@@ -5832,6 +5832,14 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if not repo or not ref:
                 raise HTTPException(400, "a ledger answer names the repo and the entry")
             more: dict[str, Any] = {}
+            if body.get("lift"):
+                # **Lift the hold** (§4.4 *Board write-back*: *Lift the hold is a lift on the press*, TD-1829): the
+                # gate lifted on the press, no line written; any words are ignored, and a Queue tree row's bare repo
+                # name is resolved to its checkout as a road's is
+                if not repo.startswith(("/", "~")):
+                    repo = next((str(p) for p in hosts.local_host().repos() if Path(p).expanduser().name == repo), repo)
+                got = await call("ledger_decide", repo=repo, id=ref, lift=True)
+                return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
             if road := str(body.get("road") or ""):
                 # **Done…** / **Back to design…** (§4.5 screen 12 *any open row*, TD-905): refused here where
                 # nobody would read the line; the home tells and writes it

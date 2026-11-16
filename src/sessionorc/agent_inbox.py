@@ -1153,6 +1153,7 @@ class InboxMixin:
         go: bool = False,
         road: str = "",
         form: int | None = None,
+        lift: bool = False,
         caller: Any = None,
     ) -> dict[str, Any]:
         """The person's answer to a ledger entry that waits on them (design §4.5 screen 6 *The ledger's
@@ -1162,7 +1163,11 @@ class InboxMixin:
         write-back*) — `Context:` the id, committed as `shiftlead: append <title> (session n/a)` — so it
         is a work order at once. `repo` is the checkout the home's repo facts key it by; the entry is
         read from that reading, and refused when it no longer sorts *for you* or an open decided line
-        already names it. The ledger itself is never written. The repo's work orders are read again
+        already names it. An answer writes no ledger file and lifts no gate: on an entry carrying `decision (<p>)` the
+        gate stands while its session acts on the line (§4.4 *Every other answer leaves the gate standing*). `lift`
+        is **Lift the hold**'s press alone (§4.4 *Board write-back*: *Lift the hold is a lift on the press*, TD-1829):
+        it writes no line and lifts the gate itself (`_press_lift`), refused beside a `road`, an `answer` or `go`.
+        The repo's work orders are read again
         once the line lands, so the row leaves on the next poll. `road` is **Done…** (`done`) or **Back to
         design…** (`design`) on any open row (`_ledger_road`, TD-905). A person's session passes for a road
         alone (`mail.PERSON_SESSION`, §4.8 *A person's session passes one of them*, TD-1117): the answer with
@@ -1180,6 +1185,10 @@ class InboxMixin:
             raise RpcError(f"{repo} is not a repo this home reads (its repos registry)")
         view = self._repos.get(root) or {}
         name = str(view.get("name") or Path(root).name)
+        if lift:
+            if road or answer is not None or go or form is not None:
+                raise RpcError("Lift the hold is a press of its own: it takes no answer, Go with it or road")
+            return await self._press_lift(root, str(id or "").strip().upper())
         if road:
             return await self._ledger_road(root, name, view, str(id or "").strip().upper(), road, words, caller)
         e = next(
@@ -1234,6 +1243,62 @@ class InboxMixin:
         finally:
             self._board_adding.discard(key)
         return {"repo": root, "id": id, "decided": " ".join(said.split()), **done}
+
+    async def _press_lift(
+        self, root: str, id: str, *, answer: str = "go ahead", asker: str | None = None
+    ) -> dict[str, Any]:
+        """The one lift every lifting road calls (§4.4 *The press's checks*, TD-1829, built by TD-1831): **Lift the
+        hold**'s press (`ledger_decide`'s `lift`), §4.10's lifting answer (`answer` the label) and the outcome's
+        lift and reply, each having run `agent_common.person_only` first. It needs only an open entry of the reading
+        carrying `decision (<p>)`, `<p>` the home's person (`ledger_mod.PERSON_OWNER`): an entry carrying none, or
+        no longer open, answers `{repo, id, gone: true}`, no refusal and no write. An entry whose `Owner:` is the
+        person is refused, *yours to do*, which its **Done** answers. The claims are read through `held_claims`
+        (the records of `asker`, a record id, left out) and handed to the write (`board.lift_on_press`), which runs
+        under the entry's key in a thread, inside the press's applying mark (act *lift*), the board re-read after.
+        Returns `{repo, id, lifted: true}` on a lift."""
+        view = self._repos.get(root) or {}
+        name = str(view.get("name") or Path(root).name)
+        key = f"ledger:{root}:{id}"
+        if key in self._board_adding:
+            raise RpcError(f"{id} is already being decided")
+        self._board_adding.add(key)
+        try:
+            e = next(
+                (
+                    x
+                    for x in ((view.get("ledger") or {}).get("entries") or [])
+                    if isinstance(x, dict) and str(x.get("id") or "").upper() == id
+                ),
+                None,
+            )
+            if e is None or not ledger_mod.decided_by(e, ledger_mod.PERSON_OWNER):
+                return {"repo": root, "id": id, "gone": True}
+            if str(e.get("owner") or "").lower() == ledger_mod.PERSON_OWNER:
+                raise RpcError(f"{id} is yours to do: its Done answers it")
+            graph = self._graph()
+            records = [r for r in graph.values() if asker is None or str(r.id) != asker]
+            claims = queue_mod.held_claims(records, self._repos, datetime.now(UTC))
+
+            def holder(sid: str) -> dict[str, str]:
+                rec = graph.get(sid)
+                return {"id": sid, "name": str(getattr(rec, "name", "") or sid)}
+
+            held = {ref: holder(sid) for ref, sid in claims.items() if ref.startswith(workorders.PREFIX)}
+            mine = claims.get(queue_mod.qid(name, id))
+            async with self._applying_mark(root, f"ledger:{queue_mod.qid(name, id)}", "lift"):  # TD-1508
+                try:
+                    done = await asyncio.to_thread(
+                        board_mod.lift_on_press, root, id, answer, held, holder(mine) if mine else None
+                    )
+                except board_mod.Refused as err:
+                    raise RpcError(str(err)) from None
+                if done.get("gone"):
+                    return {"repo": root, "id": id, "gone": True}
+                log.info("board %s: %s", root, done.get("message"))
+                await self._reread_board(root)
+        finally:
+            self._board_adding.discard(key)
+        return {"repo": root, "id": id, "lifted": True}
 
     def _decided_covers(self) -> set[str]:
         """Every `<repo>#TD-n` an open decided line on any board the home reads covers — names it, names the entry
