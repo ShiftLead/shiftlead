@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 import shutil
 import subprocess
 
@@ -82,8 +83,8 @@ def test_a_refusals_press_line_keeps_its_prefix_capitalised_and_says_what_was_se
 
 def test_an_items_drawing_changes_with_its_bar_and_not_with_an_age():
     bar = [{"dataset": {"act": "ledger"}, "text": "“Yes”"}, {"text": "Open"}]
-    line = {"text": "You answered “Yes”, 2m ago — waiting."}
-    later = {"text": "You answered “Yes”, 3m ago — waiting."}
+    line = {"text": "You answered “Yes”, just now — waiting."}
+    later = {"text": "You answered “Yes”, 1 h ago — waiting."}
     got = _node(
         {
             "lines": [],
@@ -102,10 +103,13 @@ def test_an_items_drawing_changes_with_its_bar_and_not_with_an_age():
 @pytest.mark.unit
 def test_every_refusal_is_stored_with_its_flag_and_drawn_by_the_one_drawer():
     # each writer stores the one shape, its `sent` flag false but where a hand-off may have gone
-    assert JS.count("AO.pressErrs[") == 9  # two deletes, four writers, three reads
+    for rhs in re.findall(r"AO\.pressErrs\[[^\]]+\] = ([^;]+);", JS):
+        assert rhs in ("err", "AO.pressErr(words, AO.maySent(e), atSig)"), rhs
     assert "const err = AO.pressErr(words, !/^not handed: /.test(words), atSig);" in JS
-    assert "AO.pressErrs[qled] = AO.pressErr(words, false, atSig);" in JS
-    assert "AO.pressErrs[msgOf] = AO.pressErr(words, false, atSig);" in JS
+    assert "AO.pressErrs[qled] = AO.pressErr(words, AO.maySent(e), atSig);" in JS
+    assert "AO.pressErrs[msgOf] = AO.pressErr(words, AO.maySent(e), atSig);" in JS
+    # a refusal with a status wrote nothing; no answer at all, or a verdict unknown, may have
+    assert "AO.maySent = (e) => !e || !e.status || e.status === 503;" in JS
     assert "if (row && row.dataset.msg && (left || writes)) AO.pressErrs[row.dataset.msg] = err;" in JS
     # nothing writes a refusal on a row's error line but the drawer
     assert "er.textContent = words" not in JS and "rowerr.textContent" not in JS
