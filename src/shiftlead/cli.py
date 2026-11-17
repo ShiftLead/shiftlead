@@ -53,6 +53,15 @@ from sessionorc.models import (
 from sessionorc.tmux import attach_argv
 from shiftlead import connect, doctor, feedback, orgcheck, repoconfig, service, teamrun, teams
 from shiftlead import org as orgmod
+from shiftlead.cardtext import (  # `ao card`'s names, kept where they were (TD-1903)
+    CARD_NOT_MAIL,  # noqa: F401
+    MAIL_WORDS_CUT,  # noqa: F401
+    _answer_lines,  # noqa: F401
+    _card_item_lines,  # noqa: F401
+    _card_row_line,  # noqa: F401
+    _card_time,  # noqa: F401
+)
+from shiftlead.cardtext import card_text as _card_text
 from shiftlead.ending import (
     closer_words,
     exit_words,
@@ -4899,9 +4908,6 @@ NO_UI_CARD = (
     "or ask from a terminal outside ShiftLead"
 )
 UI_CARD_WAIT = 30.0  # seconds: a cold card reads the queue, the inbox, the board and the ledger
-MAIL_WORDS_CUT = "its words are the person's to read"
-# `shiftlead.ui.queue.NOT_MAIL`, which needs the [ui] extra
-CARD_NOT_MAIL = ("board", "ledger", "red_pr", "fork_pr", "stuck")
 
 
 class _CardRefusal(Exception):
@@ -4975,160 +4981,6 @@ def _local_card(id: str) -> dict[str, Any] | None:
         if e.kind == "no_queue":
             raise _CardRefusal(f"the home did not serve the Queue: {e.why}") from e
         raise _CardRefusal(e.why) from e
-
-
-def _answer_lines(answers: Any, default: Any, consequences: Any = ()) -> list[str]:
-    """Each answer on its own line, the default marked (once) and, where it has one, its consequence."""
-    out: list[str] = []
-    cons = list(consequences or ())
-    for i, a in enumerate(answers or ()):
-        a = str(a)
-        if default and a == str(default) and not a.rstrip().lower().endswith("(default)"):
-            a += " (default)"
-        c = str(cons[i]) if i < len(cons) and cons[i] else ""
-        out.append(f"- {a}" + (f" — {c}" if c else ""))
-    return out
-
-
-def _card_item_lines(x: Mapping[str, Any], cut: bool) -> list[str]:
-    """One attached item as a block (§4.7 *Each item's block*): its first line, then its body indented."""
-    row = x.get("row") if isinstance(x.get("row"), Mapping) else {}
-    which = str(row.get("row") or "")
-    mail = which not in CARD_NOT_MAIL
-    # a decided line moved while stuck prints as the stuck row: its id the `stuck` key (the line's own), kind *stuck*;
-    # a handed entry's the same, its id its own (TD-1497 slice 4)
-    moves = which == "board" or bool(row.get("handed_row"))
-    st = row.get("stuck") if moves and isinstance(row.get("stuck"), Mapping) else None
-    stuck = st if st is not None and not st.get("waiting_until") else None
-    kind = "stuck" if stuck else {"red_pr": "red PR", "fork_pr": "fork PR"}.get(which) or str(row.get("kind") or "")
-    head = [str(x.get("item") or row.get("id") or "")]
-    if kind:
-        head.append(kind)
-    if mail and (row.get("from_name") or row.get("from")):
-        head.append(f"from {row.get('from_name') or row.get('from')}")
-    if mail and row.get("at"):
-        head.append(_card_time(row["at"]))
-    if x.get("on_row"):
-        head.append(f"on {x['on_row']}")
-    if which == "board":
-        head.append(f"board of {row.get('repo_name') or x.get('repo') or ''}".rstrip())
-    tied = x.get("tied") if isinstance(x.get("tied"), Mapping) else None
-    if tied:
-        head.append(f"tied by {tied.get('by')}: {tied.get('ref')}")
-    if which == "board" and row.get("due"):
-        head.append(f"due {row['due']}")
-    if mail and cut:
-        head.append(MAIL_WORDS_CUT)
-    body: list[str] = []
-    if which == "board":
-        card = row.get("card") if isinstance(row.get("card"), Mapping) else {}
-        body += [str(card.get(k) or "") for k in ("sentence", "leads", "context")]
-        body += [str(row.get("detail") or ""), *_answer_lines(row.get("answers"), row.get("default"))]
-        if st is not None:  # the stuck words, a line under the decided line's own (§6 rule 13, TD-1497)
-            body.append(str(st.get("text") or ""))
-    elif which == "ledger":
-        body += [str(row.get(k) or "") for k in ("title", "ask", "detail")]
-        body += _answer_lines(row.get("answers"), row.get("default"), row.get("consequences"))
-    elif which in ("red_pr", "fork_pr"):
-        body += [str(row.get("title") or ""), str(row.get("text") or "")]
-    elif which == "stuck":  # the home's words, never mail's: *stuck <age>: <the work> — <reason>* (TD-1497)
-        body.append(str(row.get("text") or ""))
-    elif not cut:
-        if row.get("handed_row"):
-            entry = row.get("entry") if isinstance(row.get("entry"), Mapping) else {}
-            body.append(str(entry.get("title") or ""))
-        else:
-            body += [str(row.get("subject") or ""), str(row.get("text") or "")]
-            body += _answer_lines(row.get("answers"), row.get("default"))
-    if row.get("handed_row") and st is not None:  # the home's words, kept where mail's are cut (TD-1497 slice 4)
-        body.append(str(st.get("text") or ""))
-    # a holder's or a pending row's stuck lines: work it is the actor of, under its own row (§6 rule 13, TD-1497)
-    body += [str(ln.get("text") or "") for ln in row.get("stuck_lines") or () if isinstance(ln, Mapping)]
-    lines = ["  " + " · ".join(h for h in head if h)]
-    for b in body:
-        lines += ["    " + ln if ln.strip() else "" for ln in b.strip("\n").splitlines()] if b.strip() else []
-    return lines
-
-
-def _card_time(at: Any) -> str:
-    """A message's time as §4.7's example writes it, `2026-11-05 14:12`; anything unparsable as it is."""
-    try:
-        return datetime.fromisoformat(str(at)).strftime("%Y-%m-%d %H:%M")
-    except ValueError:
-        return str(at)
-
-
-def _card_row_line(r: Mapping[str, Any]) -> str:
-    """One row of the card's `Part of:` tree (§4.7 *The rows*), indented by its depth."""
-    holder = r.get("holder") if isinstance(r.get("holder"), Mapping) else None
-    state = str(r.get("state") or "")
-    rest = [state] if state else [f"needs you ({r['needs']})"] if r.get("needs") else []
-    name = str(holder.get("name") or holder.get("id") or "") if holder else ""
-    if name and name not in state:
-        rest.append(name)
-    if r.get("pr") and not r.get("archived"):
-        rest.append(f"PR #{r['pr']}")
-    rest += [f"after {a}" for a in r.get("after") or ()]
-    if r.get("archived") and r.get("resolved"):
-        rest.append(str(r["resolved"]))
-    first = "  ".join(str(v) for v in (r.get("qid"), r.get("priority"), r.get("page")) if v)
-    return "  " * (1 + int(r.get("depth") or 0)) + first + ("  " + " · ".join(rest) if rest else "")
-
-
-def _card_text(got: Mapping[str, Any], cut: bool | None = None) -> list[str]:
-    """`ao card`'s text form (§4.7 *What it prints*): the header, the rows with every fold opened, the wants with
-    each item's block, then what the items mention."""
-    card = got.get("card") or {}
-    top = card.get("top") or {}
-    cut = got.get("mail") == "ids" if cut is None else cut or got.get("mail") == "ids"
-    group = str(card.get("group") or "")
-    where: list[str] = []
-    if group == "up_next":
-        places = [p for p in card.get("places") or () if isinstance(p, Mapping)]
-        if len(places) > 1:
-            where.append("up next " + ", ".join(f"{p.get('n')} in {p.get('repo')}" for p in places))
-        elif places or card.get("place"):
-            where.append(f"up next {places[0].get('n') if places else card.get('place')}")
-        else:
-            where.append("up next")
-    elif group == "waiting":
-        where.append("waiting")
-        wait = card.get("wait") if isinstance(card.get("wait"), Mapping) else {}
-        if wait.get("phrase"):
-            where.append(str(wait["phrase"]))
-        would = [p for p in card.get("would_be") or () if isinstance(p, Mapping)]
-        if would:
-            where.append(", ".join(f"would be {p.get('n')} in {p.get('repo')}" for p in would))
-    elif group:
-        where.append(group.replace("_", " "))
-    if card.get("status"):
-        where.append(str(card["status"]))
-    where.append(f"{card.get('done') or 0}/{card.get('of') or 0} done")
-    if card.get("start"):
-        where.append(f"start {card['start']}")
-    lines = [f"{card.get('id')} — {top.get('title') or ''}", " · ".join(where), "rows"]
-    lines += [_card_row_line(r) for r in [top, *(card.get("rows") or ())] if isinstance(r, Mapping)]
-    wants = got.get("wants") or {}
-    groups: list[tuple[str, list[Any]]] = [("decide", wants.get("decide") or []), ("do", wants.get("do") or [])]
-    read = wants.get("read") or {}
-    labels = {"answered": "answered for you", "waiting": "waiting on them", "fyi": "fyi"}  # `READ_LINES`
-    groups += [(labels.get(k, k), read.get(k) or []) for k in (*labels, *(k for k in read if k not in labels))]
-    groups += [("with you", wants.get("with_you") or []), ("answered", wants.get("answered") or [])]
-    for label, items in groups:
-        if items:
-            lines.append(f"{label} {len(items)}")
-            for x in items:
-                lines += _card_item_lines(x, cut)
-    mentioned = got.get("mentioned") or {}
-    if mentioned:
-        lines.append("mentioned")
-        for qid, items in mentioned.items():
-            lines.append(f"  {qid}")
-            for m in items:
-                words = " ".join(str(m.get("words") or "").split())
-                words = words if len(words) <= 100 else words[:99] + "…"
-                lines.append("    " + " · ".join(str(v) for v in (m.get("item"), m.get("kind"), words) if v))
-    return lines
 
 
 def cmd_card(args: argparse.Namespace) -> int:

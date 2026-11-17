@@ -480,7 +480,7 @@ def test_start_session_starts_the_persons_session_in_td_n_with_work_md_sent(tmp_
         f"I opened this session from the Inbox to work {ref} of samscrape's ledger (docs/technical_debt.md) myself: "
         f"it waits on me ({why}). Its entries are: waits on me — {qid}; the rest — none. Read the entry, check the "
         "code and the design for what is already built or decided, and tell me in a few lines what it asks of me "
-        "and what you would do first. Then wait for me: I drive this one."
+        "and what you would do first."
     )
 
 
