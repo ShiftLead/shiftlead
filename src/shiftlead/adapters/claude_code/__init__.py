@@ -11,6 +11,7 @@ from __future__ import annotations
 import fcntl
 import json
 import logging
+import math
 import os
 import re
 import shlex
@@ -1136,6 +1137,7 @@ class ClaudeCodeAdapter:
         except UsageRefused as e:
             out: dict = {"reason": e.reason, "retry_after": e.retry_after}
             return out | {"detail": e.detail} if e.detail else out
+        # `usage` names a body it cannot read (TD-1904); None is left for a caller that stubs it
         return {**asdict(u), "reason": "ok"} if u else {"reason": "error", "detail": "a body of no known shape"}
 
     def usage(self, profile: Profile, timeout: float = 10.0) -> Usage | None:
@@ -1147,9 +1149,9 @@ class ClaudeCodeAdapter:
         endpoint answers HTTP 429 `rate_limit_error` when the account's allowance is spent — by
         us, by the tool, by anything else on the same account — and a caller told only `None`
         answers it with another request a minute later. **A 200 whose body does not parse is the
-        one that still returns `None`**: `parse_usage` reads what it can and answers nothing when
-        the shape is not what it knows, which is a shape question and not a reason; `usage_for`
-        turns that into `error`, which is what it is.
+        one with no window `parse_usage` can read** (TD-1904): it is refused as `error`, its detail the
+        body's keys and the kind of each window it looked for (`_shape`), never their values, so the
+        journal says what the endpoint sent in place of the windows.
         """
         import urllib.error
         import urllib.request
@@ -1167,13 +1169,17 @@ class ClaudeCodeAdapter:
         )
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 — fixed https URL
-                return parse_usage(json.loads(r.read().decode()))
+                body = json.loads(r.read().decode())
         except urllib.error.HTTPError as e:
             if e.code == 429:
                 raise UsageRefused("rate_limited", _retry_after(e), _cause(e)) from None
             raise UsageRefused("error", detail=_cause(e)) from None
         except Exception as e:  # noqa: BLE001
             raise UsageRefused("error", detail=_cause(e)) from None
+        u = parse_usage(body) if isinstance(body, dict) else None
+        if u is None:
+            raise UsageRefused("error", detail=_shape(body))
+        return u
 
 
 def _pid_alive(pid: int, proc_start: object) -> bool:
@@ -1194,24 +1200,56 @@ def _pid_alive(pid: int, proc_start: object) -> bool:
 NOT_A_MODEL = {"oauth_apps"}
 
 
+# the endpoint's account-wide windows, by the labels a reading gives them (`STATUSLINE_WINDOWS`'s too)
+ENDPOINT_WINDOWS = {"five_hour": "5h", "seven_day": "week"}
+
+
+def _pct(v: object) -> int | None:
+    """A window's `utilization` as a whole percentage, or None when it carries no number."""
+    u = v.get("utilization") if isinstance(v, dict) else None
+    ok = isinstance(u, int | float) and not isinstance(u, bool) and math.isfinite(u)  # json reads NaN
+    return int(u) if ok else None
+
+
+def _shape(body: object) -> str:
+    """Why a 200 gave no reading (TD-1904): the body's keys and the kind of each account-wide
+    window, never a value, bounded for the journal — `a body of no known shape: keys five_hour,
+    seven_day; five_hour null, seven_day dict with no number`."""
+    if not isinstance(body, dict):
+        return f"a body of no known shape: a {type(body).__name__}, not an object"
+    keys = ", ".join(sorted(str(k) for k in body)[:12]) or "none"
+    kinds = []
+    for key in ENDPOINT_WINDOWS:
+        if key not in body:
+            kind = "missing"
+        elif body[key] is None:
+            kind = "null"
+        else:
+            kind = "dict with no number" if isinstance(body[key], dict) else type(body[key]).__name__
+        kinds.append(f"{key} {kind}")
+    return f"a body of no known shape: keys {keys}; {', '.join(kinds)}"[:200]
+
+
 def parse_usage(d: dict) -> Usage | None:
     """The endpoint's windows as labelled entries: `5h`, `week` (all models), and every per-model
     weekly window it reports as `week · <Model>` (TD-122) — the account page shows *Fable 17%*
-    beside *All models*, and the chip's worst-window rule must see it. A per-model window the
-    endpoint sends empty (`null`, or no number) is not one."""
-    try:
-        f, w = d["five_hour"], d["seven_day"]
-        windows = [
-            Window(label="5h", pct=int(f["utilization"]), resets=f.get("resets_at")),
-            Window(label="week", pct=int(w["utilization"]), resets=w.get("resets_at")),
-        ]
-    except (KeyError, TypeError, ValueError):
+    beside *All models*, and the chip's worst-window rule must see it. Each window is read on its
+    own (TD-1904): one the endpoint leaves out or sends empty (`null`, or no number) is not one, an
+    account with no five-hour window still has its week, and a body with no window at all is None."""
+    if not isinstance(d, dict):
         return None
+    windows = []
+    for key, label in ENDPOINT_WINDOWS.items():
+        pct = _pct(d.get(key))
+        if pct is not None:
+            windows.append(Window(label=label, pct=pct, resets=d[key].get("resets_at")))
     for key, v in d.items():
         model = key.removeprefix("seven_day_")
         if model == key or not model or model in NOT_A_MODEL or not isinstance(v, dict):
             continue
-        u = v.get("utilization")
-        if isinstance(u, int | float) and not isinstance(u, bool):
-            windows.append(Window(label=f"week · {model.capitalize()}", pct=int(u), resets=v.get("resets_at")))
+        pct = _pct(v)
+        if pct is not None:
+            windows.append(Window(label=f"week · {model.capitalize()}", pct=pct, resets=v.get("resets_at")))
+    if not windows:
+        return None
     return Usage(windows=windows, fetched=datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"))
