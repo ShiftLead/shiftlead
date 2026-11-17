@@ -1,0 +1,13 @@
+# Line endings (cadence.md §7.14, TD-187): every text file is LF in the repository and in every
+# checkout, whatever a clone's core.autocrlf says. A file that must be CRLF says so below.
+# SEED: the repo owns this file — add its own patterns, keep the first rule.
+* text=auto eol=lf
+
+# Windows scripts, run by cmd.exe or PowerShell, keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# The ledgerboard fixtures' bytes are what their tests check, CRLF and mixed endings included:
+# git never converts them (TD-1913; agent-cadence's own seed uses the same rule).
+tests/ledgerboard/** -text
