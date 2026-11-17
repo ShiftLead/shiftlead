@@ -1579,10 +1579,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
          §4.9b, so none is an order's actor, nor is a member its flow sat out, `work.sat_out`); a team none of
          whose members is live and that `work.team_wound_down` reads wound down, or `work.team_stopped`
          stopped, is read whole, by its `work_waiting` (rule 8) — one whose members ended otherwise (a
-         crash, a restart ceiling) keeps each member's own state as its reason, the cure's name, and a live
-         one whose restart waits on the person (an early or a repeated `restart_wanted`, the Inbox row's
-         reading) reads *restart wanted · early* (or *· repeats <ref>*), its cure the person's Restart,
-         rather than *idle* (TD-1900) — where two teams' lanes
+         crash, a restart ceiling) keeps each member's own state as its reason, the cure's name — where two teams' lanes
          take it, each team's, the reason the first's in `teams` order. A line no team's lane takes reads
          *no lane takes it* once past the wait. While the line has a **holder**, its holders are its only
          actors: each record that `mail.lease_holders(f"board:{key}", records, now)` returns over the
@@ -1626,10 +1623,19 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        *suspended*, *sat out*, *restart ceiling*, *profile gated*, *fill ceiling*), stored as
        `{state: "unfillable", why}` and drawn as `why`, never through `words` (the `stuck` shape check takes
        any `state` string); and
-       two whose words are this rule's own, for which
+       three whose words are this rule's own, for which
        `words` is not called: a record
        with `stalled_ticks` at least 2 reads **`stalled`**, *`<name>` is `stalled?` — a request held past
-       `STALL_AFTER` with nothing new on its screen*; and an `idle` one reads *`<name>` has been idle
+       `STALL_AFTER` with nothing new on its screen*; a record whose restart waits on the person — one for
+       which `agent_common.restart_waits_of` gives a mark that does not lapse (`lapses` false), the Inbox
+       restart row's own reading (an early or a repeated `restart_wanted`, a restart ceiling, a lost brief,
+       a held restart; a fill mark that lapses cures itself and is not this) — reads **`restart`**,
+       *`<name>` waits on your Restart: <word>*, `<word>` that function's short word, in place
+       of `idle` and of whatever reason `read` gives that record (`restart_ceiling` and `fills_exhausted`
+       among them, the same cure in the row's words) (TD-1900: a designer idle behind an early restart read only as
+       idle, so the press that cured it went unnamed), for every kind of work this rule reads (an ask's
+       addressee, an order's actor, a holder), its `since` the record's own idle start as `idle`'s is,
+       tested after `stalled` and before `idle`; and an `idle` one reads *`<name>` has been idle
        since `<time>` with it open*, `<time>` the record's own idle start (`agent_common.idle_from`), the
        stamp's `since` keeping the clock's instant (*The clock*, below) (TD-1435's cause: a seat that read its asks
        and ends every turn on
@@ -1747,7 +1753,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        the first actor's `unanswered` stamp — `needs_you` among the
        reasons, its words a line under its pending row — as `read` gives it (with its
        `since`, `start_at`, `gate`, `ended` and the rest), rule 13's own as `{state: "stalled" | "idle",
-       since}`, a team's as `{state: "team", team, held}` (`held` as rule 8 writes it, none for *waits
+       since}` or `{state: "restart", word, since}` (TD-1900), a team's as `{state: "team", team, held}` (`held` as rule 8 writes it, none for *waits
        for your Start*, `{why: "stopped"}` and `{why: "wound_down"}` for the other two), *no lane takes
        it* as `{state: "no_lane"}`; **`actor`** `{id, host,
        name, more}` — the first not acting (an ask's in its `to` order, an order's by lane order then id),
