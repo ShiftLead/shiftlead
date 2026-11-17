@@ -1,6 +1,7 @@
 """The Focus pane measures character widths by Unicode 11 (design §2 goal 12, TD-1912): xterm.js's unicode11
 addon, vendored at the release paired with the vendored xterm, is loaded where the terminal is built and made
-the active version, so an emoji or a wide symbol takes the cells tmux gives it."""
+the active version, so an emoji or a wide symbol takes the cells tmux gives it (a ZWJ sequence or an emoji
+presentation selector waits for the xterm 6 line, TD-1918)."""
 
 from __future__ import annotations
 
