@@ -355,6 +355,7 @@ async def pump(
     leave: Callable[[], Awaitable[None]] | None = None,
     jump: Callable[[list[dict]], Awaitable[bool]] | None = None,
     read_only: bool = False,
+    name: str = "",
 ) -> None:
     """Run both directions until either side ends. `recv` yields str (keys), bytes, or a dict
     with `resize: [cols, rows]` or `scroll: "up" | "down"` and, for the wheel, `lines: n`; `send`
@@ -393,8 +394,12 @@ async def pump(
                 return
             if isinstance(msg, dict):
                 if "resize" in msg:
-                    cols, rows = msg["resize"]
-                    pty.resize(int(cols), int(rows))
+                    cols, rows = int(msg["resize"][0]), int(msg["resize"][1])
+                    # one line per grid the page sends, so a repeated or garbled repaint can be lined up with
+                    # the resizes that preceded it (the connect line records only the grid at the dial); ints
+                    # only, so a client's odd value never reaches the log
+                    log.info("term resize %s %dx%d", name or "-", cols, rows)
+                    pty.resize(cols, rows)
                 elif "scroll" in msg and scroll is not None:
                     lines = msg.get("lines")
                     scrolled = True
