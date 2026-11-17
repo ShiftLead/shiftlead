@@ -1094,7 +1094,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        - it was closed by the tick after the person wound it down: its closer's `by` is `tick`, its
          `why` `wind_down` or `finished`, and its `wind_down.by` or `wrapup_by`, as the record holds it,
          is the person — a member's `wind_down` close, and a manager's rule 9 close after the person's
-         Wind down sent it the wrap-up (TD-1895, rule 9 *A wind-down's close*). A tick's close for any
+         Wind down sent it the wrap-up (TD-1895, rule 9 *A wind-down's close*); the manager's own close
+         of itself after that wrap-up is the bullet above's. A manager whose `wrapup_by` a person's later
+         send cleared carries no mark of its own and reads as the person's where any member of its team
+         carries a `wind_down.by` that is the person. A tick's close for any
          other cause names nobody, as before; such a close after a session's wind-down reads as that
          session's, `other`.
 
@@ -1291,7 +1294,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      press or a session's) that is not a seat and not its team's manager, once it has settled — `idle`
      as this rule reads idle, and the mark's `waits` false, or a turn ended after the mark (`turn_at`,
      the same clock) with the record idle since for `SEND_STALL_SECONDS` (measured on the home's clock
-     from the first tick that read it idle after that turn), or `WRAPUP_GRACE` past the mark (on the home's clock, from the first tick that read the mark) — under `_finished_close`'s check, with closer `{by: tick, why: wind_down}`, **whether or not
+     from the first tick that read it idle after that turn, and started again by any tick that reads it not idle), or `WRAPUP_GRACE` past the mark (on the home's clock, from the first tick that read the mark) — under `_finished_close`'s check, with closer `{by: tick, why: wind_down}`, **whether or not
      it declared and whether or not the reading holds**: the presser's word is the ending (§4.9a). It
      runs **first** in the team's pass, and the members and their views are read again after it, so a
      member it just closed is never read as one at work. One left open with work is closed the tick its
