@@ -2073,6 +2073,7 @@ class TickMixin:
                         # only to the record still under its address, as a read is
                         if self._is_record(s) and self._cadence_member(s):
                             old["closed"] = True
+                            old.pop("row", None)  # a fail nothing can cure asks nobody (TD-1908)
                             self._save(s)
                         continue
                 got = await asyncio.to_thread(cadence_mod.check, root, pr)

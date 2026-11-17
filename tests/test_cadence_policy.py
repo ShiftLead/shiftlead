@@ -59,6 +59,24 @@ def test_a_read_leaves_the_entry_and_its_marks():
     assert merged["row"] == "t4" and merged["merged"] is True and not cadence.untold(merged)
 
 
+def test_a_pr_closed_unmerged_asks_nobody_to_fix_its_fail():
+    """TD-1908: a PR closed unmerged on purpose (a moot lift, a moot filing PR) can never pass, so its
+    fail is no line, no clause and no Inbox row — first read, read again after the member was told,
+    or carried from an older read that set `row` before the close."""
+    first = cadence.record(None, 842, "aaa", False, FAIL, "t1", closed=True)
+    assert first["closed"] is True and "row" not in first and not cadence.untold(first)
+    assert cadence.clause([first]) == ""
+    second = cadence.record({**first, "told": "t1"}, 842, "aaa", False, FAIL, "t2", closed=True)
+    assert "row" not in second and second["told"] == "t1"
+    shown = cadence.record({"pr": 842, "verdict": "fail", "failed": ["review"], "told": "t1", "row": "t1"},
+                           842, "aaa", False, FAIL, "t3", closed=True)  # fmt: skip
+    assert "row" not in shown, "a row set while it was open goes once it is read closed"
+    older = {"pr": 842, "verdict": "fail", "failed": ["review"], "told": "t1", "row": "t1", "closed": True}
+    assert cadence.rows([older]) == [] and cadence.clause([older]) == "" and not cadence.untold(older)
+    reopened = cadence.record(older, 842, "bbb", False, FAIL, "t4")
+    assert "closed" not in reopened and cadence.rows([reopened]) == [reopened], "reopened and failing again: the row"
+
+
 def test_the_fixed_words():
     c = {"pr": 842, "verdict": "fail", "failed": ["review", "ledger"]}
     assert cadence.line(c, "TD-257") == (
@@ -488,9 +506,11 @@ async def test_a_closed_pr_settles_and_an_open_ones_head_comes_from_the_repo_rea
         gh.heads[842], gh.verdicts[842] = ("aaa", "open"), FAIL
         await agent._cadence_pass([rec])
         assert gh.asked == [842] and gh.ran == [842]
+        rec.checks[0].update(told="t", row="t")  # told, and the row up, before the close (TD-1908)
         gh.heads[842] = ("aaa", "closed")  # closed at the head it was read at: settled, not read again
         await agent._cadence_pass([rec])
         assert rec.checks[0]["closed"] is True and gh.ran == [842] and gh.asked == [842, 842]
+        assert "row" not in rec.checks[0] and cadence.clause(rec.checks) == "", "TD-1908: nobody is asked"
         await agent._cadence_pass([rec])
         assert gh.asked == [842, 842], "a closed PR's settled read asks nothing more, not even its head"
         # a record replaced while the pass was out is never written: the mark goes to the record under the address
