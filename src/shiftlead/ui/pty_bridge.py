@@ -394,11 +394,12 @@ async def pump(
                 return
             if isinstance(msg, dict):
                 if "resize" in msg:
-                    cols, rows = msg["resize"]
+                    cols, rows = int(msg["resize"][0]), int(msg["resize"][1])
                     # one line per grid the page sends, so a repeated or garbled repaint can be lined up with
-                    # the resizes that preceded it (the connect line records only the grid at the dial)
-                    log.info("term resize %s %sx%s", name or "-", cols, rows)
-                    pty.resize(int(cols), int(rows))
+                    # the resizes that preceded it (the connect line records only the grid at the dial); ints
+                    # only, so a client's odd value never reaches the log
+                    log.info("term resize %s %dx%d", name or "-", cols, rows)
+                    pty.resize(cols, rows)
                 elif "scroll" in msg and scroll is not None:
                     lines = msg.get("lines")
                     scrolled = True
