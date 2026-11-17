@@ -48,13 +48,14 @@
       term.loadAddon(gl);
     } catch (e) { /* no WebGL here: the DOM renderer draws the pane */ }
   };
-  // Character widths by Unicode 11 (goal 12, TD-1912): xterm.js's own tables are Unicode 6, so an emoji or
-  // a wide symbol would take other cells than tmux gives it and every line after it would drift. The
-  // `unicode` API is a proposed one, so the terminal is built with `allowProposedApi`.
+  // Character widths by Unicode 15 with grapheme clusters (goal 12, TD-1912, TD-1918): xterm.js's own tables
+  // are Unicode 6, so an emoji, a wide symbol, a ZWJ sequence or an emoji presentation selector would take
+  // other cells than tmux gives it and every line after it would drift. The `unicode` API is a proposed one,
+  // so the terminal is built with `allowProposedApi`.
   AO.termUnicode = function (term) {
-    if (typeof Unicode11Addon === "undefined") return;
-    term.loadAddon(new Unicode11Addon.Unicode11Addon());
-    term.unicode.activeVersion = "11";
+    if (typeof UnicodeGraphemesAddon === "undefined") return;
+    term.loadAddon(new UnicodeGraphemesAddon.UnicodeGraphemesAddon());
+    term.unicode.activeVersion = "15-graphemes";
   };
   // xterm.js measures a cell once, at open; the bundled face (app.css) may still be on its way, and
   // a cell measured on the fallback font leaves every glyph misplaced once it lands. So when the
