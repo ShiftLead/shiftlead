@@ -194,5 +194,8 @@ def card_block(got: Mapping[str, Any], id_: str, cap: int = CARD_PROMPT_CAP) -> 
     if kept < len(lines):
         while kept > rows_end and (not lines[kept] or lines[kept].startswith("    ")):
             kept -= 1
+        # nor a label left with nothing under it: a group's (*decide 2*) or *mentioned*
+        while kept > rows_end and not lines[kept - 1].startswith(" "):
+            kept -= 1
         lines = [*lines[:kept], CARD_CUT.format(id=id_)]
     return [CARD_DATA.format(id=id_), "", *lines, "", CARD_END]

@@ -103,6 +103,7 @@ def test_an_oversize_card_is_cut_at_a_row_or_an_item_boundary_naming_ao_card():
         assert card[-1] == cardtext.CARD_CUT.format(id=CID), cap
         kept = card[:-1]
         assert kept == whole[: len(kept)] and len(kept) in starts, f"cut mid-unit at cap {cap}"
+        assert len(kept) <= rows_end or kept[-1].startswith(" "), f"a label left bare at cap {cap}"
         assert sum(len(ln) + 1 for ln in kept) <= cap
     assert cardtext.card_block(got, CID, cap=total)[2:-2] == whole, "a card within the cap is whole, no cut line"
 
