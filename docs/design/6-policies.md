@@ -120,12 +120,15 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      false) is a person's or a controller's act and is never undone; an exit after a wrap-up is an
      ending. **The ceiling**: `RESTART_CEILING` — three counted restarts of one session in two
      hours (a wanted restart with new work is not counted: §4.9a *Inside the ceiling*;
-     `agent_common._counted`), `one_for_one` (only the session that exited, never its siblings).
+     `agent_common._counted`; one left out only for a push counts toward `RESTART_PUSHED_CEILING`, six
+     in the window, tested by rule 2 after this one, §4.9a *A pushed commit is new work*, TD-1900),
+     `one_for_one` (only the session that exited, never its siblings).
      Each restart is appended to the record's `restarts: [{at, why}]` (home-owned, carried across
      the supersede so the count survives the restart it counts, and drawn for `RESTART_WINDOW` as
      the card's **restarted** chip, §4.5a; each replay's entry also carries
      `done: [{ref, pr}]` and `left: [ref]`, what the run it replaced reported and what it claimed
-     and did not close, from the old record's `progress`, which the new record does not keep but for
+     and did not close, from the old record's `progress`, and a wanted restart's `pushed: <sha>` where its
+     mark carried one (§4.9a *A pushed commit is new work*, TD-1900), which the new record does not keep but for
      its waiting claims, rule 5);
      **the mail is kept**: every replay of the tick's — this rule's, rule 2's, rule 7's and
      rule 8's — is a `create` with `keep_mail` (§4.9b), so the closed run's inbox and outbox move
@@ -166,7 +169,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      restart runs and clears the mark itself, so `restart_blocked` is transient where
      `restart_ceiling` is not: the ceiling stands until a person's Resume or Forget (save a seat's
      plain fill mark, which lapses after the hour, rule 3), or until the
-     window holds fewer than `RESTART_CEILING` counted restarts and the member declares a clean
+     window holds fewer than `RESTART_CEILING` counted restarts (a `why: pushed` mark: fewer than
+     `RESTART_PUSHED_CEILING` by its own count, §4.9a, TD-1900) and the member declares a clean
      `restart_wanted`, which rule 2 then acts on — the ceiling guards against a crash loop, not a
      member that has worked for hours since — and rule 1 never restarts past it; a person's Resume
      clears `restarts` with the mark, so a resumed session gets three fresh restarts, where the
