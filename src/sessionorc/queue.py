@@ -1375,8 +1375,9 @@ def lay_held(queue: Mapping[str, Any], repos: Mapping[str, Mapping[str, Any]]) -
             return row
         if (applying := pressing.get(str(row.get("qid") or ""))) is None:
             return row
+        # `restart_home` stays, so the card is still *needs you* (TD-1856); the word it replaces goes
         return {**row, "state": applying_words(applying), "needs": None, "answered": None, "applying": applying,
-                "lift_here": False}  # fmt: skip
+                "lift_here": False, "restart_word": False}  # fmt: skip
 
     def card(c: Any) -> Any:
         if not isinstance(c, Mapping):
@@ -1586,6 +1587,13 @@ def reading(
         live.setdefault(str(getattr(rec, "name", "") or rec.id), str(rec.id))
 
     pressing = _pressing(open_, boards, linked)
+    # the row each live record's restart row is homed on, where its mark passes the one reader (§4.4 *The card's
+    # status*, TD-1856): the claim `holder_claims` picks, as the Inbox's `item_home` picks it — every `holds` qid is
+    # in `open_`, so the pick is the page's
+    from sessionorc import agent_common  # the tick's readers; imported late, as the agent's modules import this
+
+    marked = {str(rec.id) for rec in recs if agent_common.restart_waits_of(rec) is not None}
+    restart_homes = {q for sid, q in holder_claims(holds, open_).items() if sid in marked}
     # the open decided lines that hide an entry's item, each with what it covers: a row's ⋯ Lift reads them (TD-1831)
     decided_lines = open_decided_lines(boards, open_, linked, person_only=True)
     # the design PR an item about each entry links (TD-1531), with its synopsis (TD-1536)
@@ -1601,7 +1609,8 @@ def reading(
     def row(q: str) -> dict[str, Any]:
         if q in open_:
             e = open_[q]
-            st, needs, hold = _state(e, held.get(q, []), prs.get(q), recs, set(waiting), now)
+            st, needs, hold, restart = _state(e, held.get(q, []), prs.get(q), recs, set(waiting), now)
+            word = st
             # the need rows' `with_you` mark is the person's own session on a row that waits on them (TD-1281); on
             # any other row it holds, its record is the holder alone and the row carries no mark (TD-1567)
             mine = hold if needs else None
@@ -1657,6 +1666,12 @@ def reading(
                 # the person's own session holding their entry is its holder whatever else claims it (TD-1281,
                 # TD-1567), and a *stalled* row's the record it stands for, the first stuck one by id (TD-1567)
                 "holder": hold or (_holder(claim[0][0]) if claim and st != "stalled" else None),
+                # the row reads a restart word (TD-1856), from `_state`'s mark and never by the words: its word
+                # links the record's Focus, drawn `s-restart`
+                "restart_word": restart is not None and st == word,
+                # the row the restart row of a record whose mark passes the reader is homed on (`holder_claims`,
+                # TD-1856), whatever word it reads: its card is *needs you*
+                "restart_home": q in restart_homes,
                 "with_you": mine["name"] if mine else None,
                 "answered": answered,
                 "applying": applying,
@@ -1685,6 +1700,8 @@ def reading(
             "needs": None,
             "pr": pr,
             "holder": None,
+            "restart_word": False,
+            "restart_home": False,
             "with_you": None,
             "answered": None,
             "applying": None,
@@ -1741,13 +1758,15 @@ def _state(
     recs: list[Any],
     waiting: set[str],
     now: datetime,
-) -> tuple[str, str | None, dict[str, Any] | None]:
+) -> tuple[str, str | None, dict[str, Any] | None, dict[str, Any] | None]:
     """A row's one state word, the first that applies (§4.4 *A row's state*), what it needs of the person —
     `owner` (`Owner: paul`) or `decision` (`decision (paul)`) — when it waits on them, which draws no word, and
     the row's holder where the word stands for one: the person's own session where one claims the entry, the
     first by id of its claims' records with `unattended: false`, whose name *with you in <name>* carries (TD-1281;
-    on a row that needs nothing too, TD-1567), else a *stalled* row's first stuck record by id (TD-1567). The row
-    keeps its need; the caller sets the need rows' `with_you` mark from the holder only where the need is set."""
+    on a row that needs nothing too, TD-1567), else a restart word's record (TD-1856), else a *stalled* row's first
+    stuck record by id (TD-1567); and, fourth, the restart mark the word was read from (`agent_common.restart_waits`),
+    None where it read none. The row keeps its need; the caller sets the need rows' `with_you` mark from the holder
+    only where the need is set."""
     # `Owner: paul` holds nothing (TD-1375): the gate is the need, and the Owner says it is the person's to do
     need = (
         ("owner" if str(e.get("owner") or "").lower() == PERSON else "decision")
@@ -1757,15 +1776,30 @@ def _state(
     own = sorted((rec for rec, _ in claims if not getattr(rec, "unattended", False)), key=lambda r: str(r.id))
     if need:
         if own:
-            return f"with you in {own[0].name}", need, _holder(own[0])
-        return "", need, None
+            return f"with you in {own[0].name}", need, _holder(own[0]), None
+        return "", need, None, None
+    if not own and (marked := _restart_holder(claims)):  # before *stalled* (§4.4, TD-1856)
+        rec, mark = marked
+        return mark["word"], None, _holder(rec), mark
     word = _state_word(e, claims, pr, recs, waiting, now, own=own[0] if own else None)
     if own:
-        return word, None, _holder(own[0])
+        return word, None, _holder(own[0]), None
     if word == "stalled":
         stuck = sorted((rec for rec, _ in claims if _holder_stuck(rec, waiting, now)), key=lambda r: str(r.id))
-        return word, None, _holder(stuck[0]) if stuck else None
-    return word, None, None
+        return word, None, _holder(stuck[0]) if stuck else None, None
+    return word, None, None, None
+
+
+def _restart_holder(claims: Iterable[tuple[Any, Any]]) -> tuple[Any, dict[str, Any]] | None:
+    """The first record by id among a row's claims whose mark draws a restart row (§4.4 *A holder waiting on a
+    restart is not stalled*, TD-1856), with its mark — read by the one reader, never `_holder_stuck`: an idle
+    holder with a live subagent, or one working at its ceiling, reads the word too."""
+    from sessionorc import agent_common  # the tick's readers; imported late, as the agent's modules import this
+
+    for rec in sorted({id(r): r for r, _ in claims}.values(), key=lambda r: str(r.id)):
+        if (mark := agent_common.restart_waits_of(rec)) is not None:
+            return rec, mark
+    return None
 
 
 def _state_word(
@@ -1900,6 +1934,8 @@ def _card(
         "done": len(done_rows),
         "of": len(members) + len(done_rows),
         "status": _status(open_rows, [open_[q] for q in members]),
+        # a record's restart row is homed on one of its rows (TD-1856): the field the header and the pill read
+        "restart_home": any(r.get("restart_home") for r in open_rows),
         "stalled_holder": stalled_holder([top_row, *rows]),
         "wait": _wait(members, open_, blockers, parts, keyed, top),
         "start": _start(members, open_, keyed, top),
@@ -1946,7 +1982,10 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
     """The ledger's part of a card's status (§4.4 *The card's status*): *needs you* > *stalled* > *blocked*
     > *waiting* > *ready*; *steer*, and a question's *needs you*, are the mail's. A row the person's own
     session holds (`with_you`, TD-1281), or whose question the person answered (`answered`, TD-1316), which
-    keeps its `needs`, is no need."""
+    keeps its `needs`, is no need. A row a record's restart row is homed on (`restart_home`, TD-1856) is a need
+    first, whatever word it reads."""
+    if any(r.get("restart_home") for r in rows):
+        return "needs you"
     if any(r["needs"] and not r.get("with_you") and not r.get("answered") for r in rows):
         return "needs you"
     if any(r["state"] == "stalled" for r in rows):

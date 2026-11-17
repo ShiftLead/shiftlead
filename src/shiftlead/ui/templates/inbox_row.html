@@ -1007,9 +1007,9 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 
 {#- a state row on a card (a stopped holder's, §4.5a *Queue card: holder's state row*) draws its words as a foot and its
     controls in the answer bar (§4.5 screen 12 *One answer set*, TD-1842): a permission's **Allow** / **Deny** and *why?*
-    in slot 1, as are the row's own answers (Restart, Resume, Reopen and push, Hand back), then the right group —
-    the Dismiss its Inbox row draws, kept as today until TD-1856, and **Open**, its session's Focus. No Snooze on the
-    Queue -#}
+    in slot 1, as are the row's own answers (Restart, Reopen and push, Hand back), then the right group — a cadence or
+    held mark's Dismiss, and **Open**, its session's Focus. A restart row (TD-1856) draws Restart where the record's own
+    `restartable` says, then Open: no Resume, no Dismiss. No Snooze on the Queue -#}
 {% macro state_bar(e) -%}
 <div class="row gap wrap mfoot">
   {%- if e.row == 'permission' %}
@@ -1041,8 +1041,9 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   <button class="btn sm" data-act="deny" data-id="{{ e.sid }}" data-call="{{ e.call }}">Deny</button>
   <input class="denywhy" type="text" maxlength="200" data-id="{{ e.sid }}" data-call="{{ e.call }}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it">
   {%- elif e.row == 'restart' %}
-  {% if e.restartable %}<button class="btn sm" data-act="restart" data-id="{{ e.sid }}" title="{{ help_title('restart') }}">Restart</button>{% endif %}
-  <button class="btn sm" data-act="resume" data-id="{{ e.sid }}"{% if e.resume_confirm %} data-confirm="{{ e.resume_confirm }}"{% endif %}>Resume</button>
+  {#- on its entry's card (TD-1856): Restart from the record's own flag, never the merged one; no Resume, the record
+      being live, and no Dismiss — a seat's or an unsupervised record's row draws Open alone #}
+  {%- if e.record_restartable %}<button class="btn sm" data-act="restart" data-id="{{ e.sid }}" title="{{ help_title('restart') }}">Restart</button>{% endif %}
   {%- elif e.row == 'held_mail' %}
   <button class="btn sm primary" data-act="mode" data-via="inbox" data-id="{{ e.sid }}" data-unattended="0" title="{{ help_title('held-mail') }}">Hand back</button>
   {%- elif e.row == 'unpushed' %}
@@ -1051,8 +1052,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {%- endif %}
 {%- endset %}
 {%- set right %}
-  {%- if e.row == 'restart' %}<button class="btn sm ghost" data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="restart" data-until="dismissed:{{ e.at }}" title="remove this row: the mark stays on the record and its card, and a new mark raises a new row">Dismiss</button>
-  {%- elif e.mark == 'cadence' %}<button class="btn sm ghost" data-act="clear_mark" data-id="person" data-sid="{{ e.sid }}" data-kind="cadence" data-pr="{{ e.pr }}" title="{{ help_title('cadence-failed') }}">Dismiss</button>
+  {%- if e.mark == 'cadence' %}<button class="btn sm ghost" data-act="clear_mark" data-id="person" data-sid="{{ e.sid }}" data-kind="cadence" data-pr="{{ e.pr }}" title="{{ help_title('cadence-failed') }}">Dismiss</button>
   {%- elif e.mark == 'held' %}<button class="btn sm ghost" data-act="clear_mark" data-id="person" data-sid="{{ e.sid }}" data-kind="held" title="{{ help_title('held-missed') }}">Dismiss</button>{% endif %}
   {%- if e.sid %}{{ open_btn(e, 'Details' if e.row == 'unpushed' else 'Open') }}{% endif %}
 {%- endset %}

@@ -33,7 +33,7 @@ from sessionorc import settings as settings_mod
 from sessionorc import shots as shots_mod
 from sessionorc import unanswered as unanswered_mod
 from sessionorc import workorders as workorders_mod
-from sessionorc.agent_common import HELD_MAIL, STALL_AFTER, WRAPUP_GRACE, fill_ceiling, fill_lapses
+from sessionorc.agent_common import HELD_MAIL, STALL_AFTER, WRAPUP_GRACE, fill_ceiling, fill_lapses, restart_waits
 from sessionorc.client import call_sync
 from sessionorc.models import (
     PERSON,
@@ -47,7 +47,7 @@ from . import render as rendermod
 from . import uiconf
 from .cards import MODE_VIA_WORDS, _clock, _first_line, alarm_note, alarm_to_view, fill_words, subagent_held
 from .common import _age, _countdown, _instant, _iso, _left, editor_file_link, host_name, templates
-from .queue import HOLDER_ROWS, asker_repos, design_link, item_home
+from .queue import HOLDER, HOLDER_ROWS, asker_repos, design_link, item_home
 
 # -- the Inbox page (design §4.5 screen 6, §4.5a **Inbox page**, §4.10; TD-069 step 1) -------------
 
@@ -166,10 +166,11 @@ def restart_mark(v: dict[str, Any]) -> tuple[str, str] | None:
     on (§4.9a) — else None. The words are fixed, from the record's fields: an early one says what
     decided it (`restart_wanted.decided`, the host agent's reading — *early: nothing reported done
     this run*, *repeats TD-229: reported done by an earlier run too*; TD-249 slice 6), and its `why`
-    is the session's own sentence, shown as such and never acted on."""
-    if v.get("superseded_by"):
-        return None
+    is the session's own sentence, shown as such and never acted on. Whether the record has a row at all is the
+    one reader's (`restart_waits`, TD-1863), which the told row and the Queue's row word read too."""
     ceiling, held, wanted = v.get("restart_ceiling"), v.get("restart_blocked"), v.get("restart_wanted")
+    if restart_waits(wanted, ceiling, held, v.get("superseded_by"), v.get("state")) is None:
+        return None
     if isinstance(ceiling, dict):
         n = ceiling.get("count")
         n = n if isinstance(n, int) else "?"
@@ -190,7 +191,7 @@ def restart_mark(v: dict[str, Any]) -> tuple[str, str] | None:
             f"restart held: {held.get('dirty')} uncommitted and {held.get('unpushed')} unpushed in its checkout "
             "— it is restarted by itself the moment they are pushed"
         )
-    if isinstance(wanted, dict) and wanted.get("early") and v.get("state") in ("idle", "exited"):
+    if isinstance(wanted, dict):
         why = _first_line(wanted.get("why") or "") or "no reason given"
         decided = _first_line(wanted.get("decided") or "") or "early"  # a mark older than the field
         return str(wanted.get("at") or ""), f"restart wanted · {decided} — {why}"
@@ -434,6 +435,9 @@ def state_rows(
                     or (v.get("seat") is not None and fill_ceiling(v.get("restart_ceiling"))),
                     # a seat's plain fill mark lapses after the hour: the caption says so (§4.5a, TD-1422)
                     "lapses": fill_lapses(v.get("restart_ceiling")),
+                    # the record's own flag, which a card-homed restart row's Restart reads (§4.5a, TD-1863): never
+                    # the merged `restartable` above, whose *fills exhausted* term clears a mark and starts nothing
+                    "record_restartable": bool(v.get("restartable")),
                 }
             )
         if mark := idle_open_mark(v, views, now):
@@ -1266,6 +1270,12 @@ def _holder_where(h: Mapping[str, Any]) -> str:
     return "in the Inbox"
 
 
+def _holder_rank(r: Mapping[str, Any]) -> int:
+    """Which of a session's holder rows takes its stuck lines (§6 rule 13, TD-1856): its pending row
+    (`NEEDS_YOU_ROWS`), then its restart row, then any other."""
+    return 0 if r.get("row") in NEEDS_YOU_ROWS else 1 if r.get("row") == "restart" else 2
+
+
 def stuck_onto_holders(out: dict[str, list[dict[str, Any]]], waiting_on: Callable[[Mapping[str, Any]], Any]) -> None:
     """§6 rule 13 *What the person sees* (TD-1497 slice 3), after `item_home`: one counted item for one cause.
 
@@ -1289,9 +1299,9 @@ def stuck_onto_holders(out: dict[str, list[dict[str, Any]]], waiting_on: Callabl
                 sid = str(r["sid"])
                 if r.get("row") in NEEDS_YOU_ROWS:
                     pending.setdefault(sid, r)
-                    holders[sid] = holders[sid] if holders.get(sid, {}).get("row") in NEEDS_YOU_ROWS else r
-                else:
-                    holders.setdefault(sid, r)
+                # by an explicit priority (TD-1856): a pending row first, then the restart row, then any other
+                if sid not in holders or _holder_rank(r) < _holder_rank(holders[sid]):
+                    holders[sid] = r
     lines: dict[str, list[dict[str, Any]]] = {}
     back: list[dict[str, Any]] = []
     for sec, rows in out.items():
@@ -2765,6 +2775,10 @@ def inbox_sections(
             # the `auto`, retry and installed-by-hand rows have Snooze ▾, so a snoozed one is set aside as any row is
             out["fyi"].append(r)
             continue
+        if r.get("row") == "restart" and cards and cards.get(HOLDER + str(r.get("sid") or "")):
+            # a restart row homed on a card is drawn there whatever the store says of its Inbox row: a dismissal
+            # or a snooze is the Inbox's alone (§4.5 screen 6, TD-1856)
+            raw = None
         if isinstance(raw, str) and raw.startswith("dismissed:"):
             # the restart row's **Dismiss** (§4.5a, TD-103): that one mark's row is gone from every
             # section; a new mark carries a new `at` and raises a new row

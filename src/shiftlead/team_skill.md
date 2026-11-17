@@ -438,7 +438,7 @@ ao team stop cm-grind --close         # also close each member that settled clea
 
 **One member back** (design §4.9a *One member back, today*). Mail to an exited member waits in its
 inbox and starts nothing: only a seat is filled by a question. To bring one member back into a
-running team: **Restart** — on its Inbox restart row, in its card's *more ▾*, or `ao restart <id>` —
+running team: **Restart** — on its restart row, in its card's *more ▾*, or `ao restart <id>` —
 which puts it back in the team's run as its launch record started it, unattended and on a fresh
 prompt, with its mail kept (a person's alone: a session is refused); for a record with no launch
 record, **Resume with changes…** on its card with *Unattended* ticked — **Resume** alone

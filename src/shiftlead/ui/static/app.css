@@ -1253,6 +1253,8 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qstate { white-space: nowrap; color: var(--muted); }
 .qstate.needs { color: var(--needs-fg); font-weight: 600; }
 .qstate.s-stalled { border-bottom: 1px dashed var(--ended); }
+/* a restart that waits on the person (§4.4 *A holder waiting on a restart is not stalled*, TD-1856): amber with a mark */
+.qstate.s-restart { color: var(--needs-fg); } .qstate.s-restart::before { content: "↻ "; }
 .qstate.done { color: var(--done-fg); }
 /* a holder's word opens its Focus (§4.5 screen 12, TD-1724): its own colour and mark, and a hover changes colour only */
 a.qstate:hover, a.qstatus:hover { text-decoration: none; color: var(--link); }
