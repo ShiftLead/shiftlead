@@ -2683,7 +2683,7 @@ class MailMixin:
                 handed = {e.id: s.id for s in self.sessions.values() for e in s.inbox if e.handed_entry and e.owes}
                 # a seat's own question: the person's answer to it fills the seat too (§4.9b, TD-1051)
                 seats = {s.id for s in self.sessions.values() if s.seat}
-                inboxes: dict[str, list[MailEntry] | None] = {}  # each asker's inbox, found once per read
+                inboxes: dict[str, dict[str, list[tuple[str, str]]] | None] = {}  # askers' replies, once a read
                 return {
                     "id": PERSON,
                     "entries": [
@@ -2754,23 +2754,27 @@ class MailMixin:
             "unread": s.unread(),
         }
 
-    def _person_replied_at(self, e: MailEntry, inboxes: dict[str, list[MailEntry] | None]) -> str | None:
+    def _person_replied_at(
+        self, e: MailEntry, inboxes: dict[str, dict[str, list[tuple[str, str]]] | None]
+    ) -> str | None:
         """When the person last replied on `e`, a question they answered (§4.5 screen 12 *A press is never left
         stranded*, TD-1843): the `at` of the newest message in its asker's inbox `from` the person whose `reply_to`
         is its id and which is not the answer that closed it (`closed_by`; a `go_with_it` close has none, so its
-        first such reply counts). The asker's inbox is found through `_find`, wherever its host is; None where
-        there is no such reply, or no record."""
+        first such reply counts). The asker's inbox is found through `_find`, wherever its host is, and indexed once
+        per read by `reply_to`; None where there is no such reply, or no record."""
         asker = self._addr(e.from_)
         if asker not in inboxes:
             try:
-                inboxes[asker] = self._find(asker).inbox
+                box = self._find(asker).inbox
             except RpcError:
                 inboxes[asker] = None
-        got = [
-            x.at
-            for x in inboxes[asker] or ()
-            if x.from_ == PERSON and x.reply_to == e.id and x.id != e.closed_by and x.at
-        ]
+            else:
+                index: dict[str, list[tuple[str, str]]] = {}
+                for x in box:
+                    if x.from_ == PERSON and x.reply_to and x.at:
+                        index.setdefault(x.reply_to, []).append((x.id, x.at))
+                inboxes[asker] = index
+        got = [at for mid, at in (inboxes[asker] or {}).get(e.id, ()) if mid != e.closed_by]
         return max(got) if got else None
 
     def _sent(self, id: str | None, caller: Any) -> dict[str, Any]:

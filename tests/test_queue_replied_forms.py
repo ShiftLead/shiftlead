@@ -30,6 +30,9 @@ def test_a_replied_blocked_hold_carries_its_state_and_reply_age_and_draws_its_ow
     assert o["state"] == "blocked" and o["replied"] is True and o["replied_age"] == "10m"
     html = _render(row, mode="card", home="queue")
     assert press(html) == "qp-idle: You answered “Yes”. designer could not do it: the PR is red; you replied 10m ago."
+    # its question row gone from the person inbox's open rows: the age is the outcome's own reply's
+    (gone,) = _rows(_repos(tmp_path / "g", "r"), [_ask(answer_given="Yes", outcome=REPLIED)])
+    assert gone["answered"]["outcome"]["replied_age"] == "10m"
     # a `done` hold draws its own form, different (step 9's test)
     (done,) = _rows(
         _repos(tmp_path / "d", "r"), [_ask(answer_given="Yes", outcome={**BLOCKED, "state": "done", "text": "#9"})]

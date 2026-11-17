@@ -3487,7 +3487,13 @@ def _held_answered(
             "state": str(outcome.get("state") or ""),
             "text": str(outcome.get("text") or ""),
             "replied": outcome.get("state") == "blocked" and isinstance(outcome.get("replied"), Mapping),
-            "replied_age": str(q.get("replied_age") or "") if outcome.get("state") == "blocked" else "",
+            # the question row's own stamp, else the reply's `at` the outcome carries (a row gone to FYI)
+            "replied_age": (
+                str(q.get("replied_age") or "")
+                or (_age(outcome["replied"].get("at"), now) if isinstance(outcome.get("replied"), Mapping) else "")
+            )
+            if outcome.get("state") == "blocked"
+            else "",
         }
         if outcome
         else None,
