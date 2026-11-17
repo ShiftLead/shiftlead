@@ -264,6 +264,7 @@ from sessionorc.gitinfo import (
     git_info,
     main_checkout,
     pick_files,
+    pushed_since,
     reap_worktree,
     rehydrate,
     reweigh_gone,
@@ -4633,7 +4634,8 @@ class HostAgent(
         else:
             # The word stands whenever it is said — it is the session's — but one said inside
             # `RESTART_EARLY` of this record's own start is marked, and a controller does not act
-            # on it: a run that is over before it began did not run out of context. The bound is
+            # on it: a run that is over before it began did not run out of context — unless the home
+            # read it over its bound, or it pushed work of its own (§4.9a, TD-1900). The bound is
             # applied here because the home holds the start time; the controller reads a field.
             mark: dict[str, Any] = {"at": now_iso(), "why": why.strip()}
             # Early is read from the record, not from the clock alone (§4.9a, TD-249): a run that
@@ -4642,9 +4644,16 @@ class HostAgent(
             # A restart its changed brief asked for (§6 rule 7) is neither: the run is not over on
             # its own account, and rule 2 is what brings the new brief; nor is one its team's changed flow
             # asked for (§4.9c *Switching*)
-            reading = agent_common._restart_reading(s, datetime.now(UTC))
+            # A pushed commit is new work (§4.9a, TD-1900): read off the event loop, and only on the
+            # home, where the record's worktree is; a node's member reads no push
+            pushed = None
+            if s.host == self.host and not (s.brief_changed or s.relaunch):
+                pushed = await asyncio.to_thread(pushed_since, s.dir, s.created)
+            reading = agent_common._restart_reading(s, datetime.now(UTC), pushed=pushed)
             if s.brief_changed or s.relaunch:
                 reading = {"early": False, "repeat": None, "words": None}
+            if reading.get("pushed"):
+                mark["pushed"] = reading["pushed"]  # the replay copies it into the `restarts` entry (§6 rule 1)
             if reading["early"]:
                 mark["early"] = True
                 mark["decided"] = reading["words"]  # the row's, the card's and `ao status -v`'s words

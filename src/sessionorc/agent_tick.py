@@ -72,6 +72,7 @@ from sessionorc.agent_common import (
     REMOVED_GUARD_SECONDS,
     REPOS_EVERY,
     RESTART_CEILING,
+    RESTART_PUSHED_CEILING,
     RESTART_WINDOW,
     RESUME_MIN,
     SCHEDULE_LATE,
@@ -1581,9 +1582,21 @@ class TickMixin:
             self._save(s)
             await self._push_changes()
             return
+        # under `RESTART_CEILING`, the pushed restarts' own ceiling (§4.9a *A pushed commit is new work*,
+        # TD-1900): six already in the pushed count, and this, the seventh, is the person's
+        pushes = agent_common._counted(s.restarts, now, pushed=True)
+        if len(pushes) >= RESTART_PUSHED_CEILING:
+            s.restart_ceiling = {"at": now_iso(), "count": len(pushes), "why": "pushed"}
+            log.warning("%s: %d restarts in %s, pushed ones counted — the ceiling", s.id, len(pushes), RESTART_WINDOW)
+            self._save(s)
+            await self._push_changes()
+            return
         log.info("%s wants another run and its work is pushed: restarting it", s.id)
-        # the member's own why (*context bound*) kept on the entry, for rule 9's note (§4.9a, TD-468)
+        # the member's own why (*context bound*) kept on the entry, for rule 9's note (§4.9a, TD-468), and
+        # the mark's `pushed` sha, which leaves the entry out of `RESTART_CEILING`'s count (TD-1900)
         said = {"said": str(rw["why"])} if rw.get("why") else {}
+        if rw.get("pushed"):
+            said["pushed"] = str(rw["pushed"])
         if s.state == "idle":
             try:
                 closer = {"by": "tick", "why": "wanted"}
@@ -1846,6 +1859,11 @@ class TickMixin:
 
     @staticmethod
     def _window_full(s: Session, now: datetime) -> bool:
+        """Whether the window still holds a ceiling's worth: a `why: pushed` mark read against the pushed count
+        and `RESTART_PUSHED_CEILING`, since `RESTART_CEILING`'s count leaves pushed restarts out (TD-1900)."""
+        mark = s.restart_ceiling
+        if isinstance(mark, dict) and mark.get("why") == "pushed":
+            return len(agent_common._counted(s.restarts, now, pushed=True)) >= RESTART_PUSHED_CEILING
         recent = agent_common._counted(s.restarts, now)
         return len(recent) >= RESTART_CEILING
 
@@ -1875,7 +1893,10 @@ class TickMixin:
         — and nothing declared, is sent
         one fixed line naming it, once per idle
         stretch (`nudged_at`; a stretch ends when the state changes). It spends no wake budget. The
-        send needs the pane here: a node's member is not nudged yet (TD-103)."""
+        send needs the pane here: a node's member is not nudged yet (TD-103). A record carrying
+        `restart_wanted` is never nudged: it has declared — rule 2 restarts it, and an `early` mark is the
+        person's Inbox row — and since TD-1900 a run sent away at its context bound, or one that pushed, reads
+        not early and is rule 2's, so no line names its open work."""
         if not (s.supervised and s.unattended) or s.superseded_by or s.suspended or s.host != self.host:
             return
         if s.state != "idle" or not s.told or s.pending or s.out_of_work or s.restart_wanted:

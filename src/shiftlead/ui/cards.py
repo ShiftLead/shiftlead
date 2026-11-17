@@ -14,7 +14,14 @@ from typing import Any
 
 from sessionorc import hosts, identity, mail, naming, work
 from sessionorc.adapters import short_model
-from sessionorc.agent_common import CLOSED_KEEP, RESTART_CEILING, RESTART_WINDOW, _counted
+from sessionorc.agent_common import (
+    CLOSED_KEEP,
+    RESTART_CEILING,
+    RESTART_PUSHED_CEILING,
+    RESTART_WINDOW,
+    _counted,
+    pushed_ceiling_words,
+)
 from sessionorc.models import (
     GRANTS,
     STATE_RANK,
@@ -544,14 +551,19 @@ def view(
     #
     # **`early` is carried, and it is the one thing the design did not have to say.** The home
     # marks a restart asked for inside `RESTART_EARLY` of the record's own start, and a controller
-    # **does not act on it** — a run that was over before it began did not run out of context. So
+    # **does not act on it** — a run that was over before it began did not run out of context, unless
+    # the home read it over its bound or it pushed work of its own (§4.9a, TD-1900). So
     # an early one must not read as an ordinary one: a person seeing the same chip would expect the
     # same thing to happen next, and nothing will. What made it early is the home's reading too
     # (§4.9a *Early is decided from the record*, TD-249 slice 6): `repeat`, the entry a run reported
     # again or left a third time, and `decided`, the words — nothing here reads a clock.
     # design §4.5a **restarted** chip (§6 *Keeping a team running*, TD-485, built by TD-487): where this
     # run came from — never on a seat, which ends and is filled by design
-    d["restarted"] = None if s.get("seat") or s.get("id") in seats else restarted_view(s.get("restarts"), now)
+    d["restarted"] = (
+        None
+        if s.get("seat") or s.get("id") in seats
+        else restarted_view(s.get("restarts"), now, ceiling=s.get("restart_ceiling"))
+    )
     rw = s.get("restart_wanted")
     rw = rw if isinstance(rw, dict) else {}
     d["restart_wanted"] = (
@@ -986,7 +998,7 @@ def flow_mark(s: Mapping[str, Any], here: str = "") -> dict[str, str] | None:
     return None
 
 
-def restarted_view(restarts: Any, now: datetime) -> dict[str, str] | None:
+def restarted_view(restarts: Any, now: datetime, ceiling: Any = None) -> dict[str, str] | None:
     """The **restarted** chip (design §4.5a, TD-485, TD-487): the `restarts` entries younger than
     `RESTART_WINDOW` whose `why` is a restart — every one but `start`, a scheduled start's own create,
     and `fill`, a seat's. `text` is the Focus header's, *restarted ·* and the newest entry in
@@ -994,7 +1006,9 @@ def restarted_view(restarts: Any, now: datetime) -> dict[str, str] | None:
     (*restarted · cache lapsed*); `hover` every entry in the window, newest first, in the full words
     with its age, and the count toward the ceiling by the ceiling's own rule (*2 of 3 in 2 h*); `until`
     when the window passes the newest entry, so the chip and the ceiling keep one clock. None when no
-    entry is one; a malformed entry is passed over."""
+    entry is one; a malformed entry is passed over. Where an entry in the window carries `pushed`, or the
+    record's `ceiling` is a `why: pushed` mark, the count toward `RESTART_PUSHED_CEILING` stands beside it
+    (*0 of 3 · 6 of 6 pushed in 2 h*, design §4.9a *A pushed commit is new work*, TD-1900)."""
     entries = [r for r in restarts if isinstance(r, dict)] if isinstance(restarts, list) else []
     window = []
     for r in entries:
@@ -1008,11 +1022,17 @@ def restarted_view(restarts: Any, now: datetime) -> dict[str, str] | None:
     short = "cache lapsed" if newest.get("why") == "cache" else str(newest.get("why") or "") or "restarted"
     hours = round(RESTART_WINDOW.total_seconds() / 3600)
     lines = [f"{restart_words(r)}, {_age(r.get('at'), now)} ago" for _, r in window]
+    pushes: int | None = None
     try:
         counted = len(_counted(entries, now))
+        if any(r.get("pushed") for _, r in window) or (isinstance(ceiling, dict) and ceiling.get("why") == "pushed"):
+            pushes = len(_counted(entries, now, pushed=True))
     except (TypeError, ValueError, AttributeError):  # a malformed `done`: this card's count, not the grid
         counted = len(window)
-    lines.append(f"{counted} of {RESTART_CEILING} in {hours} h")
+    if pushes is None:
+        lines.append(f"{counted} of {RESTART_CEILING} in {hours} h")
+    else:
+        lines.append(f"{counted} of {RESTART_CEILING} · {pushes} of {RESTART_PUSHED_CEILING} pushed in {hours} h")
     return {
         "short": f"restarted · {short}",
         "text": f"restarted · {restart_words(newest)}",
@@ -1266,6 +1286,9 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
             f"{text}: it exited on its own each time and the host agent restarted it, up to its ceiling "
             "(design §6) — it is yours now: Resume it, or Forget it"
         )
+        if d["restart_ceiling"].get("why") == "pushed":  # the pushed restarts' own ceiling (§4.9a, TD-1900)
+            text = pushed_ceiling_words(n)
+            full = f"{text} (design §4.9a) — it is yours now: Resume it, or Forget it"
     elif state in ("exited", "closed"):
         if state == "exited":
             # an exit, and how (TD-490): `ending.exit_words`, and the time on hover as the pill says it
