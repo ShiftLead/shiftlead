@@ -6466,7 +6466,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
         watcher = asyncio.ensure_future(watch_clients(read_clients, ws.send_text))
         try:
-            await pump(pty, send, recv, scroll, leave=leave, jump=jump, read_only=read_only)
+            await pump(pty, send, recv, scroll, leave=leave, jump=jump, read_only=read_only, name=sid)
         finally:
             watcher.cancel()
             for f in reapers:
