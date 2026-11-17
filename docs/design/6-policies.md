@@ -1316,7 +1316,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      it, and still failing — or **a fail read on a PR already merged**, which no re-report cures,
      is the **Inbox row: cadence check failed** (§4.5a), under *Needs you*, counted, `#842` a
      link, the failed rows named, and `row` on the entry; a later pass removes the row and leaves
-     the entry as the record of what was read. **The `review` row is still self-attested**: the
+     the entry as the record of what was read. **A PR closed unmerged** asks nobody: its fail is no
+     line, no clause and no row, and a row an earlier read set goes once the entry is `closed`.
+     Nothing can cure it, since a PR closed on purpose (a moot lift, a filing PR found moot) gets no
+     review a reader would pass, and its member's `done` or `drop` already said it is over. **The `review` row is still self-attested**: the
      script proves the comment was posted before the merge, not that it was honest, and the home
      adds beside the verdict what it alone knows — *read by techlead-ao-1* when a mailbox it holds
      has an `ask` carrying `pr: 842` with a reply from the seat on its thread (§4.9b *The

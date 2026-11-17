@@ -421,7 +421,8 @@ def record(
     once it is closed unmerged), and
     the marks. **`pass`** removes `row` and `told`. **`fail`** on a merged PR — which no re-report
     cures — or read again after the member was told (`told`, whatever was read in between but a
-    pass) sets `row`, the Inbox row's mark. **`unknown`** tells nothing and changes no mark.
+    pass) sets `row`, the Inbox row's mark. A PR **closed unmerged** never has `row`: nothing can
+    cure its fail, and nobody need (TD-1908). **`unknown`** tells nothing and changes no mark.
     `read_by` is carried."""
     new: dict[str, Any] = {"pr": pr, "at": at, "sha": sha, "verdict": got["verdict"], "failed": list(got["failed"])}
     if merged:
@@ -436,12 +437,15 @@ def record(
         new.pop("told", None)  # a fail after a pass is a first fail again, and told anew
     elif got["verdict"] == "fail" and (merged or new.get("told")):
         new.setdefault("row", at)
+    if closed and not merged:
+        new.pop("row", None)
     return new
 
 
 def rows(checks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """The entries the **Inbox row: cadence check failed** draws (§4.5a): one row a PR."""
-    return [c for c in checks if c.get("row")]
+    """The entries the **Inbox row: cadence check failed** draws (§4.5a): one row a PR — never one
+    closed unmerged, whose `row` an older read may still carry (TD-1908)."""
+    return [c for c in checks if c.get("row") and not (c.get("closed") and not c.get("merged"))]
 
 
 def dismiss(checks: list[dict[str, Any]], pr: int) -> tuple[list[dict[str, Any]], bool]:
@@ -454,8 +458,9 @@ def dismiss(checks: list[dict[str, Any]], pr: int) -> tuple[list[dict[str, Any]]
 
 
 def untold(c: dict[str, Any]) -> bool:
-    """A first fail the member has not been told of. A merged PR's fail is the row's, not a line's."""
-    return c.get("verdict") == "fail" and not c.get("told") and not c.get("merged")
+    """A first fail the member has not been told of. A merged PR's fail is the row's, not a line's,
+    and one closed unmerged is nobody's (TD-1908)."""
+    return c.get("verdict") == "fail" and not c.get("told") and not c.get("merged") and not c.get("closed")
 
 
 def _what(c: dict[str, Any]) -> str:
@@ -472,11 +477,12 @@ def line(c: dict[str, Any], ref: str) -> str:
 
 def clause(checks: list[dict[str, Any]]) -> str:
     """The clause at the end of every `ao` reply while an open PR of the member's fails: *PR #842
-    fails the cadence check: review, ledger*. "" when none does."""
+    fails the cadence check: review, ledger*. "" when none does — a merged PR's fail is the row's,
+    and one closed unmerged is nobody's (TD-1908)."""
     return "; ".join(
         f"PR #{c['pr']} fails the cadence check: {_what(c)}"
         for c in checks
-        if c.get("verdict") == "fail" and not c.get("merged")
+        if c.get("verdict") == "fail" and not c.get("merged") and not c.get("closed")
     )
 
 
