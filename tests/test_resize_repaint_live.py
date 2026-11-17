@@ -5,7 +5,7 @@ directory `AO_LIVE_CLAUDE_CONFIG_DIR` names) — it starts the real `claude` (Ha
 private tmux server, asks for thirty long, uniquely labelled paragraphs, and changes the attached client's
 grid while they stream, which spends a small amount of the account's tokens and is never part of the suite.
 
-What it found (2026-11-16, three to five runs per mode; `test_tmux_resize_history_tmux.py` is the control that
+What it found (2026-11-16, tmux 3.5a, two to five runs per mode; `test_tmux_resize_history_tmux.py` is the control that
 tmux's own history is intact):
 
 - no resize: every paragraph once;
@@ -14,8 +14,9 @@ tmux's own history is intact):
 - a **reattach** at another size: repeats, and one paragraph missing;
 - the prompt echoed twice after any of them;
 - a **pinned** window (`window-size manual`, one `resize-window`, then the same churn and reattaches): clean, 8 of 8
-  runs. Waiting for the pane to be idle first does not help (a width change repeats the last paragraphs, a height
-  change loses 3 to 4), and `attach -f ignore-size` alone does not either (with one client the window still follows it).
+  runs (two each of steady, width, height and reattach, in a script, then the combined churn here). Waiting for the
+  pane to be idle first does not help (a width change repeats the last paragraphs, a height change loses 3 to 4),
+  and `attach -f ignore-size` alone does not either (the window still followed the one client).
 
 The known-bad modes are `xfail` (not strict), so a mitigation that holds the pane's grid still turns them into
 passes without breaking the file. A mode that starts failing where it passed is a regression.
