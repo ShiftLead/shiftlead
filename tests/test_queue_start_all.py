@@ -7,7 +7,7 @@ opens on the walk sentence (`WORK_ALL`); with one item the header draws none, an
 from __future__ import annotations
 
 from test_queue import NOW
-from test_queue_start import TAIL, _q, _rec
+from test_queue_start import TAIL, _q, _rec, bare
 from test_ui_inbox import entry
 from test_ui_inbox_ledger import MANAGER, _start_world
 
@@ -102,7 +102,7 @@ def _press(tmp_path, monkeypatch, inbox: list[dict], **extra) -> tuple[int, str]
     r = c.post("/api/ledger/start", json={"repo": "samscrape", "id": "TD-009", **extra})
     assert r.status_code == 200, r.text
     (kw,) = created
-    return r.status_code, kw["prompt"]
+    return r.status_code, bare(kw["prompt"])  # the card block is test_queue_start_card.py's
 
 
 def test_a_header_press_on_a_two_item_card_walks_them(tmp_path, monkeypatch):

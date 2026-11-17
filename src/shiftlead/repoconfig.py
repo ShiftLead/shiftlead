@@ -30,7 +30,7 @@ from __future__ import annotations
 import copy
 import re
 import tomllib
-from collections.abc import Callable, Collection, Iterable
+from collections.abc import Callable, Collection, Iterable, Sequence
 from dataclasses import dataclass, field
 from functools import lru_cache
 from importlib import resources
@@ -127,6 +127,7 @@ ENTRY_PLACEHOLDER = "{entry}"
 # was pressed on, the id, the repo and the ledger file), then the card's ids, waits on me and the rest.
 WORK_TEMPLATE = "work.md"
 WORK_SLOTS = ("{opening}", "{mine}", "{rest}")
+WORK_CARD = "{card}"  # filled last, after `WORK_SLOTS` (TD-1903)
 WORK_OPENING = {
     "yours": "I opened this session from the {where} to work {id} of {repo}'s ledger ({ledger}) myself: it waits "
     "on me (its owner is me).",
@@ -343,6 +344,7 @@ def work_text(
     item: str = "",
     walk: bool = False,
     kept: bool = False,
+    card: Sequence[str] = (),
 ) -> str:
     """`work.md` filled: the opening prompt **Start session** sends (TD-678, TD-912). `why` a key of
     `WORK_OPENING` — *yours* (`Owner: paul`), *decision* (`decision (paul)`), *card* (any other entry a
@@ -350,7 +352,9 @@ def work_text(
     *waits on me* its Decide and Do items and *the rest* its other entries, each group *none* when empty.
     `item`, pressed on a Queue card's item (TD-1246), is named by `WORK_ITEM` in the first sentence's place;
     `walk`, the header's press on a card with two or more items (TD-1340), puts `WORK_ALL` there. `kept`, an item
-    pressed on a kept completed card (TD-1618), puts `WORK_ITEM_KEPT` in `WORK_ITEM`'s place, its slots the same."""
+    pressed on a kept completed card (TD-1618), puts `WORK_ITEM_KEPT` in `WORK_ITEM`'s place, its slots the same.
+    `card`, the card's block as `cardtext.card_block` builds it (TD-1903), fills `{card}` last, so no card line is
+    read as a slot; with none the slot and its blank lines go."""
     text = resources.files("shiftlead").joinpath("briefs", WORK_TEMPLATE).read_text(encoding="utf-8")
     opening = WORK_OPENING[why]
     if item:
@@ -364,6 +368,8 @@ def work_text(
     ids = [", ".join(mine) or "none", ", ".join(rest) or "none"]
     for slot, value in zip(WORK_SLOTS, (opening, *ids), strict=True):
         text = text.replace(slot, value)
+    # no card: the slot and its blank lines go, one paragraph as before the slot (TD-1903)
+    text = text.replace(WORK_CARD, "\n".join(card)) if card else text.replace(f"\n\n{WORK_CARD}\n\n", " ")
     return text.strip()
 
 

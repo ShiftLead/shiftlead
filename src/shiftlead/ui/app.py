@@ -51,9 +51,9 @@ from sessionorc.models import (
 from sessionorc.queue import TD_REF, card_entries, qid, repo_roots
 from sessionorc.queue import refs as _refs_of
 from sessionorc.store import kept as doing_kept
+from shiftlead import cardtext, repoconfig, teamrun, teams
 from shiftlead import org as orgmod
 from shiftlead import profiles as profiles_mod
-from shiftlead import repoconfig, teamrun, teams
 from shiftlead import review as reviewmod
 from shiftlead.cli import stop_time as clistop
 
@@ -3885,18 +3885,16 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             ledger = cfg.ledger
         except ValueError as e:
             cfg, cfg_why = None, str(e).strip('"')
-        prompt = repoconfig.work_text(
-            ref,
-            repo,
-            ledger,
-            why_key,
-            where="Queue" if card_id else "Inbox",
-            mine=mine,
-            rest=rest,
-            item=item,
-            walk=walk,
-            kept=kept is not None,
-        )
+        work = {
+            "where": "Queue" if card_id else "Inbox",
+            "mine": mine,
+            "rest": rest,
+            "item": item,
+            "walk": walk,
+            "kept": kept is not None,
+        }
+        # card-less: every `form()` below keeps it, since the form road's prompt travels in a URL (TD-1903)
+        prompt = repoconfig.work_text(ref, repo, ledger, why_key, **work)
         t = org.teams.get(team) if team else None
         if t is not None:
             mid = teams.manager_id(org, t, t.host or host_name(), host_name())
@@ -3927,6 +3925,16 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             review = got["review"]
         # the `project` badge, as New session's (§4.9, TD-1043): the badge alone, not the Project block
         project, _block = await asyncio.to_thread(teams.reach_block, org, root, host_name())
+        # the card as `ao card` prints it under a pane, read last and never on a kept card (§4.5 screen 12, TD-1903):
+        # what the card read answers but a card, or a failed read, leaves it out and never refuses the press
+        # — `sent`, never `prompt`, which `form()` reads when the create is refused below
+        card_ref = str(card.get("id") or "") if card is not None and kept is None else ""
+        sent = prompt
+        with contextlib.suppress(Exception):
+            got = json.loads(json.dumps(await h.card(card_ref, words=False), default=str)) if card_ref else None
+            if isinstance(got, dict) and isinstance(got.get("card"), dict):
+                block = cardtext.card_block(got, card_ref)
+                sent = repoconfig.work_text(ref, repo, ledger, why_key, card=block, **work)
         try:
             s = await call(
                 "create",
@@ -3934,7 +3942,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 dir=root,
                 adapter="claude-code",
                 profile=preset.profile or "",
-                prompt=prompt,  # the opening prompt, never the role's brief (§4.9)
+                prompt=sent,  # the opening prompt, never the role's brief (§4.9)
                 unattended=False,
                 **teams.gate_prompts(False),
                 worktree=name,

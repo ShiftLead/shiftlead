@@ -163,8 +163,14 @@ def _q(start: str = "samscrape#TD-009") -> dict:
 
 TAIL = (
     "Read the entry, check the code and the design for what is already built or decided, and tell me in a few lines "
-    "what it asks of me and what you would do first. Then wait for me: I drive this one."
+    "what it asks of me and what you would do first."
 )
+
+
+def bare(prompt: str) -> str:
+    """The prompt with its card block (TD-1903) taken out, as one paragraph: a test about the id lists reads them."""
+    head, sep, rest = prompt.partition(".\n\nThis is the card as the Queue drew it")
+    return head + ". " + rest.split("— end of the card —\n\n", 1)[1] if sep else prompt
 
 
 def test_a_card_press_starts_on_its_start_with_the_queue_prompt_and_the_cards_ids(tmp_path, monkeypatch):

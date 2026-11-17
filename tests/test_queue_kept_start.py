@@ -74,7 +74,7 @@ def _press(c, **body: Any):
 
 TAIL = (
     "Read the entry, check the code and the design for what is already built or decided, and tell me in a few lines "
-    "what it asks of me and what you would do first. Then wait for me: I drive this one."
+    "what it asks of me and what you would do first."
 )
 
 
