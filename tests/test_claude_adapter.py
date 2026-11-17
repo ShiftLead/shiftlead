@@ -1320,6 +1320,16 @@ def test_a_body_with_any_window_is_a_reading_and_one_with_none_names_its_shape(t
             ad.usage(prof)
         assert (e.value.reason, e.value.detail) == ("error", detail)
         assert "secret-ish" not in e.value.detail
+    # TD-1909: the detail is bounded for the journal — the first 12 keys sorted, the whole cut at 200.
+    from shiftlead.adapters.claude_code import _shape
+
+    many = {f"k{i:02d}": i for i in range(19, -1, -1)}
+    assert _shape(many) == (
+        "a body of no known shape: keys " + ", ".join(f"k{i:02d}" for i in range(12)) + "; "
+        "five_hour missing, seven_day missing"
+    )
+    long = _shape({"x" * 500: 1})
+    assert len(long) == 200 and long == ("a body of no known shape: keys " + "x" * 500)[:200]
     reply = io.BytesIO(json.dumps({"five_hour": None, "seven_day": week}).encode())
     with (
         um.patch.object(ClaudeCodeAdapter, "_creds", return_value={"accessToken": "t"}),
