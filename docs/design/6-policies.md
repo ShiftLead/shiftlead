@@ -120,12 +120,15 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      false) is a person's or a controller's act and is never undone; an exit after a wrap-up is an
      ending. **The ceiling**: `RESTART_CEILING` — three counted restarts of one session in two
      hours (a wanted restart with new work is not counted: §4.9a *Inside the ceiling*;
-     `agent_common._counted`), `one_for_one` (only the session that exited, never its siblings).
+     `agent_common._counted`; one left out only for a push counts toward `RESTART_PUSHED_CEILING`, six
+     in the window, tested by rule 2 after this one, §4.9a *A pushed commit is new work*, TD-1900),
+     `one_for_one` (only the session that exited, never its siblings).
      Each restart is appended to the record's `restarts: [{at, why}]` (home-owned, carried across
      the supersede so the count survives the restart it counts, and drawn for `RESTART_WINDOW` as
      the card's **restarted** chip, §4.5a; each replay's entry also carries
      `done: [{ref, pr}]` and `left: [ref]`, what the run it replaced reported and what it claimed
-     and did not close, from the old record's `progress`, which the new record does not keep but for
+     and did not close, from the old record's `progress`, and a wanted restart's `pushed: <sha>` where its
+     mark carried one (§4.9a *A pushed commit is new work*, TD-1900), which the new record does not keep but for
      its waiting claims, rule 5);
      **the mail is kept**: every replay of the tick's — this rule's, rule 2's, rule 7's and
      rule 8's — is a `create` with `keep_mail` (§4.9b), so the closed run's inbox and outbox move
@@ -166,7 +169,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      restart runs and clears the mark itself, so `restart_blocked` is transient where
      `restart_ceiling` is not: the ceiling stands until a person's Resume or Forget (save a seat's
      plain fill mark, which lapses after the hour, rule 3), or until the
-     window holds fewer than `RESTART_CEILING` counted restarts and the member declares a clean
+     window holds fewer than `RESTART_CEILING` counted restarts (a `why: pushed` mark: fewer than
+     `RESTART_PUSHED_CEILING` by its own count, §4.9a, TD-1900) and the member declares a clean
      `restart_wanted`, which rule 2 then acts on — the ceiling guards against a crash loop, not a
      member that has worked for hours since — and rule 1 never restarts past it; a person's Resume
      clears `restarts` with the mark, so a resumed session gets three fresh restarts, where the
@@ -495,7 +499,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      sender, the person's included, less one it passed up — an answer to its own question is a seat's
      count alone, since a member reads its own on the doorbell; TD-1435: a read question is never rung again, since the doorbell rings only undecided mail) — and no
      declaration (a member that declared `none` is not nudged for its questions either: its brief reads its
-     inbox before declaring), no pending, not
+     inbox before declaring), no `restart_wanted` mark (its next move is the restart's: rule 2's, or the
+     person's for an early one, whose Inbox row and Queue card name it, TD-1863; so such a member writes no
+     `idle_open` either, and rule 3's *open* cause never reads it, TD-1900), no pending, not
      gated, **no live subagent and no live background shell** (§4.2 *Working on its own*, the card's reading: its own work is
      running, and its card says *working*; TD-734, TD-761; the twenty minutes count from the later of
      `since`, `subagent_at` and `shells_at`, and *idle · open work* is not marked, nor a standing one read as
@@ -1570,7 +1576,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
          move: an addressee that is no seat, a seat the person's team pick holds, a session's own ledger
          request.
        - **A decided board line waiting on a session**: a work order `board:<key>` (§4.9a *What a
-         session does with a decided line*), read from the lanes as `ao repo` reads them, open while
+         session does with a decided line*), read from the lanes as `ao repo` reads them — joined first
+         (`workorders.join`), so an order rule 6 routes to the design-first lanes, or to one designer, is
+         that lane's and never the free-pick lanes' (TD-1900) — open while
          its line is open. Its actors are the records of every lane that takes it (a seat has no lane,
          §4.9b, so none is an order's actor, nor is a member its flow sat out, `work.sat_out`); a team none of
          whose members is live and that `work.team_wound_down` reads wound down, or `work.team_stopped`
@@ -1619,10 +1627,24 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        *suspended*, *sat out*, *restart ceiling*, *profile gated*, *fill ceiling*), stored as
        `{state: "unfillable", why}` and drawn as `why`, never through `words` (the `stuck` shape check takes
        any `state` string); and
-       two whose words are this rule's own, for which
+       three whose words are this rule's own, for which
        `words` is not called: a record
        with `stalled_ticks` at least 2 reads **`stalled`**, *`<name>` is `stalled?` — a request held past
-       `STALL_AFTER` with nothing new on its screen*; and an `idle` one reads *`<name>` has been idle
+       `STALL_AFTER` with nothing new on its screen*; a record whose restart waits on the person — one for
+       which `agent_common.restart_waits_of` gives a mark that does not lapse (`lapses` false), the Inbox
+       restart row's own reading (an early or a repeated `restart_wanted`, a restart ceiling, a lost brief,
+       a held restart; a fill mark that lapses cures itself and is not this) — reads **`restart`**,
+       *`<name>` waits on your Restart: <word>*, `<word>` that function's short word, its `until` none
+       (it never comes back on its own), in place
+       of `idle` and of whatever reason `read` gives that record (`restart_ceiling` and `fills_exhausted`
+       among them, the same cure in the row's words) (TD-1900: a designer idle behind an early restart read only as
+       idle, so the press that cured it went unnamed), for every kind of work this rule reads (an ask's
+       addressee, an order's actor, a holder), its `since` read as `idle`'s is (the
+       actor's figure floored at the work's open time, *The clock*), tested only on an actor not acting, whose state is `idle` or `exited` (the
+       states `restart_waits` reads an early mark in; a `needs-you` or permission-waiting record keeps
+       `read`'s more specific reason) — so a working one, one on its own (`on_its_own`), a fillable seat and the person's own session are
+       never it — after `stalled` and before `idle`; the Queue card's holder row keeps its own restart word
+       (TD-1856) and the stuck line beneath it says the same cure, as any reason's line does; and an `idle` one reads *`<name>` has been idle
        since `<time>` with it open*, `<time>` the record's own idle start (`agent_common.idle_from`), the
        stamp's `since` keeping the clock's instant (*The clock*, below) (TD-1435's cause: a seat that read its asks
        and ends every turn on
@@ -1740,7 +1762,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        the first actor's `unanswered` stamp — `needs_you` among the
        reasons, its words a line under its pending row — as `read` gives it (with its
        `since`, `start_at`, `gate`, `ended` and the rest), rule 13's own as `{state: "stalled" | "idle",
-       since}`, a team's as `{state: "team", team, held}` (`held` as rule 8 writes it, none for *waits
+       since}` or `{state: "restart", word, since}` (TD-1900), a team's as `{state: "team", team, held}` (`held` as rule 8 writes it, none for *waits
        for your Start*, `{why: "stopped"}` and `{why: "wound_down"}` for the other two), *no lane takes
        it* as `{state: "no_lane"}`; **`actor`** `{id, host,
        name, more}` — the first not acting (an ask's in its `to` order, an order's by lane order then id),
