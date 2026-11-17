@@ -65,6 +65,7 @@ from sessionorc import work as work_mod
 from sessionorc.agent_attention import AttentionMixin
 from sessionorc.agent_ci import CiMixin
 from sessionorc.agent_common import (  # re-exported: callers and tests read these from the agent
+    _COUNT_WORDS,  # noqa: F401
     _CSI,  # noqa: F401
     _ESC_OTHER,  # noqa: F401
     _LINE_BREAKS,  # noqa: F401
@@ -135,6 +136,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     REPOS_EVERY,  # noqa: F401
     RESTART_CEILING,  # noqa: F401
     RESTART_EARLY,  # noqa: F401
+    RESTART_PUSHED_CEILING,  # noqa: F401
     RESTART_SETTLE,  # noqa: F401
     RESTART_WINDOW,  # noqa: F401
     RESUME_MIN,  # noqa: F401
@@ -224,6 +226,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     model_env,  # noqa: F401
     on_its_own,  # noqa: F401
     person_only,  # noqa: F401
+    pushed_ceiling_words,  # noqa: F401
     read_checkout,  # noqa: F401
     read_draft_claim,  # noqa: F401
     restart_waits,  # noqa: F401
