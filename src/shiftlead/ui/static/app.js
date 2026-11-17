@@ -48,6 +48,14 @@
       term.loadAddon(gl);
     } catch (e) { /* no WebGL here: the DOM renderer draws the pane */ }
   };
+  // Character widths by Unicode 11 (goal 12, TD-1912): xterm.js's own tables are Unicode 6, so an emoji or
+  // a wide symbol would take other cells than tmux gives it and every line after it would drift. The
+  // `unicode` API is a proposed one, so the terminal is built with `allowProposedApi`.
+  AO.termUnicode = function (term) {
+    if (typeof Unicode11Addon === "undefined") return;
+    term.loadAddon(new Unicode11Addon.Unicode11Addon());
+    term.unicode.activeVersion = "11";
+  };
   // xterm.js measures a cell once, at open; the bundled face (app.css) may still be on its way, and
   // a cell measured on the fallback font leaves every glyph misplaced once it lands. So when the
   // face was not ready at open, measure again when it is. Two sets, because xterm.js ignores an
@@ -8155,8 +8163,9 @@
     }
     // the held press's recorder (TD-1299): each of the terminal's link readers is given its `hover` / `leave`
     const rec = AO.linkPress();
-    const term = new Terminal({ ...AO.TERM_OPTS, theme: { ...AO.TERM_THEME }, scrollback: 0, linkHandler: AO.paneLinkHandler($("#term"), rec) });
+    const term = new Terminal({ ...AO.TERM_OPTS, theme: { ...AO.TERM_THEME }, scrollback: 0, allowProposedApi: true, linkHandler: AO.paneLinkHandler($("#term"), rec) });
     const fit = new FitAddon.FitAddon(); term.loadAddon(fit);
+    AO.termUnicode(term);
     const links = new WebLinksAddon.WebLinksAddon((e, uri) => AO.paneLink(e, uri), AO.webLinkOptions(rec));  // on a read-only Focus too
     term.loadAddon({ activate: (t) => links.activate(AO.cutRows(t)), dispose: () => links.dispose() });
     // **a path is a link** (TD-501): only where the Session card draws its editor button

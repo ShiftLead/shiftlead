@@ -11,4 +11,5 @@ the xterm.js family on one release line: the addons are built against `@xterm/xt
 | `addon-fit.js` | `@xterm/addon-fit` | 0.10.0 | MIT (`LICENSE-addon-fit.txt`) |
 | `addon-webgl.js` | `@xterm/addon-webgl` | 0.18.0 (the release paired with xterm 5.5.0) | MIT (`LICENSE-addon-webgl.txt`) |
 | `addon-web-links.js` | `@xterm/addon-web-links` | 0.11.0 (the release paired with xterm 5.5.0; matched 2026-10-08, TD-422) | MIT (`LICENSE-addon-web-links.txt`) |
+| `addon-unicode11.js` | `@xterm/addon-unicode11` | 0.8.0 (the release paired with xterm 5.5.0; matched 2026-11-17, TD-1912) | MIT (`LICENSE-addon-unicode11.txt`) |
 | `fonts/jetbrains-mono-latin-{400,700}-normal.woff2` | `@fontsource/jetbrains-mono` | 5.1.1, latin subset | SIL OFL 1.1 (`fonts/OFL.txt`) |
