@@ -1273,6 +1273,59 @@ def test_a_429_is_read_as_rate_limited_with_its_retry_after(tmp_path, monkeypatc
     assert e.value.reason == "no_credentials"
 
 
+def test_a_body_with_any_window_is_a_reading_and_one_with_none_names_its_shape(tmp_path, monkeypatch):
+    """TD-1904: each window is read on its own, so an account the endpoint gives no five-hour window
+    still has its week; a 200 with no window at all is refused as `error`, its detail the body's keys
+    and the kind of each account-wide window, never a value."""
+    import io
+    import unittest.mock as um
+
+    from shiftlead.adapters.claude_code import UsageRefused
+
+    week = {"utilization": 81.0, "resets_at": "2026-11-18T00:00:00Z"}
+    for body in ({"five_hour": None, "seven_day": week}, {"seven_day": week}, {"five_hour": {}, "seven_day": week}):
+        u = parse_usage(body)
+        assert u and [(w.label, w.pct, w.resets) for w in u.windows] == [("week", 81, "2026-11-18T00:00:00Z")]
+    u = parse_usage({"five_hour": {"utilization": 12}, "seven_day": None})
+    assert u and [(w.label, w.pct) for w in u.windows] == [("5h", 12)]
+    assert parse_usage({"five_hour": None, "seven_day": None}) is None
+    assert parse_usage({"five_hour": {"utilization": True}}) is None  # a bool is not a number
+    assert parse_usage([]) is None
+
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    ad = ClaudeCodeAdapter()
+    prof = profiles.get(None)
+    for body, detail in (
+        (
+            {"five_hour": None, "seven_day": {"utilization": None}, "extra_usage": {"is_enabled": False}},
+            "a body of no known shape: keys extra_usage, five_hour, seven_day; five_hour null, "
+            "seven_day dict with no number",
+        ),
+        (
+            {"error": {"type": "x", "message": "secret-ish"}},
+            "a body of no known shape: keys error; five_hour missing, seven_day missing",
+        ),
+        ({}, "a body of no known shape: keys none; five_hour missing, seven_day missing"),
+        ([1, 2], "a body of no known shape: a list, not an object"),
+    ):
+        reply = io.BytesIO(json.dumps(body).encode())
+        with (
+            um.patch.object(ClaudeCodeAdapter, "_creds", return_value={"accessToken": "t"}),
+            um.patch("urllib.request.urlopen", return_value=reply),
+            pytest.raises(UsageRefused) as e,
+        ):
+            ad.usage(prof)
+        assert (e.value.reason, e.value.detail) == ("error", detail)
+        assert "secret-ish" not in e.value.detail
+    reply = io.BytesIO(json.dumps({"five_hour": None, "seven_day": week}).encode())
+    with (
+        um.patch.object(ClaudeCodeAdapter, "_creds", return_value={"accessToken": "t"}),
+        um.patch("urllib.request.urlopen", return_value=reply),
+    ):
+        got = ad.usage_for("default")
+    assert got["reason"] == "ok" and [w["label"] for w in got["windows"]] == ["week"]
+
+
 def test_composer_reads_painted_text_only():
     """TD-027: the composer is the last `❯` row; faint text (a suggested next prompt, the first-run
     placeholder) is not content; a slash command's colour is; no `❯` row means no opinion."""
