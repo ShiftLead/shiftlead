@@ -5,14 +5,18 @@ directory `AO_LIVE_CLAUDE_CONFIG_DIR` names) — it starts the real `claude` (Ha
 private tmux server, asks for thirty long, uniquely labelled paragraphs, and changes the attached client's
 grid while they stream, which spends a small amount of the account's tokens and is never part of the suite.
 
-What it found (2026-11-16, three to five runs per mode; `test_tmux_resize_history_tmux.py` is the control that
+What it found (2026-11-16, tmux 3.5a, two to five runs per mode; `test_tmux_resize_history_tmux.py` is the control that
 tmux's own history is intact):
 
 - no resize: every paragraph once;
 - the **width** changes while it streams: paragraphs repeated in tmux's history (5 to 13 of 30);
 - the **height** changes: whole paragraphs missing from the history (3 to 4 of 30), none repeated;
 - a **reattach** at another size: repeats, and one paragraph missing;
-- the prompt echoed twice after any of them.
+- the prompt echoed twice after any of them;
+- a **pinned** window (`window-size manual`, one `resize-window`, then the same churn and reattaches): clean, 8 of 8
+  runs (two each of steady, width, height and reattach, in a script, then the combined churn here). Waiting for the
+  pane to be idle first does not help (a width change repeats the last paragraphs, a height change loses 3 to 4),
+  and `attach -f ignore-size` alone does not either (the window still followed the one client).
 
 The known-bad modes are `xfail` (not strict), so a mitigation that holds the pane's grid still turns them into
 passes without breaking the file. A mode that starts failing where it passed is a regression.
@@ -57,6 +61,7 @@ SEQUENCES = {
     "rows": [(100, 18), (100, 16), (100, 19), (100, 20)] * 3,
     "both": [(99, 18), (101, 16), (98, 19), (100, 20)] * 3,
     "reattach": [(99, 20), (101, 18), (98, 16), (100, 20)] * 2,
+    "pinned": [(99, 18), (101, 16), (98, 19), (100, 20)] * 3,
 }
 KNOWN_BAD = pytest.mark.xfail(
     reason="Claude Code's repaint loses or repeats rows across a resize", strict=False, raises=AssertionError
@@ -119,6 +124,9 @@ def _run(sock: str, cwd, mode: str) -> tuple[list[str], list[str], int]:
         ],
         check=True,
     )
+    if mode == "pinned":  # tmux stops sizing the window to its clients: one grid, whatever attaches
+        _tmux(sock, "set-option", "-w", "-t", "=ao-live:", "window-size", "manual")
+        _tmux(sock, "resize-window", "-t", "=ao-live:", "-x", "100", "-y", "20")
     p = _attach(sock, 100, 20)
     try:
         _ready(sock, p)
@@ -143,6 +151,11 @@ def _run(sock: str, cwd, mode: str) -> tuple[list[str], list[str], int]:
             for cols, rows in SEQUENCES.get(mode, []):
                 p.setwinsize(rows, cols)
                 _drain(p, 1.0)
+            if mode == "pinned":
+                for cols, rows in SEQUENCES["reattach"][:6]:
+                    p.terminate(force=True)
+                    p = _attach(sock, cols, rows)
+                    _drain(p, 1.0)
         deadline = time.monotonic() + 60
         while time.monotonic() < deadline and not re.search(rf"^(?:● | {{2}})P{PARAS:02d}\b", _history(sock), re.M):
             _drain(p, 0.5)
@@ -172,7 +185,13 @@ def test_a_steady_pane_draws_every_paragraph_once(live):
     assert (missing, repeated, echoes) == ([], [], 1)
 
 
-@pytest.mark.parametrize("mode", [pytest.param(m, marks=KNOWN_BAD) for m in SEQUENCES])
+def test_a_pinned_window_leaves_every_paragraph_once_through_any_resize_or_reattach(live):
+    sock, cwd = live
+    missing, repeated, echoes = _run(sock, cwd, "pinned")
+    assert (missing, repeated, echoes) == ([], [], 1)
+
+
+@pytest.mark.parametrize("mode", [pytest.param(m, marks=KNOWN_BAD) for m in SEQUENCES if m != "pinned"])
 def test_a_resize_while_it_streams_leaves_every_paragraph_once(live, mode):
     sock, cwd = live
     missing, repeated, echoes = _run(sock, cwd, mode)
