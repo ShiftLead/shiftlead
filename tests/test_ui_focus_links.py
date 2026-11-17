@@ -97,11 +97,11 @@ def test_focus_loads_the_addon_with_the_handler_on_every_focus():
 def test_the_addon_is_vendored_at_its_release_with_its_licence():
     vendor = UI / "static" / "vendor"
     data = (vendor / "addon-web-links.js").read_bytes()
-    # the file @xterm/addon-web-links 0.11.0 publishes (npm and jsdelivr, 2026-10-08)
-    assert hashlib.sha256(data).hexdigest() == "f230a6c8211ce4614dda5441f27b603c7c1ca95151a655bc0efac6377ee643f0"
+    # the file @xterm/addon-web-links 0.12.0 publishes (jsdelivr and unpkg, 2026-11-17, TD-1918)
+    assert hashlib.sha256(data).hexdigest() == "b74864125ef3889753b94e61eb4dabb99b2a27f920f0c9a7bd53cbe6d10f032a"
     assert "Permission is hereby granted, free of charge" in (vendor / "LICENSE-addon-web-links.txt").read_text()
     readme = (vendor / "README.md").read_text()
-    assert "| `addon-web-links.js` | `@xterm/addon-web-links` | 0.11.0" in readme
+    assert "| `addon-web-links.js` | `@xterm/addon-web-links` | 0.12.0" in readme
 
 
 @pytest.mark.unit

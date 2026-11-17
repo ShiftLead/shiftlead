@@ -38,9 +38,9 @@
     person may set the face and size (§5 `person.terminal`, the Settings page), ligatures off and
     `monospace` the fallback whatever they choose; it
     draws through xterm.js's WebGL renderer where the browser has WebGL, the DOM renderer
-    otherwise, and measures character widths by Unicode 11 (xterm.js's unicode11 addon, the release
-    paired with the vendored `@xterm/xterm`), so an emoji or a wide symbol takes the cells tmux gives it; a
-    ZWJ sequence or an emoji presentation selector still does not, until the xterm 6 line (TD-1918).
+    otherwise, and measures character widths by Unicode 15 with grapheme clusters (xterm.js's
+    unicode-graphemes addon, the release paired with the vendored `@xterm/xterm`), so an emoji, a wide
+    symbol, a ZWJ sequence or an emoji presentation selector takes the cells tmux gives it.
 13. **Local and volatile hosts**: the person's own laptop is a host too (transport `local`, no
     ssh). A host marked `volatile: true` sleeps with the lid; its sessions show `unreachable`
     (not `stalled?`) when the host agent stops answering, its VS Code links use the local
