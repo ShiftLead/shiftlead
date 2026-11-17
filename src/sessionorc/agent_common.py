@@ -62,7 +62,8 @@ LEASE_TTL = mail.LEASE_TTL
 # A `restart` declared inside this of the record's own start is marked `early` (design §4.9a
 # *A run that ends with work left*, TD-083). The word still stands — it is the session's — but a
 # controller does not act on an early one and puts it on the board instead: a run that is over
-# before it began did not run out of context. The home applies the bound because it holds the
+# before it began did not run out of context — unless the home read it over its context bound, or it
+# pushed a commit of its own this run (§4.9a, TD-1900). The home applies the bound because it holds the
 # start time, so a controller reads a field and never a clock.
 RESTART_EARLY = timedelta(minutes=30)
 GIT_EVERY = timedelta(seconds=10)  # git status per live session, cheap and cached
