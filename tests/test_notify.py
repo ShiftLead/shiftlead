@@ -687,3 +687,27 @@ async def test_a_stopped_holders_row_is_linked_to_its_card(agent, sent, tmp_path
         agent._queue = None
         agent.sessions.pop(s.id, None)
         agent.sessions.pop(o.id, None)
+
+
+async def test_a_restart_row_homed_on_a_card_is_linked_there_and_told_though_dismissed(agent, sent, tmp_path):
+    """TD-1863 (§4.10, TD-1856): a restart row homed on its entry's card is told by the card's page, its `item=` the
+    row's own key, and its Inbox row's Dismiss does not end it — the card draws it whatever the store says."""
+    _on()
+    t0 = datetime.now(UTC)
+    s = _session(agent, tmp_path, state="idle", since=_z(t0))
+    s.restart_ceiling = {"at": _z(t0), "count": 3}
+    agent.attention_snoozed[f"{s.id}|restart"] = f"dismissed:{_z(t0)}"
+    top = {"qid": "s#TD-020"}
+    agent._queue = {
+        "cards": [{"id": "s#TD-020", "top": top, "rows": [top, {"qid": "s#TD-021"}]}],
+        "completed": [],
+        "holds": [{"sid": s.id, "qid": "s#TD-21", "source": "declared", "at": _z(t0), "n": 0}],
+    }
+    try:
+        await _pass(agent, t0 + timedelta(seconds=61))
+        links = [t.split("\n")[1] for _, t in sent]
+        assert links == ["http://kmaster:8765/card/s%23TD-020?row=s%23TD-021&item=ao-x-w%3Arestart"]
+    finally:
+        agent._queue = None
+        agent.attention_snoozed.clear()
+        agent.sessions.pop(s.id, None)

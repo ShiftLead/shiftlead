@@ -226,6 +226,8 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     person_only,  # noqa: F401
     read_checkout,  # noqa: F401
     read_draft_claim,  # noqa: F401
+    restart_waits,  # noqa: F401
+    restart_waits_of,  # noqa: F401
     run_ended,
     shells_live,  # noqa: F401
     stat_dir,  # noqa: F401

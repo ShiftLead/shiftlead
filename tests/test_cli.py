@@ -2851,7 +2851,7 @@ def test_ao_restart_prints_the_new_records_line_and_a_refusal_in_the_agents_word
     assert cli.main(["restart", "ao-x-tl"]) == 0
     assert capsys.readouterr().out == "tl · fills exhausted cleared — rule 3 fills it when it is due\n"
     manager = (pathlib.Path(__file__).parents[1] / "src/shiftlead/briefs/manager.md").read_text()
-    assert "on the board once — the person's press is the Inbox row's Restart, or `ao restart <id>`." in manager
+    assert "on the board once — the person's press is its restart row's Restart, or `ao restart <id>`." in manager
 
 
 def test_the_presets_say_what_over_its_line_means():

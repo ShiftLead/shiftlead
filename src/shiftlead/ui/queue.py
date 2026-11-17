@@ -66,8 +66,8 @@ DATE_ONLY = re.compile(r"\d{4}-\d{2}-\d{2}")
 # (TD-1380), nor its `Hide until:` or `Lifts:`
 CONTEXT = re.compile(r"\bContext:\s*(.*?)(?=\s+(?:Parts|Due|Hide until|Answers|Lifts|Decided|Closed):|$)", re.S)
 # a stopped holder's state rows, drawn on the card of the entry it holds (§4.5 screen 6 *One place for each thing that
-# needs the person*, TD-1468) — those five and no other
-HOLDER_ROWS = ("permission", "question", "needs", "limited", "stalled")
+# needs the person*, TD-1468) — those five, and its restart row (TD-1856), and no other
+HOLDER_ROWS = ("permission", "question", "needs", "limited", "stalled", "restart")
 # the filter row's one status pick (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): the
 # **Needs you** switch, beside the team chips and the find box (TD-1287)
 FILTERS = {"needs-you": "Needs you"}

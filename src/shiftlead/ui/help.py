@@ -367,7 +367,7 @@ HELP: tuple[Help, ...] = (
     Help(
         "restart",
         "Restart",
-        "the Inbox restart row, a card's *more ▾*, the ending banner",
+        "the restart row, in the Inbox or on its entry's Queue card, a card's *more ▾*, the ending banner",
         (
             "Puts this session back in its team's run as its launch record started it: closed if it is still "
             "there, then started again under the same name, team, lane and brief, unattended if it was "

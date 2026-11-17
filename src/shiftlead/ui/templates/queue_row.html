@@ -8,12 +8,13 @@
 {% macro needs_word(r) %}{% if r.needs == 'owner' %}yours to do{% elif r.needs == 'decision' %}your decision{% endif %}{% endmacro %}
 
 {#- a word that stands for a session opens its Focus, as the holder pill does (§4.5 screen 12 *A holder's word opens
-    the holder*, §4.5a *Queue card: holder's word*, TD-1724): *with you in <name>*, *held by <name>* and *stalled*,
-    wherever the row has a holder; *answered — waiting on <asker>*, the need words and a holderless *stalled* stay plain -#}
-{% macro state(r, words=False) %}{% set sw = state_words(r.state) if words else r.state %}{% set opens = r.holder and not r.archived and (r.with_you or (r.state or '').startswith(('with you in', 'held by')) or r.state == 'stalled') %}
+    the holder*, §4.5a *Queue card: holder's word*, TD-1724): *with you in <name>*, *held by <name>*, *stalled* and a
+    restart word (`restart_word`, drawn `s-restart` whatever its first word, TD-1856), wherever the row has a holder;
+    *answered — waiting on <asker>*, the need words and a holderless *stalled* stay plain -#}
+{% macro state(r, words=False) %}{% set sw = state_words(r.state) if words else r.state %}{% set opens = r.holder and not r.archived and (r.with_you or (r.state or '').startswith(('with you in', 'held by')) or r.state == 'stalled' or r.restart_word) %}
 {%- if r.with_you or r.answered %}{% if r.with_you and opens %}<a class="qstate s-with" href="/focus/{{ r.holder.id }}" title="open {{ r.holder.name }}">{{ sw }}</a>{% else %}<span class="qstate s-with">{{ sw }}</span>{% endif %}
 {%- elif r.needs %}<span class="qstate needs">{{ needs_word(r) }}</span>
-{%- elif r.state %}{% set cls = "qstate s-" ~ (r.state.split(' ')[0] | replace('#', 'pr')) ~ (" done" if r.archived else "") %}
+{%- elif r.state %}{% set cls = "qstate s-" ~ ('restart' if r.restart_word else r.state.split(' ')[0] | replace('#', 'pr')) ~ (" done" if r.archived else "") %}
 {%- if opens %}<a class="{{ cls }}" href="/focus/{{ r.holder.id }}" title="open {{ r.holder.name }}">{{ sw }}</a>{% else %}<span class="{{ cls }}">{{ sw }}</span>{% endif %}{% endif %}{% endmacro %}
 
 {# the row's controls, defined once (design §4.5 screen 12 *any open row*, §4.5a *Queue card: what needs the

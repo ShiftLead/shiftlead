@@ -310,6 +310,37 @@ def fill_lapses(mark: Any) -> bool:
     return isinstance(mark, dict) and mark.get("why") == "fill" and not mark.get("held")
 
 
+def restart_waits(
+    restart_wanted: Any, restart_ceiling: Any, restart_blocked: Any, superseded_by: Any, state: Any
+) -> dict[str, Any] | None:
+    """The one test of *this record's mark draws a restart row* (§4.5a **Inbox row: restart**, §4.4 *A holder
+    waiting on a restart is not stalled*, TD-1856): `{at, word, lapses}` — the mark's own time, its short word and
+    whether it is a plain fill mark that lapses (`fill_lapses`) — else None. Not superseded; a `restart_ceiling` or
+    `restart_blocked` dict whatever the record reads; an `early` `restart_wanted` only while it reads idle or
+    exited. The short word: *restart wanted · repeats <ref>* or *restart wanted · early*; *brief lost twice*,
+    *fills exhausted* or *restarts exhausted* for a ceiling, by its `why`; *restart held*. The Inbox row's full
+    words stay the UI's; the Inbox's `restart_mark`, the told row and the Queue's row word all read this."""
+    if superseded_by:
+        return None
+    if isinstance(restart_ceiling, dict):
+        why = restart_ceiling.get("why")
+        word = {"lost-brief": "brief lost twice", "fill": "fills exhausted"}.get(str(why), "restarts exhausted")
+        return {"at": str(restart_ceiling.get("at") or ""), "word": word, "lapses": fill_lapses(restart_ceiling)}
+    if isinstance(restart_blocked, dict):
+        return {"at": str(restart_blocked.get("at") or ""), "word": "restart held", "lapses": False}
+    if isinstance(restart_wanted, dict) and restart_wanted.get("early") and state in ("idle", "exited"):
+        repeat = restart_wanted.get("repeat")
+        ref = repeat.get("ref") if isinstance(repeat, dict) else None
+        word = f"restart wanted · repeats {ref}" if ref else "restart wanted · early"
+        return {"at": str(restart_wanted.get("at") or ""), "word": word, "lapses": False}
+    return None
+
+
+def restart_waits_of(rec: Any) -> dict[str, Any] | None:
+    """`restart_waits` read from a `Session`'s own fields."""
+    return restart_waits(rec.restart_wanted, rec.restart_ceiling, rec.restart_blocked, rec.superseded_by, rec.state)
+
+
 def closer_of(caller: Any, closer: Any, at: str) -> dict[str, Any]:
     """A close's `closer: {by, why, at}` (§4.5 row 5 (b), TD-265): `closer` as handed in — the
     tick's word, or the home's over the link — only from a call with no session caller; otherwise

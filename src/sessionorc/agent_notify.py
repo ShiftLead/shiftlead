@@ -48,19 +48,11 @@ class _Row:
 
 
 def _restart_at(s: Any) -> str:
-    """When the restart row (§4.5a **Inbox row: restart**) began, or "" for none: the page's
-    `restart_mark` read from the same fields — a ceiling, a hold by work left, an early wanted."""
-    if s.superseded_by:
-        return ""
-    if s.seat and agent_common.fill_lapses(s.restart_ceiling):
-        return ""  # a seat's plain fill mark lapses after the hour and is never told (§4.10 *What is told*, TD-1422)
-    for mark in (s.restart_ceiling, s.restart_blocked):
-        if isinstance(mark, dict):
-            return str(mark.get("at") or "")
-    wanted = s.restart_wanted
-    if isinstance(wanted, dict) and wanted.get("early") and s.state in ("idle", "exited"):
-        return str(wanted.get("at") or "")
-    return ""
+    """When the restart row (§4.5a **Inbox row: restart**) began, or "" for none: the one reader
+    (`agent_common.restart_waits`, TD-1863) the page's `restart_mark` reads too. A plain fill mark lapses after
+    the hour and is never told (§4.10 *What is told*, TD-1422); only a seat carries one."""
+    mark = agent_common.restart_waits_of(s)
+    return "" if mark is None or mark["lapses"] else mark["at"]
 
 
 def _card(
@@ -108,7 +100,10 @@ class NotifyMixin:
         for sid, s in graph.items():
             if at := _restart_at(s):
                 k = f"{sid}|restart"
-                rows[k] = _Row(at, notify.restart_line(s.name or sid, s.team or ""), k, k)
+                # homed on its entry's card as a stopped holder's state row is (TD-1856): told by the card's page
+                card = index.get(queue_mod.HOLDER + sid)
+                link = f"{sid}:restart" if card else k
+                rows[k] = _Row(at, notify.restart_line(s.name or sid, s.team or ""), link, k, card=card)
         # keyed by whole address against the home's host; an entry the person handed a session reads its first
         # addressee's repo, as the Inbox's rows read it (TD-1541)
         handed = [e for r in graph.values() for e in r.inbox if e.handed_entry]
@@ -202,6 +197,8 @@ class NotifyMixin:
         return rows
 
     def _notify_snoozed(self, row: _Row, now: datetime) -> bool:
+        if row.card is not None and not row.mail and row.snooze.endswith("|restart"):
+            return False  # a restart row homed on a card is drawn there whatever its Inbox row's store says (TD-1856)
         until = row.until if row.mail else self.attention_snoozed.get(row.snooze)
         if not until:
             return False
