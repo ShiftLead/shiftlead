@@ -13,7 +13,7 @@ from test_queue_with_you import _mine
 from test_ui_queue import at
 
 from sessionorc import agent_common, agent_notify, queue
-from shiftlead.ui.inbox import _holder_rank, restart_mark, state_rows
+from shiftlead.ui.inbox import _holder_rank, restart_mark, state_rows, stuck_onto_holders
 
 pytestmark = pytest.mark.unit
 
@@ -180,6 +180,18 @@ def test_a_dismissed_or_snoozed_restart_row_is_drawn_on_its_card_all_the_same():
 def test_a_stuck_line_goes_under_the_pending_row_first_then_the_restart_row():
     ranks = [_holder_rank({"row": r}) for r in ("permission", "restart", "stalled", "limited")]
     assert ranks == [0, 1, 2, 2]
+
+
+def test_a_stalled_row_listed_before_the_restart_row_leaves_the_stuck_line_to_the_restart_row():
+    # TD-1916: the rank is held in its use — a first-wins pick would keep the line on the stalled row
+    stalled = {"row": "stalled", "sid": "s", "home": "inbox"}
+    restart = {"row": "restart", "sid": "s", "home": "inbox"}
+    line = {"row": "stuck", "id": "ask:m-1", "home": "inbox", "at": "a", "reason_base": "r", "text": "stuck 1h",
+            "actor": {"id": "s"}}  # fmt: skip
+    out = {"needs": [stalled, restart, line], "steering": [], "waiting": [], "snoozed": []}
+    stuck_onto_holders(out, lambda r: "")
+    assert restart["stuck_lines"] == [{"id": "ask:m-1", "text": "stuck 1h"}]
+    assert "stuck_lines" not in stalled and out["needs"] == [stalled, restart], "the stuck row is a line, no row"
 
 
 def test_the_rows_record_restartable_is_the_records_own_flag_and_the_merged_one_is_unchanged():
