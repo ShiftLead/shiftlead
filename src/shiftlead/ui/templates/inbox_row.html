@@ -453,7 +453,9 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   <span class="st age" data-since="{{ e.at or '' }}">{{ e.age or '' }}</span>
 </div>
 {{ body(e) }}
-{{ outcome_line(e) }}
+{#- a `blocked` handed entry on its card (TD-1843): its press line says what came of it, so no outcome line -#}
+{%- set hpress = whole and (e.outcome or {}).state == 'blocked' and not (e.stuck and not e.stuck.waiting_until) %}
+{%- if not hpress %}{{ outcome_line(e) }}{% endif %}
 {%- if e.holder_doing %}<div class="st" title="what the holder says it is doing (design §4.8): its own words">doing: {{ e.holder_doing.text }}{% if e.holder_doing.age %} · says {{ e.holder_doing.age }} ago{% endif %}</div>{% endif %}
 {%- if e.holder_waits and section != 'needs' %}<div class="st dflt routed" title="its seat cannot answer now (design §4.9b *A seat that cannot answer is routed around*)">{{ e.holder_waits }}</div>{% endif %}
 {#- §4.5a **Queue card / Inbox: stuck row** (§6 rule 13 *What the person sees*, TD-1497 slice 4): a stuck handed
@@ -469,6 +471,9 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 </div>
 {%- endif %}
 {%- set stuck = e.stuck and not e.stuck.waiting_until %}
+{%- if hpress %}{% set s = (e.holder_name ~ ' could not do it: ' ~ (e.outcome.text or 'blocked')) | trim %}
+<div class="qpress qp-needs" role="status">{{ s }}{% if not s.endswith(('.', '?', '!')) %}.{% endif %} Start a session, or dismiss it.</div>
+{%- else %}
 <div class="row gap wrap mfoot">
   {%- if section == 'needs' and not (e.stuck and not e.stuck.waiting_until) %}
   <span class="st">blocked on something only a person can move — {{ e.holder_name }}'s questions come as rows of their own</span>
@@ -482,6 +487,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
   {{ dismiss_btn(e, e.holder_name, True) }}
   {%- endif %}
 </div>
+{%- endif %}
 {#- on a card (TD-1842): a handed entry's `blocked` outcome draws Start session, **Dismiss** and **Open** (its holder's
     Focus), no Answer… and no ⋯; a stuck one is the stuck row, its **Open** the actor's Focus alone -#}
 {%- if whole %}
@@ -1601,6 +1607,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {%- if app %}{{ e.applying_words or 'answered — applying' }}: {% if app.answer %}you {{ 'answered' if app.act == 'decide' else 'wrote' }} &ldquo;{{ app.answer }}&rdquo; — {% endif %}landing on {{ e.name }}'s board
 {%- elif ans.kind == 'handed' and not ans.until %}handed to {{ ans.name }}{% if ans.age %}, {{ ans.age }} ago{% endif %} — {% if ans.outcome %}{{ ans.name }} could not do it: {{ ans.outcome.text or 'blocked' }}{% else %}its outcome ends this hold{% endif %}
 {%- elif ans.kind == 'board' %}{{ ans.words }}, {{ ans.age ~ ' ago' if ans.age else 'today' }} — {% if ans.until %}it waits until {{ short_date(ans.until) or ans.until }}, then you are asked again{% elif ans.board.to %}carried to {{ ans.board.to | map('replace', e.name ~ '#', '') | join(' and ') }}{% else %}{{ ans.name }} acts on it{% endif %}
+{%- elif ans.outcome and ans.outcome.state == 'blocked' %}{{ ans.words }}. {{ ans.name }} could not do it: {{ ans.outcome.text or 'blocked' }}{% if ans.outcome.replied %}; you replied{% if ans.outcome.replied_age %} {{ ans.outcome.replied_age }} ago{% endif %}{% endif %}
 {%- else %}{{ ans.words }} in {{ ans.name }}'s {{ ans.kind or 'question' }}, {{ ans.age ~ ' ago' if ans.age else 'just now' }} — {% if ans.outcome %}{{ ans.name }}: {{ ans.outcome.text or 'done' }}{% else %}the hold goes when its PR merges{% endif %}
 {%- endif %}
 {%- endset %}
@@ -1617,10 +1624,10 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {%- set o = e.outcome or {} %}
 {%- set s -%}
 {%- if e.answer_given %}You answered &ldquo;{{ e.answer_given }}&rdquo;.{% elif e.closed_reason == 'go_with_it' %}You let it go with its default.{% else %}You answered.{% endif %}
-{%- if o.state == 'blocked' %} {{ who }} could not do it: {{ o.text or 'blocked' }}{% else %} {{ who }} {{ e.asker_state or 'exited' }} without reporting what came of it{% endif %}
+{%- if o.state == 'blocked' %} {{ who }} could not do it: {{ o.text or 'blocked' }}{% elif e.owed_replied_age %} You replied {{ e.owed_replied_age }} ago; {{ who }} reads it when it is resumed{% else %} {{ who }} {{ e.asker_state or 'exited' }} without reporting what came of it{% endif %}
 {%- endset %}
 {%- set s = s | trim %}
-<div class="qpress qp-needs" role="status">{{ s }}{% if not s.endswith(('.', '?', '!')) %}.{% endif %} {% if o.state == 'blocked' and e.lift_reply and e.lift_reply.id and e.lift_reply.root %}Lift the hold, reply, start a session, or dismiss it.{% else %}Reply, start a session, or dismiss it.{% endif %}</div>
+<div class="qpress qp-needs" role="status">{{ s }}{% if not s.endswith(('.', '?', '!')) %}.{% endif %} {% if o.state == 'blocked' and e.lift_reply and e.lift_reply.id and e.lift_reply.root %}Lift the hold, reply, start a session, or dismiss it.{% elif o.state != 'blocked' and e.owed_replied_age %}Reply again, start a session, or dismiss it.{% else %}Reply, start a session, or dismiss it.{% endif %}</div>
 {%- endmacro %}
 
 {% macro ledger(e, section) -%}

@@ -2548,6 +2548,9 @@ def _owing(e: dict[str, Any], record: dict[str, Any] | None, now: datetime) -> N
         {"text": str(doing.get("text") or ""), "age": _age(doing.get("at"), now)} if doing.get("text") else None
     )
     e["asker_gone_quiet"] = bool(e["owes"] and e["asker_state"] in ("exited", "closed"))
+    # the person's newest reply on it since the answer (`replied_at`, the home's stamp, TD-1843): an exited
+    # asker's press line says *You replied <age> ago; <asker> reads it when it is resumed.*
+    e["owed_replied_age"] = _age(e.get("replied_at"), now) if e["owes"] else ""
     if outcome:
         e["outcome_age"] = _age(outcome.get("at"), now)
     e.update(_blocked_words(e, now))
@@ -3478,7 +3481,16 @@ def _held_answered(
         "kind": str(got.get("kind") or ""),
         "words": f"you answered \u201c{given}\u201d" if given else str(q.get("answer_how") or "you answered"),
         "age": _age(got.get("closed_at"), now),
-        "outcome": {"text": str(outcome.get("text") or "")} if outcome else None,
+        # its `state` and, on a replied `blocked` one, the question row's own `replied_age` (`_blocked_words`): the
+        # press line's replied form, *… could not do it: <text>; you replied <age> ago.* (TD-1843 step 9)
+        "outcome": {
+            "state": str(outcome.get("state") or ""),
+            "text": str(outcome.get("text") or ""),
+            "replied": outcome.get("state") == "blocked" and isinstance(outcome.get("replied"), Mapping),
+            "replied_age": str(q.get("replied_age") or "") if outcome.get("state") == "blocked" else "",
+        }
+        if outcome
+        else None,
         "lift": {"root": str(lift.get("root") or ""), "id": str(lift.get("id") or "")} if lift else None,
     }
 
