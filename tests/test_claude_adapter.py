@@ -1290,6 +1290,9 @@ def test_a_body_with_any_window_is_a_reading_and_one_with_none_names_its_shape(t
     assert u and [(w.label, w.pct) for w in u.windows] == [("5h", 12)]
     assert parse_usage({"five_hour": None, "seven_day": None}) is None
     assert parse_usage({"five_hour": {"utilization": True}}) is None  # a bool is not a number
+    assert (
+        parse_usage(json.loads('{"five_hour": {"utilization": NaN}, "seven_day": {"utilization": Infinity}}')) is None
+    )
     assert parse_usage([]) is None
 
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))

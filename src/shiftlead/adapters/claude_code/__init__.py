@@ -11,6 +11,7 @@ from __future__ import annotations
 import fcntl
 import json
 import logging
+import math
 import os
 import re
 import shlex
@@ -1206,7 +1207,8 @@ ENDPOINT_WINDOWS = {"five_hour": "5h", "seven_day": "week"}
 def _pct(v: object) -> int | None:
     """A window's `utilization` as a whole percentage, or None when it carries no number."""
     u = v.get("utilization") if isinstance(v, dict) else None
-    return int(u) if isinstance(u, int | float) and not isinstance(u, bool) else None
+    ok = isinstance(u, int | float) and not isinstance(u, bool) and math.isfinite(u)  # json reads NaN
+    return int(u) if ok else None
 
 
 def _shape(body: object) -> str:
