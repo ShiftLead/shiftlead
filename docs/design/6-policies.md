@@ -495,7 +495,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      sender, the person's included, less one it passed up — an answer to its own question is a seat's
      count alone, since a member reads its own on the doorbell; TD-1435: a read question is never rung again, since the doorbell rings only undecided mail) — and no
      declaration (a member that declared `none` is not nudged for its questions either: its brief reads its
-     inbox before declaring), no pending, not
+     inbox before declaring), no `restart_wanted` mark (its next move is the restart's: rule 2's, or the
+     person's for an early one, whose Inbox row and Queue card name it, TD-1863; so such a member writes no
+     `idle_open` either, and rule 3's *open* cause never reads it, TD-1900), no pending, not
      gated, **no live subagent and no live background shell** (§4.2 *Working on its own*, the card's reading: its own work is
      running, and its card says *working*; TD-734, TD-761; the twenty minutes count from the later of
      `since`, `subagent_at` and `shells_at`, and *idle · open work* is not marked, nor a standing one read as
@@ -1570,12 +1572,17 @@ block. A policy is agent code and needs no grant; a session doing the same work 
          move: an addressee that is no seat, a seat the person's team pick holds, a session's own ledger
          request.
        - **A decided board line waiting on a session**: a work order `board:<key>` (§4.9a *What a
-         session does with a decided line*), read from the lanes as `ao repo` reads them, open while
+         session does with a decided line*), read from the lanes as `ao repo` reads them — joined first
+         (`workorders.join`), so an order rule 6 routes to the design-first lanes, or to one designer, is
+         that lane's and never the free-pick lanes' (TD-1900) — open while
          its line is open. Its actors are the records of every lane that takes it (a seat has no lane,
          §4.9b, so none is an order's actor, nor is a member its flow sat out, `work.sat_out`); a team none of
          whose members is live and that `work.team_wound_down` reads wound down, or `work.team_stopped`
          stopped, is read whole, by its `work_waiting` (rule 8) — one whose members ended otherwise (a
-         crash, a restart ceiling) keeps each member's own state as its reason, the cure's name — where two teams' lanes
+         crash, a restart ceiling) keeps each member's own state as its reason, the cure's name, and a live
+         one whose restart waits on the person (an early or a repeated `restart_wanted`, the Inbox row's
+         reading) reads *restart wanted · early* (or *· repeats <ref>*), its cure the person's Restart,
+         rather than *idle* (TD-1900) — where two teams' lanes
          take it, each team's, the reason the first's in `teams` order. A line no team's lane takes reads
          *no lane takes it* once past the wait. While the line has a **holder**, its holders are its only
          actors: each record that `mail.lease_holders(f"board:{key}", records, now)` returns over the
