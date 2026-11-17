@@ -91,7 +91,8 @@ def test_a_bare_id_carried_by_two_repos_links_to_neither(tmp_path):
 def test_a_done_outcome_draws_the_askers_line(tmp_path):
     done = {"state": "done", "text": "#2900 drops the hold", "at": (NOW - timedelta(minutes=5)).isoformat()}
     (row,) = _rows(_repos(tmp_path, "r"), [_ask(outcome=done)])
-    assert row["answered"]["outcome"] == {"text": "#2900 drops the hold"}
+    assert row["answered"]["outcome"] == {"state": "done", "text": "#2900 drops the hold", "replied": False,
+                                          "replied_age": ""}  # fmt: skip
     html = _render(row)
     assert "designer: #2900 drops the hold" in html and "the hold goes when its PR merges" not in html
 

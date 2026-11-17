@@ -165,7 +165,8 @@ def test_a_blocked_handed_entry_at_waiting_still_says_it_is_blocked(tmp_path, mo
     (r,) = secs["needs"]
     assert r["stuck"]["waiting_until"] == until
     html = ui.templates.get_template("queue_mail.html").render(e={**r, "want": "do"}, section="needs", origin="")
-    assert "blocked on something only a person can move" in html
+    # on its card the press line says it (TD-1843): *<seat> could not do it: <text>.*
+    assert "could not do it: needs a key." in html and "qp-needs" in html
 
 
 @pytest.mark.unit
