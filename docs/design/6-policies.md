@@ -1640,8 +1640,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        among them, the same cure in the row's words) (TD-1900: a designer idle behind an early restart read only as
        idle, so the press that cured it went unnamed), for every kind of work this rule reads (an ask's
        addressee, an order's actor, a holder), its `since` read as `idle`'s is (the
-       actor's figure floored at the work's open time, *The clock*), tested only on an actor not acting —
-       so a working one, one on its own (`on_its_own`), a fillable seat and the person's own session are
+       actor's figure floored at the work's open time, *The clock*), tested only on an actor not acting, whose state is `idle` or `exited` (the
+       states `restart_waits` reads an early mark in; a `needs-you` or permission-waiting record keeps
+       `read`'s more specific reason) — so a working one, one on its own (`on_its_own`), a fillable seat and the person's own session are
        never it — after `stalled` and before `idle`; the Queue card's holder row keeps its own restart word
        (TD-1856) and the stuck line beneath it says the same cure, as any reason's line does; and an `idle` one reads *`<name>` has been idle
        since `<time>` with it open*, `<time>` the record's own idle start (`agent_common.idle_from`), the
