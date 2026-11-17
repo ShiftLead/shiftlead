@@ -1630,12 +1630,16 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        which `agent_common.restart_waits_of` gives a mark that does not lapse (`lapses` false), the Inbox
        restart row's own reading (an early or a repeated `restart_wanted`, a restart ceiling, a lost brief,
        a held restart; a fill mark that lapses cures itself and is not this) — reads **`restart`**,
-       *`<name>` waits on your Restart: <word>*, `<word>` that function's short word, in place
+       *`<name>` waits on your Restart: <word>*, `<word>` that function's short word, its `until` none
+       (it never comes back on its own), in place
        of `idle` and of whatever reason `read` gives that record (`restart_ceiling` and `fills_exhausted`
        among them, the same cure in the row's words) (TD-1900: a designer idle behind an early restart read only as
        idle, so the press that cured it went unnamed), for every kind of work this rule reads (an ask's
-       addressee, an order's actor, a holder), its `since` the record's own idle start as `idle`'s is,
-       tested after `stalled` and before `idle`; and an `idle` one reads *`<name>` has been idle
+       addressee, an order's actor, a holder), its `since` read as `idle`'s is (the
+       actor's figure floored at the work's open time, *The clock*), tested only on an actor not acting —
+       so a working one, one on its own (`on_its_own`), a fillable seat and the person's own session are
+       never it — after `stalled` and before `idle`; the Queue card's holder row keeps its own restart word
+       (TD-1856) and the stuck line beneath it says the same cure, as any reason's line does; and an `idle` one reads *`<name>` has been idle
        since `<time>` with it open*, `<time>` the record's own idle start (`agent_common.idle_from`), the
        stamp's `since` keeping the clock's instant (*The clock*, below) (TD-1435's cause: a seat that read its asks
        and ends every turn on
