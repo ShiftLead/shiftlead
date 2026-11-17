@@ -128,7 +128,10 @@ def test_an_outcome_in_the_inbox_alone_or_on_another_card_hides_nothing():
     led = {"row": "ledger", "id": "TD-1", "name": "r", "home": "queue", "on_card": "c", "on_row": "c",
            "answered": {"mid": "m-1", "asker": "a", "kind": "ask", "lift": {"root": "/x/r", "id": "TD-1"}}}  # fmt: skip
     mail = {"id": "m-1", "kind": "ask", "outcome": {"state": "blocked", "text": "no"}}
-    for other in ({**mail, "home": "inbox"}, {**mail, "home": "queue", "on_card": "d", "on_row": "d"}):
+    # TD-1907: an Inbox outcome that names the card hides nothing either. No live Inbox item carries an `on_card`, but
+    # this case is what holds the home test apart from the card match
+    inbox_on_c = {**mail, "home": "inbox", "on_card": "c", "on_row": "c"}
+    for other in ({**mail, "home": "inbox"}, inbox_on_c, {**mail, "home": "queue", "on_card": "d", "on_row": "d"}):
         got = attach({"needs": [led, other]}, lambda e, sec: Markup(""))
         assert HIDDEN not in got["cards"].get("c", {}) and got["cards"]["c"]["needs"][0]["item"] == "r#TD-001"
 
