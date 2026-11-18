@@ -1029,7 +1029,8 @@ def ci_not_run_rows(spells: Mapping[str, Any] | None, now: datetime | None = Non
 
 def _stuck_reason(reason: Mapping[str, Any], name: str, at: datetime) -> str:
     """A stuck row's *<reason>* (§6 rule 13 *Stuck work*, §4.5a *Queue card / Inbox: stuck row*): rule 13's own words
-    for `stalled`, `idle`, `unfillable` (its `why` as is) and `no_lane`; any other state the actor's `unanswered`
+    for `stalled`, `restart` (*waits on your Restart: <word>*, TD-1924), `idle`, `unfillable` (its `why` as is) and
+    `no_lane`; any other state the actor's `unanswered`
     stamp, in `unanswered.words`' fixed words, its closing stop dropped (the row's sentence goes on)."""
     s = reason.get("state")
     if s == "stalled":
@@ -1038,6 +1039,8 @@ def _stuck_reason(reason: Mapping[str, Any], name: str, at: datetime) -> str:
     if s == "idle":
         since = f" since {unanswered_mod.clock(reason['since'], at)}" if reason.get("since") else ""
         return f"{name} has been idle{since} with it open"
+    if s == "restart":
+        return f"{name} waits on your Restart: {reason.get('word') or 'restart wanted'}"
     if s == "unfillable":
         return str(reason.get("why") or f"{name} cannot be filled")
     if s == "no_lane":

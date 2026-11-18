@@ -158,7 +158,9 @@ def judge(
 ) -> Actor:
     """One actor read as rule 13 reads it. `stamp` is `unanswered.read`'s for `r` (the walk's last record, None:
     gone), `idle_clock` what an `idle` actor gives for this work (an ask: its copy's `read_at`; an order: its
-    `stuck_open` `at`), `open_at` the work's open time, which floors every figure."""
+    `stuck_open` `at`), `open_at` the work's open time, which floors every figure. An idle or exited actor whose
+    restart waits on the person (`agent_common.restart_waits_of`, a mark that does not lapse) reads `restart` with
+    the mark's short word, clocked as `idle` is, after `stalled` and before `idle` (TD-1924)."""
     if r is None:
         reason = {k: v for k, v in stamp.items() if k != "at"}
         return Actor(address, "", address, reason=reason, since=open_at, until=comes_back(reason))
@@ -181,6 +183,15 @@ def judge(
     elif stamp.get("state") == "working":
         a.acting = True
         return a
+    elif r.state in ("idle", "exited") and (mark := agent_common.restart_waits_of(r)) and not mark.get("lapses"):
+        # its restart waits on the person (TD-1900, TD-1924): the press that cures it, in place of `idle` and of
+        # whatever `read` gives — unless it is working on its own (§4.2 *Working on its own*)
+        if agent_common.on_its_own(r, now):
+            a.acting = True
+            return a
+        start = agent_common.idle_from(r)
+        a.reason = {"state": "restart", "word": str(mark.get("word") or ""), **({"since": iso(start)} if start else {})}
+        figure = _latest(idle_clock, r.subagent_at, r.shells_at)
     elif stamp.get("state") == "idle":
         if agent_common.on_its_own(r, now):
             a.acting = True  # a live subagent or background shell is working (§4.2 *Working on its own*)
@@ -283,8 +294,19 @@ def board_read(reading: Any) -> str:
 
 
 def orders(reading: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """The work orders of a repo reading's boards (`workorders.orders`: every open decided line that is not
-    `fyi`), each `{id, entry}` — `entry` the line as the lanes read it (`workorders.entry`)."""
+    """A repo reading's decided board lines as rule 13 reads them, each `{id, entry}`: its stored `work_orders`'
+    `board:<key>` orders, the joined list `ao repo` prints (§6 rule 6 *save a design's answer*, TD-1705), so
+    `lane_records` sees a design's answer's `lane` and `for` and never hands it to a free-pick lane (TD-1924). A
+    reading with no stored orders list falls back to its boards (`workorders.orders`, each through
+    `workorders.entry`), unjoined."""
+    wos = reading.get("work_orders")
+    stored = wos.get("orders") if isinstance(wos, Mapping) else None
+    if isinstance(stored, list):
+        return [
+            {"id": str(o["id"]), "entry": o}
+            for o in stored
+            if isinstance(o, Mapping) and str(o.get("id") or "").startswith("board:")
+        ]
     return [{"id": o["id"], "entry": workorders.entry(o)} for o in workorders.orders(reading.get("boards") or {})]
 
 
