@@ -127,7 +127,7 @@ def mail_then_yours(
     ids)`. None for any other item."""
     if e.get("row") or e.get("kind") != "ask" or e.get("orphaned") or not e.get("lift") or not entries:
         return None
-    if e.get("closed_by") or e.get("closed_at") or e.get("closed_reason") or e.get("outcome") or e.get("owes"):
+    if any(e.get(k) for k in ("closed_by", "closed_at", "closed_reason", "expired_at", "outcome", "owes")):
         return None  # answered: no question left to withhold
     repo = str(e.get("repo") or "").strip() or (askers or {}).get(str(e.get("id") or ""))
     ref = first_ref(e.get("about"), f"{e.get('subject') or ''} {e.get('text') or ''}", repo)
