@@ -2198,6 +2198,61 @@ def queue_page():
 ''' + TAIL
 
 
+
+def queue_who_closed():
+    """Screen 12, Recently completed: an opened line's entries, each with its `Resolved:` text and under it **who closed
+    it** (TD-1899; §4.5 screen 12 *Recently completed*, §4.4 *What closed*'s `by`): the closing commit's trailers in
+    words, the three marks in the warning colour, and an entry whose commit has no `Merged-by:` drawing none."""
+    P = {"H": ("#1e3a8a", "#fff"), "M": ("#2563eb", "#fff"), "L": ("#bfdbfe", "#1e3a8a")}
+    def badge(p):
+        bg, fg = P[p]
+        return (f'<span class="mono" style="display: inline-flex; width: 15px; height: 15px; align-items: center; justify-content: center; '
+                f'border-radius: 3px; font-size: 10px; font-weight: 600; background: {bg}; color: {fg};">{p}</span>')
+    def tid(t):
+        return f'<span class="mono" style="font-size: 12.5px; font-weight: 600;">{t}</span>'
+    def warn(t):
+        return f'<span style="color: #b45309; font-weight: 600;">{t}</span>'
+    def entry(t, pr, title, resolved, who):
+        by = (f'<div style="font-size: 12px; margin-top: 2px; color: #6b7280; white-space: normal;">{who}</div>' if who else "")
+        return (f'<div style="padding: 6px 0 6px calc(3.5em + 8px);"><span class="mono" style="font-size: 12.5px;">{t}</span> '
+                f'<span class="mono" style="font-size: 12.5px;">#{pr}</span> <span class="meta" style="font-size: 12px;">{title}</span>'
+                f'<div style="font-size: 13px; color: #374151; white-space: normal;">{resolved}</div>{by}</div>')
+    def line(age, t, p, title, right, body=""):
+        return (f'<div style="border-top: 1px solid #eef1f4;"><div style="display: flex; gap: 8px; align-items: baseline; padding: 8px 14px;">'
+                f'<span class="meta" style="width: 3.5em; text-align: right; font-size: 12px;">{age}</span>{tid(t)}{badge(p)}'
+                f'<span style="flex: 1;">{title}</span><span class="meta" style="font-size: 12px;">{right}</span></div>'
+                + (f'<div style="padding: 0 14px 8px;">{body}</div>' if body else "") + '</div>')
+    sep = ' <span style="color: #9ca3af;">·</span> '
+    opened = (
+        entry("TD-9102", 9871, "A PR the gate sweep opens is the team\'s at once",
+              "the grinder brief carries the taker\'s steps; the sweeper\'s branch is stranded/&lt;date&gt;",
+              "built by grinder-ao-2" + sep + "reviewed by sonnet, passed" + sep + "merged by grinder-ao-2")
+        + entry("TD-9101", 9880, "A lift PR the gate sweep opens reaches nobody",
+                "designed and built: its part TD-9102; the live check held",
+                "built by designer-ao-1" + sep + "reviewed by sonnet, passed" + sep + "merged by designer-ao-1")
+        + entry("TD-9103", 9870, "Restarts that pushed new work leave the crash ceiling",
+                "rule 2 counts a pushed restart apart",
+                "built by grinder-ao-2 and techlead-ao-1" + sep + "reviewed by sonnet, passed after fixes; opus, passed" + sep
+                + "merged by techlead-ao-1")
+        + entry("TD-9104", 9872, "A send that did not land says so",
+                "rule 13 in every brief",
+                "built by grinder-ao-1" + sep + warn("no review") + sep + warn("merged past the gate") + sep + "merged by Paul")
+        + entry("TD-9105", 9790, "An old entry closed by hand", "closed by a direct push; no trailers, so no line", "")
+    )
+    lines = (
+        line("2h", "TD-9101", "M", "A lift PR the gate sweep opens reaches nobody: hand each one to a reader",
+             '<span style="color: #15803d;">live</span> &nbsp;5 entries', opened)
+        + line("3h", "TD-9090", "M", "Answer on the Queue again", '<span style="color: #15803d;">live</span>')
+    )
+    return head("Queue — who closed it") + f'''<div style="width: 900px; min-height: 520px; background: #f4f5f7; padding: 24px; box-sizing: border-box;">
+  <div style="display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px;"><span style="font-size: 17px; font-weight: 600;">Recently completed (9)</span>
+  <span class="meta" style="font-size: 12px;">4 h · <b>day</b> · week · month</span></div>
+  <div style="background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; overflow: hidden;">{lines}</div>
+  <p style="font-size: 12px; margin-top: 12px; max-width: 820px; color: #6b7280; white-space: normal;">TD-1899: each entry of an opened line carries who closed it, from its closing
+  commit\'s trailers. The marks <i>no review</i>, <i>no precheck</i> and <i>merged past the gate</i> are drawn in the warning colour. The fifth entry\'s commit
+  has no <span class="mono">Merged-by:</span>, so it draws no such line. The ids, titles and names are made up for the mockup.</p>
+</div>'''
+
 def darken(html):
     for a, b in DARK:
         html = html.replace(a, b)
@@ -2632,6 +2687,7 @@ files = {
     "Settings.dc.html": settings_page(),
     "RepoFacet.dc.html": repo_facet_board(),
     "Queue.dc.html": queue_page(),
+    "QueueWhoClosed.dc.html": queue_who_closed(),
     "Spend.dc.html": spend_page(),
     "SpendTeam.dc.html": spend_page("team"),
     "SpendShape.dc.html": spend_shape_page(),
@@ -2671,6 +2727,7 @@ LAYOUT = [
     ("NewSession.dc.html", "New session", 1),
     ("RepoPage.dc.html", "Repo — the page (checked in from the canvas, 2026-09-26)", 1),
     ("Queue.dc.html", "Queue — the cards in rank order (TD-748, built by TD-771)", 1),
+    ("QueueWhoClosed.dc.html", "Queue — Recently completed: who closed it (TD-1899)", 1),
     ("Spend.dc.html", "Spend — All: over time by team, by team, top sessions (TD-818, built by TD-832 and TD-859)", 1),
     ("SpendTeam.dc.html", "Spend — a team: over time by role, its seats and finished entries (TD-818, built by TD-832 and TD-859)", 1),
     ("SpendShape.dc.html", "Spend — the Shape view: a team's members by class, its queues, the suggestions (TD-819, built by TD-835)", 1),

@@ -201,10 +201,18 @@
       "h": 1180
     },
     {
+      "file": "QueueWhoClosed.dc.html",
+      "title": "Queue \u2014 Recently completed: who closed it (TD-1899)",
+      "x": 1540,
+      "y": 8300,
+      "w": 900,
+      "h": 520
+    },
+    {
       "file": "Spend.dc.html",
       "title": "Spend \u2014 All: over time by team, by team, top sessions (TD-818, built by TD-832 and TD-859)",
       "x": 1540,
-      "y": 8300,
+      "y": 8920,
       "w": 1440,
       "h": 980
     },
@@ -212,7 +220,7 @@
       "file": "SpendTeam.dc.html",
       "title": "Spend \u2014 a team: over time by role, its seats and finished entries (TD-818, built by TD-832 and TD-859)",
       "x": 1540,
-      "y": 9380,
+      "y": 10000,
       "w": 1440,
       "h": 980
     },
@@ -220,7 +228,7 @@
       "file": "SpendShape.dc.html",
       "title": "Spend \u2014 the Shape view: a team's members by class, its queues, the suggestions (TD-819, built by TD-835)",
       "x": 1540,
-      "y": 10460,
+      "y": 11080,
       "w": 1440,
       "h": 900
     },
@@ -228,7 +236,7 @@
       "file": "Commands.dc.html",
       "title": "Commands",
       "x": 1540,
-      "y": 11460,
+      "y": 12080,
       "w": 1440,
       "h": 820
     },
@@ -236,7 +244,7 @@
       "file": "Settings.dc.html",
       "title": "Settings",
       "x": 1540,
-      "y": 12380,
+      "y": 13000,
       "w": 1440,
       "h": 2560
     },
