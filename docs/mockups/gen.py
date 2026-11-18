@@ -1296,6 +1296,93 @@ def add_entry():
 ''' + TAIL
 
 
+def team_page():
+    """Screen 14, Team (design §4.5, §4.9 *A team's own page*, TD-1153): one page per team holding its members,
+    its settings and its definition; a repo team's definition edit is proposed as a PR."""
+    b = lambda label, c="", extra="": f'<span class="btn sm {c}"{extra}>{label}</span>'
+    gap = '<span style="flex-grow: 1;"></span>'
+    def field(label, value, hint="", w=110):
+        h = f'<span class="muted mono" style="font-size: 12px;">{hint}</span>' if hint else ""
+        return f'<span style="display: inline-flex; align-items: center; gap: 8px; margin-right: 18px;"><span class="muted" style="font-size: 12px;">{label}</span><span class="input" style="width: {w}px; height: 28px; display: inline-flex; align-items: center; padding: 0 8px; font-size: 13px;">{value}</span>{h}</span>'
+    def sec(title, anchor, note=""):
+        return f'<div class="isec-h"><span>{title}</span><span class="mono muted" style="font-size: 12px; font-weight: 400;">#{anchor}</span><span style="flex-grow: 1;"></span><span class="muted" style="font-size: 12px; font-weight: 400;">{note}</span></div>'
+    def mrow(role, name, lane, size, holders, state, ctl):
+        st = pill(state) if state else '<span class="muted">not live</span>'
+        return f'''<div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #eceef1;">
+  <span class="badge">{role_icon(role)}{ROLE_LABEL.get(role, role.capitalize())}</span>
+  <span class="mono">{name}</span><span class="meta">{lane}</span>{size}
+  {gap}<span class="mono muted" style="font-size: 12px;">{holders}</span>{st}{ctl}
+</div>'''
+    pm = lambda n, extra="": f'{b("−")}<span class="mono" style="min-width: 18px; text-align: center;">{n}</span>{b("+")}{extra}'
+    members = "".join([
+        mrow("manager", "manager-ao-1", "", "", "ao-shiftlead-manager-ao-1", "working", ""),
+        mrow("techlead", "techlead-ao-1", "", '<span class="meta">up to</span><span class="input" style="width: 44px; height: 26px;">3</span>', "seat", "oncall", ""),
+        mrow("grinder", "grinder-ao", "free-pick", pm(2, '<span class="meta">up to</span><span class="input" style="width: 44px; height: 26px;">4</span>'), "grinder-ao-1 · grinder-ao-2", "working", b("Remove", "ghost")),
+        mrow("designer", "designer-ao-1", "design-first", pm(1), "ao-shiftlead-designer-ao-1", "idle", b("Remove", "ghost")),
+    ])
+    add = f'''<div style="border-top: 1px solid #eceef1; padding-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+      <span style="font-weight: 600;">Add member</span>
+      <span class="input" style="width: 150px;">reviewer ▾</span>
+      <span class="input mono" style="width: 170px;">reviewer-ao</span>
+      <span class="input mono" style="width: 150px; color: #9ca3af;">lane (the stage’s)</span>
+      {gap}{b("Propose as PR", "primary")}
+    </div>
+    <div class="muted" style="font-size: 12px;">a repo’s team: Add member and Remove make their one-line edit and propose it as a PR — nothing starts or winds down until it merges and you press Apply</div>'''
+    settings = '<div class="txt">' + field("flow", "td ▾", "the one Flow pick · the card’s Apply moves the team", 90) + field("when work appears", "start the team ▾", "default", 140) + '</div>' \
+        + '<div class="txt">' + field("stop time", "06:00", "Fri 06:00 · every member and seat") + field("reserve priority", "10", "+10 on grind’s reserve → line 60%", 60) + '</div>' \
+        + '<div class="txt">' + field("schedule", "☑ start at a reset", "", 140) + field("profile", "grind ▾", "", 90) + field("window", "week ▾", "starts at the reset · Thu 07:00", 80) + '</div>' \
+        + '<div class="txt">' + field("balance", "☑ on", "", 70) + field("open PRs above", "10", "now 4", 50) + field("oldest open longer than", "2d", "now 19h", 50) + '</div>' \
+        + f'<div class="ctl">{b("Save", "primary")}{b("Cancel")}{b("Clear stop time")}</div>'
+    cur = """ao-grind:
+  # the shiftlead team: two grinders and a designer
+  manager: {name: manager-ao-1, brief: docs/briefs/manager-ao-1.md}
+  techlead: {name: techlead-ao-1, brief: docs/briefs/techlead-ao-1.md}
+  flows: [td]
+  members:
+    - {role: grinder, name: grinder-ao, count: 2, lane: free-pick}
+    - {role: designer, name: designer-ao-1, lane: design-first}"""
+    new = cur.replace("    - {role: designer, name: designer-ao-1, lane: design-first}", "    - {role: designer, name: designer-ao-1, lane: design-first}\n    - {role: reviewer, name: reviewer-ao-1, brief: docs/briefs/reviewer-ao-1.md}").replace("flows: [td]", "flows: [td, td-review]")
+    def numbered(text, edit=False):
+        rows = "".join(f'<div style="display: flex; gap: 12px;"><span class="muted" style="width: 22px; text-align: right; flex: none;">{i + 1}</span><span style="white-space: pre;">{ln.replace("<", "&lt;")}</span></div>' for i, ln in enumerate(text.split("\n")))
+        border = "1px solid #1f5fa8" if edit else "1px solid #dfe3e8"
+        bg = "#fff" if edit else "#f8f9fb"
+        return f'<div class="mono" style="font-size: 12.5px; line-height: 1.6; padding: 10px 12px; border: {border}; border-radius: 4px; background: {bg}; overflow-x: auto;">{rows}</div>'
+    definition_edit = f'''<div class="mcard" style="display: block; padding: 14px;">
+  <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;"><span class="mono" style="font-size: 12.5px;">shiftlead/.shiftlead.yml · teams.ao-grind</span><span class="badge">repo’s team · changed by PR</span>{gap}<span class="muted" style="font-size: 12px;">editing</span></div>
+  {numbered(new, edit=True)}
+  <div class="note" style="color: #7c3d00; margin-top: 8px;">{ICON["warn"]}docs/briefs/reviewer-ao-1.md is not in the checkout — a warning, not a refusal: the brief may come in its own PR</div>
+  <div style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+    <span class="muted" style="font-size: 12px;">summary</span><span class="input" style="width: 420px; height: 28px;">add a reviewer and the td-review flow</span>
+    {gap}{b("Cancel")}{b("Propose as PR", "primary")}
+  </div>
+  <div class="muted" style="font-size: 12px; margin-top: 6px;">checked before anything is written: the block unchanged since you opened it · the team’s own key first · the file parses · nothing outside the block moved · no session named twice · every listed flow followable</div>
+</div>'''
+    definition_open = f'''<div class="mcard" style="display: block; padding: 14px;">
+  <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;"><span style="font-weight: 600;">proposed as <a href="#" style="color: #1f5fa8;">PR #4102</a></span><span class="muted">— the team runs on the checkout’s definition until it merges and the checkout is pulled</span>{gap}{b("Edit", "", ' style="opacity: .45;" title="PR #4102 holds an edit of ao-grind: merge or close it first"')}</div>
+  <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px;">
+    <div><div class="muted" style="font-size: 12px; margin-bottom: 4px;">now (the checkout)</div>{numbered(cur)}</div>
+    <div><div class="muted" style="font-size: 12px; margin-bottom: 4px;">proposed (team/ao-grind/20261117-1842)</div>{numbered(new)}</div>
+  </div>
+</div>'''
+    return head("Team") + f'''<div style="width: 1440px; min-height: 1400px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Sessions")}
+<div style="padding: 16px 20px 28px;">
+<div class="inboxcol">
+  {page_head("ao-grind", "shiftlead · shiftlead/.shiftlead.yml · live · 6 sessions", '<span class="badge">flow td</span><a href="#" style="color: #1f5fa8; font-size: 13px;">‹ Sessions</a>')}
+  {sec("Members", "members", "the Members dialog, in place")}
+  <div class="mcard" style="display: block; padding: 6px 14px 12px;">{members}{add}</div>
+  {sec("Settings", "settings", "settings.yml · through set_settings · moved here from the Settings page")}
+  <div class="mcard" style="display: block; padding: 12px 14px;">{settings}</div>
+  {sec("Definition", "definition", "the team’s block of its file, as text")}
+  {definition_edit}
+  <div class="muted" style="font-size: 12px; margin: 4px 0;">— the same section once proposed —</div>
+  {definition_open}
+  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">Design notes, not page text. <b>Screen 14, Team</b> (TD-1153): everything a person changes about one team. Members and Settings are the Members dialog and the Settings page’s team card, moved whole. Definition edits the team’s own block of its file as text, never re-serialised: an <span class="mono">org.yml</span> team is written in place; a repo’s team is committed by the home on <span class="mono">team/&lt;team&gt;/&lt;stamp&gt;</span> at origin’s head and opened as a PR it never merges — a work order of the team’s lanes at once. Nothing starts or winds down on a definition edit: the card’s <i>definition changed — Apply</i> does that.</div>
+</div>
+</div>
+</div>
+''' + TAIL
+
 def members_dialog():
     """The team card's **Members…** dialog (design §4.9 *Add or remove a member from the team card*,
     TD-163): the definition as the file holds it, the session holding each entry, Add member and Remove."""
@@ -2616,6 +2703,7 @@ files = {
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
     "Members.dc.html": members_dialog(),
+    "Team.dc.html": team_page(),
     "AddEntry.dc.html": add_entry(),
     "Help.dc.html": help_page(),
     "Transcript.dc.html": transcript(),
