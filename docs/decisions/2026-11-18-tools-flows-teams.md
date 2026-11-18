@@ -72,7 +72,7 @@ Today the techlead, auditors, fact-checkers and sweeper are the team's `seats:`,
    ask is refused with *has no question seat — ask the person* (§4.10), and a session's request to file
    an entry in the repo is refused (§4.9b); `entries.feature` defaults, as today, to the role of
    the stage that takes `design-first`, else to the question seat's role (§4.9c), and where the flow has
-   neither, to a new value, `person`: an entry the person picks up, the one new rule here. Otherwise nothing
+   neither, to a new value, `person`: an entry the person picks up. Beside the director road, nothing
    reaches the person's Inbox that does not today. **The record marks the question seat**: a start writes it
    on the seat's `seat` mark (today `tags: true` does this, §4.10, TD-1565), so `--team` never finds a
    fact-checker, which is also an `asks` seat. A flow may leave any of its seats out. **A switch drops a
