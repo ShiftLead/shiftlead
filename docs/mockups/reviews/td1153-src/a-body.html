@@ -1,0 +1,219 @@
+<style>
+.tp { max-width: 1180px; margin: 0 auto; padding: 18px 20px 60px; }
+.tp-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.tp-head h1 { font-size: 22px; margin: 0; font-weight: 600; }
+.tp-head .tp-src { color: var(--muted); }
+.tp-head .tp-src code { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); color: var(--strong); }
+.tp-head .tp-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.tp-sub { color: var(--muted); margin: 4px 0 22px; }
+.tp-sec { margin-top: 26px; }
+.tp-sec > h2 { font-size: var(--t-title); margin: 0 0 4px; font-weight: 600; display: flex; align-items: baseline; gap: 10px; }
+.tp-sec > h2 .tp-note { font-weight: 400; font-size: var(--t-small); color: var(--muted); }
+.tp-sec > p.tp-lead { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
+
+/* flow picker */
+.tp-flows { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 12px; }
+.tp-flows span { padding: 4px 12px; font-size: var(--t-btn); background: var(--card); border-right: 1px solid var(--border); }
+.tp-flows span:last-child { border-right: 0; }
+.tp-flows span.on { background: var(--primary); color: var(--primary-fg); }
+.tp-flows small { opacity: .7; margin-left: 6px; }
+
+/* the strip */
+.tp-strip { display: grid; grid-template-columns: 1fr 22px 1.25fr 22px 1fr 22px 150px; align-items: stretch; }
+.tp-arrow { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 18px; }
+.tp-stage { background: var(--card); border: 1px solid var(--line); border-top: 4px solid var(--hue); border-radius: 6px; display: flex; flex-direction: column; min-width: 0; }
+.tp-stage .tp-sh { padding: 10px 12px 8px; border-bottom: 1px solid var(--line2); background: color-mix(in srgb, var(--hue) 5%, var(--card)); }
+.tp-stage .tp-sn { font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.tp-stage .tp-sn .tp-chip { font-size: var(--t-cap); font-weight: 700; color: #fff; background: var(--hue); padding: 1px 6px; border-radius: 3px; letter-spacing: .02em; }
+.tp-stage .tp-what { font-size: var(--t-small); color: var(--muted); margin-top: 3px; }
+.tp-stage .tp-what a { color: var(--link); }
+.tp-seats { padding: 6px 6px 8px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.tp-seat { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 4px; border: 1px solid transparent; cursor: pointer; }
+.tp-seat:hover { background: var(--hover); }
+.tp-seat.sel { border-color: var(--link); background: color-mix(in srgb, var(--link) 7%, var(--card)); }
+.tp-seat .tp-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--st); }
+.tp-seat .tp-name { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tp-seat .tp-st { font-size: var(--t-small); color: var(--stfg); }
+.tp-seat .tp-extra { grid-column: 2 / 4; font-size: var(--t-small); color: var(--muted); margin-top: -3px; }
+.tp-seat.new { border: 1px dashed var(--working); background: var(--working-bg); }
+.tp-seat.new .tp-st { color: var(--working-fg); font-weight: 600; }
+.tps-work { --st: var(--working); --stfg: var(--working-fg); }
+.tps-idle { --st: var(--idle); --stfg: var(--idle-fg); }
+.tps-call { --st: var(--ended); --stfg: var(--muted); }
+.tps-lim { --st: var(--limited); --stfg: var(--limited-fg); }
+.tp-add { margin: 2px 6px 0; padding: 5px 8px; font-size: var(--t-small); color: var(--link); border: 1px dashed var(--border); border-radius: 4px; text-align: left; background: none; }
+.tp-cap { padding: 6px 12px 10px; font-size: var(--t-small); color: var(--muted); border-top: 1px solid var(--line2); }
+.tp-you { border: 1px solid var(--line); border-radius: 6px; border-top: 4px solid var(--needs); background: var(--card); padding: 10px 12px; }
+.tp-you b { font-size: 15px; display: block; }
+.tp-you span { font-size: var(--t-small); color: var(--muted); }
+
+/* around the flow */
+.tp-around { margin-top: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+.tp-around h3 { font-size: 14px; margin: 0 0 6px; font-weight: 600; }
+.tp-around h3 span { font-weight: 400; color: var(--muted); font-size: var(--t-small); margin-left: 6px; }
+.tp-ar { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 4px 14px; }
+.tp-ar .tp-seat { grid-template-columns: 10px 1fr auto; }
+
+/* detail panel */
+.tp-detail { margin-top: 14px; background: var(--card); border: 1px solid var(--link); border-radius: 6px; padding: 12px 14px; display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px 18px; align-items: end; }
+.tp-detail h3 { grid-column: 1 / -1; margin: 0; font-size: 15px; display: flex; gap: 10px; align-items: baseline; }
+.tp-detail h3 code { font-family: "JetBrains Mono", monospace; font-size: 14px; }
+.tp-detail h3 span { font-weight: 400; color: var(--muted); font-size: var(--t-small); }
+.tp-f label { display: block; font-size: var(--t-small); color: var(--muted); margin-bottom: 3px; }
+.tp-f .input { width: 100%; box-sizing: border-box; font-size: 14px; }
+.tp-f .tp-hint { font-size: var(--t-small); color: var(--muted); margin-top: 3px; }
+
+/* settings */
+.tp-set { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 4px 14px; }
+.tp-row { display: grid; grid-template-columns: 170px 220px 1fr; gap: 14px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line2); }
+.tp-row:last-child { border-bottom: 0; }
+.tp-row > b { font-weight: 500; font-size: 14px; }
+.tp-row .input { font-size: 14px; height: 32px; }
+.tp-row .tp-h { font-size: var(--t-small); color: var(--muted); }
+
+/* changes tray */
+.tp-tray { position: static; margin-top: 26px; background: var(--card); border: 1px solid var(--strong); border-radius: 6px; box-shadow: 0 -4px 18px rgba(0,0,0,.08); padding: 12px 14px; display: grid; grid-template-columns: 1fr auto; gap: 8px 20px; }
+.tp-tray h3 { margin: 0; font-size: 15px; }
+.tp-tray ul { margin: 4px 0 0; padding-left: 18px; font-size: 14px; }
+.tp-tray ul code { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); }
+.tp-tray .tp-how { font-size: var(--t-small); color: var(--muted); margin-top: 6px; }
+.tp-tray .tp-btns { display: flex; gap: 8px; align-items: start; }
+.tp-diff { grid-column: 1 / -1; font-family: "JetBrains Mono", monospace; font-size: 12.5px; background: var(--bg); border-radius: 4px; padding: 8px 10px; line-height: 1.55; }
+.tp-diff .add { color: var(--working-fg); background: var(--working-bg); display: block; }
+.tp-diff .ctx { color: var(--muted); display: block; }
+
+.tp-text { margin-top: 26px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+.tp-text summary { cursor: pointer; color: var(--fg); font-weight: 500; }
+@media (max-width: 720px) {
+ .tp { padding: 14px 12px 40px; }
+ .tp-strip { grid-template-columns: 1fr; }
+ .tp-arrow { transform: rotate(90deg); height: 20px; }
+ .tp-detail { grid-template-columns: 1fr; }
+ .tp-row { grid-template-columns: 1fr; gap: 4px; }
+ .tp-tray { grid-template-columns: 1fr; }
+ .tp-sec > h2 { flex-wrap: wrap; }
+ .tp-flows { display: flex; flex-wrap: wrap; }
+}
+.tp-run { color: var(--strong) !important; }
+.tp-detail { grid-template-columns: 1.6fr 1fr; align-items: start; }
+.tp-opts { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.tp-opt { display: grid; grid-template-columns: 1fr auto; gap: 0 12px; padding: 7px 10px; border-bottom: 1px solid var(--line2); font-size: 14px; }
+.tp-opt:last-child { border-bottom: 0; }
+.tp-opt span { grid-column: 1; font-size: var(--t-small); color: var(--muted); font-family: "JetBrains Mono", monospace; }
+.tp-opt i { grid-column: 2; grid-row: 1 / 3; align-self: center; font-style: normal; font-size: var(--t-small); color: var(--muted); }
+.tp-opt i.ok { color: var(--working-fg); }
+.tp-opt.on { background: color-mix(in srgb, var(--link) 9%, var(--card)); box-shadow: inset 3px 0 0 var(--link); }
+.tp-opt.off b { color: var(--muted); font-weight: 500; }
+.tp-side { display: flex; flex-direction: column; gap: 12px; align-items: start; }
+.tp-side .tp-f { width: 100%; }
+@media (max-width: 720px) { .tp-opt { grid-template-columns: 1fr; } .tp-opt i { grid-column: 1; grid-row: auto; } }
+</style>
+
+<div class="tp">
+  <div class="tp-head">
+    <h1>ao-grind</h1>
+    <span class="tp-src">shiftlead · defined in <code>.shiftlead.yml</code></span>
+    <span class="tp-right">
+      <span class="st working" style="font-size:12px">4 LIVE</span>
+      <a class="btn">Wind down</a><a class="btn">Open file</a>
+    </span>
+  </div>
+  <div class="tp-sub">Who works in this team, how work moves between them, and when they run.</div>
+
+  <section class="tp-sec">
+    <h2>How work moves <span class="tp-note">the flow is read here; seats are edited here</span></h2>
+    <div class="tp-flows"><span class="on">td <small>running</small></span><span>build-review <small>listed · designer would sit out</small></span></div>
+
+    <div class="tp-strip">
+      <div class="tp-stage" style="--hue: var(--hue-indigo)">
+        <div class="tp-sh"><div class="tp-sn"><span class="tp-chip">DESIGN</span> designer</div>
+          <div class="tp-what">takes design-first entries · <a>design.md</a></div></div>
+        <div class="tp-seats">
+          <div class="tp-seat tps-work"><span class="tp-dot"></span><span class="tp-name">designer-ao-1</span><span class="tp-st">working 3m</span><span class="tp-extra tp-run">Claude Code · Opus</span></div>
+        </div>
+        <button class="tp-add">+ add a designer</button>
+        <div class="tp-cap">a design waits on you before its builds go to build</div>
+      </div>
+      <div class="tp-arrow">→</div>
+      <div class="tp-stage" style="--hue: var(--hue-blue)">
+        <div class="tp-sh"><div class="tp-sn"><span class="tp-chip">BUILD</span> grinder</div>
+          <div class="tp-what">takes the top-ranked free entry · <a>build.md</a></div></div>
+        <div class="tp-seats">
+          <div class="tp-seat tps-idle"><span class="tp-dot"></span><span class="tp-name">grinder-ao-1</span><span class="tp-st">idle 58m</span><span class="tp-extra tp-run">Claude Code · Opus</span></div>
+          <div class="tp-seat tps-idle sel"><span class="tp-dot"></span><span class="tp-name">grinder-ao-2</span><span class="tp-st">idle 1h</span>
+            <span class="tp-extra tp-run">Claude Code · Opus · asks permission</span></div>
+          <div class="tp-seat new"><span class="tp-dot" style="background:var(--working)"></span><span class="tp-name">grinder-ao-3</span><span class="tp-st">new · unsaved</span><span class="tp-extra tp-run">Claude Code · Sonnet</span></div>
+        </div>
+        <button class="tp-add">+ add a grinder</button>
+        <div class="tp-cap">3 seats share one lane · scales up to 4 when the lane is deep</div>
+      </div>
+      <div class="tp-arrow">→</div>
+      <div class="tp-stage" style="--hue: var(--hue-amber)">
+        <div class="tp-sh"><div class="tp-sn"><span class="tp-chip">REVIEW</span> techlead</div>
+          <div class="tp-what">reads each green PR, merges or asks · <a>review.md</a></div></div>
+        <div class="tp-seats">
+          <div class="tp-seat tps-call"><span class="tp-dot"></span><span class="tp-name">techlead-ao-1</span><span class="tp-st">on call</span>
+            <span class="tp-extra tp-run">Claude Code · Opus</span><span class="tp-extra">opens when a PR asks · up to 3 at once</span></div>
+        </div>
+        <div class="tp-cap">a seat, not a lane: it opens on an ask and closes idle</div>
+      </div>
+      <div class="tp-arrow">→</div>
+      <div class="tp-you"><b>you</b><span>held paths, passed-up asks and decides reach your Queue</span></div>
+    </div>
+
+    <div class="tp-around">
+      <h3>Around the flow <span>seats that open on a trigger, outside the stages</span></h3>
+      <div class="tp-ar">
+        <div class="tp-seat tps-call"><span class="tp-dot"></span><span class="tp-name">manager-ao-1</span><span class="tp-st">on call</span><span class="tp-extra">the team's manager · stalls, permissions, questions</span></div>
+        <div class="tp-seat tps-call"><span class="tp-dot"></span><span class="tp-name">docs-audit-ao-1</span><span class="tp-st">closed</span><span class="tp-extra">auditor · after every 10 merged PRs</span></div>
+        <div class="tp-seat tps-call"><span class="tp-dot"></span><span class="tp-name">test-audit-ao-1</span><span class="tp-st">closed</span><span class="tp-extra">auditor · after every 10 merged PRs</span></div>
+        <div class="tp-seat tps-lim"><span class="tp-dot"></span><span class="tp-name">fact-check-ao-1</span><span class="tp-st">limited till 08:00</span><span class="tp-extra">Gemini · 3.5 Flash Lite · asked on doc-only PRs</span></div>
+        <div class="tp-seat tps-call"><span class="tp-dot"></span><span class="tp-name">fact-check-ao-2</span><span class="tp-st">closed</span><span class="tp-extra">Grok · trial · asked on doc-only PRs</span></div>
+      </div>
+    </div>
+
+    <div class="tp-detail">
+      <h3><code>grinder-ao-2</code> <span>a grinder in build · selected</span></h3>
+      <div class="tp-f tp-pick"><label>Runs on</label>
+        <div class="tp-opts">
+          <div class="tp-opt"><b>Claude Code · Opus</b><span>grind · the team's default</span><i class="ok">smoke-tested as grinder</i></div>
+          <div class="tp-opt on"><b>Claude Code · Opus, asks permission</b><span>grind-ask · TD-641 trial</span><i class="ok">smoke-tested as grinder</i></div>
+          <div class="tp-opt"><b>Claude Code · Sonnet</b><span>grind-sonnet</span><i class="ok">smoke-tested as grinder</i></div>
+          <div class="tp-opt"><b>Claude Code · Fable</b><span>grind-fable</span><i class="ok">smoke-tested as grinder</i></div>
+          <div class="tp-opt off"><b>Gemini · 3.5 Flash Lite</b><span>gemini-reader</span><i>not smoke-tested as grinder · Run the smoke</i></div>
+          <div class="tp-opt off"><b>Grok</b><span>grok-reader</span><i>not smoke-tested as grinder · Run the smoke</i></div>
+        </div></div>
+      <div class="tp-side">
+        <div class="tp-f"><label>Brief</label><div class="input" style="font-family:'JetBrains Mono',monospace;font-size:13px">docs/briefs/grinder-ao-2.md</div><div class="tp-hint">the repo's words for this seat · Open</div></div>
+        <div class="tp-f"><label>Unattended</label><div class="input">yes</div></div>
+        <a class="btn">Remove from team</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="tp-sec">
+    <h2>When it runs <span class="tp-note">settings.yml · saved at once, no PR</span></h2>
+    <div class="tp-set">
+      <div class="tp-row"><b>Starts</b><div class="input">at each week reset ▾</div><span class="tp-h">next: Thu 07:00 · profile grind</span></div>
+      <div class="tp-row"><b>Stops</b><div class="input">Fri 06:00</div><span class="tp-h">every member and seat winds down then · Clear</span></div>
+      <div class="tp-row"><b>Reserve priority</b><div class="input">10</div><span class="tp-h">+10 on the week's reserve · it stops at 60% used</span></div>
+      <div class="tp-row"><b>When work appears</b><div class="input">start the team ▾</div><span class="tp-h">the default</span></div>
+      <div class="tp-row"><b>Balance</b><div class="input">on · 10 open PRs · oldest 2d</div><span class="tp-h">grinders review before building past either · now 4 open, oldest 19h</span></div>
+    </div>
+  </section>
+
+  <div class="tp-tray">
+    <div>
+      <h3>1 change to the team</h3>
+      <ul><li>add <code>grinder-ao-3</code> to build, on Claude Code · Sonnet</li></ul>
+      <div class="tp-how">Checked: the file parses, the org builds, no session is named twice, td and build-review can both be staffed, grind-sonnet passed the grinder smoke.
+      Saving commits to <code>.shiftlead.yml</code> on main through a PR that merges itself once its checks pass. The team runs as before until you press Apply.</div>
+    </div>
+    <div class="tp-btns"><a class="btn">Discard</a><a class="btn primary">Save change</a></div>
+    <div class="tp-diff"><span class="ctx">  members:</span><span class="ctx">    - {role: grinder, name: grinder-ao-2, brief: docs/briefs/grinder-ao-2.md, profile: grind-ask}</span><span class="add">+   - {role: grinder, name: grinder-ao-3, profile: grind-sonnet}</span><span class="ctx">    # the design stage's member; what the person sees of a design is its own call (design §4.8)</span></div>
+  </div>
+
+  <details class="tp-text"><summary>The definition as text</summary>
+    The team's block of <code>.shiftlead.yml</code>, comments kept. For anything the page does not edit: a flow's list, the manager, a seat's trigger.
+  </details>
+</div>

@@ -1,0 +1,168 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+.bx { --c-bg: #e7ebee; --c-ink: #13212d; --c-dim: #5c6b78; --c-rule: #b8c2ca; --c-card: #f6f8f9;
+      --c-design: #4f46e5; --c-build: #1d6fe0; --c-review: #c97f00; --c-ok: #178a45; --c-lim: #7c3aed;
+      background: var(--c-bg); color: var(--c-ink); font-family: Archivo, "IBM Plex Sans", sans-serif; font-variation-settings: "wdth" 100;
+      min-height: 100vh; }
+.bx * { box-sizing: border-box; }
+.bx-wrap { max-width: 1240px; margin: 0 auto; padding: 34px 28px 80px; }
+.bx-title { display: flex; align-items: flex-end; gap: 22px; flex-wrap: wrap; border-bottom: 2px solid var(--c-ink); padding-bottom: 14px; }
+.bx-title h1 { margin: 0; font-size: 56px; line-height: .9; font-weight: 800; font-variation-settings: "wdth" 125; letter-spacing: -.01em; }
+.bx-title .bx-meta { color: var(--c-dim); font-size: 15px; padding-bottom: 4px; }
+.bx-title .bx-meta code { font-family: "JetBrains Mono", monospace; color: var(--c-ink); font-size: 13px; }
+.bx-title .bx-act { margin-left: auto; display: flex; gap: 8px; padding-bottom: 2px; }
+.bx-btn { font: 600 14px Archivo, sans-serif; padding: 8px 14px; border: 1.5px solid var(--c-ink); background: transparent; color: var(--c-ink); border-radius: 999px; cursor: pointer; }
+.bx-btn.solid { background: var(--c-ink); color: var(--c-bg); }
+
+.bx-h2 { display: flex; align-items: baseline; gap: 14px; margin: 36px 0 6px; }
+.bx-h2 h2 { margin: 0; font-size: 22px; font-weight: 700; font-variation-settings: "wdth" 112; }
+.bx-h2 p { margin: 0; color: var(--c-dim); font-size: 14px; }
+.bx-flowpick { margin-left: auto; display: flex; gap: 4px; font-size: 14px; }
+.bx-flowpick span { padding: 4px 12px; border-radius: 999px; border: 1.5px solid var(--c-rule); color: var(--c-dim); }
+.bx-flowpick span.on { border-color: var(--c-ink); color: var(--c-ink); font-weight: 600; }
+
+/* the line */
+.bx-line { position: relative; display: grid; grid-template-columns: 1fr 1.3fr 1fr .7fr; margin-top: 18px; }
+.bx-line::before { content: ""; position: absolute; left: 4%; right: 8%; top: 77px; height: 10px; border-radius: 5px;
+  background: linear-gradient(90deg, var(--c-design) 0 27%, var(--c-build) 27% 63%, var(--c-review) 63% 89%, var(--c-ink) 89%); }
+.bx-stn { position: relative; padding: 0 18px 0 0; }
+.bx-stn .bx-name { font-size: 34px; font-weight: 800; font-variation-settings: "wdth" 118; line-height: 1; color: var(--hue); height: 40px; }
+.bx-stn .bx-role { font-size: 14px; color: var(--c-dim); margin-top: 4px; height: 20px; }
+.bx-stn .bx-ring { width: 30px; height: 30px; border-radius: 50%; background: var(--c-bg); border: 7px solid var(--hue); margin-top: 6px; position: relative; z-index: 1; }
+.bx-stn .bx-drop { border-left: 2px solid var(--hue); margin-left: 14px; padding: 10px 0 0 16px; }
+.bx-tag { display: flex; align-items: center; gap: 10px; background: var(--c-card); border-radius: 6px; padding: 8px 12px; margin-bottom: 6px; box-shadow: inset 4px 0 0 var(--st, var(--c-rule)); cursor: pointer; }
+.bx-tag code { font-family: "JetBrains Mono", monospace; font-size: 13.5px; font-weight: 600; }
+.bx-tag em { font-style: normal; font-size: 13px; color: var(--st, var(--c-dim)); margin-left: auto; white-space: nowrap; }
+.bx-tag.sel { outline: 2px solid var(--c-ink); }
+.bx-tag.new { background: transparent; border: 1.5px dashed var(--c-ok); box-shadow: none; }
+.t-work { --st: var(--c-ok); } .t-idle { --st: var(--c-build); } .t-lim { --st: var(--c-lim); }
+.bx-plus { display: inline-block; font-size: 14px; font-weight: 600; color: var(--hue); margin: 2px 0 0 2px; cursor: pointer; }
+.bx-stn .bx-small { font-size: 13px; color: var(--c-dim); margin-top: 8px; max-width: 30ch; line-height: 1.4; }
+.bx-stepper { display: inline-flex; align-items: center; gap: 0; border: 1.5px solid var(--hue); border-radius: 999px; margin-left: 10px; vertical-align: middle; }
+.bx-stepper b { padding: 0 9px; font-size: 15px; color: var(--hue); }
+.bx-stepper span { padding: 0 10px; font-size: 16px; color: var(--hue); cursor: pointer; }
+.bx-end .bx-ring { background: var(--c-ink); border-color: var(--c-ink); }
+
+/* service loop */
+.bx-loop { margin-top: 30px; border-top: 2px dashed var(--c-rule); padding-top: 14px; display: grid; grid-template-columns: 180px 1fr; gap: 20px; }
+.bx-loop h3 { margin: 0; font-size: 16px; font-weight: 700; font-variation-settings: "wdth" 112; }
+.bx-loop h3 + p { margin: 4px 0 0; font-size: 13px; color: var(--c-dim); line-height: 1.4; }
+.bx-loopstops { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 14px; }
+.bx-loopstops .bx-tag { flex-wrap: wrap; row-gap: 2px; }
+.bx-loopstops .bx-why { flex-basis: 100%; font-size: 12.5px; color: var(--c-dim); }
+
+/* timetable */
+.bx-tt { display: grid; grid-template-columns: 1.2fr 1fr; gap: 28px; margin-top: 10px; }
+.bx-hours { background: var(--c-ink); color: var(--c-bg); border-radius: 10px; padding: 18px 22px; }
+.bx-hours .bx-big { font-size: 40px; font-weight: 800; font-variation-settings: "wdth" 70; line-height: 1.05; }
+.bx-hours .bx-big span { color: #8fa0ae; font-weight: 400; }
+.bx-hours p { margin: 8px 0 0; color: #b9c5cf; font-size: 14px; }
+.bx-hours .bx-edit { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+.bx-knobs { display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; align-content: start; font-size: 15px; }
+.bx-knobs dt { color: var(--c-dim); }
+.bx-knobs dd { margin: 0; font-weight: 600; }
+.bx-knobs dd small { font-weight: 400; color: var(--c-dim); margin-left: 6px; }
+
+/* tray */
+.bx-tray { position: static; margin-top: 40px; background: var(--c-ink); color: var(--c-bg); border-radius: 12px; padding: 16px 20px; display: grid; grid-template-columns: 1fr auto; gap: 10px 24px; }
+.bx-tray h3 { margin: 0; font-size: 18px; font-variation-settings: "wdth" 112; }
+.bx-tray p { margin: 4px 0 0; color: #b9c5cf; font-size: 13.5px; max-width: 80ch; }
+.bx-tray code { font-family: "JetBrains Mono", monospace; font-size: 13px; color: #fff; }
+.bx-tray .bx-btn { border-color: #b9c5cf; color: var(--c-bg); }
+.bx-tray .bx-btn.solid { background: #3ccf75; border-color: #3ccf75; color: var(--c-ink); }
+.bx-tray .bx-acts { display: flex; gap: 8px; align-items: start; }
+@media (max-width: 720px) {
+ .bx-wrap { padding: 20px 14px 40px; }
+ .bx-title h1 { font-size: 40px; }
+ .bx-title .bx-act { margin-left: 0; }
+ .bx-h2 { flex-wrap: wrap; }
+ .bx-flowpick { margin-left: 0; }
+ .bx-line { grid-template-columns: 1fr; }
+ .bx-line::before { display: none; }
+ .bx-stn { border-left: 8px solid var(--hue); padding: 0 0 18px 16px; }
+ .bx-stn .bx-ring { display: none; }
+ .bx-stn .bx-drop { border: 0; margin: 0; padding: 8px 0 0; }
+ .bx-stn .bx-name { font-size: 28px; height: auto; }
+ .bx-loop, .bx-tt, .bx-tray { grid-template-columns: 1fr; }
+ .bx-hours .bx-big { font-size: 30px; }
+}
+</style>
+
+<div class="bx"><div class="bx-wrap">
+  <div class="bx-title">
+    <h1>ao-grind</h1>
+    <div class="bx-meta">shiftlead's team · <code>.shiftlead.yml</code> · 4 sessions live</div>
+    <div class="bx-act"><button class="bx-btn">Open file</button><button class="bx-btn">Wind down</button></div>
+  </div>
+
+  <div class="bx-h2"><h2>The line</h2><p>how an entry travels, and who works each stop</p>
+    <div class="bx-flowpick"><span class="on">td</span><span>build-review</span></div></div>
+
+  <div class="bx-line">
+    <div class="bx-stn" style="--hue: var(--c-design)">
+      <div class="bx-name">Design</div><div class="bx-role">designer · design-first entries</div>
+      <div class="bx-ring"></div>
+      <div class="bx-drop">
+        <div class="bx-tag t-work"><code>designer-ao-1</code><em>working 3m</em></div>
+        <span class="bx-plus">+ designer</span>
+        <div class="bx-small">Waits on you once its design is written.</div>
+      </div>
+    </div>
+    <div class="bx-stn" style="--hue: var(--c-build)">
+      <div class="bx-name">Build <span class="bx-stepper"><span>−</span><b>3</b><span>+</span></span></div><div class="bx-role">grinders · the top-ranked free entry</div>
+      <div class="bx-ring"></div>
+      <div class="bx-drop">
+        <div class="bx-tag t-idle"><code>grinder-ao-1</code><em>idle 58m</em></div>
+        <div class="bx-tag t-idle sel"><code>grinder-ao-2</code><em>idle 1h · grind-ask</em></div>
+        <div class="bx-tag new"><code>grinder-ao-3</code><em style="color:var(--c-ok)">new</em></div>
+        <div class="bx-small">Share one lane. Grows to 4 when the lane is deep.</div>
+      </div>
+    </div>
+    <div class="bx-stn" style="--hue: var(--c-review)">
+      <div class="bx-name">Review</div><div class="bx-role">techlead · each green PR</div>
+      <div class="bx-ring"></div>
+      <div class="bx-drop">
+        <div class="bx-tag"><code>techlead-ao-1</code><em>on call</em></div>
+        <div class="bx-small">Opens when a PR asks, up to 3 at once; merges or asks you.</div>
+      </div>
+    </div>
+    <div class="bx-stn bx-end" style="--hue: var(--c-ink)">
+      <div class="bx-name">You</div><div class="bx-role">your Queue</div>
+      <div class="bx-ring"></div>
+      <div class="bx-drop" style="border-color: transparent">
+        <div class="bx-small">Held paths, passed-up asks and decides.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bx-loop">
+    <div><h3>On call</h3><p>Seats off the line. Each opens on its trigger and closes when done.</p></div>
+    <div class="bx-loopstops">
+      <div class="bx-tag"><code>manager-ao-1</code><em>on call</em><span class="bx-why">a stall, a permission, a question</span></div>
+      <div class="bx-tag"><code>docs-audit-ao-1</code><em>closed</em><span class="bx-why">every 10 merged PRs</span></div>
+      <div class="bx-tag"><code>test-audit-ao-1</code><em>closed</em><span class="bx-why">every 10 merged PRs</span></div>
+      <div class="bx-tag t-lim"><code>fact-check-ao-1</code><em>limited till 08:00</em><span class="bx-why">Gemini · each doc-only PR</span></div>
+      <div class="bx-tag"><code>fact-check-ao-2</code><em>closed</em><span class="bx-why">Grok trial · each doc-only PR</span></div>
+    </div>
+  </div>
+
+  <div class="bx-h2"><h2>Hours</h2><p>saved at once to settings.yml</p></div>
+  <div class="bx-tt">
+    <div class="bx-hours">
+      <div class="bx-big">Thu 07:00 <span>to</span> Fri 06:00</div>
+      <p>Starts at each week's reset on grind, and winds down Friday morning. <span class="bx-edit">Change hours</span></p>
+    </div>
+    <dl class="bx-knobs">
+      <dt>When work appears</dt><dd>start the team <small>default</small></dd>
+      <dt>Reserve priority</dt><dd>10 <small>stops at 60% of the week</small></dd>
+      <dt>Balance</dt><dd>on <small>review first past 10 open PRs or 2 days · now 4, 19h</small></dd>
+    </dl>
+  </div>
+
+  <div class="bx-tray">
+    <div><h3>Add grinder-ao-3 to Build</h3>
+      <p>Checked against the org and both flows. Saving writes one line to <code>.shiftlead.yml</code> and merges it on main once checks pass; the team picks it up when you press Apply.</p></div>
+    <div class="bx-acts"><button class="bx-btn">Discard</button><button class="bx-btn solid">Save</button></div>
+  </div>
+</div></div>
