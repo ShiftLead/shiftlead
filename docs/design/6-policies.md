@@ -242,7 +242,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      up to it*, TD-657; and, with `director.work` on, by **`watch`** once `director.watch` has passed since its
      last watch fill concluded (with none concluded, at once) or when the home reads a PR its `merge` delegation
      could merge turn ready — precheck green and review evidence posted — keeping `seat_due: {at, by: watch, prs}`
-     so a fill is once per set of PRs, §4.9b *The director works for the person*, TD-1910), and kept until the fill: for `asks`, when `asks_waiting` leaves zero (and
+     and `seat_filled` keeping `{by: watch, prs}`, so a fill is once per set of PRs (`watch` and `groom` are
+     `by` words of the director's alone, beside `prompt` and `asks`), §4.9b *The director works for the person*, TD-1910), and kept until the fill: for `asks`, when `asks_waiting` leaves zero (and
      cleared again if it returns to zero before a fill — the question was answered elsewhere);
      for `prs: n`, when **`seat_count: {prs, at}`** (home-owned) reaches `n` — the PRs merged to
      the seat's repo's default branch since the seat's record was created, read with `gh` on the
