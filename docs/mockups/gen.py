@@ -2229,7 +2229,7 @@ def queue_who_closed():
               "built by grinder-ao-2" + sep + "reviewed by sonnet, passed" + sep + "merged by grinder-ao-2")
         + entry("TD-9101", 9880, "A lift PR the gate sweep opens reaches nobody",
                 "designed and built: its part TD-9102; the live check held",
-                "in #9884: by designer-ao-1" + sep + "reviewed, passed" + sep + "merged by designer-ao-1")
+                "closed in #9884 by designer-ao-1" + sep + "reviewed by an unnamed reviewer, passed" + sep + "merged by designer-ao-1")
         + entry("TD-9103", 9870, "Restarts that pushed new work leave the crash ceiling",
                 "rule 2 counts a pushed restart apart",
                 "built by grinder-ao-2 and techlead-ao-1" + sep + "reviewed by sonnet, blocked; sonnet, passed after fixes" + sep
@@ -2254,7 +2254,7 @@ def queue_who_closed():
   <div style="background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; overflow: hidden;">{lines}</div>
   <p style="font-size: 12px; margin-top: 12px; max-width: 820px; color: #6b7280; white-space: normal;">TD-1899: each entry of an opened line carries who closed it, from its closing
   commit\'s trailers. The marks <i>no review</i>, <i>no precheck</i>, <i>merged past the gate</i> and a <i>blocked</i> no later review passed are drawn
-  in the warning colour. TD-9101 was archived by a later PR than the one drawn beside it, so its line names that PR and says <i>by</i>, not <i>built by</i>; its
+  in the warning colour. TD-9101 was archived by a later PR than the one drawn beside it, so its line opens <i>closed in #9884 by</i>, not <i>built by</i>; its
   review named no model. The last entry\'s commit has no <span class="mono">Merged-by:</span>, so it draws no such line. The ids, titles and names are made up for the mockup.</p>
 </div>'''
 
