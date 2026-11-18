@@ -1,0 +1,16 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "migrate-body",
+  "changes": [],
+  "entries": 1,
+  "migrated": [],
+  "refused": [
+   {
+    "path": "ledger/TD-003.md",
+    "why": "TD-003: a code fence never closes (fence-open), so its sections cannot be read — close it by hand, then run again"
+   }
+  ],
+  "subject": null
+ }
+}

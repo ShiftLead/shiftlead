@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "decide",
+  "refused": "rule 4: the Context names a gate on another repo's entry"
+ }
+}

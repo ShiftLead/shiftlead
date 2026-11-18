@@ -1,0 +1,28 @@
+{
+ "argv": [
+  "add",
+  "--board",
+  "board",
+  "--id",
+  "2026-01-15-5eed0001",
+  "--kind",
+  "decide",
+  "--scope",
+  "merge-line",
+  "--text",
+  "Merge the parser change?",
+  "--context",
+  "the parser review",
+  "--due",
+  "2026-01-20",
+  "--answer",
+  "Merge",
+  "--answer",
+  "Hold",
+  "--detail",
+  "{\"context\": \"The review passed.\", \"question\": \"Merge it?\", \"recommended\": \"it is green\"}",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

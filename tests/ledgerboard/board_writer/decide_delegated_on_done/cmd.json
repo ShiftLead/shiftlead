@@ -1,0 +1,14 @@
+{
+ "argv": [
+  "done",
+  "--board",
+  "board",
+  "--id",
+  "2026-01-12-a0000001",
+  "--delegate",
+  "director",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

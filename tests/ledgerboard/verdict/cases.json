@@ -761,6 +761,221 @@
    "delete": [
     "docs/user_attention_archive.md"
    ]
+  },
+  {
+   "name": "an item whose Context names two entries and one gate",
+   "files": [
+    "docs/user_attention/2026-01-06-be7088b5.md"
+   ],
+   "subject": "board: decide Go on both entries?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "delegated: covered at base",
+   "files": [
+    "docs/ledger/TD-150.md",
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-54236abb.md"
+   ],
+   "subject": "board: decide Search go?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
+  },
+  {
+   "name": "delegated: the person's own answer on a scoped item passes as today",
+   "files": [
+    "docs/ledger/TD-150.md",
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-54236abb.md"
+   ],
+   "subject": "board: decide Search go?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
+  },
+  {
+   "name": "delegated: the PR also adds the grant",
+   "files": [
+    "docs/ledger/TD-150.md",
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-54236abb.md",
+    "docs/user_attention/README.md"
+   ],
+   "subject": "board: decide Search go?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
+  },
+  {
+   "name": "delegated: only the item's Scope changes",
+   "files": [
+    "docs/ledger/TD-150.md",
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-54236abb.md"
+   ],
+   "subject": "board: decide Search go?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
+  },
+  {
+   "name": "delegated: rescoped and answered in the new scope",
+   "files": [
+    "docs/ledger/TD-150.md",
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-54236abb.md"
+   ],
+   "subject": "board: decide Search go?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
+  },
+  {
+   "name": "delegated: its Decided alone carries another scope",
+   "files": [
+    "docs/ledger/TD-150.md",
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-54236abb.md"
+   ],
+   "subject": "board: decide Search go?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
+  },
+  {
+   "name": "delegated: the person spelled Pat against People's pat",
+   "files": [
+    "docs/ledger/TD-150.md",
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-54236abb.md"
+   ],
+   "subject": "board: decide Search go?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
+  },
+  {
+   "name": "delegated: under no grant",
+   "files": [
+    "docs/ledger/TD-150.md",
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-54236abb.md"
+   ],
+   "subject": "board: decide Search go?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
+  },
+  {
+   "name": "delegated: rule 1, the base item has no Scope",
+   "files": [
+    "docs/ledger/TD-150.md",
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-54236abb.md"
+   ],
+   "subject": "board: decide Search go?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
+  },
+  {
+   "name": "delegated: rule 3 on an owner board",
+   "files": [
+    "docs/ledger/TD-150.md",
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-54236abb.md"
+   ],
+   "subject": "board: decide Search go?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
+  },
+  {
+   "name": "delegated: rule 4, another repo's entry",
+   "files": [
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-54236abb.md"
+   ],
+   "subject": "board: decide Search go?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
+  },
+  {
+   "name": "delegated: rule 4, this repo's own entry written with #",
+   "files": [
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-54236abb.md"
+   ],
+   "subject": "board: decide Search go?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
+  },
+  {
+   "name": "delegated: a # ref beside a second ref",
+   "files": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ],
+   "subject": "board: decide Search go?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": []
+  },
+  {
+   "name": "delegated: uncovered before a ledger fault",
+   "files": [
+    "docs/ledger/TD-150.md",
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-54236abb.md"
+   ],
+   "subject": "board: decide Search go?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
   }
  ],
  "tripwire": [
@@ -887,6 +1102,18 @@
    "delete": [
     "docs/user_attention/2026-01-06-d6f09cf2.md"
    ]
+  },
+  {
+   "name": "delegated: a change of the delegate alone, seen by the tripwire",
+   "files": [
+    "docs/ledger/TD-150.md",
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ],
+   "subject": "board: decide Search go?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": []
   }
  ],
  "uncovered": [
@@ -941,6 +1168,788 @@
   {
    "name": "v3_uncovered_new_decide",
    "boards": []
+  }
+ ],
+ "ledger_lift": [
+  {
+   "name": "lift-none",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-shared",
+   "files": [
+    "docs/ledger/TD-111.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-111 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-decided",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "shiftlead: lift decision (Pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "lift-decided, the subject spelling the person otherwise",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "lift-two decided items",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/2026-01-07-0c1d2e01.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-07-0c1d2e01.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/2026-01-07-0c1d2e01.md"
+   ]
+  },
+  {
+   "name": "lift-decided beside an undecided shared item",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "lift-decided, its Decided spelling the person otherwise",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "lift-a short id for a padded file",
+   "files": [
+    "docs/ledger/TD-012.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-12 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-a board path in files, the board unchanged",
+   "files": [
+    "docs/ledger/TD-160.md",
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-a close a day after the merge",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-14",
+   "merged_at": "2026-01-14",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "lift-no board",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete_base": [
+    "docs/user_attention/"
+   ]
+  },
+  {
+   "name": "lift-a v2 board at the base",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete_base": [
+    "docs/user_attention/"
+   ]
+  },
+  {
+   "name": "lift-a v2 board at the head",
+   "files": [
+    "docs/ledger/TD-160.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/"
+   ]
+  },
+  {
+   "name": "lift-no People",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-a decide subject",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "board: decide 2026-01-06-85a7b461 Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-two commits",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 2,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-a v1 ledger",
+   "files": [
+    "docs/technical_debt.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete_base": [
+    "docs/ledger/"
+   ]
+  },
+  {
+   "name": "lift-the subject names an entry with no gate",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-120 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-the entry does not carry the subject's gate",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (sam) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-an entry archived by the PR",
+   "files": [
+    "docs/ledger/TD-160.md",
+    "docs/ledger/archive/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/ledger/TD-160.md"
+   ]
+  },
+  {
+   "name": "lift-an entry the head drops",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/ledger/TD-160.md"
+   ]
+  },
+  {
+   "name": "lift-a second ledger file",
+   "files": [
+    "docs/ledger/TD-150.md",
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-a path outside the board and the ledger",
+   "files": [
+    "docs/ledger/TD-160.md",
+    "src/app.py"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-the subject names another gated entry",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-150 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-a v1 ledger file the files omit",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-no new Log line",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-two new Log lines",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-a lift line for another gate",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-an override lift",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-a note in place of the lift",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-another person on an Answered by any board",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-the gate's person not on People",
+   "files": [
+    "docs/ledger/TD-130.md"
+   ],
+   "subject": "shiftlead: lift decision (quinn) on TD-130 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-asked",
+   "files": [
+    "docs/ledger/TD-100.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-asked beside decided",
+   "files": [
+    "docs/ledger/TD-100.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-none logged with no suffix",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-none logged as shared",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-a waiting-only label",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-none with no suffix that changes an item",
+   "files": [
+    "docs/ledger/TD-160.md",
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-a dropped old Log line",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-a lift on another repo's board",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-decided, the item left open",
+   "files": [
+    "docs/ledger/TD-100.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-decided, closed with another why",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "lift-decided by another on an Answered by any board",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "lift-decided naming no one",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "lift-a close under the wrong month",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-02/2026-01-06-85a7b461.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "lift-a close with no readable Closed",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "lift-an item with two head files",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-decided, also closing the shared item",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/2026-01-07-0c1d2e02.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-07-0c1d2e02.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/2026-01-07-0c1d2e02.md"
+   ]
+  },
+  {
+   "name": "lift-shared, changing an item",
+   "files": [
+    "docs/ledger/TD-111.md",
+    "docs/user_attention/2026-01-06-d6f09cf2.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-111 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-none, changing an item",
+   "files": [
+    "docs/ledger/TD-160.md",
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-a changed README",
+   "files": [
+    "docs/ledger/TD-160.md",
+    "docs/user_attention/README.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-a Log date a day after the merge",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-14",
+   "merged_at": "2026-01-14"
+  },
+  {
+   "name": "lift-a Log date two days before the PR opened",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "lift-a close two days before the PR opened",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "lift-a close two days after the merge",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention/2026-01-06-85a7b461.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-100 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-85a7b461.md"
+   ]
+  },
+  {
+   "name": "delegated: ledger lift, an undelegated line over a delegated item",
+   "files": [
+    "docs/ledger/TD-150.md",
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-54236abb.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-150 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
+  },
+  {
+   "name": "delegated: ledger lift, a delegated line over a delegated item",
+   "files": [
+    "docs/ledger/TD-150.md",
+    "docs/user_attention/2026-01-06-54236abb.md",
+    "docs/user_attention/archive/2026-01/2026-01-06-54236abb.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-150 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-06-54236abb.md"
+   ]
+  },
+  {
+   "name": "delegated: ledger lift, a delegated line with no item",
+   "files": [
+    "docs/ledger/TD-160.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-160 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": []
+  },
+  {
+   "name": "delegated: ledger lift, a delegated item in the shared set while decided wins",
+   "files": [
+    "docs/ledger/TD-111.md",
+    "docs/user_attention/2026-01-07-0c1d2e0a.md",
+    "docs/user_attention/archive/2026-01/2026-01-07-0c1d2e0a.md"
+   ],
+   "subject": "shiftlead: lift decision (pat) on TD-111 (session n/a)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15",
+   "delete": [
+    "docs/user_attention/2026-01-07-0c1d2e0a.md"
+   ]
+  }
+ ],
+ "lift_form": [
+  {
+   "name": "form of lift-none",
+   "case": "lift-none",
+   "tid": "TD-160",
+   "gate": "decision (pat)"
+  },
+  {
+   "name": "form of lift-shared",
+   "case": "lift-shared",
+   "tid": "TD-111",
+   "gate": "decision (pat)"
+  },
+  {
+   "name": "form of lift-decided",
+   "case": "lift-decided",
+   "tid": "TD-100",
+   "gate": "decision (Pat)"
+  },
+  {
+   "name": "form of lift-two decided items",
+   "case": "lift-two decided items",
+   "tid": "TD-100",
+   "gate": "decision (pat)"
+  },
+  {
+   "name": "form of lift-decided beside an undecided shared item",
+   "case": "lift-decided beside an undecided shared item",
+   "tid": "TD-100",
+   "gate": "decision (pat)"
+  },
+  {
+   "name": "form of lift-asked",
+   "case": "lift-asked",
+   "tid": "TD-100",
+   "gate": "decision (pat)"
+  },
+  {
+   "name": "form of lift-asked beside decided",
+   "case": "lift-asked beside decided",
+   "tid": "TD-100",
+   "gate": "decision (pat)"
+  },
+  {
+   "name": "form of lift-the gate's person not on People",
+   "case": "lift-the gate's person not on People",
+   "tid": "TD-130",
+   "gate": "decision (quinn)"
+  },
+  {
+   "name": "lift-form through Part of",
+   "tid": "TD-171",
+   "gate": "decision (pat)"
+  },
+  {
+   "name": "lift-form with another repo's part",
+   "tid": "TD-171",
+   "gate": "decision (pat)"
+  },
+  {
+   "name": "lift-form with a part no longer gated",
+   "tid": "TD-171",
+   "gate": "decision (pat)"
+  },
+  {
+   "name": "lift-form with an archived part",
+   "tid": "TD-171",
+   "gate": "decision (pat)"
   }
  ]
 }

@@ -11,6 +11,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -53,6 +55,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "Rotate the key.",
    "waiting_on": "person"
@@ -65,6 +68,8 @@
    "context": "none",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -93,6 +98,7 @@
    "path": "",
    "refs": [],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "Ping sam.",
    "waiting_on": "person"

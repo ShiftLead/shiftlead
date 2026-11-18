@@ -600,11 +600,13 @@
     },
     "log-lift-answer": {
       "accept": [
-        "- 2026-01-05: gate lifted: decision (pat) — by pat; answer \"Go\"; shared board item left open"
+        "- 2026-01-05: gate lifted: decision (pat) — by pat; answer \"Go\"; shared board item left open",
+        "- 2026-01-05: gate lifted: decision (pat) — by director for pat (merge-line); answer \"Go\""
       ],
       "refuse": [
         "- 2026-01-05: gate lifted: decision (pat) — by pat; answer Go",
-        "- 2026-01-05: gate lifted: decision (pat) — by pat; answer \"Go\"; left open"
+        "- 2026-01-05: gate lifted: decision (pat) — by pat; answer \"Go\"; left open",
+        "- 2026-01-05: gate lifted: decision (pat) — by director for pat; answer \"Go\""
       ]
     },
     "lift-gate": {
@@ -658,10 +660,12 @@
     },
     "log-kept-waiting": {
       "accept": [
-        "- 2026-01-05: kept waiting: decision (pat) — by pat; answer \"Not yet\""
+        "- 2026-01-05: kept waiting: decision (pat) — by pat; answer \"Not yet\"",
+        "- 2026-01-05: kept waiting: decision (pat) — by director for pat (merge-line); answer \"Not yet\""
       ],
       "refuse": [
-        "- 2026-01-05: kept waiting: decision (pat) — by pat"
+        "- 2026-01-05: kept waiting: decision (pat) — by pat",
+        "- 2026-01-05: kept waiting: decision (pat) — by director for pat; answer \"Not yet\""
       ]
     },
     "log-reassigned": {
@@ -917,10 +921,12 @@
     },
     "decided-field": {
       "accept": [
-        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n**Decided:** 2026-11-12 by pat — Go (by Friday)\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n**Decided:** 2026-11-12 by pat — Go (by Friday)\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n",
+        "## Merge the parser change?\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Context:** TD-5 decision (pat)\n**Scope:** merge-line\n**Due:** 2026-11-18\n**Answers:** Go | Not yet\n**Decided:** 2026-11-12 by director for pat (merge-line) — Go\n"
       ],
       "refuse": [
-        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n**Decided:** 2026-11-12 by pat smith — Go\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+        "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Split | Hold: <note>\n**Decided:** 2026-11-12 by pat smith — Go\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n",
+        "## Merge the parser change?\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Context:** TD-5 decision (pat)\n**Scope:** merge-line\n**Due:** 2026-11-18\n**Answers:** Go | Not yet\n**Decided:** 2026-11-12 by director for pat — Go\n"
       ]
     },
     "closed-field": {
@@ -1089,6 +1095,99 @@
       ],
       "refuse": [
         "## Say Go to the split.\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go | Spl\nit\n\n- **Context:** TD-5 asks.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+      ]
+    },
+    "scope-field": {
+      "accept": [
+        "## Merge the parser change?\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Context:** the parser review\n**Scope:** merge-line\n**Due:** 2026-11-18\n**Answers:** Merge | Hold\n"
+      ],
+      "refuse": [
+        "## Merge the parser change?\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Context:** the parser review\n**Scope:** merge line\n**Due:** 2026-11-18\n**Answers:** Merge | Hold\n"
+      ]
+    }
+  },
+  "lift-subject": {
+    "lift-subject": {
+      "accept": [
+        "shiftlead: lift decision (paul) on TD-12 (session n/a)"
+      ],
+      "refuse": [
+        "shiftlead: lift decision (paul) on TD-12 (session n/a) ",
+        "shiftlead: lift decision (paul) for TD-12 (session n/a)",
+        "shiftlead: lift until (paul) on TD-12 (session n/a)"
+      ]
+    },
+    "log-token": {
+      "accept": [
+        "a.b@c/d_e-1: lift decision (paul) on TD-12 (session w-1)"
+      ],
+      "refuse": [
+        "shift lead: lift decision (paul) on TD-12 (session n/a)",
+        "shiftlead: lift decision (paul) on TD-12 (session a b)",
+        "shiftlead: lift decision (paul) on TD-12 (session `lb-designer`)"
+      ]
+    },
+    "person": {
+      "accept": [
+        "shiftlead: lift decision (sam.lee) on TD-12 (session n/a)"
+      ],
+      "refuse": [
+        "shiftlead: lift decision (a b) on TD-12 (session n/a)",
+        "shiftlead: lift decision (sam..lee) on TD-12 (session n/a)"
+      ]
+    },
+    "person-part": {
+      "accept": [
+        "shiftlead: lift decision (a-b_C) on TD-12 (session n/a)"
+      ],
+      "refuse": [
+        "shiftlead: lift decision (a+b) on TD-12 (session n/a)",
+        "shiftlead: lift decision () on TD-12 (session n/a)"
+      ]
+    },
+    "digit": {
+      "accept": [
+        "shiftlead: lift decision (paul) on TD-0012 (session n/a)"
+      ],
+      "refuse": [
+        "shiftlead: lift decision (paul) on TD-١٢ (session n/a)",
+        "shiftlead: lift decision (paul) on TD-x (session n/a)"
+      ]
+    }
+  },
+  "delegates-line": {
+    "delegates-line": {
+      "accept": [
+        "Delegates: director for pat (merge-line); director for sam (merge-line, design-go)"
+      ],
+      "refuse": [
+        "Delegates: director for pat (merge-line);",
+        "Delegates:director for pat (merge-line)"
+      ]
+    },
+    "grant": {
+      "accept": [
+        "Delegates: director for pat (merge-line, design-go)"
+      ],
+      "refuse": [
+        "Delegates: director for pat ()",
+        "Delegates: director for pat (merge-line,design-go)"
+      ]
+    },
+    "person": {
+      "accept": [
+        "Delegates: lead.bot for pat.lee (merge-line)"
+      ],
+      "refuse": [
+        "Delegates: lead. for pat (merge-line)"
+      ]
+    },
+    "person-part": {
+      "accept": [
+        "Delegates: d_1 for p-2 (s_3)"
+      ],
+      "refuse": [
+        "Delegates: d!1 for pat (merge-line)"
       ]
     }
   }

@@ -1,0 +1,88 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "migrate-body",
+  "entries": 28,
+  "migrated": [
+   "ledger/TD-001.md",
+   "ledger/TD-002.md",
+   "ledger/TD-006.md",
+   "ledger/TD-010.md",
+   "ledger/TD-011.md",
+   "ledger/TD-013.md",
+   "ledger/TD-020.md",
+   "ledger/TD-021.md",
+   "ledger/TD-022.md",
+   "ledger/TD-023.md",
+   "ledger/TD-025.md",
+   "ledger/archive/TD-030.md",
+   "ledger/archive/TD-031.md"
+  ],
+  "paths": [
+   "ledger/TD-001.md",
+   "ledger/TD-002.md",
+   "ledger/TD-006.md",
+   "ledger/TD-010.md",
+   "ledger/TD-011.md",
+   "ledger/TD-013.md",
+   "ledger/TD-020.md",
+   "ledger/TD-021.md",
+   "ledger/TD-022.md",
+   "ledger/TD-023.md",
+   "ledger/TD-025.md",
+   "ledger/archive/TD-030.md",
+   "ledger/archive/TD-031.md"
+  ],
+  "refused": [
+   {
+    "path": "ledger/TD-003.md",
+    "why": "TD-003: a code fence never closes (fence-open), so its sections cannot be read — close it by hand, then run again"
+   },
+   {
+    "path": "ledger/TD-004.md",
+    "why": "TD-004: it has a Context section beside an Ask of several paragraphs — merge them by hand"
+   },
+   {
+    "path": "ledger/TD-005.md",
+    "why": "TD-005: its Ask's first paragraph holds a list or a fence — make it one sentence, by hand"
+   },
+   {
+    "path": "ledger/TD-007.md",
+    "why": "TD-007: the label '**:**' has no name to respell — reword it by hand"
+   },
+   {
+    "path": "ledger/TD-008.md",
+    "why": "TD-008: respelling '**Log.**' as **Log:** would make it a section this format reads — reword it by hand"
+   },
+   {
+    "path": "ledger/TD-009.md",
+    "why": "TD-009: an indented or quoted **Ask:** is not a rewrite this writer guesses — remove the indent or the quote by hand"
+   },
+   {
+    "path": "ledger/TD-012.md",
+    "why": "TD-012: respelling '**Done when.**' as **Done when:** would make it a section this format reads — reword it by hand"
+   },
+   {
+    "path": "ledger/TD-015.md",
+    "why": "TD-015: its Ask's lead line holds no question — write it there, by hand"
+   },
+   {
+    "path": "ledger/TD-016.md",
+    "why": "TD-016: its Ask's first paragraph runs over lines and holds a comment or a code span — join it by hand"
+   },
+   {
+    "path": "ledger/TD-018.md",
+    "why": "TD-018: respelling '**Why.**' as **Why:** would make it a section this format reads — reword it by hand"
+   },
+   {
+    "path": "ledger/TD-024.md",
+    "why": "TD-024: respelling '**Note.**' as **Note:** would make it another section of the entry — reword it by hand"
+   },
+   {
+    "path": "ledger/TD-026.md",
+    "why": "TD-026: respelling '**Notes.**' as **Notes:** would make it another section of the entry — reword it by hand"
+   }
+  ],
+  "subject": null
+ }
+}

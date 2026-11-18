@@ -1,4 +1,4 @@
-# ledgerboard v3.2 sha256:5a32c2a0a1dd8fb1824753db9f71a5195bab828601980fa777c70c4c318d2eab
+# ledgerboard v3.4 sha256:44953e3dc48bef1de7186970bfb46aab7bb1daf182742cda5a9447719904680a
 # SYNCED FILE — canonical copy: ShiftLead/ledgerboard ledgerboard/board.py (vendored by agent-cadence as files/scripts/ledgerboard/board.py)
 # Edit it there and release; an edit made in a consumer's copy is overwritten by the next vendor or sync.
 """The board and rank writer: the module's board edits, read from and written to files (SPEC *The board writer*).
@@ -11,10 +11,12 @@
                                          [--decided WORDS [--by NAME]]
                                          [--parts TD-a,TD-b]... [--ledger DIR]   (a decide's snapshot)
                                          [--doer REPO | --doer "team NAME"]       (an act's doer)
+                                         [--scope NAME]                           (a decide's scope, v3.4)
     python3 -m ledgerboard.board snooze  --board PATH --id ID --to D   (hide until D)
     python3 -m ledgerboard.board due     --board PATH --id ID --to D   (move Due: to D)
     python3 -m ledgerboard.board done    --board PATH --id ID [--why TEXT]
     python3 -m ledgerboard.board decide  --board PATH --id ID --answer TEXT [--by NAME] [--ledger DIR | --board-only]
+                                         [--delegate NAME]   (a delegated answer for --by, v3.4)
     python3 -m ledgerboard.board reply   --board PATH --id ID --text TEXT --by NAME
     python3 -m ledgerboard.board fmt     --board PATH
     python3 -m ledgerboard.board split   --board PATH.md [--archive PATH]   (a v2 board into its directory)
@@ -72,6 +74,7 @@ from . import (
     _num,
     answered_by,
     archive_path,
+    board_delegates,
     board_people,
     board_problems,
     board_stub,
@@ -79,6 +82,7 @@ from . import (
     closes,
     decide_lift,
     decided_file,
+    delegate_problem,
     edit_item,
     entries,
     fill_form,
@@ -405,6 +409,9 @@ def who_answered(board: Board, by: str | None) -> str:
 
 
 DOER_DECIDED = "--doer is an act's, who does its step: a decided item is a decide and takes none"
+SCOPE_DECIDED = "--scope is an asked decide's, the kind of decision it is: an item raised already answered takes none"
+DELEGATE_NOT_DECIDE = "--delegate is a decide's"
+DELEGATE_BOARD_ONLY = "--delegate writes its own ledger half, never --board-only"
 DRAWS = 8  # an add draws a nonce at most this many times in all (D3)
 
 
@@ -444,13 +451,15 @@ def plan_add(board: str, text: str, *, due: str | None = None, context: str | No
              decided: str | None = None, said: str | None = None, by: str | None = None,
              today: str | date | None = None, tool: str = TOOL, id: str | None = None,
              hide_until: str | None = None, lifts: Sequence[str] | None = None,
-             parts: Sequence[str] | None = None, ledger: str | None = None, doer: str | None = None) -> Plan:
+             parts: Sequence[str] | None = None, ledger: str | None = None, doer: str | None = None,
+             scope: str | None = None) -> Plan:
     """A new item file at ``<board>/<id>.md`` (``item_file()``), its id ``id`` or drawn (``_new_id()``); with
     `said`, a question that was already answered, `said` its first reply, a Log line ``- <today>: <by>: <said>``;
     with `decided`, an item already decided by the person (``decided_file()``: `text` its title, `context` its ref,
     `by` who answered, as ``who_answered()`` resolves it). With `parts` (v2.6), a decide's `Parts:` snapshot
     (``item_file(parts=)``), checked against the ledger (`ledger`, else ``ledger/`` beside the board when it is a
-    directory) by ``parts_problems()`` before the board's gate. With `doer` (v2.8), an act's `Doer:`."""
+    directory) by ``parts_problems()`` before the board's gate. With `doer` (v2.8), an act's `Doer:`; with `scope`
+    (v3.4), a decide's `Scope`."""
     day = _today(today).isoformat()
     if ledger is not None and parts is None:
         raise Refused("--ledger on an add is the ledger a --parts snapshot is checked against: give --parts too")
@@ -459,6 +468,8 @@ def plan_add(board: str, text: str, *, due: str | None = None, context: str | No
             raise Refused("--parts is a decide's snapshot, asked as a question: a decided item takes none")
         if doer is not None:
             raise Refused(DOER_DECIDED)
+        if scope is not None:
+            raise Refused(SCOPE_DECIDED)
         if any(v is not None for v in (due, kind, detail, session, host, said, hide_until, lifts)):
             raise Refused("a decided item takes its title, context, answers, default, words and who gave them alone")
     elif said is not None or by is not None:
@@ -473,7 +484,7 @@ def plan_add(board: str, text: str, *, due: str | None = None, context: str | No
         new = item_file(text, due, day, session, host, context, kind=kind,
                         answers=list(answers) if answers is not None else None, default=default, detail=detail,
                         hide_until=hide_until, lifts=list(lifts) if lifts is not None else None,
-                        parts=list(parts) if parts is not None else None, doer=doer)
+                        parts=list(parts) if parts is not None else None, doer=doer, scope=scope)
         if said is not None:
             if not _one_line(said):
                 raise Refused("--said is one line: it holds a line break")
@@ -546,12 +557,16 @@ def _id_notes(board: Board, id: str, today: date) -> list[dict]:
 def plan_edit(board: str, action: str, id: str, *, to: str | None = None,
               why: str | None = None, answer: str | None = None, text: str | None = None,
               by: str | None = None, today: str | date | None = None, tool: str = TOOL,
-              session: str | None = None, ledger: str | None = None, board_only: bool = False) -> Plan:
+              session: str | None = None, ledger: str | None = None, board_only: bool = False,
+              delegate: str | None = None) -> Plan:
     """One of the five edits (``edit_item()``) of the open item ``id``; a decide's `by`, who answered, as
     ``who_answered()`` resolves it. A decide on an item naming one entry and one gate is the two-file decide lift
     (``_decide_ledger()``): the item file, closed per ``closes()``, and the entries ``decide_lift()`` changes in
     ``ledger``, both or neither; ``board_only`` writes the board half alone. ``done``, and a decide that closes,
-    write the archived file (``item_path(id, closed)``) and remove the open one in one write."""
+    write the archived file (``item_path(id, closed)``) and remove the open one in one write. With ``delegate``
+    (v3.4), a delegated answer for ``by``: refused with ``board_only`` and on any action but a decide, then, once
+    ``by`` is resolved, with ``delegate_problem()``'s message; written in the delegated form, the delegate as the
+    grant spells it, its ledger half by the decide lift in the delegated Log form."""
     if action not in EDITS:
         raise Refused(f"an edit is one of {', '.join(EDITS)}, not {action!r}")
     day = _today(today)
@@ -566,18 +581,33 @@ def plan_edit(board: str, action: str, id: str, *, to: str | None = None,
         raise Refused("a reply needs --by, who says it")
     if (ledger is not None or board_only) and action != "decide":
         raise Refused("--ledger and --board-only are a decide's")
+    if delegate is not None and action != "decide":
+        raise Refused(DELEGATE_NOT_DECIDE)
+    if delegate is not None and board_only:
+        raise Refused(DELEGATE_BOARD_ONLY)
     if action == "done" and why is not None:
         why = re.sub(r"[\s.?!]+\Z", "", " ".join(why.split()))  # collapsed, then stripped, as v2.x's edit_line() did (D7)
     if action == "decide" and isinstance(answer, str) and answer.strip():
         answer = fill_form(answer, it.answers) or answer  # v2.8: filled once, so board, ledger and subject agree
     if action == "decide":
         by = who_answered(old, by)
-    edit_item(it.raw, action, to=when, answer=answer, why=why or None, reply=text, by=by, today=day)  # its refusals first
+    scope = None
+    if delegate is not None:  # v3.4: D3's rules, before the item edit and the ledger half
+        delegate = " ".join(delegate.split())
+        fault = delegate_problem(old, it, delegate, by)
+        if fault is not None:
+            raise Refused(fault)
+        delegate = next(d for d, p, _ in board_delegates(old) or [] if p is not None and d.lower() == delegate.lower()
+                        and p.lower() == by.lower())  # as the grant spells it
+        scope = it.scope
+    edit_item(it.raw, action, to=when, answer=answer, why=why or None, reply=text, by=by, today=day,
+              delegate=delegate)  # its refusals first
     changes: dict[str, str | None] = {}
     info: dict = {"id": id}
     close = False
     if action == "decide":
-        close, changes, extra = _decide_ledger(board, old, it, answer, by, day, ledger, board_only, today)
+        close, changes, extra = _decide_ledger(board, old, it, answer, by, day, ledger, board_only, today,
+                                               delegate=delegate, scope=scope)
         info = {"id": id, **extra}
         if "left_open" in info:  # v2.7: a --board-only lift that does not close the item writes nothing
             gate_ = info.pop("gate")
@@ -585,7 +615,7 @@ def plan_edit(board: str, action: str, id: str, *, to: str | None = None,
             return Plan("decide", None, {}, info,
                         [f"left open: {', '.join(info['left_open'])} still carry {gate_}"])
     new = edit_item(it.raw, action, to=when, answer=answer, why=why or None, reply=text, by=by, today=day,
-                    close=close)
+                    close=close, delegate=delegate)
     d = board_dir(old.path)
     here = os.path.join(d, it.path)
     shut = parse_item(new).closed
@@ -621,8 +651,8 @@ def _may_answer(board: Board, gate_: str, by: str) -> None:
 
 
 def _decide_ledger(board_path: str, board: Board, item: BoardItem, label: str | None, by: str, day: date,
-                   ledger: str | None, board_only: bool, today: str | date | None
-                   ) -> tuple[bool, dict[str, str | None], dict]:
+                   ledger: str | None, board_only: bool, today: str | date | None, *, delegate: str | None = None,
+                   scope: str | None = None) -> tuple[bool, dict[str, str | None], dict]:
     """A decide's ledger half (v2.4, SPEC *The board writer*): (whether the answer closes the item, the ledger
     files it changes, what it reports). An item whose Context names one bare ``TD-n`` and one gate is the
     decide lift: ``decide_lift()`` on the ledger's base texts of that entry and its `Parts:` (a listed id only the
@@ -674,7 +704,7 @@ def _decide_ledger(board_path: str, board: Board, item: BoardItem, label: str | 
             return shut, {}, {"entries": [], "board_only": True}
         ledger_day = L._today(today)
         got = decide_lift(file, base, label or "", by, ledger_day, board_people(board), answered_by(board),
-                          archived=gone)
+                          archived=gone, delegate=delegate, scope=scope)
         changes: dict[str, str | None] = {found[tid]: text for tid, text in got.items()}
         notes = L.gate(led, changes, today=ledger_day) if changes else []
     except L.Unusable as e:
@@ -855,6 +885,8 @@ def build(a: argparse.Namespace) -> Plan:
             raise Refused("--parts is a decide's snapshot, asked as a question: a decided item takes none")
         if a.doer is not None and a.decided is not None:  # the same step (v2.8): a decided line is a decide
             raise Refused(DOER_DECIDED)
+        if a.scope is not None and a.decided is not None:  # the same step (v3.4)
+            raise Refused(SCOPE_DECIDED)
         parts = _parts_given(a.parts)
         detail = None
         if a.detail is not None:
@@ -867,14 +899,14 @@ def build(a: argparse.Namespace) -> Plan:
         return plan_add(a.board, a.text, due=a.due, context=a.context, kind=a.kind, hide_until=a.hide_until,
                         answers=a.answer or None, default=a.default, lifts=a.lift or None, detail=detail, session=a.session,
                         host=a.host, decided=a.decided, said=a.said, by=a.by, id=a.id,
-                        today=a.today, tool=a.tool, parts=parts, ledger=a.ledger, doer=a.doer)
+                        today=a.today, tool=a.tool, parts=parts, ledger=a.ledger, doer=a.doer, scope=a.scope)
     if a.action in EDITS:
         if a.action == "decide" and len(a.answer) != 1:
             raise Refused("decide takes one --answer, the person's")
         answer = a.answer[0] if a.action == "decide" else None
         return plan_edit(a.board, a.action, a.id, to=a.to, why=a.why, answer=answer,
                          text=a.text, by=a.by, today=a.today, tool=a.tool, session=a.session,
-                         ledger=a.ledger, board_only=a.board_only or False)
+                         ledger=a.ledger, board_only=a.board_only or False, delegate=a.delegate)
     if a.action == "fmt":
         return plan_fmt(a.board)
     if a.action == "split":
@@ -896,11 +928,11 @@ TAKES = {
     "show": {"board", "today", "hidden"},
     "add": {"board", "text", "due", "context", "kind", "answer", "default", "detail", "session", "host",
             "decided", "said", "by", "id", "today", "tool", "hide_until", "lift", "parts", "ledger",
-            "doer"},
+            "doer", "scope"},
     "snooze": {"board", "id", "to", "today", "tool", "session"},
     "due": {"board", "id", "to", "today", "tool", "session"},
     "done": {"board", "id", "why", "today", "tool", "session"},
-    "decide": {"board", "id", "answer", "by", "today", "tool", "session", "ledger", "board_only"},
+    "decide": {"board", "id", "answer", "by", "today", "tool", "session", "ledger", "board_only", "delegate"},
     "reply": {"board", "id", "text", "by", "today", "tool", "session"},
     "fmt": {"board"},
     "split": {"board", "archive"},
@@ -945,6 +977,8 @@ def parser() -> argparse.ArgumentParser:
                     help="add: a decide's Parts: snapshot, TD-a,TD-b (repeat; each part Part of the Context's "
                          "entry and carrying its gate)")
     ap.add_argument("--doer", help="add: an act's Doer:, who should do its step: a repo, or 'team <name>'")
+    ap.add_argument("--scope", help="add: a decide's Scope, the kind of decision it is (v3.4)")
+    ap.add_argument("--delegate", help="decide: the delegate answering for --by under the board's Delegates: (v3.4)")
     ap.add_argument("--text", help="add: the item's text; reply: the reply's words")
     ap.add_argument("--by", help="reply, add --said: who says it; decide, add --decided: who answered (the one name "
                     "on the board's People: when it lists one)")

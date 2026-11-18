@@ -664,3 +664,17 @@ Ledgerboard: 2
 **Blocked by:** decision (pat)
 
 **Ask:** Go, or say what else?
+
+## TD-283: The banner waits on pat, its Ask with a Context (v3.3)
+
+**Priority:** Low
+**Added:** 2026-09-01
+**Status:** Open
+**Blocked by:** decision (pat)
+
+**Ask:** Should the banner show the release date?
+
+**Context:** The release date is known a week ahead,
+and the banner is read by every visitor.
+
+**Fix:** show it.

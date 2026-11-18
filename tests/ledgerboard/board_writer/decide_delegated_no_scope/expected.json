@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "decide",
+  "refused": "rule 1: the item has no Scope"
+ }
+}

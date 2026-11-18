@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "add",
+  "refused": "a scope is one name, not 'merge line'"
+ }
+}

@@ -1,0 +1,26 @@
+{
+ "argv": [
+  "new",
+  "--id",
+  "TD-2",
+  "--title",
+  "A new entry",
+  "--priority",
+  "Low",
+  "--why",
+  "why.txt",
+  "--ask",
+  "ask.txt",
+  "--context",
+  "context.txt",
+  "--fix",
+  "fix.txt",
+  "--blocked-by",
+  "decision (pat)",
+  "--today",
+  "2026-01-10",
+  "--ledger",
+  "ledger",
+  "--json"
+ ]
+}

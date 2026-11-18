@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "renumber",
+  "refused": "⚠ TD-040: the 1st `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+ }
+}

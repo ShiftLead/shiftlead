@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "set",
+  "unusable": "--delegate and --scope go together: a delegated answer names its delegate and its scope"
+ }
+}

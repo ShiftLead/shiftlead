@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "edit",
+  "refused": "⚠ TD-001: the 1st code fence opens and never closes (fence-open), so no lead after it is read: close it"
+ }
+}

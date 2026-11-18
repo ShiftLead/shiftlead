@@ -1,0 +1,13 @@
+{
+ "argv": [
+  "edit",
+  "TD-1",
+  "--section",
+  "Ask",
+  "--from",
+  "ask.txt",
+  "--ledger",
+  "ledger",
+  "--json"
+ ]
+}

@@ -9,6 +9,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -47,6 +49,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "Overdue by ten.",
    "waiting_on": "person"
@@ -59,6 +62,8 @@
    "context": "TD-2",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -103,6 +108,7 @@
     "TD-2"
    ],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "Overdue by two, hidden.",
    "waiting_on": "person"
@@ -115,6 +121,8 @@
    "context": "TD-3",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -159,6 +167,7 @@
     "TD-3"
    ],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "Overdue by two, hide passed.",
    "waiting_on": "person"
@@ -180,6 +189,8 @@
     "text": "a"
    },
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -232,6 +243,7 @@
     "TD-4"
    ],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "Decided, hidden but a work order.",
    "waiting_on": "session"
@@ -253,6 +265,8 @@
     "text": "b"
    },
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -299,6 +313,7 @@
     "TD-5"
    ],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "Decided earlier.",
    "waiting_on": "session"
@@ -311,6 +326,8 @@
    "context": "TD-6",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -349,6 +366,7 @@
     "TD-6"
    ],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "Due today.",
    "waiting_on": "person"
@@ -361,6 +379,8 @@
    "context": "TD-7",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -399,6 +419,7 @@
     "TD-7"
    ],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "Due in three.",
    "waiting_on": "person"
@@ -411,6 +432,8 @@
    "context": "TD-8",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -449,6 +472,7 @@
     "TD-8"
    ],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "Bad date.",
    "waiting_on": "person"
@@ -461,6 +485,8 @@
    "context": "TD-9",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -495,6 +521,7 @@
     "TD-9"
    ],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "Undated.",
    "waiting_on": "person"
@@ -507,6 +534,8 @@
    "context": "TD-10",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -545,6 +574,7 @@
     "TD-10"
    ],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "Check the mirror.",
    "waiting_on": "person"
@@ -557,6 +587,8 @@
    "context": "TD-11",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -595,6 +627,7 @@
     "TD-11"
    ],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "Check the cache.",
    "waiting_on": "person"
@@ -607,6 +640,8 @@
    "context": "none",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -645,6 +680,7 @@
    "path": "",
    "refs": [],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "The mirror moved.",
    "waiting_on": "person"
@@ -657,6 +693,8 @@
    "context": "none",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -693,6 +731,7 @@
    "path": "",
    "refs": [],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "Hidden fyi.",
    "waiting_on": "person"
@@ -705,6 +744,8 @@
    "context": "TD-12",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -743,6 +784,7 @@
     "TD-12"
    ],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "Prose Hide until: 2026-02-01 is no field.",
    "waiting_on": "person"
@@ -761,6 +803,8 @@
    "context": "TD-13",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -803,6 +847,7 @@
     "TD-13"
    ],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "An answer is no hide.",
    "waiting_on": "person"
@@ -824,6 +869,8 @@
     "text": "a. Hide until: 2030-01-01"
    },
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -870,6 +917,7 @@
     "TD-14"
    ],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "A decision is no hide.",
    "waiting_on": "session"

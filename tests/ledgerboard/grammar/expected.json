@@ -229,6 +229,56 @@
    }
   ]
  },
+ "delegates-line": {
+  "delegates-line": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   }
+  ],
+  "grant": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   }
+  ],
+  "person": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   }
+  ],
+  "person-part": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   }
+  ]
+ },
  "event-section": {
   "char": [
    {
@@ -654,8 +704,16 @@
     "why": null
    },
    {
+    "accepted": true,
+    "why": null
+   },
+   {
     "accepted": false,
-    "why": "decided: `Decided` is `<date>[ by <person>] — <label>`"
+    "why": "decided: `Decided` is `<date>[ by <person>[ for <person> (<scope>)]] — <label>`"
+   },
+   {
+    "accepted": false,
+    "why": "decided: `Decided` is `<date>[ by <person>[ for <person> (<scope>)]] — <label>`"
    }
   ],
   "digit": [
@@ -775,7 +833,7 @@
    },
    {
     "accepted": false,
-    "why": "header: Context stands after Due; the fields' order is Kind, Added, Session, Context, Parts, Doer, Due, Hide until, Answers, Lifts, Decided, Closed"
+    "why": "header: Context stands after Due; the fields' order is Kind, Added, Session, Context, Parts, Doer, Scope, Due, Hide until, Answers, Lifts, Decided, Closed"
    }
   ],
   "item-label": [
@@ -875,7 +933,7 @@
    },
    {
     "accepted": false,
-    "why": "decided: `Decided` is `<date>[ by <person>] — <label>`"
+    "why": "decided: `Decided` is `<date>[ by <person>[ for <person> (<scope>)]] — <label>`"
    }
   ],
   "person-part": [
@@ -885,7 +943,7 @@
    },
    {
     "accepted": false,
-    "why": "decided: `Decided` is `<date>[ by <person>] — <label>`"
+    "why": "decided: `Decided` is `<date>[ by <person>[ for <person> (<scope>)]] — <label>`"
    }
   ],
   "reply-by": [
@@ -928,6 +986,16 @@
     "why": "parts: `Parts` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
    }
   ],
+  "scope-field": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "scope: `Scope` is one name"
+   }
+  ],
   "session-field": [
    {
     "accepted": true,
@@ -936,6 +1004,86 @@
    {
     "accepted": false,
     "why": "session: 'w 9' is not `<name>` or `<name> on <host>`"
+   }
+  ]
+ },
+ "lift-subject": {
+  "digit": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   }
+  ],
+  "lift-subject": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   }
+  ],
+  "log-token": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   }
+  ],
+  "person": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   }
+  ],
+  "person-part": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
    }
   ]
  },
@@ -1068,6 +1216,14 @@
     "why": null
    },
    {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
+   },
+   {
     "accepted": false,
     "why": "malformed"
    }
@@ -1076,6 +1232,14 @@
    {
     "accepted": true,
     "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "malformed"
    },
    {
     "accepted": false,

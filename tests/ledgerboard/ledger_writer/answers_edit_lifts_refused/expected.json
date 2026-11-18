@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "edit",
+  "refused": "⚠ TD-003: the gate sweep cannot offer its own answers (answers-unusable): a **Lifts:** with no **Answers:** (the first fault found)"
+ }
+}

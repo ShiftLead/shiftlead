@@ -15,6 +15,18 @@
    15,
    "## In-flight",
    "names In-flight: the board is now this directory"
+  ],
+  [
+   "README.md",
+   15,
+   "## In-flight",
+   "carried from the board's line 18, below an item: no item holds it"
+  ],
+  [
+   "README.md",
+   16,
+   "- (none)",
+   "carried from the board's line 20, below an item: no item holds it"
   ]
  ],
  "persisted_keys_found": true

@@ -1,0 +1,15 @@
+{
+ "argv": [
+  "edit",
+  "TD-1",
+  "--section",
+  "Why",
+  "--from",
+  "why.txt",
+  "--base",
+  "base",
+  "--ledger",
+  "ledger",
+  "--json"
+ ]
+}

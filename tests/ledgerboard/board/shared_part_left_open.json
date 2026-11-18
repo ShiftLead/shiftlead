@@ -15,6 +15,8 @@
    "context": "TD-12 decision (pat)",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": "Go",
    "detail": [],
    "doer": null,
@@ -68,6 +70,7 @@
     "TD-12"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-1",
    "text": "Go on the report parts?",
    "waiting_on": "person"
@@ -89,6 +92,8 @@
     "text": "Go"
    },
    "decided_by": "pat",
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": "Go",
    "detail": [],
    "doer": null,
@@ -146,6 +151,7 @@
     "TD-20"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-1",
    "text": "Go on the export parts?",
    "waiting_on": "session"

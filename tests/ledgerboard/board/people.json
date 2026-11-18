@@ -18,6 +18,8 @@
     "text": "files"
    },
    "decided_by": "pat",
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": "files",
    "detail": [],
    "doer": null,
@@ -68,6 +70,7 @@
     "TD-7"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-1",
    "text": "**Pick a store.**",
    "waiting_on": "session"
@@ -89,6 +92,8 @@
     "text": "Go"
    },
    "decided_by": "Friday",
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -139,6 +144,7 @@
     "TD-8"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-2",
    "text": "Ship on Friday?",
    "waiting_on": "session"
@@ -160,6 +166,8 @@
     "text": "next (by next week)"
    },
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -210,6 +218,7 @@
     "TD-9"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-2",
    "text": "Which week?",
    "waiting_on": "session"
@@ -231,6 +240,8 @@
     "text": "(by sam.lee)"
    },
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -281,6 +292,7 @@
     "TD-10"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-3",
    "text": "Name it?",
    "waiting_on": "session"
@@ -293,6 +305,8 @@
    "context": "TD-11",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -335,6 +349,7 @@
     "TD-11"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-3",
    "text": "Rotate the key.",
    "waiting_on": "person"

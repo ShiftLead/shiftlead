@@ -11,6 +11,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -49,6 +51,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "An fyi of the 7th.",
    "waiting_on": "person"
@@ -61,6 +64,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -103,6 +108,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "An empty due.",
    "waiting_on": "person"
@@ -115,6 +121,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -153,6 +161,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "Undated, added on the 5th.",
    "waiting_on": "person"
@@ -165,6 +174,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -207,6 +218,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "Due the 20th, added the 4th.",
    "waiting_on": "person"
@@ -219,6 +231,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -261,6 +275,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "A due that is no day.",
    "waiting_on": "person"
@@ -273,6 +288,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -315,6 +332,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "Due the 20th, added the 3rd, nonce f.",
    "waiting_on": "person"
@@ -327,6 +345,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -369,6 +389,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "Due the 20th, added the 3rd, nonce a.",
    "waiting_on": "person"
@@ -381,6 +402,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -419,6 +442,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "An fyi of the 3rd.",
    "waiting_on": "person"
@@ -431,6 +455,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -469,6 +495,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "Undated, added on the 3rd.",
    "waiting_on": "person"
@@ -481,6 +508,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -523,6 +552,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "Due the 20th, added the 2nd.",
    "waiting_on": "person"

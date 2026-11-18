@@ -1,14 +1,839 @@
 {
- "verdict": {
-  "a lift, closed in the same write": {
+ "ledger_lift": {
+  "delegated: ledger lift, a delegated item in the shared set while decided wins": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-delegated",
+     "the item 2026-01-06-d6f09cf2 covering decision (pat) for TD-111 was answered by director for pat (merge-line): its lift takes review"
+    ]
+   ]
+  },
+  "delegated: ledger lift, a delegated line over a delegated item": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-delegated",
+     "TD-150's lift of decision (pat) is written by director for pat (merge-line): a delegated ledger lift takes review"
+    ]
+   ]
+  },
+  "delegated: ledger lift, a delegated line with no item": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-delegated",
+     "TD-160's lift of decision (pat) is written by director for pat (merge-line): a delegated ledger lift takes review"
+    ]
+   ]
+  },
+  "delegated: ledger lift, an undelegated line over a delegated item": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-delegated",
+     "the item 2026-01-06-54236abb covering decision (pat) for TD-150 was answered by director for pat (merge-line): its lift takes review"
+    ]
+   ]
+  },
+  "lift-a Log date a day after the merge": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-date",
+     "the Log date 2026-01-15 is outside 2026-01-13 .. 2026-01-14"
+    ]
+   ]
+  },
+  "lift-a Log date two days before the PR opened": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-date",
+     "the Log date 2026-01-13 is outside 2026-01-14 .. 2026-01-15"
+    ]
+   ]
+  },
+  "lift-a board path in files, the board unchanged": {
    "carve_out": true,
    "flags": [],
    "review": []
+  },
+  "lift-a changed README": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-board",
+     "the board's changes ['docs/user_attention/README.md'] are not the none form's []"
+    ]
+   ]
+  },
+  "lift-a close a day after the merge": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "lift-a close two days after the merge": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-date",
+     "the Closed: date 2026-01-17 is outside 2026-01-14 .. 2026-01-16"
+    ]
+   ]
+  },
+  "lift-a close two days before the PR opened": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-date",
+     "the Closed: date 2026-01-13 is outside 2026-01-14 .. 2026-01-16"
+    ]
+   ]
+  },
+  "lift-a close under the wrong month": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-board",
+     "docs/user_attention/archive/2026-02/2026-01-06-85a7b461.md is not what the close writes at docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+    ]
+   ]
+  },
+  "lift-a close with no readable Closed": {
+   "carve_out": false,
+   "flags": [
+    [
+     "tripwire-no-decided",
+     "TD-100 lifts decision (Pat), and no item covering it on this repo's board gains a Decided: in the same diff"
+    ]
+   ],
+   "review": [
+    [
+     "ledger-lift-board",
+     "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md has no readable Closed:"
+    ]
+   ]
+  },
+  "lift-a decide subject": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-subject",
+     "the commit's subject is not a ledger lift: 'board: decide 2026-01-06-85a7b461 Warm the cache nightly?: Go (session w-1)'"
+    ]
+   ]
+  },
+  "lift-a dropped old Log line": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-bytes",
+     "docs/ledger/TD-160.md is not what lift_gate writes for the none form, byte for byte"
+    ]
+   ]
+  },
+  "lift-a lift line for another gate": {
+   "carve_out": false,
+   "flags": [
+    [
+     "tripwire-unanswered",
+     "TD-160 drops decision (pat) with no answer logged — a gate is lifted by its person's answer, reassigned (gate reassigned) or overridden (override:)"
+    ]
+   ],
+   "review": [
+    [
+     "ledger-lift-log",
+     "TD-160's Log does not gain exactly one gate lifted: decision (pat) … answer line"
+    ]
+   ]
+  },
+  "lift-a lift on another repo's board": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-bytes",
+     "docs/ledger/TD-160.md is not what lift_gate writes for the none form, byte for byte"
+    ]
+   ]
+  },
+  "lift-a note in place of the lift": {
+   "carve_out": false,
+   "flags": [
+    [
+     "tripwire-unanswered",
+     "TD-160 drops decision (pat) with no answer logged — a gate is lifted by its person's answer, reassigned (gate reassigned) or overridden (override:)"
+    ]
+   ],
+   "review": [
+    [
+     "ledger-lift-log",
+     "TD-160's Log does not gain exactly one gate lifted: decision (pat) … answer line"
+    ]
+   ]
+  },
+  "lift-a path outside the board and the ledger": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-files",
+     "the PR changes src/app.py, neither docs/ledger/TD-160.md nor an item file of the board"
+    ]
+   ]
+  },
+  "lift-a second ledger file": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-files",
+     "the PR changes docs/ledger/TD-150.md, neither docs/ledger/TD-160.md nor an item file of the board"
+    ]
+   ]
+  },
+  "lift-a short id for a padded file": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "lift-a v1 ledger": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-entry",
+     "a v1 ledger's lift is not recomputed — it takes ordinary review"
+    ]
+   ]
+  },
+  "lift-a v1 ledger file the files omit": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-files",
+     "the PR changes docs/technical_debt.md, neither docs/ledger/TD-160.md nor under docs/user_attention/"
+    ]
+   ]
+  },
+  "lift-a v2 board at the base": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-board-v2",
+     "the PR's board is a v2 board at its base or head: a v3 writer writes none"
+    ]
+   ]
+  },
+  "lift-a v2 board at the head": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-board-v2",
+     "the PR's board is a v2 board at its base or head: a v3 writer writes none"
+    ]
+   ]
+  },
+  "lift-a waiting-only label": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-bytes",
+     "lift_gate refuses the lift: 'Not yet' only keeps the gate waiting — it never lifts"
+    ]
+   ]
+  },
+  "lift-an entry archived by the PR": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-entry",
+     "the head does not hold docs/ledger/TD-160.md open"
+    ]
+   ]
+  },
+  "lift-an entry the head drops": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-entry",
+     "the head does not hold docs/ledger/TD-160.md open"
+    ]
+   ]
+  },
+  "lift-an item with two head files": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-board",
+     "the head holds 2 files for the item 2026-01-06-85a7b461"
+    ]
+   ]
+  },
+  "lift-an override lift": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-log",
+     "TD-160's Log does not gain exactly one gate lifted: decision (pat) … answer line"
+    ]
+   ]
+  },
+  "lift-another person on an Answered by any board": {
+   "carve_out": false,
+   "flags": [
+    [
+     "tripwire-by",
+     "TD-160 lifts decision (pat) by sam, not pat — only the gate's person answers, or anyone listed on a board whose Answered by is any"
+    ]
+   ],
+   "review": [
+    [
+     "ledger-lift-by",
+     "sam lifts decision (pat): only the gate's person, listed on the base board's People:, lifts it on the press"
+    ]
+   ]
+  },
+  "lift-asked": {
+   "carve_out": false,
+   "flags": [
+    [
+     "tripwire-no-board-item",
+     "TD-100 lifts decision (Pat) with no board item, but an open item on this repo's board asks it — answer that item"
+    ]
+   ],
+   "review": [
+    [
+     "ledger-lift-asked",
+     "an open item on this repo's board asks decision (pat) for TD-100 — its answer is the decide lift"
+    ]
+   ]
+  },
+  "lift-asked beside decided": {
+   "carve_out": false,
+   "flags": [
+    [
+     "tripwire-no-decided",
+     "TD-100 lifts decision (Pat), and no item covering it on this repo's board gains a Decided: in the same diff"
+    ]
+   ],
+   "review": [
+    [
+     "ledger-lift-asked",
+     "an open item on this repo's board asks decision (pat) for TD-100 — its answer is the decide lift"
+    ]
+   ]
+  },
+  "lift-decided": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "lift-decided beside an undecided shared item": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "lift-decided by another on an Answered by any board": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-board",
+     "the item 2026-01-06-85a7b461's Decided: is not pat's answer"
+    ]
+   ]
+  },
+  "lift-decided naming no one": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-board",
+     "the item 2026-01-06-85a7b461's Decided: is not pat's answer"
+    ]
+   ]
+  },
+  "lift-decided, also closing the shared item": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-board",
+     "the board's changes ['docs/user_attention/2026-01-06-85a7b461.md', 'docs/user_attention/2026-01-07-0c1d2e02.md', 'docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md', 'docs/user_attention/archive/2026-01/2026-01-07-0c1d2e02.md'] are not the decided form's ['docs/user_attention/2026-01-06-85a7b461.md', 'docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md']"
+    ]
+   ]
+  },
+  "lift-decided, closed with another why": {
+   "carve_out": false,
+   "flags": [
+    [
+     "tripwire-no-decided",
+     "TD-100 lifts decision (Pat), and no item covering it on this repo's board gains a Decided: in the same diff"
+    ]
+   ],
+   "review": [
+    [
+     "ledger-lift-board",
+     "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md is not what the close writes at docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md"
+    ]
+   ]
+  },
+  "lift-decided, its Decided spelling the person otherwise": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "lift-decided, the item left open": {
+   "carve_out": false,
+   "flags": [
+    [
+     "tripwire-no-decided",
+     "TD-100 lifts decision (Pat), and no item covering it on this repo's board gains a Decided: in the same diff"
+    ]
+   ],
+   "review": [
+    [
+     "ledger-lift-board",
+     "docs/user_attention/2026-01-06-85a7b461.md has no readable Closed:"
+    ]
+   ]
+  },
+  "lift-decided, the subject spelling the person otherwise": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "lift-no People": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-no-people",
+     "the base board declares no People: line, so who may lift is unchecked"
+    ]
+   ]
+  },
+  "lift-no board": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-no-board",
+     "the PR has no board at docs/user_attention/ or docs/user_attention.md at its base or head"
+    ]
+   ]
+  },
+  "lift-no new Log line": {
+   "carve_out": false,
+   "flags": [
+    [
+     "tripwire-unanswered",
+     "TD-160 drops decision (pat) with no answer logged — a gate is lifted by its person's answer, reassigned (gate reassigned) or overridden (override:)"
+    ]
+   ],
+   "review": [
+    [
+     "ledger-lift-log",
+     "TD-160's Log does not gain exactly one gate lifted: decision (pat) … answer line"
+    ]
+   ]
+  },
+  "lift-none": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "lift-none logged as shared": {
+   "carve_out": false,
+   "flags": [
+    [
+     "tripwire-shared",
+     "TD-160 lifts decision (pat) leaving a shared board item open, but no item it covers still asks another listed entry"
+    ]
+   ],
+   "review": [
+    [
+     "ledger-lift-bytes",
+     "docs/ledger/TD-160.md is not what lift_gate writes for the none form, byte for byte"
+    ]
+   ]
+  },
+  "lift-none logged with no suffix": {
+   "carve_out": false,
+   "flags": [
+    [
+     "tripwire-no-decided",
+     "TD-160 lifts decision (pat), and no item covering it on this repo's board gains a Decided: in the same diff"
+    ]
+   ],
+   "review": [
+    [
+     "ledger-lift-bytes",
+     "docs/ledger/TD-160.md is not what lift_gate writes for the none form, byte for byte"
+    ]
+   ]
+  },
+  "lift-none with no suffix that changes an item": {
+   "carve_out": false,
+   "flags": [
+    [
+     "tripwire-no-decided",
+     "TD-160 lifts decision (pat), and no item covering it on this repo's board gains a Decided: in the same diff"
+    ]
+   ],
+   "review": [
+    [
+     "ledger-lift-bytes",
+     "docs/ledger/TD-160.md is not what lift_gate writes for the none form, byte for byte"
+    ]
+   ]
+  },
+  "lift-none, changing an item": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-board",
+     "the board's changes ['docs/user_attention/2026-01-06-85a7b461.md'] are not the none form's []"
+    ]
+   ]
+  },
+  "lift-shared": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "lift-shared, changing an item": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-board",
+     "the board's changes ['docs/user_attention/2026-01-06-d6f09cf2.md'] are not the shared form's []"
+    ]
+   ]
+  },
+  "lift-the entry does not carry the subject's gate": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-entry",
+     "the base ledger holds no open TD-160 carrying decision (sam)"
+    ]
+   ]
+  },
+  "lift-the gate's person not on People": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-by",
+     "quinn lifts decision (quinn): only the gate's person, listed on the base board's People:, lifts it on the press"
+    ]
+   ]
+  },
+  "lift-the subject names an entry with no gate": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-entry",
+     "the base ledger holds no open TD-120 carrying decision (pat)"
+    ]
+   ]
+  },
+  "lift-the subject names another gated entry": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-files",
+     "the PR changes docs/ledger/TD-160.md, neither docs/ledger/TD-150.md nor an item file of the board"
+    ]
+   ]
+  },
+  "lift-two commits": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-subject",
+     "a lift PR is one commit, squash-merged; this has 2"
+    ]
+   ]
+  },
+  "lift-two decided items": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "lift-two new Log lines": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "ledger-lift-log",
+     "TD-160's Log does not gain exactly one gate lifted: decision (pat) … answer line"
+    ]
+   ]
+  }
+ },
+ "lift_form": {
+  "form of lift-asked": [
+   "asked",
+   [
+    "2026-01-06-85a7b461"
+   ]
+  ],
+  "form of lift-asked beside decided": [
+   "asked",
+   [
+    "2026-01-06-85a7b461"
+   ]
+  ],
+  "form of lift-decided": [
+   "decided",
+   [
+    "2026-01-06-85a7b461"
+   ]
+  ],
+  "form of lift-decided beside an undecided shared item": [
+   "decided",
+   [
+    "2026-01-06-85a7b461"
+   ]
+  ],
+  "form of lift-none": [
+   "none",
+   []
+  ],
+  "form of lift-shared": [
+   "shared",
+   [
+    "2026-01-06-d6f09cf2"
+   ]
+  ],
+  "form of lift-the gate's person not on People": [
+   "none",
+   []
+  ],
+  "form of lift-two decided items": [
+   "decided",
+   [
+    "2026-01-07-0c1d2e01",
+    "2026-01-06-85a7b461"
+   ]
+  ],
+  "lift-form through Part of": [
+   "asked",
+   [
+    "2026-01-07-0c1d2e03"
+   ]
+  ],
+  "lift-form with a part no longer gated": [
+   "asked",
+   [
+    "2026-01-07-0c1d2e03"
+   ]
+  ],
+  "lift-form with an archived part": [
+   "decided",
+   [
+    "2026-01-07-0c1d2e03"
+   ]
+  ],
+  "lift-form with another repo's part": [
+   "asked",
+   [
+    "2026-01-07-0c1d2e03"
+   ]
+  ]
+ },
+ "tripwire": {
+  "a decide lift": [],
+  "a gate removed by hand": [
+   [
+    "tripwire-unanswered",
+    "TD-150 drops decision (pat) with no answer logged — a gate is lifted by its person's answer, reassigned (gate reassigned) or overridden (override:)"
+   ]
+  ],
+  "a gate removed by hand, in the migrate commit": [],
+  "a lift by someone other than the gate's person, owner board": [
+   [
+    "tripwire-by",
+    "TD-150 lifts decision (pat) by sam, not pat — only the gate's person answers, or anyone listed on a board whose Answered by is any"
+   ]
+  ],
+  "a reassign": [],
+  "a shared item said to be left open, with nothing shared": [
+   [
+    "tripwire-shared",
+    "TD-150 lifts decision (pat) leaving a shared board item open, but no item it covers still asks another listed entry"
+   ]
+  ],
+  "a teammate's lift on an any board": [],
+  "an answer on another repo's board": [],
+  "an answer said to be on this repo's own board": [
+   [
+    "tripwire-board",
+    "TD-150 lifts decision (pat) on board acme/widgets, which is this repo's own — its answer is on this board, written as Decided:"
+   ]
+  ],
+  "an entry the diff archives": [],
+  "an override": [],
+  "delegated: a change of the delegate alone, seen by the tripwire": [],
+  "no board item, and none at base or head": [],
+  "no board item, but the base had one (read the head alone and it passes)": [
+   [
+    "tripwire-no-board-item",
+    "TD-150 lifts decision (pat) with no board item, but an open item on this repo's board asks it — answer that item"
+   ]
+  ],
+  "no board item, on a board with no People": [],
+  "set by= on one part of a shared item, decided": [
+   [
+    "tripwire-shared-decided",
+    "TD-111 lifts decision (pat) leaving a shared board item open, but the item gains a Decided: that speaks for the entries left — leave it unanswered"
+   ]
+  ],
+  "set by= on one part of a shared item, left open": [],
+  "set by= with the board's Decided": [],
+  "split_pr": [],
+  "the item closed with no Decided": [
+   [
+    "tripwire-no-decided",
+    "TD-150 lifts decision (pat), and no item covering it on this repo's board gains a Decided: in the same diff"
+   ]
+  ],
+  "the last part of a shared item lifted, the item newly closed": [],
+  "the last part of a shared item lifted, undecided at the base": [],
+  "v3_tripwire_lifted": []
+ },
+ "uncovered": {
+  "a gate already at base": {
+   "flags": [],
+   "refusals": []
+  },
+  "a new decision covered on another repo's board": {
+   "flags": [
+    [
+     "decision-elsewhere",
+     "TD-170 gains decision (kim), and this repo's board does not list kim: covered on example.com/acme/kim, which not every machine reads"
+    ]
+   ],
+   "refusals": []
+  },
+  "a new decision item whose Lifts name its answers": {
+   "flags": [],
+   "refusals": []
+  },
+  "a new decision item whose only lifting answer is a form": {
+   "flags": [],
+   "refusals": []
+  },
+  "a new decision item with no lifting answer": {
+   "flags": [],
+   "refusals": [
+    [
+     "decision-no-lift",
+     "the new decide item 2026-01-06-e1f76e2e asks decision (pat) and none of its answers lifts it (Go)"
+    ]
+   ]
+  },
+  "a new decision no board read covers": {
+   "flags": [
+    [
+     "decision-elsewhere",
+     "TD-170 gains decision (kim), and this repo's board does not list kim: no board read covers it — the sweep files its item"
+    ]
+   ],
+   "refusals": []
+  },
+  "a new decision with no item": {
+   "flags": [],
+   "refusals": [
+    [
+     "decision-uncovered",
+     "TD-160 gains decision (pat) and no open decide item on this repo's board asks it — file the item in the same PR"
+    ]
+   ]
+  },
+  "a new decision, its item filed with it": {
+   "flags": [],
+   "refusals": []
+  },
+  "old_form_rewrite_gained": {
+   "flags": [],
+   "refusals": [
+    [
+     "decision-uncovered",
+     "TD-190 gains decision (Kim) and no open decide item on this repo's board asks it — file the item in the same PR"
+    ]
+   ]
+  },
+  "v3_uncovered_new_decide": {
+   "flags": [],
+   "refusals": [
+    [
+     "decision-no-lift",
+     "the new decide item 2026-01-06-e1f76e2e asks decision (pat) and none of its answers lifts it (Go)"
+    ]
+   ]
+  }
+ },
+ "verdict": {
+  "a CRLF board whose answered line drops its CR": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-board-line",
+     "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md at the head is not what the decide edit writes at archive/2026-01/2026-01-06-85a7b461.md"
+    ]
+   ]
   },
   "a Decided one day ahead of both UTC dates": {
    "carve_out": true,
    "flags": [],
    "review": []
+  },
+  "a Decided one day behind the PR's opening": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "a Decided that names no answerer": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-no-by",
+     "the Decided: names no answerer (by <person>)"
+    ]
+   ]
   },
   "a Decided two days ahead": {
    "carve_out": false,
@@ -20,21 +845,6 @@
     ]
    ]
   },
-  "a Log date two days after the PR opened": {
-   "carve_out": false,
-   "flags": [],
-   "review": [
-    [
-     "lift-log-date",
-     "the Log date 2026-01-17 is outside 2026-01-14 .. 2026-01-16"
-    ]
-   ]
-  },
-  "a Decided one day behind the PR's opening": {
-   "carve_out": true,
-   "flags": [],
-   "review": []
-  },
   "a Decided two days behind the PR's opening": {
    "carve_out": false,
    "flags": [],
@@ -45,43 +855,13 @@
     ]
    ]
   },
-  "a board with CRLF line endings": {
-   "carve_out": true,
-   "flags": [],
-   "review": []
-  },
-  "a CRLF board whose answered line drops its CR": {
+  "a Log date two days after the PR opened": {
    "carve_out": false,
    "flags": [],
    "review": [
     [
-     "lift-board-line",
-     "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md at the head is not what the decide edit writes at archive/2026-01/2026-01-06-85a7b461.md"
-    ]
-   ]
-  },
-  "a lift not yet merged": {
-   "carve_out": true,
-   "flags": [],
-   "review": []
-  },
-  "a lift with another file changed": {
-   "carve_out": false,
-   "flags": [],
-   "review": [
-    [
-     "lift-files",
-     "the PR changes ['docs/ledger/TD-100.md', 'docs/ledger/TD-150.md', 'docs/user_attention/2026-01-06-85a7b461.md', 'docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md'], and a lift changes ['docs/ledger/TD-100.md', 'docs/user_attention/2026-01-06-85a7b461.md', 'docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md']"
-    ]
-   ]
-  },
-  "a ledger change that is not decide_lift's": {
-   "carve_out": false,
-   "flags": [],
-   "review": [
-    [
-     "lift-ledger",
-     "docs/ledger/TD-100.md is not what decide_lift writes, byte for byte"
+     "lift-log-date",
+     "the Log date 2026-01-17 is outside 2026-01-14 .. 2026-01-16"
     ]
    ]
   },
@@ -100,45 +880,40 @@
     ]
    ]
   },
-  "a subject that is not a decide": {
-   "carve_out": false,
-   "flags": [],
-   "review": [
-    [
-     "lift-subject",
-     "the commit's subject is not a board decide: 'board: reply Warm the cache nightly? (session w-1)'"
-    ]
-   ]
-  },
-  "two commits": {
-   "carve_out": false,
-   "flags": [],
-   "review": [
-    [
-     "lift-commits",
-     "a lift PR is one commit, squash-merged; this has 2"
-    ]
-   ]
-  },
-  "a waiting-only answer, closed kept waiting": {
+  "a board with CRLF line endings": {
    "carve_out": true,
    "flags": [],
    "review": []
   },
-  "a work order, left open and decided": {
-   "carve_out": true,
-   "flags": [],
-   "review": []
-  },
-  "a work order closed under the carve-out": {
+  "a decide lift that edits the archived part": {
    "carve_out": false,
    "flags": [],
    "review": [
     [
-     "lift-board-line",
-     "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md at the head is not what the decide edit writes at 2026-01-06-85a7b461.md"
+     "lift-files",
+     "the PR changes ['docs/ledger/TD-160.md', 'docs/ledger/TD-161.md', 'docs/ledger/archive/TD-162.md', 'docs/user_attention/2026-01-06-37630303.md', 'docs/user_attention/archive/2026-01/2026-01-06-37630303.md'], and a lift changes ['docs/ledger/TD-160.md', 'docs/ledger/TD-161.md', 'docs/user_attention/2026-01-06-37630303.md', 'docs/user_attention/archive/2026-01/2026-01-06-37630303.md']"
     ]
    ]
+  },
+  "a decide lift whose Context is archived": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-refused",
+     "decide_lift refuses it: TD-160, the item's Context entry, is archived — the answer lifts nothing; it takes review"
+    ]
+   ]
+  },
+  "a decide lift with a Resolved part in the open directory": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "a decide lift with an archived part": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
   },
   "a finished lift left open": {
    "carve_out": false,
@@ -150,7 +925,47 @@
     ]
    ]
   },
-  "one go for a parent's parts": {
+  "a ledger change that is not decide_lift's": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-ledger",
+     "docs/ledger/TD-100.md is not what decide_lift writes, byte for byte"
+    ]
+   ]
+  },
+  "a lift by a form's fill": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "a lift not yet merged": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "a lift with another file changed": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-files",
+     "the PR changes ['docs/ledger/TD-100.md', 'docs/ledger/TD-150.md', 'docs/user_attention/2026-01-06-85a7b461.md', 'docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md'], and a lift changes ['docs/ledger/TD-100.md', 'docs/user_attention/2026-01-06-85a7b461.md', 'docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md']"
+    ]
+   ]
+  },
+  "a lift writing an unfilled form": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-board-line",
+     "the decide writer refuses the answer: Hold needs its words"
+    ]
+   ]
+  },
+  "a lift, closed in the same write": {
    "carve_out": true,
    "flags": [],
    "review": []
@@ -159,21 +974,6 @@
    "carve_out": true,
    "flags": [],
    "review": []
-  },
-  "another repo's entry, on the board alone": {
-   "carve_out": true,
-   "flags": [],
-   "review": []
-  },
-  "another repo's entry, with a ledger file": {
-   "carve_out": false,
-   "flags": [],
-   "review": [
-    [
-     "lift-files",
-     "another repo's entry is answered on the board alone: ['docs/ledger/TD-150.md', 'docs/user_attention/2026-01-06-be7088b5.md']"
-    ]
-   ]
   },
   "a re-answer": {
    "carve_out": false,
@@ -185,17 +985,17 @@
     ]
    ]
   },
-  "a Decided that names no answerer": {
+  "a subject that is not a decide": {
    "carve_out": false,
    "flags": [],
    "review": [
     [
-     "lift-no-by",
-     "the Decided: names no answerer (by <person>)"
+     "lift-subject",
+     "the commit's subject is not a board decide: 'board: reply Warm the cache nightly? (session w-1)'"
     ]
    ]
   },
-  "an event item answered by anyone listed": {
+  "a teammate's answer on an any board": {
    "carve_out": true,
    "flags": [],
    "review": []
@@ -215,53 +1015,228 @@
     ]
    ]
   },
-  "a teammate's answer on an any board": {
+  "a waiting-only answer, closed kept waiting": {
    "carve_out": true,
    "flags": [],
    "review": []
   },
-  "a decide lift with an archived part": {
-   "carve_out": true,
-   "flags": [],
-   "review": []
-  },
-  "a decide lift that edits the archived part": {
-   "carve_out": false,
-   "flags": [],
-   "review": [
-    [
-     "lift-files",
-     "the PR changes ['docs/ledger/TD-160.md', 'docs/ledger/TD-161.md', 'docs/ledger/archive/TD-162.md', 'docs/user_attention/2026-01-06-37630303.md', 'docs/user_attention/archive/2026-01/2026-01-06-37630303.md'], and a lift changes ['docs/ledger/TD-160.md', 'docs/ledger/TD-161.md', 'docs/user_attention/2026-01-06-37630303.md', 'docs/user_attention/archive/2026-01/2026-01-06-37630303.md']"
-    ]
-   ]
-  },
-  "a decide lift with a Resolved part in the open directory": {
-   "carve_out": true,
-   "flags": [],
-   "review": []
-  },
-  "a decide lift whose Context is archived": {
-   "carve_out": false,
-   "flags": [],
-   "review": [
-    [
-     "lift-refused",
-     "decide_lift refuses it: TD-160, the item's Context entry, is archived — the answer lifts nothing; it takes review"
-    ]
-   ]
-  },
-  "a lift by a form's fill": {
-   "carve_out": true,
-   "flags": [],
-   "review": []
-  },
-  "a lift writing an unfilled form": {
+  "a work order closed under the carve-out": {
    "carve_out": false,
    "flags": [],
    "review": [
     [
      "lift-board-line",
-     "the decide writer refuses the answer: Hold needs its words"
+     "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md at the head is not what the decide edit writes at 2026-01-06-85a7b461.md"
+    ]
+   ]
+  },
+  "a work order, left open and decided": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "an event item answered by anyone listed": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "an item whose Context names two entries and one gate": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-no-gate",
+     "the answered item is not a decide whose Context names one entry and one gate"
+    ]
+   ]
+  },
+  "another repo's entry, on the board alone": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "another repo's entry, with a ledger file": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-files",
+     "another repo's entry is answered on the board alone: ['docs/ledger/TD-150.md', 'docs/user_attention/2026-01-06-be7088b5.md']"
+    ]
+   ]
+  },
+  "delegated: a # ref beside a second ref": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-no-gate",
+     "the answered item is not a decide whose Context names one entry and one gate"
+    ]
+   ]
+  },
+  "delegated: covered at base": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "delegated: its Decided alone carries another scope": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-board-line",
+     "docs/user_attention/archive/2026-01/2026-01-06-54236abb.md at the head is not what the decide edit writes at archive/2026-01/2026-01-06-54236abb.md"
+    ]
+   ]
+  },
+  "delegated: only the item's Scope changes": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-board-line",
+     "docs/user_attention/archive/2026-01/2026-01-06-54236abb.md at the head is not what the decide edit writes at archive/2026-01/2026-01-06-54236abb.md"
+    ]
+   ]
+  },
+  "delegated: rescoped and answered in the new scope": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-ledger",
+     "docs/ledger/TD-150.md is not what decide_lift writes, byte for byte"
+    ]
+   ]
+  },
+  "delegated: rule 1, the base item has no Scope": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-delegate-uncovered",
+     "rule 1: the item has no Scope"
+    ]
+   ]
+  },
+  "delegated: rule 3 on an owner board": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-delegate-uncovered",
+     "rule 3: pat may not answer this item"
+    ]
+   ]
+  },
+  "delegated: rule 4, another repo's entry": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-delegate-uncovered",
+     "rule 4: the Context names a gate on another repo's entry"
+    ]
+   ]
+  },
+  "delegated: rule 4, this repo's own entry written with #": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-delegate-uncovered",
+     "rule 4: the Context names a gate on another repo's entry"
+    ]
+   ]
+  },
+  "delegated: the PR also adds the grant": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-board-diff",
+     "the board changes are not one item's file changed in place or moved to archive/"
+    ]
+   ]
+  },
+  "delegated: the person spelled Pat against People's pat": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-ledger",
+     "docs/ledger/TD-150.md is not what decide_lift writes, byte for byte"
+    ]
+   ]
+  },
+  "delegated: the person's own answer on a scoped item passes as today": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "delegated: uncovered before a ledger fault": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-delegate-uncovered",
+     "rule 2: no faultless Delegates: grant covers director for pat (merge-line)"
+    ]
+   ]
+  },
+  "delegated: under no grant": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-delegate-uncovered",
+     "rule 2: no faultless Delegates: grant covers director for pat (merge-line)"
+    ]
+   ]
+  },
+  "one go for a parent's parts": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "split_pr": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-board-v2",
+     "the PR's board is a v2 board at its base or head: a v3 writer writes none"
+    ]
+   ]
+  },
+  "two commits": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-commits",
+     "a lift PR is one commit, squash-merged; this has 2"
+    ]
+   ]
+  },
+  "v2_lift": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-board-v2",
+     "the PR's board is a v2 board at its base or head: a v3 writer writes none"
+    ]
+   ]
+  },
+  "v3_head_v2": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-board-v2",
+     "the PR's board is a v2 board at its base or head: a v3 writer writes none"
     ]
    ]
   },
@@ -280,86 +1255,6 @@
    "flags": [],
    "review": []
   },
-  "v3_lift_open": {
-   "carve_out": true,
-   "flags": [],
-   "review": []
-  },
-  "v3_lift_work_order_archived": {
-   "carve_out": false,
-   "flags": [],
-   "review": [
-    [
-     "lift-board-line",
-     "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md at the head is not what the decide edit writes at 2026-01-06-85a7b461.md"
-    ]
-   ]
-  },
-  "v3_other_repo": {
-   "carve_out": true,
-   "flags": [],
-   "review": []
-  },
-  "v3_lift_two_items": {
-   "carve_out": false,
-   "flags": [],
-   "review": [
-    [
-     "lift-board-diff",
-     "the board changes are not one item's file changed in place or moved to archive/"
-    ]
-   ]
-  },
-  "v3_lift_wrong_month": {
-   "carve_out": false,
-   "flags": [],
-   "review": [
-    [
-     "lift-board-line",
-     "docs/user_attention/archive/2026-02/2026-01-06-85a7b461.md at the head is not what the decide edit writes at archive/2026-01/2026-01-06-85a7b461.md"
-    ]
-   ]
-  },
-  "v3_lift_wrong_bytes": {
-   "carve_out": false,
-   "flags": [],
-   "review": [
-    [
-     "lift-board-line",
-     "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md at the head is not what the decide edit writes at archive/2026-01/2026-01-06-85a7b461.md"
-    ]
-   ]
-  },
-  "v3_lift_stray_board_path": {
-   "carve_out": false,
-   "flags": [],
-   "review": [
-    [
-     "lift-files",
-     "docs/user_attention/notes/plan.md is under docs/user_attention/ but neither an item file in it nor one under archive/<YYYY-MM>/"
-    ]
-   ]
-  },
-  "v3_lift_outside_path": {
-   "carve_out": false,
-   "flags": [],
-   "review": [
-    [
-     "lift-files",
-     "the PR changes README.md, outside the board and the ledger"
-    ]
-   ]
-  },
-  "v3_lift_open_and_archive": {
-   "carve_out": false,
-   "flags": [],
-   "review": [
-    [
-     "lift-board-diff",
-     "the board changes are not one item's file changed in place or moved to archive/"
-    ]
-   ]
-  },
   "v3_lift_no_board": {
    "carve_out": false,
    "flags": [
@@ -375,15 +1270,85 @@
     ]
    ]
   },
-  "v3_head_v2": {
+  "v3_lift_open": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "v3_lift_open_and_archive": {
    "carve_out": false,
    "flags": [],
    "review": [
     [
-     "lift-board-v2",
-     "the PR's board is a v2 board at its base or head: a v3 writer writes none"
+     "lift-board-diff",
+     "the board changes are not one item's file changed in place or moved to archive/"
     ]
    ]
+  },
+  "v3_lift_outside_path": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-files",
+     "the PR changes README.md, outside the board and the ledger"
+    ]
+   ]
+  },
+  "v3_lift_stray_board_path": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-files",
+     "docs/user_attention/notes/plan.md is under docs/user_attention/ but neither an item file in it nor one under archive/<YYYY-MM>/"
+    ]
+   ]
+  },
+  "v3_lift_two_items": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-board-diff",
+     "the board changes are not one item's file changed in place or moved to archive/"
+    ]
+   ]
+  },
+  "v3_lift_work_order_archived": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-board-line",
+     "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md at the head is not what the decide edit writes at 2026-01-06-85a7b461.md"
+    ]
+   ]
+  },
+  "v3_lift_wrong_bytes": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-board-line",
+     "docs/user_attention/archive/2026-01/2026-01-06-85a7b461.md at the head is not what the decide edit writes at archive/2026-01/2026-01-06-85a7b461.md"
+    ]
+   ]
+  },
+  "v3_lift_wrong_month": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-board-line",
+     "docs/user_attention/archive/2026-02/2026-01-06-85a7b461.md at the head is not what the decide edit writes at archive/2026-01/2026-01-06-85a7b461.md"
+    ]
+   ]
+  },
+  "v3_other_repo": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
   },
   "v3_stub_only_head": {
    "carve_out": false,
@@ -397,157 +1362,6 @@
     [
      "lift-no-board",
      "the PR has no board at docs/user_attention/ or docs/user_attention.md at its base or head"
-    ]
-   ]
-  },
-  "v2_lift": {
-   "carve_out": false,
-   "flags": [],
-   "review": [
-    [
-     "lift-board-v2",
-     "the PR's board is a v2 board at its base or head: a v3 writer writes none"
-    ]
-   ]
-  },
-  "split_pr": {
-   "carve_out": false,
-   "flags": [],
-   "review": [
-    [
-     "lift-board-v2",
-     "the PR's board is a v2 board at its base or head: a v3 writer writes none"
-    ]
-   ]
-  }
- },
- "tripwire": {
-  "a decide lift": [],
-  "set by= with the board's Decided": [],
-  "no board item, but the base had one (read the head alone and it passes)": [
-   [
-    "tripwire-no-board-item",
-    "TD-150 lifts decision (pat) with no board item, but an open item on this repo's board asks it — answer that item"
-   ]
-  ],
-  "the item closed with no Decided": [
-   [
-    "tripwire-no-decided",
-    "TD-150 lifts decision (pat), and no item covering it on this repo's board gains a Decided: in the same diff"
-   ]
-  ],
-  "a gate removed by hand": [
-   [
-    "tripwire-unanswered",
-    "TD-150 drops decision (pat) with no answer logged — a gate is lifted by its person's answer, reassigned (gate reassigned) or overridden (override:)"
-   ]
-  ],
-  "a gate removed by hand, in the migrate commit": [],
-  "a reassign": [],
-  "an override": [],
-  "an entry the diff archives": [],
-  "no board item, and none at base or head": [],
-  "an answer on another repo's board": [],
-  "an answer said to be on this repo's own board": [
-   [
-    "tripwire-board",
-    "TD-150 lifts decision (pat) on board acme/widgets, which is this repo's own — its answer is on this board, written as Decided:"
-   ]
-  ],
-  "set by= on one part of a shared item, left open": [],
-  "set by= on one part of a shared item, decided": [
-   [
-    "tripwire-shared-decided",
-    "TD-111 lifts decision (pat) leaving a shared board item open, but the item gains a Decided: that speaks for the entries left — leave it unanswered"
-   ]
-  ],
-  "a shared item said to be left open, with nothing shared": [
-   [
-    "tripwire-shared",
-    "TD-150 lifts decision (pat) leaving a shared board item open, but no item it covers still asks another listed entry"
-   ]
-  ],
-  "the last part of a shared item lifted, the item newly closed": [],
-  "the last part of a shared item lifted, undecided at the base": [],
-  "a lift by someone other than the gate's person, owner board": [
-   [
-    "tripwire-by",
-    "TD-150 lifts decision (pat) by sam, not pat — only the gate's person answers, or anyone listed on a board whose Answered by is any"
-   ]
-  ],
-  "a teammate's lift on an any board": [],
-  "no board item, on a board with no People": [],
-  "split_pr": [],
-  "v3_tripwire_lifted": []
- },
- "uncovered": {
-  "a new decision, its item filed with it": {
-   "refusals": [],
-   "flags": []
-  },
-  "a new decision with no item": {
-   "refusals": [
-    [
-     "decision-uncovered",
-     "TD-160 gains decision (pat) and no open decide item on this repo's board asks it — file the item in the same PR"
-    ]
-   ],
-   "flags": []
-  },
-  "a new decision covered on another repo's board": {
-   "refusals": [],
-   "flags": [
-    [
-     "decision-elsewhere",
-     "TD-170 gains decision (kim), and this repo's board does not list kim: covered on example.com/acme/kim, which not every machine reads"
-    ]
-   ]
-  },
-  "a new decision no board read covers": {
-   "refusals": [],
-   "flags": [
-    [
-     "decision-elsewhere",
-     "TD-170 gains decision (kim), and this repo's board does not list kim: no board read covers it — the sweep files its item"
-    ]
-   ]
-  },
-  "a new decision item with no lifting answer": {
-   "refusals": [
-    [
-     "decision-no-lift",
-     "the new decide item 2026-01-06-e1f76e2e asks decision (pat) and none of its answers lifts it (Go)"
-    ]
-   ],
-   "flags": []
-  },
-  "a new decision item whose Lifts name its answers": {
-   "refusals": [],
-   "flags": []
-  },
-  "a gate already at base": {
-   "refusals": [],
-   "flags": []
-  },
-  "a new decision item whose only lifting answer is a form": {
-   "refusals": [],
-   "flags": []
-  },
-  "v3_uncovered_new_decide": {
-   "refusals": [
-    [
-     "decision-no-lift",
-     "the new decide item 2026-01-06-e1f76e2e asks decision (pat) and none of its answers lifts it (Go)"
-    ]
-   ],
-   "flags": []
-  },
-  "old_form_rewrite_gained": {
-   "flags": [],
-   "refusals": [
-    [
-     "decision-uncovered",
-     "TD-190 gains decision (Kim) and no open decide item on this repo's board asks it — file the item in the same PR"
     ]
    ]
   }

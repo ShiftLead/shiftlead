@@ -212,6 +212,27 @@
     "TD-580": "## TD-580: Waits on a go, or a hold with a note\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-04\n**Status:** Open\n\n**Why:** the build waits on the person's answer.\n\n**Ask:** go, or hold with a note.\n\n**Log:**\n- 2026-01-04: gate added: decision (pat)\n- 2026-01-15: gate lifted: decision (pat) — by pat; answer \"Hold: the vendor\"\n"
    }
   },
+  "delegated_event_work_order_no_line": {
+   "ok": {}
+  },
+  "delegated_kept_waiting_bad_delegate_refused": {
+   "refused": "a delegate answers for another: pat is the person answering"
+  },
+  "delegated_lift": {
+   "ok": {
+    "TD-500": "## TD-500: A parent waiting on its go\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n\n**Why:** the design is still being shaped.\n\n**Ask:** say go once the parts read right.\n\n**Log:**\n- 2026-01-02: filed by pat, session w-1: \"file the parent\"\n- 2026-01-02: gate added: decision (Pat)\n- 2026-01-15: gate lifted: decision (Pat) — by director for pat (merge-line); answer \"Go\"\n"
+   }
+  },
+  "delegated_not_yet": {
+   "ok": {
+    "TD-500": "## TD-500: A parent waiting on its go\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** decision (Pat)\n\n**Why:** the design is still being shaped.\n\n**Ask:** say go once the parts read right.\n\n**Log:**\n- 2026-01-02: filed by pat, session w-1: \"file the parent\"\n- 2026-01-02: gate added: decision (Pat)\n- 2026-01-15: kept waiting: decision (Pat) — by director for pat (merge-line); answer \"Not yet\"\n"
+   }
+  },
+  "delegated_work_order": {
+   "ok": {
+    "TD-500": "## TD-500: A parent waiting on its go\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** decision (Pat)\n\n**Why:** the design is still being shaped.\n\n**Ask:** say go once the parts read right.\n\n**Log:**\n- 2026-01-02: filed by pat, session w-1: \"file the parent\"\n- 2026-01-02: gate added: decision (Pat)\n- 2026-01-15: kept waiting: decision (Pat) — by director for pat (merge-line); answer \"One more round\"\n"
+   }
+  },
   "event_answerer_off_people_refused": {
    "refused": "lee is not on the board's People: (pat, sam) — only a listed person answers"
   },
@@ -342,6 +363,36 @@
   },
   "decision_waiting_only_refused": {
    "refused": "'Keep waiting' only keeps the gate waiting — it never lifts"
+  },
+  "delegated_answer": {
+   "ok": "## TD-501: The first part, waiting on the same go and an entry\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-03\n**Status:** Open\n**Blocked by:** TD-9\n**Part of:** TD-500\n\n**Why:** the first half of the work.\n\n**Ask:** the parent's go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (pat) — by director for pat (merge-line); answer \"Go\"\n"
+  },
+  "delegated_board_suffix_refused": {
+   "refused": "a delegate answers no gate on another repo's entry (rule 4): no board <repo> suffix"
+  },
+  "delegated_check_refused": {
+   "refused": "only an answer is delegated: an override, a check's lift and a date's take no delegate"
+  },
+  "delegated_date_refused": {
+   "refused": "only an answer is delegated: an override, a check's lift and a date's take no delegate"
+  },
+  "delegated_equal_by_refused": {
+   "refused": "a delegate answers for another: Pat is the person answering"
+  },
+  "delegated_event_answer": {
+   "ok": "## TD-530: Waits on a vendor's merged PR\n\n**Priority:** Medium\n**Type:** debt\n**Added:** 2026-01-05\n**Status:** Open\n\n**Why:** the vendor's fix must land first.\n\n**Event (vendor-ships):** the vendor merges its fix.\ncheck: pr-merged acme/tools#42\n\n**Log:**\n- 2026-01-05: gate added: event (vendor-ships)\n- 2026-01-15: gate lifted: event (vendor-ships) — by director for sam (merge-line); answer \"Drop the gate\"\n"
+  },
+  "delegated_no_scope_refused": {
+   "refused": "a delegated answer takes both delegate and scope, or neither"
+  },
+  "delegated_not_a_name_refused": {
+   "refused": "a delegate, 'the director', is not a person's name"
+  },
+  "delegated_override_refused": {
+   "refused": "only an answer is delegated: an override, a check's lift and a date's take no delegate"
+  },
+  "delegated_scope_alone_refused": {
+   "refused": "a delegated answer takes both delegate and scope, or neither"
   },
   "event_bad_answered_by_refused": {
    "refused": "Answered by is owner or any, not 'bogus'"

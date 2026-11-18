@@ -1,0 +1,285 @@
+{
+ "changed: a grant added": {
+  "ok": true
+ },
+ "changed: a line added": {
+  "ok": true
+ },
+ "changed: a second line is none": {
+  "ok": false
+ },
+ "changed: reordered grants and scopes, and whitespace": {
+  "ok": false
+ },
+ "covers: a grant": {
+  "ok": true
+ },
+ "covers: a line of only ;": {
+  "ok": false
+ },
+ "covers: a scope not granted": {
+  "ok": false
+ },
+ "covers: an empty line": {
+  "ok": false
+ },
+ "covers: case-insensitive": {
+  "ok": true
+ },
+ "covers: no line": {
+  "ok": false
+ },
+ "covers: one bad grant voids the line": {
+  "ok": false
+ },
+ "decided: a scope that is no name": {
+  "ok": null
+ },
+ "decided: delegated": {
+  "ok": [
+   "director",
+   "merge-line"
+  ]
+ },
+ "decided: no scope (outside the form)": {
+  "ok": null
+ },
+ "decided: undelegated": {
+  "ok": null
+ },
+ "event gate: any of People": {
+  "ok": null
+ },
+ "faults: a bad grant standing (info)": {
+  "ok": [
+   [
+    "README.md",
+    "ℹ delegates: kim is not on the board's `People:`"
+   ]
+  ]
+ },
+ "faults: a delegate for itself": {
+  "ok": [
+   [
+    "README.md",
+    "delegates: director is granted for itself"
+   ]
+  ]
+ },
+ "faults: a delegate on People": {
+  "ok": [
+   [
+    "README.md",
+    "delegates: sam is on the board's `People:`: a delegate is not a person"
+   ]
+  ]
+ },
+ "faults: a new board (no old) is an edit": {
+  "ok": [
+   [
+    "README.md",
+    "delegates: kim is not on the board's `People:`"
+   ]
+  ]
+ },
+ "faults: a person off People": {
+  "ok": [
+   [
+    "README.md",
+    "delegates: kim is not on the board's `People:`"
+   ]
+  ]
+ },
+ "faults: a person removed from People leaves a grant faulty (info)": {
+  "ok": [
+   [
+    "README.md",
+    "ℹ delegates: sam is not on the board's `People:`"
+   ]
+  ]
+ },
+ "faults: a repeated grant": {
+  "ok": [
+   [
+    "README.md",
+    "delegates: Director for PAT is granted twice"
+   ]
+  ]
+ },
+ "faults: a repeated scope": {
+  "ok": [
+   [
+    "README.md",
+    "delegates: director for pat names the scope merge-line twice"
+   ]
+  ]
+ },
+ "faults: a second line": {
+  "ok": [
+   [
+    "README.md",
+    "delegates: a second `Delegates:` line — the first is read"
+   ]
+  ]
+ },
+ "faults: an edit adds a second line (error)": {
+  "ok": [
+   [
+    "README.md",
+    "delegates: a second `Delegates:` line — the first is read"
+   ]
+  ]
+ },
+ "faults: an edit fixing one of two faults meets the other as an error": {
+  "ok": [
+   [
+    "README.md",
+    "delegates: kim is not on the board's `People:`"
+   ],
+   [
+    "README.md",
+    "delegates: lee is not on the board's `People:`"
+   ]
+  ]
+ },
+ "faults: an edit introduces a bad grant (error)": {
+  "ok": [
+   [
+    "README.md",
+    "delegates: kim is not on the board's `People:`"
+   ]
+  ]
+ },
+ "faults: an empty ()": {
+  "ok": [
+   [
+    "README.md",
+    "delegates: 'director for pat ()' is not `<delegate> for <person> (<scope>, …)`"
+   ]
+  ]
+ },
+ "faults: lists no grant": {
+  "ok": [
+   [
+    "README.md",
+    "delegates: `Delegates:` lists no grant"
+   ]
+  ]
+ },
+ "faults: no People line": {
+  "ok": [
+   [
+    "README.md",
+    "delegates: pat is not on the board's `People:`"
+   ],
+   [
+    "README.md",
+    "delegates: sam is not on the board's `People:`"
+   ]
+  ]
+ },
+ "faults: none": {
+  "ok": []
+ },
+ "faults: outside the form": {
+  "ok": [
+   [
+    "README.md",
+    "delegates: 'director pat (merge-line)' is not `<delegate> for <person> (<scope>, …)`"
+   ]
+  ]
+ },
+ "gate: a bad Delegates line an edit introduces": {
+  "ok": [
+   [
+    "README.md",
+    "delegates: sam is on the board's `People:`: a delegate is not a person"
+   ]
+  ]
+ },
+ "gate: a delegated answer covered (standing)": {
+  "ok": []
+ },
+ "gate: a delegated answer no longer covered (standing, info)": {
+  "ok": [
+   [
+    "2026-01-12-a0000001.md",
+    "ℹ delegates: the answer by director for pat (merge-line) is no longer covered by the board's `Delegates:`"
+   ]
+  ]
+ },
+ "gateless: two entries, no gate": {
+  "ok": null
+ },
+ "read: a piece outside the form": {
+  "ok": [
+   [
+    "director pat (merge-line)",
+    null,
+    null
+   ],
+   [
+    "director",
+    "sam",
+    [
+     "merge-line"
+    ]
+   ]
+  ]
+ },
+ "read: an empty value": {
+  "ok": []
+ },
+ "read: no line": {
+  "ok": null
+ },
+ "read: only ;": {
+  "ok": []
+ },
+ "read: spaces and a trailing ;": {
+  "ok": [
+   [
+    "director",
+    "pat",
+    [
+     "merge-line",
+     "design-go"
+    ]
+   ],
+   [
+    "director",
+    "sam",
+    [
+     "merge-line"
+    ]
+   ]
+  ]
+ },
+ "rule 1: no Scope": {
+  "ok": "rule 1: the item has no Scope"
+ },
+ "rule 2: no grant": {
+  "ok": "rule 2: no faultless Delegates: grant covers director for pat (release)"
+ },
+ "rule 3 passes under Answered by: any": {
+  "ok": null
+ },
+ "rule 3: not the gate's person (owner)": {
+  "ok": "rule 3: pat may not answer this item"
+ },
+ "rule 4 before rule 5: a # ref beside a second ref": {
+  "ok": "rule 4: the Context names a gate on another repo's entry"
+ },
+ "rule 4: another repo's entry": {
+  "ok": "rule 4: the Context names a gate on another repo's entry"
+ },
+ "rule 5: two entries": {
+  "ok": "rule 5: the gated Context is not one entry and one gate"
+ },
+ "rule 5: two gates": {
+  "ok": "rule 5: the gated Context is not one entry and one gate"
+ },
+ "rule: covered": {
+  "ok": null
+ }
+}

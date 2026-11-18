@@ -1,0 +1,476 @@
+{
+ "cases": [
+  {
+   "name": "read: spaces and a trailing ;",
+   "fn": "board_delegates",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates:   director  for pat ( merge-line ,design-go );  director for sam (merge-line) ;\n"
+   }
+  },
+  {
+   "name": "read: no line",
+   "fn": "board_delegates",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\n"
+   }
+  },
+  {
+   "name": "read: an empty value",
+   "fn": "board_delegates",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates:\n"
+   }
+  },
+  {
+   "name": "read: only ;",
+   "fn": "board_delegates",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: ; ;\n"
+   }
+  },
+  {
+   "name": "read: a piece outside the form",
+   "fn": "board_delegates",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director pat (merge-line); director for sam (merge-line)\n"
+   }
+  },
+  {
+   "name": "faults: none",
+   "fn": "delegates_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n"
+   }
+  },
+  {
+   "name": "faults: outside the form",
+   "fn": "delegates_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director pat (merge-line)\n"
+   }
+  },
+  {
+   "name": "faults: an empty ()",
+   "fn": "delegates_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat ()\n"
+   }
+  },
+  {
+   "name": "faults: a person off People",
+   "fn": "delegates_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for kim (merge-line)\n"
+   }
+  },
+  {
+   "name": "faults: no People line",
+   "fn": "delegates_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n"
+   }
+  },
+  {
+   "name": "faults: a delegate on People",
+   "fn": "delegates_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: sam for pat (merge-line)\n"
+   }
+  },
+  {
+   "name": "faults: a delegate for itself",
+   "fn": "delegates_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for director (merge-line)\n"
+   }
+  },
+  {
+   "name": "faults: a repeated grant",
+   "fn": "delegates_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line); Director for PAT (design-go)\n"
+   }
+  },
+  {
+   "name": "faults: a repeated scope",
+   "fn": "delegates_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, Merge-Line)\n"
+   }
+  },
+  {
+   "name": "faults: a second line",
+   "fn": "delegates_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\nDelegates: bot for pat (merge-line)\n"
+   }
+  },
+  {
+   "name": "faults: lists no grant",
+   "fn": "delegates_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: ;\n"
+   }
+  },
+  {
+   "name": "faults: an edit introduces a bad grant (error)",
+   "fn": "delegates_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line); bot for kim (merge-line)\n"
+   },
+   "old": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n"
+   }
+  },
+  {
+   "name": "faults: a bad grant standing (info)",
+   "fn": "delegates_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line); bot for kim (merge-line)\n"
+   },
+   "old": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line); bot for kim (merge-line)\n"
+   }
+  },
+  {
+   "name": "faults: a person removed from People leaves a grant faulty (info)",
+   "fn": "delegates_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n"
+   },
+   "old": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n"
+   }
+  },
+  {
+   "name": "faults: an edit fixing one of two faults meets the other as an error",
+   "fn": "delegates_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for kim (merge-line); bot for lee (merge-line)\n"
+   },
+   "old": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for kim (merge-line); bot for lee (merge-line); sam for pat (merge-line)\n"
+   }
+  },
+  {
+   "name": "faults: a new board (no old) is an edit",
+   "fn": "delegates_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for kim (merge-line)\n"
+   }
+  },
+  {
+   "name": "covers: a grant",
+   "fn": "delegation_covers",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n"
+   },
+   "delegate": "director",
+   "person": "pat",
+   "scope": "design-go"
+  },
+  {
+   "name": "covers: case-insensitive",
+   "fn": "delegation_covers",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n"
+   },
+   "delegate": "DIRECTOR",
+   "person": "Pat",
+   "scope": "Merge-Line"
+  },
+  {
+   "name": "covers: a scope not granted",
+   "fn": "delegation_covers",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n"
+   },
+   "delegate": "director",
+   "person": "sam",
+   "scope": "design-go"
+  },
+  {
+   "name": "covers: one bad grant voids the line",
+   "fn": "delegation_covers",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line); bot for kim (merge-line)\n"
+   },
+   "delegate": "director",
+   "person": "pat",
+   "scope": "merge-line"
+  },
+  {
+   "name": "covers: no line",
+   "fn": "delegation_covers",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\n"
+   },
+   "delegate": "director",
+   "person": "pat",
+   "scope": "merge-line"
+  },
+  {
+   "name": "covers: an empty line",
+   "fn": "delegation_covers",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates:\n"
+   },
+   "delegate": "director",
+   "person": "pat",
+   "scope": "merge-line"
+  },
+  {
+   "name": "covers: a line of only ;",
+   "fn": "delegation_covers",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: ;\n"
+   },
+   "delegate": "director",
+   "person": "pat",
+   "scope": "merge-line"
+  },
+  {
+   "name": "changed: a grant added",
+   "fn": "delegates_changed",
+   "base": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line)\n"
+   },
+   "head": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n"
+   }
+  },
+  {
+   "name": "changed: reordered grants and scopes, and whitespace",
+   "fn": "delegates_changed",
+   "base": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n"
+   },
+   "head": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director  for sam (merge-line) ;Director for PAT (design-go,merge-line)\n"
+   }
+  },
+  {
+   "name": "changed: a line added",
+   "fn": "delegates_changed",
+   "base": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\n"
+   },
+   "head": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n"
+   }
+  },
+  {
+   "name": "changed: a second line is none",
+   "fn": "delegates_changed",
+   "base": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n"
+   },
+   "head": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\nDelegates: bot for pat (x)\n"
+   }
+  },
+  {
+   "name": "decided: delegated",
+   "fn": "parse_decided_delegation",
+   "value": "2026-11-20 by director for pat (merge-line) — Merge"
+  },
+  {
+   "name": "decided: undelegated",
+   "fn": "parse_decided_delegation",
+   "value": "2026-11-20 by pat — Merge"
+  },
+  {
+   "name": "decided: no scope (outside the form)",
+   "fn": "parse_decided_delegation",
+   "value": "2026-11-20 by director for pat — Merge"
+  },
+  {
+   "name": "decided: a scope that is no name",
+   "fn": "parse_decided_delegation",
+   "value": "2026-11-20 by director for pat (merge line) — Merge"
+  },
+  {
+   "name": "rule: covered",
+   "fn": "delegate_problem",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n",
+    "items": {
+     "2026-01-12-a0000001.md": "## Go on it?\n\n**Kind:** decide\n**Added:** 2026-01-12\n**Context:** TD-1 decision (pat)\n**Scope:** merge-line\n**Due:** 2026-01-20\n**Answers:** Go (default) | Not yet\n\n- **Context:** It waits.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+    }
+   },
+   "item": "2026-01-12-a0000001.md",
+   "delegate": "director",
+   "person": "pat"
+  },
+  {
+   "name": "rule 1: no Scope",
+   "fn": "delegate_problem",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n",
+    "items": {
+     "2026-01-12-a0000001.md": "## Go on it?\n\n**Kind:** decide\n**Added:** 2026-01-12\n**Context:** TD-1 decision (pat)\n**Due:** 2026-01-20\n**Answers:** Go (default) | Not yet\n\n- **Context:** It waits.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+    }
+   },
+   "item": "2026-01-12-a0000001.md",
+   "delegate": "director",
+   "person": "pat"
+  },
+  {
+   "name": "rule 2: no grant",
+   "fn": "delegate_problem",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n",
+    "items": {
+     "2026-01-12-a0000001.md": "## Go on it?\n\n**Kind:** decide\n**Added:** 2026-01-12\n**Context:** TD-1 decision (pat)\n**Scope:** release\n**Due:** 2026-01-20\n**Answers:** Go (default) | Not yet\n\n- **Context:** It waits.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+    }
+   },
+   "item": "2026-01-12-a0000001.md",
+   "delegate": "director",
+   "person": "pat"
+  },
+  {
+   "name": "rule 3: not the gate's person (owner)",
+   "fn": "delegate_problem",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n",
+    "items": {
+     "2026-01-12-a0000001.md": "## Go on it?\n\n**Kind:** decide\n**Added:** 2026-01-12\n**Context:** TD-1 decision (sam)\n**Scope:** merge-line\n**Due:** 2026-01-20\n**Answers:** Go (default) | Not yet\n\n- **Context:** It waits.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+    }
+   },
+   "item": "2026-01-12-a0000001.md",
+   "delegate": "director",
+   "person": "pat"
+  },
+  {
+   "name": "rule 3 passes under Answered by: any",
+   "fn": "delegate_problem",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nAnswered by: any\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n",
+    "items": {
+     "2026-01-12-a0000001.md": "## Go on it?\n\n**Kind:** decide\n**Added:** 2026-01-12\n**Context:** TD-1 decision (sam)\n**Scope:** merge-line\n**Due:** 2026-01-20\n**Answers:** Go (default) | Not yet\n\n- **Context:** It waits.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+    }
+   },
+   "item": "2026-01-12-a0000001.md",
+   "delegate": "director",
+   "person": "pat"
+  },
+  {
+   "name": "rule 4: another repo's entry",
+   "fn": "delegate_problem",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n",
+    "items": {
+     "2026-01-12-a0000001.md": "## Go on it?\n\n**Kind:** decide\n**Added:** 2026-01-12\n**Context:** acme#TD-5 decision (pat)\n**Scope:** merge-line\n**Due:** 2026-01-20\n**Answers:** Go (default) | Not yet\n\n- **Context:** It waits.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+    }
+   },
+   "item": "2026-01-12-a0000001.md",
+   "delegate": "director",
+   "person": "pat"
+  },
+  {
+   "name": "rule 4 before rule 5: a # ref beside a second ref",
+   "fn": "delegate_problem",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n",
+    "items": {
+     "2026-01-12-a0000001.md": "## Go on it?\n\n**Kind:** decide\n**Added:** 2026-01-12\n**Context:** acme#TD-5 and TD-1 decision (pat)\n**Scope:** merge-line\n**Due:** 2026-01-20\n**Answers:** Go (default) | Not yet\n\n- **Context:** It waits.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+    }
+   },
+   "item": "2026-01-12-a0000001.md",
+   "delegate": "director",
+   "person": "pat"
+  },
+  {
+   "name": "rule 5: two gates",
+   "fn": "delegate_problem",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n",
+    "items": {
+     "2026-01-12-a0000001.md": "## Go on it?\n\n**Kind:** decide\n**Added:** 2026-01-12\n**Context:** TD-1 decision (pat) event (ships)\n**Scope:** merge-line\n**Due:** 2026-01-20\n**Answers:** Go (default) | Not yet\n\n- **Context:** It waits.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+    }
+   },
+   "item": "2026-01-12-a0000001.md",
+   "delegate": "director",
+   "person": "pat"
+  },
+  {
+   "name": "rule 5: two entries",
+   "fn": "delegate_problem",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n",
+    "items": {
+     "2026-01-12-a0000001.md": "## Go on it?\n\n**Kind:** decide\n**Added:** 2026-01-12\n**Context:** TD-1 and TD-2 decision (pat)\n**Scope:** merge-line\n**Due:** 2026-01-20\n**Answers:** Go (default) | Not yet\n\n- **Context:** It waits.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+    }
+   },
+   "item": "2026-01-12-a0000001.md",
+   "delegate": "director",
+   "person": "pat"
+  },
+  {
+   "name": "gateless: two entries, no gate",
+   "fn": "delegate_problem",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n",
+    "items": {
+     "2026-01-12-a0000001.md": "## Go on it?\n\n**Kind:** decide\n**Added:** 2026-01-12\n**Context:** TD-1 and TD-2 follow-up\n**Scope:** merge-line\n**Due:** 2026-01-20\n**Answers:** Go (default) | Not yet\n\n- **Context:** It waits.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+    }
+   },
+   "item": "2026-01-12-a0000001.md",
+   "delegate": "director",
+   "person": "pat"
+  },
+  {
+   "name": "event gate: any of People",
+   "fn": "delegate_problem",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n",
+    "items": {
+     "2026-01-12-a0000001.md": "## Go on it?\n\n**Kind:** decide\n**Added:** 2026-01-12\n**Context:** TD-2 event (ships)\n**Scope:** merge-line\n**Due:** 2026-01-20\n**Answers:** Go (default) | Not yet\n\n- **Context:** It waits.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+    }
+   },
+   "item": "2026-01-12-a0000001.md",
+   "delegate": "director",
+   "person": "sam"
+  },
+  {
+   "name": "gate: a delegated answer covered (standing)",
+   "fn": "board_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n",
+    "items": {
+     "2026-01-12-a0000001.md": "## Go on it?\n\n**Kind:** decide\n**Added:** 2026-01-12\n**Context:** TD-1 decision (pat)\n**Scope:** merge-line\n**Due:** 2026-01-20\n**Answers:** Go (default) | Not yet\n**Decided:** 2026-01-13 by director for pat (merge-line) — Go\n\n- **Context:** It waits.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+    }
+   }
+  },
+  {
+   "name": "gate: a delegated answer no longer covered (standing, info)",
+   "fn": "board_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for sam (merge-line)\n",
+    "items": {
+     "2026-01-12-a0000001.md": "## Go on it?\n\n**Kind:** decide\n**Added:** 2026-01-12\n**Context:** TD-1 decision (pat)\n**Scope:** merge-line\n**Due:** 2026-01-20\n**Answers:** Go (default) | Not yet\n**Decided:** 2026-01-13 by director for pat (merge-line) — Go\n\n- **Context:** It waits.\n- **Question:** Go?\n- **Recommended:** Go — it is ready.\n"
+    }
+   }
+  },
+  {
+   "name": "gate: a bad Delegates line an edit introduces",
+   "fn": "board_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line); sam for pat (x)\n"
+   },
+   "old": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line, design-go); director for sam (merge-line)\n"
+   }
+  },
+  {
+   "name": "faults: an edit adds a second line (error)",
+   "fn": "delegates_problems",
+   "board": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line)\nDelegates: bot for pat (merge-line)\n"
+   },
+   "old": {
+    "readme": "# Attention board\n\nLedgerboard: 3\nPeople: pat, sam\nDelegates: director for pat (merge-line)\n"
+   }
+  }
+ ]
+}

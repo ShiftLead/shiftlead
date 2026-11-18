@@ -2483,6 +2483,39 @@
    "name": "decision_missing_no_old",
    "ledger": "check/asks_after.md",
    "archive": ""
+  },
+  {
+   "name": "body_shape_no_old",
+   "ledger": "check/body_shape.md",
+   "archive": ""
+  },
+  {
+   "name": "body_shape_against_old",
+   "ledger": "check/body_new.md",
+   "archive": "",
+   "old": "check/body_old.md"
+  },
+  {
+   "name": "body_shape_old_none",
+   "ledger": "check/body_new.md",
+   "archive": ""
+  },
+  {
+   "name": "body_shape_standing",
+   "ledger": "check/body_shape.md",
+   "archive": "",
+   "old": "check/body_shape.md"
+  },
+  {
+   "name": "answers_unusable_against_old",
+   "ledger": "check/answers_after.md",
+   "archive": "",
+   "old": "check/answers_before.md"
+  },
+  {
+   "name": "answers_unusable_no_old",
+   "ledger": "check/answers_after.md",
+   "archive": ""
   }
  ],
  "log": [
@@ -2567,6 +2600,14 @@
    "name": "retitled_quotes",
    "text": "## TD-071: A plain title\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n\n**Log:**\n- 2026-01-20: retitled: was \"An \"old\" title\"\n",
    "gates": []
+  },
+  {
+   "name": "delegated",
+   "file": "log_delegated.md",
+   "gates": [
+    "decision (pat)",
+    "decision (kim)"
+   ]
   }
  ],
  "archive_plan": [

@@ -1,0 +1,13 @@
+{
+ "argv": [
+  "set",
+  "TD-1",
+  "--context",
+  "context.txt",
+  "--today",
+  "2026-01-10",
+  "--ledger",
+  "ledger",
+  "--json"
+ ]
+}

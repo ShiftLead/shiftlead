@@ -1529,6 +1529,594 @@
     "standing": false,
     "text": "⚠ TD-706: has an **Ask:** but its Blocked by names no decision (<person>), so nothing shows the person that it waits on them — add the gate with set --blocked-by (and the board item a gained decision is owed), or, if it waits on no one, remove the Ask with edit TD-706 --section Ask --remove"
    }
+  ],
+  "body_shape_against_old": [
+   {
+    "field": "done when",
+    "id": "TD-851",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-851: the 1st `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "done when",
+    "id": "TD-852",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-852: the 1st `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "done when",
+    "id": "TD-852",
+    "kind": "lead-form",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-852: the 2nd `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "fix",
+    "id": "TD-853",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-853: the 1st `**fix:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   },
+   {
+    "field": "done when",
+    "id": "TD-854",
+    "kind": "lead-form",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-854: the 1st `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "done when",
+    "id": "TD-856",
+    "kind": "lead-form",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-856: the 1st `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "done when",
+    "id": "TD-857",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-857: the 1st `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "note",
+    "id": "TD-858",
+    "kind": "glued-lead",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-858: the 1st `**note:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   }
+  ],
+  "body_shape_no_old": [
+   {
+    "field": "done when",
+    "id": "TD-801",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-801: the 1st `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "done when",
+    "id": "TD-802",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-802: the 1st `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "fix",
+    "id": "TD-803",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-803: the 1st `**fix:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   },
+   {
+    "field": "body",
+    "id": "TD-804",
+    "kind": "fence-open",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-804: the 1st code fence opens and never closes (fence-open), so no lead after it is read: close it"
+   },
+   {
+    "field": "body",
+    "id": "TD-805",
+    "kind": "fence-open",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-805: the 1st code fence opens and never closes (fence-open), so no lead after it is read: close it"
+   },
+   {
+    "field": "ask",
+    "id": "TD-806",
+    "kind": "field-lines",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-806: the 1st `**ask:**` section runs past its lead's line (field-lines): an Ask is one line, `**Ask:** <the question>` — move the rest under a `**Context:**` section after it (migrate-body does)"
+   },
+   {
+    "field": "ask",
+    "id": "TD-807",
+    "kind": "field-lines",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-807: the 1st `**ask:**` section runs past its lead's line (field-lines): an Ask is one line, `**Ask:** <the question>` — move the rest under a `**Context:**` section after it (migrate-body does)"
+   },
+   {
+    "field": "ask",
+    "id": "TD-808",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-808: the 1st `**ask:**` lead is indented or quoted, so it opens no section and the Ask is never read (glued-lead): remove the indent or the quote"
+   },
+   {
+    "field": "ask",
+    "id": "TD-809",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-809: the 1st `**ask:**` lead is indented or quoted, so it opens no section and the Ask is never read (glued-lead): remove the indent or the quote"
+   },
+   {
+    "field": "ask",
+    "id": "TD-810",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-810: the 1st `**ask:**` lead is indented or quoted, so it opens no section and the Ask is never read (glued-lead): remove the indent or the quote"
+   },
+   {
+    "field": "ask",
+    "id": "TD-811",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-811: the 1st `**ask:**` lead is indented or quoted, so it opens no section and the Ask is never read (glued-lead): remove the indent or the quote"
+   },
+   {
+    "field": "ask",
+    "id": "TD-812",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-812: the 1st `**ask:**` lead is indented or quoted, so it opens no section and the Ask is never read (glued-lead): remove the indent or the quote"
+   },
+   {
+    "field": "ask",
+    "id": "TD-813",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-813: the 1st `**ask:**` lead is indented or quoted, so it opens no section and the Ask is never read (glued-lead): remove the indent or the quote"
+   },
+   {
+    "field": "fix",
+    "id": "TD-816",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-816: the 1st `**fix:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   },
+   {
+    "field": "why",
+    "id": "TD-817",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-817: the 1st `**why**` lead is not a strict `**Name:**` (lead-form): write it `**why:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "fix",
+    "id": "TD-818",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-818: the 1st `**fix:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   },
+   {
+    "field": "body",
+    "id": "TD-822",
+    "kind": "fence-open",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-822: the 1st code fence opens and never closes (fence-open), so no lead after it is read: close it"
+   },
+   {
+    "field": "ask",
+    "id": "TD-823",
+    "kind": "field-lines",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-823: the 1st `**ask:**` section runs past its lead's line (field-lines): an Ask is one line, `**Ask:** <the question>` — move the rest under a `**Context:**` section after it (migrate-body does)"
+   },
+   {
+    "field": "fix",
+    "id": "TD-824",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-824: the 1st `**fix:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   },
+   {
+    "field": "ask",
+    "id": "TD-825",
+    "kind": "field-lines",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-825: the 1st `**ask:**` section runs past its lead's line (field-lines): an Ask is one line, `**Ask:** <the question>` — move the rest under a `**Context:**` section after it (migrate-body does)"
+   },
+   {
+    "field": "fix",
+    "id": "TD-825",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-825: the 1st `**fix:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   },
+   {
+    "field": "ask",
+    "id": "TD-827",
+    "kind": "field-lines",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-827: the 1st `**ask:**` section has no question on its lead's line (field-lines): write the question there, one line"
+   },
+   {
+    "field": "done when",
+    "id": "TD-828",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-828: the 1st `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "done when",
+    "id": "TD-828",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-828: the 2nd `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "body",
+    "id": "TD-829",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-829: the 1st nameless lead is not a strict `**Name:**` (lead-form): write it `**Name:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   }
+  ],
+  "body_shape_old_none": [
+   {
+    "field": "done when",
+    "id": "TD-851",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-851: the 1st `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "done when",
+    "id": "TD-852",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-852: the 1st `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "done when",
+    "id": "TD-852",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-852: the 2nd `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "fix",
+    "id": "TD-853",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-853: the 1st `**fix:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   },
+   {
+    "field": "done when",
+    "id": "TD-854",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-854: the 1st `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "done when",
+    "id": "TD-856",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-856: the 1st `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "done when",
+    "id": "TD-857",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-857: the 1st `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "note",
+    "id": "TD-858",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-858: the 1st `**note:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   }
+  ],
+  "body_shape_standing": [
+   {
+    "field": "done when",
+    "id": "TD-801",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-801: the 1st `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "done when",
+    "id": "TD-802",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-802: the 1st `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "fix",
+    "id": "TD-803",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-803: the 1st `**fix:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   },
+   {
+    "field": "body",
+    "id": "TD-804",
+    "kind": "fence-open",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-804: the 1st code fence opens and never closes (fence-open), so no lead after it is read: close it"
+   },
+   {
+    "field": "body",
+    "id": "TD-805",
+    "kind": "fence-open",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-805: the 1st code fence opens and never closes (fence-open), so no lead after it is read: close it"
+   },
+   {
+    "field": "ask",
+    "id": "TD-806",
+    "kind": "field-lines",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-806: the 1st `**ask:**` section runs past its lead's line (field-lines): an Ask is one line, `**Ask:** <the question>` — move the rest under a `**Context:**` section after it (migrate-body does)"
+   },
+   {
+    "field": "ask",
+    "id": "TD-807",
+    "kind": "field-lines",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-807: the 1st `**ask:**` section runs past its lead's line (field-lines): an Ask is one line, `**Ask:** <the question>` — move the rest under a `**Context:**` section after it (migrate-body does)"
+   },
+   {
+    "field": "ask",
+    "id": "TD-808",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-808: the 1st `**ask:**` lead is indented or quoted, so it opens no section and the Ask is never read (glued-lead): remove the indent or the quote"
+   },
+   {
+    "field": "ask",
+    "id": "TD-809",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-809: the 1st `**ask:**` lead is indented or quoted, so it opens no section and the Ask is never read (glued-lead): remove the indent or the quote"
+   },
+   {
+    "field": "ask",
+    "id": "TD-810",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-810: the 1st `**ask:**` lead is indented or quoted, so it opens no section and the Ask is never read (glued-lead): remove the indent or the quote"
+   },
+   {
+    "field": "ask",
+    "id": "TD-811",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-811: the 1st `**ask:**` lead is indented or quoted, so it opens no section and the Ask is never read (glued-lead): remove the indent or the quote"
+   },
+   {
+    "field": "ask",
+    "id": "TD-812",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-812: the 1st `**ask:**` lead is indented or quoted, so it opens no section and the Ask is never read (glued-lead): remove the indent or the quote"
+   },
+   {
+    "field": "ask",
+    "id": "TD-813",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-813: the 1st `**ask:**` lead is indented or quoted, so it opens no section and the Ask is never read (glued-lead): remove the indent or the quote"
+   },
+   {
+    "field": "fix",
+    "id": "TD-816",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-816: the 1st `**fix:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   },
+   {
+    "field": "why",
+    "id": "TD-817",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-817: the 1st `**why**` lead is not a strict `**Name:**` (lead-form): write it `**why:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "fix",
+    "id": "TD-818",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-818: the 1st `**fix:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   },
+   {
+    "field": "body",
+    "id": "TD-822",
+    "kind": "fence-open",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-822: the 1st code fence opens and never closes (fence-open), so no lead after it is read: close it"
+   },
+   {
+    "field": "ask",
+    "id": "TD-823",
+    "kind": "field-lines",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-823: the 1st `**ask:**` section runs past its lead's line (field-lines): an Ask is one line, `**Ask:** <the question>` — move the rest under a `**Context:**` section after it (migrate-body does)"
+   },
+   {
+    "field": "fix",
+    "id": "TD-824",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-824: the 1st `**fix:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   },
+   {
+    "field": "ask",
+    "id": "TD-825",
+    "kind": "field-lines",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-825: the 1st `**ask:**` section runs past its lead's line (field-lines): an Ask is one line, `**Ask:** <the question>` — move the rest under a `**Context:**` section after it (migrate-body does)"
+   },
+   {
+    "field": "fix",
+    "id": "TD-825",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-825: the 1st `**fix:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   },
+   {
+    "field": "ask",
+    "id": "TD-827",
+    "kind": "field-lines",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-827: the 1st `**ask:**` section has no question on its lead's line (field-lines): write the question there, one line"
+   },
+   {
+    "field": "done when",
+    "id": "TD-828",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-828: the 1st `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "done when",
+    "id": "TD-828",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-828: the 2nd `**done when**` lead is not a strict `**Name:**` (lead-form): write it `**done when:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   },
+   {
+    "field": "body",
+    "id": "TD-829",
+    "kind": "lead-form",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-829: the 1st nameless lead is not a strict `**Name:**` (lead-form): write it `**Name:**` to keep it a section, or reword the paragraph to open with words; it is read as a lead until v4.0 (ledger.py migrate-body respells it)"
+   }
+  ],
+  "answers_unusable_against_old": [
+   {
+    "level": "info",
+    "id": "TD-801",
+    "field": "answers",
+    "kind": "answers-unusable",
+    "text": "ℹ TD-801: the gate sweep cannot offer its own answers (answers-unusable): as a decide's answers they are refused: a decide offers two or more answers (the first fault found)",
+    "standing": true
+   },
+   {
+    "level": "error",
+    "id": "TD-802",
+    "field": "answers",
+    "kind": "answers-unusable",
+    "text": "⚠ TD-802: the gate sweep cannot offer its own answers (answers-unusable): an Answers or Lifts lead that starts no section (glued to the line above it, or indented) (the first fault found)",
+    "standing": false
+   },
+   {
+    "level": "error",
+    "id": "TD-802",
+    "field": "lifts",
+    "kind": "glued-lead",
+    "standing": false,
+    "text": "⚠ TD-802: the 1st `**lifts:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   }
+  ],
+  "answers_unusable_no_old": [
+   {
+    "level": "info",
+    "id": "TD-801",
+    "field": "answers",
+    "kind": "answers-unusable",
+    "text": "ℹ TD-801: the gate sweep cannot offer its own answers (answers-unusable): as a decide's answers they are refused: a decide offers two or more answers (the first fault found)",
+    "standing": false
+   },
+   {
+    "level": "info",
+    "id": "TD-802",
+    "field": "answers",
+    "kind": "answers-unusable",
+    "text": "ℹ TD-802: the gate sweep cannot offer its own answers (answers-unusable): an Answers or Lifts lead that starts no section (glued to the line above it, or indented) (the first fault found)",
+    "standing": false
+   },
+   {
+    "level": "info",
+    "id": "TD-802",
+    "field": "lifts",
+    "kind": "glued-lead",
+    "standing": false,
+    "text": "ℹ TD-802: the 1st `**lifts:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   }
   ]
  },
  "edit_entry": {
@@ -2080,7 +2668,9 @@
      "gate": "decision (Kim)",
      "kind": "kept-waiting",
      "label": "Not yet",
-     "text": "kept waiting: decision (Kim) — by Kim; answer \"Not yet\""
+     "text": "kept waiting: decision (Kim) — by Kim; answer \"Not yet\"",
+     "delegate": null,
+     "scope": null
     },
     {
      "by": "Kim",
@@ -2099,7 +2689,9 @@
      "label": "Go",
      "suffix": "; board other-repo",
      "text": "gate lifted: decision (Lee) — by Lee; answer \"Go\"; board other-repo",
-     "via": "answer"
+     "via": "answer",
+     "delegate": null,
+     "scope": null
     },
     {
      "by": "Kim",
@@ -2127,7 +2719,9 @@
      "kind": "gate-lifted",
      "label": "Drop it",
      "text": "gate lifted: event (tool-v3) — by Kim; answer \"Drop it\"",
-     "via": "answer"
+     "via": "answer",
+     "delegate": null,
+     "scope": null
     },
     {
      "by": "box-1",
@@ -2277,7 +2871,9 @@
      "kind": "gate-lifted",
      "label": "Go",
      "text": "gate lifted: event (docs) — by Kim; answer \"Go\"",
-     "via": "answer"
+     "via": "answer",
+     "delegate": null,
+     "scope": null
     },
     {
      "by": "Kim",
@@ -2285,7 +2881,9 @@
      "gate": "until 2026-03-01",
      "kind": "kept-waiting",
      "label": "Keep waiting",
-     "text": "kept waiting: until 2026-03-01 — by Kim; answer \"Keep waiting\""
+     "text": "kept waiting: until 2026-03-01 — by Kim; answer \"Keep waiting\"",
+     "delegate": null,
+     "scope": null
     },
     {
      "date": "2026-01-12",
@@ -2305,7 +2903,9 @@
      "gate": "event (none-added)",
      "kind": "kept-waiting",
      "label": "Keep waiting",
-     "text": "kept waiting: event (none-added) — by Kim; answer \"Keep waiting\""
+     "text": "kept waiting: event (none-added) — by Kim; answer \"Keep waiting\"",
+     "delegate": null,
+     "scope": null
     }
    ],
    "log_problems": [],
@@ -2474,6 +3074,75 @@
    "log_problems": [],
    "status_notes_to_log": {
     "ok": "## TD-092: x\n\n**Added:** 2026-09-01\n**Status:** Open 2026-11-01\n\n**Why:** w\n\n**Resolved:** 2026-10-01 (PR #3)\n\n**Log:**\n- 2026-10-01: was: Resolved: built\n- 2026-11-01: looked again\n"
+   }
+  },
+  "delegated": {
+   "gate_added": {
+    "decision (kim)": "2026-01-04",
+    "decision (pat)": null
+   },
+   "gate_age": {
+    "decision (kim)": "2026-01-05",
+    "decision (pat)": "2026-01-03"
+   },
+   "log_lines": [
+    {
+     "date": "2026-01-02",
+     "gate": "decision (pat)",
+     "kind": "gate-added",
+     "text": "gate added: decision (pat)"
+    },
+    {
+     "by": "pat",
+     "date": "2026-01-03",
+     "delegate": "director",
+     "gate": "decision (pat)",
+     "kind": "kept-waiting",
+     "label": "Not yet",
+     "scope": "merge-line",
+     "text": "kept waiting: decision (pat) — by director for pat (merge-line); answer \"Not yet\""
+    },
+    {
+     "by": "pat",
+     "date": "2026-01-04",
+     "delegate": "director",
+     "gate": "decision (pat)",
+     "kind": "gate-lifted",
+     "label": "Go",
+     "scope": "merge-line",
+     "text": "gate lifted: decision (pat) — by director for pat (merge-line); answer \"Go\"",
+     "via": "answer"
+    },
+    {
+     "date": "2026-01-04",
+     "gate": "decision (kim)",
+     "kind": "gate-added",
+     "text": "gate added: decision (kim)"
+    },
+    {
+     "by": "kim",
+     "date": "2026-01-05",
+     "delegate": null,
+     "gate": "decision (kim)",
+     "kind": "kept-waiting",
+     "label": "Not yet",
+     "scope": null,
+     "text": "kept waiting: decision (kim) — by kim; answer \"Not yet\""
+    },
+    {
+     "date": "2026-01-06",
+     "kind": "malformed",
+     "text": "kept waiting: decision (kim) — by director for kim; answer \"Not yet\""
+    }
+   ],
+   "log_problems": [
+    [
+     "log-line",
+     "its Log line '- 2026-01-06: kept waiting: decision (kim) — by director for kim; answer \"Not yet\"' begins with a writer's prefix but not in its shape"
+    ]
+   ],
+   "status_notes_to_log": {
+    "ok": "## TD-7: An entry a delegate answered for\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** decision (kim)\n\n**Why:** invented.\n\n**Log:**\n- 2026-01-02: gate added: decision (pat)\n- 2026-01-03: kept waiting: decision (pat) — by director for pat (merge-line); answer \"Not yet\"\n- 2026-01-04: gate lifted: decision (pat) — by director for pat (merge-line); answer \"Go\"\n- 2026-01-04: gate added: decision (kim)\n- 2026-01-05: kept waiting: decision (kim) — by kim; answer \"Not yet\"\n- 2026-01-06: kept waiting: decision (kim) — by director for kim; answer \"Not yet\"\n"
    }
   }
  }

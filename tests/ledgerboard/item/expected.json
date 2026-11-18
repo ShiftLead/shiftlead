@@ -89,6 +89,15 @@
   "refused_two_lines": {
    "refused": "an item's text is one line: put the rest on that line"
   },
+  "scope": {
+   "ok": "## Merge the parser change\n\n**Kind:** decide\n**Added:** 2026-11-12\n**Session:** w-9\n**Context:** the parser review\n**Scope:** merge-line\n**Due:** 2026-11-20\n**Answers:** Merge (default) | Hold\n\n- **Context:** The review passed.\n- **Question:** Merge it?\n- **Recommended:** Merge — it is green.\n"
+  },
+  "scope_no_name": {
+   "refused": "a scope is one name, not 'merge line'"
+  },
+  "scope_on_act": {
+   "refused": "only a decide names its scope, not an act"
+  },
   "todo": {
    "ok": "## Rotate the key\n\n**Added:** 2026-11-12\n**Session:** w-9 on host-a\n**Context:** none\n**Due:** 2026-11-20\n"
   },
@@ -115,17 +124,32 @@
   "decide_close_waiting": {
    "ok": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n**Decided:** 2026-11-12 — Not yet\n**Closed:** 2026-11-12 — kept waiting\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n"
   },
+  "decide_delegated": {
+   "ok": "## Say Go to the merge\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Context:** TD-70 decision (pat)\n**Scope:** merge-line\n**Due:** 2026-11-18\n**Answers:** Go (default) | Not yet\n**Decided:** 2026-11-12 by director for pat (merge-line) — Go\n"
+  },
+  "decide_delegated_no_scope": {
+   "refused": "rule 1: the item has no Scope"
+  },
+  "decide_delegated_self": {
+   "refused": "a delegate answers for another: Pat is the person answering"
+  },
   "decide_form_fill": {
    "ok": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n**Decided:** 2026-11-12 — Hold: not yet\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n"
   },
   "decide_form_fill_close": {
    "ok": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n**Decided:** 2026-11-12 — Hold: not yet\n**Closed:** 2026-11-12 — lifted\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n"
   },
+  "decide_own_over_delegated": {
+   "ok": "## Say Go to the merge\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Context:** TD-70 decision (pat)\n**Scope:** merge-line\n**Due:** 2026-11-18\n**Answers:** Go (default) | Not yet\n**Decided:** 2026-11-12 by pat — Go\n"
+  },
   "decide_replaces": {
    "ok": "## Say Go to the split\n\n**Kind:** decide\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-5 decision (pat)\n**Due:** 2026-11-18\n**Answers:** Go (default) — the split stands | Change | Hold: <note> | Not yet\n**Lifts:** Go | Hold: <note>\n**Decided:** 2026-11-12 — Go\n\n- **Context:** TD-5 is split.\n- **Question:** Go?\n- **Recommended:** Go — ready.\n"
   },
   "done": {
    "ok": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Owner:** sam.lee\n**Due:** 2026-11-20\n**Closed:** 2026-11-12\n\n- **Context:** kept as written.\n  - nested\n"
+  },
+  "done_delegated": {
+   "refused": "--delegate is a decide's"
   },
   "done_why": {
    "ok": "## Rotate the key\n\n**Kind:** act\n**Added:** 2026-11-11\n**Session:** w-9 on host-a\n**Context:** TD-1\n**Owner:** sam.lee\n**Due:** 2026-11-20\n**Closed:** 2026-11-12 — rotated, Context: TD-1\n\n- **Context:** kept as written.\n  - nested\n"
@@ -191,7 +215,7 @@
    "ok": [
     [
      "2026-01-06-5e6f7a8b.md",
-     "header: Context stands after Due; the fields' order is Kind, Added, Session, Context, Parts, Doer, Due, Hide until, Answers, Lifts, Decided, Closed"
+     "header: Context stands after Due; the fields' order is Kind, Added, Session, Context, Parts, Doer, Scope, Due, Hide until, Answers, Lifts, Decided, Closed"
     ]
    ]
   },
@@ -202,7 +226,7 @@
    "ok": [
     [
      "2026-01-06-5e6f7a8b.md",
-     "header: Context stands after Due; the fields' order is Kind, Added, Session, Context, Parts, Doer, Due, Hide until, Answers, Lifts, Decided, Closed"
+     "header: Context stands after Due; the fields' order is Kind, Added, Session, Context, Parts, Doer, Scope, Due, Hide until, Answers, Lifts, Decided, Closed"
     ]
    ]
   },
@@ -281,6 +305,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -290,6 +316,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -327,6 +354,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": "Go",
     "doer": null,
     "due": "2026-11-20",
@@ -336,6 +365,7 @@
     "kind": "decide",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Say Go"
    },
    "fields": [
@@ -377,6 +407,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -386,6 +418,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -427,6 +460,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -436,6 +471,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -474,6 +510,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -483,6 +521,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -524,6 +563,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -533,6 +574,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -574,6 +616,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -583,6 +627,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -621,6 +666,8 @@
     "context": "TD-1 and TD-2\fand TD-3",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -630,6 +677,7 @@
     "kind": null,
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Ping sam"
    },
    "fields": [
@@ -656,6 +704,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -671,6 +721,7 @@
       "ok"
      ]
     ],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -708,6 +759,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": [
      "team",
@@ -721,6 +774,7 @@
     "kind": "decide",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Say Go"
    },
    "fields": [
@@ -772,6 +826,8 @@
      "2026-11-12"
     ],
     "decided_by": "pat",
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": "Go",
     "doer": null,
     "due": "2026-11-18",
@@ -787,6 +843,7 @@
       "does S4 cover the archive's months?"
      ]
     ],
+    "scope": null,
     "words": "Say Go to the board scope"
    },
    "fields": [
@@ -836,6 +893,8 @@
      "2026-11-12"
     ],
     "decided_by": "pat",
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -845,6 +904,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -886,6 +946,8 @@
      "2026-11-12"
     ],
     "decided_by": "pat",
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -895,6 +957,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -936,6 +999,8 @@
      "2026-11-12"
     ],
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -945,6 +1010,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -986,6 +1052,8 @@
      "2026-11-12"
     ],
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -995,6 +1063,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -1033,6 +1102,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -1042,6 +1113,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -1080,6 +1152,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -1089,6 +1163,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -1118,6 +1193,123 @@
     ]
    ]
   },
+  "delegated_decided": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [
+     "Go",
+     "Not yet"
+    ],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-70 decision (pat)",
+    "decided": [
+     "Go",
+     "2026-11-12"
+    ],
+    "decided_by": "pat",
+    "decided_delegate": "director",
+    "decided_scope": "merge-line",
+    "default": "Go",
+    "doer": null,
+    "due": "2026-11-18",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "decide",
+    "parts": [],
+    "replies": [],
+    "scope": "merge-line",
+    "words": "Say Go to the merge"
+   },
+   "fields": [
+    [
+     "Kind",
+     "decide"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Context",
+     "TD-70 decision (pat)"
+    ],
+    [
+     "Scope",
+     "merge-line"
+    ],
+    [
+     "Due",
+     "2026-11-18"
+    ],
+    [
+     "Answers",
+     "Go (default) | Not yet"
+    ],
+    [
+     "Decided",
+     "2026-11-12 by director for pat (merge-line) — Go"
+    ]
+   ]
+  },
+  "delegated_decided_no_scope_outside": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [
+     "Go",
+     "Not yet"
+    ],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-70 decision (pat)",
+    "decided": null,
+    "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
+    "default": "Go",
+    "doer": null,
+    "due": "2026-11-18",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "decide",
+    "parts": [],
+    "replies": [],
+    "scope": "merge-line",
+    "words": "Say Go to the merge"
+   },
+   "fields": [
+    [
+     "Kind",
+     "decide"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Context",
+     "TD-70 decision (pat)"
+    ],
+    [
+     "Scope",
+     "merge-line"
+    ],
+    [
+     "Due",
+     "2026-11-18"
+    ],
+    [
+     "Answers",
+     "Go (default) | Not yet"
+    ],
+    [
+     "Decided",
+     "2026-11-12 by director for pat — Go"
+    ]
+   ]
+  },
   "doer_repo": {
    "attrs": {
     "added": "2026-11-11",
@@ -1127,6 +1319,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": [
      "repo",
@@ -1140,6 +1334,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -1178,6 +1373,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": [
      "team",
@@ -1191,6 +1388,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -1229,6 +1427,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": [
      "team",
@@ -1242,6 +1442,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -1280,6 +1481,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": null,
@@ -1289,6 +1492,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -1323,6 +1527,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": null,
@@ -1332,6 +1538,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -1366,6 +1573,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": null,
@@ -1375,6 +1584,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -1412,6 +1622,8 @@
     "context": "TD-1, Due: 2026-01-01. Decided: no",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -1427,6 +1639,7 @@
       "Context: TD-3, Due: 2026-02-01, Decided: no"
      ]
     ],
+    "scope": null,
     "words": "Ask whether Context: TD-9 Due: 2026-01-01 Decided: Go stands"
    },
    "fields": [
@@ -1461,6 +1674,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": null,
@@ -1470,6 +1685,7 @@
     "kind": "fyi",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Read the notes"
    },
    "fields": [
@@ -1500,6 +1716,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": null,
@@ -1509,6 +1727,7 @@
     "kind": "fyi",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Read the notes"
    },
    "fields": [
@@ -1543,6 +1762,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": null,
@@ -1554,6 +1775,7 @@
      "TD-23"
     ],
     "replies": [],
+    "scope": null,
     "words": "Read it"
    },
    "fields": [
@@ -1589,6 +1811,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -1598,6 +1822,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -1632,6 +1857,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -1652,6 +1879,7 @@
       "second"
      ]
     ],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -1689,6 +1917,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": "Works",
     "doer": null,
     "due": "2026-11-20",
@@ -1698,6 +1928,7 @@
     "kind": "look",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Check the page"
    },
    "fields": [
@@ -1736,6 +1967,8 @@
     "context": "none",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": null,
@@ -1745,6 +1978,7 @@
     "kind": null,
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Ping sam."
    },
    "fields": [
@@ -1770,6 +2004,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -1779,6 +2015,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -1813,6 +2050,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -1822,6 +2061,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -1857,6 +2097,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -1866,6 +2108,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -1900,6 +2143,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -1909,6 +2154,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -1947,6 +2193,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -1956,6 +2204,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -1981,6 +2230,204 @@
     ]
    ]
   },
+  "scope_no_name": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [
+     "Go",
+     "Not yet"
+    ],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-70 decision (pat)",
+    "decided": null,
+    "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
+    "default": "Go",
+    "doer": null,
+    "due": "2026-11-18",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "decide",
+    "parts": [],
+    "replies": [],
+    "scope": null,
+    "words": "Say Go to the merge"
+   },
+   "fields": [
+    [
+     "Kind",
+     "decide"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Context",
+     "TD-70 decision (pat)"
+    ],
+    [
+     "Scope",
+     "merge line"
+    ],
+    [
+     "Due",
+     "2026-11-18"
+    ],
+    [
+     "Answers",
+     "Go (default) | Not yet"
+    ]
+   ]
+  },
+  "scope_no_name_on_act": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-70",
+    "decided": null,
+    "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-18",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "scope": null,
+    "words": "Say Go to the merge"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Context",
+     "TD-70"
+    ],
+    [
+     "Scope",
+     "merge line"
+    ],
+    [
+     "Due",
+     "2026-11-18"
+    ]
+   ]
+  },
+  "scope_on_act": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-70",
+    "decided": null,
+    "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
+    "default": null,
+    "doer": null,
+    "due": "2026-11-18",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "act",
+    "parts": [],
+    "replies": [],
+    "scope": "merge-line",
+    "words": "Say Go to the merge"
+   },
+   "fields": [
+    [
+     "Kind",
+     "act"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Context",
+     "TD-70"
+    ],
+    [
+     "Scope",
+     "merge-line"
+    ],
+    [
+     "Due",
+     "2026-11-18"
+    ]
+   ]
+  },
+  "scope_read": {
+   "attrs": {
+    "added": "2026-11-11",
+    "answers": [
+     "Go",
+     "Not yet"
+    ],
+    "bad_due": null,
+    "closed": null,
+    "context": "TD-70 decision (pat)",
+    "decided": null,
+    "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
+    "default": "Go",
+    "doer": null,
+    "due": "2026-11-18",
+    "fyi_due": false,
+    "hide_until": null,
+    "id": "2026-11-11-3f9a2c1d",
+    "kind": "decide",
+    "parts": [],
+    "replies": [],
+    "scope": "merge-line",
+    "words": "Say Go to the merge"
+   },
+   "fields": [
+    [
+     "Kind",
+     "decide"
+    ],
+    [
+     "Added",
+     "2026-11-11"
+    ],
+    [
+     "Context",
+     "TD-70 decision (pat)"
+    ],
+    [
+     "Scope",
+     "merge-line"
+    ],
+    [
+     "Due",
+     "2026-11-18"
+    ],
+    [
+     "Answers",
+     "Go (default) | Not yet"
+    ]
+   ]
+  },
   "todo": {
    "attrs": {
     "added": "2026-11-11",
@@ -1990,6 +2437,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -1999,6 +2448,7 @@
     "kind": null,
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Ping sam"
    },
    "fields": [
@@ -2029,6 +2479,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -2038,6 +2490,7 @@
     "kind": "act",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Rotate the key"
    },
    "fields": [
@@ -2076,6 +2529,8 @@
     "context": "TD-1",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "doer": null,
     "due": "2026-11-20",
@@ -2085,6 +2540,7 @@
     "kind": "watch",
     "parts": [],
     "replies": [],
+    "scope": null,
     "words": "Watch the deploy"
    },
    "fields": [
@@ -2114,6 +2570,13 @@
  "problems": {
   "body_not_bullet": "body: 'Some prose, not a bullet.' is no detail bullet (`- ` at column 0, or nested under one)",
   "crlf": "file: each line ends in `\\n` alone",
+  "delegated_no_for_scope": "decided: `Decided` is `<date>[ by <person>[ for <person> (<scope>)]] — <label>`",
+  "delegated_no_scope": "decided: a delegated answer on an item with no `Scope`",
+  "delegated_ok": null,
+  "delegated_other_repo": "decided: a delegated answer: rule 4: the Context names a gate on another repo's entry",
+  "delegated_scope_differs": "decided: a delegated answer's scope release is not the item's `Scope`, merge-line",
+  "delegated_self": "decided: a delegated answer's delegate pat is its person",
+  "delegated_two_gates": "decided: a delegated answer: rule 5: the gated Context is not one entry and one gate",
   "doer_on_decide": "doer: a decide carries no `Doer`: only an act names who does its step",
   "due_respelled": "header: written `**Due:** <value>`, one space after the name and none at the line's end, not '**due:** 2026-11-20'",
   "log_not_last": "log: the Log is the file's last part",
@@ -2121,8 +2584,11 @@
   "marked_form_decided": null,
   "marked_form_open": "answers: a form cannot be the default: pressing it sends no words",
   "no_blank_line": "heading: one blank line, then the header block",
-  "out_of_order": "header: Context stands after Due; the fields' order is Kind, Added, Session, Context, Parts, Doer, Due, Hide until, Answers, Lifts, Decided, Closed",
+  "out_of_order": "header: Context stands after Due; the fields' order is Kind, Added, Session, Context, Parts, Doer, Scope, Due, Hide until, Answers, Lifts, Decided, Closed",
   "parts_on_act": "parts: an act carries no `Parts`: only a decide asks about a parent's parts",
+  "scope_no_name": "scope: `Scope` is one name",
+  "scope_no_name_on_act": "scope: an act carries no `Scope`: only a decide names its scope; scope: `Scope` is one name",
+  "scope_on_act": "scope: an act carries no `Scope`: only a decide names its scope",
   "twice": "header: Due stands twice",
   "two_forms_closed": null,
   "two_forms_decided": null,
@@ -2212,7 +2678,62 @@
    "ledgerboard: archive 2 closed items (session n/a)": null,
    "not a subject": null,
    "queue: rank TD-1 (shiftlead)": null,
-   "shiftlead: append Ship it (session n/a)": null
+   "shiftlead: append Ship it (session n/a)": null,
+   "shiftlead: lift decision (paul) on TD-12 (session n/a)": null
+  },
+  "lift_subjects": {
+   "reader": {
+    "shiftlead: lift decision (Ann) on TD-012 (session lb-designer)": {
+     "gate": "decision (Ann)",
+     "id": "TD-012",
+     "session": "lb-designer",
+     "tool": "shiftlead"
+    },
+    "shiftlead: lift decision (paul) on TD-12 (session `lb-designer`)": null,
+    "shiftlead: lift decision (paul) on TD-12 (session n/a)": {
+     "gate": "decision (paul)",
+     "id": "TD-12",
+     "session": "n/a",
+     "tool": "shiftlead"
+    },
+    "shiftlead: lift decision (paul) on TD-12 (session n/a)\n": null,
+    "shiftlead: lift decision (paul) on TD-123456789012345678 (session n/a)": {
+     "gate": "decision (paul)",
+     "id": "TD-123456789012345678",
+     "session": "n/a",
+     "tool": "shiftlead"
+    },
+    "shiftlead: lift decision (paul) on TD-1234567890123456789 (session n/a)": null,
+    "shiftlead: lift decision (paul) on TD-١٢ (session n/a)": null,
+    "shiftlead: lift decision (paul) on acme/other#TD-12 (session n/a)": null,
+    "shiftlead: lift until 2026-02-01 on TD-12 (session n/a)": null
+   },
+   "writer": [
+    {
+     "ok": "shiftlead: lift decision (paul) on TD-12 (session n/a)"
+    },
+    {
+     "ok": "shiftlead: lift decision (Ann) on TD-012 (session lb-designer)"
+    },
+    {
+     "refused": "a gate is decision (<person>), until YYYY-MM-DD or event (<name>), one of them, not 'decision (Ann )'"
+    },
+    {
+     "refused": "a lift's subject names a bare TD-n of 1 to 18 digits, not 'acme/other#TD-12'"
+    },
+    {
+     "refused": "a lift's subject names a decision (<person>) gate, not 'until 2026-02-01'"
+    },
+    {
+     "refused": "the session, 'w 1', is a token of [A-Za-z0-9_.@/-]"
+    },
+    {
+     "refused": "a lift's subject names a bare TD-n of 1 to 18 digits, not 'TD-1234567890123456789'"
+    },
+    {
+     "ok": "shiftlead: lift decision (paul) on TD-123456789012345678 (session n/a)"
+    }
+   ]
   },
   "subject_ids": {
    "board: append 2026-02-30-abcd1234 Ping sam (session n/a)": null,
@@ -2221,7 +2742,8 @@
    "board: snooze 2026-11-11-3f9a2c1d Rotate the key now to 2026-11-20 (session w-9)": "2026-11-11-3f9a2c1d",
    "board_edit: done Ship it (session s-1)": null,
    "shiftlead: append Ship it (session n/a)": null,
-   "shiftlead: board A new item (from TD-12)": null
+   "shiftlead: board A new item (from TD-12)": null,
+   "shiftlead: lift decision (paul) on TD-12 (session n/a)": null
   },
   "subject_kinds": {
    "Fix the parser (#12)": null,
@@ -2247,6 +2769,7 @@
    "shiftlead: archive 3 closed items (session w-1)": "archive",
    "shiftlead: board A new item (from TD-12)": "append",
    "shiftlead: board decide TD-12 (person)": "append",
+   "shiftlead: lift decision (paul) on TD-12 (session n/a)": "lift",
    "shiftlead: reply on Pick a name (session w-1)": "edit"
   },
   "subjects": [
@@ -2285,6 +2808,7 @@
   "field_words": null,
   "fyi": null,
   "look": null,
+  "scope": null,
   "todo": null,
   "watch": null
  }

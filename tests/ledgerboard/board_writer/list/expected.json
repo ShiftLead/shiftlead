@@ -17,6 +17,8 @@
     "context": "TD-7",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": "Memory",
     "detail": [
      "- **Context:** Two caches fit.",
@@ -41,6 +43,7 @@
      "TD-7"
     ],
     "replies": [],
+    "scope": null,
     "session": "w-2",
     "text": "**Pick a cache.**",
     "waiting_on": "person"
@@ -53,6 +56,8 @@
     "context": "PR #12",
     "decided": null,
     "decided_by": null,
+    "decided_delegate": null,
+    "decided_scope": null,
     "default": null,
     "detail": [],
     "doer": null,
@@ -73,6 +78,7 @@
      "PR #12"
     ],
     "replies": [],
+    "scope": null,
     "session": "w-1",
     "text": "Merge the parser fix.",
     "waiting_on": "person"

@@ -9,6 +9,8 @@
    "context": "TD-4",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": {
@@ -59,6 +61,7 @@
     "TD-4"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-1",
    "text": "Bump the pin.",
    "waiting_on": "person"
@@ -71,6 +74,8 @@
    "context": "TD-5",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": {
@@ -121,6 +126,7 @@
     "TD-5"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-1",
    "text": "Rotate the key.",
    "waiting_on": "person"
@@ -133,6 +139,8 @@
    "context": "TD-4, PR #7",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": {
@@ -184,6 +192,7 @@
     "PR #7"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-1",
    "text": "Vendor the release.",
    "waiting_on": "person"
@@ -196,6 +205,8 @@
    "context": "TD-6",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -244,6 +255,7 @@
      "text": "Doer: someone."
     }
    ],
+   "scope": null,
    "session": "w-2",
    "text": "Merge the docs.",
    "waiting_on": "person"
@@ -256,6 +268,8 @@
    "context": "TD-7",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -300,6 +314,7 @@
      "text": "Doer: acme."
     }
    ],
+   "scope": null,
    "session": "w-2",
    "text": "Read the notes.",
    "waiting_on": "person"
@@ -318,6 +333,8 @@
    "context": "TD-8",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": {
@@ -372,6 +389,7 @@
     "TD-8"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-2",
    "text": "Which store?",
    "waiting_on": "person"
@@ -384,6 +402,8 @@
    "context": "TD-9",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -430,6 +450,7 @@
     "TD-9"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-3",
    "text": "Check the mirror.",
    "waiting_on": "person"
@@ -442,6 +463,8 @@
    "context": "TD-10",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": {
@@ -492,6 +515,7 @@
     "TD-10"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-3",
    "text": "Tag it.",
    "waiting_on": "person"
@@ -504,6 +528,8 @@
    "context": "TD-11",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -550,6 +576,7 @@
     "TD-11"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-3",
    "text": "Tag the docs.",
    "waiting_on": "person"
@@ -562,6 +589,8 @@
    "context": "TD-12",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -608,6 +637,7 @@
     "TD-12"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-3",
    "text": "Tag the site.",
    "waiting_on": "person"
@@ -620,6 +650,8 @@
    "context": "TD-13",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -666,6 +698,7 @@
     "TD-13"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-3",
    "text": "Tag the app.",
    "waiting_on": "person"
@@ -678,6 +711,8 @@
    "context": "TD-14",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": {
@@ -728,6 +763,7 @@
     "TD-14"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-4",
    "text": "Sweep the cache.",
    "waiting_on": "person"
@@ -740,6 +776,8 @@
    "context": "TD-15",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": {
@@ -790,6 +828,7 @@
     "TD-15"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-4",
    "text": "Sweep the logs.",
    "waiting_on": "person"
@@ -802,6 +841,8 @@
    "context": "TD-16",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": {
@@ -852,6 +893,7 @@
     "TD-16"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-4",
    "text": "Sweep the queue.",
    "waiting_on": "person"
@@ -867,6 +909,8 @@
     "text": "done"
    },
    "decided_by": "pat",
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": {
@@ -921,6 +965,7 @@
     "TD-17"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-4",
    "text": "Restart the runner.",
    "waiting_on": "session"

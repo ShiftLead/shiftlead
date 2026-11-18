@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "new",
+  "unusable": "--context is an Ask's context (v3.3): give it with --ask"
+ }
+}

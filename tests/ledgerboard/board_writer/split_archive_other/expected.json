@@ -36,6 +36,18 @@
     "why": "names In-flight: the board is now this directory"
    },
    {
+    "line": 6,
+    "path": "board/README.md",
+    "text": "## In-flight",
+    "why": "carried from the board's line 12, below an item: no item holds it"
+   },
+   {
+    "line": 7,
+    "path": "board/README.md",
+    "text": "- (none)",
+    "why": "carried from the board's line 14, below an item: no item holds it"
+   },
+   {
     "line": 3,
     "path": "old.md",
     "text": "Old note.",
