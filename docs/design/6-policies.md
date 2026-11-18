@@ -240,9 +240,13 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      groom pass concluded (with none concluded, at once) or at a press of **Groom now**, never while
      its proposal stands, §4.9b *The director answers what is passed
      up to it*, TD-657; and, with `director.work` on, by **`watch`** once `director.watch` has passed since its
-     last watch fill concluded (with none concluded, at once) or when the home reads a PR its `merge` delegation
-     could merge turn ready — precheck green and review evidence posted — keeping `seat_due: {at, by: watch, prs}`
-     and `seat_filled` keeping `{by: watch, prs}`, so a fill is once per set of PRs (`watch` and `groom` are
+     last watch fill's close (`seat_filled.at`, as `swept`'s; with none, at once) and the `repos` or `boards`
+     reading or its inbox has changed since (a digest kept as `watch_seen`), at once on a note from a person's
+     session, and, while `merge` is in `director.delegate`, at once when the home reads a PR turn ready for it
+     (§4.9b *Acting by delegation*), keeping `seat_due: {at, by: watch, ready}` and `seat_filled` keeping
+     `{by: watch, ready}` (`ready` the `<repo>#<n>` list), so a fill is once per set of PRs; never raised
+     while the seat has used five of its six `FILL_CEILING` fills in the hour; a fill running when `director.work`
+     turns off is closed at the tick (`watch` and `groom` are
      `by` words of the director's alone, beside `prompt` and `asks`), §4.9b *The director works for the person*, TD-1910), and kept until the fill: for `asks`, when `asks_waiting` leaves zero (and
      cleared again if it returns to zero before a fill — the question was answered elsewhere);
      for `prs: n`, when **`seat_count: {prs, at}`** (home-owned) reaches `n` — the PRs merged to
