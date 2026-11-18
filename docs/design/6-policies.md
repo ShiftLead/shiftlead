@@ -243,12 +243,13 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      last watch fill's close (`seat_filled.at`, as `swept`'s; with none, at once) and the `repos` or `boards`
      reading or its inbox has changed since (`watch_seen`, a digest over the fields §4.9b names, left as it
      was by a fill whose send to the person was refused for its depth), at once on the person's answer to one
-     of its asks (with `director.work` off too, for a fill that files a *File it* and nothing else) and on a
+     of its asks (with `director.work` off, a *File it* alone, keeping `seat_due: {at, by: watch, filing}`,
+     for a fill that files it and nothing else, which the turn-off's close does not reach) and on a
      note from a person's session, and, while `merge` is in `director.delegate`, at once when the home reads a PR turn ready for it
      (§4.9b *Acting by delegation*), keeping `seat_due: {at, by: watch, ready}` and `seat_filled` keeping
      `{by: watch, ready}` (`ready` the `<repo>#<n>` list), so a fill is once per set of PRs; never raised
      while the seat has used five of its six `FILL_CEILING` fills in the hour; a fill running when `director.work`
-     turns off is closed at the tick (`watch` and `groom` are
+     turns off is closed at that tick (`watch` and `groom` are
      `by` words of the director's alone, beside `prompt` and `asks`), §4.9b *The director works for the person*, TD-1910), and kept until the fill: for `asks`, when `asks_waiting` leaves zero (and
      cleared again if it returns to zero before a fill — the question was answered elsewhere);
      for `prs: n`, when **`seat_count: {prs, at}`** (home-owned) reaches `n` — the PRs merged to
