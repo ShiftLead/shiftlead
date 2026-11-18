@@ -98,24 +98,40 @@ holds: the tick never reads a flow.
 **A machine that cannot run a seat's model cannot follow the flow**, read as followability is today
 (§4.9c), naming the reason: *td-grok cannot be followed here: no Grok login*; *build on Fable has no
 passing grinder smoke on claude-code 2.4*. The person copies the flow and changes the model. The seat
-smoke and the judge (§4.3, §4.9b), today lines quoted in PRs, become records the Tools page keeps per
-CLI version, model and role, which this check reads.
+smoke and the judge (§4.3, §4.9b), today lines quoted in PRs, become records this check reads, kept per
+CLI version, model and role. Paul, 2026-11-18: ShiftLead ships the **known passes** — a list in the package
+of the CLI, model and role combinations its own smoke passed, on which CLI versions — so a person does not
+re-run a smoke someone has already run; a person's own passes, recorded by the Tools page, add to it.
 
 This reverses §4.9c's *a flow names roles only* and *roles and flows are orthogonal*: a role's
 profile overlays (`roles:` in `org.yml` and `.shiftlead.yml`) no longer choose a model for a flow's
 seat. They stay for sessions no flow runs (`ao new`, the director, the sweep, a person's own session).
 The precedence gains the flow's seat as a rung, below a member's own `profile:` and `ao new --profile`.
 
-Formal load balancing across subscriptions is the deferred pool-with-`max` design (§4.9b), out of scope.
+**A backup for a critical seat** (Paul, 2026-11-18: *paul-grok is limited, but grok-heather is the
+backup*) reuses the seat pool (§4.9b *A seat as an ordered pool*): an ordered list whose later members
+are held and filled only when the first cannot answer, each its own record. Two kinds, kept apart:
+another **login** of the same CLI and model is the install's (the binding becomes an ordered list,
+paul-grok then grok-heather); another **model** (Grok, then Claude Code · Opus) is the flow's, since it
+changes what the flow is. Either draws on the seat as its backup, *Grok · backup grok-heather*. Pools are
+refused today on a review stage, the techlead and the manager; the Flows round decides whether that
+still holds for a critical seat. Formal load balancing across subscriptions is the deferred
+pool-with-`max` design, out of scope.
+
+**A model is named by its family, not its version** (Paul, 2026-11-18): a seat says `opus` or `sonnet`, and
+the CLI runs its default version of it, so ShiftLead never tracks which old versions a CLI still offers.
+The version a session actually ran is read from its transcript (the spend reader already reads model ids
+there) and kept on its record, so metrics compare like with like without the flow naming it. Opus 5 and
+Opus 5.5 are one flow.
 
 ## A flow has an id, and a lineage
 
 Paul, 2026-11-18: flows get an internal id, so a person may rename one freely. Each `flow.yml` carries an
 **`id`** written when the flow is created (a built-in's fixed in the package); everything that names a
 flow — a team's `flows:` list, the `flow` setting, the login bindings, the stage chip's lookup, a
-benchmark's record — names the id, and the name is a label. A copy takes a new id and records **`from:`**
-the id and the content hash it was copied from, so two flows' results can be compared and a shared flow
-recognised. Open for the Flows round: how a flow is found once its directory name stops being its name
+benchmark's record — names the id, and the name is a label. A copy takes a new id. There is no `from:`:
+a copy may be changed past any resemblance, so lineage says little; what a benchmark needs is the
+**content hash** of the flow a session ran under, kept on its record beside the model version. Open for the Flows round: how a flow is found once its directory name stops being its name
 (today *a flow is found by its directory*), and what the org-over-repo-over-package shadowing means when
 two places hold one id.
 
@@ -176,5 +192,6 @@ that changes `review-model` must agree with it or say it overrides it.
    person pressing Enter.
 5. **Which review-round keys does a flow get first?** Recommended: the four agent-cadence has today, by
    environment; convergence and sticking-point keys filed against agent-cadence as their own entry.
-6. **Is a flow's model a fixed model or a class?** Recommended: a fixed model (`opus`), so a benchmark
-   compares like with like; a person who wants another copies the flow.
+6. **Is a model's backup on another model allowed on a review stage, the techlead or the manager?**
+   Recommended: a backup login yes (same model, so the same reader); a backup model no, as pools are
+   refused there today, until a round shows a reader can change model mid-chain.
