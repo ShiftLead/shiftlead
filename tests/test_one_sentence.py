@@ -138,7 +138,7 @@ def test_an_entry_filed_with_a_context_leads_with_its_ask_alone(tmp_path, capsys
     (entry,) = ledger.entries(text)
     assert entry["for_page"] == "for-you"
     assert entry["ask"] == "Which account should the walk sign in with?"
-    assert not any("cookie" in line or "once a day" in line for line in entry["detail"])
+    assert text.index("**Ask:**") < text.index("**Context:**") and "It keeps the cookie between runs." in text
 
 
 def test_the_inbox_row_shows_each_answer_whole_and_a_press_sends_its_label(tmp_path, monkeypatch):
