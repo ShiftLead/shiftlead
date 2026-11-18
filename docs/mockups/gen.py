@@ -2202,7 +2202,7 @@ def queue_page():
 def queue_who_closed():
     """Screen 12, Recently completed: an opened line's entries, each with its `Resolved:` text and under it **who closed
     it** (TD-1899; §4.5 screen 12 *Recently completed*, §4.4 *What closed*'s `by`): the closing commit's trailers in
-    words, the three marks in the warning colour, and an entry whose commit has no `Merged-by:` drawing none."""
+    words, the four marks in the warning colour, and an entry whose commit has no `Merged-by:` drawing none."""
     P = {"H": ("#1e3a8a", "#fff"), "M": ("#2563eb", "#fff"), "L": ("#bfdbfe", "#1e3a8a")}
     def badge(p):
         bg, fg = P[p]
@@ -2229,19 +2229,23 @@ def queue_who_closed():
               "built by grinder-ao-2" + sep + "reviewed by sonnet, passed" + sep + "merged by grinder-ao-2")
         + entry("TD-9101", 9880, "A lift PR the gate sweep opens reaches nobody",
                 "designed and built: its part TD-9102; the live check held",
-                "built by designer-ao-1" + sep + "reviewed by sonnet, passed" + sep + "merged by designer-ao-1")
+                "in #9884: by designer-ao-1" + sep + "reviewed, passed" + sep + "merged by designer-ao-1")
         + entry("TD-9103", 9870, "Restarts that pushed new work leave the crash ceiling",
                 "rule 2 counts a pushed restart apart",
-                "built by grinder-ao-2 and techlead-ao-1" + sep + "reviewed by sonnet, passed after fixes; opus, passed" + sep
+                "built by grinder-ao-2 and techlead-ao-1" + sep + "reviewed by sonnet, blocked; sonnet, passed after fixes" + sep
                 + "merged by techlead-ao-1")
         + entry("TD-9104", 9872, "A send that did not land says so",
                 "rule 13 in every brief",
                 "built by grinder-ao-1" + sep + warn("no review") + sep + warn("merged past the gate") + sep + "merged by Paul")
+        + entry("TD-9106", 9875, "The doorbell rings once per batch",
+                "one ring per batch of mail",
+                "built by grinder-ao-2" + sep + "reviewed by claude-sonnet, " + warn("blocked") + sep + warn("no precheck") + sep
+                + warn("merged past the gate") + sep + "merged by Paul")
         + entry("TD-9105", 9790, "An old entry closed by hand", "closed by a direct push; no trailers, so no line", "")
     )
     lines = (
         line("2h", "TD-9101", "M", "A lift PR the gate sweep opens reaches nobody: hand each one to a reader",
-             '<span style="color: #15803d;">live</span> &nbsp;5 entries', opened)
+             '<span style="color: #15803d;">live</span> &nbsp;6 entries', opened)
         + line("3h", "TD-9090", "M", "Answer on the Queue again", '<span style="color: #15803d;">live</span>')
     )
     return head("Queue — who closed it") + f'''<div style="width: 900px; min-height: 520px; background: #f4f5f7; padding: 24px; box-sizing: border-box;">
@@ -2249,8 +2253,9 @@ def queue_who_closed():
   <span class="meta" style="font-size: 12px;">4 h · <b>day</b> · week · month</span></div>
   <div style="background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; overflow: hidden;">{lines}</div>
   <p style="font-size: 12px; margin-top: 12px; max-width: 820px; color: #6b7280; white-space: normal;">TD-1899: each entry of an opened line carries who closed it, from its closing
-  commit\'s trailers. The marks <i>no review</i>, <i>no precheck</i> and <i>merged past the gate</i> are drawn in the warning colour. The fifth entry\'s commit
-  has no <span class="mono">Merged-by:</span>, so it draws no such line. The ids, titles and names are made up for the mockup.</p>
+  commit\'s trailers. The marks <i>no review</i>, <i>no precheck</i>, <i>merged past the gate</i> and a <i>blocked</i> no later review passed are drawn
+  in the warning colour. TD-9101 was archived by a later PR than the one drawn beside it, so its line names that PR and says <i>by</i>, not <i>built by</i>; its
+  review named no model. The last entry\'s commit has no <span class="mono">Merged-by:</span>, so it draws no such line. The ids, titles and names are made up for the mockup.</p>
 </div>'''
 
 def darken(html):
