@@ -241,8 +241,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      its proposal stands, §4.9b *The director answers what is passed
      up to it*, TD-657; and, with `director.work` on, by **`watch`** once `director.watch` has passed since its
      last watch fill's close (`seat_filled.at`, as `swept`'s; with none, at once) and the `repos` or `boards`
-     reading or its inbox has changed since (a digest kept as `watch_seen`), at once on a note from a person's
-     session, and, while `merge` is in `director.delegate`, at once when the home reads a PR turn ready for it
+     reading or its inbox has changed since (`watch_seen`, a digest over the fields §4.9b names, left as it
+     was by a fill whose send to the person was refused for its depth), at once on the person's answer to one
+     of its asks (with `director.work` off too, for a fill that files a *File it* and nothing else) and on a
+     note from a person's session, and, while `merge` is in `director.delegate`, at once when the home reads a PR turn ready for it
      (§4.9b *Acting by delegation*), keeping `seat_due: {at, by: watch, ready}` and `seat_filled` keeping
      `{by: watch, ready}` (`ready` the `<repo>#<n>` list), so a fill is once per set of PRs; never raised
      while the seat has used five of its six `FILL_CEILING` fills in the hour; a fill running when `director.work`
