@@ -1114,17 +1114,21 @@ block. A policy is agent code and needs no grant; a session doing the same work 
          Wind down sent it the wrap-up (TD-1895, rule 9 *A wind-down's close*); or
        - it closed itself (its closer's `by` its own id) after the person's wrap-up, or, marked, left on
          its own naming nobody after the person wound it down, its `wind_down.by` the person where a
-         later send of the person's cleared its `wrapup_by` (TD-1895). A manager whose `wrapup_by` a
-         person's later send cleared, or which never held one, carries no mark of its own and reads as
-         the person's, in each of these three shapes, where any member among the team's current records (never a
-         superseded one) carries a `wind_down.by` that is the person. A tick's close for any
+         later send of the person's cleared its `wrapup_by`, read by its `wind_down.at` against the stop
+         time's stamp as `wrapup_at` is (TD-1895). The manager (`work.manager_of`), which carries no
+         mark, whose `wrapup_by` is not the person, reads as the person's, in each of these three
+         shapes, where any member among the team's current records carries a mark of this run (§4.9a
+         *A mark counts for its run only*) whose `wind_down.by` is the person — in an exit naming nobody,
+         by the newest such `wind_down.at` against the stop time's stamp; an unmarked record that is not
+         the manager reads as before. A tick's close for any
          other cause names nobody, as before; such a close after a session's wind-down reads as that
          session's, `other`.
 
        Otherwise it is `until` where one's `ended.why` or `closer.why` is the stop time's own word,
        `stop time`, as the tick writes it when it ends a record at its `run_until`, or where one
        whose end names nobody carries `wrapup_sent_at`, the stop time's own wrap-up stamp (§4.4a),
-       as `wrapup_by` is the person's. Otherwise it is `other`.
+       as `wrapup_by` (or, where a person's send cleared it, a marked record's `wind_down.by`) is the
+       person's. Otherwise it is `other`.
 
      It is removed as a wound-down team's is: by a crew session live again, by no id new, by `off`,
      by Start or by Dismiss — save a held part, `seats_held`, which no id new or Dismiss removes (below). A team whose reading turns *wound down* has its mark rewritten without
@@ -1321,11 +1325,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      work reads pushed; one on a dialog is left open and named, never killed. It needs no
      `FINISHED_SETTLE` (the press is not a reading that could stop holding) and is never taken back by
      a member at work (that member is simply not settled yet). Where any record of the team carries a
-     mark whose `by` is the person, this rule writes no note, and owes none (`_finished_owed` is not
+     mark of this run (§4.9a *A mark counts for its run only*) whose `by` is the person, this rule writes no note, and owes none (`_finished_owed` is not
      written for such a team). Where only a session pressed it, the note is written once, on the tick
      whose `wind_down` close leaves the team with no live marked record and nobody live in its crew, in
-     a wound-down team's words (§4.9a gives them), its `since` the earliest `wind_down.at` among the
-     team's records; where the last marked member is closed by another hand (a `--close`, a person's
+     a wound-down team's words (§4.9a gives them), its `since` the earliest `wind_down.at` among
+     this run's marks; where the last marked member is closed by another hand (a `--close`, a person's
      Close) none is written. While a marked member stays open the reading carries its clause and a live
      manager is neither told nor closed. A manager the reading then finds alone is told and closed as
      above — `FINISHED_SETTLE` from the last member's close, then `WRAPUP_GRACE` — the line in a
