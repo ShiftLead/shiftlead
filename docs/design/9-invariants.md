@@ -56,8 +56,8 @@
     next call and neither is cached. Reads are never gated, and a person at a terminal or the
     UI is not a session, nor is the person's own shell (§4.8, TD-801). Acting is what changes a
     session — the host agent's `ACTING_RPCS`:
-    `send`, `keys`, `kill`, `close`, `set_mode`, `create`, `remove`, `decide`, `set_grants`,
-    `set_controllers` and `set_stop` (`ao until`, §6). **Messaging is not acting** and does not
+    `send`, `keys`, `kill`, `close`, `set_mode`, `keep`, `create`, `remove`, `decide`, `set_grants`,
+    `set_controllers`, `set_stop` (`ao until`, §6), `set_start` and `mark_wind_down` (§4.9a). **Messaging is not acting** and does not
     pass through this gate: its own, weaker rule is §4.10's graph (my controllers, my members,
     my team, a shared target), it needs no grant, and it is refused by naming that rule rather
     than this one.
