@@ -175,6 +175,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _usage_hover,  # noqa: F401
     _usage_line,  # noqa: F401
     _usage_profiles,  # noqa: F401
+    asked_once_words,  # noqa: F401
     bare_id,  # noqa: F401
     build_chip,  # noqa: F401
     cap_first,  # noqa: F401
