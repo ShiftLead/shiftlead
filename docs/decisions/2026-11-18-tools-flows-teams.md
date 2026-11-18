@@ -61,10 +61,14 @@ Today the techlead, auditors, fact-checkers and sweeper are the team's `seats:`,
    — the **question seat** (key `question`: the go-between that answers a member's steer or work
    question or passes it up, and that another repo's `--team`/`--repo` ask finds, §4.9b), a review
    stage's reader on held paths, the auditors (`prs: 10`), the fact-checkers (`asks`), a sweeper
-   (`swept:`). **A flow that names no question seat leaves the person to answer** (Paul, 2026-11-18), as a
-   team without a techlead does today, unchanged: a member's brief reads `{techlead}` as `none` and
-   says *ask the person* (§4.9b), so its steers and work questions go to the person directly, never
-   through the director, which takes only what a seat passes up (§4.9b); another team's `--team`/`--repo`
+   (`swept:`). **A flow that names no question seat sends its members' questions to the director** (Paul,
+   2026-11-18: *seems like these should go to the director*, which exists to take load off the person),
+   where the org has one, and to the person where it has none, as today: a member's brief reads
+   `{techlead}` as the director (else `none`, *ask the person*, §4.9b), so its steers and work questions
+   go there directly. This is a new road into the director, which today takes only what a seat passes up
+   (§4.9b *The director answers what is passed up to it*); it answers them as it answers a pass-up, from
+   the person's preferences, and passes up to the person what it cannot. Otherwise, as today: another
+   team's `--team`/`--repo`
    ask is refused with *has no question seat — ask the person* (§4.10), and a session's request to file
    an entry in the repo is refused (§4.9b); `entries.feature` defaults, as today, to the role of
    the stage that takes `design-first`, else to the question seat's role (§4.9c), and where the flow has
@@ -109,7 +113,7 @@ default. The Flows page checks every flow against the list, as §4.9c checks fol
 | Run the precheck on a PR's head | the author or the merger (cadence §4.12); main's own is the home's |
 | Review evidence (`cadence-review:`; a fact-check for docs) | the author's independent reviewer (cadence §4.8) |
 | Read a held path (`held:`) | the review stage's reader; with no review stage, nobody, and the author merges on the gate (§4.9c) |
-| Answer a member's question | the flow's question seat; with none, the person |
+| Answer a member's question | the flow's question seat; with none, the director, else the person |
 | File entries and write the board | each session, through the helpers |
 | Notice stalls, permissions, idle-with-work | the manager and the tick of the host the team runs on |
 
@@ -186,6 +190,8 @@ could benchmark different flow results.*
   default; §4.9b's *ask the person when there is no techlead* is the same rule restated.
 - **§4.9b *A seat as an ordered pool*** — retired; **§4.9b *A seat that cannot answer is routed around***
   — a stopped seat's questions go to its extras, then the person.
+- **§4.9b's director** — takes a member's steer or work question directly where its team's flow names
+  no question seat, not only what a seat passes up.
 - **§4.4's tagging seat** — chosen by the repo's setting, not by `tags: true` on a techlead; and §4.10's
   `--team`/`--repo` choice (TD-1565), which reads `tags`, reads the question mark instead.
 - **The record and invariant 9** — the record gains `model`, `login`, the seat's key and its question mark,
