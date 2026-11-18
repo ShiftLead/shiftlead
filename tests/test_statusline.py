@@ -13,6 +13,7 @@ import socket
 import struct
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -167,8 +168,9 @@ class FakeAgent:
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    h = Path("/tmp") / f"aosl-{tmp_path.name[-12:]}"  # a unix socket path must stay short
-    h.mkdir(exist_ok=True)
+    # a unix socket path must stay short, and be this run's own: tmp_path's name is the test's, the same in
+    # every run, so two runs at once on one machine bound one socket (TD-1942)
+    h = Path(tempfile.mkdtemp(prefix="aosl-", dir="/tmp"))
     monkeypatch.setenv("SHIFTLEAD_HOME", str(h))
     monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x-w1")
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "cfg"))
