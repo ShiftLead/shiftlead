@@ -442,7 +442,8 @@ def carried_to(reason: str) -> list[str]:
 def carried(board: ledgerboard.Board) -> list[dict[str, Any]]:
     """The closed decided items that may still hold a member (§4.4 *The boards* `carried`, *The card's status*,
     TD-1368): every closed `decide` item with a `Decided` whose `Context` names an entry, the board's closed items
-    read whole (its archive too), as `{key, ref, decided, decided_by, closed, to, at, refs, parts}` — `ref` the
+    read whole (its archive too), as `{key, ref, decided, decided_by, closed, to, at, refs, parts}`, and
+    `decided_delegate` and `decided_scope` for a delegated answer alone (v3.4, TD-1939) — `ref` the
     `Context`'s first entry ref, `refs` all of them (gate words after a ref read past), `parts` its `Parts` ids,
     `closed` `{date, why}` (the item's `Closed` fields, ledgerboard v3.0, TD-1881: `why` '' for none), `to` the
     reason's *carried to* or *see* ids, and `at` one index over every item of the board — the open items', then the
@@ -463,6 +464,11 @@ def carried(board: ledgerboard.Board) -> list[dict[str, Any]]:
                 "ref": refs[0],
                 "decided": {"text": it.decided[0], "date": it.decided[1].isoformat()},
                 "decided_by": it.decided_by,
+                **(
+                    {"decided_delegate": it.decided_delegate, "decided_scope": it.decided_scope}
+                    if it.decided_delegate
+                    else {}
+                ),
                 "closed": {"date": day.isoformat() if day else "", "why": why},
                 "to": carried_to(why),
                 "at": n,
@@ -549,8 +555,9 @@ def read_boards(
 
 def orders(reading: dict[str, Any]) -> list[dict[str, Any]]:
     """The work orders of a `read_boards` reading — its open decided items that are not `fyi`, each
-    `{id, title, text, context, decided: {text, date}, refs, session, kind}` — `text` the item's words, `context`
-    its `Context` (ledgerboard v3.0, TD-1881) — a filter over the one reading, never a second read of the board
+    `{id, title, text, context, decided: {text, date[, delegate, scope]}, refs, session, kind}` — `text` the item's
+    words, `context` its `Context` (ledgerboard v3.0, TD-1881), `decided` gaining `delegate` and `scope` for a
+    delegated answer alone (v3.4, TD-1939) — a filter over the one reading, never a second read of the board
     (§4.4 *The boards*)."""
     out: list[dict[str, Any]] = []
     for b in reading.get("boards") or []:
@@ -565,7 +572,15 @@ def orders(reading: dict[str, Any]) -> list[dict[str, Any]]:
                     "title": head(str(it["text"])),
                     "text": str(it["text"]),
                     "context": it.get("context"),
-                    "decided": {"text": str(it["decided"].get("text") or ""), "date": it["decided"].get("date")},
+                    "decided": {
+                        "text": str(it["decided"].get("text") or ""),
+                        "date": it["decided"].get("date"),
+                        **(
+                            {"delegate": it["decided_delegate"], "scope": it.get("decided_scope")}
+                            if it.get("decided_delegate")
+                            else {}
+                        ),
+                    },
                     "refs": [str(r) for r in it.get("refs") or []],
                     "session": it.get("session"),
                     "kind": it.get("kind"),

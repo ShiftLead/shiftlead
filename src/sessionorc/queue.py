@@ -984,8 +984,9 @@ def lift_here(
 
 def _board_lines(boards: Mapping[str, Iterable[Mapping[str, Any]]]) -> list[dict[str, Any]]:
     """Every `decide` line of the boards, open (`items`) and closed (`carried`), as one shape: `{repo, key, open,
-    decided, said, by, refs, parts, closed, to, at, session}` — `decided` None for an open line not yet answered,
-    `said` its `Decided:` words."""
+    decided, said, by, delegate, scope, refs, parts, closed, to, at, session}` — `decided` None for an open line not
+    yet answered, `said` its `Decided:` words, `delegate` and `scope` a delegated answer's (ledgerboard v3.4, TD-1939:
+    `by` is then the person it answered for), else None."""
     out: list[dict[str, Any]] = []
     for repo, bl in boards.items():
         for b in bl or ():
@@ -997,6 +998,7 @@ def _board_lines(boards: Mapping[str, Iterable[Mapping[str, Any]]]) -> list[dict
                 d = it.get("decided") if isinstance(it.get("decided"), Mapping) else None
                 out.append({"repo": repo, "key": str(it.get("key") or ""), "open": True,
                             "decided": str(d.get("date") or "") if d else None, "by": it.get("decided_by"),
+                            "delegate": it.get("decided_delegate"), "scope": it.get("decided_scope"),
                             "said": str(d.get("text") or "") if d else "",
                             "refs": [str(r) for r in it.get("refs") or () if refs(r)],
                             "parts": [str(p) for p in it.get("parts") or ()], "closed": None, "to": [],
@@ -1006,6 +1008,7 @@ def _board_lines(boards: Mapping[str, Iterable[Mapping[str, Any]]]) -> list[dict
                     continue
                 out.append({"repo": repo, "key": str(c.get("key") or ""), "open": False,
                             "decided": str(c["decided"].get("date") or ""), "by": c.get("decided_by"),
+                            "delegate": c.get("decided_delegate"), "scope": c.get("decided_scope"),
                             "said": str(c["decided"].get("text") or ""),
                             "refs": [str(r) for r in c.get("refs") or ()],
                             "parts": [str(p) for p in c.get("parts") or ()],
@@ -1140,6 +1143,8 @@ def board_hold(
         return None
     _, ln, covered = picked
     line = {"key": ln["key"], "open": ln["open"], "to": list(ln["to"]), "said": ln["said"]}
+    if ln.get("delegate"):  # a delegated answer names its delegate and scope (ledgerboard v3.4, TD-1939)
+        line.update(delegate=ln["delegate"], scope=ln.get("scope"))
     held = next((claims[q] for q in covered if q in claims), None)  # a covered member's holder, the member first
     if ln["open"]:
         asker = line_holder(ln["key"], ln["session"], covered, claims, live) or "a pick"

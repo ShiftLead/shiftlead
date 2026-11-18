@@ -1954,13 +1954,28 @@ def board_head(text: str) -> str:
     return words if len(words) <= board_mod.HEAD_MAX else words[: board_mod.HEAD_MAX - 1].rstrip() + "…"
 
 
+def delegated_for(delegate: Any, scope: Any) -> str:
+    """Who answered for the person, as a row names it — *<delegate> for you (<scope>)* — or '' for the person's own
+    answer (§4.5 screen 6, ledgerboard v3.4, TD-1939): a delegated `Decided:` is read as the person's, and the row
+    names the delegate and the scope it answered under beside it."""
+    who = str(delegate or "").strip()
+    if not who:
+        return ""
+    within = str(scope or "").strip()
+    return f"{who} for you ({within})" if within else f"{who} for you"
+
+
 def _decided(it: Mapping[str, Any]) -> dict[str, str] | None:
-    """The reader's `decided` as the row prints it — *decided: <text> · <date>* — or None."""
+    """The reader's `decided` as the row prints it — *decided: <text> · <date>*, then *· <delegate> for you
+    (<scope>)* for a delegated answer alone (`for`, TD-1939) — or None."""
     got = it.get("decided")
     if not isinstance(got, dict) or not got.get("text"):
         return None
     d = _civil(got.get("date"))
-    return {"text": str(got["text"]), "date": f"{d:%b} {d.day}" if d else str(got.get("date") or "")}
+    out = {"text": str(got["text"]), "date": f"{d:%b} {d.day}" if d else str(got.get("date") or "")}
+    if who := delegated_for(it.get("decided_delegate"), it.get("decided_scope")):
+        out["for"] = who
+    return out
 
 
 def _ahead_words(due: str, today: str, tag: str = "") -> str:
@@ -3481,7 +3496,8 @@ def _held_answered(
     the question's kind, `words` — what the question's row says of the answer (`_owing`'s `answer_given`, else its
     `answer_how`) — `age`, the answer's, and `outcome`, its `done` outcome where one is sent. A board answer's
     (`kind: board`, TD-1368) carries `board`, the line's `{key, open, to}`, and `words` *you answered "<its
-    `Decided:` words>" on the board*, its age the `Decided:` date's; a kept-waiting one `until`, its date. A mail
+    `Decided:` words>" on the board* — a delegated one's *<delegate> answered "<words>" for you on the board
+    (<scope>)* (TD-1939) — its age the `Decided:` date's; a kept-waiting one `until`, its date. A mail
     answer's carries `lift`, `{root, id}`, where the row's `lift_item` is set (the caller passes it then): a `blocked`
     outcome on its question draws the entry's **Lift the hold**, whose press is `ledger_lift_reply` (§4.4 *Where Lift
     the hold is drawn*, TD-1879); the board and handed answers carry none."""
@@ -3502,12 +3518,18 @@ def _held_answered(
         line = got.get("line") if isinstance(got.get("line"), Mapping) else {}
         asker = str(got.get("asker") or "")
         said = str(line.get("said") or "")
+        quoted = f" \u201c{said}\u201d" if said else ""
+        if who := str(line.get("delegate") or "").strip():  # a delegated answer (ledgerboard v3.4, TD-1939)
+            within = str(line.get("scope") or "").strip()
+            words = f"{who} answered{quoted} for you on the board" + (f" ({within})" if within else "")
+        else:
+            words = f"you answered{quoted} on the board"
         return {
             "mid": "",
             "asker": asker,
             "name": names.get(asker, asker),
             "kind": "board",
-            "words": f"you answered \u201c{said}\u201d on the board" if said else "you answered on the board",
+            "words": words,
             "age": _board_age(got.get("closed_at"), now),
             "outcome": None,
             "until": str(got.get("until") or ""),

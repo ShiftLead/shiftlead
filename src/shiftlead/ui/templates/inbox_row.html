@@ -1224,7 +1224,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
     unanswered after `BOARD_WAIT_DAYS`, it says nobody has acted. -#}
 {%- set waits = section == 'waiting' %}
 {%- if e.decided %}
-<div class="st decided">decided: {{ e.decided.text }} · {{ e.decided.date }}</div>
+<div class="st decided">decided: {{ e.decided.text }} · {{ e.decided.date }}{% if e.decided.for %} · {{ e.decided.for }}{% endif %}</div>
 {%- endif %}
 {#- §4.5a **Queue card / Inbox: stuck row** (§6 rule 13 *What the person sees*, TD-1497 slice 2): a stuck decided
     line is drawn on its own row, the stuck words a line under it and its **Open** the actor's Focus — moved to
@@ -1604,7 +1604,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
    draws no answers, Reply, Go with it or Start session: **Open** is in its ⋯, and **Lift the hold** where its
    `lift_item` is set (§4.4 *Where Lift the hold is drawn*, TD-1879). A board
    answer (`ans.kind == 'board'`, TD-1364) is the same row, its foot *you answered "<Decided: words>" on the
-   board, <age> ago* then *carried to TD-m* or *<holder> acts on it*; a kept-waiting one reads *waits until
+   board, <age> ago* (a delegated answer's *<delegate> answered "<words>" for you on the board (<scope>)*, TD-1939) then *carried to TD-m* or *<holder> acts on it*; a kept-waiting one reads *waits until
    <date>*. A step handed by **Have a session do it** (`ans.kind == 'handed'`, TD-1660) reads *handed to <seat> ·
    <age>*, its foot the seat and what ends the hold, its ⋯ the entry's own answer — **Done** on an `Owner: paul`
    entry, else **Lift the hold** where `lift_item` is set. A row a press is landing on (`e.applying`, §4.4 *A press is drawn as it lands*, TD-1508) reads its
