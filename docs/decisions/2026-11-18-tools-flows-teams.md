@@ -65,11 +65,14 @@ and some seats on every team. The plan splits them:
 1. **Every team's seats** — the **manager** (on call, or `person`) and the **question seat**: the
    techlead's first job, the go-between that answers a member's steer or work question or passes it up
    (§4.9b), that another repo's ask finds by `--team`/`--repo`, and that tags entries where its line
-   says `tags: true` (§4.9b, §4.4). Automatic: a team never lacks one. Today the techlead is optional and
-   never `person` (§4.9b), and `{techlead}` reads `none` without one; the plan adds **`person`** as a value,
-   under which `{techlead}` names the person, `--team`/`--repo` asks reach the person's Inbox, and
-   `entries.feature`'s default role `techlead` falls to the person. Whether a tier-1 seat is a session
-   or the person is the team's choice; its model, where it is a session, is the flow's. Whether the question seat and a
+   says `tags: true` (§4.9b, §4.4). Recommended (open question 1): automatic, so a team never lacks one.
+   Today the techlead is optional and never `person` (§4.9b), and `{techlead}` already reads "ask the
+   person" when a team has none (§4.9b); the plan rewrites that rule into a **`person`** value, under which
+   `{techlead}` names the person, `--team`/`--repo` asks reach the person's Inbox, `entries.feature`
+   stores a literal `person` (an entry the person picks up themselves, never a role's lane), and nothing
+   tags the team's entries unless another team's seat does. Whether a tier-1 seat is a session or the
+   person is the team's choice; its model, where it is a session, is the flow's. A flow addresses the
+   two by fixed keys, **`manager`** and **`question`**. Whether the question seat and a
    review stage's reader stay one record, as they are today (§4.9c), is the Flows round's.
 2. **The flow's seats** — its stages (design, build, review, hunt, ...) and its **on-call seats**: a
    review stage's reader on held paths (the techlead's second job), the auditors (`prs: 10`), the
@@ -81,7 +84,9 @@ and some seats on every team. The plan splits them:
    a **key** naming the seat within the flow (two fact-checker `asks` seats, one on Gemini and one on
    Grok, are told apart only by it), the role, the trigger with its argument (`asks`, `prs: 10`,
    `every:`, `swept:`), the model, `permission_prompts`, a context bound; the team keeps what is its own,
-   by that key — the seat's name (org-unique), its own brief, and the techlead's `tags`. The manager's and
+   by that key — the seat's name (org-unique), its own brief, and the techlead's `tags`. A member stage's
+   `size` and `max` (`settings.yml`, keyed today by a member line's `name:`, §5) are keyed by the same
+   seat key, and today's keys (`grinder-ao`) migrate. The manager's and
    techlead's other keys (`lane`, `grants`, `unattended`, `on_call`, `context`) are placed by the Flows
    round. `pool:` goes (below).
 3. **The org's seat** — the **director**, outside any team. It stays on the Settings page, and picks a
@@ -128,6 +133,9 @@ smoke and the judge (§4.3, §4.9b), today lines quoted in PRs, become records t
 CLI version, model and role. Paul, 2026-11-18: ShiftLead ships the **known passes** — a list in the package
 of the CLI, model and role combinations its own smoke passed, on which CLI versions — so a person does not
 re-run a smoke someone has already run; a person's own passes, recorded by the Tools page, add to it.
+The gate is on from the first build: the Tools build ships the list seeded with every tool, model and role
+running on this install today (each of ao-grind's seats' profiles), whose passes are the lines its PRs
+already quote (§4.3), so no team running now becomes unfollowable.
 
 This reverses §4.9c's *a flow names roles only* and *roles and flows are orthogonal*: a role's
 profile overlays (`roles:` in `org.yml` and `.shiftlead.yml`) no longer choose a model for any seat;
@@ -161,8 +169,9 @@ login is offered for a seat once its tool passes there.
   handed over from the transcript (below): **Switch profile…** (§4.3 *The limit dialog*, §4.5a), designed for a person's
   press and not built, done by the tick of the host the team runs on (a node's own, §4.4a). One
   mechanism serves every seat (Paul, 2026-11-18: a question seat stopped mid-answer is where a build
-  seat stopped mid-issue is, only less often); new questions to a stopped question seat are routed around
-  it meanwhile (§4.9b), and a lane's other members keep picking. With no usable login left the seat waits,
+  seat stopped mid-issue is, only less often); a seat's extras (td-max, §4.9) are launches like any other, so
+  each takes the first usable login too, and a stopped seat's questions are routed to its extras first
+  as §4.9b routes them today, then to the person; a lane's other members keep picking. With no usable login left the seat waits,
   as it does today. An interactive session is never moved (invariant 5). A relaunch is a new process on
   the same record (§4.5a), so the seat keeps its name, and a review stage's reader stays one reader.
 - **Every handoff starts from the transcript** (Paul, 2026-11-18: *all handoffs should probably use the
@@ -217,11 +226,13 @@ file and the default; cadence §9.18), and ShiftLead launches every session, so 
 agent-cadence's config reader and its review statistics read them, not the merge gate, so a seat run on
 other rounds trips no one else's check.
 
-Three limits. agent-cadence's review statistics judge a design's cap from the repo's file
+Four limits. agent-cadence's review statistics judge a design's cap from the repo's file
 (`review_stats.py`), so a flow's cap set by environment is read against the repo's; the Flows round
 either has the flow's value written where the statistics read it or accepts the mismatch. A
 fact-checker seat's model in the flow and `CADENCE_FACT_CHECK_MODEL` are two sources for one fact: the
-flow writes both from one field. The stop rule for convergence and a sticking point is prose in cadence §4.8, not a setting:
+flow writes both from one field. And a reviewer `review-model` names runs as a subagent inside the seat's
+own tool and login, so a flow whose review models that login does not offer is not followable there,
+said with its reason. The stop rule for convergence and a sticking point is prose in cadence §4.8, not a setting:
 making it a lever means new keys in agent-cadence, a change there and a pin bump here — partly a bump
 only, since a newer agent-cadence than this repo's pin already has `design-hold-rounds`. And the person's
 own cadence layer may say how rounds alternate (this install's says Sonnet, fix, Fable, fix), so a flow
@@ -240,9 +251,17 @@ that changes `review-model` must agree with it or say it overrides it.
 - **The record and the compare** — the record gains `model` and `login`, a launch record holds a model
   and no login, and §4.9c's TD-619 compare reads the model; §6's gate, which pauses a seat at its
   account's reserve, now hands it to the next usable login first.
-- **§4.3 *Nobody answers the box for the session … waits for a person*** and **§4.5a** *Switch profile…*
-  (a person's control, not built) — an unattended `limited` seat is relaunched by the tick; the build
-  rewrites those passages and §4.5a's two *not built* notes.
+- **Invariant 9 and the `relaunch` mark** — the mark is today *a person's act* (the `relaunch` RPC), its
+  `profile` read by the compare (`teamrun`, *profile a → b*) and handed to the next launch. A tick's
+  relaunch of a stopped seat is a new path the tick writes, not that mark, carrying a `model`; the mark's
+  `profile` becomes `model`, and the compare's line reads *model a → b*. Invariant 9 is amended to say so.
+- **§4.3 *Nobody answers the box for the session … waits for a person***, **§4.3 and §4.5a** *Switch
+  profile…* (a person's control, not built, which resumes with `--resume` and the record's `adapter_id`)
+  — an unattended gated or `limited` seat is relaunched by the tick, handed over from the transcript, never
+  `--resume`; the build rewrites those passages, §4.5a's two *not built* notes and its row.
+- **§4.9b *A seat that cannot answer is routed around*** — with pools gone, a stopped seat's questions go
+  to its extras, then the person; and **§4.9b's techlead *optional, never `person`*** becomes the
+  `person` value (tier 1).
 - **§4.3 "the install is never run by ShiftLead or a session"** (Grok; Gemini's layer needs `sudo`) — the
   Tools page shows the documented install and opens a Shell tab where the person runs it; it does not
   run it. Keeps the rule.
@@ -259,8 +278,10 @@ that changes `review-model` must agree with it or say it overrides it.
 - **Tools**: per host (a node's CLIs, logins and `profiles.yml` are its own, and its tick runs its relaunches);
   a login's schema first (account, config directory, options, per host); renaming an account moves its reserve
   and its usage and spend history (the key changes); metered and API-key logins (no quota, amount
-  reserves); a login's options (`permission_prompts`, `config_dir`, `extra_args`, `billing`, and a
-  metered login's `prices`); a writer for `profiles.yml`, which has none today, written only from the
+  reserves); a login's options (`config_dir`, `extra_args`, `billing`, a metered login's `prices`,
+  and the models it offers, which a pin narrows: `gemini-reader` offers only `flash-lite`, since the
+  CLI's default exhausts its free tier at once — the family a tool's default model carries is listed
+  beside it); a writer for `profiles.yml`, which has none today, written only from the
   person's own pages and RPC, as `set_settings` is; the context bound, a
   role setting that a new model should re-ask; migrating today's profiles into logins, and every
   `profile:` in definitions and settings into a flow's model and a team's login list.
@@ -270,7 +291,7 @@ that changes `review-model` must agree with it or say it overrides it.
   stage held only by an interactive member counts toward followability as today; followability shown with its reason.
 - **Settings that name a profile today** — `teams.<t>.schedule.profile`, `sweep.profile`,
   `director.profile`, `ao team start --profile`, `ao new --profile` — each becomes a login and a model.
-- **Team**: the per-CLI login list and how a limited login's seat moves to the next; which rows move from the Settings team card (and the flow chip's link); `size`/`max` and
+- **Team**: the team's one login list and how a gated or limited seat moves to the next; which rows move from the Settings team card (and the flow chip's link); `size`/`max` and
   run-only members (TD-1149) and auto size (TD-1154); the change tray applies on Save, but a live team
   still moves only on Apply.
 
@@ -292,7 +313,9 @@ that changes `review-model` must agree with it or say it overrides it.
    writes a flow of its own under a new name and id (a directory may not take a built-in's name, §4.9c),
    re-points the team's `flows:` list (a repo team's by PR) and its `flow` setting, and moves each
    tier-2 seat's role, trigger and model into it while the team keeps the seat's name and brief.
-   An org team's new flow is an org flow, which a node cannot run (§4.9c), so a node team's goes in its
+   For ao-grind (this repo's own team, its two fact-check seats on Gemini and Grok and grinder-ao-2's
+   permission prompts) the step is a PR rewriting `.shiftlead.yml` and adding the flow under
+   `.shiftlead/flows/`, under the full cadence. An org team's new flow is an org flow, which a node cannot run (§4.9c), so a node team's goes in its
    repo. Role overlays' models and members' `profile:` values are dropped by the same step, each
    written into the flow or the login list first.
 4. **Is "Install" a button?** Recommended: a button that opens a Shell tab with the command typed, the
@@ -301,7 +324,7 @@ that changes `review-model` must agree with it or say it overrides it.
    environment; convergence and sticking-point keys filed against agent-cadence as their own entry.
 6. **Does a review stage, the techlead or the manager get a backup?** Answered by the relaunch: yes, the
    same seat on the next login, so a review chain keeps one reader. What stays refused is a second
-   reader beside the first.
+   reader beside the first. An interactive reader is never moved (invariant 5): it waits, as today.
 7. **Every team runs a flow** (Paul, 2026-11-18). A flow is opt-in today (§4.9c). A *none* flow that
    behaves as a flowless team does cannot be written as a flow: a flowless team reads each role's own
    `review:` and keeps its seats on the team (§4.9c), which no flow file expresses. Decided (Paul,
