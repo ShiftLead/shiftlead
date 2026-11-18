@@ -1116,7 +1116,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
          its own naming nobody after the person wound it down, its `wind_down.by` the person where a
          later send of the person's cleared its `wrapup_by` (TD-1895). A manager whose `wrapup_by` a
          person's later send cleared, or which never held one, carries no mark of its own and reads as
-         the person's where any member of its team carries a `wind_down.by` that is the person. A tick's close for any
+         the person's, in each of these three shapes, where any member among the team's current records (never a
+         superseded one) carries a `wind_down.by` that is the person. A tick's close for any
          other cause names nobody, as before; such a close after a session's wind-down reads as that
          session's, `other`.
 
