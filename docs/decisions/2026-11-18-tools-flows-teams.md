@@ -34,15 +34,19 @@ what is shared through git goes by PR**.
 |---|---|---|---|
 | CLIs found, versions, logins and their identity | each tool's own config directory, read | detection, read-only | Tools |
 | Account names, reserves per subscription (`usage_gate:`) | `profiles.yml`, `settings.yml` (the install's) | a writer RPC, at once | Tools |
-| Profiles (login + model + options) | `profiles.yml` | a writer RPC, at once | Tools |
+| A login's options (`permission_prompts`, `extra_args`, `billing`, `config_dir`) | `profiles.yml` | a writer RPC, at once | Tools |
 | A flow's stages, seats, triggers, briefs | the flow's directory (package: read-only; org: at once, committed by the home; repo: by PR) | the Flows page | Flows |
-| Each seat's CLI and model | the flow's directory, with its seats | as the flow is | Flows |
+| Each seat's CLI and model, and its review-round settings | the flow's directory, with its seats | as the flow is | Flows |
 | The ordered logins per CLI a team runs on (the first, then backups) | `settings.yml` (the install's; see *A flow names its models*, below) | at once | Team |
 | Flow pick, seat count ranges (`size`, `max`), hours, reserve priority, balance, on_work | `settings.yml` | at once (as the Settings team card does today) | Team |
 | A team's definition (which flows it lists, members' own briefs, the seats it adds) | `org.yml` (at once) or `.shiftlead.yml` (by PR) | rare; the page opens the PR | Team |
 
-So most of the team page needs no PR at all; the earlier draft's "a repo team's edit lands as a PR" covers
+So most of the team page needs no PR at all; design PR #4076's "a repo team's edit lands as a PR" covers
 only the rare definition change.
+
+A **profile** stops being something the person edits for a flow's seat: it is what the flow's model and
+the team's login compile to, with the login's options. Profiles a person names by hand stay for sessions
+no flow runs (*Which current rules*, below).
 
 ## Seats come in three tiers
 
@@ -60,7 +64,7 @@ and some seats on every team. The plan splits them:
    fact-checkers (`asks`), a sweeper (`swept:`). A flow may leave any of these out. This reverses
    "a seat never sits out" for these seats only.
 3. **The org's seats** — the **director** and the repo's **tagging seat**, outside any team. They stay on
-   the Settings page; the Tools page lists them among what runs on each profile.
+   the Settings page; the Tools page lists them among what runs on each login.
 
 ## Every flow covers the minimum tasks
 
@@ -104,7 +108,8 @@ re-run a smoke someone has already run; a person's own passes, recorded by the T
 This reverses §4.9c's *a flow names roles only* and *roles and flows are orthogonal*: a role's
 profile overlays (`roles:` in `org.yml` and `.shiftlead.yml`) no longer choose a model for a flow's
 seat. They stay for sessions no flow runs (`ao new`, the director, the sweep, a person's own session).
-The precedence gains the flow's seat as a rung, below a member's own `profile:` and `ao new --profile`.
+Under a flow, a seat's model comes from the flow and its login from the team's list; whether a member's
+own `profile:` may still override them is open question 7.
 
 **The team lists its subscriptions; the flow names only the model** (Paul, 2026-11-18: *the model name in
 the flow, and the sub list in the teams page — my flow could say opus, then my teams page says
@@ -115,7 +120,8 @@ and moves to the next when one is limited or cannot answer; each later entry is 
 then, as the seat pool does (§4.9b *A seat as an ordered pool*), each its own record. **A team whose list
 holds no login that can run a seat's model cannot follow the flow**, and the page says why. A backup is
 always another login for the same model: falling back to another model is out of scope, and if it is
-wanted later it is the flow's to name. A metered login (`claude-api`) is marked as one, since falling
+wanted later it is the flow's to name, perhaps as a **failover flow** with its own model set (Paul,
+2026-11-18: *if that ever becomes a need*). A metered login (`claude-api`) is marked as one, since falling
 through to it spends money, and its reserve is an amount, not a share of a window (§6). Spreading two
 subscriptions over seats by hand would need a per-seat *start on* pick, left out until it is asked for.
 Pools are refused today on a review stage, the techlead and the manager, since a backup is another
@@ -132,11 +138,10 @@ Opus 5.5 are one flow.
 
 Paul, 2026-11-18: flows get an internal id, so a person may rename one freely. Each `flow.yml` carries an
 **`id`** written when the flow is created (a built-in's fixed in the package); everything that names a
-flow — a team's `flows:` list, the `flow` setting, the login bindings, the stage chip's lookup, a
-benchmark's record — names the id, and the name is a label. A copy takes a new id. There is no `from:`:
+flow — a team's `flows:` list, the `flow` setting, the stage chip's lookup, a benchmark's record — names the id, and the name is a label. A copy takes a new id. There is no `from:`:
 a copy may be changed past any resemblance, so lineage says little; what a benchmark needs is the
-**content hash** of the flow a session ran under, kept on its record beside the model version. Open for the Flows round: how a flow is found once its directory name stops being its name
-(today *a flow is found by its directory*), and what the org-over-repo-over-package shadowing means when
+**content hash** of the flow a session ran under, kept on its record beside the model version. Open for
+the Flows round: how a flow is found once its directory name stops being its name (today *a flow is found by its directory*), and what the org-over-repo-over-package shadowing means when
 two places hold one id.
 
 ## A flow may set its review rounds
@@ -176,11 +181,12 @@ that changes `review-model` must agree with it or say it overrides it.
   and its usage and spend history (the key changes); metered and API-key logins (no quota, amount
   reserves); a profile's options beyond CLI, account and model (`permission_prompts`, `config_dir`,
   `extra_args`, `billing`); a writer for `profiles.yml`, which has none today; the context bound, a
-  role setting that a new model should re-ask.
-- **Flows**: where the login bindings live and their node story (org flows already cannot run on a node, §4.9c);
+  role setting that a new model should re-ask; a per-seat option a login cannot carry (the grind-ask
+  trial runs one grinder with permission prompts on, another without, on one login).
+- **Flows**: a node team's login list is the node's own logins (org flows already cannot run on a node, §4.9c);
   pools on a flow's seat (refused today on a review stage, the techlead and the manager); a flow switch
   never changes an interactive member's model (invariant 5); followability shown with its reason.
-- **Team**: which rows move from the Settings team card (and the flow chip's link); `size`/`max` and
+- **Team**: the per-CLI login list and how a limited login's seat moves to the next; which rows move from the Settings team card (and the flow chip's link); `size`/`max` and
   run-only members (TD-1149) and auto size (TD-1154); the change tray applies on Save, but a live team
   still moves only on Apply.
 
@@ -199,3 +205,6 @@ that changes `review-model` must agree with it or say it overrides it.
 6. **May a review stage, the techlead or the manager have a backup?** Recommended: not until the Flows
    round shows how a review chain hands a PR to a backup reader, a new session either way; until then
    such a seat waits out its limit, as it does today.
+7. **May a member's own `profile:` override the flow's model and the team's login?** Recommended: no for
+   the model (the flow defines it); a per-seat option such as permission prompts moves to the seat in the
+   flow, so an override is not needed.
