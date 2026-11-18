@@ -8,7 +8,7 @@ own questions and holes are in its ledger entry, as that round's starting list. 
 the design until a round writes it there.
 
 Review rounds: the design held on 2026-11-18 (Paul). Round 1 (Sonnet) read the plan before this split,
-and round 2 (Fable) the frame; their twelve and ten findings are applied; the record is `docs/reviews/TD-1953.md`. Three earlier reads (Fable,
+round 2 (Fable) and round 3 (Sonnet) the frame; their findings are applied; the record is `docs/reviews/TD-1953.md`. Three earlier reads (Fable,
 Sonnet, Fable, on PR #4110) came while the design was still changing and are not counted.
 
 ## Why three pages
@@ -61,25 +61,31 @@ Today the techlead, auditors, fact-checkers and sweeper are the team's `seats:`,
    — the **question seat** (key `question`: the go-between that answers a member's steer or work
    question or passes it up, and that another repo's `--team`/`--repo` ask finds, §4.9b), a review
    stage's reader on held paths, the auditors (`prs: 10`), the fact-checkers (`asks`), a sweeper
-   (`swept:`). **A flow that names no question seat sends its members' questions to the director** (Paul,
-   2026-11-18: *seems like these should go to the director*, which exists to take load off the person),
-   where the org has one, and to the person where it has none, as today: a member's brief reads
-   `{techlead}` as the director (else `none`, *ask the person*, §4.9b), so its steers and work questions
-   go there directly. This is a new road into the director, which today takes only what a seat passes up
-   (§4.9b *The director answers what is passed up to it*); it answers them as it answers a pass-up, from
-   the person's preferences, and passes up to the person what it cannot. Otherwise, as today: another
+   (`swept:`). **A flow that names no question seat takes the load off the person through the director**
+   (Paul, 2026-11-18: these questions *should go to the director*). Recommended road, to confirm: no new
+   mail road into the director. A member's steer or work question goes to the person's Inbox, as today
+   (`{techlead}` reads `none`, *ask the person*, §4.9b), where the director already reads every open
+   question when `director.work` is on (TD-1910: `ao inbox --person-questions`) and recommends on each. A
+   new delegation in `director.delegate`, **`answer`**, lets it answer such a question itself from the
+   person's preferences, told to the person as everything answered for them is (§4.9b), and leave the rest
+   with its recommendation. A new edge straight to the director was weighed and set aside: the director
+   holds no team badge and no `asks` trigger (§4.10's edges), a direct send is bounded by no asker's
+   count, and `{techlead}` naming it would go stale whenever `director:` or its record changes. The
+   director answers conservatively and from preferences, not from the design and ledger as a question
+   seat does, so a flow that wants work questions really answered names a question seat. Otherwise, as today: another
    team's `--team`/`--repo`
    ask is refused with *has no question seat — ask the person* (§4.10), and a session's request to file
    an entry in the repo is refused (§4.9b); `entries.feature` defaults, as today, to the role of
    the stage that takes `design-first`, else to the question seat's role (§4.9c), and where the flow has
-   neither, to a new value, `person`: an entry the person picks up. Beside the director road, nothing
-   reaches the person's Inbox that does not today. **The record marks the question seat**: a start writes it
+   neither, to a new value, `person`: an entry the person picks up. Otherwise nothing reaches the person's Inbox
+   that does not today. **The record marks the question seat**: a start writes it
    on the seat's `seat` mark (today `tags: true` does this, §4.10, TD-1565), so `--team` never finds a
    fact-checker, which is also an `asks` seat. A flow may leave any of its seats out. **A switch drops a
    seat by one rule**: the seat still answers what it was already asked, then closes (§4.9c *A switch
    mid-chain*, whose reason stays); the switch itself waits for nothing. The question seat joins the
    compare (§4.9c, TD-619), so a member whose brief named the dropped seat as `{techlead}` reads
-   *definition changed* and is relaunched with the new one at Apply.
+   *definition changed* and is relaunched with the new one at Apply; an interactive member is never
+   relaunched (invariant 5), and is told the new seat instead.
 3. **The director** stays the org's, outside any team, on the Settings page.
 
 **Tagging is the repo's, not a flow's** (Paul, 2026-11-18). Where a repo has more than one team, an entry
@@ -87,8 +93,8 @@ filed without a `Team:` line is handed to a tagging seat that writes it (§4.4 *
 today that is the first live team's techlead, marked `tags: true`. It chooses between teams, so no one
 team's flow owns it: the repo names which team's question seat tags (`settings.yml` `repos.<repo>`, §5),
 defaulting, as today, to the first live team in the repo's declared team order (§4.4) whose flow has a
-question seat. Where none has, the home puts a Queue item before the person naming the untagged entries,
-where today nobody is told and `ao org check` names the lack (§4.4). A one-team repo, as every repo here
+question seat. Where none has, the home puts a Queue item before the person naming the untagged entries;
+today only the Repo page and `ao repo` say why nobody tags (`teamrun.tagging_seat`). A one-team repo, as every repo here
 is, needs none.
 
 **A seat line splits by a key** (§4.9b's `{name, role, trigger, brief, profile}`; `home:` is refused since
@@ -113,7 +119,7 @@ default. The Flows page checks every flow against the list, as §4.9c checks fol
 | Run the precheck on a PR's head | the author or the merger (cadence §4.12); main's own is the home's |
 | Review evidence (`cadence-review:`; a fact-check for docs) | the author's independent reviewer (cadence §4.8) |
 | Read a held path (`held:`) | the review stage's reader; with no review stage, nobody, and the author merges on the gate (§4.9c) |
-| Answer a member's question | the flow's question seat; with none, the director, else the person |
+| Answer a member's question | the flow's question seat; with none, the person, the director answering under its `answer` delegation |
 | File entries and write the board | each session, through the helpers |
 | Notice stalls, permissions, idle-with-work | the manager and the tick of the host the team runs on |
 
@@ -190,10 +196,14 @@ could benchmark different flow results.*
   default; §4.9b's *ask the person when there is no techlead* is the same rule restated.
 - **§4.9b *A seat as an ordered pool*** — retired; **§4.9b *A seat that cannot answer is routed around***
   — a stopped seat's questions go to its extras, then the person.
-- **§4.9b's director** — takes a member's steer or work question directly where its team's flow names
-  no question seat, not only what a seat passes up.
-- **§4.4's tagging seat** — chosen by the repo's setting, not by `tags: true` on a techlead; and §4.10's
-  `--team`/`--repo` choice (TD-1565), which reads `tags`, reads the question mark instead.
+- **§4.9b's director** — gains the `answer` delegation: under `director.work`, it may answer a member's
+  steer or work question in the person's Inbox, not only recommend on it.
+- **§4.4's tagging seat** — chosen by the repo's setting, not by `tags: true` on a techlead. `seat.tags`
+  splits in two: the question mark (every question seat) and the tagging mark (the one seat the repo's
+  setting names, written at its team's start, the tick's `tag` cause reading it). Every reader of `tags`
+  moves to one or the other: §4.10's `--team`/`--repo` choice (TD-1565, `agent_mail._one_seat`), an
+  entry's reroute and filer (`agent_mail`), the tick's `tag` cause (`agent_tick`), and
+  `teamrun.tagging_seat`.
 - **The record and invariant 9** — the record gains `model`, `login`, the seat's key and its question mark,
   and `permission_prompts` compiles into a field a start writes beside `lane`, `review` and
   `prompt_from`; a launch record holds the model; the compare reads *model a → b* and the question seat.
