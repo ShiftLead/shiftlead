@@ -11,7 +11,7 @@ import contextlib
 import os
 import re
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -395,6 +395,8 @@ class InboxMixin:
             said = self._board_answer(action, answer, answers, form)
         except board_mod.Refused as e:
             raise RpcError(str(e)) from None
+        if action == "decide":
+            self._refuse_waiting(self._line_covers(root, str(key or ""), str(text or "")))  # TD-1926
         async with self._applying_mark(root, str(key or ""), action, said):  # drawn as it lands (TD-1508)
             try:
                 done = await asyncio.to_thread(
@@ -1210,6 +1212,7 @@ class InboxMixin:
             raise RpcError(f"{id} no longer waits on you in {name}'s ledger: reload the Inbox")
         if queue_mod.qid(name, id) in self._decided_covers():
             raise RpcError(f"{id} is already decided on {name}'s board: its session acts on it")
+        self._refuse_waiting([queue_mod.qid(name, id)])  # its question waits on open work (TD-1926)
         answers = [str(a) for a in e.get("answers") or () if str(a).strip()]
         d = e.get("default")
         default = d if isinstance(d, int) and not isinstance(d, bool) and 0 <= d < len(answers) else None
@@ -1282,6 +1285,8 @@ class InboxMixin:
                 return {"repo": root, "id": id, "gone": True}
             if str(e.get("owner") or "").lower() == ledger_mod.PERSON_OWNER:
                 raise RpcError(f"{id} is yours to do: its Done answers it")
+            # among the press's own checks, before anything is written: a lifting reply is refused whole (TD-1926)
+            self._refuse_waiting([queue_mod.qid(name, id)])
             graph = self._graph()
             records = [r for r in graph.values() if asker is None or str(r.id) != asker]
             claims = queue_mod.held_claims(records, self._repos, datetime.now(UTC))
@@ -1363,6 +1368,51 @@ class InboxMixin:
         name, _, tid = hit.rpartition("#")
         got = readings.get(name)
         return (got[0], tid.upper()) if got else None
+
+    def _open_work(self) -> tuple[dict[str, dict[str, Any]], dict[str, list[str]], dict[str, str]]:
+        """The open entries of every reading the home holds by `<repo>#TD-n`, each `decision (paul)` member's counted
+        open work over them (`queue.open_work`, the one builder the Queue and the Inbox read, §4.4 *The card's
+        status*, TD-1926), and the index a line's refs link through."""
+        readings = {str(r.get("name") or Path(root).name): r for root, r in self._repos.items() if isinstance(r, dict)}
+        opens = {
+            queue_mod.qid(n, str(e.get("id"))): {**e, "repo": n}
+            for n, r in readings.items()
+            for e in (r.get("ledger") or {}).get("entries") or ()
+            if isinstance(e, dict) and e.get("id")
+        }
+        origins = {n: ledgerboard.origin_path(str(r.get("remote") or "")) or "" for n, r in readings.items()}
+        work = queue_mod.open_work(opens, queue_mod.item_resolver(origins))
+        return opens, work, queue_mod.open_refs(opens, {n: o for n, o in origins.items() if o})
+
+    def _refuse_waiting(self, qids: Iterable[str]) -> None:
+        """A press on a member whose question still waits on counted open work is stale (§4.4 *The card's status*,
+        TD-1926): refused before anything is written, *TD-n waits on TD-m: it is asked once that closes*, TD-m the
+        member's first counted id (bare in the member's own repo)."""
+        _, work, _ = self._open_work()
+        for q in qids:
+            if counted := work.get(q):
+                repo, _, tid = q.partition("#")
+                first = counted[0].removeprefix(f"{repo}#")
+                raise RpcError(f"{tid} waits on {first}: it is asked once that closes")
+
+    def _line_covers(self, root: str, key: str, text: str) -> list[str]:
+        """The entries the open board line a decide names covers (`queue.covers`): found by its id (`key`, the item's
+        id ending with it) else its words, in the board of `root`; none where no open line is found."""
+        view = self._repos.get(root) or {}
+        name = str(view.get("name") or Path(root).name)
+        opens, _, linked = self._open_work()
+        want = key.removeprefix("board:").strip()
+        for b in (view.get("boards") or {}).get("boards") or ():
+            for it in (b.get("items") or ()) if isinstance(b, Mapping) else ():
+                if not isinstance(it, Mapping) or it.get("decided"):
+                    continue
+                found = str(it.get("key") or "").removeprefix("board:").endswith(want) if want else False
+                if found or (
+                    not want and text and " ".join(text.split()) == " ".join(str(it.get("text") or "").split())
+                ):
+                    covered = queue_mod.covers(it.get("refs") or (), it.get("parts") or (), name, opens, linked)
+                    return sorted(covered)
+        return []
 
     def _decided_covers(self) -> set[str]:
         """Every `<repo>#TD-n` an open decided line on any board the home reads covers — names it, names the entry

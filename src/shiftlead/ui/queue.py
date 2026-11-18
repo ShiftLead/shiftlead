@@ -27,6 +27,7 @@ from sessionorc.queue import (  # noqa: F401 — the home's
     PERSON,
     SYNOPSIS_KEY,
     TD_REF,
+    _key_sort,
     asker_repos,
     card_entries,
     card_index,
@@ -84,7 +85,36 @@ def board_context(e: Mapping[str, Any]) -> str | None:
     return m.group(1) if m else None
 
 
+def line_then_yours(e: Mapping[str, Any], entries: Mapping[str, Mapping[str, Any]] | None) -> list[str] | None:
+    """An open, undecided `decide` line covering any member with counted open work (§4.4 *The card's status*,
+    TD-1926): the union of those members' counted ids (`entries`' `open_work`, as `ledger_for_you` gives them), in
+    key order, whatever its other members read — its answer acts on every entry it lists. None for any other item."""
+    if e.get("row") != "board" or str(e.get("kind") or "").lower() != "decide" or e.get("decided") or not entries:
+        return None
+    work = {
+        w: str((entries.get(w) or {}).get("key") or "")
+        for q in covered(e, entries)
+        for w in (entries.get(q) or {}).get("open_work") or ()
+    }
+    return sorted(work, key=lambda w: _key_sort(work[w], w)) or None
+
+
 def item_home(
+    e: Mapping[str, Any],
+    index: Mapping[str, tuple[str, str]] | None,
+    askers: Mapping[str, str] | None = None,
+    needs: bool = False,
+    entries: Mapping[str, Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """`_item_home`, and on an open undecided `decide` line covering a member with counted open work its
+    `then_yours` (`line_then_yours`, TD-1926)."""
+    home = _item_home(e, index, askers, needs, entries)
+    if then := line_then_yours(e, entries):
+        home = {**home, "then_yours": then}
+    return home
+
+
+def _item_home(
     e: Mapping[str, Any],
     index: Mapping[str, tuple[str, str]] | None,
     askers: Mapping[str, str] | None = None,
@@ -496,6 +526,8 @@ def split_later(
             else:
                 # the Inbox's own row of a line no card holds draws its *holds* line too (TD-1380)
                 keep.append({**e, **{k: home[k] for k in ("covers", "holds") if k in home}, **link})
+    # `n` here is the rows the Inbox draws, a *waiting, then yours* one among them, so its list is not hidden; the
+    # rail counts through `rail_rows`, which leaves that row out (TD-1926)
     return {"n": sum(len(g["rows"]) for g in groups), "groups": groups}, rest, moved, unshown
 
 
@@ -760,6 +792,15 @@ def waits_on_me(mine: Iterable[str], wants: Mapping[str, Any]) -> list[str]:
             if ref and not TD_REF.fullmatch(ref) and ref not in out:
                 out.append(ref)
     return out
+
+
+def asked_once(mine: Iterable[str], card: Mapping[str, Any] | None) -> list[str]:
+    """*waits on me* as a Start session's prompt says it (§4.4 *The card's status*, TD-1926): an entry whose row
+    reads *waiting, then yours* ends *— asked once TD-n closes*, TD-n its first counted id alone, so the session
+    reads that it waits; every other id as given."""
+    rows = [(card or {}).get("top"), *((card or {}).get("rows") or ())]
+    then = {str(r["qid"]): r["then_yours"] for r in rows if isinstance(r, Mapping) and r.get("then_yours")}
+    return [f"{m} — asked once {then[m][0]} closes" if m in then else m for m in mine]
 
 
 def item_id(e: Mapping[str, Any]) -> str:
@@ -1276,14 +1317,14 @@ def card_edge(group: str, status: str, wants: Mapping[str, Any]) -> str:
 def branch(r: Mapping[str, Any]) -> str:
     """A row's colour in the card's tree (§4.5 screen 12 *A card*, TD-915): `done` (green) an archived row,
     `needs` (amber) the person's — *yours to do*, *your decision* — `waiting` (teal) one that
-    waits — *waits until*, *waits on an event*, *waiting* (TD-1130), *settling* — else `open` (grey), *with you in
-    <name>* among them (TD-1281)."""
+    waits — *waits until*, *waits on an event*, *waiting* (TD-1130), *settling*, *waiting, then yours* (TD-1926: it
+    keeps its `needs`, which no test of need reads) — else `open` (grey), *with you in <name>* among them (TD-1281)."""
     state = str(r.get("state") or "")
     if r.get("archived"):
         return "done"
-    if r.get("needs") and not (r.get("with_you") or r.get("answered")):
+    if r.get("needs") and not (r.get("with_you") or r.get("answered") or r.get("then_yours")):
         return "needs"
-    if state.startswith("waits ") or state in ("waiting", "settling"):
+    if state.startswith("waits ") or state in ("waiting", "settling") or r.get("then_yours"):
         return "waiting"
     return "open"
 
@@ -1293,7 +1334,7 @@ def _seg(r: Mapping[str, Any]) -> dict[str, str]:
     *in review* keeps its word in a grey segment (§4.5 screen 12 *A card*, TD-1131)."""
     word = (
         ""
-        if r.get("with_you") or r.get("answered")
+        if r.get("with_you") or r.get("answered") or r.get("then_yours")  # its own word, *waiting, then yours*
         else {"owner": "yours to do", "decision": "your decision"}.get(str(r.get("needs") or ""), "")
     )
     return {"b": branch(r), "title": f"{r.get('show') or r.get('qid')}: {word or r.get('state') or 'open'}"}

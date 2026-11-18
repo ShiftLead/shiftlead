@@ -468,6 +468,7 @@ from .queue import (
     WINDOW_LABEL,
     WINDOW_WORD,
     apply_picks,
+    asked_once,
     attach,
     card_index,
     card_page_find,
@@ -3888,7 +3889,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             cfg, cfg_why = None, str(e).strip('"')
         work = {
             "where": "Queue" if card_id else "Inbox",
-            "mine": mine,
+            # an entry *waiting, then yours* ends *— asked once TD-n closes* (TD-1926)
+            "mine": asked_once(mine, card) if card is not None and kept is None else mine,
             "rest": rest,
             "item": item,
             "walk": walk,

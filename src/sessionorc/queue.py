@@ -1508,6 +1508,10 @@ def reading(
             touch[n].add(a_q)
             up[a_q] = n
 
+    # the fact (§4.4 *The card's status*, TD-1926): a `decision (paul)` member's counted open work, on the entry,
+    # read by its rows, Lift, `_own` and `_status`'s `waits`, whatever word a row draws
+    for q, work in open_work(open_, xref).items():
+        open_[q]["open_work"] = work
     # an open member blocked past the org's reach (§4.4 *Blocked*): a decision not the person's, an id in
     # no reading (an unknown id keeps its block), a `<repo>#TD-n` no reading holds open, or an item
     # ledgerboard cannot read
@@ -1645,11 +1649,18 @@ def reading(
             applying = pressing.get(q) if not mine else None  # *with you* first, then the mark (TD-1508)
             if applying:
                 st, needs, answered = applying_words(applying), None, None  # the mark is no need of the person
+            # *waiting, then yours* (TD-1926): a member that would otherwise need the person and whose question waits
+            # on open work; every word above keeps its place, and the row keeps its `needs`, marked
+            fact = list(e.get("open_work") or ())
+            then_yours = fact if fact and needs and not mine and not answered else None
+            if then_yours:
+                st = "waiting, then yours"
             # **Lift the hold** in the row's ⋯ (§4.4 *Where Lift the hold is drawn*, TD-1831): read on its own,
             # whichever answer's word the row draws; never on a *with you* row or under a press's mark
             lift = (
                 not mine
                 and not applying
+                and not fact  # a member with counted open work draws no Lift, whatever its word (TD-1926)
                 and lift_here(
                     e, decided_lines, claims, live, boards, open_, rs.origins.get(e["repo"]) or str(e["repo"]).lower()
                 )
@@ -1675,6 +1686,8 @@ def reading(
                 "with_you": mine["name"] if mine else None,
                 "answered": answered,
                 "applying": applying,
+                "open_work": fact,  # the fact, whatever the word (TD-1926)
+                "then_yours": then_yours,  # the word's mark: its counted ids, a need no test of need reads
                 "lift_here": bool(lift),
                 # what the row's controls read (§4.5 screen 12 *any open row*, TD-905): its page kind, an open
                 # id in its `Blocked by:` or an open part, and a design's open builds (`ledger.builds_open`, TD-1130)
@@ -1705,6 +1718,8 @@ def reading(
             "with_you": None,
             "answered": None,
             "applying": None,
+            "open_work": [],
+            "then_yours": None,
             "lift_here": False,
             "page": "",
             "after": [],
@@ -1746,6 +1761,63 @@ def reading(
         "design_prs": designs,
         "at": now.isoformat(),
     }
+
+
+def item_resolver(origins: Mapping[str, str]) -> Callable[[str], str | None]:
+    """A `<repo>#TD-n` item's `<repo>#TD-n` qid among the readings named in `origins` (name → origin path, '' for
+    none), as the Queue's reading resolves one (`_Repos.resolve`, `ledger.pick_repo`); None where no one reading is
+    named."""
+
+    def xref(item: str) -> str | None:
+        m = lb.XREPO_ITEM_RE.match(item)
+        name = ledger_mod.pick_repo(m.group(1), dict(origins), {n: n for n in origins}) if m else None
+        return qid(name, m.group(2)) if m and name else None
+
+    return xref
+
+
+def open_work(entries: Mapping[str, Mapping[str, Any]], xref: Callable[[str], str | None]) -> dict[str, list[str]]:
+    """Each `decision (paul)` member's **counted open work** (§4.4 *The card's status*, *A `decision (paul)` member
+    that still waits on open work is no need*, TD-1926): the open ids in its `Blocked by:` — this repo's, and a
+    `<repo>#TD-n` that `xref` resolves to an open entry — and the open entries naming it in `Part of:`, less each
+    that carries `decision (paul)` itself and each whose own open `Blocked by:` chain reaches the member (its answer
+    comes first; a visited set guards a cycle). An id that resolves to no open entry, and an `until` or `event`
+    gate, count for nothing. `entries` are the open entries by `<repo>#TD-n`, each with its `repo`; the result
+    holds only members with some, each list in key order (`_key_sort`, this repo's before another's). One builder:
+    the Queue's reading, the Inbox's `ledger_for_you` and the home's refusal of a stale press all call it."""
+    blockers: dict[str, set[str]] = {q: set() for q in entries}
+    parts: dict[str, set[str]] = {q: set() for q in entries}
+    for q, e in entries.items():
+        named = [qid(str(e.get("repo") or ""), str(b)) for b in e.get("blocked_ids") or []]
+        named += [x for x in map(xref, e.get("xrepo_ids") or []) if x]
+        for n in named:
+            if n in entries and n != q:
+                blockers[q].add(n)
+        if e.get("part_of") and (n := qid(str(e.get("repo") or ""), str(e["part_of"]))) in entries and n != q:
+            parts[n].add(q)
+
+    def held(q: str) -> bool:
+        return ledger_mod.decided_by(dict(entries[q]), PERSON)
+
+    def reaches(start: str, target: str) -> bool:
+        seen, todo = {start}, [start]
+        while todo:
+            for b in blockers.get(todo.pop(), ()):
+                if b == target:
+                    return True
+                if b not in seen:
+                    seen.add(b)
+                    todo.append(b)
+        return False
+
+    out: dict[str, list[str]] = {}
+    for q in entries:
+        if not held(q):
+            continue
+        counted = [w for w in blockers[q] | parts[q] if not held(w) and not reaches(w, q)]
+        if counted:
+            out[q] = sorted(counted, key=lambda w: _key_sort(str(entries[w].get("key") or ""), w))
+    return out
 
 
 def _holder(rec: Any) -> dict[str, Any]:
@@ -1953,7 +2025,12 @@ def _start(members: list[str], open_: Mapping[str, Mapping[str, Any]], keyed: Ma
     `decision (paul)` entry by key, else the top entry — by key alone, never by what is claimed, so two presses
     choose the same entry."""
     by_key = sorted(members, key=lambda q: _key_sort(keyed[q], q))
-    owned = [q for q in by_key if str(open_[q].get("owner") or "").lower() == PERSON and _own(open_[q])]
+    # the gate itself, not `_own`: an entry whose question waits on open work is still the one Start opens (TD-1926)
+    owned = [
+        q
+        for q in by_key
+        if str(open_[q].get("owner") or "").lower() == PERSON and ledger_mod.decided_by(dict(open_[q]), PERSON)
+    ]
     if len(owned) == 1:
         return owned[0]
     return next((q for q in by_key if ledger_mod.decided_by(dict(open_[q]), PERSON)), top)
@@ -1987,12 +2064,14 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
     first, whatever word it reads."""
     if any(r.get("restart_home") for r in rows):
         return "needs you"
-    if any(r["needs"] and not r.get("with_you") and not r.get("answered") for r in rows):
+    if any(r["needs"] and not r.get("with_you") and not r.get("answered") and not r.get("then_yours") for r in rows):
         return "needs you"
     if any(r["state"] == "stalled" for r in rows):
         return "stalled"
 
     def waits(e: Mapping[str, Any]) -> bool:
+        if e.get("open_work"):  # a held member whose question waits on counted open work (TD-1926)
+            return True
         if e.get("waiting") or e.get("settling"):  # a live check's `event (live)` gate among them (TD-1452)
             return True
         # blocked only by open ids (a gate is the `waiting` mark's, TD-1395)
@@ -2010,8 +2089,9 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
 
 def _own(e: Mapping[str, Any]) -> bool:
     """The person's own member (§4.4 *Waiting*): `Blocked by: decision (paul)` — an `Owner: paul` alone holds
-    nothing (TD-1375)."""
-    return ledger_mod.decided_by(dict(e), PERSON)
+    nothing (TD-1375) — with no counted open work: one with some waits as a member blocked by open ids does
+    (TD-1926), read from the stamped `open_work`, never from `parts_open`."""
+    return ledger_mod.decided_by(dict(e), PERSON) and not e.get("open_work")
 
 
 def _wait(
@@ -2043,7 +2123,10 @@ def _wait(
         e = open_[q]
         return bool(e.get("waiting") or e.get("settling")) or far(e)
 
-    if not rest or not all(of_its_own(q) or (blockers[q] | parts[q]) - own for q in rest):
+    def counted(q: str) -> set[str]:  # a held member's counted open work (TD-1926), else its open ids and parts
+        return set(open_[q].get("open_work") or ()) or (blockers[q] | parts[q])
+
+    if not rest or not all(of_its_own(q) or counted(q) - own for q in rest):
         return None
     home = top.partition("#")[0]
 
