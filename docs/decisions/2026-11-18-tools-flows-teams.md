@@ -80,7 +80,7 @@ today.
 
 Escalation to the person and promoting the live copy are fixed: no flow changes them.
 
-## A flow names its models; the install binds only the subscription
+## A flow names its models; the install lists the logins
 
 Paul, 2026-11-18: *part of defining a good flow will also be defining which models do which parts — if
 those models are not available on a machine, then that machine cannot run that flow (the user can copy
@@ -89,10 +89,8 @@ could benchmark different flow results.*
 
 So each seat of a flow names the **CLI and model** it runs on (`claude-code` · `opus`, `grok` · its
 model), never an account or a profile name, which are one machine's (and a node's are its own,
-§4.4a). The install binds only **which login** runs each such seat: the one login of that CLI where
-there is one, a per-seat pick where there are several (two SuperGrok subscriptions spread by hand over
-two seats). That binding is the install's, saved at once on the Flows page or the team page, and it
-compiles into the `profile` a record already carries, so invariant 9 (*a flow is not on the record*)
+§4.4a). The install binds only **which login** runs each such seat, and its backups, as one ordered list
+(below), saved at once with the team; it compiles into the `profile` a record already carries, so invariant 9 (*a flow is not on the record*)
 holds: the tick never reads a flow.
 
 **A machine that cannot run a seat's model cannot follow the flow**, read as followability is today
@@ -108,16 +106,19 @@ profile overlays (`roles:` in `org.yml` and `.shiftlead.yml`) no longer choose a
 seat. They stay for sessions no flow runs (`ao new`, the director, the sweep, a person's own session).
 The precedence gains the flow's seat as a rung, below a member's own `profile:` and `ao new --profile`.
 
-**A backup for a critical seat** (Paul, 2026-11-18: *paul-grok is limited, but grok-heather is the
-backup*) is one ordered list per seat on the flow: CLI and model entries, *Grok, then Claude Code · Opus*.
-The install expands each entry into every signed-in login of that CLI, tried in order before the next
-entry, so another login is a backup with nothing set; the page draws one line, *Grok · backup Claude Code ·
-Opus*, with each login's state under it. The person may set only which login a seat starts on (to spread
-two subscriptions by hand) and exclude a login from a seat. It reuses the seat pool (§4.9b *A seat as an
-ordered pool*): later members are held and filled only when the one before cannot answer, each its own
-record. Pools are refused today on a review stage, the techlead and the manager, since a backup is another
-session and so another reader; the Flows round decides whether that holds, for a backup of either kind.
-Formal load balancing across subscriptions is the deferred pool-with-`max` design, out of scope.
+**A seat's logins are one ordered list, and its backups are the rest of it** (Paul, 2026-11-18: *just
+list the login in the backup list, e.g. [grok-paul, claude-paul, grok-heather] — that would also offer
+the user more control*). Each entry is a login and a model, since a login alone does not fix one:
+`[grok-paul · grok, claude-paul · opus, grok-heather · grok]`. The first runs the flow's model for the
+seat; the rest are tried in the order written when the one before is limited or cannot answer. The list
+is the install's, saved at once with the team (`settings.yml`), since login names are one machine's; the
+shared flow names only each seat's model, which is what a benchmark compares and what decides whether a
+machine can follow it. A copy of a flow brings its models, never the person's backups. A session that ran on
+a backup keeps on its record the model it ran. An entry is a profile in all but name, and the list is the
+seat pool (§4.9b *A seat as an ordered pool*): later entries are held and filled only when the one before
+cannot answer, each its own record. Pools are refused today on a review stage, the techlead and the
+manager, since a backup is another session and so another reader; the Flows round decides whether that
+holds. Formal load balancing across subscriptions is the deferred pool-with-`max` design, out of scope.
 
 **A model is named by its family, not its version** (Paul, 2026-11-18): a seat says `opus` or `sonnet`, and
 the CLI runs its default version of it, so ShiftLead never tracks which old versions a CLI still offers.
@@ -125,7 +126,7 @@ The version a session actually ran is read from its transcript (the spend reader
 there) and kept on its record, so metrics compare like with like without the flow naming it. Opus 5 and
 Opus 5.5 are one flow.
 
-## A flow has an id, and a lineage
+## A flow has an id
 
 Paul, 2026-11-18: flows get an internal id, so a person may rename one freely. Each `flow.yml` carries an
 **`id`** written when the flow is created (a built-in's fixed in the package); everything that names a
