@@ -203,6 +203,7 @@ def test_an_entry_closed_by_a_squash_merge_reads_its_pr_and_a_direct_push_none(r
         "closed": r["recent"][[e["id"] for e in r["recent"]].index("TD-001")]["closed"],
         "pr": 1290,
         "sha": life["TD-001"].sha,  # the closing commit, the promote reading's test (TD-904)
+        "by": None,  # no `Merged-by:` trailer on its closing commit (TD-1899)
         "author": "eyecantell",
         "branch": "td001-rest",
         "url": "https://x/pull/1290",

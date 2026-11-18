@@ -31,8 +31,8 @@ from typing import Any
 
 import yaml
 
+from sessionorc import cadence, mail, paths
 from sessionorc import ledgerboard as lb
-from sessionorc import mail, paths
 from sessionorc.models import owner_word
 
 # origin's default branch as last fetched; the two usual names when `origin/HEAD` was never set
@@ -1195,29 +1195,86 @@ class Change:
     closed: datetime | None = None
     pr: int | None = None
     sha: str | None = None
+    by: dict[str, Any] | None = None  # who closed it, from the closing commit's trailers (`closed_by`, TD-1899)
 
 
-Event = tuple[str | None, datetime | None, int | None, dict[str, str], set[str]]  # sha, at, pr, added, removed
+Trailers = list[tuple[str, str]]  # a commit's trailers in order, each key lower-cased (git compares them so)
+Event = tuple[str | None, datetime | None, int | None, dict[str, str], set[str], Trailers]
+# sha, at, pr, added, removed, trailers
+
+# the log's commit line (§4.4 *Who closed it*, TD-1899): the subject, then `\x1d` and the trailers, `\x1f` between
+LOG_FORMAT = "--format=%x00C %H %cI %s%x1d%(trailers:only,unfold,separator=%x1f)"
+_VERDICT = r"\((SHIP|FIXED|BLOCK)\)\s*$"
+VERDICT_RE = re.compile(_VERDICT, re.IGNORECASE)
+_WORD = r"[A-Za-z0-9][A-Za-z0-9._/-]*"
+# a review value's model, in the cadence's own two shapes: `<word> (…)… (<verdict>)` and `(<word>, …) at … (<verdict>)`
+REVIEW_WORD_RE = re.compile(rf"^({_WORD})(?:\s*\([^()]*\))*\s*{_VERDICT}", re.IGNORECASE)
+REVIEW_AT_RE = re.compile(rf"^\(({_WORD}),[^()]*\)\s+at\s.*{_VERDICT}", re.IGNORECASE)
+_TRAILING_GROUP = re.compile(r"\s*\([^()]*\)\s*$")
+_COAUTHOR = re.compile(r"^(.*?)\s*<([^<>@\s]+)@[^<>]*>\s*$")
 
 
-def _commit_line(line: str) -> tuple[str | None, datetime | None, int | None]:
-    """A `\\x00C <sha> <iso> <subject>` line's sha, instant and squash PR."""
-    parts = line.split(" ", 3)
+def _commit_line(line: str) -> tuple[str | None, datetime | None, int | None, Trailers]:
+    """A `\\x00C <sha> <iso> <subject>\\x1d<trailers>` line's sha, instant, squash PR and trailers: the line is
+    split at its first `\\x1d` first, so the subject keeps the end its `(#n)` is read from; the trailers are split
+    at `\\x1f`, each at its first `: ` (§4.4 *Who closed it*, TD-1899)."""
+    head, _, tail = line.partition("\x1d")
+    parts = head.split(" ", 3)
     try:
         at = datetime.fromisoformat(parts[2].strip())
     except (IndexError, ValueError):
         at = None
     m = SQUASH.search(parts[3]) if len(parts) > 3 else None
-    return (parts[1] if len(parts) > 1 else None), at, (int(m.group(1)) if m else None)
+    trailers: Trailers = []
+    for t in tail.split("\x1f"):
+        key, sep, value = t.partition(": ")
+        if sep and key.strip():
+            trailers.append((key.strip().lower(), value.strip()))
+    return (parts[1] if len(parts) > 1 else None), at, (int(m.group(1)) if m else None), trailers
+
+
+def review_of(value: str) -> dict[str, str | None]:
+    """One `Review:` trailer's `{model, verdict}` (§4.4 *Who closed it*, TD-1899): `verdict` the parenthesised
+    `SHIP`, `FIXED` or `BLOCK` ending the value, upper-cased (else None); `model` the name, as written, only in the
+    cadence's own shapes, and None for any other value and for `unknown`."""
+    v = VERDICT_RE.search(value)
+    m = REVIEW_WORD_RE.match(value) or REVIEW_AT_RE.match(value)
+    model = m.group(1) if m else None
+    return {"model": None if model is None or model.lower() == "unknown" else model,
+            "verdict": v.group(1).upper() if v else None}  # fmt: skip
+
+
+def closed_by(trailers: Trailers, pr: int | None) -> dict[str, Any] | None:
+    """Who closed an entry, from its closing commit's trailers (§4.4 *Who closed it*, TD-1899): None with no
+    `Merged-by:`, else `{pr, built, reviews, precheck, merged, override}`. `precheck` is the trailer's presence
+    here; `history` sets it None where the repo sets no precheck."""
+    merged = next((v for k, v in trailers if k == "merged-by"), None)
+    if merged is None:
+        return None
+    built: list[str] = []
+    for k, v in trailers:
+        if k == "co-authored-by" and (m := _COAUTHOR.match(v)):
+            name = m.group(1).strip()
+            if name and name == m.group(2) and name not in built:
+                built.append(name)
+    return {
+        "pr": pr,
+        "built": built,
+        "reviews": [review_of(v) for k, v in trailers if k == "review"],
+        "precheck": any(k == "precheck" for k, _ in trailers),
+        "merged": _TRAILING_GROUP.sub("", merged).strip(),
+        "override": any(k == "merge-override" for k, _ in trailers),
+    }
 
 
 def _log_events(out: str, skip: set[str]) -> list[Event]:
     """Each commit of `git log --reverse -p --unified=0`: a heading on a `+` line is in the file after that
     commit, on a `-` line it left."""
     events: list[Event] = []
-    for line in out.splitlines():
+    for line in out.split("\n"):  # never splitlines(): it breaks at `\x1d`
         if line.startswith("\x00C "):
-            events.append((*_commit_line(line), {}, set()))
+            sha, at, pr, trailers = _commit_line(line)
+            events.append((sha, at, pr, {}, set(), trailers))
         elif events and line[:1] in "+-" and (tid := lb.entry_id(line[1:])) and tid not in skip:
             if line[0] == "+":
                 events[-1][3][tid] = line[1:].partition(":")[2].strip()
@@ -1232,9 +1289,10 @@ def _dir_events(out: str, directory: str, titles: dict[str, str]) -> tuple[list[
     that add its `README.md` (the split)."""
     events: list[Event] = []
     split: set[str] = set()
-    for line in out.splitlines():
+    for line in out.split("\n"):  # never splitlines(): it breaks at `\x1d`
         if line.startswith("\x00C "):
-            events.append((*_commit_line(line), {}, set()))
+            sha, at, pr, trailers = _commit_line(line)
+            events.append((sha, at, pr, {}, set(), trailers))
             continue
         status, _, path = line.partition("\t")
         if not events or status not in ("A", "D"):
@@ -1254,23 +1312,24 @@ def _dir_events(out: str, directory: str, titles: dict[str, str]) -> tuple[list[
 def _replay(events: list[Event]) -> dict[str, Change]:
     """Every entry's life from the commits' events in order. A heading both removed and added in one commit
     (an entry moved in the file, its title edited) stays. An entry closed and later re-added is open again
-    from its first opening."""
+    from its first opening. A close's `by` is its commit's trailers' alone (`closed_by`), cleared on a re-open."""
     life: dict[str, Change] = {}
     present: set[str] = set()
-    for sha, at, pr, added, removed in events:
+    for sha, at, pr, added, removed, trailers in events:
         if at is None:
             continue
         for tid in removed - set(added):
             if tid in present:
                 present.discard(tid)
                 life[tid].closed, life[tid].pr, life[tid].sha = at, pr, sha
+                life[tid].by = closed_by(trailers, pr)
         for tid, title in added.items():
             if tid not in life:
                 life[tid] = Change(tid, title, at)
             else:
                 life[tid].title = title or life[tid].title
                 if tid not in present:
-                    life[tid].closed, life[tid].pr, life[tid].sha = None, None, None
+                    life[tid].closed, life[tid].pr, life[tid].sha, life[tid].by = None, None, None, None
             present.add(tid)
     return life
 
@@ -1315,10 +1374,10 @@ def history(
     skip = {m.group(1) for m in lb.HEADING_RE.finditer(text)} - {
         m.group(1) for m in lb.HEADING_RE.finditer(strip_comments(text))
     }
-    fmt = "--format=%x00C %H %cI %s"
+    fmt = LOG_FORMAT
     if io[0](rel) is None:
         out = _log(root, timeout, fmt, "-p", "--unified=0", rev, "--", rel)
-        return None if out is None else _parse_log(out, skip)
+        return None if out is None else _no_precheck(root, rev, _parse_log(out, skip))
     # the v1 file beside the directory, by agent-cadence's names (`layout_at`): a custom-named v1 file is not read
     v1 = layout_at(rel, None, _null_io())[0]
     one = _log(root, timeout, fmt, "-p", "--unified=0", rev, "--", v1)
@@ -1333,7 +1392,17 @@ def history(
     old = _log_events(one, skip)
     split &= {e[0] for e in old if e[4]}  # a split moves v1 headings out; a ledger born v2 opens its files
     merged = sorted(old + events, key=lambda e: at.get(e[0] or "", -1))
-    return _replay([e for e in merged if e[0] not in split])
+    return _no_precheck(root, rev, _replay([e for e in merged if e[0] not in split]))
+
+
+def _no_precheck(root: Path | str, rev: str, life: dict[str, Change]) -> dict[str, Change]:
+    """Every `by`'s `precheck` None where the repo sets no `precheck` at `rev`, or it cannot be read — one reading
+    for every entry (§4.4 *Who closed it*, TD-1899); read only where some entry has a `by`."""
+    if any(c.by for c in life.values()) and cadence.precheck_command(root, rev)[0] is None:
+        for c in life.values():
+            if c.by:
+                c.by["precheck"] = None
+    return life
 
 
 def stamp(root: Path | str, branch: str | None = None) -> tuple[str, float, str | None] | None:
@@ -1563,6 +1632,7 @@ def read(
             "closed": c.closed and c.closed.isoformat(),
             "pr": c.pr if c.closed else None,
             "sha": c.sha if c.closed else None,
+            "by": c.by if c.closed else None,
         }
         for c in recent
     ]
@@ -1602,8 +1672,9 @@ def reading(
 
 def completed(recent: list[dict[str, Any]] | None, prs: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
     """*What closed, and by which PR* (design §4.4 *Repo facts*, TD-604): the ledger reading's `recent`
-    entries that closed, newest first, each `{id, title, closed, pr, sha, author, branch, url}` — `pr` the
-    closing commit's squash number (None: a direct push), `sha` that commit (TD-904), and `author`,
+    entries that closed, newest first, each `{id, title, closed, pr, sha, by, author, branch, url}` — `pr` the
+    closing commit's squash number (None: a direct push), `sha` that commit (TD-904), `by` who closed it
+    (`closed_by`, TD-1899), and `author`,
     `branch` and `url` the month's PR reading's by that number (empty where it holds none), so a view can
     name the session whose branch it was. The archive is not read."""
     by_number = {p.get("number"): p for p in prs or () if isinstance(p, dict)}
@@ -1620,6 +1691,7 @@ def completed(recent: list[dict[str, Any]] | None, prs: list[dict[str, Any]] | N
                 "closed": e["closed"],
                 "pr": pr,
                 "sha": e.get("sha"),
+                "by": e.get("by"),
                 "author": str((p or {}).get("author") or ""),
                 "branch": str((p or {}).get("branch") or ""),
                 "url": str((p or {}).get("url") or ""),
