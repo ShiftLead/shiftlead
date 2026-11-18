@@ -499,6 +499,58 @@ def split_later(
     return {"n": sum(len(g["rows"]) for g in groups), "groups": groups}, rest, moved, unshown
 
 
+# a review's verdict in words on the who-closed-it line (§4.5 screen 12 *Recently completed*, TD-1899)
+VERDICT_WORDS = {"SHIP": "passed", "FIXED": "passed after fixes", "BLOCK": "blocked"}
+PASSED = ("SHIP", "FIXED")
+
+
+def who_closed(by: Any, drawn_pr: Any) -> list[list[dict[str, Any]]] | None:
+    """An entry's who-closed-it line from its closing commit's trailers (§4.4 *What closed*'s `by`; §4.5 screen 12
+    *Recently completed*, TD-1899, built by TD-1933): its parts in order, each a list of spans `{t, w}` (`w` the
+    warning colour), the page joining parts with *·*. None where `by` is None: nothing says it is missing.
+    The head is *built by* the sessions joined by *and* (left out where none), or *closed in #n*, *by* them where
+    any, where the closing PR is set and is not `drawn_pr`; then *reviewed by* each review joined by *;*, or *no
+    review*; *no precheck* where `precheck` is False (never None); *merged past the gate* where `override`;
+    *merged by* the merger as written. A *blocked* no later review passed (`SHIP` or `FIXED`) is marked."""
+    if not isinstance(by, Mapping):
+        return None
+    quiet = lambda t: {"t": t, "w": False}  # noqa: E731
+    warn = lambda t: {"t": t, "w": True}  # noqa: E731
+    parts: list[list[dict[str, Any]]] = []
+    names = " and ".join(str(b) for b in by.get("built") or () if b)
+    pr = by.get("pr")
+    if pr is not None and drawn_pr is not None and str(pr) != str(drawn_pr):
+        parts.append([quiet(f"closed in #{pr}" + (f" by {names}" if names else ""))])
+    elif names:
+        parts.append([quiet(f"built by {names}")])
+    reviews = [r for r in by.get("reviews") or () if isinstance(r, Mapping)]
+    verdicts = [str(r.get("verdict") or "").upper() for r in reviews]
+    if not reviews:
+        parts.append([warn("no review")])
+    else:
+        spans = [quiet("reviewed by ")]
+        for i, r in enumerate(reviews):
+            spans.append(quiet(("; " if i else "") + str(r.get("model") or "an unnamed reviewer")))
+            if (v := verdicts[i]) in VERDICT_WORDS:
+                spans.append(quiet(", "))
+                passed_later = any(x in PASSED for x in verdicts[i + 1 :])
+                spans.append({"t": VERDICT_WORDS[v], "w": v == "BLOCK" and not passed_later})
+        joined: list[dict[str, Any]] = []
+        for s in spans:  # quiet neighbours as one span, so the page draws one text where nothing is marked
+            if joined and not s["w"] and not joined[-1]["w"]:
+                joined[-1] = quiet(joined[-1]["t"] + s["t"])
+            else:
+                joined.append(s)
+        parts.append(joined)
+    if by.get("precheck") is False:
+        parts.append([warn("no precheck")])
+    if by.get("override"):
+        parts.append([warn("merged past the gate")])
+    if by.get("merged"):
+        parts.append([quiet(f"merged by {by['merged']}")])
+    return parts
+
+
 def _plain(text: Any) -> str:
     """A `Resolved:` line as the card opens to it: the ledger's emphasis and code marks dropped, its
     words kept (no Markdown is rendered on the page)."""
@@ -1430,16 +1482,18 @@ def queue_view(
                 "priority": str(top.get("priority") or "").lower(),
                 "title": str(top.get("title") or (c.get("titles") or {}).get(c.get("id")) or ""),
                 "n": len(c.get("ids") or ents) or 1,
-                # what it opens to: each entry's `Resolved:` and its PR; nothing to say, it does not open
+                # what it opens to: each entry's `Resolved:`, its PR and who closed it (TD-1899); an entry with
+                # nothing to say is listed only on a line of more than one, and a line listing none does not open
                 "entries": [
                     {
                         "show": _show(str(e.get("qid") or ""), one_repo),
                         "title": e.get("title") or "",
                         "pr": e.get("pr"),
                         "resolved": _plain(e.get("resolved")),
+                        "who": who_closed(e.get("by"), e.get("pr")),
                     }
                     for e in ents
-                    if e.get("resolved") or len(ents) > 1
+                    if e.get("resolved") or e.get("by") or len(ents) > 1
                 ],
                 "wins": _wins(c.get("at") or c.get("closed"), at, now),
                 "live": live(str(c.get("id") or "").partition("#")[0], (ents[0] if ents else {}).get("sha")),
@@ -1469,11 +1523,13 @@ def queue_view(
                         {
                             "show": r["show"],
                             "title": r.get("title") or "",
-                            "pr": r.get("pr"),
+                            # a row's PR is read from `Resolved:` alone; where that names none, the closing one
+                            "pr": (drawn := r.get("pr") or (r.get("by") or {}).get("pr")),
                             "resolved": _plain(r.get("resolved")),
+                            "who": who_closed(r.get("by"), drawn),
                         }
                     ]
-                    if r.get("resolved")
+                    if r.get("resolved") or r.get("by")
                     else [],
                     "wins": _wins(r.get("closed"), at, now),
                     "live": live(str(r.get("repo") or str(r.get("qid") or "").partition("#")[0]), r.get("sha")),
