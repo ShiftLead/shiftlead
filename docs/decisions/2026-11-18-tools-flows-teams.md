@@ -37,7 +37,7 @@ what is shared through git goes by PR**.
 | Profiles (login + model + options) | `profiles.yml` | a writer RPC, at once | Tools |
 | A flow's stages, seats, triggers, briefs | the flow's directory (package: read-only; org: at once, committed by the home; repo: by PR) | the Flows page | Flows |
 | Each seat's CLI and model | the flow's directory, with its seats | as the flow is | Flows |
-| Which login runs each seat, where a CLI has several | `settings.yml` (the install's; see *A flow names its models*, below) | at once | Flows, Team |
+| The ordered logins per CLI a team runs on (the first, then backups) | `settings.yml` (the install's; see *A flow names its models*, below) | at once | Team |
 | Flow pick, seat count ranges (`size`, `max`), hours, reserve priority, balance, on_work | `settings.yml` | at once (as the Settings team card does today) | Team |
 | A team's definition (which flows it lists, members' own briefs, the seats it adds) | `org.yml` (at once) or `.shiftlead.yml` (by PR) | rare; the page opens the PR | Team |
 
@@ -80,7 +80,7 @@ today.
 
 Escalation to the person and promoting the live copy are fixed: no flow changes them.
 
-## A flow names its models; the install lists the logins
+## A flow names its models; the team lists its logins
 
 Paul, 2026-11-18: *part of defining a good flow will also be defining which models do which parts — if
 those models are not available on a machine, then that machine cannot run that flow (the user can copy
@@ -89,8 +89,8 @@ could benchmark different flow results.*
 
 So each seat of a flow names the **CLI and model** it runs on (`claude-code` · `opus`, `grok` · its
 model), never an account or a profile name, which are one machine's (and a node's are its own,
-§4.4a). The install binds only **which login** runs each such seat, and its backups, as one ordered list
-(below), saved at once with the team; it compiles into the `profile` a record already carries, so invariant 9 (*a flow is not on the record*)
+§4.4a). The team binds only **which logins** run them, as an ordered list per CLI (below); a seat's choice
+compiles into the `profile` a record already carries, so invariant 9 (*a flow is not on the record*)
 holds: the tick never reads a flow.
 
 **A machine that cannot run a seat's model cannot follow the flow**, read as followability is today
@@ -106,19 +106,21 @@ profile overlays (`roles:` in `org.yml` and `.shiftlead.yml`) no longer choose a
 seat. They stay for sessions no flow runs (`ao new`, the director, the sweep, a person's own session).
 The precedence gains the flow's seat as a rung, below a member's own `profile:` and `ao new --profile`.
 
-**A seat's logins are one ordered list, and its backups are the rest of it** (Paul, 2026-11-18: *just
-list the login in the backup list, e.g. [grok-paul, claude-paul, grok-heather] — that would also offer
-the user more control*). Each entry is a login and a model, since a login alone does not fix one:
-`[grok-paul · grok, claude-paul · opus, grok-heather · grok]`. The first runs the flow's model for the
-seat; the rest are tried in the order written when the one before is limited or cannot answer. The list
-is the install's, saved at once with the team (`settings.yml`), since login names are one machine's; the
-shared flow names only each seat's model, which is what a benchmark compares and what decides whether a
-machine can follow it. A copy of a flow brings its models, never the person's backups. A session that ran on
-a backup keeps on its record the model it ran. An entry is a profile in all but name, and the list is the
-seat pool (§4.9b *A seat as an ordered pool*): later entries are held and filled only when the one before
-cannot answer, each its own record. Pools are refused today on a review stage, the techlead and the
-manager, since a backup is another session and so another reader; the Flows round decides whether that
-holds. Formal load balancing across subscriptions is the deferred pool-with-`max` design, out of scope.
+**The team lists its subscriptions; the flow names only the model** (Paul, 2026-11-18: *the model name in
+the flow, and the sub list in the teams page — my flow could say opus, then my teams page says
+(claude-paul, claude-heather, claude-api) and if opus is not available, the flow is broken*). The team
+page keeps one ordered list of logins per CLI the flow uses, saved at once with the team
+(`settings.yml`), since login names are one machine's. Every seat on that CLI starts on the first login
+and moves to the next when one is limited or cannot answer; each later entry is a backup, filled only
+then, as the seat pool does (§4.9b *A seat as an ordered pool*), each its own record. **A team whose list
+holds no login that can run a seat's model cannot follow the flow**, and the page says why. A backup is
+always another login for the same model: falling back to another model is out of scope, and if it is
+wanted later it is the flow's to name. A metered login (`claude-api`) is marked as one, since falling
+through to it spends money, and its reserve is an amount, not a share of a window (§6). Spreading two
+subscriptions over seats by hand would need a per-seat *start on* pick, left out until it is asked for.
+Pools are refused today on a review stage, the techlead and the manager, since a backup is another
+session and so another reader; the Flows round decides whether that holds. Formal load balancing is
+the deferred pool-with-`max` design, out of scope.
 
 **A model is named by its family, not its version** (Paul, 2026-11-18): a seat says `opus` or `sonnet`, and
 the CLI runs its default version of it, so ShiftLead never tracks which old versions a CLI still offers.
@@ -186,8 +188,8 @@ that changes `review-model` must agree with it or say it overrides it.
 
 1. **Is the question seat a tier-1 seat on every team?** Recommended: yes, as the manager is; a team that
    wants none says `person`.
-2. **Where do login bindings live?** Recommended: `settings.yml` under the team (`teams.<team>.logins`),
-   since which subscription runs a team's seat is the team's running choice; a node's are its own.
+2. **Is the login list per CLI or per seat?** Recommended: per CLI, every seat on it sharing the order;
+   a per-seat *start on* pick only if spreading by hand is wanted.
 3. **Do on-call seats move from the team's `seats:` into `flow.yml`?** Recommended: yes for tier 2, with a
    migration that writes each repo's current seats into a repo copy of its flow.
 4. **Is "Install" a button?** Recommended: a button that opens a Shell tab with the command typed, the
