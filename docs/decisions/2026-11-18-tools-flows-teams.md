@@ -269,8 +269,9 @@ that changes `review-model` must agree with it or say it overrides it.
    reader beside the first.
 7. **Every team runs a flow** (Paul, 2026-11-18). A flow is opt-in today (§4.9c). A *none* flow that
    behaves as a flowless team does cannot be written as a flow: a flowless team reads each role's own
-   `review:` and keeps its seats on the team (§4.9c), which no flow file expresses. Recommended: no
-   *none* flow; a team picks a real flow, the plainest being the built-in `build` (build only, no review
-   stage). Every team on this install already runs one, so nothing migrates here. Tier-1 seats' models are
+   `review:` and keeps its seats on the team (§4.9c), which no flow file expresses. Decided (Paul,
+   2026-11-18): no *none* flow; a team picks a real flow, the plainest being the built-in `build` (build
+   only, no review stage). Per-role review rules, the one thing a flowless team has that a flow drops, are
+   a flow's to express if they are ever wanted. Every team on this install already runs one, so nothing migrates here. Tier-1 seats' models are
    named in the flow, and a flow switch reaches a running team only through Apply (Paul, 2026-11-18),
    which waits until the question seat holds no open ask.
