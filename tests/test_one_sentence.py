@@ -101,7 +101,7 @@ def test_a_ledger_entry_carries_its_ask_and_its_answers_consequences():
 def test_an_entry_filed_with_a_context_leads_with_its_ask_alone(tmp_path, capsys):
     """TD-1915, design §4.4 *What waits on the person*: the Ask file is one line and its context goes in
     `--context`, which the writer puts in a `**Context:**` section right after it; the Queue card's sentence is
-    still the Ask alone, the Context's paragraphs read neither into it nor into the row's detail."""
+    still the Ask alone, none of the Context's paragraphs read into it."""
     from sessionorc.ledgerboard import ledger as lb_ledger
 
     (led := tmp_path / "docs" / "ledger").mkdir(parents=True)
