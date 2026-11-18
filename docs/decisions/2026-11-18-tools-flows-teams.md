@@ -157,19 +157,19 @@ login is offered for a seat once its tool passes there.
   or a removed login is no difference either: it takes effect at each seat's next launch.
 - **A seat that is stopped moves.** An unattended seat that is gated (its account at its reserve, §6,
   which pauses it before the tool's own limit) or `limited` (Paul, 2026-11-18: *hitting either the
-  reserve or a hard limit should trigger the backup*) is relaunched on the next usable login, its
-  conversation resumed: **Switch profile…** (§4.3 *The limit dialog*, §4.5a), designed for a person's
+  reserve or a hard limit should trigger the backup*) is relaunched on the next usable login, its work
+  handed over from the transcript (below): **Switch profile…** (§4.3 *The limit dialog*, §4.5a), designed for a person's
   press and not built, done by the tick of the host the team runs on (a node's own, §4.4a). One
   mechanism serves every seat (Paul, 2026-11-18: a question seat stopped mid-answer is where a build
   seat stopped mid-issue is, only less often); new questions to a stopped question seat are routed around
   it meanwhile (§4.9b), and a lane's other members keep picking. With no usable login left the seat waits,
   as it does today. An interactive session is never moved (invariant 5). A relaunch is a new process on
   the same record (§4.5a), so the seat keeps its name, and a review stage's reader stays one reader.
-- **Resuming across logins and tools.** A tool resumes a conversation from its own config directory, and
-  another login is another directory, or another tool. ShiftLead already keeps the transcripts, so where
-  a tool cannot resume, the relaunch starts a fresh session seeded from the transcript (Paul,
-  2026-11-18), and an open ask the seat held stays on its mail for it. The Tools round tests a native
-  resume first, with a second Claude login, since every Claude profile here shares one.
+- **Every handoff starts from the transcript** (Paul, 2026-11-18: *all handoffs should probably use the
+  same (transcript) method for simplicity*). A relaunch on another login never asks the tool to resume
+  its own conversation, which lives in that login's config directory or another tool's format: it starts
+  a fresh session seeded from the transcript ShiftLead already keeps, the same way whatever the tools. An
+  open ask the seat held stays on its mail for the new session. No cross-login resume test is needed.
 - **A metered login** (`claude-api`) is marked as one, since a seat that moves to it spends money; it is
   used like any other in its place in the list, its reserve an amount rather than a share of a window
   (§6) — see open question 8.
@@ -313,6 +313,6 @@ that changes `review-model` must agree with it or say it overrides it.
 8. **May a seat move onto a metered login on its own?** Decided (Paul, 2026-11-18): yes, in its place in
    the list, bounded by its amount reserve; a person who wants it only by hand leaves it out of the list.
 9. **Does a flow ever pin the tool?** The same model through Claude Code and through an aggregator's tool
-   is two harnesses, which may do the work differently, and a benchmark should know. Recommended: no pin
-   for now; every run's tool is kept beside its model version and flow hash, so results can be split by
+   is two harnesses, which may do the work differently, and a benchmark should know. Decided (Paul,
+   2026-11-18): no pin for now; every run's tool is kept beside its model version and flow hash, so results can be split by
    it, and a pin is added if a flow is found to need one.
