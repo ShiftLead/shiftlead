@@ -283,6 +283,34 @@ def test_pushed_since_skips_old_authors_merges_and_other_branches(clone: Path):
     assert pushed_since(clone, START) is None
 
 
+@pytest.mark.unit
+def test_pushed_since_skips_a_commit_already_on_main(clone: Path):
+    """TD-1940: a commit reachable from `origin/HEAD` is not new work (§4.9a), even made after the start and
+    pushed on the branch's own ref, as a fast-forward to main brings it there."""
+    _git(clone, "switch", "-q", "main")
+    _commit(clone, "m", NEW)
+    _git(clone, "push", "-q", "origin", "main")
+    _git(clone, "switch", "-q", "td1-x")
+    _git(clone, "merge", "-q", "--ff-only", "origin/main")
+    _git(clone, "push", "-q", "-u", "origin", "td1-x")
+    assert _git(clone, "rev-parse", "origin/td1-x") == _git(clone, "rev-parse", "origin/HEAD")
+    assert pushed_since(clone, START) is None, "its only new commit is main's"
+    own = _commit(clone, "e", NEW)
+    _git(clone, "push", "-q")
+    assert pushed_since(clone, START) == own
+
+
+@pytest.mark.unit
+def test_pushed_since_reads_origin_for_a_branch_tracking_a_local_one(clone: Path):
+    """TD-1940: a branch tracking a local branch (`branch.<name>.remote` is `.`) is read on `origin/<name>`."""
+    _git(clone, "switch", "-q", "-c", "td2-y", "--track", "main")
+    assert _git(clone, "config", "--get", "branch.td2-y.remote") == "."
+    own = _commit(clone, "f", NEW)
+    _git(clone, "push", "-q", "origin", "td2-y")  # no -u: it keeps tracking the local main
+    assert _git(clone, "config", "--get", "branch.td2-y.remote") == "."
+    assert pushed_since(clone, START) == own
+
+
 # -- the chip and the Inbox row (§4.5a) -------------------------------------------------------------------
 
 
