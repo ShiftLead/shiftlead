@@ -472,6 +472,42 @@ def _git(directory: Path | str, *args: str, timeout: float) -> str | None:
     return cp.stdout if cp.returncode == 0 else None
 
 
+def pushed_since(directory: Path | str, since_iso: str, timeout: float = 5.0) -> str | None:
+    """The sha of a commit this run pushed (design §4.9a *A pushed commit is new work*, TD-1900): on the
+    checked-out branch's **own** remote ref — `refs/remotes/<remote>/<branch>`, the remote the branch is
+    configured with, else `origin`; never `@{upstream}`, which a fresh worktree's branch sets to `origin/main`
+    until its first push — the newest commit not reachable from `origin/HEAD` and not a merge whose **author**
+    date (a rebase re-stamps the committer's, never the author's) is at or after `since_iso`. None on a
+    detached HEAD, no such ref, a failed or timed-out read, a directory not a worktree, or no such commit.
+    Read-only, under `read_only_env`; the caller runs it off the event loop."""
+    try:
+        since = datetime.fromisoformat(str(since_iso).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if since.tzinfo is None:
+        since = since.replace(tzinfo=UTC)
+    branch = _git(directory, "symbolic-ref", "-q", "--short", "HEAD", timeout=timeout)
+    branch = (branch or "").strip()
+    if not branch:
+        return None
+    remote = (_git(directory, "config", "--get", f"branch.{branch}.remote", timeout=timeout) or "").strip()
+    if not remote or remote == ".":  # a branch tracking a local branch has no remote of its own
+        remote = "origin"
+    ref = f"refs/remotes/{remote}/{branch}"
+    if _git(directory, "rev-parse", "--verify", "-q", ref, timeout=timeout) is None:
+        return None
+    out = _git(directory, "log", ref, "--not", "origin/HEAD", "--no-merges", "--format=%H %aI", timeout=timeout)
+    for line in (out or "").splitlines():
+        sha, _, when = line.strip().partition(" ")
+        try:
+            at = datetime.fromisoformat(when.strip())
+        except ValueError:
+            continue
+        if sha and at >= since:
+            return sha
+    return None
+
+
 def _unpushed(directory: Path | str, branch: str, upstream: str | None, ahead: int, timeout: float) -> tuple[int, str]:
     """How many commits exist **only on this machine**, and what that was measured against (design
     §4.2 *one measure*, TD-080). The first rule that applies answers:

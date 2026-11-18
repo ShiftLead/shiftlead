@@ -35,6 +35,7 @@ from sessionorc.models import (
     SOURCES,
     MailEntry,
     Session,
+    context_over,
     normalize_context,
     normalize_ref,
     normalize_review,
@@ -61,7 +62,8 @@ LEASE_TTL = mail.LEASE_TTL
 # A `restart` declared inside this of the record's own start is marked `early` (design §4.9a
 # *A run that ends with work left*, TD-083). The word still stands — it is the session's — but a
 # controller does not act on an early one and puts it on the board instead: a run that is over
-# before it began did not run out of context. The home applies the bound because it holds the
+# before it began did not run out of context — unless the home read it over its context bound, or it
+# pushed a commit of its own this run (§4.9a, TD-1900). The home applies the bound because it holds the
 # start time, so a controller reads a field and never a clock.
 RESTART_EARLY = timedelta(minutes=30)
 GIT_EVERY = timedelta(seconds=10)  # git status per live session, cheap and cached
@@ -132,6 +134,10 @@ RESUME_MIN = timedelta(minutes=10)
 # exit inside the window is the person's.
 RESTART_CEILING = 3
 RESTART_WINDOW = timedelta(hours=2)
+# A run that pushes its own work each time is not counted by `RESTART_CEILING`, yet a run that fills its
+# context fast and pushes a trivial commit each time is still a loop: its wanted restarts count toward this
+# ceiling of their own, read over `_counted(…, pushed=True)` (design §4.9a *A pushed commit is new work*, TD-1900).
+RESTART_PUSHED_CEILING = 6
 # A record a tick restart has just created is not judged crashed for this long (TD-186): the run it
 # replaced may still be ending, and what it reports then is not the new run's.
 RESTART_SETTLE = timedelta(seconds=60)
@@ -334,6 +340,21 @@ def restart_waits(
         word = f"restart wanted · repeats {ref}" if ref else "restart wanted · early"
         return {"at": str(restart_wanted.get("at") or ""), "word": word, "lapses": False}
     return None
+
+
+_COUNT_WORDS = ("no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
+
+
+def pushed_ceiling_words(count: Any) -> str:
+    """The words of a `why: pushed` `restart_ceiling` (§4.5a **Inbox row: restart**, §4.9a *A pushed commit is
+    new work*, TD-1900), the Inbox row's and the card's slot's: *restarts exhausted · 6 in 2 h — pushed restarts
+    counted, it restarted six times in two hours*, `count` the mark's."""
+    n = count if isinstance(count, int) and not isinstance(count, bool) else None
+    said = _COUNT_WORDS[n] if n is not None and 0 <= n < len(_COUNT_WORDS) else (str(n) if n is not None else "?")
+    return (
+        f"restarts exhausted · {n if n is not None else '?'} in 2 h — pushed restarts counted, "
+        f"it restarted {said} times in two hours"
+    )
 
 
 def restart_waits_of(rec: Any) -> dict[str, Any] | None:
@@ -1136,14 +1157,17 @@ def _new_done(done: Any, earlier: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [d for d in (done or []) if isinstance(d, dict) and not seen(d)]
 
 
-def _counted(restarts: list[Any], now: datetime, fills: bool = True) -> list[dict[str, Any]]:
+def _counted(restarts: list[Any], now: datetime, fills: bool = True, pushed: bool = False) -> list[dict[str, Any]]:
     """The `restarts` entries that count toward `RESTART_CEILING` now (design §4.9a *What counts
     toward the ceiling*, §6 rule 1; TD-249 slice 3): those inside `RESTART_WINDOW`, leaving out a
     `wanted` restart that carried new work — its `done` holds something no entry in the window
     before its own held. A crash, a fill, a failed replay and a wanted restart with nothing new
     (an early one a person let run, a repeat) count; an entry written before the fields has no
     `done` and counts. A `person` entry — the one a person's Restart leaves — never counts.
-    `fills=False` leaves a seat's `fill` entries out, as rule 8's reading does."""
+    `fills=False` leaves a seat's `fill` entries out, as rule 8's reading does. A `wanted` entry carrying a
+    `pushed` sha (§4.9a *A pushed commit is new work*, TD-1900) carried new work too and is left out; with
+    `pushed=True` the count is `RESTART_PUSHED_CEILING`'s: this one's entries and, beside them, those left out
+    only for a push — a `pushed` sha and no new `done` (one with a new `done` counts toward neither)."""
     entries = [r for r in restarts if isinstance(r, dict)]
     out = []
     for i, r in enumerate(entries):
@@ -1158,11 +1182,13 @@ def _counted(restarts: list[Any], now: datetime, fills: bool = True) -> list[dic
                 at = now
             if _new_done(r.get("done"), [e for e in entries[:i] if _recent(e.get("at"), at, RESTART_WINDOW)]):
                 continue
+            if r.get("pushed") and not pushed:
+                continue
         out.append(r)
     return out
 
 
-def _restart_reading(s: Session, now: datetime) -> dict[str, Any]:
+def _restart_reading(s: Session, now: datetime, pushed: str | None = None) -> dict[str, Any]:
     """What a `restart` declared now is, read from the record (design §4.9a *Early is decided from
     the record*, *Repeated work is the person's at once*; TD-249 slice 2): `{early, repeat, words}`.
 
@@ -1174,6 +1200,13 @@ def _restart_reading(s: Session, now: datetime) -> dict[str, Any]:
     run on it. An entry with no `done` or `left` (one written before the fields, or by a close that
     failed) says nothing either way. `words` is what decided it, for the reply, and for the mark
     of an early one (`restart_wanted.decided`), which the row, the card and `ao status -v` print.
+
+    Two readings make a restart inside `RESTART_EARLY` with nothing new **not early** (TD-1900): `pushed`, the
+    sha `gitinfo.pushed_since` found on the branch's own remote ref since the record began (§4.9a *A pushed
+    commit is new work*) — not early, never the *three runs running* repeat, and kept on the mark as `pushed`;
+    and the record's context reading over its bound (§4.9a *A run past its context bound is not early*), the
+    home having sent that run away itself. The order: the same-`done` repeat, a push, the three-runs repeat
+    (nothing pushed), the context reading, then `RESTART_EARLY`.
 
     The repeat test reads what the run **declared** `done`, never what the tick derived (slice 6):
     after a replay the new record sits on the old branch, so the tick's first derivation writes a
@@ -1196,13 +1229,17 @@ def _restart_reading(s: Session, now: datetime) -> dict[str, Any]:
     if said and not new:
         ref = said[0]["ref"]
         return {"early": True, "repeat": {"ref": ref}, "words": f"repeats {ref}: reported done by an earlier run too"}
-    if thrice is not None:
+    if not pushed and thrice is not None:
         words = f"repeats {thrice}: claimed and left three runs running"
         return {"early": True, "repeat": {"ref": thrice}, "words": words}
+    if pushed:
+        return {"early": False, "repeat": None, "words": f"not early: pushed {pushed[:7]} this run", "pushed": pushed}
     try:
         inside = now - _parse(s.created) < RESTART_EARLY
     except (TypeError, ValueError):
         inside = False
+    if inside and not new and context_over({"context": s.context, "context_bound": s.context_bound}):
+        return {"early": False, "repeat": None, "words": "not early: context over its bound"}
     if inside and not new:
         return {"early": True, "repeat": None, "words": "early: nothing reported done this run"}
     if inside:

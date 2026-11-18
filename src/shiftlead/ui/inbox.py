@@ -33,7 +33,15 @@ from sessionorc import settings as settings_mod
 from sessionorc import shots as shots_mod
 from sessionorc import unanswered as unanswered_mod
 from sessionorc import workorders as workorders_mod
-from sessionorc.agent_common import HELD_MAIL, STALL_AFTER, WRAPUP_GRACE, fill_ceiling, fill_lapses, restart_waits
+from sessionorc.agent_common import (
+    HELD_MAIL,
+    STALL_AFTER,
+    WRAPUP_GRACE,
+    fill_ceiling,
+    fill_lapses,
+    pushed_ceiling_words,
+    restart_waits,
+)
 from sessionorc.client import call_sync
 from sessionorc.models import (
     PERSON,
@@ -182,6 +190,9 @@ def restart_mark(v: dict[str, Any]) -> tuple[str, str] | None:
         if ceiling.get("why") == "fill":
             # the card's line (§6 rule 3 *The ceiling is a rate, not a stop*, TD-1422): a plain mark lapses
             return str(ceiling.get("at") or ""), fill_words(ceiling)
+        if ceiling.get("why") == "pushed":
+            # the pushed restarts' own ceiling (§4.9a *A pushed commit is new work*, TD-1900)
+            return str(ceiling.get("at") or ""), pushed_ceiling_words(ceiling.get("count"))
         return str(ceiling.get("at") or ""), (
             f"restarts exhausted · {n} in 2 h — it exited on its own each time and the host agent restarted it "
             "up to its ceiling"

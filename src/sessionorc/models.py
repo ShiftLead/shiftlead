@@ -1322,7 +1322,10 @@ class Session:
     # not a state — the record still reads `idle` or `exited` — written only by the session it is
     # about (§9 invariant 14) and cleared by a later declared claim, which means it went on after
     # all. `early` marks one declared inside `RESTART_EARLY` of the record's own start by a run that
-    # reported nothing new, and `repeat: {ref}` beside it one whose `done` an earlier run reported
+    # reported nothing new, pushed nothing of its own and read under its context bound — a run that is
+    # over before it began did not run out of context, unless the home read it over its bound or it
+    # pushed (TD-1900, `pushed: <sha>` then kept here for the replay's `restarts` entry) — and
+    # `repeat: {ref}` beside it one whose `done` an earlier run reported
     # or that leaves a claim a third time (`agent_common._restart_reading`, TD-249): the word
     # stands, and a controller does not act on it. It and `out_of_work` clear each other, the later
     # declaration standing (TD-1485): a session is out of work or it wants another run at it, never both.
