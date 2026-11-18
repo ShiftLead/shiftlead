@@ -109,14 +109,15 @@ seat. They stay for sessions no flow runs (`ao new`, the director, the sweep, a 
 The precedence gains the flow's seat as a rung, below a member's own `profile:` and `ao new --profile`.
 
 **A backup for a critical seat** (Paul, 2026-11-18: *paul-grok is limited, but grok-heather is the
-backup*) reuses the seat pool (§4.9b *A seat as an ordered pool*): an ordered list whose later members
-are held and filled only when the first cannot answer, each its own record. Two kinds, kept apart:
-another **login** of the same CLI and model is the install's (the binding becomes an ordered list,
-paul-grok then grok-heather); another **model** (Grok, then Claude Code · Opus) is the flow's, since it
-changes what the flow is. Either draws on the seat as its backup, *Grok · backup grok-heather*. Pools are
-refused today on a review stage, the techlead and the manager; the Flows round decides whether that
-still holds for a critical seat. Formal load balancing across subscriptions is the deferred
-pool-with-`max` design, out of scope.
+backup*) is one ordered list per seat on the flow: CLI and model entries, *Grok, then Claude Code · Opus*.
+The install expands each entry into every signed-in login of that CLI, tried in order before the next
+entry, so another login is a backup with nothing set; the page draws one line, *Grok · backup Claude Code ·
+Opus*, with each login's state under it. The person may set only which login a seat starts on (to spread
+two subscriptions by hand) and exclude a login from a seat. It reuses the seat pool (§4.9b *A seat as an
+ordered pool*): later members are held and filled only when the one before cannot answer, each its own
+record. Pools are refused today on a review stage, the techlead and the manager, since a backup is another
+session and so another reader; the Flows round decides whether that holds, for a backup of either kind.
+Formal load balancing across subscriptions is the deferred pool-with-`max` design, out of scope.
 
 **A model is named by its family, not its version** (Paul, 2026-11-18): a seat says `opus` or `sonnet`, and
 the CLI runs its default version of it, so ShiftLead never tracks which old versions a CLI still offers.
@@ -192,6 +193,6 @@ that changes `review-model` must agree with it or say it overrides it.
    person pressing Enter.
 5. **Which review-round keys does a flow get first?** Recommended: the four agent-cadence has today, by
    environment; convergence and sticking-point keys filed against agent-cadence as their own entry.
-6. **Is a model's backup on another model allowed on a review stage, the techlead or the manager?**
-   Recommended: a backup login yes (same model, so the same reader); a backup model no, as pools are
-   refused there today, until a round shows a reader can change model mid-chain.
+6. **May a review stage, the techlead or the manager have a backup?** Recommended: not until the Flows
+   round shows how a review chain hands a PR to a backup reader, a new session either way; until then
+   such a seat waits out its limit, as it does today.
