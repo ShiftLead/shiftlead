@@ -10,8 +10,8 @@ own questions and holes are in its ledger entry, as that round's starting list. 
 the design until a round writes it there.
 
 Review rounds: the design held on 2026-11-18 (Paul). Round 1 (Sonnet) read the plan before this split,
-rounds 2 to 5 (Fable, Sonnet, Fable, Sonnet) the frame; their findings are applied (round 5 found
-nothing build-changing), those on the director's part
+rounds 2 to 6 (Fable, Sonnet, Fable, Sonnet, Fable) the frame; their findings are applied (rounds 5 and
+6 returned FIXED; round 5 found nothing build-changing), those on the director's part
 moved with it to TD-1956 (Paul, 2026-11-18); the record is `docs/reviews/TD-1953.md`. Three earlier reads (Fable,
 Sonnet, Fable, on PR #4110) came while the design was still changing and are not counted.
 
@@ -40,6 +40,7 @@ rule).
 | Tools and services found, their versions, logins and identity, the models each login offers, each account's reserve and reading (a reserve is the account's, §6) | each tool's own config directory (read); `settings.yml` | detected; reserves at once | Tools |
 | A login: its tool, account, config directory, `billing` (a metered one's `prices`), `extra_args` — each host its own | `profiles.yml` (each host's) | at once, by the person's pages only | Tools |
 | A flow: its id, stages, seats (each by a key), triggers, briefs, each seat's model and `permission_prompts`, its review-round settings | the flow's directory (package: read-only; org: committed by the home; repo: by PR) | as the flow is | Flows |
+| The install-wide default login list, for sessions no flow runs — each host's | `profiles.yml` (each host's, beside today's `default:`; not `settings.yml`, which the home replicates whole to every node, §4.4a) | at once | Tools |
 | The team's one ordered login list, across tools | `settings.yml` | at once | Team |
 | Flow pick, seat counts (`size`, `max`, by seat key), hours, reserve priority, balance, on_work | `settings.yml` | at once | Team |
 | The team's definition: the flows it lists, and each seat's name and brief by the seat's key | `org.yml` (at once) or `.shiftlead.yml` (by PR, under the full cadence) | rarely | Team |
@@ -158,11 +159,19 @@ could benchmark different flow results.*
 - **Backups are logins, never models.** Falling back to another model is out of scope; if it is ever
   wanted it is the flow's, perhaps a **failover flow** with its own model set (Paul).
 - **The cut-over from profiles** — every launch moving from a named profile to a model and a login —
-  needs the Flows round's model and the Team round's list, so it is a build after both, not the Tools
-  round's; until it lands, launches keep today's profiles.
-- **Known smoke passes ship with ShiftLead** (Paul), per tool version, model and role, so a person does not
-  re-run a smoke someone already has; their own passes add to it. The gate is on from the first build,
-  the list seeded with every tool, model and role running here today.
+  needs the Flows round's model and the Team round's list, so it is built after both, and it happens **per
+  team, at its repo's PR** (*Moving every repo over*, below). Until then a team launches as today: by the
+  profile rungs (`org.yml`'s `roles:` profiles among them) and its own `techlead:` and `seats:`, ignoring the
+  models and seats the built-in flows now carry. Its login list (`settings.yml`, saved at once) is written
+  before its PR merges, or it is unfollowable at the merge. `size`/`max` read both keys until then.
+  Logins are written beside today's profiles in `profiles.yml`, and the profiles, and `roles:` profiles,
+  go only when the old shape goes.
+- **Known smoke passes ship with ShiftLead** (Paul), per tool, model and role, so a person does not re-run
+  a smoke someone already has; their own passes add to it. The gate is on from the first build, the list
+  seeded with every tool, model and role running here today. **The gate keys on tool, model and role, not
+  on the tool's version**: each pass records the version it ran on, and a new version is only told, once a
+  day, as §4.3 does today, so a tool that updates itself never strands every seat on it; a pass is lost only
+  when a smoke on the new version fails.
 
 ## A flow has an id, and may set its review rounds
 
@@ -189,7 +198,9 @@ The plan is wide: it changes every repo with a team, and makes `flow.yml` a form
   `flow.yml`; every node then reports the new build (a container node is re-provisioned by the supervisor
   after its grace; a machine node is updated by the person, the home installing nothing there, §4.4a);
   each repo moves by its own PR under its own cadence, shiftlead's last, since the home reads its own
-  checkout at once; only then does the old shape go, `ao org check` naming any repo or node still on it. A built-in flow's id is its name (`td`,
+  checkout at once; only then does the old shape go, `ao org check` naming any repo or node still on it. Until it goes,
+  the dual reader's commit is the floor for a rollback (`ao promote --back`, AGENTS.md *Going back*): an
+  older reader refuses a moved repo's file, and `ao org check` says so. A built-in flow's id is its name (`td`,
   `build-review`, `build`), so `flows: [td]` and `flow: td` keep reading; an org or repo flow with no
   `id` reads as its directory's name until it is saved with one. `techlead.context` (today the techlead's primer) goes with the
   question seat's brief, on the team's side of the split.
@@ -237,7 +248,8 @@ The plan is wide: it changes every repo with a team, and makes `flow.yml` a form
 - **§4.3 *Nobody answers the box … waits for a person*** and **§4.3, §4.5a *Switch profile…*** (a person's
   control, not built, resuming with `--resume`) — the tick relaunches an unattended gated or `limited`
   seat, handed over from the transcript.
-- **§4.3's adapter contract** — gains the transcript handoff method (above).
+- **§4.3's adapter contract** — gains the transcript handoff method (above). §4.3's tool-version rule (a
+  new version is told, nothing stops) is kept: the smoke gate does not key on the version.
 - **§4.3's install rule** (never run by ShiftLead or a session) — kept: the Tools page opens a Shell tab
   with the install typed, and the person runs it.
 - **Definition edits from a page** — a repo team's or repo flow's edit is a PR under the full cadence; no
