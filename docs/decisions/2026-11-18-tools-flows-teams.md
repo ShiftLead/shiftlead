@@ -52,7 +52,7 @@ and some seats on every team. The plan splits them:
 
 1. **Every team's seats** — the **manager** (on call, or `person`) and the **question seat** (the
    techlead's first job: the go-between that answers a member's steer or work question or passes it
-   up, §4.9b, and that another repo's ask finds by `--team`/`--repo`). Automatic; the flow only casts
+   up, §4.9b, and that another repo's ask finds by `--team`/`--repo`). Automatic; the flow only names
    their model, or says the person holds it. A team never lacks one, so `{techlead}` in briefs, Add
    entry's default (`entries.feature`) and cross-repo asks keep working.
 2. **The flow's seats** — its stages (design, build, review, hunt, ...) and its **on-call seats**: a
