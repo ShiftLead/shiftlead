@@ -188,6 +188,35 @@ async def test_a_pushed_declaration_is_marked_and_its_entry_carries_the_sha(
 
 
 @pytest.mark.integration
+async def test_a_nodes_member_reads_no_push(agent, composerstubs, tmp_path, monkeypatch):
+    """§4.9a *A pushed commit is new work*: a node's member's worktree is not on the home, so its restart is
+    read with no push, and the git read is never run (TD-1941)."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    calls: list[str] = []
+
+    def read(d, since, timeout=5.0):
+        calls.append(d)
+        return SHA
+
+    monkeypatch.setattr("sessionorc.agent.pushed_since", read)
+    async with LocalClient() as person:
+        sid = await _member(agent, person, tmp_path)
+        first = agent.sessions[sid]
+        first.created = _iso(now - timedelta(minutes=17))
+        first.host = f"{agent.host}-node"
+        # a node's member calls the home over its link as `id@<node>`; the local socket drops a caller's
+        # `@host` (identity is the channel's), so the call is let through as its own here
+        monkeypatch.setattr(agent, "_is_self", lambda s, caller: s is first)
+        async with LocalClient(caller=sid) as w:
+            got = await w.call("progress", id=sid, status="restart", why="round pushed")
+        assert calls == [], "a node's member's push is never read on the home"
+        assert "pushed" not in got["restart_wanted"] and got["restart_wanted"].get("early") is True
+        first.host = agent.host
+        await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
 async def test_the_seventh_pushed_restart_is_the_persons_and_three_counted_trip_first(agent, composerstubs, tmp_path):
     await park_ticks(agent)
     now = datetime.now(UTC)
@@ -298,3 +327,23 @@ def test_the_chip_and_the_row_name_the_pushed_count():
     words = "restarts exhausted · 6 in 2 h — pushed restarts counted, it restarted six times in two hours"
     assert pushed_ceiling_words(6) == words
     assert restart_mark({"restart_ceiling": mark, "state": "idle"}) == (mark["at"], words)
+
+
+@pytest.mark.unit
+def test_the_card_slot_names_a_pushed_ceiling(tmp_path, monkeypatch):
+    """§4.5 row 5 (b): an exited member at the pushed restarts' ceiling reads the pushed words in the card's slot,
+    not the plain ceiling's, and its hover names §4.9a (TD-1941)."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import view
+
+    rec = {
+        "id": "ao-w", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": "/r/.claude/worktrees/w",
+        "repo": "/r", "state": "exited", "exit_code": 1, "since": "2026-11-15T22:00:00Z", "confidence": "hook",
+        "pane": True, "tail": ["done.", "❯ "], "seen_at": "2026-11-15T23:00:00Z", "unattended": True,
+        "git": {"branch": "w", "dirty": 1},
+    }  # fmt: skip
+    pushed = view({**rec, "restart_ceiling": {"at": _iso(NOW), "count": 6, "why": "pushed"}})["slot"]
+    assert pushed["text"] == pushed_ceiling_words(6) and pushed["kind"] == "bad"
+    assert pushed["full"] == f"{pushed_ceiling_words(6)} (design §4.9a) — it is yours now: Resume it, or Forget it"
+    plain = view({**rec, "restart_ceiling": {"at": _iso(NOW), "count": 3}})["slot"]
+    assert plain["text"] == "restarts exhausted · 3 in 2 h"
