@@ -1,6 +1,8 @@
 # ADR 2026-11-18: Tools, Flows and Team pages — the frame
 
-Status: **for discussion**. Class: in-repo. This is the frame for three design rounds: TD-1953 (the Tools
+Status: **for discussion**. Class: **wide** (reclassed by Paul after round 3, 2026-11-18: the migration
+rewrites every team repo's `.shiftlead.yml`, and `flow.yml` becomes a format meant to be shared), capped
+at `design-rounds-wide`. This is the frame for three design rounds: TD-1953 (the Tools
 page), TD-1954 (the Flows page) and TD-1153 (the team page), worked out with Paul on 2026-11-18 in
 session td-1153. It holds only what cuts across the three pages: where each thing lives, how a seat's
 model and login are chosen, which seats a flow has, and which current rules that reverses. Each page's
@@ -62,7 +64,7 @@ Today the techlead, auditors, fact-checkers and sweeper are the team's `seats:`,
    question or passes it up, and that another repo's `--team`/`--repo` ask finds, §4.9b), a review
    stage's reader on held paths, the auditors (`prs: 10`), the fact-checkers (`asks`), a sweeper
    (`swept:`). **A flow that names no question seat takes the load off the person through the director**
-   (Paul, 2026-11-18: these questions *should go to the director*). Recommended road, to confirm: no new
+   (Paul, 2026-11-18: these questions *should go to the director*). Decided road (Paul, 2026-11-18): no new
    mail road into the director. A member's steer or work question goes to the person's Inbox, as today
    (`{techlead}` reads `none`, *ask the person*, §4.9b), where the director already reads every open
    question when `director.work` is on (TD-1910: `ao inbox --person-questions`) and recommends on each. A
