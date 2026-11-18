@@ -13,6 +13,7 @@ import socket
 import struct
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -167,17 +168,16 @@ class FakeAgent:
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    h = Path("/tmp") / f"aosl-{tmp_path.name[-12:]}"  # a unix socket path must stay short
-    h.mkdir(exist_ok=True)
-    monkeypatch.setenv("SHIFTLEAD_HOME", str(h))
-    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x-w1")
-    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "cfg"))
-    # in this process the report is sent inline: a fork of the test runner is no status line's
-    monkeypatch.setattr(hook_mod, "aside", lambda fn, wait=hook_mod.REPORT_TIMEOUT: fn(hook_mod.REPORT_WAIT))
-    yield h
-    for f in sorted(h.rglob("*"), reverse=True):
-        f.unlink() if not f.is_dir() else f.rmdir()
-    h.rmdir()
+    # a unix socket path must stay short, and be this run's own: tmp_path's name is the test's, the same in
+    # every run, so two runs at once on one machine bound one socket (TD-1942)
+    with tempfile.TemporaryDirectory(prefix="aosl-", dir="/tmp") as d:
+        h = Path(d)
+        monkeypatch.setenv("SHIFTLEAD_HOME", str(h))
+        monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x-w1")
+        monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "cfg"))
+        # in this process the report is sent inline: a fork of the test runner is no status line's
+        monkeypatch.setattr(hook_mod, "aside", lambda fn, wait=hook_mod.REPORT_TIMEOUT: fn(hook_mod.REPORT_WAIT))
+        yield h
 
 
 def run_statusline(monkeypatch, capsys, p: dict | str, now: float) -> str:
