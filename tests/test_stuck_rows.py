@@ -97,6 +97,8 @@ def test_a_stuck_ask_naming_no_entry_is_an_inbox_needs_you_row_counted():
     [
         ({"state": "limited", "name": "techlead-1", "cap": "resets 08:00"},
          "techlead-1 is at its usage cap: resets 08:00 — it is rung after"),
+        ({"state": "restart", "word": "restart wanted · early", "since": at(2)},
+         "techlead-1 waits on your Restart: restart wanted · early"),
         ({"state": "stalled", "since": at(2)},
          "techlead-1 is stalled? — a request held past 20m with nothing new on its screen"),
         ({"state": "unfillable", "why": "fill ceiling"}, "fill ceiling"),

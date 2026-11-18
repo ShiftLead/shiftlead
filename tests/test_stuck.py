@@ -207,6 +207,28 @@ async def test_the_pass_reads_no_steer_and_keeps_a_board_entry_as_stored(agent, 
         assert agent._host_rec["stuck"] == {"board:abc": board}
 
 
+EARLY = {"at": _z(NOW - timedelta(hours=1)), "why": "context bound", "early": True, "decided": "early: nothing done"}
+
+
+@pytest.mark.unit
+def test_an_actor_whose_restart_waits_on_the_person_reads_restart_with_its_word():
+    # TD-1924 (§6 rule 13): the press that cures it, in place of `idle` and of whatever `read` gives
+    r = rec("dz", restart_wanted=EARLY)
+    a = judge(r, {"state": "idle"}, clock=NOW - timedelta(minutes=50))
+    assert a.reason == {"state": "restart", "word": "restart wanted · early", "since": r.since}
+    assert a.since == NOW - timedelta(minutes=50) and a.until is None, "clocked as idle's; it never comes back"
+    capped = rec("dz", state="exited", restart_ceiling={"at": _z(NOW), "count": 3})
+    a = judge(capped, {"state": "restart_ceiling"})
+    assert a.reason["state"] == "restart" and a.reason["word"] == "restarts exhausted", "in place of read's reason"
+    busy = rec("dz", restart_wanted=EARLY, subagents=1, subagent_at=_z(NOW - timedelta(minutes=1)))
+    assert judge(busy, {"state": "idle"}).acting, "an early mark with a live subagent is acting"
+    fill = rec("dz", state="exited", restart_ceiling={"at": _z(NOW), "why": "fill", "count": 4})
+    assert judge(fill, {"state": "fills_exhausted"}).reason == {"state": "fills_exhausted"}, "a lapsing fill mark"
+    asking = rec("dz", state="needs-you", restart_ceiling={"at": _z(NOW), "count": 3})
+    assert judge(asking, {"state": "needs_you"}).reason == {"state": "needs_you"}, "a needs-you record keeps read's"
+    assert judge(rec("dz", state="working", restart_ceiling={"at": _z(NOW)}), {"state": "working"}).acting
+
+
 # -- a decided board line waiting on a session (TD-1496 slice 2) -------------------------------------------------
 
 ROOT = "/repos/fx"
@@ -221,7 +243,11 @@ def board(*, case: str | None = "current", lines: tuple[str, ...] = (LINE,), car
         for t in lines
     ]
     b = {"fetch_case": case, "items": items, "carried": [{"key": k} for k in carried]}
-    return {"name": "fx", "root": ROOT, "boards": {"boards": [b]}}
+    bds = {"boards": [b]}
+    # the stored orders as the board pass writes them beside the boards (`workorders.entry` of each), which
+    # rule 13 reads joined (TD-1924)
+    wos = {"orders": [workorders.entry(o) for o in workorders.orders(bds)]}
+    return {"name": "fx", "root": ROOT, "boards": bds, "work_orders": wos}
 
 
 def member(n: str, state: str = "idle", **kw) -> models.Session:
@@ -373,6 +399,49 @@ async def test_a_team_held_at_day_reads_that_reason_and_a_line_no_lane_takes_rea
     put(home, rec("solo", repo="/repos/other", lane=["free-pick"]))
     await home._stuck_pass(NOW + OWAIT + timedelta(minutes=2))
     assert home._host_rec["stuck"][KEY]["reason"] == {"state": "no_lane"}
+
+
+def routed(**fields) -> dict:
+    """`board()` with its one order routed by the join to the design-first lanes (§6 rule 6, TD-1705)."""
+    got = board()
+    (o,) = got["work_orders"]["orders"]
+    got["work_orders"] = {"orders": [{**o, "lane": "design-first", "design": "TD-7", "owner": "designer", **fields}]}
+    return got
+
+
+@pytest.mark.integration
+async def test_a_design_answer_routed_to_the_designer_names_the_designer_never_a_grinder(home):
+    # TD-1924: rule 13 reads the joined orders, so a design's answer is the design-first lane's (2026-11-16: the
+    # One more round on TD-1829 named grinder-ao-1)
+    home._repos = {ROOT: routed()}
+    grinder = member("g")
+    designer = rec("dz", repo=ROOT, lane=["design-first", "owner:designer"])
+    put(home, grinder, designer)
+    home._host_rec["stuck_open"] = {KEY: {"at": _z(NOW - timedelta(hours=2)), "repo": "fx"}}
+    await home._stuck_pass(NOW)
+    row = home._host_rec["stuck"][KEY]
+    assert row["actor"]["id"] == "ao-dz" and row["actor"]["more"] == 0, "the designer alone, no grinder"
+    home._repos = {ROOT: routed(**{"for": "ao-dz"})}
+    await home._stuck_pass(NOW)
+    assert home._host_rec["stuck"][KEY]["actor"]["id"] == "ao-dz", "the designer it names"
+    designer.restart_wanted = EARLY
+    await home._stuck_pass(NOW)
+    reason = home._host_rec["stuck"][KEY]["reason"]
+    assert reason == {"state": "restart", "word": "restart wanted · early", "since": designer.since}
+    home._repos = {ROOT: board()}
+    await home._stuck_pass(NOW)
+    assert home._host_rec["stuck"][KEY]["actor"]["id"] == "ao-g", "unrouted, the free-pick lane's"
+
+
+@pytest.mark.unit
+def test_orders_reads_the_stored_orders_joined_and_falls_back_to_the_boards():
+    got = stuck.orders(routed())
+    assert [o["id"] for o in got] == [KEY] and got[0]["entry"]["lane"] == "design-first"
+    no_stored = {k: v for k, v in board().items() if k != "work_orders"}
+    (o,) = stuck.orders(no_stored)
+    assert o["id"] == KEY and "lane" not in o["entry"] and o["entry"]["work_order"] is True
+    pr = {**board(), "work_orders": {"orders": [{"id": "pr:12", "work_order": True}]}}
+    assert stuck.orders(pr) == [], "a board line's alone"
 
 
 @pytest.mark.integration
