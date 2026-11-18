@@ -10,7 +10,7 @@ own questions and holes are in its ledger entry, as that round's starting list. 
 the design until a round writes it there.
 
 Review rounds: the design held on 2026-11-18 (Paul). Round 1 (Sonnet) read the plan before this split,
-round 2 (Fable) and round 3 (Sonnet) the frame; their findings are applied; the record is `docs/reviews/TD-1953.md`. Three earlier reads (Fable,
+rounds 2 to 4 (Fable, Sonnet, Fable) the frame; their findings are applied; the record is `docs/reviews/TD-1953.md`. Three earlier reads (Fable,
 Sonnet, Fable, on PR #4110) came while the design was still changing and are not counted.
 
 ## Why three pages
@@ -69,8 +69,18 @@ Today the techlead, auditors, fact-checkers and sweeper are the team's `seats:`,
    (`{techlead}` reads `none`, *ask the person*, §4.9b), where the director already reads every open
    question when `director.work` is on (TD-1910: `ao inbox --person-questions`) and recommends on each. A
    new delegation in `director.delegate`, **`answer`**, lets it answer such a question itself from the
-   person's preferences, told to the person as everything answered for them is (§4.9b), and leave the rest
-   with its recommendation. A new edge straight to the director was weighed and set aside: the director
+   person's preferences, and leave the rest with its recommendation. **Its bounds**: the host agent takes
+   such a reply only where the asker's team has no question-marked seat, the question carries no `--lift`
+   and no `passes`, and the sender is not the director, so a techlead's pass-up and a gate-lifting ask stay
+   the person's (TD-1910 withholds `decide` until ledgerboard TD-132); the director's floor, which sends
+   *a question the asker addressed to the person by name* to the person at every level (§4.9b), is carved
+   out for a question that reached the person only for want of a question seat, the rest of the floor
+   (destructive, spending, scope, credentials, *Always ask me*) holding. **Its telling**: each answer is an
+   `act` record under `director.review` and the digest, as TD-1910's other acts are, so the person sees it
+   counted. **Its timing** (recommended, to confirm): such a question makes the director due at once, as
+   the person's answer to one of its asks does, since a watch fill comes hourly at best and a `steer`
+   lapses to its default before then. All of it only where the person turned `director.work` on and
+   delegated `answer`; both are off by default (§5). A new edge straight to the director was weighed and set aside: the director
    holds no team badge and no `asks` trigger (§4.10's edges), a direct send is bounded by no asker's
    count, and `{techlead}` naming it would go stale whenever `director:` or its record changes. The
    director answers conservatively and from preferences, not from the design and ledger as a question
@@ -121,7 +131,7 @@ default. The Flows page checks every flow against the list, as §4.9c checks fol
 | Run the precheck on a PR's head | the author or the merger (cadence §4.12); main's own is the home's |
 | Review evidence (`cadence-review:`; a fact-check for docs) | the author's independent reviewer (cadence §4.8) |
 | Read a held path (`held:`) | the review stage's reader; with no review stage, nobody, and the author merges on the gate (§4.9c) |
-| Answer a member's question | the flow's question seat; with none, the person, the director answering under its `answer` delegation |
+| Answer a member's question | the flow's question seat; with none, the person, the director answering only with `work` on and `answer` delegated |
 | File entries and write the board | each session, through the helpers |
 | Notice stalls, permissions, idle-with-work | the manager and the tick of the host the team runs on |
 
@@ -184,6 +194,27 @@ could benchmark different flow results.*
   agent-cadence's config reader and review statistics read them, not the merge gate. Convergence and
   sticking-point settings are prose in cadence §4.8 today, so they are agent-cadence's to add.
 
+## Moving every repo over, and sharing a flow
+
+The plan is wide: it changes every repo with a team, and makes `flow.yml` a format meant to travel.
+
+- **A dual-read window.** `repoconfig` refuses an unknown key and the frame changes the file's shape, while
+  five repos (samscrape, contractmatch, ledgerboard, agent-cadence, guardians-devenv) each write
+  `techlead: {name, context}` and name built-in flows by directory. Their five PRs cannot land with one
+  promote, and contractmatch's node reads its checkout with its own wheel (§4.4a). So: promote a reader of
+  both shapes; re-provision the nodes; each repo moves by its own PR under its own cadence; only then does
+  the old shape go, `ao org check` naming any repo still on it. The built-in flows' names map to fixed
+  ids, so `flows: [td]` keeps reading. `techlead.context` (today the techlead's primer) goes with the
+  question seat's brief, on the team's side of the split.
+- **A format version.** `flow.yml` carries `format: <n>`. A flow from a newer ShiftLead reads *made by a
+  newer ShiftLead*, never a stray-key refusal; a shared flow carries or names the roles it uses, since a
+  role lives outside the flow's directory; the Flows page says which of model, role or smoke pass is
+  missing where a flow cannot be followed. The content hash covers the flow's resolved `package:` briefs,
+  or the package version with them, so two versions never hash alike.
+- **A model swap on a node team is a repo PR** (accepted, recommended): org flows cannot run on a node
+  (§4.9c), so a node team's flows are its repo's, and changing a model there is a PR, where an org team's
+  is saved at once. The install-wide default login list is each host's.
+
 ## Which current rules this reverses or bends
 
 - **§4.9c orthogonality** — reversed: a flow's seat names its model; the tool is the login's.
@@ -198,8 +229,12 @@ could benchmark different flow results.*
   default; §4.9b's *ask the person when there is no techlead* is the same rule restated.
 - **§4.9b *A seat as an ordered pool*** — retired; **§4.9b *A seat that cannot answer is routed around***
   — a stopped seat's questions go to its extras, then the person.
-- **§4.9b's director** — gains the `answer` delegation: under `director.work`, it may answer a member's
-  steer or work question in the person's Inbox, not only recommend on it.
+- **§4.9b's director** — gains the `answer` delegation (§5 `director.delegate`, §4.7, under §4.8's `work`
+  grant): it may answer a member's steer or work question in the person's Inbox, within the bounds above,
+  not only recommend on it. **§4.10's reply edge** — a session replies today only to an ask in its own
+  inbox; the director's reply to a person-inbox question, addressed to its asker and closing it with a
+  reason of its own, is a new reply edge. No new road into the director. **§4.9b's floor** — carved out
+  as above. **§6 rule 3** — a new due cause for the director (recommended).
 - **§4.4's tagging seat** — chosen by the repo's setting, not by `tags: true` on a techlead. `seat.tags`
   splits in two: the question mark (every question seat) and the tagging mark (the one seat the repo's
   setting names, written at its team's start, the tick's `tag` cause reading it). Every reader of `tags`
