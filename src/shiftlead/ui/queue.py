@@ -526,6 +526,8 @@ def split_later(
             else:
                 # the Inbox's own row of a line no card holds draws its *holds* line too (TD-1380)
                 keep.append({**e, **{k: home[k] for k in ("covers", "holds") if k in home}, **link})
+    # `n` here is the rows the Inbox draws, a *waiting, then yours* one among them, so its list is not hidden; the
+    # rail counts through `rail_rows`, which leaves that row out (TD-1926)
     return {"n": sum(len(g["rows"]) for g in groups), "groups": groups}, rest, moved, unshown
 
 

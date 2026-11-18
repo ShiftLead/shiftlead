@@ -3073,6 +3073,7 @@ def rail_rows(
         for sec, rows in [*((s, sections.get(s) or ()) for s in RAIL_SECTIONS), ("coming", ahead), ("later", ledger)]
         for e in rows
         if e.get("home") != "queue"  # drawn on its Queue card, not on this page (§4.5 screen 6 *Where a row is drawn*)
+        and not e.get("then_yours")  # *waiting, then yours* stays in the list, counted nowhere (TD-1926)
     ]
 
 
@@ -3195,9 +3196,9 @@ def _added_words(day: str) -> str:
 
 
 def ledger_rows(lf: Mapping[str, Any] | None) -> list[dict[str, Any]]:
-    """`ledger_for_you`'s rows, every group's, in its order: what the rail counts under *Later* — less a row
-    *waiting, then yours* (`then_yours`, TD-1926), which stays in the list, drawn grey, and is counted nowhere."""
-    return [r for g in (lf or {}).get("groups") or () for r in g.get("rows") or () if not r.get("then_yours")]
+    """`ledger_for_you`'s rows, every group's, in its order: what the rail counts under *Later* (`rail_rows` leaves out
+    a row *waiting, then yours*, TD-1926) and the Repo page lists *for you*, where such a row stays."""
+    return [r for g in (lf or {}).get("groups") or () for r in g.get("rows") or ()]
 
 
 def ledger_for_you(

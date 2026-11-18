@@ -17,7 +17,7 @@ from sessionorc import queue, settle
 from sessionorc.agent_common import RpcError
 from sessionorc.agent_inbox import InboxMixin
 from shiftlead.ui.app import ledger_for_you
-from shiftlead.ui.inbox import ledger_rows
+from shiftlead.ui.inbox import ledger_rows, rail_rows, row_find
 from shiftlead.ui.queue import _seg, asked_once, branch, line_then_yours
 
 PART = {"Priority": "High", "Part_of": "TD-001"}
@@ -113,7 +113,8 @@ def test_the_inbox_row_carries_the_mark_and_the_counts_leave_it_out(tmp_path):
     assert rows["TD-001"]["then_yours"] == ["r#TD-002"] and rows["TD-001"]["lift_item"] is False
     assert not rows["TD-003"]["then_yours"] and rows["TD-003"]["lift_item"] is True
     assert lf["n"] == 1 and lf["groups"][0]["n"] == 1, "the row stays in the list, counted nowhere"
-    assert [x["id"] for x in ledger_rows(lf)] == ["TD-003"]
+    assert [x["id"] for x in ledger_rows(lf)] == ["TD-001", "TD-003"], "the Repo page still lists it for you"
+    assert [x["find"] for x in rail_rows({}, (), ledger_rows(lf))] == [row_find(rows["TD-003"], "later")]
     assert lf["entries"]["r#TD-001"]["open_work"] == ["r#TD-002"]
 
 
