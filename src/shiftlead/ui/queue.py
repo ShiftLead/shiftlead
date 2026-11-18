@@ -762,6 +762,15 @@ def waits_on_me(mine: Iterable[str], wants: Mapping[str, Any]) -> list[str]:
     return out
 
 
+def asked_once(mine: Iterable[str], card: Mapping[str, Any] | None) -> list[str]:
+    """*waits on me* as a Start session's prompt says it (§4.4 *The card's status*, TD-1926): an entry whose row
+    reads *waiting, then yours* ends *— asked once TD-n closes*, TD-n its first counted id alone, so the session
+    reads that it waits; every other id as given."""
+    rows = [(card or {}).get("top"), *((card or {}).get("rows") or ())]
+    then = {str(r["qid"]): r["then_yours"] for r in rows if isinstance(r, Mapping) and r.get("then_yours")}
+    return [f"{m} — asked once {then[m][0]} closes" if m in then else m for m in mine]
+
+
 def item_id(e: Mapping[str, Any]) -> str:
     """An attached item's id as `ao card` prints it (§4.7 *`ao card`*, TD-1411): `item_ref`, else *fork PR
     <repo>#<n>* for a fork's PR (its `pr`, so two repos' cannot collide), else its row's `id`."""
@@ -1276,14 +1285,14 @@ def card_edge(group: str, status: str, wants: Mapping[str, Any]) -> str:
 def branch(r: Mapping[str, Any]) -> str:
     """A row's colour in the card's tree (§4.5 screen 12 *A card*, TD-915): `done` (green) an archived row,
     `needs` (amber) the person's — *yours to do*, *your decision* — `waiting` (teal) one that
-    waits — *waits until*, *waits on an event*, *waiting* (TD-1130), *settling* — else `open` (grey), *with you in
-    <name>* among them (TD-1281)."""
+    waits — *waits until*, *waits on an event*, *waiting* (TD-1130), *settling*, *waiting, then yours* (TD-1926: it
+    keeps its `needs`, which no test of need reads) — else `open` (grey), *with you in <name>* among them (TD-1281)."""
     state = str(r.get("state") or "")
     if r.get("archived"):
         return "done"
-    if r.get("needs") and not (r.get("with_you") or r.get("answered")):
+    if r.get("needs") and not (r.get("with_you") or r.get("answered") or r.get("then_yours")):
         return "needs"
-    if state.startswith("waits ") or state in ("waiting", "settling"):
+    if state.startswith("waits ") or state in ("waiting", "settling") or r.get("then_yours"):
         return "waiting"
     return "open"
 
@@ -1293,7 +1302,7 @@ def _seg(r: Mapping[str, Any]) -> dict[str, str]:
     *in review* keeps its word in a grey segment (§4.5 screen 12 *A card*, TD-1131)."""
     word = (
         ""
-        if r.get("with_you") or r.get("answered")
+        if r.get("with_you") or r.get("answered") or r.get("then_yours")  # its own word, *waiting, then yours*
         else {"owner": "yours to do", "decision": "your decision"}.get(str(r.get("needs") or ""), "")
     )
     return {"b": branch(r), "title": f"{r.get('show') or r.get('qid')}: {word or r.get('state') or 'open'}"}

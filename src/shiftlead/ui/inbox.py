@@ -3195,8 +3195,9 @@ def _added_words(day: str) -> str:
 
 
 def ledger_rows(lf: Mapping[str, Any] | None) -> list[dict[str, Any]]:
-    """`ledger_for_you`'s rows, every group's, in its order: what the rail counts under *Later*."""
-    return [r for g in (lf or {}).get("groups") or () for r in g.get("rows") or ()]
+    """`ledger_for_you`'s rows, every group's, in its order: what the rail counts under *Later* — less a row
+    *waiting, then yours* (`then_yours`, TD-1926), which stays in the list, drawn grey, and is counted nowhere."""
+    return [r for g in (lf or {}).get("groups") or () for r in g.get("rows") or () if not r.get("then_yours")]
 
 
 def ledger_for_you(
@@ -3268,6 +3269,9 @@ def ledger_for_you(
     # while it waits on its session (TD-565) — names it, names its parent while it carries `decision (paul)`, or
     # lists it in `Parts:`, on any board the home reads (§4.4 *The card's status*, TD-1364)
     covered = queue_mod.open_decided_covers(boards, opens, linked, person_only=True)
+    # each `decision (paul)` member's counted open work (§4.4 *The card's status*, TD-1926), by the Queue's builder
+    origins = {n: lb.origin_path(str(r.get("remote") or "")) or "" for n, r in readings.items()}
+    work = queue_mod.open_work(opens, queue_mod.item_resolver(origins))
     groups: list[dict[str, Any]] = []
     for root, r in (repos or {}).items():
         if not isinstance(r, dict):
@@ -3338,9 +3342,11 @@ def ledger_for_you(
             # **Lift the hold** on the entry's own item and rows (§4.4 *Where Lift the hold is drawn*, TD-1829, built
             # by TD-1879): it carries the person's gate, is not theirs to do, no press is landing on it, and no open
             # undecided line asks its hold (case (d)); a session holding it clears nothing (*No holder test*)
+            fact = list(work.get(queue_mod.qid(name, str(e["id"]))) or ())
             lift_item = bool(
                 not owner
                 and applying is None
+                and not fact  # a member with counted open work draws no Lift, whatever its word (TD-1926)
                 and ledger_mod.decided_by(dict(e), ledger_mod.PERSON_OWNER)
                 and not queue_mod.lift_case_d({**e, "repo": name}, boards, opens, repo_key)
             )
@@ -3386,6 +3392,13 @@ def ledger_for_you(
                     if got_q
                     else None,
                     "lift_item": lift_item,
+                    # the fact, whatever the row reads, and *waiting, then yours* where no earlier word stands — no
+                    # answer, hand-off, the person's own session holding it, or press landing (TD-1926): counted
+                    # nowhere, drawn grey
+                    "open_work": fact,
+                    "then_yours": fact
+                    if fact and not got_q and applying is None and not any(not s.get("unattended") for s in holders)
+                    else None,
                     # a press landing on it (§4.4 *A press is drawn as it lands*, TD-1508): no need of the person
                     "applying": applying,
                     "applying_words": queue_mod.applying_words(e["applying"])
@@ -3393,13 +3406,13 @@ def ledger_for_you(
                     else "",
                 }
             )
-        groups.append({"repo": name, "rows": rows})
+        groups.append({"repo": name, "rows": rows, "n": sum(1 for x in rows if not x.get("then_yours"))})
     # the open entries of every repo read, by `<repo>#TD-n`: what a board line covers is read through them
     # (`ui.queue.covered`, TD-1380) — its `decision (paul)` members `Part of` a `Context:` entry
     entries_open = {
         q: {k: e.get(k) for k in ("repo", "part_of", "part_of_raw", "blocked_by")} for q, e in opens.items()
     }
-    return {"n": sum(len(g["rows"]) for g in groups), "groups": groups, "entries": entries_open}
+    return {"n": sum(g["n"] for g in groups), "groups": groups, "entries": entries_open}
 
 
 def _hold_inputs(

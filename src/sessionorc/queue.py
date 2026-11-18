@@ -1763,9 +1763,20 @@ def reading(
     }
 
 
-def open_work(
-    entries: Mapping[str, Mapping[str, Any]], xref: Callable[[str], str | None]
-) -> dict[str, list[str]]:
+def item_resolver(origins: Mapping[str, str]) -> Callable[[str], str | None]:
+    """A `<repo>#TD-n` item's `<repo>#TD-n` qid among the readings named in `origins` (name → origin path, '' for
+    none), as the Queue's reading resolves one (`_Repos.resolve`, `ledger.pick_repo`); None where no one reading is
+    named."""
+
+    def xref(item: str) -> str | None:
+        m = lb.XREPO_ITEM_RE.match(item)
+        name = ledger_mod.pick_repo(m.group(1), dict(origins), {n: n for n in origins}) if m else None
+        return qid(name, m.group(2)) if m and name else None
+
+    return xref
+
+
+def open_work(entries: Mapping[str, Mapping[str, Any]], xref: Callable[[str], str | None]) -> dict[str, list[str]]:
     """Each `decision (paul)` member's **counted open work** (§4.4 *The card's status*, *A `decision (paul)` member
     that still waits on open work is no need*, TD-1926): the open ids in its `Blocked by:` — this repo's, and a
     `<repo>#TD-n` that `xref` resolves to an open entry — and the open entries naming it in `Part of:`, less each
