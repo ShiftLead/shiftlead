@@ -60,17 +60,24 @@ Today the techlead, auditors, fact-checkers and the sweeper are the team's `seat
 and "a seat never sits out" (§4.9c). Paul wants the flow to say which seats exist and when each is used,
 and some seats on every team. The plan splits them:
 
-1. **Every team's seats** — the **manager** (on call, or `person`) and the **question seat** (the
-   techlead's first job: the go-between that answers a member's steer or work question or passes it
-   up, §4.9b, and that another repo's ask finds by `--team`/`--repo`). Automatic; the flow only names
-   their model, or says the person holds it. A team never lacks one, so `{techlead}` in briefs, Add
-   entry's default (`entries.feature`) and cross-repo asks keep working.
+1. **Every team's seats** — the **manager** (on call, or `person`) and the **question seat**: the
+   techlead's first job, the go-between that answers a member's steer or work question or passes it up
+   (§4.9b), that another repo's ask finds by `--team`/`--repo`, and that tags entries where its line
+   says `tags: true` (§4.9b, §4.4). Automatic: a team never lacks one. Today the techlead is optional and
+   never `person` (§4.9b), and `{techlead}` reads `none` without one; the plan adds **`person`** as a value,
+   under which `{techlead}` names the person, `--team`/`--repo` asks reach the person's Inbox, and
+   `entries.feature`'s default role `techlead` falls to the person. Whether the question seat and a
+   review stage's reader stay one record, as they are today (§4.9c), is the Flows round's.
 2. **The flow's seats** — its stages (design, build, review, hunt, ...) and its **on-call seats**: a
    review stage's reader on held paths (the techlead's second job), the auditors (`prs: 10`), the
-   fact-checkers (`asks`), a sweeper (`swept:`). A flow may leave any of these out. This reverses
-   "a seat never sits out" for these seats only.
-3. **The org's seats** — the **director** and the repo's **tagging seat**, outside any team. They stay on
-   the Settings page; the Tools page lists them among what runs on each login.
+   fact-checkers (`asks`), a sweeper (`swept:`). A flow may leave any of these out, reversing "a seat
+   never sits out" for these seats only; the rule's own reason (§4.9c *A switch mid-chain*) stays: a
+   seat a switch leaves out still answers what it was already asked, then closes.
+   **What a seat line holds splits** (§4.9b: today `{name, role, trigger, brief, profile, home}`): the
+   flow holds what is shareable — the role, the trigger, the model; the team keeps what is one org's or
+   one machine's — the seat's name (org-unique), its `home`, and its own brief.
+3. **The org's seat** — the **director**, outside any team. It stays on the Settings page, and picks a
+   login and a model as every session no flow runs does.
 
 ## Every flow covers the minimum tasks
 
@@ -83,8 +90,8 @@ today.
 | Merge a PR | the PR's author, on the cadence's gate (cadence §4.2 step 5); under a review stage, its last reader |
 | Run the precheck on a PR's head | the author or the merger (cadence §4.12); main's own is the home's |
 | Review evidence (`cadence-review:`; a fact-check for docs) | the author's independent reviewer (cadence §4.8) |
-| Read a held path (`held:`) | the review stage's reader; with none, the person |
-| Answer a member's question | the team's question seat (tier 1); with none, the person |
+| Read a held path (`held:`) | the review stage's reader; a flow with no review stage gives no reader, and the author merges on the cadence's gate (§4.9c) |
+| Answer a member's question | the team's question seat (tier 1), which may be the person |
 | File entries and write the board | each session, through the helpers; the question seat lands filed asks |
 | Notice stalls, permissions, idle-with-work | the manager (tier 1) and the home's tick |
 
@@ -123,22 +130,32 @@ the flow, and the sub list in the teams page — my flow could say opus, then my
 (claude-paul, claude-heather, claude-api) and if opus is not available, the flow is broken*). The team
 page keeps one ordered list of logins per CLI the flow uses, saved at once with the team
 (`settings.yml`), since login names are one machine's. Every seat on that CLI starts on the first login
-and moves to the next when one is limited or cannot answer; each later entry is a backup, filled only
-then, as the seat pool does (§4.9b *A seat as an ordered pool*), each its own record. **A team whose list
+and moves to the next when one is limited or cannot answer. That is two mechanisms, not one: an `asks`
+seat keeps today's pool (§4.9b *A seat as an ordered pool*), later logins held and filled only when the
+one before cannot answer, each its own record, and only general questions move (a `pr` ask and an
+`entry` envelope stay with their seat, §4.9b); a **worker stage** and a `prs:`/`swept:` seat, which hold
+live claims and worktrees and have no pool today, **relaunch on the next login** through the record's
+existing `relaunch.profile` mark (§4.9c), resuming where the CLI allows. The tick does either from the
+record and the team's list, never from the flow. The compiled profile (a model and a login) is written by
+the home, which owns `profiles.yml`'s writer (*Holes*, below), never by a session. Today's refusals of a
+pool beside `max`, and on any trigger but `asks`, are reversed for the login list only: it is a list of
+logins, not of seats. **A team whose list
 holds no login that can run a seat's model cannot follow the flow**, and the page says why. A backup is
 always another login for the same model: falling back to another model is out of scope, and if it is
 wanted later it is the flow's to name, perhaps as a **failover flow** with its own model set (Paul,
 2026-11-18: *if that ever becomes a need*). A metered login (`claude-api`) is marked as one, since falling
 through to it spends money, and its reserve is an amount, not a share of a window (§6). Spreading two
 subscriptions over seats by hand would need a per-seat *start on* pick, left out until it is asked for.
-Pools are refused today on a review stage, the techlead and the manager, since a backup is another
-session and so another reader; the Flows round decides whether that holds. Formal load balancing is
+Pools are refused today on a review stage, the techlead and the manager (and on `max`, and on any trigger
+but `asks`, §4.9b), since a backup is another session and so another reader; the Flows round decides
+whether that holds for each. Formal load balancing is
 the deferred pool-with-`max` design, out of scope.
 
 **A model is named by its family, not its version** (Paul, 2026-11-18): a seat says `opus` or `sonnet`, and
 the CLI runs its default version of it, so ShiftLead never tracks which old versions a CLI still offers.
 The version a session actually ran is read from its transcript (the spend reader already reads model ids
-there) and kept on its record, so metrics compare like with like without the flow naming it. Opus 5 and
+there) and kept with its run's benchmark row (*A flow has an id*), so metrics compare like with like
+without the flow naming it. Opus 5 and
 Opus 5.5 are one flow.
 
 ## A flow has an id
@@ -147,7 +164,10 @@ Paul, 2026-11-18: flows get an internal id, so a person may rename one freely. E
 **`id`** written when the flow is created (a built-in's fixed in the package); everything that names a
 flow — a team's `flows:` list, the `flow` setting, the stage chip's lookup, a benchmark's record — names the id, and the name is a label. A copy takes a new id. There is no `from:`:
 a copy may be changed past any resemblance, so lineage says little; what a benchmark needs is the
-**content hash** of the flow a session ran under, kept on its record beside the model version. Open for
+**content hash** of the flow a session ran under. Invariant 9 keeps the record free of any flow or stage
+field (§9, §4.9c), so neither the hash nor the flow's id goes on the record: the client writes them, with
+the model version the transcript names, to a store of its own beside the spend reader's, read by no
+rule. Open for
 the Flows round: how a flow is found once its directory name stops being its name (today *a flow is found by its directory*), and what the org-over-repo-over-package shadowing means when
 two places hold one id.
 
@@ -161,8 +181,13 @@ file and the default; cadence §9.18), and ShiftLead launches every session, so 
 agent-cadence's config reader and its review statistics read them, not the merge gate, so a seat run on
 other rounds trips no one else's check.
 
-Two limits. The stop rule for convergence and a sticking point is prose in cadence §4.8, not a setting:
-making it a lever means new keys in agent-cadence, a change there and a pin bump here. And the person's
+Three limits. agent-cadence's review statistics judge a design's cap from the repo's file
+(`review_stats.py`), so a flow's cap set by environment is read against the repo's; the Flows round
+either has the flow's value written where the statistics read it or accepts the mismatch. A
+fact-checker seat's model in the flow and `CADENCE_FACT_CHECK_MODEL` are two sources for one fact: the
+flow writes both from one field. The stop rule for convergence and a sticking point is prose in cadence §4.8, not a setting:
+making it a lever means new keys in agent-cadence, a change there and a pin bump here — partly a bump
+only, since a newer agent-cadence than this repo's pin already has `design-hold-rounds`. And the person's
 own cadence layer may say how rounds alternate (this install's says Sonnet, fix, Fable, fix), so a flow
 that changes `review-model` must agree with it or say it overrides it.
 
@@ -190,13 +215,16 @@ that changes `review-model` must agree with it or say it overrides it.
 
 - **Tools**: per host (a node's CLIs and logins are its own); renaming an account moves its reserve
   and its usage and spend history (the key changes); metered and API-key logins (no quota, amount
-  reserves); a profile's options beyond CLI, account and model (`permission_prompts`, `config_dir`,
-  `extra_args`, `billing`); a writer for `profiles.yml`, which has none today; the context bound, a
+  reserves); a login's options (`permission_prompts`, `config_dir`, `extra_args`, `billing`, and a
+  metered login's `prices`); a writer for `profiles.yml`, which has none today, written only from the
+  person's own pages and RPC, as `set_settings` is; the context bound, a
   role setting that a new model should re-ask; migrating today's profiles into logins, and every
   `profile:` in definitions and settings into a flow's model and a team's login list.
 - **Flows**: a node team's login list is the node's own logins (org flows already cannot run on a node, §4.9c);
   pools on a flow's seat (refused today on a review stage, the techlead and the manager); a flow switch
   never changes an interactive member's model (invariant 5); followability shown with its reason.
+- **Settings that name a profile today** — `teams.<t>.schedule.profile`, `sweep.profile`,
+  `director.profile`, `ao team start --profile`, `ao new --profile` — each becomes a login and a model.
 - **Team**: the per-CLI login list and how a limited login's seat moves to the next; which rows move from the Settings team card (and the flow chip's link); `size`/`max` and
   run-only members (TD-1149) and auto size (TD-1154); the change tray applies on Save, but a live team
   still moves only on Apply.
@@ -207,8 +235,16 @@ that changes `review-model` must agree with it or say it overrides it.
    wants none says `person`.
 2. **Is the login list per CLI or per seat?** Recommended: per CLI, every seat on it sharing the order;
    a per-seat *start on* pick only if spreading by hand is wanted.
-3. **Do on-call seats move from the team's `seats:` into `flow.yml`?** Recommended: yes for tier 2, with a
-   migration that writes each repo's current seats into a repo copy of its flow.
+3. **How do today's teams move onto flows that name models?** Recommended: the built-in flows name a
+   model for every seat (the package's own choice, Claude Code · Opus first, as the smoke passes show),
+   so a team on `td` keeps running wherever Claude Code is signed in; a team whose seats run another model
+   today (a fact-checker on Gemini, a grinder trial on another model) is migrated by a one-time step that
+   writes a flow of its own under a new name and id (a directory may not take a built-in's name, §4.9c),
+   re-points the team's `flows:` list (a repo team's by PR) and its `flow` setting, and moves each
+   tier-2 seat's role, trigger and model into it while the team keeps the seat's name, home and brief.
+   An org team's new flow is an org flow, which a node cannot run (§4.9c), so a node team's goes in its
+   repo. Role overlays' models and members' `profile:` values are dropped by the same step, each
+   written into the flow or the login list first.
 4. **Is "Install" a button?** Recommended: a button that opens a Shell tab with the command typed, the
    person pressing Enter.
 5. **Which review-round keys does a flow get first?** Recommended: the four agent-cadence has today, by
@@ -216,3 +252,9 @@ that changes `review-model` must agree with it or say it overrides it.
 6. **May a review stage, the techlead or the manager have a backup?** Recommended: not until the Flows
    round shows how a review chain hands a PR to a backup reader, a new session either way; until then
    such a seat waits out its limit, as it does today.
+7. **Where does a team with no flow get its models, and do tier-1 seats take theirs from the flow?** A flow
+   is opt-in today (§4.9c): a team may run none. Tier-1 seats also serve other repos' asks and tagging
+   whatever the flow, so a flow switch would relaunch the question seat on another model mid-thread.
+   Recommended: every team runs a flow (a team that wants none gets the built-in `build`), so there is
+   one road to a model; tier-1 seats' models are named in the flow, as Paul set, and a switch that
+   changes one waits, as Apply does today, until the seat holds no open ask.
