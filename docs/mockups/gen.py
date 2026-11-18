@@ -2211,7 +2211,7 @@ def queue_who_closed():
     def tid(t):
         return f'<span class="mono" style="font-size: 12.5px; font-weight: 600;">{t}</span>'
     def warn(t):
-        return f'<span style="color: #b45309; font-weight: 600;">{t}</span>'
+        return f'<span style="color: #7c2d12; font-weight: 600;">{t}</span>'
     def entry(t, pr, title, resolved, who):
         by = (f'<div style="font-size: 12px; margin-top: 2px; color: #6b7280; white-space: normal;">{who}</div>' if who else "")
         return (f'<div style="padding: 6px 0 6px calc(3.5em + 8px);"><span class="mono" style="font-size: 12.5px;">{t}</span> '
