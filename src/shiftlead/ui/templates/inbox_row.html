@@ -1224,7 +1224,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
     unanswered after `BOARD_WAIT_DAYS`, it says nobody has acted. -#}
 {%- set waits = section == 'waiting' %}
 {%- if e.decided %}
-<div class="st decided">decided: {{ e.decided.text }} · {{ e.decided.date }}</div>
+<div class="st decided">decided: {{ e.decided.text }} · {{ e.decided.date }}{% if e.decided.for %} · {{ e.decided.for }}{% endif %}</div>
 {%- endif %}
 {#- §4.5a **Queue card / Inbox: stuck row** (§6 rule 13 *What the person sees*, TD-1497 slice 2): a stuck decided
     line is drawn on its own row, the stuck words a line under it and its **Open** the actor's Focus — moved to
