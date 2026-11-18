@@ -70,7 +70,8 @@ person:                                       # the person's own — nothing her
   open_in: vscode                             # the editor button, below
   file_link: {folder_first: true, wait: 1}    # what a file link sends (§4.6): the folder first, and how long before the file, 0–4 s; below
   terminal: {size: 13, face: "JetBrains Mono",   # goal 12: ligatures off regardless, monospace always the fallback
-             copy_on_select: true}             # a selection in the Focus pane copies itself (§4.5a; default on)
+             copy_on_select: true,             # a selection in the Focus pane copies itself (§4.5a; default on)
+             grid: [120, 40]}                  # columns and rows a new session's pinned window starts at (§4.6, TD-1919); written by a wide Focus's Fit to window; absent, 120 × 40
   inbox: {board_show: "next:10"}              # which board items the Inbox lists before they are due: next:<n> per repo | due | <n>d | all (drawn by the Inbox and the Repo page, picked on the Settings page's You)
   composer: folded                            # §4.5a *Focus composer* **the bar**: folded (the default) | open — whether Focus draws the composer as one bar under the terminal or open under it (TD-491)
   attach: {max: "256M"}                       # §4.4 *Attachment drop*: the most a Focus attachment may be, 1M to 4G (TD-473; built by TD-478); read by the attach RPC on each call
