@@ -98,6 +98,49 @@ def test_a_ledger_entry_carries_its_ask_and_its_answers_consequences():
     assert bare["ask"] == "" and bare["answers"] == [] and bare["consequences"] == []
 
 
+def test_an_entry_filed_with_a_context_leads_with_its_ask_alone(tmp_path, capsys):
+    """TD-1915, design §4.4 *What waits on the person*: the Ask file is one line and its context goes in
+    `--context`, which the writer puts in a `**Context:**` section right after it; the Queue card's sentence is
+    still the Ask alone, none of the Context's paragraphs read into it."""
+    from sessionorc.ledgerboard import ledger as lb_ledger
+
+    (led := tmp_path / "docs" / "ledger").mkdir(parents=True)
+    (tmp_path / "why").write_text("the reason.\n")
+    (tmp_path / "ask").write_text("Which account should the walk sign in with?\n")
+    (tmp_path / "ctx").write_text("The walk signs in once a day.\n\nIt keeps the cookie between runs.\n")
+    argv = [
+        "new",
+        "--ledger",
+        str(led),
+        "--id",
+        "TD-7",
+        "--title",
+        "A walk",
+        "--priority",
+        "Low",
+        "--owner",
+        "paul",
+        "--kind",
+        "build",
+        "--blocked-by",
+        "decision (paul)",
+        "--why",
+        str(tmp_path / "why"),
+        "--ask",
+        str(tmp_path / "ask"),
+        "--context",
+        str(tmp_path / "ctx"),
+    ]
+    assert lb_ledger.main(argv) == 0
+    capsys.readouterr()
+    text = (led / "TD-007.md").read_text()
+    assert "**Context:** The walk signs in once a day." in text  # the writer wrote the section
+    (entry,) = ledger.entries(text)
+    assert entry["for_page"] == "for-you"
+    assert entry["ask"] == "Which account should the walk sign in with?"
+    assert text.index("**Ask:**") < text.index("**Context:**") and "It keeps the cookie between runs." in text
+
+
 def test_the_inbox_row_shows_each_answer_whole_and_a_press_sends_its_label(tmp_path, monkeypatch):
     """A row with no card mode draws `<label> — <consequence>` as before the split; the route reads the
     label by the pressed index, which the home matches word for word (§4.10 *The answers' split*)."""
