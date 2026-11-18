@@ -63,28 +63,10 @@ Today the techlead, auditors, fact-checkers and sweeper are the team's `seats:`,
    — the **question seat** (key `question`: the go-between that answers a member's steer or work
    question or passes it up, and that another repo's `--team`/`--repo` ask finds, §4.9b), a review
    stage's reader on held paths, the auditors (`prs: 10`), the fact-checkers (`asks`), a sweeper
-   (`swept:`). **A flow that names no question seat takes the load off the person through the director**
-   (Paul, 2026-11-18: these questions *should go to the director*). Decided road (Paul, 2026-11-18): no new
-   mail road into the director. A member's steer or work question goes to the person's Inbox, as today
-   (`{techlead}` reads `none`, *ask the person*, §4.9b), where the director already reads every open
-   question when `director.work` is on (TD-1910: `ao inbox --person-questions`) and recommends on each. A
-   new delegation in `director.delegate`, **`answer`**, lets it answer such a question itself from the
-   person's preferences, and leave the rest with its recommendation. **Its bounds**: the host agent takes
-   such a reply only where the asker's team has no question-marked seat, the question carries no `--lift`
-   and no `passes`, and the sender is not the director, so a techlead's pass-up and a gate-lifting ask stay
-   the person's (TD-1910 withholds `decide` until ledgerboard TD-132); the director's floor, which sends
-   *a question the asker addressed to the person by name* to the person at every level (§4.9b), is carved
-   out for a question that reached the person only for want of a question seat, the rest of the floor
-   (destructive, spending, scope, credentials, *Always ask me*) holding. **Its telling**: each answer is an
-   `act` record under `director.review` and the digest, as TD-1910's other acts are, so the person sees it
-   counted. **Its timing** (recommended, to confirm): such a question makes the director due at once, as
-   the person's answer to one of its asks does, since a watch fill comes hourly at best and a `steer`
-   lapses to its default before then. All of it only where the person turned `director.work` on and
-   delegated `answer`; both are off by default (§5). A new edge straight to the director was weighed and set aside: the director
-   holds no team badge and no `asks` trigger (§4.10's edges), a direct send is bounded by no asker's
-   count, and `{techlead}` naming it would go stale whenever `director:` or its record changes. The
-   director answers conservatively and from preferences, not from the design and ledger as a question
-   seat does, so a flow that wants work questions really answered names a question seat. Otherwise, as today: another
+   (`swept:`). **A flow that names no question seat leaves its members' questions to the person**, as a
+   team without a techlead does today: a member's brief reads `{techlead}` as `none` and says *ask the
+   person* (§4.9b). Whether the director takes that load is TD-1956's, outside this frame (Paul,
+   2026-11-18: *drop the director from this discussion for now and pick it up in another TD*). Otherwise, as today: another
    team's `--team`/`--repo`
    ask is refused with *has no question seat — ask the person* (§4.10), and a session's request to file
    an entry in the repo is refused (§4.9b); `entries.feature` defaults, as today, to the role of
@@ -131,7 +113,7 @@ default. The Flows page checks every flow against the list, as §4.9c checks fol
 | Run the precheck on a PR's head | the author or the merger (cadence §4.12); main's own is the home's |
 | Review evidence (`cadence-review:`; a fact-check for docs) | the author's independent reviewer (cadence §4.8) |
 | Read a held path (`held:`) | the review stage's reader; with no review stage, nobody, and the author merges on the gate (§4.9c) |
-| Answer a member's question | the flow's question seat; with none, the person, the director answering only with `work` on and `answer` delegated |
+| Answer a member's question | the flow's question seat; with none, the person (the director's part: TD-1956) |
 | File entries and write the board | each session, through the helpers |
 | Notice stalls, permissions, idle-with-work | the manager and the tick of the host the team runs on |
 
@@ -211,7 +193,8 @@ The plan is wide: it changes every repo with a team, and makes `flow.yml` a form
   role lives outside the flow's directory; the Flows page says which of model, role or smoke pass is
   missing where a flow cannot be followed. The content hash covers the flow's resolved `package:` briefs,
   or the package version with them, so two versions never hash alike.
-- **A model swap on a node team is a repo PR** (accepted, recommended): org flows cannot run on a node
+- **A model swap on a node team is a repo PR** (decided, Paul, 2026-11-18: flows live in the repo when
+  customised): org flows cannot run on a node
   (§4.9c), so a node team's flows are its repo's, and changing a model there is a PR, where an org team's
   is saved at once. The install-wide default login list is each host's.
 
@@ -229,12 +212,6 @@ The plan is wide: it changes every repo with a team, and makes `flow.yml` a form
   default; §4.9b's *ask the person when there is no techlead* is the same rule restated.
 - **§4.9b *A seat as an ordered pool*** — retired; **§4.9b *A seat that cannot answer is routed around***
   — a stopped seat's questions go to its extras, then the person.
-- **§4.9b's director** — gains the `answer` delegation (§5 `director.delegate`, §4.7, under §4.8's `work`
-  grant): it may answer a member's steer or work question in the person's Inbox, within the bounds above,
-  not only recommend on it. **§4.10's reply edge** — a session replies today only to an ask in its own
-  inbox; the director's reply to a person-inbox question, addressed to its asker and closing it with a
-  reason of its own, is a new reply edge. No new road into the director. **§4.9b's floor** — carved out
-  as above. **§6 rule 3** — a new due cause for the director (recommended).
 - **§4.4's tagging seat** — chosen by the repo's setting, not by `tags: true` on a techlead. `seat.tags`
   splits in two: the question mark (every question seat) and the tagging mark (the one seat the repo's
   setting names, written at its team's start, the tick's `tag` cause reading it). Every reader of `tags`
