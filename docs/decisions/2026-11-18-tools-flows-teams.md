@@ -10,7 +10,8 @@ own questions and holes are in its ledger entry, as that round's starting list. 
 the design until a round writes it there.
 
 Review rounds: the design held on 2026-11-18 (Paul). Round 1 (Sonnet) read the plan before this split,
-rounds 2 to 4 (Fable, Sonnet, Fable) the frame; their findings are applied, those on the director's part
+rounds 2 to 5 (Fable, Sonnet, Fable, Sonnet) the frame; their findings are applied (round 5 found
+nothing build-changing), those on the director's part
 moved with it to TD-1956 (Paul, 2026-11-18); the record is `docs/reviews/TD-1953.md`. Three earlier reads (Fable,
 Sonnet, Fable, on PR #4110) came while the design was still changing and are not counted.
 
@@ -71,8 +72,8 @@ Today the techlead, auditors, fact-checkers and sweeper are the team's `seats:`,
    another team's `--team`/`--repo` ask is refused with *has no question seat — ask the person* (§4.10), and a session's request to file
    an entry in the repo is refused (§4.9b); `entries.feature` defaults, as today, to the role of
    the stage that takes `design-first`, else to the question seat's role (§4.9c), and where the flow has
-   neither, to a new value, `person`: an entry the person picks up. Nothing else reaches the person's Inbox that
-   does not today. **The record marks the question seat**: a start writes it
+   neither, to a new value, `person`: an entry the person picks up. No member's question reaches the person that
+   did not today. **The record marks the question seat**: a start writes it
    on the seat's `seat` mark (today `tags: true` does this, §4.10, TD-1565), so `--team` never finds a
    fact-checker, which is also an `asks` seat. A flow may leave any of its seats out. **A switch drops a
    seat by one rule**: the seat still answers what it was already asked, then closes (§4.9c *A switch
@@ -180,16 +181,22 @@ could benchmark different flow results.*
 
 The plan is wide: it changes every repo with a team, and makes `flow.yml` a format meant to travel.
 
-- **A dual-read window.** `repoconfig` refuses an unknown key and the frame changes the file's shape, while
-  five repos (samscrape, contractmatch, ledgerboard, agent-cadence, guardians-devenv) each write
-  `techlead: {name, context}` and name built-in flows by directory. Their five PRs cannot land with one
-  promote, and contractmatch's node reads its checkout with its own wheel (§4.4a). So: promote a reader of
-  both shapes; re-provision the nodes; each repo moves by its own PR under its own cadence; only then does
-  the old shape go, `ao org check` naming any repo still on it. The built-in flows' names map to fixed
-  ids, so `flows: [td]` keeps reading. `techlead.context` (today the techlead's primer) goes with the
+- **A dual-read window.** `repoconfig` refuses an unknown key (as `org.TEAM_KEYS` does) and the frame
+  changes the file's shape, while six repos — samscrape, contractmatch, ledgerboard, agent-cadence,
+  guardians-devenv and shiftlead itself — each write `techlead: {name, context}` and name built-in flows
+  by directory. Their PRs cannot land with one promote, and contractmatch's node reads its checkout with
+  its own wheel (§4.4a). So: promote a reader of both shapes, which also accepts `id` and `format` in
+  `flow.yml`; every node then reports the new build (a container node is re-provisioned by the supervisor
+  after its grace; a machine node is updated by the person, the home installing nothing there, §4.4a);
+  each repo moves by its own PR under its own cadence, shiftlead's last, since the home reads its own
+  checkout at once; only then does the old shape go, `ao org check` naming any repo or node still on it. A built-in flow's id is its name (`td`,
+  `build-review`, `build`), so `flows: [td]` and `flow: td` keep reading; an org or repo flow with no
+  `id` reads as its directory's name until it is saved with one. `techlead.context` (today the techlead's primer) goes with the
   question seat's brief, on the team's side of the split.
-- **A format version.** `flow.yml` carries `format: <n>`. A flow from a newer ShiftLead reads *made by a
-  newer ShiftLead*, never a stray-key refusal; a shared flow carries or names the roles it uses, since a
+- **A format version.** `flow.yml` carries `format: <n>`, read before the stray-key check (§4.9c), and a
+  flow with none reads as format 1. A flow from a newer ShiftLead reads *made by a newer ShiftLead*, never
+  a stray-key refusal; a repo flow that writes a new key waits on the promote that accepts it, as `color`
+  did (TD-1765); a shared flow carries or names the roles it uses, since a
   role lives outside the flow's directory; the Flows page says which of model, role or smoke pass is
   missing where a flow cannot be followed. The content hash covers the flow's resolved `package:` briefs,
   or the package version with them, so two versions never hash alike.
@@ -206,6 +213,8 @@ The plan is wide: it changes every repo with a team, and makes `flow.yml` a form
   --profile`, *Switch profile…*) changes, and today's profiles, definitions and settings migrate.
 - **§4.9c "a seat never sits out"** — reversed for a flow's seats; and §4.9c's *a seat is `org.yml`'s,
   which no flow compiles* — a flow now compiles its seats.
+- **§4.9c *a flow's name is its directory's*, *a flow is found by its directory*** — a flow is named and
+  found by its `id`; its name is a label; and §4.9c's stray-key refusal in `flow.yml` reads `format` first.
 - **§4.9c *A flow is opt-in*** — reversed (every team runs one); §4.9c's rejected alternative *`td` as
   every team's default* stays rejected: a team picks its flow.
 - **§4.9b's techlead, optional and never `person`** — becomes the flow's question seat, the person by
