@@ -1715,6 +1715,7 @@ def reading(
             "archived": True,
             "closed": _closed(a["fields"], closed_at.get(q)),
             "sha": (closed_at.get(q) or {}).get("sha"),  # the closing commit, the page's live mark (TD-904)
+            "by": (closed_at.get(q) or {}).get("by"),  # who closed it, from that commit's trailers (TD-1899)
             "resolved": _resolved_text(a["fields"]),
             "synopsis": own_synopsis(q),
         }
@@ -2154,7 +2155,8 @@ def _completed(
     whose members an open entry names and whose own `Blocked by:` names no open id, dated by the
     latest `Resolved:` date of its members, its PR from that line, else *What closed*. `entries` are its
     members as the page opens the card — `qid`, `id`, `title`, `priority`, `closed` (`_closed`), `pr`, `sha`
-    (the closing commit, TD-904) and `resolved`, the `Resolved:` text — newest first, and `at` the newest `closed`.
+    (the closing commit, TD-904), `by` (who closed it, `ledger.closed_by`, TD-1899) and `resolved`, the
+    `Resolved:` text — newest first, and `at` the newest `closed`.
     Beside `ids` and `titles`, keyed alike, `types`: each member's archived `Type:` read as `ledger.entries` reads an
     open entry's (`ledger.entry_type`), so always an entry type — what a kept card's item starts its session with
     (§4.5 screen 12 *Three verbs: An item on a kept card*, TD-1618)."""
@@ -2209,6 +2211,7 @@ def _completed(
                     "closed": _closed(a["fields"], closed_at.get(q)),
                     "pr": _resolved_pr(a["fields"]) or (closed_at.get(q) or {}).get("pr"),
                     "sha": (closed_at.get(q) or {}).get("sha"),
+                    "by": (closed_at.get(q) or {}).get("by"),
                     "resolved": _resolved_text(a["fields"]),
                 }
             )
