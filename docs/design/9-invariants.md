@@ -98,4 +98,8 @@
     node's link is down its sessions neither send mail, act on another session nor create one —
     refused, visibly — its stopping policies keep running, and a person at that host may still
     act through it.
+16. **Transcripts are never removed.** No sweep or reap ShiftLead runs removes a path inside an adapter's
+    `transcript_roots()` (§4.3), or a path that holds one, since later analysis reads them; the disk
+    sweep (§4.6) refuses one,
+    never follows a symlink into one, and a test holds it (Paul, TD-1921).
 

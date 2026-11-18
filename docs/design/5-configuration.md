@@ -3,14 +3,15 @@
 - Hosts: `~/.shiftlead/hosts.yml` on every host — the UI host's copy lists the hosts; each host
   agent's copy carries its own `local` entry and, on a node, `home:` (§4.4a). The `local` entry's
   fields: `name`, `vscode_host`, `local: true|false` (`vscode://file` links, for a UI on the machine
-  you sit at), `volatile: true|false`, `repos_registry` path (unset: the home's own roster, `repos.txt` under the home, into which agent-cadence's `~/.config/agent-cadence/repos.txt` is imported when it exists — *Repos*, below; TD-584), `runs_keep_days`, `identity` (§4.8a)
+  you sit at), `volatile: true|false`, `repos_registry` path (unset: the home's own roster, `repos.txt` under the home, into which agent-cadence's `~/.config/agent-cadence/repos.txt` is imported when it exists — *Repos*, below; TD-584), `runs_keep_days`, the disk sweep's `runs_keep_mb`, `scratch_root`, `scratch_keep_hours`,
+  `worktree_keep_days` and `cache_keep_days` (§4.6 *A session's scratch*, *The disk sweep*, TD-1921), `identity` (§4.8a)
   and `person` (§4.4a); the top-level keys are `home:`, `nodes:` and `link:` (§4.4a). There are
   no per-host `transport:` or `ssh` target entries: the hub-and-spoke ssh transport they were for
   was replaced by the home and node split (§4.4a, §7 phase 2), where a node dials the home with its
   `link:` and the home lists it under `nodes:` with its flags (`volatile` among them, which sorts
   that host's *unreachable* card with *idle*, §4.5). The UI process may run on a
   laptop; only the session hosts need to stay awake. The parser is `sessionorc.hosts`, shared by the UI and the host agent (there are
-  no env-var overrides). A field the *agent* acts on (`runs_keep_days`) is read on the session host
+  no env-var overrides). A field the *agent* acts on (`runs_keep_days` and the disk sweep's) is read on the session host
   from its own file's `local` entry, so every session host carries its own copy. `local.name`, `home:` and `local.identity`
   are read by the host agent **once, at its start**, and by the UI on every request, so a hand edit
   of one leaves the two disagreeing until the agent restarts: the Sessions page then says so in one line
