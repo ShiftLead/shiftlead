@@ -396,7 +396,8 @@ class InboxMixin:
         except board_mod.Refused as e:
             raise RpcError(str(e)) from None
         if action == "decide":
-            self._refuse_waiting(self._line_covers(root, str(key or ""), str(text or "")))  # TD-1926
+            # the reading is keyed by the root's string, as `_board_served` reads it (TD-1955)
+            self._refuse_waiting(self._line_covers(str(root), str(key or ""), str(text or "")))  # TD-1926
         async with self._applying_mark(root, str(key or ""), action, said):  # drawn as it lands (TD-1508)
             try:
                 done = await asyncio.to_thread(
