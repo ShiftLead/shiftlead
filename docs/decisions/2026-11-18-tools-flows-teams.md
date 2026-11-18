@@ -1,8 +1,8 @@
 # ADR 2026-11-18: Tools, Flows and Team pages — the plan, for discussion
 
-Status: **for discussion**. Review rounds: none counted yet — the three reads so far (Fable, Sonnet,
-Fable, on PR #4110) came while the design was still changing, and Paul counts the limited rounds only
-from when it stops (2026-11-18). This is the high-level plan behind TD-1953 (the Tools page), TD-1954 (the
+Status: **for discussion**. Class: in-repo. Review rounds: the design held on 2026-11-18 (Paul), and round 1
+starts there; the three earlier reads (Fable, Sonnet, Fable, on PR #4110) came while it was still
+changing and are not counted. The record is `docs/reviews/TD-1953.md`. This is the high-level plan behind TD-1953 (the Tools page), TD-1954 (the
 Flows page) and TD-1153 (the team page), written with Paul on 2026-11-18 in session td-1153 before any
 of them is designed. It says where each thing lives, which current rules each page keeps or reverses,
 and the open questions, each with a recommendation. A Fable review reads it before the first design
