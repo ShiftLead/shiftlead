@@ -10,7 +10,8 @@ own questions and holes are in its ledger entry, as that round's starting list. 
 the design until a round writes it there.
 
 Review rounds: the design held on 2026-11-18 (Paul). Round 1 (Sonnet) read the plan before this split,
-rounds 2 to 4 (Fable, Sonnet, Fable) the frame; their findings are applied; the record is `docs/reviews/TD-1953.md`. Three earlier reads (Fable,
+rounds 2 to 4 (Fable, Sonnet, Fable) the frame; their findings are applied, those on the director's part
+moved with it to TD-1956 (Paul, 2026-11-18); the record is `docs/reviews/TD-1953.md`. Three earlier reads (Fable,
 Sonnet, Fable, on PR #4110) came while the design was still changing and are not counted.
 
 ## Why three pages
@@ -66,13 +67,12 @@ Today the techlead, auditors, fact-checkers and sweeper are the team's `seats:`,
    (`swept:`). **A flow that names no question seat leaves its members' questions to the person**, as a
    team without a techlead does today: a member's brief reads `{techlead}` as `none` and says *ask the
    person* (§4.9b). Whether the director takes that load is TD-1956's, outside this frame (Paul,
-   2026-11-18: *drop the director from this discussion for now and pick it up in another TD*). Otherwise, as today: another
-   team's `--team`/`--repo`
-   ask is refused with *has no question seat — ask the person* (§4.10), and a session's request to file
+   2026-11-18: *drop the director from this discussion for now and pick it up in another TD*). As today,
+   another team's `--team`/`--repo` ask is refused with *has no question seat — ask the person* (§4.10), and a session's request to file
    an entry in the repo is refused (§4.9b); `entries.feature` defaults, as today, to the role of
    the stage that takes `design-first`, else to the question seat's role (§4.9c), and where the flow has
-   neither, to a new value, `person`: an entry the person picks up. Otherwise nothing reaches the person's Inbox
-   that does not today. **The record marks the question seat**: a start writes it
+   neither, to a new value, `person`: an entry the person picks up. Nothing else reaches the person's Inbox that
+   does not today. **The record marks the question seat**: a start writes it
    on the seat's `seat` mark (today `tags: true` does this, §4.10, TD-1565), so `--team` never finds a
    fact-checker, which is also an `asks` seat. A flow may leave any of its seats out. **A switch drops a
    seat by one rule**: the seat still answers what it was already asked, then closes (§4.9c *A switch
