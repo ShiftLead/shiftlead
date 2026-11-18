@@ -245,7 +245,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      was by a fill whose send to the person was refused for its depth), at once on the person's answer to one
      of its asks (with `director.work` off, a *File it* alone, keeping `seat_due: {at, by: watch, filing}`,
      for a fill that files it and nothing else, which the turn-off's close does not reach) and on a
-     note from a person's session, and, while `merge` is in `director.delegate`, at once when the home reads a PR turn ready for it
+     note from a person's session, and, while `merge` is in `director.delegate`, at once when the home reads a PR turn ready with every file it changes in `director.merge_paths`
      (§4.9b *Acting by delegation*), keeping `seat_due: {at, by: watch, ready}` and `seat_filled` keeping
      `{by: watch, ready}` (`ready` the `<repo>#<n>` list), so a fill is once per set of PRs; never raised
      while the seat has used five of its six `FILL_CEILING` fills in the hour; a fill running when `director.work`
