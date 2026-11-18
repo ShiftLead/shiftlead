@@ -102,12 +102,12 @@ def test_delegated_for_names_the_delegate_and_its_scope(delegate, scope, words):
 
 @pytest.mark.unit
 def test_a_board_rows_decided_line_names_the_delegate():
-    """The board row's *decided: <text> · <date>* gains *· <delegate> for you (<scope>)*; a person's own has ''."""
+    """The board row's *decided: <text> · <date>* gains *· <delegate> for you (<scope>)*; a person's own, no `for`."""
     got = inbox._decided(
         {"decided": {"text": "Go", "date": "2026-11-12"}, "decided_delegate": "director", "decided_scope": "merge-line"}
     )
     assert got == {"text": "Go", "date": "Nov 12", "for": "director for you (merge-line)"}
-    assert inbox._decided({"decided": {"text": "Go", "date": "2026-11-12"}, "decided_by": "paul"})["for"] == ""
+    assert "for" not in inbox._decided({"decided": {"text": "Go", "date": "2026-11-12"}, "decided_by": "paul"})
 
 
 @pytest.mark.unit

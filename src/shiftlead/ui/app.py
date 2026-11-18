@@ -334,6 +334,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     cadence_marks,  # noqa: F401
     ci_not_run_kinds,
     ci_not_run_rows,
+    delegated_for,  # noqa: F401
     find_matches,  # noqa: F401
     find_words,  # noqa: F401
     fork_pr_rows,

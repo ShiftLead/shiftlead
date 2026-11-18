@@ -1967,16 +1967,15 @@ def delegated_for(delegate: Any, scope: Any) -> str:
 
 def _decided(it: Mapping[str, Any]) -> dict[str, str] | None:
     """The reader's `decided` as the row prints it — *decided: <text> · <date>*, then *· <delegate> for you
-    (<scope>)* for a delegated answer (`for`, TD-1939) — or None."""
+    (<scope>)* for a delegated answer alone (`for`, TD-1939) — or None."""
     got = it.get("decided")
     if not isinstance(got, dict) or not got.get("text"):
         return None
     d = _civil(got.get("date"))
-    return {
-        "text": str(got["text"]),
-        "date": f"{d:%b} {d.day}" if d else str(got.get("date") or ""),
-        "for": delegated_for(it.get("decided_delegate"), it.get("decided_scope")),
-    }
+    out = {"text": str(got["text"]), "date": f"{d:%b} {d.day}" if d else str(got.get("date") or "")}
+    if who := delegated_for(it.get("decided_delegate"), it.get("decided_scope")):
+        out["for"] = who
+    return out
 
 
 def _ahead_words(due: str, today: str, tag: str = "") -> str:
