@@ -1348,6 +1348,7 @@ details.qdots { display: inline-block; }
 .queuepage { max-width: 1100px; width: 100%; margin: 0 auto; }
 .queuepage .qsub { color: var(--muted); font-size: var(--t-small); }  /* words in the sans face: mono is for ids alone */
 .qdres .qsub { display: block; overflow-wrap: anywhere; }
+.qdres .qwho { font-size: var(--t-small); margin-top: 2px; } .qwho .qwsep { opacity: .6; } .qwho .warnish { color: var(--warn-fg); font-weight: 600; }  /* who closed it (TD-1899) */
 .qdbody[hidden], .qdline[hidden] { display: none; }
 .queuepage .rsec { margin-top: 18px; }
 .queuepage .rsh { align-items: baseline; margin-bottom: 8px; flex-wrap: wrap; }
