@@ -44,9 +44,15 @@ what is shared through git goes by PR**.
 So most of the team page needs no PR at all; design PR #4076's "a repo team's edit lands as a PR" covers
 only the rare definition change.
 
-A **profile** stops being something the person edits for a flow's seat: it is what the flow's model and
-the team's login compile to, with the login's options. Profiles a person names by hand stay for sessions
-no flow runs (*Which current rules*, below).
+**Profiles leave the person's view** (Paul, 2026-11-18). A profile today bundles a CLI, an account, a model
+and options (§4.2a), named by hand in `profiles.yml` and picked by name in a dozen places. The plan splits
+it: the **model** is the flow's, and the **login** — the account, its config directory and its options
+(`permission_prompts`, `extra_args`, `billing`) — is the Tools page's. A profile survives only inside, as
+what a model and a login compile to on a session's record. Sessions no flow runs (`ao new`, the director,
+the sweep, the schedule, a person's own session) pick a login and a model the same way, never a profile
+by name, so `profiles.yml` becomes the Tools page's store of logins. A seat that needs other options (the
+grind-ask trial's permission prompts) runs on a login that has them: two logins over one subscription,
+as `gemini-reader` and `gemini-conformance` are today.
 
 ## Seats come in three tiers
 
@@ -106,10 +112,11 @@ of the CLI, model and role combinations its own smoke passed, on which CLI versi
 re-run a smoke someone has already run; a person's own passes, recorded by the Tools page, add to it.
 
 This reverses §4.9c's *a flow names roles only* and *roles and flows are orthogonal*: a role's
-profile overlays (`roles:` in `org.yml` and `.shiftlead.yml`) no longer choose a model for a flow's
-seat. They stay for sessions no flow runs (`ao new`, the director, the sweep, a person's own session).
-Under a flow, a seat's model comes from the flow and its login from the team's list; whether a member's
-own `profile:` may still override them is open question 7.
+profile overlays (`roles:` in `org.yml` and `.shiftlead.yml`) no longer choose a model for any seat;
+the rest of a role overlay (a brief, a context bound) stays.
+Under a flow, a seat's model comes from the flow and its login from the team's list, and nothing
+overrides them: a member's own `profile:` and the role overlays' profiles go (Paul, 2026-11-18: overrides
+are complexity not needed).
 
 **The team lists its subscriptions; the flow names only the model** (Paul, 2026-11-18: *the model name in
 the flow, and the sub list in the teams page — my flow could say opus, then my teams page says
@@ -161,8 +168,12 @@ that changes `review-model` must agree with it or say it overrides it.
 
 ## Which current rules this reverses or bends
 
-- **§4.9c orthogonality** — reversed: a flow's seat names its CLI and model; role overlays keep only
-  sessions no flow runs.
+- **§4.9c orthogonality** — reversed: a flow's seat names its CLI and model.
+- **§4.2a profiles** — a profile is no longer named by the person anywhere: the model is the flow's (or
+  picked beside a login for a session no flow runs), the login and its options the Tools page's. Every
+  place that takes a profile by name today (§4.9's five rungs, seat pools, `schedule.profile`,
+  `sweep.profile`, `director.profile`, `ao new --profile`, *Switch profile…*) changes, and today's
+  `profiles.yml` files and team definitions migrate.
 - **§4.9c "a seat never sits out"** — reversed for tier-2 seats.
 - **§4.3 "the install is never run by ShiftLead or a session"** (Grok; Gemini's layer needs `sudo`) — the
   Tools page shows the documented install and opens a Shell tab where the person runs it; it does not
@@ -181,8 +192,8 @@ that changes `review-model` must agree with it or say it overrides it.
   and its usage and spend history (the key changes); metered and API-key logins (no quota, amount
   reserves); a profile's options beyond CLI, account and model (`permission_prompts`, `config_dir`,
   `extra_args`, `billing`); a writer for `profiles.yml`, which has none today; the context bound, a
-  role setting that a new model should re-ask; a per-seat option a login cannot carry (the grind-ask
-  trial runs one grinder with permission prompts on, another without, on one login).
+  role setting that a new model should re-ask; migrating today's profiles into logins, and every
+  `profile:` in definitions and settings into a flow's model and a team's login list.
 - **Flows**: a node team's login list is the node's own logins (org flows already cannot run on a node, §4.9c);
   pools on a flow's seat (refused today on a review stage, the techlead and the manager); a flow switch
   never changes an interactive member's model (invariant 5); followability shown with its reason.
@@ -205,6 +216,3 @@ that changes `review-model` must agree with it or say it overrides it.
 6. **May a review stage, the techlead or the manager have a backup?** Recommended: not until the Flows
    round shows how a review chain hands a PR to a backup reader, a new session either way; until then
    such a seat waits out its limit, as it does today.
-7. **May a member's own `profile:` override the flow's model and the team's login?** Recommended: no for
-   the model (the flow defines it); a per-seat option such as permission prompts moves to the seat in the
-   flow, so an override is not needed.
