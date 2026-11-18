@@ -66,7 +66,8 @@ and some seats on every team. The plan splits them:
    says `tags: true` (§4.9b, §4.4). Automatic: a team never lacks one. Today the techlead is optional and
    never `person` (§4.9b), and `{techlead}` reads `none` without one; the plan adds **`person`** as a value,
    under which `{techlead}` names the person, `--team`/`--repo` asks reach the person's Inbox, and
-   `entries.feature`'s default role `techlead` falls to the person. Whether the question seat and a
+   `entries.feature`'s default role `techlead` falls to the person. Whether a tier-1 seat is a session
+   or the person is the team's choice; its model, where it is a session, is the flow's. Whether the question seat and a
    review stage's reader stay one record, as they are today (§4.9c), is the Flows round's.
 2. **The flow's seats** — its stages (design, build, review, hunt, ...) and its **on-call seats**: a
    review stage's reader on held paths (the techlead's second job), the auditors (`prs: 10`), the
@@ -75,8 +76,8 @@ and some seats on every team. The plan splits them:
    seat a switch leaves out still answers what it was already asked, then closes.
    **What a seat line holds splits** (§4.9b: today `{name, role, trigger, brief, profile}`; its old
    `home:` is refused since TD-722, a team landing on one host, §4.9): the flow holds what is shareable —
-   the role, the trigger, the model; the team keeps what is its own — the seat's name (org-unique) and
-   its own brief.
+   the role, the trigger with its argument (`asks`, `prs: 10`, `every:`, `swept:`), the model; the team
+   keeps what is its own — the seat's name (org-unique) and its own brief. `pool:` goes (below).
 3. **The org's seat** — the **director**, outside any team. It stays on the Settings page, and picks a
    login and a model as every session no flow runs does.
 
@@ -131,16 +132,18 @@ the flow, and the sub list in the teams page — my flow could say opus, then my
 (claude-paul, claude-heather, claude-api) and if opus is not available, the flow is broken*). The team
 page keeps one ordered list of logins per CLI the flow uses, saved at once with the team
 (`settings.yml`), since login names are one machine's. Every seat on that CLI starts on the first login
-and moves to the next when one is limited. **One mechanism serves every seat** (Paul, 2026-11-18: a
-question seat limited mid-answer is in the same place as a build seat limited mid-issue, only less
-often): a `limited` session is relaunched on the next login of the list, its conversation resumed —
+and moves to the next when one is limited. **One mechanism serves every unattended seat** (Paul, 2026-11-18:
+a question seat limited mid-answer is in the same place as a build seat limited mid-issue, only less
+often; an interactive session stays the person's, invariant 5): a `limited` session is relaunched on the next login of the list, its conversation resumed —
 **Switch profile…** (§4.3 *The limit dialog*, §4.5a), designed for a person's press and not yet built,
 done by the home's tick from the record and the team's list, never from the flow. New questions to a
 `limited` question seat are already routed around it meanwhile (§4.9b *A seat that cannot answer is
 routed around*); a build lane's other members keep picking. The ordered pool (§4.9b *A seat as an
-ordered pool*) is not needed for this and stays what it is. To test in the Tools round: whether a CLI
+ordered pool*) is retired: it is a list of profiles, which leave the person's view, its use is a
+fallback to another model, which is out of scope, and no definition on this install uses one. To test in the Tools round: whether a CLI
 resumes a conversation under another login, whose config directory (where Claude Code keeps its
-conversations) is another; if it cannot, the relaunch starts fresh with a handoff. The compiled
+conversations) is another; if it cannot, the relaunch starts fresh with a handoff, and an open ask the seat held stays on its mail
+for the new session. The compiled
 profile (a model and a login) is written by the home, which owns `profiles.yml`'s writer (*Holes*,
 below), never by a session. **A team whose list
 holds no login that can run a seat's model cannot follow the flow**, and the page says why. A backup is
@@ -149,9 +152,12 @@ wanted later it is the flow's to name, perhaps as a **failover flow** with its o
 2026-11-18: *if that ever becomes a need*). A metered login (`claude-api`) is marked as one, since falling
 through to it spends money, and its reserve is an amount, not a share of a window (§6). Spreading two
 subscriptions over seats by hand would need a per-seat *start on* pick, left out until it is asked for.
-A relaunch keeps the seat's record and name, so a review stage's reader stays one reader; nothing here
-needs the pool's refusals reversed. Formal load balancing is
-the deferred pool-with-`max` design, out of scope.
+A relaunch is a new process on the same record (§4.5a *Switch profile…*), so the seat keeps its name and
+a review stage's reader stays one reader. The definition's compare (§4.9c, *definition changed —
+Apply*) reads a seat's model and the team's list, never the login on the record, and the relaunch writes
+a mark the compare passes over, so a relaunched seat reads no standing difference and an Apply never
+sends it back to the capped login; the seat returns to the first login at its next relaunch after the
+limit lifts. Formal load balancing across subscriptions is out of scope.
 
 **A model is named by its family, not its version** (Paul, 2026-11-18): a seat says `opus` or `sonnet`, and
 the CLI runs its default version of it, so ShiftLead never tracks which old versions a CLI still offers.
@@ -202,6 +208,10 @@ that changes `review-model` must agree with it or say it overrides it.
   `sweep.profile`, `director.profile`, `ao new --profile`, *Switch profile…*) changes, and today's
   `profiles.yml` files and team definitions migrate.
 - **§4.9c "a seat never sits out"** — reversed for tier-2 seats.
+- **§4.9b *A seat as an ordered pool*** — retired (see *the team lists its subscriptions*).
+- **§4.3 *Nobody answers the box for the session … waits for a person*** and **§4.5a** *Switch profile…*
+  (a person's control, not built) — an unattended `limited` seat is relaunched by the tick; the build
+  rewrites those passages and §4.5a's two *not built* notes.
 - **§4.3 "the install is never run by ShiftLead or a session"** (Grok; Gemini's layer needs `sudo`) — the
   Tools page shows the documented install and opens a Shell tab where the person runs it; it does not
   run it. Keeps the rule.
@@ -223,7 +233,7 @@ that changes `review-model` must agree with it or say it overrides it.
   role setting that a new model should re-ask; migrating today's profiles into logins, and every
   `profile:` in definitions and settings into a flow's model and a team's login list.
 - **Flows**: a node team's login list is the node's own logins (org flows already cannot run on a node, §4.9c);
-  pools on a flow's seat (refused today on a review stage, the techlead and the manager); a flow switch
+  a flow switch
   never changes an interactive member's model (invariant 5); followability shown with its reason.
 - **Settings that name a profile today** — `teams.<t>.schedule.profile`, `sweep.profile`,
   `director.profile`, `ao team start --profile`, `ao new --profile` — each becomes a login and a model.
@@ -240,7 +250,8 @@ that changes `review-model` must agree with it or say it overrides it.
 3. **How do today's teams move onto flows that name models?** Recommended: the built-in flows are
    written exactly as a person's are (Paul, 2026-11-18: dogfooding), each seat's model the package's
    choice from the smoke and judge results, not Opus throughout — the manager, whose work is stalls,
-   permissions and questions, on Sonnet once a manager smoke passes;
+   permissions and questions, on Sonnet once a manager smoke exists and passes. Until the known-passes
+   list exists the built-ins name Opus throughout, which is what they run on today;
    so a team on `td` keeps running wherever Claude Code is signed in; a team whose seats run another model
    today (a fact-checker on Gemini, a grinder trial on another model) is migrated by a one-time step that
    writes a flow of its own under a new name and id (a directory may not take a built-in's name, §4.9c),
@@ -253,11 +264,13 @@ that changes `review-model` must agree with it or say it overrides it.
    person pressing Enter.
 5. **Which review-round keys does a flow get first?** Recommended: the four agent-cadence has today, by
    environment; convergence and sticking-point keys filed against agent-cadence as their own entry.
-6. **May a review stage, the techlead or the manager have a backup?** Recommended: not until the Flows
-   round shows how a review chain hands a PR to a backup reader, a new session either way; until then
-   such a seat waits out its limit, as it does today.
-7. **Every team runs a flow** (Paul, 2026-11-18). A flow is opt-in today (§4.9c); a team that runs none
-   gets the built-in **`none`** flow, in which every member takes its own role's lane and review as a
-   flowless team does today, so it migrates with no change in behaviour. Tier-1 seats' models are named in
-   the flow, and a flow switch reaches a running team only through Apply (Paul, 2026-11-18), which waits
-   until the question seat holds no open ask.
+6. **Does a review stage, the techlead or the manager get a backup?** Answered by the relaunch: yes, the
+   same seat on the next login, so a review chain keeps one reader. What stays refused is a second
+   reader beside the first.
+7. **Every team runs a flow** (Paul, 2026-11-18). A flow is opt-in today (§4.9c). A *none* flow that
+   behaves as a flowless team does cannot be written as a flow: a flowless team reads each role's own
+   `review:` and keeps its seats on the team (§4.9c), which no flow file expresses. Recommended: no
+   *none* flow; a team picks a real flow, the plainest being the built-in `build` (build only, no review
+   stage). Every team on this install already runs one, so nothing migrates here. Tier-1 seats' models are
+   named in the flow, and a flow switch reaches a running team only through Apply (Paul, 2026-11-18),
+   which waits until the question seat holds no open ask.
