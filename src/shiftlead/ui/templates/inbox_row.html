@@ -1604,7 +1604,7 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
    draws no answers, Reply, Go with it or Start session: **Open** is in its ⋯, and **Lift the hold** where its
    `lift_item` is set (§4.4 *Where Lift the hold is drawn*, TD-1879). A board
    answer (`ans.kind == 'board'`, TD-1364) is the same row, its foot *you answered "<Decided: words>" on the
-   board, <age> ago* then *carried to TD-m* or *<holder> acts on it*; a kept-waiting one reads *waits until
+   board, <age> ago* (a delegated answer's *<delegate> answered "<words>" for you on the board (<scope>)*, TD-1939) then *carried to TD-m* or *<holder> acts on it*; a kept-waiting one reads *waits until
    <date>*. A step handed by **Have a session do it** (`ans.kind == 'handed'`, TD-1660) reads *handed to <seat> ·
    <age>*, its foot the seat and what ends the hold, its ⋯ the entry's own answer — **Done** on an `Owner: paul`
    entry, else **Lift the hold** where `lift_item` is set. A row a press is landing on (`e.applying`, §4.4 *A press is drawn as it lands*, TD-1508) reads its
