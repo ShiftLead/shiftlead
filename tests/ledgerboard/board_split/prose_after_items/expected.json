@@ -16,6 +16,24 @@
    8,
    "## In-flight",
    "names In-flight: the board is now this directory"
+  ],
+  [
+   "README.md",
+   6,
+   "A note left by hand: see [notes](../notes.md) and `[raw](raw.md)`.",
+   "carried from the board's line 9, below an item: no item holds it"
+  ],
+  [
+   "README.md",
+   8,
+   "## In-flight",
+   "carried from the board's line 13, below an item: no item holds it"
+  ],
+  [
+   "README.md",
+   9,
+   "- (none)",
+   "carried from the board's line 15, below an item: no item holds it"
   ]
  ],
  "persisted_keys_found": true

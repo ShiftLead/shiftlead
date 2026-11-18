@@ -1,4 +1,165 @@
 {
+ "answers": {
+  "lifts": [],
+  "to_close": {},
+  "to_file": {
+   "example.com/acme/widgets": [
+    {
+     "answers": [
+      "Go",
+      "Not yet"
+     ],
+     "context": "TD-301 decision (pat)",
+     "default": null,
+     "detail": {
+      "context": "TD-301 (The widget's shape waits on pat, with no answers of its own) waits on decision (pat), and no board item asked for it",
+      "question": "Should the widget be round?",
+      "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+     },
+     "kind": "decide",
+     "lifts": null,
+     "text": "Should the widget be round?"
+    },
+    {
+     "answers": [
+      "Works — I'll archive the check",
+      "Not right: <what it printed> — I'll file what you saw"
+     ],
+     "context": "TD-302 decision (pat)",
+     "default": null,
+     "detail": {
+      "context": "TD-302 (A check of the widget's export waits on pat's look) waits on decision (pat), and no board item asked for it",
+      "question": "Did the export print the widget's name?",
+      "recommended": "Only pat can say: Works lifts the gate, and the other answers leave it standing"
+     },
+     "kind": "decide",
+     "lifts": [
+      "Works"
+     ],
+     "text": "Did the export print the widget's name?"
+    },
+    {
+     "answers": [
+      "Go — the grinders build it",
+      "One more round — a session runs one more review round, then asks again",
+      "Hold: <note> — a session revises the design as your note says"
+     ],
+     "context": "TD-303 decision (pat)",
+     "default": 0,
+     "detail": {
+      "context": "TD-303 (The widget's design waits on pat's go) waits on decision (pat), and no board item asked for it",
+      "question": "Build the widget's design now, or run one more review round?",
+      "recommended": "Only pat can say: Go lifts the gate, and the other answers leave it standing"
+     },
+     "kind": "decide",
+     "lifts": null,
+     "text": "Build the widget's design now, or run one more review round?"
+    },
+    {
+     "answers": [
+      "Go",
+      "Not yet"
+     ],
+     "context": "TD-304 decision (pat)",
+     "default": null,
+     "detail": {
+      "context": "TD-304 (The widget's size waits on pat, its lifts naming an answer not offered) waits on decision (pat), and no board item asked for it; its own answers could not be offered (the ledger check names why)",
+      "question": "Should the widget be larger?",
+      "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+     },
+     "kind": "decide",
+     "lifts": null,
+     "text": "Should the widget be larger?"
+    },
+    {
+     "answers": [
+      "Go",
+      "Not yet"
+     ],
+     "context": "TD-305 decision (pat)",
+     "default": null,
+     "detail": {
+      "context": "TD-305 (The widget's review waits on pat, with no answer that lifts) waits on decision (pat), and no board item asked for it; its own answers could not be offered (the ledger check names why)",
+      "question": "Run one more round on the widget, or hold it?",
+      "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+     },
+     "kind": "decide",
+     "lifts": null,
+     "text": "Run one more round on the widget, or hold it?"
+    },
+    {
+     "answers": [
+      "Go",
+      "Not yet"
+     ],
+     "context": "TD-306 decision (pat)",
+     "default": null,
+     "detail": {
+      "context": "TD-306 (The widget's label waits on pat, with lifts and no answers) waits on decision (pat), and no board item asked for it; its own answers could not be offered (the ledger check names why)",
+      "question": "Should the widget carry a label?",
+      "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+     },
+     "kind": "decide",
+     "lifts": null,
+     "text": "Should the widget carry a label?"
+    },
+    {
+     "answers": [
+      "Go — the grinders build it",
+      "Hold: <note> — a session revises the plan as your note says"
+     ],
+     "context": "TD-307 decision (pat)",
+     "default": null,
+     "detail": {
+      "context": "TD-307 (The widget's colour plan waits on pat, its lift a form) waits on decision (pat), and no board item asked for it",
+      "question": "Go ahead with the colour plan, or hold it with a note?",
+      "recommended": "Only pat can say: Go, Hold: <note> lift the gate"
+     },
+     "kind": "decide",
+     "lifts": [
+      "Go",
+      "Hold: <note>"
+     ],
+     "text": "Go ahead with the colour plan, or hold it with a note?"
+    },
+    {
+     "answers": [
+      "Go",
+      "Not yet"
+     ],
+     "context": "TD-308 decision (pat)",
+     "default": null,
+     "detail": {
+      "context": "TD-308 (The widget's name waits on pat, its own answers today's pair) waits on decision (pat), and no board item asked for it",
+      "question": "Should the widget keep its name?",
+      "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+     },
+     "kind": "decide",
+     "lifts": null,
+     "text": "Should the widget keep its name?"
+    },
+    {
+     "answers": [
+      "Works — I'll archive the check",
+      "Not yet — nobody looks until you say",
+      "Not right: <what it printed> — I'll file what you saw"
+     ],
+     "context": "TD-309 decision (pat)",
+     "default": null,
+     "detail": {
+      "context": "TD-309 (A check of the widget's import waits on pat's look, deferral offered) waits on decision (pat), and no board item asked for it",
+      "question": "Did the import read the widget's name?",
+      "recommended": "Only pat can say: Works lifts the gate, and Not yet keeps it waiting, asked again in 30 days, and the other answers leave it standing"
+     },
+     "kind": "decide",
+     "lifts": [
+      "Works"
+     ],
+     "text": "Did the import read the widget's name?"
+    }
+   ]
+  }
+ },
  "covers": [
   [],
   [
@@ -58,6 +219,334 @@
    ]
   ]
  ],
+ "delegated": {
+  "a closed delegated answer whose gate stands is owed": {
+   "lifts": [],
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": null,
+      "context": "TD-403 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-403's decision (pat) was answered with a lift by director for pat (merge-line) on 2026-11-01, and the item was closed as lifted, but the gate was never lifted on TD-403",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it with ledger.py set --blocked-by … --by pat --delegate director --scope merge-line --answer \"Go\"; that PR goes to review. Not an override, which would record the person's own lift; to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-403 was answered with a lift by director for pat (merge-line) on 2026-11-01 but still stands on TD-403: lift it."
+     }
+    ]
+   }
+  },
+  "a closed delegated answer whose gate was lifted owes nothing": {
+   "lifts": [],
+   "to_close": {},
+   "to_file": {}
+  },
+  "an open delegated work order covers its gate": {
+   "lifts": [],
+   "to_close": {},
+   "to_file": {}
+  },
+  "the person's newer answer beside an older delegated one": {
+   "lifts": [],
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": null,
+      "context": "TD-404 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-404's decision (pat) was answered with a lift by director for pat (merge-line) on 2026-11-01, and the item was closed as lifted, but the gate was never lifted on TD-404",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it with ledger.py set --blocked-by … --by pat --delegate director --scope merge-line --answer \"Go\"; that PR goes to review. Not an override, which would record the person's own lift; to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-404 was answered with a lift by director for pat (merge-line) on 2026-11-01 but still stands on TD-404: lift it."
+     }
+    ]
+   }
+  },
+  "two delegated answers, the newer one's names": {
+   "lifts": [],
+   "to_close": {},
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": null,
+      "context": "TD-405 decision (pat) lift",
+      "default": null,
+      "detail": {
+       "context": "TD-405's decision (pat) was answered with a lift by bot for pat (merge-line) on 2026-11-02, and the item was closed as lifted, but the gate was never lifted on TD-405",
+       "question": "Lift the gate by hand, or ask the question again?",
+       "recommended": "Lift it with ledger.py set --blocked-by … --by pat --delegate bot --scope merge-line --answer \"Go\"; that PR goes to review. Not an override, which would record the person's own lift; to ask again instead, close this and add the question"
+      },
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (pat) on TD-405 was answered with a lift by bot for pat (merge-line) on 2026-11-02 but still stands on TD-405: lift it."
+     }
+    ]
+   }
+  }
+ },
+ "entry_answers": {
+  "a bold run inside an answer": {
+   "ok": {
+    "answers": [
+     "Go",
+     "Not yet — **Note:** you wait"
+    ],
+    "default": null,
+    "lifts": null
+   }
+  },
+  "a comment on the line after": {
+   "ok": {
+    "answers": [
+     "Go",
+     "Not yet"
+    ],
+    "default": null,
+    "lifts": null
+   }
+  },
+  "a comment then text on the line after": {
+   "error": "Refused"
+  },
+  "a fix after with only a comment line between": {
+   "ok": {
+    "answers": [
+     "Go",
+     "Not yet"
+    ],
+    "default": null,
+    "lifts": null
+   }
+  },
+  "a fix glued below": {
+   "error": "Refused"
+  },
+  "a form as the default": {
+   "error": "Refused"
+  },
+  "a list item": {
+   "ok": null
+  },
+  "a quote": {
+   "ok": null
+  },
+  "a stray paragraph after": {
+   "error": "Refused"
+  },
+  "after a backtick fence never closed": {
+   "error": "Refused"
+  },
+  "after a tilde fence closed by backticks": {
+   "error": "Refused"
+  },
+  "after the ask with only a comment line between": {
+   "ok": {
+    "answers": [
+     "Go",
+     "Not yet"
+    ],
+    "default": null,
+    "lifts": null
+   }
+  },
+  "an entry the parts refuse, no lead": {
+   "ok": null
+  },
+  "an entry the parts refuse, with answers": {
+   "error": "Refused"
+  },
+  "answers glued to the ask": {
+   "error": "Refused"
+  },
+  "bold labels, none lifts": {
+   "error": "Refused"
+  },
+  "colon after the bold": {
+   "ok": {
+    "answers": [
+     "Go",
+     "Not yet"
+    ],
+    "default": null,
+    "lifts": null
+   }
+  },
+  "empty answers": {
+   "error": "Refused"
+  },
+  "empty lifts": {
+   "error": "Refused"
+  },
+  "escaped bar in an answer": {
+   "ok": {
+    "answers": [
+     "Red | blue — I'll paint it both",
+     "Go — I'll paint it red"
+    ],
+    "default": null,
+    "lifts": null
+   }
+  },
+  "go default, one more round, hold": {
+   "ok": {
+    "answers": [
+     "Go — the grinders build it",
+     "One more round — a session runs one more round",
+     "Hold: <note> — a session revises it as your note says"
+    ],
+    "default": 0,
+    "lifts": null
+   }
+  },
+  "go form, no lifts": {
+   "error": "Refused"
+  },
+  "header field and no section": {
+   "ok": null
+  },
+  "indented block": {
+   "error": "Refused"
+  },
+  "inside a comment": {
+   "ok": null
+  },
+  "inside a fence in the fix": {
+   "ok": null
+  },
+  "lifts and no answers": {
+   "error": "Refused"
+  },
+  "lifts glued below": {
+   "error": "Refused"
+  },
+  "lifts glued below, indented": {
+   "error": "Refused"
+  },
+  "lifts hold for an offered form": {
+   "error": "Refused"
+  },
+  "lifts in capitals": {
+   "ok": {
+    "answers": [
+     "Works — I'll archive it",
+     "Not yet"
+    ],
+    "default": null,
+    "lifts": [
+     "Works"
+    ]
+   }
+  },
+  "lifts names a form": {
+   "ok": {
+    "answers": [
+     "Go — the grinders build it",
+     "Hold: <note> — a session revises it"
+    ],
+    "default": null,
+    "lifts": [
+     "Hold: <note>"
+    ]
+   }
+  },
+  "lifts names a label not offered": {
+   "error": "Refused"
+  },
+  "lifts of only bars": {
+   "error": "Refused"
+  },
+  "lifts on the answers' line": {
+   "error": "Refused"
+  },
+  "lifts on the line after a stray bold": {
+   "error": "Refused"
+  },
+  "lower-case go lifts": {
+   "ok": {
+    "answers": [
+     "go",
+     "Not yet"
+    ],
+    "default": null,
+    "lifts": null
+   }
+  },
+  "mark on the second answer": {
+   "ok": {
+    "answers": [
+     "Go — I'll build it",
+     "Not yet — nobody builds it until you say"
+    ],
+    "default": 1,
+    "lifts": null
+   }
+  },
+  "no answer lifts": {
+   "error": "Refused"
+  },
+  "no section": {
+   "ok": null
+  },
+  "one answer": {
+   "error": "Refused"
+  },
+  "qualified lead": {
+   "ok": null
+  },
+  "singular answer": {
+   "ok": null
+  },
+  "text before the lead": {
+   "ok": null
+  },
+  "two answers sections": {
+   "error": "Refused"
+  },
+  "two answers with one label": {
+   "error": "Refused"
+  },
+  "two marks": {
+   "error": "Refused"
+  },
+  "unclosed fence after the field": {
+   "ok": {
+    "answers": [
+     "Go",
+     "Not yet"
+    ],
+    "default": null,
+    "lifts": null
+   }
+  },
+  "unclosed fence and no lead": {
+   "ok": null
+  },
+  "works and not right, lifts works": {
+   "ok": {
+    "answers": [
+     "Works — I'll archive the check",
+     "Not right: <what it printed> — I'll file what you saw"
+    ],
+    "default": null,
+    "lifts": [
+     "Works"
+    ]
+   }
+  },
+  "wrapped onto a second line": {
+   "error": "Refused"
+  }
+ },
  "parts_problems": {
   "context-archived-no-entry": {
    "lift": {
@@ -1290,6 +1779,22 @@
       "kind": "decide",
       "lifts": null,
       "text": "Go, or hold with a note?"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-283 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "The release date is known a week ahead, and the banner is read by every visitor.",
+       "question": "Should the banner show the release date?",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 0 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Should the banner show the release date?"
      }
     ],
     "github.com/acme/beta": [
@@ -1845,6 +2350,22 @@
       "kind": "decide",
       "lifts": null,
       "text": "An answer dated in the future"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-283 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "The release date is known a week ahead, and the banner is read by every visitor.",
+       "question": "Should the banner show the release date?",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Should the banner show the release date?"
      }
     ],
     "github.com/acme/beta": [
@@ -2447,6 +2968,22 @@
       "kind": "decide",
       "lifts": null,
       "text": "An answer dated in the future"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-283 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "The release date is known a week ahead, and the banner is read by every visitor.",
+       "question": "Should the banner show the release date?",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Should the banner show the release date?"
      }
     ],
     "github.com/acme/beta": [

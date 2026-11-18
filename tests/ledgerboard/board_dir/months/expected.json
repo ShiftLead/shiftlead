@@ -17,6 +17,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -63,6 +65,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "Ping lee.",
    "waiting_on": "person"
@@ -78,6 +81,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -124,6 +129,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "Ping pat.",
    "waiting_on": "person"
@@ -139,6 +145,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -185,6 +193,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "Ping sam.",
    "waiting_on": "person"
@@ -200,6 +209,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -242,6 +253,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "Rotate the key.",
    "waiting_on": "person"

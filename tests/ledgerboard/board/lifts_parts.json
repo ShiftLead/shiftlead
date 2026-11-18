@@ -15,6 +15,8 @@
    "context": "TD-12 decision (pat)",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": "Go",
    "detail": [],
    "doer": null,
@@ -68,6 +70,7 @@
     "TD-12"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-1",
    "text": "**Go on the parts?**",
    "waiting_on": "person"
@@ -91,6 +94,8 @@
     "text": "Db"
    },
    "decided_by": "pat",
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -148,6 +153,7 @@
     "TD-13"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-1",
    "text": "Which store?",
    "waiting_on": "session"
@@ -166,6 +172,8 @@
    "context": "TD-14 event (vendor-v2)",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -228,6 +236,7 @@
      "text": "ask me later."
     }
    ],
+   "scope": null,
    "session": "w-2",
    "text": "Keep waiting?",
    "waiting_on": "person"
@@ -246,6 +255,8 @@
    "context": "TD-20",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -298,6 +309,7 @@
      "text": "see Parts: TD-21. Lifts: none."
     }
    ],
+   "scope": null,
    "session": "w-2",
    "text": "Check it.",
    "waiting_on": "person"
@@ -310,6 +322,8 @@
    "context": "TD-22",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -360,6 +374,7 @@
     "TD-22"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-3",
    "text": "Read the notes.",
    "waiting_on": "person"
@@ -381,6 +396,8 @@
     "text": "Go. Lifts: none"
    },
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -431,6 +448,7 @@
     "TD-24"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-3",
    "text": "Ship it?",
    "waiting_on": "session"
@@ -443,6 +461,8 @@
    "context": "TD-25",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -491,6 +511,7 @@
      "text": "done. Lifts: Go."
     }
    ],
+   "scope": null,
    "session": "w-3",
    "text": "Ship it?",
    "waiting_on": "person"
@@ -503,6 +524,8 @@
    "context": "TD-26",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -547,6 +570,7 @@
      "text": "done. Parts: TD-27."
     }
    ],
+   "scope": null,
    "session": "w-3",
    "text": "Read it.",
    "waiting_on": "person"
@@ -565,6 +589,8 @@
    "context": "TD-28",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -611,6 +637,7 @@
     "TD-28"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-3",
    "text": "Ship it?",
    "waiting_on": "person"

@@ -1,0 +1,24 @@
+{
+ "exit": 1,
+ "out": {
+  "errors": 1,
+  "flags": [
+   {
+    "field": "note",
+    "id": "TD-001",
+    "kind": "glued-lead",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-001: the 1st `**note:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   },
+   {
+    "field": "note",
+    "id": "TD-001",
+    "kind": "glued-lead",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-001: the 2nd `**note:**` lead is glued to the line above, so it opens no section (glued-lead): add a blank line above it to make it the section its writer meant (migrate-body does), or reword the line so it does not open with a lead"
+   }
+  ]
+ }
+}

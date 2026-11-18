@@ -970,5 +970,272 @@
   "run": "today",
   "basename": "alpha",
   "dir": "alpha"
- }
+ },
+ "answers": {
+  "ledger": "answers/ledger.md",
+  "board": "answers/board",
+  "url": "git@example.com:acme/widgets.git",
+  "basename": "widgets",
+  "repo": "acme/widgets",
+  "today_utc": "2026-11-03",
+  "today_local": "2026-11-03"
+ },
+ "entry_answers": [
+  {
+   "name": "no section",
+   "body": "**Why:** Invented.\n"
+  },
+  {
+   "name": "works and not right, lifts works",
+   "body": "**Answers:** Works — I'll archive the check | Not right: <what it printed> — I'll file what you saw\n\n**Lifts:** Works\n"
+  },
+  {
+   "name": "go default, one more round, hold",
+   "body": "**Answers:** Go (default) — the grinders build it | One more round — a session runs one more round | Hold: <note> — a session revises it as your note says\n"
+  },
+  {
+   "name": "lifts names a label not offered",
+   "body": "**Answers:** Go — I'll make it | Not yet — nobody makes it until you say\n\n**Lifts:** Larger\n"
+  },
+  {
+   "name": "no answer lifts",
+   "body": "**Answers:** One more round — a session runs one more round | Hold: <note> — a session revises it\n"
+  },
+  {
+   "name": "lifts and no answers",
+   "body": "**Lifts:** Go\n"
+  },
+  {
+   "name": "lifts names a form",
+   "body": "**Answers:** Go — the grinders build it | Hold: <note> — a session revises it\n\n**Lifts:** Hold: <note>\n"
+  },
+  {
+   "name": "escaped bar in an answer",
+   "body": "**Answers:** Red \\| blue — I'll paint it both | Go — I'll paint it red\n"
+  },
+  {
+   "name": "qualified lead",
+   "body": "**Answers (old):** Go | No\n"
+  },
+  {
+   "name": "header field and no section",
+   "text": "## TD-5: An invented entry\n\n**Priority:** Medium\n**Answers:** Go | No\n**Status:** Open\n**Blocked by:** decision (pat)\n\n**Ask:** Does the widget work?\n"
+  },
+  {
+   "name": "mark on the second answer",
+   "body": "**Answers:** Go — I'll build it | Not yet (default) — nobody builds it until you say\n"
+  },
+  {
+   "name": "two marks",
+   "body": "**Answers:** Go (default) | Not yet (default)\n"
+  },
+  {
+   "name": "two answers with one label",
+   "body": "**Answers:** Go | go\n"
+  },
+  {
+   "name": "bold labels, none lifts",
+   "body": "**Answers:** **Go** — build it | **Not yet**\n"
+  },
+  {
+   "name": "a form as the default",
+   "body": "**Answers:** Go | Hold: <note> (default)\n"
+  },
+  {
+   "name": "one answer",
+   "body": "**Answers:** Go\n"
+  },
+  {
+   "name": "empty answers",
+   "body": "**Answers:**\n"
+  },
+  {
+   "name": "empty lifts",
+   "body": "**Answers:** Go | No\n\n**Lifts:**\n"
+  },
+  {
+   "name": "lifts of only bars",
+   "body": "**Answers:** Go | No\n\n**Lifts:** | |\n"
+  },
+  {
+   "name": "two answers sections",
+   "body": "**Answers:** Go | No\n\n**Answers:** Go | No\n"
+  },
+  {
+   "name": "go form, no lifts",
+   "body": "**Answers:** Go: <note> | No\n"
+  },
+  {
+   "name": "lower-case go lifts",
+   "body": "**Answers:** go | Not yet\n"
+  },
+  {
+   "name": "lifts hold for an offered form",
+   "body": "**Answers:** Go | Hold: <note> — a session revises it\n\n**Lifts:** Hold\n"
+  },
+  {
+   "name": "colon after the bold",
+   "body": "**Answers**: Go | Not yet\n"
+  },
+  {
+   "name": "wrapped onto a second line",
+   "body": "**Answers:** Go | Not\nyet\n"
+  },
+  {
+   "name": "a stray paragraph after",
+   "body": "**Answers:** Go | Not yet\n\nA stray sentence.\n\n**Fix:** Invented.\n"
+  },
+  {
+   "name": "a comment on the line after",
+   "body": "**Answers:** Go | Not yet\n<!-- a note -->\n"
+  },
+  {
+   "name": "a comment then text on the line after",
+   "body": "**Answers:** Go | Not yet\n<!-- a note --> more words\n"
+  },
+  {
+   "name": "after the ask with only a comment line between",
+   "text": "## TD-5: An invented entry\n\n**Priority:** Medium\n**Status:** Open\n**Blocked by:** decision (pat)\n\n**Ask:** Does the widget work?\n<!-- a note -->\n**Answers:** Go | Not yet\n"
+  },
+  {
+   "name": "a fix after with only a comment line between",
+   "body": "**Answers:** Go | Not yet\n<!-- a note -->\n**Fix:** Invented.\n"
+  },
+  {
+   "name": "indented block",
+   "body": "**Why:** Invented.\n\n    **Answers:** Go | Not yet\n"
+  },
+  {
+   "name": "after a backtick fence never closed",
+   "body": "**Why:** Invented.\n\n```\ncode\n\n**Answers:** Go | Not yet\n"
+  },
+  {
+   "name": "after a tilde fence closed by backticks",
+   "body": "**Why:** Invented.\n\n~~~\ncode\n```\n\n**Answers:** Go | Not yet\n"
+  },
+  {
+   "name": "lifts on the answers' line",
+   "body": "**Answers:** Go | Not yet **Lifts:** Go\n"
+  },
+  {
+   "name": "lifts on the line after a stray bold",
+   "body": "**Answers:** A — x ** | B — y **Lifts:** A\n"
+  },
+  {
+   "name": "unclosed fence after the field",
+   "body": "**Answers:** Go | Not yet\n\n**Fix:** Invented.\n\n```\nopen\n"
+  },
+  {
+   "name": "unclosed fence and no lead",
+   "body": "**Fix:** Invented.\n\n```\nopen\n"
+  },
+  {
+   "name": "lifts in capitals",
+   "body": "**Answers:** Works — I'll archive it | Not yet\n\n**LIFTS:** Works\n"
+  },
+  {
+   "name": "a list item",
+   "body": "- **Answers:** Go | Not yet\n"
+  },
+  {
+   "name": "a quote",
+   "body": "> **Answers:** Go | Not yet\n"
+  },
+  {
+   "name": "text before the lead",
+   "body": "Answers here: **Answers:** Go | Not yet\n"
+  },
+  {
+   "name": "singular answer",
+   "body": "**Answer:** Go | Not yet\n"
+  },
+  {
+   "name": "lifts glued below",
+   "body": "**Answers:** Go | Not yet\n**Lifts:** Go\n"
+  },
+  {
+   "name": "lifts glued below, indented",
+   "body": "**Answers:** Go | Not yet\n **Lifts:** Go\n"
+  },
+  {
+   "name": "answers glued to the ask",
+   "text": "## TD-5: An invented entry\n\n**Priority:** Medium\n**Status:** Open\n**Blocked by:** decision (pat)\n\n**Ask:** Does the widget work?\n**Answers:** Go | Not yet\n"
+  },
+  {
+   "name": "a fix glued below",
+   "body": "**Answers:** Go | Not yet\n**Fix:** Invented.\n"
+  },
+  {
+   "name": "inside a comment",
+   "body": "<!-- **Answers:** Go | No -->\n"
+  },
+  {
+   "name": "inside a fence in the fix",
+   "body": "**Fix:** Invented.\n\n```\n**Answers:** Go | No\n```\n"
+  },
+  {
+   "name": "a bold run inside an answer",
+   "body": "**Answers:** Go | Not yet — **Note:** you wait\n"
+  },
+  {
+   "name": "an entry the parts refuse, with answers",
+   "text": "## TD-5: An invented entry\n\n**Priority:** Medium\nnot a field\n\n**Answers:** Go | No\n"
+  },
+  {
+   "name": "an entry the parts refuse, no lead",
+   "text": "## TD-5: An invented entry\n\n**Priority:** Medium\nnot a field\n\n**Why:** Invented.\n"
+  }
+ ],
+ "delegated": [
+  {
+   "name": "an open delegated work order covers its gate",
+   "ledger": "delegated/an open delegated work order covers its gate/ledger.md",
+   "board": "delegated/an open delegated work order covers its gate/board",
+   "url": "git@example.com:acme/widgets.git",
+   "basename": "widgets",
+   "repo": "acme/widgets",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "a closed delegated answer whose gate was lifted owes nothing",
+   "ledger": "delegated/a closed delegated answer whose gate was lifted owes nothing/ledger.md",
+   "board": "delegated/a closed delegated answer whose gate was lifted owes nothing/board",
+   "url": "git@example.com:acme/widgets.git",
+   "basename": "widgets",
+   "repo": "acme/widgets",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "a closed delegated answer whose gate stands is owed",
+   "ledger": "delegated/a closed delegated answer whose gate stands is owed/ledger.md",
+   "board": "delegated/a closed delegated answer whose gate stands is owed/board",
+   "url": "git@example.com:acme/widgets.git",
+   "basename": "widgets",
+   "repo": "acme/widgets",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "the person's newer answer beside an older delegated one",
+   "ledger": "delegated/the person's newer answer beside an older delegated one/ledger.md",
+   "board": "delegated/the person's newer answer beside an older delegated one/board",
+   "url": "git@example.com:acme/widgets.git",
+   "basename": "widgets",
+   "repo": "acme/widgets",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "two delegated answers, the newer one's names",
+   "ledger": "delegated/two delegated answers, the newer one's names/ledger.md",
+   "board": "delegated/two delegated answers, the newer one's names/board",
+   "url": "git@example.com:acme/widgets.git",
+   "basename": "widgets",
+   "repo": "acme/widgets",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  }
+ ]
 }

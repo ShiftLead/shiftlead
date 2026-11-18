@@ -1,0 +1,62 @@
+{
+ "files": {
+  "2026-01-05-3dab34aa.md": "## A host as a phrase.\n\n**Kind:** act\n**Added:** 2026-01-05\n**Session:** s-3 on Pat's\n**Context:** TD-3\n**Due:** 2026-01-20\n",
+  "2026-01-07-25fcdeba.md": "## A backticked host run on.\n\n**Kind:** act\n**Added:** 2026-01-07\n**Session:** s-5 on pats\n**Context:** TD-5\n**Due:** 2026-01-21\n",
+  "2026-01-08-40e83d24.md": "## No host.\n\n**Kind:** act\n**Added:** 2026-01-08\n**Session:** s-6\n**Context:** TD-6\n**Due:** 2026-01-22\n",
+  "2026-01-09-d47523b3.md": "## Text before the host.\n\n**Kind:** act\n**Added:** 2026-01-09\n**Session:** s-7 on host-c\n**Context:** TD-7\n**Due:** 2026-01-23\n",
+  "2026-01-10-8ad772e2.md": "## A backticked host alone.\n\n**Kind:** act\n**Added:** 2026-01-10\n**Session:** s-8 on host-d\n**Context:** TD-8\n**Due:** 2026-01-24\n",
+  "README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat, sam.lee\n",
+  "archive/2026-01/2026-01-06-3fa04b4c.md": "## A closed host phrase.\n\n**Kind:** act\n**Added:** 2026-01-06\n**Session:** s-4 on pats\n**Context:** TD-4\n**Closed:** 2026-01-09 — done\n"
+ },
+ "notes": [
+  [
+   "README.md",
+   1,
+   "# Needs the user",
+   "names Needs the user: the board is now this directory"
+  ],
+  [
+   "2026-01-05-3dab34aa.md",
+   5,
+   "**Session:** s-3 on Pat's",
+   "host kept to its first word; not carried: laptop"
+  ],
+  [
+   "2026-01-05-3dab34aa.md",
+   5,
+   "**Session:** s-3 on Pat's",
+   "head text not carried: main"
+  ],
+  [
+   "2026-01-07-25fcdeba.md",
+   5,
+   "**Session:** s-5 on pats",
+   "host kept to its first word; not carried: laptop"
+  ],
+  [
+   "2026-01-07-25fcdeba.md",
+   5,
+   "**Session:** s-5 on pats",
+   "head text not carried: pr 9"
+  ],
+  [
+   "2026-01-08-40e83d24.md",
+   5,
+   "**Session:** s-6",
+   "head text not carried: branch y"
+  ],
+  [
+   "2026-01-09-d47523b3.md",
+   5,
+   "**Session:** s-7 on host-c",
+   "head text not carried: branch z , pr 2"
+  ],
+  [
+   "archive/2026-01/2026-01-06-3fa04b4c.md",
+   5,
+   "**Session:** s-4 on pats",
+   "host kept to its first word; not carried: work laptop"
+  ]
+ ],
+ "persisted_keys_found": true
+}

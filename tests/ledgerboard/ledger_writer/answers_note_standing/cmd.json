@@ -1,0 +1,12 @@
+{
+ "argv": [
+  "note",
+  "TD-2",
+  "looked at it again",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

@@ -17,6 +17,8 @@
    "context": "TD-040",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": "On disk",
    "detail": [],
    "doer": null,
@@ -63,6 +65,7 @@
     "TD-040"
    ],
    "replies": [],
+   "scope": null,
    "session": "s-1",
    "text": "**Where the cache lives.**",
    "waiting_on": "person"
@@ -81,6 +84,8 @@
    "context": "TD-041",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": "South",
    "detail": [],
    "doer": null,
@@ -127,6 +132,7 @@
     "TD-041"
    ],
    "replies": [],
+   "scope": null,
    "session": "s-2",
    "text": "Pick a region.",
    "waiting_on": "person"
@@ -148,6 +154,8 @@
     "text": "Keep"
    },
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": "Keep",
    "detail": [],
    "doer": null,
@@ -198,6 +206,7 @@
     "TD-042"
    ],
    "replies": [],
+   "scope": null,
    "session": "s-3",
    "text": "An old whole-answer mark.",
    "waiting_on": "session"

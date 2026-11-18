@@ -117,6 +117,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -163,6 +165,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "Closed but left outside archive.",
    "waiting_on": "person"
@@ -178,6 +181,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -224,6 +229,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "One id, open and archived.",
    "waiting_on": "person"
@@ -239,6 +245,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -281,6 +289,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "Archived with no Closed.",
    "waiting_on": "person"
@@ -296,6 +305,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -342,6 +353,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "Filed in the wrong month.",
    "waiting_on": "person"
@@ -357,6 +369,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -403,6 +417,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "One id, archived twice.",
    "waiting_on": "person"
@@ -418,6 +433,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -460,6 +477,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "A kind in capitals.",
    "waiting_on": "person"
@@ -478,6 +496,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": "Go",
    "detail": [
     "- **Context:** the store.",
@@ -536,6 +556,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "A doer on a decide.",
    "waiting_on": "person"
@@ -548,6 +569,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": {
@@ -598,6 +621,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "A team spelled with two spaces.",
    "waiting_on": "person"
@@ -610,6 +634,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -656,6 +682,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "A doer not in its form.",
    "waiting_on": "person"
@@ -674,6 +701,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": "Go",
    "detail": [
     "- **Context:** the store.",
@@ -728,6 +757,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "Parts not in their form.",
    "waiting_on": "person"
@@ -740,6 +770,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -786,6 +818,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "A hide that is no day.",
    "waiting_on": "person"
@@ -798,6 +831,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -840,6 +875,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "A banana kind.",
    "waiting_on": "person"
@@ -852,6 +888,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -894,6 +932,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "A header line that is no field.",
    "waiting_on": "person"
@@ -906,6 +945,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -952,6 +993,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "A Closed not in its form.",
    "waiting_on": "person"
@@ -964,6 +1006,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -1006,6 +1050,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "An Added that is no day.",
    "waiting_on": "person"
@@ -1018,6 +1063,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -1056,6 +1103,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "No Added at all.",
    "waiting_on": "person"
@@ -1068,6 +1116,8 @@
    "context": "TD-1",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -1110,6 +1160,7 @@
     "TD-1"
    ],
    "replies": [],
+   "scope": null,
    "session": "w-9",
    "text": "Added not the id's date.",
    "waiting_on": "person"

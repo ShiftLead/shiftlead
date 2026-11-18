@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "set",
+  "unusable": "an override lift takes --by and its why, no --answer, board flag or --delegate"
+ }
+}

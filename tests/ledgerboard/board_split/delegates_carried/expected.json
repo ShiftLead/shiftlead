@@ -1,0 +1,15 @@
+{
+ "files": {
+  "2026-01-05-d59266bd.md": "## Go on the merge?\n\n**Kind:** decide\n**Added:** 2026-01-05\n**Context:** TD-1 decision (pat)\n**Due:** 2026-01-20\n**Answers:** Go | Not yet\n",
+  "README.md": "# Needs the user\n\nLedgerboard: 3\nPeople: pat\nDelegates: director for pat (merge-line)\n"
+ },
+ "notes": [
+  [
+   "README.md",
+   1,
+   "# Needs the user",
+   "names Needs the user: the board is now this directory"
+  ]
+ ],
+ "persisted_keys_found": true
+}

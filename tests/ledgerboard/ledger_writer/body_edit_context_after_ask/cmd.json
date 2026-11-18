@@ -1,0 +1,13 @@
+{
+ "argv": [
+  "edit",
+  "TD-1",
+  "--section",
+  "Context",
+  "--from",
+  "context.txt",
+  "--ledger",
+  "ledger",
+  "--json"
+ ]
+}

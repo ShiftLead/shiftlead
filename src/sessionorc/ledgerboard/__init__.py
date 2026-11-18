@@ -1,4 +1,4 @@
-# ledgerboard v3.2 sha256:c77e6966c0aa62f3a00104ace8d3807e9642493c815322f42fc7616171c4f80d
+# ledgerboard v3.4 sha256:239780508027f75852cfa687e1c880ee586853580e76edd45786e54cc2ec94a4
 # SYNCED FILE — canonical copy: ShiftLead/ledgerboard ledgerboard/__init__.py (vendored by agent-cadence as files/scripts/ledgerboard/__init__.py)
 # Edit it there and release; an edit made in a consumer's copy is overwritten by the next vendor or sync.
 """The ledger and board formats, defined once (SPEC.md).
@@ -30,6 +30,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from dataclasses import replace as _dc_replace
@@ -69,7 +70,7 @@ WORD_RE = re.compile(r"[^\s,;]+")
 PRIORITIES = ("high", "medium", "low")
 EDIT_ERRORS = ("pickable-disagrees", "undeclared-field", "cycle", "legacy-part", "priority", "ask-missing",
                "decision-missing", "gate-repeated", "blocker-superseded", "blocker-dropped",
-               "blocker-unknown-status")  # information on a standing ledger, an error in a new edit
+               "blocker-unknown-status", "answers-unusable")  # information on a standing ledger, an error in a new edit
 
 # A resolver answers one ``<repo>#TD-NNN`` item: ``(state, why)`` or a mapping carrying at least
 # ``state`` and ``why`` (any other keys ride along into the entry's ``cross_repo``). ``state`` is
@@ -828,7 +829,12 @@ def check(ledger: str, archive: str, old: str | None = None, resolve: Resolve | 
     error, scoped by the entry's whole text): ``misplaced_names()`` of each open entry, the ledger's ``Fields:`` names
     its declared ones. From v3.1, ``decision-missing`` (``_decision_missing()``): an open entry with an Ask whose
     Blocked by names no decision and whose Log does not show it answered (``_ask_answered()``), scoped by the
-    entry's whole text, an error on a rewritten one. ``today`` is ``pickable()``'s (v2.4): the UTC date, required."""
+    entry's whole text, an error on a rewritten one. From v3.3, the body's shape (``_body_records()``, SPEC *The body's
+    shape*): ``lead-form``, ``glued-lead``, ``fence-open`` and ``field-lines`` on each open entry's raw body, counted
+    per key against ``old``'s, its own scoping — a fault ``old`` has of a key is ℹ and standing, the rest errors.
+    Also from v3.3, ``answers-unusable``: an open entry whose Blocked by names a decision and whose own answers
+    ``entry_answers()`` refuses, scoped by the entry's whole text, an error on a rewritten one.
+    ``today`` is ``pickable()``'s (v2.4): the UTC date, required."""
     recs = [dict(r, standing=False)
             for r in pickable(ledger, archive, resolve, undeclared=True, rank_text=rank_text,
                               today=today)["flag_recs"]]
@@ -851,6 +857,14 @@ def check(ledger: str, archive: str, old: str | None = None, resolve: Resolve | 
         if why:
             recs.append({"level": "info", "id": tid, "field": "blocked by", "kind": "decision-missing",
                          "text": f"ℹ {tid}: {why}", "standing": False})
+        if e and parse_gates(e[0]["blocked_raw"])["decisions"] \
+                and first_word(e[0]["fields"].get("status")) not in ARCHIVED_WORDS:
+            try:  # v3.3: an entry's own answers the gate sweep cannot offer
+                entry_answers(text)
+            except Refused as unusable:
+                recs.append({"level": "info", "id": tid, "field": "answers", "kind": "answers-unusable",
+                             "text": f"ℹ {tid}: the gate sweep cannot offer its own answers (answers-unusable): "
+                                     f"{unusable}{ANSWERS_UNUSABLE_TAIL}", "standing": False})
         for gate in (gate_items(parse_gates(e[0]["blocked_raw"])) if e else []):
             try:  # an entry _entry_parts() refuses (a field below its header block) has its ℹ already
                 n = reassigns(text, gate) if gate.startswith("decision") else 0
@@ -861,8 +875,9 @@ def check(ledger: str, archive: str, old: str | None = None, resolve: Resolve | 
                              "text": f"ℹ {tid}: {gate} was reassigned {n} times — is the decision stuck?",
                              "standing": False})
     statuses = _status_records(ledger, archive) + _retired_records(ledger, archive)
+    body = _body_records(ledger, old)  # v3.3: the body's shape, counted per key against old, its own scoping
     if old is None:
-        return recs + statuses
+        return recs + body + statuses
     before = {e["id"]: e["fields"] for e in entries(old)}
     changed = {e["id"] for e in entries(ledger) if before.get(e["id"]) != e["fields"]}
     rewritten = {t for t, x in texts.items() if old_texts.get(t) != x}  # a Log flag's scope: the whole entry
@@ -875,7 +890,7 @@ def check(ledger: str, archive: str, old: str | None = None, resolve: Resolve | 
         elif r["kind"] in EDIT_ERRORS:
             r["level"] = "error"
         r["text"] = ("⚠" if r["level"] == "error" else "ℹ") + r["text"][1:]
-    return recs + _left_with_open_parts(old, ledger) + statuses
+    return recs + body + _left_with_open_parts(old, ledger) + statuses
 
 
 def _status_records(ledger: str, archive: str) -> list[dict]:
@@ -922,7 +937,7 @@ def _retired_records(ledger: str, archive: str) -> list[dict]:
 LOG_KINDS = ("log-not-last", "log-line")  # check()'s flags on an entry's Log (v2.4)
 EVENT_KINDS = ("event-section", "event-check", "event-ungated", "event-undated")  # check()'s flags on an entry's events (v2.4; event-undated v2.5)
 TEXT_KINDS = LOG_KINDS + EVENT_KINDS + ("ask-missing", "decision-missing", "gate-reassigned-often",
-                                       "misplaced-name")  # flags that read the body: scoped by the entry's whole text
+                                       "misplaced-name", "answers-unusable")  # flags that read the body: scoped by the entry's whole text
 
 
 def _entry_texts(text: str) -> dict[str, str]:
@@ -1607,6 +1622,9 @@ class BoardItem:
     lifts: list[str] | None = None  # `Lifts:` (v2.3): the answers that lift; None means `Go`
     parts: list[str] = field(default_factory=list)  # `Parts:` (v2.3): the parts a parent's question asks about
     doer: tuple[str, str, str] | None = None  # `Doer:` (v2.8): (kind, name, text), who should do an act's step
+    scope: str | None = None  # `Scope` (v3.4): the kind of decision a decide is; None when absent or no name
+    decided_delegate: str | None = None  # (v3.4) the delegate who wrote a delegated `Decided`; None otherwise
+    decided_scope: str | None = None  # (v3.4) the scope a delegated `Decided` names; None otherwise
     # v3.0's item file (parse_item()); a v2 item keeps these defaults until the reader fills them (B2).
     id: str | None = None  # `YYYY-MM-DD-<8 hex>`, from the file's name; None when it is no id
     path: str = ""  # the file's path relative to the board's directory; "" for a v2 item
@@ -2143,6 +2161,9 @@ def item_record(item: BoardItem, today: date) -> dict:
         "lifts": item.lifts,  # v2.3
         "parts": item.parts,  # v2.3
         "doer": dict(zip(("kind", "name", "text"), item.doer)) if item.doer else None,  # v2.8
+        "scope": item.scope,  # v3.4
+        "decided_delegate": item.decided_delegate,  # v3.4
+        "decided_scope": item.decided_scope,  # v3.4
     }
 
 
@@ -2556,6 +2577,201 @@ def _answered_by_problems(board: str, every: bool = False) -> list[tuple[int, st
     return out
 
 
+DELEGATES_RE = re.compile(r"^Delegates:(?P<value>.*)$")
+DELEGATE_GRANT_RE = re.compile(r"(?P<delegate>\S+) for (?P<person>\S+) \((?P<scopes>[^()]*)\)")
+
+
+def _delegates_line(content: str, every: bool = False) -> tuple[int, str] | None:
+    """(1-based line, value) of the board's first `Delegates:` line above its first item (``every``: on any
+    line), or None (v3.4)."""
+    for n, ln in enumerate(content.splitlines(), start=1):
+        if ANY_ITEM_RE.match(ln) and not every:
+            return None
+        m = DELEGATES_RE.match(ln.rstrip())
+        if m:
+            return n, m.group("value")
+    return None
+
+
+def _delegates_lines(board: Board) -> list[str]:
+    """Every `Delegates:` line a board's preamble holds, in order (v3.4): what an edit of the line changes, a
+    second line among them."""
+    text, every = _preamble(board)
+    out = []
+    for ln in text.splitlines():
+        if ANY_ITEM_RE.match(ln) and not every:
+            break
+        m = DELEGATES_RE.match(ln.rstrip())
+        if m:
+            out.append(m.group("value"))
+    return out
+
+
+def _grants(value: str) -> list[tuple[str, str | None, list[str] | None]]:
+    """A `Delegates:` value's grants as written (v3.4): split at `;`, each piece stripped and its inner whitespace
+    folded to one space, an empty piece skipped; a piece outside `<delegate> for <person> (<scope>, …)` as
+    ``(piece, None, None)``."""
+    out: list[tuple[str, str | None, list[str] | None]] = []
+    for piece in value.split(";"):
+        piece = " ".join(piece.split())
+        if not piece:
+            continue
+        m = DELEGATE_GRANT_RE.fullmatch(piece)
+        scopes = [s.strip() for s in m.group("scopes").split(",")] if m else []
+        if m is None or not is_person(m.group("delegate")) or not is_person(m.group("person")) \
+                or not all(is_person(s) for s in scopes):
+            out.append((piece, None, None))
+        else:
+            out.append((m.group("delegate"), m.group("person"), scopes))
+    return out
+
+
+def board_delegates(content: Board) -> list[tuple[str, str | None, list[str] | None]] | None:
+    """The grants the board's `Delegates:` preamble line makes (v3.4), as written, each
+    ``(delegate, person, scopes)`` — a piece outside the form as ``(piece, None, None)`` — ``[]`` for a line that
+    holds no grant, or None when the board has no such line. Read as board_people() reads `People:`."""
+    got = _delegates_line(*_preamble(_a_board(content, "board_delegates()")))
+    return None if got is None else _grants(got[1])
+
+
+def delegates_problems(board: Board, old: Board | None = None) -> list[tuple[str, str]]:
+    """``(path, problem)`` for the board's `Delegates:` preamble line (v3.4): a grant outside the form, a person
+    not on `People:`, a delegate on `People:`, a delegate granted for itself (that fault alone for its grant), two
+    grants of one delegate for one person, a scope named twice in a grant, a line that lists no grant, and a second
+    line. A fault is an error when the edit introduces it — the board's `Delegates:` lines, a second among them, differ
+    from ``old``'s, or ``old`` is None —
+    and opens `ℹ` otherwise. Names are compared case-insensitively. Each is named as people_problems() names them."""
+    board = _a_board(board, "delegates_problems()")
+    found = _delegates_problems(*_preamble(board), board_people(board))
+    if not found:
+        return []
+    if old is not None:
+        old = _a_board(old, "delegates_problems()'s old")
+        if _delegates_lines(board) == _delegates_lines(old):
+            found = [(n, p if p.startswith("ℹ") else f"ℹ {p}") for n, p in found]
+    return [(_preamble_path(board), p) for _, p in found]
+
+
+def _delegates_problems(board: str, every: bool, people: list[str] | None) -> list[tuple[int, str]]:
+    got = _delegates_line(board, every)
+    if got is None:
+        return []
+    n, value = got
+    on = {p.lower() for p in people or []}
+    out: list[tuple[int, str]] = []
+    grants = _grants(value)
+    if not grants:
+        out.append((n, "delegates: `Delegates:` lists no grant"))
+    seen: set[tuple[str, str]] = set()
+    for d, p, scopes in grants:
+        if p is None or scopes is None:
+            out.append((n, f"delegates: {d!r} is not `<delegate> for <person> (<scope>, …)`"))
+            continue
+        if d.lower() == p.lower():
+            out.append((n, f"delegates: {d} is granted for itself"))
+        else:
+            if p.lower() not in on:
+                out.append((n, f"delegates: {p} is not on the board's `People:`"))
+            if d.lower() in on:
+                out.append((n, f"delegates: {d} is on the board's `People:`: a delegate is not a person"))
+        if (d.lower(), p.lower()) in seen:
+            out.append((n, f"delegates: {d} for {p} is granted twice"))
+        seen.add((d.lower(), p.lower()))
+        folded = [s.lower() for s in scopes]
+        twice = sorted({s for s in folded if folded.count(s) > 1})
+        if twice:
+            out.append((n, f"delegates: {d} for {p} names the scope {', '.join(twice)} twice"))
+    lines = board.splitlines()
+    for m in range(n, len(lines)):
+        if ANY_ITEM_RE.match(lines[m]) and not every:
+            break
+        if DELEGATES_RE.match(lines[m].rstrip()):
+            out.append((m + 1, "delegates: a second `Delegates:` line — the first is read"))
+    return out
+
+
+def delegation_covers(board: Board, delegate: str, person: str, scope: str) -> bool:
+    """Whether the board's `Delegates:` line grants ``delegate`` the authority to answer for ``person`` on items of
+    ``scope`` (v3.4): true only when delegates_problems() finds no fault in the line and a grant of that delegate,
+    for that person, names that scope, all compared case-insensitively. No line, or a faulty one, grants nothing."""
+    board = _a_board(board, "delegation_covers()")
+    grants = board_delegates(board)
+    if not grants or delegates_problems(board):
+        return False
+    for d, p, scopes in grants:
+        if d.lower() == str(delegate).lower() and str(p).lower() == str(person).lower() \
+                and str(scope).lower() in {s.lower() for s in scopes or []}:
+            return True
+    return False
+
+
+DELEGATE_RULES = {
+    1: "rule 1: the item has no Scope",
+    2: "rule 2: no faultless Delegates: grant covers {delegate} for {person} ({scope})",
+    3: "rule 3: {person} may not answer this item",
+    4: "rule 4: the Context names a gate on another repo's entry",
+    5: "rule 5: the gated Context is not one entry and one gate",
+}
+
+
+def _delegate_context_rule(ctx: str) -> int | None:
+    """Rule 4 or 5 of a delegated answer (v3.4) on an item whose Context is ``ctx``, or None: a gated Context naming
+    an entry ref with `#` (rule 4), or one that is not one entry and one gate (rule 5). A Context naming no gate
+    meets neither."""
+    if not CONTEXT_ANY_GATE_RE.search(ctx or ""):
+        return None
+    if any("#" in x.group(0) for x in REF_TD_RE.finditer(ctx)):
+        return 4
+    ref, gate = _context_gate(ctx)
+    return 5 if ref is None or gate is None else None
+
+
+def delegate_problem(board: Board, item: BoardItem | str, delegate: str, person: str) -> str | None:
+    """The first rule (v3.4, SPEC *Edits*) a delegated answer by ``delegate`` for ``person`` on ``item`` fails, as
+    its fixed message, or None: 1, the item has a `Scope`; 2, ``delegation_covers()`` for that scope; 3, the person
+    may answer the item as an undelegated answer is judged (a decision gate's person, or any of `People:` under
+    `Answered by: any`; any of `People:` on an event gate or with no gate); 4, a gated Context names no entry with
+    `#`; 5, a gated Context names one entry and one gate. The board writer and ``lift_pr_verdict()`` share it."""
+    board = _a_board(board, "delegate_problem()")
+    it = _as_item(item)
+    if it.scope is None:
+        return DELEGATE_RULES[1]
+    if not delegation_covers(board, delegate, person, it.scope):
+        return DELEGATE_RULES[2].format(delegate=delegate, person=person, scope=it.scope)
+    on = {p.lower() for p in board_people(board) or []}
+    ctx = it.context or ""
+    decision = CONTEXT_GATE_RE.search(ctx)
+    if decision is not None:
+        anyone = (answered_by(board) or "").lower() == "any"
+        may = person.lower() == decision.group("person").lower() or (anyone and person.lower() in on)
+    else:
+        may = person.lower() in on
+    if not may:
+        return DELEGATE_RULES[3].format(person=person)
+    rule = _delegate_context_rule(ctx)
+    return DELEGATE_RULES[rule] if rule is not None else None
+
+
+def _grant_set(board: Board) -> set[tuple[str, ...]] | None:
+    grants = board_delegates(board)
+    if grants is None:
+        return None
+    out: set[tuple[str, ...]] = set()
+    for d, p, scopes in grants:
+        if p is None or scopes is None:
+            out.add((d,))
+        else:
+            out |= {(d.lower(), p.lower(), s.lower()) for s in scopes}
+    return out
+
+
+def delegates_changed(base: Board, head: Board) -> bool:
+    """Whether the first `Delegates:` line's grants differ between two boards (v3.4): each read as a set of
+    ``(delegate, person, scope)``, names case-folded, a piece outside the form as its whitespace-folded text.
+    Reordering grants or scopes, or whitespace, is no change; no line and a line are a change."""
+    return _grant_set(_a_board(base, "delegates_changed()")) != _grant_set(_a_board(head, "delegates_changed()"))
+
+
 def board_problems(board: Board, old: Board | None = None) -> list[tuple[str, str]]:
     """The board's gate (v3.0, *The gate*), on a ``Board`` read from a directory: a consumer calls it on the
     board as the edit leaves it, with the board as the edit found it. First `README.md`'s `People:` problems
@@ -2576,7 +2792,14 @@ def _board_gate(board: Board, old: Board | None) -> list[tuple[str, str]]:
     known = None if old is None else {it.id for it in [*old.items, *old.closed] if it.id is not None}
     people = board_people(board)
     on = {x.lower() for x in people or []}
-    out: list[tuple[str, str]] = [*people_problems(board), *answered_by_problems(board)]
+    out: list[tuple[str, str]] = [*people_problems(board), *answered_by_problems(board),
+                                  *delegates_problems(board, old)]
+    if old is None:  # v3.4: on a standing board, a delegated answer the current line no longer covers is a note
+        for it in board.items:
+            if it.decided_delegate is not None and it.decided_by is not None \
+                    and not delegation_covers(board, it.decided_delegate, it.decided_by, it.decided_scope or ""):
+                out.append((it.path, f"ℹ delegates: the answer by {it.decided_delegate} for {it.decided_by} "
+                                     f"({it.decided_scope}) is no longer covered by the board's `Delegates:`"))
     for it in board.items:
         if known is not None and it.id in known:
             continue
@@ -2659,7 +2882,37 @@ def subject_kind(line: str) -> str | None:
         return "edit"
     if APPEND_SUBJECT_RE.match(line) or any(r.match(line) for r in LEGACY_APPEND_SUBJECT_RES):
         return "append"
+    if lift_subject_parts(line) is not None:  # v3.3
+        return "lift"
     return None
+
+
+def lift_subject(tid: str, gate: str, tool: str, session: str | None = None) -> str:
+    """The one-line commit subject of a ledger lift (v3.3, SPEC *The commit subject of a ledger lift*):
+    ``<tool>: lift decision (<p>) on TD-n (session <name>)``, the gate as ``_one_gate()`` spells it, the id as
+    given, ``session`` else ``n/a``. Refused: a ``tid`` that is no bare ``TD-n`` of 1 to 18 ASCII digits, a gate
+    that is no decision, and a ``tool`` or ``session`` that is no token of ``[A-Za-z0-9_.@/-]+``."""
+    if not isinstance(tid, str) or not LIFT_TID_RE.fullmatch(tid):
+        raise Refused(f"a lift's subject names a bare TD-n of 1 to 18 digits, not {tid!r}")
+    g = _one_gate(gate)
+    if not GATE_DECISION_RE.match(g):
+        raise Refused(f"a lift's subject names a decision (<person>) gate, not {gate!r}")
+    if not isinstance(tool, str) or not LOG_TOKEN_RE.fullmatch(tool):
+        raise Refused(f"the tool, {tool!r}, is a token of [A-Za-z0-9_.@/-]")
+    name = "n/a" if session is None else session
+    if not isinstance(name, str) or not LOG_TOKEN_RE.fullmatch(name):
+        raise Refused(f"the session, {session!r}, is a token of [A-Za-z0-9_.@/-]")
+    out = f"{tool}: lift {g} on {tid} (session {name})"
+    if lift_subject_parts(out) is None:
+        raise Refused(f"the subject would not read back as a lift: {out!r}")
+    return out
+
+
+def lift_subject_parts(line: str) -> dict | None:
+    """A ledger lift's commit subject read back (v3.3): ``{tool, gate, id, session}``, each part as written
+    (``n/a`` too), or None for any other line."""
+    m = LIFT_SUBJECT_RE.fullmatch(line) if isinstance(line, str) else None
+    return None if m is None else {k: m.group(k) for k in ("tool", "gate", "id", "session")}
 
 
 def edit_action(line: str) -> str | None:
@@ -2689,8 +2942,8 @@ def subject_id(line: str) -> str | None:
 ITEM_ID_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9a-f]{8}")  # an item's id, matched whole: Added, a nonce
 ITEM_NONCE_RE = re.compile(r"[0-9a-f]{8}")  # the id's eight lower-case hex digits
 # An item file's header fields, in the order the writers write them.
-ITEM_FIELDS = ("Kind", "Added", "Session", "Context", "Parts", "Doer", "Due", "Hide until", "Answers", "Lifts",
-               "Decided", "Closed")
+ITEM_FIELDS = ("Kind", "Added", "Session", "Context", "Parts", "Doer", "Scope", "Due", "Hide until", "Answers",
+               "Lifts", "Decided", "Closed")
 ITEM_FIELD_KEYS = {field_key(n): n for n in ITEM_FIELDS}  # a name as field_key() folds it, to its spelling
 ITEM_LOG_LEAD = "**Log:**"  # the Log's lead, a line of its own: the file's last part
 # A Log line that is a reply: `- YYYY-MM-DD: <name>: <words>`, the name holding no `:`, at most 40 characters.
@@ -2737,16 +2990,49 @@ def item_path(id: str, closed: str | None = None) -> str:
     return f"archive/{closed[:7]}/{id}.md"
 
 
-def parse_decided_value(value: str) -> tuple[str, date, str | None] | None:
-    """An item file's `Decided` value, `<date>[ by <person>] — <label>`, as (label, date, by), ``by`` None when it
-    names no one; None outside that form (v3.0). The person is only the `by <person>` before the first ` — `: the
-    label runs to the line's end and is never split on a trailing `(by …)`."""
+DECIDED_DELEGATED_RE = re.compile(rf"(?P<delegate>{PERSON}) for (?P<person>{PERSON}) \((?P<scope>{PERSON})\)")
+
+
+def _decided_value(value: str) -> tuple[str, date, str | None, str | None, str | None] | None:
+    """(label, date, by, delegate, scope) of an item file's `Decided` value, or None outside its form (v3.4)."""
     head, sep, label = str(value).partition(CONSEQUENCE_SEP)
     label = label.strip(" \t")
     day, by_sep, by = head.partition(" by ")
-    if not sep or not label or not _real_day(day) or (by_sep and not is_person(by)):
+    if not sep or not label or not _real_day(day):
         return None
-    return label, date.fromisoformat(day), by if by_sep else None
+    if not by_sep:
+        return label, date.fromisoformat(day), None, None, None
+    if is_person(by):
+        return label, date.fromisoformat(day), by, None, None
+    m = DECIDED_DELEGATED_RE.fullmatch(by)
+    if m is None:
+        return None
+    return label, date.fromisoformat(day), m.group("person"), m.group("delegate"), m.group("scope")
+
+
+def parse_decided_value(value: str) -> tuple[str, date, str | None] | None:
+    """An item file's `Decided` value, `<date>[ by <person>] — <label>`, as (label, date, by), ``by`` None when it
+    names no one; None outside that form (v3.0). The person is only the `by <person>` before the first ` — `: the
+    label runs to the line's end and is never split on a trailing `(by …)`. A delegated value (v3.4),
+    `<date> by <delegate> for <person> (<scope>) — <label>`, returns the **person** as ``by``:
+    parse_decided_delegation() reads its delegate and scope."""
+    got = _decided_value(value)
+    return got[:3] if got else None
+
+
+def parse_decided_delegation(value: str) -> tuple[str, str] | None:
+    """A delegated `Decided` value's ``(delegate, scope)`` (v3.4), or None for an undelegated value or one outside
+    the form."""
+    got = _decided_value(value)
+    return (got[3], got[4]) if got and got[3] is not None else None
+
+
+def _decided_render(day: date, by: str | None, delegate: str | None, scope: str | None, label: str) -> str:
+    """A `Decided` value as the writers write it (v3.4): `<date>[ by <person>[ for …]]`, delegated as
+    `<date> by <delegate> for <person> (<scope>) — <label>`."""
+    if delegate is not None:
+        return f"{day.isoformat()} by {delegate} for {by} ({scope}) — {label}"
+    return f"{day.isoformat()}{f' by {by}' if by else ''} — {label}"
 
 
 def parse_closed_value(value: str) -> tuple[date, str | None] | None:
@@ -2835,7 +3121,9 @@ def parse_item(text: str, path: str = "") -> BoardItem | None:
             if ref_key(x) not in {ref_key(o) for o in parts}:
                 parts.append(x)
     doer = doer_value(got["doer"]) if "doer" in got else None
-    decided = parse_decided_value(got["decided"]) if "decided" in got else None
+    decided = _decided_value(got["decided"]) if "decided" in got else None
+    scope = got.get("scope")
+    scope = scope if is_person(scope) else None
     closed = parse_closed_value(got["closed"]) if "closed" in got else None
     if str(path).startswith(f"{LEDGER_ARCHIVE}/"):
         closed = closed or (None, None)
@@ -2852,7 +3140,8 @@ def parse_item(text: str, path: str = "") -> BoardItem | None:
     return BoardItem(
         due=due, answers=[lbl for lbl, _, _ in split], default=marked[0] if len(marked) == 1 else None,
         consequences=[c for _, c, _ in split], decided=decided[:2] if decided else None,
-        decided_by=decided[2] if decided else None, bad_due=bad, kind=kind, fyi_due=fyi_due, detail=detail,
+        decided_by=decided[2] if decided else None, decided_delegate=decided[3] if decided else None,
+        decided_scope=decided[4] if decided else None, scope=scope, bad_due=bad, kind=kind, fyi_due=fyi_due, detail=detail,
         hide_until=day("Hide until"), lifts=parse_answers_value(got["lifts"]) if "lifts" in got else None,
         parts=parts, doer=(*doer, got["doer"]) if doer else None,
         id=stem if is_item_id(stem) else None, path=str(path), words=bare[h][3:].strip(" \t"), added=day("Added"),
@@ -2863,9 +3152,9 @@ def parse_item(text: str, path: str = "") -> BoardItem | None:
 def _item_read(it: BoardItem) -> tuple:
     """What a reader reads of an item file, every attribute but its spelling (``fields``, ``raw``), its place
     (``id``, ``path``) and its ``closed`` (an edit's own), for a read-back to compare."""
-    return (it.words, it.kind, it.added, it.session, it.host, it.context, it.parts, it.doer, it.due, it.bad_due,
-            it.fyi_due, it.hide_until, it.answers, it.consequences, it.default, it.lifts, it.decided, it.decided_by,
-            it.detail, it.replies)
+    return (it.words, it.kind, it.added, it.session, it.host, it.context, it.parts, it.doer, it.scope, it.due,
+            it.bad_due, it.fyi_due, it.hide_until, it.answers, it.consequences, it.default, it.lifts, it.decided,
+            it.decided_by, it.decided_delegate, it.decided_scope, it.detail, it.replies)
 
 
 def _item_value(value: object, what: str, *, empty: bool = False) -> str:
@@ -2897,13 +3186,15 @@ def _written_answer(lbl: str, cons: str, marked: bool) -> str:
 def item_file(text: str, due: str | None, today: str, session: str | None, host: str | None,
               context: str | None, *, kind: str | None = None, answers: list[str] | None = None,
               default: int | None = None, detail: Mapping | None = None, hide_until: str | None = None,
-              lifts: list[str] | None = None, parts: list[str] | None = None, doer: str | None = None) -> str:
+              lifts: list[str] | None = None, parts: list[str] | None = None, doer: str | None = None,
+              scope: str | None = None) -> str:
     """A new item file (v3.0, SPEC *Edits*), `\\n`-ended: `## <text>`, a blank line, the header block
-    (`Kind` when given, `Added: <today>`, `Session` when there is one, `Context`, then `Parts`, `Doer`, `Due`,
+    (`Kind` when given, `Added: <today>`, `Session` when there is one, `Context`, then `Parts`, `Doer`, `Scope`, `Due`,
     `Hide until`, `Answers` and `Lifts` as given) and, after a blank line, the detail block at column 0. It takes
     the arguments v2's ``item_line()`` took and keeps its refusals that still mean something (a value of more than one line, a
     host with no session, a kind's rules, the `Parts` and `Lifts` rules, a look's fixed pair, a doubled
-    Recommended label, a doer off an act or outside its form, a result that does not read back), but no field's
+    Recommended label, a doer off an act or outside its form, a result that does not read back), a scope (v3.4) off
+    a decide or that is no name, but no field's
     name is refused anywhere: each value is a line of its own. No period is added to the text."""
     if kind is not None and kind not in KINDS:
         raise Refused(f"a kind is one of {', '.join(KINDS)}, not {kind!r}")
@@ -2922,6 +3213,11 @@ def item_file(text: str, due: str | None, today: str, session: str | None, host:
             raise Refused(f"a doer is a repo, `<repo>` not ending in `.`, or a team, `team <name>` with one space, "
                           f"not {doer!r}")
         want_doer = (*got_doer, doer)
+    if scope is not None:
+        if kind != "decide":
+            raise Refused(f"only a decide names its scope, not {_a_kind(kind)}")
+        if not is_person(scope):
+            raise Refused(f"a scope is one name, not {scope!r}")
     words = _item_value(text, "an item's text")
     today = _civil_date(today, "today is written")
     if kind == "fyi":
@@ -3005,6 +3301,7 @@ def item_file(text: str, due: str | None, today: str, session: str | None, host:
     header.append(("Context", ctx))
     header += [("Parts", ", ".join(parts))] if parts else []
     header += [("Doer", doer)] if doer is not None else []
+    header += [("Scope", scope)] if scope is not None else []
     header += [("Due", due)] if due is not None else []
     header += [("Hide until", hide_until)] if hide_until is not None else []
     if offered:
@@ -3016,9 +3313,9 @@ def item_file(text: str, due: str | None, today: str, session: str | None, host:
     got = parse_item(new)
     if got is None or (got.words, got.kind, got.added and got.added.isoformat(), got.session, got.host, got.context,
                        got.due and got.due.isoformat(), got.answers, got.consequences, got.default, got.detail,
-                       got.hide_until and got.hide_until.isoformat(), got.lifts, got.parts, got.doer) \
+                       got.hide_until and got.hide_until.isoformat(), got.lifts, got.parts, got.doer, got.scope) \
             != (words, kind, today, session, host, ctx, due, [lbl for lbl, _ in offered], [c for _, c in offered],
-                label, body, hide_until, lifted or None, parts or [], want_doer) \
+                label, body, hide_until, lifted or None, parts or [], want_doer, scope) \
             or got.decided is not None or got.closed is not None or got.replies or got.fyi_due or got.bad_due \
             or [n for n, _ in got.fields] != [n for n, _ in header]:
         raise Refused("the board's reader would not read this item back as meant — rephrase it")
@@ -3061,7 +3358,7 @@ def decided_file(title: str, ref: str, answers: list[str], default: int | None, 
 
 def edit_item(text: str, action: str, *, to: date | None = None, answer: str | None = None,
               why: str | None = None, reply: str | None = None, by: str | None = None,
-              today: date | None = None, close: bool = False) -> str:
+              today: date | None = None, close: bool = False, delegate: str | None = None) -> str:
     """The open item file ``text`` after ``action`` (v3.0, SPEC *Edits*): snooze (`Hide until` set to
     ``to``), due (`Due` set to ``to``), done (`Closed: <today>[ — <why>]`), decide (`Decided: <today>[ by <by>] —
     <answer>`, a form's fill written as its fill; with ``close``, on an item whose Context names a gate, also
@@ -3069,7 +3366,10 @@ def edit_item(text: str, action: str, *, to: date | None = None, answer: str | N
     opens after the body when there is none). A field set that is there is rewritten in place; one added goes
     right after the last known field before it in the header order, or first in the header block. The line added
     or rewritten ends as the file's first line does; every other byte is kept. Raises Refused for a closed item
-    and for any result the reader would not read back as meant."""
+    and for any result the reader would not read back as meant. With ``delegate`` (v3.4, a decide only), the answer
+    is written in the delegated form, `<date> by <delegate> for <by> (<scope>) — <answer>`, the scope read from the
+    item's `Scope`: refused on an item with no `Scope`, with no ``by``, or with a delegate that is no name or is
+    ``by``. Whether a grant covers it is the caller's (delegate_problem())."""
     today = today or date.today()  # noqa: DTZ011  # a civil date, as the readers use
     lay = _item_layout(text)
     it = parse_item(text)
@@ -3079,6 +3379,8 @@ def edit_item(text: str, action: str, *, to: date | None = None, answer: str | N
         raise Refused("the item is closed: an edit changes an open item")
     if close and action != "decide":
         raise Refused("only a decide closes the item it answers (close)")
+    if delegate is not None and action != "decide":
+        raise Refused("--delegate is a decide's")
     raw, bare, _, a, b, _ = lay
     eol = "\r\n" if raw[0].endswith("\r\n") else "\n"
     lines = list(raw)
@@ -3126,7 +3428,20 @@ def edit_item(text: str, action: str, *, to: date | None = None, answer: str | N
         by = " ".join((by or "").split()) or None
         if by is not None and not is_person(by):
             raise Refused(f"who answered, {by!r}, is not a person's name (letters, digits, `_`, `-`, dot-separated)")
-        put("Decided", f"{today.isoformat()}{f' by {by}' if by else ''} — {answer}")
+        scope = None
+        if delegate is not None:
+            delegate = " ".join(str(delegate).split())
+            if not is_person(delegate):
+                raise Refused(f"a delegate, {delegate!r}, is not a person's name (letters, digits, `_`, `-`, "
+                              "dot-separated)")
+            if by is None:
+                raise Refused("a delegated answer names the person it is for (by)")
+            if delegate.lower() == by.lower():
+                raise Refused(f"a delegate answers for another: {delegate} is the person answering")
+            scope = it.scope
+            if scope is None:
+                raise Refused("rule 1: the item has no Scope")
+        put("Decided", _decided_render(today, by, delegate, scope, answer))
         reason = None
         if close:  # v2.4: the answer closes the item in the same write
             if _context_gate(it.context or "")[1] is None:
@@ -3157,7 +3472,7 @@ def edit_item(text: str, action: str, *, to: date | None = None, answer: str | N
     want = {"snooze": {"hide_until": to}, "due": {"due": to, "bad_due": None}, "done": {}, "decide": {},
             "reply": {}}[action]
     if action == "decide":
-        want = {"decided": (answer, today), "decided_by": by}
+        want = {"decided": (answer, today), "decided_by": by, "decided_delegate": delegate, "decided_scope": scope}
     if action == "reply":
         want = {"replies": [*it.replies, (who, today.isoformat(), words)]}
     meant = _item_read(_dc_replace(it, **want))
@@ -3286,6 +3601,11 @@ def _item_values_problems(seen: Mapping[str, str]) -> list[str]:
             out.append("doer: `Doer` names a repo, `<repo>` not ending in `.`, or a team, `team <name>`")
         elif got[0] == "team" and seen["Doer"] != f"team {got[1]}":
             out.append("doer: written `team <name>`, one space after `team`")
+    if "Scope" in seen:  # v3.4
+        if kind != "decide":
+            out.append(f"scope: {_a_kind(kind)} carries no `Scope`: only a decide names its scope")
+        if not is_person(seen["Scope"]):
+            out.append("scope: `Scope` is one name")
     if kind == "fyi":
         if "Due" in seen:
             out.append("due: an fyi carries no `Due`")
@@ -3344,16 +3664,35 @@ def _item_values_problems(seen: Mapping[str, str]) -> list[str]:
             and len({ref_key(x.group(0)) for x in REF_TD_RE.finditer(ctx)}) != 1:
         out.append("context: a decide that lifts a gate names exactly one entry in its Context")
     if decided:
-        d = parse_decided_value(seen["Decided"])
-        if d is None or seen["Decided"] != f"{d[1].isoformat()}{f' by {d[2]}' if d[2] else ''} — {d[0]}" \
-                or not _item_text_ok(d[0]):
-            out.append("decided: `Decided` is `<date>[ by <person>] — <label>`")
+        d = _decided_value(seen["Decided"])
+        if d is None or seen["Decided"] != _decided_render(d[1], d[2], d[3], d[4], d[0]) or not _item_text_ok(d[0]):
+            out.append("decided: `Decided` is `<date>[ by <person>[ for <person> (<scope>)]] — <label>`")
+        elif d[3] is not None:  # v3.4: a delegated answer, judged on the item's text alone
+            fault = _delegated_item_fault(d[3], d[2], d[4], seen.get("Scope"), ctx)
+            if fault is not None:
+                out.append(f"decided: {fault}")
     if "Closed" in seen:
         c = parse_closed_value(seen["Closed"])
         if c is None or seen["Closed"] != f"{c[0].isoformat()}{f' — {c[1]}' if c[1] else ''}" \
                 or (c[1] is not None and not _item_text_ok(c[1])):
             out.append("closed: `Closed` is `<date>` or `<date> — <why>`")
     return out
+
+
+def _delegated_item_fault(delegate: str, person: str, scope: str, item_scope: str | None, ctx: str) -> str | None:
+    """Why a delegated `Decided` cannot stand on its item, read from the item's text alone (v3.4), or None: no
+    `Scope`, a scope other than the item's, a delegate that is its person, a gate on another repo's entry (rule 4),
+    a gated Context that is not one entry and one gate (rule 5)."""
+    if item_scope is None:
+        return "a delegated answer on an item with no `Scope`"
+    if scope != item_scope:
+        return f"a delegated answer's scope {scope} is not the item's `Scope`, {item_scope}"
+    if delegate.lower() == person.lower():
+        return f"a delegated answer's delegate {delegate} is its person"
+    rule = _delegate_context_rule(ctx)
+    if rule is not None:
+        return f"a delegated answer: {DELEGATE_RULES[rule]}"
+    return None
 
 
 def canonical_item_file(text: str) -> str:
@@ -3560,7 +3899,8 @@ def _item_dir_problems(it: BoardItem) -> list[tuple[int, int, str]]:
     def fault(name: str, words: str) -> None:
         out.append((14, _field_line(it, name), words))
     if "decided" in got and parse_decided_value(got["decided"]) is None:
-        fault("Decided", "decided: `Decided` is not `<date>[ by <person>] — <label>`; read as no answer")
+        fault("Decided", "decided: `Decided` is not `<date>[ by <person>[ for <person> (<scope>)]] — <label>`; read "
+                         "as no answer")
     if "closed" in got and parse_closed_value(got["closed"]) is None:
         fault("Closed", "closed: `Closed` is not `<date>[ — <why>]`; read as no close")
     if "kind" in got:
@@ -3579,10 +3919,13 @@ def _item_dir_problems(it: BoardItem) -> list[tuple[int, int, str]]:
                           "as no doer")
         elif dv[0] == "team" and got["doer"] != f"team {dv[1]}":
             fault("Doer", f"doer: written with more than one space, or a tab, after `team`; read as the team {dv[1]}")
+    if "scope" in got and not is_person(got["scope"]):
+        fault("Scope", "scope: `Scope` is no name; read as no scope")
     if kind == "fyi" and "due" in got:
         fault("Due", "due: an fyi carries no `Due`; read as fyi_due")
     for key, name, takes in (("parts", "Parts", ("decide",)), ("lifts", "Lifts", ("decide",)),
-                             ("doer", "Doer", ("act",)), ("answers", "Answers", ("decide", "look"))):
+                             ("doer", "Doer", ("act",)), ("scope", "Scope", ("decide",)),
+                             ("answers", "Answers", ("decide", "look"))):
         if key in got and kind not in takes:
             fault(name, f"{key}: {_a_kind(kind)} carries no `{name}`; read as written")
     archived = it.path.startswith(f"{BOARD_ARCHIVE}/")
@@ -3688,7 +4031,7 @@ def _read_board_dir(d: str, names: list[str], ls: Ls, read: Read, since: date | 
 # Migration (v3.0, SPEC *The board as a directory*, *Migration*): a v2 board split into its directory
 # ---------------------------------------------------------------------------------------------
 
-SPLIT_PREAMBLE_LINE_RE = re.compile(r"^(?:People|Answered by|Ledgerboard):")  # a line README.md would read
+SPLIT_PREAMBLE_LINE_RE = re.compile(r"^(?:People|Answered by|Delegates|Ledgerboard):")  # a line README.md would read
 SPLIT_V2_NAMES = ("user_attention_archive.md", "user_attention.md", "Needs the user", "In-flight")
 SPLIT_ARCHIVE = "(archive)"  # the path split_board_notes() gives a line of the v2 archive's own text
 SPLIT_HEAD_RE = re.compile(r"^(?:[A-Za-z]+\s+)?\d{4}-\d{2}-\d{2}\s*\((?P<inner>session\s[^)]*)\)")
@@ -3760,10 +4103,11 @@ def _fenced(lines: list[str]) -> set[int]:
     return out
 
 
-def _split_text(text: str, where: str) -> tuple[list[str], list[list[str]]]:
+def _split_text(text: str, where: str) -> tuple[list[str], list[list[tuple[int, str]]]]:
     """A v2 board's (or archive's) lines before its first item, and its carried groups: each line after the first
-    item that is no item, no detail block's line and not blank, in order, a `## ` heading opening the group of the
-    lines under it (a heading with none under it dropped). Refused for a carried line README.md would read."""
+    item that is no item, no detail block's line and not blank, in order, with its line number, a `## ` heading
+    opening the group of the lines under it (a heading with none under it dropped). Refused for a carried line
+    README.md would read."""
     lines = text.splitlines()
     first = next((i for i, ln in enumerate(lines) if ANY_ITEM_RE.match(ln)), len(lines))
     taken: set[int] = set()
@@ -3779,7 +4123,7 @@ def _split_text(text: str, where: str) -> tuple[list[str], list[list[str]]]:
         if i in taken or (not ln.strip() and i not in fenced):
             continue
         if ln.startswith("## ") and i not in fenced:
-            head, open_group = ln, False
+            head, open_group = (i + 1, ln), False
             continue
         if SPLIT_PREAMBLE_LINE_RE.match(ln):
             raise Refused(f"{where}'s line {i + 1}, {ln.split(':', 1)[0]}:, stands below the first item, where no "
@@ -3790,7 +4134,7 @@ def _split_text(text: str, where: str) -> tuple[list[str], list[list[str]]]:
         elif not open_group:
             groups.append([])
             open_group = True
-        groups[-1].append(ln)
+        groups[-1].append((i + 1, ln))
     return lines[:first], groups
 
 
@@ -3898,7 +4242,17 @@ def _split_items(board: str, archive: str) -> dict:
     title = next((i for i, ln in enumerate(apre) if ln.strip()), None)
     archive_pre = [(n, ln) for n, ln in enumerate(apre, 1)
                    if ln.strip() and not (n - 1 == title and ln.startswith("# "))]
-    return {"items": items, "readme": _split_readme(pre, [*carried, *acarried]), "archive_pre": archive_pre}
+    groups = [*carried, *acarried]
+    readme = _split_readme(pre, [[ln for _, ln in g] for g in groups])
+    at = len(readme.splitlines()) - sum(1 + len(g) for g in groups)
+    moved = []
+    for where, gs in (("the board", carried), ("the archive", acarried)):
+        for g in gs:
+            at += 1
+            for n, _ in g:
+                at += 1
+                moved.append((at, where, n))
+    return {"items": items, "readme": readme, "archive_pre": archive_pre, "carried": moved}
 
 
 def _split_file(it: BoardItem) -> str:
@@ -3954,9 +4308,10 @@ def _split_check(board: str, archive: str, files: dict[str, str]) -> None:
         if diff:
             raise Refused(f"the split would not read back the same items: {diff[0]} reads differently — nothing "
                           "was split")
-    if ties(old) != ties(new) or board_people(old) != board_people(new) or answered_by(old) != answered_by(new):
-        raise Refused("the split would not read back the same board: what needs the person, People: or Answered "
-                      "by: reads differently — nothing was split")
+    if ties(old) != ties(new) or board_people(old) != board_people(new) or answered_by(old) != answered_by(new) \
+            or board_delegates(old) != board_delegates(new):
+        raise Refused("the split would not read back the same board: what needs the person, People:, Answered "
+                      "by: or Delegates: reads differently — nothing was split")
     carried = set()
     for path, text in files.items():
         it = parse_item(text, path) if path != BOARD_README else None
@@ -3967,14 +4322,25 @@ def _split_check(board: str, archive: str, files: dict[str, str]) -> None:
         raise Refused(f"the split would not read as its files say ({'; '.join(bad)}) — nothing was split")
 
 
-def _head_extra(line: str) -> str:
-    """The text a v2 line's head group holds after its session and host, which no file holds (v3.0)."""
+def _head_extra(line: str) -> tuple[str, str]:
+    """The text a v2 line's head group holds beyond its session and host, which no file holds, as ``(run-on,
+    rest)`` (v3.0; the run-on v3.3): the run-on is what follows the host's match, one closing backtick dropped, up
+    to the group's first ``,`` or ``;``, collapsed; the rest is the group less the session, the host's match with
+    that backtick, and the run-on, collapsed and trimmed of ``,``, ``;`` and spaces."""
     m = ITEM_RE.match(line) or CLOSED_ITEM_RE.match(line)
     g = SPLIT_HEAD_RE.match(m.group("text").strip()) if m else None
     if g is None:
-        return ""
-    inner = HEAD_HOST_RE.sub("", SPLIT_SESSION_RE.sub("", g.group("inner"), count=1), count=1)
-    return " ".join(inner.split()).strip(",; ")
+        return "", ""
+    inner = SPLIT_SESSION_RE.sub("", g.group("inner"), count=1)
+    run_on = ""
+    h = HEAD_HOST_RE.search(inner)
+    if h:
+        end = h.end() + (inner[h.end():h.end() + 1] == "`")
+        tail = inner[end:]
+        cut = next((i for i, c in enumerate(tail) if c in ",;"), len(tail)) if tail[:1].isspace() else 0
+        run_on = _collapsed(tail[:cut])
+        inner = inner[:h.start()] + tail[cut:]
+    return run_on, _collapsed(inner).strip(",; ")
 
 
 def _collapsed(text: str) -> str:
@@ -3984,9 +4350,11 @@ def _collapsed(text: str) -> str:
 def split_board_notes(files: Mapping[str, str], board: str, archive: str = "") -> list[tuple[str, int, str, str]]:
     """What a caller warns about after a split (v3.0, SPEC *Migration*), ``(path, line number, line, why)``, nothing
     rewritten: ``files`` is ``split_board(board, archive)``. `README.md`'s lines that may still describe the v2
-    board; the archive's own lines before its first item, not carried (path ``(archive)``, the archive's line);
+    board; each line carried to `README.md` from below the first item, which no item holds; the archive's own lines
+    before its first item, not carried (path ``(archive)``, the archive's line);
     an open twin whose detail block or line held what its closed twin's does not; each rule-14 shape the split
-    carried, at its field's line; and each item whose v2 line's head group held more than its session and host."""
+    carried, at its field's line; and each item whose v2 line's head group held more than its session and host, a
+    host's run-on apart from the rest (v3.3)."""
     got = _split_items(board, archive)
     out: list[tuple[str, int, str, str]] = []
     for n, ln in enumerate(files.get(BOARD_README, "").splitlines(), 1):
@@ -3995,6 +4363,10 @@ def split_board_notes(files: Mapping[str, str], board: str, archive: str = "") -
             out.append((BOARD_README, n, ln, f"names {named}: the board is now this directory"))
         elif ln.startswith("Format:"):
             out.append((BOARD_README, n, ln, "a Format: line: it may describe the v2 board's lines"))
+    readme = files.get(BOARD_README, "").splitlines()
+    out += [(BOARD_README, at, readme[at - 1],
+             f"carried from {where}'s line {n}, below an item: no item holds it")
+            for at, where, n in got["carried"] if at <= len(readme) and readme[at - 1].strip()]
     out += [(SPLIT_ARCHIVE, n, ln, "archive preamble not carried") for n, ln in got["archive_pre"]]
     parsed = [(it, path, twin, parse_item(files[path], path)) for it, path, twin in got["items"] if path in files]
     for it, path, twin, p in parsed:
@@ -4018,10 +4390,14 @@ def split_board_notes(files: Mapping[str, str], board: str, archive: str = "") -
         out += [(path, line, lines[line - 1] if line else "", msg)
                 for rule, line, msg in _item_dir_problems(p) if rule == 14]
     for it, path, _, p in parsed:
-        extra = _head_extra(it.raw)
-        if extra and p is not None:
+        run_on, extra = _head_extra(it.raw)
+        if (run_on or extra) and p is not None:
             line = _field_line(p, "Session") or 1
-            out.append((path, line, files[path].splitlines()[line - 1], f"head text not carried: {extra}"))
+            text = files[path].splitlines()[line - 1]
+            if run_on:
+                out.append((path, line, text, f"host kept to its first word; not carried: {run_on}"))
+            if extra:
+                out.append((path, line, text, f"head text not carried: {extra}"))
     return out
 
 
@@ -4466,6 +4842,337 @@ def _entry_sections(body: str) -> list[tuple[str | None, str]]:
     return found
 
 
+# The body's shape (v3.3, SPEC *The entry*, *The body's shape*): a strict lead, `**Name:**`; the prefix before an
+# `**Ask:**` that hides it (up to three spaces, or a `>` quote, nested or not); a list item's or a code span's mark.
+STRICT_LEAD_RE = re.compile(r"^\*\*(?P<name>[^*\s][^*\n]*?)[ \t]*:\*\*")
+ASK_PREFIX_RE = re.compile(r"^(?: {1,3}|(?: {0,3}>[ \t]*)+)(?=\*\*)")
+LIST_ITEM_RE = re.compile(r"^[ \t]*(?:[-*+]|\d{1,9}[.)])(?:[ \t]|$)")
+BODY_KINDS = ("lead-form", "glued-lead", "fence-open", "field-lines")  # check()'s four flags on the body (v3.3)
+# The section names this format reads, which a respelling may not make a label into (migrate-body, v3.3).
+READ_SECTION_KEYS = frozenset({"why", "fix", "done when", "related", "ask", "answers", "lifts", "context", "location",
+                               "log", "resolved", "title"})
+
+
+def _body_lines(body: str) -> list[dict]:
+    """Each line of a raw body as the body's shape reads it (v3.3, SPEC *The body's shape*): its text, its offset,
+    ``blank`` (whitespace only), ``hidden`` (its start lies inside an HTML comment: after a span's start and before
+    its end), its words outside the comment spans (``outside``), and its kind — ``blank``, ``text`` (words outside the
+    spans), ``inside`` (hidden, no words outside) or ``comment`` (a comment-only line: a span clipped to it and only
+    whitespace outside them), which is text to the glued rule, never to the Ask's."""
+    spans = [m.span() for m in COMMENT_RE.finditer(body)]
+    out, at = [], 0
+    for line in body.split("\n"):
+        a, b = at, at + len(line)
+        cut = sorted((max(s, a) - a, min(e, b) - a) for s, e in spans if s < b and e > a)
+        outside, k = [], 0
+        for s, e in cut:
+            if s > k:
+                outside.append(line[k:s])
+            k = max(k, e)
+        outside.append(line[k:])
+        words = "".join(outside)
+        hidden = any(s < a < e for s, e in spans)
+        kind = "blank" if not line.strip() else "text" if words.strip() else "inside" if hidden else "comment"
+        out.append({"line": line, "at": a, "blank": not line.strip(), "hidden": hidden, "outside": words,
+                    "kind": kind, "spans": bool(cut)})
+        at = b + 1
+    return out
+
+
+def _fence_step(fence: str, line: str) -> str:
+    """The open fence after ``line`` (``_entry_sections()``'s rule): a fence line opens one, and a bare run of its
+    own character at least as long closes it."""
+    f = FENCE_RE.match(line)
+    if f and not fence:
+        return f.group("fence")
+    if f and fence and f.group("fence")[0] == fence[0] and len(f.group("fence")) >= len(fence) \
+            and not f.group("info").strip():
+        return ""
+    return fence
+
+
+def _section_spans(lines: Sequence[str]) -> list[tuple[str | None, int, int]]:
+    """The body's sections as ``_entry_sections()`` cuts them, by line: (the lead as written, or None; the first
+    line; one past the last, trailing blank lines trimmed). The unnamed section is left out when it is empty."""
+    starts: list[tuple[str | None, int]] = []
+    fence, prev_blank = "", True
+    for i, line in enumerate(lines):
+        m = LEAD_RE.match(line) if prev_blank and not fence else None
+        if m or not starts:
+            starts.append((m.group("lead") if m else None, i))
+        fence = _fence_step(fence, line)
+        prev_blank = not line.strip()
+    out = []
+    for k, (lead, a) in enumerate(starts):
+        b = starts[k + 1][1] if k + 1 < len(starts) else len(lines)
+        while b > a and not lines[b - 1].strip():
+            b -= 1
+        if lead is not None or b > a:
+            out.append((lead, a, b))
+    return out
+
+
+def _ask_reading(rows: Sequence[dict], a: int, b: int) -> dict:
+    """The one reading of an Ask section, lines ``a`` to ``b`` of a raw body's ``_body_lines()`` (v3.3): ``value``,
+    the lead's line after its bold run, comments dropped, whitespace trimmed (one ``:`` dropped where the bold run
+    held none); ``past``, the text lines after the lead's line (comment-only and in-comment lines, and blank ones,
+    aside); ``para_end``, the line after its first paragraph (the first blank line outside a comment, else ``b``);
+    ``para``, the text lines of its first paragraph, the lead's among them; and ``words``, every text line's words
+    outside the comments, in order."""
+    lead = rows[a]
+    m = LEAD_RE.match(lead["line"])
+    head = lead["outside"]
+    if m and head.startswith(m.group(0)):
+        head = head[m.end():]
+        if not m.group("lead").rstrip().endswith(":") and head.lstrip().startswith(":"):
+            head = head.lstrip()[1:]
+    value = head.strip()
+    past = [i for i in range(a + 1, b) if rows[i]["kind"] == "text"]
+    end = next((i for i in range(a + 1, b) if rows[i]["blank"] and not rows[i]["hidden"]), b)
+    para = [a] + [i for i in range(a + 1, end) if rows[i]["kind"] == "text"]
+    words = [value] + [rows[i]["outside"].strip() for i in past]
+    return {"value": value, "past": past, "para_end": end, "para": para, "words": [w for w in words if w]}
+
+
+def _body_faults(body: str) -> list[tuple[str, str, str, int]]:
+    """The body's shape faults (v3.3, SPEC *The body's shape*), in line order: (kind, key, how, line) — ``lead-form``
+    (how ``form``), ``glued-lead`` (``glued``, or ``hidden`` for an indented or quoted Ask), ``fence-open``
+    (``open``, key ``""``) and ``field-lines`` (``lines``, or ``empty``), read on the raw body as the writers read it."""
+    rows = _body_lines(body)
+    out: list[tuple[str, str, str, int]] = []
+    fence, prev_blank = "", True
+    for i, r in enumerate(rows):
+        line = r["line"]
+        if not fence and not r["hidden"]:
+            lead, strict = LEAD_RE.match(line), STRICT_LEAD_RE.match(line)
+            q = ASK_PREFIX_RE.match(line)
+            hid = STRICT_LEAD_RE.match(line[q.end():]) if q else None
+            if prev_blank and lead and not strict:
+                out.append(("lead-form", _section_key(lead.group("lead")), "form", i))
+            elif not prev_blank and strict:
+                out.append(("glued-lead", field_key(strict.group("name")), "glued", i))
+            elif hid and field_key(hid.group("name")) == "ask":
+                out.append(("glued-lead", "ask", "hidden", i))
+        fence = _fence_step(fence, line)
+        prev_blank = r["blank"]
+    if fence:
+        out.append(("fence-open", "", "open", len(rows)))
+    for lead, a, b in _section_spans([r["line"] for r in rows]):
+        if lead is not None and _section_key(lead) == "ask":
+            got = _ask_reading(rows, a, b)
+            if not got["value"] or got["past"]:
+                out.append(("field-lines", "ask", "empty" if not got["value"] else "lines", a))
+    return sorted(out, key=lambda f: (f[3], BODY_KINDS.index(f[0])))
+
+
+def body_problems(text: str) -> list[tuple[str, str, str]] | None:
+    """One entry's body-shape faults (v3.3, SPEC *The body's shape*), the raw text as the writers read it:
+    [(kind, key, sentence)], each sentence naming the entry, the kind, the lead's key and its ordinal among the
+    faults of that kind and key, never a line; None for an entry ``_entry_parts()`` refuses, which is not read."""
+    try:
+        m, _, body = _entry_parts(text)
+    except Refused:
+        return None
+    tid, seen, out = m.group(1), Counter(), []
+    for kind, key, how, _ in _body_faults(body):
+        seen[(kind, key)] += 1
+        nth = _ordinal(seen[(kind, key)])
+        lead = f"`**{key}:**`" if key else "nameless"
+        why = {
+            "form": f"the {nth} {f'`**{key}**`' if key else 'nameless'} lead is not a strict `**Name:**` (lead-form): "
+                    f"write it `**{key or 'Name'}:**` to keep it a section, or reword the paragraph to open with words; "
+                    "it is read as a lead until v4.0 (ledger.py migrate-body respells it)",
+            "glued": f"the {nth} {lead} lead is glued to the line above, so it opens no section (glued-lead): add a "
+                     "blank line above it to make it the section its writer meant (migrate-body does), or reword the "
+                     "line so it does not open with a lead",
+            "hidden": f"the {nth} {lead} lead is indented or quoted, so it opens no section and the Ask is never read "
+                      "(glued-lead): remove the indent or the quote",
+            "open": f"the {nth} code fence opens and never closes (fence-open), so no lead after it is read: close it",
+            "lines": f"the {nth} {lead} section runs past its lead's line (field-lines): an Ask is one line, "
+                     "`**Ask:** <the question>` — move the rest under a `**Context:**` section after it (migrate-body "
+                     "does)",
+            "empty": f"the {nth} {lead} section has no question on its lead's line (field-lines): write the question "
+                     "there, one line",
+        }[how]
+        out.append((kind, key, f"{tid}: {why}"))
+    return out
+
+
+def _ordinal(n: int) -> str:
+    """``1st``, ``2nd``, ``3rd``, ``4th``, …, ``11th``, ``21st``."""
+    suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def _raw_entry_texts(text: str) -> dict[str, str]:
+    """Each entry's raw text (its heading to the next ``## `` heading outside an HTML comment, comments kept), by
+    id, the first of an id winning, as ``_entry_texts()`` keeps."""
+    out: dict[str, str] = {}
+    for tid, part in _sections(text or ""):
+        if tid is not None:
+            out.setdefault(tid, part)
+    return out
+
+
+def _body_records(ledger: str, old: str | None) -> list[dict]:
+    """``check()``'s four body-shape flags (v3.3, SPEC *The body's shape*) over the open entries' raw texts, counted
+    per key (entry, kind, the lead's key): with no ``old`` each is ℹ; with it, the first j of a key are ℹ and
+    standing where ``old``'s entry had j, the rest errors — an entry absent from ``old`` counting from 0, one
+    ``old`` cannot read all ℹ, and where ``old``'s entry has ``fence-open``, its other three kinds ℹ."""
+    olds = _raw_entry_texts(old) if old is not None else {}
+    out = []
+    for tid, text in _raw_entry_texts(ledger).items():
+        found = body_problems(text)
+        if not found:
+            continue
+        had: Counter | None = Counter()
+        fenced = False
+        if old is not None and tid in olds:
+            was = body_problems(olds[tid])
+            if was is None:
+                had = None
+            else:
+                had.update((k, key) for k, key, _ in was)
+                fenced = any(k == "fence-open" for k, _, _ in was)
+        seen = Counter()
+        for kind, key, why in found:
+            seen[(kind, key)] += 1
+            if old is None:
+                level, standing = "info", False
+            elif had is None or (fenced and kind != "fence-open") or seen[(kind, key)] <= had[(kind, key)]:
+                level, standing = "info", True
+            else:
+                level, standing = "error", False
+            out.append({"level": level, "id": tid, "field": key or "body", "kind": kind, "standing": standing,
+                        "text": f"{'⚠' if level == 'error' else 'ℹ'} {why}"})
+    return out
+
+
+def _respelled(bold: str) -> str:
+    """A label's strict spelling (v3.3, migrate-body): the bold text's whitespace trimmed, one trailing ``.`` or
+    ``:`` dropped; the name alone, or ``""`` when none is left."""
+    name = bold.strip()
+    if name.endswith((".", ":")):
+        name = name[:-1]
+    return name.rstrip()
+
+
+def migrate_body(text: str, declared_fields=()) -> str:
+    """One entry rewritten so ``check()`` flags none of the body's four kinds (v3.3, SPEC *The ledger writer*,
+    ``migrate-body``), in ``canonical()`` form; ``text`` itself when it needs no declared rewrite (already
+    migrated). The rewrites, in order on the raw body: each non-strict lead respelled ``**Name:**``, a blank line
+    above each glued lead, then a multi-line Ask's first paragraph joined to one line and the rest moved, byte for
+    byte, under a ``**Context:**`` lead after it. Raises Refused for an entry ``_entry_parts()`` refuses, and on an
+    entry with a fault for: ``fence-open``; an indented or quoted Ask; a label with no name, or one whose respelling
+    changes its key to another section's, a name this format reads or a header name (``declared_fields``: the
+    ledger's ``Fields:``); a comment inside a label's bold run; two Asks; an Ask whose lead's line is empty, whose
+    first paragraph holds a list or a fence, or that must be joined and holds a comment, a code span, a line that is
+    not plain text or a hard break; a Context beside an Ask with more to move; and a rewrite that would not read
+    back to the v3.3 reading under the declared rewrites alone."""
+    m, header, body = _entry_parts(text)
+    faults = _body_faults(body)
+    if not faults:
+        return text
+    tid = m.group(1)
+    if any(k == "fence-open" for k, *_ in faults):
+        raise Refused(f"{tid}: a code fence never closes (fence-open), so its sections cannot be read — close it by "
+                      "hand, then run again")
+    if any(how == "hidden" for _, _, how, _ in faults):
+        raise Refused(f"{tid}: an indented or quoted **Ask:** is not a rewrite this writer guesses — remove the indent "
+                      "or the quote by hand")
+    rows = _body_lines(body)
+    lines = [r["line"] for r in rows]
+    spans = _section_spans(lines)
+    keys = {i: (_section_key(lead) if lead is not None else None) for lead, i, _ in spans}
+    reads = READ_SECTION_KEYS | set(HEADER_NAMES) | _declared_keys(declared_fields)
+    expected: list[list] = []  # [key, text after the lead's bold run] per section, the declared rewrites applied
+    glued = {i: k for kind, k, how, i in faults if kind == "glued-lead"}
+    formed = {i for kind, _, _, i in faults if kind == "lead-form"}
+    for lead, a, b in spans:
+        cuts = [a, *sorted(i for i in glued if a < i < b), b]
+        for x, y in zip(cuts, cuts[1:]):
+            first = LEAD_RE.match(lines[x]) if (x == a and lead is not None) or x in glued else None
+            key = keys[a] if x == a else glued[x]
+            after = "\n".join([lines[x][first.end():] if first else lines[x], *lines[x + 1:y]])
+            if x in formed:
+                bold = first.group("lead")
+                if any(s < rows[x]["at"] + first.end() and e > rows[x]["at"]
+                       for s, e in (c.span() for c in COMMENT_RE.finditer(body))):
+                    raise Refused(f"{tid}: a comment inside the label {lines[x][:first.end()]!r} — fix it by hand")
+                name = _respelled(bold)
+                if not name:
+                    raise Refused(f"{tid}: the label {lines[x][:first.end()]!r} has no name to respell — reword it by "
+                                  "hand")
+                new = field_key(name)
+                if new != key and (new in reads or new.startswith("event (") or
+                                   new in {v for i, v in keys.items() if i != a and v is not None}
+                                   | set(glued.values())):  # D7: tested after splitting, so a glued lead's key too
+                    raise Refused(f"{tid}: respelling {lines[x][:first.end()]!r} as **{name}:** would make it "
+                                  f"{'another section of the entry' if new not in reads else 'a section this format reads'}"
+                                  " — reword it by hand")
+                after = after[1:] if after.startswith(":") else after
+                tail = lines[x][first.end():]
+                lines[x] = f"**{name}:**{tail[1:] if tail.startswith(':') else tail}"
+                key = new
+            expected.append([key, after.strip()])
+    for i in sorted(glued, reverse=True):
+        lines.insert(i, "")
+    rows = _body_lines("\n".join(lines))
+    asks = [(a, b) for lead, a, b in _section_spans(lines) if lead is not None and _section_key(lead) == "ask"]
+    if len(asks) > 1:
+        raise Refused(f"{tid}: the body has {len(asks)} Ask sections — keep one, by hand")
+    if asks:
+        a, b = asks[0]
+        got = _ask_reading(rows, a, b)
+        if not got["value"]:
+            raise Refused(f"{tid}: its Ask's lead line holds no question — write it there, by hand")
+        if got["past"]:
+            end = got["para_end"]
+            if any(LIST_ITEM_RE.match(lines[i]) or FENCE_RE.match(lines[i]) for i in range(a + 1, end)):
+                raise Refused(f"{tid}: its Ask's first paragraph holds a list or a fence — make it one sentence, by hand")
+            joined = None
+            if len(got["para"]) > 1:
+                para = range(a, end)
+                if any(rows[i]["spans"] or rows[i]["hidden"] for i in para) or \
+                        any("`" in lines[i] for i in para):
+                    raise Refused(f"{tid}: its Ask's first paragraph runs over lines and holds a comment or a code "
+                                  "span — join it by hand")
+                if any(re.match(r"^(?: {4}|[ \t]*[>|#]|[ \t]*(?:-{3,}|={3,}|\*{3,}|_{3,})[ \t]*$)", lines[i]) or LIST_ITEM_RE.match(lines[i])
+                       or FENCE_RE.match(lines[i]) for i in got["para"][1:]) or \
+                        any(lines[i].endswith(("\\", "  ")) for i in got["para"][:-1]):
+                    raise Refused(f"{tid}: its Ask's first paragraph holds a line that is not plain text — join it by "
+                                  "hand")
+                joined = " ".join(" ".join(lines[i] for i in got["para"]).split())
+            rest = lines[end:b]
+            while rest and not rest[0].strip():
+                rest = rest[1:]
+            more = any(r["kind"] == "text" for r in rows[end:b])
+            if more and any(lead is not None and _section_key(lead) == "context"
+                            for lead, _, _ in _section_spans(lines)):
+                raise Refused(f"{tid}: it has a Context section beside an Ask of several paragraphs — merge them by hand")
+            head = [joined] if joined is not None else lines[a:end]
+            block = [*head, *(["", "**Context:**", "", *rest] if more else ["", *rest] if rest else [])]
+            lines[a:b] = block
+            at = next(n for n, e in enumerate(expected) if e[0] == "ask")
+            ask_words = " ".join(lines[a].split()) if joined is not None else "\n".join(head)
+            m_ = LEAD_RE.match(ask_words)
+            expected[at][1] = (ask_words[m_.end():] if m_ else ask_words).strip()
+            if more:
+                expected.insert(at + 1, ["context", "\n".join(rest).strip()])
+            elif rest:
+                expected[at][1] = (expected[at][1] + "\n\n" + "\n".join(rest)).strip()
+    new_body = "\n".join(lines)
+    actual = []
+    for lead, a, b in _section_spans(lines):
+        first = LEAD_RE.match(lines[a]) if lead is not None else None
+        after = "\n".join([lines[a][first.end():] if first else lines[a], *lines[a + 1:b]])
+        actual.append([_section_key(lead) if lead is not None else None, after.strip()])
+    if actual != expected or _body_faults(new_body):
+        raise Refused(f"{tid}: the rewrite would not read back its sections under the declared rewrites alone — "
+                      "fix it by hand")
+    return canonical(_render(tid, m.group(3), header, new_body))
+
+
 def _section_key(lead: str) -> str:
     """A section's name for matching: its lead's ``field_key`` with a trailing colon dropped, so
     ``Done when`` and ``Done when:`` are one name; a qualified lead (``Fix (to design):``) keeps its
@@ -4790,13 +5497,15 @@ LOG_TOKEN = r"[A-Za-z0-9_.@/-]+"  # who, a session, a host: no spaces, commas, c
 LOG_ID = rf"(?:{REPO}#)?TD-\d+"  # the ids Blocked by takes
 LOG_GATE = r"decision \(" + PERSON + r"\)|until \d{4}-\d{2}-\d{2}|event \([a-z0-9-]+\)"
 LOG_LIFT_SUFFIX = rf"; board {REPO}|; no board item|; shared board item left open"
+# v3.4: a delegated answer's `by <delegate> for <person> (<scope>)`, in the answer and kept-waiting shapes alone
+LOG_BY_DELEGATED = rf"(?P<by>{LOG_TOKEN})(?: for (?P<person>{LOG_TOKEN}) \((?P<scope>{LOG_TOKEN})\))?"
 # Each writer-made shape, tried in this order; a quoted label or words run to the line's last `"`.
 LOG_SHAPES = (
     ("filed", re.compile(rf"filed by (?P<who>{LOG_TOKEN}), session (?P<session>{LOG_TOKEN})"
                          rf"(?:, while (?P<while>{LOG_ID}))?: \"(?P<words>.*)\"")),
     ("gate-added", re.compile(rf"gate added: (?P<gate>{LOG_GATE})")),
     ("gate-lifted", re.compile(rf"gate lifted: (?P<gate>decision \({PERSON}\)|event \([a-z0-9-]+\)) — by "
-                               rf"(?P<by>{LOG_TOKEN}); answer \"(?P<label>.*)\"(?P<suffix>{LOG_LIFT_SUFFIX})?")),
+                               rf"{LOG_BY_DELEGATED}; answer \"(?P<label>.*)\"(?P<suffix>{LOG_LIFT_SUFFIX})?")),
     ("gate-lifted", re.compile(rf"gate lifted: (?P<gate>decision \({PERSON}\)) — by (?P<by>{LOG_TOKEN}); "
                                r"override: (?P<why>\S.*)")),
     ("gate-lifted", re.compile(rf"gate lifted: (?P<gate>event \([a-z0-9-]+\)) — by (?P<by>{LOG_TOKEN}); "
@@ -4805,7 +5514,7 @@ LOG_SHAPES = (
                                r"date reached")),
     ("gate-lift-skipped", re.compile(rf"gate lift skipped: (?P<id>{LOG_ID}) no longer carries "
                                      rf"(?P<gate>decision \({PERSON}\)|event \([a-z0-9-]+\))")),
-    ("kept-waiting", re.compile(rf"kept waiting: (?P<gate>{LOG_GATE}) — by (?P<by>{LOG_TOKEN}); "
+    ("kept-waiting", re.compile(rf"kept waiting: (?P<gate>{LOG_GATE}) — by {LOG_BY_DELEGATED}; "
                                 r"answer \"(?P<label>.*)\"")),
     ("gate-reassigned", re.compile(rf"gate reassigned: (?P<gate>decision \({PERSON}\)) → "
                                    rf"(?P<to>decision \({PERSON}\)) — by (?P<by>{LOG_TOKEN}); (?P<why>\S.*)")),
@@ -4839,7 +5548,9 @@ def log_line(line: str) -> dict | None:
     ``gate-lift-skipped``, ``kept-waiting``, ``gate-reassigned``, ``archived``, ``reopened``, ``was``,
     ``retitled`` (v2.8)),
     ``note`` for any other words, or ``malformed`` for words that begin with a writer prefix and do
-    not take its shape. A ``gate-lifted`` line also says ``via``: answer, override, check or date."""
+    not take its shape. A ``gate-lifted`` line also says ``via``: answer, override, check or date. A
+    ``gate-lifted`` answer line and a ``kept-waiting`` line (v3.4) also carry ``delegate`` and ``scope``, null
+    unless the line is delegated, `by <delegate> for <person> (<scope>)`, whose ``by`` is then the person."""
     m = LOG_LINE_RE.match(line.rstrip("\r"))
     if not m:
         return None
@@ -4849,7 +5560,14 @@ def log_line(line: str) -> dict | None:
         s = rx.fullmatch(words)
         if s:
             out["kind"] = kind
-            out.update({n: v for n, v in s.groupdict().items() if v is not None})
+            got = s.groupdict()
+            delegated = "person" in got
+            person = got.pop("person", None)
+            out.update({n: v for n, v in got.items() if v is not None and n != "scope"})
+            if delegated:  # v3.4: the answer and kept-waiting shapes
+                out["delegate"], out["scope"] = (got["by"], got["scope"]) if person is not None else (None, None)
+                if person is not None:
+                    out["by"] = person
             if kind == "gate-lifted":
                 out["via"] = ("answer", "override", "check", "date")[k - 2]
             return out
@@ -5393,7 +6111,8 @@ def edit_entry(text: str, action: str, *, today: date | str | None = None, field
             if at:
                 sections[at[0]] = (sections[at[0]][0], f"**{sections[at[0]][0]}** {said}")
             else:
-                pos = _section_place(sections)
+                asks = _keyed(sections, "ask") if key == "context" else []  # v3.3: the Ask's context follows it
+                pos = asks[0] + 1 if asks else _section_place(sections)
                 sections.insert(pos, (f"{name}:", f"**{name}:** {said}"))
             after = parse_event_section(sections[at[0] if at else pos][1])
             carried = parse_gates(_value(header, "blocked by"))["events"]
@@ -5670,6 +6389,11 @@ LIFT_SUFFIX_RE = re.compile(rf"board (?P<repo>{REPO})|no board item|shared board
 EVIDENCE_PR_RE = re.compile(rf"(?P<repo>{REPO})#(?P<n>[0-9]{{1,18}})")
 EVIDENCE_AT_RE = re.compile(rf"(?P<repo>{REPO})@(?P<sha>[0-9a-f]{{7,40}})")
 LOG_TOKEN_RE = re.compile(LOG_TOKEN)
+# The commit subject of a ledger lift (v3.3, SPEC *Edits*): `<tool>: lift decision (<p>) on TD-n (session <name>)`,
+# matched whole; the id's digits ASCII and at most 18, the reader's cap.
+LIFT_SUBJECT_RE = re.compile(rf"(?P<tool>{LOG_TOKEN}): lift (?P<gate>decision \({PERSON}\)) on "
+                             rf"(?P<id>TD-[0-9]{{1,18}}) \(session (?P<session>{LOG_TOKEN})\)")
+LIFT_TID_RE = re.compile(r"TD-[0-9]{1,18}")
 
 
 def _host_log_evidence_ok(ev: str, source: str) -> bool:
@@ -5763,7 +6487,8 @@ def _without(text: str, gate: str) -> tuple[str, str | None]:
 
 def lift_gate(text: str, gate: str, by: str, *, answer: str | None = None, evidence: str | None = None,
               suffix: str | None = None, override: str | None = None, today: date | str,
-              people: list[str] | None = None, answered_by: str | None = None) -> str:
+              people: list[str] | None = None, answered_by: str | None = None, delegate: str | None = None,
+              scope: str | None = None) -> str:
     """One open entry's text with ``gate`` removed from its Blocked by and the matching `gate lifted` Log line
     appended (v2.4, SPEC *Lifting a gate*): the one text edit every route writes — the person's ``set by=``,
     a host's event and ``until`` lifts, the cross-repo decision lift — and that decide_lift() composes. The
@@ -5781,7 +6506,11 @@ def lift_gate(text: str, gate: str, by: str, *, answer: str | None = None, evide
       section; ``by`` is the host's token;
     - ``until D``: none of them; ``today`` (the UTC date) must have reached D.
 
-    An emptied Blocked by is removed; the Log line carries the gate as the entry wrote it and ``by`` as given."""
+    An emptied Blocked by is removed; the Log line carries the gate as the entry wrote it and ``by`` as given.
+    ``delegate`` and ``scope`` (v3.4), both or neither, only write a person's answer line in the delegated form,
+    `by <delegate> for <by> (<scope>)`; every comparison is of ``by``, the person. They are refused on the
+    override, check and date shapes, with the `board <repo>` suffix, and for a delegate that is no name or is
+    ``by``, or a scope that is no name."""
     day = utc_day(today, "lift_gate()'s today")
     gate = _one_gate(gate)
     if not entries(text):
@@ -5791,6 +6520,11 @@ def lift_gate(text: str, gate: str, by: str, *, answer: str | None = None, evide
     given = [k for k, v in (("answer", answer), ("evidence", evidence), ("suffix", suffix), ("override", override))
              if v is not None]
     by = " ".join(str(by or "").split())
+    if delegate is not None and (override is not None or evidence is not None or gate.startswith("until")):
+        raise Refused("only an answer is delegated: an override, a check's lift and a date's take no delegate")
+    if delegate is not None and suffix is not None and " ".join(str(suffix).split()).removeprefix("; ").startswith("board "):
+        raise Refused("a delegate answers no gate on another repo's entry (rule 4): no board <repo> suffix")
+    who = _delegated_by(by, delegate, scope)
 
     def only(*allowed: str) -> None:
         stray = [k for k in given if k not in allowed]
@@ -5832,7 +6566,7 @@ def lift_gate(text: str, gate: str, by: str, *, answer: str | None = None, evide
         elif by.lower() != person.lower():
             raise Refused(f"only {person} lifts {gate}, not {by} (the set route's, or a board without Answered by: any)")
         written, value = _without(text, gate)
-        return _logged(text, "lift", value, [f"gate lifted: {written} — by {by}; answer \"{said}\"{tail}"], day)
+        return _logged(text, "lift", value, [f"gate lifted: {written} — by {who}; answer \"{said}\"{tail}"], day)
     if override is not None:
         raise Refused(f"an override lifts a decision, not {gate}")
     if gate.startswith("until"):
@@ -5873,7 +6607,25 @@ def lift_gate(text: str, gate: str, by: str, *, answer: str | None = None, evide
     if not is_person(by) or by.lower() not in on:
         raise Refused(f"{by} is not on the board's People: ({', '.join(people)}) — only a listed person answers")
     written, value = _without(text, gate)
-    return _logged(text, "lift", value, [f"gate lifted: {written} — by {by}; answer \"{said}\""], day)
+    return _logged(text, "lift", value, [f"gate lifted: {written} — by {who}; answer \"{said}\""], day)
+
+
+def _delegated_by(by: str, delegate: str | None, scope: str | None) -> str:
+    """The Log line's `by` group (v3.4): ``by``, or `<delegate> for <by> (<scope>)` for a delegated answer;
+    refused for one of the pair without the other, a delegate or scope that is no name, or a delegate that is
+    ``by``."""
+    if delegate is None and scope is None:
+        return by
+    if delegate is None or scope is None:
+        raise Refused("a delegated answer takes both delegate and scope, or neither")
+    delegate, scope = " ".join(str(delegate).split()), " ".join(str(scope).split())
+    if not is_person(delegate):
+        raise Refused(f"a delegate, {delegate!r}, is not a person's name")
+    if not is_person(scope):
+        raise Refused(f"a scope, {scope!r}, is one name")
+    if delegate.lower() == by.lower():
+        raise Refused(f"a delegate answers for another: {delegate} is the person answering")
+    return f"{delegate} for {by} ({scope})"
 
 
 def reassign_gate(text: str, frm: str, to: str, *, by: str, why: str, today: date | str) -> str:
@@ -5916,7 +6668,8 @@ def reassigns(text: str, gate: str) -> int:
 
 def decide_lift(item: BoardItem | str, entries: Mapping[str, str], label: str, by: str, today: date | str,
                 board_people: list[str] | None, answered_by: str | None,
-                archived: Iterable[str] = ()) -> dict[str, str]:
+                archived: Iterable[str] = (), delegate: str | None = None, scope: str | None = None
+                ) -> dict[str, str]:
     """The decide lift's ledger half (v2.4, SPEC *The decide lift*): ``{id: new_text}`` for each entry the answer
     ``label``, given by ``by``, changes, from the ``decide`` item ``item`` (the base item: an item file's text or a
     ``BoardItem``, v3.0) and
@@ -5939,7 +6692,8 @@ def decide_lift(item: BoardItem | str, entries: Mapping[str, str], label: str, b
     a tool PR there); a Context entry missing or archived (in ``archived``, or its Status an archived one); a
     `Parts:` id in neither ``entries`` nor ``archived``, of another repo, or, given as a text, not `Part of` the
     Context entry; a gate's person not on `People:`; an answerer not on `People:`, or, for a decision under
-    ``owner``, not the gate's person."""
+    ``owner``, not the gate's person. ``delegate`` and ``scope`` (v3.4) only write each Log line in the delegated
+    form, as lift_gate() does, and are refused as it refuses them."""
     day = utc_day(today, "decide_lift()'s today")
     item = _as_item(item)
     if item.kind != "decide" or item.closed is not None:
@@ -5956,6 +6710,7 @@ def decide_lift(item: BoardItem | str, entries: Mapping[str, str], label: str, b
         raise Refused("the answer is empty")
     if not is_person(by):
         raise Refused(f"who answered, {by!r}, is not a person's name")
+    who = _delegated_by(by, delegate, scope)  # v3.4: refused as lift_gate() refuses it
     if answered_by is not None and answered_by.lower() not in ANSWERED_BY:
         raise Refused(f"Answered by is owner or any, not {answered_by!r}")
     on = {x.lower() for x in board_people or []}
@@ -6016,10 +6771,10 @@ def decide_lift(item: BoardItem | str, entries: Mapping[str, str], label: str, b
         if lifting:
             out[k] = lift_gate(t, gate, by, answer=said, today=day,
                                people=board_people if board_people is not None else ([by] if person is None else None),
-                               answered_by="any" if not owner else None)
+                               answered_by="any" if not owner else None, delegate=delegate, scope=scope)
         else:
             out[k] = _logged(t, "answer", _entries(t)[0]["blocked_raw"],
-                             [f"kept waiting: {written} — by {by}; answer \"{said}\""], day)
+                             [f"kept waiting: {written} — by {who}; answer \"{said}\""], day)
     if skipped:
         spelled = _carried(ctx_text, gate) or gate
         out[key] = _logged(out.get(key, ctx_text), "lift", _entries(out.get(key, ctx_text))[0]["blocked_raw"],
@@ -6583,15 +7338,19 @@ def covers(entry_text: str, gate: str, boards: Sequence[Sequence], repo: str) ->
 
 
 def _entry_ask(text: str, title: str) -> str:
-    """The entry's Ask as one line: its ``**Ask:**`` section's words, else its title."""
+    """The entry's Ask as one line: its ``**Ask:**`` section's words, else its title. From v3.3 the section is read
+    on the raw text by ``_ask_reading()``, the one helper ``check()`` uses: each text line's words outside the comment
+    spans over the raw body, clipped to the Ask's lines, joined (``Go? <!-- a``, a blank line, ``**Context:** x -->``
+    is ``Go?``)."""
     try:
-        sections = _entry_sections(_entry_parts(text)[2])
+        body = _entry_parts(text)[2]
     except Refused:
-        sections = []
-    at = _keyed(sections, "ask")
+        return title
+    rows = _body_lines(body)
+    at = [(a, b) for lead, a, b in _section_spans([r["line"] for r in rows])
+          if lead is not None and _section_key(lead) == "ask"]
     if at:
-        words = " ".join(sections[at[0]][1].split())
-        words = words[len("**Ask:**"):].strip() if words.startswith("**Ask:**") else words
+        words = " ".join(" ".join(_ask_reading(rows, *at[0])["words"]).split())
         if words:
             return words
     return title
@@ -6726,21 +7485,168 @@ def _sweep_text(cond: str, tid: str, gate: str, extra: str = "") -> str:
                      f"for {tid}."}[cond]
 
 
+def _entry_context(text: str) -> str:
+    """The entry's ``**Context:**`` section as one line (v3.3, the Ask's context): its words after the lead, its
+    whitespace collapsed; ``""`` when it has none or its body cannot be read."""
+    try:
+        sections = _entry_sections(_entry_parts(text)[2])
+    except Refused:
+        return ""
+    at = _keyed(sections, "context")
+    if not at:
+        return ""
+    lead, words = sections[at[0]]
+    m = LEAD_RE.match(words)
+    rest = words[m.end():] if m else words
+    if m and not m.group("lead").rstrip().endswith(":") and rest.lstrip().startswith(":"):
+        rest = rest.lstrip()[1:]  # `**Context**: x`, as the Ask's one reading drops it
+    return " ".join(rest.split())
+
+
+# An entry's own answers (v3.3, SPEC *The ledger*, *An entry's own answers*): the one-line `**Answers:**` and
+# `**Lifts:**` body fields the gate sweep offers, read by entry_answers() alone.
+ANSWER_FIELDS = ("answers", "lifts")  # the two leads' names, as _section_key() reads them
+BOLD_AT_RE = re.compile(r"(?=\*\*(?P<lead>[^*\n]+?)\*\*)")  # a bold run tried at every `**` (overlapping)
+ANSWERS_UNUSABLE_TAIL = " (the first fault found)"
+
+
+def _answer_lead(line: str) -> str | None:
+    """``answers`` or ``lifts`` where ``line``, its leading whitespace removed, opens with a lead of that name."""
+    m = LEAD_RE.match(line.lstrip())
+    k = _section_key(m.group("lead")) if m else None
+    return k if k in ANSWER_FIELDS else None
+
+
+def _stray_answer_lead(lines: Sequence[str], starts: set[int]) -> int | None:
+    """The first line, outside a fence, that opens with an `Answers` or `Lifts` lead and is not in ``starts`` (the
+    lines that open a section); where the text ends inside an open fence, the lines after its opening line are
+    tested too."""
+    fence, opened, hits = "", None, []
+    for i, line in enumerate(lines):
+        if not fence and i not in starts and _answer_lead(line):
+            hits.append(i)
+        was = fence
+        fence = _fence_step(fence, line)
+        if fence and not was:
+            opened = i
+    if fence and opened is not None:
+        hits += [i for i in range(opened + 1, len(lines)) if i not in starts and _answer_lead(lines[i])]
+    return min(hits) if hits else None
+
+
+def _answer_value(line: str) -> str:
+    """A one-line field's value: the line after its lead's bold run, leading whitespace removed, then one `:` where
+    the bold run held none, then trimmed."""
+    m = LEAD_RE.match(line)
+    rest = line[m.end():].lstrip()
+    if not m.group("lead").rstrip().endswith(":") and rest.startswith(":"):
+        rest = rest[1:]
+    return rest.strip()
+
+
+def entry_answers(entry_text: str) -> dict | None:
+    """One entry's own answers (v3.3, SPEC *An entry's own answers*): None when its body holds neither an
+    ``**Answers:**`` nor a ``**Lifts:**`` field; ``{"answers", "default", "lifts"}`` when they can be offered as a
+    board ``decide``'s (each answer with its ``(default)`` mark removed and a literal ``|``; the marked one's index or
+    None; the ``**Lifts:**`` labels or None). Raises Refused, naming the first fault found, for answers the gate
+    sweep cannot offer. HTML comments are dropped first; it reads no board and no person."""
+    text = COMMENT_RE.sub("", str(entry_text)).replace("\r\n", "\n").replace("\r", "\n")
+    try:
+        m, _, body = _entry_parts(text)
+    except Refused as e:
+        lines = text.split("\n")
+        i = 1
+        while i < len(lines) and not lines[i].strip():
+            i += 1
+        while i < len(lines) and lines[i].strip():
+            i += 1
+        if _stray_answer_lead(lines[i:], set()) is not None:
+            raise Refused(str(e)) from None
+        return None
+    tid = m.group(1)
+    lines = body.split("\n")
+    spans = _section_spans(lines)
+    if _stray_answer_lead(lines, {a for lead, a, _ in spans if lead is not None}) is not None:
+        raise Refused("an Answers or Lifts lead that starts no section (glued to the line above it, or indented)")
+    found = {k: [(a, b) for lead, a, b in spans if lead is not None and _section_key(lead) == k] for k in ANSWER_FIELDS}
+    if not found["answers"] and not found["lifts"]:
+        return None
+    for k in ANSWER_FIELDS:
+        if len(found[k]) > 1:
+            raise Refused(f"two **{k.capitalize()}:** sections")
+    for k in ANSWER_FIELDS:
+        if found[k] and found[k][0][1] - found[k][0][0] > 1:
+            raise Refused(f"the **{k.capitalize()}:** field runs past its line (it is one line)")
+    if not found["answers"]:
+        raise Refused("a **Lifts:** with no **Answers:**")
+    values = {k: _answer_value(lines[found[k][0][0]]) if found[k] else None for k in ANSWER_FIELDS}
+    if not parse_answers_value(values["answers"]):
+        raise Refused("no answers")
+    if values["lifts"] is not None and not parse_answers_value(values["lifts"]):
+        raise Refused("no lifts")
+    for k in ANSWER_FIELDS:
+        for r in BOLD_AT_RE.finditer(values[k] or ""):
+            if _section_key(r.group("lead")) in ANSWER_FIELDS:
+                raise Refused(f"a field inside the line: **{r.group('lead')}** in the **{k.capitalize()}:** line")
+    answers, default, labels = [], None, []
+    for k, raw in enumerate(parse_answers_value(values["answers"])):
+        label, cons, marked = split_answer(raw)
+        if marked and default is not None:
+            raise Refused("two answers marked (default)")
+        if marked:
+            default = k
+        bare = not cons and raw.rstrip().endswith(CONSEQUENCE_SEP.rstrip())  # `a —`, for item_file() to refuse
+        answers.append(f"{label}{CONSEQUENCE_SEP}{cons}" if cons else f"{label} —" if bare else label)
+        labels.append(label)
+    lifts = parse_answers_value(values["lifts"]) if values["lifts"] is not None else None
+    try:
+        item_file("x", "2000-01-02", "2000-01-01", None, None, f"{tid} decision (p)", kind="decide",
+                  answers=answers, default=default, lifts=lifts,
+                  detail={"context": "x", "question": "x?", "recommended": "x"})
+    except Refused as e:
+        raise Refused(f"as a decide's answers they are refused: {e}") from None
+    folded = [" ".join(x.split()).casefold() for x in labels]
+    for k, f in enumerate(folded):
+        if f in folded[:k]:
+            raise Refused(f"two answers with one label: {labels[folded.index(f)]!r} and {labels[k]!r}")
+    if lifts is None and "go" not in folded:
+        raise Refused(f"no answer lifts (labels read: {', '.join(labels)})")
+    return {"answers": answers, "default": default, "lifts": lifts}
+
+
+def _lifting_labels(got: Mapping) -> list[str]:
+    """The labels of ``entry_answers()``'s answers that lift, in the answers' order, each as written."""
+    want = {" ".join(x.split()).casefold() for x in (got["lifts"] or ["Go"])}
+    return [lbl for lbl in (split_answer(a)[0] for a in got["answers"]) if " ".join(lbl.split()).casefold() in want]
+
+
 def _sweep_item(cond: str, tid: str, ref: str, gate: str, *, ask: str = "", title: str = "", extra: str = "",
-                reask_days: int = SWEEP_REASK_DAYS) -> dict:
+                reask_days: int = SWEEP_REASK_DAYS, context: str = "", own: Mapping | None = None,
+                unusable: bool = False) -> dict:
     """One item the sweep files, as ``item_file()``'s arguments (the host adds today, its Due:, session and
-    host): {text, context, kind, answers, default, detail, lifts}."""
+    host): {text, context, kind, answers, default, detail, lifts}. A decision's item takes the entry's
+    ``**Context:**`` (``context``, v3.3) as its detail block's context, where the entry has one, and (v3.3) the
+    entry's own answers (``own``, ``entry_answers()``'s), else `Go | Not yet`; ``unusable`` (the entry's answers
+    refused) adds a clause to its context."""
     kind = SWEEP_KINDS[cond]
     ctx = f"{ref} {gate}" + (" board " + extra if cond == "audit" else "")
     out: dict = {"text": ask if cond == "uncovered" else _sweep_text(cond, tid, gate, extra), "context": ctx,
                  "kind": kind, "answers": None, "default": None, "detail": None, "lifts": None}
     if cond == "uncovered":
         name = gate[gate.index("(") + 1: -1]
-        out.update(answers=list(SWEEP_DECISION_ANSWERS), detail={
-            "context": f"{tid} ({title}) waits on {gate}, and no board item asked for it",
-            "question": ask,
-            "recommended": f"Only {name} can say: Go lifts the gate, and Not yet keeps it waiting, asked again "
-                           f"in {reask_days} days"})
+        got = own or {"answers": list(SWEEP_DECISION_ANSWERS), "default": None, "lifts": None}
+        labels = [split_answer(a)[0] for a in got["answers"]]
+        up = _lifting_labels(got)
+        said = f"Only {name} can say: {', '.join(up)} {'lifts' if len(up) == 1 else 'lift'} the gate"
+        said += "".join(f", and {lbl} keeps it waiting, asked again in {reask_days} days"
+                        for lbl in labels if waiting_only(lbl))
+        if any(lbl not in up and not waiting_only(lbl) for lbl in labels):
+            said += ", and the other answers leave it standing"
+        why = context or f"{tid} ({title}) waits on {gate}, and no board item asked for it"
+        if unusable:
+            why += "; its own answers could not be offered (the ledger check names why)"
+        out.update(answers=list(got["answers"]), default=got["default"], lifts=got["lifts"] and list(got["lifts"]),
+                   detail={"context": why, "question": ask, "recommended": said})
     elif cond == "impossible":
         out.update(answers=list(SWEEP_IMPOSSIBLE_ANSWERS), lifts=list(SWEEP_EVENT_LIFTS), detail={
             "context": f"The check for {gate} on {tid} says it can no longer happen",
@@ -6786,12 +7692,15 @@ def sweep(entries: Iterable[str], boards: Sequence[Sequence], results: Mapping, 
     own_name = _board_name(own)
     texts: dict[int, str] = {}
     open_texts: dict[int, str] = {}
+    raws: dict[int, str] = {}  # v3.3: each entry's raw text, which its Ask is read from
     for t in entries:
+        raw = _raw_entry_texts(str(t or ""))
         for tid, body in _entry_texts(str(t or "")).items():
             n = _num(tid)
             if n in open_texts:
                 continue  # the ledger's open copy is read over an archived one
             texts[n] = body
+            raws[n] = raw.get(tid, body)
             e = _entries(body)[0]
             if first_word(e["fields"].get("status")) not in ARCHIVED_WORDS:
                 open_texts[n] = body
@@ -6852,14 +7761,26 @@ def sweep(entries: Iterable[str], boards: Sequence[Sequence], results: Mapping, 
             ref, gate = ref_of(cnum, on_own), last["gate"]
             ids = ", ".join(ref_of(n, on_own) for n in todo)
             day = newest.isoformat()
+            recommended = ("Lift it by hand (an `override:` naming the answer); to ask again instead, close this "
+                           "and add the question")
+            by = ""
+            delegated = [a for a in answers if a["read"]["item"].decided_delegate is not None]
+            if delegated:  # v3.4: the act follows the newest delegated answer, and recommends its reviewed set
+                d_day = max(a["date"] for a in delegated)
+                d = min((a for a in delegated if a["date"] == d_day), key=lambda a: a["read"]["pick"])["read"]["item"]
+                day = d_day.isoformat()
+                by = f" by {d.decided_delegate} for {d.decided_by} ({d.decided_scope})"
+                recommended = (f"Lift it with ledger.py set --blocked-by … --by {d.decided_by} --delegate "
+                               f"{d.decided_delegate} --scope {d.decided_scope} --answer \"{d.decided[0]}\"; that PR "
+                               "goes to review. Not an override, which would record the person's own lift; to ask "
+                               "again instead, close this and add the question")
             add(last["read"]["board"], cnum, gate, "unlifted", {
-                "text": f"{gate} on {ref} was answered with a lift on {day} but still stands on {ids}: lift it.",
+                "text": f"{gate} on {ref} was answered with a lift{by} on {day} but still stands on {ids}: lift it.",
                 "context": f"{ref} {gate} lift", "kind": "act", "answers": None, "default": None, "lifts": None,
-                "detail": {"context": f"{ref}'s {gate} was answered with a lift on {day}, and the item was closed "
+                "detail": {"context": f"{ref}'s {gate} was answered with a lift{by} on {day}, and the item was closed "
                                       f"as lifted, but the gate was never lifted on {ids}",
                            "question": "Lift the gate by hand, or ask the question again?",
-                           "recommended": "Lift it by hand (an `override:` naming the answer); to ask again "
-                                          "instead, close this and add the question"}}, "lift")
+                           "recommended": recommended}}, "lift")
             filing = True
         for a in (answers if is_open or filing else within):
             held.update((n, key) for n in a["owed"])
@@ -6895,9 +7816,13 @@ def sweep(entries: Iterable[str], boards: Sequence[Sequence], results: Mapping, 
                         add(own_name, num, gate, "no-board", _sweep_item("no-board", tid, tid, gate))
                     continue
                 ref = tid if pick is own else f"{repo.lower()}#{tid}"
+                try:  # v3.3: the entry's own answers; the sweep never raises for them
+                    mine, unusable = entry_answers(raws.get(num, text)), False
+                except Refused:
+                    mine, unusable = None, True
                 add(_board_name(pick), num, gate, "uncovered", _sweep_item(
-                    "uncovered", tid, ref, gate, ask=_entry_ask(text, e["title"]), title=e["title"],
-                    reask_days=reask_days))
+                    "uncovered", tid, ref, gate, ask=_entry_ask(raws.get(num, text), e["title"]), title=e["title"],
+                    context=_entry_context(text), reask_days=reask_days, own=mine, unusable=unusable))
                 continue
             name = gate[len("event ("): -1]
             got, evidence = _outcome(results, tid, name)
@@ -7059,7 +7984,7 @@ def _tree_ledger_by_place(tree: Mapping[str, str]) -> tuple[dict[int, str], dict
 
 def _tree_board_path(tree: Mapping[str, str]) -> str:
     """Where a tree's board is read (v3.0, SPEC *The merge gate's verdicts*): ``BOARD_DIR`` when the tree holds a
-    file under it, else ``BOARD_V2_PATH``, the one rule the three verdicts share."""
+    file under it, else ``BOARD_V2_PATH``, the one rule the verdicts share."""
     pre = BOARD_DIR + "/"
     return BOARD_DIR if any(k.startswith(pre) for k in tree) else BOARD_V2_PATH
 
@@ -7106,6 +8031,12 @@ def _new_log(base: str | None, head: str) -> list[dict]:
         else:
             out.append(r)
     return out
+
+
+def _answer_of(it: BoardItem) -> tuple:
+    """An item's answer as the tripwire compares it (v3.4): the answer, who it counts as, and its delegate and
+    scope, so a change of the delegate alone is a change of the answer."""
+    return it.decided, it.decided_by, it.decided_delegate, it.decided_scope
 
 
 def tripwire(base_tree: Mapping[str, str], head_tree: Mapping[str, str], subject: str, repo: str) -> list[tuple[str, str]]:
@@ -7174,7 +8105,7 @@ def tripwire(base_tree: Mapping[str, str], head_tree: Mapping[str, str], subject
             answered_here = []  # the covering items the head answers: (base item, head item)
             for it, s in cov_b:
                 for hit in h_by.get(_ident(it), []):
-                    gained = hit.decided is not None and (hit.decided, hit.decided_by) != (it.decided, it.decided_by)
+                    gained = hit.decided is not None and _answer_of(hit) != _answer_of(it)
                     newly_lifted = (it.decided is not None and it.closed is None and hit.closed is not None
                                     and hit.closed[1] == "lifted" and hit.decided is not None)
                     if gained or newly_lifted:
@@ -7201,9 +8132,9 @@ def tripwire(base_tree: Mapping[str, str], head_tree: Mapping[str, str], subject
                 if not shared:
                     flags.append(("tripwire-shared", f"{tid} lifts {gate} leaving a shared board item open, but no "
                                   "item it covers still asks another listed entry"))
-                base_dec = {_ident(it): (it.decided, it.decided_by) for it, _ in cov_b}
+                base_dec = {_ident(it): _answer_of(it) for it, _ in cov_b}
                 if any(_ident(it) in still and it.decided is not None
-                       and (it.decided, it.decided_by) != base_dec[_ident(it)]
+                       and _answer_of(it) != base_dec[_ident(it)]
                        for it, _ in cov_h):  # v2.7: an answer for one part must not speak for the rest
                     flags.append(("tripwire-shared-decided", f"{tid} lifts {gate} leaving a shared board item open, "
                                   "but the item gains a Decided: that speaks for the entries left — leave it "
@@ -7341,7 +8272,7 @@ def lift_pr_verdict(base_tree: Mapping[str, str], head_tree: Mapping[str, str], 
     ref, gate = _item_gate(b_item)
     if h_item.decided is None:
         return review("lift-not-answered", "the changed item gains no Decided:")
-    if gate is None or b_item.kind != "decide":
+    if ref is None or gate is None or b_item.kind != "decide":
         return review("lift-no-gate", "the answered item is not a decide whose Context names one entry and one gate")
     if b_item.decided is not None:
         return review("lift-reanswer", "the item was answered already — a re-answer takes ordinary review")
@@ -7358,6 +8289,15 @@ def lift_pr_verdict(base_tree: Mapping[str, str], head_tree: Mapping[str, str], 
         return review("lift-no-by", "the Decided: names no answerer (by <person>)")
     if not (created - one <= d <= (merged or created) + one):
         return review("lift-decided-date", f"the Decided: date {d} is outside {created - one} .. {(merged or created) + one}")
+    delegate, scope = h_item.decided_delegate, None
+    if delegate is not None:  # v3.4: a delegated answer, judged over the base board and item
+        fault = delegate_problem(b_board, b_item, delegate, by)
+        if fault is not None:
+            return review("lift-delegate-uncovered", fault)
+        delegate = next(g for g, p, _ in board_delegates(b_board) or []
+                        if p is not None and g.lower() == delegate.lower() and p.lower() == by.lower())
+        by = next(p for p in people if p.lower() == by.lower())
+        scope = b_item.scope
     answered = answered_by(b_board)
     if "#" in ref:
         other = ref.rpartition("#")[0]
@@ -7399,7 +8339,8 @@ def lift_pr_verdict(base_tree: Mapping[str, str], head_tree: Mapping[str, str], 
             return review("lift-log-date", f"the new Log lines carry more than one date: {sorted(days)}")
         t = date.fromisoformat(days.pop()) if days else created
         try:
-            result = decide_lift(b_item, entries_given, label, by, t, people, answered, archived=gone)
+            result = decide_lift(b_item, entries_given, label, by, t, people, answered, archived=gone,
+                                 delegate=delegate, scope=scope)
         except Refused as e:
             return review("lift-refused", f"decide_lift refuses it: {e}")
         if result and not (created - one <= t <= min(created + one, merged or created + one)):
@@ -7419,11 +8360,204 @@ def lift_pr_verdict(base_tree: Mapping[str, str], head_tree: Mapping[str, str], 
     try:
         close = closes(b_item, label, {**entries_given, **result})
         want_path = item_path(b_item.id, d.isoformat() if close else None)
-        text = edit_item(base_tree[pre + b_rel], "decide", answer=label, by=by, today=d, close=close)
+        text = edit_item(base_tree[pre + b_rel], "decide", answer=label, by=by, today=d, close=close,
+                         delegate=delegate)
     except (Refused, ValueError) as e:
         return review("lift-board-line", f"the decide writer refuses the answer: {e}")
     if h_rel != want_path or head_tree.get(pre + h_rel) != text:
         return review("lift-board-line", f"{pre + h_rel} at the head is not what the decide edit writes at {want_path}")
+    return {"carve_out": True, "flags": flags, "review": []}
+
+
+LIFT_FORM_SUFFIX = {"decided": None, "shared": "shared board item left open", "none": "no board item"}
+
+
+def lift_form(tree: Mapping[str, str], tid: str, gate: str, repo: str) -> tuple[str, list[BoardItem]]:
+    """The form a lift of open entry ``tid``'s ``gate`` takes (v3.3, SPEC *The merge gate's verdicts*): ``(case,
+    items)``, read against the tree's own board. Of the items covers() names covering the gate, the first case
+    that holds: ``asked``, an undecided item that lists no other gated entry; ``decided``, a decided one that lists
+    none (every such item, to close ``— lifted``); ``shared``, an item that lists another gated entry (a bare
+    ``TD-n`` among its Context entry and `Parts:`, open in the ledger, not ``tid``'s number, carrying the gate);
+    ``none``, no item. ``items`` in the board's item order. Refused: an entry the ledger does not hold open (its file
+    directly in the ledger's directory, its Status open), one not carrying ``gate``, a gate that is no decision, a
+    v1 ledger and a ``repo`` _check_repo() refuses. A tree with no board, or a board whose `People:` does not list
+    the gate's person, is ``none``."""
+    _check_repo(repo)
+    gate = _one_gate(gate)
+    if not GATE_DECISION_RE.match(gate):
+        raise Refused(f"a lift's form is read for a decision (<person>) gate, not {gate!r}")
+    if not isinstance(tid, str) or not LIFT_TID_RE.fullmatch(tid):
+        raise Refused(f"an entry is a bare TD-n, not {tid!r}")
+    if _tree_ls(tree)(LEDGER_DIR) is None:
+        raise Refused("a v1 ledger: the lift's form is read from a v2 ledger")
+    open_t, _, _ = _tree_ledger(tree)
+    num = _num(tid)
+    text = open_t.get(num)
+    if text is None:
+        raise Refused(f"the ledger holds no open {tid}")
+    if _carried(text, gate) is None:
+        raise Refused(f"{tid} does not carry {gate}")
+    board = _tree_board(tree, repo)
+    order = {_ident(it): i for i, it in enumerate(board[2].items)}
+    cov = [(it, s) for _, it, s in covers(text, gate, [board], repo) if s in COVERING]
+    cov.sort(key=lambda p: order.get(_ident(p[0]), len(order)))
+
+    def lists_other(it: BoardItem) -> bool:
+        ref, _g = _item_gate(it)
+        listed = [x for x in [ref, *it.parts] if x and "#" not in x and _num(x) != num]
+        return any(_carried(open_t.get(_num(x)), gate) is not None for x in listed)
+    other = {_ident(it): lists_other(it) for it, _ in cov}
+    asked = [it for it, s in cov if s == "open" and not other[_ident(it)]]
+    if asked:
+        return "asked", asked
+    decided = [it for it, s in cov if s == "decided" and not other[_ident(it)]]
+    if decided:
+        return "decided", decided
+    shared = [it for it, _ in cov if other[_ident(it)]]
+    if shared:
+        return "shared", shared
+    return "none", []
+
+
+def ledger_lift_verdict(base_tree: Mapping[str, str], head_tree: Mapping[str, str], files: Sequence[str],
+                        subject: str, commits: int, created_at: date | datetime | str,
+                        merged_at: date | datetime | str | None, repo: str) -> dict:
+    """The ledger lift's verdict (v3.3, SPEC *The merge gate's verdicts*): ``{carve_out, flags, review}`` for a PR
+    that lifts one entry's decision on the ledger, its arguments and ``flags`` as lift_pr_verdict()'s.
+    ``carve_out`` says the diff is exactly the writers' lift of one gate by its person, the shape the person's
+    press writes; otherwise ``review`` names the first condition that fails: a v3 board at the base and the head,
+    whose base declares `People:`; a lift subject and one commit; the subject's entry open at the base (carrying
+    its gate) and the head; the paths; one new `gate lifted … answer` Log line for the gate; its ``by`` the gate's
+    person, on `People:`; a form that is not ``asked``; the head entry lift_gate()'s bytes with the form's suffix,
+    and the board unchanged (``shared``, ``none``) or each item the form names closed ``— lifted`` by
+    edit_item(), its base `Decided:` the gate's person's; the dates; and no flag. A ``Refused`` from tripwire(),
+    which runs first, or from the dates and ``commits``, escapes; past them an unreadable text is a reason."""
+    flags = tripwire(base_tree, head_tree, subject, repo)
+    created = _verdict_day(created_at, "created_at")
+    merged = None if merged_at is None else _verdict_day(merged_at, "merged_at")
+    if merged is not None and merged < created:
+        raise Refused(f"merged_at {merged} is before created_at {created}")
+    if isinstance(commits, bool) or not isinstance(commits, int) or commits < 0:
+        raise Refused(f"commits is the PR's commit count, not {commits!r}")
+    one = timedelta(days=1)
+
+    def review(kind: str, text: str) -> dict:
+        return {"carve_out": False, "flags": flags, "review": [(kind, text)]}
+    # 1. The board.
+    b_board, h_board = _tree_load(base_tree), _tree_load(head_tree)
+    if b_board.form is None or h_board.form is None:
+        return review("ledger-lift-no-board", f"the PR has no board at {BOARD_DIR}/ or {BOARD_V2_PATH} at its base "
+                      "or head")
+    if b_board.form != "dir" or h_board.form != "dir":
+        return review("ledger-lift-board-v2", "the PR's board is a v2 board at its base or head: a v3 writer writes "
+                      "none")
+    people = board_people(b_board)
+    if people is None:
+        return review("ledger-lift-no-people", "the base board declares no People: line, so who may lift is "
+                      "unchecked")
+    # 2. The subject.
+    parts = lift_subject_parts(subject or "")
+    if parts is None:
+        return review("ledger-lift-subject", f"the commit's subject is not a ledger lift: {subject!r}")
+    if commits != 1:
+        return review("ledger-lift-subject", f"a lift PR is one commit, squash-merged; this has {commits}")
+    tid, gate = parts["id"], parts["gate"]
+    # 3. The entry.
+    ls, h_ls = _tree_ls(base_tree), _tree_ls(head_tree)
+    if ls(LEDGER_DIR) is None:
+        return review("ledger-lift-entry", "a v1 ledger's lift is not recomputed — it takes ordinary review")
+    num = _num(tid)
+    b_open, _, _ = _tree_ledger(base_tree)
+    h_open, _, _ = _tree_ledger(head_tree)
+    btext = b_open.get(num)
+    if btext is None or _carried(btext, gate) is None:
+        return review("ledger-lift-entry", f"the base ledger holds no open {tid} carrying {gate}")
+    path = entry_path(LEDGER_DIR, _entries(btext)[0]["id"], ls)
+    if path is None or "/" in path[len(LEDGER_DIR) + 1:] or base_tree.get(path) is None:
+        return review("ledger-lift-entry", f"{tid} is not one open file directly in {LEDGER_DIR}/ at the base")
+    htext = h_open.get(num)
+    if htext is None or entry_path(LEDGER_DIR, _entries(htext)[0]["id"], h_ls) != path or head_tree.get(path) is None:
+        return review("ledger-lift-entry", f"the head does not hold {path} open")
+    # 4. The files.
+    pre = BOARD_DIR + "/"
+    for f in sorted(set(files)):
+        if f != path and not (f.startswith(pre) and _board_file_place(f[len(pre):])):
+            return review("ledger-lift-files", f"the PR changes {f}, neither {path} nor an item file of the board")
+    changed = {p for p in {*base_tree, *head_tree} if base_tree.get(p) != head_tree.get(p)}
+    for p in sorted(changed):
+        if p != path and not p.startswith(pre):
+            return review("ledger-lift-files", f"the PR changes {p}, neither {path} nor under {pre}")
+    # 5. The Log line.
+    new = _new_log(btext, htext)
+    rec = new[0] if len(new) == 1 else None
+    if rec is None or rec["kind"] != "gate-lifted" or rec.get("via") != "answer" \
+            or _gate_key(rec["gate"]) != _gate_key(gate):
+        return review("ledger-lift-log", f"{tid}'s Log does not gain exactly one gate lifted: {gate} … answer line")
+    if rec.get("delegate") is not None:  # v3.4: a delegated ledger lift carves out nothing
+        return review("ledger-lift-delegated", f"{tid}'s lift of {gate} is written by {rec['delegate']} for "
+                      f"{rec['by']} ({rec['scope']}): a delegated ledger lift takes review")
+    label, by = rec["label"], rec["by"]
+    try:
+        t = date.fromisoformat(rec["date"])
+    except ValueError:
+        return review("ledger-lift-log", f"the lift's Log date {rec['date']} is no day")
+    # 6. Who.
+    person = GATE_DECISION_RE.match(gate).group("who").strip()
+    if by.lower() != person.lower() or by.lower() not in {p.lower() for p in people}:
+        return review("ledger-lift-by", f"{by} lifts {gate}: only the gate's person, listed on the base board's "
+                      "People:, lifts it on the press")
+    # 7. The form.
+    case, items = lift_form(base_tree, tid, gate, repo)
+    if case == "asked":
+        return review("ledger-lift-asked", f"an open item on this repo's board asks {gate} for {tid} — its answer "
+                      "is the decide lift")
+    for _, it, state in covers(btext, gate, [_tree_board(base_tree, repo)], repo):  # v3.4, whatever the form
+        if state in COVERING and it.decided_delegate is not None:
+            return review("ledger-lift-delegated", f"the item {it.id} covering {gate} for {tid} was answered by "
+                          f"{it.decided_delegate} for {it.decided_by} ({it.decided_scope}): its lift takes review")
+    # 8. The bytes: the entry's, then the board's.
+    try:
+        want = lift_gate(base_tree[path], gate, by, answer=label, suffix=LIFT_FORM_SUFFIX[case], today=t)
+    except Refused as e:
+        return review("ledger-lift-bytes", f"lift_gate refuses the lift: {e}")
+    if head_tree[path] != want:
+        return review("ledger-lift-bytes", f"{path} is not what lift_gate writes for the {case} form, byte for byte")
+    board_changed = {p for p in changed if p.startswith(pre)}
+    want_board: set[str] = set()
+    closes_on: list[date] = []
+    for it in items if case == "decided" else []:
+        if (it.decided_by or "").lower() != person.lower():
+            return review("ledger-lift-board", f"the item {it.id}'s Decided: is not {person}'s answer")
+        heads = [p for p in head_tree if p.startswith(pre) and p.rsplit("/", 1)[-1] == f"{it.id}.md"]
+        if len(heads) != 1:
+            return review("ledger-lift-board", f"the head holds {len(heads)} files for the item {it.id}")
+        h_item = parse_item(head_tree[heads[0]], heads[0][len(pre):])
+        c = h_item.closed[0] if h_item is not None and h_item.closed is not None else None
+        if c is None:
+            return review("ledger-lift-board", f"{heads[0]} has no readable Closed:")
+        try:
+            want_path = pre + item_path(it.id, c.isoformat())
+            text = edit_item(base_tree[pre + it.path], "done", why="lifted", today=c)
+        except (Refused, ValueError) as e:
+            return review("ledger-lift-board", f"the done writer refuses the close of {it.id}: {e}")
+        if heads[0] != want_path or head_tree[heads[0]] != text:
+            return review("ledger-lift-board", f"{heads[0]} is not what the close writes at {want_path}")
+        want_board |= {pre + it.path, want_path}
+        closes_on.append(c)
+    if board_changed != want_board:
+        return review("ledger-lift-board", f"the board's changes {sorted(board_changed)} are not the {case} form's "
+                      f"{sorted(want_board)}")
+    # 9. The dates.
+    if not (created - one <= t <= min(created + one, merged or created + one)):
+        return review("ledger-lift-date", f"the Log date {t} is outside {created - one} .. "
+                      f"{min(created + one, merged or created + one)}")
+    for c in closes_on:
+        if not (created - one <= c <= (merged or created) + one):
+            return review("ledger-lift-date", f"the Closed: date {c} is outside {created - one} .. "
+                          f"{(merged or created) + one}")
+    # 10. No flag.
+    if flags:
+        return review("ledger-lift-flagged", "the tripwire flags the PR")
     return {"carve_out": True, "flags": flags, "review": []}
 
 

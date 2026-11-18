@@ -1,0 +1,26 @@
+{
+ "argv": [
+  "add",
+  "--board",
+  "board",
+  "--id",
+  "2026-01-15-5eed0001",
+  "--text",
+  "Pick a store?",
+  "--context",
+  "TD-3",
+  "--answer",
+  "Memory",
+  "--answer",
+  "Disk",
+  "--decided",
+  "Memory",
+  "--by",
+  "pat",
+  "--scope",
+  "merge-line",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

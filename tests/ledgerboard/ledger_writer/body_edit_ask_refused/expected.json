@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "edit",
+  "refused": "⚠ TD-001: the 1st `**ask:**` section runs past its lead's line (field-lines): an Ask is one line, `**Ask:** <the question>` — move the rest under a `**Context:**` section after it (migrate-body does)"
+ }
+}

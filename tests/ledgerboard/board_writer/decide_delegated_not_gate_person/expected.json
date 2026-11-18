@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "decide",
+  "refused": "rule 3: pat may not answer this item"
+ }
+}

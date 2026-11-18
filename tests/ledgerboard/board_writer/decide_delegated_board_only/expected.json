@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "decide",
+  "refused": "--delegate writes its own ledger half, never --board-only"
+ }
+}

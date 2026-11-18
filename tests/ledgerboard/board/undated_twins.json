@@ -11,6 +11,8 @@
    "context": "none",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -44,6 +46,7 @@
    "raw": "- [x] Ping sam about the logs. Context: none. Due: 2026-01-20. Closed: 2026-01-12 — pinged.",
    "refs": [],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "Ping sam about the logs.",
    "waiting_on": "person"
@@ -58,6 +61,8 @@
    "context": "none",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -86,6 +91,7 @@
    "path": "",
    "refs": [],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "Ping pat about the disk.",
    "waiting_on": "person"

@@ -1,0 +1,11 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "migrate-body",
+  "entries": 2,
+  "migrated": [],
+  "paths": [],
+  "refused": [],
+  "subject": null
+ }
+}

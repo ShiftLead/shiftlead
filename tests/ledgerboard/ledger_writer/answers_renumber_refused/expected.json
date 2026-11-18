@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "renumber",
+  "refused": "⚠ TD-004: the gate sweep cannot offer its own answers (answers-unusable): as a decide's answers they are refused: a decide offers two or more answers (the first fault found)"
+ }
+}

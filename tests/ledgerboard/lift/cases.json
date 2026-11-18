@@ -17,7 +17,9 @@
   "hold_unlisted": "## Go on the build?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-580 decision (pat)\n**Due:** 2026-01-20\n**Answers:** Go | Hold: <note>\n",
   "hold_later": "## Go on the build?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-580 decision (pat)\n**Due:** 2026-01-20\n**Answers:** Go | Hold: <note> | Hold: later\n**Lifts:** Hold: <note>\n",
   "hold_shared_head": "## Go on the build?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-580 decision (pat)\n**Due:** 2026-01-20\n**Answers:** Hold: <a> | Hold:\n**Lifts:** Hold:\n",
-  "waiting_form": "## Go on the build?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-580 decision (pat)\n**Due:** 2026-01-20\n**Answers:** Go | Not yet: <why>\n"
+  "waiting_form": "## Go on the build?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-580 decision (pat)\n**Due:** 2026-01-20\n**Answers:** Go | Not yet: <why>\n",
+  "scoped_decision": "## Go on the store?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-500 decision (pat)\n**Scope:** merge-line\n**Due:** 2026-01-20\n**Answers:** Go (default) | Not yet | One more round\n",
+  "scoped_event": "## Has the vendor shipped?\n\n**Kind:** decide\n**Added:** 2026-01-06\n**Session:** w-1\n**Context:** TD-530 event (vendor-ships)\n**Scope:** merge-line\n**Due:** 2026-01-20\n**Answers:** Go (default) | Rewrite the check\n"
  },
  "decide_lift": [
   {
@@ -631,6 +633,91 @@
     "pat"
    ],
    "answered_by": null
+  },
+  {
+   "name": "delegated_lift",
+   "entries": [
+    "TD-500",
+    "TD-530"
+   ],
+   "by": "pat",
+   "people": [
+    "pat",
+    "sam"
+   ],
+   "answered_by": null,
+   "delegate": "director",
+   "scope": "merge-line",
+   "line": "scoped_decision",
+   "label": "Go"
+  },
+  {
+   "name": "delegated_not_yet",
+   "entries": [
+    "TD-500",
+    "TD-530"
+   ],
+   "by": "pat",
+   "people": [
+    "pat",
+    "sam"
+   ],
+   "answered_by": null,
+   "delegate": "director",
+   "scope": "merge-line",
+   "line": "scoped_decision",
+   "label": "Not yet"
+  },
+  {
+   "name": "delegated_work_order",
+   "entries": [
+    "TD-500",
+    "TD-530"
+   ],
+   "by": "pat",
+   "people": [
+    "pat",
+    "sam"
+   ],
+   "answered_by": null,
+   "delegate": "director",
+   "scope": "merge-line",
+   "line": "scoped_decision",
+   "label": "One more round"
+  },
+  {
+   "name": "delegated_event_work_order_no_line",
+   "entries": [
+    "TD-500",
+    "TD-530"
+   ],
+   "by": "sam",
+   "people": [
+    "pat",
+    "sam"
+   ],
+   "answered_by": null,
+   "delegate": "director",
+   "scope": "merge-line",
+   "line": "scoped_event",
+   "label": "Rewrite the check"
+  },
+  {
+   "name": "delegated_kept_waiting_bad_delegate_refused",
+   "entries": [
+    "TD-500",
+    "TD-530"
+   ],
+   "by": "pat",
+   "people": [
+    "pat",
+    "sam"
+   ],
+   "answered_by": null,
+   "delegate": "pat",
+   "scope": "merge-line",
+   "line": "scoped_decision",
+   "label": "Not yet"
   }
  ],
  "lift_gate": [
@@ -978,6 +1065,98 @@
     "pat"
    ],
    "answered_by": "bogus"
+  },
+  {
+   "name": "delegated_answer",
+   "file": "TD-501",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "answer": "Go",
+   "delegate": "director",
+   "scope": "merge-line"
+  },
+  {
+   "name": "delegated_event_answer",
+   "file": "TD-530",
+   "gate": "event (vendor-ships)",
+   "by": "sam",
+   "answer": "Drop the gate",
+   "people": [
+    "pat",
+    "sam"
+   ],
+   "delegate": "director",
+   "scope": "merge-line"
+  },
+  {
+   "name": "delegated_override_refused",
+   "file": "TD-501",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "override": "away",
+   "delegate": "director",
+   "scope": "merge-line"
+  },
+  {
+   "name": "delegated_check_refused",
+   "file": "TD-530",
+   "gate": "event (vendor-ships)",
+   "by": "box-1",
+   "evidence": "acme/tools#42",
+   "delegate": "director",
+   "scope": "merge-line"
+  },
+  {
+   "name": "delegated_date_refused",
+   "file": "TD-540",
+   "gate": "until 2026-01-10",
+   "by": "box-1",
+   "delegate": "director",
+   "scope": "merge-line"
+  },
+  {
+   "name": "delegated_board_suffix_refused",
+   "file": "TD-501",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "answer": "Go",
+   "suffix": "board acme/tools",
+   "delegate": "director",
+   "scope": "merge-line"
+  },
+  {
+   "name": "delegated_equal_by_refused",
+   "file": "TD-501",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "answer": "Go",
+   "delegate": "Pat",
+   "scope": "merge-line"
+  },
+  {
+   "name": "delegated_not_a_name_refused",
+   "file": "TD-501",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "answer": "Go",
+   "delegate": "the director",
+   "scope": "merge-line"
+  },
+  {
+   "name": "delegated_no_scope_refused",
+   "file": "TD-501",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "answer": "Go",
+   "delegate": "director"
+  },
+  {
+   "name": "delegated_scope_alone_refused",
+   "file": "TD-501",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "answer": "Go",
+   "scope": "merge-line"
   }
  ],
  "same_text": [

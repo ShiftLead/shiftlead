@@ -1,0 +1,12 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "decide",
+  "id": "2026-01-12-a0000005",
+  "item_notes": [],
+  "paths": [
+   "board/2026-01-12-a0000005.md"
+  ],
+  "subject": "ledgerboard: decide 2026-01-12-a0000005 Merge the export review?: Merge (session n/a)"
+ }
+}

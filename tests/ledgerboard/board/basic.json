@@ -11,6 +11,8 @@
    "context": null,
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -48,6 +50,7 @@
    "raw": "- [x] 2026-01-02 (session s-13) — Closed twin left open by a merge. Due: 2026-01-03. Closed: 2026-01-04 — shipped.",
    "refs": [],
    "replies": [],
+   "scope": null,
    "session": "s-13",
    "text": "Closed twin left open by a merge.",
    "waiting_on": "person"
@@ -71,6 +74,8 @@
     "text": "beta"
    },
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": "beta",
    "detail": [],
    "doer": null,
@@ -122,6 +127,7 @@
     "PR #12"
    ],
    "replies": [],
+   "scope": null,
    "session": "ab12cd34",
    "text": "**Pick a name** for the tool.",
    "waiting_on": "session"
@@ -134,6 +140,8 @@
    "context": "other-repo#TD-020, PRs #30/#31",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [
     "- the second region is still on the old key",
@@ -187,6 +195,7 @@
      "text": "done on staging only"
     }
    ],
+   "scope": null,
    "session": "worker-2",
    "text": "Rotate the key.",
    "waiting_on": "person"
@@ -205,6 +214,8 @@
    "context": "none",
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -245,6 +256,7 @@
    "path": "",
    "refs": [],
    "replies": [],
+   "scope": null,
    "session": null,
    "text": "Does the page render?",
    "waiting_on": "person"
@@ -257,6 +269,8 @@
    "context": null,
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -293,6 +307,7 @@
    "path": "",
    "refs": [],
    "replies": [],
+   "scope": null,
    "session": "s-9",
    "text": "Re-check the import after a week.",
    "waiting_on": "person"
@@ -305,6 +320,8 @@
    "context": null,
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -341,6 +358,7 @@
    "path": "",
    "refs": [],
    "replies": [],
+   "scope": null,
    "session": "s-10",
    "text": "The mirror moved.",
    "waiting_on": "person"
@@ -353,6 +371,8 @@
    "context": null,
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -381,6 +401,7 @@
    "path": "",
    "refs": [],
    "replies": [],
+   "scope": null,
    "session": "s-11",
    "text": "Undated and unmarked.",
    "waiting_on": "person"
@@ -393,6 +414,8 @@
    "context": null,
    "decided": null,
    "decided_by": null,
+   "decided_delegate": null,
+   "decided_scope": null,
    "default": null,
    "detail": [],
    "doer": null,
@@ -425,6 +448,7 @@
    "path": "",
    "refs": [],
    "replies": [],
+   "scope": null,
    "session": "s-12",
    "text": "A typo'd date.",
    "waiting_on": "person"

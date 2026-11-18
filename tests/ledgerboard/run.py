@@ -100,7 +100,9 @@ Fixtures, each an invented input and its expected JSON:
   ``tripwire()`` and ``uncovered_decisions()`` of each case's trees: ``base/`` under each case's
   ``cases/<name>/base/``, less its ``delete_base`` paths, then its ``cases/<name>/head/`` over that, less its
   ``delete`` paths (a path ending in ``/`` every path under it, v3.0); the board a v3 directory, and another
-  repo's board under ``boards/`` a directory or a v2 file read through ``load_board()`` (v3.0).
+  repo's board under ``boards/`` a directory or a v2 file read through ``load_board()`` (v3.0); and (v3.3)
+  ``ledger_lift_verdict()`` of each ``ledger_lift`` case, and ``lift_form()``'s ``[case, item ids]`` of each
+  ``lift_form`` case, read from the base of the ``ledger_lift`` case it names (``case``), else its own overlay.
 - ``board_writer/<case>/`` (v2.3): the board writer, ``board.py`` — ``before/`` (the files a command
   starts from; from v3.0 the board a directory of item files, ``board/`` with its ``README.md``, or a v2 file
   for the reads and the refusals), ``cmd.json`` (``{"argv": [...]}``, run in a copy of ``before/``), ``after/``
@@ -712,7 +714,9 @@ def item_attrs(item) -> dict:
             "bad_due": item.bad_due, "fyi_due": item.fyi_due, "hide_until": day(item.hide_until),
             "context": item.context, "answers": item.answers, "default": item.default,
             "decided": [item.decided[0], day(item.decided[1])] if item.decided else None,
-            "decided_by": item.decided_by, "doer": list(item.doer) if item.doer else None, "parts": item.parts,
+            "decided_by": item.decided_by, "decided_delegate": item.decided_delegate,  # v3.4
+            "decided_scope": item.decided_scope, "scope": item.scope,  # v3.4
+            "doer": list(item.doer) if item.doer else None, "parts": item.parts,
             "replies": [list(r) for r in item.replies],
             "closed": [day(item.closed[0]), item.closed[1]] if item.closed is not None else None}
 
@@ -741,8 +745,8 @@ def item_cases(L, spec: dict) -> dict:
 
     def compose(c):
         if c["fn"] == "item_file":
-            kw = {k: c[k] for k in ("kind", "answers", "default", "detail", "hide_until", "lifts", "parts", "doer")
-                  if k in c}
+            kw = {k: c[k] for k in ("kind", "answers", "default", "detail", "hide_until", "lifts", "parts", "doer",
+                                    "scope") if k in c}
             return _refused(lambda: L.item_file(c["text"], c["due"], c.get("today", spec["today"]), c["session"],
                                                 c["host"], c["context"], **kw))
         by = {"by": c["by"]} if "by" in c else {}
@@ -753,7 +757,8 @@ def item_cases(L, spec: dict) -> dict:
         to = date.fromisoformat(c["to"]) if c.get("to") else None
         return _refused(lambda: L.edit_item(c["text"], c["action"], to=to, answer=c.get("answer"), why=c.get("why"),
                                             reply=c.get("reply"), by=c.get("by"), today=today,
-                                            close=bool(c.get("close"))))
+                                            close=bool(c.get("close")),
+                                            **({"delegate": c["delegate"]} if "delegate" in c else {})))
     def board(b):
         return None if b is None else L.load_board(b["path"], dict_ls(b["files"]), b["files"].get)
 
@@ -787,8 +792,51 @@ def item_cases(L, spec: dict) -> dict:
                 session=c.get("session"))) for c in subj["subjects"]],  # v3.0 removed the form with no id
             "subject_kinds": {s: L.subject_kind(s) for s in subj["subject_kinds"]},
             "edit_actions": {s: L.edit_action(s) for s in subj["edit_actions"]},  # v2.3
-            "subject_ids": {s: L.subject_id(s) for s in subj["subject_ids"]}},
+            "subject_ids": {s: L.subject_id(s) for s in subj["subject_ids"]},
+            "lift_subjects": ({  # v3.3: a ledger lift's subject, written and read back
+                "writer": [_refused(lambda c=c: L.lift_subject(c["tid"], c["gate"], c["tool"], c.get("session")))
+                           for c in subj["lift_subjects"]["writer"]],
+                "reader": {s: L.lift_subject_parts(s) for s in subj["lift_subjects"]["reader"]}}
+                if hasattr(L, "lift_subject") else
+                {"missing": "the module has no lift_subject — older than v3.3"})},
     }
+
+
+def delegates_cases(L, spec: dict) -> dict:
+    """Delegated answers (v3.4): each case one call over boards built from a `README.md` text (``readme``) and item
+    files (``items``, by name) — ``board_delegates()``, ``delegates_problems()`` (with an ``old`` board),
+    ``delegation_covers()``, ``delegates_changed()``, ``delegate_problem()``, ``board_problems()`` — or
+    ``parse_decided_delegation()`` of a ``Decided`` value; a ``Refused`` recorded as ``{"refused": why}``."""
+    if not hasattr(L, "board_delegates"):  # a module older than v3.4
+        return {"missing": "the module has no board_delegates — older than v3.4"}
+
+    def board(b):
+        if b is None:
+            return None
+        files = {"b/README.md": b["readme"], **{f"b/{n}": t for n, t in b.get("items", {}).items()}}
+        return L.load_board("b", dict_ls(files), files.get)
+
+    def call(c):
+        fn = c["fn"]
+        if fn == "parse_decided_delegation":
+            got = L.parse_decided_delegation(c["value"])
+            return list(got) if got is not None else None
+        if fn == "board_delegates":
+            got = L.board_delegates(board(c["board"]))
+            return [list(g) for g in got] if got is not None else None
+        if fn == "delegates_problems":
+            return [list(x) for x in L.delegates_problems(board(c["board"]), board(c.get("old")))]
+        if fn == "board_problems":
+            return [list(x) for x in L.board_problems(board(c["board"]), board(c.get("old")))]
+        if fn == "delegation_covers":
+            return L.delegation_covers(board(c["board"]), c["delegate"], c["person"], c["scope"])
+        if fn == "delegates_changed":
+            return L.delegates_changed(board(c["base"]), board(c["head"]))
+        if fn == "delegate_problem":
+            b = board(c["board"])
+            return L.delegate_problem(b, next(i for i in b.items if i.path == c["item"]), c["delegate"], c["person"])
+        raise ValueError(f"no such call: {fn}")
+    return {c["name"]: _refused(lambda c=c: call(c)) for c in spec["cases"]}
 
 
 def ledger_edit_cases(L, spec: dict, root: Path = HERE) -> dict:
@@ -843,7 +891,9 @@ def ledger_edit_cases(L, spec: dict, root: Path = HERE) -> dict:
                                   if r["kind"] in ("archive-open-parts", "part-of-archived", "part-of-unknown",
                                                    "log-not-last", "log-line", "event-undated", "status",  # status: v2.7
                                                    "misplaced-name",  # v2.8
-                                                   "decision-missing")  # v3.1
+                                                   "decision-missing",  # v3.1
+                                                   "lead-form", "glued-lead", "fence-open", "field-lines",  # v3.3
+                                                   "answers-unusable")  # v3.3
                                   or r["kind"] == "retired"]  # v3.0: every retired kind
                       for c in spec["check"]},
             "entry_text": {c["name"]: _refused(lambda c=c: L.entry_text(
@@ -878,11 +928,13 @@ def lift_cases(L, spec: dict, root: Path = HERE) -> dict:
         return _refused(lambda: L.decide_lift(
             items[c["line"]], {t: entry(t) for t in c["entries"]}, c["label"], c["by"],
             spec["today"],
-            c["people"], c["answered_by"], **({"archived": c["archived"]} if "archived" in c else {})))
+            c["people"], c["answered_by"], **({"archived": c["archived"]} if "archived" in c else {}),
+            **{k: c[k] for k in ("delegate", "scope") if k in c}))
     decided = {c["name"]: decide(c) for c in spec["decide_lift"]}
     lifted = {c["name"]: _refused(lambda c=c: L.lift_gate(
         entry(c["file"]), c["gate"], c["by"], today=c.get("today", spec["today"]),
-        **{k: c[k] for k in ("answer", "evidence", "suffix", "override", "people", "answered_by") if k in c}))
+        **{k: c[k] for k in ("answer", "evidence", "suffix", "override", "people", "answered_by", "delegate", "scope")
+           if k in c}))
         for c in spec["lift_gate"]}
 
     def after(c):
@@ -1008,6 +1060,10 @@ def sweep_cases(L, spec: dict, root: Path = HERE) -> dict:
                 "board_dir_problems": [list(x) for x in L.board_dir_problems(c["dir"], dict_ls(files), files.get)]}
     return {
         **out,
+        **({"answers": answers_case(L, spec["answers"], files)} if "answers" in spec else {}),
+        **({"delegated": {c["name"]: answers_case(L, c, files) for c in spec["delegated"]}}  # v3.4
+           if "delegated" in spec and hasattr(L, "board_delegates") else {}),
+        **({"entry_answers": entry_answers_cases(L, spec["entry_answers"])} if "entry_answers" in spec else {}),
         "runs": runs,
         "rerun": run(first, boards_of(rerun_boards, after)),
         "covers": [[[b, it.id, state] for b, it, state in L.covers(entry[t], g, boards, spec["repo"])]
@@ -1018,6 +1074,35 @@ def sweep_cases(L, spec: dict, root: Path = HERE) -> dict:
         "sets": {c["name"]: sets(c) for c in spec.get("sets", [])},
         **({"split": split(spec["split"])} if "split" in spec else {}),
     }
+
+
+def answers_case(L, c: dict, files: dict[str, str]) -> dict:
+    """An entry's own answers on the sweep (v3.3): ``sweep()`` over ``c``'s own ledger and its one v3 board
+    directory, read apart from the other runs, on one date."""
+    if not hasattr(L, "entry_answers"):
+        return {"missing": "the module has no entry_answers — older than v3.3"}
+    board = L.load_board(c["board"], dict_ls(files), files.get)
+    got = L.sweep([files[c["ledger"]], ""], [(c["url"], c["basename"], board)], {}, c["today_utc"], c["today_local"],
+                  repo=c["repo"])
+    return {"to_file": got["to_file"], "to_close": got["to_close"], "lifts": got["lifts"]}
+
+
+ENTRY_ANSWERS_HEAD = ("## TD-5: An invented entry\n\n**Priority:** Medium\n**Status:** Open\n"
+                      "**Blocked by:** decision (pat)\n\n**Ask:** Does the widget work?\n\n")
+
+
+def entry_answers_cases(L, cases: list[dict]) -> dict:
+    """``entry_answers()`` (v3.3) of each case's entry: its ``text``, else ``ENTRY_ANSWERS_HEAD`` then its ``body``;
+    its result, or ``{"error": "Refused"}``."""
+    if not hasattr(L, "entry_answers"):
+        return {"missing": "the module has no entry_answers — older than v3.3"}
+    out = {}
+    for c in cases:
+        try:
+            out[c["name"]] = {"ok": L.entry_answers(c["text"] if "text" in c else ENTRY_ANSWERS_HEAD + c["body"])}
+        except L.Refused:
+            out[c["name"]] = {"error": "Refused"}
+    return out
 
 
 def _parts_entry(tid: str, e) -> object:
@@ -1148,11 +1233,29 @@ def verdict_cases(L, spec: dict, root: Path = HERE) -> dict:
         boards = [(b["url"], b["basename"], _fs_board(d / "boards", b["board"], L)) for b in c["boards"]]
         refusals, flags = L.uncovered_decisions(base, head, boards, spec["repo"])
         return {"refusals": [list(x) for x in refusals], "flags": [list(x) for x in flags]}
+
+    def ledger_lift(c):  # v3.3: the ledger lift's verdict
+        base, head = trees(c)
+        got = L.ledger_lift_verdict(base, head, c["files"], c["subject"], c["commits"], c["created_at"],
+                                    c["merged_at"], spec["repo"])
+        return {"carve_out": got["carve_out"], "flags": [list(x) for x in got["flags"]],
+                "review": [list(x) for x in got["review"]]}
+    lifts = {c["name"]: c for c in spec.get("ledger_lift", [])}
+
+    def form(c):  # v3.3: the base a named ledger_lift case reads, else the form case's own overlay
+        case, items = L.lift_form(trees(lifts[c["case"]] if "case" in c else c)[0], c["tid"], c["gate"],
+                                  spec["repo"])
+        return [case, [it.id for it in items]]
     return {
         "verdict": {c["name"]: verdict(c) for c in spec["verdict"]},
         "tripwire": {c["name"]: [list(x) for x in L.tripwire(*trees(c), c["subject"], spec["repo"])]
                      for c in spec["tripwire"]},
         "uncovered": {c["name"]: uncovered(c) for c in spec["uncovered"]},
+        "ledger_lift": ({c["name"]: ledger_lift(c) for c in spec.get("ledger_lift", [])}
+                        if hasattr(L, "ledger_lift_verdict") else
+                        {"missing": "the module has no ledger_lift_verdict — older than v3.3"}),
+        "lift_form": ({c["name"]: form(c) for c in spec.get("lift_form", [])} if hasattr(L, "lift_form") else
+                      {"missing": "the module has no lift_form — older than v3.3"}),
     }
 
 
@@ -1179,10 +1282,27 @@ def grammar_cases(L, spec: dict) -> dict:
         "rank-file": lambda s: (not L.rank(s)[1], L.rank(s)[1]),
         "blocked-by": lambda s: _gates_verdict(L.parse_gates(s)),  # v2.4: a person's name is a decision's
         "event-section": lambda s: (L.parse_event_section(s)["problem"] is None, L.parse_event_section(s)["problem"]),
+        "lift-subject": lambda s: (L.lift_subject_parts(s) is not None, None),  # v3.3: a ledger lift's subject
+        "delegates-line": lambda s: (_delegates_canonical(L, s), None),  # v3.4
     }
-    return {start: {prod: [dict(zip(("accepted", "why"), judge[start](s))) for s in g["accept"] + g["refuse"]]
-                    for prod, g in groups.items()}
+    return {start: ({prod: [dict(zip(("accepted", "why"), judge[start](s))) for s in g["accept"] + g["refuse"]]
+                     for prod, g in groups.items()}
+                    if (start != "lift-subject" or hasattr(L, "lift_subject_parts"))
+                    and (start != "delegates-line" or hasattr(L, "board_delegates")) else
+                    {"missing": f"the module has no reader for {start} — older than its release"})
             for start, groups in spec.items()}
+
+
+def _delegates_canonical(L, s: str) -> bool:
+    """A `Delegates:` line's grammar verdict (v3.4): ``s`` as a directory board's preamble, ``board_delegates()``
+    reads one grant or more, none outside the form, and the grants re-rendered after `Delegates: ` are ``s``.
+    ``delegates_problems()`` is not called: its faults are the board's, not the grammar's."""
+    if not hasattr(L, "board_delegates"):
+        return False
+    grants = L.board_delegates(L.Board("dir", "b", 3, preamble=s))
+    if not grants or any(p is None for _, p, _ in grants):
+        return False
+    return "Delegates: " + "; ".join(f"{d} for {p} ({', '.join(sc)})" for d, p, sc in grants) == s
 
 
 def _why(problem) -> tuple[bool, object]:
@@ -1327,6 +1447,8 @@ def cases(L, root: Path):
     yield root / "edit" / "expected.json", edit_cases(L, spec, root)
     spec = json.loads((root / "item" / "cases.json").read_text(encoding="utf-8"))
     yield root / "item" / "expected.json", item_cases(L, spec)  # v3.0
+    spec = json.loads((root / "delegates" / "cases.json").read_text(encoding="utf-8"))
+    yield root / "delegates" / "expected.json", delegates_cases(L, spec)  # v3.4
     if hasattr(L, "__path__"):  # the writers ship in the package; a single module file has none
         for case in sorted(p for p in (root / "board_writer").glob("*") if p.is_dir()):
             yield case, writer_case(L, case)

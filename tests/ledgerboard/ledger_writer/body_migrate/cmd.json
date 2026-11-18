@@ -1,0 +1,8 @@
+{
+ "argv": [
+  "migrate-body",
+  "--ledger",
+  "ledger",
+  "--json"
+ ]
+}
