@@ -303,6 +303,21 @@ def card_whole(mode: Any, e: Any) -> bool:
 templates.env.globals["card_whole"] = card_whole
 
 
+def asked_once_words(ids: Any, repo: Any = "") -> str:
+    """A *waiting, then yours* item's one status sentence (§4.5 screen 12 *A press is never left stranded*, §4.4 *The
+    card's status*, TD-1926): *Asked once TD-n closes*, TD-n the first counted id (`ids`, `<repo>#TD-n` in key order),
+    bare in `repo`, the row's own; *Asked once TD-n and k more close* where there are more; '' with none."""
+    got = [str(x) for x in ids or () if x] if isinstance(ids, (list, tuple)) else []
+    if not got:
+        return ""
+    first = got[0].removeprefix(f"{repo}#") if repo else got[0]
+    more = len(got) - 1
+    return f"Asked once {first} and {more} more close" if more else f"Asked once {first} closes"
+
+
+templates.env.globals["asked_once_words"] = asked_once_words
+
+
 def card_path(cid: Any) -> str:
     """A card's page (§4.5 screen 12 *The card's page*, *Addresses*): `/card/<card id>`, the id percent-encoded whole
     — a card's id carries a `#`, a loose card's a `:` too — as `notify.queue_path` writes it (TD-1763)."""

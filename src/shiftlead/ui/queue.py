@@ -32,6 +32,7 @@ from sessionorc.queue import (  # noqa: F401 — the home's
     card_entries,
     card_index,
     context_pr,
+    first_ref,
     held_refs,
     kept_or_loose,
     named_refs,
@@ -111,7 +112,27 @@ def item_home(
     home = _item_home(e, index, askers, needs, entries)
     if then := line_then_yours(e, entries):
         home = {**home, "then_yours": then}
+    elif got := mail_then_yours(e, askers, entries):
+        # its ids are bared in the entry's own repo, as the entry's row bares them (`asked_once_words`)
+        home = {**home, "then_yours": got[1], "then_repo": got[0]}
     return home
+
+
+def mail_then_yours(
+    e: Mapping[str, Any], askers: Mapping[str, str] | None, entries: Mapping[str, Mapping[str, Any]] | None
+) -> tuple[str, list[str]] | None:
+    """An open `ask --lift` to the person whose entry — `first_ref` of its `about`, else its words, a bare one its
+    asker's repo's — has counted open work (§4.4 *The card's status*, TD-1926): that entry's counted ids, in key
+    order, so its item is drawn grey with its answers withheld as the entry's own are — with the entry's repo, `(repo,
+    ids)`. None for any other item."""
+    if e.get("row") or e.get("kind") != "ask" or e.get("orphaned") or not e.get("lift") or not entries:
+        return None
+    if any(e.get(k) for k in ("closed_by", "closed_at", "closed_reason", "expired_at", "outcome", "owes")):
+        return None  # answered: no question left to withhold
+    repo = str(e.get("repo") or "").strip() or (askers or {}).get(str(e.get("id") or ""))
+    ref = first_ref(e.get("about"), f"{e.get('subject') or ''} {e.get('text') or ''}", repo)
+    work = (entries.get(ref) or {}).get("open_work") if ref else None
+    return (ref.partition("#")[0], list(work)) if ref and work else None
 
 
 def _item_home(
@@ -695,12 +716,15 @@ def answered_case(e: Mapping[str, Any]) -> str:
     """Which of the four grey kinds sharing the `answered` want a ledger row is (§4.5 screen 12 *A press is never left
     stranded*, TD-1843): `applying` (a press landing, TD-1508), `until` (a kept-waiting board answer), `handed` (a step
     handed by Have a session do it, TD-1660), else `waiting` — *answered — waiting on <asker>*, the only one that draws
-    **Answer…** and Start session and counts for the header where it draws its button; '' for a row none of them."""
+    **Answer…** and Start session and counts for the header where it draws its button; and after them `then_yours`
+    (*waiting, then yours*, a held entry, a covering line or an `ask --lift` whose question waits on open work,
+    TD-1926), its bar **Open** alone; '' for a row none of them."""
     if e.get("applying"):
         return "applying"
     a = e.get("answered")
     if not isinstance(a, Mapping) or not a:
-        return ""
+        # *waiting, then yours* (TD-1926): after every other case, so a row with an earlier word keeps it
+        return "then_yours" if e.get("then_yours") else ""
     if a.get("until"):
         return "until"
     return "handed" if a.get("kind") == "handed" else "waiting"
@@ -875,6 +899,10 @@ def attach(
         if e.get("row") == "ledger" and (e.get("applying") or e.get("answered")) and want in WANTS:
             # a press landing (TD-1508) or an answer acted on (TD-1316): no need of the person
             return "answered", "", None
+        if e.get("then_yours") and want in WANTS:
+            # *waiting, then yours* (§4.5 screen 12 *A press is never left stranded*, TD-1926): a held entry, a line
+            # covering one, or an `ask --lift` on one, whose question waits on open work — grey, never a Decide item
+            return "answered", "", None
         return want, kind, None
 
     # a board line that names an entry is the question itself and is drawn instead of the entry's own block
@@ -916,10 +944,12 @@ def attach(
             e = {**e, "lift_reply": lift}
         if (
             e.get("row") == "ledger"
-            and want in WANTS
+            and (want in WANTS or (want == "answered" and answered_case(e) == "then_yours"))
             and (str(e.get("on_row") or "") in strip_rows or covered_by(e, strip))
         ):
-            return  # only the entry's own question goes: *with you* and *answered* are no question to draw over
+            # only the entry's own question goes, its grey *waiting, then yours* too, the line standing in its place
+            # (TD-1926): *with you* and *answered* are no question to draw over
+            return
         # starts no session (TD-1246, TD-1292, TD-1468, TD-1497)
         pr_row = e.get("row") in ("red_pr", "fork_pr", "stuck", *HOLDER_ROWS) or stuck_line(e)
         # an item *answered — waiting on <asker>* draws one too, where no other session holds its entry (TD-1843)
