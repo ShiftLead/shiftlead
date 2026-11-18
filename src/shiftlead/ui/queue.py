@@ -27,6 +27,7 @@ from sessionorc.queue import (  # noqa: F401 — the home's
     PERSON,
     SYNOPSIS_KEY,
     TD_REF,
+    _key_sort,
     asker_repos,
     card_entries,
     card_index,
@@ -84,7 +85,36 @@ def board_context(e: Mapping[str, Any]) -> str | None:
     return m.group(1) if m else None
 
 
+def line_then_yours(e: Mapping[str, Any], entries: Mapping[str, Mapping[str, Any]] | None) -> list[str] | None:
+    """An open, undecided `decide` line covering any member with counted open work (§4.4 *The card's status*,
+    TD-1926): the union of those members' counted ids (`entries`' `open_work`, as `ledger_for_you` gives them), in
+    key order, whatever its other members read — its answer acts on every entry it lists. None for any other item."""
+    if e.get("row") != "board" or str(e.get("kind") or "").lower() != "decide" or e.get("decided") or not entries:
+        return None
+    work = {
+        w: str((entries.get(w) or {}).get("key") or "")
+        for q in covered(e, entries)
+        for w in (entries.get(q) or {}).get("open_work") or ()
+    }
+    return sorted(work, key=lambda w: _key_sort(work[w], w)) or None
+
+
 def item_home(
+    e: Mapping[str, Any],
+    index: Mapping[str, tuple[str, str]] | None,
+    askers: Mapping[str, str] | None = None,
+    needs: bool = False,
+    entries: Mapping[str, Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """`_item_home`, and on an open undecided `decide` line covering a member with counted open work its
+    `then_yours` (`line_then_yours`, TD-1926)."""
+    home = _item_home(e, index, askers, needs, entries)
+    if then := line_then_yours(e, entries):
+        home = {**home, "then_yours": then}
+    return home
+
+
+def _item_home(
     e: Mapping[str, Any],
     index: Mapping[str, tuple[str, str]] | None,
     askers: Mapping[str, str] | None = None,

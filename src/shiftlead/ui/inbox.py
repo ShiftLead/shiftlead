@@ -3410,7 +3410,11 @@ def ledger_for_you(
     # the open entries of every repo read, by `<repo>#TD-n`: what a board line covers is read through them
     # (`ui.queue.covered`, TD-1380) — its `decision (paul)` members `Part of` a `Context:` entry
     entries_open = {
-        q: {k: e.get(k) for k in ("repo", "part_of", "part_of_raw", "blocked_by")} for q, e in opens.items()
+        q: {
+            **{k: e.get(k) for k in ("repo", "part_of", "part_of_raw", "blocked_by", "key")},
+            "open_work": work.get(q) or [],  # the fact, which a covering line reads (`ui.queue.line_then_yours`)
+        }
+        for q, e in opens.items()
     }
     return {"n": sum(g["n"] for g in groups), "groups": groups, "entries": entries_open}
 
