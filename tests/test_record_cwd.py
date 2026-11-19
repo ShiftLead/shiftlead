@@ -192,3 +192,35 @@ async def test_a_root_that_cannot_be_read_never_costs_the_record_its_git(agent, 
     monkeypatch.setattr(gitinfo, "cwd_root", broken)
     await agent._refresh_git(datetime.now(UTC))
     assert s.git is not None and s.git["top"] == str(repo.resolve()) and s.cwd_root is None
+
+
+async def test_an_older_slow_resolve_never_overwrites_a_newer_event_back_at_the_last_folder(
+    agent, tmp_path, monkeypatch
+):
+    import asyncio
+    import os
+    import threading
+
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    d, a, b = tmp_path / "d", tmp_path / "a", tmp_path / "b"
+    for p in (d, a, b):
+        p.mkdir()
+    s = _record(agent, d)
+    await agent.rpc_hook(s.id, cwd=str(a))
+    assert s.cwd == str(a.resolve())
+    gate, real = threading.Event(), os.path.realpath
+
+    def slow(path, *args, **kw):
+        if str(path) == str(b):
+            gate.wait(10)  # B's resolve hangs (a slow mount)
+        return real(path, *args, **kw)
+
+    monkeypatch.setattr(os.path, "realpath", slow)
+    moved = asyncio.create_task(agent.rpc_hook(s.id, cwd=str(b)))
+    await asyncio.sleep(0.2)
+    await agent.rpc_hook(s.id, cwd=str(a))  # back at A while B's resolve is under way
+    gate.set()
+    await moved
+    assert s.cwd == str(a.resolve())

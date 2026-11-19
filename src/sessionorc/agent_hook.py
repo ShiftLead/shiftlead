@@ -78,6 +78,7 @@ class HookMixin:
         if not isinstance(raw, str) or not raw or event.get("subagent") or s is None or not s.dir:
             return
         if raw == self._cwd_raw.get(session):
+            self._cwd_asking.pop(session, None)  # back where it was: an older resolve under way hands nothing on
             return
         self._cwd_asking[session] = raw  # the newest raw value asked: a slower, older resolve hands nothing on
         try:
