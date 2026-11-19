@@ -5929,7 +5929,6 @@
       b.disabled = true;
       try {
         const got = await post(path, body);
-        if (got && got.billing_error) alert(got.billing_error);  // added, its billing refused: said, the login kept
         if (got && got.shell && got.shell.id) location.href = "/focus/" + encodeURIComponent(got.shell.id);
         else { if (got && got.shell_error) alert(got.shell_error); location.reload(); }
       } catch (e) { say(e.message); b.disabled = false; }

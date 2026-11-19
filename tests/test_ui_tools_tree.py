@@ -152,7 +152,8 @@ def test_a_logins_settings_form_is_filled_from_the_read(monkeypatch):
 
 def test_add_login_on_each_card_and_add_on_a_found_row(monkeypatch):
     text = page(monkeypatch, read())
-    assert text.count("+ Add login") == 2 and 'class="tooladdform row gap wrap" data-tool="gemini"' in text
+    assert text.count('class="btn sm link tooladd"') == 2  # one + Add login a card
+    assert 'class="tooladdform row gap wrap" data-tool="gemini"' in text
     gemini = section(text, 'data-adapter="gemini"', "</section>")
     assert re.search(r'class="btn sm tooladdfound" type="button" data-tool="gemini" data-path="[^"]+"', gemini)
     assert 'data-billing=""' in gemini  # no reading: nothing chosen
@@ -160,9 +161,12 @@ def test_add_login_on_each_card_and_add_on_a_found_row(monkeypatch):
     form = section(gemini, 'class="tooladdform', "</form>")
     assert re.search(r'name="billing".*?<option value="">not set</option><option>subscription</option>', form, re.S)
     got = read()
+    got["tools"][1]["found"][0]["billing"] = "subscription"
+    gemini = section(page(monkeypatch, got), 'data-adapter="gemini"', "</section>")
+    assert 'data-billing="subscription"' in gemini  # identity's reading, offered by the found row's Add
     got["tools"][1]["found"][0]["billing"] = "metered"
     gemini = section(page(monkeypatch, got), 'data-adapter="gemini"', "</section>")
-    assert 'data-billing="metered"' in gemini  # identity's reading, offered by the found row's Add
+    assert 'data-billing=""' in gemini  # a default home takes no metered login (§4.2a): not offered
     got = read()
     got["switched"] = False
     text = page(monkeypatch, got)
@@ -320,7 +324,7 @@ def test_add_with_a_billing_sets_it_and_a_refusal_keeps_the_login(monkeypatch):
         r = c.post("/api/tools/add", json={"tool": "gemini", "name": "work", "billing": "subscription"})
         assert r.json() == {"change": "added", "login": "gemini:work"}
         r = c.post("/api/tools/add", json={"tool": "gemini", "name": "work", "billing": "metered"})
-        assert r.status_code == 200 and r.json()["billing_error"] == (
+        assert r.status_code == 400 and r.json()["detail"] == (  # drawn in place, the login named as added
             "gemini:work was added, but its billing was not set: a metered login needs a folder of its own"
         )
         c.post("/api/tools/add", json={"tool": "gemini", "name": "work", "billing": ""})  # not set: no write

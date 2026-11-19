@@ -78,7 +78,7 @@
     {% for f in c.found %}
     <div class="toolfound row gap wrap"><span class="mono">{{ f.shown }}</span>
       {%- if f.own_home %}<span class="note">the tool's own home: ShiftLead launches {{ c.label }} into a folder of its own</span>
-      {%- else %}<span class="note">found here, signed in</span>{% if c.tree %}<span class="grow"></span><button class="btn sm tooladdfound" type="button" data-tool="{{ c.adapter }}" data-path="{{ f.folder }}" data-billing="{{ f.billing or '' }}" title="{{ help_title('tools-add-found') }}">Add</button>{% endif %}{% endif %}</div>
+      {%- else %}<span class="note">found here, signed in</span>{% if c.tree %}<span class="grow"></span><button class="btn sm tooladdfound" type="button" data-tool="{{ c.adapter }}" data-path="{{ f.folder }}" data-billing="{{ f.offer or '' }}" title="{{ help_title('tools-add-found') }}">Add</button>{% endif %}{% endif %}</div>
     {% else %}
     <div class="toolfound row gap wrap"><span class="note">no signed-in folder found at the tool's default home</span></div>
     {% endfor %}

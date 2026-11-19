@@ -5124,6 +5124,9 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 c["short"] = tools_mod.short_version(c.get("version"))
                 for f in c.get("found", []):
                     f["shown"] = _shown_folder(str(f.get("folder") or ""), home)
+                    # Add offers the reading where it can be taken: a found row is the tool's default home, which a
+                    # metered login may not use (§4.2a), so a metered reading is not chosen
+                    f["offer"] = f.get("billing") if f.get("billing") != "metered" else None
                 if got.get("switched"):
                     c["tree"] = login_tree(c, home, weights)
             got["read_ago"] = _age(got.get("read_at"), datetime.now(UTC)) or "0s"
@@ -5191,8 +5194,9 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/tools/add")
     async def tools_add(request: Request):
-        """§4.5a *Tools page: + Add login*, *Add on a found row* (TD-1974): `{tool, name, path, account}` →
-        `login_add` (`ao login add`), the person's own act — a `path` that is the tool's home is used, an empty or
+        """§4.5a *Tools page: + Add login*, *Add on a found row* (TD-1974): `{tool, name, path, account, billing}` →
+        `login_add` (`ao login add`), then, where a billing is chosen, `login_set` of it, whose refusal is a 400 naming
+        the login as added; the person's own act — a `path` that is the tool's home is used, an empty or
         missing one made one, and with none the adapter suggests the folder from the name; a login whose folder was
         made has its tools shell opened for Sign in (`shell` in the reply), whose Focus the page then opens."""
         body = await body_of(request)
@@ -5202,8 +5206,10 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if billing and isinstance(got, dict) and got.get("login"):  # the person's choice, written as Settings writes it
             try:
                 await call("login_set", login=got["login"], key="billing", value=billing)
-            except HTTPException as e:  # the login stands; its billing's refusal is said
-                got["billing_error"] = f"{got['login']} was added, but its billing was not set: {e.detail}"
+            except HTTPException as e:  # the login stands; its billing's refusal is drawn in place, as Settings'
+                raise HTTPException(
+                    e.status_code, f"{got['login']} was added, but its billing was not set: {e.detail}"
+                ) from None
         return got
 
     @app.post("/api/tools/account/label")
