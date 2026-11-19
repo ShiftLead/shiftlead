@@ -3971,7 +3971,9 @@ class HostAgent(
         """Read this host's tools again and keep the read (design §4.2b *What the adapter reads*, TD-1973)."""
         async with self._tools_lock:
             try:
-                got = await _in_daemon_thread(functools.partial(tools_mod.read, self._tools_salt, memory=self._tools_memory))
+                got = await _in_daemon_thread(
+                    functools.partial(tools_mod.read, self._tools_salt, memory=self._tools_memory)
+                )
             except Exception as e:  # noqa: BLE001 — a failed read is said to the asker; the kept one stands
                 log.exception("the tools read failed")
                 raise RpcError(f"this host's tools could not be read: {type(e).__name__}") from None

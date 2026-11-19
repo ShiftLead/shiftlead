@@ -244,7 +244,7 @@ async def test_a_test_agent_makes_no_start_read(agent, monkeypatch):
     from sessionorc.client import LocalClient
 
     assert agent._tools_task is None and agent._tools_kept is None
-    monkeypatch.setattr(tools, "read", lambda salt, env=None, home=None: {"read": True})
+    monkeypatch.setattr(tools, "read", lambda salt, env=None, home=None, memory=None: {"read": True})
     async with LocalClient() as c:
         assert await c.call("tools") == {"read": True}
 
