@@ -4,9 +4,19 @@
 {# design §4.2b *The page*, §4.5 screen 14 **Tools** (TD-1953, built by TD-1973; mockup
    `docs/mockups/reviews/2026-11-18-td1953-tools-own5-{1440,420}.png`): the coding tools on the home's host — a card
    per supported tool found, headed by its name and version, its found rows; then *Not ready to run here*. Before the
-   switch-over it draws no accounts or logins (TD-1974 and TD-1975 draw them). Drawn from the host agent's kept
+   switch-over it draws no accounts or logins; on a switched host (`t.switched`) each card draws them as a tree, each
+   account and its logins, *Not signed in*, then the logins whose account is to be named (TD-1974; the gauges are
+   TD-1975's). Drawn from the host agent's kept
    `tools` read; **Check again** posts `/api/tools/check` (`tools_check`), **Install** `/api/tools/install`
    (`tools_install`), which opens the install shell's Focus. #}
+{% macro login_row(lg) %}
+      <div class="toollogin row gap wrap" data-login="{{ lg.name }}"><span class="mono toolloginname">{{ lg.label or lg.name }}</span>{% if lg.label %}<span class="mono note">{{ lg.name }}</span>{% endif %}
+        <span class="mono note toolfolder">{{ lg.shown }}</span>
+        {%- if lg.pin or lg.note %}<span class="note toolnote"><i>{% if lg.pin %}pinned: {{ lg.pin }}{% endif %}{% if lg.pin and lg.note %} · {% endif %}{{ lg.note or "" }}</i></span>{% endif %}
+        <span class="grow"></span><span class="toolstate state-{{ lg.state }}">{{ lg.said }}</span>
+        {%- if lg.mismatch %}<div class="note toolwarn">these logins read different accounts: this one launches nothing until they agree</div>{% endif %}
+        {%- for w in lg.warned %}<div class="note toolwarn">{{ w }}</div>{% endfor %}</div>
+{% endmacro %}
 {% block body %}
 <div class="page inboxpage toolspage" id="toolspage">
   <div class="row gap wrap toolshead"><span class="h1">Tools</span>{% if t %}<span class="note">on <span class="mono">{{ t.host }}</span></span>{% endif %}<span class="grow"></span>
@@ -20,6 +30,28 @@
   {% for c in t.tools %}
   <section class="toolcard" data-adapter="{{ c.adapter }}">
     <div class="row gap toolname"><span class="h2">{{ c.label }}</span><span class="mono note" title="{{ c.version or '' }} · {{ c.binary }}">{{ c.short or "version not read" }}</span></div>
+    {% if c.tree %}
+    {% for a in c.tree.accounts %}
+    <div class="toolbranch">
+      <div class="toolacct" data-account="{{ a.key }}"><span class="toolacctname">{{ a.label or a.name }}</span>{% if a.label %} <span class="mono note">{{ a.name }}</span>{% endif %}
+        <div class="note">{{ a.plan or "plan not recorded by the tool" }}{% if a.billing %} · {{ a.billing }}{% endif %}</div>
+        {% if a.models and a.models.families %}<div class="mono toolfams">{{ a.models.families | join(" · ") }}</div>{% endif %}</div>
+      {% for lg in a.logins %}{{ login_row(lg) }}{% endfor %}
+    </div>
+    {% endfor %}
+    {% if c.tree.unsigned %}
+    <div class="toolbranch">
+      <div class="toolacct toolunsigned"><span class="toolacctname">Not signed in</span><div class="note">a folder joins its account once signed in</div></div>
+      {% for lg in c.tree.unsigned %}{{ login_row(lg) }}{% endfor %}
+    </div>
+    {% endif %}
+    {% if c.tree.naming %}
+    <div class="toolbranch">
+      <div class="toolacct toolunsigned"><span class="toolacctname">Signed in, account not named</span><div class="note">a login launches nothing until its account is named</div></div>
+      {% for lg in c.tree.naming %}{{ login_row(lg) }}{% endfor %}
+    </div>
+    {% endif %}
+    {% endif %}
     {% for f in c.found %}
     <div class="toolfound row gap wrap"><span class="mono">{{ f.shown }}</span>
       {%- if f.own_home %}<span class="note">the tool's own home: ShiftLead launches {{ c.label }} into a folder of its own</span>
