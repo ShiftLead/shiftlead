@@ -24,6 +24,10 @@ from sessionorc import adapters, hosts, paths
 log = logging.getLogger("shiftlead.tools")
 
 LOGINS_FILE = "logins.yml"
+# whether the host agent makes the Tools page's read when it starts (design §4.2b, TD-2002): a test knob, never a
+# setting — the suite starts hundreds of host agents, and each one's read runs every tool's real `--version` on this
+# machine; conftest turns it off, and a test of the start's read turns it on
+READ_AT_START = True
 
 
 _VERSION = re.compile(r"\d+(?:\.\d+)+")

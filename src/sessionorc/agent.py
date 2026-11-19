@@ -523,6 +523,30 @@ def _bound(path: Path) -> socket.socket:
     return s
 
 
+async def _in_daemon_thread(fn: Callable[..., Any], *args: Any) -> Any:
+    """`fn(*args)` in a daemon thread of its own, awaited (design §4.2b, TD-2002). `asyncio.to_thread` runs it on the
+    loop's default executor, which `asyncio.run` joins at its end, so a stop waited for every tool's `--version` the
+    read had left to run (up to its bound each) — a host agent told to stop did not. A daemon thread holds no exit:
+    a read cut short by one is lost, and the next run reads again."""
+    loop = asyncio.get_running_loop()
+    fut: asyncio.Future[Any] = loop.create_future()
+
+    def settle(ok: bool, value: Any) -> None:
+        if not fut.done():
+            (fut.set_result if ok else fut.set_exception)(value)
+
+    def run() -> None:
+        try:
+            got, ok = fn(*args), True
+        except BaseException as e:  # noqa: BLE001 — handed to the awaiting task, which says it
+            got, ok = e, False
+        with contextlib.suppress(RuntimeError):  # the loop closed under the read: nobody waits for it
+            loop.call_soon_threadsafe(settle, ok, got)
+
+    threading.Thread(target=run, name="tools-read", daemon=True).start()
+    return await fut
+
+
 class HostAgent(
     ServeMixin,
     TickMixin,
@@ -1067,7 +1091,8 @@ class HostAgent(
         # than racing it with a sleep, which is the shape TD-078 and TD-088 keep catching. The
         # `finally` below cancels it either way — cancelling a cancelled task is a no-op.
         # the Tools page's read at start (§4.2b): in the background, as each tool's `--version` is bounded but slow
-        self._tools_task = asyncio.create_task(self._tools_start())
+        if tools_mod.READ_AT_START:
+            self._tools_task = asyncio.create_task(self._tools_start())
         ticker = self._ticker = asyncio.create_task(self._tick_loop())
         dialer = asyncio.create_task(self._dial_home()) if self.mode == "node" else None
         try:
@@ -3943,7 +3968,7 @@ class HostAgent(
         """Read this host's tools again and keep the read (design §4.2b *What the adapter reads*, TD-1973)."""
         async with self._tools_lock:
             try:
-                got = await asyncio.to_thread(tools_mod.read, self._tools_salt)
+                got = await _in_daemon_thread(tools_mod.read, self._tools_salt)
             except Exception as e:  # noqa: BLE001 — a failed read is said to the asker; the kept one stands
                 log.exception("the tools read failed")
                 raise RpcError(f"this host's tools could not be read: {type(e).__name__}") from None
