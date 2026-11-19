@@ -5,7 +5,6 @@ call real but `remote get-url`, which names the GitHub origin the fake answers f
 import asyncio
 import json
 import os
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -66,44 +65,16 @@ def _register(*roots: Path | str) -> None:
 
 @pytest.fixture
 def gh(monkeypatch):
-    """The fake: `urls` names each checkout's origin URL; `prs` the open PRs, each a list of `(file, patch)`
-    (patch None where GitHub leaves it out) or `(file, status, previous name)`, or a string (the listing's
-    error); `slow` a PR's read delay; `on_list` runs as the list is read. Every other call is the real `_run`."""
+    """The fake: `urls` names each checkout's origin URL; `calls` records every command run, so a test can see
+    that the home ran no `gh` and no fetch of its own (TD-971). Every other call is the real `_run`."""
     real = agent_ids._run
-    state = {"urls": {}, "prs": {}, "slow": {}, "list_error": None, "on_list": None, "calls": []}
+    state = {"urls": {}, "calls": []}
 
     async def fake(argv, cwd, timeout, **kw):
         state["calls"].append(argv)
         if argv[:1] == ["git"] and argv[3:6] == ["remote", "get-url", "origin"]:
             url = state["urls"].get(argv[2])
             return (0, url + "\n", "") if url else (2, "", "error: No such remote 'origin'")
-        if argv[:3] == ["gh", "pr", "list"]:
-            if state["on_list"]:
-                state["on_list"]()
-            if state["list_error"]:
-                return 1, "", state["list_error"]
-            return 0, json.dumps([{"number": n} for n in state["prs"]]), ""
-        if argv[:2] == ["gh", "api"]:
-            n = int(argv[2].split("/")[-2])
-            jq = argv[argv.index("--jq") + 1]
-            if delay := state["slow"].get(n):
-                try:
-                    await asyncio.wait_for(asyncio.sleep(delay), timeout)
-                except TimeoutError:
-                    return -1, "", "timed out"
-            files = state["prs"][n]
-            if isinstance(files, str):
-                return 1, "", files
-            under = re.findall(r'startswith\(("[^"]*")\)', jq)
-            out = [
-                json.dumps({"f": x[0], "p": x[1]})
-                if len(x) == 2 and json.dumps(x[0]) in jq
-                else json.dumps({"f": x[0], "s": x[1], "o": x[2]})
-                if len(x) == 3 and any(x[0].startswith(json.loads(u)) for u in under)
-                else "0"
-                for x in files
-            ]
-            return 0, "\n".join(out) + "\n", ""
         return await real(argv, cwd, timeout, **kw)
 
     monkeypatch.setattr(agent_ids, "_run", fake)
@@ -116,10 +87,31 @@ async def home(agent):
     return agent
 
 
-def _one(tmp_path, gh, name="shiftlead", nums=(1, 2), url="git@github.com:ShiftLead/shiftlead.git", files=None):
+COUNTER = r"""
+import json, os, sys
+args = sys.argv[1:]
+floor, count = int(args[args.index("--floor") + 1]), int(args[args.index("--count") + 1])
+open(os.environ.get("STUB_LOG") or os.devnull, "w").write(json.dumps({"argv": args, "cwd": os.getcwd()}))
+ids = [f"TD-{n:03d}" for n in range(floor + 1, floor + 1 + count)]
+print(json.dumps({"ids": ids, "reserved": True, "why": "", "unread": [], "warnings": []}))
+"""
+
+
+def _counter(root: Path) -> None:
+    """A stand-in `ledger_next_id.py` that counts on from the home's `--floor`, as origin's counter does when
+    only the home takes from it: `count` ids above the floor, reserved (TD-971: the home has no road of its own,
+    so every call runs a script)."""
+    (root / "scripts").mkdir(parents=True, exist_ok=True)
+    (root / "scripts" / "ledger_next_id.py").write_text(COUNTER)
+
+
+def _one(tmp_path, gh, name="shiftlead", nums=(1, 2), url="git@github.com:ShiftLead/shiftlead.git", files=None,
+         script=True):  # fmt: skip
     root = _repo(tmp_path, name, files or {LEDGER: _ledger(*nums), ARCHIVE: _ledger()})
     gh["urls"][str(root)] = url
     _register(root)
+    if script and not (root / "scripts" / "ledger_next_id.py").exists():
+        _counter(root)
     return root
 
 
@@ -136,12 +128,6 @@ def test_an_origin_is_owner_repo_for_github_ssh_or_https_and_the_url_otherwise()
     ):
         assert agent_ids.origin_key(url) == "shiftlead/shiftlead", url
     assert agent_ids.origin_key("https://GitLab.com/a/B.git") == "https://gitlab.com/a/b"
-    assert agent_ids.is_github("shiftlead/shiftlead") and not agent_ids.is_github("https://gitlab.com/a/b")
-
-
-def test_a_patch_adds_the_headings_it_adds():
-    patch = "@@ -1 +1 @@\n+## TD-012: new\n-## TD-009: gone\n ## TD-003: kept\n+## TD-7: short\n"
-    assert agent_ids.added_ids(patch) == {12, 7}
 
 
 def test_td_next_is_forwarded_and_refused_offline_for_a_person_too():
@@ -158,6 +144,7 @@ def test_td_next_is_forwarded_and_refused_offline_for_a_person_too():
 @pytest.mark.integration
 async def test_count_gives_ids_in_a_row_and_the_record_keeps_who(home, gh, tmp_path):
     _one(tmp_path, gh, nums=(1, 4))
+    paths.ids_file().write_text(json.dumps({"shiftlead/shiftlead": {"last": 4, "given": []}}))
     got = await home.rpc_td_next(repo="shiftlead", count=3, caller="ao-w")
     assert got == {"repo": "shiftlead", "origin": "shiftlead/shiftlead", "ids": ["TD-005", "TD-006", "TD-007"],
                    "unread": [], "reserved": True, "why": "", "warnings": [], "taken_by": None,
@@ -167,7 +154,7 @@ async def test_count_gives_ids_in_a_row_and_the_record_keeps_who(home, gh, tmp_p
     assert rec["last"] == 7 and [(g["id"], g["by"]) for g in rec["given"]] == [
         ("TD-005", "ao-w"), ("TD-006", "ao-w"), ("TD-007", "ao-w")
     ]  # fmt: skip
-    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-008"], "the last given beats main"
+    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-008"], "the last given is the next floor"
     assert json.loads(paths.ids_file().read_text())["shiftlead/shiftlead"]["given"][-1]["by"] == "person"
     for bad in (0, 11, "2", True):
         with pytest.raises(RpcError, match="1 to 10"):
@@ -177,8 +164,7 @@ async def test_count_gives_ids_in_a_row_and_the_record_keeps_who(home, gh, tmp_p
 @pytest.mark.integration
 async def test_two_calls_at_once_get_different_ids_and_three_all_answer(home, gh, tmp_path):
     _one(tmp_path, gh, nums=(9,))
-    gh["prs"] = {50: [("README.md", "+x")]}
-    gh["slow"] = {50: 0.2}
+    paths.ids_file().write_text(json.dumps({"shiftlead/shiftlead": {"last": 9, "given": []}}))
     got = await asyncio.wait_for(
         asyncio.gather(*(home.rpc_td_next(repo="shiftlead", caller=f"ao-{i}") for i in range(3))), 120
     )
@@ -191,89 +177,8 @@ async def test_by_is_the_dispatchers_caller_whatever_the_call_carries(home, gh, 
     req = {"id": 1, "method": "td_next", "caller": "ao-real", "params": {"repo": "shiftlead", "caller": "ao-fake",
                                                                        "by": "ao-fake"}}  # fmt: skip
     resp = await home._dispatch_inner(req)
-    assert resp["result"]["ids"] == ["TD-003"], resp
+    assert resp["result"]["ids"] == ["TD-001"], resp
     assert json.loads(paths.ids_file().read_text())["shiftlead/shiftlead"]["given"][0]["by"] == "ao-real"
-
-
-@pytest.mark.integration
-async def test_an_open_prs_added_heading_raises_the_floor_and_the_archive_counts(home, gh, tmp_path):
-    _one(tmp_path, gh, nums=(1, 2))
-    gh["prs"] = {
-        7: [(LEDGER, "+## TD-040: in a PR\n"), ("src/x.py", "+## TD-099: not a ledger\n")],
-        8: [(ARCHIVE, "+## TD-041: filed and archived in one PR\n")],
-    }
-    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-042"]
-
-
-@pytest.mark.integration
-async def test_a_custom_ledger_reads_that_file_and_its_archive(home, gh, tmp_path):
-    files = {".shiftlead.yml": "ledger: notes/debt.md\n", "notes/debt.md": _ledger(3),
-             "notes/debt_archive.md": _ledger(20), LEDGER: _ledger(90)}  # fmt: skip
-    _one(tmp_path, gh, files=files)
-    gh["prs"] = {4: [("notes/debt.md", "+## TD-030: x\n"), (LEDGER, "+## TD-095: the default is not this ledger\n")]}
-    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-031"]
-
-
-@pytest.mark.integration
-async def test_a_pr_merged_between_the_pr_read_and_the_fetch_is_counted(home, gh, tmp_path):
-    root = _one(tmp_path, gh, nums=(1,))
-    seed = tmp_path / "late"
-    _git(tmp_path, "clone", "-q", _git(root, "remote", "get-url", "origin"), str(seed))
-    # the PR merges just as the list is read: it is not listed, and the fetch after the list has it
-    gh["on_list"] = lambda: _push(seed, {LEDGER: _ledger(1, 12)})
-    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-013"]
-
-
-@pytest.mark.integration
-async def test_prs_not_read_are_named_and_the_ids_still_come(home, gh, tmp_path, monkeypatch):
-    _one(tmp_path, gh, nums=(1,))
-    gh["prs"] = {
-        3: "HTTP 404: Not Found",
-        4: [(LEDGER, None)],
-        5: [(LEDGER, "+## TD-005: read\n")],
-        6: [(LEDGER, "+## TD-060: too slow\n")],
-    }
-    gh["slow"] = {6: 5.0}
-    monkeypatch.setattr(agent_ids, "PRS_BY", 0.5)
-    got = await home.rpc_td_next(repo="shiftlead")
-    assert got["ids"] == ["TD-006"]
-    assert got["unread"] == [
-        "open PR #3 not read: HTTP 404: Not Found",
-        f"open PR #4 not read: {LEDGER} has no patch (too large a diff)",
-        "open PR #6 not read: budget",
-    ]
-    gh["list_error"] = "API rate limit exceeded"
-    assert (await home.rpc_td_next(repo="shiftlead"))["unread"] == ["open PRs not read: API rate limit exceeded"]
-
-
-@pytest.mark.integration
-async def test_a_listing_cut_at_3000_files_is_unread(home, gh, tmp_path):
-    _one(tmp_path, gh)
-    gh["prs"] = {9: [(f"f{i}", "+x") for i in range(agent_ids.FILES_CAP)]}
-    got = await home.rpc_td_next(repo="shiftlead")
-    assert got["unread"] == [f"open PR #9 not read: its listing is cut at {agent_ids.FILES_CAP} files"]
-
-
-@pytest.mark.integration
-async def test_a_list_that_fills_its_limit_is_unread_and_one_short_of_it_is_not(home, gh, tmp_path, monkeypatch):
-    """TD-708: an open PR past `--limit` would go unread silently, so a list exactly at it is named."""
-    monkeypatch.setattr(agent_ids, "PR_LIMIT", 3)
-    _one(tmp_path, gh)
-    gh["prs"] = {n: [] for n in (5, 6)}
-    assert (await home.rpc_td_next(repo="shiftlead"))["unread"] == []
-    gh["prs"] = {n: [] for n in (5, 6, 7)}
-    got = await home.rpc_td_next(repo="shiftlead")
-    assert got["unread"] == ["open PRs not read: the list filled its 3"] and got["ids"] == ["TD-004"]
-    assert all(c[c.index("--limit") + 1] == "3" for c in gh["calls"] if c[:3] == ["gh", "pr", "list"])
-
-
-@pytest.mark.integration
-async def test_a_non_github_origin_reads_no_prs_and_names_why(home, gh, tmp_path):
-    _one(tmp_path, gh, url="https://gitlab.com/a/b.git")
-    got = await home.rpc_td_next(repo="shiftlead")
-    assert got["origin"] == "https://gitlab.com/a/b" and got["ids"] == ["TD-003"]
-    assert got["unread"] == ["open PRs not read: the origin https://gitlab.com/a/b is not GitHub's"]
-    assert not [c for c in gh["calls"] if c[:1] == ["gh"]], "no gh call against a non-GitHub origin"
 
 
 @pytest.mark.integration
@@ -299,15 +204,6 @@ async def test_a_lock_not_taken_by_30_seconds_refuses_busy(home, gh, tmp_path, m
 
 
 @pytest.mark.integration
-async def test_a_failed_fetch_refuses(home, gh, tmp_path):
-    root = _one(tmp_path, gh)
-    _git(root, "remote", "set-url", "origin", str(tmp_path / "gone.git"))
-    with pytest.raises(RpcError, match="the fetch of shiftlead's origin failed"):
-        await home.rpc_td_next(repo="shiftlead")
-    assert not paths.ids_file().exists(), "nothing given, nothing recorded"
-
-
-@pytest.mark.integration
 async def test_given_keeps_the_newest_200(home, gh, tmp_path):
     _one(tmp_path, gh)
     old = [{"id": f"TD-{n:03d}", "by": "x", "at": "2026-10-01T00:00:00Z"} for n in range(1, 201)]
@@ -323,11 +219,12 @@ async def test_a_shared_name_of_two_origins_is_refused_and_owner_repo_picks_one(
     b = _repo(tmp_path, "tools", {LEDGER: _ledger(70)})
     gh["urls"] = {str(a): "git@github.com:One/tools.git", str(b): "https://github.com/Two/tools"}
     _register(a, b)
+    log_a, log_b = _stub(a, ids=("TD-006",)), _stub(b, ids=("TD-071",))
     with pytest.raises(RpcError, match="different origins") as e:
         await home.rpc_td_next(repo="tools")
-    assert str(a) in str(e.value) and str(b) in str(e.value)
-    assert (await home.rpc_td_next(repo="Two/tools"))["ids"] == ["TD-071"]
-    assert (await home.rpc_td_next(repo="one/tools"))["ids"] == ["TD-006"]
+    assert str(a) in str(e.value) and str(b) in str(e.value) and not log_a.exists() and not log_b.exists()
+    assert (await home.rpc_td_next(repo="Two/tools"))["ids"] == ["TD-071"] and log_b.exists()
+    assert (await home.rpc_td_next(repo="one/tools"))["ids"] == ["TD-006"] and log_a.exists()
 
 
 @pytest.mark.integration
@@ -336,9 +233,11 @@ async def test_two_checkouts_of_one_origin_ssh_and_https_share_one_counter(home,
     b = _repo(tmp_path, "shiftlead-2", {}, origin=Path(_git(a, "remote", "get-url", "origin")))
     gh["urls"] = {str(a): "git@github.com:ShiftLead/shiftlead.git", str(b): "https://github.com/ShiftLead/shiftlead"}
     _register(a, b)
-    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-002"]
-    assert (await home.rpc_td_next(repo="shiftlead-2"))["ids"] == ["TD-003"]
-    assert (await home.rpc_td_next(repo="ShiftLead/shiftlead"))["ids"] == ["TD-004"]
+    for r in (a, b):
+        _counter(r)
+    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-001"]
+    assert (await home.rpc_td_next(repo="shiftlead-2"))["ids"] == ["TD-002"], "one floor for one origin"
+    assert (await home.rpc_td_next(repo="ShiftLead/shiftlead"))["ids"] == ["TD-003"]
     assert list(json.loads(paths.ids_file().read_text())) == ["shiftlead/shiftlead"]
 
 
@@ -356,7 +255,7 @@ async def test_a_node_forwards_a_persons_call_by_name_and_refuses_it_offline(hom
     monkeypatch.setattr(home, "_forward", forward)
     monkeypatch.setattr(home, "home_reachable", lambda: True)
     resp = await home._dispatch_inner({"id": 1, "method": "td_next", "params": {"repo": "shiftlead"}, "caller": None})
-    assert seen == [("td_next", {"repo": "shiftlead"}, None)] and resp["result"]["ids"] == ["TD-003"]
+    assert seen == [("td_next", {"repo": "shiftlead"}, None)] and resp["result"]["ids"] == ["TD-001"]
     monkeypatch.setattr(home, "home_reachable", lambda: False)
     resp = await home._dispatch_inner({"id": 2, "method": "td_next", "params": {"repo": "shiftlead"}, "caller": None})
     assert "ids.json is the home's" in resp["error"]
@@ -418,8 +317,9 @@ async def test_two_origins_at_once_keep_each_others_record(home, gh, tmp_path):
     b = _repo(tmp_path, "two", {LEDGER: _ledger(50)})
     gh["urls"] = {str(a): "git@github.com:O/one.git", str(b): "git@github.com:O/two.git"}
     _register(a, b)
-    gh["prs"] = {1: [(LEDGER, "+x")]}
-    gh["slow"] = {1: 0.1}
+    for r in (a, b):
+        _counter(r)
+    paths.ids_file().write_text(json.dumps({"o/one": {"last": 1, "given": []}, "o/two": {"last": 50, "given": []}}))
     await asyncio.gather(*(home.rpc_td_next(repo=r) for r in ("one", "two", "one", "two")))
     store = json.loads(paths.ids_file().read_text())
     assert (store["o/one"]["last"], store["o/two"]["last"]) == (3, 52)
@@ -430,23 +330,8 @@ async def test_two_origins_at_once_keep_each_others_record(home, gh, tmp_path):
 async def test_a_persons_call_forwarded_from_a_node_is_served_at_the_home(home, gh, tmp_path):
     _one(tmp_path, gh)
     resp = await home._forwarded("laptop", {"rpc": "td_next", "params": {"repo": "shiftlead"}, "caller": None})
-    assert resp["result"]["ids"] == ["TD-003"], resp
+    assert resp["result"]["ids"] == ["TD-001"], resp
     assert json.loads(paths.ids_file().read_text())["shiftlead/shiftlead"]["given"][0]["by"] == "person"
-
-
-@pytest.mark.integration
-async def test_a_listing_line_that_is_no_file_is_unread(home, gh, tmp_path, monkeypatch):
-    _one(tmp_path, gh)
-    gh["prs"] = {5: [(LEDGER, "+## TD-009: x\n")]}
-    real = agent_ids._run
-
-    async def null(argv, cwd, timeout):
-        rc, out, err = await real(argv, cwd, timeout)
-        return (0, "null\n", "") if argv[:2] == ["gh", "api"] else (rc, out, err)
-
-    monkeypatch.setattr(agent_ids, "_run", null)
-    got = await home.rpc_td_next(repo="shiftlead")
-    assert got["ids"] == ["TD-003"] and got["unread"] == ["open PR #5 not read: its listing is not a list of files"]
 
 
 @pytest.mark.unit
@@ -610,7 +495,7 @@ async def test_a_script_past_the_budget_refuses_and_dies_with_its_group(home, gh
 
 @pytest.mark.integration
 async def test_agent_cadences_own_checkout_runs_files_scripts(home, gh, tmp_path):
-    root = _one(tmp_path, gh)
+    root = _one(tmp_path, gh, script=False)
     log = _stub(root, where="files/scripts", ids=("TD-003",))
     assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-003"] and log.exists()
     assert agent_ids.ids_script(str(root)) == root / "files/scripts/ledger_next_id.py"
@@ -772,10 +657,13 @@ async def test_a_branch_git_would_not_name_is_refused(home, gh, tmp_path):
 
 
 @pytest.mark.integration
-async def test_the_homes_own_road_drops_the_branch_and_answers_no_take(home, gh, tmp_path):
-    _one(tmp_path, gh)
-    got = await home.rpc_td_next(repo="shiftlead", branch="td1089-td-next")
-    assert got["ids"] == ["TD-003"] and (got["taken_by"], got["id_take"], got["id_take_line"]) == (None, None, None)
+async def test_a_checkout_without_the_script_is_refused_naming_the_sync(home, gh, tmp_path):
+    """TD-971 (§4.4 *The run*): the home has no road of its own, so a checkout that has not synced the release
+    shipping `ledger_next_id.py` is refused, naming the sync; nothing is given or recorded, and no PR is read."""
+    _one(tmp_path, gh, script=False)
+    with pytest.raises(RpcError, match=r"^no scripts/ledger_next_id.py in shiftlead: sync agent-cadence to 232f2ad"):
+        await home.rpc_td_next(repo="shiftlead", branch="td1089-td-next")
+    assert not paths.ids_file().exists() and not [c for c in gh["calls"] if c[:1] == ["gh"] or "fetch" in c]
 
 
 # -- TD-1282: the filing question review-outcomes asks (§4.4 *Its answer*, *The filing question*) -----------------
@@ -796,12 +684,6 @@ async def test_the_scripts_filing_question_is_carried_only_when_it_ends_its_stde
     _stub(root, ids=("TD-052",))  # review-outcomes off: the script asks nothing
     assert (await home.rpc_td_next(repo="shiftlead"))["question"] is None
     _stub(root, ids=("TD-053",), err_last="ledger_next_id: some other line")
-    assert (await home.rpc_td_next(repo="shiftlead"))["question"] is None
-
-
-@pytest.mark.integration
-async def test_the_homes_own_road_asks_no_question(home, gh, tmp_path):
-    _one(tmp_path, gh)
     assert (await home.rpc_td_next(repo="shiftlead"))["question"] is None
 
 
@@ -847,7 +729,7 @@ async def test_no_taken_by_line_is_given_and_taken_by_is_information(home, gh, t
 @pytest.mark.integration
 async def test_an_unreadable_ledger_gives_no_id_take_line(home, gh, tmp_path):
     root = _one(tmp_path, gh, files={LEDGER: _ledger(1), ARCHIVE: _ledger()})
-    (root / "scripts").mkdir()
+    (root / "scripts").mkdir(exist_ok=True)
     (root / "scripts" / "ledgerboard.py").write_text(SIBLING)  # before v2.2: the ledger decides
     _stub(root, id_take=NONCE)
     (root / LEDGER).unlink()
@@ -994,38 +876,6 @@ def _v2(nums=(1, 2), archived=(10,), readme: str = "# Ledger\n\nLedgerboard: 2\n
     files = lb.split(_ledger(*nums), _ledger(*archived))
     files["README.md"] = readme
     return {f"docs/ledger/{rel}": text for rel, text in files.items()}
-
-
-@pytest.mark.integration
-async def test_a_v2_ledgers_ids_are_its_file_names_and_an_open_prs_added_files_on_both_layouts(home, gh, tmp_path):
-    _one(tmp_path, gh, files=_v2(nums=(1, 2), archived=(10,)))
-    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-011"], "the archive's names count"
-    gh["prs"] = {
-        7: [("docs/ledger/TD-040.md", "added", None), ("src/TD-090.md", "added", None)],
-        8: [("docs/ledger/archive/TD-041.md", "added", None)],  # filed and archived in one PR
-        9: [("docs/ledger/archive/TD-002.md", "renamed", "docs/ledger/TD-002.md")],  # an archive files nothing
-        10: [("docs/ledger/TD-099.md", "modified", None), ("docs/ledger/README.md", "added", None)],
-    }
-    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-042"]
-    gh["prs"][11] = [(LEDGER, "+## TD-050: opened before the split\n")]
-    gh["prs"][12] = [("docs/ledger/archive/TD-060.md", "renamed", "notes/TD-060.md")]  # moved in from no entry
-    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-061"]
-    gh["prs"][13] = [("docs/ledger/TD-070.md", "renamed", "docs/ledger/TD-001.md")]  # renamed to a new id
-    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-071"]
-    gh["prs"][14] = [("docs/ledger/archive/TD-080.md", "renamed", "docs/ledger/TD-080.md")]  # above every other row
-    # TD-071 was given above; counted as filed, the move would raise the next to TD-081
-    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-072"], "an archive move files nothing"
-
-
-@pytest.mark.integration
-async def test_a_checkout_behind_a_split_reads_main_as_main_holds_it(home, gh, tmp_path):
-    root = _one(tmp_path, gh, nums=(1, 2))
-    seed = tmp_path / "split"
-    _git(tmp_path, "clone", "-q", _git(root, "remote", "get-url", "origin"), str(seed))
-    _git(seed, "rm", "-q", LEDGER, ARCHIVE)
-    _push(seed, _v2(nums=(1, 2, 30), archived=(31,)))
-    assert (root / LEDGER).is_file(), "the checkout is still v1"
-    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-032"]
 
 
 @pytest.mark.integration
@@ -1186,14 +1036,12 @@ async def test_a_take_is_read_again_by_its_nonce_or_as_the_callers_last_and_spen
 
 
 @pytest.mark.integration
-async def test_last_on_the_homes_own_road_is_the_callers_newest_call_and_an_old_record_groups_by_its_second(
-    home, gh, tmp_path
-):
+async def test_last_is_the_callers_newest_call_and_an_old_record_groups_by_its_second(home, gh, tmp_path):
     _one(tmp_path, gh, nums=(1, 2))
     await home.rpc_td_next(repo="shiftlead", count=2, caller="ao-w")
     await home.rpc_td_next(repo="shiftlead", count=1, caller="ao-w")
     got = await home.rpc_td_take(repo="shiftlead", take="last", caller="ao-w")
-    assert got["ids"] == ["TD-005"] and got["id_take"] is None and got["id_take_line"] is None
+    assert got["ids"] == ["TD-003"] and got["id_take"] is None and got["id_take_line"] is None
     old = [{"id": "TD-090", "by": "ao-o", "at": "t1"}, {"id": "TD-091", "by": "ao-o", "at": "t2"},
            {"id": "TD-092", "by": "ao-o", "at": "t2"}]  # fmt: skip
     paths.ids_file().write_text(json.dumps({"shiftlead/shiftlead": {"last": 92, "given": old}}))
