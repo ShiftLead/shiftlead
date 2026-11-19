@@ -173,11 +173,12 @@ def test_a_join_keeps_a_pin_its_new_account_offers_and_clears_any_other():
     )
     assert "pin" not in d["logins"]["claude-code:api"]
     d["logins"]["claude-code:api"]["pin"] = "haiku"
-    got = logins.join(d, "api", "fresh", families=fam)  # a new key: no read has its families
-    assert got.endswith(
-        "its pin haiku cleared, as claude-code:fresh's families are not read yet: Check again, then pin"
-    )
+    got = logins.join(d, "api", "fresh", families=fam)  # a new key: no read can have its families
+    assert got.endswith("as claude-code:fresh is a new account no read has yet: pin it once it is signed in")
     assert "pin" not in d["logins"]["claude-code:api"]
+    d["logins"]["claude-code:grind"]["pin"] = "opus"
+    got = logins.join(d, "grind", "claude-code:fresh", families=fam)  # a live account whose families are unread
+    assert got.endswith("its pin opus cleared, as claude-code:fresh's families are not read yet: Check again, then pin")
 
 
 def test_forget_moves_a_login_to_forgotten_and_its_last_account_leaves():

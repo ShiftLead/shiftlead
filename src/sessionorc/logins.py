@@ -519,7 +519,7 @@ def join(
                 f"{lk} shares its folder with {other}, and {metered} is metered: under {acct} its spend would count "
                 "another account's turns (design §4.2a)"
             )
-    left = account_of(lk, e)
+    left, new = account_of(lk, e), acct not in live_keys(data)
     _put(e, "account", None if acct == lk else acct)
     if left not in live_keys(data):  # its last login gone, the account's entry leaves `accounts:`, as forget's does
         data["accounts"].pop(left, None)
@@ -530,11 +530,12 @@ def join(
     if offered is not None and pin in set(offered):
         return f"{lk} joined {acct}"
     del e["pin"]
-    why = (
-        f"{acct} offers no {pin}"
-        if offered is not None
-        else f"{acct}'s families are not read yet: Check again, then pin"
-    )
+    if offered is not None:
+        why = f"{acct} offers no {pin}"
+    elif new:
+        why = f"{acct} is a new account no read has yet: pin it once it is signed in"
+    else:
+        why = f"{acct}'s families are not read yet: Check again, then pin"
     return f"{lk} joined {acct}; its pin {pin} cleared, as {why}"
 
 

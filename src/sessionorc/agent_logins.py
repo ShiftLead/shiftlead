@@ -9,6 +9,7 @@ inherits.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 from collections.abc import Callable
 from pathlib import Path
@@ -133,7 +134,10 @@ class LoginsMixin:
             reserve_keys = set()
         matches = dict(self._tools_memory.last)
         if self._tools_kept is None and await self._login_pinned(str(login or "")):
-            await self.rpc_tools()  # a pin is checked against the joined account's families: read them afresh
+            # a pin is checked against the joined account's families: read them afresh; with no read the join
+            # stands, the pin cleared as unread
+            with contextlib.suppress(RpcError):
+                await self.rpc_tools()
         offered = self._kept_families()  # read in the loop
         return await self._login_write(
             lambda d: logins.join(
