@@ -107,8 +107,9 @@ def load(home: Path | None = None) -> dict[str, Any] | None:
 
 def save(data: Mapping[str, Any], change: str, home: Path | None = None) -> bool:
     """Write the host's logins as one replace, then commit it as `logins: <change>` (§4.2b *Where it lives*), so it is
-    never committed later as *edited by hand*. True when a commit was made: none on a node, whose file is untracked, nor
-    before the switch-over puts it among `defs.TRACKED` in `profiles.yml`'s place (§4.9, the cut-over's, TD-1976)."""
+    never committed later as *edited by hand*. True when a commit was made, at the home, where it is among
+    `defs.TRACKED` (beside `profiles.yml` until the switch-over takes that out, TD-1976); none on a node, whose home is
+    no tree and whose file is untracked."""
     p = path(home)
     p.parent.mkdir(parents=True, exist_ok=True)
     out = {part: {k: _clean(v) for k, v in sorted(data.get(part, {}).items())} for part in empty()}
@@ -122,8 +123,6 @@ def save(data: Mapping[str, Any], change: str, home: Path | None = None) -> bool
     except BaseException:
         Path(tmp).unlink(missing_ok=True)
         raise
-    if LOGINS_FILE not in defs.TRACKED:  # it takes `profiles.yml`'s place there at the switch-over (TD-1976)
-        return False
     return defs.commit(f"logins: {change}"[:200], home=home, files=(LOGINS_FILE,))
 
 

@@ -74,7 +74,7 @@ def read(path: str, merged: bool = True) -> tuple[str, str]:
     if merged and p.parent.is_dir():
         top = _git(p.parent, "rev-parse", "--show-toplevel")
         root = Path(top.decode().strip()) if top is not None else None
-        # the home is a work tree of its three definition files (§4.9), never a checkout a brief is
+        # the home is a work tree of its definition files (§4.9), never a checkout a brief is
         # merged into: a file kept under it is read from disk, whatever remote the person adds
         if root is not None and root.resolve() != paths.home().resolve():
             for ref in DEFAULT_REFS:
