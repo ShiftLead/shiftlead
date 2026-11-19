@@ -822,7 +822,7 @@ def test_a_held_lift_pr_is_no_order_and_its_idle_holder_is_told_then_passed_over
 
 
 def _sweep(n=1950, branch="sweep/2026-11-15", since=T0, checks="green", **kw):
-    pr = {"number": n, "title": "board: gate sweep 2026-11-15 — 1 filed, 0 closed (TD-1376)", "branch": branch}
+    pr = {"number": n, "title": "board: gate sweep 2026-11-15 — 1 filed, 0 closed", "branch": branch}
     return {**pr, "url": f"https://github.com/o/r/pull/{n}", "author": "a", "checks": checks, "failing": [],
             "sweep": "sweep", "sweep_since": since.isoformat(), "head": "abc", **kw}  # fmt: skip
 
