@@ -1797,9 +1797,11 @@ data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}'
 {%- endmacro %}
 
 {#- §4.6 *A path in the Inbox and the Queue is a link too* (TD-1108): the context a row's paths resolve
-    by, written on the mail, board and ledger roots and a thread row, never on a trail or state row -#}
+    by, written on the mail, board and ledger roots and a thread row, never on a trail or state row; an `id:`
+    row beside it the record's `cwd` as rendered (`data-paths-cwd`), its asker's key with the context (TD-1988) -#}
 {% macro paths_attr(e) -%}
 {%- set pc = paths_ctx(e) %}{% if pc %} data-paths-ctx="{{ pc }}"{% endif %}
+{%- if pc.startswith("id:") and e.from_cwd %} data-paths-cwd="{{ e.from_cwd }}"{% endif %}
 {%- endmacro %}
 
 {#- every row carries an error line (§4.5a *Inbox row: pending*, TD-340): a refused write, or a press
