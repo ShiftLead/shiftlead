@@ -81,8 +81,17 @@ header .chk button { font:inherit; color:var(--ink); background:none; border:1px
   .login .dir em { display:block; margin:0; }
   .order li { margin-bottom:6px; }
 }
+.more { margin-top:36px; }
+.more h2 { font-size:16px; font-weight:600; margin:0 0 10px; color:var(--soft); }
+.ghost { display:grid; grid-template-columns:150px 260px 1fr auto; gap:16px; align-items:center; padding:10px 16px; margin-bottom:8px; border:1px dashed var(--rule); border-radius:6px; color:var(--off); background:transparent; }
+.ghost b { color:var(--soft); font-weight:600; }
+.ghost code { font:12.5px "IBM Plex Mono", monospace; }
+.ghost button { font:inherit; font-size:13px; background:var(--sheet); border:1px solid var(--ink); color:var(--ink); border-radius:3px; padding:2px 10px; }
+.ghost.sup b, .ghost.sup span { color:var(--ink); }
+.addtool { display:inline-block; margin:4px 0 0 16px; font-size:13px; color:var(--used); }
+@media (max-width:760px) { .ghost { grid-template-columns:1fr auto; gap:2px 10px; } .ghost code, .ghost span { grid-column:1; } .ghost button { grid-column:2; grid-row:1; } }
 </style></head><body><div class="wrap">
-<header><h1>Tools</h1><span class="host">on <b>kmaster</b> · 1 of 2 hosts</span><span class="chk">read 2 min ago<button>Check again</button></span></header>
+<header><h1>Tools</h1><span class="host">on <b>kmaster</b></span><span class="chk">read 2 min ago<button>Check again</button></span></header>
 <p class="lede">What can run here: each tool, the accounts it signs into, and the folders that hold those sign-ins. The hatched end of each bar is what you keep back for yourself; unattended seats stop when they reach it.</p>
 
 <section class="tool"><h2>Claude Code <span>2.1.327</span><a>Update to 2.1.330</a></h2>
@@ -90,8 +99,7 @@ header .chk button { font:inherit; color:var(--ink); background:none; border:1px
     <div class="acct-row">
       <div><div class="acct-name">paul<small>Max plan</small></div><div class="models">opus · sonnet · fable · haiku</div></div>
       <div><div class="gauge"><div class="used" style="width:6%"></div><div class="keep" style="width:15%"></div><div class="room" style="left:6%;right:15%">room for unattended work: 79%</div></div>
-        <div class="glegend"><span><b>6%</b> of the week used · resets Tue 17:00</span><span class="k">keep back <input value="15%"></span></div>
-        <div class="smoke">Smoke-tested: opus in every built-in role; sonnet as manager, hunter and auditor; fable as reviewer.</div></div>
+        <div class="glegend"><span><b>6%</b> of the week used · resets Tue 17:00</span><span class="k">keep back <input value="15%"></span></div></div>
     </div>
     <div class="logins">
       <div class="login"><span class="nm">claude-paul</span><span class="dir">~/.claude</span><span class="state">signed in</span></div>
@@ -132,14 +140,9 @@ header .chk button { font:inherit; color:var(--ink); background:none; border:1px
   </div>
 </section>
 
-<div class="also">
-  <span><b>Codex</b> <code>0.163.0</code> is installed, but no seat can run on it until ShiftLead has its adapter.</span>
-  <span><b>opencode</b> is not installed<button>Install</button></span>
-  <span>+ Add tool</span>
-</div>
-
-<section class="order"><h3>When no team says otherwise</h3>
-  <p>Sessions you start yourself take the first login on this list that is signed in, has room, and offers the model asked for.</p>
-  <ol><li>claude-paul</li><li>grok-paul</li><li>gemini-paul</li></ol>
+<section class="more"><h2>Not ready to run here</h2>
+  <div class="ghost"><b>Codex</b><code>0.163.0 installed</code><span>ShiftLead has no adapter for it yet, so no seat can run on it.</span></div>
+  <div class="ghost"><b>opencode</b><code>not installed</code><span>No adapter yet. Its install appears here once there is one.</span></div>
+  <a class="addtool">+ Add tool</a>
 </section>
 </div></body></html>
