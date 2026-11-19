@@ -153,6 +153,7 @@ class Pass:
     removed: list[str] = field(default_factory=list)
     kept: list[tuple[str, str]] = field(default_factory=list)
     cursor: str = ""
+    stopped: bool = False  # the budget ran out before every worktree was weighed
 
 
 def sweep(
@@ -166,12 +167,15 @@ def sweep(
     budget: float = SWEEP_WORKTREE_S,
     now: float | None = None,
     tally: Any = None,
+    dry: bool = False,
 ) -> Pass:
     """One pass of the worktree rule over every worktree under each repo's worktree root, in path order from the
     first path after `cursor` (wrapping), until `budget` seconds are spent. `idle(wt)` is the host agent's
     `_reap_idle`; `hold(wt, main)` takes the create's locks without waiting and returns their release, or None when
     either is busy (*busy: a start is using it*); it is asked, and `idle` again, just before each removal. `tally`
-    (a `diskbook.Tally`) lists every worktree found and sizes each one weighed, a removed one's bytes counted."""
+    (a `diskbook.Tally`) lists every worktree found and sizes each one weighed, a removed one's bytes counted. `dry`
+    removes nothing, takes no lock and asks nothing again: `removed` is what the pass would remove (§4.6 *The sweep's
+    reading*, TD-1946)."""
     now = time.time() if now is None else now
     troots = list(transcript_roots)
     found: list[tuple[Path, Path, str | None]] = []
@@ -200,19 +204,25 @@ def sweep(
     start = time.monotonic()
     for wt, repo, branch in order:
         if time.monotonic() - start >= budget:
+            out.stopped = True
             break
         out.cursor = str(wt)
         known = tally is not None and tally.known(wt)
         if tally is not None and not known:  # sized before the weigh, which may remove it
             tally.measure(wt, deadline=min(start + budget, diskbook.deadline()))
         try:
-            why = _one(wt, repo, branch, now, keep_days, idle, hold, troots)
+            why = _one(wt, repo, branch, now, keep_days, idle, hold, troots, dry)
         except Exception:  # noqa: BLE001 — one worktree that cannot be weighed never starves the rest
             log.exception("worktree sweep: %s could not be weighed", wt)
             why = gitinfo.NOT_WEIGHED
         if why is None:
             out.removed.append(str(wt))
-            log.info("worktree sweep: removed %s", wt)
+            log.log(
+                logging.DEBUG if dry else logging.INFO,
+                "worktree sweep: %s %s",
+                "would remove" if dry else "removed",
+                wt,
+            )
             if tally is not None:
                 tally.gone(wt)
         else:
@@ -233,8 +243,10 @@ def _one(
     idle: Callable[[Path], str | None] | None,
     hold: Callable[[Path, Path], Callable[[], None] | None] | None,
     troots: list[Path],
+    dry: bool = False,
 ) -> str | None:
-    """One worktree's weigh and, where nothing keeps it, its removal under the create's locks: its why, or None."""
+    """One worktree's weigh and, where nothing keeps it, its removal under the create's locks (`dry`: none): its
+    why, or None."""
     deadline = time.monotonic() + gitinfo.REAP_WITHIN
     why = weigh(
         wt,
@@ -246,7 +258,7 @@ def _one(
         idle=(lambda w=wt: idle(w)) if idle is not None else None,
         transcript_roots=troots,
     )
-    if why is None:
+    if why is None and not dry:
         release = hold(wt, repo) if hold is not None else (lambda: None)
         if release is None:
             why = "busy: a start is using it"

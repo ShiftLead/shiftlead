@@ -158,6 +158,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     SHELL_WAIT,  # noqa: F401
     STALL_AFTER,  # noqa: F401
     SUBMIT_SECONDS,  # noqa: F401
+    SWEEP_DRY_S,  # noqa: F401
     TAIL_LINES,  # noqa: F401
     TICK_SECONDS,  # noqa: F401
     TITLE_CAP,  # noqa: F401

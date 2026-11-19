@@ -437,6 +437,8 @@ def sweep(
     live_now,
     transcript_roots: list[Path],
     tally: Any = None,
+    dry: bool = False,
+    deadline: float | None = None,
 ) -> list[tuple[str, str]]:
     """The hourly sweep's scratch rule for directories no live record holds (§4.6 *The disk sweep*). `named` maps
     a directory to the record naming it in the snapshot and when that record ended (None: live). A directory
@@ -447,7 +449,9 @@ def sweep(
     no readable `owner.json`. After a removal, `git worktree prune` runs in each repo a worktree under it named.
     Returns the kept directories with why, and logs each removal. `tally` (a `diskbook.Tally`) lists each directory
     this home holds, measures each one the pass removes or keeps and each it has no size for, and counts what goes;
-    one naming another home that exists is kept *another home*, its bytes that home's."""
+    one naming another home that exists is kept *another home*, its bytes that home's. `dry` removes nothing, each
+    directory it would remove counted as gone in `tally`; past `deadline` (monotonic) it stops, the tally *partial*
+    (a dry run's, §4.6 *The sweep's reading*, TD-1946)."""
     import logging
     import shutil
 
@@ -466,6 +470,10 @@ def sweep(
             tally.unlisted = True  # the last reading stands, *partial*
         return kept
     for e in entries:
+        if deadline is not None and time.monotonic() > deadline:
+            if tally is not None:
+                tally.unlisted = True
+            break
         path = Path(e.path)
         if not _under(path, p) or e.is_symlink() or not e.is_dir(follow_symlinks=False):
             continue
@@ -510,6 +518,10 @@ def sweep(
             size = None
             if tally is not None:
                 size = tally.measure(path, deadline=diskbook.deadline())  # None past it: removed as last measured
+            if dry:
+                if tally is not None:
+                    tally.gone(path, size)
+                continue
             _remove(path)
             if tally is not None:
                 tally.gone(path, size)

@@ -214,14 +214,29 @@ DIGEST_READS = frozenset({"conversations", "transcript_digest"})
 # learns it from the reply's record — a home that cleared its replica would have it back on the
 # next report. Without an `id` the RPC is the home's own list and never leaves this host.
 NODE_ACTS = frozenset(
-    {"send", "keys", "kill", "close", "remove", "decide", "create", "name_check", "disk", "identity_ack"}
+    {
+        "send",
+        "keys",
+        "kill",
+        "close",
+        "remove",
+        "decide",
+        "create",
+        "name_check",
+        "disk",
+        "disk_dry_run",
+        "identity_ack",
+    }
 )
 # The acts addressed by a `host` param rather than an `id`'s address (§4.4a *Acts across the link*): the link pops
 # the param before the handler runs at the node.
-HOST_ADDRESSED = frozenset({"create", "name_check", "disk"})
+HOST_ADDRESSED = frozenset({"create", "name_check", "disk", "disk_dry_run"})
 # The sweep's reading (§4.6, TD-1946) is waited for DIGEST_TIMEOUT across the link, chosen by the method's name as
 # DIGEST_READS chooses a read's; every other act waits ACT_TIMEOUT.
-DISK_ACTS = frozenset({"disk"})
+DISK_ACTS = frozenset({"disk", "disk_dry_run"})
+# A dry run's one deadline over every kind (§4.6 *The sweep's reading*, TD-1946): inside the link's DIGEST_TIMEOUT,
+# checked between steps, so the reply comes at most one step past it.
+SWEEP_DRY_S = 240.0
 # What the home owns and edits on its own copy (§4.4a "Each field has one owner"), and pushes to
 # the node's replica in the same call so its stopping policies read the same intent. 4b generalises
 # the push to every home-owned field on reconnect.

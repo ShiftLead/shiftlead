@@ -87,6 +87,7 @@ from sessionorc.agent_common import (
     SEAT_PR_WAIT,
     SETTLED,
     STALL_AFTER,
+    SWEEP_DRY_S,
     TAIL_LINES,
     RpcError,
     _clean,
@@ -472,25 +473,7 @@ class TickMixin:
         sweeping = (self._prune_task is not None and not self._prune_task.done()) or self._sweep_lock.locked()
         if snapshot_at - self._pruned_at > PRUNE_EVERY and not sweeping:
             pruned_before, self._pruned_at = self._pruned_at, snapshot_at
-            # the live set is read here, on the loop (the class's one-writer rule); only the file
-            # work goes to the thread
-            ended = ("exited", "closed")
-            live = {s.run_log for s in self.sessions.values() if s.run_log and s.state not in ended}
-            # a round log goes with the last record of its name (§4.6, TD-191): kept while one is live
-            live |= {str(self._rounds_log(s)) for s in self.sessions.values() if s.state not in ended}
-            # an attachment's folder is kept whole while any record of its session is live (§4.4, TD-469)
-            live_ids = {s.id for s in self.sessions.values() if s.state not in ended}
-            # each live record's scratch on this host is kept alive by the sweep (§4.6, TD-1944)
-            scratch = {
-                s.id: s.scratch
-                for s in self.sessions.values()
-                if s.scratch and s.state not in ended and s.host == self.host
-            }
-            # and every record's, live or ended, so the pass can take an ended one's past its keep (§4.6, TD-1945)
-            named = _scratch_named(self.sessions.values(), self.host, snapshot_at)
-            # the cache and worktree rules' repos, each registered root (a reading's `root`, else its key): never
-            # keyed by name, where two repos sharing one would keep only the first's
-            self._sweep_roots = sweep_roots(self._repos)
+            live, live_ids, scratch, named = self._sweep_snapshot(snapshot_at)
             # kept as a pass (TD-1506) the tick never waits on (TD-1945): `_prune_task` is what the tests drain, as
             # every `*_task` pass is drained
             self._prune_task = asyncio.create_task(
@@ -5368,6 +5351,30 @@ class TickMixin:
         except Exception:  # noqa: BLE001 — a detached task: log, and try again tomorrow
             log.exception("the nightly backup of the store failed")
 
+    def _sweep_snapshot(
+        self, snapshot_at: datetime
+    ) -> tuple[set[str], set[str], dict[str, str], dict[str, tuple[str, float | None]]]:
+        """What a sweep pass, or a dry run, reads of the records: on the loop (the class's one-writer rule); only the
+        file work goes to the thread. Sets `_sweep_roots` too."""
+        ended = ("exited", "closed")
+        live = {s.run_log for s in self.sessions.values() if s.run_log and s.state not in ended}
+        # a round log goes with the last record of its name (§4.6, TD-191): kept while one is live
+        live |= {str(self._rounds_log(s)) for s in self.sessions.values() if s.state not in ended}
+        # an attachment's folder is kept whole while any record of its session is live (§4.4, TD-469)
+        live_ids = {s.id for s in self.sessions.values() if s.state not in ended}
+        # each live record's scratch on this host is kept alive by the sweep (§4.6, TD-1944)
+        scratch = {
+            s.id: s.scratch
+            for s in self.sessions.values()
+            if s.scratch and s.state not in ended and s.host == self.host
+        }
+        # and every record's, live or ended, so the pass can take an ended one's past its keep (§4.6, TD-1945)
+        named = _scratch_named(self.sessions.values(), self.host, snapshot_at)
+        # the cache and worktree rules' repos, each registered root (a reading's `root`, else its key): never
+        # keyed by name, where two repos sharing one would keep only the first's
+        self._sweep_roots = sweep_roots(self._repos)
+        return live, live_ids, scratch, named
+
     async def _sweep(
         self,
         now: datetime,
@@ -5460,6 +5467,43 @@ class TickMixin:
             return await asyncio.to_thread(self._disk_here)
         return await self._disk_everywhere("disk", self._disk_here)
 
+    async def rpc_disk_dry_run(self, host: str | None = None) -> dict[str, Any]:
+        """`ao disk --dry-run` (§4.7, §4.6 *The sweep's reading*, TD-1946): a pass that removes nothing, routed as
+        `disk` is. It writes no `disk.json`, leaves the worktree pass's cursor and the sweep's memory as they were,
+        weighs worktrees in path order from the first, runs every kind under `SWEEP_DRY_S` (checked between steps,
+        so it answers at most one step past it) and says *partial* when it stops short; refused while a pass holds
+        the lock (*a pass runs; ask again in a minute*)."""
+        self._sweep_loop = asyncio.get_running_loop()
+        snap = self._sweep_snapshot(datetime.now(UTC))
+        if host or self.mode != "home":
+            return await asyncio.to_thread(self._disk_dry_here, snap)
+        return await self._disk_everywhere("disk_dry_run", lambda: self._disk_dry_here(snap))
+
+    def _disk_dry_here(
+        self, snap: tuple[set[str], set[str], dict[str, str], dict[str, tuple[str, float | None]]]
+    ) -> dict[str, Any]:
+        """This host's dry run, in a thread, under the pass's lock taken without waiting."""
+        if not self._sweep_lock.acquire(blocking=False):
+            raise RpcError("a pass runs; ask again in a minute")
+        try:
+            live, live_ids, _scratch, named = snap
+            book = self._disk_book.copy()
+            tallies = book.tallies()
+            with contextlib.suppress(OSError):  # the runs held now; the rules count what they would remove
+                for path, size in _run_items(live_ids).items():
+                    tallies["runs"].measure(path, size)
+            deadline = time.monotonic() + SWEEP_DRY_S
+            self._prune_rules(datetime.now(UTC), live, live_ids, None, named, tallies, dry=True, deadline=deadline)
+            kinds = book.dry(tallies)
+        finally:
+            self._sweep_lock.release()
+        return {
+            "host": self.host,
+            "dry_run": True,
+            "partial": any(k["partial"] for k in kinds.values()),
+            "kinds": kinds,
+        }
+
     async def _disk_everywhere(self, method: str, here: Callable[[], dict[str, Any]]) -> dict[str, Any]:
         """`method` asked of this host (`here`, in a thread) and of every node (`hosts.nodes()`, each through
         `_route_act` with `host` set) under one `asyncio.gather`: `{host: entry}`, each entry the host's reading or
@@ -5490,6 +5534,8 @@ class TickMixin:
         scratch: dict[str, str] | None,
         named: dict[str, tuple[str, float | None]] | None,
         tallies: dict[str, diskbook.Tally],
+        dry: bool = False,
+        deadline: float | None = None,
     ) -> None:
         """Run-log retention (design §4.6): a log older than `runs_keep_days` goes unless it is in
         `live`, the logs of sessions still running (never truncate a live log: invariant 3). Logs
@@ -5505,9 +5551,19 @@ class TickMixin:
         (`scratch.keep_alive`); `named`, every record's scratch on this host with when its record ended (None:
         live), lets the scratch rule of §4.6 *The disk sweep* take what no live record holds (`scratch.sweep`),
         the records read again from a list copy just before each removal. Runs in a thread: touches files, and
-        reads `self.sessions` only through a list copy."""
-        root = getattr(hosts.local_host(), "scratch_root", None) or hosts.DEFAULT_SCRATCH_ROOT
-        if scratch:
+        reads `self.sessions` only through a list copy. `dry` (a dry run's, TD-1946) removes and touches nothing,
+        each item a rule would remove counted gone in its kind's tally (the runs rules' through `_Removal`), every
+        kind under `deadline` (monotonic), checked between steps, a kind it never reached *partial*."""
+        root = self._scratch_root()
+        rm = _Removal(tallies["runs"] if dry else None)
+
+        def late(kind: str) -> bool:
+            if deadline is not None and time.monotonic() > deadline:
+                tallies[kind].unlisted = True
+                return True
+            return False
+
+        if scratch and not dry:
             try:
                 large = scratch_mod.keep_alive(root, scratch, paths.home(), time.time_ns(), tallies["scratch"])
             except Exception:  # noqa: BLE001 — a bad record's scratch never stops the rest of the sweep
@@ -5516,7 +5572,7 @@ class TickMixin:
             for rid in large:
                 tallies["scratch"].keep(scratch[rid], "large scratch")
                 log.warning("large scratch: %s holds more than %d stale files", rid, scratch_mod.SWEEP_TOUCH_FILES)
-        if named is not None:
+        if named is not None and not late("scratch"):
             ended_states = ("exited", "closed")
 
             def live_now(path: str) -> bool:
@@ -5538,27 +5594,34 @@ class TickMixin:
                         live_now,
                         troots,
                         tallies["scratch"],
+                        dry=dry,
+                        deadline=deadline,
                     )
             except Exception:  # noqa: BLE001 — the scratch rule never stops the rest of the sweep
                 tallies["scratch"].unlisted = True
                 log.exception("scratch removal failed")
             for path, why in kept:
                 log.info("scratch kept: %s (%s)", path, why)
-        self._sweep_caches(now, tallies["caches"])
-        self._sweep_worktrees(now, tallies["worktrees"])
+        if not late("caches"):
+            self._sweep_caches(now, tallies["caches"], dry=dry, deadline=deadline)
+        if not late("worktrees"):
+            self._sweep_worktrees(now, tallies["worktrees"], dry=dry, deadline=deadline)
+        if late("runs"):
+            return
         idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
         for f in paths.attachments_dir().glob("*/*.part"):
             try:
                 # an upload's `.part` alone (`<name>.<16 hex>.part`): a finished file a person named
                 # `notes.part` is an attachment, kept as any other is
                 if paths.UPLOAD_PART.fullmatch(f.name) and f.stat().st_mtime < idle:
-                    f.unlink()
+                    if rm.unlink(f):
+                        continue
                     log.info("pruned attachment upload %s (nothing written for an hour)", f)
             except OSError:
                 continue
         local = hosts.local_host()
         keep = local.runs_keep_days
-        _prune_drafts(now, keep, live_ids)
+        _prune_drafts(now, keep, live_ids, rm)
         ended = ("exited", "closed")
         _prune_runs_by_size(
             local.runs_keep_mb,
@@ -5566,6 +5629,7 @@ class TickMixin:
             live_ids,
             now,
             lambda rid: any(s.id == rid and s.state not in ended for s in list(self.sessions.values())),
+            rm,
         )
         if keep <= 0:
             return
@@ -5573,7 +5637,8 @@ class TickMixin:
         for f in paths.runs_dir().glob("*.log"):
             try:
                 if str(f) not in live and f.stat().st_mtime < cutoff:
-                    f.unlink()
+                    if rm.unlink(f):
+                        continue
                     log.info("pruned run log %s (older than %d days)", f.name, keep)
             except OSError:
                 continue
@@ -5582,7 +5647,8 @@ class TickMixin:
         for f in (paths.home() / "promotes").glob("*/*.log"):
             try:
                 if str(f) not in inflight and f.stat().st_mtime < cutoff:
-                    f.unlink()
+                    if rm.unlink(f):
+                        continue
                     log.info("pruned promote log %s (older than %d days)", f, keep)
             except OSError:
                 continue
@@ -5600,14 +5666,17 @@ class TickMixin:
             for f in files:
                 try:
                     if f.stat().st_mtime < cutoff:
-                        f.unlink()
+                        if rm.unlink(f):
+                            continue
                         log.info("pruned attachment %s (older than %d days)", f, keep)
                 except OSError as e:
                     log.warning("could not prune attachment %s: %s", f, e)
             with contextlib.suppress(OSError):  # not empty: a younger file keeps it
-                folder.rmdir()
+                rm.rmdir(folder)
 
-    def _sweep_caches(self, now: datetime, tally: diskbook.Tally | None = None) -> None:
+    def _sweep_caches(
+        self, now: datetime, tally: diskbook.Tally | None = None, dry: bool = False, deadline: float | None = None
+    ) -> None:
         """The cache rule of §4.6 *The disk sweep* (TD-1945): agent-cadence trees no registered repo's `origin`
         default branch pins, older than `cache_keep_days`, removed only by the default home's host agent and only
         where it registers a repo (a home with no roster leaves every tree), every pin read or none removed."""
@@ -5617,7 +5686,9 @@ class TickMixin:
         try:
             pinned = cachesweep.pins(roots)
             if pinned is not None:
-                cachesweep.sweep_trees(pinned, hosts.local_host().cache_keep_days, now.timestamp(), tally=tally)
+                cachesweep.sweep_trees(
+                    pinned, hosts.local_host().cache_keep_days, now.timestamp(), tally=tally, dry=dry, deadline=deadline
+                )
             elif tally is not None:
                 cachesweep.tally_trees(tally)  # no pin read, none removed: the trees are still held
         except Exception:  # noqa: BLE001 — the cache rule never stops the rest of the sweep
@@ -5625,10 +5696,13 @@ class TickMixin:
                 tally.unlisted = True
             log.exception("cache sweep failed")
 
-    def _sweep_worktrees(self, now: datetime, tally: diskbook.Tally | None = None) -> None:
+    def _sweep_worktrees(
+        self, now: datetime, tally: diskbook.Tally | None = None, dry: bool = False, deadline: float | None = None
+    ) -> None:
         """The worktree rule of §4.6 *The disk sweep* (TD-1945, `worktreesweep`): only the default home's host agent
         (`_worktree_scope` where a test gives it), over each registered repo, from the cursor, for at most
-        `SWEEP_WORKTREE_S`. Runs in the sweep's thread; a create's two locks are taken on the loop."""
+        `SWEEP_WORKTREE_S`. Runs in the sweep's thread; a create's two locks are taken on the loop. `dry` (TD-1946)
+        weighs from the first path, for what is left before `deadline`, removes nothing and leaves the cursor."""
         scope = self._worktree_scope if self._worktree_scope is not None else cachesweep.default_home()
         roots = list(self._sweep_roots)
         if not scope or not roots:
@@ -5640,20 +5714,29 @@ class TickMixin:
                     tally.unlisted = True
                 log.warning("worktree sweep skipped: %s named no transcript roots", ", ".join(blind))
                 return
+            budget = worktreesweep.SWEEP_WORKTREE_S
+            if dry:
+                budget = max(0.0, deadline - time.monotonic()) if deadline is not None else float("inf")
             got = worktreesweep.sweep(
                 [Path(r) for r in roots],
-                cursor=self._worktree_cursor,
+                cursor="" if dry else self._worktree_cursor,
                 keep_days=hosts.local_host().worktree_keep_days,
                 idle=lambda wt: self._reap_idle(None, wt),
                 hold=self._hold_create_locks,
                 transcript_roots=troots,
                 now=now.timestamp(),
                 tally=tally,
+                budget=budget,
+                dry=dry,
             )
         except Exception:  # noqa: BLE001 — the worktree rule never stops the rest of the sweep
             if tally is not None:
                 tally.unlisted = True
             log.exception("worktree sweep failed")
+            return
+        if dry:
+            if got.stopped and tally is not None:
+                tally.unlisted = True
             return
         self._worktree_cursor = got.cursor
         for path, why in got.kept:
@@ -7410,6 +7493,40 @@ def _tree_size(p: Path) -> tuple[int, float]:
     return size, newest or st.st_mtime
 
 
+class _Removal:
+    """The run-log rules' removals (§4.6 *The disk sweep*): done, or — given a dry run's `tally` — counted gone in it
+    and left (§4.6 *The sweep's reading*, TD-1946). Each call returns whether it was dry."""
+
+    def __init__(self, tally: diskbook.Tally | None = None) -> None:
+        self.tally = tally
+
+    @property
+    def dry(self) -> bool:
+        return self.tally is not None
+
+    def unlink(self, f: Path, size: int | None = None) -> bool:
+        if self.tally is None:
+            f.unlink()
+            return False
+        self.tally.gone(f, f.lstat().st_size if size is None else size)
+        return True
+
+    def rmtree(self, d: Path, size: int | None = None) -> bool:
+        if self.tally is None:
+            shutil.rmtree(d)
+            return False
+        self.tally.gone(d, _tree_size(d)[0] if size is None else size)
+        return True
+
+    def rmdir(self, d: Path) -> bool:
+        if self.tally is None:
+            d.rmdir()
+            return False
+        if not any(d.iterdir()):
+            self.tally.gone(d, 0)
+        return True
+
+
 def _run_items(live_ids: set[str] | None) -> dict[str, int]:
     """The run logs (a rounds log aside) and, with `live_ids` given, the attachment folders (drafts aside) the
     sweep's reading counts as *runs*, each with its bytes (§4.6 *The sweep's reading*)."""
@@ -7434,6 +7551,7 @@ def _prune_runs_by_size(
     live_ids: set[str] | None,
     now: datetime | None = None,
     still_live: Callable[[str], bool] | None = None,
+    rm: _Removal | None = None,
 ) -> None:
     """Run logs past `runs_keep_mb` (§4.6 *The disk sweep*, TD-1945): while the ended runs' logs and attachment
     folders together exceed it, the oldest go first — a live record's earlier runs among them, a live run's never.
@@ -7466,14 +7584,13 @@ def _prune_runs_by_size(
         if p.is_dir() and still_live is not None and still_live(p.name):
             continue  # Resumed since the snapshot
         try:
-            if p.is_dir():
-                shutil.rmtree(p)
-            else:
-                p.unlink()
+            dry = (rm or _Removal()).rmtree(p, size) if p.is_dir() else (rm or _Removal()).unlink(p, size)
         except OSError as e:
             log.warning("could not prune %s past runs_keep_mb: %s", p, e)
             continue
         total -= size
+        if dry:
+            continue
         log.info("pruned %s (the ended runs are past runs_keep_mb, %d MB)", p, keep_mb)
 
 
@@ -7483,14 +7600,15 @@ def sweep_roots(repos: Mapping[Any, Any] | None) -> list[str]:
     return sorted({str(r.get("root") or k) for k, r in (repos or {}).items() if isinstance(r, Mapping)})
 
 
-def _prune_drafts(now: datetime, keep: int, live_ids: set[str] | None) -> None:
+def _prune_drafts(now: datetime, keep: int, live_ids: set[str] | None, rm: _Removal | None = None) -> None:
     """The Add entry form's draft folders (design §4.6 *Run-log retention*, §4.4 *The Add entry form's
     draft*, TD-630), by their `claimed.json`: one with none is removed once nothing in it was written
     for `ATTACH_PART_IDLE_S`, whatever `keep`; one claimed by a hand (`by: hand:<ask id>`) is removed
     `keep` days after its `at`, and kept under `0`; one claimed by a session lives as that session's
     own folder does — kept while its id is in `live_ids` (`None`: nothing is known, so kept), its
     files then going by age and the folder, claim and all, once nothing else is left. A claim that
-    cannot be read is kept: the person's files are the safe direction."""
+    cannot be read is kept: the person's files are the safe direction. `rm` (a dry run's) records instead."""
+    rm = rm or _Removal()
     idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
     cutoff = (now - timedelta(days=keep)).timestamp()
     for folder in paths.attachments_dir().glob("draft-*"):
@@ -7500,8 +7618,7 @@ def _prune_drafts(now: datetime, keep: int, live_ids: set[str] | None) -> None:
             claim = agent_common.read_draft_claim(folder)
             if claim is None:
                 last = max([folder.lstat().st_mtime, *(f.lstat().st_mtime for f in folder.iterdir())])
-                if last < idle:
-                    shutil.rmtree(folder)
+                if last < idle and not rm.rmtree(folder):
                     log.info("pruned draft %s (unclaimed, nothing written for an hour)", folder.name)
                 continue
             by = str(claim.get("by") or "")
@@ -7510,18 +7627,16 @@ def _prune_drafts(now: datetime, keep: int, live_ids: set[str] | None) -> None:
                     at = datetime.fromisoformat(str(claim.get("at"))).timestamp()
                 except ValueError:
                     continue
-                if keep > 0 and at < cutoff:
-                    shutil.rmtree(folder)
+                if keep > 0 and at < cutoff and not rm.rmtree(folder):
                     log.info("pruned draft %s (handed as %s, older than %d days)", folder.name, by[5:], keep)
                 continue
             if not by or live_ids is None or by in live_ids or keep <= 0:
                 continue
             files = [f for f in folder.iterdir() if f.name != paths.DRAFT_CLAIM]
             for f in files:
-                if f.is_file() and not f.is_symlink() and f.lstat().st_mtime < cutoff:
-                    f.unlink()
+                if f.is_file() and not f.is_symlink() and f.lstat().st_mtime < cutoff and not rm.unlink(f):
                     log.info("pruned attachment %s (older than %d days)", f, keep)
-            if not any(f.name != paths.DRAFT_CLAIM for f in folder.iterdir()):
+            if not rm.dry and not any(f.name != paths.DRAFT_CLAIM for f in folder.iterdir()):
                 (folder / paths.DRAFT_CLAIM).unlink(missing_ok=True)
                 folder.rmdir()
         except OSError as e:  # gone meanwhile, or not ours to remove: the next sweep tries again

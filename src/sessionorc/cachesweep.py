@@ -170,17 +170,44 @@ def tally_trees(
 
 
 def sweep_trees(
-    pinned: set[str], keep_days: float, now_s: float, cache: Path | None = None, tally: Any = None
+    pinned: set[str],
+    keep_days: float,
+    now_s: float,
+    cache: Path | None = None,
+    tally: Any = None,
+    dry: bool = False,
+    deadline: float | None = None,
 ) -> list[str]:
     """Remove the trees no pin in `pinned` names whose newest write is older than `keep_days`, under the cache's
     lock taken without waiting (busy: none this pass). Returns the removed trees' paths; `tally` (a
-    `diskbook.Tally`) is given every tree, each removed one's bytes counted."""
+    `diskbook.Tally`) is given every tree, each removed one's bytes counted. `dry` takes no lock and removes
+    nothing, returning (and counting as gone) what it would remove, and stops past `deadline` (monotonic), the tally
+    *partial* (a dry run's, §4.6 *The sweep's reading*, TD-1946)."""
     cache = cache or cache_dir()
     trees = cache / "trees"
     removed: list[str] = []
     if tally is not None:
         tally_trees(tally, pinned, keep_days, now_s, cache)
     if keep_days <= 0 or not trees.is_dir():
+        return removed
+    if dry:
+        for e in sorted(os.scandir(trees), key=lambda e: e.name):
+            if deadline is not None and time.monotonic() > deadline:
+                if tally is not None:
+                    tally.unlisted = True
+                break
+            if (
+                not COMMIT.fullmatch(e.name)
+                or e.name in pinned
+                or e.is_symlink()
+                or not e.is_dir(follow_symlinks=False)
+            ):
+                continue
+            with contextlib.suppress(OSError):
+                if now_s - _newest_write(Path(e.path)) >= keep_days * 86400:
+                    removed.append(e.path)
+                    if tally is not None:
+                        tally.gone(e.path)
         return removed
     with open(cache / "lock", "a") as lock:
         try:
