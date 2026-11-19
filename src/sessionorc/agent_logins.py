@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import copy
 import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from sessionorc import adapters, agent_common, logins
+from sessionorc import adapters, agent_common, defs, logins
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import RpcError, log
 
@@ -139,17 +140,60 @@ class LoginsMixin:
             with contextlib.suppress(RpcError):
                 await self.rpc_tools()
         offered = self._kept_families()  # read in the loop
-        return await self._login_write(
-            lambda d: logins.join(
+        emptied: dict[str, Any] = {}
+
+        def edit(d: dict[str, Any]) -> str:
+            lk, e = logins.resolve(d, str(login or ""))
+            left = logins.account_of(lk, e)
+            words = logins.join(
                 d,
-                str(login or ""),
+                lk,
                 str(account or ""),
                 version,
                 reserve_keys=reserve_keys,
                 matches=matches,
                 families=offered.get,
             )
-        )
+            if left not in logins.live_keys(d):  # its last login gone: its reserve goes with it (*A login changes
+                acct = logins.account_of(lk, e)  # account*)
+                under = {
+                    str(oe.get("billing") or "subscription")
+                    for o, oe in d["logins"].items()
+                    if logins.account_of(o, oe) == acct
+                }
+                emptied.update(src=left, dst=acct, metered=None if len(under) > 1 else under == {"metered"})
+            return words
+
+        out = await self._login_write(edit)
+        if emptied and self.mode == "home":  # the reserves are the home's `settings.yml` (§4.2b *Not here*)
+            moved = self._move_reserve(**emptied)
+            if moved:
+                out["change"] += "; " + "; ".join(moved)
+        return out
+
+    def _move_reserve(self, src: str, dst: str, metered: bool | None) -> list[str] | None:
+        """`settings.move_reserve` on the home's `settings.yml`: one read, edit and save with no wait between, as
+        the migration's is, so a `set_settings` is either read by it or lands after it; then pushed to the nodes and
+        committed as a `set_settings` write is. None where the file is absent or broken, or `src` holds none."""
+        if not settings_mod.settings_file().exists():
+            return None
+        doc = settings_mod.read()
+        if doc is None:
+            return None
+        before = copy.deepcopy(doc)
+        said = settings_mod.move_reserve(doc, src, dst, metered)
+        if said is None:
+            return None
+        settings_mod.save(doc)
+        log.info("a login's join moved its account's reserve: %s", "; ".join(said))
+        task = asyncio.create_task(self._after_reserve_move(before, doc))
+        self._bg.add(task)
+        task.add_done_callback(self._bg.discard)
+        return said
+
+    async def _after_reserve_move(self, before: dict[str, Any], doc: dict[str, Any]) -> None:
+        await self._push_settings()
+        await self._commit_defs(defs.settings_message(before, doc), ("settings.yml",))
 
     async def _login_pinned(self, ref: str) -> bool:
         """Whether the login `ref` names has a model pin as the file stands (False where it cannot be read)."""

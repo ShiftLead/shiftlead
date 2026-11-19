@@ -552,6 +552,40 @@ def migrate_reserves(
     return said
 
 
+def move_reserve(doc: dict[str, Any], src: str, dst: str, metered: bool | None) -> list[str] | None:
+    """The reserve of the account `src`, whose last login has joined `dst`, given to `dst` in place (§4.2b *A login
+    changes account*, TD-1581's rule): per window label, where its unit fits `dst`'s billing (`metered`; None where
+    `dst`'s logins disagree on it, so nothing fits), the one `_rank` puts first kept where both have one (as the
+    migration keeps it: the larger percent, a per-day one on a tie; the smaller amount, money before tokens), `dst`'s
+    own on a tie; one that does not fit is dropped. One sentence a label, the change's words. None where `src` holds
+    no reserve: nothing to do."""
+    gate = doc.get("usage_gate")
+    if not isinstance(gate, dict) or not isinstance(gate.get(src), dict):
+        return None
+    theirs = gate.pop(src)
+    own = gate.get(dst) if isinstance(gate.get(dst), dict) else {}
+    kept = dict(own)
+    said: list[str] = []
+    for label, value in sorted(theirs.items(), key=lambda kv: str(kv[0])):
+        got = None if metered is None else _fit(value, metered)
+        if got is None:
+            why = "its logins disagree on billing" if metered is None else "it does not fit its billing"
+            said.append(f"{src}'s {label} reserve {_word(value)} is dropped: {dst} takes it nowhere, as {why}")
+            continue
+        mine = _fit(kept[label], bool(metered)) if label in kept else None
+        if mine is not None and _rank(mine, bool(metered)) <= _rank(got, bool(metered)):
+            said.append(f"{dst} keeps its {label} reserve {_word(mine)} over {src}'s {_word(got)}")
+            continue
+        kept[label] = got
+        had = f" over its own {_word(mine)}" if mine is not None else ""
+        said.append(f"{dst} takes {src}'s {label} reserve {_word(got)}{had}")
+    if kept:
+        gate[dst] = kept
+    else:
+        gate.pop(dst, None)
+    return said
+
+
 def scale(doc: dict[str, Any]) -> dict[str, Any]:
     """The `scale:` key as kept, each field that is not valid dropped."""
     return parse_scale(doc.get("scale"), drop=True)
