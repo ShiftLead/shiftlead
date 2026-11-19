@@ -203,6 +203,11 @@ def test_add_names_a_folder_a_login_and_a_forgotten_folder_takes_back_its_name()
     )
     assert d["logins"]["claude-code:grind"]["account"] == "claude-code:paul-k" and not d["forgotten"]
     assert logins.add(d, "gemini", Path("/h/.claude-grind"), "grind", **kw)[0] == "gemini:grind"  # per tool
+    logins.forget(d, "claude-code:grind")
+    assert (
+        logins.add(d, "claude-code", Path("/h/.claude-grind"), None, "grind", **kw)[1] == "claude-code:grind added back"
+    )
+    assert "account" not in d["logins"]["claude-code:grind"]  # its own account, named over the old one
 
 
 def test_add_names_its_account_up_front_and_suggests_a_free_name():

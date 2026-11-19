@@ -600,6 +600,8 @@ def add(
         acct = account_key(data, tool, account, reserve_keys)
         if acct != lk:
             entry["account"] = acct
+        else:  # its own account, named over a forgotten login's old one
+            entry.pop("account", None)
     data["logins"][lk] = entry
     under = f" under {entry['account']}" if entry.get("account") else ""
     return lk, f"{lk} added{' back' if back else ''}{under}"

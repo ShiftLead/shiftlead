@@ -187,9 +187,14 @@ class LoginsMixin:
             folder = Path(ad.new_home(name)).expanduser()
         home = "is_home" in has and await asyncio.to_thread(ad.is_home, folder)
         if not home:
-            empty = await asyncio.to_thread(
-                lambda: not folder.exists() or (folder.is_dir() and not any(folder.iterdir()))
-            )
+            try:
+                empty = await asyncio.to_thread(
+                    lambda: not folder.exists() or (folder.is_dir() and not any(folder.iterdir()))
+                )
+            except OSError as e:
+                raise RpcError(
+                    f"{folder} cannot be read ({e.strerror or type(e).__name__}): give another --path"
+                ) from None
             if not empty:
                 raise RpcError(f"{folder} is neither a {tool} home nor an empty folder: give another --path")
         suggested = None
