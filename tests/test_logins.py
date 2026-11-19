@@ -345,6 +345,7 @@ async def test_a_poll_runs_only_while_a_login_s_tools_shell_is_open(monkeypatch)
     ag = agent_mod.HostAgent.__new__(agent_mod.HostAgent)
     ag._tools_poll_task, ag._tools_polled_at = None, -1e9
     ag._tools_lock, ag._tools_salt, ag._tools_memory = asyncio.Lock(), b"s" * 32, logins.Memory()
+    ag._tools_was_switched = True
     ag._tools_kept, ag._tools_gen, ag._tools_poll_failing = {"switched": True, "tools": []}, 0, False
     calls = []
     monkeypatch.setattr(tools, "repoll", lambda kept, salt, memory=None: calls.append(kept) or {**kept, "polled": 1})
@@ -379,6 +380,7 @@ async def test_a_read_begun_before_a_logins_write_is_never_kept_and_its_memory_i
     ag = agent_mod.HostAgent.__new__(agent_mod.HostAgent)
     ag._tools_poll_task, ag._tools_polled_at = None, -1e9
     ag._tools_lock, ag._tools_salt, ag._tools_memory = asyncio.Lock(), b"s" * 32, logins.Memory()
+    ag._tools_was_switched = True
     ag._tools_kept, ag._tools_gen, ag._tools_poll_failing = {"switched": True, "tools": [], "label": "old"}, 0, False
     loop_memory = ag._tools_memory
     started, release = threading.Event(), threading.Event()
@@ -406,6 +408,70 @@ async def test_a_read_begun_before_a_logins_write_is_never_kept_and_its_memory_i
     assert ag._tools_kept["p"] == 2 and ag._tools_memory.last == {"x": "m"}  # no write between: both kept
 
 
+async def test_a_logins_write_never_stops_the_poll_its_next_pass_reads_in_full(monkeypatch):
+    """§4.2b *The tools shell*: the poll runs while the shell is open. A write clears the kept read; the next pass is a
+    full read, and the passes after it repoll. Before the run's first read, no pass at all."""
+    import asyncio
+
+    from sessionorc import agent as agent_mod
+
+    ag = agent_mod.HostAgent.__new__(agent_mod.HostAgent)
+    ag._tools_poll_task, ag._tools_polled_at = None, -1e9
+    ag._tools_lock, ag._tools_salt, ag._tools_memory = asyncio.Lock(), b"s" * 32, logins.Memory()
+    ag._tools_kept, ag._tools_gen, ag._tools_poll_failing, ag._tools_was_switched = None, 0, False, False
+    reads, polls = [], []
+    monkeypatch.setattr(
+        tools, "read", lambda salt, env=None, home=None, memory=None: reads.append(1) or {"switched": True}
+    )
+    monkeypatch.setattr(tools, "repoll", lambda kept, salt, memory=None: polls.append(1) or {**kept, "p": 1})
+    shell = {"ao--tools-t-paul": type("P", (), {"dead": False})()}
+    ag._tools_poll_due(shell)
+    assert ag._tools_poll_task is None  # before the run's first read: none
+    await ag._tools_reread()
+    monkeypatch.setattr(logins, "update", lambda edit, home=None: "noted")
+    await ag._login_write(lambda d: "x")
+    assert ag._tools_kept is None
+    ag._tools_poll_due(shell)
+    await ag._tools_poll_task
+    assert len(reads) == 2 and not polls and ag._tools_kept == {"switched": True}  # the pass after a write: in full
+    ag._tools_polled_at = -1e9
+    ag._tools_poll_due(shell)
+    await ag._tools_poll_task
+    assert len(reads) == 2 and len(polls) == 1  # and repolls after it
+
+
+async def test_a_poll_s_failing_full_read_is_logged_once_and_waits_longer(monkeypatch, caplog):
+    import asyncio
+
+    from sessionorc import agent as agent_mod
+
+    ag = agent_mod.HostAgent.__new__(agent_mod.HostAgent)
+    ag._tools_poll_task, ag._tools_polled_at = None, -1e9
+    ag._tools_lock, ag._tools_salt, ag._tools_memory = asyncio.Lock(), b"s" * 32, logins.Memory()
+    ag._tools_kept, ag._tools_gen, ag._tools_poll_failing, ag._tools_was_switched = None, 0, False, True
+    reads = []
+
+    def read(salt, env=None, home=None, memory=None):
+        reads.append(1)
+        raise OSError("gone")
+
+    monkeypatch.setattr(tools, "read", read)
+    shell = {"ao--tools-t-paul": type("P", (), {"dead": False})()}
+    ag._tools_poll_due(shell)
+    await ag._tools_poll_task
+    ag._tools_poll_due(shell)
+    assert ag._tools_poll_task.done() and len(reads) == 1  # 5 s on: the failed full read waits longer
+    for _ in range(2):
+        ag._tools_polled_at = -1e9
+        ag._tools_poll_due(shell)
+        await ag._tools_poll_task
+    assert len(reads) == 3 and sum("tools read failed" in r.message for r in caplog.records) == 1
+    ag._tools_was_switched = False  # an unswitched host's cleared read starts no pass
+    ag._tools_polled_at = -1e9
+    ag._tools_poll_due(shell)
+    assert ag._tools_poll_task.done() and len(reads) == 3
+
+
 async def test_a_failing_poll_is_logged_once_until_one_succeeds(monkeypatch, caplog):
     import asyncio
 
@@ -414,6 +480,7 @@ async def test_a_failing_poll_is_logged_once_until_one_succeeds(monkeypatch, cap
     ag = agent_mod.HostAgent.__new__(agent_mod.HostAgent)
     ag._tools_poll_task, ag._tools_polled_at = None, -1e9
     ag._tools_lock, ag._tools_salt, ag._tools_memory = asyncio.Lock(), b"s" * 32, logins.Memory()
+    ag._tools_was_switched = True
     ag._tools_kept, ag._tools_gen, ag._tools_poll_failing = {"switched": True, "tools": []}, 0, False
     ok = []
 

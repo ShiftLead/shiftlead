@@ -260,6 +260,7 @@ PERSON_ONLY = frozenset(
         "login_account",
         "login_forget",
         "login_shell",
+        "login_add",
     }
 )
 

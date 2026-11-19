@@ -426,6 +426,24 @@ def test_is_home_reads_what_the_tool_writes_there(name, tmp_path):
 
 
 @pytest.mark.parametrize("name", AGENTS)
+def test_new_home_suggests_a_folder_and_make_home_makes_one_a_sign_in_fills(name, tmp_path, monkeypatch):
+    """`new_home(name)` suggests a new login's folder beside the tool's default, its name in it, and makes nothing;
+    `make_home(path)` makes any folder one the tool's sign-in can write into, 0700, and a home only once signed in."""
+    ad = _declares(name, "new_home")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    got = ad.new_home("work-2")
+    assert isinstance(got, Path) and got.is_absolute() and "work-2" in got.name and not got.exists()
+    assert not adapters.same_home(got, ad.default_home({}))
+    ad = _declares(name, "make_home")
+    folder = tmp_path / "deep" / "login"
+    ad.make_home(folder)
+    assert folder.is_dir() and folder.stat().st_mode & 0o777 == 0o700 and ad.is_home(folder) is False
+    ad.make_home(folder)  # again: nothing changes
+    HARNESSES[name].mark_home(folder)
+    assert ad.is_home(folder) is True
+
+
+@pytest.mark.parametrize("name", AGENTS)
 def test_install_and_signin_commands_are_the_persons_to_run(name):
     """`install_command()` is one line of text; `signin_command()` an argv whose first word is the binary."""
     ad = _declares(name, "install_command")

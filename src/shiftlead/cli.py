@@ -853,6 +853,21 @@ def cmd_login(args: argparse.Namespace) -> int:
     account controls, each a person's own act acting on this host, refused before the switch-over. A login is named by
     its name (`<tool>:<name>` where a bare one is ambiguous), an account by its key."""
     act = args.login_action
+    if act == "add":
+        r = call_sync("login_add", tool=args.tool, path=args.path, name=args.name, account=args.account)
+        s = r.get("shell")
+        if s and getattr(args, "attach", False):
+            return _attach(args, s["id"], s)
+
+        def prose() -> None:
+            print(r.get("change"))
+            if s:
+                print(f"{s['id']}  (tools shell): its sign-in command is typed, not run — attach and press Enter")
+                print(f"attach: tmux attach -t {s['id']}")
+            elif r.get("shell_error"):
+                print(f"its tools shell did not open: {r['shell_error']} — ao login shell {r['login']} opens it")
+
+        return emit(args, r, prose)
     if act == "shell":
         s = call_sync("login_shell", login=args.login)
         if getattr(args, "attach", False):
@@ -5797,6 +5812,12 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("text", nargs="*")
     q = add_login("forget", help="forget a login, leaving its folder on disk; refused while a session runs on it")
     q.add_argument("login", help=login_help)
+    q = add_login("add", help="add a login: a folder that is the tool's home, or a new or empty one made one")
+    q.add_argument("tool", help="the tool's adapter (claude-code, gemini, grok)")
+    q.add_argument("--path", help="its folder: the tool's home, or one that does not exist or is empty")
+    q.add_argument("--name", help="its name; with no --path, its folder is suggested from it (~/.claude-<name>)")
+    q.add_argument("--account", help="the account it is under: <tool>:<name>, or a name")
+    q.add_argument("--attach", action="store_true", help="then attach this terminal to its tools shell, if opened")
     q = add_login("shell", help="open the login's tools shell, its sign-in command typed and not run")
     q.add_argument("login", help=login_help)
     q.add_argument("--attach", action="store_true", help="then attach this terminal to it (tmux attach)")

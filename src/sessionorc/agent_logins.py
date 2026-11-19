@@ -151,6 +151,101 @@ class LoginsMixin:
 
         return await self._login_write(edit)
 
+    async def rpc_login_add(
+        self,
+        tool: str = "",
+        path: str | None = None,
+        name: str | None = None,
+        account: str | None = None,
+        caller: Any = None,
+    ) -> dict[str, Any]:
+        """`ao login add <tool> [--path <folder>] [--name <name>] [--account <name>]`, **+ Add login**, **Use an
+        existing folder** and **Add** on a found row (§4.2b *Controls and verbs*, *How a login is found and made*). A
+        `path` that is the tool's home (`is_home`) is used; one that does not exist or is empty is made a home
+        (`make_home`); any other is refused. With no `path` the folder is the adapter's `new_home(name)`, made. A
+        forgotten login's folder takes back its name and account. A login whose folder was made has its tools shell
+        opened for **Sign in**: its `shell` in the reply."""
+        agent_common.person_only(caller, "add a login", SECTION, self._graph())
+        tool = str(tool or "").strip()
+        try:
+            ad = adapters.get(tool)
+        except KeyError:
+            raise RpcError(f"no tool {tool!r} has an adapter here") from None
+        if not adapters.has_agent(tool):
+            raise RpcError(f"{tool} runs no agent: it has no logins")
+        has = adapters.implements(ad)
+        name = str(name).strip() if name else None
+        if path:
+            folder = Path(str(path)).expanduser()
+            if not folder.is_absolute():
+                raise RpcError(f"{path} is not a full path: give it from / or ~")
+        elif not name:
+            raise RpcError("name the new login (--name), or give the folder it is (--path)")
+        elif "new_home" not in has:
+            raise RpcError(f"the {tool} adapter suggests no folder for a new login: give one (--path)")
+        else:
+            folder = Path(ad.new_home(name)).expanduser()
+        home = "is_home" in has and await asyncio.to_thread(ad.is_home, folder)
+        if not home:
+            try:
+                empty = await asyncio.to_thread(
+                    lambda: not folder.exists() or (folder.is_dir() and not any(folder.iterdir()))
+                )
+            except OSError as e:
+                raise RpcError(
+                    f"{folder} cannot be read ({e.strerror or type(e).__name__}): give another --path"
+                ) from None
+            if not empty:
+                raise RpcError(f"{folder} is neither a {tool} home nor an empty folder: give another --path")
+        suggested = None
+        if home and not name and "identity" in has:
+            try:
+                ident = await asyncio.to_thread(ad.identity, folder, self._tools_salt)
+            except Exception:  # noqa: BLE001 — no display read: the person types the name
+                ident = None
+            display = adapters.plain_name((ident or {}).get("display"))
+            folded = logins.name_of(display) if display else ""
+            suggested = logins.name_of(f"{tool}-{folded}") if folded else None
+        try:
+            reserve_keys = set(settings_mod.reserves(settings_mod.load()))
+        except Exception:  # noqa: BLE001 — an unreadable settings file retires nothing it holds
+            reserve_keys = set()
+        tools = adapters.names()
+        made: list[str] = []
+
+        def edit(d: dict[str, Any]) -> str:
+            lk, words = logins.add(
+                d,
+                tool,
+                folder,
+                name,
+                account,
+                tools=tools,
+                reserve_keys=reserve_keys,
+                same=adapters.same_home,
+                suggested=suggested,
+            )
+            if not home:  # the last step before the entry stands: a refusal above makes no folder
+                try:
+                    if "make_home" in has:
+                        ad.make_home(folder)
+                    else:
+                        folder.mkdir(mode=0o700, parents=True, exist_ok=True)
+                except OSError as e:
+                    raise logins.LoginError(f"{folder} could not be made a home: {e.strerror or e}") from None
+            made.append(lk)
+            return words
+
+        got = await self._login_write(edit)
+        lk = made[0]
+        got["login"] = lk
+        if not home:
+            try:
+                got["shell"] = await self._login_shell(tool, logins.split(lk)[1], folder)
+            except RpcError as e:  # the login stands; Sign in opens its shell again
+                got["shell_error"] = str(e)
+        return got
+
     async def rpc_login_shell(self, login: str = "", caller: Any = None) -> dict[str, Any]:
         """`ao login shell <login>`, **Sign in**, **Sign in again** and **Open a shell here** (§4.2b *The tools
         shell*): the login's tools shell, its sign-in command typed with no Enter; a second press reopens it."""

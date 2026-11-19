@@ -497,24 +497,7 @@ def join(
     login (`Memory.last`); a login with none is compared with nothing."""
     lk, e = resolve(data, ref)
     check_version(e, sent, lk)
-    tool = split(lk)[0]
-    target = str(target or "").strip()
-    if ":" in target:
-        acct = target
-        a, n = split(acct)
-        if a != tool:
-            raise LoginError(f"{acct} is an account of {a}, and {lk} is a {tool} login")
-        if not valid_name(n):
-            raise LoginError(f"{acct} is not an account's key: <tool>:<name>, the name at most 24 letters and digits")
-    else:
-        if not valid_name(target):
-            raise LoginError(f"{target!r} is not an account name: at most 24 letters, digits, '-' and '_'")
-        acct = key(tool, target)
-        if acct in retired(data, reserve_keys):
-            raise LoginError(
-                f"{acct} is a forgotten account's key: give the full key, {acct}, to rejoin it and its reserve, "
-                "or another name"
-            )
+    acct = account_key(data, split(lk)[0], target, reserve_keys, who=lk)
     if acct == account_of(lk, e):
         raise LoginError(f"{lk} is under {acct} already")
     mine = (matches or {}).get(lk)
@@ -539,6 +522,89 @@ def join(
     if left not in live_keys(data):  # its last login gone, the account's entry leaves `accounts:`, as forget's does
         data["accounts"].pop(left, None)
     return f"{lk} joined {acct}"
+
+
+def account_key(
+    data: Mapping[str, Any], tool: str, target: str, reserve_keys: Iterable[str] = (), who: str = "the login"
+) -> str:
+    """The account a name or a key names for a login of `tool` (§4.2b *Matching across a restart*): a key as given,
+    its tool `tool`'s; a bare name `<tool>:<name>`, refused where that is a retired key, whose full key rejoins it."""
+    target = str(target or "").strip()
+    if ":" in target:
+        a, n = split(target)
+        if a != tool:
+            raise LoginError(f"{target} is an account of {a}, and {who} is a {tool} login")
+        if not valid_name(n):
+            raise LoginError(f"{target} is not an account's key: <tool>:<name>, the name at most 24 letters and digits")
+        return target
+    if not valid_name(target):
+        raise LoginError(f"{target!r} is not an account name: at most 24 letters, digits, '-' and '_'")
+    acct = key(tool, target)
+    if acct in retired(data, reserve_keys):
+        raise LoginError(
+            f"{acct} is a forgotten account's key: give the full key, {acct}, to rejoin it and its reserve, "
+            "or another name"
+        )
+    return acct
+
+
+def add(
+    data: dict[str, Any],
+    tool: str,
+    folder: Path,
+    name: str | None,
+    account: str | None = None,
+    *,
+    tools: Iterable[str] = (),
+    reserve_keys: Iterable[str] = (),
+    same: Callable[[Path, Path], bool] = lambda a, b: a == b,
+    suggested: str | None = None,
+) -> tuple[str, str]:
+    """`ao login add <tool> [--path] [--name] [--account]` (§4.2b *Controls and verbs*, *Where it lives*): `folder` a
+    login of `tool`, named `name`. A folder already a login's is refused; a forgotten login's folder takes back its old
+    name and account, and a different `name` is refused; a forgotten login's name is refused any other folder, so a
+    record never resolves to another folder. `account` names the login's account up front (`account_key`); `same`
+    compares two folders; `suggested` is the base of a name to suggest where none is given (`<tool>-<display>`), a
+    suffix added where it is taken. Returns the new login's key and the change's words."""
+    folder = Path(folder)
+    for lk, e in sorted(data["logins"].items()):
+        if split(lk)[0] == tool and same(Path(str(e.get("folder") or "")).expanduser(), folder):
+            raise LoginError(f"{folder} is {lk}'s folder already")
+    back = sorted(
+        lk
+        for lk, f in data["forgotten"].items()
+        if split(lk)[0] == tool and same(Path(str((f or {}).get("folder") or "")).expanduser(), folder)
+    )
+    if back:
+        old = split(back[0])[1]
+        if name and name != old:
+            raise LoginError(f"{folder} was the login {back[0]}: it takes back its name, {old}, and no other")
+        name = old
+    if not name and suggested:
+        taken = {split(k)[1] for k in (*data["logins"], *data["forgotten"]) if split(k)[0] == tool}
+        name = suggest(suggested, taken)
+    if not name:
+        raise LoginError("name the new login (--name): its tool records no display name to suggest one from")
+    lk = key(tool, name)
+    if not back and lk in data["forgotten"]:
+        raise LoginError(f"{lk} is a forgotten login's name, kept for its own folder: give another name")
+    why = name_taken(data, tool, name, tools)
+    if why:
+        raise LoginError(why)
+    entry: dict[str, Any] = {"folder": str(folder)}
+    if back:
+        was = data["forgotten"].pop(lk)
+        if was.get("account") and was["account"] != lk:
+            entry["account"] = was["account"]
+    if account:
+        acct = account_key(data, tool, account, reserve_keys)
+        if acct != lk:
+            entry["account"] = acct
+        else:  # its own account, named over a forgotten login's old one
+            entry.pop("account", None)
+    data["logins"][lk] = entry
+    under = f" under {entry['account']}" if entry.get("account") else ""
+    return lk, f"{lk} added{' back' if back else ''}{under}"
 
 
 def forget(data: dict[str, Any], ref: str, sent: str | None = None, *, in_use: Iterable[str] = ()) -> str:

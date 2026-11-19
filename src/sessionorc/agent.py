@@ -552,6 +552,8 @@ async def _in_daemon_thread(fn: Callable[..., Any], *args: Any) -> Any:
 
 # how often a login's open tools shell has its identity read again (design §4.2b *The tools shell*: every few seconds)
 TOOLS_POLL_SECONDS = 5.0
+# how long a tools shell's poll waits after a full read that failed (§4.2b): it runs every tool's `--version`
+TOOLS_FULL_RETRY_SECONDS = 60.0
 
 
 class HostAgent(
@@ -1088,6 +1090,8 @@ class HostAgent(
         self._tools_poll_task: asyncio.Task[Any] | None = None
         self._tools_polled_at = -TOOLS_POLL_SECONDS  # the first poll is due at once
         self._tools_poll_failing = False  # a failing poll is logged once, until one succeeds
+        # whether the last kept read was switched over: a logins write clears the read, and the poll goes on after it
+        self._tools_was_switched = False
 
     # -- lifecycle ------------------------------------------------------------------------------
 
@@ -3995,14 +3999,20 @@ class HostAgent(
     async def _tools_reread(self) -> dict[str, Any]:
         """Read this host's tools again and keep the read (design §4.2b *What the adapter reads*, TD-1973)."""
         async with self._tools_lock:
-            gen, memory = self._tools_gen, copy.deepcopy(self._tools_memory)
-            try:
-                got = await _in_daemon_thread(functools.partial(tools_mod.read, self._tools_salt, memory=memory))
-            except Exception as e:  # noqa: BLE001 — a failed read is said to the asker; the kept one stands
+            return await self._tools_read_held()
+
+    async def _tools_read_held(self, *, say: bool = True) -> dict[str, Any]:
+        """A full read, `_tools_lock` held: kept where no logins write came while it ran (`_tools_keep`). `say`: a
+        failure is logged (a poll's, once until one succeeds)."""
+        gen, memory = self._tools_gen, copy.deepcopy(self._tools_memory)
+        try:
+            got = await _in_daemon_thread(functools.partial(tools_mod.read, self._tools_salt, memory=memory))
+        except Exception as e:  # noqa: BLE001 — a failed read is said to the asker; the kept one stands
+            if say:
                 log.exception("the tools read failed")
-                raise RpcError(f"this host's tools could not be read: {type(e).__name__}") from None
-            self._tools_keep(gen, got, memory)
-            return got
+            raise RpcError(f"this host's tools could not be read: {type(e).__name__}") from None
+        self._tools_keep(gen, got, memory)
+        return got
 
     def _tools_keep(self, gen: int, got: dict[str, Any], memory: Any) -> None:
         """Keep a read and the memory it settled, on the loop: the read's thread settled a copy, so nothing on the loop
@@ -4010,15 +4020,18 @@ class HostAgent(
         kept, and the next read settles the file as it stands."""
         if gen == self._tools_gen:
             self._tools_kept, self._tools_memory = got, memory
+            self._tools_was_switched = bool(got.get("switched"))
 
     def _tools_poll_due(self, panes: Mapping[str, Any]) -> None:
         """Start a tools shell's poll where one is due (design §4.2b *The tools shell*), from the tick: while a login's
         tools shell is open (its pane alive; an install shell reads no login), every `TOOLS_POLL_SECONDS` one pass
         of reads over the logins, so a login moves under its account as soon as the tool has written the sign-in.
-        Detached, as the tick waits on no tool's files; one pass at a time, and none before the run's first read."""
+        Detached, as the tick waits on no tool's files; one pass at a time, and none before the run's first read. A
+        logins write clears the kept read; the poll goes on after it, its next pass a full read."""
         if self._tools_poll_task is not None and not self._tools_poll_task.done():
             return
-        if self._tools_kept is None or not self._tools_kept.get("switched"):
+        kept = self._tools_kept
+        if not (kept.get("switched") if kept is not None else self._tools_was_switched):
             return
         now = time.monotonic()
         if now - self._tools_polled_at < TOOLS_POLL_SECONDS:
@@ -4040,7 +4053,14 @@ class HostAgent(
             return
         async with self._tools_lock:
             kept = self._tools_kept
-            if kept is None:
+            if kept is None:  # a logins write cleared it: this pass reads in full, and the polls after it repoll
+                try:
+                    await self._tools_read_held(say=not self._tools_poll_failing)
+                except RpcError:  # every tool's --version again in 5 s is too dear: the next full read waits longer
+                    self._tools_poll_failing = True
+                    self._tools_polled_at = time.monotonic() + TOOLS_FULL_RETRY_SECONDS - TOOLS_POLL_SECONDS
+                    return
+                self._tools_poll_failing = False
                 return
             gen, memory = self._tools_gen, copy.deepcopy(self._tools_memory)
             try:
