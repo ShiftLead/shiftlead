@@ -10,7 +10,7 @@ from pathlib import Path
 CSS = """
 :root { --page:#E7EBEC; --sheet:#FAFBFB; --ink:#1F272C; --soft:#5D6970; --rule:#C6CFD3; --rule2:#DDE3E5;
   --on:#2E8A57; --used:#2D5F86; --keep:#C27A1A; --off:#9AA5AA; --bad:#B4432F;
-  --design:#5B5BD6; --build:#2D7FB8; --review:#C27A1A; --find:#C2528B; --call:#3B8F86; }
+  --design:#5B5BD6; --build:#2D7FB8; --review:#C27A1A; --find:#C2528B; --call:#3B8F86; --orders:#6B7780; }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--page); color:var(--ink); font:15px/1.5 "IBM Plex Sans", system-ui, sans-serif; }
 .wrap { max-width:1180px; margin:0 auto; padding:28px 24px 64px; }
@@ -182,7 +182,11 @@ def catalogue(used):
         ("Review", "review", "an independent read of the PR"),
         ("Read held paths", "review", "a seat's verdict on a held PR"),
         ("Merge", "build", "the gate, then the squash"),
+        ("Board answers", "orders", "carry out what you answered"),
+        ("Unheld PRs", "orders", "PRs nobody holds: sync, red, lift, sweep, filing"),
+        ("Live checks", "orders", "confirm a build on the running system"),
         ("Answer", "call", "members' questions"),
+        ("Draft an entry", "call", "an entry you or another repo hand over"),
         ("Audit", "call", "the last n merged PRs"),
         ("Sweep", "call", "stranded work"),
     ]
@@ -193,12 +197,12 @@ def catalogue(used):
     return '<div class="cat">' + "".join(out) + "</div>"
 
 
-def page(sel, body, cap):
+def page(sel, body, cap, title='Flows', sub='the path an entry takes: who does what, in what order, on which model', navhtml=''):
     return (
         f'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">{FONT}'
         f"<style>{CSS}</style></head><body><div class='wrap'><div class='cap'>{cap}</div>"
-        "<header><h1>Flows</h1><span class='sub'>the path an entry takes: who does what, in what order, on which "
-        f"model</span></header><div class='cols'>{nav(sel)}<main>{body}</main></div></div></body></html>"
+        f"<header><h1>{title}</h1><span class='sub'>{sub}</span></header>"
+        f"<div class='cols'>{navhtml or nav(sel)}<main>{body}</main></div></div></body></html>"
     )
 
 
@@ -212,10 +216,13 @@ def td():
             act("Merge", "on the gate; the builds wait for your Go where the verdict asks"),
         ], count="1")
         + '<div class="hand">the builds it filed become pickable</div>'
-        + step(2, "build", "Build", "grinder", "every other entry", model("opus"), [
+        + step(2, "build", "Build", "builder", "every other entry", model("opus"), [
             act("Build", "the change, its tests, the PR"),
             act("Review", "one independent read; its evidence on the PR", fresh(model("sonnet"))),
             act("Merge", "on the gate, unless the PR touches a held path"),
+            act("Board answers", "an answered card is carried out before any entry"),
+            act("Unheld PRs", "a PR nobody holds: sync, red, lift, sweep, filing"),
+            act("Live checks", "once a build is live, confirm it on the running system"),
         ], count="1 – 4, set on the team")
         + '<div class="hand">a PR on a held path is asked of the reader</div>'
         + step(3, "review", "Read", "the question seat", "PRs on held paths", model("opus"), [
@@ -224,7 +231,7 @@ def td():
         ])
     )
     calls = (
-        call("Question seat", "when asked", "answers members' questions, passes the rest to you", model("opus"))
+        call("Question seat", "when asked", "Answer · Draft an entry — passes the rest to you", model("opus"))
         + call("Docs audit", "every 10 merged PRs", "audits them against the docs, files findings", model("sonnet"))
         + call("Test audit", "every 10 merged PRs", "audits them against the tests, files findings", model("sonnet"))
         + call("Manager", "every team has one", "stalls, permission prompts, idle with work", model("sonnet"), fixed=True)
@@ -247,8 +254,8 @@ def td():
         "an action marked <i>a fresh reader</i> is handed to a new session on that model, never done by the author.</p>"
         f"{steps}<h3>On call</h3><p>Seats outside the path, started when their trigger fires.</p>{calls}"
         f"{FIXED}<div class='foot'><div><h3>Every task has someone</h3><p></p>{cov}</div>"
-        "<div><h3>Standard actions</h3><p>Dashed ones are not used by this flow.</p>"
-        f'{catalogue({"Design", "Design rounds", "Fact-check", "Build", "Review", "Read held paths", "Merge", "Answer", "Audit"})}'
+        "<div><h3>Actions</h3><p>Dashed ones are not used by this flow. Each has its brief on the Actions page.</p>"
+        f'{catalogue({"Design", "Design rounds", "Fact-check", "Build", "Review", "Read held paths", "Merge", "Answer", "Audit", "Board answers", "Unheld PRs", "Live checks", "Draft an entry"})}'
         '<h3>Where it can run</h3><p class="runs"><span class="ok">ao-grind</span> — every model has a signed-in login '
         'and a smoke pass<br><span class="nok">cm-grind</span> — no smoke pass for sonnet as manager on contractmatch</p>'
         "</div></div></div>"
@@ -259,7 +266,7 @@ def td():
 def solo():
     fresh = lambda m: f"a fresh reader on {m}"  # noqa: E731
     steps = (
-        step(1, "build", "Design and build", "grinder", "every entry", model("opus"), [
+        step(1, "build", "Design and build", "builder", "every entry", model("opus"), [
             act("Design", "only where the entry is design-first"),
             act("Fact-check", "the design, before any code", fresh(model("flash-lite", bad=True))),
             act("Build", "the change, its tests, the PR"),
@@ -270,6 +277,12 @@ def solo():
             act("Review", "the independent read, by this seat instead of a fresh reader"),
             act("Merge", "once it passes"),
         ])
+        + '<div class="hand">beside the path: a cheaper seat takes the work orders</div>'
+        + step(3, "orders", "Chores", "builder", "work orders only", model("sonnet"), [
+            act("Board answers", "an answered card is carried out before any entry"),
+            act("Unheld PRs", "a PR nobody holds: sync, red, lift, sweep, filing"),
+            act("Live checks", "once a build is live, confirm it on the running system"),
+        ], count="1")
         + '<div class="addstep">+ Add a step</div>'
     )
     calls = (
@@ -294,12 +307,103 @@ def solo():
         "An action is offered only where it can go: a review is never the author's own.</p>"
         f"{steps}<h3>On call</h3><p></p>{calls}{FIXED}"
         f"<div class='foot'><div><h3>Every task has someone</h3><p></p>{cov}</div>"
-        "<div><h3>Standard actions</h3><p>Drag a dashed one into a step to use it.</p>"
-        f'{catalogue({"Design", "Fact-check", "Build", "Review", "Merge"})}'
+        "<div><h3>Actions</h3><p>Drag one into a step to use it. Yours are listed with the built-in ones.</p>"
+        f'{catalogue({"Design", "Fact-check", "Build", "Review", "Merge", "Board answers", "Unheld PRs", "Live checks"})}'
         '<h3>Where it can run</h3><p class="runs"><span class="nok">ao-grind</span> — no login offers flash-lite</p>'
         "</div></div>"
     )
     return page("solo", body, "B — a copy being edited: one session designs and builds, a reviewer seat reads every PR.")
+
+
+ACSS = """
+.facts { display:grid; grid-template-columns:150px 1fr; gap:5px 14px; font-size:14px; margin:14px 0 4px; max-width:760px; }
+.facts dt { color:var(--soft); } .facts dd { margin:0; }
+.brief { background:var(--sheet); border:1px solid var(--rule2); border-radius:6px; padding:14px 20px; font-size:14px; max-width:820px; }
+.brief p { margin:0 0 9px; } .brief p:last-child { margin:0; }
+.brief code { font:12.5px "IBM Plex Mono", monospace; background:#EEF1F2; padding:0 4px; border-radius:2px; }
+.brief .slot { font:12.5px "IBM Plex Mono", monospace; color:var(--used); }
+.brief.edit { background:#fff; border-color:var(--ink); font:13.5px/1.6 "IBM Plex Mono", monospace; min-height:230px; }
+.more { color:var(--soft); font-size:13px; margin:6px 0 0; }
+.add2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:820px; }
+.add2 > div { border:1px dashed var(--rule); border-radius:6px; padding:10px 14px; font-size:13.5px; background:var(--sheet); }
+.add2 b { display:block; font-weight:600; font-size:13px; } .add2 span { color:var(--soft); }
+.add2 em { color:var(--used); font-style:normal; }
+.tools { display:flex; gap:14px; font-size:13px; color:var(--soft); margin:0 0 6px; max-width:820px; }
+.tools span:last-child { margin-left:auto; }
+nav a i { float:right; font:400 11.5px "IBM Plex Sans", sans-serif; color:var(--off); font-style:normal; }
+"""
+
+
+def anav(sel):
+    def a(name, tag=""):
+        cls = ' class="sel"' if name == sel else ""
+        return f"<a{cls} style='font-family:inherit;font-weight:{600 if name == sel else 400}'>{name}<i>{tag}</i></a>"
+
+    groups = [
+        ("Every session", [("ShiftLead mechanics", ""), ("Taking work", "lane steps")]),
+        ("In the path", [(n, "") for n in ("Find", "Design", "Design rounds", "Fact-check", "Build", "Review", "Read held paths", "Merge")]),
+        ("Work orders", [(n, "") for n in ("Board answers", "Unheld PRs", "Live checks")]),
+        ("On call", [(n, "") for n in ("Answer", "Draft an entry", "Audit", "Sweep", "Manage")]),
+        ("Yours", [("Build, docs only", "this install")]),
+    ]
+    return "<nav>" + "".join(f"<h4>{g}</h4>" + "".join(a(n, t) for n, t in items) for g, items in groups) + "</nav>"
+
+
+SUB = "what a session can be asked to do, and the words it is told"
+
+
+def action_builtin():
+    body = (
+        '<div class="fhead"><h2>Build</h2><span class="id">build</span>'
+        '<span class="tag">built in · read only · last changed 2026-11-02</span>'
+        '<div class="act"><button class="pri">Copy to edit</button></div></div>'
+        '<p class="used">The change an entry asks for, its tests, and the pull request.</p>'
+        "<dl class='facts'><dt>Done by</dt><dd>a step that holds a lane — never a fresh reader, never an on-call seat</dd>"
+        "<dt>Used in</dt><dd><b>td</b> step 2 · <b>build-review</b> step 1 · <b>build</b> step 1 · <b>one-owner</b> step 1</dd>"
+        "<dt>Ends when</dt><dd>its pull request merges, or the claim is dropped with a reason</dd>"
+        "<dt>Brings with it</dt><dd>claim · worktree · open the PR · precheck · wait for checks · archive the entry · report done</dd>"
+        "<dt>Needs after it</dt><dd>Review and Merge, in this step or a later one</dd></dl>"
+        "<h3>The brief</h3><p>What a session doing this action is told, after the ShiftLead mechanics and before the path.</p>"
+        "<div class='brief'><p><b>Build.</b> Resolve each entry you take to a pull request, in this order: verify the "
+        "current code first — entries lag reality, so search before you build — then fix, test "
+        "(<span class='slot'>{test}</span>, <span class='slot'>{lint}</span>) and open the pull request against "
+        "<code>main</code>.</p><p>A change in behaviour is a change to the design "
+        "(<span class='slot'>{design_dir}</span>) first, in the same pull request; the dated fact goes to the history.</p>"
+        "<p>A page you change is looked at before the pull request: run it on a scratch home, never the live one, "
+        "and keep the screenshots with the change.</p><p>Archive the entry in the pull request that completes it, and "
+        "its parent with the last of its parts.</p></div><p class='more'>412 words · filled per repo: "
+        "<span class='mono'>{test} {lint} {design_dir} {ledger}</span></p>"
+        "<h3>Added words</h3><p>Yours, told after the built-in brief wherever this action is used. The built-in brief itself is never edited.</p>"
+        "<div class='add2'><div><b>This install</b><em>Add…</em></div>"
+        "<div><b>shiftlead (repo)</b><span>Run the UI check before any PR that touches <span class='mono'>src/shiftlead/ui/</span>…</span> "
+        "<em>Edit… (a pull request)</em></div></div>"
+    )
+    cap = "C — the Actions page: a built-in action, its facts and its brief. Read only; your words are added beside it."
+    return page("", body, cap, title="Actions", sub=SUB, navhtml=anav("Build")).replace("<style>", "<style>" + ACSS)
+
+
+def action_own():
+    body = (
+        '<div class="fhead"><h2><span class="ed">Build, docs only</span></h2><span class="id">build-docs</span>'
+        '<span class="tag">this install · unsaved changes</span><div class="act"><button class="quiet">Delete</button>'
+        '<button class="quiet">Discard</button><button class="pri">Save</button></div></div>'
+        '<p class="used">Started as a copy of Build. It is its own action from here: nothing follows the built-in.</p>'
+        "<dl class='facts'><dt>Done by</dt><dd>a step that holds a lane</dd>"
+        "<dt>Used in</dt><dd>no flow yet</dd>"
+        "<dt>Ends when</dt><dd>its pull request merges, or the claim is dropped with a reason</dd>"
+        "<dt>Brings with it</dt><dd>claim · worktree · open the PR · precheck · wait for checks · archive the entry · report done</dd>"
+        "<dt>Needs after it</dt><dd>Review or Fact-check, and Merge, in this step or a later one</dd></dl>"
+        "<h3>The brief</h3><p>Plain Markdown. A word in braces is filled per repo.</p>"
+        "<div class='tools'><span><b>Write</b></span><span>Preview</span><span>Slots: {test} {lint} {design_dir} {ledger}</span><span>88 words</span></div>"
+        "<div class='brief edit'>**Build, docs only.** Take only entries whose change is to the docs: the design, the "
+        "briefs, the glossary, a README.<br><br>Verify the page as it stands first — an entry lags reality. Write the "
+        "change in the present tense; the dated fact goes to the history, never the design.<br><br>Run {lint} and the "
+        "doc tests before you open the pull request against `main`.<br><br>Never change code in the same pull request: "
+        "an entry that needs both is not yours — pass it over and say why in your doing line.▍</div>"
+        "<p class='more'>Saved at once on this install. To use it in a repo's flow, the repo holds its own copy, saved as a pull request.</p>"
+    )
+    cap = "D — an action of your own, started from a copy of Build and now edited freely."
+    return page("", body, cap, title="Actions", sub=SUB, navhtml=anav("Build, docs only")).replace("<style>", "<style>" + ACSS)
 
 
 if __name__ == "__main__":
@@ -309,7 +413,12 @@ if __name__ == "__main__":
     src = Path(__file__).parent
     with sync_playwright() as p:
         b = p.chromium.launch()
-        for name, html in (("a-builtin", td()), ("b-editing", solo())):
+        for name, html in (
+            ("a-builtin", td()),
+            ("b-editing", solo()),
+            ("c-action", action_builtin()),
+            ("d-own-action", action_own()),
+        ):
             (src / f"{name}.html").write_text(html)
             pg = b.new_page(viewport={"width": 1440, "height": 900})
             pg.set_content(html, wait_until="networkidle")
