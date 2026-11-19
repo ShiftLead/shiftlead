@@ -256,3 +256,6 @@ async def test_paths_resolves_a_relative_run_against_cwd_first_then_dir(agent, t
     s.cwd = str((d / "sub").resolve())  # a subdirectory of `dir`: it still comes first
     got = (await agent.rpc_paths(id=s.id, runs=["both.py", "only_dir.py"]))["paths"]
     assert got == {"both.py": str((d / "sub" / "both.py").resolve()), "only_dir.py": str((d / "only_dir.py").resolve())}
+    s.cwd = str(tmp_path / "gone")  # a folder deleted since: `dir` answers
+    got = (await agent.rpc_paths(id=s.id, runs=["both.py"]))["paths"]
+    assert got == {"both.py": str((d / "both.py").resolve())}
