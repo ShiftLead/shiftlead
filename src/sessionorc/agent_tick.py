@@ -24,6 +24,7 @@ from sessionorc import (
     adapters,
     agent_common,
     cachesweep,
+    gitinfo,
     hosts,
     link,
     mail,
@@ -32,6 +33,7 @@ from sessionorc import (
     reports,
     witness,
     workorders,
+    worktreesweep,
 )
 from sessionorc import balance as balance_mod
 from sessionorc import brief as brief_mod
@@ -483,7 +485,9 @@ class TickMixin:
             }
             # and every record's, live or ended, so the pass can take an ended one's past its keep (§4.6, TD-1945)
             named = _scratch_named(self.sessions.values(), self.host, snapshot_at)
-            self._sweep_roots = sorted(set(queue_mod.repo_roots(self._repos).values()))  # the cache rule's pins
+            # the cache and worktree rules' repos, each registered root (a reading's `root`, else its key): never
+            # keyed by name, where two repos sharing one would keep only the first's
+            self._sweep_roots = sweep_roots(self._repos)
             # kept as a pass (TD-1506) the tick never waits on (TD-1945): `_prune_task` is what the tests drain, as
             # every `*_task` pass is drained
             self._prune_task = asyncio.create_task(
@@ -5373,6 +5377,8 @@ class TickMixin:
         """One pass of the hourly sweep, in a thread, under the one lock a pass holds (§4.6 *The disk sweep*,
         TD-1945); a detached task, so a failure is logged here, never left to vanish."""
 
+        self._sweep_loop = asyncio.get_running_loop()  # the worktree rule takes a create's locks on it
+
         def run() -> bool:
             if not self._sweep_lock.acquire(blocking=False):
                 return False
@@ -5446,6 +5452,7 @@ class TickMixin:
             for path, why in kept:
                 log.info("scratch kept: %s (%s)", path, why)
         self._sweep_caches(now)
+        self._sweep_worktrees(now)
         idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
         for f in paths.attachments_dir().glob("*/*.part"):
             try:
@@ -5520,6 +5527,73 @@ class TickMixin:
                 cachesweep.sweep_trees(pinned, hosts.local_host().cache_keep_days, now.timestamp())
         except Exception:  # noqa: BLE001 — the cache rule never stops the rest of the sweep
             log.exception("cache sweep failed")
+
+    def _sweep_worktrees(self, now: datetime) -> None:
+        """The worktree rule of §4.6 *The disk sweep* (TD-1945, `worktreesweep`): only the default home's host agent
+        (`_worktree_scope` where a test gives it), over each registered repo, from the cursor, for at most
+        `SWEEP_WORKTREE_S`. Runs in the sweep's thread; a create's two locks are taken on the loop."""
+        scope = self._worktree_scope if self._worktree_scope is not None else cachesweep.default_home()
+        roots = list(self._sweep_roots)
+        if not scope or not roots:
+            return
+        try:
+            troots, blind = adapters.transcript_roots()
+            if blind:  # an adapter that cannot name its stores could have one inside a worktree: none goes
+                log.warning("worktree sweep skipped: %s named no transcript roots", ", ".join(blind))
+                return
+            got = worktreesweep.sweep(
+                [Path(r) for r in roots],
+                cursor=self._worktree_cursor,
+                keep_days=hosts.local_host().worktree_keep_days,
+                idle=lambda wt: self._reap_idle(None, wt),
+                hold=self._hold_create_locks,
+                transcript_roots=troots,
+                now=now.timestamp(),
+            )
+        except Exception:  # noqa: BLE001 — the worktree rule never stops the rest of the sweep
+            log.exception("worktree sweep failed")
+            return
+        self._worktree_cursor = got.cursor
+        for path, why in got.kept:
+            log.debug("worktree kept: %s (%s)", path, why)
+
+    def _hold_create_locks(self, wt: Path, repo: Path) -> Callable[[], None] | None:
+        """Take, without waiting, the two locks a create holds before its record exists (`_dir_locks` keyed
+        `worktree:<main>:<name>` and by the directory), from the sweep's thread on the loop; their release, or None
+        when either is busy (§4.6 *The disk sweep*: *busy: a start is using it*)."""
+        loop = self._sweep_loop
+        if loop is None or loop.is_closed():
+            return None
+        try:
+            main = gitinfo.main_checkout(wt)
+        except gitinfo.WorktreeError:
+            main = repo
+        keys = [f"worktree:{main}:{wt.name}", str(wt)]
+
+        async def take() -> list[asyncio.Lock] | None:
+            got: list[asyncio.Lock] = []
+            for k in keys:
+                lock = self._dir_locks[k]
+                if lock.locked():
+                    for g in got:
+                        g.release()
+                    return None
+                await lock.acquire()  # free: taken at once, with no wait
+                got.append(lock)
+            return got
+
+        try:
+            held = asyncio.run_coroutine_threadsafe(take(), loop).result(timeout=gitinfo.REAP_STEP)
+        except Exception:  # noqa: BLE001 — a loop that cannot answer keeps the worktree
+            return None
+        if held is None:
+            return None
+
+        def release() -> None:
+            for lock in held:
+                loop.call_soon_threadsafe(lock.release)
+
+        return release
 
     async def _clear_gone_kept(self) -> None:
         """A closed record still saying its worktree is kept stops saying so once the directory is gone, such as
@@ -7277,6 +7351,12 @@ def _prune_runs_by_size(
             continue
         total -= size
         log.info("pruned %s (the ended runs are past runs_keep_mb, %d MB)", p, keep_mb)
+
+
+def sweep_roots(repos: Mapping[Any, Any] | None) -> list[str]:
+    """The registered repos the disk sweep's cache and worktree rules read (§4.6 *The disk sweep*, TD-1945): each
+    reading's `root`, else its key — never keyed by name, where two repos sharing one would keep only the first's."""
+    return sorted({str(r.get("root") or k) for k, r in (repos or {}).items() if isinstance(r, Mapping)})
 
 
 def _prune_drafts(now: datetime, keep: int, live_ids: set[str] | None) -> None:

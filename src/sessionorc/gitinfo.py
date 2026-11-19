@@ -1027,7 +1027,9 @@ def landed_since_edited(directory: Path | str, ref: str, base_ref: str, timeout:
     if not base:
         return None
     names = [
-        f for f in (_git(directory, "diff", "--name-only", "-z", base, ref, timeout=timeout) or "").split("\0") if f
+        f
+        for f in (_git(directory, "diff", "--name-only", "-z", base, ref, "--", timeout=timeout) or "").split("\0")
+        if f
     ]
     if not names:
         return None
@@ -1074,7 +1076,7 @@ def landed_of(
     base = (_git(directory, "merge-base", base_ref, ref, timeout=timeout) or "").strip()
     if not base:
         return "no"
-    out = _git(directory, "diff", "--name-only", "-z", base, ref, timeout=timeout)
+    out = _git(directory, "diff", "--name-only", "-z", base, ref, "--", timeout=timeout)
     if out is None:
         return "unreadable"
     files = [f for f in out.split("\0") if f]
