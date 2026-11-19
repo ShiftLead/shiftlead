@@ -173,6 +173,57 @@ def test_forget_moves_a_login_to_forgotten_and_its_last_account_leaves():
     assert "claude-code:paul-k" in logins.retired(d)
 
 
+def _same(a, b):
+    return str(a) == str(b)
+
+
+def test_add_names_a_folder_a_login_and_a_forgotten_folder_takes_back_its_name():
+    from pathlib import Path
+
+    d = _data()
+    kw = {"tools": ["claude-code", "gemini"], "same": _same}
+    assert logins.add(d, "claude-code", Path("/h/.claude-new"), "new", **kw) == (
+        "claude-code:new",
+        "claude-code:new added",
+    )
+    assert d["logins"]["claude-code:new"] == {"folder": "/h/.claude-new"}
+    with pytest.raises(logins.LoginError, match="claude-code:grind's folder already"):
+        logins.add(d, "claude-code", Path("/h/.claude-grind"), "other", **kw)
+    with pytest.raises(logins.LoginError, match="a login on this host already"):
+        logins.add(d, "claude-code", Path("/h/.claude-x"), "grind", **kw)
+    with pytest.raises(logins.LoginError, match="name the new login"):
+        logins.add(d, "claude-code", Path("/h/.claude-x"), None, **kw)
+    logins.forget(d, "grind")
+    with pytest.raises(logins.LoginError, match="forgotten login's name"):
+        logins.add(d, "claude-code", Path("/h/.claude-x"), "grind", **kw)  # never another folder's
+    with pytest.raises(logins.LoginError, match="takes back its name, grind"):
+        logins.add(d, "claude-code", Path("/h/.claude-grind"), "work", **kw)
+    assert logins.add(d, "claude-code", Path("/h/.claude-grind"), None, **kw)[1] == (
+        "claude-code:grind added back under claude-code:paul-k"
+    )
+    assert d["logins"]["claude-code:grind"]["account"] == "claude-code:paul-k" and not d["forgotten"]
+    assert logins.add(d, "gemini", Path("/h/.claude-grind"), "grind", **kw)[0] == "gemini:grind"  # per tool
+
+
+def test_add_names_its_account_up_front_and_suggests_a_free_name():
+    from pathlib import Path
+
+    d = _data()
+    kw = {"tools": ["claude-code"], "same": _same}
+    assert (
+        logins.add(d, "claude-code", Path("/a"), "a", "paul-k", **kw)[1]
+        == "claude-code:a added under claude-code:paul-k"
+    )
+    with pytest.raises(logins.LoginError, match="an account of gemini"):
+        logins.add(d, "claude-code", Path("/b"), "b", "gemini:x", **kw)
+    logins.forget(d, "api")  # claude-code:api, an account of its own, is retired with it
+    with pytest.raises(logins.LoginError, match="forgotten account's key"):
+        logins.add(d, "claude-code", Path("/c"), "c", "api", **kw)
+    assert logins.add(d, "claude-code", Path("/c"), "c", "claude-code:api", **kw)[1].endswith("under claude-code:api")
+    assert logins.add(d, "claude-code", Path("/d"), None, suggested="paul", **kw)[0] == "claude-code:paul-2"
+    assert logins.add(d, "claude-code", Path("/e"), "e", "claude-code:e", **kw)[1] == "claude-code:e added"
+
+
 def test_the_cli_calls_each_verb(monkeypatch, capsys):
     from shiftlead import cli
 
@@ -188,6 +239,7 @@ def test_the_cli_calls_each_verb(monkeypatch, capsys):
         ["login", "set", "api", "pin", ""],
         ["login", "note", "api", "the", "key", "account"],
         ["login", "forget", "api"],
+        ["login", "add", "claude-code", "--path", "~/.claude-w", "--name", "w", "--account", "paul-k"],
     ):
         a = p.parse_args(argv)
         assert a.fn(a) == 0, argv
@@ -200,6 +252,7 @@ def test_the_cli_calls_each_verb(monkeypatch, capsys):
         ("login_set", {"login": "api", "key": "pin", "value": None}),
         ("login_note", {"login": "api", "text": "the key account"}),
         ("login_forget", {"login": "api"}),
+        ("login_add", {"tool": "claude-code", "path": "~/.claude-w", "name": "w", "account": "paul-k"}),
     ]
     assert "login_forget done" in capsys.readouterr().out
 
@@ -220,11 +273,13 @@ async def test_the_verbs_are_the_persons_and_refused_before_the_switch(agent, tm
         "login_account": {"login": "grind", "account": "work"},
         "login_forget": {"login": "grind"},
         "login_shell": {"login": "grind"},
+        "login_add": {"tool": "claude-code", "path": str(tmp_path / "made"), "name": "made"},
     }
     async with LocalClient() as c:
         for m, k in calls.items():
             with pytest.raises(AgentError, match="no logins until the switch-over"):
                 await c.call(m, **k)
+        assert not (tmp_path / "made").exists()  # refused before the switch: no folder made
         logins.save(_data(), "fixture", paths.home())
         assert (await c.call("login_set", login="grind", key="permission_wait", value=60))["change"] == (
             "claude-code:grind permission_wait set"
@@ -272,3 +327,36 @@ async def _reread(agent, kept):
         ]
     }
     return agent._tools_kept
+
+
+@pytest.mark.integration
+async def test_add_uses_a_home_makes_an_empty_folder_one_and_opens_its_shell(agent, tmp_path):
+    from conftest import park_ticks
+
+    from sessionorc import naming, paths
+    from sessionorc.client import AgentError, LocalClient
+
+    await park_ticks(agent)
+    logins.save(_data(), "fixture", paths.home())
+    home = tmp_path / "signed"
+    home.mkdir()
+    (home / ".credentials.json").write_text("{}")
+    full = tmp_path / "full"
+    full.mkdir()
+    (full / "notes.txt").write_text("x")
+    async with LocalClient() as c:
+        got = await c.call("login_add", tool="claude-code", path=str(home), name="signed")
+        assert got["change"] == "claude-code:signed added" and "shell" not in got  # a home: used, no shell
+        made = tmp_path / "new"
+        got = await c.call("login_add", tool="claude-code", path=str(made), name="fresh", account="paul-k")
+        assert got["login"] == "claude-code:fresh" and made.is_dir() and made.stat().st_mode & 0o777 == 0o700
+        assert got["shell"]["id"] == naming.tools_id("claude-code", "fresh")  # made: its shell opens for Sign in
+        with pytest.raises(AgentError, match="neither a claude-code home nor an empty folder"):
+            await c.call("login_add", tool="claude-code", path=str(full), name="full")
+        with pytest.raises(AgentError, match="not a full path"):
+            await c.call("login_add", tool="claude-code", path="rel/dir", name="rel")
+        with pytest.raises(AgentError, match="no tool 'nope'"):
+            await c.call("login_add", tool="nope", path=str(tmp_path / "n"), name="n")
+        on_disk = yaml.safe_load(logins.path(paths.home()).read_text())["logins"]
+        assert on_disk["claude-code:fresh"] == {"folder": str(made), "account": "claude-code:paul-k"}
+        assert on_disk["claude-code:signed"] == {"folder": str(home)}

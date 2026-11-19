@@ -627,7 +627,7 @@ class ClaudeCodeAdapter:
         {
             *("background", "composer", "context", "conversations", "links", "prompts", "spend", "title"),
             *("usage_report", "find", "home_env", "install_command", "signin_command", "is_home", "identity"),
-            "models",
+            *("models", "new_home", "make_home"),
         }
     )
     marks_errors = True  # a tool result's `is_error` (design §4.3 `read_transcript`, TD-1491)
@@ -1062,6 +1062,15 @@ class ClaudeCodeAdapter:
         credentials — never a repo's `.claude/` of settings alone."""
         p = Path(path).expanduser()
         return any((p / mark).exists() for mark in HOME_MARKS)
+
+    def new_home(self, name: str) -> Path:
+        """A new login's suggested folder (§4.2b *How a login is found and made*): `~/.claude-<name>`, beside the
+        tool's default; made by nothing here."""
+        return Path(f"~/.claude-{name}").expanduser()
+
+    def make_home(self, path: Path) -> None:
+        """Make `path` a home a sign-in can write into (§4.2b): the folder alone, 0700 — the tool writes the rest."""
+        Path(path).expanduser().mkdir(mode=0o700, parents=True, exist_ok=True)
 
     def identity(self, home: Path, salt: bytes) -> dict | None:
         """Who `home` is signed in as (§4.2b): the `oauthAccount` of the `.claude.json` a launch on it reads —

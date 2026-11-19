@@ -307,6 +307,7 @@ class GeminiAdapter:
         {
             *("background", "composer", "context", "conversations", "links", "mail", "spend", "title"),
             *("find", "home_env", "install_command", "signin_command", "is_home", "identity", "models"),
+            *("new_home", "make_home"),
         }
     )
 
@@ -512,6 +513,17 @@ class GeminiAdapter:
         """Whether `path` is a home of this tool, by what the tool writes under its `.gemini/` (§4.2b)."""
         gem = Path(path).expanduser() / ".gemini"
         return any((gem / mark).exists() for mark in HOME_MARKS)
+
+    def new_home(self, name: str) -> Path:
+        """A new login's suggested folder (§4.2b *How a login is found and made*): `~/.gemini-<name>`, the parent of
+        the `.gemini/` `make_home` puts in it; made by nothing here."""
+        return Path(f"~/.gemini-{name}").expanduser()
+
+    def make_home(self, path: Path) -> None:
+        """Make `path` a home a sign-in can write into (§4.2b): the folder and its `.gemini/`, each 0700 —
+        `GEMINI_CLI_HOME` names the parent, and the tool writes under `.gemini/`."""
+        (Path(path).expanduser() / ".gemini").mkdir(mode=0o700, parents=True, exist_ok=True)
+        Path(path).expanduser().chmod(0o700)
 
     def identity(self, home: Path, salt: bytes) -> dict | None:
         """Who `home` is signed in as (§4.2b): the active account of its `.gemini/google_accounts.json`, an email,

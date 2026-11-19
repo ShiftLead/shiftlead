@@ -180,7 +180,10 @@ class GrokAdapter:
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): the reads of its
     # transcript come with TD-1637's later slices
     implements: frozenset[str] = frozenset(
-        {"composer", "title", "find", "home_env", "install_command", "signin_command", "is_home", "identity", "models"}
+        {
+            *("composer", "title", "find", "home_env", "install_command", "signin_command", "is_home", "identity"),
+            *("models", "new_home", "make_home"),
+        }
     )
     # its title does not tell a question tool's wait from a turn's spinner (§4.3 *The title as the check*)
     state_in_title = False
@@ -376,6 +379,16 @@ class GrokAdapter:
         ShiftLead's own hook file alone."""
         p = Path(path).expanduser()
         return any((p / mark).exists() for mark in HOME_MARKS)
+
+    def new_home(self, name: str) -> Path:
+        """A new login's suggested folder (§4.2b *How a login is found and made*): `~/.config/grok-<name>`; made by
+        nothing here."""
+        return Path(f"~/.config/grok-{name}").expanduser()
+
+    def make_home(self, path: Path) -> None:
+        """Make `path` a home a sign-in can write into (§4.2b): the folder alone, 0700 — `grok login` writes the
+        rest, and its launch home beside it is the launch's to make."""
+        Path(path).expanduser().mkdir(mode=0o700, parents=True, exist_ok=True)
 
     def identity(self, home: Path, salt: bytes) -> dict | None:
         """Who `home` is signed in as (§4.2b): the entry of its `auth.json` — the account key is the entry's
