@@ -270,12 +270,12 @@ def test_prices_offer_the_settings_pages_weights_for_the_accounts_families(monke
     assert 'label="gemini-2.5-flash-lite"' in gem and "claude" not in gem  # a family with a dash in it
 
 
-def test_a_weight_matches_a_family_as_a_word_and_none_read_offers_every_one():
+def test_a_weight_matches_a_family_as_a_word_and_none_read_or_matched_offers_none():
     w = {"as_of": "x", "claude-opus-5": {"input": 5}, "claude-sonnet-4": {"input": 3}, "bad": 1}
     assert [f["model"] for f in app_mod.price_fills(w, ["opus"])] == ["claude-opus-5"]
     assert [f["model"] for f in app_mod.price_fills(w, ["sonnet-4"])] == ["claude-sonnet-4"]
-    assert [f["model"] for f in app_mod.price_fills(w, ["op"])] == ["claude-opus-5", "claude-sonnet-4"]
-    assert [f["model"] for f in app_mod.price_fills(w, [])] == ["claude-opus-5", "claude-sonnet-4"]
+    assert app_mod.price_fills(w, ["op"]) == []  # no weight for its models: no fill-in, never another model's
+    assert app_mod.price_fills(w, []) == []  # no families read: none
     assert app_mod.price_fills({}, ["opus"]) == []
 
 

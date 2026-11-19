@@ -1094,12 +1094,13 @@ LOGIN_WARNINGS = {
 def price_fills(weights: Mapping[str, Any], families: list[str]) -> list[dict[str, str]]:
     """The Settings page's weights a login's **prices** offer as a fill-in (design §4.2b *A login's Settings*, §5
     `spend.weights`): each weight whose model name holds one of the login's account's families between dashes
-    (`claude-opus-5-5` for `opus`, `gemini-2.5-flash-lite` for `flash-lite`), every weight where no family is read
-    or none matches; as `{model, prices}`, the prices as the form's text. `as_of` is a date, not a weight."""
+    (`claude-opus-5-5` for `opus`, `gemini-2.5-flash-lite` for `flash-lite`), as `{model, prices}`, the prices as the
+    form's text; none where no family is read or none matches, since another model's prices would be the wrong number
+    one press away. `as_of` is a date, not a weight."""
     rows = {str(k): v for k, v in weights.items() if k != "as_of" and isinstance(v, dict)}
     fams = [f"-{str(f).lower()}-" for f in families if f]
     mine = {k for k in rows if any(f in f"-{k.lower()}-" for f in fams)}
-    return [{"model": k, "prices": _setting_text(rows[k])} for k in sorted(mine or rows)]
+    return [{"model": k, "prices": _setting_text(rows[k])} for k in sorted(mine)]
 
 
 def login_tree(card: dict[str, Any], home: str, weights: Mapping[str, Any] | None = None) -> dict[str, Any]:
