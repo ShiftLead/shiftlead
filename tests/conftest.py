@@ -204,16 +204,19 @@ def sweep_stale_test_servers() -> None:
 
 
 def _rmtree_writable(path: str) -> None:
-    """Remove a tree even where a test left a read-only file or directory in it (TD-2015)."""
-
-    def _retry(func, p, _exc):
-        with contextlib.suppress(OSError):
-            os.chmod(os.path.dirname(p), 0o700)
+    """Remove a tree even where a test left a read-only directory in it (TD-2015): every directory in it, never
+    through a link, is made writable and searchable first; what still cannot be removed is left."""
+    if os.path.islink(path) or not os.path.isdir(path):
+        return
+    with contextlib.suppress(OSError):
+        os.chmod(path, 0o700)
+    for d, dirs, _files in os.walk(path):
+        for n in dirs:
+            p = os.path.join(d, n)
             if not os.path.islink(p):
-                os.chmod(p, 0o700)
-            func(p)
-
-    shutil.rmtree(path, onexc=_retry)
+                with contextlib.suppress(OSError):
+                    os.chmod(p, 0o700)
+    shutil.rmtree(path, ignore_errors=True)
 
 
 def sweep_stale_scratch_roots(base: str = "/tmp") -> None:

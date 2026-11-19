@@ -17,7 +17,7 @@ def _root(base, owner_pid=None, age=0.0):
     root = base / f"aoscr-{uuid.uuid4().hex[:8]}"
     (root / "shiftlead-1000" / "ro").mkdir(parents=True)
     (root / "shiftlead-1000" / "ro" / "f").write_text("x")
-    os.chmod(root / "shiftlead-1000" / "ro", 0o555)  # a read-only directory a test left behind
+    os.chmod(root / "shiftlead-1000" / "ro", 0o000)  # a directory a test left unreadable and unwritable
     if owner_pid is not None:
         OWNERS.mkdir(exist_ok=True)
         (OWNERS / root.name).write_text(str(owner_pid))
