@@ -33,6 +33,7 @@ PAGES = {
     "queue.html": "/queue",
     "card_page.html": "/card/s%23TD-1",
     "spend.html": "/spend",
+    "tools.html": "/tools",
     "repo.html": "/repo/samscrape",
 }
 
