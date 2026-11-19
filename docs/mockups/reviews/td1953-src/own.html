@@ -47,7 +47,7 @@ header .chk button { font:inherit; color:var(--ink); background:none; border:1px
 .login::before { content:""; position:absolute; left:0; top:0; height:50%; width:18px; border-left:2px solid var(--rule); border-bottom:2px solid var(--rule); border-bottom-left-radius:6px; }
 .login + .login::after { content:""; position:absolute; left:0; top:-50%; height:50%; border-left:2px solid var(--rule); }
 .login .nm { font:600 14px "IBM Plex Mono", monospace; }
-.login .nm::after { content:" ✎"; font-weight:400; color:var(--off); font-size:12px; }
+.acct-name > span::after, .login .nm::after { content:" ✎"; font-size:12px; font-weight:400; color:var(--off); font-size:12px; }
 .login .dir { font:400 13px "IBM Plex Mono", monospace; color:var(--soft); }
 .login .dir em { font:italic 13px "IBM Plex Sans", sans-serif; margin-left:10px; }
 .login .state { font-size:13px; display:flex; align-items:center; gap:7px; white-space:nowrap; }
@@ -95,6 +95,10 @@ header .chk button { font:inherit; color:var(--ink); background:none; border:1px
 .acct.out .acct-row { background:transparent; border-style:dashed; grid-template-columns:1fr; padding:8px 16px; }
 .add { margin:10px 0 0 9px; font-size:13px; color:var(--used); }
 @media (max-width:760px) { .login { grid-template-columns:1fr auto 20px; } .login .dir { grid-column:1 / -1; } }
+.found { display:grid; grid-template-columns:260px 1fr auto; gap:16px; align-items:center; margin:8px 0 0 9px; padding:6px 12px; border:1px dashed var(--rule); border-radius:4px; font-size:13px; color:var(--soft); }
+.found .dir { font:13px "IBM Plex Mono", monospace; color:var(--ink); }
+.found button { font:inherit; font-size:13px; background:var(--sheet); border:1px solid var(--ink); border-radius:3px; padding:1px 10px; }
+@media (max-width:760px) { .found { grid-template-columns:1fr auto; } .found span:nth-child(2) { grid-column:1; } .found button { grid-column:2; grid-row:1; } }
 </style></head><body><div class="wrap">
 <header><h1>Tools</h1><span class="host">on <b>kmaster</b></span><span class="chk">read 2 min ago<button>Check again</button></span></header>
 <p class="lede">What can run here: each tool, the accounts it signs into, and the folders that hold those sign-ins. The hatched end of each bar is what you keep back for yourself; unattended seats stop when they reach it.</p>
@@ -102,7 +106,7 @@ header .chk button { font:inherit; color:var(--ink); background:none; border:1px
 <section class="tool"><h2>Claude Code <span>2.1.327</span><a>Update to 2.1.330</a></h2>
   <div class="acct">
     <div class="acct-row">
-      <div><div class="acct-name">paul<small>Max plan</small></div><div class="models">opus · sonnet · fable · haiku</div></div>
+      <div><div class="acct-name"><span>paul</span><small>Max plan</small></div><div class="models">opus · sonnet · fable · haiku</div></div>
       <div><div class="gauge"><div class="used" style="width:6%"></div><div class="keep" style="width:15%"></div><div class="room" style="left:6%;right:15%">room for unattended work: 79%</div></div>
         <div class="glegend"><span><b>6%</b> of the week used · resets Tue 17:00</span><span class="k">keep back <input value="15%"></span></div></div>
     </div>
@@ -123,7 +127,7 @@ header .chk button { font:inherit; color:var(--ink); background:none; border:1px
 <section class="tool"><h2>Grok <span>1.0.77</span></h2>
   <div class="acct">
     <div class="acct-row">
-      <div><div class="acct-name">paul-supergrok<small>SuperGrok</small></div><div class="models">grok-4.7</div></div>
+      <div><div class="acct-name"><span>paul-supergrok</span><small>SuperGrok</small></div><div class="models">grok-4.7</div></div>
       <div><div class="gauge unread"></div>
         <div class="glegend"><span>No usage reading yet, so nothing to keep back against.</span></div></div>
     </div>
@@ -132,24 +136,26 @@ header .chk button { font:inherit; color:var(--ink); background:none; border:1px
       <div class="login"><span class="nm">grok-conformance</span><span class="dir">~/.config/grok-conformance<em>conformance walks copy it</em></span><span class="state">signed in</span><span class="dots">⋯</span></div>
     </div>
   </div>
+  <div class="found"><span class="dir">~/.grok</span><span>found here, signed in as paul-supergrok, not yet a login</span><button>Add</button></div>
   <div class="add">+ Add login</div>
 </section>
 
 <section class="tool"><h2>Gemini <span>0.66.0</span></h2>
   <div class="acct">
     <div class="acct-row">
-      <div><div class="acct-name">paul-google<small>AI Studio key · free tier</small></div><div class="models">flash-lite <s>(pinned)</s></div></div>
+      <div><div class="acct-name"><span>paul-google</span><small>AI Studio key · free tier</small></div><div class="models">flash-lite <s>(pinned)</s></div></div>
       <div><div class="gauge unread"></div><div class="glegend"><span>No usage reading yet.</span></div></div>
     </div>
     <div class="logins"><div class="login"><span class="nm">gemini-paul</span><span class="dir">~/.gemini-reader</span><span class="state">signed in</span><span class="dots">⋯</span></div></div>
   </div>
   <div class="acct">
     <div class="acct-row">
-      <div><div class="acct-name">paul-gemini<small>Google sign-in</small></div><div class="models">flash-lite <s>(pinned)</s></div></div>
+      <div><div class="acct-name"><span>paul-gemini</span><small>Google sign-in</small></div><div class="models">flash-lite <s>(pinned)</s></div></div>
       <div><div class="gauge unread"></div><div class="glegend"><span>No usage reading yet.</span></div></div>
     </div>
     <div class="logins"><div class="login"><span class="nm">gemini-conformance</span><span class="dir">~/.gemini-conformance<em>conformance walks record here</em></span><span class="state lim">limited till 08:00</span><span class="dots">⋯</span></div></div>
   </div>
+  <div class="found"><span class="dir">~/.gemini</span><span>found here, signed in as paul-google, not yet a login</span><button>Add</button></div>
   <div class="add">+ Add login</div>
 </section>
 
