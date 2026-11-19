@@ -13,32 +13,34 @@ def test_names_follow_the_rules():
     assert logins.valid_name("claude-paul") and logins.valid_name("a_1") and logins.valid_name("x" * 24)
     for bad in ("", "-x", "_x", "x" * 25, "a:b", "a.b", "a@b", "a b", None):
         assert not logins.valid_name(bad), bad
-    assert logins.fold("Claude_Paul") == "claude-paul"
+    assert logins.split("claude-code:paul") == ("claude-code", "paul") and logins.key("t", "w") == "t:w"
     assert logins.name_of("Paul K") == "paul-k" and logins.name_of("@@") == ""
     assert logins.suggest("paul", []) == "paul" and logins.suggest("paul", ["paul", "paul-2"]) == "paul-3"
     assert len(logins.suggest("x" * 24, ["x" * 24])) <= 24
 
 
-def test_a_name_is_unique_on_the_host_and_its_fold_within_its_tool():
+def test_a_name_is_unique_per_tool_and_its_tools_shell_id_on_the_host():
     data = logins.empty()
-    data["logins"]["claude-paul"] = {"tool": "claude-code", "folder": "/f"}
-    assert "already" in logins.name_taken(data, "grok", "claude-paul")
-    assert "folds" in logins.name_taken(data, "claude-code", "Claude_Paul")
-    assert logins.name_taken(data, "grok", "Claude_Paul") is None
+    data["logins"]["claude-code:paul"] = {"folder": "/f"}
+    assert "already" in logins.name_taken(data, "claude-code", "paul")
+    assert logins.name_taken(data, "grok", "paul") is None  # another tool's login may share the name
+    assert "tools shell would be claude-code:paul's" in logins.name_taken(data, "claude-code", "Paul")
+    assert "tools shell would be claude-code:paul's" in logins.name_taken(data, "claude", "code-paul")
+    assert "install shell" in logins.name_taken(logins.empty(), "install", "grok", tools=["grok"])
     assert "not a login name" in logins.name_taken(data, "grok", "a:b")
 
 
 def test_the_file_round_trips_and_an_unswitched_host_reads_none(tmp_path):
     assert logins.load(tmp_path) is None and not logins.switched(tmp_path)
     data = logins.empty()
-    data["logins"]["w"] = {"tool": "t", "folder": "/f", "label": None, "account": "t:paul"}
+    data["logins"]["t:w"] = {"folder": "/f", "label": None, "account": "t:paul"}
     data["accounts"]["t:paul"] = {"label": "work"}
     data["forgotten"]["t:old"] = {"folder": "/o", "account": "t:gone"}
     assert logins.save(data, "w added", tmp_path) is False  # not tracked before the switch-over: no commit
     raw = yaml.safe_load((tmp_path / "logins.yml").read_text())
-    assert raw["logins"]["w"] == {"tool": "t", "folder": "/f", "account": "t:paul"}  # an unset key is not written
+    assert raw["logins"]["t:w"] == {"folder": "/f", "account": "t:paul"}  # an unset key is not written
     assert logins.load(tmp_path) == {
-        "logins": {"w": {"tool": "t", "folder": "/f", "account": "t:paul"}},
+        "logins": {"t:w": {"folder": "/f", "account": "t:paul"}},
         "accounts": {"t:paul": {"label": "work"}},
         "forgotten": {"t:old": {"folder": "/o", "account": "t:gone"}},
     }
@@ -68,17 +70,21 @@ def test_a_version_is_the_entry_s_hash_and_a_stale_one_is_refused():
 
 def test_resolve_takes_a_name_or_tool_and_name_never_a_label():
     data = logins.empty()
-    data["logins"]["w"] = {"tool": "t", "folder": "/f", "label": "work"}
-    assert logins.resolve(data, "w")[0] == "w" and logins.resolve(data, "t:w")[0] == "w"
+    data["logins"]["t:w"] = {"folder": "/f", "label": "work"}
+    assert logins.resolve(data, "w")[0] == "t:w" and logins.resolve(data, "t:w")[0] == "t:w"
     for ref in ("work", "u:w", "x"):
         with pytest.raises(logins.LoginError):
             logins.resolve(data, ref)
+    data["logins"]["u:w"] = {"folder": "/g"}
+    assert logins.resolve(data, "u:w")[0] == "u:w"
+    with pytest.raises(logins.LoginError, match="say which, t:w or u:w"):
+        logins.resolve(data, "w")  # a bare name two tools' logins share is refused, naming both
 
 
 def test_a_retired_key_is_a_forgotten_or_reserved_key_no_live_login_names():
     data = logins.empty()
-    data["logins"]["w"] = {"tool": "t", "folder": "/f", "account": "t:paul"}
-    data["logins"]["k"] = {"tool": "t", "folder": "/k"}  # derived key t:k
+    data["logins"]["t:w"] = {"folder": "/f", "account": "t:paul"}
+    data["logins"]["t:k"] = {"folder": "/k"}  # derived key t:k
     data["forgotten"]["t:old"] = {"folder": "/o", "account": "t:gone"}
     data["forgotten"]["t:w2"] = {"folder": "/o2", "account": "t:paul"}
     assert logins.retired(data, ["t:orphan", "t:k"]) == {"t:gone", "t:orphan"}
@@ -196,10 +202,10 @@ def test_a_switched_host_draws_its_logins_in_each_state(monkeypatch, tmp_path):
     _host(monkeypatch, tool)
     data = logins.empty()
     for n in ("work", "again", "out", "key", "new"):
-        data["logins"][n] = {"tool": "t", "folder": f[n]}
+        data["logins"][f"t:{n}"] = {"folder": f[n]}
     for n in ("work", "again", "out"):
-        data["logins"][n]["account"] = "t:paul"
-    data["logins"]["work"].update(billing="metered", pin="small", note="the main one", label="work laptop")
+        data["logins"][f"t:{n}"]["account"] = "t:paul"
+    data["logins"]["t:work"].update(billing="metered", pin="small", note="the main one", label="work laptop")
     data["accounts"]["t:paul"] = {"label": "Paul's"}
     logins.save(data, "fixture", tmp_path)
     r = tools.read(b"s" * 32, env={}, home=tmp_path, memory=logins.Memory())
@@ -215,7 +221,7 @@ def test_a_switched_host_draws_its_logins_in_each_state(monkeypatch, tmp_path):
     }
     w = got["work"]
     assert w["label"] == "work laptop" and w["pin"] == "small" and w["note"] == "the main one"
-    assert w["warnings"] == ["billing_mismatch"] and w["version"] == logins.version(data["logins"]["work"])
+    assert w["warnings"] == ["billing_mismatch"] and w["version"] == logins.version(data["logins"]["t:work"])
     accts = {a["key"]: a for a in card["accounts"]}
     assert set(accts) == {"t:paul", "t:key"}
     assert accts["t:paul"]["label"] == "Paul's" and accts["t:paul"]["plan"] == "Max"
@@ -229,12 +235,12 @@ def test_a_login_that_joins_an_account_is_written(monkeypatch, tmp_path):
     ident = {"match": "M", "plan": "Pro"}
     _host(monkeypatch, _Tool("t", tmp_path / "none", {a: (ident, True), b: (ident, True)}))
     data = logins.empty()
-    data["logins"]["a"] = {"tool": "t", "folder": a, "account": "t:paul"}
-    data["logins"]["b"] = {"tool": "t", "folder": b}
+    data["logins"]["t:a"] = {"folder": a, "account": "t:paul"}
+    data["logins"]["t:b"] = {"folder": b}
     logins.save(data, "fixture", tmp_path)
     mem = logins.Memory()
     tools.read(b"s" * 32, env={}, home=tmp_path, memory=mem)
-    assert logins.load(tmp_path)["logins"]["b"]["account"] == "t:paul"
+    assert logins.load(tmp_path)["logins"]["t:b"]["account"] == "t:paul"
     assert "M" not in (tmp_path / "logins.yml").read_text().split()  # no match is ever written
 
 
@@ -242,7 +248,7 @@ def test_a_login_on_the_default_home_hides_the_found_row(monkeypatch, tmp_path):
     d = str(tmp_path / "default")
     _host(monkeypatch, _Tool("t", tmp_path / "default", {d: ({"match": "M"}, True)}))
     data = logins.empty()
-    data["logins"]["mine"] = {"tool": "t", "folder": d, "account": "t:paul"}
+    data["logins"]["t:mine"] = {"folder": d, "account": "t:paul"}
     logins.save(data, "fixture", tmp_path)
     [card] = tools.read(b"s" * 32, env={}, home=tmp_path)["tools"]
     assert card["found"] == [] and [lg["name"] for lg in card["logins"]] == ["mine"]

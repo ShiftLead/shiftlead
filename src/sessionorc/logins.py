@@ -2,8 +2,9 @@
 its reader and writer, the name rules, an entry's version, retired keys, and the settling of one pass of identity
 reads into accounts.
 
-Data, no tool name: a login is `{tool, folder, label, note, account, billing, prices, extra_args, unattended_args,
-permission_wait, pin}` under its name; `accounts:` holds each account's label by key; `forgotten:` each forgotten
+Data, no tool name: a login is `{folder, label, note, account, billing, prices, extra_args, unattended_args,
+permission_wait, pin}` under `<tool>:<name>` (a name is unique per tool on a host, §4.2b *Terms used below*);
+`accounts:` holds each account's label by key; `forgotten:` each forgotten
 login's folder and account by `<tool>:<name>`. The file holds no secret and no identity: which login is which account
 is each login's `account`, and an identity's `match` is compared only in the host agent's memory (`Memory`).
 """
@@ -22,7 +23,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import defs, paths
+from sessionorc import defs, naming, paths
 
 LOGINS_FILE = "logins.yml"
 
@@ -31,7 +32,7 @@ LOGINS_FILE = "logins.yml"
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,23}")
 # what a login's Settings may set (§4.2b *A login's Settings*), `ao login set`'s keys
 SETTINGS = ("billing", "prices", "extra_args", "unattended_args", "permission_wait", "pin")
-ENTRY_KEYS = ("tool", "folder", "label", "note", "account", *SETTINGS)
+ENTRY_KEYS = ("folder", "label", "note", "account", *SETTINGS)
 
 
 class LoginError(ValueError):
@@ -51,11 +52,6 @@ def valid_name(name: object) -> bool:
     return isinstance(name, str) and _NAME.fullmatch(name) is not None
 
 
-def fold(name: str) -> str:
-    """A name folded as a tools shell's id carries it (§4.2b *The tools shell*): lowercased, `_` turned to `-`."""
-    return name.lower().replace("_", "-")
-
-
 def name_of(text: str) -> str:
     """A display name folded to a name's characters (`Paul K` → `paul-k`), for a suggestion (§4.2b *How a login is
     found and made*); empty where nothing of it is left."""
@@ -63,10 +59,20 @@ def name_of(text: str) -> str:
     return out[:24].rstrip("-_")
 
 
-def derived_key(tool: str, name: str) -> str:
-    """The key of a login with no identity, an account of its own: `<adapter>:<login name>`, never written to its
-    `account` (§4.2b *Matching across a restart*)."""
+def key(tool: str, name: str) -> str:
+    """A login's key in `logins:` and `forgotten:`, `<tool>:<name>`; it is also the key of the account of its own a
+    login with no identity is (`<adapter>:<login name>`), never written to its `account` (§4.2b *Matching across a
+    restart*)."""
     return f"{tool}:{name}"
+
+
+derived_key = key
+
+
+def split(lk: str) -> tuple[str, str]:
+    """A login's key as `(tool, name)`."""
+    tool, _, name = lk.rpartition(":")
+    return tool, name
 
 
 def empty() -> dict[str, Any]:
@@ -130,17 +136,24 @@ def check_version(entry: Mapping[str, Any] | None, sent: str | None, name: str) 
 
 
 def resolve(data: Mapping[str, Any], ref: str) -> tuple[str, dict[str, Any]]:
-    """A login by its name, or `<tool>:<name>` (§4.2b *Controls and verbs*); a label is never taken as a name."""
+    """A login by `<tool>:<name>`, or by its bare name where one login of this host has it — two refused, naming both
+    forms (§4.2b *Controls and verbs*); a label is never taken as a name. Returns the login's key and entry."""
     logins = data["logins"]
-    tool, _, name = ref.rpartition(":")
-    if name in logins and (not tool or logins[name].get("tool") == tool):
-        return name, logins[name]
+    if ":" in ref:
+        if ref in logins:
+            return ref, logins[ref]
+    else:
+        hits = sorted(lk for lk in logins if split(lk)[1] == ref)
+        if len(hits) == 1:
+            return hits[0], logins[hits[0]]
+        if hits:
+            raise LoginError(f"{ref} names more than one login here: say which, {' or '.join(hits)}")
     raise LoginError(f"no login {ref} on this host")
 
 
-def account_of(name: str, entry: Mapping[str, Any]) -> str:
-    """The key a login's launches read: its stored `account`, else its derived key."""
-    return str(entry.get("account") or derived_key(str(entry.get("tool")), name))
+def account_of(lk: str, entry: Mapping[str, Any]) -> str:
+    """The key a login's launches read: its stored `account`, else its derived key (its own key)."""
+    return str(entry.get("account") or lk)
 
 
 def live_keys(data: Mapping[str, Any]) -> set[str]:
@@ -155,17 +168,22 @@ def retired(data: Mapping[str, Any], reserve_keys: Iterable[str] = ()) -> set[st
     return (named | set(reserve_keys)) - live_keys(data)
 
 
-def name_taken(data: Mapping[str, Any], tool: str, name: str) -> str | None:
-    """Why `name` cannot be a new login of `tool` here, or None: a name is unique on the host (so a team's login list
-    names one login), and its fold may not meet another login's of the same tool, whose tools shells would share an
-    id (§4.2b *The tools shell*)."""
+def name_taken(data: Mapping[str, Any], tool: str, name: str, tools: Iterable[str] = ()) -> str | None:
+    """Why `name` cannot be a new login of `tool` here, or None (§4.2b *Terms used below*, *The tools shell*): a name
+    is unique per tool, and the login's tools shell id may not be one another login's shell or an install shell of
+    `tools` (the registered adapters) already has — one fold, or a hyphenated adapter name meeting another's."""
     if not valid_name(name):
         return f"{name!r} is not a login name: at most 24 letters, digits, '-' and '_', the first a letter or digit"
-    if name in data["logins"]:
-        return f"a login named {name} is on this host already"
-    for other, e in data["logins"].items():
-        if e.get("tool") == tool and fold(other) == fold(name):
-            return f"{name} folds to the same tools shell as {other}"
+    lk = key(tool, name)
+    if lk in data["logins"]:
+        return f"{lk} is a login on this host already"
+    sid = naming.tools_id(tool, name)
+    for other in data["logins"]:
+        if naming.tools_id(*split(other)) == sid:
+            return f"{lk}'s tools shell would be {other}'s"
+    for t in tools:
+        if naming.tools_install_id(t) == sid:
+            return f"{lk}'s tools shell would be {t}'s install shell"
     return None
 
 
@@ -195,7 +213,7 @@ class Memory:
 @dataclass
 class Settled:
     account: dict[str, str | None]  # each login's account this pass: a key, or None (no account, no match)
-    moves: dict[str, str]  # logins whose stored `account` this pass writes: name → key
+    moves: dict[str, str]  # logins whose stored `account` this pass writes: login key → account key
     name_account: set[str]  # signed in as an account none has: launches nothing until the person names it
     mismatch: set[str]  # *these logins read different accounts*: launches nothing
 

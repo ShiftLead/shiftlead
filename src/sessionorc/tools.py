@@ -129,8 +129,8 @@ def read(
         ad = adapters.get(name)
         mine = [
             Path(e.get("folder", "")).expanduser()
-            for e in (data or {}).get("logins", {}).values()
-            if e.get("tool") == name
+            for lk, e in (data or {}).get("logins", {}).items()
+            if logins.split(lk)[0] == name
         ]
         card = _card(name, ad, env, salt, mine)
         (tools if card["installed"] else not_ready).append(card)
@@ -177,7 +177,7 @@ def _login_tree(
     by_tool = {c["adapter"]: c for c in cards}
     reads: dict[str, tuple[dict[str, Any] | None, bool | None]] = {}
     for n, e in data["logins"].items():
-        card = by_tool.get(str(e.get("tool")))
+        card = by_tool.get(logins.split(n)[0])
         if card is None:
             continue
         ad = adapters.get(card["adapter"])
@@ -188,7 +188,7 @@ def _login_tree(
             _ask(ad, "credentials_ok", None, folder),
         )
     # a match is compared within its tool alone: two tools' keys are never one account
-    matches = {n: f"{data['logins'][n]['tool']}\0{i['match']}" if i else None for n, (i, _) in reads.items()}
+    matches = {n: f"{logins.split(n)[0]}\0{i['match']}" if i else None for n, (i, _) in reads.items()}
     stored = {n: data["logins"][n].get("account") for n in reads}
     settled = logins.settle(stored, matches, memory)
     if settled.moves:
@@ -199,20 +199,20 @@ def _login_tree(
     stored_billing: dict[str, str] = {}  # an account's billing is its logins' `billing`, the person's, where one says
     for n, (ident, creds) in reads.items():
         e = data["logins"][n]
-        card = by_tool[str(e["tool"])]
+        card = by_tool[logins.split(n)[0]]
         ad = adapters.get(card["adapter"])
         st = logins.state(ident, creds)
         key = settled.account.get(n)
         if n in settled.name_account:
             st, key = "name_account", None
         elif key is None and st == "signed_in":
-            key = logins.derived_key(str(e["tool"]), n)  # an API key with no identity: an account of its own
+            key = n  # its own key, `<adapter>:<login name>`: an API key with no identity: an account of its own
         warnings = []
         if ident and ident.get("billing") and e.get("billing") and ident["billing"] != e["billing"]:
             warnings.append("billing_mismatch")
         card["logins"].append(
             {
-                "name": n,
+                "name": logins.split(n)[1],
                 "label": e.get("label"),
                 "folder": str(e.get("folder", "")),
                 "account": key,
