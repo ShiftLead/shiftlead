@@ -44,9 +44,10 @@ def test_the_file_round_trips_and_an_unswitched_host_reads_none(tmp_path):
         "accounts": {"t:paul": {"label": "work"}},
         "forgotten": {"t:old": {"folder": "/o", "account": "t:gone"}},
     }
-    (tmp_path / "logins.yml").write_text("logins: [\n")
-    with pytest.raises(logins.LoginError):
-        logins.load(tmp_path)
+    for bad in ("logins: [\n", "logins:\n  t:a: x\n", "logins:\n  t:a: [1]\n", "- 1\n"):
+        (tmp_path / "logins.yml").write_text(bad)
+        with pytest.raises(logins.LoginError):
+            logins.load(tmp_path)
 
 
 def test_a_write_is_committed_once_the_file_is_tracked(tmp_path, monkeypatch):
@@ -97,7 +98,7 @@ def test_a_first_match_joins_its_stored_account():
     mem = logins.Memory()
     s = logins.settle({"a": "t:p", "b": "t:p"}, {"a": "x", "b": "x"}, mem)
     assert s.account == {"a": "t:p", "b": "t:p"} and not s.moves and not s.mismatch and not s.name_account
-    assert mem.last == {"a": "x", "b": "x"} and mem.owner == {"x": "t:p"}
+    assert mem.last == {"a": "x", "b": "x"} and not mem.unnamed
 
 
 def test_a_match_another_account_has_marks_the_incoming_login_alone():
@@ -105,6 +106,22 @@ def test_a_match_another_account_has_marks_the_incoming_login_alone():
     logins.settle({"a": "t:p"}, {"a": "x"}, mem)
     s = logins.settle({"a": "t:p", "b": "t:q"}, {"a": "x", "b": "x"}, mem)
     assert s.mismatch == {"b"}
+
+
+def test_which_account_has_a_match_is_read_from_this_pass_not_the_run_s_history():
+    mem = logins.Memory()
+    logins.settle({"a": "t:p"}, {"a": "x"}, mem)
+    logins.settle({"a": "t:p"}, {"a": "y"}, mem)  # a moved on: no p login reads x any more
+    s = logins.settle({"a": "t:p", "b": "t:q"}, {"a": "y", "b": "x"}, mem)
+    assert not s.mismatch and s.account["b"] == "t:q"
+
+
+def test_a_match_established_on_two_accounts_marks_every_reader():
+    mem = logins.Memory()
+    logins.settle({"a": "t:p", "b": "t:q"}, {"a": "x", "b": "y"}, mem)
+    logins.settle({"a": "t:p", "b": "t:q"}, {"a": "x", "b": "y"}, mem)
+    s = logins.settle({"a": "t:p", "b": "t:q", "c": None}, {"a": "x", "b": "y", "c": "x"}, mem)
+    assert s.moves == {"c": "t:p"} and not s.mismatch
 
 
 def test_a_stored_account_whose_logins_read_two_matches_marks_all_of_them():
@@ -124,6 +141,11 @@ def test_a_change_within_the_run_moves_the_login_or_asks_for_a_name():
     assert s.moves == {"a": "t:q"} and s.account["a"] == "t:q" and not s.mismatch
     s = logins.settle({"a": "t:q", "b": "t:q"}, {"a": "z", "b": "y"}, mem)  # then as an account none has
     assert s.name_account == {"a"} and not s.moves
+    for _ in range(2):  # it stays so pass after pass, never rejoining its stored account unmarked
+        s = logins.settle({"a": "t:q", "b": "t:q"}, {"a": "z", "b": "y"}, mem)
+        assert s.name_account == {"a"} and s.account["a"] is None and not s.mismatch and not s.moves
+    s = logins.settle({"a": "t:r", "b": "t:q"}, {"a": "z", "b": "y"}, mem)  # the person names it
+    assert not s.name_account and s.account["a"] == "t:r" and not s.mismatch
 
 
 def test_a_new_login_joins_an_account_with_its_match_or_waits_for_a_name():
@@ -252,3 +274,32 @@ def test_a_login_on_the_default_home_hides_the_found_row(monkeypatch, tmp_path):
     logins.save(data, "fixture", tmp_path)
     [card] = tools.read(b"s" * 32, env={}, home=tmp_path)["tools"]
     assert card["found"] == [] and [lg["name"] for lg in card["logins"]] == ["mine"]
+
+
+def test_a_join_never_overwrites_a_write_made_while_the_pass_read(monkeypatch, tmp_path):
+    a, b = str(tmp_path / "a"), str(tmp_path / "b")
+    ident = {"match": "M"}
+
+    class _Slow(_Tool):
+        def identity(self, home, salt):  # the person writes a note while the pass is reading
+            if str(home) == b:
+                logins.update(lambda d: d["logins"]["t:a"].update(note="mine") or "a note", tmp_path)
+            return super().identity(home, salt)
+
+    _host(monkeypatch, _Slow("t", tmp_path / "none", {a: (ident, True), b: (ident, True)}))
+    data = logins.empty()
+    data["logins"]["t:a"] = {"folder": a, "account": "t:paul"}
+    data["logins"]["t:b"] = {"folder": b}
+    logins.save(data, "fixture", tmp_path)
+    tools.read(b"s" * 32, env={}, home=tmp_path, memory=logins.Memory())
+    now = logins.load(tmp_path)["logins"]
+    assert now["t:a"]["note"] == "mine" and now["t:b"]["account"] == "t:paul"
+
+
+def test_update_refuses_an_unswitched_host_and_writes_nothing_for_no_change(tmp_path):
+    with pytest.raises(logins.LoginError, match="switch-over"):
+        logins.update(lambda d: "x", tmp_path)
+    logins.save(logins.empty(), "first", tmp_path)
+    before = (tmp_path / "logins.yml").stat().st_mtime_ns
+    assert logins.update(lambda d: None, tmp_path) is None
+    assert (tmp_path / "logins.yml").stat().st_mtime_ns == before

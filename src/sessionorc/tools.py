@@ -192,12 +192,10 @@ def _login_tree(
     stored = {n: data["logins"][n].get("account") for n in reads}
     settled = logins.settle(stored, matches, memory)
     if settled.moves:
-        for n, key in settled.moves.items():
-            data["logins"][n]["account"] = key
-        logins.save(data, ", ".join(f"{n} joined {k}" for n, k in sorted(settled.moves.items())), home)
+        _write_moves(settled.moves, stored, home)
     accounts: dict[str, dict[str, Any]] = {}
     stored_billing: dict[str, str] = {}  # an account's billing is its logins' `billing`, the person's, where one says
-    for n, (ident, creds) in reads.items():
+    for n, (ident, creds) in sorted(reads.items()):
         e = data["logins"][n]
         card = by_tool[logins.split(n)[0]]
         ad = adapters.get(card["adapter"])
@@ -244,3 +242,23 @@ def _login_tree(
             card["accounts"].append(acct)
             if e.get("billing"):
                 stored_billing[key] = e["billing"]
+
+
+def _write_moves(moves: Mapping[str, str], read: Mapping[str, str | None], home: Path | None) -> None:
+    """Write the logins that joined an account (§4.2b *A login changes account*), on the file as it stands now: a
+    login the person changed or forgot since this pass read the file is left as they left it. A failed write is
+    logged and the read stands; the next pass settles again."""
+
+    def change(data: dict[str, Any]) -> str | None:
+        done = []
+        for n, key in sorted(moves.items()):
+            e = data["logins"].get(n)
+            if e is not None and e.get("account") == read.get(n):
+                e["account"] = key
+                done.append(f"{n} joined {key}")
+        return ", ".join(done) or None
+
+    try:
+        logins.update(change, home)
+    except (OSError, logins.LoginError) as e:
+        log.warning("tools read: writing the logins that joined an account failed: %s", type(e).__name__)

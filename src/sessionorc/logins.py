@@ -16,7 +16,8 @@ import json
 import os
 import re
 import tempfile
-from collections.abc import Iterable, Mapping
+import threading
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -96,7 +97,10 @@ def load(home: Path | None = None) -> dict[str, Any] | None:
         got = raw.get(part) or {}
         if not isinstance(got, dict):
             raise LoginError(f"{p}: `{part}:` is not a mapping")
-        data[part] = {str(k): dict(v) if isinstance(v, dict) else {} for k, v in got.items()}
+        for k, v in got.items():
+            if not isinstance(v, dict):  # a write over it would erase what the person wrote there
+                raise LoginError(f"{p}: `{part}:` {k} is not a mapping")
+            data[part][str(k)] = dict(v)
     return data
 
 
@@ -105,11 +109,14 @@ def save(data: Mapping[str, Any], change: str, home: Path | None = None) -> bool
     never committed later as *edited by hand*. True when a commit was made: none on a node, whose file is untracked, nor
     before the switch-over puts it among `defs.TRACKED` in `profiles.yml`'s place (§4.9, the cut-over's, TD-1976)."""
     p = path(home)
+    p.parent.mkdir(parents=True, exist_ok=True)
     out = {part: {k: _clean(v) for k, v in sorted(data.get(part, {}).items())} for part in empty()}
     fd, tmp = tempfile.mkstemp(dir=p.parent, prefix=".logins-", suffix=".yml")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             yaml.safe_dump(out, f, sort_keys=False, allow_unicode=True)
+            f.flush()
+            os.fsync(f.fileno())
         os.replace(tmp, p)
     except BaseException:
         Path(tmp).unlink(missing_ok=True)
@@ -117,6 +124,23 @@ def save(data: Mapping[str, Any], change: str, home: Path | None = None) -> bool
     if LOGINS_FILE not in defs.TRACKED:  # it takes `profiles.yml`'s place there at the switch-over (TD-1976)
         return False
     return defs.commit(f"logins: {change}"[:200], home=home, files=(LOGINS_FILE,))
+
+
+_LOCK = threading.Lock()
+
+
+def update(change: Callable[[dict[str, Any]], str | None], home: Path | None = None) -> str | None:
+    """One read-modify-write of the host's logins under the host agent's one lock, so two writers never lose each
+    other's change: `change` edits the file as it stands now and returns the change's words, or None to write
+    nothing. Returns those words. Not switched: `LoginError`."""
+    with _LOCK:
+        data = load(home)
+        if data is None:
+            raise LoginError("this host has no logins until the switch-over (design §4.2b)")
+        words = change(data)
+        if words:
+            save(data, words, home)
+        return words
 
 
 def _clean(entry: Mapping[str, Any]) -> dict[str, Any]:
@@ -204,10 +228,11 @@ def suggest(base: str, taken: Iterable[str]) -> str:
 @dataclass
 class Memory:
     """What one run of the host agent knows of matches: never written anywhere. `last` is each login's last match this
-    run (none is not a match); `owner` the account a match settled to first this run."""
+    run (none is not a match); `unnamed` each login drawn *name its account*, with the match and stored account it was
+    drawn on — it stays so until either changes (the person names it, or it is signed in again)."""
 
     last: dict[str, str] = field(default_factory=dict)
-    owner: dict[str, str] = field(default_factory=dict)
+    unnamed: dict[str, tuple[str, str | None]] = field(default_factory=dict)
 
 
 @dataclass
@@ -220,47 +245,63 @@ class Settled:
 
 def settle(stored: Mapping[str, str | None], matches: Mapping[str, str | None], memory: Memory) -> Settled:
     """Settle one pass of reads, once all of them are in (§4.2b *Matching across a restart*). `stored` is each login's
-    stored `account`; `matches` its identity's match this pass, or None. `memory` is updated in place.
+    stored `account`; `matches` its identity's match this pass, or None. `memory` is updated in place. Which account
+    has a match is read from this pass: the stored accounts of the logins that read it now.
 
     1. A login whose match differs from its own last match this run moves to the account whose logins read that
        match, or draws *name its account* where none does.
-    2. A login's first match this run joins its stored account, unless that match is another account's logins'
-       (marking that login alone), or its stored account's other logins read another (marking all of them).
-    3. A login with no stored account and a match no account has draws *name its account*; one some account has
-       joins it."""
-    changed = {n for n, m in matches.items() if m and memory.last.get(n) not in (None, m)}
-    steady = {n: m for n, m in matches.items() if m and n not in changed and stored.get(n)}
-    # who owns a match: what earlier passes settled, then a match only one stored account's logins read now
-    readers: dict[str, set[str]] = {}
-    for n, m in steady.items():
+    2. A login's first match this run joins its stored account, unless that match is read by a login of another
+       account that read it before (marking the incoming login alone; at the run's first pass, where none read it
+       before, every reader), or its stored account's other logins read another (marking all of them).
+    3. A login with no stored account and a match no account has draws *name its account*; one exactly one account
+       has joins it. Two accounts reading the match mark the login."""
+    for n, (m, acct) in list(memory.unnamed.items()):
+        if matches.get(n) != m or stored.get(n) != acct:
+            del memory.unnamed[n]  # named by the person, or signed in again: settled afresh below
+    unnamed = set(memory.unnamed)
+    changed = {n for n, m in matches.items() if m and n not in unnamed and memory.last.get(n) not in (None, m)}
+    placed = {n: m for n, m in matches.items() if m and n not in changed and n not in unnamed and stored.get(n)}
+    seen = {n for n, m in placed.items() if memory.last.get(n) == m}  # read this match before: established
+    readers: dict[str, set[str]] = {}  # a match → the accounts whose logins read it now
+    for n, m in placed.items():
         readers.setdefault(m, set()).add(str(stored[n]))
-    for m, accts in readers.items():
-        if m not in memory.owner and len(accts) == 1:
-            memory.owner[m] = next(iter(accts))
     mismatch: set[str] = set()
-    for n, m in steady.items():  # rule 2's first case: the incoming login alone; a match no one owns, every reader
-        if memory.owner.get(m) != stored[n]:
-            mismatch.add(n)
+    for m, accts in readers.items():
+        if len(accts) < 2:
+            continue
+        on = [n for n, got in placed.items() if got == m]
+        established = {str(stored[n]) for n in on if n in seen}
+        if len(established) == 1:  # rule 2's first case: the incoming logins alone
+            mismatch |= {n for n in on if stored[n] not in established}
+        else:  # no account had it before (the run's first pass), or two did: every reader
+            mismatch |= set(on)
     by_account: dict[str, set[str]] = {}
-    for n, m in steady.items():
+    for n, m in placed.items():
         if n not in mismatch:
             by_account.setdefault(str(stored[n]), set()).add(m)
     for acct, ms in by_account.items():  # rule 2's second case: the stored account's logins disagree
         if len(ms) > 1:
-            mismatch |= {n for n in steady if stored[n] == acct}
+            mismatch |= {n for n in placed if stored[n] == acct}
     account: dict[str, str | None] = {n: stored.get(n) for n in matches}
     moves: dict[str, str] = {}
-    name_account: set[str] = set()
+    name_account: set[str] = set(unnamed)
+    for n in unnamed:
+        account[n] = None
     for n, m in matches.items():
-        if not m or (n in steady):
+        if not m or n in placed or n in unnamed:
             continue
-        target = memory.owner.get(m)
-        if target is not None:
+        has = readers.get(m, set())
+        if len(has) == 1:
+            target = next(iter(has))
             if target != stored.get(n):
                 moves[n] = target
             account[n] = target
+        elif has:
+            mismatch.add(n)
         else:
             name_account.add(n)
+            memory.unnamed[n] = (m, stored.get(n))
+            account[n] = None
     for n, m in matches.items():
         if m:
             memory.last[n] = m
