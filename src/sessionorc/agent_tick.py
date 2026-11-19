@@ -480,9 +480,13 @@ class TickMixin:
                 for s in self.sessions.values()
                 if s.scratch and s.state not in ended and s.host == self.host
             }
+            # and every record's, live or ended, so the pass can take an ended one's past its keep (§4.6, TD-1945)
+            named = _scratch_named(self.sessions.values(), self.host, snapshot_at)
             # kept as a pass (TD-1506) the tick never waits on (TD-1945): `_prune_task` is what the tests drain, as
             # every `*_task` pass is drained
-            self._prune_task = asyncio.create_task(self._sweep(snapshot_at, live, live_ids, scratch, pruned_before))
+            self._prune_task = asyncio.create_task(
+                self._sweep(snapshot_at, live, live_ids, scratch, pruned_before, named)
+            )
         if self.mode == "home":
             self._supervise_containers()
             day = datetime.now().astimezone().date().isoformat()
@@ -5362,6 +5366,7 @@ class TickMixin:
         live_ids: set[str] | None,
         scratch: dict[str, str] | None,
         before: datetime | None = None,
+        named: dict[str, tuple[str, float | None]] | None = None,
     ) -> None:
         """One pass of the hourly sweep, in a thread, under the one lock a pass holds (§4.6 *The disk sweep*,
         TD-1945); a detached task, so a failure is logged here, never left to vanish."""
@@ -5370,7 +5375,7 @@ class TickMixin:
             if not self._sweep_lock.acquire(blocking=False):
                 return False
             try:
-                self._prune_runs(now, live, live_ids, scratch)
+                self._prune_runs(now, live, live_ids, scratch, named)
             finally:
                 self._sweep_lock.release()
             return True
@@ -5387,6 +5392,7 @@ class TickMixin:
         live: set[str],
         live_ids: set[str] | None = None,
         scratch: dict[str, str] | None = None,
+        named: dict[str, tuple[str, float | None]] | None = None,
     ) -> None:
         """Run-log retention (design §4.6): a log older than `runs_keep_days` goes unless it is in
         `live`, the logs of sessions still running (never truncate a live log: invariant 3). Logs
@@ -5399,9 +5405,12 @@ class TickMixin:
         The Add entry form's draft folders go by their claim (`_prune_drafts`, TD-630), before the
         early returns, and so does `scratch`, each live record of this host's scratch directory (§4.6
         *A session's scratch*, TD-1944): made again where it is gone, its stale files' access times moved
-        (`scratch.keep_alive`). Runs in a thread: touches files, never `self.sessions`."""
+        (`scratch.keep_alive`); `named`, every record's scratch on this host with when its record ended (None:
+        live), lets the scratch rule of §4.6 *The disk sweep* take what no live record holds (`scratch.sweep`),
+        the records read again from a list copy just before each removal. Runs in a thread: touches files, and
+        reads `self.sessions` only through a list copy."""
+        root = getattr(hosts.local_host(), "scratch_root", None) or hosts.DEFAULT_SCRATCH_ROOT
         if scratch:
-            root = getattr(hosts.local_host(), "scratch_root", None) or hosts.DEFAULT_SCRATCH_ROOT
             try:
                 large = scratch_mod.keep_alive(root, scratch, paths.home(), time.time_ns())
             except Exception:  # noqa: BLE001 — a bad record's scratch never stops the rest of the sweep
@@ -5409,6 +5418,27 @@ class TickMixin:
                 large = []
             for rid in large:
                 log.warning("large scratch: %s holds more than %d stale files", rid, scratch_mod.SWEEP_TOUCH_FILES)
+        if named is not None:
+            ended_states = ("exited", "closed")
+
+            def live_now(path: str) -> bool:
+                return any(s.scratch == path and s.state not in ended_states for s in list(self.sessions.values()))
+
+            try:
+                kept = scratch_mod.sweep(
+                    root,
+                    paths.home(),
+                    named,
+                    hosts.local_host().scratch_keep_hours,
+                    time.time(),
+                    live_now,
+                    adapters.transcript_roots()[0],
+                )
+            except Exception:  # noqa: BLE001 — the scratch rule never stops the rest of the sweep
+                log.exception("scratch removal failed")
+                kept = []
+            for path, why in kept:
+                log.info("scratch kept: %s (%s)", path, why)
         idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
         for f in paths.attachments_dir().glob("*/*.part"):
             try:
@@ -7338,3 +7368,27 @@ def _instant(value: Any) -> datetime | None:
 def _iso_of(t: datetime) -> str:
     """`t` in the one spelling the schedule keeps: UTC, whole seconds, `…Z`."""
     return t.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _scratch_named(records, host: str, now: datetime) -> dict[str, tuple[str, float | None]]:
+    """Each scratch directory this host's records name, with the record and when it ended — None while any record
+    naming it is live, else the latest end: `ended.at`, else `since` once `exited` or `closed`, else the snapshot's
+    time, so an unreadable end is kept a full `scratch_keep_hours` (§4.6 *The disk sweep*, TD-1945)."""
+    out: dict[str, tuple[str, float | None]] = {}
+    for s in records:
+        if not s.scratch or s.host != host:
+            continue
+        if s.state not in ("exited", "closed"):
+            out[s.scratch] = (s.id, None)
+            continue
+        at = now.timestamp()
+        for when in ((s.ended or {}).get("at"), s.since):
+            try:
+                at = datetime.fromisoformat(str(when).replace("Z", "+00:00")).timestamp()
+                break
+            except (TypeError, ValueError):
+                continue
+        prev = out.get(s.scratch)
+        if prev is None or (prev[1] is not None and at > prev[1]):
+            out[s.scratch] = (s.id, at)
+    return out

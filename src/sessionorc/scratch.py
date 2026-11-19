@@ -14,6 +14,7 @@ import json
 import os
 import secrets
 import stat
+import subprocess
 from pathlib import Path
 
 MAX_ROOT = 48  # bytes: a scratch home's `agent.sock` at `$SHIFTLEAD_SCRATCH/home` binds within 107 (§4.6)
@@ -220,3 +221,244 @@ def keep_alive(root: str | Path, records: dict[str, str], home: str | Path, now_
         if _touch(path, now_ns, SWEEP_TOUCH_FILES):
             large.append(record)
     return large
+
+
+# -- the disk sweep's scratch rule (design §4.6 *The disk sweep*, TD-1945) ----------------------------------------
+
+UNNAMED_AFTER_S = 3600  # a directory no record names (or naming a gone home) goes an hour after its newest write
+GIT_WORK = "git work"
+GIT_STEP = 20.0  # each git read's own timeout
+
+
+def _git_dirs(path: Path) -> list[tuple[str, Path]]:
+    """Every git store under `path`, not following a symlink: (`clone`, its directory) for a `.git` directory or a
+    bare repo (a directory holding `HEAD`, `objects` and `refs`), (`worktree`, its directory) for a `.git` file. A
+    store's own insides are not walked. Raises OSError where a directory cannot be read: kept as *git work*."""
+    found: list[tuple[str, Path]] = []
+    todo = [path]
+    while todo:
+        d = todo.pop()
+        names = {e.name: e for e in os.scandir(d)}
+        if d != path and "HEAD" in names and "objects" in names and "refs" in names:
+            found.append(("clone", d))  # a bare repo
+            continue
+        for name, e in names.items():
+            if e.is_symlink():
+                continue
+            if name == ".git":
+                found.append(("clone" if e.is_dir(follow_symlinks=False) else "worktree", d))
+            elif e.is_dir(follow_symlinks=False):
+                todo.append(Path(e.path))
+    return found
+
+
+def _repo_root(d: Path) -> Path | None:
+    """The checkout of the repo a store names, whose `docs/cadence.toml` the *landed* test reads; None for a
+    bare repo."""
+    from sessionorc import gitinfo
+
+    common = gitinfo._git(d, "rev-parse", "--path-format=absolute", "--git-common-dir", timeout=GIT_STEP)
+    if not common:
+        return None
+    c = Path(common.strip())
+    return c.parent if c.name == ".git" else None
+
+
+def _branch_holds(d: Path, ref: str, branch: str, upstream: str | None, root: Path | None) -> bool:
+    """Whether one branch (or a detached `HEAD`, `branch` empty) holds work: not *landed* and commits only on this
+    machine by §4.2's one measure, its `ahead` read against its upstream."""
+    from sessionorc import gitinfo
+
+    if branch and gitinfo.landed_of(d, ref, root=root, need_pin=True, timeout=GIT_STEP) in gitinfo.LANDED:
+        return False
+    ahead = 0
+    if upstream:
+        out = gitinfo._git(d, "rev-list", "--count", f"{upstream}..{ref}", timeout=GIT_STEP)
+        if out is None or not out.strip().isdigit():
+            return True
+        ahead = int(out.strip())
+    n, against = gitinfo._unpushed(d, branch or "(detached)", upstream, ahead, GIT_STEP, ref=ref)
+    return n > 0 or not against
+
+
+def _store_holds(kind: str, d: Path) -> bool:
+    """Whether one store under scratch holds git work (§4.6): a clone over every local branch and its stash, a
+    worktree over its own checked-out branch or detached `HEAD`; a work tree with modified or untracked files; or
+    a read that failed."""
+    from sessionorc import gitinfo
+
+    root = _repo_root(d)
+    bare = gitinfo._git(d, "rev-parse", "--is-bare-repository", timeout=GIT_STEP)
+    if bare is None:
+        return True
+    if bare.strip() != "true":
+        status = gitinfo._git(d, "status", "--porcelain", "--untracked-files=all", timeout=GIT_STEP)
+        if status is None or status.strip():
+            return True
+    if kind == "worktree":
+        branch = (gitinfo._git(d, "symbolic-ref", "-q", "--short", "HEAD", timeout=GIT_STEP) or "").strip()
+        if not branch:
+            return _branch_holds(d, "HEAD", "", None, root)
+        refs = [(branch, f"refs/heads/{branch}")]
+    else:
+        out = gitinfo._git(d, "for-each-ref", "--format=%(refname:short)", "refs/heads", timeout=GIT_STEP)
+        if out is None:
+            return True
+        refs = [(b, f"refs/heads/{b}") for b in out.split()]
+        head = (gitinfo._git(d, "symbolic-ref", "-q", "--short", "HEAD", timeout=GIT_STEP) or "").strip()
+        has_head = gitinfo._git(d, "rev-parse", "--verify", "-q", "HEAD^{commit}", timeout=GIT_STEP) is not None
+        if not head and has_head and _branch_holds(d, "HEAD", "", None, root):
+            return True
+        stash = gitinfo._git(d, "rev-parse", "--verify", "-q", "refs/stash", timeout=GIT_STEP)
+        if stash is not None:
+            n = gitinfo._git(d, "rev-list", "--count", "refs/stash", "--not", "--remotes", timeout=GIT_STEP)
+            if n is None or not n.strip().isdigit() or int(n.strip()):
+                return True
+    for branch, ref in refs:
+        up = gitinfo._git(
+            d, "rev-parse", "--abbrev-ref", "--symbolic-full-name", f"{branch}@{{upstream}}", timeout=GIT_STEP
+        )
+        upstream = (up or "").strip() or None
+        if upstream and gitinfo._git(d, "rev-parse", "--verify", "-q", upstream, timeout=GIT_STEP) is None:
+            upstream = None  # an upstream gone: passed as none, so `<ref> --not --remotes` answers
+        if _branch_holds(d, ref, branch, upstream, root):
+            return True
+    return False
+
+
+def git_work(path: str | Path) -> bool:
+    """Whether a scratch directory holds git work and is kept (*git work*, §4.6): any store under it that holds
+    some, or a tree or store that cannot be read."""
+    try:
+        stores = _git_dirs(Path(path))
+    except OSError:
+        return True
+    return any(_store_holds(kind, d) for kind, d in stores)
+
+
+def _worktree_mains(path: Path) -> list[Path]:
+    """The repos whose worktrees lie under `path` (by each `.git` file's `gitdir:`), for `git worktree prune` once
+    it is gone."""
+    mains: list[Path] = []
+    try:
+        stores = _git_dirs(path)
+    except OSError:
+        return mains
+    for kind, d in stores:
+        if kind != "worktree":
+            continue
+        try:
+            line = (d / ".git").read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if line.startswith("gitdir:"):
+            g = Path(line.removeprefix("gitdir:").strip())
+            if g.parent.name == "worktrees":
+                common = g.parent.parent
+                mains.append(common.parent if common.name == ".git" else common)
+    return mains
+
+
+def _newest_write(path: Path) -> float:
+    """The newest modification time of anything under `path`, itself included, not following a symlink."""
+    newest = path.lstat().st_mtime
+    todo = [path]
+    while todo:
+        try:
+            entries = list(os.scandir(todo.pop()))
+        except OSError:
+            continue
+        for e in entries:
+            try:
+                newest = max(newest, e.stat(follow_symlinks=False).st_mtime)
+                if e.is_dir(follow_symlinks=False):
+                    todo.append(Path(e.path))
+            except OSError:
+                continue
+    return newest
+
+
+def _remove(path: Path) -> None:
+    """Remove a scratch directory whole, a symlink inside it as a link, read-only directories made writable."""
+    import shutil
+
+    def again(fn, p, _exc):
+        with contextlib.suppress(OSError):
+            os.chmod(os.path.dirname(p), 0o700)
+            if not os.path.islink(p) and os.path.isdir(p):
+                os.chmod(p, 0o700)
+        fn(p)
+
+    shutil.rmtree(path, onexc=again)
+
+
+def sweep(
+    root: str | Path,
+    home: str | Path,
+    named: dict[str, tuple[str, float | None]],
+    keep_hours: float,
+    now_s: float,
+    live_now,
+    transcript_roots: list[Path],
+) -> list[tuple[str, str]]:
+    """The hourly sweep's scratch rule for directories no live record holds (§4.6 *The disk sweep*). `named` maps
+    a directory to the record naming it in the snapshot and when that record ended (None: live). A directory
+    straight under this host's `shiftlead-<uid>/` whose `owner.json` names this home goes once its record has
+    been ended `keep_hours`, or, named by no record or naming a home that no longer exists, an hour after its
+    newest write — unless `live_now(path)` (the records read again just before the removal) says a live record
+    holds it, or it holds git work or a transcript store. Never one naming another home that exists, nor one with
+    no readable `owner.json`. After a removal, `git worktree prune` runs in each repo a worktree under it named.
+    Returns the kept directories with why, and logs each removal."""
+    import logging
+    import shutil
+
+    log = logging.getLogger(__name__)
+    p = parent(root)
+    kept: list[tuple[str, str]] = []
+    try:
+        st = p.lstat()
+        if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
+            return kept
+        entries = sorted(os.scandir(p), key=lambda e: e.name)
+    except OSError:
+        return kept
+    for e in entries:
+        path = Path(e.path)
+        if not _under(path, p) or e.is_symlink() or not e.is_dir(follow_symlinks=False):
+            continue
+        try:
+            if e.stat(follow_symlinks=False).st_uid != os.getuid():
+                continue
+            got = owner(path)
+            if not got or not isinstance(got.get("home"), str):
+                kept.append((str(path), "no owner"))
+                continue
+            rid, ended = named.get(str(path), (None, None))
+            if got["home"] != str(home):
+                if Path(got["home"]).exists():
+                    continue  # another home's own agent sweeps it (*another home*, never taken by this one)
+                rid = None
+            if rid is not None:
+                if ended is None or now_s - ended < keep_hours * 3600:
+                    continue
+            elif now_s - _newest_write(path) < UNNAMED_AFTER_S:
+                continue
+            if live_now(str(path)):
+                kept.append((str(path), "live record"))
+                continue
+            if any(overlaps(path, t) for t in transcript_roots):
+                kept.append((str(path), "transcripts"))
+                continue
+            if git_work(path):
+                kept.append((str(path), GIT_WORK))
+                continue
+            mains = _worktree_mains(path)
+            _remove(path)
+            log.info("removed scratch %s (%s)", path, f"ended {rid}" if rid else "named by no live record")
+            for m in mains:
+                git = shutil.which("git") or "git"
+                with contextlib.suppress(OSError, subprocess.TimeoutExpired):
+                    subprocess.run([git, "-C", str(m), "worktree", "prune"], capture_output=True, timeout=GIT_STEP)
+        except OSError as err:
+            log.warning("could not weigh or remove scratch %s: %s", path, err)
+    return kept
