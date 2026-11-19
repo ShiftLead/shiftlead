@@ -224,3 +224,35 @@ async def test_an_older_slow_resolve_never_overwrites_a_newer_event_back_at_the_
     gate.set()
     await moved
     assert s.cwd == str(a.resolve())
+
+
+async def test_paths_resolves_a_relative_run_against_cwd_first_then_dir(agent, tmp_path):
+    """Design §4.6 *A path in the pane is a link* (TD-1988): the folder the tool is in comes first, `dir`
+    answers what it does not, and a `cwd` that is only a subdirectory of `dir` is first too."""
+    d, other = tmp_path / "d", tmp_path / "other"
+    (d / "sub").mkdir(parents=True)
+    other.mkdir()
+    for f in (d / "both.py", other / "both.py", d / "only_dir.py", other / "only_cwd.py", d / "sub" / "both.py"):
+        f.write_text("x\n")
+    s = _record(agent, d)
+    runs = ["both.py", "only_dir.py", "only_cwd.py", "nowhere.py", str(d / "only_dir.py")]
+    got = (await agent.rpc_paths(id=s.id, runs=runs))["paths"]
+    assert got == {  # no cwd: `dir` alone, as before
+        "both.py": str((d / "both.py").resolve()),
+        "only_dir.py": str((d / "only_dir.py").resolve()),
+        "only_cwd.py": None,
+        "nowhere.py": None,
+        str(d / "only_dir.py"): str((d / "only_dir.py").resolve()),
+    }
+    s.cwd = str(other.resolve())
+    got = (await agent.rpc_paths(id=s.id, runs=runs))["paths"]
+    assert got == {
+        "both.py": str((other / "both.py").resolve()),  # cwd's copy first
+        "only_dir.py": str((d / "only_dir.py").resolve()),  # cwd answers nothing: `dir`
+        "only_cwd.py": str((other / "only_cwd.py").resolve()),
+        "nowhere.py": None,
+        str(d / "only_dir.py"): str((d / "only_dir.py").resolve()),  # an absolute run is unchanged
+    }
+    s.cwd = str((d / "sub").resolve())  # a subdirectory of `dir`: it still comes first
+    got = (await agent.rpc_paths(id=s.id, runs=["both.py", "only_dir.py"]))["paths"]
+    assert got == {"both.py": str((d / "sub" / "both.py").resolve()), "only_dir.py": str((d / "only_dir.py").resolve())}

@@ -407,6 +407,16 @@ def _resolve_paths(runs: list[str], cwd: Path) -> dict[str, str | None]:
     return out
 
 
+def _resolve_in(runs: list[str], cwd: str | None, dir: Path) -> dict[str, str | None]:
+    """`rpc_paths`' record form (design §4.6 *A path in the pane is a link*, TD-1988): each run resolved
+    against the record's `cwd` where it has one, then each that answered nothing against `dir` — both
+    passes in the one ask, so the folder the tool is in comes first and a path printed before a move
+    still finds `dir`'s copy. An absolute or `~/` run answers the same in either pass."""
+    got = _resolve_paths(runs, Path(cwd)) if cwd else {}
+    rest = [r for r in runs if got.get(r) is None]
+    return {**got, **_resolve_paths(rest, dir)} if rest else got
+
+
 def _registered_checkout(repo: Any) -> Path | None:
     """`rpc_paths`' `repo`: its real path (`~` expanded) when that is one of `hosts.local_host().repos()`'
     real paths, by equality — a directory inside a checkout is none — else `None`, an empty, non-string
@@ -4260,7 +4270,8 @@ class HostAgent(
         host that this user can read (TD-688), its real path judged, so a symlink answers its target —
         else `None`: a directory, a missing or unreadable file, and a path `PATHS_PRIVATE` holds (a
         credential file stays text) alike, since the page needs no reason. A relative run is resolved
-        against `dir`, `~` is this user's home. It stats and reads nothing else. Served
+        against the record's `cwd` where it has one, then, where that answers nothing, against `dir`
+        (§4.2 *The record's `cwd`*, TD-1988); `~` is this user's home. It stats and reads nothing else. Served
         here, on the record's host — a node's record reaches its node through `read` (`NODE_READS`).
         With `repo` in place of `id` (§4.6 *A path in the Inbox and the Queue is a link too*, TD-1108)
         a relative run resolves against that main checkout, answered only when its real path is one of
@@ -4276,7 +4287,8 @@ class HostAgent(
         if id is not None and repo is not None:
             raise RpcError("paths takes id or repo, not both (design §4.6)")
         if id is not None:
-            return {"paths": await asyncio.to_thread(_resolve_paths, runs, Path(self._get(id).dir))}
+            s = self._get(id)
+            return {"paths": await asyncio.to_thread(_resolve_in, runs, s.cwd, Path(s.dir))}
         if repo is not None:
             root = await asyncio.to_thread(_registered_checkout, repo)
             if root is None:
