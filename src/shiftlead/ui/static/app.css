@@ -1124,6 +1124,12 @@ html.phonefocus .composer.nopen #send { min-height: 40px; border-radius: 20px; m
 .toolspage .toolstate.state-limited::before, .toolspage .toolstate.state-sign_in_again::before,
 .toolspage .toolstate.state-name_account::before { color: var(--needs); }
 .toolspage .toolwarn { flex-basis: 100%; color: var(--needs); }
+.toolspage .toolsettings { flex-basis: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16em), 1fr)); gap: 8px 14px; padding: 8px 0 4px; }
+.toolspage .toolsettings label, .toolspage .tooladdform label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); min-width: 0; }
+.toolspage .toolsettings input, .toolspage .toolsettings select, .toolspage .tooladdform input { min-width: 0; }
+.toolspage .tooladdlogin { padding: 6px 0 0 14px; }
+.toolspage .tooladdform { padding: 6px 0; align-items: flex-end; }
+.toolspage .toolsettings[hidden], .toolspage .tooladdform[hidden] { display: none; }
 .setpage .setcard { display: flex; flex-direction: column; gap: 10px; }
 .setpage .setrow { display: grid; grid-template-columns: 150px minmax(0, 220px) minmax(0, 1fr); gap: 10px; align-items: center; }
 .setpage .setpullcol { display: flex; flex-wrap: wrap; column-gap: 10px; row-gap: 2px; align-items: baseline; min-width: 0; }  /* the pull row's note and its reading, one column (TD-296 #17) */

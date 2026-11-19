@@ -261,6 +261,10 @@ def test_a_switched_host_draws_its_logins_in_each_state(monkeypatch, tmp_path):
     w = got["work"]
     assert w["label"] == "work laptop" and w["pin"] == "small" and w["note"] == "the main one"
     assert w["warnings"] == ["billing_mismatch"] and w["version"] == logins.version(data["logins"]["t:work"])
+    # its Settings but the pin, the Tools page's form values; unset ones null
+    assert w["settings"] == {
+        "billing": "metered", "prices": None, "extra_args": None, "unattended_args": None, "permission_wait": None
+    }  # fmt: skip
     accts = {a["key"]: a for a in card["accounts"]}
     assert set(accts) == {"t:paul", "t:key"}
     assert accts["t:paul"]["label"] == "Paul's" and accts["t:paul"]["plan"] == "Max"

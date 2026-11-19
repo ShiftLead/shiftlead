@@ -1100,6 +1100,11 @@ def login_tree(card: dict[str, Any], home: str) -> dict[str, Any]:
         lg["shown"] = _shown_folder(str(lg.get("folder") or ""), home)
         lg["said"] = LOGIN_STATES.get(str(lg.get("state")), str(lg.get("state") or ""))
         lg["warned"] = [LOGIN_WARNINGS.get(w, w) for w in lg.get("warnings") or []]
+        lg["form"] = {k: _setting_text(v) for k, v in (lg.get("settings") or {}).items()}  # the Settings form's values
+        lg["form"]["pin"] = _setting_text(lg.get("pin"))
+    fams = {a.get("key"): ((a.get("models") or {}).get("families") or []) for a in card.get("accounts") or []}
+    for lg in card.get("logins") or []:
+        lg["families"] = fams.get(lg.get("account")) or []  # a pin's choices: its account's families
     accounts = []
     for a in card.get("accounts") or []:
         key = str(a.get("key") or "")
@@ -1113,6 +1118,40 @@ def login_tree(card: dict[str, Any], home: str) -> dict[str, Any]:
         "unsigned": [lg for lg in rest if lg.get("state") != "name_account"],
         "naming": [lg for lg in rest if lg.get("state") == "name_account"],
     }
+
+
+def _setting_text(v: Any) -> str:
+    """A setting's value as the Settings form shows it, text that reads back as the same value: a list or a mapping
+    as JSON (which YAML reads), a number as its digits, unset empty."""
+    if v is None:
+        return ""
+    return json.dumps(v) if isinstance(v, list | dict) else str(v)
+
+
+LOGIN_SETTINGS = ("billing", "prices", "extra_args", "unattended_args", "permission_wait", "pin")
+
+
+def settings_writes(changes: dict[str, Any], billing: str | None) -> list[tuple[str, Any]]:
+    """A login's Settings form as its writes (design §4.2b *Controls and verbs*, TD-1974): each changed key's text read
+    as YAML, as `ao login set` reads it (a list, a mapping and a number say what they are; empty clears), in an order
+    no write of the press refuses for another: prices cleared before a billing that drops them, set after one that
+    takes them. `billing` is the login's as the page read it. A key that is not a setting, or text that does not read
+    as a value, is a 400 naming it."""
+    import yaml
+
+    out: dict[str, Any] = {}
+    for k, text in changes.items():
+        if k not in LOGIN_SETTINGS:
+            raise HTTPException(400, f"{k!r} is not a login's setting ({', '.join(LOGIN_SETTINGS)})")
+        text = "" if text is None else str(text)
+        try:
+            out[k] = yaml.safe_load(text) if text.strip() else None
+        except yaml.YAMLError:
+            raise HTTPException(400, f"{k}: {text!r} does not read as a value") from None
+    to_metered = out.get("billing", billing) == "metered" and billing != "metered"
+    first = ["prices"] if "prices" in out and not to_metered else []
+    order = [*first, "billing", *[k for k in LOGIN_SETTINGS if k not in ("billing", *first)]]
+    return [(k, out[k]) for k in order if k in out]
 
 
 async def agent_call(method: str, **params: Any) -> Any:
@@ -5115,7 +5154,30 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return await call("login_account", login=login, account=str(body.get("account") or ""), version=version)
         if verb == "forget":
             return await call("login_forget", login=login, version=version)
+        if verb == "settings":  # one write a key, the first sending the version read (§4.2b *Controls and verbs*)
+            changes = body.get("changes") if isinstance(body.get("changes"), dict) else {}
+            writes = settings_writes(changes, body.get("billing") or None)
+            saved: list[str] = []
+            for k, v in writes:
+                try:
+                    await call("login_set", login=login, key=k, value=v, version=None if saved else version)
+                except HTTPException as e:
+                    if not saved:
+                        raise
+                    raise HTTPException(e.status_code, f"{e.detail} ({', '.join(saved)} saved)") from None
+                saved.append(k)
+            return {"saved": saved}
         raise HTTPException(404, f"no login control {verb!r}")
+
+    @app.post("/api/tools/add")
+    async def tools_add(request: Request):
+        """§4.5a *Tools page: + Add login*, *Add on a found row* (TD-1974): `{tool, name, path, account}` →
+        `login_add` (`ao login add`), the person's own act — a `path` that is the tool's home is used, an empty or
+        missing one made one, and with none the adapter suggests the folder from the name; a login whose folder was
+        made has its tools shell opened for Sign in (`shell` in the reply), whose Focus the page then opens."""
+        body = await body_of(request)
+        params = {k: str(body.get(k) or "").strip() or None for k in ("name", "path", "account")}
+        return await call("login_add", tool=str(body.get("tool") or ""), **params)
 
     @app.post("/api/tools/account/label")
     async def tools_account_label(request: Request):

@@ -12,21 +12,31 @@
    `/api/tools/login/<verb>` and `/api/tools/account/label`, each its `ao login` / `ao account` verb. #}
 {% macro login_row(c, lg) %}
       <div class="toollogin row gap wrap" data-login="{{ c.adapter }}:{{ lg.name }}" data-version="{{ lg.version or '' }}" data-label="{{ lg.label or '' }}" data-note="{{ lg.note or '' }}"><span class="mono toolloginname">{{ lg.label or lg.name }}</span>{% if lg.label %}<span class="mono note">{{ lg.name }}</span>{% endif %}
-        <button class="btn sm link toolpen" type="button" data-act="label" title="{{ help_title('tools-label') }}" aria-label="label {{ lg.name }}">✎</button>
+        <button class="btn sm link toolpen" type="button" data-tool-act="label" title="{{ help_title('tools-label') }}" aria-label="label {{ lg.name }}">✎</button>
         <span class="mono note toolfolder">{{ lg.shown }}</span>
         {%- if lg.pin or lg.note %}<span class="note toolnote"><i>{% if lg.pin %}pinned: {{ lg.pin }}{% endif %}{% if lg.pin and lg.note %} · {% endif %}{{ lg.note or "" }}</i></span>{% endif %}
         <span class="grow"></span><span class="toolstate state-{{ lg.state }}">{{ lg.said }}</span>
-        {%- if lg.state == 'not_signed_in' %}<button class="btn sm toolact" type="button" data-act="shell" title="{{ help_title('tools-sign-in') }}">Sign in</button>
-        {%- elif lg.state == 'sign_in_again' %}<button class="btn sm toolact" type="button" data-act="shell" title="{{ help_title('tools-sign-in') }}">Sign in again</button>{% endif %}
-        {%- if lg.state == 'name_account' or lg.mismatch %}<button class="btn sm toolact" type="button" data-act="account" title="{{ help_title('tools-name-account') }}">Name its account</button>{% endif %}
+        {%- if lg.state == 'not_signed_in' %}<button class="btn sm toolact" type="button" data-tool-act="shell" title="{{ help_title('tools-sign-in') }}">Sign in</button>
+        {%- elif lg.state == 'sign_in_again' %}<button class="btn sm toolact" type="button" data-tool-act="shell" title="{{ help_title('tools-sign-in') }}">Sign in again</button>{% endif %}
+        {%- if lg.state == 'name_account' or lg.mismatch %}<button class="btn sm toolact" type="button" data-tool-act="account" title="{{ help_title('tools-name-account') }}">Name its account</button>{% endif %}
         <details class="more"><summary class="btn sm link" title="more">⋯</summary>
           <div class="menu">
-            <button type="button" data-act="shell" title="{{ help_title('tools-login-shell') }}">Open a shell here</button>
-            <button type="button" data-act="note" title="{{ help_title('tools-note') }}">Edit note</button>
-            <button type="button" data-act="forget" title="{{ help_title('tools-forget') }}">Forget this login</button>
+            <button type="button" data-tool-act="shell" title="{{ help_title('tools-login-shell') }}">Open a shell here</button>
+            <button type="button" data-tool-act="settings" title="{{ help_title('tools-settings') }}">Settings</button>
+            <button type="button" data-tool-act="note" title="{{ help_title('tools-note') }}">Edit note</button>
+            <button type="button" data-tool-act="forget" title="{{ help_title('tools-forget') }}">Forget this login</button>
           </div></details>
         {%- if lg.mismatch %}<div class="note toolwarn">these logins read different accounts: this one launches nothing until they agree</div>{% endif %}
-        {%- for w in lg.warned %}<div class="note toolwarn">{{ w }}</div>{% endfor %}</div>
+        {%- for w in lg.warned %}<div class="note toolwarn">{{ w }}</div>{% endfor %}
+        <form class="toolsettings" data-billing="{{ lg.form.billing }}" hidden>
+          <label>billing <select name="billing" data-was="{{ lg.form.billing }}"><option value="">not set</option>{% for b in ("subscription", "metered") %}<option{% if lg.form.billing == b %} selected{% endif %}>{{ b }}</option>{% endfor %}</select></label>
+          <label>prices <input class="mono" name="prices" value="{{ lg.form.prices }}" data-was="{{ lg.form.prices }}" placeholder='{"input": 3, "output": 15}' title="a metered login's price per million tokens of each kind (input, output, cache_read, cache_write); empty: a self-hosted model read in tokens"></label>
+          <label>extra_args <input class="mono" name="extra_args" value="{{ lg.form.extra_args }}" data-was="{{ lg.form.extra_args }}" placeholder='["--flag"]'></label>
+          <label>unattended_args <input class="mono" name="unattended_args" value="{{ lg.form.unattended_args }}" data-was="{{ lg.form.unattended_args }}" placeholder='["--flag"]'></label>
+          <label>permission_wait <input class="mono" name="permission_wait" value="{{ lg.form.permission_wait }}" data-was="{{ lg.form.permission_wait }}" placeholder="seconds" inputmode="numeric"></label>
+          <label>pin <select name="pin" data-was="{{ lg.form.pin }}"><option value="">none</option>{% for f in lg.families %}<option{% if lg.form.pin == f %} selected{% endif %}>{{ f }}</option>{% endfor %}{% if lg.form.pin and lg.form.pin not in lg.families %}<option selected>{{ lg.form.pin }}</option>{% endif %}</select></label>
+          <div class="row gap"><button class="btn sm" type="submit">Save</button><button class="btn sm ghost" type="button" data-cancel>Cancel</button></div>
+        </form></div>
 {% endmacro %}
 {% block body %}
 <div class="page inboxpage toolspage" id="toolspage">
@@ -45,7 +55,7 @@
     {% for a in c.tree.accounts %}
     <div class="toolbranch">
       <div class="toolacct" data-account="{{ a.key }}" data-version="{{ a.version or '' }}" data-label="{{ a.label or '' }}"><span class="toolacctname">{{ a.label or a.name }}</span>{% if a.label %} <span class="mono note">{{ a.name }}</span>{% endif %}
-        <button class="btn sm link toolpen" type="button" data-act="label" title="{{ help_title('tools-label') }}" aria-label="label {{ a.name }}">✎</button>
+        <button class="btn sm link toolpen" type="button" data-tool-act="label" title="{{ help_title('tools-label') }}" aria-label="label {{ a.name }}">✎</button>
         <div class="note">{{ a.plan or "plan not recorded by the tool" }}{% if a.billing %} · {{ a.billing }}{% endif %}</div>
         {% if a.models and a.models.families %}<div class="mono toolfams">{{ a.models.families | join(" · ") }}</div>{% endif %}</div>
       {% for lg in a.logins %}{{ login_row(c, lg) }}{% endfor %}
@@ -67,10 +77,19 @@
     {% for f in c.found %}
     <div class="toolfound row gap wrap"><span class="mono">{{ f.shown }}</span>
       {%- if f.own_home %}<span class="note">the tool's own home: ShiftLead launches {{ c.label }} into a folder of its own</span>
-      {%- else %}<span class="note">found here, signed in</span>{% endif %}</div>
+      {%- else %}<span class="note">found here, signed in</span>{% if c.tree %}<span class="grow"></span><button class="btn sm tooladdfound" type="button" data-tool="{{ c.adapter }}" data-path="{{ f.folder }}" title="{{ help_title('tools-add-found') }}">Add</button>{% endif %}{% endif %}</div>
     {% else %}
     <div class="toolfound row gap wrap"><span class="note">no signed-in folder found at the tool's default home</span></div>
     {% endfor %}
+    {% if c.tree %}
+    <div class="tooladdlogin"><button class="btn sm link tooladd" type="button" title="{{ help_title('tools-add-login') }}">+ Add login</button>
+      <form class="tooladdform row gap wrap" data-tool="{{ c.adapter }}" hidden>
+        <label>name <input class="mono" name="name" placeholder="e.g. {{ c.adapter }}-work"></label>
+        <label>folder <input class="mono" name="path" placeholder="empty: a new folder beside the tool's own" title="Use an existing folder: a {{ c.label }} home, or an empty or missing folder to make one"></label>
+        <label>account <input class="mono" name="account" placeholder="optional: its account's name"></label>
+        <button class="btn sm" type="submit">Add</button><button class="btn sm ghost" type="button" data-cancel>Cancel</button>
+      </form></div>
+    {% endif %}
   </section>
   {% else %}
   <div class="note">No coding tool ShiftLead has an adapter for is found on this host.</div>

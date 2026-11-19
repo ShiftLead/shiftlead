@@ -251,6 +251,8 @@ def _login_tree(
                 "warnings": warnings,
                 "note": e.get("note"),
                 "pin": e.get("pin"),
+                # its Settings as the person set them (§4.2b *A login's Settings*), the form's values; the pin above
+                "settings": {k: e.get(k) for k in logins.SETTINGS if k != "pin"},
                 "version": logins.version(e),
             }
         )

@@ -8,9 +8,13 @@ from typing import Any
 HOME = str(Path.home())
 
 
+UNSET = {"billing": None, "prices": None, "extra_args": None, "unattended_args": None, "permission_wait": None}
+
+
 def login(name: str, account: str | None, state: str, **kw: Any) -> dict[str, Any]:
     return {"name": name, "label": None, "folder": f"{HOME}/.{name}", "account": account, "state": state,
-            "mismatch": False, "warnings": [], "note": None, "pin": None, "version": "v", **kw}  # fmt: skip
+            "mismatch": False, "warnings": [], "note": None, "pin": None, "settings": dict(UNSET),
+            "version": "v", **kw}  # fmt: skip
 
 
 def read() -> dict[str, Any]:
@@ -22,7 +26,8 @@ def read() -> dict[str, Any]:
              "models": {"families": ["opus", "sonnet", "haiku"]}, "gauges": [], "version": "a"},
         ],
         "logins": [
-            login("claude-paul", "claude-code:paul", "signed_in", label="work laptop"),
+            login("claude-paul", "claude-code:paul", "signed_in", label="work laptop",
+                  settings={**UNSET, "billing": "subscription", "extra_args": ["--verbose"], "permission_wait": 30}),
             login("claude-conformance", "claude-code:paul", "limited", note="conformance walks record here"),
             login("claude-heather", None, "not_signed_in"),
             login("claude-new", None, "name_account"),
