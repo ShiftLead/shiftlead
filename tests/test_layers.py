@@ -81,6 +81,9 @@ def test_the_listing_is_agent_cadences_json_in_its_order(tmp_path, monkeypatch):
     rows = [
         {"root": "/l/theirs", "kind": "followed", "ref": "f00", "commit": "f00"},
         {"root": "/l/broken", "kind": "own", "ref": None, "commit": None, "error": "not a repo"},
+        # a followed layer is read at its pin alone, never its working tree: no pin, or one not a string, is left out
+        {"root": "/l/unpinned", "kind": "followed", "commit": "f01"},
+        {"root": "/l/badpin", "kind": "followed", "ref": 7, "commit": "f02"},
         {"root": "/l/mine", "kind": "own", "ref": None, "commit": "abc"},
     ]
 
@@ -309,3 +312,15 @@ def test_the_directors_preferences_are_ones_own_layers_alone_listed_with_no_repo
     monkeypatch.setattr(layers, "listing", none_here)
     with pytest.raises(layers.NoSource):
         layers.preferences([])
+
+
+def test_the_last_own_layer_with_preferences_wins(two_layers, tmp_path, monkeypatch):
+    """Two own layers both holding `preferences.md`: the later one in the listing's order is the director's."""
+    later = tmp_path / "mine-later"
+    _layer_repo(later, {"preferences.md": "- mine, later\n"})
+    found = [*two_layers, layers.Layer(root=later, kind="own", ref=None, commit="def5678")]
+    monkeypatch.setattr(layers, "listing", lambda where, src: list(found))
+    assert layers.preferences([]) == later / "shiftlead" / "preferences.md"
+    # the later own layer without one: the earlier own layer's
+    (later / "shiftlead" / "preferences.md").unlink()
+    assert layers.preferences([]) == two_layers[1].root / "shiftlead" / "preferences.md"
