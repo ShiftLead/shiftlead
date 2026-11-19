@@ -120,3 +120,22 @@ async def test_a_tick_is_not_delayed_by_a_slow_pass_and_starts_no_second(agent, 
     await agent.tick()
     await agent._prune_task
     assert len(calls) == 2 and agent._pruned_at != before
+
+
+@pytest.mark.integration
+async def test_a_run_written_after_the_snapshot_or_resumed_since_is_kept(agent):
+    """TD-1945 review: the pass is detached, so its snapshot can go stale; a log newer than it is passed over, and
+    a folder whose record reads live again just before the removal is kept."""
+    from sessionorc.models import Session
+
+    await park_ticks(agent)
+    (paths.home() / "hosts.yml").write_text("local:\n  runs_keep_mb: 1\n")
+    snap = datetime.now(UTC) - timedelta(hours=1)
+    new = paths.runs_dir() / "ao-new-1-20261119T000000Z.log"
+    _put(new, 3, 0)  # written after the snapshot
+    back = paths.attachments_dir() / "ao-back-2"
+    _put(back / "a.png", 3, 5)
+    agent.sessions["ao-back-2"] = Session(id="ao-back-2", name="b", kind="interactive", adapter="shell", dir="/")
+    agent._prune_runs(snap, set(), set())  # the snapshot read no live record
+    assert new.exists() and back.exists()
+    del agent.sessions["ao-back-2"]

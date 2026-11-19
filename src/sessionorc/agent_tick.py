@@ -465,7 +465,7 @@ class TickMixin:
         # running, or a dry run holding its lock, starts none and leaves `_pruned_at` as it was, to try at the next
         sweeping = (self._prune_task is not None and not self._prune_task.done()) or self._sweep_lock.locked()
         if snapshot_at - self._pruned_at > PRUNE_EVERY and not sweeping:
-            self._pruned_at = snapshot_at
+            pruned_before, self._pruned_at = self._pruned_at, snapshot_at
             # the live set is read here, on the loop (the class's one-writer rule); only the file
             # work goes to the thread
             ended = ("exited", "closed")
@@ -482,7 +482,7 @@ class TickMixin:
             }
             # kept as a pass (TD-1506) the tick never waits on (TD-1945): `_prune_task` is what the tests drain, as
             # every `*_task` pass is drained
-            self._prune_task = asyncio.create_task(self._sweep(snapshot_at, live, live_ids, scratch))
+            self._prune_task = asyncio.create_task(self._sweep(snapshot_at, live, live_ids, scratch, pruned_before))
         if self.mode == "home":
             self._supervise_containers()
             day = datetime.now().astimezone().date().isoformat()
@@ -5356,21 +5356,28 @@ class TickMixin:
             log.exception("the nightly backup of the store failed")
 
     async def _sweep(
-        self, now: datetime, live: set[str], live_ids: set[str] | None, scratch: dict[str, str] | None
+        self,
+        now: datetime,
+        live: set[str],
+        live_ids: set[str] | None,
+        scratch: dict[str, str] | None,
+        before: datetime | None = None,
     ) -> None:
         """One pass of the hourly sweep, in a thread, under the one lock a pass holds (§4.6 *The disk sweep*,
         TD-1945); a detached task, so a failure is logged here, never left to vanish."""
 
-        def run() -> None:
+        def run() -> bool:
             if not self._sweep_lock.acquire(blocking=False):
-                return  # a dry run holds it: the next tick tries again
+                return False
             try:
                 self._prune_runs(now, live, live_ids, scratch)
             finally:
                 self._sweep_lock.release()
+            return True
 
         try:
-            await asyncio.to_thread(run)
+            if not await asyncio.to_thread(run) and before is not None and self._pruned_at == now:
+                self._pruned_at = before  # a dry run took the lock first: `_pruned_at` as it was, the next tick tries
         except Exception:  # noqa: BLE001 — a detached task: log, and the next pass tries again
             log.exception("the hourly sweep failed")
 
@@ -5415,7 +5422,14 @@ class TickMixin:
         local = hosts.local_host()
         keep = local.runs_keep_days
         _prune_drafts(now, keep, live_ids)
-        _prune_runs_by_size(local.runs_keep_mb, live, live_ids)
+        ended = ("exited", "closed")
+        _prune_runs_by_size(
+            local.runs_keep_mb,
+            live,
+            live_ids,
+            now,
+            lambda rid: any(s.id == rid and s.state not in ended for s in list(self.sessions.values())),
+        )
         if keep <= 0:
             return
         cutoff = (now - timedelta(days=keep)).timestamp()
@@ -7162,11 +7176,19 @@ def _tree_size(p: Path) -> tuple[int, float]:
     return size, newest or st.st_mtime
 
 
-def _prune_runs_by_size(keep_mb: int, live: set[str], live_ids: set[str] | None) -> None:
+def _prune_runs_by_size(
+    keep_mb: int,
+    live: set[str],
+    live_ids: set[str] | None,
+    now: datetime | None = None,
+    still_live: Callable[[str], bool] | None = None,
+) -> None:
     """Run logs past `runs_keep_mb` (§4.6 *The disk sweep*, TD-1945): while the ended runs' logs and attachment
     folders together exceed it, the oldest go first — a live record's earlier runs among them, a live run's never.
     A base id's rounds log, the promote logs and the draft folders neither count nor go by it. `0` is no bound;
-    with `live_ids` None no attachment folder counts, as the age rule sweeps none."""
+    with `live_ids` None no attachment folder counts, as the age rule sweeps none. The snapshot can go stale while
+    the pass runs (TD-1945 review): an item written after `now` is passed over, and a folder whose record
+    `still_live` reads live again (a list copy, read just before the removal) is kept."""
     if keep_mb <= 0:
         return
     items: list[tuple[float, int, Path]] = []
@@ -7175,18 +7197,22 @@ def _prune_runs_by_size(keep_mb: int, live: set[str], live_ids: set[str] | None)
             continue
         with contextlib.suppress(OSError):
             size, at = _tree_size(f)
-            items.append((at, size, f))
+            if now is None or at <= now.timestamp():
+                items.append((at, size, f))
     if live_ids is not None:
         for d in paths.attachments_dir().glob("*"):
             if d.name in live_ids or d.is_symlink() or not d.is_dir() or paths.DRAFT.fullmatch(d.name):
                 continue
             with contextlib.suppress(OSError):
                 size, at = _tree_size(d)
-                items.append((at, size, d))
+                if now is None or at <= now.timestamp():
+                    items.append((at, size, d))
     total, bound = sum(i[1] for i in items), keep_mb * 1024 * 1024
     for _at, size, p in sorted(items, key=lambda i: (i[0], str(i[2]))):
         if total <= bound:
             break
+        if p.is_dir() and still_live is not None and still_live(p.name):
+            continue  # Resumed since the snapshot
         try:
             if p.is_dir():
                 shutil.rmtree(p)
