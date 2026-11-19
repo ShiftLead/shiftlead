@@ -191,7 +191,7 @@ def test_states_follow_the_table():
 class _Tool:
     """An agent adapter whose identity and credentials are set per folder."""
 
-    implements = frozenset({"find", "identity", "credentials_ok", "models"})
+    implements = frozenset({"find", "identity", "credentials_ok", "models", "env_signin"})
 
     def __init__(self, name, default, by_folder):
         self.name, self.label, self._default, self.by_folder = name, name, default, by_folder
@@ -214,6 +214,9 @@ class _Tool:
 
     def models(self, home, plan):
         return {"families": ["big", "small"], "default": None, "unconfirmed": plan is None}
+
+    def env_signin(self, env):
+        return bool(env.get("T_KEY"))
 
 
 def _host(monkeypatch, tool):
@@ -271,6 +274,9 @@ def test_a_switched_host_draws_its_logins_in_each_state(monkeypatch, tmp_path):
     assert accts["t:paul"]["billing"] == "metered" and accts["t:paul"]["models"]["families"] == ["big", "small"]
     assert card["found"] == [{"folder": f["default"], "own_home": False}]  # signed in and no login yet
     assert "SECRETMATCH" not in repr(r) and "OTHER" not in repr(r) and "Paul'" not in repr(r).replace("Paul's", "")
+    r = tools.read(b"s" * 32, env={"T_KEY": "k"}, home=tmp_path, memory=logins.Memory())
+    got = {lg["name"]: lg["warnings"] for lg in r["tools"][0]["logins"]}  # one key signs in all: each login warned
+    assert got["work"] == ["billing_mismatch", "env_key"] and all("env_key" in w for w in got.values())
 
 
 def test_a_login_that_joins_an_account_is_written(monkeypatch, tmp_path):

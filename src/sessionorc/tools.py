@@ -135,7 +135,7 @@ def read(
         card = _card(name, ad, env, salt, mine)
         (tools if card["installed"] else not_ready).append(card)
     if data is not None:
-        _login_tree(tools, data, salt, memory if memory is not None else logins.Memory(), home)
+        _login_tree(tools, data, salt, memory if memory is not None else logins.Memory(), home, env)
     try:
         known = adapters.known_tools()
     except Exception:  # noqa: BLE001 — a bad table row costs the known tools, never the supported tools' cards
@@ -201,12 +201,20 @@ def repoll(
 
 
 def _login_tree(
-    cards: list[dict[str, Any]], data: dict[str, Any], salt: bytes, memory: logins.Memory, home: Path | None
+    cards: list[dict[str, Any]],
+    data: dict[str, Any],
+    salt: bytes,
+    memory: logins.Memory,
+    home: Path | None,
+    env: Mapping[str, str] | None = None,
 ) -> None:
     """Each found tool's logins and accounts (design §4.2b *The page*, *A login's state*, *Matching across a
     restart*): every login's identity and credentials read, the whole pass settled once its reads are in, a login
-    that joined an account written, and the cards filled. A login whose tool is not found draws on no card."""
+    that joined an account written, and the cards filled. A login whose tool is not found draws on no card. `env` is
+    the host agent's environment, where one key can sign in every login of a tool (`env_signin`)."""
     by_tool = {c["adapter"]: c for c in cards}
+    env = dict(os.environ if env is None else env)
+    one_key = {t for t in by_tool if _ask(adapters.get(t), "env_signin", False, env) is True}
     reads: dict[str, tuple[dict[str, Any] | None, bool | None]] = {}
     for n, e in data["logins"].items():
         card = by_tool.get(logins.split(n)[0])
@@ -240,6 +248,8 @@ def _login_tree(
         warnings = []
         if ident and ident.get("billing") and e.get("billing") and ident["billing"] != e["billing"]:
             warnings.append("billing_mismatch")
+        if card["adapter"] in one_key:  # one key in the environment signs in every login of the tool: §4.2b
+            warnings.append("env_key")
         card["logins"].append(
             {
                 "name": logins.split(n)[1],

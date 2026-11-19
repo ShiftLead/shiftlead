@@ -444,6 +444,14 @@ def test_new_home_suggests_a_folder_and_make_home_makes_one_a_sign_in_fills(name
 
 
 @pytest.mark.parametrize("name", AGENTS)
+def test_env_signin_reads_the_environment_it_is_given(name):
+    """`env_signin(env)` is True for the environment whose one key signs in every login, False for an empty one."""
+    ad = _declares(name, "env_signin")
+    assert ad.env_signin({}) is False
+    assert ad.env_signin(HARNESSES[name].signin_env) is True
+
+
+@pytest.mark.parametrize("name", AGENTS)
 def test_install_and_signin_commands_are_the_persons_to_run(name):
     """`install_command()` is one line of text; `signin_command()` an argv whose first word is the binary."""
     ad = _declares(name, "install_command")

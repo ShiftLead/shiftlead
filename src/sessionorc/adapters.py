@@ -240,6 +240,8 @@ class Adapter(Protocol):
     #                                                      `home` is the tool's `default_home`, as a launch on a
     #                                                      profile with no `config_dir` sets nothing (§4.2b)
     #   install_command() -> str                          the vendor's documented install line, the person's to run
+    #   env_signin(env: Mapping) -> bool                  whether one key in `env` (the host agent's environment)
+    #                                                      signs in every login of the tool on the host (§4.2b)
     #   signin_command() -> list[str]                     the sign-in command alone, its environment `home_env`'s
     #   is_home(path: Path) -> bool                       whether a folder is this tool's home, by the files the tool
     #                                                      writes there (§4.2b); each of these five is declared in
@@ -290,6 +292,7 @@ OPTIONAL_METHODS = (
     "composer",
     "context",
     "conversations",
+    "env_signin",
     "find",
     "home_env",
     "install_command",

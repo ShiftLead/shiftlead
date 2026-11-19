@@ -307,7 +307,7 @@ class GeminiAdapter:
         {
             *("background", "composer", "context", "conversations", "links", "mail", "spend", "title"),
             *("find", "home_env", "install_command", "signin_command", "is_home", "identity", "models"),
-            *("new_home", "make_home"),
+            *("new_home", "make_home", "env_signin"),
         }
     )
 
@@ -484,6 +484,11 @@ class GeminiAdapter:
         return True if any((gem / f).is_file() for f in ("gemini-credentials.json", "oauth_creds.json")) else None
 
     # -- the Tools page's reads (design §4.2b *What the adapter reads*, TD-1971) -----------------
+
+    def env_signin(self, env: Mapping[str, str]) -> bool:
+        """Whether one key in `env` signs in every Gemini login on the host (design §4.2b *A login's state*): a
+        `GEMINI_API_KEY`, which `credentials_ok` takes for any home with a selected auth type."""
+        return bool(env.get("GEMINI_API_KEY"))
 
     def find(self) -> str | None:
         """The binary a launch finds, asked without launching (§4.2b): the PATH, then npm's user prefix, as
