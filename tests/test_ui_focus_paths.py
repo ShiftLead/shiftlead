@@ -568,8 +568,8 @@ def test_a_brace_set_is_asked_as_its_choices_and_the_first_that_resolves_is_the_
     # the sentence stop spares the set's own `}` and strips what follows it
     assert [r[:2] for r in got["braceStop"]] == [["a/x.{png,jpg}", "a/x.png"], ["a/x.{png,jpg}", "a/x.jpg"]]
     # a second set, a nested one, one before the first `/`, nine choices, one choice or an empty one, an unclosed set
-    # and a stray `}`: cut at the first brace, the part before it asked only where it names a file
-    assert [[r[1] for r in rs] for rs in got["braceCut"]] == [[], [], [], [], [], [], ["src/x-"], ["x/a"], []]
+    # and a stray `}`: cut at the first brace, the part before it, its trailing `/` dropped, asked where it holds a `/`
+    assert [[r[1] for r in rs] for rs in got["braceCut"]] == [[], [], [], [], [], [], ["src/x-"], ["x/a"], ["d/e"]]
     # the pane: two brace runs both link, the first's eight choices one ask, the second's two the next
     assert got["braceAsks"] == [[f"a/{i}.md" for i in range(1, 9)], ["x/y-1440.png", "x/y-420.png"]]
     assert [t for t, _ in got["braceLinks"]] == ["a/{1,2,3,4,5,6,7,8}.md", "x/y-{1440,420}.png"]

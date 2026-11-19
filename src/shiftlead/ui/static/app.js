@@ -7489,7 +7489,7 @@
   // marked `expansion` (`choice` its place in the set), the literal run never; the set's `,` is no piece separator,
   // and a `#`, `,` or `=` outside it makes pieces as above, each expanded. The tail strip spares the set's own `}`.
   // A second set, a nested one, a set before the first `/` or a stray brace cuts the run at its first brace, the part
-  // before it a candidate where it holds a `/` and does not end in one.
+  // before it, its trailing `/` dropped, a candidate where it holds a `/`.
   AO.pathRuns = function (text) {
     const urls = [];
     for (const m of String(text).matchAll(/[A-Za-z][A-Za-z0-9+.-]*:\/\/\S+/g)) urls.push([m.index, m.index + m[0].length]);
@@ -7504,7 +7504,7 @@
       const open = path.search(/[{}]/);
       if (open < 0) return { path: tail ? path : strip(path) };
       const close = path.indexOf("}", open + 1);
-      const cut = { path: strip(path.slice(0, open)), cut: true };
+      const cut = { path: strip(path.slice(0, open).replace(/\/+$/, "")), cut: true };  // as main read `a/b/{c`: `a/b`
       if (path[open] !== "{" || close < 0 || open < path.indexOf("/")) return cut;
       const body = path.slice(open + 1, close).split(",");
       const after = tail ? path.slice(close + 1) : strip(path.slice(close + 1));
@@ -7522,7 +7522,6 @@
         const b = braces(lc ? m[0].slice(0, lc.index) : m[0], !!lc);
         const path = b.path, tail = lc && !b.cut, run = tail ? m[0] : path;
         if (!path.includes("/") || /^\.*\/*$/.test(path) || path.length > 512) continue;  // the read's bound
-        if (b.cut && path.endsWith("/")) continue;  // cut at a brace after a `/`: no file named yet
         got.push({ run, path, line: tail ? +lc[1] : null, col: tail && lc[2] ? +lc[2] : null, start,
           end: start + run.length, set: b.set || null });
       }
