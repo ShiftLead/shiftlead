@@ -345,7 +345,7 @@ async def test_a_poll_runs_only_while_a_login_s_tools_shell_is_open(monkeypatch)
     ag = agent_mod.HostAgent.__new__(agent_mod.HostAgent)
     ag._tools_poll_task, ag._tools_polled_at = None, -1e9
     ag._tools_lock, ag._tools_salt, ag._tools_memory = asyncio.Lock(), b"s" * 32, logins.Memory()
-    ag._tools_kept = {"switched": True, "tools": []}
+    ag._tools_kept, ag._tools_gen, ag._tools_poll_failing = {"switched": True, "tools": []}, 0, False
     calls = []
     monkeypatch.setattr(tools, "repoll", lambda kept, salt, memory=None: calls.append(kept) or {**kept, "polled": 1})
     pane = type("P", (), {"dead": False})()
@@ -366,6 +366,72 @@ async def test_a_poll_runs_only_while_a_login_s_tools_shell_is_open(monkeypatch)
     ag._tools_polled_at, ag._tools_kept = -1e9, {"switched": False, "tools": []}
     ag._tools_poll_due({"ao--tools-t-paul": pane})
     assert ag._tools_poll_task.done() and len(calls) == 1  # an unswitched host polls no logins
+
+
+async def test_a_read_begun_before_a_logins_write_is_never_kept_and_its_memory_is_a_copy(monkeypatch, tmp_path):
+    """A poll in flight when a login write lands settled the file as it was: the write's cleared read stays cleared,
+    and the memory it settled is not kept; the pass settles a copy, never the memory the loop reads."""
+    import asyncio
+    import threading
+
+    from sessionorc import agent as agent_mod
+
+    ag = agent_mod.HostAgent.__new__(agent_mod.HostAgent)
+    ag._tools_poll_task, ag._tools_polled_at = None, -1e9
+    ag._tools_lock, ag._tools_salt, ag._tools_memory = asyncio.Lock(), b"s" * 32, logins.Memory()
+    ag._tools_kept, ag._tools_gen, ag._tools_poll_failing = {"switched": True, "tools": [], "label": "old"}, 0, False
+    loop_memory = ag._tools_memory
+    started, release = threading.Event(), threading.Event()
+
+    def repoll(kept, salt, memory=None):
+        assert memory is not loop_memory
+        memory.last["claude-code:paul"] = "m1"
+        started.set()
+        release.wait(5)
+        return {**kept, "polled": 1}
+
+    monkeypatch.setattr(tools, "repoll", repoll)
+    monkeypatch.setattr(logins, "update", lambda edit, home=None: "claude-code:paul labelled 'new'")
+    ag._tools_poll_due({"ao--tools-t-paul": type("P", (), {"dead": False})()})
+    await asyncio.to_thread(started.wait, 5)
+    assert await ag._login_write(lambda d: "x") == {"change": "claude-code:paul labelled 'new'"}
+    release.set()
+    await ag._tools_poll_task
+    assert ag._tools_kept is None and ag._tools_memory is loop_memory and not loop_memory.last
+    ag._tools_kept = {"switched": True, "tools": []}
+    ag._tools_polled_at = -1e9
+    monkeypatch.setattr(tools, "repoll", lambda kept, salt, memory=None: memory.last.update(x="m") or {**kept, "p": 2})
+    ag._tools_poll_due({"ao--tools-t-paul": type("P", (), {"dead": False})()})
+    await ag._tools_poll_task
+    assert ag._tools_kept["p"] == 2 and ag._tools_memory.last == {"x": "m"}  # no write between: both kept
+
+
+async def test_a_failing_poll_is_logged_once_until_one_succeeds(monkeypatch, caplog):
+    import asyncio
+
+    from sessionorc import agent as agent_mod
+
+    ag = agent_mod.HostAgent.__new__(agent_mod.HostAgent)
+    ag._tools_poll_task, ag._tools_polled_at = None, -1e9
+    ag._tools_lock, ag._tools_salt, ag._tools_memory = asyncio.Lock(), b"s" * 32, logins.Memory()
+    ag._tools_kept, ag._tools_gen, ag._tools_poll_failing = {"switched": True, "tools": []}, 0, False
+    ok = []
+
+    def repoll(kept, salt, memory=None):
+        if not ok:
+            raise logins.LoginError("logins.yml is malformed")
+        return {**kept, "p": 1}
+
+    monkeypatch.setattr(tools, "repoll", repoll)
+    for _ in range(3):
+        await ag._tools_poll()
+    assert sum("poll failed" in r.message for r in caplog.records) == 1
+    ok.append(1)
+    await ag._tools_poll()
+    assert not ag._tools_poll_failing and ag._tools_kept["p"] == 1
+    ok.clear()
+    await ag._tools_poll()
+    assert sum("poll failed" in r.message for r in caplog.records) == 2  # failing again after a success: said again
 
 
 def test_update_refuses_an_unswitched_host_and_writes_nothing_for_no_change(tmp_path):

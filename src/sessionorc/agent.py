@@ -1071,11 +1071,14 @@ class HostAgent(
         self._tools_kept: dict[str, Any] | None = None
         # what this run knows of the logins' matches (§4.2b *Matching across a restart*): in memory only, never written
         self._tools_memory = tools_mod.logins.Memory()
+        # bumped by each logins write: a read begun before it settled on the file as it was, so it is never kept
+        self._tools_gen = 0
         self._tools_lock = asyncio.Lock()
         self._tools_task: asyncio.Task[Any] | None = None
         # a tools shell's poll (§4.2b *The tools shell*): the pass in flight, and when the last one started
         self._tools_poll_task: asyncio.Task[Any] | None = None
         self._tools_polled_at = -TOOLS_POLL_SECONDS  # the first poll is due at once
+        self._tools_poll_failing = False  # a failing poll is logged once, until one succeeds
 
     # -- lifecycle ------------------------------------------------------------------------------
 
@@ -3982,15 +3985,21 @@ class HostAgent(
     async def _tools_reread(self) -> dict[str, Any]:
         """Read this host's tools again and keep the read (design §4.2b *What the adapter reads*, TD-1973)."""
         async with self._tools_lock:
+            gen, memory = self._tools_gen, copy.deepcopy(self._tools_memory)
             try:
-                got = await _in_daemon_thread(
-                    functools.partial(tools_mod.read, self._tools_salt, memory=self._tools_memory)
-                )
+                got = await _in_daemon_thread(functools.partial(tools_mod.read, self._tools_salt, memory=memory))
             except Exception as e:  # noqa: BLE001 — a failed read is said to the asker; the kept one stands
                 log.exception("the tools read failed")
                 raise RpcError(f"this host's tools could not be read: {type(e).__name__}") from None
-            self._tools_kept = got
+            self._tools_keep(gen, got, memory)
             return got
+
+    def _tools_keep(self, gen: int, got: dict[str, Any], memory: Any) -> None:
+        """Keep a read and the memory it settled, on the loop: the read's thread settled a copy, so nothing on the loop
+        reads the memory mid-pass. A logins write since the read began (`_tools_gen` moved) made it stale: neither is
+        kept, and the next read settles the file as it stands."""
+        if gen == self._tools_gen:
+            self._tools_kept, self._tools_memory = got, memory
 
     def _tools_poll_due(self, panes: Mapping[str, Any]) -> None:
         """Start a tools shell's poll where one is due (design §4.2b *The tools shell*), from the tick: while a login's
@@ -4023,14 +4032,18 @@ class HostAgent(
             kept = self._tools_kept
             if kept is None:
                 return
+            gen, memory = self._tools_gen, copy.deepcopy(self._tools_memory)
             try:
                 got = await _in_daemon_thread(
-                    functools.partial(tools_mod.repoll, kept, self._tools_salt, memory=self._tools_memory)
+                    functools.partial(tools_mod.repoll, kept, self._tools_salt, memory=memory)
                 )
-            except Exception:  # noqa: BLE001 — a poll is never worth more than a log line
-                log.exception("a tools shell's poll failed")
+            except Exception:  # noqa: BLE001 — a poll is never worth more than a log line, and one until it mends
+                if not self._tools_poll_failing:
+                    log.exception("a tools shell's poll failed; its next failures are not logged until one succeeds")
+                self._tools_poll_failing = True
                 return
-            self._tools_kept = got
+            self._tools_poll_failing = False
+            self._tools_keep(gen, got, memory)
 
     async def _tools_start(self) -> None:
         """The start's read (§4.2b): a failure is logged, and the next `tools` call reads again."""
