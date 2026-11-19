@@ -496,3 +496,6 @@ async def test_a_join_that_empties_an_account_moves_its_reserve(agent, tmp_path)
         got = await c.call("login_account", login="grind", account="work")  # paul-k keeps paul and api: it stays
         assert got["change"] == "claude-code:grind joined claude-code:work"
         assert settings_mod.read()["usage_gate"] == {"claude-code:paul-k": {"week": 20}}
+    import asyncio
+
+    await asyncio.gather(*list(agent._bg))  # the move's push and commit, detached: done before the home is torn down
