@@ -394,6 +394,11 @@ def view(
     if d["editor"]:
         fl = uiconf.file_link()
         d["editor"] = {**d["editor"], "file": editor_file(reach), "first": fl["folder_first"], "wait": fl["wait"]}
+        # …and the folder the session's tool works in (§4.5a *Focus side panel, Git card: working in*, §4.2 *The
+        # record's `cwd`*, TD-1988): the same form for `cwd_root`, under the same gate, served under
+        # `folder_first: false` too — that changes only a press's first launch
+        if (root := str(s.get("cwd_root") or "")) and (cwd := editor_link(root, reach)):
+            d["editor"]["cwd_url"] = cwd["url"]
     # Focus header **‹› VS Code** on the transcript (§4.5a, TD-578): the Transcript page's own link, from
     # the record's `transcript`. Drawn only for a record on this host under an `open_in:` (`drawn`), and
     # hidden there until the hook reports the file; another host's file is not at that path here

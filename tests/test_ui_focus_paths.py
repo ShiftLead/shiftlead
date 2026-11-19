@@ -74,6 +74,31 @@ def test_focus_is_served_editor_file_only_beside_its_editor_button(tmp_path, mon
     assert view({**rec, "host": "elsewhere"})["editor"] is None
 
 
+def test_focus_is_served_the_cwd_root_folder_beside_its_editor_button(tmp_path, monkeypatch, person):
+    """§4.5a *Focus side panel, Git card: working in* (TD-1988): `editor.cwd_url`, the folder form for the
+    record's `cwd_root`, under the button's own gate; served under `folder_first: false` too; absent under
+    `open_in: none`, on a record with no `cwd_root`, and on another host's record."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    from shiftlead.ui.app import view
+
+    other = tmp_path / "wt"
+    rec = {"id": "ao-x-1", "name": "w", "kind": "agent", "dir": str(tmp_path), "state": "idle"}
+    moved = {**rec, "cwd": str(other), "cwd_root": str(other)}
+    person("")
+    assert "cwd_url" not in view(rec)["editor"]
+    got = view(moved)["editor"]
+    assert got["cwd_url"].startswith("vscode://") and str(other) in got["cwd_url"] and got["cwd_url"] != got["url"]
+    person("file_link: {folder_first: false}")
+    assert view(moved)["editor"]["cwd_url"] == got["cwd_url"]
+    person("open_in: none")
+    assert view(moved)["editor"] is None
+    person("")
+    assert view({**moved, "host": "elsewhere"})["editor"] is None
+    reach = view({**moved, "host": "cm", "host_link": {"reach": {"vscode": REACH}}})["editor"]
+    assert reach["cwd_url"] == reach["url"] == REACH  # a reach is the reach link, whatever the folder
+
+
 @pytest.mark.unit
 def test_the_route_forwards_the_runs_to_the_paths_read(tmp_path, monkeypatch):
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))

@@ -492,3 +492,54 @@ def test_the_page_links_an_items_runs_by_its_context_and_keeps_its_markup():
     assert got["pollLinked"] == 1 and got["pollAsks"] == 0, "a redrawn row is relinked from the cache"
     assert got["foldLinks"] == 1 and got["foldAsks"] == 0, "a fold's body is linked from the cache, on both puts"
     assert got["newPageAsks"] == 1, "quiet lasts the page's life"
+
+
+@pytest.mark.unit
+def test_a_path_under_cwd_root_takes_that_folder_first_by_the_deeper_root(route, monkeypatch):
+    """§4.6 *A path in the pane is a link*, the press's first launch (TD-1988): a path under the record's
+    `cwd_root`, where that is the deeper of it and `git.top` holding the path, opens `cwd_root`'s folder; one
+    under `dir` alone opens the Session card's; none under `folder_first: false`; a reach record's through
+    its reach."""
+    c, home, repo = route
+    wt = repo / ".claude" / "worktrees" / "w"  # a worktree nested under the main checkout: under both
+    (wt / "src").mkdir(parents=True)
+    (wt / "src" / "y.py").write_text("y\n")
+    out = home.parent / "elsewhere"  # a folder in no repository, outside `dir`
+    out.mkdir()
+    (out / "z.py").write_text("z\n")
+    base = {"host": "kmaster", "dir": str(repo), "state": "idle", "git": {"top": str(repo)}}
+    _Fake.records["ao-m"] = {**base, "id": "ao-m", "cwd": str(wt), "cwd_root": str(wt)}
+    _Fake.records["ao-o"] = {**base, "id": "ao-o", "cwd": str(out), "cwd_root": str(out)}
+    link = {"reach": {"vscode": REACH}}
+    _Fake.records["ao-k@cm"] = {
+        **base,
+        "id": "ao-k@cm",
+        "host": "cm",
+        "cwd": str(wt),
+        "cwd_root": str(wt),
+        "host_link": link,
+    }
+    folder, moved = f"vscode://file{repo}?windowId=_blank", f"vscode://file{wt}?windowId=_blank"
+    y, x, z = str(wt / "src" / "y.py"), str(repo / "src" / "x.py"), str(out / "z.py")
+    got = _post(c, "id:ao-m", [y, x]).json()["paths"]
+    assert got == {y: {"path": y, "folder": moved}, x: {"path": x, "folder": folder}}
+    got = _post(c, "id:ao-o", [z, x]).json()["paths"]
+    assert got == {z: {"path": z, "folder": f"vscode://file{out}?windowId=_blank"}, x: {"path": x, "folder": folder}}
+    got = _post(c, "id:ao-k@cm", [y]).json()["paths"]
+    assert got[y]["folder"] == REACH  # `editor_link` with a reach is the reach link, whatever the folder
+    _person("file_link: {folder_first: false}")
+    assert _post(c, "id:ao-m", [y]).json()["paths"][y]["folder"] is None
+
+
+@pytest.mark.unit
+def test_under_cwd_root_takes_the_deeper_of_cwd_root_and_the_top_level():
+    from shiftlead.ui.common import under_cwd_root
+
+    nested = {"dir": "/r", "git": {"top": "/r"}, "cwd_root": "/r/.claude/worktrees/w"}
+    assert under_cwd_root("/r/.claude/worktrees/w/a.py", nested)
+    assert not under_cwd_root("/r/a.py", nested)
+    assert not under_cwd_root("/r/.claude/worktrees/wx/a.py", nested)  # a sibling sharing its prefix
+    # with `dir` in no repository and `cwd_root` an ancestor of it, a file under `dir` is `dir`'s
+    up = {"dir": "/a/b", "git": {}, "cwd_root": "/a"}
+    assert not under_cwd_root("/a/b/f.py", up) and under_cwd_root("/a/c/f.py", up)
+    assert not under_cwd_root("/x/f.py", {"dir": "/r", "git": {"top": "/r"}})  # no cwd_root

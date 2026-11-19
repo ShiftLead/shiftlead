@@ -91,18 +91,23 @@ def transcript_editor(path: str, here: bool) -> dict[str, Any] | None:
     return editor_file_link(path, folder=False) if here and path else None
 
 
-def transcript_paths(directory: str) -> dict[str, Any] | None:
+def transcript_paths(directory: str, cwd_root: str = "") -> dict[str, Any] | None:
     """What a path in a turn presses (§4.6 *A path in a transcript is a link too*, TD-691): the editor's
     file form (`file`, `{path}` unfilled) and the session's folder link sent first (`url`, `editor_link`
     of the record's `dir`; none with `folder_first: false`, so the press is one launch), as the pane's
-    `editor`. The caller asks it only where the page draws its **VS Code** button; None for no links."""
+    `editor`, and beside it `cwd_url`, the same link for the record's `cwd_root` where it has one (TD-1988),
+    none with `folder_first: false` as `url`; the press chooses by the pane's rule. The caller asks it only
+    where the page draws its **VS Code** button; None for no links."""
     file = editor_file()
     if not file:
         return None
-    folder = editor_link(directory) if directory and uiconf.file_link()["folder_first"] else None
+    first = uiconf.file_link()["folder_first"]
+    folder = editor_link(directory) if directory and first else None
+    cwd = editor_link(cwd_root) if cwd_root and first else None
     return {
         "label": uiconf.open_in().label,
         "file": file,
         "url": folder["url"] if folder else None,
+        "cwd_url": cwd["url"] if cwd else None,
         "wait": uiconf.file_link()["wait"],
     }

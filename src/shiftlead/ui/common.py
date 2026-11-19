@@ -1232,6 +1232,25 @@ def editor_link(directory: str, reach: str = "") -> dict[str, str] | None:
     return uiconf.editor_link(directory, local=h.local, remote=h.vscode_host, reach=reach)
 
 
+def under_cwd_root(path: str, s: Mapping[str, Any]) -> bool:
+    """Whether a resolved `path` of record `s` takes its `cwd_root`'s folder link first (design §4.6 *A path
+    in the pane is a link*, the press's first launch; §4.2 *The record's `cwd`*, TD-1988): `cwd_root` holds
+    it and is the deeper of `cwd_root` and `dir`'s top level (`git.top`, else `dir`) that does — a worktree
+    nested under the main checkout lies under both, and the inner wins, as `checkout_of` takes it. Real
+    paths compared as strings: the host wrote `cwd_root` and `git.top` as real paths, `paths` answers one."""
+    root = str(s.get("cwd_root") or "")
+    if not root or not path:
+        return False
+
+    def holds(top: str) -> bool:
+        return bool(top) and (path == top or path.startswith(top.rstrip("/") + "/"))
+
+    if not holds(root):
+        return False
+    top = str((s.get("git") or {}).get("top") or s.get("dir") or "")
+    return not holds(top) or len(root) > len(top)
+
+
 def editor_file(reach: str = "") -> str | None:
     """The editor button's file form for a record on this host, `{path}` unfilled (design §4.6 *A
     path in the pane is a link*, TD-501), or None for no file links."""
