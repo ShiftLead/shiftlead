@@ -187,6 +187,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     editor_file,  # noqa: F401
     editor_file_link,  # noqa: F401
     editor_link,  # noqa: F401
+    form_person,
     host_name,  # noqa: F401
     identity_note,  # noqa: F401
     ledger_link,
@@ -3178,10 +3179,15 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         if team.strip()
                         else {}
                     )
+                    # the person's own additions (§4.8, TD-1016), read at the home whatever host the session
+                    # lands on: under the directory's repo here, else the agent-cadence source among the home's
+                    person = await asyncio.to_thread(form_person, preset, None if away else dir.strip() or os.getcwd())
                     if away:
-                        brief, made_from = await asyncio.to_thread(preset.compose, refs or None, read=read, **ids)
+                        brief, made_from = await asyncio.to_thread(
+                            preset.compose, refs or None, read=read, person=person, **ids
+                        )
                     else:
-                        brief, made_from = preset.compose(refs or None, **ids)
+                        brief, made_from = preset.compose(refs or None, person=person, **ids)
             except (KeyError, ValueError) as e:
                 raise HTTPException(400, str(e).strip('"')) from None
         # design §4.5a New session **Team** picker (§4.9 *A person in the team*, TD-173): a role's own

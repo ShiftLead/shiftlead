@@ -285,3 +285,27 @@ def test_no_layer_adds_nothing_no_agent_cadence_is_named_and_a_failed_listing_is
     monkeypatch.setattr(layers, "listing", listing)
     with pytest.raises(layers.ListingError, match="exited 2"):
         layers.addition("work.md", tmp_path, [])
+
+
+def test_the_directors_preferences_are_ones_own_layers_alone_listed_with_no_repo(two_layers, tmp_path, monkeypatch):
+    """`preferences()`: the person's own layer's `preferences.md`, never a followed one's, listed with no repo
+    under the agent-cadence source among the home's repos (§4.8, §4.9b)."""
+    asked = []
+
+    def listing(where, src):
+        asked.append((where, src))
+        return list(two_layers)
+
+    monkeypatch.setattr(layers, "listing", listing)
+    assert layers.preferences([]) == two_layers[1].root / "shiftlead" / "preferences.md"
+    assert asked == [(None, None)]
+    # one's own without the file: none, though the followed layer has one
+    (two_layers[1].root / "shiftlead" / "preferences.md").unlink()
+    assert layers.preferences([]) is None
+
+    def none_here(where, src):
+        raise layers.NoSource(layers.NO_SOURCE)
+
+    monkeypatch.setattr(layers, "listing", none_here)
+    with pytest.raises(layers.NoSource):
+        layers.preferences([])

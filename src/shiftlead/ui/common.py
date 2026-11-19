@@ -34,8 +34,8 @@ from sessionorc.ledger import SQUASH as SQUASH_PR
 from sessionorc.models import (
     tokens_short,
 )
+from shiftlead import layers, repoconfig, teamrun, teams
 from shiftlead import org as orgmod
-from shiftlead import repoconfig, teamrun, teams
 from shiftlead.cli import stop_time as clistop
 
 from . import help as helpmod
@@ -1129,6 +1129,21 @@ def teams_for_form(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
             }
         )
     return out
+
+
+def form_person(preset: repoconfig.Role, repo: str | None) -> list[dict[str, Any]]:
+    """The New session form's `{person}` parts for a role pick (§4.8 *The person's own additions*, TD-1016), as
+    `ao new --role` takes them, read at the home: listed under `repo` here, else the agent-cadence source among the
+    home's repos. None for a role with no template, none with no agent-cadence to list the layers (*Your own rules*
+    then reads `none`), and a failed listing a `ValueError` the form refuses in its words."""
+    if preset.template is None and preset.defined is None:
+        return []
+    try:
+        return layers.person(preset.name, repo, layers.roots_of(org_here()[0], host_name()))
+    except layers.NoSource:
+        return []
+    except layers.ListingError as e:
+        raise ValueError(str(e)) from None
 
 
 def team_brief_ids(
