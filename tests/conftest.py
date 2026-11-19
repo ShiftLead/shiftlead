@@ -23,6 +23,7 @@ import contextlib
 import glob
 import json
 import os
+import shutil
 import signal
 import socket
 import subprocess
@@ -202,19 +203,57 @@ def sweep_stale_test_servers() -> None:
         _forget_owner(name)
 
 
+def _rmtree_writable(path: str) -> None:
+    """Remove a tree even where a test left a read-only file or directory in it (TD-2015)."""
+
+    def _retry(func, p, _exc):
+        with contextlib.suppress(OSError):
+            os.chmod(os.path.dirname(p), 0o700)
+            if not os.path.islink(p):
+                os.chmod(p, 0o700)
+            func(p)
+
+    shutil.rmtree(path, onexc=_retry)
+
+
+def sweep_stale_scratch_roots(base: str = "/tmp") -> None:
+    """A test run whose workers are killed, or whose session restarts mid-run, never reaches its scratch
+    root's cleanup, so its `aoscr-*` directory used to stay in `/tmp` for good: 182 of them held about
+    45,000 inodes of the shared tmpfs on 2026-11-19, which then refused every test's setup (TD-2015). The
+    sweep removes the roots of runs that have ended — an owner file naming a pid no longer running — and
+    leaves a live run's alone, as the tmux sweep does. A root no owner file names (one made before TD-2015)
+    is never touched: whose it is cannot be read, so it is left for a person to clear."""
+    for root in glob.glob(os.path.join(base, "aoscr-*")):
+        name = os.path.basename(root)
+        if not (OWNERS / name).exists() or _owner_alive(name):
+            continue
+        _rmtree_writable(root)
+        _forget_owner(name)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _scratch_root():
     """Every run's scratch directory (design §4.6, TD-1944) under a short root of the test run's own, never
     the host's `/tmp/shiftlead-<uid>/`: short, since a root past 48 bytes is refused, so not `tmp_path`.
-    The subprocess agent reads it from `AO_TEST_SCRATCH_ROOT` (`_agent_child.py`)."""
+    The subprocess agent reads it from `AO_TEST_SCRATCH_ROOT` (`_agent_child.py`). Its owner is recorded,
+    and the roots of runs that have ended are swept first (TD-2015)."""
     from sessionorc import hosts
 
-    with tempfile.TemporaryDirectory(prefix="aoscr-", dir="/tmp", ignore_cleanup_errors=True) as root:
-        mp = pytest.MonkeyPatch()
-        mp.setattr(hosts, "DEFAULT_SCRATCH_ROOT", root)
-        mp.setenv("AO_TEST_SCRATCH_ROOT", root)
+    sweep_stale_scratch_roots()
+    root = tempfile.mkdtemp(prefix="aoscr-", dir="/tmp")
+    name = os.path.basename(root)
+    with contextlib.suppress(OSError):
+        OWNERS.mkdir(exist_ok=True)
+        (OWNERS / name).write_text(str(os.getpid()))
+    mp = pytest.MonkeyPatch()
+    mp.setattr(hosts, "DEFAULT_SCRATCH_ROOT", root)
+    mp.setenv("AO_TEST_SCRATCH_ROOT", root)
+    try:
         yield root
+    finally:
         mp.undo()
+        _rmtree_writable(root)
+        _forget_owner(name)
 
 
 @pytest.fixture(scope="session", autouse=True)
