@@ -5861,6 +5861,30 @@
   // Recently completed window picker — its choice remembered in this browser, *day* first — a completed
   // line that opens to what was done, `/queue#TD-n` opening the card that holds the entry, and the lists
   // re-read on the poll and on the `queue` event.
+  // The Tools page (design §4.2b *The page*, §4.5 screen 14, TD-1973): **Check again** reads this host's tools again
+  // and draws the page afresh; **Install** opens the tool's install shell (TD-1972) and goes to its Focus, where the
+  // install line waits typed for the person's Enter. A refusal is the host agent's words, in place.
+  AO.tools = function () {
+    const page = $("#toolspage"); if (!page) return;
+    const said = $("#toolssaid", page);
+    const say = (text) => { said.textContent = text; said.hidden = false; said.classList.add("warn"); };
+    const post = async (path, body) => {
+      const r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body || {}) });
+      if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
+      return r.json();
+    };
+    const check = $("#toolscheck", page);
+    if (check) check.addEventListener("click", async () => {
+      check.disabled = true; check.textContent = "Checking…";
+      try { await post("/api/tools/check"); location.reload(); }
+      catch (e) { say(e.message); check.disabled = false; check.textContent = "Check again"; }
+    });
+    $$(".toolinstall", page).forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try { const s = await post("/api/tools/install", { tool: b.dataset.tool }); location.href = "/focus/" + encodeURIComponent(s.id); }
+      catch (e) { say(e.message); b.disabled = false; }
+    }));
+  };
   // the Spend page (design §4.5 screen 13, §4.5a *Spend page*; TD-832): every pick is a link carried in the URL,
   // and a press re-reads the body (`part=1`) in place rather than the page; a failed read follows the link
   AO.spend = function () {

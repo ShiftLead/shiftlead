@@ -252,6 +252,7 @@ PERSON_ONLY = frozenset(
         "ci_rerun",
         "add_repo",
         "tools_install",
+        "tools_check",
     }
 )
 

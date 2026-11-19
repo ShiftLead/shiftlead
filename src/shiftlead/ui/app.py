@@ -5000,6 +5000,61 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             },
         )
 
+    @app.get("/tools", response_class=HTMLResponse)
+    async def tools_page(request: Request):
+        """design §4.2b *The page*, §4.5 screen 14 **Tools** (TD-1953, built by TD-1973): the coding tools on the home's
+        host, from the host agent's kept `tools` read — a card per supported tool found, its version and found rows,
+        then *Not ready to run here*. Before the switch-over no accounts or logins are drawn."""
+        from sessionorc import tools as tools_mod
+
+        agent_down, got, why = False, None, ""
+        try:
+            got = await call("tools")
+        except HTTPException as e:
+            agent_down = e.status_code == 503
+            why = "" if agent_down else f"the host agent did not serve its tools: {e.detail}"  # an older agent
+        if got is not None:
+            home = str(Path.home())
+            for c in [*got.get("tools", []), *got.get("not_ready", [])]:
+                c["short"] = tools_mod.short_version(c.get("version"))
+                for f in c.get("found", []):
+                    folder = str(f.get("folder") or "")
+                    f["shown"] = (
+                        "~ (the tool's default)"
+                        if folder == home
+                        else "~" + folder[len(home) :]
+                        if folder.startswith(home + "/")
+                        else folder
+                    )
+            got["read_ago"] = _age(got.get("read_at"), datetime.now(UTC)) or "0s"
+        return templates.TemplateResponse(
+            request,
+            "tools.html",
+            {
+                "t": got,
+                "why": why,
+                "agent_down": agent_down,
+                "host": host_name(),
+                "active": "",
+                "volatile": hosts.local_host().volatile,
+                "usage": {} if agent_down else await chip_usage(call),
+                "build_chip": None if agent_down else await chip_build(call),
+            },
+        )
+
+    @app.post("/api/tools/check")
+    async def tools_check():
+        """§4.5a *Tools page: Check again* (TD-1973): `tools_check`, the person's own act — this host's tools read
+        again and kept; the page draws it afresh."""
+        return await call("tools_check")
+
+    @app.post("/api/tools/install")
+    async def tools_install(request: Request):
+        """§4.5a *Tools page: Install* (TD-1973): `{tool}` → `tools_install`, the tool's install shell with its install
+        command typed and not run (§4.2b *The tools shell*, TD-1972); the page opens its Focus."""
+        body = await request.json()
+        return await call("tools_install", tool=str(body.get("tool") or ""))
+
     @app.get("/settings", response_class=HTMLResponse)
     async def settings_view(request: Request):
         agent_down, got, usage, info, why = False, {}, {}, {}, ""
