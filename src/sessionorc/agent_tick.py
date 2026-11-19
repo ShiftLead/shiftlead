@@ -23,6 +23,7 @@ from typing import Any
 from sessionorc import (
     adapters,
     agent_common,
+    cachesweep,
     hosts,
     link,
     mail,
@@ -482,6 +483,7 @@ class TickMixin:
             }
             # and every record's, live or ended, so the pass can take an ended one's past its keep (§4.6, TD-1945)
             named = _scratch_named(self.sessions.values(), self.host, snapshot_at)
+            self._sweep_roots = sorted(set(queue_mod.repo_roots(self._repos).values()))  # the cache rule's pins
             # kept as a pass (TD-1506) the tick never waits on (TD-1945): `_prune_task` is what the tests drain, as
             # every `*_task` pass is drained
             self._prune_task = asyncio.create_task(
@@ -5443,6 +5445,7 @@ class TickMixin:
                 log.exception("scratch removal failed")
             for path, why in kept:
                 log.info("scratch kept: %s (%s)", path, why)
+        self._sweep_caches(now)
         idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
         for f in paths.attachments_dir().glob("*/*.part"):
             try:
@@ -5503,6 +5506,20 @@ class TickMixin:
                     log.warning("could not prune attachment %s: %s", f, e)
             with contextlib.suppress(OSError):  # not empty: a younger file keeps it
                 folder.rmdir()
+
+    def _sweep_caches(self, now: datetime) -> None:
+        """The cache rule of §4.6 *The disk sweep* (TD-1945): agent-cadence trees no registered repo's `origin`
+        default branch pins, older than `cache_keep_days`, removed only by the default home's host agent and only
+        where it registers a repo (a home with no roster leaves every tree), every pin read or none removed."""
+        roots = list(self._sweep_roots)
+        if not roots or not cachesweep.default_home():
+            return
+        try:
+            pinned = cachesweep.pins(roots)
+            if pinned is not None:
+                cachesweep.sweep_trees(pinned, hosts.local_host().cache_keep_days, now.timestamp())
+        except Exception:  # noqa: BLE001 — the cache rule never stops the rest of the sweep
+            log.exception("cache sweep failed")
 
     async def _clear_gone_kept(self) -> None:
         """A closed record still saying its worktree is kept stops saying so once the directory is gone, such as
