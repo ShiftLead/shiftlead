@@ -257,9 +257,10 @@ def test_a_stop_is_never_held_by_the_start_read(tmp_path, monkeypatch):
 
     slow = tmp_path / "slow-bin"
     slow.mkdir()
-    for name in ("claude", "gemini", "grok"):  # each tool's `--version` sits out its whole bound
+    token = f"59.{os.getpid()}{time.monotonic_ns() % 10**6}"  # this run's own `sleep`, never an earlier run's
+    for name in ("claude", "gemini"):  # each found on the PATH; its `--version` sits out its whole bound
         b = slow / name
-        b.write_text(f"#!/bin/sh\nexec sleep 59.7311 # {name}\n")
+        b.write_text(f"#!/bin/sh\nexec sleep {token} # {name}\n")
         b.chmod(0o755)
     home = tmp_path / "home"
     sock_name = private_socket_name()
@@ -279,7 +280,7 @@ def test_a_stop_is_never_held_by_the_start_read(tmp_path, monkeypatch):
         assert wait_for_sync(lambda: sock.exists() or proc.poll() is not None, timeout=10.0)
         assert proc.poll() is None, proc.communicate(timeout=5)[1]
         ps = ["ps", "-eo", "args"]
-        assert wait_for_sync(lambda: b"sleep 59.7311" in subprocess.run(ps, capture_output=True).stdout)
+        assert wait_for_sync(lambda: f"sleep {token}".encode() in subprocess.run(ps, capture_output=True).stdout)
         t0 = time.monotonic()
         proc.send_signal(signal.SIGTERM)
         _, err = proc.communicate(timeout=8)
