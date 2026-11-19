@@ -6,7 +6,8 @@ agent whose `SHIFTLEAD_HOME` is the default path, so a scratch home with no rost
 The removal holds agent-cadence's cache lock (`~/.cache/agent-cadence/lock`), renames the tree aside under a
 `.tmp-` name (which the launcher itself clears under that lock, should a removal die midway), makes it writable
 (trees are made read-only) and removes it. A tree is fetched again when next wanted: its removal costs time, never
-work. A repo's own precheck cache is never this rule's.
+work. A pin a checkout of a registered repo names (a branch's bump, in its own working tree) is
+kept too. A repo's own precheck cache is never this rule's.
 """
 
 from __future__ import annotations
@@ -56,9 +57,14 @@ def pin_of(root: str | Path) -> tuple[bool, str | None]:
     has = gitinfo._git_rc(root, "cat-file", "-e", spec, timeout=GIT_STEP)
     if has is None:
         return False, None
-    if has != 0:
-        return True, None
-    text = gitinfo._git(root, "show", spec, timeout=GIT_STEP)
+    if has != 0:  # absent only where the commit's tree lists no such file; a broken object store is no reading
+        listed = gitinfo._git(root, "ls-tree", "--name-only", base, "--", PIN_FILE, timeout=GIT_STEP)
+        return (True, None) if listed is not None and not listed.strip() else (False, None)
+    return _parse(gitinfo._git(root, "show", spec, timeout=GIT_STEP))
+
+
+def _parse(text: str | None) -> tuple[bool, str | None]:
+    """(read, ref) of a `docs/cadence.toml`'s text, None being no reading."""
     if text is None:
         return False, None
     try:
@@ -71,16 +77,42 @@ def pin_of(root: str | Path) -> tuple[bool, str | None]:
     return True, (ref if isinstance(ref, str) and COMMIT.fullmatch(ref) else None)
 
 
+def checkout_pins(root: str | Path) -> tuple[bool, set[str]]:
+    """The pins the repo's checkouts name as written in each one's own `docs/cadence.toml` — the main checkout's
+    and every worktree's (`git worktree list`), since the launcher runs a branch's own pin — read or not."""
+    out = gitinfo._git(root, "worktree", "list", "--porcelain", timeout=GIT_STEP)
+    if out is None:
+        return False, set()
+    found: set[str] = set()
+    for line in out.splitlines():
+        if not line.startswith("worktree "):
+            continue
+        f = Path(line.removeprefix("worktree ")) / PIN_FILE
+        try:
+            text = f.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            continue
+        except OSError:
+            return False, set()
+        ok, ref = _parse(text)
+        if not ok:
+            return False, set()
+        if ref:
+            found.add(ref)
+    return True, found
+
+
 def pins(roots: Iterable[str | Path]) -> set[str] | None:
-    """Every registered repo's pin on its `origin` default branch, or None where any cannot be read."""
+    """Every registered repo's pin on its `origin` default branch and in each of its checkouts, or None where
+    any cannot be read."""
     out: set[str] = set()
     for root in roots:
         ok, ref = pin_of(root)
-        if not ok:
-            log.warning("cache sweep: the pin of %s cannot be read, so no tree is removed this pass", root)
+        ok2, local = checkout_pins(root)
+        if not (ok and ok2):
+            log.warning("cache sweep: a pin of %s cannot be read, so no tree is removed this pass", root)
             return None
-        if ref:
-            out.add(ref)
+        out |= local | ({ref} if ref else set())
     return out
 
 
@@ -88,7 +120,8 @@ def _newest_write(path: Path) -> float:
     """The newest modification time under `path`, itself included, never following a symlink; an entry that
     cannot be read counts as written now."""
     newest = path.lstat().st_mtime
-    for d, dirs, files in os.walk(path, onerror=lambda _e: None):
+    unread: list[OSError] = []
+    for d, dirs, files in os.walk(path, onerror=unread.append):
         for name in dirs + files:
             try:
                 newest = max(newest, os.lstat(os.path.join(d, name)).st_mtime)
@@ -96,7 +129,7 @@ def _newest_write(path: Path) -> float:
                 continue
             except OSError:
                 return time.time()
-    return newest
+    return time.time() if unread else newest
 
 
 def _writable(path: Path) -> None:
@@ -125,6 +158,11 @@ def sweep_trees(pinned: set[str], keep_days: float, now_s: float, cache: Path | 
             log.info("cache sweep: agent-cadence's cache lock is held, so no tree is removed this pass")
             return removed
         try:
+            for e in os.scandir(trees):  # an aside a pass left half removed: gone first, under the lock
+                if e.name.startswith(".tmp-sweep-") and not e.is_symlink():
+                    with contextlib.suppress(OSError):
+                        _writable(Path(e.path))
+                    shutil.rmtree(e.path, ignore_errors=True)
             for e in sorted(os.scandir(trees), key=lambda e: e.name):
                 if not COMMIT.fullmatch(e.name) or e.name in pinned:
                     continue
@@ -138,6 +176,9 @@ def sweep_trees(pinned: set[str], keep_days: float, now_s: float, cache: Path | 
                     os.rename(tree, aside)
                     _writable(aside)
                     shutil.rmtree(aside, ignore_errors=True)
+                    if aside.exists():
+                        log.warning("agent-cadence tree %s was moved aside but not wholly removed", tree)
+                        continue
                     removed.append(str(tree))
                     log.info("removed agent-cadence tree %s (no registered repo pins it)", tree)
                 except OSError as err:

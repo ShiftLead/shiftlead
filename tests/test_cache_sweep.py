@@ -70,7 +70,7 @@ def test_the_pin_is_read_on_origin_s_default_branch(tmp_path):
     assert cachesweep.pin_of(repo(tmp_path, "n", None)) == (True, None)
     assert cachesweep.pin_of(repo(tmp_path, "u", "[[[ not toml")) == (False, None)
     assert cachesweep.pin_of(tmp_path / "nowhere") == (False, None)
-    assert cachesweep.pins([pinned, tmp_path / "n"]) == {PINNED}
+    assert cachesweep.pins([pinned, tmp_path / "n"]) == {PINNED, OLD}  # the checkout's own, as written, too
     assert cachesweep.pins([pinned, tmp_path / "u"]) is None
 
 
@@ -114,3 +114,22 @@ async def test_only_the_default_home_with_a_roster_takes_a_tree(agent, monkeypat
     agent._sweep_roots = [str(pinned)]
     agent._sweep_caches(now)
     assert p.exists() and not o.exists()
+
+
+def test_a_checkout_s_own_pin_is_kept_and_a_broken_one_removes_nothing(tmp_path):
+    pinned = repo(tmp_path, "p", f'[agent-cadence]\nsource = "/x"\nref = "{PINNED}"\n')
+    wt = tmp_path / "wt"
+    git(pinned, "worktree", "add", "-q", "-b", "bump", str(wt))
+    (wt / "docs" / "cadence.toml").write_text(f'[agent-cadence]\nsource = "/x"\nref = "{YOUNG}"\n')  # a bump
+    assert cachesweep.pins([pinned]) == {PINNED, YOUNG}
+    (wt / "docs" / "cadence.toml").write_text("[[[ mid-edit")
+    assert cachesweep.pins([pinned]) is None
+
+
+def test_a_half_removed_aside_is_cleared_and_other_names_are_never_the_rule_s(tmp_path):
+    cache = tmp_path / "cache"
+    stale = tree(cache, ".tmp-sweep-x-1", 0)
+    link = cache / "trees" / OLD
+    link.symlink_to(tmp_path)  # a link named like a commit is never followed nor removed
+    assert cachesweep.sweep_trees(set(), 14, time.time(), cache) == []
+    assert not stale.exists() and link.is_symlink() and tmp_path.exists()
