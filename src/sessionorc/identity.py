@@ -59,6 +59,7 @@ READS = frozenset(
         "occupancy",
         "name_check",
         "disk",
+        "disk_dry_run",
         "recent_dirs",
         "usage",
         "repos",

@@ -3654,6 +3654,17 @@ def disk_lines(by_host: dict[str, Any]) -> list[str]:
             silent = "did not answer" in str(why) or "dropped" in str(why)  # a refusal is printed as the host's own
             out.append(f"{host}: unreachable — {why}" if silent and "unreachable" not in str(why) else f"{host}: {why}")
             continue
+        if e.get("dry_run"):
+            short = " (partial: it stopped short)" if e.get("partial") else ""
+            out.append(f"{host}: a dry run, nothing removed{short}")
+            for kind, k in (e.get("kinds") or {}).items():
+                held = _bytes(k.get("held")) + (" (partial)" if k.get("partial") else "")
+                out.append(f"  {kind:<10} held {held}, would remove {_bytes(k.get('removed'))}")
+                for gone in k.get("would_remove") or []:
+                    out.append(f"    would remove {gone.get('path')} ({_bytes(gone.get('bytes'))})")
+                for kept in k.get("kept") or []:
+                    out.append(f"    kept {kept.get('path')} — {kept.get('why')}")
+            continue
         out.append(f"{host}: {'last pass ' + e['at'] if e.get('at') else 'no pass yet'}")
         for kind, k in (e.get("kinds") or {}).items():
             held = _bytes(k.get("held")) + (" (partial)" if k.get("partial") else "")
@@ -3682,13 +3693,14 @@ def disk_lines(by_host: dict[str, Any]) -> list[str]:
 
 
 def cmd_disk(args: argparse.Namespace) -> int:
-    """`ao disk [--host <host>] [--json]` (design §4.7, §4.6 *The sweep's reading*, TD-1946): the disk sweep's reading
-    for every host, or one. `--json` prints `{host: entry}` whichever was asked: a bare reading (one host's, or a
+    """`ao disk [--host <host>] [--dry-run] [--json]` (design §4.7, §4.6 *The sweep's reading*, TD-1946): the disk
+    sweep's reading for every host, or one; `--dry-run` asks each host agent for a pass that removes nothing and
+    prints what it would remove. `--json` prints `{host: entry}` whichever was asked: a bare reading (one host's, or a
     node's own) is keyed by the `host` it carries. A read, under no grant; it waits `DIGEST_TIMEOUT` plus
     `CALL_TIMEOUT`, as `ao feedback`'s reads do."""
     params = {"host": args.host} if args.host else {}
     try:
-        got = call_sync("disk", _timeout=feedback.WAIT, **params)
+        got = call_sync("disk_dry_run" if args.dry_run else "disk", _timeout=feedback.WAIT, **params)
     except AgentError as e:
         if "unknown method" not in str(e):
             raise
@@ -6176,6 +6188,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_doctor)
     p = add("disk", help="the disk sweep's reading for every host: held, removed, kept and free (§4.7)")
     p.add_argument("--host", metavar="host", help="this host alone (at a node, only its own)")
+    p.add_argument("--dry-run", action="store_true", help="run a pass that removes nothing and print what it would")
     p.set_defaults(fn=cmd_disk)
     p = add("doing", help="say in one line what this session is doing now (design §4.8)")
     p.add_argument("words", nargs="*", metavar="line", help="one line; the last one replaces the one before")

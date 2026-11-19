@@ -65,8 +65,9 @@ class Tally:
         self.listed: set[str] = set()
         self.measured: dict[str, int] = {}
         self.removed = 0
-        self.gone_paths: set[str] = set()
+        self.gone_paths: dict[str, int] = {}  # each removed path (a dry run's: each it would remove) and its bytes
         self.kept: list[tuple[str, str]] = []
+        self.held_gone = 0  # the removed bytes that were among those held (a dry run reads them back as held)
         self.unlisted = False  # the rule could not list its items this pass: the last reading stands, *partial*
 
     def list(self, path: str | Path) -> None:
@@ -88,10 +89,14 @@ class Tally:
     def gone(self, path: str | Path, size: int | None = None) -> None:
         """`path` was removed: its bytes (`size`, else as last measured) count as removed, and it is held no more."""
         p = str(path)
+        if p in self.gone_paths:  # a dry run's second rule over a path it already counted: once
+            return
         if size is None:
             size = self.measured.get(p, self._known.get(p, 0))
+        if p in self.listed:
+            self.held_gone += size
         self.removed += size
-        self.gone_paths.add(p)
+        self.gone_paths[p] = size
         self.listed.discard(p)
         self.measured.pop(p, None)
 
@@ -104,6 +109,12 @@ class Book:
 
     def __init__(self) -> None:
         self.sizes: dict[str, dict[str, int]] = {k: {} for k in KINDS}
+
+    def copy(self) -> Book:
+        """A book of the same sizes that a dry run folds into and then drops, so the pass's own memory stays."""
+        other = Book()
+        other.sizes = {k: dict(v) for k, v in self.sizes.items()}
+        return other
 
     def tallies(self) -> dict[str, Tally]:
         return {k: Tally(self.sizes[k]) for k in KINDS}
@@ -128,6 +139,19 @@ class Book:
                 "removed": t.removed,
                 "kept": [{"path": p, "why": w} for p, w in t.kept],
             }
+        return out
+
+    def dry(self, tallies: dict[str, Tally]) -> dict[str, Any]:
+        """A dry run's result (§4.6 *The sweep's reading*): `close`'s per kind, `removed` read as the bytes it would
+        remove, `held` the bytes held now (what it would remove among them), and `would_remove`, each path it would
+        remove with its bytes."""
+        out = self.close(tallies)
+        for kind in KINDS:
+            t = tallies.get(kind)
+            out[kind]["held"] += t.held_gone if t else 0
+            out[kind]["would_remove"] = [
+                {"path": p, "bytes": s} for p, s in sorted((t.gone_paths if t else {}).items())
+            ]
         return out
 
 
