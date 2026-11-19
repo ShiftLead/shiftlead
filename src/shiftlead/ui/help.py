@@ -1008,6 +1008,17 @@ HELP: tuple[Help, ...] = (
             "one suggested from who is signed in. It is never added unasked, since it may be a scratch copy."
         ),
     ),
+    Help(
+        "tools-keep-back",
+        "keep back",
+        "Tools page: an account",
+        (
+            "Holds back this much of the account's window for your own use: unattended sessions pause when the "
+            "use reaches the hatched end. It takes what ao gate takes, a percent (30) or a percent per day "
+            "(10/day), and a metered account an amount ($5, 20M tok); empty clears it. It is the account's, so "
+            "every login on it shares it."
+        ),
+    ),
 )
 
 BY_KEY: dict[str, Help] = {h.key: h for h in HELP}
@@ -1146,6 +1157,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "tools-settings",
             "tools-add-login",
             "tools-add-found",
+            "tools-keep-back",
         ),
     ),
 )

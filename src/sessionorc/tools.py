@@ -292,7 +292,7 @@ def _login_tree(
                 "plan": plan,
                 "billing": e.get("billing") or (ident.get("billing") if ident else None),
                 "models": offer if isinstance(offer, dict) else {"families": [], "default": None, "unconfirmed": True},
-                "gauges": [],
+                "gauges": None,  # filled by the host agent at each `tools` read, never kept (usage.gauges)
                 "version": logins.version(data["accounts"].get(key)),
             }
             card["accounts"].append(acct)

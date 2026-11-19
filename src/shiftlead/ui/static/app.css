@@ -1116,6 +1116,20 @@ html.phonefocus .composer.nopen #send { min-height: 40px; border-radius: 20px; m
 .toolspage .toolacct.toolunsigned { background: transparent; border-style: dashed; }
 .toolspage .toolacctname { font-weight: 600; }
 .toolspage .toolfams { margin-top: 4px; }
+.toolspage .toolacct.hasgauge { display: grid; grid-template-columns: minmax(160px, 250px) 1fr; gap: 10px 24px; align-items: start; }
+@media (max-width: 640px) { .toolspage .toolacct.hasgauge { grid-template-columns: 1fr; } }
+/* the gauge (§4.2b *The gauge*, TD-1975): the use fills from the left, the reserve is a hatched bay from the right */
+.toolspage .toolgauges { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.toolspage .gauge { position: relative; height: 24px; border: 1px solid var(--line); border-radius: 3px; background: var(--bg); overflow: hidden; }
+.toolspage .gauge .used { position: absolute; left: 0; top: 0; bottom: 0; background: var(--link); }
+.toolspage .gauge .keep { position: absolute; right: 0; top: 0; bottom: 0; border-left: 2px solid var(--scraped); background: repeating-linear-gradient(-45deg, var(--scraped) 0 2px, transparent 2px 7px); }
+.toolspage .gauge .room { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; font-size: var(--t-small); color: var(--muted); white-space: nowrap; overflow: hidden; }
+.toolspage .gauge.unread { background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 12px); }
+.toolspage .gauge.stale .used { opacity: .5; }
+.toolspage .glegend { margin-top: 4px; font-size: var(--t-body); align-items: baseline; }
+.toolspage .glegend .k { display: inline-flex; gap: 6px; align-items: baseline; }
+.toolspage .toolkeep { width: 64px; text-align: right; }
+.toolspage .toolstale { color: var(--warn-fg); }
 .toolspage .toollogin { padding: 4px 0 4px 14px; align-items: baseline; min-width: 0; }
 .toolspage .toolloginname { min-width: 11em; font-weight: 600; }
 .toolspage .toolfolder { overflow-wrap: anywhere; }

@@ -5129,6 +5129,12 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     f["offer"] = f.get("billing") if f.get("billing") != "metered" else None
                 if got.get("switched"):
                     c["tree"] = login_tree(c, home, weights)
+                    for acct in c["tree"]["accounts"]:  # its gauges as the read fills them (§4.2b *The gauge*)
+                        acct["gauge"] = setmod.gauge_view(acct.get("gauges"), acct.get("billing"))
+                        acct["gauge"]["each"] = ", ".join(
+                            f"{lg.get('name')} {(lg.get('settings') or {}).get('billing') or 'not set'}"
+                            for lg in acct["logins"]
+                        )
             got["read_ago"] = _age(got.get("read_at"), datetime.now(UTC)) or "0s"
         return templates.TemplateResponse(
             request,
@@ -5251,6 +5257,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 read("list"),
                 read("repos", omit=[*REPOS_OMIT_PAGE, "completed"]),  # numbers alone (TD-746)
                 read("gate"),  # the usage chip's lines, handed to it below
+                read("tools"),  # a switched home's accounts, whose reserves are the Tools page's (TD-1975)
             ),
             asyncio.to_thread(settings_files),
         )
@@ -5278,6 +5285,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             k: None if isinstance(r, HTTPException) else r
             for k, r in (("usage", first[1]), ("gate", first[5]), ("host", first[2]))
         }
+        home_keys = setmod.tools_accounts(None if isinstance(first[6], HTTPException) else first[6])
         org, local = local_files["org"], local_files["local"]
         notes: list[str] = [why] if why else []
         notes += profile_notes + local_files["notes"]
@@ -5288,7 +5296,12 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             request,
             "settings.html",
             {
-                "usage_cards": setmod.usage_cards(profiles, got.get("usage_accounts"), usage),
+                "usage_cards": [
+                    c
+                    for c in setmod.usage_cards(profiles, got.get("usage_accounts"), usage)
+                    if home_keys is None or c["account"] not in home_keys  # on the Tools page (§4.2b *The gauge*)
+                ],
+                "usage_moved": home_keys is not None,
                 "max_age": str((got.get("usage") or {}).get("max_age") or ""),
                 # **settle** (§4.5a *Settings page: settle*, TD-710): the install's map as the field writes it
                 "settle": settle_mod.text_of(got.get("settle")),

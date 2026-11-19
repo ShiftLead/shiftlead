@@ -5936,6 +5936,22 @@
         else { if (got && got.shell_error) alert(got.shell_error); location.reload(); }
       } catch (e) { say(e.message); b.disabled = false; }
     };
+    // an account's keep-back field (§4.2b *The gauge*, TD-1975): `ao gate`'s forms written to the home's settings.yml
+    // through the Settings card's own write, on Enter or on leaving the field; Remove clears a reserve on a window
+    // the reading no longer reports
+    const keep = async (box, label, value, b) => {
+      if (b) b.disabled = true;
+      try { await post("/api/settings/usage", { account: box.dataset.account, reserves: { [label]: value } }); location.reload(); }
+      catch (e) { say(e.message); if (b) b.disabled = false; }
+    };
+    $$(".toolgauges", page).forEach((box) => {
+      $$("input.toolkeep", box).forEach((x) => {
+        const go = () => { if (x.value.trim() !== (x.dataset.was || "")) { x.dataset.was = x.value.trim(); keep(box, x.name, x.value.trim(), null); } };
+        x.addEventListener("change", go);
+        x.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); go(); } });
+      });
+      $$(".toolkeepgone", box).forEach((b) => b.addEventListener("click", () => keep(box, b.dataset.label, "", b)));
+    });
     // Settings: the keys changed since the page drew them, one write each (§4.2b *Controls and verbs*)
     $$("form.toolsettings", page).forEach((f) => {
       $("[data-cancel]", f).addEventListener("click", () => { f.reset(); f.hidden = true; });
