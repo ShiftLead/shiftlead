@@ -45,7 +45,7 @@
 {%- set g = a.gauge -%}
 <div class="toolgauges" data-account="{{ a.key }}"{% if g.metered %} data-metered="1"{% endif %}>
   {%- if g.mixed %}
-  <div class="note">its logins disagree on billing ({{ g.mixed }}), so it takes no reserve: give them one billing in each login's Settings</div>
+  <div class="note">its logins disagree on billing ({{ g.each }}), so it takes no reserve: give them one billing in each login's Settings</div>
   {%- else %}
   {%- for w in g.gauges %}
   <div class="toolgauge">
@@ -55,10 +55,10 @@
       {%- if w.room is not none and not g.metered %}<div class="room" style="left:{{ w.used }}%;right:{{ w.keep or 0 }}%">room for unattended work: {{ w.room }}%</div>{% endif %}
     </div>
     <div class="glegend row gap wrap">
-      {%- if g.metered %}<span>{{ w.label }} · {{ w.line }}</span>
+      {%- if g.metered %}<span title="{{ g.age }}">{{ w.label }} · {{ w.line }}{% if g.stale and w.used is not none %} · <span class="toolstale">stale</span>{% endif %}</span>
       {%- elif w.used is none %}<span>No usage reading yet{% if g.gauges | length > 1 or w.label != "week" %} · {{ w.label }}{% endif %}</span>
-      {%- else %}<span title="{{ w.age }}"><b>{{ w.used | round | int }}%</b> of the {{ w.label }} used{% if w.resets %} · resets {{ w.resets }}{% endif %}{% if g.stale %} · <span class="toolstale">stale</span>{% endif %}</span>{% endif %}
-      <label class="k" title="{{ help_title('tools-keep-back') }}">{{ "amount" if g.metered else "keep back" }} <input class="mono toolkeep" name="{{ w.label }}" value="{{ w.value }}" data-was="{{ w.value }}" placeholder="{{ 'no amount' if g.metered else '—' }}" autocomplete="off" spellcheck="false" aria-label="{{ a.key }} {{ w.label }} {{ 'amount' if g.metered else 'reserve' }}"></label>
+      {%- else %}<span title="{{ g.age }}"><b>{{ w.used | round | int }}%</b> of the {{ w.label }} used{% if w.resets %} · resets {{ w.resets }}{% endif %}{% if g.stale %} · <span class="toolstale">stale</span>{% endif %}</span>{% endif %}
+      <label class="k" title="{{ help_title('tools-keep-back') }}">{{ "amount" if g.metered else "keep back" }} <input class="mono toolkeep" name="{{ w.label }}" value="{{ w.value }}" data-was="{{ w.value }}" placeholder="—" autocomplete="off" spellcheck="false" aria-label="{{ a.key }} {{ w.label }} {{ 'amount' if g.metered else 'reserve' }}"></label>
       {%- if w.value and w.line and not g.metered %}<span class="note">{{ w.line }}</span>{% endif %}
     </div>
   </div>

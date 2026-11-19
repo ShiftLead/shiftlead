@@ -5113,21 +5113,11 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             agent_down = e.status_code == 503
             why = "" if agent_down else f"the host agent did not serve its tools: {e.detail}"  # an older agent
         weights: dict[str, Any] = {}
-        gauges: dict[str, Any] = {}
         if got is not None and got.get("switched"):
-            profiles = (await asyncio.to_thread(settings_profiles))[0]
-            sets, usage = await asyncio.gather(
-                call("settings", profiles=list(profiles)), call("usage"), return_exceptions=True
-            )
-            sets = {} if isinstance(sets, BaseException) else sets  # an older agent: no fill-in, no reserves
-            # prices' fill-in (§4.2b *A login's Settings*): an older agent or none drawn is no fill-in
-            weights = (sets.get("spend") or {}).get("weights") or {}
-            # each account's gauges (§4.2b *The gauge*, TD-1975): its Usage card, as the Settings page reads it
-            cards = setmod.usage_cards(
-                profiles, sets.get("usage_accounts"), {} if isinstance(usage, BaseException) else usage
-            )
-            age = setmod.settings_mod.max_age(sets)
-            gauges = {c["account"]: setmod.account_gauges(c, age) for c in cards}
+            try:  # prices' fill-in (§4.2b *A login's Settings*): an older agent or none drawn is no fill-in
+                weights = ((await call("settings")).get("spend") or {}).get("weights") or {}
+            except HTTPException:
+                weights = {}
         if got is not None:
             home = str(Path.home())
             for c in [*got.get("tools", []), *got.get("not_ready", [])]:
@@ -5139,8 +5129,12 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     f["offer"] = f.get("billing") if f.get("billing") != "metered" else None
                 if got.get("switched"):
                     c["tree"] = login_tree(c, home, weights)
-                    for acct in c["tree"]["accounts"]:
-                        acct["gauge"] = gauges.get(acct.get("key")) or setmod.account_gauges(None, None, billing=acct.get("billing"))
+                    for acct in c["tree"]["accounts"]:  # its gauges as the read fills them (§4.2b *The gauge*)
+                        acct["gauge"] = setmod.gauge_view(acct.get("gauges"), acct.get("billing"))
+                        acct["gauge"]["each"] = ", ".join(
+                            f"{lg.get('name')} {(lg.get('settings') or {}).get('billing') or 'not set'}"
+                            for lg in acct["logins"]
+                        )
             got["read_ago"] = _age(got.get("read_at"), datetime.now(UTC)) or "0s"
         return templates.TemplateResponse(
             request,
@@ -5253,6 +5247,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # `profiles.yml` first, on a worker thread: the `settings` read takes its names, answering each
         # one's window labels for the **schedule** field's window pick (§4.5a *Settings page: Teams*, TD-1346)
         profiles, default, profile_notes = await asyncio.to_thread(settings_profiles)
+        home_keys = await asyncio.to_thread(setmod.home_accounts)  # a switched home's: the Tools page's (TD-1975)
         # Every read the page makes at once (§4.5 *Page loads*, TD-884): the RPCs, none waiting on
         # another, and this host's other files on a worker thread, so the loop is not held by a YAML load
         first, local_files = await asyncio.gather(
@@ -5300,7 +5295,12 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             request,
             "settings.html",
             {
-                "usage_cards": setmod.usage_cards(profiles, got.get("usage_accounts"), usage),
+                "usage_cards": [
+                    c
+                    for c in setmod.usage_cards(profiles, got.get("usage_accounts"), usage)
+                    if home_keys is None or c["account"] not in home_keys  # on the Tools page (§4.2b *The gauge*)
+                ],
+                "usage_moved": home_keys is not None,
                 "max_age": str((got.get("usage") or {}).get("max_age") or ""),
                 # **settle** (§4.5a *Settings page: settle*, TD-710): the install's map as the field writes it
                 "settle": settle_mod.text_of(got.get("settle")),

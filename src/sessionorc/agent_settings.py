@@ -113,6 +113,27 @@ class SettingsMixin:
             "max_age": max_age,
         }
 
+    async def _tools_gauges(self, read: dict[str, Any]) -> dict[str, Any]:
+        """The `tools` read with each account's `gauges` filled (design §4.2b *The gauge*, *The read*; TD-1975), on
+        a copy, so the kept read is never written: from the `gate` reply's entry for its key and the account's last
+        reading, by `usage.gauges` — the one builder. A read of a host not switched has no accounts to fill."""
+        if not read.get("switched"):
+            return read
+        gate, now = await self.rpc_gate(), datetime.now(UTC)
+        max_age = settings_mod.max_age(settings_mod.load())
+        cards = []
+        for card in read.get("tools") or []:
+            accounts = []
+            for acct in card.get("accounts") or []:
+                key = str(acct.get("key") or "")
+                entry = gate["accounts"].get(key)
+                names = (entry or {}).get("profiles") or []
+                reading = self._usage_acct.get(key) or next((self._usage[p] for p in names if p in self._usage), None)
+                g = usage_mod.gauges(entry, reading, max_age, now, acct.get("billing"), spend_mod.LABELS)
+                accounts.append({**acct, "gauges": g})
+            cards.append({**card, "accounts": accounts})
+        return {**read, "tools": cards}
+
     def _gate_accounts(
         self, whole: dict[str, Any], raw: dict[str, Any], watched: set[str], now: datetime
     ) -> dict[str, Any]:

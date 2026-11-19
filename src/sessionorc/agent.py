@@ -4086,17 +4086,19 @@ class HostAgent(
     async def rpc_tools(self) -> dict[str, Any]:
         """`ao tools`, the Tools page (design §4.2b *The page*, TD-1973): the read the host agent keeps, made at start
         and on Check again — the tool cards, their versions, the found rows and *Not ready to run here*. Read only,
-        so any caller may ask; a run that has made none yet makes it now."""
+        so any caller may ask; a run that has made none yet makes it now. Each account's `gauges` are filled afresh
+        at each read, from its readings as they stand (TD-1975)."""
         if self._tools_kept is None:
             async with self._tools_lock:  # the start's read in flight: take it rather than read twice
                 pass
-        return self._tools_kept if self._tools_kept is not None else await self._tools_reread()
+        kept = self._tools_kept if self._tools_kept is not None else await self._tools_reread()
+        return await self._tools_gauges(kept)
 
     async def rpc_tools_check(self, caller: Any = None) -> dict[str, Any]:
         """`ao tools check`, the Tools page's **Check again** (design §4.2b, TD-1973): read this host's tools again
         — the PATH, the versions, the default homes — and keep it. A person's own act."""
         agent_common.person_only(caller, "check this host's tools again", "§4.2b *The page*", self._graph())
-        return await self._tools_reread()
+        return await self._tools_gauges(await self._tools_reread())
 
     def _start_tools(self, sid: str, cwd: Path, env: dict[str, str]) -> None:
         self.tmux.ensure_server()

@@ -26,7 +26,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import hosts, paths, work
+from sessionorc import hosts, logins, paths, work
 from sessionorc import settings as settings_mod
 from sessionorc import spend as spend_mod
 from sessionorc.models import tokens_short
@@ -223,11 +223,10 @@ def usage_cards(
                         "value": value,
                         "line": spend_text(by_label.get(label), "tok" if value.endswith("tok") else ""),
                         "resets": str((by_label.get(label) or {}).get("resets") or ""),
-                        # its spend over the amount, which the Tools page's gauge fills (§4.2b *The gauge*)
-                        "pct": (by_label.get(label) or {}).get("pct") if label in amounts else None,
+                        "pct": None,
                     }
                 )
-            cards.append(card | {"badge": badge, "unchecked": False, "read_secs": _secs(reading, now)})
+            cards.append(card | {"badge": badge, "unchecked": False})
             continue
         reserves = a.get("reserves") or {}
         read = usage_read(reading, now)
@@ -251,13 +250,8 @@ def usage_cards(
             if windows:  # a reading that lacks the window: no field, and the card's Save clears it (TD-1680)
                 row |= {"line": f"not reported: {key} reports {', '.join(reported)}", "stale": True}
             card["rows"].append(row)
-        cards.append(card | {"badge": badge, "unchecked": not windows, "read_secs": (read or {}).get("secs")})
+        cards.append(card | {"badge": badge, "unchecked": not windows})
     return cards
-
-
-def _secs(reading: Any, now: datetime) -> float | None:
-    read = usage_read(reading, now)
-    return read["secs"] if read else None
 
 
 WEIGHT_KINDS = ("input", "output", "cache_read", "cache_write")  # `settings.WEIGHT_KINDS`, in the card's order
@@ -955,59 +949,69 @@ def push_card(
     }
 
 
-def _keep(value: str) -> int | None:
-    """A reserve's bay as the gauge draws it: a whole percent held from the right, None for none or for a percent
-    per day (`10/day`), whose share of the window moves through it."""
-    return int(value) if value.isdigit() and 0 < int(value) <= 100 else None
-
-
-def account_gauges(
-    card: Mapping[str, Any] | None, max_age_secs: float | None, now: datetime | None = None, billing: Any = None
-) -> dict[str, Any]:
-    """An account's gauges as the Tools page draws them (design §4.2b *The gauge*, TD-1975), from its Usage card
-    (`usage_cards`, one source for both pages): one per window it reports, the week's first — the use filling from
-    the left, the reserve (`keep`) a bay held from the right, and the room between; a metered account's one per
-    window it sums, its spend against that window's amount. With no reading, `unread` and a field per label it has
-    a reserve on (none: the week's), the labels unchecked. A reading older than the gate trusts (`usage.max_age`)
-    is `stale`; an account whose logins disagree on billing is `mixed` and takes no reserve. A reserve on a label
-    the reading no longer reports is `gone`, its value drawn with a Remove. An account no card names yet (no
-    profile on it, no reserve) draws as its `billing` says: a metered one the home's windows, each with no reading."""
-    now = now or datetime.now(UTC)
-    if card is None and billing == "metered":
-        card = {"metered": True, "rows": [{"label": x, "value": "", "line": "no reading yet"} for x in spend_mod.LABELS]}
-    card = card or {}
-    out: dict[str, Any] = {"metered": bool(card.get("metered")), "mixed": card.get("mixed"), "gauges": [], "gone": []}
-    if out["mixed"]:
-        return out
-    for row in card.get("rows") or []:
-        if row.get("stale"):
-            out["gone"].append({"label": row["label"], "value": row.get("value") or "", "line": row.get("line") or ""})
-            continue
-        pct = row.get("pct") if _is_num(row.get("pct")) else None
-        value = str(row.get("value") or "")
-        keep = None if out["metered"] else _keep(value)
-        used = None if pct is None else max(0.0, min(100.0, float(pct)))
-        g = {
-            "label": str(row["label"]),
-            "value": value,
-            "used": used,
-            "keep": keep,
-            "room": None if used is None else max(0, round(100 - used - (keep or 0))),
-            "resets": "",
-            "line": str(row.get("line") or ""),
-            "age": str(row.get("age") or ""),
-        }
-        if (resets := _when(row.get("resets"))) and resets > now:
-            g["resets"] = f"{resets.astimezone():%a %H:%M}"
-        out["gauges"].append(g)
-    if not out["metered"] and not any(g["used"] is not None for g in out["gauges"]):
-        out["unread"] = True
-        if not out["gauges"]:
-            out["gauges"].append(
-                {"label": "week", "value": "", "used": None, "keep": None, "room": None, "resets": "", "line": "",
-                 "age": ""}
-            )
-    if card.get("read_secs") is not None and max_age_secs is not None and card["read_secs"] > max_age_secs:
-        out["stale"] = True
-    out["gauges"].sort(key=lambda g: 0 if g["label"] == "week" else 1)  # the week's first (§4.2b)
+def gauge_view(g: Mapping[str, Any] | None, billing: Any = None) -> dict[str, Any]:
+    """An account's gauges as the Tools page draws them (design §4.2b *The gauge*, TD-1975): the `tools` read's
+    `gauges` (`sessionorc.usage.gauges`, the one builder) with the words each window shows — the reserve as the field
+    takes it back, the line it makes or a metered window's spend, and its reset in local time. An older agent's read,
+    whose `gauges` are not filled, draws as an account with no reading, a metered one its home's windows."""
+    if not isinstance(g, Mapping):
+        g = {"billing": billing or "subscription", "unread": True, "windows": [], "gone": []}
+        if g["billing"] == "metered":
+            labels = sorted(spend_mod.LABELS, key=lambda x: x != "week")  # the week's first (§4.2b)
+            g["windows"] = [{"label": x, "pct": None, "reserve": None} for x in labels]
+        else:
+            g["windows"] = [{"label": "week", "pct": None, "reserve": None}]
+    metered = g.get("billing") == "metered"
+    out: dict[str, Any] = {
+        "metered": metered,
+        "mixed": g.get("billing") == "mixed",
+        "unread": bool(g.get("unread")) and not metered,
+        "stale": bool(g.get("stale")),
+        "age": f"read {ago} ago" if (ago := _age(g.get("read_at"), datetime.now(UTC))) else "",
+        "gauges": [],
+        "gone": [],
+    }
+    reported = [str(w.get("label")) for w in g.get("windows") or []]
+    for w in g.get("windows") or []:
+        pct = w.get("pct") if _is_num(w.get("pct")) else None
+        value = reserve_text(w.get("reserve"))
+        if metered:
+            spent = {"spent": w.get("spent"), "pct": None if pct is None else round(pct), "resets": w.get("resets")}
+            line = spend_text(spent, "tok" if value.endswith("tok") else "")
+        else:
+            line = line_text({"line": w.get("line"), "reserve": w.get("reserve"), "resets": w.get("resets")})
+        resets = _when(w.get("resets"))
+        out["gauges"].append(
+            {
+                "label": str(w.get("label")),
+                "value": value,
+                "used": pct,
+                "keep": w.get("keep"),
+                "room": w.get("room"),
+                "resets": f"{resets.astimezone():%a %H:%M}" if resets else "",
+                "line": line,
+            }
+        )
+    for x in g.get("gone") or []:
+        out["gone"].append(
+            {
+                "label": str(x.get("label")),
+                "value": reserve_text(x.get("reserve")),
+                "line": f"not reported: its reading reports {', '.join(reported)}",
+            }
+        )
     return out
+
+
+def home_accounts() -> set[str] | None:
+    """The accounts of the home's host once it is switched (design §4.2b *The gauge*, TD-1975): their gauges and
+    reserves are the Tools page's, so the Settings page's Usage card leaves them and keeps an account seen only on a
+    node. None before the switch, and for a `logins.yml` that does not read, where the card keeps every account."""
+    try:
+        data = logins.load()
+    except logins.LoginError:
+        return None
+    if data is None:
+        return None
+    named = {str(e["account"]) for e in (data.get("logins") or {}).values() if isinstance(e, dict) and e.get("account")}
+    return named | {str(k) for k in data.get("accounts") or {}}

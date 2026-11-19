@@ -62,6 +62,7 @@
     </form>
     {#- a card per account (§4.5a *Settings page: Usage*, §6 *A reserve is the account's*; TD-1610): its badge
         the profiles on it, its Save `set_settings {account, reserves}` -#}
+    {% if usage_moved %}<div class="note">This host's accounts keep their reserves beside their gauges on the <a href="/tools">Tools page</a>; an account seen only on a node keeps its card here.</div>{% endif %}
     {% for c in usage_cards %}
       <form class="card pad setcard" data-section="usage" data-account="{{ c.account }}">
         <div class="row gap wrap"><span class="h2 mono">{{ c.account }}</span><span class="note">{{ c.badge }}</span>{% if c.metered or c.mixed %}{{ filehead(profiles_file, "billing and prices in") }}{% endif %}</div>

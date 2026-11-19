@@ -1,114 +1,72 @@
-"""The Tools page's gauges (design §4.2b *The gauge*, §4.5a *Tools page: an account* **keep back**, TD-1975): one per
-window an account's reading reports, drawn from the same Usage card the Settings page reads."""
+"""The Tools page's gauges (design §4.2b *The gauge*, §4.5a *Tools page: an account* **keep back**, TD-1975): drawn
+from the `tools` read's `gauges`, and the Settings page's Usage card leaving a switched home's accounts to it."""
 
 from datetime import UTC, datetime, timedelta
 
 from fixture_tools_tree import read
 
-from shiftlead import profiles as profiles_mod
 from shiftlead.ui import app as app_mod
 from shiftlead.ui import settings_page as setmod
 
-NOW = datetime(2026, 11, 19, 12, 0, tzinfo=UTC)
+NOW = datetime.now(UTC)
 
 
-def _cards(usage, accounts, profiles=None):
-    profiles = profiles or {
-        "claude-paul": profiles_mod.Profile(name="claude-paul", account="paul"),
-        "api": profiles_mod.Profile(name="api", account="key", billing="metered", prices={"input": 3}),
-        "sa": profiles_mod.Profile(name="sa", account="split"),
-        "sb": profiles_mod.Profile(name="sb", account="split", billing="metered"),
-    }
-    return {c["account"]: c for c in setmod.usage_cards(profiles, accounts, usage, NOW)}
+def _iso(t: datetime) -> str:
+    return t.isoformat().replace("+00:00", "Z")
 
 
-def test_a_subscription_account_draws_a_gauge_per_window_the_week_first_with_its_reserve_as_a_bay():
-    resets = (NOW + timedelta(days=2)).isoformat()
-    usage = {"claude-paul": {"tool": "claude-code", "fetched": (NOW - timedelta(minutes=5)).isoformat(), "windows": [
-        {"label": "5h", "pct": 41, "resets": (NOW + timedelta(hours=2)).isoformat()},
-        {"label": "week", "pct": 6, "resets": resets}]}}  # fmt: skip
-    accounts = {"claude-code:paul": {"profiles": ["claude-paul"], "billing": "subscription",
-        "reserves": {"week": 15, "5h": {"per_day": 10}}, "windows": [
-        {"label": "week", "line": 85, "reserve": 15, "resets": resets, "next": None}]}}  # fmt: skip
-    g = setmod.account_gauges(_cards(usage, accounts)["claude-code:paul"], 3600, NOW)
-    assert [w["label"] for w in g["gauges"]] == ["week", "5h"]  # the week's first
-    week, five = g["gauges"]
-    assert (week["used"], week["keep"], week["room"], week["value"]) == (6.0, 15, 79, "15")
-    assert week["resets"]  # the reset's day and time, local
-    assert (five["keep"], five["value"]) == (None, "10/day")  # a percent per day draws no fixed bay
-    assert not g.get("unread") and not g.get("stale") and not g["metered"]
+def test_the_view_gives_each_window_its_words_and_an_older_agents_read_draws_unread():
+    g = {"billing": "subscription", "read_at": _iso(NOW - timedelta(minutes=5)), "stale": False, "unread": False,
+         "windows": [{"label": "week", "pct": 6.0, "reserve": 15, "keep": 15, "room": 79, "line": 85,
+                      "resets": _iso(NOW + timedelta(days=2))},
+                     {"label": "5h", "pct": 41.0, "reserve": {"per_day": 10}, "keep": None, "room": 59, "line": None,
+                      "resets": None}],
+         "gone": [{"label": "week (opus)", "reserve": 20}]}  # fmt: skip
+    v = setmod.gauge_view(g)
+    week, five = v["gauges"]
+    assert (week["value"], week["used"], week["keep"], week["room"], week["line"]) == ("15", 6.0, 15, 79, "→ line 85%")
+    assert week["resets"] and five["value"] == "10/day" and v["age"].startswith("read ")
+    assert v["gone"] == [{"label": "week (opus)", "value": "20", "line": "not reported: its reading reports week, 5h"}]
+    old = setmod.gauge_view([])  # an older agent: `gauges: []`, never filled
+    assert old["unread"] and [w["label"] for w in old["gauges"]] == ["week"]
+    assert [w["label"] for w in setmod.gauge_view(None, "metered")["gauges"]] == ["week", "day", "month"]
+    metered = setmod.gauge_view({"billing": "metered", "windows": [
+        {"label": "day", "pct": 64.0, "reserve": "$5", "spent": {"total": 9, "cost": 3.2}}]})  # fmt: skip
+    assert metered["metered"] and "spent $3.20 · 64%" in metered["gauges"][0]["line"]
+    assert setmod.gauge_view({"billing": "mixed", "windows": []})["mixed"]
 
 
-def test_an_account_with_no_reading_draws_an_empty_gauge_and_its_field_and_an_old_one_is_stale():
-    accounts = {"claude-code:paul": {"profiles": ["claude-paul"], "billing": "subscription", "reserves": {},
-        "windows": []}}  # fmt: skip
-    g = setmod.account_gauges(_cards({}, accounts)["claude-code:paul"], 3600, NOW)
-    assert g["unread"] and [(w["label"], w["used"]) for w in g["gauges"]] == [("week", None)]
-    assert setmod.account_gauges(None, None, NOW)["unread"]  # an account the gate has not named yet
-    cold = setmod.account_gauges(None, None, NOW, billing="metered")  # a metered one: the home's windows, unread
-    assert cold["metered"] and [(w["label"], w["used"], w["line"]) for w in cold["gauges"]][0] == (
-        "week", None, "no reading yet")
-    old = {"claude-paul": {"tool": "claude-code", "fetched": (NOW - timedelta(hours=3)).isoformat(),
-        "windows": [{"label": "week", "pct": 50}]}}  # fmt: skip
-    assert setmod.account_gauges(_cards(old, accounts)["claude-code:paul"], 3600, NOW)["stale"]
-    assert not setmod.account_gauges(_cards(old, accounts)["claude-code:paul"], None, NOW).get("stale")  # off
-
-
-def test_a_metered_account_sums_each_window_against_its_amount_and_a_mixed_one_takes_none():
-    resets = (NOW + timedelta(hours=10)).isoformat()
-    usage = {"api": {"tool": "claude-code", "windows": [
-        {"label": "day", "pct": 64, "resets": resets, "spent": {"total": 9, "cost": 3.2}}]}}  # fmt: skip
-    accounts = {
-        "claude-code:key": {"profiles": ["api"], "billing": "metered", "amounts": {"day": "$5"}, "windows": []},
-        "claude-code:split": {"profiles": ["sa", "sb"], "billing": "mixed",
-            "billings": {"sa": "subscription", "sb": "metered"}},
-    }  # fmt: skip
-    cards = _cards(usage, accounts)
-    g = setmod.account_gauges(cards["claude-code:key"], 3600, NOW)
-    assert g["metered"] and [w["label"] for w in g["gauges"]] == ["week", "day", "month"]  # the week's first
-    day = next(w for w in g["gauges"] if w["label"] == "day")
-    assert (day["used"], day["value"], day["keep"]) == (64.0, "$5", None) and "spent $3.20" in day["line"]
-    week = next(w for w in g["gauges"] if w["label"] == "week")
-    assert week["used"] is None  # no amount on it: nothing to fill against
-    mixed = setmod.account_gauges(cards["claude-code:split"], 3600, NOW)
-    assert mixed["mixed"] and mixed["gauges"] == []
-
-
-def test_a_reserve_on_a_window_no_longer_reported_is_drawn_with_remove():
-    usage = {"claude-paul": {"tool": "claude-code", "windows": [{"label": "week", "pct": 6}]}}
-    accounts = {"claude-code:paul": {"profiles": ["claude-paul"], "billing": "subscription",
-        "reserves": {"week (opus)": 20}, "windows": []}}  # fmt: skip
-    g = setmod.account_gauges(_cards(usage, accounts)["claude-code:paul"], 3600, NOW)
-    assert [(x["label"], x["value"]) for x in g["gauges"]] == [("week", "")]
-    assert [(x["label"], x["value"]) for x in g["gone"]] == [("week (opus)", "20")]
-
-
-def test_the_tools_page_draws_each_accounts_gauges_and_keep_back_writes_through_the_settings_card(monkeypatch):
+def test_the_tools_page_draws_the_reads_gauges_and_keep_back_writes_through_the_settings_card(monkeypatch):
     from fastapi.testclient import TestClient
 
     calls = []
-    usage = {"claude-paul": {"tool": "claude-code", "windows": [{"label": "week", "pct": 6}]}}
+    got = read()
+    got["tools"][0]["accounts"][0]["gauges"] = {
+        "billing": "subscription", "read_at": _iso(NOW), "stale": True, "unread": False, "gone": [],
+        "windows": [{"label": "week", "pct": 6.0, "reserve": 15, "keep": 15, "room": 79, "line": 85}]}  # fmt: skip
 
     async def call(m, **p):
         calls.append((m, p))
-        if m == "tools":
-            return read()
-        if m == "usage":
-            return usage
-        if m == "settings":
-            return {"usage_accounts": {"claude-code:paul": {"profiles": ["claude-paul"], "billing": "subscription",
-                "reserves": {"week": 15}, "windows": []}}}  # fmt: skip
-        return {}
+        return got if m == "tools" else {}
 
     monkeypatch.setattr(app_mod, "agent_call", call)
-    real = setmod.usage_cards  # the home's profiles.yml as the page reads it: the one profile on paul's account
-    mine = {"claude-paul": profiles_mod.Profile(name="claude-paul", account="paul")}
-    monkeypatch.setattr(setmod, "usage_cards", lambda _p, a, u, now=None: real(mine, a, u, now))
     with TestClient(app_mod.create_app()) as c:
         r = c.get("/tools")
         assert r.status_code == 200
         assert 'class="toolgauges" data-account="claude-code:paul"' in r.text
         assert "room for unattended work: 79%" in r.text and 'name="week" value="15"' in r.text
-        assert 'data-account="gemini:paul-google" data-metered="1"' in r.text  # metered, with no card yet
+        assert ">stale<" in r.text
+        assert 'data-account="gemini:paul-google" data-metered="1"' in r.text  # unfilled: the home's windows
         r = c.post("/api/settings/usage", json={"account": "claude-code:paul", "reserves": {"week": "20"}})
     assert ("set_settings", {"reserves": {"week": 20}, "account": "claude-code:paul"}) in calls
+    assert not any(m in ("usage", "gate") for m, _ in calls[:2])  # the page reads no usage of its own
+
+
+def test_a_switched_home_leaves_its_accounts_usage_cards_to_the_tools_page(tmp_path, monkeypatch):
+    from sessionorc import logins
+
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    assert setmod.home_accounts() is None  # not switched: the card keeps every account
+    logins.save({"logins": {"claude-code:paul": {"folder": "/h/.claude", "account": "claude-code:paul"}},
+                 "accounts": {"gemini:key": {"label": "k"}}, "forgotten": {}}, "fixture", tmp_path)  # fmt: skip
+    assert setmod.home_accounts() == {"claude-code:paul", "gemini:key"}

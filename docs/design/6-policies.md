@@ -2920,7 +2920,8 @@ teams:
   start is a person's act, a schedule's (off by default) or rule 8's where the person set it.
   Interactive sessions are never paused and carry no line: at 100% they show `limited`. The
   reserves are the person's, per account, in the host's `settings.yml` (§5), read on every tick and
-  changed by `ao gate` (§4.7) or the Settings page; the top bar's chip shows the line beside the
+  changed by `ao gate` (§4.7) or the Settings page — on a switched host the Tools page's *keep back* field for
+  each account of the home's host (§4.2b *The gauge*); the top bar's chip shows the line beside the
   number (§4.5a). A one-day change to a reserve is by hand — the reserve down, and back after the
   reset; an override that expires on its own is rejected for now (TD-101). **A metered profile**
   (§4.2a) has no quota to keep back, so its reserve is an **amount per window**, in money where the

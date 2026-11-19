@@ -1129,3 +1129,19 @@ def test_the_ledger_row_says_the_resolved_ledger_and_whether_the_file_set_it(tmp
     (v1 / ".shiftlead.yml").write_text("ledger: docs/technical_debt.md\n")
     (a,) = ({r["key"]: r for r in c["rows"]}["ledger"] for c in setmod.repo_cards([str(v1)], {}))
     assert a == {"key": "ledger", "value": "docs/technical_debt.md", "default": False}
+
+
+def test_a_switched_home_leaves_its_accounts_usage_cards_to_the_tools_page(client, subprocess_agent, grind_profile):
+    """§4.2b *The gauge* (TD-1975): once the home has a `logins.yml`, an account of its host keeps its reserve on the
+    Tools page, so the Usage card leaves it; with no `logins.yml` the card is drawn as before."""
+    from sessionorc import logins, paths
+
+    assert 'data-account="claude-code:paul"' in client.get("/settings").text
+    logins.save({"logins": {"claude-code:grind": {"folder": "/h/.claude", "account": "claude-code:paul"}},
+                 "accounts": {}, "forgotten": {}}, "fixture", paths.home())  # fmt: skip
+    try:
+        page = client.get("/settings").text
+        assert 'data-section="usage" data-account="claude-code:paul"' not in page
+        assert "keep their reserves beside their gauges" in page
+    finally:
+        logins.path(paths.home()).unlink(missing_ok=True)
