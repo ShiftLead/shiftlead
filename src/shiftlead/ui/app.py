@@ -3180,8 +3180,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         else {}
                     )
                     # the person's own additions (§4.8, TD-1016), read at the home whatever host the session
-                    # lands on: under the directory's repo here, else the agent-cadence source among the home's
-                    person = await asyncio.to_thread(form_person, preset, None if away else dir.strip() or os.getcwd())
+                    # lands on: under the repo's root here, else the agent-cadence source among the home's
+                    person = await asyncio.to_thread(form_person, preset, None if away else str(cfg.root))
                     if away:
                         brief, made_from = await asyncio.to_thread(
                             preset.compose, refs or None, read=read, person=person, **ids

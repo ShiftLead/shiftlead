@@ -1248,6 +1248,23 @@ def test_start_with_a_role_carries_the_persons_layer_additions_and_a_failed_list
     def failed(role, repo, roots):
         raise layers.ListingError("agent-cadence's layer listing exited 2")
 
+    # a directory inside the repo lists under the repo's root, as `ao new` does
+    asked.clear()
+    sub = tmp_path / "shiftlead" / "src"
+    sub.mkdir(exist_ok=True)
+    assert client.post("/new", data={**data, "name": "h1", "dir": str(sub)}, follow_redirects=False).status_code == 303
+    assert asked == [("hunter", str(tmp_path / "shiftlead"))]
+
+    # no agent-cadence to list the layers: *Your own rules* reads none, and the session starts
+    def none_here(role, repo, roots):
+        raise layers.NoSource(layers.NO_SOURCE)
+
+    monkeypatch.setattr(layers, "person", none_here)
+    fleet.calls.clear()
+    assert client.post("/new", data={**data, "name": "h3"}, follow_redirects=False).status_code == 303
+    (made,) = fleet.creates()
+    assert made["prompt_from"]["slots"]["{person}"] == {"text": "none"}
+
     monkeypatch.setattr(layers, "person", failed)
     fleet.calls.clear()
     r = client.post("/new", data={**data, "name": "h2"}, follow_redirects=False)
