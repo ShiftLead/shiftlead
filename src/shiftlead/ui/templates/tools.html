@@ -78,7 +78,7 @@
     {% for f in c.found %}
     <div class="toolfound row gap wrap"><span class="mono">{{ f.shown }}</span>
       {%- if f.own_home %}<span class="note">the tool's own home: ShiftLead launches {{ c.label }} into a folder of its own</span>
-      {%- else %}<span class="note">found here, signed in</span>{% if c.tree %}<span class="grow"></span><button class="btn sm tooladdfound" type="button" data-tool="{{ c.adapter }}" data-path="{{ f.folder }}" title="{{ help_title('tools-add-found') }}">Add</button>{% endif %}{% endif %}</div>
+      {%- else %}<span class="note">found here, signed in</span>{% if c.tree %}<span class="grow"></span><button class="btn sm tooladdfound" type="button" data-tool="{{ c.adapter }}" data-path="{{ f.folder }}" data-billing="{{ f.billing or '' }}" title="{{ help_title('tools-add-found') }}">Add</button>{% endif %}{% endif %}</div>
     {% else %}
     <div class="toolfound row gap wrap"><span class="note">no signed-in folder found at the tool's default home</span></div>
     {% endfor %}
@@ -88,6 +88,7 @@
         <label>name <input class="mono" name="name" placeholder="e.g. {{ c.adapter }}-work"></label>
         <label>folder <input class="mono" name="path" placeholder="empty: a new folder beside the tool's own" title="Use an existing folder: a {{ c.label }} home, or an empty or missing folder to make one"></label>
         <label>account <input class="mono" name="account" placeholder="optional: its account's name"></label>
+        <label>billing <select name="billing" title="the person's: a found folder's Add chooses what the tool's record reads, which you may change"><option value="">not set</option>{% for b in ("subscription", "metered") %}<option>{{ b }}</option>{% endfor %}</select></label>
         <button class="btn sm" type="submit">Add</button><button class="btn sm ghost" type="button" data-cancel>Cancel</button>
       </form></div>
     {% endif %}

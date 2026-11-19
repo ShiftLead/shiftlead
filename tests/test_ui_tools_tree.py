@@ -155,6 +155,14 @@ def test_add_login_on_each_card_and_add_on_a_found_row(monkeypatch):
     assert text.count("+ Add login") == 2 and 'class="tooladdform row gap wrap" data-tool="gemini"' in text
     gemini = section(text, 'data-adapter="gemini"', "</section>")
     assert re.search(r'class="btn sm tooladdfound" type="button" data-tool="gemini" data-path="[^"]+"', gemini)
+    assert 'data-billing=""' in gemini  # no reading: nothing chosen
+    # + Add login's form chooses a billing, not set first
+    form = section(gemini, 'class="tooladdform', "</form>")
+    assert re.search(r'name="billing".*?<option value="">not set</option><option>subscription</option>', form, re.S)
+    got = read()
+    got["tools"][1]["found"][0]["billing"] = "metered"
+    gemini = section(page(monkeypatch, got), 'data-adapter="gemini"', "</section>")
+    assert 'data-billing="metered"' in gemini  # identity's reading, offered by the found row's Add
     got = read()
     got["switched"] = False
     text = page(monkeypatch, got)
@@ -293,3 +301,29 @@ def test_a_settings_read_refused_draws_no_fill_in(monkeypatch):
         r = c.get("/tools")
     assert r.status_code == 200 and 'data-login="claude-code:claude-paul"' in r.text
     assert "<datalist" not in r.text and 'name="prices"' in r.text
+
+
+def test_add_with_a_billing_sets_it_and_a_refusal_keeps_the_login(monkeypatch):
+    from fastapi import HTTPException
+    from fastapi.testclient import TestClient
+
+    calls = []
+
+    async def call(m, **p):
+        calls.append((m, p))
+        if m == "login_set" and p["value"] == "metered":
+            raise HTTPException(400, "a metered login needs a folder of its own")
+        return {"change": "added", "login": "gemini:work"} if m == "login_add" else {"change": "set"}
+
+    monkeypatch.setattr(app_mod, "agent_call", call)
+    with TestClient(app_mod.create_app()) as c:
+        r = c.post("/api/tools/add", json={"tool": "gemini", "name": "work", "billing": "subscription"})
+        assert r.json() == {"change": "added", "login": "gemini:work"}
+        r = c.post("/api/tools/add", json={"tool": "gemini", "name": "work", "billing": "metered"})
+        assert r.status_code == 200 and r.json()["billing_error"] == (
+            "gemini:work was added, but its billing was not set: a metered login needs a folder of its own"
+        )
+        c.post("/api/tools/add", json={"tool": "gemini", "name": "work", "billing": ""})  # not set: no write
+    mine = [(m, p) for m, p in calls if m.startswith("login_")]
+    assert [m for m, _ in mine] == ["login_add", "login_set", "login_add", "login_set", "login_add"]
+    assert mine[1] == ("login_set", {"login": "gemini:work", "key": "billing", "value": "subscription"})

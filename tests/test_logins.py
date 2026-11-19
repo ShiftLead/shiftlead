@@ -272,7 +272,8 @@ def test_a_switched_host_draws_its_logins_in_each_state(monkeypatch, tmp_path):
     assert set(accts) == {"t:paul", "t:key"}
     assert accts["t:paul"]["label"] == "Paul's" and accts["t:paul"]["plan"] == "Max"
     assert accts["t:paul"]["billing"] == "metered" and accts["t:paul"]["models"]["families"] == ["big", "small"]
-    assert card["found"] == [{"folder": f["default"], "own_home": False}]  # signed in and no login yet
+    # signed in, no login yet: identity's billing rides on the row, which Add offers
+    assert card["found"] == [{"folder": f["default"], "own_home": False, "billing": "subscription"}]
     assert "SECRETMATCH" not in repr(r) and "OTHER" not in repr(r) and "Paul'" not in repr(r).replace("Paul's", "")
     r = tools.read(b"s" * 32, env={"T_KEY": "k"}, home=tmp_path, memory=logins.Memory())
     got = {lg["name"]: lg["warnings"] for lg in r["tools"][0]["logins"]}  # one key signs in all: each login warned
@@ -357,7 +358,7 @@ def test_a_poll_drops_a_found_row_whose_folder_became_a_login(monkeypatch, tmp_p
     _host(monkeypatch, _Tool("t", tmp_path / "default", {d: ({"match": "M"}, True)}))
     logins.save(logins.empty(), "fixture", tmp_path)
     kept = tools.read(b"s" * 32, env={}, home=tmp_path, memory=logins.Memory())
-    assert kept["tools"][0]["found"] == [{"folder": d, "own_home": False}]
+    assert kept["tools"][0]["found"] == [{"folder": d, "own_home": False, "billing": None}]
     logins.update(lambda data: data["logins"].update({"t:mine": {"folder": d}}) or "a login", tmp_path)
     [card] = tools.repoll(kept, b"s" * 32, home=tmp_path, memory=logins.Memory())["tools"]
     assert card["found"] == [] and [lg["name"] for lg in card["logins"]] == ["mine"]

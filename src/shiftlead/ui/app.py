@@ -5197,7 +5197,14 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         made has its tools shell opened for Sign in (`shell` in the reply), whose Focus the page then opens."""
         body = await body_of(request)
         params = {k: str(body.get(k) or "").strip() or None for k in ("name", "path", "account")}
-        return await call("login_add", tool=str(body.get("tool") or ""), **params)
+        got = await call("login_add", tool=str(body.get("tool") or ""), **params)
+        billing = str(body.get("billing") or "").strip()
+        if billing and isinstance(got, dict) and got.get("login"):  # the person's choice, written as Settings writes it
+            try:
+                await call("login_set", login=got["login"], key="billing", value=billing)
+            except HTTPException as e:  # the login stands; its billing's refusal is said
+                got["billing_error"] = f"{got['login']} was added, but its billing was not set: {e.detail}"
+        return got
 
     @app.post("/api/tools/account/label")
     async def tools_account_label(request: Request):
