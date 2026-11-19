@@ -38,7 +38,7 @@ rule).
 | Thing | Lives in | Written | Page |
 |---|---|---|---|
 | Tools and services found, their versions, logins and identity, the models each login offers, each account's reserve and reading (a reserve is the account's, §6) | each tool's own config directory (read); `settings.yml` | detected; reserves at once | Tools |
-| A login: its tool, account, config directory, `billing` (a metered one's `prices`), `extra_args` — each host its own | `profiles.yml` (each host's) | at once, by the person's pages only | Tools |
+| A login: its tool, account, config directory, `billing` (a metered one's `prices`), `extra_args` — each host its own | `logins.yml` (each host's, §4.2b; `profiles.yml` is hand-written and goes at the cut-over) | at once, by the person's pages only | Tools |
 | A flow: its id, stages, seats (each by a key), triggers, briefs, each seat's model and `permission_prompts`, its review-round settings | the flow's directory (package: read-only; org: committed by the home; repo: by PR) | as the flow is | Flows |
 | The team's one ordered login list, across tools | `settings.yml` | at once | Team |
 | Flow pick, seat counts (`size`, `max`, by seat key), hours, reserve priority, balance, on_work | `settings.yml` | at once | Team |
@@ -153,7 +153,8 @@ could benchmark different flow results.*
   resume, and an open ask stays on the seat's mail. ShiftLead keeps only a transcript's path; the file is
   the tool's, under the login's config directory, and on a node the node's (§4.3). So the handoff is a
   new adapter-contract method — read a transcript into a bounded handoff text — on the host that ran
-  it; it is cross-cutting, and the Tools round designs it.
+  it; it is cross-cutting, and the cut-over build's design takes it (moved there by TD-1953's round: a
+  handoff is a launch's, not a login's).
 - **A metered login** is used in its place in the list (decided), bounded by its amount reserve; the page
   marks it, since moving onto it spends money.
 - **Backups are logins, never models.** Falling back to another model is out of scope; if it is ever
@@ -164,8 +165,8 @@ could benchmark different flow results.*
   profile rungs (`org.yml`'s `roles:` profiles among them) and its own `techlead:` and `seats:`, ignoring the
   models and seats the built-in flows now carry. Its login list (`settings.yml`, saved at once) is written
   before its PR merges, or it is unfollowable at the merge. `size`/`max` read both keys until then.
-  Logins are written beside today's profiles in `profiles.yml`, and the profiles, and `roles:` profiles,
-  go only when the old shape goes.
+  Logins are written to each host's `logins.yml` beside today's hand-written `profiles.yml` (§4.2b), and the
+  profiles, and `roles:` profiles, go only when the old shape goes.
 - **Known smoke passes ship with ShiftLead** (Paul), per tool, model and role, so a person does not re-run
   a smoke someone already has; their own passes add to it. The gate is on from the first build, the list
   seeded with every tool, model and role running here today. **The gate keys on tool, model and role, not

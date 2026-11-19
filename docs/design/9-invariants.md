@@ -3,7 +3,8 @@
 1. Only the host agent creates, kills, or sends keys to an `ao-*` tmux session.
 2. A directory has at most one agent session (`kind: interactive`, adapter other than `shell`;
    main checkout, worktree, or plain directory). Shells and command sessions are exempt. No seat runs in a main checkout (§4.9b *No anchor seat*): the one agent there is the person's own session, the anchor session.
-3. Every session has a run log from its first byte.
+3. Every session has a run log from its first byte. The one exception is a Tools page's tools shell
+   (§4.2b), whose log is removed when its pane closes: a sign-in prints an account's email, links and codes.
 4. A state shown as `hook` came from a hook; `scraped` is visible in the UI.
 5. Interactive sessions (`kind: interactive`, `unattended: false`) are never paused, killed, or
    sent to by a policy, and never acted on by another session: an acting RPC from a session onto
