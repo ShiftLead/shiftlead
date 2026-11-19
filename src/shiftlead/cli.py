@@ -567,6 +567,9 @@ def _person(role: repoconfig.Role, cfg: repoconfig.RepoConfig) -> list[dict[str,
         roots = []
     try:
         return layers.person(role.name, cfg.root, roots)
+    except layers.NoSource:  # named, and the start goes on with none (§4.8)
+        print(f"{layers.NO_SOURCE} — the person's own additions are not read", file=sys.stderr)
+        return []
     except layers.ListingError as e:
         raise ValueError(str(e)) from None
 

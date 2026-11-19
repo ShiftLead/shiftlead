@@ -110,7 +110,20 @@ def test_no_agent_cadence_to_list_under_is_named_and_reads_no_layer(tmp_path, mo
     _machine(tmp_path, monkeypatch, '[[layers]]\npath = "~/x.md"\n')
     with pytest.raises(layers.NoSource, match=layers.NO_SOURCE):
         layers.listing(tmp_path, None)
-    assert layers.person("grinder", tmp_path, [tmp_path]) == []
+    with pytest.raises(layers.NoSource):
+        layers.person("grinder", tmp_path, [tmp_path])
+
+
+def test_no_agent_cadence_is_said_at_ao_new_and_the_start_goes_on(tmp_path, monkeypatch, capsys):
+    """`ao new --role`: with no agent-cadence under the repo or among the home's, the start names it and goes on
+    with no addition (§4.8)."""
+    from shiftlead import cli
+
+    _machine(tmp_path, monkeypatch, '[[layers]]\npath = "~/x.md"\n')
+    monkeypatch.setattr(cli, "_org_notes", lambda: (__import__("shiftlead.org").org.Org(), []))
+    role = repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder")
+    assert cli._person(role, repoconfig.load(tmp_path)) == []
+    assert f"{layers.NO_SOURCE} — the person's own additions are not read" in capsys.readouterr().err
 
 
 def test_a_grinder_brief_holds_both_layers_under_your_own_rules(two_layers, tmp_path):
@@ -187,8 +200,17 @@ def test_a_team_start_lists_under_the_homes_checkout_and_stops_on_a_failed_listi
     with pytest.raises(teams.TeamError, match="team t: g: agent-cadence's layer listing exited 2"):
         teams._person(org, "app", repoconfig.resolve_role(repoconfig.load(repo), "grinder"), "here", "team t: g")
     assert asked == [(repo, source)]
+    # neither holds agent-cadence: none, marked so the start names it once (`plan`'s notes)
+
+    def none_here(where, src):
+        raise layers.NoSource(layers.NO_SOURCE)
+
+    monkeypatch.setattr(layers, "listing", none_here)
+    grinder = repoconfig.resolve_role(repoconfig.load(repo), "grinder")
+    assert teams._person(org, "app", grinder, "here", "team t: g") == ([], True)
+    monkeypatch.setattr(layers, "listing", listing)
     # a role whose brief is the repo's own, whole, has no place for them: nothing is listed
-    assert teams._person(org, "app", repoconfig.Role(name="own", root=repo), "here", "team t: o") == []
+    assert teams._person(org, "app", repoconfig.Role(name="own", root=repo), "here", "team t: o") == ([], False)
     assert len(asked) == 1
 
 

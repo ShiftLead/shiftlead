@@ -132,6 +132,7 @@ class Launch:
     context_bound: int | None = None  # tokens past which rule 5 tells it to end its run (§4.8, TD-190)
     prompt_from: dict[str, Any] | None = None  # what `prompt` was made from (§6 rule 7, TD-217)
     set_aside: bool = False  # its role's own `review:` was set aside under the team's flow (§4.9c item 2)
+    unlisted: bool = False  # no agent-cadence to list the person's layers (§4.8, TD-1016): said once at start
     pool_size: int = 0  # a pool member's definition's member count, for its held line (§4.9b, TD-1476)
     scale: str = ""  # an extra's line or seat (§4.9 *Scaling with the work*, TD-1545): written held, `scale: {line}`
 
@@ -347,17 +348,22 @@ def _brief(
     )
 
 
-def _person(org: orgmod.Org, repo: str, role: repoconfig.Role, here: str, where: str) -> list[dict[str, Any]]:
+def _person(
+    org: orgmod.Org, repo: str, role: repoconfig.Role, here: str, where: str
+) -> tuple[list[dict[str, Any]], bool]:
     """The person's own additions to `role`'s brief (design §4.8 *The person's own additions*, TD-1016), read at
     the home whatever host the member runs on: listed under the home's checkout of `repo`, else the agent-cadence
-    source among the home's repos. A listing that fails stops the start, by name. A role with no template (a repo's
-    own brief, whole) has no place for them, and nothing is listed."""
+    source among the home's repos; with neither, none, and True beside them, which the start names (`NO_SOURCE`).
+    A listing that fails stops the start, by name. A role with no template (a repo's own brief, whole) has no place
+    for them, and nothing is listed."""
     if role.template is None and role.defined is None:
-        return []
+        return [], False
     mine = org.checkout(repo, here)
     roots = [Path(c).expanduser() for r in org.checkouts if (c := org.checkout(r, here)) is not None]
     try:
-        return layers.person(role.name, mine, roots)
+        return layers.person(role.name, mine, roots), False
+    except layers.NoSource:
+        return [], True
     except layers.ListingError as e:
         raise TeamError(f"{where}: {e}") from None
 
@@ -931,7 +937,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
             raise TeamError(
                 f"{where}: profile {profile!r} runs a shell, and a team session is an agent's (design §4.9)"
             )
-    person = _person(org, home, role, here, where)
+    person, unlisted = _person(org, home, role, here, where)
     try:
         prompt, prompt_from = _brief(role, member, lane, read, techlead, context, manager, told, person=person)
     except ValueError as e:
@@ -962,6 +968,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         context_bound=None if seat and role.context_default else role.context_bound,
         prompt_from=prompt_from,
         set_aside=under is not None and bool(role.review),
+        unlisted=unlisted,
     )
 
 
@@ -1260,6 +1267,9 @@ def plan(
             by_finding.setdefault(finding, []).append(x.name)
     for finding, who in by_finding.items():
         p.warnings.append(f"{', '.join(who)}: the brief names one run — {finding}")
+    # the person's layers not listed, with no agent-cadence here (§4.8 *The person's own additions*): said once
+    if unlisted := [x.name for x in p.launches if x.unlisted]:
+        p.notes.append(f"{', '.join(unlisted)}: {layers.NO_SOURCE} — the person's own additions are not read")
     # TD-114's transition (design §4.8): a repo's brief that is still a whole brief repeats the
     # template's headings, and by the precedence rule its stale copy wins. Said, and started anyway.
     by_heading: dict[str, list[str]] = {}

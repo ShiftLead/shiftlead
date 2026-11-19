@@ -191,11 +191,7 @@ def brief_parts(role: str, layers: Iterable[Layer]) -> list[dict[str, Any]]:
 
 def person(role: str, repo: Path | str | None, roots: Iterable[Path | str] = ()) -> list[dict[str, Any]]:
     """The `{person}` parts a start of `role` in `repo` hands its brief (§4.8): listed under `repo` where it holds
-    agent-cadence, else under the agent-cadence source among `roots`; neither, none (`NoSource`). A listing that
-    fails is `ListingError`, the start's error."""
+    agent-cadence, else under the agent-cadence source among `roots`; neither, `NoSource`, which the start names
+    (`NO_SOURCE`) and goes on from with none. A listing that fails is `ListingError`, the start's error."""
     here = Path(repo).expanduser() if repo is not None else None
-    try:
-        found = listing(here if here is not None and here.is_dir() else None, source_of(roots))
-    except NoSource:
-        return []
-    return brief_parts(role, found)
+    return brief_parts(role, listing(here if here is not None and here.is_dir() else None, source_of(roots)))
