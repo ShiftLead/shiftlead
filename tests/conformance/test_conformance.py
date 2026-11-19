@@ -433,3 +433,55 @@ def test_install_and_signin_commands_are_the_persons_to_run(name):
     ad = _declares(name, "signin_command")
     argv = ad.signin_command()
     assert argv and all(isinstance(a, str) for a in argv) and argv[0] == ad.binary
+
+
+def _signed_in(name: str, root: Path, folder: str, key: str, display: str = "Ada") -> Path:
+    home = root / folder
+    home.mkdir()
+    HARNESSES[name].sign_in_as(home, key, display)
+    return home
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_identity_is_none_before_a_sign_in_and_on_a_record_it_cannot_read(name, tmp_path):
+    """`identity(home, salt)` is None with no account recorded, and None, never an exception, on a broken record."""
+    ad = _declares(name, "identity")
+    home = tmp_path / "login"
+    home.mkdir()
+    assert ad.identity(home, b"salt") is None
+    harness = HARNESSES[name]
+    for text in harness.corrupt_identity(home):
+        harness.write_identity(home, text)
+        assert ad.identity(home, b"salt") is None, text
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_identity_matches_compare_within_one_salt_only(name, tmp_path):
+    """One key under two salts gives two matches; two homes with one key give one; two keys give two (§4.2b)."""
+    ad = _declares(name, "identity")
+    one = _signed_in(name, tmp_path, "one", "acct-1@example.com")
+    two = _signed_in(name, tmp_path, "two", "acct-1@example.com")
+    other = _signed_in(name, tmp_path, "other", "acct-2@example.com")
+    a, b = ad.identity(one, b"salt-a"), ad.identity(one, b"salt-b")
+    assert a["match"] != b["match"]
+    assert ad.identity(two, b"salt-a")["match"] == a["match"]
+    assert ad.identity(other, b"salt-a")["match"] != a["match"]
+    assert set(a) == {"match", "display", "plan", "billing"}
+    assert a["billing"] in ("subscription", "metered", None)
+    assert a["plan"] is None or isinstance(a["plan"], str)
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_identity_never_lets_the_account_key_out(name, tmp_path, caplog, capsys):
+    """The key never leaves the adapter: not in the reply, a log line or printed output (§4.2b); `display` is a
+    name, never an email or part of one."""
+    ad = _declares(name, "identity")
+    key = "f00dfeed-secret-key@example.com"
+    caplog.set_level("DEBUG")
+    home = _signed_in(name, tmp_path, "login", key, display="Ada")
+    reply = ad.identity(home, b"salt")
+    assert reply is not None and reply["display"] in ("Ada", None)
+    seen = repr(reply) + caplog.text + "".join(capsys.readouterr())
+    assert "f00dfeed" not in seen and key not in seen
+    emailed = _signed_in(name, tmp_path, "emailed", key, display="ada@example.com")
+    assert ad.identity(emailed, b"salt")["display"] is None

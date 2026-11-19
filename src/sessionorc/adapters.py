@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 import shutil
 import subprocess
@@ -242,6 +244,13 @@ class Adapter(Protocol):
     #   is_home(path: Path) -> bool                       whether a folder is this tool's home, by the files the tool
     #                                                      writes there (§4.2b); each of these five is declared in
     #                                                      `implements`, and none launches the tool or sends anything
+    #   identity(home: Path, salt: bytes) -> dict | None  who a home is signed in as (§4.2b): {match, display, plan,
+    #                                                      billing}, or None with no account recorded. `match` is
+    #                                                      `account_match(salt, key)` of the tool's account key; the
+    #                                                      key itself never leaves the adapter (no reply, log line or
+    #                                                      exception holds it); `display` a name, never an email;
+    #                                                      `billing` the tool's record read as `subscription` or
+    #                                                      `metered`, None where it does not say — only a suggestion
     #   setup_note() -> dict | None                       what the machine needs a person for before this
     #                                                      adapter's sessions run (design §4.3, TD-875): None
     #                                                      with nothing to say; {key: None} all as wanted;
@@ -280,6 +289,7 @@ OPTIONAL_METHODS = (
     "find",
     "home_env",
     "install_command",
+    "identity",
     "is_home",
     "links",
     "mail",
@@ -289,6 +299,19 @@ OPTIONAL_METHODS = (
     "title",
     "usage_report",
 )
+
+
+def account_match(salt: bytes, key: str) -> str:
+    """An account key's match (design §4.2b `identity`): HMAC-SHA256 under the host agent's in-memory salt, so two
+    logins' matches compare within one run and nothing written anywhere can be checked against a guessed key."""
+    return hmac.new(salt, key.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def plain_name(value: object) -> str | None:
+    """A display name the tool recorded, or None — never an email or part of one (design §4.2b `identity`)."""
+    if not isinstance(value, str) or not value.strip() or "@" in value:
+        return None
+    return value.strip()
 
 
 def same_home(a: Path | str, b: Path | str) -> bool:
