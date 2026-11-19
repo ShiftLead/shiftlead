@@ -1217,3 +1217,56 @@ def test_a_stopped_teams_rename_reads_definition_changed_beside_start_and_on_the
     # Start reads the same pairing, and its confirm says so first (TD-706 slice 3)
     moved = "It first applies the definition: grind-1 → mill: renamed; hunt: removed from the definition."
     assert f'data-confirm="Start ao-grind? {moved}" data-moved="{moved}">Start</button>' in head
+
+
+def test_start_with_a_role_carries_the_persons_layer_additions_and_a_failed_listing_refuses(world, client, monkeypatch):
+    """TD-1016 (design §4.8 *The person's own additions*): the form's preset brief carries the person's own
+    `briefs/<role>.md` under *Your own rules*, read at the home and among what the brief was made from; a listing
+    that fails refuses the press in its words, and nothing starts."""
+    from shiftlead import layers
+
+    tmp_path, fleet = world
+    mine = tmp_path / "layer" / "shiftlead" / "briefs" / "hunter.md"
+    mine.parent.mkdir(parents=True)
+    mine.write_text("mine: look at the flaky tests first\n")
+    asked = []
+
+    def person(role, repo, roots):
+        asked.append((role, repo))
+        return [{"path": str(mine), "ref": None, "root": str(tmp_path / "layer"), "head": "— from your layer —"}]
+
+    monkeypatch.setattr(layers, "person", person)
+    data = {"name": "h", "dir": str(tmp_path / "shiftlead"), "role": "hunter", "lane": "TD-9"}
+    assert client.post("/new", data=data, follow_redirects=False).status_code == 303
+    (made,) = fleet.creates()
+    assert asked == [("hunter", str(tmp_path / "shiftlead"))]
+    prompt = made["prompt"]
+    assert prompt.index("## Your own rules") < prompt.index("mine: look at the flaky tests first")
+    assert prompt.index("mine: look at the flaky tests first") < prompt.index("## This repo's rules")
+    assert made["prompt_from"]["slots"]["{person}"]["layers"][0]["path"] == str(mine)
+
+    def failed(role, repo, roots):
+        raise layers.ListingError("agent-cadence's layer listing exited 2")
+
+    # a directory inside the repo lists under the repo's root, as `ao new` does
+    asked.clear()
+    sub = tmp_path / "shiftlead" / "src"
+    sub.mkdir(exist_ok=True)
+    assert client.post("/new", data={**data, "name": "h1", "dir": str(sub)}, follow_redirects=False).status_code == 303
+    assert asked == [("hunter", str(tmp_path / "shiftlead"))]
+
+    # no agent-cadence to list the layers: *Your own rules* reads none, and the session starts
+    def none_here(role, repo, roots):
+        raise layers.NoSource(layers.NO_SOURCE)
+
+    monkeypatch.setattr(layers, "person", none_here)
+    fleet.calls.clear()
+    assert client.post("/new", data={**data, "name": "h3"}, follow_redirects=False).status_code == 303
+    (made,) = fleet.creates()
+    assert made["prompt_from"]["slots"]["{person}"] == {"text": "none"}
+
+    monkeypatch.setattr(layers, "person", failed)
+    fleet.calls.clear()
+    r = client.post("/new", data={**data, "name": "h2"}, follow_redirects=False)
+    assert r.status_code == 400 and "agent-cadence's layer listing exited 2" in r.text
+    assert fleet.creates() == []

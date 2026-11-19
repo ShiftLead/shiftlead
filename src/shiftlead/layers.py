@@ -218,3 +218,16 @@ def addition(rel: str, repo: Path | str | None, roots: Iterable[Path | str] = ()
         return ""
     text, _sources = brief_mod.layered(got)
     return "" if text == "none" else text
+
+
+def preferences(roots: Iterable[Path | str] = ()) -> Path | None:
+    """The person's `shiftlead/preferences.md`, the director's (§4.9b *Preferences, in layers*): from one's own
+    layer alone, never a followed one, listed with no repo — under the agent-cadence source among `roots` (§4.8:
+    the director's preferences, `ao prefs`, the Director card). None with no own layer or none written there;
+    `NoSource` with no agent-cadence to list them, `ListingError` when the listing fails — each the reader's to
+    name (TD-662's `{my_preferences}` and `ao prefs`)."""
+    own = [layer for layer in listing(None, source_of(roots)) if layer.own]
+    for layer in reversed(own):  # one's own is last in the listing; the last own one wins
+        if read(layer, "preferences.md") is not None:
+            return path_of(layer, "preferences.md")
+    return None
