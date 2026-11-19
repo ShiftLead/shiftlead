@@ -125,3 +125,77 @@ def env(path: str, scratch_env: str | None) -> dict[str, str]:
     if scratch_env:
         out[scratch_env] = path
     return out
+
+
+SWEEP_TOUCH_FILES = 200_000  # files a record a pass the sweep touches at most; past it, *large scratch* (§4.6)
+TOUCH_AFTER_S = 86_400  # a file not accessed for a day is touched (§4.6)
+
+
+def _touch(path: Path, now_ns: int, cap: int) -> bool:
+    """Move the access time of every file under `path` not accessed for a day to `now_ns`, its modification
+    time left true (§4.6): `systemd-tmpfiles` ages a file by its own times, so a seat that runs past its age
+    keeps what it wrote. A symlink is skipped, never touched through; a `.git` is descended into as any
+    directory. True where more than `cap` files wanted touching: the rest wait for the next pass."""
+    stale = now_ns - TOUCH_AFTER_S * 1_000_000_000
+    touched = 0
+    todo = [path]
+    while todo:
+        try:
+            entries = list(os.scandir(todo.pop()))
+        except OSError:  # gone meanwhile, or unreadable
+            continue
+        for e in entries:
+            try:
+                if e.is_symlink():
+                    continue
+                if e.is_dir(follow_symlinks=False):
+                    todo.append(Path(e.path))
+                    continue
+                if not e.is_file(follow_symlinks=False):
+                    continue
+                st = e.stat(follow_symlinks=False)
+                if st.st_atime_ns >= stale:
+                    continue
+                if touched >= cap:
+                    return True
+                os.utime(e.path, ns=(now_ns, st.st_mtime_ns), follow_symlinks=False)
+                touched += 1
+            except OSError:
+                continue
+    return False
+
+
+def keep_alive(root: str | Path, records: dict[str, str], home: str | Path, now_ns: int) -> list[str]:
+    """The hourly sweep's part for live records (§4.6): `records` maps each live record of this host to its
+    `scratch`. A directory straight under this host's `shiftlead-<uid>/` that is gone is made again (`0700`,
+    `owner.json`, empty), one missing its `owner.json` gains it, and its stale files are touched (`_touch`).
+    One elsewhere, not this uid's, or whose `owner.json` names another record or home is left alone. Returns
+    the ids past `SWEEP_TOUCH_FILES`, each logged *large scratch* by the caller."""
+    try:
+        p = ensure_parent(root)
+    except (ScratchError, OSError):
+        return []
+    large: list[str] = []
+    for record, given in records.items():
+        path = Path(given)
+        if not path.is_absolute() or not _under(path, p):
+            continue
+        try:
+            try:
+                st = path.lstat()
+            except FileNotFoundError:
+                path.mkdir(mode=0o700)
+                write_owner(path, record, home)
+                continue
+            if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
+                continue
+            got = owner(path)
+            if got is None and not (path / OWNER).exists():
+                write_owner(path, record, home)
+            elif not got or got.get("id") != record or got.get("home") != str(home):
+                continue
+        except OSError:
+            continue
+        if _touch(path, now_ns, SWEEP_TOUCH_FILES):
+            large.append(record)
+    return large
