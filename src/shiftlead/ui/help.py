@@ -902,6 +902,26 @@ HELP: tuple[Help, ...] = (
         "Queue card",
         "This item was answered or closed elsewhere; Refresh takes it away.",
     ),
+    Help(
+        "tools-check",
+        "Check again",
+        "Tools page",
+        (
+            "Reads this host's coding tools again: each tool's binary on the PATH, its version and its default home. "
+            "Press it after installing or updating a tool, or signing one in outside ShiftLead. It installs, updates "
+            "and signs in nothing, and reads no other host."
+        ),
+    ),
+    Help(
+        "tools-install",
+        "Install",
+        "Tools page: Not ready to run here",
+        (
+            "Opens the tool's install shell, its vendor's install line typed and not run: you press Enter there. "
+            "Press it to install a tool ShiftLead supports that this host lacks, then Check again. ShiftLead runs "
+            "no install itself, and a tool with no adapter has no Install."
+        ),
+    ),
 )
 
 BY_KEY: dict[str, Help] = {h.key: h for h in HELP}
@@ -1025,6 +1045,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ),
     ("settings", "Settings", ("on-work", "balance", "schedule", "file-link", "telegram", "telegram-test")),
     ("spend", "Spend", ("usage-chip", "spend-view", "spend-picks", "spend-bar")),
+    ("tools", "Tools", ("tools-check", "tools-install")),
 )
 
 

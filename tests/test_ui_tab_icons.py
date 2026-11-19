@@ -36,6 +36,7 @@ ICON = {
     "settings.html": "page-settings",
     "help.html": "page-help",
     "spend.html": "page-spend",
+    "tools.html": "page-settings",
     "new.html": "page-new",
     "transcript.html": "page-transcript",
     "focus.html": "state-",

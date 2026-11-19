@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Tools · ShiftLead{% endblock %}
+{% block icon %}page-settings{% endblock %}
+{# design §4.2b *The page*, §4.5 screen 14 **Tools** (TD-1953, built by TD-1973; mockup
+   `docs/mockups/reviews/2026-11-18-td1953-tools-own5-{1440,420}.png`): the coding tools on the home's host — a card
+   per supported tool found, headed by its name and version, its found rows; then *Not ready to run here*. Before the
+   switch-over it draws no accounts or logins (TD-1974 and TD-1975 draw them). Drawn from the host agent's kept
+   `tools` read; **Check again** posts `/api/tools/check` (`tools_check`), **Install** `/api/tools/install`
+   (`tools_install`), which opens the install shell's Focus. #}
+{% block body %}
+<div class="page inboxpage toolspage" id="toolspage">
+  <div class="row gap wrap toolshead"><span class="h1">Tools</span>{% if t %}<span class="note">on <span class="mono">{{ t.host }}</span></span>{% endif %}<span class="grow"></span>
+    {% if t %}<span class="note" id="toolsread" title="{{ t.read_at }}">read {{ t.read_ago }} ago</span>{% endif %}
+    <button class="btn sm" type="button" id="toolscheck" title="{{ help_title('tools-check') }}"{% if agent_down %} disabled{% endif %}>Check again</button></div>
+  <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable{% if volatile %} (a volatile host: asleep?){% endif %} — this host's tools cannot be read until it is back <span class="grow"></span><a class="btn sm ghost" href="/tools">Retry</a></div>
+  {% if why %}<div class="note warn">{{ why }}</div>{% endif %}
+  <div class="note toolssaid" id="toolssaid" hidden></div>
+  {% if t %}
+  <div class="note">What can run here: each coding tool ShiftLead has an adapter for and found on this host, its version, and the folder it is signed in from.</div>
+  {% for c in t.tools %}
+  <section class="toolcard" data-adapter="{{ c.adapter }}">
+    <div class="row gap toolname"><span class="h2">{{ c.label }}</span><span class="mono note" title="{{ c.version or '' }} · {{ c.binary }}">{{ c.short or "version not read" }}</span></div>
+    {% for f in c.found %}
+    <div class="toolfound row gap wrap"><span class="mono">{{ f.shown }}</span>
+      {%- if f.own_home %}<span class="note">the tool's own home: ShiftLead launches {{ c.label }} into a folder of its own</span>
+      {%- else %}<span class="note">found here, signed in</span>{% endif %}</div>
+    {% else %}
+    <div class="toolfound row gap wrap"><span class="note">no signed-in folder found at the tool's default home</span></div>
+    {% endfor %}
+  </section>
+  {% else %}
+  <div class="note">No coding tool ShiftLead has an adapter for is found on this host.</div>
+  {% endfor %}
+  {% if t.not_ready %}
+  <section class="toolsnotready">
+    <div class="h2">Not ready to run here</div>
+    {% for c in t.not_ready %}
+    <div class="toolnr row gap wrap" data-adapter="{{ c.adapter }}"><span class="toolnrname">{{ c.label }}</span>
+      <span class="mono toolnrver">{% if c.installed %}{{ c.short or "version not read" }} installed{% else %}not installed{% endif %}</span>
+      {%- if c.supported %}<span class="note grow">Not installed on this host.</span>
+        {%- if c.install_command %}<button class="btn sm toolinstall" type="button" data-tool="{{ c.adapter }}" title="{{ help_title('tools-install') }}"{% if agent_down %} disabled{% endif %}>Install</button>{% endif %}
+      {%- elif c.installed %}<span class="note grow">ShiftLead has no adapter for it yet, so no seat can run on it.</span>
+      {%- else %}<span class="note grow">No adapter yet. Its install appears here once there is one.</span>{% endif %}</div>
+    {% endfor %}
+  </section>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}<script>AO.tools();</script>{% endblock %}

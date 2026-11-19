@@ -69,6 +69,7 @@ READS = frozenset(
         "sweep_switch",
         "seats",
         "adapters",
+        "tools",
         "ping",
         "whoami",
         "identity",

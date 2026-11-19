@@ -846,6 +846,38 @@ def cmd_tools_install(args: argparse.Namespace) -> int:
     )
 
 
+def _tools_prose(r: dict[str, Any]) -> None:
+    """The Tools page as lines (design §4.2b, TD-1973): each tool found, its version and found rows, then *Not ready
+    to run here*."""
+    print(f"Tools on {r.get('host')}  (read {_age(str(r.get('read_at') or ''))} ago)")
+    for t in r.get("tools") or []:
+        print(f"{t['label']}  {t.get('version') or 'version not read'}  ({t.get('binary')})")
+        for f in t.get("found") or []:
+            if f.get("own_home"):
+                print(f"  {f['folder']}  the tool's own home: ShiftLead launches {t['label']} into a folder of its own")
+            else:
+                print(f"  {f['folder']}  found here, signed in")
+    if r.get("not_ready"):
+        print("Not ready to run here:")
+    for t in r.get("not_ready") or []:
+        version = f"{t.get('version') or 'version not read'} installed" if t.get("installed") else "not installed"
+        if t.get("supported"):
+            why = f"install it: ao tools install {t['adapter']}" if t.get("install_command") else "no install command"
+        elif t.get("installed"):
+            why = "ShiftLead has no adapter for it yet, so no seat can run on it"
+        else:
+            why = "no adapter yet"
+        print(f"  {t['label']}  {version}  — {why}")
+
+
+def cmd_tools(args: argparse.Namespace) -> int:
+    """`ao tools [--json]` and `ao tools check` (design §4.2b *Controls and verbs*, TD-1973): the coding tools on this
+    host, as the Tools page draws them — the read the host agent keeps, or (`check`, the page's **Check again**, a
+    person's own act) read again."""
+    r = call_sync("tools_check" if getattr(args, "action", None) == "check" else "tools")
+    return emit(args, r, lambda: _tools_prose(r))
+
+
 def cmd_roles(args: argparse.Namespace) -> int:
     """`ao roles` (design §4.7, §4.8): every preset that resolves in this repo — the package's
     built-ins and what the repo's `.shiftlead.yml` redefines or adds — with where each came from."""
@@ -5690,7 +5722,11 @@ def build_parser() -> argparse.ArgumentParser:
     q.set_defaults(fn=cmd_team_list)
 
     p = add("tools", help="the coding tools on this host (§4.2b, the Tools page)")
-    tools_sub = p.add_subparsers(dest="action", required=True)
+    p.set_defaults(fn=cmd_tools)
+    tools_sub = p.add_subparsers(dest="action")
+    q = tools_sub.add_parser("check", help="read this host's tools again: the page's Check again (§4.2b)")
+    q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the RPC result as JSON")
+    q.set_defaults(fn=cmd_tools)
     q = tools_sub.add_parser("install", help="open the tool's install shell, its install command typed (§4.2b)")
     q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the RPC result as JSON")
     q.add_argument("tool", help="the tool's adapter (claude-code, gemini, grok)")
