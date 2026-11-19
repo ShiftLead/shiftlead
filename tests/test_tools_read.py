@@ -203,3 +203,89 @@ def test_the_page_draws_the_hosts_tools_and_settings_links_it(subprocess_agent):
     assert 'id="toolspage"' in page.text and 'id="toolscheck"' in page.text and "Check again" in page.text
     assert "host agent unreachable" in page.text and 'class="warn hidden" id="agentdown"' in page.text
     assert 'href="/tools"' in settings.text
+
+
+def test_the_reads_thread_never_holds_the_loops_end():
+    """TD-2002: the read ran on the loop's default executor, which `asyncio.run` joins at its end, so a host agent
+    told to stop waited for every `--version` its read had left — a child agent of the suite outlived its SIGTERM.
+    The read's own daemon thread is awaited like the executor was, and holds no end."""
+    import asyncio
+    import threading
+    import time
+
+    from sessionorc.agent import _in_daemon_thread
+
+    release = threading.Event()
+
+    async def cut_short():
+        task = asyncio.create_task(_in_daemon_thread(release.wait, 30))
+        await asyncio.sleep(0.05)
+        task.cancel()
+
+    t0 = time.monotonic()
+    asyncio.run(cut_short())
+    assert time.monotonic() - t0 < 5, "the loop's end waited for the read"
+    release.set()
+
+    async def whole():
+        assert await _in_daemon_thread(lambda a, b: a + b, 2, 3) == 5
+        with pytest.raises(ZeroDivisionError):
+            await _in_daemon_thread(lambda: 1 / 0)
+
+    asyncio.run(whole())
+
+
+@pytest.mark.integration
+async def test_a_test_agent_makes_no_start_read(agent):
+    """TD-2002: the suite's host agents make no start read (conftest's `_no_start_tools_read`); one asked for still
+    answers `tools` with a read of its own."""
+    assert agent._tools_task is None and agent._tools_kept is None
+
+
+@pytest.mark.integration
+def test_a_stop_is_never_held_by_the_start_read(tmp_path, monkeypatch):
+    """TD-2002: a child agent whose start read is stuck in a slow `--version` stops at its SIGTERM, exit 0."""
+    import os
+    import signal
+    import subprocess
+    import sys
+    import time
+
+    from conftest import CHILD, kill_private_server, private_socket_name, wait_for_sync
+
+    from sessionorc.tmux import Tmux
+
+    slow = tmp_path / "slow-bin"
+    slow.mkdir()
+    for name in ("claude", "gemini", "grok"):  # each tool's `--version` sits out its whole bound
+        b = slow / name
+        b.write_text(f"#!/bin/sh\nexec sleep 59.7311 # {name}\n")
+        b.chmod(0o755)
+    home = tmp_path / "home"
+    sock_name = private_socket_name()
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_TMUX_SOCKET", sock_name)
+    monkeypatch.setenv("AO_TEST_TOOLS_AT_START", "1")
+    monkeypatch.setenv("PATH", f"{slow}{os.pathsep}{os.environ['PATH']}")
+    proc = subprocess.Popen(
+        [sys.executable, str(CHILD), sock_name],
+        env=dict(os.environ),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        sock = home / "agent.sock"
+        assert wait_for_sync(lambda: sock.exists() or proc.poll() is not None, timeout=10.0)
+        assert proc.poll() is None, proc.communicate(timeout=5)[1]
+        ps = ["ps", "-eo", "args"]
+        assert wait_for_sync(lambda: b"sleep 59.7311" in subprocess.run(ps, capture_output=True).stdout)
+        t0 = time.monotonic()
+        proc.send_signal(signal.SIGTERM)
+        _, err = proc.communicate(timeout=8)
+        assert proc.returncode == 0, err
+        assert time.monotonic() - t0 < 5, "the stop waited for the start's read"
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+        kill_private_server(Tmux(socket_name=sock_name))

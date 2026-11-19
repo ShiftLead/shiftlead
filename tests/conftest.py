@@ -100,6 +100,16 @@ def _person_text_off_unless_marked(request: pytest.FixtureRequest, monkeypatch: 
 
 
 @pytest.fixture(autouse=True)
+def _no_start_tools_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The host agent reads this host's tools when it starts (design §4.2b, TD-1973): every tool's real `--version`,
+    a node process each for some. The suite starts hundreds of host agents, so a test makes none of those reads; a
+    test of the start's read sets `tools.READ_AT_START` back (a child agent: `AO_TEST_TOOLS_AT_START=1`, TD-2002)."""
+    from sessionorc import tools
+
+    monkeypatch.setattr(tools, "READ_AT_START", False)
+
+
+@pytest.fixture(autouse=True)
 def _no_extras_unless_asked(monkeypatch: pytest.MonkeyPatch) -> None:
     """A team with no `max` key is on td-max's default ceilings (§4.9 *Scaling with the work*, TD-1545), so
     every Start would write two held extras per line and seat beside the sessions a test counts. A test
