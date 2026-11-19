@@ -304,10 +304,11 @@ class ClaudeCodeHarness:
         (home / ".credentials.json").write_text(json.dumps({"claudeAiOauth": {"accessToken": "t"}}), encoding="utf-8")
 
     def mark_home(self, home: Path) -> None:
-        (home / "projects").mkdir(exist_ok=True)
+        (home / ".claude.json").write_text("{}", encoding="utf-8")
 
     def not_a_home(self, path: Path) -> None:
         (path / "settings.json").write_text("{}", encoding="utf-8")
+        (path / "projects").mkdir(exist_ok=True)  # a workspace's own directory of that name
 
     def hook_command(self, argv: list[str], env: dict[str, str]) -> str:
         """The hook command the launch's `--settings` layer names for every event."""
@@ -506,11 +507,12 @@ class GrokHarness:
         (home / "auth.json").write_text("{}", encoding="utf-8")
 
     def mark_home(self, home: Path) -> None:
-        (home / "sessions").mkdir(exist_ok=True)
+        (home / "auth.json").write_text("{}", encoding="utf-8")
 
     def not_a_home(self, path: Path) -> None:
         (path / "hooks").mkdir(exist_ok=True)
         (path / "hooks" / "shiftlead.json").write_text("{}", encoding="utf-8")  # ShiftLead's own, not the tool's
+        (path / "sessions").mkdir(exist_ok=True)  # another program's directory of that name
 
     def hook_command(self, argv: list[str], env: dict[str, str]) -> str:
         """The command the hook file in the launch's `GROK_HOME` names for every event."""

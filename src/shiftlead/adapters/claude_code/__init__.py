@@ -486,8 +486,9 @@ def _instant(at: object) -> datetime | None:
 RULES_FILE = Path(__file__).with_name("screen_rules.toml")
 # the vendor's documented install line, the native installer (design §4.2b `install_command`, TD-1971)
 INSTALL_LINE = "curl -fsSL https://claude.ai/install.sh | bash"
-# what the tool writes into a home of its own: its sign-in record, its credentials, its transcripts (§4.2b `is_home`)
-HOME_MARKS = (".claude.json", ".credentials.json", "projects")
+# what the tool writes into a home of its own: its sign-in record or its credentials (§4.2b `is_home`) — never a
+# directory name as plain as `projects/`, which any workspace may hold
+HOME_MARKS = (".claude.json", ".credentials.json")
 
 
 # A launch with no prompt (`ao new` without one, Add entry's **Open a session**) lands at the composer:
@@ -1022,8 +1023,8 @@ class ClaudeCodeAdapter:
         return [self.binary]
 
     def is_home(self, path: Path) -> bool:
-        """Whether `path` is a home of this tool, by what the tool writes there (§4.2b): its sign-in record, its
-        credentials or its transcripts' directory — never a repo's `.claude/` of settings alone."""
+        """Whether `path` is a home of this tool, by what the tool writes there (§4.2b): its sign-in record or its
+        credentials — never a repo's `.claude/` of settings alone."""
         p = Path(path).expanduser()
         return any((p / mark).exists() for mark in HOME_MARKS)
 

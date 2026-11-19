@@ -41,8 +41,9 @@ OWN_HOME = Path("~/.grok")  # the tool's own default home, never written (§4.2a
 BINARY = OWN_HOME / "bin" / "grok"  # the install's link, by absolute path (§4.3 `launch`)
 INSTALL_LINE = "curl -fsSL https://x.ai/cli/install.sh | bash"  # the person's, by hand (§4.3 *The install*)
 HOOK_FILE = Path("hooks") / "shiftlead.json"  # under the profile's GROK_HOME
-# what the tool writes into a home of its own: its sign-in and its sessions (design §4.2b `is_home`, TD-1971)
-HOME_MARKS = ("auth.json", "sessions")
+# what the tool writes into a home of its own: its sign-in (design §4.2b `is_home`, TD-1971) — never a directory
+# name as plain as `sessions/`, which another program's folder may hold
+HOME_MARKS = ("auth.json",)
 # every event the state feed reads (§4.3 *The state feed*; the guide's *Hook Events*)
 HOOK_EVENTS = (
     "SessionStart",
@@ -333,8 +334,8 @@ class GrokAdapter:
         return [self.binary, "login"]
 
     def is_home(self, path: Path) -> bool:
-        """Whether `path` is a home of this tool, by what the tool writes there (§4.2b): its sign-in or its
-        sessions — never ShiftLead's own hook file alone."""
+        """Whether `path` is a home of this tool, by what the tool writes there (§4.2b): its sign-in — never
+        ShiftLead's own hook file alone."""
         p = Path(path).expanduser()
         return any((p / mark).exists() for mark in HOME_MARKS)
 
