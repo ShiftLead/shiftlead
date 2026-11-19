@@ -399,6 +399,7 @@ BACKUP_MEMBERS = (
     "org.yml",
     "hosts.yml",
     "profiles.yml",
+    "logins.yml",  # the host's logins (§4.2b *Where it lives*, TD-1974)
     "settings.yml",
     "witnessed",  # the witness log (§4.4 *The home keeps a log of what it witnesses*, TD-1386)
     "host-log.toml",  # its host file, the person's once written (§4.4 *The host file*, TD-1390)

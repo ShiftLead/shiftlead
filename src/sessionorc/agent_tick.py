@@ -1283,7 +1283,7 @@ class TickMixin:
         if (
             self.mode == "home" and (self._defs_task is None or self._defs_task.done())
         ) and now - self._defs_read_at > DERIVE_EVERY:
-            # a hand edit of the three files is committed on the reports' cadence (§4.9), detached
+            # a hand edit of the definition files is committed on the reports' cadence (§4.9), detached
             self._defs_read_at = now
             self._defs_task = asyncio.create_task(self._commit_defs("edited by hand"))
 

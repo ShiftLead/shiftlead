@@ -105,12 +105,13 @@ def test_ao_org_prints_each_team_its_file_its_repo_and_where_it_lands(world, cap
     # the org file's own team has no landing rule: its `host:`, or where it is started
     assert rows["span"]["source"] == str(home / "org.yml") and rows["span"]["host"] == HOST
     assert rows["span"]["why"].startswith("no host:")
-    # the remainder: the three files, none with a history until the home is a work tree
+    # the remainder: the tracked files, none with a history until the home is a work tree
     rem = got["remainder"]
     assert rem["tree"] is False and [f["name"] for f in rem["files"]] == list(defs.TRACKED)
     assert {f["name"]: f["exists"] for f in rem["files"]} == {
         "org.yml": True,
         "profiles.yml": True,
+        "logins.yml": False,
         "settings.yml": False,
     }
     assert cli.main(["org"]) == 0

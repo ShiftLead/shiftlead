@@ -407,7 +407,7 @@ def install(
         wheel = None
     if wheel is not None:
         written.append(str(wheel))
-    # At the home the directory becomes a work tree that tracks its three definition files (design
+    # At the home the directory becomes a work tree that tracks its definition files (design
     # §4.9 *What is left at the home has a history*, TD-229); never on a node, never fatal to the units.
     try:
         tree = _home_history(home)

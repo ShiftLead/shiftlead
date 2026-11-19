@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 import yaml
 
-from sessionorc import adapters, defs, logins, tools
+from sessionorc import adapters, agent_common, defs, logins, tools
 
 
 def test_names_follow_the_rules():
@@ -50,13 +50,30 @@ def test_the_file_round_trips_and_an_unswitched_host_reads_none(tmp_path):
             logins.load(tmp_path)
 
 
-def test_a_write_is_committed_once_the_file_is_tracked(tmp_path, monkeypatch):
-    monkeypatch.setattr(defs, "TRACKED", (*defs.TRACKED, "logins.yml"))
-    monkeypatch.setattr(defs, "IGNORE", defs.IGNORE + "!logins.yml\n")
+def test_a_write_at_the_home_is_committed_as_logins(tmp_path):
+    assert "logins.yml" in defs.TRACKED and "profiles.yml" in defs.TRACKED  # beside it until the switch-over
+    assert "logins.yml" in agent_common.BACKUP_MEMBERS
     assert defs.init(tmp_path)
     assert logins.save(logins.empty(), "first", tmp_path) is True
     log = defs._git(tmp_path, "log", "-1", "--format=%s").stdout.strip()
     assert log == "logins: first"
+    assert logins.save(logins.empty(), "again", tmp_path) is False  # nothing changed, nothing committed
+
+
+def test_a_home_made_a_tree_before_logins_were_tracked_lets_the_file_in_on_its_write(tmp_path):
+    assert defs.init(tmp_path)
+    ignore = tmp_path / ".gitignore"
+    ignore.write_text(ignore.read_text().replace("!logins.yml\n", ""))  # the ignore file an older home wrote
+    defs._git(tmp_path, "commit", "-qam", "older home")
+    assert logins.save({"accounts": {"t:paul": {"label": "work"}}}, "account t:paul", tmp_path) is True
+    assert "!logins.yml" in ignore.read_text().splitlines()
+    files = defs._git(tmp_path, "show", "--name-only", "--format=", "HEAD").stdout.split()
+    assert sorted(files) == [".gitignore", "logins.yml"]
+
+
+def test_a_write_on_a_node_commits_nothing(tmp_path):
+    assert logins.save(logins.empty(), "first", tmp_path) is False  # a node's home is no tree
+    assert (tmp_path / "logins.yml").exists() and not defs.is_tree(tmp_path)
 
 
 def test_a_version_is_the_entry_s_hash_and_a_stale_one_is_refused():
