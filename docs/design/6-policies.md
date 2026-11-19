@@ -1224,7 +1224,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      unattended session live, the clients calling it with the same records, so the card and the
      tick never disagree. Where a lead under the manager also holds `control` and is listed
      (manager → lead → worker), the manager is the one no other such record controls, and the
-     lead is a member. **Which members count.** An ended (`closed` or `exited`) member carrying a Wind down's `wind_down` mark (a member's, never the manager's lead mark) is passed over,
+     lead is a member. **Which members count.** An ended (`closed` or `exited`) record carrying a member's `wind_down` mark (one without `lead`, never the manager's lead mark, whether or not `work.manager_of` names the record) is passed over,
      as a sat-out one is, and a live one is a clause, *<name> winding down*, so the reading holds only
      once every marked member is gone (§4.9a *A wind-down closes its members*, TD-1895). A live member with `out_of_work` is finished; a
      `closed` or `exited` one with `out_of_work` is finished too; a member `exited` with `pane`
@@ -1312,9 +1312,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      (`ao team status --json`, §4.9) and never an earlier round's; what it may not do is keep a
      finished team live by not saying so.
      **A wind-down's close** (TD-1895, §4.9a *A wind-down closes its members*). The same pass closes,
-     on every tick at the home, each live unattended record carrying a **`wind_down`** mark (stamped by
+     on every tick at the home, each live unattended record carrying a member's **`wind_down`** mark, one
+     without `lead` (stamped by
      a Wind down's wrap-up send once submitted, or by `mark_wind_down` on a finished member sent nothing — a person's
-     press or a session's) that is not a seat and not its team's manager, once it has settled — `idle`
+     press or a session's), that is not a seat and not its team's manager, once it has settled — `idle`
      as this rule reads idle, and the mark's `waits` false, or a turn ended after the mark (`turn_at`,
      the same clock) with the record idle since for `SEND_STALL_SECONDS` (measured on the home's clock
      from the first tick that read it idle after that turn, and started again by any tick that reads it not idle), or `WRAPUP_GRACE` past the mark (on the home's clock, from the first tick that read the mark) — under `_finished_close`'s check, with closer `{by: tick, why: wind_down}`, **whether or not
