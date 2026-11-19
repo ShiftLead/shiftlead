@@ -5376,7 +5376,12 @@ class TickMixin:
         (`scratch.keep_alive`). Runs in a thread: touches files, never `self.sessions`."""
         if scratch:
             root = getattr(hosts.local_host(), "scratch_root", None) or hosts.DEFAULT_SCRATCH_ROOT
-            for rid in scratch_mod.keep_alive(root, scratch, paths.home(), time.time_ns()):
+            try:
+                large = scratch_mod.keep_alive(root, scratch, paths.home(), time.time_ns())
+            except Exception:  # noqa: BLE001 — a bad record's scratch never stops the rest of the sweep
+                log.exception("scratch sweep failed")
+                large = []
+            for rid in large:
                 log.warning("large scratch: %s holds more than %d stale files", rid, scratch_mod.SWEEP_TOUCH_FILES)
         idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
         for f in paths.attachments_dir().glob("*/*.part"):

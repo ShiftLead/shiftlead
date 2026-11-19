@@ -317,7 +317,8 @@ def main(argv: list[str] | None = None) -> int:
         home = args.home.expanduser().resolve()
         home.mkdir(parents=True)
     else:
-        # the run's own scratch (§4.6, TD-1944) where it has one: its root is at most 78 bytes (§4.6)
+        # the run's own scratch (§4.6, TD-1944) where it has one: at most 78 bytes,
+        # so `agent.sock` at most 105 (AF_UNIX: 107)
         home = Path(tempfile.mkdtemp(prefix="aolook-", dir=os.environ.get("SHIFTLEAD_SCRATCH") or "/tmp"))
     sock = f"ao-look-{uuid.uuid4().hex[:8]}"
     port = args.port or free_port()
