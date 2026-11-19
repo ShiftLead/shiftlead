@@ -536,3 +536,24 @@ NAMED_MODELS = {
     ],
     "grok": [("grok", "grok-4.7"), ("build-fast", "grok-4.7-build-fast")],
 }
+
+
+# the settings file naming a model in a home, where the adapter reads its default from one (§4.2b `models`)
+DEFAULT_SETTINGS = {
+    "claude-code": ("settings.json", {"model": "claude-sonnet-5-5"}, "sonnet"),
+    "gemini": (".gemini/settings.json", {"model": {"name": "gemini-3.5-flash-lite"}}, "flash-lite"),
+}
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_models_default_is_the_family_the_homes_settings_name(name, tmp_path):
+    """`default` is the family of the model the home's settings name, and None where they name none."""
+    ad = _declares(name, "models")
+    if name not in DEFAULT_SETTINGS:
+        pytest.skip(f"{name} reads no default from a file")
+    rel, doc, family = DEFAULT_SETTINGS[name]
+    home = tmp_path / "login"
+    (home / rel).parent.mkdir(parents=True)
+    assert ad.models(home, None)["default"] is None
+    (home / rel).write_text(json.dumps(doc), encoding="utf-8")
+    assert ad.models(home, None)["default"] == family

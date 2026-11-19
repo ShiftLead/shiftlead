@@ -123,13 +123,13 @@ CLI_INSTALL_LINE = "npm install -g @google/gemini-cli"
 # what the tool writes under a home's `.gemini/`: its accounts, its credentials, its install id (§4.2b `is_home`);
 # never `settings.json`, which a repo's own `.gemini/` holds too
 HOME_MARKS = ("google_accounts.json", "oauth_creds.json", "gemini-credentials.json", "installation_id")
-# how each `selectedType` is billed, as `identity` suggests it (§4.2b): a Google sign-in's quota windows, or a key's
-# metered use; another type says nothing
 # the model families Gemini CLI's names carry, the version between `gemini-` and the family (design §4.2b `models`)
 FAMILIES = ("pro", "flash", "flash-lite")
 # the families each plan (`selectedType`) offers, only where a host has run each: none is confirmed yet (an API key ran
 # flash and flash-lite on kmaster, pro unread, 2026-11-19), so every plan offers every family, unconfirmed
 PLAN_FAMILIES: dict[str, tuple[str, ...]] = {}
+# how each `selectedType` is billed, as `identity` suggests it (§4.2b): a Google sign-in's quota windows, or a key's
+# metered use; another type says nothing
 SELECTED_BILLING = {"oauth-personal": "subscription", "gemini-api-key": "metered", "vertex-ai": "metered"}
 
 
