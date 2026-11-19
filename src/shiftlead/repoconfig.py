@@ -657,7 +657,8 @@ class Role:
         template, composed with the same slots — the seat smoke's `--brief`, replaying an older brief (design
         §4.3 *The live smoke, unattended*, TD-1648). `person` is the person's own additions (§4.8 *The person's
         own additions*, TD-1016): `shiftlead.layers.brief_parts`, filled into `{person}` under *Your own rules*,
-        `none` when no layer has one or none was read.
+        `none` when no layer has one or none was read. It is filled right after `{repo}`, so a slot word the
+        person writes (`{lane}`, `{gate}`) is filled as in the repo's text, on a replay alike.
 
         Beside the text, what it was made from (design §6 *Keeping a team running* rule 7, TD-217):
         `prompt_from = {base, slots}` — `base` the template's path as installed, or the repo's brief
@@ -690,13 +691,14 @@ class Role:
             added = self._read(extra, read).strip() if extra else ""
             text = text.replace(REPO_PLACEHOLDER, added or NO_REPO)
             slots[REPO_PLACEHOLDER] = {"file": str(self._path(extra))} if extra else {"text": NO_REPO}
-            if person:
-                mine, _ = brief_mod.layered(person)
-                slots[PERSON_PLACEHOLDER] = {"layers": [dict(part) for part in person]}
-            else:
-                mine = NO_PERSON
-                slots[PERSON_PLACEHOLDER] = {"text": NO_PERSON}
-            text = text.replace(PERSON_PLACEHOLDER, mine)
+            if PERSON_PLACEHOLDER in text:  # a role's own template may have no place for them (§4.9c)
+                if person:
+                    mine, _ = brief_mod.layered(person)
+                    slots[PERSON_PLACEHOLDER] = {"layers": [dict(part) for part in person]}
+                else:
+                    mine = NO_PERSON
+                    slots[PERSON_PLACEHOLDER] = {"text": NO_PERSON}
+                text = text.replace(PERSON_PLACEHOLDER, mine)
             stage = flow.stage if flow is not None else default_stage
             text = text.replace(FLOW_PLACEHOLDER, flow.text if flow is not None else NO_FLOW)
             slots[FLOW_PLACEHOLDER] = {"text": flow.text if flow is not None else NO_FLOW}

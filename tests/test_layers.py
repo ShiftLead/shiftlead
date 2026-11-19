@@ -185,5 +185,33 @@ def test_a_team_start_lists_under_the_homes_checkout_and_stops_on_a_failed_listi
 
     monkeypatch.setattr(layers, "listing", listing)
     with pytest.raises(teams.TeamError, match="team t: g: agent-cadence's layer listing exited 2"):
-        teams._person(org, "app", "grinder", "here", "team t: g")
+        teams._person(org, "app", repoconfig.resolve_role(repoconfig.load(repo), "grinder"), "here", "team t: g")
     assert asked == [(repo, source)]
+    # a role whose brief is the repo's own, whole, has no place for them: nothing is listed
+    assert teams._person(org, "app", repoconfig.Role(name="own", root=repo), "here", "team t: o") == []
+    assert len(asked) == 1
+
+
+def test_a_followed_layer_is_read_at_its_pin_where_its_checkout_lacks_the_directory(two_layers, tmp_path):
+    """The followed clone may stand at a commit without `shiftlead/briefs/`: the read goes by the layer's root."""
+    followed = two_layers[0]
+    import shutil
+
+    shutil.rmtree(followed.root / "shiftlead")
+    parts = layers.brief_parts("grinder", [followed])
+    assert parts and parts[0]["root"] == str(followed.root)
+    assert brief_mod.layered(parts)[0].endswith("theirs: test twice")
+
+
+def test_a_failed_listing_is_asked_once_per_start(tmp_path, monkeypatch):
+    _machine(tmp_path, monkeypatch, '[[layers]]\npath = "~/x.md"\n')
+    asked = []
+
+    def run(argv, **k):
+        asked.append(argv)
+        return subprocess.CompletedProcess(argv, 1, "", "no\n")
+
+    for _ in range(2):
+        with pytest.raises(layers.ListingError):
+            layers.listing(None, tmp_path, run=run)
+    assert len(asked) == 1

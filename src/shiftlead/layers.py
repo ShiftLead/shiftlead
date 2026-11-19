@@ -38,7 +38,7 @@ NO_LAYER = (
 )
 MACHINE_FILE = "cadence.toml"
 LISTED_FOR = 60.0  # one listing answers every member of one team start (as `cadence.TREE_FOR`)
-_listed: dict[str, tuple[float, list[Layer]]] = {}
+_listed: dict[str, tuple[float, list[Layer] | ListingError]] = {}  # a failure too: one per team start
 
 
 class ListingError(Exception):
@@ -120,7 +120,19 @@ def listing(
     key = str(Path(where).expanduser())
     hit = _listed.get(key)
     if hit is not None and time.monotonic() - hit[0] < LISTED_FOR:
+        if isinstance(hit[1], ListingError):
+            raise hit[1]
         return list(hit[1])
+    try:
+        out = _listing(where, run)
+    except ListingError as e:
+        _listed[key] = (time.monotonic(), e)
+        raise
+    _listed[key] = (time.monotonic(), out)
+    return list(out)
+
+
+def _listing(where: Path | str, run: Callable[..., subprocess.CompletedProcess[str]]) -> list[Layer]:
     argv, env = cadence.command(where, *LISTING)
     try:
         cp = run(argv, env=env, capture_output=True, text=True, timeout=LIST_TIMEOUT)
@@ -146,8 +158,7 @@ def listing(
             continue  # a followed layer is read at its pin alone, never its working tree
         commit = row.get("commit") if isinstance(row.get("commit"), str) else None
         out.append(Layer(root=Path(os.path.expanduser(row["root"])), kind=kind, ref=ref, commit=commit))
-    _listed[key] = (time.monotonic(), out)
-    return list(out)
+    return out
 
 
 def path_of(layer: Layer, rel: str) -> Path:
@@ -158,7 +169,7 @@ def read(layer: Layer, rel: str) -> tuple[str, str] | None:
     """`(text, sha)` of the layer's `shiftlead/<rel>`, its own from the working tree, a followed one's at its
     `ref`; None when it has none."""
     try:
-        return brief_mod.read_layer(str(path_of(layer, rel)), layer.ref)
+        return brief_mod.read_layer(str(path_of(layer, rel)), layer.ref, str(layer.root))
     except brief_mod.Unreadable:
         return None
 
@@ -167,7 +178,7 @@ def parts(layers: Iterable[Layer], rel: str) -> list[dict[str, Any]]:
     """The `{layers: …}` slot's parts for `shiftlead/<rel>` (`sessionorc.brief.layered`): each layer that has
     the file, in order, with its path, its `ref` and the head line naming it."""
     return [
-        {"path": str(path_of(layer, rel)), "ref": layer.ref, "head": layer.head()}
+        {"path": str(path_of(layer, rel)), "ref": layer.ref, "root": str(layer.root), "head": layer.head()}
         for layer in layers
         if read(layer, rel) is not None
     ]

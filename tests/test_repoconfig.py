@@ -158,7 +158,8 @@ def test_built_in_briefs_fill_the_lane_and_plain_has_none(tmp_path):
     # design §4.9a *A wind-down is announced* (TD-053 step 5): the note to the person comes before the close (TD-125)
     assert orc.index("ran out of work at <t>. Merged this run") < orc.index("ao close $SHIFTLEAD_SESSION")
     assert repoconfig.resolve_role(cfg, "plain").brief_text() is None
-    for name in ("grinder", "hunter", "manager"):  # one screen each, *The path* and *Your own rules* included (§4.9c, TD-1016)
+    # one screen each, *The path* and *Your own rules* included (§4.9c, TD-1016)
+    for name in ("grinder", "hunter", "manager"):
         assert len(repoconfig.resolve_role(cfg, name).brief_text().splitlines()) < 50
 
 

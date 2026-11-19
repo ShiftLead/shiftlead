@@ -95,34 +95,42 @@ def read(path: str, merged: bool = True) -> tuple[str, str]:
     return _text(data), blob_sha(data)
 
 
-def read_layer(path: str, ref: str | None) -> tuple[str, str]:
+def read_layer(path: str, ref: str | None, root: str | None = None) -> tuple[str, str]:
     """`(text, sha)` of one file of the person's agent-cadence layer (design §4.8 *The person's own additions*,
     TD-1016): one's own layer (`ref` None) from its working tree, as the person last saved it — never as merged,
     since the layer is theirs and nobody reviews it; a followed layer's at its pinned `ref`, by `git show
-    <ref>:<path in its repo>`. `Unreadable` when it is not there."""
+    <ref>:<path in its repo>`, from the layer's `root` where given — its checkout may stand at another commit,
+    without the file's directory. `Unreadable` when it is not there."""
     if ref is None:
         return read(path, merged=False)
     p = Path(path)
-    top = _git(p.parent, "rev-parse", "--show-toplevel") if p.parent.is_dir() else None
-    if top is None:
+    if root is not None:
+        top: Path | None = Path(root)
+    else:
+        got = _git(p.parent, "rev-parse", "--show-toplevel") if p.parent.is_dir() else None
+        top = Path(got.decode().strip()) if got is not None else None
+    if top is None or not top.is_dir():
         raise Unreadable(f"{path} is in no checkout to read at {ref}")
-    root = Path(top.decode().strip())
     try:
-        rel = p.resolve().relative_to(root.resolve()).as_posix()
+        rel = p.relative_to(top).as_posix()
     except ValueError:
-        raise Unreadable(f"{path} is not under {root}") from None
-    data = _git(root, "show", f"{ref}:{rel}")
+        try:
+            rel = p.resolve().relative_to(top.resolve()).as_posix()
+        except ValueError:
+            raise Unreadable(f"{path} is not under {top}") from None
+    data = _git(top, "show", f"{ref}:{rel}")
     if data is None:
-        raise Unreadable(f"{rel} is not at {ref} in {root}")
+        raise Unreadable(f"{rel} is not at {ref} in {top}")
     return _text(data), blob_sha(data)
 
 
 def layered(parts: Any) -> tuple[str, list[dict[str, str]]]:
     """The `{person}` slot's text and its sources (§4.8 *The person's own additions*): each layer's file in
     the listing's order, its `head` line (the source, as the session reads it) above its text, joined by a
-    blank line; `none` when no part reads. A part is `{path, ref, head}`, `ref` None for one's own layer; a
-    source keeps its `ref`, so rule 7's comparison reads it the same way. A part whose file is gone now is
-    left out, as it would be at a start."""
+    blank line; `none` when no part reads. A part is `{path, ref, root, head}`, `ref` None for one's own layer;
+    a source keeps its `ref` and `root`, so rule 7's comparison reads it the same way. A part whose file is gone
+    now is left out, as it would be at a start; one that did not exist then is no source, so writing it later
+    applies at the next start, not by rule 7 (§4.8: each file *read* is among the sources)."""
     texts: list[str] = []
     sources: list[dict[str, str]] = []
     for part in parts if isinstance(parts, list) else []:
@@ -130,15 +138,22 @@ def layered(parts: Any) -> tuple[str, list[dict[str, str]]]:
         if not isinstance(path, str):
             raise Unreadable("a layer part names no path")
         ref = part.get("ref") if isinstance(part.get("ref"), str) else None
+        root = part.get("root") if isinstance(part.get("root"), str) else None
         try:
-            got, sha = read_layer(path, ref)
+            got, sha = read_layer(path, ref, root)
         except Unreadable:
             continue
         if not got.strip():
             continue
         head = part.get("head")
         texts.append(f"{head}\n\n{got.strip()}" if isinstance(head, str) and head else got.strip())
-        sources.append({"path": path, "sha": sha, **({"ref": ref} if ref else {"layer": "own"})})
+        sources.append(
+            {
+                "path": path,
+                "sha": sha,
+                **({"ref": ref, **({"root": root} if root else {})} if ref else {"layer": "own"}),
+            }
+        )
     return ("\n\n".join(texts) or "none"), sources
 
 
@@ -146,7 +161,7 @@ def _read_source(src: dict[str, Any]) -> tuple[str, str]:
     """A source as it was read: a layer's file by `read_layer`, any other as merged."""
     path = src["path"]
     if isinstance(src.get("ref"), str):
-        return read_layer(path, src["ref"])
+        return read_layer(path, src["ref"], src["root"] if isinstance(src.get("root"), str) else None)
     if src.get("layer") == "own":
         return read_layer(path, None)
     return read(path, True)

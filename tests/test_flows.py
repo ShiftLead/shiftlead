@@ -336,7 +336,7 @@ def test_every_template_carries_the_path_slots_and_the_path_words_moved_beside_i
     assert "Never merge a held PR yourself" in text and "ask --pr <n> ao-r-techlead-1" in text
     assert "a PR you have asked a reader about is the reader's to merge" in text  # stays in the template
     assert made["slots"]["{stage}"] == {"file": str(Path(repoconfig.__file__).parent / "briefs" / "grinder.stage.md")}
-    assert list(made["slots"])[:4] == ["{repo}", "{person}", "{flow}", "{stage}"]  # before the slots a stage brief may use
+    assert list(made["slots"])[:4] == ["{repo}", "{person}", "{flow}", "{stage}"]  # before a stage brief's slots
     text, _ = repoconfig.resolve_role(cfg, "techlead").compose()
     assert "### A held PR" in text
     text, made = repoconfig.resolve_role(cfg, "hunter").compose()  # the package ships no hunter.stage.md

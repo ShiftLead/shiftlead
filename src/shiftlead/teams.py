@@ -347,14 +347,17 @@ def _brief(
     )
 
 
-def _person(org: orgmod.Org, repo: str, role: str, here: str, where: str) -> list[dict[str, Any]]:
+def _person(org: orgmod.Org, repo: str, role: repoconfig.Role, here: str, where: str) -> list[dict[str, Any]]:
     """The person's own additions to `role`'s brief (design §4.8 *The person's own additions*, TD-1016), read at
     the home whatever host the member runs on: listed under the home's checkout of `repo`, else the agent-cadence
-    source among the home's repos. A listing that fails stops the start, by name."""
+    source among the home's repos. A listing that fails stops the start, by name. A role with no template (a repo's
+    own brief, whole) has no place for them, and nothing is listed."""
+    if role.template is None and role.defined is None:
+        return []
     mine = org.checkout(repo, here)
     roots = [Path(c).expanduser() for r in org.checkouts if (c := org.checkout(r, here)) is not None]
     try:
-        return layers.person(role, mine, roots)
+        return layers.person(role.name, mine, roots)
     except layers.ListingError as e:
         raise TeamError(f"{where}: {e}") from None
 
@@ -928,7 +931,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
             raise TeamError(
                 f"{where}: profile {profile!r} runs a shell, and a team session is an agent's (design §4.9)"
             )
-    person = _person(org, home, role.name, here, where)
+    person = _person(org, home, role, here, where)
     try:
         prompt, prompt_from = _brief(role, member, lane, read, techlead, context, manager, told, person=person)
     except ValueError as e:
