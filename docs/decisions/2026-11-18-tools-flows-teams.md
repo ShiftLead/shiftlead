@@ -140,7 +140,7 @@ could benchmark different flow results.*
   fill and a td-max extra alike. **Usable**: signed in; not gated (its account at its reserve, §6) or
   `limited`; not on an account an earlier unusable login shares (a reserve is the account's, §6); and with
   a smoke pass for its tool, the model and the seat's role. A launch record holds the model, never a
-  login; the session's record gains `model` and `login`, and the definition's compare (§4.9c, TD-619)
+  login; the session's record gains the seat's intended model (`seat_model`, home-owned; the record's `model` stays the observed one, node-owned, §4.2a) and `login`, and the definition's compare (§4.9c, TD-619)
   reads the model, so a seat on a backup login reads no difference and a reordered list takes effect at
   each next launch.
 - **A stopped seat moves** (Paul: *hitting either the reserve or a hard limit should trigger the backup*).
@@ -167,7 +167,7 @@ could benchmark different flow results.*
   before it, doing nothing until the window. At the window `profiles.yml` and the `roles:` profiles go,
   and each host's logins are in its `logins.yml` (§4.2b).
 - **Known smoke passes ship with ShiftLead** (Paul), per tool, model and role, so a person does not re-run
-  a smoke someone already has; their own passes add to it. The gate is on from the first build, the list
+  a smoke someone already has; their own passes add to it. The gate binds from the switch-over, the list
   seeded with every tool, model and role running here today. **The gate keys on tool, model and role, not
   on the tool's version**: each pass records the version it ran on, and a new version is only told, once a
   day, as §4.3 does today, so a tool that updates itself never strands every seat on it; a pass is lost only
@@ -236,10 +236,10 @@ The plan is wide: it changes every repo with a team, and makes `flow.yml` a form
   moves to one or the other: §4.10's `--team`/`--repo` choice (TD-1565, `agent_mail._one_seat`), an
   entry's reroute and filer (`agent_mail`), the tick's `tag` cause (`agent_tick`), and
   `teamrun.tagging_seat`.
-- **The record and invariant 9** — the record gains `model`, `login`, the seat's key and its question mark,
+- **The record and invariant 9** — the record gains `seat_model`, `login`, `account`, the seat's key and its question mark,
   and `permission_prompts` compiles into a field a start writes beside `lane`, `review` and
-  `prompt_from`; a launch record holds the model; the compare reads *model a → b* and the question seat.
-  Under invariant 15 the home holds a record's intent: the home writes `model`, and a node's tick, which
+  `prompt_from`; a launch record holds the model; the compare reads *seat_model a → b* and the question seat.
+  Under invariant 15 the home holds a record's intent: the home writes `seat_model`, and a node's tick, which
   picks the login at a node launch, reports the `login` it took and the `account` key it ran under
   (node-owned, like `tool_version`). The `relaunch` mark, today a person's act carrying `profile`, carries a
   `model`, and the tick's relaunch of a stopped seat is a path of its own. Invariant 9 is amended to say so.
