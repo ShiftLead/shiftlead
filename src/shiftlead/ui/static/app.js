@@ -7483,31 +7483,65 @@
   // order of start, so the first the host resolves is the link. Each is `{run, path, line, col, start,
   // end}`, `start`/`end` the run's columns in the row's text (end exclusive). The shape only asks: the
   // host says which are files.
+  // **A brace set** (§4.6, TD-1959, TD-1989): a run may hold one `{a,b,…}` after its first `/` — two to eight
+  // choices, each a non-empty run of the segment characters without `/`, `,`, `{` or `}` — and is given as its
+  // expansions in the set's order, each its own entry with the run's `start`, `end` and `run` and its own `path`,
+  // marked `expansion` (`choice` its place in the set), the literal run never; the set's `,` is no piece separator,
+  // and a `#`, `,` or `=` outside it makes pieces as above, each expanded. The tail strip spares the set's own `}`.
+  // A second set, a nested one, a set before the first `/` or a stray brace cuts the run at its first brace, the part
+  // before it, its trailing `/` dropped, a candidate where it holds a `/`.
   AO.pathRuns = function (text) {
     const urls = [];
     for (const m of String(text).matchAll(/[A-Za-z][A-Za-z0-9+.-]*:\/\/\S+/g)) urls.push([m.index, m.index + m[0].length]);
     const seg = "[\\p{L}\\p{M}\\p{N}_.@+-]";
-    const wide = new RegExp(`(?:~|\\.{1,2})?\\/?${seg}+(?:\\/[\\p{L}\\p{M}\\p{N}_.@+#,=-]+)+(?::\\d+(?::\\d+)?)?`, "gu");
+    const wide = new RegExp(`(?:~|\\.{1,2})?\\/?${seg}+(?:\\/[\\p{L}\\p{M}\\p{N}_.@+#,={}-]+)+(?::\\d+(?::\\d+)?)?`, "gu");
     const narrow = new RegExp(`(?:~|\\.{1,2})?\\/?${seg}+(?:\\/${seg}+)+(?::\\d+(?::\\d+)?)?`, "gu");
+    const choice = /^[\p{L}\p{M}\p{N}_.@+#=-]+$/u;
+    const strip = (p) => p.replace(/[.,;:)\]}'"]+$/, "");
+    // a path's one valid set (`set`: [open, close, choices]) with what follows it stripped where the run has no
+    // `:line` tail; or the path cut at its first brace (`cut`); or, with no brace, the path stripped as ever
+    const braces = (path, tail) => {
+      const open = path.search(/[{}]/);
+      if (open < 0) return { path: tail ? path : strip(path) };
+      const close = path.indexOf("}", open + 1);
+      const cut = { path: strip(path.slice(0, open).replace(/\/+$/, "")), cut: true };  // as main read `a/b/{c`: `a/b`
+      if (path[open] !== "{" || close < 0 || open < path.indexOf("/")) return cut;
+      const body = path.slice(open + 1, close).split(",");
+      const after = tail ? path.slice(close + 1) : strip(path.slice(close + 1));
+      if (body.length < 2 || body.length > 8 || !body.every((c) => choice.test(c)) || /[{}]/.test(after)) return cut;
+      return { path: path.slice(0, close + 1) + after, set: [open, close, body] };
+    };
+    const expand = (r, set) => set[2].map((c, k) => ({ ...r,
+      path: r.path.slice(0, set[0]) + c + r.path.slice(set[1] + 1), expansion: true, choice: k }));
     const scan = (s, re, base) => {
       const got = [];
       for (const m of s.matchAll(re)) {
         const start = base + m.index;
-        let run = m[0];
-        if (urls.some(([a, b]) => start < b && start + run.length > a)) continue;
-        const lc = run.match(/:(\d+)(?::(\d+))?$/);
-        let path = lc ? run.slice(0, lc.index) : run;
-        if (!lc) { path = path.replace(/[.,;:)\]}'"]+$/, ""); run = path; }
+        if (urls.some(([a, b]) => start < b && start + m[0].length > a)) continue;
+        const lc = m[0].match(/:(\d+)(?::(\d+))?$/);
+        const b = braces(lc ? m[0].slice(0, lc.index) : m[0], !!lc);
+        const path = b.path, tail = lc && !b.cut, run = tail ? m[0] : path;
         if (!path.includes("/") || /^\.*\/*$/.test(path) || path.length > 512) continue;  // the read's bound
-        got.push({ run, path, line: lc ? +lc[1] : null, col: lc && lc[2] ? +lc[2] : null, start, end: start + run.length });
+        got.push({ run, path, line: tail ? +lc[1] : null, col: tail && lc[2] ? +lc[2] : null, start,
+          end: start + run.length, set: b.set || null });
       }
       return got;
     };
     const out = [];
+    const MASK = "\uA66E";  // a letter no path names: the set's columns while its run is cut into pieces
     for (const r of scan(String(text), wide, 0)) {
-      out.push(r);
-      if (!/[#,=]/.test(r.run)) continue;
-      out.push(...scan(r.run, narrow, r.start).filter((p) => p.run !== r.run).map((p) => ({ ...p, piece: true })));
+      const { set, ...whole } = r;
+      out.push(...(set ? expand(whole, set) : [whole]));
+      const at = set ? set[0] : -1, masked = set ? whole.run.slice(0, at) + MASK.repeat(set[1] + 1 - at)
+        + whole.run.slice(set[1] + 1) : whole.run;
+      if (!/[#,=]/.test(masked)) continue;
+      for (const { set: _none, ...p } of scan(masked, narrow, whole.start)) {
+        if (p.run === masked) continue;
+        const from = p.start - whole.start, run = whole.run.slice(from, from + p.run.length);
+        const piece = { ...p, run, path: whole.run.slice(from, from + p.path.length), piece: true };
+        const lo = at - from, hi = set ? set[1] - from : -1;
+        out.push(...(set && lo >= 0 && hi < p.path.length ? expand(piece, [lo, hi, set[2]]) : [piece]));
+      }
     }
     return out;
   };
@@ -7917,9 +7951,9 @@
         const joined = AO.pathRuns(text).filter((r) => at[r.start].y <= y && y <= at[r.end - 1].y);
         const alone = AO.pathRuns(own).map((r) => ({ ...r, start: r.start + off, end: r.end + off }))
           .filter((r) => !joined.some((j) => j.start === r.start && j.end === r.end));
-        // eight runs, each with its pieces (TD-1262), asked eight paths at a time
+        // eight runs, each with its pieces (TD-1262) and a brace set's expansions (TD-1989), asked eight paths at a time
         let whole = 0;
-        const runs = [...joined, ...alone].filter((r) => (r.piece ? whole <= 8 : ++whole <= 8));
+        const runs = [...joined, ...alone].filter((r) => (r.piece || r.choice > 0 ? whole <= 8 : ++whole <= 8));
         if (!runs.length) { callback(undefined); return; }
         // a joined run the host resolved wins over a run of the row alone it covers
         const links = (paths) => runs.filter((r) => paths[r.path]).filter((r, i, ok) =>

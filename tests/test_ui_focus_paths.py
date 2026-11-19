@@ -197,10 +197,41 @@ const BOX = "vscode://vscode-remote/attached-container+7b7d{path}";
   const cp = AO.pathProvider(capped, "ao-x-1", { file: FILE }, (r) => { capAsks.push(r);
     return Promise.resolve({ paths: Object.fromEntries(r.map((k) => [k, null])) }); });
   await new Promise((res) => cp.provideLinks(1, res));
+  // brace sets (TD-1989): a row of two, the first's eight choices filling one ask, the second's in the next
+  const braced = { buffer: { active: { getLine: (y) => (y === 0
+    ? { translateToString: () => "a/{1,2,3,4,5,6,7,8}.md then x/y-{1440,420}.png." } : undefined) } } };
+  const braceAsks = [];
+  const bp = AO.pathProvider(braced, "ao-x-1", { file: FILE }, (r) => { braceAsks.push(r);
+    const ok = (k) => (["a/8.md", "x/y-420.png"].includes(k) ? "/r/" + k : null);
+    return Promise.resolve({ paths: Object.fromEntries(r.map((k) => [k, ok(k)])) }); });
+  const braceLinks = await new Promise((res) => bp.provideLinks(1,
+    (l) => res((l || []).map((k) => [k.text, k.range]))));
+  let braceOpened = null;
+  const savedOpenFile = AO.openFile; AO.openFile = (editor, url) => { braceOpened = url; };
+  await new Promise((res) => bp.provideLinks(1, (l) => { l[1].activate({ ctrlKey: true }); res(); }));
+  AO.openFile = savedOpenFile;
+  // nine brace runs: the first eight with their expansions asked, the ninth not
+  const nineBraced = Array.from({ length: 9 }, (_, i) => `a/${i + 1}-{x,y}.md`).join(" ");
+  const nb = { buffer: { active: { getLine: (y) => (y === 0
+    ? { translateToString: () => nineBraced } : undefined) } } };
+  const nbAsks = [];
+  const np = AO.pathProvider(nb, "ao-x-1", { file: FILE }, (r) => { nbAsks.push(r);
+    return Promise.resolve({ paths: Object.fromEntries(r.map((k) => [k, null])) }); });
+  await new Promise((res) => np.provideLinks(1, res));
   sp.clear(); release(); await pending;
   sp.provideLinks(3, noop); await new Promise((r) => setImmediate(r));
   console.log(JSON.stringify({
-    wideLinks, slowAsks: slowAsked.length, listAsks, listLinks, capAsks,
+    wideLinks, slowAsks: slowAsked.length, listAsks, listLinks, capAsks, braceAsks, braceLinks, braceOpened, nbAsks,
+    brace: AO.pathRuns("see docs/r/x-{1440,420}.png now")
+      .map((r) => [r.run, r.path, r.start, r.end, r.expansion, r.choice]),
+    braceAnchor: runs("a/x-{1,2}.png#L3"),
+    braceLine: runs("a/{b,c}.py:12"),
+    braceStop: runs("see a/x.{png,jpg}."),
+    braceCut: ["a/{b,c}/{d,e}.py", "a/{b,{c,d}}.py", "{a,b}/x.py", "a/{1,2,3,4,5,6,7,8,9}.py", "a/{b}.py",
+      "a/{,b}.py", "src/x-{a,b", "x/a}b", "d/e/{f,g}/{h,i}.md"].map(runs),
+    braceHtml: AO.pathLinksHtml("open a/x-{1440,420}.png here", { "a/x-420.png": "/r/a/x-420.png" },
+      { file: FILE, label: "VS Code" }),
+    braceNone: AO.pathLinksHtml("open a/x-{1440,420}.png here", {}, { file: FILE }),
     long: runs("x/" + "a".repeat(600) + " and src/ok.py"),
     one: runs("see src/shiftlead/cli.py:364 and build/review."),
     shapes: runs("(./a/b.py) ~/x/y.md, /etc/hosts; ../up/z.ts:3:7] word a/"),
@@ -519,3 +550,34 @@ def test_a_path_that_wraps_or_is_cut_across_rows_is_one_link_on_every_row():
         [{"text": "src/a.py", "range": {"start": {"x": 5, "y": 1}, "end": {"x": 12, "y": 1}}}],
         [{"text": "src/b.py", "range": {"start": {"x": 6, "y": 2}, "end": {"x": 13, "y": 2}}}],
     ]
+
+
+@pytest.mark.unit
+def test_a_brace_set_is_asked_as_its_choices_and_the_first_that_resolves_is_the_link():
+    """§4.6 *A path in the pane is a link*'s brace set (TD-1959, built by TD-1989)."""
+    got = _probe()
+    # one entry per choice, in the set's order, each the whole run's span and its own path; the literal is not asked
+    assert got["brace"] == [["docs/r/x-{1440,420}.png", "docs/r/x-1440.png", 4, 27, True, 0],
+                            ["docs/r/x-{1440,420}.png", "docs/r/x-420.png", 4, 27, True, 1]]  # fmt: skip
+    # a `#` outside the set makes pieces, each expanded in the set's order
+    assert [r[1] for r in got["braceAnchor"]] == ["a/x-1.png#L3", "a/x-2.png#L3", "a/x-1.png", "a/x-2.png"]
+    assert [r[0] for r in got["braceAnchor"]] == ["a/x-{1,2}.png#L3"] * 2 + ["a/x-{1,2}.png"] * 2
+    # a `:line` tail rides on each choice
+    assert got["braceLine"] == [["a/{b,c}.py:12", "a/b.py", 12, None, 0, 13],
+                                ["a/{b,c}.py:12", "a/c.py", 12, None, 0, 13]]  # fmt: skip
+    # the sentence stop spares the set's own `}` and strips what follows it
+    assert [r[:2] for r in got["braceStop"]] == [["a/x.{png,jpg}", "a/x.png"], ["a/x.{png,jpg}", "a/x.jpg"]]
+    # a second set, a nested one, one before the first `/`, nine choices, one choice or an empty one, an unclosed set
+    # and a stray `}`: cut at the first brace, the part before it, its trailing `/` dropped, asked where it holds a `/`
+    assert [[r[1] for r in rs] for rs in got["braceCut"]] == [[], [], [], [], [], [], ["src/x-"], ["x/a"], ["d/e"]]
+    # the pane: two brace runs both link, the first's eight choices one ask, the second's two the next
+    assert got["braceAsks"] == [[f"a/{i}.md" for i in range(1, 9)], ["x/y-1440.png", "x/y-420.png"]]
+    assert [t for t, _ in got["braceLinks"]] == ["a/{1,2,3,4,5,6,7,8}.md", "x/y-{1440,420}.png"]
+    assert got["braceLinks"][1][1] == {"start": {"x": 29, "y": 1}, "end": {"x": 46, "y": 1}}  # the whole run underlines
+    assert got["braceOpened"] == "vscode://file/r/x/y-420.png:1"  # the press opens the choice that resolved
+    # a choice is exempt from the eight-run cap as a piece is: eight runs and their choices, the ninth not asked
+    asked = [p for a in got["nbAsks"] for p in a]
+    assert len(asked) == 16 and not any(p.startswith("a/9-") for p in asked) and all(len(a) <= 8 for a in got["nbAsks"])
+    # the Transcript's and the Inbox's text: the whole run is the link to the choice the host resolved, else text
+    assert ">a/x-{1440,420}.png</a>" in got["braceHtml"] and "/r/a/x-420.png" in got["braceHtml"]
+    assert "<a" not in got["braceNone"]
