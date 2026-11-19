@@ -173,10 +173,28 @@ def repoll(
 ) -> dict[str, Any]:
     """A tools shell's poll (design §4.2b *The tools shell*, *Matching across a restart*): one more pass of reads over
     every login, settled as a whole, on the kept read's tool cards — their binaries, versions and found rows stand as
-    the last read left them, so a poll probes no `--version` and finds nothing new. Each card's `accounts` and
+    the last read left them (less a found row whose folder is now a login), so a poll probes no `--version` and finds
+    nothing new. Each card's `accounts` and
     `logins` are drawn afresh from `logins.yml` as it stands, a login that joined an account written as any pass's."""
     data = logins.load(home)
-    cards = [{**c, "accounts": [], "logins": []} for c in kept.get("tools", [])]
+    folders = [
+        (logins.split(n)[0], Path(str(e.get("folder", ""))).expanduser())
+        for n, e in (data or {}).get("logins", {}).items()
+    ]
+    cards = [
+        {
+            **c,
+            "accounts": [],
+            "logins": [],
+            # a found row whose folder became a login since the read leaves, as the read itself would draw it
+            "found": [
+                f
+                for f in c.get("found", [])
+                if not any(t == c["adapter"] and adapters.same_home(Path(f["folder"]), d) for t, d in folders)
+            ],
+        }
+        for c in kept.get("tools", [])
+    ]
     if data is not None:
         _login_tree(cards, data, salt, memory if memory is not None else logins.Memory(), home)
     return {**kept, "switched": data is not None, "tools": cards}

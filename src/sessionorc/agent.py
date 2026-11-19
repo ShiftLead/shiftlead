@@ -1075,7 +1075,7 @@ class HostAgent(
         self._tools_task: asyncio.Task[Any] | None = None
         # a tools shell's poll (§4.2b *The tools shell*): the pass in flight, and when the last one started
         self._tools_poll_task: asyncio.Task[Any] | None = None
-        self._tools_polled_at = 0.0
+        self._tools_polled_at = -TOOLS_POLL_SECONDS  # the first poll is due at once
 
     # -- lifecycle ------------------------------------------------------------------------------
 

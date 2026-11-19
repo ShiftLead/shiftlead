@@ -325,13 +325,25 @@ def test_a_poll_moves_a_login_signed_in_since_the_read_and_probes_no_version(mon
     assert [lg["name"] for lg in kept["tools"][0]["logins"]] == ["a", "b"]  # the kept read is not edited in place
 
 
+def test_a_poll_drops_a_found_row_whose_folder_became_a_login(monkeypatch, tmp_path):
+    d = str(tmp_path / "default")
+    _host(monkeypatch, _Tool("t", tmp_path / "default", {d: ({"match": "M"}, True)}))
+    logins.save(logins.empty(), "fixture", tmp_path)
+    kept = tools.read(b"s" * 32, env={}, home=tmp_path, memory=logins.Memory())
+    assert kept["tools"][0]["found"] == [{"folder": d, "own_home": False}]
+    logins.update(lambda data: data["logins"].update({"t:mine": {"folder": d}}) or "a login", tmp_path)
+    [card] = tools.repoll(kept, b"s" * 32, home=tmp_path, memory=logins.Memory())["tools"]
+    assert card["found"] == [] and [lg["name"] for lg in card["logins"]] == ["mine"]
+    assert kept["tools"][0]["found"]  # the kept read is not edited in place
+
+
 async def test_a_poll_runs_only_while_a_login_s_tools_shell_is_open(monkeypatch):
     import asyncio
 
     from sessionorc import agent as agent_mod
 
     ag = agent_mod.HostAgent.__new__(agent_mod.HostAgent)
-    ag._tools_poll_task, ag._tools_polled_at = None, 0.0
+    ag._tools_poll_task, ag._tools_polled_at = None, -1e9
     ag._tools_lock, ag._tools_salt, ag._tools_memory = asyncio.Lock(), b"s" * 32, logins.Memory()
     ag._tools_kept = {"switched": True, "tools": []}
     calls = []
@@ -346,12 +358,12 @@ async def test_a_poll_runs_only_while_a_login_s_tools_shell_is_open(monkeypatch)
     assert len(calls) == 1 and ag._tools_kept["polled"] == 1
     ag._tools_poll_due({"ao--tools-t-paul": pane})
     assert ag._tools_poll_task.done() and len(calls) == 1  # within the interval: no second pass
-    ag._tools_polled_at = 0.0
+    ag._tools_polled_at = -1e9
     async with ag._tools_lock:  # a full read in flight: the poll yields to it
         ag._tools_poll_due({"ao--tools-t-paul": pane})
         await ag._tools_poll_task
     assert len(calls) == 1
-    ag._tools_polled_at, ag._tools_kept = 0.0, {"switched": False, "tools": []}
+    ag._tools_polled_at, ag._tools_kept = -1e9, {"switched": False, "tools": []}
     ag._tools_poll_due({"ao--tools-t-paul": pane})
     assert ag._tools_poll_task.done() and len(calls) == 1  # an unswitched host polls no logins
 
