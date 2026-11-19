@@ -331,3 +331,21 @@ def test_add_with_a_billing_sets_it_and_a_refusal_keeps_the_login(monkeypatch):
     mine = [(m, p) for m, p in calls if m.startswith("login_")]
     assert [m for m, _ in mine] == ["login_add", "login_set", "login_add", "login_set", "login_add"]
     assert mine[1] == ("login_set", {"login": "gemini:work", "key": "billing", "value": "subscription"})
+
+
+def test_add_whose_shell_opened_carries_a_refused_billing_so_the_page_still_goes_to_its_focus(monkeypatch):
+    from fastapi import HTTPException
+    from fastapi.testclient import TestClient
+
+    async def call(m, **p):
+        if m == "login_set":
+            raise HTTPException(400, "a metered login needs a folder of its own")
+        return {"change": "added", "login": "gemini:work", "shell": {"id": "ao--tools-gemini-work"}}
+
+    monkeypatch.setattr(app_mod, "agent_call", call)
+    with TestClient(app_mod.create_app()) as c:
+        r = c.post("/api/tools/add", json={"tool": "gemini", "name": "work", "billing": "metered"})
+    assert r.status_code == 200 and r.json()["shell"] == {"id": "ao--tools-gemini-work"}
+    assert r.json()["billing_error"] == (
+        "gemini:work was added, but its billing was not set: a metered login needs a folder of its own"
+    )

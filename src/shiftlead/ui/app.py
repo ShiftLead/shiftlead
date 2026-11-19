@@ -5196,9 +5196,10 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
     async def tools_add(request: Request):
         """§4.5a *Tools page: + Add login*, *Add on a found row* (TD-1974): `{tool, name, path, account, billing}` →
         `login_add` (`ao login add`), then, where a billing is chosen, `login_set` of it, whose refusal is a 400 naming
-        the login as added; the person's own act — a `path` that is the tool's home is used, an empty or
-        missing one made one, and with none the adapter suggests the folder from the name; a login whose folder was
-        made has its tools shell opened for Sign in (`shell` in the reply), whose Focus the page then opens."""
+        the login as added — or, where its tools shell opened, `billing_error` in the reply, so the page still goes to
+        its Focus; the person's own act — a `path` that is the tool's home is used, an empty or missing one made one,
+        and with none the adapter suggests the folder from the name; a login whose folder was made has its tools
+        shell opened for Sign in (`shell` in the reply), whose Focus the page then opens."""
         body = await body_of(request)
         params = {k: str(body.get(k) or "").strip() or None for k in ("name", "path", "account")}
         got = await call("login_add", tool=str(body.get("tool") or ""), **params)
@@ -5207,9 +5208,10 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             try:
                 await call("login_set", login=got["login"], key="billing", value=billing)
             except HTTPException as e:  # the login stands; its billing's refusal is drawn in place, as Settings'
-                raise HTTPException(
-                    e.status_code, f"{got['login']} was added, but its billing was not set: {e.detail}"
-                ) from None
+                words = f"{got['login']} was added, but its billing was not set: {e.detail}"
+                if (got.get("shell") or {}).get("id"):  # its Sign in shell opened: the page shows these, then goes
+                    return {**got, "billing_error": words}
+                raise HTTPException(e.status_code, words) from None
         return got
 
     @app.post("/api/tools/account/label")
