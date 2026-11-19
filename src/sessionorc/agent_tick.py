@@ -5817,7 +5817,10 @@ class TickMixin:
         roots: dict[str, str | None] = {}
 
         def _read(s: Session) -> gitinfo.GitInfo | None:
-            roots[s.id] = gitinfo.cwd_root(s.dir, cwds[s.id]) if cwds[s.id] else None
+            try:  # a root that cannot be read is none, and never costs the record its `git`
+                roots[s.id] = gitinfo.cwd_root(s.dir, cwds[s.id]) if cwds[s.id] else None
+            except (OSError, ValueError):
+                roots[s.id] = None
             return git_info(s.dir)
 
         results = await asyncio.gather(*(asyncio.to_thread(_read, s) for s in due), return_exceptions=True)
@@ -6937,6 +6940,8 @@ class TickMixin:
             s.transcript = path  # the tool's file for this run, pushed with the id (§4.2, TD-578)
         if "cwd_real" in event and not queued:  # the main thread's live report, resolved by the hook RPC (TD-1988)
             cwd = event["cwd_real"] if isinstance(event["cwd_real"], str) else None
+            if isinstance(event.get("cwd_raw"), str):
+                self._cwd_raw[sid] = event["cwd_raw"]  # the last raw value, marked where it is written
             if cwd != s.cwd:
                 s.cwd, s.cwd_root = cwd, None  # its root is the status read's to write: the read made due now
                 self._git_checked.pop(sid, None)
@@ -7317,6 +7322,7 @@ class TickMixin:
         for side in (
             self._git_checked,
             self._cwd_raw,
+            self._cwd_asking,
             self._files_read,
             self._derived_at,
             self._model_checked,

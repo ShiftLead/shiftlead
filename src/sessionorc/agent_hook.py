@@ -72,16 +72,22 @@ class HookMixin:
         the resolve ends, so an older event's slow resolve never overwrites a newer one. A subagent's event writes
         none; a queued one never comes here, and the apply reads `cwd_real` from a live event alone."""
         raw = event.pop("cwd", None)
-        event.pop("cwd_real", None)  # the host agent's own word, never a caller's
+        event.pop("cwd_real", None)  # the host agent's own words, never a caller's
+        event.pop("cwd_raw", None)
         s = self.sessions.get(session)
         if not isinstance(raw, str) or not raw or event.get("subagent") or s is None or not s.dir:
             return
         if raw == self._cwd_raw.get(session):
             return
-        self._cwd_raw[session] = raw
-        real, here = await asyncio.to_thread(lambda: (os.path.realpath(raw), os.path.realpath(s.dir)))
-        if self._cwd_raw.get(session) == raw:
-            event["cwd_real"] = None if real == here else real
+        self._cwd_asking[session] = raw  # the newest raw value asked: a slower, older resolve hands nothing on
+        try:
+            real, here = await asyncio.to_thread(lambda: (os.path.realpath(raw), os.path.realpath(s.dir)))
+        except (OSError, ValueError):  # a path no file system takes (a NUL in it): no `cwd`, the event still applies
+            return
+        if self._cwd_asking.get(session) == raw:
+            # the apply marks `raw` as the last one only where it writes it, so an event it drops early (a late
+            # turn's end, a closed record) leaves the next event with this `cwd` to resolve it again
+            event["cwd_real"], event["cwd_raw"] = (None if real == here else real), raw
 
     def _unread_of(self, session: str) -> int:
         """The record's unread mail: the inbox at the home, the count the home last pushed on a node

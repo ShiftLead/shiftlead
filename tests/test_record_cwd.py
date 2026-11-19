@@ -157,3 +157,38 @@ def test_a_nodes_clearing_of_cwd_reaches_the_homes_copy_through_the_overlay():
     assert home.cwd is None and home.cwd_root is None
     models.apply_home(home, {**home.to_dict(), "cwd": "/home-says"})  # the home's copy never writes them
     assert home.cwd is None
+
+
+async def test_an_event_the_apply_drops_leaves_its_cwd_to_be_resolved_again_and_a_nul_path_costs_only_cwd(
+    agent, tmp_path
+):
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    d, other = tmp_path / "d", tmp_path / "other"
+    d.mkdir()
+    other.mkdir()
+    s = _record(agent, d)
+    s.state = "closed"  # the apply drops every event of a closed record
+    await agent.rpc_hook(s.id, cwd=str(other))
+    assert s.cwd is None and s.id not in agent._cwd_raw  # not marked: never written
+    s.state = "working"
+    await agent.rpc_hook(s.id, cwd=str(other))
+    assert s.cwd == str(other.resolve()) and agent._cwd_raw[s.id] == str(other)
+    await agent.rpc_hook(s.id, cwd="a\0b", state="idle", pending=None)
+    assert s.state == "idle" and s.cwd == str(other.resolve())  # the event applied, its `cwd` none
+
+
+async def test_a_root_that_cannot_be_read_never_costs_the_record_its_git(agent, repo, monkeypatch):
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    s = _record(agent, repo)
+    s.cwd = "/x"
+
+    def broken(directory, cwd, timeout=5.0):
+        raise ValueError("lstat: embedded null character in path")
+
+    monkeypatch.setattr(gitinfo, "cwd_root", broken)
+    await agent._refresh_git(datetime.now(UTC))
+    assert s.git is not None and s.git["top"] == str(repo.resolve()) and s.cwd_root is None
