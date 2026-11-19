@@ -68,7 +68,13 @@ def test_settings_follow_the_profile_rules():
     assert ok(d, "api", "billing", "metered", **_rules()) == "claude-code:api billing set"
     assert ok(d, "api", "prices", {"input": 3, "output": 15}, **_rules()) == "claude-code:api prices set"
     assert d["logins"]["claude-code:api"]["prices"] == {"input": 3.0, "output": 15.0}
-    for bad, words in (({"tokens": 1}, "not a token kind"), ({"input": -1}, "price per million"), ([1], "a mapping")):
+    for bad, words in (
+        ({"tokens": 1}, "not a token kind"),
+        ({"input": -1}, "price per million"),
+        ({"input": float("nan")}, "price per million"),
+        ({"input": float("inf")}, "price per million"),
+        ([1], "a mapping"),
+    ):
         with pytest.raises(logins.LoginError, match=words):
             ok(d, "api", "prices", bad, **_rules())
     with pytest.raises(logins.LoginError, match="clear them"):
@@ -138,6 +144,21 @@ def test_naming_an_account_is_refused_where_the_matches_would_disagree():
     with pytest.raises(logins.LoginError, match="reads the same account as claude-code:api"):
         logins.join(d, "api", "work", matches=m)
     assert logins.join(d, "api", "paul-k", matches=m) == "claude-code:api joined claude-code:paul-k"
+
+
+def test_a_join_keeps_a_metered_logins_folder_its_accounts_alone():
+    """§4.2a: a login sharing a metered login's folder never moves to another account, nor the metered one off its
+    sharers' account; a folder shared by subscription logins alone moves freely."""
+    d = _data()
+    d["logins"]["claude-code:api2"] = {"folder": "/h/.claude-api"}  # shares api's folder, under its own key
+    logins.join(d, "api2", "claude-code:api")
+    assert logins.set_setting(d, "api", "billing", "metered", **_rules()) == "claude-code:api billing set"
+    with pytest.raises(logins.LoginError, match="claude-code:api is metered"):
+        logins.join(d, "api2", "work")  # the sharer leaves the metered login's account
+    with pytest.raises(logins.LoginError, match="claude-code:api is metered"):
+        logins.join(d, "api", "work")  # the metered login leaves its sharer's account
+    logins.set_setting(d, "api", "billing", None, **_rules())
+    assert logins.join(d, "api2", "work") == "claude-code:api2 joined claude-code:work"
 
 
 def test_forget_moves_a_login_to_forgotten_and_its_last_account_leaves():

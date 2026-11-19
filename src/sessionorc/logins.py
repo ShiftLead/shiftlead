@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import tempfile
@@ -386,6 +387,19 @@ def _arg_list(v: object, k: str) -> list[str]:
     return list(v)
 
 
+def _sharing(data: Mapping[str, Any], lk: str) -> list[tuple[str, Mapping[str, Any]]]:
+    """The other logins whose folder is `lk`'s, in key order: the logins §4.2a's metered-folder rule compares."""
+    folder = str(data["logins"][lk].get("folder") or "")
+    if not folder:
+        return []
+    mine = Path(folder).expanduser().resolve()
+    return [
+        (other, oe)
+        for other, oe in sorted(data["logins"].items())
+        if other != lk and oe.get("folder") and Path(str(oe["folder"])).expanduser().resolve() == mine
+    ]
+
+
 def setting_value(
     data: Mapping[str, Any],
     lk: str,
@@ -417,14 +431,9 @@ def setting_value(
                 )
             if not spends:
                 raise LoginError(f"{lk} cannot be metered: its tool reports no spend, so an amount would bind nothing")
-            folder = Path(str(e.get("folder") or "")).expanduser()
             mine = account_of(lk, e)
-            for other, oe in sorted(data["logins"].items()):
-                if (
-                    other != lk
-                    and Path(str(oe.get("folder") or "")).expanduser().resolve() == folder.resolve()
-                    and account_of(other, oe) != mine
-                ):
+            for other, oe in _sharing(data, lk):
+                if account_of(other, oe) != mine:
                     raise LoginError(
                         f"{lk} shares its folder with {other}, another account: a metered login's spend would count "
                         "that account's turns (design §4.2a)"
@@ -441,7 +450,7 @@ def setting_value(
         for kind, p in v.items():
             if kind not in PRICE_KINDS:
                 raise LoginError(f"prices.{kind} is not a token kind ({', '.join(PRICE_KINDS)})")
-            if isinstance(p, bool) or not isinstance(p, int | float) or p < 0:
+            if isinstance(p, bool) or not isinstance(p, int | float) or not math.isfinite(p) or p < 0:
                 raise LoginError(f"prices.{kind} is a price per million tokens, not {p!r}")
             out[str(kind)] = float(p)
         return out
@@ -518,6 +527,13 @@ def join(
             raise LoginError(f"{other} reads the same account as {lk} and is under {under}: name that one instead")
         if under == acct and theirs != mine:
             raise LoginError(f"{other} is under {acct} and reads another account than {lk}")
+    for other, oe in _sharing(data, lk):  # §4.2a: a metered login's folder is its account's alone, a join too
+        metered = lk if e.get("billing") == "metered" else other if oe.get("billing") == "metered" else None
+        if metered and account_of(other, oe) != acct:
+            raise LoginError(
+                f"{lk} shares its folder with {other}, and {metered} is metered: under {acct} its spend would count "
+                "another account's turns (design §4.2a)"
+            )
     left = account_of(lk, e)
     _put(e, "account", None if acct == lk else acct)
     if left not in live_keys(data):  # its last login gone, the account's entry leaves `accounts:`, as forget's does
