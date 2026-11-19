@@ -164,8 +164,8 @@ could benchmark different flow results.*
   one window** (*Moving every repo over*, below; Paul, 2026-11-18: the two shapes never run side by side).
   Until the window every launch is today's: the profile rungs (`org.yml`'s `roles:` profiles among them) and
   a team's own `techlead:` and `seats:`. The pages, logins and the new launch path are built and promoted
-  before it, in a build that reads both shapes, a host switching when its `logins.yml` is written. At the
-  window `profiles.yml` and the `roles:` profiles go, and each host's logins are in its `logins.yml` (§4.2b).
+  before it, doing nothing until the window. At the window `profiles.yml` and the `roles:` profiles go,
+  and each host's logins are in its `logins.yml` (§4.2b).
 - **Known smoke passes ship with ShiftLead** (Paul), per tool, model and role, so a person does not re-run
   a smoke someone already has; their own passes add to it. The gate is on from the first build, the list
   seeded with every tool, model and role running here today. **The gate keys on tool, model and role, not
@@ -191,21 +191,17 @@ could benchmark different flow results.*
 The plan is wide: it changes every repo with a team, and makes `flow.yml` a format meant to travel.
 
 - **One window, no dual read** (Paul, 2026-11-18). Every part of the new shape is built and promoted
-  first, in a build that reads both shapes; **a host's `logins.yml` is its switch** — a host with one runs
-  the new shape everywhere, a host without runs today's — so no host runs both at once. Six repos —
-  samscrape, contractmatch, ledgerboard, agent-cadence, guardians-devenv and shiftlead itself — write
-  `techlead: {name, context}` and name built-in flows by directory, so each has its move ready beforehand as
-  a green, reviewed PR, held unmerged. `ao migrate logins --check` runs on every host before the window and
-  names whatever the migration would refuse (§4.2b), for the person to fix in the old shape first. **The
-  window**, in order: every team is stopped (the person's own sessions stay, in tmux); `ao migrate logins`
-  runs on each node and then on the home (a container node is re-provisioned by the home for it, a machine
-  node — guardians-devenv — run by the person), each host switching as it finishes; the six repo PRs merge,
-  shiftlead's last; `ao org check` says every repo and host is on the new shape; the teams restart. **Going
-  back** is `ao migrate logins --back` on each host and the repo PRs reverted (§4.2b); no promote is
-  needed, the build reading both. A built-in flow's id is its name (`td`, `build-review`, `build`), so
-  `flows: [td]` and `flow: td` keep reading; an org or repo flow with no `id` reads as its directory's name
-  until it is saved with one. `techlead.context` (today the techlead's primer) goes with the question seat's
-  brief, on the team's side of the split.
+  first, doing nothing; then, in one window with every team stopped (the person's own sessions stay, in
+  tmux), each host moves from profiles to logins and the six repos — samscrape, contractmatch, ledgerboard,
+  agent-cadence, guardians-devenv and shiftlead itself, each of which writes `techlead: {name, context}` and
+  names built-in flows by directory — merge their moves, prepared beforehand as green, reviewed PRs held
+  unmerged; the teams restart once `ao org check` is clean. What each host's move makes is §4.2b's. How the
+  window runs — its order, what a host does with a launch or a repo file of the other shape, the migration
+  against a live host agent, going back, and today's readers of a record's `profile` — is **the cut-over's
+  design**, an entry of its own after the Flows and Team rounds. A built-in flow's id is its name (`td`,
+  `build-review`, `build`), so `flows: [td]` and `flow: td` keep reading; an org or repo flow with no `id`
+  reads as its directory's name until it is saved with one. `techlead.context` (today the techlead's
+  primer) goes with the question seat's brief, on the team's side of the split.
 - **A format version.** `flow.yml` carries `format: <n>`, read before the stray-key check (§4.9c), and a
   flow with none reads as format 1. A flow from a newer ShiftLead reads *made by a newer ShiftLead*, never
   a stray-key refusal; a repo flow that writes a new key waits on the promote that accepts it, as `color`
