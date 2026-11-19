@@ -168,6 +168,20 @@ def read(
     }
 
 
+def repoll(
+    kept: Mapping[str, Any], salt: bytes, home: Path | None = None, memory: logins.Memory | None = None
+) -> dict[str, Any]:
+    """A tools shell's poll (design §4.2b *The tools shell*, *Matching across a restart*): one more pass of reads over
+    every login, settled as a whole, on the kept read's tool cards — their binaries, versions and found rows stand as
+    the last read left them, so a poll probes no `--version` and finds nothing new. Each card's `accounts` and
+    `logins` are drawn afresh from `logins.yml` as it stands, a login that joined an account written as any pass's."""
+    data = logins.load(home)
+    cards = [{**c, "accounts": [], "logins": []} for c in kept.get("tools", [])]
+    if data is not None:
+        _login_tree(cards, data, salt, memory if memory is not None else logins.Memory(), home)
+    return {**kept, "switched": data is not None, "tools": cards}
+
+
 def _login_tree(
     cards: list[dict[str, Any]], data: dict[str, Any], salt: bytes, memory: logins.Memory, home: Path | None
 ) -> None:
