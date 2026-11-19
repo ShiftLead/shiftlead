@@ -120,6 +120,27 @@ async def test_a_login_shell_passes_the_same_checks_on_a_fixture(agent, tmp_path
     assert await agent.rpc_hook(sid, kind="permission", text="Bash(ls)") is None and not rec.pendings
 
 
+async def test_login_shell_after_the_switch_over_opens_the_logins_own_folder(agent, tmp_path):
+    """`ao login shell` on a switched host (§4.2b *The tools shell*): the login named by its bare name opens its tools
+    shell on its own folder, a second press answers the same shell, and a name no login has is refused."""
+    from sessionorc import logins
+
+    await park_ticks(agent)
+    home = tmp_path / "claude-grind"
+    home.mkdir()
+    d = logins.empty()
+    d["logins"]["claude-code:grind"] = {"folder": str(home)}
+    logins.save(d, "fixture", paths.home())
+    async with LocalClient() as c:
+        s = await c.call("login_shell", login="grind")
+        assert s["id"] == naming.tools_id("claude-code", "grind") and s["log"] is False
+        env = await asyncio.to_thread(agent.tmux.run, "show-environment", "-t", f"={s['id']}", "CLAUDE_CONFIG_DIR")
+        assert env.stdout.strip() == f"CLAUDE_CONFIG_DIR={home}"
+        assert (await c.call("login_shell", login="claude-code:grind"))["id"] == s["id"]  # pressed again: the same
+        with pytest.raises(AgentError, match="nope"):
+            await c.call("login_shell", login="nope")
+
+
 async def test_a_pane_with_the_prefix_and_no_record_is_adopted_as_a_tools_shell(agent, tmp_path):
     await park_ticks(agent)
     sid = "ao--tools-grok-paul"
