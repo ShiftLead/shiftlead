@@ -5096,6 +5096,39 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         body = await body_of(request)
         return await call("tools_install", tool=str(body.get("tool") or ""))
 
+    @app.post("/api/tools/login/{verb}")
+    async def tools_login(verb: str, request: Request):
+        """§4.5a *Tools page: a login* (TD-1974): a login's controls, each the person's own act (`mail.PERSON_ONLY`)
+        calling its `ao login` verb (§4.2b *Controls and verbs*) — ✎ `label`, **Name its account** `account`,
+        **Edit note** `note`, **Forget this login** `forget`, and **Sign in**, **Sign in again** and **Open a shell
+        here** `shell`, whose tools shell the page then opens. A write sends back the login's `version` the page
+        read, so one over a newer entry is refused (*changed since this page read it — reload*)."""
+        body = await body_of(request)
+        login, version = str(body.get("login") or ""), body.get("version") or None
+        if verb == "shell":
+            return await call("login_shell", login=login)
+        if verb == "label":
+            return await call("login_label", login=login, label=body.get("label") or None, version=version)
+        if verb == "note":
+            return await call("login_note", login=login, text=body.get("text") or None, version=version)
+        if verb == "account":
+            return await call("login_account", login=login, account=str(body.get("account") or ""), version=version)
+        if verb == "forget":
+            return await call("login_forget", login=login, version=version)
+        raise HTTPException(404, f"no login control {verb!r}")
+
+    @app.post("/api/tools/account/label")
+    async def tools_account_label(request: Request):
+        """§4.5a *Tools page: an account* (TD-1974): ✎ on an account → `account_label`, a label only, its key fixed;
+        an empty one clears it. The account's `version` as the page read it goes with it."""
+        body = await body_of(request)
+        return await call(
+            "account_label",
+            key=str(body.get("key") or ""),
+            label=body.get("label") or None,
+            version=body.get("version") or None,
+        )
+
     @app.get("/settings", response_class=HTMLResponse)
     async def settings_view(request: Request):
         agent_down, got, usage, info, why = False, {}, {}, {}, ""

@@ -5880,6 +5880,46 @@
       try { const s = await post("/api/tools/install", { tool: b.dataset.tool }); location.href = "/focus/" + encodeURIComponent(s.id); }
       catch (e) { say(e.message); b.disabled = false; }
     }));
+    // a login's and an account's controls on a switched host (§4.5a *Tools page: a login*, *an account*; TD-1974):
+    // each its `ao login` / `ao account` verb, sending back the version the page read; a write draws the page afresh,
+    // a shell goes to its Focus, and a refusal is the host agent's words, in place. A prompt left empty clears.
+    const act = async (b) => {
+      const row = b.closest("[data-login], [data-account]"); if (!row) return;
+      const what = b.dataset.act, v = row.dataset.version || null, login = row.dataset.login;
+      let path, body;
+      if (!login) {  // ✎ on an account
+        const label = prompt(`Label for ${row.dataset.account} (empty clears it)`, row.dataset.label || "");
+        if (label === null) return;
+        path = "/api/tools/account/label"; body = { key: row.dataset.account, label, version: v };
+      } else if (what === "shell") {
+        path = "/api/tools/login/shell"; body = { login };
+      } else if (what === "label") {
+        const label = prompt(`Label for ${login} (empty clears it)`, row.dataset.label || "");
+        if (label === null) return;
+        path = "/api/tools/login/label"; body = { login, label, version: v };
+      } else if (what === "note") {
+        const text = prompt(`Note on ${login}: one line, no secret, as the file is kept in git (empty clears it)`, row.dataset.note || "");
+        if (text === null) return;
+        path = "/api/tools/login/note"; body = { login, text, version: v };
+      } else if (what === "account") {
+        const account = prompt(`Which account is ${login} signed into? An account's key, or a new account's name`, "");
+        if (!account) return;
+        path = "/api/tools/login/account"; body = { login, account, version: v };
+      } else if (what === "forget") {
+        if (!confirm(`Forget ${login}? Its folder stays on disk, and adding that folder again takes back its name.`)) return;
+        path = "/api/tools/login/forget"; body = { login, version: v };
+      } else return;
+      b.disabled = true;
+      try {
+        const got = await post(path, body);
+        if (what === "shell" && got && got.id) location.href = "/focus/" + encodeURIComponent(got.id);
+        else location.reload();
+      } catch (e) { say(e.message); b.disabled = false; }
+    };
+    $$(".toollogin [data-act], .toolacct [data-act]", page).forEach((b) => b.addEventListener("click", () => {
+      const d = b.closest("details.more"); if (d) d.open = false;
+      act(b);
+    }));
   };
   // The Queue page (design §4.5 screen 12, §4.5a *Queue page*; TD-771): the cards (`AO.qcards`), the
   // Recently completed window picker — its choice remembered in this browser, *day* first — a completed

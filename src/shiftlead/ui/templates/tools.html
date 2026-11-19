@@ -8,12 +8,23 @@
    account and its logins, *Not signed in*, then the logins whose account is to be named (TD-1974; the gauges are
    TD-1975's). Drawn from the host agent's kept
    `tools` read; **Check again** posts `/api/tools/check` (`tools_check`), **Install** `/api/tools/install`
-   (`tools_install`), which opens the install shell's Focus. #}
-{% macro login_row(lg) %}
-      <div class="toollogin row gap wrap" data-login="{{ lg.name }}"><span class="mono toolloginname">{{ lg.label or lg.name }}</span>{% if lg.label %}<span class="mono note">{{ lg.name }}</span>{% endif %}
+   (`tools_install`), which opens the install shell's Focus. A login's and an account's controls (TD-1974) post
+   `/api/tools/login/<verb>` and `/api/tools/account/label`, each its `ao login` / `ao account` verb. #}
+{% macro login_row(c, lg) %}
+      <div class="toollogin row gap wrap" data-login="{{ c.adapter }}:{{ lg.name }}" data-version="{{ lg.version or '' }}" data-label="{{ lg.label or '' }}" data-note="{{ lg.note or '' }}"><span class="mono toolloginname">{{ lg.label or lg.name }}</span>{% if lg.label %}<span class="mono note">{{ lg.name }}</span>{% endif %}
+        <button class="btn sm link toolpen" type="button" data-act="label" title="{{ help_title('tools-label') }}" aria-label="label {{ lg.name }}">✎</button>
         <span class="mono note toolfolder">{{ lg.shown }}</span>
         {%- if lg.pin or lg.note %}<span class="note toolnote"><i>{% if lg.pin %}pinned: {{ lg.pin }}{% endif %}{% if lg.pin and lg.note %} · {% endif %}{{ lg.note or "" }}</i></span>{% endif %}
         <span class="grow"></span><span class="toolstate state-{{ lg.state }}">{{ lg.said }}</span>
+        {%- if lg.state == 'not_signed_in' %}<button class="btn sm toolact" type="button" data-act="shell" title="{{ help_title('tools-sign-in') }}">Sign in</button>
+        {%- elif lg.state == 'sign_in_again' %}<button class="btn sm toolact" type="button" data-act="shell" title="{{ help_title('tools-sign-in') }}">Sign in again</button>{% endif %}
+        {%- if lg.state == 'name_account' or lg.mismatch %}<button class="btn sm toolact" type="button" data-act="account" title="{{ help_title('tools-name-account') }}">Name its account</button>{% endif %}
+        <details class="more tooldots"><summary class="btn sm link" title="more">⋯</summary>
+          <div class="menu">
+            <button type="button" data-act="shell" title="{{ help_title('tools-login-shell') }}">Open a shell here</button>
+            <button type="button" data-act="note" title="{{ help_title('tools-note') }}">Edit note</button>
+            <button type="button" data-act="forget" title="{{ help_title('tools-forget') }}">Forget this login</button>
+          </div></details>
         {%- if lg.mismatch %}<div class="note toolwarn">these logins read different accounts: this one launches nothing until they agree</div>{% endif %}
         {%- for w in lg.warned %}<div class="note toolwarn">{{ w }}</div>{% endfor %}</div>
 {% endmacro %}
@@ -33,22 +44,23 @@
     {% if c.tree %}
     {% for a in c.tree.accounts %}
     <div class="toolbranch">
-      <div class="toolacct" data-account="{{ a.key }}"><span class="toolacctname">{{ a.label or a.name }}</span>{% if a.label %} <span class="mono note">{{ a.name }}</span>{% endif %}
+      <div class="toolacct" data-account="{{ a.key }}" data-version="{{ a.version or '' }}" data-label="{{ a.label or '' }}"><span class="toolacctname">{{ a.label or a.name }}</span>{% if a.label %} <span class="mono note">{{ a.name }}</span>{% endif %}
+        <button class="btn sm link toolpen" type="button" data-act="label" title="{{ help_title('tools-label') }}" aria-label="label {{ a.name }}">✎</button>
         <div class="note">{{ a.plan or "plan not recorded by the tool" }}{% if a.billing %} · {{ a.billing }}{% endif %}</div>
         {% if a.models and a.models.families %}<div class="mono toolfams">{{ a.models.families | join(" · ") }}</div>{% endif %}</div>
-      {% for lg in a.logins %}{{ login_row(lg) }}{% endfor %}
+      {% for lg in a.logins %}{{ login_row(c, lg) }}{% endfor %}
     </div>
     {% endfor %}
     {% if c.tree.unsigned %}
     <div class="toolbranch">
       <div class="toolacct toolunsigned"><span class="toolacctname">Not signed in</span><div class="note">a folder joins its account once signed in</div></div>
-      {% for lg in c.tree.unsigned %}{{ login_row(lg) }}{% endfor %}
+      {% for lg in c.tree.unsigned %}{{ login_row(c, lg) }}{% endfor %}
     </div>
     {% endif %}
     {% if c.tree.naming %}
     <div class="toolbranch">
       <div class="toolacct toolunsigned"><span class="toolacctname">Signed in, account not named</span><div class="note">a login launches nothing until its account is named</div></div>
-      {% for lg in c.tree.naming %}{{ login_row(lg) }}{% endfor %}
+      {% for lg in c.tree.naming %}{{ login_row(c, lg) }}{% endfor %}
     </div>
     {% endif %}
     {% endif %}
