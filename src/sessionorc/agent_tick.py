@@ -41,6 +41,7 @@ from sessionorc import held as held_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc import no_lane as no_lane_mod
 from sessionorc import queue as queue_mod
+from sessionorc import scratch as scratch_mod
 from sessionorc import screen as screen_mod
 from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
@@ -470,9 +471,17 @@ class TickMixin:
             live |= {str(self._rounds_log(s)) for s in self.sessions.values() if s.state not in ended}
             # an attachment's folder is kept whole while any record of its session is live (§4.4, TD-469)
             live_ids = {s.id for s in self.sessions.values() if s.state not in ended}
+            # each live record's scratch on this host is kept alive by the sweep (§4.6, TD-1944)
+            scratch = {
+                s.id: s.scratch
+                for s in self.sessions.values()
+                if s.scratch and s.state not in ended and s.host == self.host
+            }
             # kept as a pass (TD-1506): a thread outlives the tick that started it, so a cancelled tick
             # leaves the sweep running; `_prune_task` is what waits for it, as every `*_task` pass is waited for
-            self._prune_task = asyncio.ensure_future(asyncio.to_thread(self._prune_runs, snapshot_at, live, live_ids))
+            self._prune_task = asyncio.ensure_future(
+                asyncio.to_thread(self._prune_runs, snapshot_at, live, live_ids, scratch)
+            )
             await asyncio.shield(self._prune_task)
         if self.mode == "home":
             self._supervise_containers()
@@ -5346,7 +5355,13 @@ class TickMixin:
         except Exception:  # noqa: BLE001 — a detached task: log, and try again tomorrow
             log.exception("the nightly backup of the store failed")
 
-    def _prune_runs(self, now: datetime, live: set[str], live_ids: set[str] | None = None) -> None:
+    def _prune_runs(
+        self,
+        now: datetime,
+        live: set[str],
+        live_ids: set[str] | None = None,
+        scratch: dict[str, str] | None = None,
+    ) -> None:
         """Run-log retention (design §4.6): a log older than `runs_keep_days` goes unless it is in
         `live`, the logs of sessions still running (never truncate a live log: invariant 3). Logs
         of forgotten sessions are the common case — Forget keeps the file until this sweep. `0`
@@ -5356,7 +5371,18 @@ class TickMixin:
         attachment. An attachment's `.part` nothing has written to for an hour goes whatever
         the bound (§4.4 *Attachment drop*, TD-478): a browser closed mid-upload leaves nothing.
         The Add entry form's draft folders go by their claim (`_prune_drafts`, TD-630), before the
-        early returns. Runs in a thread: touches files, never `self.sessions`."""
+        early returns, and so does `scratch`, each live record of this host's scratch directory (§4.6
+        *A session's scratch*, TD-1944): made again where it is gone, its stale files' access times moved
+        (`scratch.keep_alive`). Runs in a thread: touches files, never `self.sessions`."""
+        if scratch:
+            root = getattr(hosts.local_host(), "scratch_root", None) or hosts.DEFAULT_SCRATCH_ROOT
+            try:
+                large = scratch_mod.keep_alive(root, scratch, paths.home(), time.time_ns())
+            except Exception:  # noqa: BLE001 — a bad record's scratch never stops the rest of the sweep
+                log.exception("scratch sweep failed")
+                large = []
+            for rid in large:
+                log.warning("large scratch: %s holds more than %d stale files", rid, scratch_mod.SWEEP_TOUCH_FILES)
         idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
         for f in paths.attachments_dir().glob("*/*.part"):
             try:

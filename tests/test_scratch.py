@@ -5,6 +5,7 @@ new one; the host agent refuses a `scratch_root` past 48 bytes and a `shiftlead-
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import socket
@@ -183,3 +184,162 @@ async def test_a_restart_keeps_the_run_s_scratch_and_makes_it_again_where_it_is_
         again = agent.sessions[sid]
         assert again.scratch == kept and sorted(p.name for p in Path(kept).iterdir()) == ["owner.json"]
         await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_resume_keeps_the_conversation_s_scratch_and_makes_it_again_where_it_is_gone(agent, hookstub, tmp_path):
+    async with LocalClient() as c:
+        old = await c.call("create", name="conv", dir=str(tmp_path), adapter="hookstub")
+        kept = agent.sessions[old["id"]].scratch
+        (Path(kept) / "notes.txt").write_text("read again by the same conversation")
+        await c.call("hook", session=old["id"], adapter_id="cc-123")
+        await c.call("kill", id=old["id"])
+        new = await c.call("create", name="conv", dir=str(tmp_path), adapter="hookstub", resume="cc-123")
+        assert agent.sessions[new["id"]].scratch == kept and (Path(kept) / "notes.txt").exists()
+        await c.call("hook", session=new["id"], adapter_id="cc-123")
+        await c.call("kill", id=new["id"])
+        # the sweep took it: the Resume makes it again, `0700`, with `owner.json`, empty
+        for f in Path(kept).iterdir():
+            f.unlink()
+        Path(kept).rmdir()
+        again = await c.call("create", name="conv", dir=str(tmp_path), adapter="hookstub", resume="cc-123")
+        assert agent.sessions[again["id"]].scratch == kept
+        assert sorted(p.name for p in Path(kept).iterdir()) == ["owner.json"]
+        assert stat.S_IMODE(Path(kept).stat().st_mode) == 0o700
+        # a fresh start of the same name, no Resume, gets a new one
+        await c.call("kill", id=again["id"])
+        fresh = await c.call("create", name="conv", dir=str(tmp_path), adapter="hookstub")
+        assert agent.sessions[fresh["id"]].scratch not in (None, kept)
+        await c.call("kill", id=fresh["id"])
+
+
+DAY_NS = 86_400 * 10**9
+
+
+def _aged(f: Path, now_ns: int, days: int = 11) -> tuple[int, int]:
+    """Date `f` `days` back, both times; returns them."""
+    t = now_ns - days * DAY_NS
+    os.utime(f, ns=(t, t))
+    return t, t
+
+
+@pytest.mark.unit
+def test_the_sweep_touches_stale_access_times_alone_and_never_through_a_symlink(tmp_path, short):
+    import time
+
+    root, now = short / "r", time.time_ns()
+    d = Path(scratch.make(root, "ao-x", "/h"))
+    old = d / "old.txt"
+    old.write_text("a")
+    git = d / "clone" / ".git" / "objects"
+    git.mkdir(parents=True)
+    obj = git / "ab"
+    obj.write_text("b")
+    outside = tmp_path / "outside.txt"
+    outside.write_text("c")
+    (d / "link").symlink_to(outside)
+    _, m_old = _aged(old, now)
+    _, m_obj = _aged(obj, now)
+    a_out, m_out = _aged(outside, now)
+    young = d / "young.txt"
+    young.write_text("d")
+    young_t = now - 3600 * 10**9
+    os.utime(young, ns=(young_t, young_t))
+    assert scratch.keep_alive(root, {"ao-x": str(d)}, "/h", now) == []
+    for f, m in ((old, m_old), (obj, m_obj)):
+        st = f.stat()
+        assert st.st_atime_ns == now and st.st_mtime_ns == m
+    st = outside.stat()
+    assert (st.st_atime_ns, st.st_mtime_ns) == (a_out, m_out)
+    assert young.stat().st_atime_ns == young_t  # accessed within the day: left
+
+
+@pytest.mark.unit
+def test_the_sweep_makes_a_live_record_s_directory_again_and_leaves_another_s(short):
+    import time
+
+    root = short / "r"
+    d = Path(scratch.make(root, "ao-x", "/h"))
+    (d / "owner.json").unlink()
+    d.rmdir()
+    other = Path(scratch.make(root, "ao-y", "/h"))
+    stray = other / "s.txt"
+    stray.write_text("e")
+    t = time.time_ns() - 11 * DAY_NS
+    os.utime(stray, ns=(t, t))
+    nowhere = short / "elsewhere"
+    scratch.keep_alive(root, {"ao-x": str(d), "ao-z": str(other), "ao-w": str(nowhere)}, "/h", time.time_ns())
+    assert _owner(str(d)) == {"id": "ao-x", "home": "/h"} and stat.S_IMODE(d.stat().st_mode) == 0o700
+    assert stray.stat().st_atime_ns == t  # its owner.json names ao-y: not ao-z's to touch
+    assert not nowhere.exists()  # not under this host's parent: never made
+    (d / "owner.json").unlink()  # a directory missing its owner.json gains it
+    scratch.keep_alive(root, {"ao-x": str(d)}, "/h", time.time_ns())
+    assert _owner(str(d)) == {"id": "ao-x", "home": "/h"}
+
+
+@pytest.mark.unit
+def test_a_record_past_sweep_touch_files_is_large_scratch(short, monkeypatch):
+    import time
+
+    monkeypatch.setattr(scratch, "SWEEP_TOUCH_FILES", 2)
+    root, now = short / "r", time.time_ns()
+    d = Path(scratch.make(root, "ao-x", "/h"))
+    files = [d / f"f{i}" for i in range(3)]
+    for f in files:
+        f.write_text("x")
+        _aged(f, now)
+    assert scratch.keep_alive(root, {"ao-x": str(d)}, "/h", now) == ["ao-x"]
+    assert sum(f.stat().st_atime_ns == now for f in files) == 2
+
+
+@pytest.mark.integration
+async def test_the_hourly_sweep_brings_back_a_live_record_s_scratch(agent, tmp_path, caplog, monkeypatch):
+    from datetime import UTC, datetime
+
+    await park_ticks(agent)
+    view = await agent.rpc_create(name="x", dir=str(tmp_path), adapter="shell")
+    d = Path(agent.sessions[view["id"]].scratch)
+    for f in d.iterdir():
+        f.unlink()
+    d.rmdir()
+    agent._pruned_at = datetime.min.replace(tzinfo=UTC)
+    await agent.tick()
+    await agent._prune_task
+    assert _owner(str(d)) == {"id": view["id"], "home": str(paths.home())}
+    monkeypatch.setattr(scratch, "SWEEP_TOUCH_FILES", 0)
+    import time
+
+    f = d / "stale"
+    f.write_text("x")
+    _aged(f, time.time_ns())
+    await asyncio.to_thread(agent._prune_runs, datetime.now(UTC), set(), set(), {view["id"]: str(d)})
+    assert "large scratch" in caplog.text
+    await agent.rpc_kill(view["id"])
+
+
+@pytest.mark.integration
+async def test_a_node_keeps_a_scratch_the_home_hands_its_create_and_makes_a_foreign_one_anew(agent, tmp_path):
+    """A node's restart (§4.6): the home closes the record and routes a create carrying its `scratch` over the
+    link, as every create param goes. The node keeps it only where it is its own record's under its own parent,
+    and a session's create through the home cannot hand one."""
+    await park_ticks(agent)
+    agent.mode, agent.home = "node", "kmaster"
+    first = (await agent._act({"rpc": "create", "params": {"name": "w", "dir": str(tmp_path), "adapter": "shell"}}))[
+        "result"
+    ]
+    kept = agent.sessions[first["id"]].scratch
+    (Path(kept) / "work.txt").write_text("x")
+    await agent.rpc_kill(first["id"])
+    params = {"name": "w", "dir": str(tmp_path), "adapter": "shell", "scratch": kept}
+    again = (await agent._act({"rpc": "create", "params": params, "caller": None}))["result"]
+    assert agent.sessions[again["id"]].scratch == kept and (Path(kept) / "work.txt").exists()
+    await agent.rpc_kill(again["id"])
+    other = scratch.make(hosts.local_host().scratch_root, "ao-someone-else", paths.home())
+    params = {"name": "v", "dir": str(tmp_path), "adapter": "shell", "scratch": other}
+    fresh = (await agent._act({"rpc": "create", "params": params, "caller": None}))["result"]
+    assert agent.sessions[fresh["id"]].scratch not in (None, other)
+    await agent.rpc_kill(fresh["id"])
+    from sessionorc import link
+
+    with pytest.raises(link.LinkError, match="a session cannot give it"):
+        await agent._act({"rpc": "create", "params": {**params, "name": "u"}, "caller": "ao-lead@kmaster"})
