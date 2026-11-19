@@ -1094,6 +1094,13 @@ def handed_hold(
     }
 
 
+def _carried_rank(ln: Mapping[str, Any]) -> int:
+    """A closed line's place among same-day answers (§4.4 *One line answers*, TD-2020): the highest `TD-m` number
+    its `Closed:` carries it to, 0 where it carries to none. A later answer is carried to an entry filed later, so
+    the higher number is the newer answer; the board keeps no time of day."""
+    return max((int(m.group(2)) for t in ln.get("to") or () if (m := TD_REF.search(str(t)))), default=0)
+
+
 def board_hold(
     member: Mapping[str, Any],
     boards: Mapping[str, Iterable[Mapping[str, Any]]],
@@ -1114,7 +1121,9 @@ def board_hold(
     A `decide` line **covers** the member when its `Context:` or `Parts:` names it, or names the entry it is
     `Part of` (the member carries `decision (paul)`, or it would not be asked). An open undecided covering line
     asks again: None. Of the covering lines `Decided:` with no `by` or `by` the person, the newest by `Decided:`
-    (an open line before a closed one, then the later `Closed:`, then the smaller `at`) alone decides: an open
+    (an open line before a closed one, then the later `Closed:`, then the later carried-to entry — its highest
+    `TD-m` number, `_carried_rank` — then the greater key; never the line's `at`, a position in a board file that
+    says nothing of order across the archive's per-item files, TD-2020) alone decides: an open
     line holds while open; one closed *carried to TD-m* or *see TD-m* (the same words, TD-1528) while a TD-m is
     open, not covered, not the person's and `Added:` no earlier than a day before the `Decided:`; one closed
     `— kept waiting.` until its `kept waiting` Log date plus `REASK_DAYS`; one closed in other words while a live
@@ -1136,7 +1145,7 @@ def board_hold(
         if ln["by"] and str(ln["by"]).strip().lower() != PERSON:
             continue  # a line decided by someone else is not the person's answer
         closed = (ln["closed"] or {}).get("date") or ""
-        k = (ln["decided"], ln["open"], closed, -ln["at"])
+        k = (ln["decided"], ln["open"], closed, _carried_rank(ln), ln["key"])
         if picked is None or k > picked[0]:
             picked = (k, ln, [me, *named])
     if picked is None:

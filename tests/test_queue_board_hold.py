@@ -228,13 +228,27 @@ def test_one_line_answers_the_newest_and_on_a_tie_an_open_line_before_a_closed_o
     root2, r2 = _setup(tmp_path / "n", [held, rnd], _closed("TD-001", "carried to TD-005", decided="Go (2026-10-12)"),
                        _closed("TD-001", "", decided="Go (2026-10-15)"))  # fmt: skip
     assert _row(_read({root2: r2}), "r#TD-001")["answered"] is None
-    # the `at` tie-break: the nearer-the-top of two otherwise equal closed lines
+    # a same-day tie is broken by the carried-to entry, never by file order (TD-2020): the line carried to an
+    # entry outranks one carried to none, in either order
     a = _closed("TD-001", "carried to TD-005")
     b = _closed("TD-001", "", decided="Again (2026-10-15)")
-    root3, r3 = _setup(tmp_path / "t", [held, rnd], a, b)
-    assert _row(_read({root3: r3}), "r#TD-001")["state"] == "answered — waiting on TD-005"
-    root4, r4 = _setup(tmp_path / "u", [held, rnd], b, a)
-    assert _row(_read({root4: r4}), "r#TD-001")["answered"] is None
+    for i, order in enumerate(((a, b), (b, a))):
+        root3, r3 = _setup(tmp_path / f"t{i}", [held, rnd], *order)
+        assert _row(_read({root3: r3}), "r#TD-001")["state"] == "answered — waiting on TD-005", i
+
+
+@pytest.mark.unit
+def test_same_day_answers_carried_to_two_archived_rounds_and_an_open_one_read_the_open_one(tmp_path):
+    """TD-2020: three `One more round` lines decided and closed the same day, two carried to archived rounds and the
+    newest to an open one — the member reads *answered — waiting on* the open round in every file order."""
+    held = _entry(1, "the held one", **HELD)
+    rnd = _entry(9, "the round", Priority="High", Added="2026-10-15")
+    lines = [_closed("TD-001", f"carried to TD-00{n}") for n in (7, 8, 9)]
+    for i, order in enumerate((lines, lines[::-1], [lines[1], lines[2], lines[0]])):
+        root, r = _setup(tmp_path / f"o{i}", [held, rnd], *order)
+        row = _row(_read({root: r}), "r#TD-001")
+        assert row["state"] == "answered — waiting on TD-009", i
+        assert row["answered"]["line"]["to"] == ["TD-009"], i
 
 
 @pytest.mark.unit
