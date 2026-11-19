@@ -1279,7 +1279,7 @@ def test_start_with_a_role_carries_the_persons_layer_additions_and_a_failed_list
     assert client.post("/new", data=typed, follow_redirects=False).status_code == 303
     (made,) = fleet.creates()
     assert made["prompt"].endswith("fix the flaky test in test_link.py") and asked == []
-    assert made.get("prompt_from") is None
+    assert "prompt_from" not in made
     fleet.calls.clear()
     r = client.post("/new", data={**typed, "name": "h5", "prompt": "   "}, follow_redirects=False)
     assert r.status_code == 400 and "agent-cadence's layer listing exited 2" in r.text
