@@ -6,8 +6,8 @@ agent-cadence's `landed_of` and `landed_since_edited` do."""
 from __future__ import annotations
 
 import os
+import secrets
 import subprocess
-import tempfile
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -57,9 +57,12 @@ def origin(tmp_path):
 
 
 @pytest.fixture
-def root(_scratch_root):
-    with tempfile.TemporaryDirectory(dir=_scratch_root) as d:
-        yield Path(d)
+def root(tmp_path):
+    """A root of this test's own, never the run's shared one, which every child agent's sweep reads: the sweep
+    needs no short root, only the create does."""
+    r = tmp_path / "scr"
+    r.mkdir()
+    return r
 
 
 def age(path: Path, seconds: float) -> None:
@@ -71,7 +74,12 @@ def age(path: Path, seconds: float) -> None:
 
 
 def made(root: Path, home: str, rid: str = "ao-x-1") -> Path:
-    return Path(scratch.make(root, rid, home))
+    p = scratch.parent(root)
+    p.mkdir(mode=0o700, exist_ok=True)
+    d = p / secrets.token_hex(4)
+    d.mkdir(mode=0o700)
+    scratch.write_owner(d, rid, home)
+    return d
 
 
 def sweep(root, home, named=None, live=(), transcripts=(), keep_hours=24):
@@ -288,6 +296,7 @@ async def test_the_hourly_pass_takes_an_ended_record_s_scratch(agent):
     agent.sessions["ao-b-2"].state = "idle"  # resumed after the snapshot
     agent._prune_runs(datetime.now(UTC), set(), set(), None, named)
     assert not ended.exists() and back.exists()
+    scratch._remove(back)
     for rid in ("ao-e-1", "ao-b-2"):
         del agent.sessions[rid]
 
