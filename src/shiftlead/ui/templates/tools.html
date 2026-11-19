@@ -19,7 +19,7 @@
         {%- if lg.state == 'not_signed_in' %}<button class="btn sm toolact" type="button" data-act="shell" title="{{ help_title('tools-sign-in') }}">Sign in</button>
         {%- elif lg.state == 'sign_in_again' %}<button class="btn sm toolact" type="button" data-act="shell" title="{{ help_title('tools-sign-in') }}">Sign in again</button>{% endif %}
         {%- if lg.state == 'name_account' or lg.mismatch %}<button class="btn sm toolact" type="button" data-act="account" title="{{ help_title('tools-name-account') }}">Name its account</button>{% endif %}
-        <details class="more tooldots"><summary class="btn sm link" title="more">⋯</summary>
+        <details class="more"><summary class="btn sm link" title="more">⋯</summary>
           <div class="menu">
             <button type="button" data-act="shell" title="{{ help_title('tools-login-shell') }}">Open a shell here</button>
             <button type="button" data-act="note" title="{{ help_title('tools-note') }}">Edit note</button>
