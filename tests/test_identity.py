@@ -895,9 +895,14 @@ def test_no_read_decides_anything_on_its_caller():
 
     from sessionorc.agent import HostAgent
 
-    for name in sorted(identity.READS):
+    assert identity.TOOLS_GATED <= identity.READS
+    for name in sorted(identity.READS - identity.TOOLS_GATED):
         fn = getattr(HostAgent, f"rpc_{name}")
         assert "caller" not in inspect.signature(fn).parameters, f"{name} takes a caller: it is not a plain read"
+    for name in sorted(identity.TOOLS_GATED):
+        # the one use of the caller: a tools shell's pane refused to a session (§4.2b, TD-1972), read first
+        src = inspect.getsource(getattr(HostAgent, f"rpc_{name}"))
+        assert src.count("caller") == src.count("self._tools_read(s.id, caller") + 1, name  # the parameter
     assert "host_files" not in identity.READS
     # and from under a pane even a read runs as that pane's session (judge leaves the claim; the
     # agent's step replaces it) — checked end to end below

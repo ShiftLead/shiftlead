@@ -211,7 +211,7 @@ HOME_OWNED = frozenset(
 )
 IDENTITY = frozenset({
     "id", "name", "kind", "adapter", "dir", "profile", "repo", "worktree", "adapter_id", "transcript", "created",
-    "host", "start_context", "model_file", "scratch",
+    "host", "start_context", "model_file", "scratch", "log",
 })  # fmt: skip
 
 # Urgent-first order (design §4.5). Lower sorts first. `unreachable` is placed by the UI
@@ -1219,6 +1219,10 @@ class Session:
     tool_open_at: str | None = None
     stalled_ticks: int = 0
     run_log: str | None = None
+    # False for a Tools page's tools shell alone (design §4.2b *The tools shell*, TD-1972): its pane is
+    # piped to no run log, the tick captures nothing of it, and a send to it keeps no text. Set at its
+    # start and never changed, so identity.
+    log: bool = True
     # The run log of the exited session of the same name this one replaced (design §4.1, TD-030):
     # the name is reused, so the previous run stays reachable from the record that took it over.
     previous_run: str | None = None

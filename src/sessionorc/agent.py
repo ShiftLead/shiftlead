@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import secrets
+import shlex
 import signal
 import socket
 import subprocess
@@ -279,6 +280,7 @@ from sessionorc.models import (
     GRANTS,
     PERSON,
     PROGRESS_STATUSES,
+    SYSTEM,
     WRAPUP_PROMPT,
     FindingEntry,
     MailEntry,
@@ -300,7 +302,7 @@ from sessionorc.store import (
     SessionStore,
     UsageStore,
 )
-from sessionorc.tmux import ARG_LIMIT, DuplicateSession, Tmux
+from sessionorc.tmux import ARG_LIMIT, DuplicateSession, Tmux, TmuxError
 
 
 def _window_bound(value: Any, name: str) -> datetime | None:
@@ -3563,11 +3565,16 @@ class HostAgent(
 
         return answer()
 
-    def _record_send(self, s: Session, caller: Any, text: str, key: str | None = None) -> SendEntry:
+    def _record_send(
+        self, s: Session, caller: Any, text: str, key: str | None = None, *, own: bool = False
+    ) -> SendEntry:
         """`sends` (design §4.10): what was typed into this pane and by whom, minted and stamped
         here like a message, bounded to the last `SENDS_KEEP`. Written at the gate — before the
         paste, since a paste that then sticks still reached the pane — and its verdict amended if
-        the submit fails."""
+        the submit fails. A tools shell's keeps no text but the host agent's own typed command (`own`):
+        a sign-in's codes and a pasted key are typed there (design §4.2b *The tools shell*, TD-1972)."""
+        if naming.is_tools(s.id) and not own:
+            text = ""
         who = PERSON if mail.is_person(caller) else str(caller)
         entry = SendEntry(id="s-" + secrets.token_hex(6), from_=who, at=now_iso(), text=text, key=key)
         s.sends = (s.sends + [entry])[-mail.SENDS_KEEP :]
@@ -3678,13 +3685,15 @@ class HostAgent(
             self._refill(s)  # keys are how a person answers a menu or a question in the pane
         await asyncio.to_thread(lambda: self.tmux.run("send-keys", "-t", f"={id}:", *keys))
 
-    async def rpc_explain(self, id: str, lines: int = 40) -> dict[str, Any]:
+    async def rpc_explain(self, id: str, lines: int = 40, caller: Any = None) -> dict[str, Any]:
         """Why the session shows the state it does (design §4.2, TD-015): the current screen, the
         record's state and confidence, the screen rule that would fire on it with its evidence, and
-        whether that verdict applies (no fresher hook state) or is outranked."""
+        whether that verdict applies (no fresher hook state) or is outranked. A tools shell's screen is
+        the person's alone (§4.2b *The tools shell*): refused to a session."""
         s = self._get(id)
+        tools = self._tools_read(s.id, caller, "explain")
         adapter = adapters.get(s.adapter)
-        tail = [_clean(t) for t in await asyncio.to_thread(self.tmux.capture_tail, id, lines)]
+        tail = [_clean(t) for t in await asyncio.to_thread(self.tmux.capture_tail, s.id, lines, tools=tools)]
         explain = getattr(adapter, "explain", None)
         now = datetime.now(UTC)
         out: dict[str, Any] = {
@@ -3826,9 +3835,96 @@ class HostAgent(
         self._uploads[upload] = {"session": owner, "part": part, "name": name, "total": total}
         return {"upload": upload, "bytes": len(raw), **said}
 
-    async def rpc_tail(self, id: str, lines: int = 40) -> list[str]:
-        self._get(id)
-        return await asyncio.to_thread(self.tmux.capture_tail, id, lines)
+    async def rpc_tail(self, id: str, lines: int = 40, caller: Any = None) -> list[str]:
+        s = self._get(id)
+        tools = self._tools_read(s.id, caller, "read")
+        return await asyncio.to_thread(self.tmux.capture_tail, s.id, lines, tools=tools)
+
+    def _tools_read(self, sid: str, caller: Any, verb: str) -> bool:
+        """Whether a pane read is of a tools shell, refusing it to a session (design §4.2b *The tools shell*,
+        §9 invariant 11's one exception, TD-1972): a sign-in prints an email, links and codes, and an API
+        key is pasted there, so every read of its pane is the person's, their own shell's included."""
+        if not naming.is_tools(sid):
+            return False
+        agent_common.person_only(caller, f"{verb} a tools shell's pane", "§4.2b *The tools shell*", self._graph())
+        return True
+
+    async def rpc_tools_install(self, tool: str, caller: Any = None) -> dict[str, Any]:
+        """`ao tools install <tool>`, the Tools page's **Install** (design §4.2b *The tools shell*, TD-1972): the
+        tool's install shell, `ao--tools-install-<adapter>`, in the person's home, its adapter's
+        `install_command()` typed with no Enter — the person presses it, and ShiftLead runs no install (§4.3).
+        One of each: a second press reopens it. A person's own act."""
+        agent_common.person_only(caller, "open an install shell", "§4.2b *The tools shell*", self._graph())
+        try:
+            ad = adapters.get(str(tool))
+        except KeyError as e:
+            raise RpcError(str(e).strip('"')) from None
+        if "install_command" not in adapters.implements(ad):
+            raise RpcError(f"the {tool} adapter names no install command (design §4.2b)")
+        return await self._tools_shell(naming.tools_install_id(str(tool)), ad.install_command(), {})
+
+    async def _login_shell(self, tool: str, login: str, home: Path) -> dict[str, Any]:
+        """A login's tools shell (design §4.2b *The tools shell*, TD-1972): `ao--tools-<adapter>-<login>`, its
+        environment the adapter's `home_env(home)` and its `signin_command()` typed with no Enter. Opened by the
+        logins' verbs (`ao login shell`, + Add login), which check the login and the caller first."""
+        try:
+            ad = adapters.get(str(tool))
+        except KeyError as e:
+            raise RpcError(str(e).strip('"')) from None
+        if not {"signin_command", "home_env"} <= adapters.implements(ad):
+            raise RpcError(f"the {tool} adapter names no sign-in command (design §4.2b)")
+        typed = shlex.join(ad.signin_command())
+        return await self._tools_shell(naming.tools_id(str(tool), login), typed, dict(ad.home_env(Path(home))))
+
+    async def _tools_shell(self, sid: str, typed: str, env: dict[str, str]) -> dict[str, Any]:
+        """Open a tools shell (design §4.2b *The tools shell*, TD-1972), or reopen the one open: a `shell`
+        session with no parent, its id the caller's `ao--tools-…`, in the person's home, with `env` (the
+        login's `home_env`), **no run log** (`log: false`, no `pipe-pane`), and `typed` typed with no Enter.
+        Its pane is the person's own shell (`mail.person_shell`: no role, no controller), so `ao` there acts
+        as the person. Only the command is recorded in `sends`: what the person types there never is."""
+        if not naming.is_tools(sid):
+            raise RpcError(f"{sid} is not a tools shell's id (design §4.2b)")
+        async with self._dir_locks[f"tools:{sid}"]:
+            held = self.sessions.get(sid)
+            panes = await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX)
+            pane = panes.get(sid)
+            if pane is not None and not pane.dead and held is not None:
+                return held.view()  # one of each: a second press reopens it
+            if pane is not None:  # a dead pane, or one no record holds: the press starts it afresh
+                await asyncio.to_thread(lambda: self.tmux.run("kill-session", "-t", f"={sid}", check=False))
+            home = Path.home()
+            full = {**env, "SHIFTLEAD_SESSION": sid, "SHIFTLEAD_HOME": str(paths.home())}
+            self._starting.add(sid)
+            try:
+                await asyncio.to_thread(self._start_tools, sid, home, full)
+            except TmuxError as e:
+                raise RpcError(str(e)) from None
+            finally:
+                self._starting.discard(sid)
+            s = Session(
+                id=sid,
+                name=naming.adopted_name(sid),
+                kind="interactive",
+                adapter="shell",
+                dir=str(home),
+                host=self.host,
+                confidence=adapters.get("shell").state_source,
+                log=False,
+            )
+            if self.mode != "node":
+                s.by_person = True
+            self.sessions[sid] = s
+            self.store.save(s)
+            if typed:
+                self._record_send(s, SYSTEM, typed, own=True)  # the host agent's own typing: no secret
+                await asyncio.to_thread(self.tmux.send_literal, sid, typed)  # no Enter: the person presses it
+            await self._push_changes()
+            return s.view()
+
+    def _start_tools(self, sid: str, cwd: Path, env: dict[str, str]) -> None:
+        self.tmux.ensure_server()
+        self.tmux.new_session(sid, cwd, None, env)  # no logfile: a tools shell has no run log (§9 invariant 3)
+        self._pane_cgroup(sid)
 
     async def rpc_transcript(
         self,

@@ -19,6 +19,7 @@ from sessionorc import (
     agent_common,
     link,
     mail,
+    naming,
     permits,
 )
 from sessionorc import settings as settings_mod
@@ -38,7 +39,13 @@ log = logging.getLogger(__name__)
 
 class HookMixin:
     async def rpc_hook(self, session: str, **event: Any) -> dict[str, Any] | None:
-        """Called by an adapter's hook script. A `permission` event blocks until answered or timed out."""
+        """Called by an adapter's hook script. A `permission` event blocks until answered or timed out.
+
+        A tools shell's report (a tool started there for `/login` runs the login's hooks) is dropped at
+        once, and a `permission` one answered without a waiter, so the tool asks in its own pane, which
+        is the person's (design §4.2b *The tools shell*, TD-1972)."""
+        if naming.is_tools(session):
+            return None
         if event.get("kind") == "permission":
             return await self._await_permission(session, event)
         # `mail`: the hook hands the turn its mail line (an adapter whose `mail` is a turn's, design §4.3),
@@ -66,8 +73,8 @@ class HookMixin:
 
     async def _await_permission(self, session: str, event: dict[str, Any]) -> dict[str, Any] | None:
         s = self.sessions.get(session)
-        if s is None:
-            return None
+        if s is None or naming.is_tools(session):
+            return None  # a tools shell's is the person's own pane, never waited on (§4.2b)
         self._last_hook[session] = datetime.now(UTC)
         self._live_hook_at[session] = time.time()
         if not s.hook_seen_at:  # the first hook (§4.1, TD-720): saved now, since a rule's answer saves nothing
