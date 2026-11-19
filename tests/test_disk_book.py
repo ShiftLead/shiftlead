@@ -60,10 +60,13 @@ def test_the_book_holds_what_it_measured_and_reads_partial_until_every_item_is()
     t = book.tallies()
     t["worktrees"].unlisted = True  # the rule could not list: the last reading stands, *partial*
     assert book.close(t)["worktrees"]["held"] == 5 and book.sizes["worktrees"] == {"/b": 5}
-    t = diskbook.Book().tallies()  # a host-agent restart: nothing measured yet
-    t["worktrees"].list("/b")
-    assert diskbook.Book().close(t)["worktrees"]["partial"] is True
     assert set(got) == set(diskbook.KINDS)
+    t = book.tallies()
+    t["worktrees"].list("/b")
+    t["worktrees"].measure("/c", 7)
+    t["worktrees"].gone("/c")  # removed, then the rule failed: what it removed is held no more
+    t["worktrees"].unlisted = True
+    assert book.close(t)["worktrees"] == {"held": 5, "partial": True, "removed": 7, "kept": []}
 
 
 @pytest.mark.unit
@@ -103,10 +106,14 @@ async def test_the_hourly_pass_sizes_a_live_scratch_by_its_walk_and_names_a_larg
     os.utime(stale, (t, t))
     monkeypatch.setattr(scratch, "SWEEP_TOUCH_FILES", 0)  # the first stale file is past the cap
     try:
-        got = agent._prune_runs(datetime.now(UTC), set(), set(), {"ao-l-1": str(live), "ao-g-2": str(large)})
+        got = agent._prune_runs(datetime.now(UTC), set(), set(), {"ao-l-1": str(live), "ao-g-2": str(large)}, {})
         s = got["scratch"]
         assert {"path": str(large), "why": "large scratch"} in s["kept"]
-        assert s["held"] == diskbook.size_of(live) and s["partial"]  # the large one's walk stopped short
+        # the large one's touch walk stopped short: it is sized by a bounded walk of its own
+        assert s["held"] == diskbook.size_of(live) + diskbook.size_of(large) and not s["partial"]
+        assert got["scratch"] is not None and agent._disk_result is got
+        got = agent._prune_runs(datetime.now(UTC), set(), set(), None, None)  # no scratch rule this pass
+        assert got["scratch"]["partial"] and got["scratch"]["held"] == s["held"]  # the last reading stands
     finally:
         for d in (live, large):
             scratch._remove(d)
@@ -134,9 +141,15 @@ def test_worktrees_read_partial_until_each_is_weighed_and_after_a_restart(repo, 
     run(repo, cursor=first.cursor, tally=t["worktrees"])
     got = book.close(t)["worktrees"]
     assert not got["partial"] and got["held"] == diskbook.size_of(a) + diskbook.size_of(b)
-    t = diskbook.Book().tallies()  # a restart: the memory is empty again
+    again = diskbook.Book()  # a host-agent restart: the memory is empty again
+    t = again.tallies()
     run(repo, tally=t["worktrees"])
-    assert diskbook.Book().close(t)["worktrees"]["partial"]
+    assert again.close(t)["worktrees"]["partial"]
+    t = book.tallies()  # a listing that fails keeps the last reading, *partial*, never a held 0
+    monkeypatch.setattr(worktreesweep, "listed", lambda _repo: None)
+    run(repo, tally=t["worktrees"])
+    got = book.close(t)["worktrees"]
+    assert got["partial"] and got["held"] == diskbook.size_of(a) + diskbook.size_of(b)
 
 
 @pytest.mark.unit

@@ -12,6 +12,12 @@ from pathlib import Path
 from typing import Any
 
 KINDS = ("scratch", "worktrees", "runs", "caches")
+WALK_S = 10.0  # one item's size walk at most, so a huge tree never spends a pass's budget (TD-1945 review)
+
+
+def deadline() -> float:
+    """The monotonic time one item's size walk stops at."""
+    return time.monotonic() + WALK_S
 
 
 def size_of(path: str | Path, deadline: float | None = None) -> int | None:
@@ -51,6 +57,7 @@ class Tally:
         self.listed: set[str] = set()
         self.measured: dict[str, int] = {}
         self.removed = 0
+        self.gone_paths: set[str] = set()
         self.kept: list[tuple[str, str]] = []
         self.unlisted = False  # the rule could not list its items this pass: the last reading stands, *partial*
 
@@ -76,6 +83,7 @@ class Tally:
         if size is None:
             size = self.measured.get(p, self._known.get(p, 0))
         self.removed += size
+        self.gone_paths.add(p)
         self.listed.discard(p)
         self.measured.pop(p, None)
 
@@ -100,7 +108,7 @@ class Book:
             t = tallies.get(kind) or Tally(self.sizes[kind])
             old = self.sizes[kind]
             if t.unlisted:
-                known = {**old, **t.measured}
+                known = {p: s for p, s in {**old, **t.measured}.items() if p not in t.gone_paths}
                 partial = True
             else:
                 known = {p: s for p, s in {**old, **t.measured}.items() if p in t.listed}

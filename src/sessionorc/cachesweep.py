@@ -23,7 +23,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from sessionorc import gitinfo, paths
+from sessionorc import diskbook, gitinfo, paths
 
 log = logging.getLogger(__name__)
 
@@ -152,13 +152,16 @@ def tally_trees(
     trees = (cache or cache_dir()) / "trees"
     try:
         entries = sorted(os.scandir(trees), key=lambda e: e.name)
+    except FileNotFoundError:
+        return  # no trees: none held
     except OSError:
+        tally.unlisted = True  # the last reading stands, *partial*
         return
     for e in entries:
         if not COMMIT.fullmatch(e.name) or e.is_symlink() or not e.is_dir(follow_symlinks=False):
             continue
         if not tally.known(e.path):
-            tally.measure(e.path)
+            tally.measure(e.path, deadline=diskbook.deadline())
         tally.list(e.path)
         if pinned and e.name in pinned and keep_days > 0:
             with contextlib.suppress(OSError):

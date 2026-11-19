@@ -5409,17 +5409,30 @@ class TickMixin:
         bytes held, *partial* until each item is measured, the bytes removed and each kept item with why
         (`diskbook`), kept as `_disk_result` for TD-1946's `disk.json`, and returned."""
         tallies = self._disk_book.tallies()
-        before = _run_items(live_ids)
+        if named is None:  # the scratch rule does not run: what it would list stands as last read, *partial*
+            tallies["scratch"].unlisted = True
+        try:
+            before = _run_items(live_ids)
+        except Exception:  # noqa: BLE001 — the reading never stops a pass
+            log.exception("the sweep's reading of the runs failed")
+            before = None
         try:
             self._prune_rules(now, live, live_ids, scratch, named, tallies)
         finally:
             runs = tallies["runs"]
-            after = _run_items(live_ids)
-            for path, size in before.items():
-                if path not in after:
-                    runs.gone(path, size)
-            for path, size in after.items():
-                runs.measure(path, size)
+            try:
+                after = _run_items(live_ids)
+            except Exception:  # noqa: BLE001
+                log.exception("the sweep's reading of the runs failed")
+                after = None
+            if before is None or after is None:
+                runs.unlisted = True
+            else:
+                for path, size in before.items():
+                    if path not in after:
+                        runs.gone(path, size)
+                for path, size in after.items():
+                    runs.measure(path, size)
             self._disk_result = self._disk_book.close(tallies)
         return self._disk_result
 

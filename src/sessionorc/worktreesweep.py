@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from sessionorc import gitinfo
+from sessionorc import diskbook, gitinfo
 from sessionorc.scratch import overlaps
 
 log = logging.getLogger(__name__)
@@ -182,6 +182,8 @@ def sweep(
         got = listed(repo)
         if got is None:
             log.warning("worktree sweep: %s's worktrees could not be listed", repo)
+            if tally is not None:
+                tally.unlisted = True  # the last reading stands, *partial*
             continue
         for wt, branch in got:
             real = os.path.realpath(wt)
@@ -200,8 +202,9 @@ def sweep(
         if time.monotonic() - start >= budget:
             break
         out.cursor = str(wt)
-        if tally is not None:
-            tally.measure(wt, deadline=start + budget)
+        known = tally is not None and tally.known(wt)
+        if tally is not None and not known:  # sized before the weigh, which may remove it
+            tally.measure(wt, deadline=min(start + budget, diskbook.deadline()))
         try:
             why = _one(wt, repo, branch, now, keep_days, idle, hold, troots)
         except Exception:  # noqa: BLE001 — one worktree that cannot be weighed never starves the rest
@@ -215,6 +218,8 @@ def sweep(
         else:
             out.kept.append((str(wt), why))
             if tally is not None:
+                if known:  # weighed again: its size as now, within what the budget leaves
+                    tally.measure(wt, deadline=min(start + budget, diskbook.deadline()))
                 tally.keep(wt, why)
     return out
 

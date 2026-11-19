@@ -19,6 +19,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from sessionorc import diskbook
+
 MAX_ROOT = 48  # bytes: a scratch home's `agent.sock` at `$SHIFTLEAD_SCRATCH/home` binds within 107 (§4.6)
 OWNER = "owner.json"
 
@@ -232,9 +234,10 @@ def keep_alive(
         if _touch(path, now_ns, SWEEP_TOUCH_FILES, size):
             large.append(record)
         if tally is not None:
-            tally.list(path)
             if size:
                 tally.measure(path, size[0] + st.st_size)  # the directory's own entry too, as `size_of` counts
+            else:  # a large scratch's touch walk stopped short: sized by a bounded walk of its own, else as last
+                tally.measure(path, deadline=diskbook.deadline())
     return large
 
 
@@ -414,7 +417,7 @@ def _keep(kept: list[tuple[str, str]], tally: Any, path: Path, why: str) -> None
     """A directory a rule would otherwise take, kept: with why, and measured for the sweep's reading."""
     kept.append((str(path), why))
     if tally is not None:
-        tally.measure(path)
+        tally.measure(path, deadline=diskbook.deadline())
         tally.keep(path, why)
 
 
@@ -422,7 +425,7 @@ def _measure_once(tally: Any, path: Path, live: bool) -> None:
     """A directory no rule takes this pass is measured only where nothing has sized it yet; a live record's is
     sized by `keep_alive`'s touch walk."""
     if tally is not None and not live and not tally.known(path):
-        tally.measure(path)
+        tally.measure(path, deadline=diskbook.deadline())
 
 
 def sweep(
@@ -456,7 +459,11 @@ def sweep(
         if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
             return kept
         entries = sorted(os.scandir(p), key=lambda e: e.name)
+    except FileNotFoundError:
+        return kept  # no scratch yet: none held
     except OSError:
+        if tally is not None:
+            tally.unlisted = True  # the last reading stands, *partial*
         return kept
     for e in entries:
         path = Path(e.path)
@@ -500,7 +507,9 @@ def sweep(
             if live_now(str(path)):  # read again just before the removal: the weigh can take a while
                 _keep(kept, tally, path, "live record")
                 continue
-            size = tally.measure(path) if tally is not None else None
+            size = None
+            if tally is not None:
+                size = tally.measure(path, deadline=diskbook.deadline())  # None past it: removed as last measured
             _remove(path)
             if tally is not None:
                 tally.gone(path, size)
