@@ -408,3 +408,14 @@ async def test_the_host_agent_refuses_to_start_on_a_root_holding_or_inside_a_tra
     with pytest.raises(scratch.ScratchError, match="transcripts"):
         await a.serve(tmp_path / "s.sock")
     assert not (tmp_path / "s.sock").exists() and not (root / f"shiftlead-{os.getuid()}").exists()
+
+
+@pytest.mark.unit
+def test_an_unreadable_profile_file_still_names_the_tools_own_transcript_roots(tmp_path, monkeypatch):
+    """TD-1945 review: a broken `profiles.yml` loses the profiles' roots, never the tools' own `projects` or `tmp`."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "cc"))
+    monkeypatch.delenv("GEMINI_CLI_HOME", raising=False)
+    (tmp_path / "profiles.yml").write_text("profiles: [unclosed\n")
+    assert Path.home() / ".claude" / "projects" in claude_code.ClaudeCodeAdapter().transcript_roots()
+    assert gemini.GeminiAdapter().transcript_roots() == [Path.home() / ".gemini" / "tmp"]

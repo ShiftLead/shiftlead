@@ -27,6 +27,8 @@ import uuid
 from collections.abc import Mapping
 from pathlib import Path
 
+import yaml
+
 from sessionorc import identity, paths
 from sessionorc.adapters import (
     Conversation,
@@ -641,7 +643,11 @@ class GeminiAdapter:
         `<home>/.gemini/tmp` of `~`, of `GEMINI_CLI_HOME` where this process has it, and of each of its profiles'
         homes, read from the profile file itself, so the disk sweep never removes inside one."""
         homes = {Path("~").expanduser(), home(Profile(name="default", adapter=NAME))}
-        profs, _ = profiles_mod.load()
+        try:
+            profs, _ = profiles_mod.load()
+        except (OSError, ValueError, yaml.YAMLError):  # an unreadable profile file still names the tool's own
+            log.exception("profiles.yml unreadable: transcript roots are the tool's own alone")
+            profs = {}
         homes |= {home(p) for p in profs.values() if p.adapter == self.name}
         return sorted(transcript_mod.chats_root(h) for h in homes)
 
