@@ -115,6 +115,33 @@ def test_a_known_tool_is_not_ready_with_its_version_and_no_install(monkeypatch, 
     assert not opencode["installed"] and opencode["version"] is None
 
 
+def test_a_known_tools_table_that_fails_costs_the_known_tools_alone(monkeypatch, tmp_path):
+    """TD-1998: `adapters.known_tools()` raising leaves the supported tools' cards (TD-1973's guard)."""
+    _registry(
+        monkeypatch, _Stub("alpha", found="/bin/alpha", home=tmp_path / "a"), _Stub("beta", found=None, home=tmp_path)
+    )
+
+    def broken():
+        raise ValueError("a bad row")
+
+    monkeypatch.setattr(adapters, "known_tools", broken)
+    r = tools.read(b"s" * 32, env={}, home=tmp_path)
+    assert [t["adapter"] for t in r["tools"]] == ["alpha"]
+    assert [t["adapter"] for t in r["not_ready"]] == ["beta"]
+
+
+def test_a_known_tools_row_that_is_no_tool_is_passed_over(monkeypatch, tmp_path):
+    """TD-1998: a row that is not a mapping, or names no tool, is skipped; a good row beside them is not ready."""
+    _registry(
+        monkeypatch,
+        _Stub("alpha", found="/bin/alpha", home=tmp_path / "a"),
+        known=["codex", {"label": "No name", "path": None}, {"name": "opencode", "label": "opencode", "path": None}],
+    )
+    r = tools.read(b"s" * 32, env={}, home=tmp_path)
+    assert [t["adapter"] for t in r["tools"]] == ["alpha"]
+    assert [t["adapter"] for t in r["not_ready"]] == ["opencode"]
+
+
 def test_switched_is_a_logins_file(tmp_path):
     assert not tools.switched(tmp_path)
     (tmp_path / "logins.yml").write_text("logins: {}\n", encoding="utf-8")
