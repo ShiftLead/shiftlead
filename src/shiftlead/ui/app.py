@@ -1804,6 +1804,7 @@ class Readings:
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
             e["from_open"] = e["from"] if e["from"] in names else ""
+            e["from_cwd"] = str((records.get(e["from"]) or {}).get("cwd") or "")  # its asker's key (§4.6, TD-1988)
             # the Reply dialog's line (§4.10 *When it is read*, TD-168): a reply reads as a note does,
             # but on a handed entry's thread, where it fills a seat on call as an ask does (TD-218)
             rw = (records.get(e["from"]) or {}).get("read_when") or {}
@@ -2730,7 +2731,11 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "error": error,
                 "editor": editor,
                 # a path in a turn is a link where **VS Code** is drawn, and absent with it (§4.6, TD-691)
-                "paths": transcript_paths(str(v.get("dir") or ""), str(s.get("cwd_root") or "")) if editor else None,
+                "paths": transcript_paths(
+                    str(v.get("dir") or ""), str(s.get("cwd_root") or ""), str((s.get("git") or {}).get("top") or "")
+                )
+                if editor
+                else None,
                 "at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "host": host_name(),
                 "active": "Sessions",
@@ -5893,12 +5898,15 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             ctx["thread_error"] = str(err.detail)
             th = {"entries": [], "pruned": False}
         # a thread reaches senders the person inbox never heard from (a techlead's reply to its asker)
-        names = {o.get("id"): o.get("name") or o.get("id") for o in await call("list")}
+        fleet = await call("list")
+        names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+        cwds = {o.get("id"): str(o.get("cwd") or "") for o in fleet}
         ctx["thread"] = [
             {
                 **t,
                 "from_name": "person" if t.get("from") == "person" else names.get(t.get("from")) or t.get("from"),
                 "from_open": t.get("from") if t.get("from") in names else "",  # its paths' context (TD-1108)
+                "from_cwd": cwds.get(t.get("from")) or "",  # …and its asker's key (§4.6, TD-1988)
                 "age": _age(t.get("at"), datetime.now(UTC)),
             }
             for t in th.get("entries") or ()

@@ -7558,10 +7558,37 @@
     const at = vscode ? `:${line || 1}${line && col ? `:${col}` : ""}` : "";
     return file.replace("{path}", path + at).replaceAll("{line}", String(line || 1));
   };
+  // **Which folder goes first** for a resolved path (§4.6 *The press is two launches*, §4.2 *The record's `cwd`*,
+  // TD-1988): the record's `cwd_root` where it holds the path and is the deeper of it and `dir`'s top level
+  // (`git.top`, else `dir`) that does — a worktree nested under the main checkout lies under both, and the inner
+  // wins — the server's `common.under_cwd_root`, compared as strings since the host wrote both as real paths
+  AO.underCwdRoot = function (path, root, top) {
+    const holds = (t) => !!t && (path === t || path.startsWith(String(t).replace(/\/+$/, "") + "/"));
+    if (!root || !path || !holds(root)) return false;
+    return !holds(top) || String(root).length > String(top).length;
+  };
+  // …the editor a press of `resolved` opens by: the view's `editor.cwd_url` in place of the Session card's folder
+  // link where the path lies under `cwd_root` by that rule, and the editor as it is otherwise
+  AO.pressEditor = function (editor, resolved) {
+    if (!editor || !editor.cwd_url || !AO.underCwdRoot(String(resolved || ""), editor.cwd_root, editor.top)) return editor;
+    return { ...editor, url: editor.cwd_url };
+  };
+  // …the Focus page's editor object, which the pane's provider holds, given the record's `cwd`, `cwd_root` and the
+  // top level (`git.top`, else `dir`) beside the view's `cwd_url`, so the provider's cache keys on `cwd` and a
+  // press picks its folder by `AO.pressEditor`; true when `cwd` changed, so the page drops the provider's cache
+  AO.focusCwd = function (ed, v) {
+    if (!ed || !v) return false;
+    const was = ed.cwd || "";
+    Object.assign(ed, {
+      cwd: v.cwd || "", cwd_root: v.cwd_root || "", top: (v.git && v.git.top) || v.dir || "",
+      cwd_url: (v.editor && v.editor.cwd_url) || null,
+    });
+    return was !== ed.cwd;
+  };
   AO.pathLink = function (event, editor, resolved, line, col, open) {
     const file = editor && editor.file;
     if (!(event && (event.ctrlKey || event.metaKey)) || !file || !resolved) return false;
-    AO.openFile(editor, AO.fileUrl(file, resolved, line, col), open);
+    AO.openFile(AO.pressEditor(editor, resolved), AO.fileUrl(file, resolved, line, col), open);
     return true;
   };
   // **A path in a transcript is a link too** (§4.6, §4.5a *Transcript*, TD-691): the pane's shape
@@ -7614,13 +7641,16 @@
   };
   // …a text with each resolved run an `a.editor` the click handler opens on Ctrl or Cmd alone
   // (`data-ctrl`), the session's folder first as the recent files' links, the rest escaped text
+  // (the moved folder's link, `cwd_url`, for a path under the record's `cwd_root`: `AO.pressEditor`, TD-1988)
   AO.pathLinksHtml = function (text, paths, editor) {
     const s = String(text), label = editor.label || "the editor";
-    const folder = editor.url ? ` data-folder="${esc(editor.url)}"${typeof editor.wait === "number" ? ` data-wait="${editor.wait}"` : ""}` : "";
+    const wait = typeof editor.wait === "number" ? ` data-wait="${editor.wait}"` : "";
     let out = "", at = 0;
     for (const r of AO.pathRuns(s)) {
       const to = paths[r.path];
       if (!to || r.start < at) continue;
+      const url = AO.pressEditor(editor, to).url;
+      const folder = url ? ` data-folder="${esc(url)}"${wait}` : "";
       out += esc(s.slice(at, r.start)) + `<a class="editor tpath" data-ctrl href="${esc(AO.fileUrl(editor.file, to, r.line, r.col))}"${folder}`
         + ` data-label="${esc(label)}" title="${esc(`Ctrl+click: ${to} in ${label}`)}">${esc(r.run)}</a>`;
       at = r.end;
@@ -7643,11 +7673,15 @@
   // in a row the server gave a context (`data-paths-ctx`: `id:<record>`, `repo:<root>` or `home`), asked of
   // `POST /api/paths` on the row's first hover by one asker per context, kept for the page's life. A context
   // the route refused, or whose first answer has no file form, goes quiet: every later batch answers `null`
-  // with no fetch. The answer's `file`, `label` and `wait` are kept from the first answer.
+  // with no fetch. The answer's `file`, `label` and `wait` are kept from the first answer. An `id:` row carries the
+  // record's `cwd` as it was rendered (`data-paths-cwd`, TD-1988), and the asker, its `meta` with it, is one per
+  // context and `cwd` pair, so a session that moved has each run asked again; the `ctx` sent is unchanged.
   AO.ITEM_TEXT = ".body, .boardreply";
   const itemAskers = new Map();
-  AO.itemAsker = function (ctx) {
-    if (itemAskers.has(ctx)) return itemAskers.get(ctx);
+  const itemKey = (ctx, cwd) => `${ctx}\n${cwd || ""}`;
+  AO.itemAsker = function (ctx, cwd) {
+    const key = itemKey(ctx, cwd);
+    if (itemAskers.has(key)) return itemAskers.get(key);
     const meta = { file: null, label: "", wait: undefined, answered: false, quiet: false };
     const asker = AO.pathsAsker(async (runs) => {
       if (meta.quiet) return { paths: Object.fromEntries(runs.map((r) => [r, null])) };
@@ -7665,7 +7699,7 @@
       return got;
     });
     const one = { asker, meta };
-    itemAskers.set(ctx, one);
+    itemAskers.set(key, one);
     return one;
   };
   // …each answered run in an element's text nodes an `a.editor` the click handler opens on Ctrl or Cmd,
@@ -7708,12 +7742,12 @@
   // …the texts under `box` (a row, or a fold's body inside one), their runs asked — or, `cacheOnly`, read
   // from what the row's context already knows — and linked
   AO.linkItem = function (row, box, cacheOnly) {
-    const ctx = row && row.dataset && row.dataset.pathsCtx;
-    if (!ctx || (cacheOnly && !itemAskers.has(ctx))) return null;
+    const ctx = row && row.dataset && row.dataset.pathsCtx, cwd = (row && row.dataset && row.dataset.pathsCwd) || "";
+    if (!ctx || (cacheOnly && !itemAskers.has(itemKey(ctx, cwd)))) return null;
     const els = [...(box || row).querySelectorAll(AO.ITEM_TEXT)];
     const paths = [...new Set(els.flatMap((el) => AO.pathRuns(el.textContent).map((r) => r.path)))];
     if (!paths.length) return null;
-    const { asker, meta } = AO.itemAsker(ctx);
+    const { asker, meta } = AO.itemAsker(ctx, cwd);
     const link = (got) => els.forEach((el) => AO.linkItemText(el, got, meta));
     if (cacheOnly) { link(asker.cached(paths)); return null; }
     return asker.resolve(paths).then(link);
@@ -7989,7 +8023,7 @@
             leave: () => rec.clear({ uri: r.run }),
           } : {}),
         }));
-        const key = `${off}|${text}`;
+        const key = `${editor.cwd || ""}|${off}|${text}`;  // keyed by the record's `cwd` as well (TD-1988)
         if (known.has(key)) { const l = links(known.get(key)); callback(l.length ? l : undefined); return; }
         const asked = era;
         const want = [...new Set(runs.map((r) => r.path))], batches = [];
@@ -8353,7 +8387,9 @@
     AO.termUnicode(term);
     const links = new WebLinksAddon.WebLinksAddon((e, uri) => AO.paneLink(e, uri), AO.webLinkOptions(rec));  // on a read-only Focus too
     term.loadAddon({ activate: (t) => links.activate(AO.cutRows(t)), dispose: () => links.dispose() });
-    // **a path is a link** (TD-501): only where the Session card draws its editor button
+    // **a path is a link** (TD-501): only where the Session card draws its editor button; the editor object
+    // carries the record's folder fields (`AO.focusCwd`, TD-1988), read again with each view
+    AO.focusCwd(s.editor, s);
     const pathLinks = s.editor && s.editor.file ? AO.pathProvider(term, id, s.editor, undefined, rec) : null;
     if (pathLinks) term.registerLinkProvider(pathLinks);
     term.open($("#term")); fit.fit();
@@ -9265,6 +9301,7 @@
       // the person's `file_link` read again with each view (§4.5a *Settings page: You, file link*: *read by the
       // next file link, no reload*; TD-536) — in place, since the pane's link provider holds this object
       if (s.editor && v.editor) { s.editor.first = v.editor.first; s.editor.wait = v.editor.wait; }
+      if (AO.focusCwd(s.editor, v) && pathLinks) pathLinks.clear();  // a move: each run asked again (TD-1988)
       AO.paintRecent(v, s.editor, $("#frecent"), $("#frecentdt"));
       // the Session card's summary (TD-964): the model once read, the tool until then; its hover the profile line
       const fmodel = $("#fmodel");
