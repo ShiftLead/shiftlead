@@ -158,8 +158,8 @@ def test_built_in_briefs_fill_the_lane_and_plain_has_none(tmp_path):
     # design §4.9a *A wind-down is announced* (TD-053 step 5): the note to the person comes before the close (TD-125)
     assert orc.index("ran out of work at <t>. Merged this run") < orc.index("ao close $SHIFTLEAD_SESSION")
     assert repoconfig.resolve_role(cfg, "plain").brief_text() is None
-    for name in ("grinder", "hunter", "manager"):  # one screen each, *The path* section included (§4.9c)
-        assert len(repoconfig.resolve_role(cfg, name).brief_text().splitlines()) < 45
+    for name in ("grinder", "hunter", "manager"):  # one screen each, *The path* and *Your own rules* included (§4.9c, TD-1016)
+        assert len(repoconfig.resolve_role(cfg, name).brief_text().splitlines()) < 50
 
 
 def test_a_repo_brief_is_read_relative_to_the_repo(tmp_path):
@@ -413,7 +413,7 @@ def test_entry_rules_are_written_once_and_read_both_ways():
     assert "it has no values block, or a value is missing or unreadable, ask the person" in added
     assert added.count("first message's values") >= 4 and not any(s in added for s in repoconfig.ENTRY_SLOTS)
     # a replay fills it after the repo's brief and the path's two slots (§4.9c)
-    assert list(made["slots"])[:4] == ["{repo}", "{flow}", "{stage}", "{entry}"]
+    assert list(made["slots"])[:5] == ["{repo}", "{person}", "{flow}", "{stage}", "{entry}"]
     for name in ("grinder", "hunter", "manager", "auditor"):
         _, made = repoconfig.resolve_role(repoconfig.RepoConfig(), name).compose([])
         assert "{entry}" not in made["slots"]

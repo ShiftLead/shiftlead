@@ -37,11 +37,13 @@ VERDICTS = ("pass", "fail", "unknown")
 SOURCE_SCRIPT = f"files/{SCRIPT}"
 DEFAULT_GATE = f"python3 {SCRIPT} --pr {{pr}} --json"
 SOURCE_GATE = f"python3 {SOURCE_SCRIPT} --pr {{pr}} --json"
-# The oldest agent-cadence commit whose files this build reads (§5 *Which agent-cadence*, TD-1012): agent-cadence
+# The oldest agent-cadence commit whose files this build reads (§5 *Which agent-cadence*, TD-1012): first agent-cadence
 # TD-106 (#241), the vendoring of ledgerboard v1.0, from which its scripts read and write the ledger and the
-# board in the ledgerboard format `seams.ledger` reads. Raised only by the PR that needs a newer one, and only
-# once every registered consumer's lock is at or after it (a raise past the roster unserves it).
-OLDEST = "6d92209da67410546a258a467e3ff292fb20166d"
+# board in the ledgerboard format `seams.ledger` reads; raised to dev-cadence TD-132 (#326), where
+# `cadence_layer.py --json` lists the person's layers for `shiftlead.layers` (§4.8 *The person's own additions*,
+# TD-1016). Raised only by the PR that needs a newer one, and only once every registered consumer's lock is at or
+# after it (a raise past the roster unserves it).
+OLDEST = "611d911b1d88cc492ef849aa226d90f47a60a7bd"
 # The oldest agent-cadence commit that reads a v2 ledger, a directory (§4.4 *Either layout*, §5 *Which agent-cadence*,
 # TD-1144): dev-cadence #405, where `ledger_next_id.py` first reads one and `ledger.py` gains `layout_at`
 OLDEST_V2 = "b9236c8a6be84b52048e0bd6517001fad13f0033"

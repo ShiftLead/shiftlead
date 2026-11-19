@@ -35,7 +35,7 @@ from sessionorc.models import REVIEW_BOUND
 # the same words — one code path, not two.
 from sessionorc.models import WRAPUP_PROMPT as WRAPUP_PROMPT
 from sessionorc.shape import lane_stage
-from shiftlead import flowdefs, profiles, repoconfig
+from shiftlead import flowdefs, layers, profiles, repoconfig
 from shiftlead import org as orgmod
 
 PAUSE_PROMPT = (
@@ -324,6 +324,7 @@ def _brief(
     manager: str = "",
     flow: repoconfig.UnderFlow | None = None,
     template_file: Path | None = None,
+    person: list[dict[str, Any]] | None = None,
 ) -> tuple[str | None, dict[str, Any] | None]:
     """The role's template with the member's `brief:` in its `{repo}` slot — in place of the role's
     own `roles.<name>.brief`, never beside it (design §4.8, TD-114) — and `{lane}`, `{techlead}`,
@@ -342,7 +343,20 @@ def _brief(
         on_call=isinstance(member, orgmod.ManagerDef) and member.on_call,
         flow=flow,
         template_file=template_file,
+        person=person,
     )
+
+
+def _person(org: orgmod.Org, repo: str, role: str, here: str, where: str) -> list[dict[str, Any]]:
+    """The person's own additions to `role`'s brief (design §4.8 *The person's own additions*, TD-1016), read at
+    the home whatever host the member runs on: listed under the home's checkout of `repo`, else the agent-cadence
+    source among the home's repos. A listing that fails stops the start, by name."""
+    mine = org.checkout(repo, here)
+    roots = [Path(c).expanduser() for r in org.checkouts if (c := org.checkout(r, here)) is not None]
+    try:
+        return layers.person(role, mine, roots)
+    except layers.ListingError as e:
+        raise TeamError(f"{where}: {e}") from None
 
 
 def _session_id(org: orgmod.Org, team: orgmod.TeamDef, name: str, host: str, here: str) -> str:
@@ -914,8 +928,9 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
             raise TeamError(
                 f"{where}: profile {profile!r} runs a shell, and a team session is an agent's (design §4.9)"
             )
+    person = _person(org, home, role.name, here, where)
     try:
-        prompt, prompt_from = _brief(role, member, lane, read, techlead, context, manager, told)
+        prompt, prompt_from = _brief(role, member, lane, read, techlead, context, manager, told, person=person)
     except ValueError as e:
         raise TeamError(f"{where}: {e}") from None
     if block:
