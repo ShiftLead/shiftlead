@@ -236,10 +236,15 @@ def test_the_reads_thread_never_holds_the_loops_end():
 
 
 @pytest.mark.integration
-async def test_a_test_agent_makes_no_start_read(agent):
+async def test_a_test_agent_makes_no_start_read(agent, monkeypatch):
     """TD-2002: the suite's host agents make no start read (conftest's `_no_start_tools_read`); one asked for still
     answers `tools` with a read of its own."""
+    from sessionorc.client import LocalClient
+
     assert agent._tools_task is None and agent._tools_kept is None
+    monkeypatch.setattr(tools, "read", lambda salt, env=None, home=None: {"read": True})
+    async with LocalClient() as c:
+        assert await c.call("tools") == {"read": True}
 
 
 @pytest.mark.integration
@@ -257,7 +262,7 @@ def test_a_stop_is_never_held_by_the_start_read(tmp_path, monkeypatch):
 
     slow = tmp_path / "slow-bin"
     slow.mkdir()
-    token = f"59.{os.getpid()}{time.monotonic_ns() % 10**6}"  # this run's own `sleep`, never an earlier run's
+    token = f"12.{os.getpid()}{time.monotonic_ns() % 10**6}"  # past the 10 s bound, and this run's own `sleep`
     for name in ("claude", "gemini"):  # each found on the PATH; its `--version` sits out its whole bound
         b = slow / name
         b.write_text(f"#!/bin/sh\nexec sleep {token} # {name}\n")
