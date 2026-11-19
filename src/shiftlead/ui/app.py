@@ -5020,7 +5020,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 for f in c.get("found", []):
                     folder = str(f.get("folder") or "")
                     f["shown"] = (
-                        "~ (the tool's default)"
+                        "~"
                         if folder == home
                         else "~" + folder[len(home) :]
                         if folder.startswith(home + "/")
@@ -5052,7 +5052,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
     async def tools_install(request: Request):
         """§4.5a *Tools page: Install* (TD-1973): `{tool}` → `tools_install`, the tool's install shell with its install
         command typed and not run (§4.2b *The tools shell*, TD-1972); the page opens its Focus."""
-        body = await request.json()
+        body = await body_of(request)
         return await call("tools_install", tool=str(body.get("tool") or ""))
 
     @app.get("/settings", response_class=HTMLResponse)

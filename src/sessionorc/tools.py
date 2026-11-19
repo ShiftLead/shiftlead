@@ -118,7 +118,14 @@ def read(salt: bytes, env: Mapping[str, str] | None = None, home: Path | None = 
             continue
         card = _card(name, adapters.get(name), env, salt)
         (tools if card["installed"] else not_ready).append(card)
-    for row in adapters.known_tools():
+    try:
+        known = adapters.known_tools()
+    except Exception:  # noqa: BLE001 — a bad table row costs the known tools, never the supported tools' cards
+        log.warning("tools read: the known-tools table failed")
+        known = []
+    for row in known:
+        if not isinstance(row, dict) or "name" not in row:
+            continue
         path = row.get("path")
         not_ready.append(
             {

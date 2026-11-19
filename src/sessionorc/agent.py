@@ -1038,6 +1038,7 @@ class HostAgent(
         self._tools_salt = secrets.token_bytes(32)
         self._tools_kept: dict[str, Any] | None = None
         self._tools_lock = asyncio.Lock()
+        self._tools_task: asyncio.Task[Any] | None = None
 
     # -- lifecycle ------------------------------------------------------------------------------
 
@@ -1066,7 +1067,7 @@ class HostAgent(
         # than racing it with a sleep, which is the shape TD-078 and TD-088 keep catching. The
         # `finally` below cancels it either way — cancelling a cancelled task is a no-op.
         # the Tools page's read at start (§4.2b): in the background, as each tool's `--version` is bounded but slow
-        self._tools_task = asyncio.create_task(self._tools_reread())
+        self._tools_task = asyncio.create_task(self._tools_start())
         ticker = self._ticker = asyncio.create_task(self._tick_loop())
         dialer = asyncio.create_task(self._dial_home()) if self.mode == "node" else None
         try:
@@ -1086,7 +1087,8 @@ class HostAgent(
                         w.close()
         finally:
             ticker.cancel()
-            self._tools_task.cancel()
+            if self._tools_task is not None:
+                self._tools_task.cancel()
             if dialer is not None:
                 dialer.cancel()
             for m in list(self._link_muxes.values()):
@@ -3940,14 +3942,26 @@ class HostAgent(
     async def _tools_reread(self) -> dict[str, Any]:
         """Read this host's tools again and keep the read (design §4.2b *What the adapter reads*, TD-1973)."""
         async with self._tools_lock:
-            got = await asyncio.to_thread(tools_mod.read, self._tools_salt)
+            try:
+                got = await asyncio.to_thread(tools_mod.read, self._tools_salt)
+            except Exception as e:  # noqa: BLE001 — a failed read is said to the asker; the kept one stands
+                log.exception("the tools read failed")
+                raise RpcError(f"this host's tools could not be read: {type(e).__name__}") from None
             self._tools_kept = got
             return got
+
+    async def _tools_start(self) -> None:
+        """The start's read (§4.2b): a failure is logged, and the next `tools` call reads again."""
+        with contextlib.suppress(RpcError):
+            await self._tools_reread()
 
     async def rpc_tools(self) -> dict[str, Any]:
         """`ao tools`, the Tools page (design §4.2b *The page*, TD-1973): the read the host agent keeps, made at start
         and on Check again — the tool cards, their versions, the found rows and *Not ready to run here*. Read only,
         so any caller may ask; a run that has made none yet makes it now."""
+        if self._tools_kept is None:
+            async with self._tools_lock:  # the start's read in flight: take it rather than read twice
+                pass
         return self._tools_kept if self._tools_kept is not None else await self._tools_reread()
 
     async def rpc_tools_check(self, caller: Any = None) -> dict[str, Any]:

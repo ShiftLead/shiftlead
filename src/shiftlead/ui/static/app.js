@@ -5857,10 +5857,6 @@
     return ok;
   };
 
-  // The Queue page (design §4.5 screen 12, §4.5a *Queue page*; TD-771): the cards (`AO.qcards`), the
-  // Recently completed window picker — its choice remembered in this browser, *day* first — a completed
-  // line that opens to what was done, `/queue#TD-n` opening the card that holds the entry, and the lists
-  // re-read on the poll and on the `queue` event.
   // The Tools page (design §4.2b *The page*, §4.5 screen 14, TD-1973): **Check again** reads this host's tools again
   // and draws the page afresh; **Install** opens the tool's install shell (TD-1972) and goes to its Focus, where the
   // install line waits typed for the person's Enter. A refusal is the host agent's words, in place.
@@ -5885,6 +5881,10 @@
       catch (e) { say(e.message); b.disabled = false; }
     }));
   };
+  // The Queue page (design §4.5 screen 12, §4.5a *Queue page*; TD-771): the cards (`AO.qcards`), the
+  // Recently completed window picker — its choice remembered in this browser, *day* first — a completed
+  // line that opens to what was done, `/queue#TD-n` opening the card that holds the entry, and the lists
+  // re-read on the poll and on the `queue` event.
   // the Spend page (design §4.5 screen 13, §4.5a *Spend page*; TD-832): every pick is a link carried in the URL,
   // and a press re-reads the body (`part=1`) in place rather than the page; a failed read follows the link
   AO.spend = function () {
