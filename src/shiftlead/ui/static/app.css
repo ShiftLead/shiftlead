@@ -1110,6 +1110,20 @@ html.phonefocus .composer.nopen #send { min-height: 40px; border-radius: 20px; m
 .toolspage .toolnr { color: var(--muted); }
 .toolspage .toolnrname { font-weight: 600; min-width: 8em; }
 .toolspage .toolnrver { min-width: 12em; }
+/* the login tree on a switched host (§4.2b *The page*, TD-1974): an account, its logins hanging under it */
+.toolspage .toolbranch { border-left: 1px solid var(--line); margin-left: 10px; padding-left: 14px; display: flex; flex-direction: column; gap: 4px; }
+.toolspage .toolacct { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; }
+.toolspage .toolacct.toolunsigned { background: transparent; border-style: dashed; }
+.toolspage .toolacctname { font-weight: 600; }
+.toolspage .toolfams { margin-top: 4px; }
+.toolspage .toollogin { padding: 4px 0 4px 14px; align-items: baseline; min-width: 0; }
+.toolspage .toolloginname { min-width: 11em; font-weight: 600; }
+.toolspage .toolfolder { overflow-wrap: anywhere; }
+.toolspage .toolstate::before { content: "●"; margin-right: 6px; color: var(--muted); }
+.toolspage .toolstate.state-signed_in::before { color: var(--working); }
+.toolspage .toolstate.state-limited::before, .toolspage .toolstate.state-sign_in_again::before,
+.toolspage .toolstate.state-name_account::before { color: var(--needs); }
+.toolspage .toolwarn { flex-basis: 100%; color: var(--needs); }
 .setpage .setcard { display: flex; flex-direction: column; gap: 10px; }
 .setpage .setrow { display: grid; grid-template-columns: 150px minmax(0, 220px) minmax(0, 1fr); gap: 10px; align-items: center; }
 .setpage .setpullcol { display: flex; flex-wrap: wrap; column-gap: 10px; row-gap: 2px; align-items: baseline; min-width: 0; }  /* the pull row's note and its reading, one column (TD-296 #17) */

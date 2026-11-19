@@ -1070,6 +1070,51 @@ def refill(held: dict[str, Any], new: Mapping[str, Any]) -> None:
     held.update(new)
 
 
+def _shown_folder(folder: str, home: str) -> str:
+    """A folder as the Tools page draws it, `~` for the person's home."""
+    if folder == home:
+        return "~"
+    return "~" + folder[len(home) :] if folder.startswith(home + "/") else folder
+
+
+LOGIN_STATES = {
+    "signed_in": "signed in",
+    "limited": "limited",
+    "sign_in_again": "sign in again",
+    "not_signed_in": "not signed in",
+    "name_account": "signed in — name its account",
+}
+LOGIN_WARNINGS = {
+    "billing_mismatch": "its billing is not what the tool records",
+    "env_key": "one key from the environment signs in every Gemini login here: their reserves bind nothing in common",
+    "moved_while_running": "moved to another account while a session runs on it",
+}
+
+
+def login_tree(card: dict[str, Any], home: str) -> dict[str, Any]:
+    """A tool card's logins as the Tools page draws them on a switched host (design §4.2b *The page*, TD-1974): each
+    account with its logins under it, then *Not signed in* (the logins with no identity to read), then the logins
+    signed in whose account is still to be named. Each login carries its folder as drawn, its state's words and its
+    warnings' words."""
+    for lg in card.get("logins") or []:
+        lg["shown"] = _shown_folder(str(lg.get("folder") or ""), home)
+        lg["said"] = LOGIN_STATES.get(str(lg.get("state")), str(lg.get("state") or ""))
+        lg["warned"] = [LOGIN_WARNINGS.get(w, w) for w in lg.get("warnings") or []]
+    accounts = []
+    for a in card.get("accounts") or []:
+        key = str(a.get("key") or "")
+        logs = card.get("logins") or []
+        mine = [lg for lg in logs if lg.get("account") == key and lg.get("state") != "not_signed_in"]
+        accounts.append({**a, "name": key.split(":", 1)[-1], "logins": mine})
+    placed = {id(lg) for a in accounts for lg in a["logins"]}
+    rest = [lg for lg in card.get("logins") or [] if id(lg) not in placed]
+    return {
+        "accounts": accounts,
+        "unsigned": [lg for lg in rest if lg.get("state") != "name_account"],
+        "naming": [lg for lg in rest if lg.get("state") == "name_account"],
+    }
+
+
 async def agent_call(method: str, **params: Any) -> Any:
     """One host-agent RPC as the page makes it: down is a 503, a refusal a 400."""
     try:
@@ -5004,7 +5049,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
     async def tools_page(request: Request):
         """design §4.2b *The page*, §4.5 screen 14 **Tools** (TD-1953, built by TD-1973): the coding tools on the home's
         host, from the host agent's kept `tools` read — a card per supported tool found, its version and found rows,
-        then *Not ready to run here*. Before the switch-over no accounts or logins are drawn."""
+        then *Not ready to run here*. Before the switch-over no accounts or logins are drawn; on a switched host each
+        card draws its accounts and logins as a tree (`login_tree`, TD-1974)."""
         from sessionorc import tools as tools_mod
 
         agent_down, got, why = False, None, ""
@@ -5018,14 +5064,9 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             for c in [*got.get("tools", []), *got.get("not_ready", [])]:
                 c["short"] = tools_mod.short_version(c.get("version"))
                 for f in c.get("found", []):
-                    folder = str(f.get("folder") or "")
-                    f["shown"] = (
-                        "~"
-                        if folder == home
-                        else "~" + folder[len(home) :]
-                        if folder.startswith(home + "/")
-                        else folder
-                    )
+                    f["shown"] = _shown_folder(str(f.get("folder") or ""), home)
+                if got.get("switched"):
+                    c["tree"] = login_tree(c, home)
             got["read_ago"] = _age(got.get("read_at"), datetime.now(UTC)) or "0s"
         return templates.TemplateResponse(
             request,
