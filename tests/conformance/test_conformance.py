@@ -483,4 +483,3 @@ def test_identity_never_lets_the_account_key_out(name, tmp_path, caplog, capsys)
     assert "f00dfeed" not in seen and key not in seen
     emailed = _signed_in(name, tmp_path, "emailed", key, display="ada@example.com")
     assert ad.identity(emailed, b"salt")["display"] is None
-
