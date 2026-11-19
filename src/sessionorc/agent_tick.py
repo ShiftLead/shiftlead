@@ -5407,7 +5407,7 @@ class TickMixin:
     ) -> dict[str, Any]:
         """One pass's rules (`_prune_rules`) and its result (§4.6 *The sweep's reading*, TD-1945): per kind the
         bytes held, *partial* until each item is measured, the bytes removed and each kept item with why
-        (`diskbook`), kept as `_disk_result` for TD-1946's `disk.json`, and returned."""
+        (`diskbook`), kept as `_disk_result`, written to `disk.json` (TD-1946) and returned."""
         tallies = self._disk_book.tallies()
         if named is None:  # the scratch rule does not run: what it would list stands as last read, *partial*
             tallies["scratch"].unlisted = True
@@ -5434,7 +5434,53 @@ class TickMixin:
                 for path, size in after.items():
                     runs.measure(path, size)
             self._disk_result = self._disk_book.close(tallies)
+            try:
+                free = diskbook.free_space(self._scratch_root())
+                diskbook.write(paths.home(), self.host, self._disk_result, free, self.started_at, datetime.now(UTC))
+            except Exception:  # noqa: BLE001 — the reading never stops a pass
+                log.exception("writing the sweep's reading failed")
         return self._disk_result
+
+    @staticmethod
+    def _scratch_root() -> str:
+        return getattr(hosts.local_host(), "scratch_root", None) or hosts.DEFAULT_SCRATCH_ROOT
+
+    def _disk_here(self) -> dict[str, Any]:
+        """This host's reading (§4.6 *The sweep's reading*, TD-1946): `disk.json`'s last pass, the 30-day totals and
+        the free space under `scratch_root` as it is now. Touches files: run off the loop."""
+        free = diskbook.free_space(self._scratch_root())
+        return diskbook.read(paths.home(), self.host, self.started_at, datetime.now(UTC), free)
+
+    async def rpc_disk(self, host: str | None = None) -> dict[str, Any]:
+        """`ao disk` (§4.7, §4.6 *The sweep's reading*, TD-1946): a read, under no grant. With `host` naming another
+        host the call never reaches here (`_act_host` routes it over the `act` link method); with it naming this one,
+        or at a node, this host's bare reading, which carries its `host`. At the home with no `host`, this host's and
+        every node's at once, `{host: entry}`, a host that fails its own `{"error": "<why>"}`, never the call's."""
+        if host or self.mode != "home":
+            return await asyncio.to_thread(self._disk_here)
+        return await self._disk_everywhere("disk", self._disk_here)
+
+    async def _disk_everywhere(self, method: str, here: Callable[[], dict[str, Any]]) -> dict[str, Any]:
+        """`method` asked of this host (`here`, in a thread) and of every node (`hosts.nodes()`, each through
+        `_route_act` with `host` set) under one `asyncio.gather`: `{host: entry}`, each entry the host's reading or
+        `{"error": "<why>"}` — a node's refusal, its link down (*unreachable since …*), its silence past
+        `DIGEST_TIMEOUT` — so one host never fails the call (§4.7 `ao disk`)."""
+        names = [n for n in hosts.nodes() if n != self.host]
+
+        async def one(h: str) -> dict[str, Any]:
+            try:
+                if h == self.host:
+                    return await asyncio.to_thread(here)
+                got = await self._route_act(method, {"host": h}, None, h)
+            except RpcError as e:
+                return {"error": str(e)}
+            except Exception as e:  # noqa: BLE001 — one host's failure is that host's entry
+                log.exception("%s on %s failed", method, h)
+                return {"error": f"{type(e).__name__}: {e}"}
+            return got if isinstance(got, dict) else {"error": f"{h} answered {method} with no reading"}
+
+        got = await asyncio.gather(*(one(h) for h in [self.host, *names]))
+        return dict(zip([self.host, *names], got, strict=True))
 
     def _prune_rules(
         self,

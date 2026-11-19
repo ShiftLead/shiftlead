@@ -27,6 +27,7 @@ from sessionorc import usage as usage_mod
 from sessionorc.agent_common import (
     ACT_TIMEOUT,
     HOME_EDITS,
+    HOST_ADDRESSED,
     INTENT_FIELDS,
     NODE_ACTS,
     NODE_READS,
@@ -354,7 +355,7 @@ class LinkMixin:
             if where and where != self.host:
                 raise link.LinkError(f"{rid} is not on {self.host}: not my host")
             p["id"] = rid = bare
-        if rpc in ("create", "name_check"):
+        if rpc in HOST_ADDRESSED:
             asked = p.pop("host", None)
             if asked and asked != self.host:
                 raise link.LinkError(f"a {rpc} for {asked} is not {self.host}'s: not my host")

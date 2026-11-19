@@ -207,12 +207,21 @@ DIGEST_TIMEOUT = 300.0
 DIGEST_READS = frozenset({"conversations", "transcript_digest"})
 # What the home routes to the node whose name is the record's `host` (design §4.4a "A node reports
 # and executes; the home decides"): the acts that touch a pane or the node's waiters, executed
-# there with no gate of their own. `name_check` is a read, routed with a `host` for a team start.
+# there with no gate of their own. `name_check` is a read, routed with a `host` for a team start, and so is
+# `disk` (§4.6 *The sweep's reading*, TD-1946): reads that name no record, addressed by a `host` param.
 # `identity_ack` is here for the same reason (§4.8a, review of PR #251): a record's identity alarms
 # are **node-owned**, observed where the socket is, so the node clears its own list and the home
 # learns it from the reply's record — a home that cleared its replica would have it back on the
 # next report. Without an `id` the RPC is the home's own list and never leaves this host.
-NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "decide", "create", "name_check", "identity_ack"})
+NODE_ACTS = frozenset(
+    {"send", "keys", "kill", "close", "remove", "decide", "create", "name_check", "disk", "identity_ack"}
+)
+# The acts addressed by a `host` param rather than an `id`'s address (§4.4a *Acts across the link*): the link pops
+# the param before the handler runs at the node.
+HOST_ADDRESSED = frozenset({"create", "name_check", "disk"})
+# The sweep's reading (§4.6, TD-1946) is waited for DIGEST_TIMEOUT across the link, chosen by the method's name as
+# DIGEST_READS chooses a read's; every other act waits ACT_TIMEOUT.
+DISK_ACTS = frozenset({"disk"})
 # What the home owns and edits on its own copy (§4.4a "Each field has one owner"), and pushes to
 # the node's replica in the same call so its stopping policies read the same intent. 4b generalises
 # the push to every home-owned field on reconnect.

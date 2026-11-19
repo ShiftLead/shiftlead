@@ -91,6 +91,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     DERIVE_EVERY,  # noqa: F401
     DIGEST_READS,  # noqa: F401
     DIGEST_TIMEOUT,
+    DISK_ACTS,  # noqa: F401
     DOORBELL_TRIES,  # noqa: F401
     ENTRY_PRIORITIES,  # noqa: F401
     ENTRY_TYPES,  # noqa: F401
@@ -109,6 +110,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     GIT_EVERY,  # noqa: F401
     HELD_MAIL,  # noqa: F401
     HOME_EDITS,  # noqa: F401
+    HOST_ADDRESSED,  # noqa: F401
     ID_RECHECK,  # noqa: F401
     IDLE_NUDGE,  # noqa: F401
     INTENT_FIELDS,  # noqa: F401
