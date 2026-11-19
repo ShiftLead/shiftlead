@@ -584,6 +584,8 @@ class ClaudeCodeAdapter:
     name = "claude-code"
     label = "Claude"  # the tool's display name: the usage chip's first word, never a key (§4.3, TD-122)
     state_source: Confidence = "hook"
+    # its per-session scratchpad and background-task files go under the run's scratch (§4.3, §4.6, TD-1944)
+    scratch_env: str | None = "CLAUDE_CODE_TMPDIR"
     # rows its repaints move, masked from the liveness clock (design §4.3 *An adapter names its volatile rows*,
     # TD-1475): the spinner line (*✶ Hatching… (4m 50s · ↓ 19.3k tokens …)*), and everything under the
     # composer's lower rule — the mode line and the status line

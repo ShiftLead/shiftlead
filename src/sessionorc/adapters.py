@@ -69,6 +69,9 @@ class Adapter(Protocol):
     name: str
     label: str  # the tool's display name ("Claude"): the usage chip's first word, never a key (§4.3, TD-122)
     state_source: Confidence
+    # `scratch_env` (design §4.3, §4.6 *A session's scratch*, TD-1944): the tool's own temp-directory variable,
+    # set by the core to the run's scratch directory after `launch`'s env; None where the tool has none.
+    # Optional, read with getattr as `shell` and `command` are, so an adapter written before it has none.
 
     def launch(
         self, *, profile: str, resume: str | None, prompt: str | None, unattended: bool, cwd: Path, name: str = ""
@@ -553,6 +556,7 @@ class ShellAdapter:
     name = "shell"
     label = "Shell"  # a display name like any adapter's; a shell reports no quota, so it draws no chip
     state_source: Confidence = "scraped"
+    scratch_env: str | None = None  # a shell has no temp variable of its own: `TMPDIR` (§4.6)
     agent = False  # what is typed at it runs as a command line, never a turn (§4.3, TD-665)
     permission_channel = False  # a shell asks no permission (§4.3, TD-112)
 

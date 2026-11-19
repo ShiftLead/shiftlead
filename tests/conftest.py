@@ -27,6 +27,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from collections.abc import Callable
@@ -189,6 +190,21 @@ def sweep_stale_test_servers() -> None:
         with contextlib.suppress(OSError):
             os.unlink(sock)
         _forget_owner(name)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _scratch_root():
+    """Every run's scratch directory (design §4.6, TD-1944) under a short root of the test run's own, never
+    the host's `/tmp/shiftlead-<uid>/`: short, since a root past 48 bytes is refused, so not `tmp_path`.
+    The subprocess agent reads it from `AO_TEST_SCRATCH_ROOT` (`_agent_child.py`)."""
+    from sessionorc import hosts
+
+    with tempfile.TemporaryDirectory(prefix="aoscr-", dir="/tmp", ignore_cleanup_errors=True) as root:
+        mp = pytest.MonkeyPatch()
+        mp.setattr(hosts, "DEFAULT_SCRATCH_ROOT", root)
+        mp.setenv("AO_TEST_SCRATCH_ROOT", root)
+        yield root
+        mp.undo()
 
 
 @pytest.fixture(scope="session", autouse=True)

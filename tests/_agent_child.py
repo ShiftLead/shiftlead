@@ -27,6 +27,8 @@ async def _run(socket_name: str) -> None:
     # never the person's agent-cadence roster: the home reads repo facts (`gh`, git) for every repo
     # on it (design §4.4 *Repo facts*), as conftest's `_no_real_repos_registry` says for this process
     hosts.AGENT_CADENCE_ROSTER = os.path.join(os.environ["SHIFTLEAD_HOME"], "no-roster", "repos.txt")
+    # never the host's own /tmp/shiftlead-<uid>: conftest's `_scratch_root` names a short one for the run (TD-1944)
+    hosts.DEFAULT_SCRATCH_ROOT = os.environ.get("AO_TEST_SCRATCH_ROOT") or hosts.DEFAULT_SCRATCH_ROOT
     # never the real gate sweep (TD-1376), which opens PRs on the forge: conftest's `_no_real_gate_sweep`
     gatesweep.eligible = lambda root: (False, "tests run no gate sweep")
     # never the person-text check (TD-1846) but in a test marked for it: conftest's `_person_text_off_unless_marked`

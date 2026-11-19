@@ -13,6 +13,7 @@ local:
                                    # unset: `repos.txt` under the home, then agent-cadence's
                                    # ~/.config/agent-cadence/repos.txt imported on the default home (§5)
   runs_keep_days: 30       # run logs of exited/closed sessions older than this are deleted; 0 keeps all
+  scratch_root: /tmp       # each run's scratch directory goes under <this>/shiftlead-<uid>/ (§4.6); at most 48 bytes
 ```
 
 A top-level **`home: <host name>`** (design §4.4a, TD-057 step 2) makes this host agent a *node* of
@@ -39,6 +40,7 @@ other field takes its default. A malformed file is the same as no file: never a 
 from __future__ import annotations
 
 import functools
+import os
 import socket
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -49,6 +51,7 @@ from sessionorc import paths
 
 AGENT_CADENCE_ROSTER = "~/.config/agent-cadence/repos.txt"
 DEFAULT_RUNS_KEEP_DAYS = 30
+DEFAULT_SCRATCH_ROOT = "/tmp"  # §4.6 *A session's scratch*: where each run's scratch directory is made
 
 
 def default_repos_registry() -> Path:
@@ -76,6 +79,8 @@ class Host:
     # read after `repos_registry`, a missing file adding nothing; None when `repos_registry:` is set
     repos_import: Path | None = field(default_factory=default_repos_import)
     runs_keep_days: int = DEFAULT_RUNS_KEEP_DAYS
+    # §4.6 *A session's scratch* (TD-1944): read at each create, so a test may patch the default
+    scratch_root: str = field(default_factory=lambda: DEFAULT_SCRATCH_ROOT)
     # design §4.8a: `off | observe | enforce`, read by `sessionorc.identity.mode_of` ('' = the default)
     identity: str = ""
     # design §4.4a *A node that carries no person*: false on an agents-only node
@@ -217,6 +222,14 @@ def _days(v: object) -> int:
     return v
 
 
+def _root(v: object) -> str:
+    """`scratch_root`: a non-empty string, `~` expanded and made absolute, else the default; its length is the
+    host agent's to refuse at start (§4.6), never silently replaced here."""
+    if not isinstance(v, str) or not v.strip():
+        return DEFAULT_SCRATCH_ROOT
+    return os.path.abspath(os.path.expanduser(v.strip()))  # a relative root would give a relative TMPDIR
+
+
 def local_host() -> Host:
     """The host this process runs on, from the file's `local` entry; with no file, the machine's
     short hostname stands in for both name fields."""
@@ -232,6 +245,7 @@ def local_host() -> Host:
         repos_registry=Path(str(registry)).expanduser() if registry else default_repos_registry(),
         repos_import=None if registry else default_repos_import(),
         runs_keep_days=_days(data.get("runs_keep_days", DEFAULT_RUNS_KEEP_DAYS)),
+        scratch_root=_root(data.get("scratch_root")),
         identity=str(data.get("identity") or ""),
         person=data.get("person") is not False,
     )

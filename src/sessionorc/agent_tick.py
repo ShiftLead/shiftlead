@@ -1494,7 +1494,7 @@ class TickMixin:
                 stored = str(self._read_launch(self._address(s)).get("prompt") or "")
                 if f"\n\n{FILLED_FOR}" in stored:
                     closing = FILLED_FOR + stored.split(f"\n\n{FILLED_FOR}", 1)[1]
-        await self._replay(s, "lost-brief", closing=closing, keep_mail=True)
+        await self._replay(s, "lost-brief", closing=closing, keep_mail=True, scratch=s.scratch)  # keeps it (§4.6)
         new = self.sessions.get(s.id) if s.host == self.host else self.remote.get(s.host, {}).get(s.id)
         if new is None or new is s:
             return True  # the replay failed: its entry says so, and the next tick retries it
@@ -1616,7 +1616,7 @@ class TickMixin:
                 self._save(s)
                 await self._push_changes()
                 return
-        await self._replay(s, "wanted", mark=said, keep_mail=True)
+        await self._replay(s, "wanted", mark=said, keep_mail=True, scratch=s.scratch)  # keeps it (§4.6)
 
     async def _retire_anchors(self) -> None:
         """The retired seats' records (design §4.9 *A definition written before TD-722*, §4.9b *No anchor
@@ -1802,7 +1802,8 @@ class TickMixin:
             # just before the replay, so a replay that fails again is taken again next tick (TD-334)
             self._mark_closed(s, why)
         last = s.restarts[-1] if why == "cache" else {}
-        await self._replay(s, why, mark={k: last[k] for k in ("idle", "context") if k in last}, keep_mail=True)
+        mark = {k: last[k] for k in ("idle", "context") if k in last}
+        await self._replay(s, why, mark=mark, keep_mail=True, scratch=s.scratch)  # a restart keeps it (§4.6)
 
     async def _cache_restart(self, s: Session, now: datetime) -> bool:
         """§4.10 *A lapsed cache is started again, not rung* (TD-459, built by TD-467): the doorbell has
@@ -1827,7 +1828,7 @@ class TickMixin:
                 self._save(s)
                 return False
         self._mark_closed(s, "cache")
-        await self._replay(s, "cache", mark=lapsed, keep_mail=True)
+        await self._replay(s, "cache", mark=lapsed, keep_mail=True, scratch=s.scratch)  # keeps it (§4.6)
         return True
 
     @staticmethod

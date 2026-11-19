@@ -211,7 +211,7 @@ HOME_OWNED = frozenset(
 )
 IDENTITY = frozenset({
     "id", "name", "kind", "adapter", "dir", "profile", "repo", "worktree", "adapter_id", "transcript", "created",
-    "host", "start_context", "model_file",
+    "host", "start_context", "model_file", "scratch",
 })  # fmt: skip
 
 # Urgent-first order (design §4.5). Lower sorts first. `unreachable` is placed by the UI
@@ -1257,6 +1257,9 @@ class Session:
     # writes with `<adapter>/<model>` whenever `model` is set or changes, for a commit hook's
     # `Agent-Model:` trailer (design §4.2 *And the model*, TD-638); None outside a git tree or with no agent.
     model_file: str | None = None
+    # The run's scratch directory, `<scratch_root>/shiftlead-<uid>/<token>/` (design §4.6 *A session's scratch*,
+    # TD-1944): `SHIFTLEAD_SCRATCH` and `TMPDIR` in its env; a restart and a Resume keep it, a fresh start a new one.
+    scratch: str | None = None
     # `{tokens, at, window}`: how much context the session's last turn sent, when the adapter can
     # tell (design §4.3 `context`, §6 rule 5, TD-190) — `at` the turn's own time, `window` the
     # model's, kept beside the tokens because the model may change mid-run. Observed like `model`:
