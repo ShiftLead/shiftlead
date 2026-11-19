@@ -73,7 +73,7 @@ async def test_the_tick_reads_a_record_as_live_until_it_ends(agent, tmp_path):
     f = _files(tmp_path, {"ao-run-5/old.png": 8, "ao-end-6/old.png": 8})
     seen = []
     real = agent._prune_runs
-    agent._prune_runs = lambda now, live, live_ids=None, scratch=None: (
+    agent._prune_runs = lambda now, live, live_ids=None, scratch=None, named=None: (
         seen.append(live_ids),
         real(now, live, live_ids, scratch),
     )
