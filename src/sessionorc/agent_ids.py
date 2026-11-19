@@ -30,19 +30,15 @@ from sessionorc.store import _atomic_write
 
 BUDGET = 45.0  # seconds from the call's arrival to its answer, the lock's wait included
 LOCK_BY = 30.0  # a lock not taken this far in refuses: *busy, ask again*
-PRS_BY = 30.0  # a PR not read this far in is unread: *budget*
-PR_LIMIT = 200  # `gh pr list --limit`: a list that fills it is one unread line
-FILES_CAP = 3000  # GitHub lists at most this many files of a PR: a listing that reaches it is cut
-PR_READERS = 4  # PRs read at once
 GIVEN_KEEP = 200
 COUNT_MAX = 10
 LAST_TAKE = "last"  # `ao td reserve --show last`: the caller's newest take (TD-1484)
 # the start of the id script's filing question (agent-cadence TD-204): its stderr's last line where the repo sets
 # `review-outcomes` on; parity with its `FILING_QUESTION` (cadence.md §7.9)
 FILING_QUESTION = "ledger_next_id: if this entry is a defect, did a design miss it?"
-ADDED = re.compile(r"^\+## TD-(\d+):", re.M)
 SCRIPTS = ("scripts/ledger_next_id.py", "files/scripts/ledger_next_id.py")  # a syncing repo's; agent-cadence's own
 IDS_SCRIPT = "ledger_next_id.py"  # as a pinned tree's `files/scripts/` holds it
+SYNCED = "232f2ad"  # the agent-cadence release that ships the id script (TD-970); a checkout before it is refused
 SCRIPT_SLACK = 5.0  # the script's race ends this far before the call's deadline
 TID = re.compile(r"TD-\d+")
 GITHUB = re.compile(
@@ -57,60 +53,6 @@ def origin_key(url: str) -> str:
     if m := GITHUB.match(u):
         return f"{m.group(1)}/{m.group(2)}".lower()
     return u.lower().removesuffix("/").removesuffix(".git")
-
-
-def is_github(key: str) -> bool:
-    return re.fullmatch(r"[^/:@\s]+/[^/:@\s]+", key) is not None
-
-
-def added_ids(patch: str | None) -> set[int]:
-    """The ids a patch adds a `## TD-NNN:` heading for."""
-    return {int(n) for n in ADDED.findall(patch or "")}
-
-
-def files_jq(paths_: tuple[str, ...], directory: str = "") -> str:
-    """One line per file of a PR's listing: the patch of a ledger file as `{f, p}` (`p` null where GitHub
-    left it out), a file under the v2 `directory` as `{f, s, o}` (its status and previous name, no patch),
-    any other file as `0`, so the lines also count the listing."""
-    names = " or ".join(f".filename == {json.dumps(p)}" for p in paths_)
-    under = f"elif (.filename | startswith({json.dumps(directory + '/')})) then " if directory else ""
-    under += "{f: .filename, s: .status, o: .previous_filename} " if directory else ""
-    return f".[] | if ({names}) then {{f: .filename, p: .patch}} {under}else 0 end"
-
-
-def both_layouts(rel: str) -> tuple[str, str, str]:
-    """`(v1 file, its archive, v2 directory)` for a ledger path of either layout: the path's own and the other
-    layout's beside it, as `ledger.layout_at` would find it after a split (design §4.4 *Either layout*)."""
-    if rel.endswith(".md"):
-        return rel, ledger_mod.archive_path(rel), ledger_mod.layout_at(rel, None, (_none, _none))[0]
-    led, arch = ledger_mod.layout_at(rel, None, (_none, _none))
-    return led, arch or ledger_mod.archive_path(led), rel
-
-
-def _none(_path: str) -> None:
-    return None
-
-
-def entry_id(path: str, directory: str) -> int | None:
-    """The id of a v2 entry file directly in `directory` or its `archive/`, else None."""
-    d, _, name = path.rpartition("/")
-    if d not in (directory, f"{directory}/{ledgerboard.LEDGER_ARCHIVE}"):
-        return None
-    m = ledgerboard.ENTRY_FILE_RE.match(name)
-    return int(m.group(1)) if m else None
-
-
-def dir_added(f: dict[str, Any], directory: str) -> int | None:
-    """The id a PR's listed file under the v2 `directory` files (§4.4 *Free*, TD-1145): an entry file it adds,
-    or one renamed to an id its previous path did not carry — a move into `archive/` files nothing."""
-    tid = entry_id(str(f.get("f") or ""), directory)
-    if tid is None:
-        return None
-    if f.get("s") == "added":
-        return tid
-    if f.get("s") == "renamed" and entry_id(str(f.get("o") or ""), directory) != tid:
-        return tid
-    return None
 
 
 def layout(root: str, rel: str) -> tuple[str, str | None, bool]:
@@ -156,14 +98,10 @@ async def _run(
     return proc.returncode or 0, out.decode(errors="replace"), err.decode(errors="replace")
 
 
-def _why(err: str, fallback: str) -> str:
-    return ((err or "").strip().splitlines() or [fallback])[-1][:200]
-
-
 def ids_script(root: str, timeout: float = cadence.TREE_TIMEOUT) -> Path | None:
     """The `ledger_next_id.py` the checkout serving a `td_next` has: in a pinned repo the pinned tree's (§5 *How
     the readers find agent-cadence*, TD-1014) — a pin that does not resolve, or a tree with no id script, refused,
-    never the home's own road, which reads no counter; else the first of `SCRIPTS` found."""
+    else the first of `SCRIPTS` found, None where the checkout has none (its call is refused, naming the sync)."""
     if cadence.pinned(root):
         payload, why = cadence.tree(root, timeout)
         if payload is None:
@@ -312,11 +250,10 @@ class IdsMixin:
         record of who was given them. `by` is the dispatcher's caller, never a parameter. Returns `{repo,
         origin, ids, unread}`, `unread` the lines naming the open PRs that
         could not be read, and `reserved`, `why`, `warnings` and `taken_by` the script's, `id_take` the take's
-        nonce and `id_take_line` the header line to write where the ledger accepts it (on the home's own road
-        `reserved` is true, `why` empty, `warnings` none and the take's three null), and `question` the script's
+        nonce and `id_take_line` the header line to write where the ledger accepts it, and `question` the script's
         filing question where the repo sets `review-outcomes` on (§4.4 *The filing question*, TD-1282), else null.
-        `branch` is the caller's directory's (§4.4 *The branch*), checked and passed to a script that takes it; the
-        home's own road drops it."""
+        `branch` is the caller's directory's (§4.4 *The branch*), checked and passed to a script that takes it. A
+        checkout with no id script is refused, naming the sync (TD-971): the home has no road of its own."""
         start = time.monotonic()
         if isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= COUNT_MAX:
             raise RpcError(f"--count is 1 to {COUNT_MAX}, not {count!r}")
@@ -331,13 +268,9 @@ class IdsMixin:
             raise RpcError(f"{name}'s ids are being handed out to another caller: busy, ask again") from None
         try:
             left = max(0.1, start + BUDGET - time.monotonic())
-            if script := await asyncio.to_thread(ids_script, root, left):
-                got = await self._ids_script(root, key, name, script, count, start, caller, branch)
-            else:
-                ids, unread = await self._ids_give(root, key, count, start, caller)
-                got = {"ids": ids, "unread": unread, "reserved": True, "why": "", "warnings": []}
-                got |= {"taken_by": None, "question": None}
-                got |= {"id_take": None, "id_take_line": None}
+            if not (script := await asyncio.to_thread(ids_script, root, left)):
+                raise RpcError(f"no {SCRIPTS[0]} in {name}: sync agent-cadence to {SYNCED} or later")
+            got = await self._ids_script(root, key, name, script, count, start, caller, branch)
         finally:
             lock.release()
         for line in [*got["unread"], *got["warnings"]] + ([] if got["reserved"] else [f"not reserved: {got['why']}"]):
@@ -488,131 +421,8 @@ class IdsMixin:
             led = {"state": "predates", "why": seams_mod.predates_v2(str(got["commit"]))}
             raise RpcError(f"{name}'s ids were not given: {seams_mod.ledger_lack(led, root)}")
 
-    async def _ids_give(
-        self, root: str, key: str, count: int, start: float, caller: Any
-    ) -> tuple[list[str], list[str]]:
-        rel = await asyncio.to_thread(ledger_mod.ledger_path, root)
-        v1, v1_archive, directory = both_layouts(rel)
-        # 1. the open PRs' added headings and entry files, on both layouts' paths, read before the fetch, so a
-        # PR merged between the two is in main
-        prs, unread = await self._ids_prs(root, key, (v1, v1_archive), start + PRS_BY, directory)
-        # 2. the fetch, then 3. main's ledger and archive at the fetched ref
-        rc, _, err = await _run(["git", "-C", root, "fetch", "-q", "origin"], None, start + BUDGET - time.monotonic())
-        if rc != 0:
-            raise RpcError(f"the fetch of {Path(root).name}'s origin failed ({_why(err, 'git fetch failed')}): "
-                           "main's ids are the floor, so none is given")  # fmt: skip
-        ref = await asyncio.to_thread(ledger_mod.default_ref, root, max(0.1, start + BUDGET - time.monotonic()))
-        if ref is None:
-            raise RpcError(f"{Path(root).name} has no origin/<default> after the fetch: main's ids are the floor")
-        main = await asyncio.to_thread(_main_ids, root, ref, rel, max(0.1, start + BUDGET - time.monotonic()))
-        # 4. the highest of the three and the last given, then 5. the record
-        by = PERSON if caller is None or mail.is_person(caller) else str(caller)
-        ids = await asyncio.to_thread(_record, key, max([*prs, *main], default=0), count, by)
-        return ids, unread
-
-    async def _ids_prs(
-        self, root: str, key: str, files: tuple[str, ...], by: float, directory: str = ""
-    ) -> tuple[set[int], list[str]]:
-        """The ids every open PR adds a heading for in the v1 ledger or its archive, or an entry file for under
-        the v2 `directory` (`dir_added`), and the unread lines."""
-        if not is_github(key):
-            return set(), [f"open PRs not read: the origin {key} is not GitHub's"]
-        rc, out, err = await _run(
-            ["gh", "pr", "list", "--repo", key, "--state", "open", "--limit", str(PR_LIMIT), "--json", "number"],
-            root, by - time.monotonic(),
-        )  # fmt: skip
-        try:
-            numbers = [int(p["number"]) for p in json.loads(out)] if rc == 0 else None
-        except (ValueError, TypeError, KeyError):
-            numbers, err = None, "gh pr list printed something that is not a list of PRs"
-        if numbers is None:
-            return set(), [f"open PRs not read: {_why(err, 'gh pr list failed')}"]
-        unread = [f"open PRs not read: the list filled its {PR_LIMIT}"] if len(numbers) >= PR_LIMIT else []
-        gate = asyncio.Semaphore(PR_READERS)
-        jq = files_jq(files, directory)
-
-        async def read(n: int) -> set[int] | str:
-            async with gate:
-                rc, out, err = await _run(
-                    ["gh", "api", f"repos/{key}/pulls/{n}/files", "--paginate", "--jq", jq], root, by - time.monotonic()
-                )
-            if rc != 0:
-                return "budget" if err == "timed out" else _why(err, "its files could not be listed")
-            lines = [ln for ln in out.splitlines() if ln.strip()]
-            if len(lines) >= FILES_CAP:
-                return f"its listing is cut at {FILES_CAP} files"
-            got: set[int] = set()
-            for ln in lines:
-                if ln.strip() == "0":
-                    continue
-                try:
-                    f = json.loads(ln)
-                except ValueError:
-                    return "its listing is not JSON"
-                if not isinstance(f, dict):
-                    return "its listing is not a list of files"
-                if "s" in f:  # under the v2 directory: its name, no patch read
-                    if (tid := dir_added(f, directory)) is not None:
-                        got.add(tid)
-                    continue
-                if f.get("p") is None:
-                    return f"{f.get('f')} has no patch (too large a diff)"
-                got |= added_ids(f["p"])
-            return got
-
-        tasks = {n: asyncio.create_task(read(n)) for n in numbers}
-        if tasks:
-            await asyncio.wait(tasks.values(), timeout=max(0.0, by - time.monotonic()))
-        ids: set[int] = set()
-        for n, t in tasks.items():
-            if not t.done():
-                t.cancel()
-                unread.append(f"open PR #{n} not read: budget")
-                continue
-            res = t.result()
-            if isinstance(res, str):
-                unread.append(f"open PR #{n} not read: {res}")
-            else:
-                ids |= res
-        await asyncio.gather(*tasks.values(), return_exceptions=True)
-        return ids, unread
-
-
-def _main_ids(root: str, ref: str, rel: str, timeout: float) -> set[int]:
-    """The ids of the ledger and its archive at `ref` (design §4.4 *Free*): the path put through `layout_at`
-    against that tree (`git_io`), so a checkout behind or ahead of a split reads main as main holds it — a v2
-    directory's file names and its `archive/`'s, no content read; a v1 file's and its archive's headings."""
-    io = ledger_mod.git_io(root, ref, ledger_mod.common_parent(rel), timeout, rel)
-    if io is None:
-        return set()
-    ls, read = io
-    led, arel = ledger_mod.layout_at(rel, ledger_mod.archive_path(rel) if rel.endswith(".md") else None, io)
-    if (names := ls(led)) is not None:
-        names += [f"{ledgerboard.LEDGER_ARCHIVE}/{n}" for n in ls(f"{led}/{ledgerboard.LEDGER_ARCHIVE}") or []]
-        return {tid for n in names if (tid := entry_id(f"{led}/{n}", led)) is not None}
-    ids = ledger_mod.ids_in(read(led)) | ledger_mod.ids_in(read(arel or ledger_mod.archive_path(led)))
-    return {int(t[3:]) for t in ids}
-
 
 _STORE = threading.Lock()  # `ids.json` is one file for every origin, and each origin has its own lock
-
-
-def _record(key: str, floor: int, count: int, by: str) -> list[str]:
-    """Take `count` ids over the highest of `floor` and the origin's `last`, and record them — the read, the
-    take and the write as one step under `_STORE`, so two origins handed out at once never drop each other's."""
-    with _STORE:
-        store = _load()
-        rec = store.get(key) if isinstance(store.get(key), dict) else {}
-        last = rec.get("last") if isinstance(rec.get("last"), int) else 0
-        top = max(floor, last)
-        ids = [f"TD-{n:03d}" for n in range(top + 1, top + 1 + count)]
-        at = now_iso()
-        given = [g for g in rec.get("given") or [] if isinstance(g, dict)]
-        call = uuid.uuid4().hex[:12]
-        given += [{"id": i, "by": by, "at": at, "call": call} for i in ids]
-        store[key] = {"last": top + count, "given": given[-GIVEN_KEEP:]}
-        _save(store)
-        return ids
 
 
 def _last(key: str) -> int:
