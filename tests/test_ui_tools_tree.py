@@ -63,3 +63,73 @@ def test_before_the_switch_over_no_account_or_login_is_drawn(monkeypatch):
 @pytest.mark.parametrize("folder,shown", [("/home/x", "~"), ("/home/x/.c", "~/.c"), ("/home/xy", "/home/xy")])
 def test_a_folder_is_drawn_from_the_home(folder, shown):
     assert app_mod._shown_folder(folder, "/home/x") == shown
+
+
+def test_each_login_draws_its_controls_by_its_state(monkeypatch):
+    text = page(monkeypatch, read())
+    rows = dict(re.findall(r'data-login="([\w:-]+)"(.*?)</details>', text, re.S))
+    assert set(rows) == {"claude-code:claude-paul", "claude-code:claude-conformance", "claude-code:claude-heather",
+                         "claude-code:claude-new", "gemini:gemini-paul"}  # fmt: skip
+    for row in rows.values():  # ✎, and the ⋯ menu's three, on every login
+        assert 'data-act="label"' in row and "Open a shell here" in row and "Edit note" in row
+        assert "Forget this login" in row and 'data-version="v"' in row
+    assert ">Sign in<" in rows["claude-code:claude-heather"] and "Sign in again" in rows["gemini:gemini-paul"]
+    assert ">Sign in<" not in rows["claude-code:claude-paul"] and "Sign in again" not in rows["claude-code:claude-paul"]
+    named = [k for k, row in rows.items() if "Name its account" in row]
+    assert sorted(named) == ["claude-code:claude-new", "gemini:gemini-paul"]  # to be named, and the mismatch
+    # an account's ✎ carries its key and version
+    assert re.search(r'data-account="claude-code:paul" data-version="a" data-label="">.*?data-act="label"', text, re.S)
+
+
+def test_before_the_switch_over_no_login_control_is_drawn(monkeypatch):
+    got = read()
+    got["switched"] = False
+    text = page(monkeypatch, got)
+    assert "Forget this login" not in text and "Name its account" not in text and "toolpen" not in text
+
+
+@pytest.mark.parametrize(
+    "path,body,method,params",
+    [
+        ("/api/tools/login/label", {"login": "claude-code:claude-paul", "label": "x", "version": "v"}, "login_label",
+         {"login": "claude-code:claude-paul", "label": "x", "version": "v"}),
+        ("/api/tools/login/label", {"login": "claude-code:claude-paul", "label": "", "version": "v"}, "login_label",
+         {"login": "claude-code:claude-paul", "label": None, "version": "v"}),
+        ("/api/tools/login/note", {"login": "gemini:g", "text": "a line", "version": "v"}, "login_note",
+         {"login": "gemini:g", "text": "a line", "version": "v"}),
+        ("/api/tools/login/account", {"login": "gemini:g", "account": "paul", "version": "v"}, "login_account",
+         {"login": "gemini:g", "account": "paul", "version": "v"}),
+        ("/api/tools/login/forget", {"login": "gemini:g", "version": "v"}, "login_forget",
+         {"login": "gemini:g", "version": "v"}),
+        ("/api/tools/login/shell", {"login": "gemini:g"}, "login_shell", {"login": "gemini:g"}),
+        ("/api/tools/account/label", {"key": "gemini:paul", "label": "k", "version": "b"}, "account_label",
+         {"key": "gemini:paul", "label": "k", "version": "b"}),
+    ],
+)  # fmt: skip
+def test_each_control_calls_its_verb(monkeypatch, path, body, method, params):
+    from fastapi.testclient import TestClient
+
+    calls = []
+
+    async def call(m, **p):
+        calls.append((m, p))
+        return {"ok": True}
+
+    monkeypatch.setattr(app_mod, "agent_call", call)
+    with TestClient(app_mod.create_app()) as c:
+        r = c.post(path, json=body)
+    assert r.status_code == 200 and [x for x in calls if x[0] == method] == [(method, params)]
+
+
+def test_a_refusal_and_an_unknown_control(monkeypatch):
+    from fastapi import HTTPException
+    from fastapi.testclient import TestClient
+
+    async def call(m, **p):
+        raise HTTPException(400, "claude-paul changed since this page read it — reload")
+
+    monkeypatch.setattr(app_mod, "agent_call", call)
+    with TestClient(app_mod.create_app()) as c:
+        r = c.post("/api/tools/login/forget", json={"login": "claude-paul", "version": "v"})
+        assert r.status_code == 400 and "changed since this page read it" in r.json()["detail"]
+        assert c.post("/api/tools/login/explode", json={}).status_code == 404

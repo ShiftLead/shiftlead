@@ -922,6 +922,62 @@ HELP: tuple[Help, ...] = (
             "no install itself, and a tool with no adapter has no Install."
         ),
     ),
+    Help(
+        "tools-label",
+        "✎",
+        "Tools page: a login, an account",
+        (
+            "Gives this login or account a label of your own, drawn in place of its name with the name beside it. "
+            "The name stays fixed and is what `ao` takes; an empty label clears it."
+        ),
+    ),
+    Help(
+        "tools-name-account",
+        "Name its account",
+        "Tools page: a login",
+        (
+            "Says which account this login is signed into: an account's key, or a new account's name. A login "
+            "whose account is not named, or whose logins read different accounts, launches nothing until you name "
+            "it."
+        ),
+    ),
+    Help(
+        "tools-sign-in",
+        "Sign in",
+        "Tools page: a login",
+        (
+            "Opens this login's tools shell with the tool's sign-in command typed and not run: you press Enter "
+            "there. The login moves under its account as soon as the tool has written the sign-in; Sign in again "
+            "does the same for a login whose sign-in has lapsed."
+        ),
+    ),
+    Help(
+        "tools-login-shell",
+        "Open a shell here",
+        "Tools page: a login",
+        (
+            "Opens this login's tools shell, a shell of your own with the tool pointed at this login's folder. A "
+            "second press reopens the same shell; nothing in it is kept or handed to a session."
+        ),
+    ),
+    Help(
+        "tools-note",
+        "Edit note",
+        "Tools page: a login",
+        (
+            "Writes one line under this login, drawn in italics; an empty note clears it. It must hold no secret, "
+            "as the logins file is kept in git."
+        ),
+    ),
+    Help(
+        "tools-forget",
+        "Forget this login",
+        "Tools page: a login",
+        (
+            "Takes this login off the page and leaves its folder on disk; adding that folder again takes back its "
+            "name. Refused, naming them, while a session runs on it."
+        ),
+    ),
 )
 
 BY_KEY: dict[str, Help] = {h.key: h for h in HELP}
@@ -1045,7 +1101,20 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ),
     ("settings", "Settings", ("on-work", "balance", "schedule", "file-link", "telegram", "telegram-test")),
     ("spend", "Spend", ("usage-chip", "spend-view", "spend-picks", "spend-bar")),
-    ("tools", "Tools", ("tools-check", "tools-install")),
+    (
+        "tools",
+        "Tools",
+        (
+            "tools-check",
+            "tools-install",
+            "tools-label",
+            "tools-name-account",
+            "tools-sign-in",
+            "tools-login-shell",
+            "tools-note",
+            "tools-forget",
+        ),
+    ),
 )
 
 
