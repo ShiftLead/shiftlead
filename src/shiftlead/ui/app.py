@@ -3301,14 +3301,18 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         else {}
                     )
                     # the person's own additions (§4.8, TD-1016), read at the home whatever host the session
-                    # lands on: under the repo's root here, else the agent-cadence source among the home's
-                    person = await asyncio.to_thread(form_person, preset, None if away else str(cfg.root))
-                    if away:
-                        brief, made_from = await asyncio.to_thread(
-                            preset.compose, refs or None, read=read, person=person, **ids
-                        )
-                    else:
-                        brief, made_from = preset.compose(refs or None, person=person, **ids)
+                    # lands on: under the repo's root here, else the agent-cadence source among the home's. A typed
+                    # prompt is the whole opening prompt, so no brief is composed and no layer read, as `ao new
+                    # --prompt` reads none: a failed listing refuses only a start that would send the brief (§4.8
+                    # *A listing that fails*, TD-1995)
+                    if not prompt.strip():
+                        person = await asyncio.to_thread(form_person, preset, None if away else str(cfg.root))
+                        if away:
+                            brief, made_from = await asyncio.to_thread(
+                                preset.compose, refs or None, read=read, person=person, **ids
+                            )
+                        else:
+                            brief, made_from = preset.compose(refs or None, person=person, **ids)
             except (KeyError, ValueError) as e:
                 raise HTTPException(400, str(e).strip('"')) from None
         # design §4.5a New session **Team** picker (§4.9 *A person in the team*, TD-173): a role's own

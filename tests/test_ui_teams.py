@@ -1270,3 +1270,20 @@ def test_start_with_a_role_carries_the_persons_layer_additions_and_a_failed_list
     r = client.post("/new", data={**data, "name": "h2"}, follow_redirects=False)
     assert r.status_code == 400 and "agent-cadence's layer listing exited 2" in r.text
     assert fleet.creates() == []
+
+    # TD-1995 (§4.8 *A listing that fails*): a typed prompt is the whole opening prompt, so it reads no layer and
+    # starts while the listing fails, as `ao new --prompt` does; a prompt of spaces is no prompt, and is refused
+    asked.clear()
+    monkeypatch.setattr(layers, "person", lambda *a: (asked.append(a), failed(*a)))
+    typed = {**data, "name": "h4", "prompt": "fix the flaky test in test_link.py"}
+    assert client.post("/new", data=typed, follow_redirects=False).status_code == 303
+    (made,) = fleet.creates()
+    assert made["prompt"].endswith("fix the flaky test in test_link.py") and asked == []
+    assert made.get("prompt_from") is None
+    fleet.calls.clear()
+    r = client.post("/new", data={**typed, "name": "h5", "prompt": "   "}, follow_redirects=False)
+    assert r.status_code == 400 and "agent-cadence's layer listing exited 2" in r.text
+    assert fleet.creates() == []
+    # a role with neither a template nor a definition reads no layer, so it starts with no prompt typed
+    assert client.post("/new", data={**data, "name": "h6", "role": "plain"}, follow_redirects=False).status_code == 303
+    assert len(fleet.creates()) == 1
