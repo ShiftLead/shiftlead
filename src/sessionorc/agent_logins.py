@@ -61,7 +61,7 @@ class LoginsMixin:
         `login`, or, before the cut-over writes one, its `profile` by the login's name."""
         tool, name = logins.split(lk)
         out = []
-        for s in self.sessions.values():
+        for s in list(self.sessions.values()):  # a copy: forget reads it from the write's thread
             if s.state in ENDED or s.adapter != tool:
                 continue
             if (getattr(s, "login", None) or s.profile) == name:
@@ -132,22 +132,47 @@ class LoginsMixin:
         except Exception:  # noqa: BLE001 — an unreadable settings file retires nothing it holds
             reserve_keys = set()
         matches = dict(self._tools_memory.last)
+        if self._tools_kept is None and await self._login_pinned(str(login or "")):
+            await self.rpc_tools()  # a pin is checked against the joined account's families: read them afresh
+        offered = self._kept_families()  # read in the loop
         return await self._login_write(
             lambda d: logins.join(
-                d, str(login or ""), str(account or ""), version, reserve_keys=reserve_keys, matches=matches
+                d,
+                str(login or ""),
+                str(account or ""),
+                version,
+                reserve_keys=reserve_keys,
+                matches=matches,
+                families=offered.get,
             )
         )
+
+    async def _login_pinned(self, ref: str) -> bool:
+        """Whether the login `ref` names has a model pin as the file stands (False where it cannot be read)."""
+        try:
+            data = await asyncio.to_thread(logins.load)
+            return bool(data and logins.resolve(data, ref)[1].get("pin"))
+        except logins.LoginError:
+            return False
+
+    def _kept_families(self) -> dict[str, list[str]]:
+        """Each account's model families as the kept read drew them, by key; an account with none read is absent."""
+        out: dict[str, list[str]] = {}
+        for card in (self._tools_kept or {}).get("tools") or []:
+            for a in card.get("accounts") or []:
+                fam = (a.get("models") or {}).get("families")
+                if a.get("key") and fam is not None:
+                    out[str(a["key"])] = list(fam)
+        return out
 
     async def rpc_login_forget(self, login: str = "", version: str | None = None, caller: Any = None) -> dict[str, Any]:
         """`ao login forget <login>`, **Forget this login**: moved to `forgotten:`, its folder left on disk; refused,
         naming them, while a live session runs on it."""
         agent_common.person_only(caller, "forget a login", SECTION, self._graph())
 
-        users = {lk: self._login_users(lk) for lk in await self._login_keys()}  # read in the loop
-
-        def edit(d: dict[str, Any]) -> str:
+        def edit(d: dict[str, Any]) -> str:  # under the logins lock: what runs on it is read as the write is made
             lk, _ = logins.resolve(d, str(login or ""))
-            return logins.forget(d, lk, version, in_use=users.get(lk, []))
+            return logins.forget(d, lk, version, in_use=self._login_users(lk))
 
         return await self._login_write(edit)
 

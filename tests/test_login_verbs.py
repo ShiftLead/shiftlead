@@ -161,6 +161,25 @@ def test_a_join_keeps_a_metered_logins_folder_its_accounts_alone():
     assert logins.join(d, "api2", "work") == "claude-code:api2 joined claude-code:work"
 
 
+def test_a_join_keeps_a_pin_its_new_account_offers_and_clears_any_other():
+    fam = {"claude-code:paul-k": ["opus", "sonnet"], "claude-code:other": ["haiku"]}.get
+    d = _data()
+    d["logins"]["claude-code:api"]["pin"] = "sonnet"
+    assert logins.join(d, "api", "claude-code:paul-k", families=fam) == "claude-code:api joined claude-code:paul-k"
+    assert d["logins"]["claude-code:api"]["pin"] == "sonnet"
+    got = logins.join(d, "api", "other", families=fam)
+    assert (
+        got == "claude-code:api joined claude-code:other; its pin sonnet cleared, as claude-code:other offers no sonnet"
+    )
+    assert "pin" not in d["logins"]["claude-code:api"]
+    d["logins"]["claude-code:api"]["pin"] = "haiku"
+    got = logins.join(d, "api", "fresh", families=fam)  # a new key: no read has its families
+    assert got.endswith(
+        "its pin haiku cleared, as claude-code:fresh's families are not read yet: Check again, then pin"
+    )
+    assert "pin" not in d["logins"]["claude-code:api"]
+
+
 def test_forget_moves_a_login_to_forgotten_and_its_last_account_leaves():
     d = _data()
     with pytest.raises(logins.LoginError, match="while ao-x-w use it"):
@@ -365,3 +384,58 @@ async def test_add_uses_a_home_makes_an_empty_folder_one_and_opens_its_shell(age
         on_disk = yaml.safe_load(logins.path(paths.home()).read_text())["logins"]
         assert on_disk["claude-code:fresh"] == {"folder": str(made), "account": "claude-code:paul-k"}
         assert on_disk["claude-code:signed"] == {"folder": str(home)}
+
+
+async def test_forget_and_naming_an_account_read_what_runs_and_what_is_retired(agent, tmp_path):
+    from conftest import park_ticks
+
+    from sessionorc import paths
+    from sessionorc.client import AgentError, LocalClient
+    from sessionorc.models import Session
+
+    await park_ticks(agent)
+    d = _data()
+    d["logins"]["claude-code:api"]["pin"] = "sonnet"
+    d["forgotten"]["claude-code:gone"] = {"folder": "/h/.claude-gone", "account": "claude-code:gone"}
+    logins.save(d, "fixture", paths.home())
+    (paths.home() / "settings.yml").write_text('usage_gate: {"claude-code:old": {week: 5}}\n')
+    s = Session(id="ao-x-run", name="run", kind="interactive", adapter="claude-code", dir="/w/run")
+    s.state, s.host, s.profile = "working", agent.host, "grind"
+    agent.sessions[s.id] = s
+    kept = {
+        "tools": [
+            {
+                "adapter": "claude-code",
+                "logins": [],
+                "accounts": [{"key": "claude-code:paul-k", "models": {"families": ["opus"]}}],
+            }
+        ]
+    }
+
+    async def reread():  # a write drops the kept read: a join on a pinned login reads it afresh
+        agent._tools_kept = kept
+        return kept
+
+    agent.rpc_tools = reread
+    async with LocalClient() as c:
+        with pytest.raises(AgentError, match="claude-code:grind cannot be forgotten while ao-x-run use it"):
+            await c.call("login_forget", login="grind")
+        s.state = "exited"  # ended: nothing runs on it
+        assert (await c.call("login_forget", login="grind"))["change"] == "claude-code:grind forgotten"
+        for name in ("old", "gone"):  # a reserve's key and a forgotten login's: retired, refused by name
+            with pytest.raises(AgentError, match=f"claude-code:{name} is a forgotten account's key"):
+                await c.call("login_account", login="api", account=name)
+        agent._tools_memory.last.update({"claude-code:api": "a@x", "claude-code:paul": "b@x"})
+        with pytest.raises(AgentError, match="claude-code:paul is under claude-code:paul-k and reads another account"):
+            await c.call("login_account", login="api", account="paul-k")
+        agent._tools_memory.last["claude-code:paul"] = "a@x"
+        got = await c.call("login_account", login="api", account="paul-k")
+        assert got["change"] == (
+            "claude-code:api joined claude-code:paul-k; its pin sonnet cleared, as claude-code:paul-k offers no sonnet"
+        )
+        with pytest.raises(AgentError, match="claude-code:paul reads the same account as claude-code:api"):
+            await c.call("login_account", login="api", account="claude-code:old")
+        agent._tools_memory.last.clear()  # no match read: nothing to disagree with
+        assert (await c.call("login_account", login="api", account="claude-code:old"))["change"] == (
+            "claude-code:api joined claude-code:old"  # its full key rejoins it deliberately
+        )
