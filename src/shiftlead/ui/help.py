@@ -975,7 +975,7 @@ HELP: tuple[Help, ...] = (
         "Tools page: a login",
         (
             "Takes this login off the page and leaves its folder on disk; adding that folder again takes back its "
-            "name. Refused while a session runs on it or a team, the director, the sweep or a schedule names it."
+            "name. Refused, naming them, while a session runs on it."
         ),
     ),
 )
