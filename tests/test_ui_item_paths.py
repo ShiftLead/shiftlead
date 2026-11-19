@@ -543,3 +543,7 @@ def test_under_cwd_root_takes_the_deeper_of_cwd_root_and_the_top_level():
     up = {"dir": "/a/b", "git": {}, "cwd_root": "/a"}
     assert not under_cwd_root("/a/b/f.py", up) and under_cwd_root("/a/c/f.py", up)
     assert not under_cwd_root("/x/f.py", {"dir": "/r", "git": {"top": "/r"}})  # no cwd_root
+    inner = {"dir": "/a/b", "git": {"top": ""}, "cwd_root": "/a/b/repo"}  # `dir` in no repository, a repo in it
+    assert under_cwd_root("/a/b/repo/f.py", inner) and not under_cwd_root("/a/b/f.py", inner)
+    old = {"dir": "/r", "cwd_root": "/r/.claude/worktrees/w"}  # an older node's record: no `git`, `dir` stands in
+    assert under_cwd_root("/r/.claude/worktrees/w/f.py", old) and not under_cwd_root("/r/f.py", old)
