@@ -152,7 +152,7 @@ def test_settings_reads_each_rpc_once_all_at_once_and_times_its_files(tmp_path, 
     r = c.get("/settings")
     assert r.status_code == 200
     # each once (an empty fleet is the one read the usage chip makes again: no session to name an account)
-    assert sorted(m for m in calls if m != "list") == ["gate", "host", "repos", "settings", "usage"]
+    assert sorted(m for m in calls if m != "list") == ["gate", "host", "repos", "settings", "tools", "usage"]
     assert live["most"] == 6  # the six the route makes, all in flight at once
     steps = _steps(r.headers["server-timing"])
     assert "files" in steps and "flows" in steps
