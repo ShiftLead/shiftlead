@@ -259,3 +259,20 @@ async def test_paths_resolves_a_relative_run_against_cwd_first_then_dir(agent, t
     s.cwd = str(tmp_path / "gone")  # a folder deleted since: `dir` answers
     got = (await agent.rpc_paths(id=s.id, runs=["both.py"]))["paths"]
     assert got == {"both.py": str((d / "both.py").resolve())}
+
+
+async def test_a_resume_starts_with_neither_cwd_nor_cwd_root(agent, hookstub, tmp_path):
+    """Design §4.2 *The record's `cwd`* (TD-1988 Fix 6): a new run's launch clears both fields; the exited
+    record kept them until then."""
+    from sessionorc.client import LocalClient
+
+    async with LocalClient() as c:
+        old = await c.call("create", name="conv", dir=str(tmp_path), adapter="hookstub")
+        await c.call("hook", session=old["id"], adapter_id="cc-123")
+        await c.call("kill", id=old["id"])
+        rec = agent.sessions[old["id"]]
+        rec.cwd, rec.cwd_root = "/elsewhere", "/elsewhere"
+        new = await c.call("create", name="conv", dir=str(tmp_path), adapter="hookstub", resume="cc-123")
+        assert new["id"] == old["id"]
+        assert agent.sessions[new["id"]].cwd is None and agent.sessions[new["id"]].cwd_root is None
+        assert new.get("cwd") is None and new.get("cwd_root") is None
