@@ -248,6 +248,7 @@ from sessionorc.agent_identity import IdentityMixin
 from sessionorc.agent_ids import IdsMixin
 from sessionorc.agent_inbox import InboxMixin
 from sessionorc.agent_link import LinkMixin
+from sessionorc.agent_logins import LoginsMixin
 from sessionorc.agent_mail import MailMixin
 from sessionorc.agent_notify import NotifyMixin
 from sessionorc.agent_promote import PromoteMixin
@@ -570,6 +571,7 @@ class HostAgent(
     DoctorMixin,
     RemoteMixin,
     LinkMixin,
+    LoginsMixin,
 ):
     def __init__(
         self,
