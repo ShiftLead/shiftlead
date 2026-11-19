@@ -51,7 +51,7 @@ from sessionorc.models import (
 from sessionorc.queue import TD_REF, card_entries, qid, repo_roots
 from sessionorc.queue import refs as _refs_of
 from sessionorc.store import kept as doing_kept
-from shiftlead import cardtext, repoconfig, teamrun, teams
+from shiftlead import cardtext, layers, repoconfig, teamrun, teams
 from shiftlead import org as orgmod
 from shiftlead import profiles as profiles_mod
 from shiftlead import review as reviewmod
@@ -3674,6 +3674,14 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # the `project` badge, as New session's: the repo's project, from the same function (§4.9, TD-1043);
         # the badge alone, since this session starts at the prompt with no text to carry a Project block
         project, _block = await asyncio.to_thread(lambda: teams.reach_block(org_here()[0], root, host_name()))
+        # the person's own `entry.md` additions follow the package's (§4.8 *The person's own additions*, TD-1016),
+        # read at the home whatever host the session lands on; a listing that fails refuses the start by name
+        try:
+            added = await asyncio.to_thread(
+                lambda: layers.addition("entry.md", root, layers.roots_of(org_here()[0], host_name()))
+            )
+        except layers.ListingError as e:
+            raise HTTPException(409, str(e)) from None
         s = await call(
             "create",
             name=plan["name"],
@@ -3694,7 +3702,9 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             controllers=[plan["manager"]] if plan["manager"] else [],
             project=project,
             team=team,  # the badge, as the New session form's Team pick sets it; none without a team
-            start_context=repoconfig.entry_text(*(repoconfig.ADDED_ENTRY[s] for s in repoconfig.ENTRY_SLOTS)),
+            start_context=repoconfig.entry_text(
+                *(repoconfig.ADDED_ENTRY[s] for s in repoconfig.ENTRY_SLOTS), added=added
+            ),
             **({"host": away} if away else {}),  # routed to the team's host, as New session's Host pick is
             **_draft_of(body),
         )
@@ -3889,7 +3899,17 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             ledger = cfg.ledger
         except ValueError as e:
             cfg, cfg_why = None, str(e).strip('"')
+        # the person's own `work.md` additions follow the package's (§4.8 *The person's own additions*, TD-1016);
+        # a listing that fails is said in the form's words, as any other refusal of the press
+        try:
+            added, added_why = (
+                await asyncio.to_thread(layers.addition, "work.md", root, layers.roots_of(org, host_name())),
+                "",
+            )
+        except layers.ListingError as e:
+            added, added_why = "", str(e)
         work = {
+            "added": added,
             "where": "Queue" if card_id else "Inbox",
             # an entry *waiting, then yours* ends *— asked once TD-n closes* (TD-1926)
             "mine": asked_once(mine, card) if card is not None and kept is None else mine,
@@ -3915,6 +3935,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return form(f"{team} runs on {t.host}: this press does not cross the link")
         if cfg is None:
             return form(cfg_why)
+        if added_why:
+            return form(added_why)
         if why := await entry_name_why(root, name):
             return form(why)
         try:

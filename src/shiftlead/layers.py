@@ -195,3 +195,26 @@ def person(role: str, repo: Path | str | None, roots: Iterable[Path | str] = ())
     (`NO_SOURCE`) and goes on from with none. A listing that fails is `ListingError`, the start's error."""
     here = Path(repo).expanduser() if repo is not None else None
     return brief_parts(role, listing(here if here is not None and here.is_dir() else None, source_of(roots)))
+
+
+def roots_of(org: Any, here: str) -> list[Path]:
+    """The home's checkouts of the org's repos on host `here`: where `source_of` looks for agent-cadence."""
+    return [Path(c).expanduser() for r in org.checkouts if (c := org.checkout(r, here)) is not None]
+
+
+def addition(rel: str, repo: Path | str | None, roots: Iterable[Path | str] = ()) -> str:
+    """The person's addition to the package's `rel` (`entry.md`, `work.md`; §4.8 *The person's own additions*):
+    each layer's `shiftlead/<rel>` in the listing's order, each under the line naming its source, joined; `""`
+    when no layer has one or none is set. With no agent-cadence to list them, the text names that (`NO_SOURCE`) in
+    their place, so the session and the *told at start* row say it, and the start goes on. A listing that fails
+    is `ListingError`, the start's error by name."""
+    here = Path(repo).expanduser() if repo is not None else None
+    try:
+        found = listing(here if here is not None and here.is_dir() else None, source_of(roots))
+    except NoSource:
+        return f"— {NO_SOURCE}: your own additions are not read —"
+    got = parts(found, rel)
+    if not got:
+        return ""
+    text, _sources = brief_mod.layered(got)
+    return "" if text == "none" else text
