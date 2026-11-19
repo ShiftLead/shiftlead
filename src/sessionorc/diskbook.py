@@ -133,9 +133,13 @@ class Book:
 
 def free_space(path: str | Path) -> dict[str, Any]:
     """The free space of the file system that holds `path`, in bytes and in inodes (`os.statvfs`); `error` in
-    place of the counts where it cannot be read. A file system that reports no inode count has `inodes_total` 0."""
+    place of the counts where it cannot be read. A file system that reports no inode count has `inodes_total` 0.
+    A `path` not made yet (a fresh host's `scratch_root`) is read at its nearest existing parent."""
+    at = Path(path)
+    while not at.exists() and at.parent != at:
+        at = at.parent
     try:
-        st = os.statvfs(path)
+        st = os.statvfs(at)
     except OSError as e:
         return {"path": str(path), "error": e.strerror or str(e)}
     return {

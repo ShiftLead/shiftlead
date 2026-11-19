@@ -15,7 +15,7 @@ from conftest import park_ticks
 
 from sessionorc import diskbook, hosts, link, modes, paths
 from sessionorc.agent_common import DIGEST_TIMEOUT, RpcError
-from sessionorc.client import LocalClient
+from sessionorc.client import AgentError, LocalClient
 from shiftlead import cli
 
 NOW = datetime(2026, 11, 19, 12, 0, tzinfo=UTC)
@@ -59,7 +59,7 @@ def test_under_a_tenth_free_of_bytes_or_inodes_is_a_warning_and_no_inode_count_d
     assert diskbook.warnings({**FREE, "inodes_free": 0, "inodes_total": 0}) == []
     got = diskbook.free_space("/")
     assert got["bytes_total"] > 0 and got["bytes_free"] >= 0 and "inodes_total" in got
-    assert "error" in diskbook.free_space("/nowhere/at/all")
+    assert diskbook.free_space("/nowhere/at/all")["bytes_total"] == got["bytes_total"]  # read at its parent
 
 
 @pytest.mark.unit
@@ -71,6 +71,10 @@ def test_the_prose_names_each_kind_what_was_kept_and_a_warning():
     assert "h: no pass yet" in text and "kept /w/a — git work" in text
     assert "⚠ /s: under a tenth of its inodes free" in text
     assert "laptop: runs on laptop: unreachable since t — down" in text
+    refused = cli.disk_lines({"desk": {"error": "desk: a pass runs; ask again in a minute"}})
+    assert refused == ["desk: desk: a pass runs; ask again in a minute"]  # the host's own refusal, never *unreachable*
+    silent = cli.disk_lines({"desk": {"error": "desk did not answer disk within 300 s: its verdict is unknown"}})
+    assert silent[0].startswith("desk: unreachable — ")
     uncounted = diskbook.read("/nowhere", "h", "s", NOW, {**FREE, "inodes_free": 0, "inodes_total": 0})
     assert "inodes" not in "\n".join(cli.disk_lines({"h": uncounted}))
 
@@ -172,3 +176,14 @@ async def test_a_node_reads_its_own_host_and_refuses_another(agent, monkeypatch)
     assert got["result"]["host"] == agent.host and got["record"] is None
     with pytest.raises(link.LinkError, match="not my host"):
         await agent._act({"rpc": "disk", "params": {"host": "desk"}, "caller": None})
+
+
+@pytest.mark.integration
+async def test_through_the_socket_a_node_answers_its_own_and_refuses_another_host(agent):
+    await park_ticks(agent)
+    agent.mode, agent.home = "node", "kmaster-home"
+    async with LocalClient(caller="ao-x-1") as session:
+        own = await session.call("disk")
+        assert own["host"] == agent.host and "kinds" in own
+        with pytest.raises(AgentError, match="ask the home"):
+            await session.call("disk", host="desk")

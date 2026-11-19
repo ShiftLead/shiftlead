@@ -3651,7 +3651,8 @@ def disk_lines(by_host: dict[str, Any]) -> list[str]:
     for host, e in by_host.items():
         if not isinstance(e, dict) or "error" in e:
             why = e.get("error") if isinstance(e, dict) else e
-            out.append(f"{host}: {why}" if "unreachable" in str(why) else f"{host}: unreachable — {why}")
+            silent = "did not answer" in str(why) or "dropped" in str(why)  # a refusal is printed as the host's own
+            out.append(f"{host}: unreachable — {why}" if silent and "unreachable" not in str(why) else f"{host}: {why}")
             continue
         out.append(f"{host}: {'last pass ' + e['at'] if e.get('at') else 'no pass yet'}")
         for kind, k in (e.get("kinds") or {}).items():
