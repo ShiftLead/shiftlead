@@ -350,6 +350,7 @@ def work_text(
     walk: bool = False,
     kept: bool = False,
     card: Sequence[str] = (),
+    added: str = "",
 ) -> str:
     """`work.md` filled: the opening prompt **Start session** sends (TD-678, TD-912). `why` a key of
     `WORK_OPENING` — *yours* (`Owner: paul`), *decision* (`decision (paul)`), *card* (any other entry a
@@ -359,7 +360,9 @@ def work_text(
     `walk`, the header's press on a card with two or more items (TD-1340), puts `WORK_ALL` there. `kept`, an item
     pressed on a kept completed card (TD-1618), puts `WORK_ITEM_KEPT` in `WORK_ITEM`'s place, its slots the same.
     `card`, the card's block as `cardtext.card_block` builds it (TD-1903), fills `{card}` last, so no card line is
-    read as a slot; with none the slot and its blank lines go."""
+    read as a slot; with none the slot and its blank lines go. `added`, the person's own `work.md` additions
+    (`shiftlead.layers.addition`, §4.8 *The person's own additions*, TD-1016), follows the package's text, each
+    part under the line naming its source; `""` adds nothing."""
     text = resources.files("shiftlead").joinpath("briefs", WORK_TEMPLATE).read_text(encoding="utf-8")
     opening = WORK_OPENING[why]
     if item:
@@ -375,15 +378,22 @@ def work_text(
         text = text.replace(slot, value)
     # no card: the slot and its blank lines go, one paragraph as before the slot (TD-1903)
     text = text.replace(WORK_CARD, "\n".join(card)) if card else text.replace(f"\n\n{WORK_CARD}\n\n", " ")
-    return text.strip()
+    return _with(text.strip(), added)
 
 
-def entry_text(repo: str, type_: str, priority: str, ledger: str) -> str:
-    """`entry.md` with its four slots filled: the rules a drafter of a new ledger entry follows."""
+def _with(text: str, added: str) -> str:
+    """The package's text, then the person's additions after a blank line (§4.8: joined, never replaced)."""
+    return f"{text}\n\n{added.strip()}" if added.strip() else text
+
+
+def entry_text(repo: str, type_: str, priority: str, ledger: str, added: str = "") -> str:
+    """`entry.md` with its four slots filled: the rules a drafter of a new ledger entry follows. `added`, the
+    person's own `entry.md` additions (`shiftlead.layers.addition`, §4.8 *The person's own additions*, TD-1016),
+    follows it, unfilled — a slot word the person writes is theirs; `""` adds nothing."""
     text = resources.files("shiftlead").joinpath("briefs", ENTRY_TEMPLATE).read_text(encoding="utf-8")
     for slot, value in zip(ENTRY_SLOTS, (repo, type_, priority, ledger), strict=True):
         text = text.replace(slot, value)
-    return text.strip()
+    return _with(text.strip(), added)
 
 
 # The built-in presets (design §4.8's table): each a brief template shipped with the package

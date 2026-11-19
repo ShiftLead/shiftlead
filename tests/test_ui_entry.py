@@ -634,3 +634,30 @@ def test_the_form_draws_priority_beside_type_with_medium_selected_and_both_ways_
     assert r.json()["text"].startswith("Add entry values — repo: samscrape, Type: debt, Priority: high,")
     bad = c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt", "priority": "urgent"})
     assert bad.status_code == 400 and "not 'urgent'" in bad.json()["detail"] and len(created) == 1
+
+
+def test_open_a_session_puts_the_persons_entry_md_after_the_packages_and_a_failed_listing_refuses(
+    tmp_path, monkeypatch
+):
+    """Add entry's start context is the package's `entry.md`, then the person's layer additions (§4.8, TD-1016);
+    a listing that fails refuses the press by name, and nothing starts."""
+    from shiftlead import layers, repoconfig
+
+    world(tmp_path, entries={"feature": "designer"})
+    created: list[dict] = []
+    manager = {"id": "ao-samscrape-manager-sam", "name": "manager-sam", "state": "idle", "team": "sam-grind"}
+    c = client(monkeypatch, tmp_path, fake([manager], created=created))
+    monkeypatch.setattr(layers, "addition", lambda rel, repo, roots: f"— from your layer ~/l @ abc1234 —\n\nmine {rel}")
+    r = c.post("/api/entry/session", json={"repo": "samscrape", "type": "feature", "words": "x"})
+    assert r.status_code == 200, r.text
+    (kw,) = created
+    package = repoconfig.entry_text(*(repoconfig.ADDED_ENTRY[s] for s in repoconfig.ENTRY_SLOTS))
+    assert kw["start_context"] == f"{package}\n\n— from your layer ~/l @ abc1234 —\n\nmine entry.md"
+
+    def failed(rel, repo, roots):
+        raise layers.ListingError("agent-cadence's layer listing exited 2")
+
+    monkeypatch.setattr(layers, "addition", failed)
+    r = c.post("/api/entry/session", json={"repo": "samscrape", "type": "feature", "words": "x"})
+    assert r.status_code == 409 and r.json()["detail"] == "agent-cadence's layer listing exited 2"
+    assert len(created) == 1

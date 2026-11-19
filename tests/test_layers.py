@@ -237,3 +237,51 @@ def test_a_failed_listing_is_asked_once_per_start(tmp_path, monkeypatch):
         with pytest.raises(layers.ListingError):
             layers.listing(None, tmp_path, run=run)
     assert len(asked) == 1
+
+
+def test_entry_and_work_texts_append_each_layers_addition_after_the_packages(tmp_path, monkeypatch):
+    """`entry.md` and `work.md` additions follow the package's text in the listing's order, each under the line
+    naming its source (§4.8); a followed layer is read at its pin, and its `preferences.md` is never among them."""
+    followed, own = tmp_path / "theirs", tmp_path / "mine"
+    pin = _layer_repo(followed, {"entry.md": "theirs entry\n", "work.md": "theirs work\n", "preferences.md": "- t\n"})
+    (followed / "shiftlead" / "entry.md").write_text("theirs: an edit nobody pinned\n")
+    _layer_repo(own, {"entry.md": "mine entry {repo}\n", "work.md": "mine work\n"})
+    found = [
+        layers.Layer(root=followed, kind="followed", ref=pin, commit=pin[:7]),
+        layers.Layer(root=own, kind="own", ref=None, commit="abc1234"),
+    ]
+    monkeypatch.setattr(layers, "listing", lambda where, src: list(found))
+    entry = layers.addition("entry.md", tmp_path, [])
+    work = layers.addition("work.md", tmp_path, [])
+    assert "an edit nobody pinned" not in entry and "- t" not in entry + work
+    package = repoconfig.entry_text("app", "debt", "medium", "docs/ledger")
+    text = repoconfig.entry_text("app", "debt", "medium", "docs/ledger", added=entry)
+    assert text.startswith(package + "\n\n")
+    order = [
+        text.index(found[0].head()),
+        text.index("theirs entry"),
+        text.index(found[1].head()),
+        text.index("mine entry {repo}"),  # the person's slot word is theirs, never filled
+    ]
+    assert order == sorted(order)
+    work_package = repoconfig.work_text("TD-9", "app", "docs/ledger", "card")
+    got = repoconfig.work_text("TD-9", "app", "docs/ledger", "card", added=work)
+    assert got == f"{work_package}\n\n{work}" and got.index("theirs work") < got.index("mine work")
+
+
+def test_no_layer_adds_nothing_no_agent_cadence_is_named_and_a_failed_listing_is_an_error(tmp_path, monkeypatch):
+    _machine(tmp_path, monkeypatch, None)
+    assert layers.addition("entry.md", tmp_path, [tmp_path]) == ""
+    assert repoconfig.entry_text("a", "b", "c", "d", added="") == repoconfig.entry_text("a", "b", "c", "d")
+    _machine(tmp_path, monkeypatch, '[[layers]]\npath = "~/x.md"\n')
+    # no agent-cadence to list them: the text names it in their place, and the start goes on
+    assert (
+        layers.addition("work.md", tmp_path, [tmp_path]) == f"— {layers.NO_SOURCE}: your own additions are not read —"
+    )
+
+    def listing(where, src):
+        raise layers.ListingError("agent-cadence's layer listing exited 2")
+
+    monkeypatch.setattr(layers, "listing", listing)
+    with pytest.raises(layers.ListingError, match="exited 2"):
+        layers.addition("work.md", tmp_path, [])

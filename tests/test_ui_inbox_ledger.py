@@ -600,3 +600,36 @@ def test_an_old_held_mark_adds_no_row_and_no_release(tmp_path, monkeypatch):
     row = _row(html, "ledger:agentorc:TD-133")
     assert ">Release</button>" not in row and ">Reply</button>" in row and "its answers" in row
     assert "ledger · held" not in html and "ledger_release" not in html and "held (person)" not in html
+
+
+def test_start_session_sends_the_persons_work_md_after_the_packages_and_a_failed_listing_is_the_forms(
+    tmp_path, monkeypatch
+):
+    """The person's `work.md` additions follow the package's in the first prompt (§4.8, TD-1016); a listing that
+    fails lands the press on the filled form with its words."""
+    from shiftlead import layers, repoconfig
+
+    asked = []
+
+    def addition(rel, repo, roots):
+        asked.append(rel)
+        return "— from your layer ~/l @ abc1234 —\n\nmine work"
+
+    monkeypatch.setattr(layers, "addition", addition)
+    _repo, c, created = _start_world(tmp_path / "a", monkeypatch, fleet=[MANAGER])
+    r = c.post("/api/ledger/start", json={"repo": "samscrape", "id": "TD-9"})
+    assert r.status_code == 200, r.text
+    (kw,) = created
+    assert asked == ["work.md"]
+    assert kw["prompt"].endswith("\n\n— from your layer ~/l @ abc1234 —\n\nmine work")
+    assert kw["prompt"].startswith(
+        repoconfig.work_text("TD-9", "samscrape", "docs/technical_debt.md", "yours", mine=["samscrape#TD-009"])
+    )
+
+    def failed(rel, repo, roots):
+        raise layers.ListingError("agent-cadence's layer listing exited 2")
+
+    monkeypatch.setattr(layers, "addition", failed)
+    _repo, c, created = _start_world(tmp_path / "b", monkeypatch, fleet=[MANAGER])
+    _fields, why = _form(c.post("/api/ledger/start", json={"repo": "samscrape", "id": "TD-9"}))
+    assert why == "agent-cadence's layer listing exited 2" and created == []
