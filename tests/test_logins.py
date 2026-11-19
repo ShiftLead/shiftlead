@@ -296,6 +296,144 @@ def test_a_join_never_overwrites_a_write_made_while_the_pass_read(monkeypatch, t
     assert now["t:a"]["note"] == "mine" and now["t:b"]["account"] == "t:paul"
 
 
+def test_a_poll_moves_a_login_signed_in_since_the_read_and_probes_no_version(monkeypatch, tmp_path):
+    a, b = str(tmp_path / "a"), str(tmp_path / "b")
+    tool = _Tool("t", tmp_path / "none", {a: ({"match": "M", "plan": "Pro"}, True), b: (None, False)})
+    _host(monkeypatch, tool)
+    data = logins.empty()
+    data["logins"]["t:a"] = {"folder": a, "account": "t:paul"}
+    data["logins"]["t:b"] = {"folder": b}
+    logins.save(data, "fixture", tmp_path)
+    mem = logins.Memory()
+    kept = tools.read(b"s" * 32, env={}, home=tmp_path, memory=mem)
+    assert {lg["name"]: lg["state"] for lg in kept["tools"][0]["logins"]} == {"a": "signed_in", "b": "not_signed_in"}
+
+    def no_probe(env):
+        raise AssertionError("a poll probes no version")
+
+    tool.tool_version = no_probe
+    tool.find = lambda: (_ for _ in ()).throw(AssertionError("a poll finds nothing"))
+    tool.by_folder[b] = ({"match": "M", "plan": "Pro"}, True)  # the person signed in in the tools shell
+    got = tools.repoll(kept, b"s" * 32, home=tmp_path, memory=mem)
+    [card] = got["tools"]
+    assert {lg["name"]: (lg["state"], lg["account"]) for lg in card["logins"]} == {
+        "a": ("signed_in", "t:paul"),
+        "b": ("signed_in", "t:paul"),
+    }
+    assert [x["key"] for x in card["accounts"]] == ["t:paul"] and card["version"] == kept["tools"][0]["version"]
+    assert logins.load(tmp_path)["logins"]["t:b"]["account"] == "t:paul"
+    assert [lg["name"] for lg in kept["tools"][0]["logins"]] == ["a", "b"]  # the kept read is not edited in place
+
+
+def test_a_poll_drops_a_found_row_whose_folder_became_a_login(monkeypatch, tmp_path):
+    d = str(tmp_path / "default")
+    _host(monkeypatch, _Tool("t", tmp_path / "default", {d: ({"match": "M"}, True)}))
+    logins.save(logins.empty(), "fixture", tmp_path)
+    kept = tools.read(b"s" * 32, env={}, home=tmp_path, memory=logins.Memory())
+    assert kept["tools"][0]["found"] == [{"folder": d, "own_home": False}]
+    logins.update(lambda data: data["logins"].update({"t:mine": {"folder": d}}) or "a login", tmp_path)
+    [card] = tools.repoll(kept, b"s" * 32, home=tmp_path, memory=logins.Memory())["tools"]
+    assert card["found"] == [] and [lg["name"] for lg in card["logins"]] == ["mine"]
+    assert kept["tools"][0]["found"]  # the kept read is not edited in place
+
+
+async def test_a_poll_runs_only_while_a_login_s_tools_shell_is_open(monkeypatch):
+    import asyncio
+
+    from sessionorc import agent as agent_mod
+
+    ag = agent_mod.HostAgent.__new__(agent_mod.HostAgent)
+    ag._tools_poll_task, ag._tools_polled_at = None, -1e9
+    ag._tools_lock, ag._tools_salt, ag._tools_memory = asyncio.Lock(), b"s" * 32, logins.Memory()
+    ag._tools_kept, ag._tools_gen, ag._tools_poll_failing = {"switched": True, "tools": []}, 0, False
+    calls = []
+    monkeypatch.setattr(tools, "repoll", lambda kept, salt, memory=None: calls.append(kept) or {**kept, "polled": 1})
+    pane = type("P", (), {"dead": False})()
+    dead = type("P", (), {"dead": True})()
+    for panes in ({}, {"ao--tools-install-t": pane}, {"ao--tools-t-paul": dead}, {"ao-repo-w": pane}):
+        ag._tools_poll_due(panes)
+        assert ag._tools_poll_task is None, panes  # no login's tools shell open: no poll
+    ag._tools_poll_due({"ao--tools-t-paul": pane})
+    await ag._tools_poll_task
+    assert len(calls) == 1 and ag._tools_kept["polled"] == 1
+    ag._tools_poll_due({"ao--tools-t-paul": pane})
+    assert ag._tools_poll_task.done() and len(calls) == 1  # within the interval: no second pass
+    ag._tools_polled_at = -1e9
+    async with ag._tools_lock:  # a full read in flight: the poll yields to it
+        ag._tools_poll_due({"ao--tools-t-paul": pane})
+        await ag._tools_poll_task
+    assert len(calls) == 1
+    ag._tools_polled_at, ag._tools_kept = -1e9, {"switched": False, "tools": []}
+    ag._tools_poll_due({"ao--tools-t-paul": pane})
+    assert ag._tools_poll_task.done() and len(calls) == 1  # an unswitched host polls no logins
+
+
+async def test_a_read_begun_before_a_logins_write_is_never_kept_and_its_memory_is_a_copy(monkeypatch, tmp_path):
+    """A poll in flight when a login write lands settled the file as it was: the write's cleared read stays cleared,
+    and the memory it settled is not kept; the pass settles a copy, never the memory the loop reads."""
+    import asyncio
+    import threading
+
+    from sessionorc import agent as agent_mod
+
+    ag = agent_mod.HostAgent.__new__(agent_mod.HostAgent)
+    ag._tools_poll_task, ag._tools_polled_at = None, -1e9
+    ag._tools_lock, ag._tools_salt, ag._tools_memory = asyncio.Lock(), b"s" * 32, logins.Memory()
+    ag._tools_kept, ag._tools_gen, ag._tools_poll_failing = {"switched": True, "tools": [], "label": "old"}, 0, False
+    loop_memory = ag._tools_memory
+    started, release = threading.Event(), threading.Event()
+
+    def repoll(kept, salt, memory=None):
+        assert memory is not loop_memory
+        memory.last["claude-code:paul"] = "m1"
+        started.set()
+        release.wait(5)
+        return {**kept, "polled": 1}
+
+    monkeypatch.setattr(tools, "repoll", repoll)
+    monkeypatch.setattr(logins, "update", lambda edit, home=None: "claude-code:paul labelled 'new'")
+    ag._tools_poll_due({"ao--tools-t-paul": type("P", (), {"dead": False})()})
+    await asyncio.to_thread(started.wait, 5)
+    assert await ag._login_write(lambda d: "x") == {"change": "claude-code:paul labelled 'new'"}
+    release.set()
+    await ag._tools_poll_task
+    assert ag._tools_kept is None and ag._tools_memory is loop_memory and not loop_memory.last
+    ag._tools_kept = {"switched": True, "tools": []}
+    ag._tools_polled_at = -1e9
+    monkeypatch.setattr(tools, "repoll", lambda kept, salt, memory=None: memory.last.update(x="m") or {**kept, "p": 2})
+    ag._tools_poll_due({"ao--tools-t-paul": type("P", (), {"dead": False})()})
+    await ag._tools_poll_task
+    assert ag._tools_kept["p"] == 2 and ag._tools_memory.last == {"x": "m"}  # no write between: both kept
+
+
+async def test_a_failing_poll_is_logged_once_until_one_succeeds(monkeypatch, caplog):
+    import asyncio
+
+    from sessionorc import agent as agent_mod
+
+    ag = agent_mod.HostAgent.__new__(agent_mod.HostAgent)
+    ag._tools_poll_task, ag._tools_polled_at = None, -1e9
+    ag._tools_lock, ag._tools_salt, ag._tools_memory = asyncio.Lock(), b"s" * 32, logins.Memory()
+    ag._tools_kept, ag._tools_gen, ag._tools_poll_failing = {"switched": True, "tools": []}, 0, False
+    ok = []
+
+    def repoll(kept, salt, memory=None):
+        if not ok:
+            raise logins.LoginError("logins.yml is malformed")
+        return {**kept, "p": 1}
+
+    monkeypatch.setattr(tools, "repoll", repoll)
+    for _ in range(3):
+        await ag._tools_poll()
+    assert sum("poll failed" in r.message for r in caplog.records) == 1
+    ok.append(1)
+    await ag._tools_poll()
+    assert not ag._tools_poll_failing and ag._tools_kept["p"] == 1
+    ok.clear()
+    await ag._tools_poll()
+    assert sum("poll failed" in r.message for r in caplog.records) == 2  # failing again after a success: said again
+
+
 def test_update_refuses_an_unswitched_host_and_writes_nothing_for_no_change(tmp_path):
     with pytest.raises(logins.LoginError, match="switch-over"):
         logins.update(lambda d: "x", tmp_path)

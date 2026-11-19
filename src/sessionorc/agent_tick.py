@@ -456,6 +456,7 @@ class TickMixin:
         await self._refresh_model(snapshot_at)
         await self._refresh_context(snapshot_at)
         await self._refresh_shells(snapshot_at, panes)
+        self._tools_poll_due(panes)  # a login's tools shell open: its identity read again (§4.2b)
         await self._refresh_links(snapshot_at)
         await self._refresh_prompts(snapshot_at)
         if self._derive_task is None or self._derive_task.done():

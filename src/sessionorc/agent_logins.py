@@ -32,6 +32,7 @@ class LoginsMixin:
         except OSError as e:
             log.warning("a logins write failed: %s", e)
             raise RpcError(f"this host's logins could not be written: {type(e).__name__}") from None
+        self._tools_gen += 1  # a read in flight settled the file as it was: it is not kept (`_tools_keep`)
         self._tools_kept = None  # the page reads afresh: what it drew is stale
         return {"change": words}
 
