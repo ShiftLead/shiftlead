@@ -978,6 +978,35 @@ HELP: tuple[Help, ...] = (
             "name. Refused, naming them, while a session runs on it."
         ),
     ),
+    Help(
+        "tools-settings",
+        "Settings",
+        "Tools page: a login",
+        (
+            "Opens this login's settings under it: its billing, a metered login's prices, the arguments added to "
+            "every launch and to an unattended one, how long a permission prompt waits, and a model pin. Save writes "
+            "only what you changed, each checked as the design's login rules say; an empty field clears it."
+        ),
+    ),
+    Help(
+        "tools-add-login",
+        "+ Add login",
+        "Tools page",
+        (
+            "Adds a login of this tool: a name, and a folder that is empty to make a new one beside the tool's own, "
+            "or an existing folder to use. A new folder's tools shell opens for Sign in; the account is named when it"
+            " signs in, or now."
+        ),
+    ),
+    Help(
+        "tools-add-found",
+        "Add",
+        "Tools page: a found row",
+        (
+            "Adds the tool's default home, found signed in here, as a login: you give its name, or leave it empty to "
+            "have one suggested from who is signed in. It is never added unasked, since it may be a scratch copy."
+        ),
+    ),
 )
 
 BY_KEY: dict[str, Help] = {h.key: h for h in HELP}
@@ -1113,6 +1142,9 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "tools-login-shell",
             "tools-note",
             "tools-forget",
+            "tools-settings",
+            "tools-add-login",
+            "tools-add-found",
         ),
     ),
 )

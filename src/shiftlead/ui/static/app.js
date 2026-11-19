@@ -5883,9 +5883,10 @@
     // a login's and an account's controls on a switched host (§4.5a *Tools page: a login*, *an account*; TD-1974):
     // each its `ao login` / `ao account` verb, sending back the version the page read; a write draws the page afresh,
     // a shell goes to its Focus, and a refusal is the host agent's words, in place. A prompt left empty clears.
+    // `data-tool-act`, never `data-act`: the page-wide handler sends every `[data-act]` press as a session's action
     const act = async (b) => {
       const row = b.closest("[data-login], [data-account]"); if (!row) return;
-      const what = b.dataset.act, v = row.dataset.version || null, login = row.dataset.login;
+      const what = b.dataset.toolAct, v = row.dataset.version || null, login = row.dataset.login;
       let path, body;
       if (!login) {  // ✎ on an account
         const label = prompt(`Label for ${row.dataset.account} (empty clears it)`, row.dataset.label || "");
@@ -5905,6 +5906,9 @@
         const account = prompt(`Which account is ${login} signed into? An account's key, or a new account's name`, "");
         if (!account) return;
         path = "/api/tools/login/account"; body = { login, account, version: v };
+      } else if (what === "settings") {  // the login's Settings form, under its row (TD-1974)
+        const f = $("form.toolsettings", row); if (f) { f.hidden = !f.hidden; if (!f.hidden) { const x = $("select, input", f); if (x) x.focus(); } }
+        return;
       } else if (what === "forget") {
         if (!confirm(`Forget ${login}? Its folder stays on disk, and adding that folder again takes back its name.`)) return;
         path = "/api/tools/login/forget"; body = { login, version: v };
@@ -5916,9 +5920,45 @@
         else location.reload();
       } catch (e) { say(e.message); b.disabled = false; }
     };
-    $$(".toollogin [data-act], .toolacct [data-act]", page).forEach((b) => b.addEventListener("click", () => {
+    $$(".toollogin [data-tool-act], .toolacct [data-tool-act]", page).forEach((b) => b.addEventListener("click", () => {
       const d = b.closest("details.more"); if (d) d.open = false;
       act(b);
+    }));
+    // a send whose reply opens a tools shell goes to its Focus; any other draws the page afresh
+    const sent = async (path, body, b) => {
+      b.disabled = true;
+      try {
+        const got = await post(path, body);
+        if (got && got.shell && got.shell.id) location.href = "/focus/" + encodeURIComponent(got.shell.id);
+        else { if (got && got.shell_error) alert(got.shell_error); location.reload(); }
+      } catch (e) { say(e.message); b.disabled = false; }
+    };
+    // Settings: the keys changed since the page drew them, one write each (§4.2b *Controls and verbs*)
+    $$("form.toolsettings", page).forEach((f) => {
+      $("[data-cancel]", f).addEventListener("click", () => { f.reset(); f.hidden = true; });
+      f.addEventListener("submit", (ev) => {
+        ev.preventDefault();
+        const row = f.closest("[data-login]"), changes = {};
+        $$("[name]", f).forEach((x) => { if (x.value !== (x.dataset.was || "")) changes[x.name] = x.value; });
+        if (!Object.keys(changes).length) { f.hidden = true; return; }
+        sent("/api/tools/login/settings", { login: row.dataset.login, version: row.dataset.version || null, billing: f.dataset.billing || null, changes }, $('[type="submit"]', f));
+      });
+    });
+    // + Add login, Use an existing folder (its folder field), and Add on a found row (§4.2b *How a login is found and made*)
+    $$(".tooladdlogin", page).forEach((w) => {
+      const f = $("form", w);
+      $(".tooladd", w).addEventListener("click", () => { f.hidden = !f.hidden; if (!f.hidden) $("input", f).focus(); });
+      $("[data-cancel]", f).addEventListener("click", () => { f.reset(); f.hidden = true; });
+      f.addEventListener("submit", (ev) => {
+        ev.preventDefault();
+        const v = (n) => $(`[name="${n}"]`, f).value.trim();
+        sent("/api/tools/add", { tool: f.dataset.tool, name: v("name"), path: v("path"), account: v("account") }, $('[type="submit"]', f));
+      });
+    });
+    $$(".tooladdfound", page).forEach((b) => b.addEventListener("click", () => {
+      const name = prompt(`Add ${b.dataset.path} as a login: its name (empty: suggested from who is signed in)`, "");
+      if (name === null) return;
+      sent("/api/tools/add", { tool: b.dataset.tool, path: b.dataset.path, name }, b);
     }));
   };
   // The Queue page (design §4.5 screen 12, §4.5a *Queue page*; TD-771): the cards (`AO.qcards`), the
