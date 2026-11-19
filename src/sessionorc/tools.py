@@ -6,7 +6,9 @@ nothing anywhere. The host agent keeps one read, made when it starts and again o
 a tick reads none of it.
 
 Before the switch-over (`switched`, no `logins.yml`) a tool card carries no accounts and no logins: the reply holds
-the tool cards, their versions, the found rows and *Not ready to run here*.
+the tool cards, their versions, the found rows and *Not ready to run here*. From it, each card carries its logins and
+the accounts they are signed into (TD-1974): each login's identity and credentials read, the pass settled
+(`logins.settle`), and a login that joined an account written to `logins.yml` before the reply.
 """
 
 from __future__ import annotations
@@ -19,11 +21,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc import adapters, hosts, paths
+from sessionorc import adapters, hosts, logins
 
 log = logging.getLogger("shiftlead.tools")
 
-LOGINS_FILE = "logins.yml"
+LOGINS_FILE = logins.LOGINS_FILE
 # whether the host agent makes the Tools page's read when it starts (design §4.2b, TD-2002): a test knob, never a
 # setting — the suite starts hundreds of host agents, and each one's read runs every tool's real `--version` on this
 # machine; conftest turns it off, and a test of the start's read turns it on
@@ -45,7 +47,7 @@ def short_version(version: str | None) -> str | None:
 def switched(home: Path | None = None) -> bool:
     """Whether this host is switched over to logins (design §4.2b *The page*): it has a `logins.yml`. The one test every
     Tools build calls; who writes the file at the window is the cut-over's design (TD-1976)."""
-    return ((home or paths.home()) / LOGINS_FILE).is_file()
+    return logins.switched(home)
 
 
 def _ask(ad: object, method: str, fallback: Any, *args: Any) -> Any:
@@ -79,7 +81,7 @@ def _version(ad: object, env: Mapping[str, str]) -> str | None:
         return None
 
 
-def _card(name: str, ad: object, env: Mapping[str, str], salt: bytes) -> dict[str, Any]:
+def _card(name: str, ad: object, env: Mapping[str, str], salt: bytes, folders: list[Path] = ()) -> dict[str, Any]:
     """One supported tool (design §4.2b *The read*): an agent adapter, found or not."""
     found = _ask(ad, "find", None)
     card: dict[str, Any] = {
@@ -102,7 +104,7 @@ def _card(name: str, ad: object, env: Mapping[str, str], salt: bytes) -> dict[st
     except Exception:  # noqa: BLE001
         home = None
     own = getattr(ad, "own_home", None)
-    if home is not None and _signed_in(ad, home, salt):
+    if home is not None and not any(adapters.same_home(home, f) for f in folders) and _signed_in(ad, home, salt):
         # the tool's default home, signed in and not yet a login; an `own_home` adapter's may never be one (§4.2a)
         card["found"].append(
             {"folder": str(home), "own_home": own is not None and adapters.same_home(home, Path(own).expanduser())}
@@ -110,18 +112,30 @@ def _card(name: str, ad: object, env: Mapping[str, str], salt: bytes) -> dict[st
     return card
 
 
-def read(salt: bytes, env: Mapping[str, str] | None = None, home: Path | None = None) -> dict[str, Any]:
+def read(
+    salt: bytes, env: Mapping[str, str] | None = None, home: Path | None = None, memory: logins.Memory | None = None
+) -> dict[str, Any]:
     """`tools`' reply (design §4.2b *Controls and verbs*): `{host, read_at, switched, tools, not_ready}`. `tools` are
     the supported tools found on this host; `not_ready` the supported tools not found (each with its install command)
-    and the known tools with no adapter, found or not — each in a card's shape, `supported` saying which."""
+    and the known tools with no adapter, found or not — each in a card's shape, `supported` saying which. On a
+    switched host each found tool's card carries its `accounts` and `logins`, `memory` the run's matches."""
     env = dict(os.environ if env is None else env)
+    data = logins.load(home)
     tools: list[dict[str, Any]] = []
     not_ready: list[dict[str, Any]] = []
     for name in adapters.names():
         if not adapters.has_agent(name):
             continue
-        card = _card(name, adapters.get(name), env, salt)
+        ad = adapters.get(name)
+        mine = [
+            Path(e.get("folder", "")).expanduser()
+            for e in (data or {}).get("logins", {}).values()
+            if e.get("tool") == name
+        ]
+        card = _card(name, ad, env, salt, mine)
         (tools if card["installed"] else not_ready).append(card)
+    if data is not None:
+        _login_tree(tools, data, salt, memory if memory is not None else logins.Memory(), home)
     try:
         known = adapters.known_tools()
     except Exception:  # noqa: BLE001 — a bad table row costs the known tools, never the supported tools' cards
@@ -148,7 +162,85 @@ def read(salt: bytes, env: Mapping[str, str] | None = None, home: Path | None = 
     return {
         "host": hosts.local_host().name,
         "read_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "switched": switched(home),
+        "switched": data is not None,
         "tools": tools,
         "not_ready": not_ready,
     }
+
+
+def _login_tree(
+    cards: list[dict[str, Any]], data: dict[str, Any], salt: bytes, memory: logins.Memory, home: Path | None
+) -> None:
+    """Each found tool's logins and accounts (design §4.2b *The page*, *A login's state*, *Matching across a
+    restart*): every login's identity and credentials read, the whole pass settled once its reads are in, a login
+    that joined an account written, and the cards filled. A login whose tool is not found draws on no card."""
+    by_tool = {c["adapter"]: c for c in cards}
+    reads: dict[str, tuple[dict[str, Any] | None, bool | None]] = {}
+    for n, e in data["logins"].items():
+        card = by_tool.get(str(e.get("tool")))
+        if card is None:
+            continue
+        ad = adapters.get(card["adapter"])
+        folder = Path(str(e.get("folder", ""))).expanduser()
+        ident = _ask(ad, "identity", None, folder, salt)
+        reads[n] = (
+            ident if isinstance(ident, dict) and ident.get("match") else None,
+            _ask(ad, "credentials_ok", None, folder),
+        )
+    # a match is compared within its tool alone: two tools' keys are never one account
+    matches = {n: f"{data['logins'][n]['tool']}\0{i['match']}" if i else None for n, (i, _) in reads.items()}
+    stored = {n: data["logins"][n].get("account") for n in reads}
+    settled = logins.settle(stored, matches, memory)
+    if settled.moves:
+        for n, key in settled.moves.items():
+            data["logins"][n]["account"] = key
+        logins.save(data, ", ".join(f"{n} joined {k}" for n, k in sorted(settled.moves.items())), home)
+    accounts: dict[str, dict[str, Any]] = {}
+    stored_billing: dict[str, str] = {}  # an account's billing is its logins' `billing`, the person's, where one says
+    for n, (ident, creds) in reads.items():
+        e = data["logins"][n]
+        card = by_tool[str(e["tool"])]
+        ad = adapters.get(card["adapter"])
+        st = logins.state(ident, creds)
+        key = settled.account.get(n)
+        if n in settled.name_account:
+            st, key = "name_account", None
+        elif key is None and st == "signed_in":
+            key = logins.derived_key(str(e["tool"]), n)  # an API key with no identity: an account of its own
+        warnings = []
+        if ident and ident.get("billing") and e.get("billing") and ident["billing"] != e["billing"]:
+            warnings.append("billing_mismatch")
+        card["logins"].append(
+            {
+                "name": n,
+                "label": e.get("label"),
+                "folder": str(e.get("folder", "")),
+                "account": key,
+                "state": st,
+                "mismatch": n in settled.mismatch,
+                "warnings": warnings,
+                "note": e.get("note"),
+                "pin": e.get("pin"),
+                "version": logins.version(e),
+            }
+        )
+        if key is None or st == "not_signed_in":
+            continue
+        acct = accounts.get(key)
+        if acct is not None and e.get("billing") and not stored_billing.get(key):
+            acct["billing"] = stored_billing[key] = e["billing"]  # the person's word over the tool's record
+        if acct is None:
+            plan = ident.get("plan") if ident else None
+            offer = _ask(ad, "models", None, Path(str(e.get("folder", ""))).expanduser(), plan)
+            acct = accounts[key] = {
+                "key": key,
+                "label": (data["accounts"].get(key) or {}).get("label"),
+                "plan": plan,
+                "billing": e.get("billing") or (ident.get("billing") if ident else None),
+                "models": offer if isinstance(offer, dict) else {"families": [], "default": None, "unconfirmed": True},
+                "gauges": [],
+                "version": logins.version(data["accounts"].get(key)),
+            }
+            card["accounts"].append(acct)
+            if e.get("billing"):
+                stored_billing[key] = e["billing"]

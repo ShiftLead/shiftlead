@@ -17,6 +17,7 @@ import binascii
 import contextlib
 import copy
 import fnmatch
+import functools
 import json
 import logging
 import os
@@ -1061,6 +1062,8 @@ class HostAgent(
         # and kept only in memory, so an identity's match compares within this run and is written nowhere
         self._tools_salt = secrets.token_bytes(32)
         self._tools_kept: dict[str, Any] | None = None
+        # what this run knows of the logins' matches (§4.2b *Matching across a restart*): in memory only, never written
+        self._tools_memory = tools_mod.logins.Memory()
         self._tools_lock = asyncio.Lock()
         self._tools_task: asyncio.Task[Any] | None = None
 
@@ -3968,7 +3971,7 @@ class HostAgent(
         """Read this host's tools again and keep the read (design §4.2b *What the adapter reads*, TD-1973)."""
         async with self._tools_lock:
             try:
-                got = await _in_daemon_thread(tools_mod.read, self._tools_salt)
+                got = await _in_daemon_thread(functools.partial(tools_mod.read, self._tools_salt, memory=self._tools_memory))
             except Exception as e:  # noqa: BLE001 — a failed read is said to the asker; the kept one stands
                 log.exception("the tools read failed")
                 raise RpcError(f"this host's tools could not be read: {type(e).__name__}") from None
