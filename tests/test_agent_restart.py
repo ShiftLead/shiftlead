@@ -250,21 +250,29 @@ def test_prune_runs_keeps_live_logs(tmp_path, monkeypatch):
     store.save(live)
     store.save(dead)
     tmux = Tmux(socket_name=private_socket_name())
+
+    async def tick_and_drain(a: HostAgent) -> None:
+        """One tick, then the sweep's pass it started, awaited in the same loop: `asyncio.run`'s teardown would
+        cancel a detached pass that has not run yet (TD-2007)."""
+        await a.tick()
+        if a._prune_task is not None:
+            await a._prune_task
+
     try:
         a = HostAgent(tmux=tmux)
-        asyncio.run(a.tick())  # the first tick sweeps
+        asyncio.run(tick_and_drain(a))  # the first tick sweeps
         assert live_log.exists() and fresh.exists()  # running session's log; a recent file
         assert not dead_log.exists() and not orphan.exists()  # exited session's; a forgotten session's
         os.utime(fresh, (old_t, old_t))
-        asyncio.run(a.tick())
+        asyncio.run(tick_and_drain(a))
         assert fresh.exists()  # within the hour: no sweep
         a._pruned_at -= timedelta(hours=2)
         (paths.home() / "hosts.yml").write_text("local:\n  runs_keep_days: 0\n")
-        asyncio.run(a.tick())
+        asyncio.run(tick_and_drain(a))
         assert fresh.exists()  # due, but 0 keeps everything
         (paths.home() / "hosts.yml").write_text("local:\n  runs_keep_days: 7\n")
         a._pruned_at -= timedelta(hours=2)
-        asyncio.run(a.tick())
+        asyncio.run(tick_and_drain(a))
         assert not fresh.exists() and live_log.exists()
     finally:
         kill_private_server(tmux)
