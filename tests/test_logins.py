@@ -440,6 +440,38 @@ async def test_a_logins_write_never_stops_the_poll_its_next_pass_reads_in_full(m
     assert len(reads) == 2 and len(polls) == 1  # and repolls after it
 
 
+async def test_a_poll_s_failing_full_read_is_logged_once_and_waits_longer(monkeypatch, caplog):
+    import asyncio
+
+    from sessionorc import agent as agent_mod
+
+    ag = agent_mod.HostAgent.__new__(agent_mod.HostAgent)
+    ag._tools_poll_task, ag._tools_polled_at = None, -1e9
+    ag._tools_lock, ag._tools_salt, ag._tools_memory = asyncio.Lock(), b"s" * 32, logins.Memory()
+    ag._tools_kept, ag._tools_gen, ag._tools_poll_failing, ag._tools_was_switched = None, 0, False, True
+    reads = []
+
+    def read(salt, env=None, home=None, memory=None):
+        reads.append(1)
+        raise OSError("gone")
+
+    monkeypatch.setattr(tools, "read", read)
+    shell = {"ao--tools-t-paul": type("P", (), {"dead": False})()}
+    ag._tools_poll_due(shell)
+    await ag._tools_poll_task
+    ag._tools_poll_due(shell)
+    assert ag._tools_poll_task.done() and len(reads) == 1  # 5 s on: the failed full read waits longer
+    for _ in range(2):
+        ag._tools_polled_at = -1e9
+        ag._tools_poll_due(shell)
+        await ag._tools_poll_task
+    assert len(reads) == 3 and sum("tools read failed" in r.message for r in caplog.records) == 1
+    ag._tools_was_switched = False  # an unswitched host's cleared read starts no pass
+    ag._tools_polled_at = -1e9
+    ag._tools_poll_due(shell)
+    assert ag._tools_poll_task.done() and len(reads) == 3
+
+
 async def test_a_failing_poll_is_logged_once_until_one_succeeds(monkeypatch, caplog):
     import asyncio
 
