@@ -600,7 +600,8 @@ def _own_board(
         closed = _write_board(
             board, items, keys, today_local, by, "the gate sweep: its condition no longer holds", name=Path(root).name
         )
-        subject = f"board: gate sweep {today_utc.isoformat()} — {len(items)} filed, {closed} closed (TD-1376)"
+        # no ledger id: TD-1376 is shiftlead's, and another repo's merge gate refuses a title naming it (TD-2022)
+        subject = f"board: gate sweep {today_utc.isoformat()} — {len(items)} filed, {closed} closed"
         body = "\n".join(
             ["The home's gate sweep (design §4.4, TD-1376) on this repo's own board.", ""]
             + [f"- file: [{it['kind']}] {it['text']} — Context: {it['context']}" for it in items]
