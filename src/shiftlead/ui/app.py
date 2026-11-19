@@ -1117,7 +1117,7 @@ def login_tree(card: dict[str, Any], home: str, weights: Mapping[str, Any] | Non
     for lg in card.get("logins") or []:
         lg["families"] = fams.get(lg.get("account")) or []  # a pin's choices: its account's families
         lg["fills"] = price_fills(weights or {}, lg["families"])  # prices' fill-in: the Settings page's weights
-        lg["fill_id"] = f"fills-{card.get('adapter')}-{lg.get('name')}"  # unique on the page: a name is per tool
+        lg["fill_id"] = f"fills-{card.get('adapter')}.{lg.get('name')}"  # unique: no tool or login name holds a `.`
     accounts = []
     for a in card.get("accounts") or []:
         key = str(a.get("key") or "")

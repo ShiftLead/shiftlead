@@ -260,8 +260,8 @@ def test_prices_offer_the_settings_pages_weights_for_the_accounts_families(monke
     with TestClient(app_mod.create_app()) as c:
         text = c.get("/tools").text
     row = section(text, 'data-login="claude-code:claude-paul"', "</form>")
-    assert 'list="fills-claude-code-claude-paul"' in row
-    fills = section(row, '<datalist id="fills-claude-code-claude-paul">', "</datalist>")
+    assert 'list="fills-claude-code.claude-paul"' in row
+    fills = section(row, '<datalist id="fills-claude-code.claude-paul">', "</datalist>")
     # its account offers opus, sonnet and haiku: their weights, and no Gemini model nor the date
     assert 'label="claude-opus-5-5"' in fills and 'label="claude-sonnet"' in fills
     assert "gemini" not in fills and "as_of" not in fills
@@ -277,3 +277,19 @@ def test_a_weight_matches_a_family_as_a_word_and_none_read_offers_every_one():
     assert [f["model"] for f in app_mod.price_fills(w, ["op"])] == ["claude-opus-5", "claude-sonnet-4"]
     assert [f["model"] for f in app_mod.price_fills(w, [])] == ["claude-opus-5", "claude-sonnet-4"]
     assert app_mod.price_fills({}, ["opus"]) == []
+
+
+def test_a_settings_read_refused_draws_no_fill_in(monkeypatch):
+    from fastapi import HTTPException
+    from fastapi.testclient import TestClient
+
+    async def call(method, **params):
+        if method == "settings":
+            raise HTTPException(400, "unknown method settings")  # an older agent
+        return read() if method == "tools" else {}
+
+    monkeypatch.setattr(app_mod, "agent_call", call)
+    with TestClient(app_mod.create_app()) as c:
+        r = c.get("/tools")
+    assert r.status_code == 200 and 'data-login="claude-code:claude-paul"' in r.text
+    assert "<datalist" not in r.text and 'name="prices"' in r.text
