@@ -26,7 +26,7 @@ import uuid
 from collections.abc import Mapping
 from pathlib import Path
 
-from sessionorc.adapters import LaunchSpec, Transcript, read_version, same_home
+from sessionorc.adapters import LaunchSpec, Transcript, account_match, plain_name, read_version, same_home
 from sessionorc.models import Confidence, State
 from sessionorc.screen import painted_text
 from sessionorc.tmux import PaneInfo
@@ -44,6 +44,10 @@ HOOK_FILE = Path("hooks") / "shiftlead.json"  # under the profile's GROK_HOME
 # what the tool writes into a home of its own: its sign-in (design §4.2b `is_home`, TD-1971) — never a directory
 # name as plain as `sessions/`, which another program's folder may hold
 HOME_MARKS = ("auth.json",)
+# how each `auth_mode` is billed, as `identity` suggests it (§4.2b): a signed-in account's plan (`oidc`, the mode
+# `grok login` writes, read off the installed tool's file at the build); an API key comes from the environment and
+# writes no entry; another mode says nothing
+AUTH_BILLING = {"oidc": "subscription"}
 # every event the state feed reads (§4.3 *The state feed*; the guide's *Hook Events*)
 HOOK_EVENTS = (
     "SessionStart",
@@ -151,7 +155,7 @@ class GrokAdapter:
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): the reads of its
     # transcript come with TD-1637's later slices
     implements: frozenset[str] = frozenset(
-        {"composer", "title", "find", "home_env", "install_command", "signin_command", "is_home"}
+        {"composer", "title", "find", "home_env", "install_command", "signin_command", "is_home", "identity"}
     )
     # its title does not tell a question tool's wait from a turn's spinner (§4.3 *The title as the check*)
     state_in_title = False
@@ -339,6 +343,26 @@ class GrokAdapter:
         ShiftLead's own hook file alone."""
         p = Path(path).expanduser()
         return any((p / mark).exists() for mark in HOME_MARKS)
+
+    def identity(self, home: Path, salt: bytes) -> dict | None:
+        """Who `home` is signed in as (§4.2b): the entry of its `auth.json` — the account key is the entry's
+        `user_id` (the entry is stored under the issuer and client id, the same for every account), which never
+        leaves here but salted as `match`; `display` its `first_name`; no `plan`, which the tool does not name;
+        `billing` read from `auth_mode`. None with no entry holding a user id."""
+        try:
+            doc = json.loads((Path(home).expanduser() / "auth.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        entries = [e for e in doc.values() if isinstance(e, dict)] if isinstance(doc, dict) else []
+        entry = next((e for e in entries if isinstance(e.get("user_id"), str) and e["user_id"]), None)
+        if entry is None:
+            return None
+        return {
+            "match": account_match(salt, entry["user_id"]),
+            "display": plain_name(entry.get("first_name")),
+            "plan": None,
+            "billing": AUTH_BILLING.get(entry.get("auth_mode") if isinstance(entry.get("auth_mode"), str) else ""),
+        }
 
     def doctor_profiles(self) -> list[dict]:
         """What `ao doctor` reads of each Grok profile (design §4.7, §4.3 *Reads*): its home and whether it is

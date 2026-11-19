@@ -34,6 +34,7 @@ from sessionorc.adapters import (
     Link,
     MailDelivery,
     Transcript,
+    account_match,
     oldest_first,
     read_version,
     same_home,
@@ -120,6 +121,9 @@ REFUSED = "the Gemini layer is not installed — run the line `ao doctor` prints
 CLI_INSTALL_LINE = "npm install -g @google/gemini-cli"
 # what the tool writes under a home's `.gemini/`: its accounts, its credentials, its install id (§4.2b `is_home`);
 # never `settings.json`, which a repo's own `.gemini/` holds too
+# how each `selectedType` is billed, as `identity` suggests it (§4.2b): a Google sign-in's quota windows, or a key's
+# metered use; another type says nothing
+SELECTED_BILLING = {"oauth-personal": "subscription", "gemini-api-key": "metered", "vertex-ai": "metered"}
 HOME_MARKS = ("google_accounts.json", "oauth_creds.json", "gemini-credentials.json", "installation_id")
 
 
@@ -287,7 +291,7 @@ class GeminiAdapter:
     implements: frozenset[str] = frozenset(
         {
             *("background", "composer", "context", "conversations", "links", "mail", "spend", "title"),
-            *("find", "home_env", "install_command", "signin_command", "is_home"),
+            *("find", "home_env", "install_command", "signin_command", "is_home", "identity"),
         }
     )
 
@@ -493,6 +497,31 @@ class GeminiAdapter:
         """Whether `path` is a home of this tool, by what the tool writes under its `.gemini/` (§4.2b)."""
         gem = Path(path).expanduser() / ".gemini"
         return any((gem / mark).exists() for mark in HOME_MARKS)
+
+    def identity(self, home: Path, salt: bytes) -> dict | None:
+        """Who `home` is signed in as (§4.2b): the active account of its `.gemini/google_accounts.json`, an email,
+        which never leaves here but salted as `match`; no `display`, since the tool records none but the email;
+        `plan` the `selectedType` of its `.gemini/settings.json`, an API key's read as metered. None with no
+        active account (signed out, or a key alone)."""
+        gem = Path(home).expanduser() / ".gemini"
+        try:
+            key = json.loads((gem / "google_accounts.json").read_text(encoding="utf-8")).get("active")
+        except (OSError, ValueError, AttributeError):
+            return None
+        if not isinstance(key, str) or not key:
+            return None
+        try:
+            doc = json.loads((gem / "settings.json").read_text(encoding="utf-8"))
+            selected = ((doc.get("security") or {}).get("auth") or {}).get("selectedType")
+        except (OSError, ValueError, AttributeError):
+            selected = None
+        selected = selected if isinstance(selected, str) else None
+        return {
+            "match": account_match(salt, key),
+            "display": None,
+            "plan": selected,
+            "billing": SELECTED_BILLING.get(selected or ""),
+        }
 
     def doctor_profiles(self) -> list[dict]:
         """What `ao doctor` reads of each Gemini profile (design §4.7, §4.3): its home, its credential, a

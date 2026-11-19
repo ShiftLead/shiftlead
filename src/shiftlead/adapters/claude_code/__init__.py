@@ -32,7 +32,9 @@ from sessionorc.adapters import (
     Link,
     Prompt,
     Transcript,
+    account_match,
     oldest_first,
+    plain_name,
     read_version,
     same_home,
 )
@@ -607,7 +609,7 @@ class ClaudeCodeAdapter:
     implements = frozenset(
         {
             *("background", "composer", "context", "conversations", "links", "prompts", "spend", "title"),
-            *("usage_report", "find", "home_env", "install_command", "signin_command", "is_home"),
+            *("usage_report", "find", "home_env", "install_command", "signin_command", "is_home", "identity"),
         }
     )
     marks_errors = True  # a tool result's `is_error` (design §4.3 `read_transcript`, TD-1491)
@@ -1029,6 +1031,28 @@ class ClaudeCodeAdapter:
         credentials — never a repo's `.claude/` of settings alone."""
         p = Path(path).expanduser()
         return any((p / mark).exists() for mark in HOME_MARKS)
+
+    def identity(self, home: Path, salt: bytes) -> dict | None:
+        """Who `home` is signed in as (§4.2b): the `oauthAccount` of the `.claude.json` a launch on it reads —
+        `~/.claude.json` for `~/.claude`, the folder's own otherwise. `match` is the salted `accountUuid`, which never
+        leaves here; `display` is `displayName`, never an email; `plan` `planDisplayName`; `billing` read from
+        `billingType`. None with no account recorded (signed out, or an API key alone)."""
+        h = Path(home).expanduser()
+        record = Path("~/.claude.json").expanduser() if same_home(h, "~/.claude") else h / ".claude.json"
+        try:
+            account = json.loads(record.read_text(encoding="utf-8")).get("oauthAccount")
+        except (OSError, ValueError, AttributeError):
+            return None
+        key = account.get("accountUuid") if isinstance(account, dict) else None
+        if not isinstance(key, str) or not key:
+            return None
+        billing = account.get("billingType")
+        return {
+            "match": account_match(salt, key),
+            "display": plain_name(account.get("displayName")),
+            "plan": account.get("planDisplayName") if isinstance(account.get("planDisplayName"), str) else None,
+            "billing": "subscription" if isinstance(billing, str) and "subscription" in billing else None,
+        }
 
     def doctor_profiles(self) -> list[dict]:
         """What `ao doctor` reads of each profile this adapter runs (design §4.7 **`ao doctor`**
