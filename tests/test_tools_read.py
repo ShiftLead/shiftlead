@@ -176,7 +176,9 @@ async def test_the_read_is_kept_and_check_again_is_the_persons(agent, monkeypatc
     if started is not None:  # the start's own read, settled before the stub stands in
         await started
     reads = []
-    monkeypatch.setattr(tools, "read", lambda salt, env=None, home=None: reads.append(salt) or {"n": len(reads)})
+    monkeypatch.setattr(
+        tools, "read", lambda salt, env=None, home=None, memory=None: reads.append(salt) or {"n": len(reads)}
+    )
     agent._tools_kept = None
     async with LocalClient() as c:
         assert await c.call("tools") == {"n": 1}
@@ -242,7 +244,7 @@ async def test_a_test_agent_makes_no_start_read(agent, monkeypatch):
     from sessionorc.client import LocalClient
 
     assert agent._tools_task is None and agent._tools_kept is None
-    monkeypatch.setattr(tools, "read", lambda salt, env=None, home=None: {"read": True})
+    monkeypatch.setattr(tools, "read", lambda salt, env=None, home=None, memory=None: {"read": True})
     async with LocalClient() as c:
         assert await c.call("tools") == {"read": True}
 
