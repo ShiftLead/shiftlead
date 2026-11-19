@@ -820,7 +820,13 @@ class HostAgent(
         self._killed_run_at: dict[str, float] = {}
         self._derive_task: asyncio.Task[None] | None = None
         self._prune_task: asyncio.Task[None] | None = None  # the hourly sweep's pass (TD-1506, TD-1945)
-        self._sweep_roots: list[str] = []  # the registered repos the cache rule reads pins from, set by the tick
+        self._sweep_roots: list[str] = []  # the registered repos the cache and worktree rules read, set by the tick
+        # the worktree rule's place (§4.6 *The disk sweep*, TD-1945): the path of the last worktree a pass weighed,
+        # held in memory only, so a restart starts at the first; and its scope, None reading `default_home()` (a test
+        # gives True to run the rule on a scratch home)
+        self._worktree_cursor = ""
+        self._worktree_scope: bool | None = None
+        self._sweep_loop: asyncio.AbstractEventLoop | None = None
         self._sweep_lock = threading.Lock()  # one pass, or a dry run, at a time (§4.6 *The disk sweep*, TD-1945)
         self._seat_count_task: asyncio.Task[None] | None = None  # §6 rule 3's `gh` read, detached
         self._seat_counted_at = datetime.min.replace(tzinfo=UTC)
@@ -2998,12 +3004,13 @@ class HostAgent(
             s.branch_kept,
         )
 
-    def _reap_idle(self, s: Session, wt: Path) -> str | None:
+    def _reap_idle(self, s: Session | None, wt: Path) -> str | None:
         """The reaper's *idle*, through ShiftLead's own seams (§4.1): no live record of any adapter, a shell's
         included, has its `dir` inside `wt` — this host's, and while their link is up those of the container
         nodes that share the directory (a link down keeps as *<host> unreachable*) — and no session outside
-        ShiftLead is inside; a blind adapter keeps. `s` itself, and an outside session whose tool id is one of
-        ours, never count. Run in a thread: it reads copies of the maps."""
+        ShiftLead is inside; a blind adapter keeps. `s` itself (None for the disk sweep, which closes no record),
+        and an outside session whose tool id is one of ours, never count. Run in a thread: it reads copies of the
+        maps."""
         wt = wt.resolve()
 
         def inside(d: str) -> bool:
@@ -3013,7 +3020,7 @@ class HostAgent(
         mine = list(self.sessions.values())
         ours = {r.adapter_id for r in mine if r.adapter_id}
         for r in mine:
-            if r.id != s.id and r.state not in ("exited", "closed") and r.dir and inside(r.dir):
+            if (s is None or r.id != s.id) and r.state not in ("exited", "closed") and r.dir and inside(r.dir):
                 return f"in use by {r.id}"
         if self.mode == "home" and self.remote:
             for host in containers.container_nodes():
