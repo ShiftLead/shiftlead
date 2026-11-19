@@ -67,6 +67,7 @@ class Tally:
         self.removed = 0
         self.gone_paths: dict[str, int] = {}  # each removed path (a dry run's: each it would remove) and its bytes
         self.kept: list[tuple[str, str]] = []
+        self.held_gone = 0  # the removed bytes that were among those held (a dry run reads them back as held)
         self.unlisted = False  # the rule could not list its items this pass: the last reading stands, *partial*
 
     def list(self, path: str | Path) -> None:
@@ -88,8 +89,12 @@ class Tally:
     def gone(self, path: str | Path, size: int | None = None) -> None:
         """`path` was removed: its bytes (`size`, else as last measured) count as removed, and it is held no more."""
         p = str(path)
+        if p in self.gone_paths:  # a dry run's second rule over a path it already counted: once
+            return
         if size is None:
             size = self.measured.get(p, self._known.get(p, 0))
+        if p in self.listed:
+            self.held_gone += size
         self.removed += size
         self.gone_paths[p] = size
         self.listed.discard(p)
@@ -143,7 +148,7 @@ class Book:
         out = self.close(tallies)
         for kind in KINDS:
             t = tallies.get(kind)
-            out[kind]["held"] += out[kind]["removed"]
+            out[kind]["held"] += t.held_gone if t else 0
             out[kind]["would_remove"] = [
                 {"path": p, "bytes": s} for p, s in sorted((t.gone_paths if t else {}).items())
             ]

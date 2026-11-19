@@ -213,6 +213,19 @@ def test_a_dry_worktree_pass_removes_nothing_and_says_what_it_would(repo):  # no
 
 
 @pytest.mark.unit
+def test_a_dry_run_counts_a_path_two_rules_would_remove_once_and_holds_only_what_was_listed():
+    book = diskbook.Book()
+    t = book.tallies()
+    t["runs"].measure("/r/a.log", 5)
+    t["runs"].gone("/r/a.log", 5)  # the size rule
+    t["runs"].gone("/r/a.log", 5)  # and the age rule, the file still there
+    t["runs"].gone("/r/draft-1", 3)  # a removal of something the reading never held
+    got = book.dry(t)["runs"]
+    assert got["removed"] == 8 and got["held"] == 5
+    assert got["would_remove"] == [{"path": "/r/a.log", "bytes": 5}, {"path": "/r/draft-1", "bytes": 3}]
+
+
+@pytest.mark.unit
 def test_a_dry_cache_pass_takes_no_lock_and_removes_nothing(tmp_path):
     cache = tmp_path / "cache"
     p, o, y = tree(cache, PINNED, 30), tree(cache, OLD, 30), tree(cache, YOUNG, 2)
