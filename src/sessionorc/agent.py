@@ -42,6 +42,7 @@ from sessionorc import (
     build,
     containers,
     defs,
+    diskbook,
     hosts,
     identity,
     ledgerboard,
@@ -825,6 +826,8 @@ class HostAgent(
         # held in memory only, so a restart starts at the first; and its scope, None reading `default_home()` (a test
         # gives True to run the rule on a scratch home)
         self._worktree_cursor = ""
+        self._disk_book = diskbook.Book()  # the sweep's sizes, in memory: a restart reads *partial* (TD-1945)
+        self._disk_result: dict[str, Any] | None = None  # the last pass's result (§4.6 *The sweep's reading*)
         self._worktree_scope: bool | None = None
         self._sweep_loop: asyncio.AbstractEventLoop | None = None
         self._sweep_lock = threading.Lock()  # one pass, or a dry run, at a time (§4.6 *The disk sweep*, TD-1945)

@@ -119,7 +119,7 @@ def test_another_home_s_and_an_unowned_one_are_left_and_a_gone_home_s_goes(root,
         age(d, 2 * HOUR)
     kept = sweep(root, str(home))
     assert theirs.exists() and not gone.exists() and unowned.exists()
-    assert kept == [(str(unowned), "no owner")]
+    assert sorted(kept) == sorted([(str(unowned), "no owner"), (str(theirs), "another home")])
     # the second home's sweep over the same root removes none of the first's
     mine = made(root, str(home), "ao-m-1")
     age(mine, 2 * HOUR)

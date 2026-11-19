@@ -21,6 +21,7 @@ import shutil
 import time
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 from sessionorc import gitinfo, paths
 
@@ -143,12 +144,39 @@ def _writable(path: Path) -> None:
                     os.chmod(p, 0o755)
 
 
-def sweep_trees(pinned: set[str], keep_days: float, now_s: float, cache: Path | None = None) -> list[str]:
+def tally_trees(
+    tally: Any, pinned: set[str] | None = None, keep_days: float = 0, now_s: float = 0, cache: Path | None = None
+) -> None:
+    """List every tree for the sweep's reading (`tally`, a `diskbook.Tally`), sizing each one nothing has sized
+    yet (a tree is named by its commit and never changes); a pinned one older than `keep_days` is kept *pinned*."""
+    trees = (cache or cache_dir()) / "trees"
+    try:
+        entries = sorted(os.scandir(trees), key=lambda e: e.name)
+    except OSError:
+        return
+    for e in entries:
+        if not COMMIT.fullmatch(e.name) or e.is_symlink() or not e.is_dir(follow_symlinks=False):
+            continue
+        if not tally.known(e.path):
+            tally.measure(e.path)
+        tally.list(e.path)
+        if pinned and e.name in pinned and keep_days > 0:
+            with contextlib.suppress(OSError):
+                if now_s - _newest_write(Path(e.path)) >= keep_days * 86400:
+                    tally.keep(e.path, "pinned")
+
+
+def sweep_trees(
+    pinned: set[str], keep_days: float, now_s: float, cache: Path | None = None, tally: Any = None
+) -> list[str]:
     """Remove the trees no pin in `pinned` names whose newest write is older than `keep_days`, under the cache's
-    lock taken without waiting (busy: none this pass). Returns the removed trees' paths."""
+    lock taken without waiting (busy: none this pass). Returns the removed trees' paths; `tally` (a
+    `diskbook.Tally`) is given every tree, each removed one's bytes counted."""
     cache = cache or cache_dir()
     trees = cache / "trees"
     removed: list[str] = []
+    if tally is not None:
+        tally_trees(tally, pinned, keep_days, now_s, cache)
     if keep_days <= 0 or not trees.is_dir():
         return removed
     with open(cache / "lock", "a") as lock:
@@ -180,6 +208,8 @@ def sweep_trees(pinned: set[str], keep_days: float, now_s: float, cache: Path | 
                         log.warning("agent-cadence tree %s was moved aside but not wholly removed", tree)
                         continue
                     removed.append(str(tree))
+                    if tally is not None:
+                        tally.gone(tree)
                     log.info("removed agent-cadence tree %s (no registered repo pins it)", tree)
                 except OSError as err:
                     log.warning("could not remove agent-cadence tree %s: %s", tree, err)
