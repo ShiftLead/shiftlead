@@ -225,6 +225,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     teams_for_form,  # noqa: F401
     teams_view,  # noqa: F401
     templates,  # noqa: F401
+    under_cwd_root,
     usage_accounts,  # noqa: F401
     usage_age,  # noqa: F401
     usage_chip,  # noqa: F401
@@ -1404,8 +1405,20 @@ async def paths_for(call: Any, body: dict[str, Any]) -> dict[str, Any]:
         if not ed or not (form := editor_file(reach)):
             return {**out, "paths": none}  # no file form: its host is never asked
         got = (await call("paths", id=rest, runs=runs))["paths"]
-        folder = ed["url"] if fl["folder_first"] else None
-        return {**out, "file": form, "paths": {r: {"path": p, "folder": folder} if p else None for r, p in got.items()}}
+        # the folder sent first: the Session card's, or for a path under `cwd_root` by the deeper-root rule
+        # that folder's, built by the same `editor_link` through the same reach (§4.6, TD-1988)
+        cwd = editor_link(str(s.get("cwd_root") or ""), reach) if s.get("cwd_root") else None
+
+        def first(p: str) -> str | None:
+            if not fl["folder_first"]:
+                return None
+            return cwd["url"] if cwd and under_cwd_root(p, s) else ed["url"]
+
+        return {
+            **out,
+            "file": form,
+            "paths": {r: {"path": p, "folder": first(p)} if p else None for r, p in got.items()},
+        }
     if not (form := editor_file()):
         return {**out, "paths": none}
     if kind == "repo":
@@ -2716,7 +2729,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "error": error,
                 "editor": editor,
                 # a path in a turn is a link where **VS Code** is drawn, and absent with it (§4.6, TD-691)
-                "paths": transcript_paths(str(v.get("dir") or "")) if editor else None,
+                "paths": transcript_paths(str(v.get("dir") or ""), str(s.get("cwd_root") or "")) if editor else None,
                 "at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "host": host_name(),
                 "active": "Sessions",

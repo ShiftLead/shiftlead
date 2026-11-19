@@ -44,6 +44,21 @@ def test_the_page_is_served_the_press_beside_its_editor_button_and_absent_with_i
     assert "data-paths" not in c.get("/transcript/ao-x-designer").text
 
 
+@pytest.mark.unit
+def test_the_page_is_served_the_cwd_root_folder_beside_the_sessions(page, monkeypatch):  # noqa: F811
+    """§4.6 *A path in a transcript is a link too* (TD-1988): the `cwd_root` folder link beside the session's,
+    where the record has one; none with `folder_first: false`, as the session's."""
+    c, _, replies, _ = page
+    assert _paths_attr(c.get("/transcript/ao-x-designer").text)["cwd_url"] is None  # no cwd_root: none
+    replies["get"] = {**replies["get"], "cwd": "/r/wt2", "cwd_root": "/r/wt2"}
+    got = _paths_attr(c.get("/transcript/ao-x-designer").text)
+    assert got["cwd_url"].startswith("vscode://") and "/r/wt2" in got["cwd_url"] and "/r/wt2" not in got["url"]
+    from shiftlead.ui import uiconf
+
+    monkeypatch.setattr(uiconf, "file_link", lambda: {"folder_first": False, "wait": 1})
+    assert _paths_attr(c.get("/transcript/ao-x-designer").text)["cwd_url"] is None
+
+
 PROBE = """
 const fs = require("fs");
 const noop = () => {};
