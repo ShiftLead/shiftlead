@@ -5113,11 +5113,21 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             agent_down = e.status_code == 503
             why = "" if agent_down else f"the host agent did not serve its tools: {e.detail}"  # an older agent
         weights: dict[str, Any] = {}
+        gauges: dict[str, Any] = {}
         if got is not None and got.get("switched"):
-            try:  # prices' fill-in (§4.2b *A login's Settings*): an older agent or none drawn is no fill-in
-                weights = ((await call("settings")).get("spend") or {}).get("weights") or {}
-            except HTTPException:
-                weights = {}
+            profiles = (await asyncio.to_thread(settings_profiles))[0]
+            sets, usage = await asyncio.gather(
+                call("settings", profiles=list(profiles)), call("usage"), return_exceptions=True
+            )
+            sets = {} if isinstance(sets, BaseException) else sets  # an older agent: no fill-in, no reserves
+            # prices' fill-in (§4.2b *A login's Settings*): an older agent or none drawn is no fill-in
+            weights = (sets.get("spend") or {}).get("weights") or {}
+            # each account's gauges (§4.2b *The gauge*, TD-1975): its Usage card, as the Settings page reads it
+            cards = setmod.usage_cards(
+                profiles, sets.get("usage_accounts"), {} if isinstance(usage, BaseException) else usage
+            )
+            age = setmod.settings_mod.max_age(sets)
+            gauges = {c["account"]: setmod.account_gauges(c, age) for c in cards}
         if got is not None:
             home = str(Path.home())
             for c in [*got.get("tools", []), *got.get("not_ready", [])]:
@@ -5129,6 +5139,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     f["offer"] = f.get("billing") if f.get("billing") != "metered" else None
                 if got.get("switched"):
                     c["tree"] = login_tree(c, home, weights)
+                    for acct in c["tree"]["accounts"]:
+                        acct["gauge"] = gauges.get(acct.get("key")) or setmod.account_gauges(None, None, billing=acct.get("billing"))
             got["read_ago"] = _age(got.get("read_at"), datetime.now(UTC)) or "0s"
         return templates.TemplateResponse(
             request,

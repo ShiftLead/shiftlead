@@ -223,10 +223,11 @@ def usage_cards(
                         "value": value,
                         "line": spend_text(by_label.get(label), "tok" if value.endswith("tok") else ""),
                         "resets": str((by_label.get(label) or {}).get("resets") or ""),
-                        "pct": None,
+                        # its spend over the amount, which the Tools page's gauge fills (§4.2b *The gauge*)
+                        "pct": (by_label.get(label) or {}).get("pct") if label in amounts else None,
                     }
                 )
-            cards.append(card | {"badge": badge, "unchecked": False})
+            cards.append(card | {"badge": badge, "unchecked": False, "read_secs": _secs(reading, now)})
             continue
         reserves = a.get("reserves") or {}
         read = usage_read(reading, now)
@@ -250,8 +251,13 @@ def usage_cards(
             if windows:  # a reading that lacks the window: no field, and the card's Save clears it (TD-1680)
                 row |= {"line": f"not reported: {key} reports {', '.join(reported)}", "stale": True}
             card["rows"].append(row)
-        cards.append(card | {"badge": badge, "unchecked": not windows})
+        cards.append(card | {"badge": badge, "unchecked": not windows, "read_secs": (read or {}).get("secs")})
     return cards
+
+
+def _secs(reading: Any, now: datetime) -> float | None:
+    read = usage_read(reading, now)
+    return read["secs"] if read else None
 
 
 WEIGHT_KINDS = ("input", "output", "cache_read", "cache_write")  # `settings.WEIGHT_KINDS`, in the card's order
@@ -947,3 +953,61 @@ def push_card(
         "last_line": "" if last_line == paused else last_line,
         "https": url if url.startswith("https://") else "",
     }
+
+
+def _keep(value: str) -> int | None:
+    """A reserve's bay as the gauge draws it: a whole percent held from the right, None for none or for a percent
+    per day (`10/day`), whose share of the window moves through it."""
+    return int(value) if value.isdigit() and 0 < int(value) <= 100 else None
+
+
+def account_gauges(
+    card: Mapping[str, Any] | None, max_age_secs: float | None, now: datetime | None = None, billing: Any = None
+) -> dict[str, Any]:
+    """An account's gauges as the Tools page draws them (design §4.2b *The gauge*, TD-1975), from its Usage card
+    (`usage_cards`, one source for both pages): one per window it reports, the week's first — the use filling from
+    the left, the reserve (`keep`) a bay held from the right, and the room between; a metered account's one per
+    window it sums, its spend against that window's amount. With no reading, `unread` and a field per label it has
+    a reserve on (none: the week's), the labels unchecked. A reading older than the gate trusts (`usage.max_age`)
+    is `stale`; an account whose logins disagree on billing is `mixed` and takes no reserve. A reserve on a label
+    the reading no longer reports is `gone`, its value drawn with a Remove. An account no card names yet (no
+    profile on it, no reserve) draws as its `billing` says: a metered one the home's windows, each with no reading."""
+    now = now or datetime.now(UTC)
+    if card is None and billing == "metered":
+        card = {"metered": True, "rows": [{"label": x, "value": "", "line": "no reading yet"} for x in spend_mod.LABELS]}
+    card = card or {}
+    out: dict[str, Any] = {"metered": bool(card.get("metered")), "mixed": card.get("mixed"), "gauges": [], "gone": []}
+    if out["mixed"]:
+        return out
+    for row in card.get("rows") or []:
+        if row.get("stale"):
+            out["gone"].append({"label": row["label"], "value": row.get("value") or "", "line": row.get("line") or ""})
+            continue
+        pct = row.get("pct") if _is_num(row.get("pct")) else None
+        value = str(row.get("value") or "")
+        keep = None if out["metered"] else _keep(value)
+        used = None if pct is None else max(0.0, min(100.0, float(pct)))
+        g = {
+            "label": str(row["label"]),
+            "value": value,
+            "used": used,
+            "keep": keep,
+            "room": None if used is None else max(0, round(100 - used - (keep or 0))),
+            "resets": "",
+            "line": str(row.get("line") or ""),
+            "age": str(row.get("age") or ""),
+        }
+        if (resets := _when(row.get("resets"))) and resets > now:
+            g["resets"] = f"{resets.astimezone():%a %H:%M}"
+        out["gauges"].append(g)
+    if not out["metered"] and not any(g["used"] is not None for g in out["gauges"]):
+        out["unread"] = True
+        if not out["gauges"]:
+            out["gauges"].append(
+                {"label": "week", "value": "", "used": None, "keep": None, "room": None, "resets": "", "line": "",
+                 "age": ""}
+            )
+    if card.get("read_secs") is not None and max_age_secs is not None and card["read_secs"] > max_age_secs:
+        out["stale"] = True
+    out["gauges"].sort(key=lambda g: 0 if g["label"] == "week" else 1)  # the week's first (§4.2b)
+    return out

@@ -39,6 +39,37 @@
           <div class="row gap"><button class="btn sm" type="submit">Save</button><button class="btn sm ghost" type="button" data-cancel>Cancel</button></div>
         </form></div>
 {% endmacro %}
+{#- an account's gauges (§4.2b *The gauge*, §4.5a *Tools page: an account*; TD-1975): one per window, the use from
+    the left, the reserve a hatched bay from the right, and under each the keep-back field `ao gate` takes -#}
+{% macro gauges(a) -%}
+{%- set g = a.gauge -%}
+<div class="toolgauges" data-account="{{ a.key }}"{% if g.metered %} data-metered="1"{% endif %}>
+  {%- if g.mixed %}
+  <div class="note">its logins disagree on billing ({{ g.mixed }}), so it takes no reserve: give them one billing in each login's Settings</div>
+  {%- else %}
+  {%- for w in g.gauges %}
+  <div class="toolgauge">
+    <div class="gauge{% if w.used is none %} unread{% endif %}{% if g.stale %} stale{% endif %}">
+      {%- if w.used is not none %}<div class="used" style="width:{{ w.used }}%"></div>{% endif %}
+      {%- if w.keep %}<div class="keep" style="width:{{ w.keep }}%"></div>{% endif %}
+      {%- if w.room is not none and not g.metered %}<div class="room" style="left:{{ w.used }}%;right:{{ w.keep or 0 }}%">room for unattended work: {{ w.room }}%</div>{% endif %}
+    </div>
+    <div class="glegend row gap wrap">
+      {%- if g.metered %}<span>{{ w.label }} · {{ w.line }}</span>
+      {%- elif w.used is none %}<span>No usage reading yet{% if g.gauges | length > 1 or w.label != "week" %} · {{ w.label }}{% endif %}</span>
+      {%- else %}<span title="{{ w.age }}"><b>{{ w.used | round | int }}%</b> of the {{ w.label }} used{% if w.resets %} · resets {{ w.resets }}{% endif %}{% if g.stale %} · <span class="toolstale">stale</span>{% endif %}</span>{% endif %}
+      <label class="k" title="{{ help_title('tools-keep-back') }}">{{ "amount" if g.metered else "keep back" }} <input class="mono toolkeep" name="{{ w.label }}" value="{{ w.value }}" data-was="{{ w.value }}" placeholder="{{ 'no amount' if g.metered else '—' }}" autocomplete="off" spellcheck="false" aria-label="{{ a.key }} {{ w.label }} {{ 'amount' if g.metered else 'reserve' }}"></label>
+      {%- if w.value and w.line and not g.metered %}<span class="note">{{ w.line }}</span>{% endif %}
+    </div>
+  </div>
+  {%- endfor %}
+  {%- if g.unread %}<div class="note">no reading yet, so the labels are not checked</div>{% endif %}
+  {%- for x in g.gone %}
+  <div class="glegend row gap wrap"><span class="note">{{ x.label }} reserve {{ x.value }}: {{ x.line }}</span><button class="btn sm link toolkeepgone" type="button" data-label="{{ x.label }}">Remove</button></div>
+  {%- endfor %}
+  {%- endif %}
+</div>
+{%- endmacro %}
 {% block body %}
 <div class="page inboxpage toolspage" id="toolspage">
   <div class="row gap wrap toolshead"><span class="h1">Tools</span>{% if t %}<span class="note">on <span class="mono">{{ t.host }}</span></span>{% endif %}<span class="grow"></span>
@@ -55,10 +86,11 @@
     {% if c.tree %}
     {% for a in c.tree.accounts %}
     <div class="toolbranch">
-      <div class="toolacct" data-account="{{ a.key }}" data-version="{{ a.version or '' }}" data-label="{{ a.label or '' }}"><span class="toolacctname">{{ a.label or a.name }}</span>{% if a.label %} <span class="mono note">{{ a.name }}</span>{% endif %}
+      <div class="toolacct hasgauge" data-account="{{ a.key }}" data-version="{{ a.version or '' }}" data-label="{{ a.label or '' }}"><div><span class="toolacctname">{{ a.label or a.name }}</span>{% if a.label %} <span class="mono note">{{ a.name }}</span>{% endif %}
         <button class="btn sm link toolpen" type="button" data-tool-act="label" title="{{ help_title('tools-label') }}" aria-label="label {{ a.name }}">✎</button>
         <div class="note">{{ a.plan or "plan not recorded by the tool" }}{% if a.billing %} · {{ a.billing }}{% endif %}</div>
         {% if a.models and a.models.families %}<div class="mono toolfams">{{ a.models.families | join(" · ") }}</div>{% endif %}</div>
+        {{ gauges(a) }}</div>
       {% for lg in a.logins %}{{ login_row(c, lg) }}{% endfor %}
     </div>
     {% endfor %}
