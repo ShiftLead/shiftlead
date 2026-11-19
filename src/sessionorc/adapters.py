@@ -361,6 +361,23 @@ def same_home(a: Path | str, b: Path | str) -> bool:
 CAPTURE_ENV = "SHIFTLEAD_CAPTURE"
 
 
+def transcript_roots() -> tuple[list[Path], list[str]]:
+    """Every adapter's `transcript_roots()` (design §4.3, §9 invariant 16, TD-1945), and the names of those that
+    raised: the paths no sweep removes inside, nor any path holding one. An adapter with none names none."""
+    out: set[Path] = set()
+    blind: list[str] = []
+    for name in names():
+        fn = getattr(get(name), "transcript_roots", None)
+        if fn is None:
+            continue
+        try:
+            out.update(Path(p) for p in fn())
+        except Exception:  # noqa: BLE001 — a broken profile file or adapter never hides the others' roots
+            log.exception("adapter %s could not name its transcript roots", name)
+            blind.append(name)
+    return sorted(out), blind
+
+
 def implements(adapter: object) -> frozenset[str]:
     """The optional methods `adapter` declares (design §4.3 *The conformance suite*): its `implements`,
     each one of `OPTIONAL_METHODS`; none where unset."""

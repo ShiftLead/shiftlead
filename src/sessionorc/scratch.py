@@ -38,6 +38,27 @@ def check_root(root: str | Path) -> None:
         )
 
 
+def overlaps(a: str | Path, b: str | Path) -> bool:
+    """Whether `a` is `b`, lies inside it or holds it, read both as written (made absolute) and with every
+    symlink resolved, so a link to either side is caught too (§4.6, §9 invariant 16)."""
+    for x, y in ((os.path.abspath(a), os.path.abspath(b)), (os.path.realpath(a), os.path.realpath(b))):
+        px, py = Path(x), Path(y)
+        if px == py or px.is_relative_to(py) or py.is_relative_to(px):
+            return True
+    return False
+
+
+def check_transcripts(root: str | Path, transcript_roots: list[Path]) -> None:
+    """Refused at the host agent's start (§4.6, §9 invariant 16, TD-1945): a `scratch_root` inside, or holding, a
+    tool's transcript store, which the disk sweep would otherwise weigh as scratch."""
+    for t in transcript_roots:
+        if overlaps(root, t):
+            raise ScratchError(
+                f"scratch_root {str(root)!r} is inside or holds {str(t)!r}, where a tool keeps its transcripts: "
+                "refused (design §4.6 A session's scratch, §9 invariant 16)"
+            )
+
+
 def ensure_parent(root: str | Path) -> Path:
     """Make `shiftlead-<uid>/` (`0700`) under `root`, or refuse it: a symlink, or not this uid's (§4.6)."""
     check_root(root)
