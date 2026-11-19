@@ -1036,8 +1036,9 @@ class HostAgent(
     async def serve(self, sock: Path | None = None) -> None:
         sock = sock or paths.socket_path()
         # §4.6 *A session's scratch* (TD-1944): a `scratch_root` past 48 bytes, or a `shiftlead-<uid>/` that is a
-        # symlink or another uid's, stops the start, as nothing a session puts there could be trusted
-        await asyncio.to_thread(scratch_mod.ensure_parent, _scratch_root())
+        # symlink or another uid's, stops the start, as nothing a session puts there could be trusted; so does one
+        # inside or holding a tool's transcript store (§9 invariant 16, TD-1945), which the disk sweep must never weigh
+        await asyncio.to_thread(_check_scratch_root, _scratch_root())
         sock.parent.mkdir(parents=True, exist_ok=True)
         with contextlib.suppress(FileNotFoundError):
             sock.unlink()
@@ -4871,6 +4872,16 @@ class HostAgent(
         if host not in self._remote_stores:
             self._remote_stores[host] = SessionStore(paths.remote_dir(host))
         return self._remote_stores[host]
+
+
+def _check_scratch_root(root: str) -> None:
+    """The start's scratch checks (§4.6): the root's length and transcript stores, then `shiftlead-<uid>/` made."""
+    scratch_mod.check_root(root)
+    roots, blind = adapters.transcript_roots()
+    if blind:
+        log.warning("transcript roots unread for %s: the scratch_root check covers the rest", ", ".join(blind))
+    scratch_mod.check_transcripts(root, roots)
+    scratch_mod.ensure_parent(root)
 
 
 def _scratch_root() -> str:

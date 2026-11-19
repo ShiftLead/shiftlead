@@ -234,8 +234,12 @@ def write_fixtures(home: Path, v2: bool = False) -> Path:
     subprocess.run([*git, "add", "-A"], check=True)
     subprocess.run([*git, "commit", "-q", "-m", "fixture"], check=True)
     (home / "repos.txt").write_text(f"{repo}\n", encoding="utf-8")
+    # the sessions' scratch under the home, beside its `claude/`: the default `/tmp` would hold the home's
+    # `claude/projects`, a transcript store the host agent refuses a `scratch_root` to hold (§4.6, TD-1945)
     (home / "hosts.yml").write_text(
-        f"local:\n  name: look\n  vscode_host: look\n  repos_registry: {home / 'repos.txt'}\n", encoding="utf-8"
+        f"local:\n  name: look\n  vscode_host: look\n  repos_registry: {home / 'repos.txt'}\n"
+        f"  scratch_root: {home / 's'}\n",
+        encoding="utf-8",
     )
     (home / "claude").mkdir()
     return repo

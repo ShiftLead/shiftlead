@@ -24,6 +24,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from sessionorc import cadence, identity, paths
 from sessionorc.adapters import (
     Conversation,
@@ -746,6 +748,19 @@ class ClaudeCodeAdapter:
         base = config_dir(profile or profiles_mod.get(None)) / "projects" / munge(cwd)
         p = base / f"{session_id}.jsonl"
         return p if p.is_file() else None
+
+    def transcript_roots(self) -> list[Path]:
+        """Every directory Claude Code keeps transcripts under (design §4.3, §9 invariant 16, TD-1945): `projects`
+        under `~/.claude`, under `CLAUDE_CONFIG_DIR` where this process has it, and under each of its profiles'
+        `config_dir`s, read from the profile file itself, so the disk sweep never removes inside one."""
+        dirs = {Path("~/.claude").expanduser(), config_dir(Profile(name="default"))}
+        try:
+            profs, _ = profiles_mod.load()
+        except (OSError, ValueError, yaml.YAMLError):  # an unreadable profile file still names the tool's own
+            log.exception("profiles.yml unreadable: transcript roots are the tool's own alone")
+            profs = {}
+        dirs |= {Path(p.config_dir).expanduser() for p in profs.values() if p.adapter == self.name and p.config_dir}
+        return sorted(d / "projects" for d in dirs)
 
     def _last_turns(self, session_id: str, cwd: Path, profile: str) -> Iterator[dict]:
         """The transcript's top-level `assistant` entries, newest first, from its last
