@@ -40,7 +40,6 @@ rule).
 | Tools and services found, their versions, logins and identity, the models each login offers, each account's reserve and reading (a reserve is the account's, §6) | each tool's own config directory (read); `settings.yml` | detected; reserves at once | Tools |
 | A login: its tool, account, config directory, `billing` (a metered one's `prices`), `extra_args` — each host its own | `profiles.yml` (each host's) | at once, by the person's pages only | Tools |
 | A flow: its id, stages, seats (each by a key), triggers, briefs, each seat's model and `permission_prompts`, its review-round settings | the flow's directory (package: read-only; org: committed by the home; repo: by PR) | as the flow is | Flows |
-| The install-wide default login list, for sessions no flow runs — each host's | `profiles.yml` (each host's, beside today's `default:`; not `settings.yml`, which the home replicates whole to every node, §4.4a) | at once | Tools |
 | The team's one ordered login list, across tools | `settings.yml` | at once | Team |
 | Flow pick, seat counts (`size`, `max`, by seat key), hours, reserve priority, balance, on_work | `settings.yml` | at once | Team |
 | The team's definition: the flows it lists, and each seat's name and brief by the seat's key | `org.yml` (at once) or `.shiftlead.yml` (by PR, under the full cadence) | rarely | Team |
@@ -50,8 +49,9 @@ rule).
 runs (`permission_prompts`); the **login** is the Tools page's. A profile survives only inside, as what a
 model and a login compile to at a launch, written by the launching host from its own `profiles.yml`.
 Sessions no flow runs (`ao new`, the director, the sweep, a scheduled start, the person's own session)
-pick a model where they are set, and their login from an **install-wide default login list** kept on the
-Tools page, taken the same way a seat takes the team's. Nothing overrides a seat's model or login: a member's own
+pick a model where they are set, and their login where they start: the person's own session in + New or
+`ao new --login`, and the director, the sweep and a scheduled start from an ordered `logins:` beside the
+`profile:` each replaces (§4.2b, TD-1953's round dropped the install-wide default list). Nothing overrides a seat's model or login: a member's own
 `profile:` and the role overlays' profiles go (Paul: overrides are complexity not needed). A seat that runs
 differently, such as the grind-ask trial's permission prompts, is a flow copy with that seat changed.
 
@@ -214,7 +214,7 @@ The plan is wide: it changes every repo with a team, and makes `flow.yml` a form
 - **A model swap on a node team is a repo PR** (decided, Paul, 2026-11-18: flows live in the repo when
   customised): org flows cannot run on a node
   (§4.9c), so a node team's flows are its repo's, and changing a model there is a PR, where an org team's
-  is saved at once. The install-wide default login list is each host's.
+  is saved at once.
 
 ## Which current rules this reverses or bends
 

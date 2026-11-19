@@ -27,6 +27,7 @@ grep the directory, read a section by its file.
 - **§4.1** [Session substrate: tmux, one session per conversation](design/4.1-session-substrate.md) — one tmux session per conversation; names, the anchor rule, worktrees, plain shells.
 - **§4.2** [State feed: hooks first, scraping as a labelled fallback](design/4.2-state-feed.md) — the states, fed by the tool's hooks first and by screen rules, labelled, where none fires.
 - **§4.2a** [Profiles: tool · account · model](design/4.2a-profiles.md) — a profile is a tool, an account and a model; how a session is launched on one.
+- **§4.2b** [Tools: the CLIs, accounts and logins on a host](design/4.2b-tools.md) — the Tools page (designed, TD-1953): each tool found, the accounts its logins sign into, each account's reserve.
 - **§4.3** [Adapter contract](design/4.3-adapter-contract.md) — what a tool adapter supplies: argv, hooks, pane classification, the composer.
 - **§4.4** [Host agent](design/4.4-host-agent.md) — the per-host process that owns tmux, the record, the tick and the RPC.
 - **§4.4a** [Home and nodes: one session graph across hosts](design/4.4a-home-and-nodes.md) — one session graph across hosts: the home, its nodes, and how a container node is made.
