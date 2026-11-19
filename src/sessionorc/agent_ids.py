@@ -1,8 +1,8 @@
 """A ledger entry's id is handed out by the home (design §4.4 *A ledger entry's id is handed out by the home*,
-TD-693, built by TD-696): `td_next` gives the next free id of a registered repo, or `count` of them in a row,
-above the highest of every open PR's added headings, the ledger and its archive on a freshly fetched
-`origin/<default>`, and the last id the home gave — under one lock per repo, so two sessions asking at once
-get different ids. What it gave is kept in `ids.json`. A mixin `HostAgent` inherits.
+TD-693, built by TD-696; TD-970, TD-971): `td_next` is a front end over the synced id script, which takes the next
+free id of a registered repo, or `count` of them in a row, from origin's counter, floored by the last id the home
+gave — under one lock per repo, so two sessions asking at once get different ids. A checkout without the script is
+refused, naming the sync. What it gave is kept in `ids.json`. A mixin `HostAgent` inherits.
 """
 
 from __future__ import annotations
