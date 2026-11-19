@@ -3,7 +3,8 @@
 1. Only the host agent creates, kills, or sends keys to an `ao-*` tmux session.
 2. A directory has at most one agent session (`kind: interactive`, adapter other than `shell`;
    main checkout, worktree, or plain directory). Shells and command sessions are exempt. No seat runs in a main checkout (§4.9b *No anchor seat*): the one agent there is the person's own session, the anchor session.
-3. Every session has a run log from its first byte.
+3. Every session has a run log from its first byte. The one exception is a Tools page's tools shell
+   (§4.2b), which has none: a sign-in prints an account's email, links and codes.
 4. A state shown as `hook` came from a hook; `scraped` is visible in the UI.
 5. Interactive sessions (`kind: interactive`, `unattended: false`) are never paused, killed, or
    sent to by a policy, and never acted on by another session: an acting RPC from a session onto
@@ -53,7 +54,7 @@
     empty list means nobody may act on it; §4.8) — and never when the target is
     interactive, whatever the list says (invariant 5). Grant and membership are both read from
     the records on every call, so a revoke or a membership edit takes effect on the session's
-    next call and neither is cached. Reads are never gated, and a person at a terminal or the
+    next call and neither is cached. Reads are never gated (save a Tools page's tools shell, whose pane reads are the person's, §4.2b), and a person at a terminal or the
     UI is not a session, nor is the person's own shell (§4.8, TD-801). Acting is what changes a
     session — the host agent's `ACTING_RPCS`:
     `send`, `keys`, `kill`, `close`, `set_mode`, `keep`, `create`, `remove`, `decide`, `set_grants`,

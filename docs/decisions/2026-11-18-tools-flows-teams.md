@@ -1,6 +1,6 @@
 # ADR 2026-11-18: Tools, Flows and Team pages — the frame
 
-Status: **for discussion**. Class: **wide** (reclassed by Paul after round 3, 2026-11-18: the migration
+Status: **for discussion**. Its migration was reshaped to one switch-over window after the frame's own rounds (Paul, 2026-11-18), and is reviewed with the Tools design's rounds (docs/reviews/TD-1953.md). Class: **wide** (reclassed by Paul after round 3, 2026-11-18: the migration
 rewrites every team repo's `.shiftlead.yml`, and `flow.yml` becomes a format meant to be shared), capped
 at `design-rounds-wide`. This is the frame for three design rounds: TD-1953 (the Tools
 page), TD-1954 (the Flows page) and TD-1153 (the team page), worked out with Paul on 2026-11-18 in
@@ -37,21 +37,21 @@ rule).
 
 | Thing | Lives in | Written | Page |
 |---|---|---|---|
-| Tools and services found, their versions, logins and identity, the models each login offers, each account's reserve and reading (a reserve is the account's, §6) | each tool's own config directory (read); `settings.yml` | detected; reserves at once | Tools |
-| A login: its tool, account, config directory, `billing` (a metered one's `prices`), `extra_args` — each host its own | `profiles.yml` (each host's) | at once, by the person's pages only | Tools |
+| Tools and services found, their versions, logins and identity, the models each account offers (a login's pin narrows them), each account's reserve and reading (a reserve is the account's, §6) | each tool's own config directory (read); `settings.yml` | detected; reserves at once | Tools |
+| A login: its tool, account, config directory, `billing` (a metered one's `prices`), `extra_args` — each host its own | `logins.yml` (each host's, §4.2b; `profiles.yml` is hand-written and goes at the cut-over) | at once, by the person's pages only | Tools |
 | A flow: its id, stages, seats (each by a key), triggers, briefs, each seat's model and `permission_prompts`, its review-round settings | the flow's directory (package: read-only; org: committed by the home; repo: by PR) | as the flow is | Flows |
-| The install-wide default login list, for sessions no flow runs — each host's | `profiles.yml` (each host's, beside today's `default:`; not `settings.yml`, which the home replicates whole to every node, §4.4a) | at once | Tools |
 | The team's one ordered login list, across tools | `settings.yml` | at once | Team |
 | Flow pick, seat counts (`size`, `max`, by seat key), hours, reserve priority, balance, on_work | `settings.yml` | at once | Team |
 | The team's definition: the flows it lists, and each seat's name and brief by the seat's key | `org.yml` (at once) or `.shiftlead.yml` (by PR, under the full cadence) | rarely | Team |
 | Which team's question seat tags a repo's untagged entries | the repo's settings | at once | Team |
 
 **Profiles leave the person's view** (Paul, 2026-11-18). The **model** is the flow's, and so is how a seat
-runs (`permission_prompts`); the **login** is the Tools page's. A profile survives only inside, as what a
-model and a login compile to at a launch, written by the launching host from its own `profiles.yml`.
+runs (`permission_prompts`); the **login** is the Tools page's. After the switch-over there are
+no profiles: a launch takes a model and a login, each host's logins in its own `logins.yml` (§4.2b).
 Sessions no flow runs (`ao new`, the director, the sweep, a scheduled start, the person's own session)
-pick a model where they are set, and their login from an **install-wide default login list** kept on the
-Tools page, taken the same way a seat takes the team's. Nothing overrides a seat's model or login: a member's own
+pick a model where they are set, and their login where they start: the person's own session in + New or
+`ao new --login`, and the director, the sweep and a scheduled start from an ordered `logins:` beside the
+`profile:` each replaces (§4.2b, TD-1953's round dropped the install-wide default list). Nothing overrides a seat's model or login: a member's own
 `profile:` and the role overlays' profiles go (Paul: overrides are complexity not needed). A seat that runs
 differently, such as the grind-ask trial's permission prompts, is a flow copy with that seat changed.
 
@@ -140,7 +140,7 @@ could benchmark different flow results.*
   fill and a td-max extra alike. **Usable**: signed in; not gated (its account at its reserve, §6) or
   `limited`; not on an account an earlier unusable login shares (a reserve is the account's, §6); and with
   a smoke pass for its tool, the model and the seat's role. A launch record holds the model, never a
-  login; the session's record gains `model` and `login`, and the definition's compare (§4.9c, TD-619)
+  login; the session's record gains the seat's intended model (`seat_model`, home-owned; the record's `model` stays the observed one, node-owned, §4.2a) and `login`, and the definition's compare (§4.9c, TD-619)
   reads the model, so a seat on a backup login reads no difference and a reordered list takes effect at
   each next launch.
 - **A stopped seat moves** (Paul: *hitting either the reserve or a hard limit should trigger the backup*).
@@ -153,21 +153,21 @@ could benchmark different flow results.*
   resume, and an open ask stays on the seat's mail. ShiftLead keeps only a transcript's path; the file is
   the tool's, under the login's config directory, and on a node the node's (§4.3). So the handoff is a
   new adapter-contract method — read a transcript into a bounded handoff text — on the host that ran
-  it; it is cross-cutting, and the Tools round designs it.
+  it; it is cross-cutting, and the cut-over build's design takes it (moved there by TD-1953's round: a
+  handoff is a launch's, not a login's).
 - **A metered login** is used in its place in the list (decided), bounded by its amount reserve; the page
   marks it, since moving onto it spends money.
 - **Backups are logins, never models.** Falling back to another model is out of scope; if it is ever
   wanted it is the flow's, perhaps a **failover flow** with its own model set (Paul).
 - **The cut-over from profiles** — every launch moving from a named profile to a model and a login —
-  needs the Flows round's model and the Team round's list, so it is built after both, and it happens **per
-  team, at its repo's PR** (*Moving every repo over*, below). Until then a team launches as today: by the
-  profile rungs (`org.yml`'s `roles:` profiles among them) and its own `techlead:` and `seats:`, ignoring the
-  models and seats the built-in flows now carry. Its login list (`settings.yml`, saved at once) is written
-  before its PR merges, or it is unfollowable at the merge. `size`/`max` read both keys until then.
-  Logins are written beside today's profiles in `profiles.yml`, and the profiles, and `roles:` profiles,
-  go only when the old shape goes.
+  needs the Flows round's model and the Team round's list, so it is built after both, and it happens **in
+  one window** (*Moving every repo over*, below; Paul, 2026-11-18: the two shapes never run side by side).
+  Until the window every launch is today's: the profile rungs (`org.yml`'s `roles:` profiles among them) and
+  a team's own `techlead:` and `seats:`. The pages, logins and the new launch path are built and promoted
+  before it, doing nothing until the window. At the window `profiles.yml` and the `roles:` profiles go,
+  and each host's logins are in its `logins.yml` (§4.2b).
 - **Known smoke passes ship with ShiftLead** (Paul), per tool, model and role, so a person does not re-run
-  a smoke someone already has; their own passes add to it. The gate is on from the first build, the list
+  a smoke someone already has; their own passes add to it. The gate binds from the switch-over, the list
   seeded with every tool, model and role running here today. **The gate keys on tool, model and role, not
   on the tool's version**: each pass records the version it ran on, and a new version is only told, once a
   day, as §4.3 does today, so a tool that updates itself never strands every seat on it; a pass is lost only
@@ -190,20 +190,18 @@ could benchmark different flow results.*
 
 The plan is wide: it changes every repo with a team, and makes `flow.yml` a format meant to travel.
 
-- **A dual-read window.** `repoconfig` refuses an unknown key (as `org.TEAM_KEYS` does) and the frame
-  changes the file's shape, while six repos — samscrape, contractmatch, ledgerboard, agent-cadence,
-  guardians-devenv and shiftlead itself — each write `techlead: {name, context}` and name built-in flows
-  by directory. Their PRs cannot land with one promote, and contractmatch's node reads its checkout with
-  its own wheel (§4.4a). So: promote a reader of both shapes, which also accepts `id` and `format` in
-  `flow.yml`; every node then reports the new build (a container node is re-provisioned by the supervisor
-  after its grace; a machine node is updated by the person, the home installing nothing there, §4.4a);
-  each repo moves by its own PR under its own cadence, shiftlead's last, since the home reads its own
-  checkout at once; only then does the old shape go, `ao org check` naming any repo or node still on it. Until it goes,
-  the dual reader's commit is the floor for a rollback (`ao promote --back`, AGENTS.md *Going back*): an
-  older reader refuses a moved repo's file, and `ao org check` says so. A built-in flow's id is its name (`td`,
-  `build-review`, `build`), so `flows: [td]` and `flow: td` keep reading; an org or repo flow with no
-  `id` reads as its directory's name until it is saved with one. `techlead.context` (today the techlead's primer) goes with the
-  question seat's brief, on the team's side of the split.
+- **One window, no dual read** (Paul, 2026-11-18). Every part of the new shape is built and promoted
+  first, doing nothing; then, in one window with every team stopped (the person's own sessions stay, in
+  tmux), each host moves from profiles to logins and the six repos — samscrape, contractmatch, ledgerboard,
+  agent-cadence, guardians-devenv and shiftlead itself, each of which writes `techlead: {name, context}` and
+  names built-in flows by directory — merge their moves, prepared beforehand as green, reviewed PRs held
+  unmerged; the teams restart once `ao org check` is clean. What each host's move makes is §4.2b's. How the
+  window runs — its order, what a host does with a launch or a repo file of the other shape, the migration
+  against a live host agent, going back, and today's readers of a record's `profile` — is **the cut-over's
+  design**, an entry of its own after the Flows and Team rounds. A built-in flow's id is its name (`td`,
+  `build-review`, `build`), so `flows: [td]` and `flow: td` keep reading; an org or repo flow with no `id`
+  reads as its directory's name until it is saved with one. `techlead.context` (today the techlead's
+  primer) goes with the question seat's brief, on the team's side of the split.
 - **A format version.** `flow.yml` carries `format: <n>`, read before the stray-key check (§4.9c), and a
   flow with none reads as format 1. A flow from a newer ShiftLead reads *made by a newer ShiftLead*, never
   a stray-key refusal; a repo flow that writes a new key waits on the promote that accepts it, as `color`
@@ -214,7 +212,7 @@ The plan is wide: it changes every repo with a team, and makes `flow.yml` a form
 - **A model swap on a node team is a repo PR** (decided, Paul, 2026-11-18: flows live in the repo when
   customised): org flows cannot run on a node
   (§4.9c), so a node team's flows are its repo's, and changing a model there is a PR, where an org team's
-  is saved at once. The install-wide default login list is each host's.
+  is saved at once.
 
 ## Which current rules this reverses or bends
 
@@ -238,11 +236,12 @@ The plan is wide: it changes every repo with a team, and makes `flow.yml` a form
   moves to one or the other: §4.10's `--team`/`--repo` choice (TD-1565, `agent_mail._one_seat`), an
   entry's reroute and filer (`agent_mail`), the tick's `tag` cause (`agent_tick`), and
   `teamrun.tagging_seat`.
-- **The record and invariant 9** — the record gains `model`, `login`, the seat's key and its question mark,
+- **The record and invariant 9** — the record gains `seat_model`, `login`, `account`, the seat's key and its question mark,
   and `permission_prompts` compiles into a field a start writes beside `lane`, `review` and
-  `prompt_from`; a launch record holds the model; the compare reads *model a → b* and the question seat.
-  Under invariant 15 the home holds a record's intent: the home writes `model`, and a node's tick, which
-  picks the login at a node launch, reports the `login` it took. The `relaunch` mark, today a person's act carrying `profile`, carries a
+  `prompt_from`; a launch record holds the model; the compare reads *seat_model a → b* and the question seat.
+  Under invariant 15 the home holds a record's intent: the home writes `seat_model`, and a node's tick, which
+  picks the login at a node launch, reports the `login` it took and the `account` key it ran under
+  (node-owned, like `tool_version`). The `relaunch` mark, today a person's act carrying `profile`, carries a
   `model`, and the tick's relaunch of a stopped seat is a path of its own. Invariant 9 is amended to say so.
 - **§6's usage gate** — a gated seat moves to the next usable login before it pauses.
 - **§4.3 *Nobody answers the box … waits for a person*** and **§4.3, §4.5a *Switch profile…*** (a person's
