@@ -1091,7 +1091,19 @@ LOGIN_WARNINGS = {
 }
 
 
-def login_tree(card: dict[str, Any], home: str) -> dict[str, Any]:
+def price_fills(weights: Mapping[str, Any], families: list[str]) -> list[dict[str, str]]:
+    """The Settings page's weights a login's **prices** offer as a fill-in (design §4.2b *A login's Settings*, §5
+    `spend.weights`): each weight whose model name holds one of the login's account's families between dashes
+    (`claude-opus-5-5` for `opus`, `gemini-2.5-flash-lite` for `flash-lite`), as `{model, prices}`, the prices as the
+    form's text; none where no family is read or none matches, since another model's prices would be the wrong number
+    one press away. `as_of` is a date, not a weight."""
+    rows = {str(k): v for k, v in weights.items() if k != "as_of" and isinstance(v, dict)}
+    fams = [f"-{str(f).lower()}-" for f in families if f]
+    mine = {k for k in rows if any(f in f"-{k.lower()}-" for f in fams)}
+    return [{"model": k, "prices": _setting_text(rows[k])} for k in sorted(mine)]
+
+
+def login_tree(card: dict[str, Any], home: str, weights: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """A tool card's logins as the Tools page draws them on a switched host (design §4.2b *The page*, TD-1974): each
     account with its logins under it, then *Not signed in* (the logins with no identity to read), then the logins
     signed in whose account is still to be named. Each login carries its folder as drawn, its state's words and its
@@ -1105,6 +1117,8 @@ def login_tree(card: dict[str, Any], home: str) -> dict[str, Any]:
     fams = {a.get("key"): ((a.get("models") or {}).get("families") or []) for a in card.get("accounts") or []}
     for lg in card.get("logins") or []:
         lg["families"] = fams.get(lg.get("account")) or []  # a pin's choices: its account's families
+        lg["fills"] = price_fills(weights or {}, lg["families"])  # prices' fill-in: the Settings page's weights
+        lg["fill_id"] = f"fills-{card.get('adapter')}.{lg.get('name')}"  # unique: no tool or login name holds a `.`
     accounts = []
     for a in card.get("accounts") or []:
         key = str(a.get("key") or "")
@@ -5098,6 +5112,12 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         except HTTPException as e:
             agent_down = e.status_code == 503
             why = "" if agent_down else f"the host agent did not serve its tools: {e.detail}"  # an older agent
+        weights: dict[str, Any] = {}
+        if got is not None and got.get("switched"):
+            try:  # prices' fill-in (§4.2b *A login's Settings*): an older agent or none drawn is no fill-in
+                weights = ((await call("settings")).get("spend") or {}).get("weights") or {}
+            except HTTPException:
+                weights = {}
         if got is not None:
             home = str(Path.home())
             for c in [*got.get("tools", []), *got.get("not_ready", [])]:
@@ -5105,7 +5125,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 for f in c.get("found", []):
                     f["shown"] = _shown_folder(str(f.get("folder") or ""), home)
                 if got.get("switched"):
-                    c["tree"] = login_tree(c, home)
+                    c["tree"] = login_tree(c, home, weights)
             got["read_ago"] = _age(got.get("read_at"), datetime.now(UTC)) or "0s"
         return templates.TemplateResponse(
             request,
