@@ -1289,7 +1289,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      manager, and the lines §4.9a *The home's note says more* adds — the pull requests in the
      members' `progress` entries reported `done` with a `pr` since the team's start, the start
      being the earliest `created` among the team's records that are neither superseded nor
-     forgotten (§4.9a's own list is the manager's, from `gh`), and each member's `out_of_work.why`
+     forgotten (§4.9a's own list is the manager's, from `gh`; this window is wider than a mark's
+     run, §4.9a *A mark counts for its run only*, and is kept so: an earlier run's records only
+     add pull requests to the list, never hide one), and each member's `out_of_work.why`
      — written on the tick the manager is closed or found closed (for a team with no live manager,
      the tick that closes its last member; where one was left open with work, the tick that finds
      the last one gone, whoever closed it — that the note is owed is kept in memory per team from
