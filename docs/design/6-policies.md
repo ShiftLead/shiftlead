@@ -1326,7 +1326,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      a member at work (that member is simply not settled yet). Where any member of the team carries a
      mark of this run (§4.9a *A mark counts for its run only*) whose `by` is the person, this rule writes no note, and owes none (`_finished_owed` is not
      written for such a team). Where only a session pressed it, the note is written once, on the tick
-     whose `wind_down` close leaves the team with no live marked record and nobody live in its crew, in
+     whose `wind_down` close leaves the team with no live marked member and nobody live in its crew, in
      a wound-down team's words (§4.9a gives them), its `since` the earliest `wind_down.at` among
      this run's marks; where the last marked member is closed by another hand (a `--close`, a person's
      Close) none is written. While a marked member stays open the reading carries its clause and a live
