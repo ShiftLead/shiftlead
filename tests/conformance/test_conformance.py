@@ -8,6 +8,7 @@ from __future__ import annotations
 import inspect
 import json
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -485,3 +486,74 @@ def test_identity_never_lets_the_account_key_out(name, tmp_path, caplog, capsys)
     assert "f00dfeed" not in seen and key not in seen
     emailed = _signed_in(name, tmp_path, "emailed", key, display="ada@example.com")
     assert ad.identity(emailed, b"salt")["display"] is None
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_models_offers_the_plans_families_or_every_family_unconfirmed(name, tmp_path):
+    """`models(home, plan)` (§4.2b): a plan the adapter's table knows offers its families, confirmed; one it does not
+    know offers the whole list, `unconfirmed`; `default` a family the adapter knows, or None."""
+    ad = _declares(name, "models")
+    mod = sys.modules[type(ad).__module__]
+    home = tmp_path / "login"
+    home.mkdir()
+    unknown = ad.models(home, "a plan nobody has")
+    assert set(unknown) == {"families", "default", "unconfirmed"}
+    assert unknown["unconfirmed"] is True and unknown["families"] == list(mod.FAMILIES)
+    assert ad.models(home, None)["unconfirmed"] is True
+    for plan, families in mod.PLAN_FAMILIES.items():
+        got = ad.models(home, plan)
+        assert got["unconfirmed"] is False and got["families"] == list(families)
+        assert set(families) <= set(mod.FAMILIES)
+    assert unknown["default"] is None or unknown["default"] in mod.FAMILIES
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_each_family_is_read_from_the_models_names_it_covers(name):
+    """The adapter's table maps a model's name to its family (§4.2b `models`, the switch-over's pin): every family is
+    some name's, and a name the table does not cover is none."""
+    ad = _declares(name, "models")
+    mod = sys.modules[type(ad).__module__]
+    assert mod.model_family("no-such-model") is None and mod.model_family(None) is None
+    for family, model in NAMED_MODELS[name]:
+        assert mod.model_family(model) == family, model
+    assert {f for f, _ in NAMED_MODELS[name]} == set(mod.FAMILIES)
+
+
+# names each tool has run on kmaster (TD-1971), one or more per family
+NAMED_MODELS = {
+    "claude-code": [
+        ("fable", "claude-fable-5-2"),
+        ("opus", "claude-opus-5-5"),
+        ("opus", "opus[1m]"),
+        ("sonnet", "sonnet"),
+        ("haiku", "claude-haiku-5-5"),
+    ],
+    "gemini": [
+        ("flash-lite", "gemini-3.5-flash-lite"),
+        ("flash", "gemini-3-flash-preview"),
+        ("flash", "gemini-3.8-flash"),
+        ("pro", "gemini-3.5-pro"),
+    ],
+    "grok": [("grok", "grok-4.7"), ("build-fast", "grok-4.7-build-fast")],
+}
+
+
+# the settings file naming a model in a home, where the adapter reads its default from one (§4.2b `models`)
+DEFAULT_SETTINGS = {
+    "claude-code": ("settings.json", {"model": "claude-sonnet-5-5"}, "sonnet"),
+    "gemini": (".gemini/settings.json", {"model": {"name": "gemini-3.5-flash-lite"}}, "flash-lite"),
+}
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_models_default_is_the_family_the_homes_settings_name(name, tmp_path):
+    """`default` is the family of the model the home's settings name, and None where they name none."""
+    ad = _declares(name, "models")
+    if name not in DEFAULT_SETTINGS:
+        pytest.skip(f"{name} reads no default from a file")
+    rel, doc, family = DEFAULT_SETTINGS[name]
+    home = tmp_path / "login"
+    (home / rel).parent.mkdir(parents=True)
+    assert ad.models(home, None)["default"] is None
+    (home / rel).write_text(json.dumps(doc), encoding="utf-8")
+    assert ad.models(home, None)["default"] == family

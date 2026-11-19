@@ -26,7 +26,15 @@ import uuid
 from collections.abc import Mapping
 from pathlib import Path
 
-from sessionorc.adapters import LaunchSpec, Transcript, account_match, plain_name, read_version, same_home
+from sessionorc.adapters import (
+    LaunchSpec,
+    Transcript,
+    account_match,
+    model_offer,
+    plain_name,
+    read_version,
+    same_home,
+)
 from sessionorc.models import Confidence, State
 from sessionorc.screen import painted_text
 from sessionorc.tmux import PaneInfo
@@ -48,6 +56,23 @@ HOME_MARKS = ("auth.json",)
 # `grok login` writes, read off the installed tool's file at the build); an API key comes from the environment and
 # writes no entry; another mode says nothing
 AUTH_BILLING = {"oidc": "subscription"}
+# the model families Grok Build's names carry: `grok-4.7` is `grok`, `grok-4.7-build-fast` is `build-fast` (design §4.2b
+# `models`, TD-1971; the names read off its `models_cache.json` on kmaster, 2026-11-19)
+FAMILIES = ("grok", "build-fast")
+# Grok Build records no plan (`identity`'s `plan` is None), so no row is confirmed: every family, unconfirmed
+PLAN_FAMILIES: dict[str, tuple[str, ...]] = {}
+
+
+def model_family(model: object) -> str | None:
+    """A model's family by its name — `grok-4.7` → `grok`, `grok-4.7-build-fast` → `build-fast`; None for a name it
+    does not cover."""
+    m = re.fullmatch(r"grok-[\d.]+(?:-(.+))?", model) if isinstance(model, str) else None
+    if not m:
+        return None
+    family = m.group(1) or "grok"
+    return family if family in FAMILIES else None
+
+
 # every event the state feed reads (§4.3 *The state feed*; the guide's *Hook Events*)
 HOOK_EVENTS = (
     "SessionStart",
@@ -155,7 +180,7 @@ class GrokAdapter:
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): the reads of its
     # transcript come with TD-1637's later slices
     implements: frozenset[str] = frozenset(
-        {"composer", "title", "find", "home_env", "install_command", "signin_command", "is_home", "identity"}
+        {"composer", "title", "find", "home_env", "install_command", "signin_command", "is_home", "identity", "models"}
     )
     # its title does not tell a question tool's wait from a turn's spinner (§4.3 *The title as the check*)
     state_in_title = False
@@ -363,6 +388,11 @@ class GrokAdapter:
             "plan": None,
             "billing": AUTH_BILLING.get(entry.get("auth_mode") if isinstance(entry.get("auth_mode"), str) else ""),
         }
+
+    def models(self, home: Path, plan: str | None) -> dict:
+        """The model families the account offers (§4.2b), from `PLAN_FAMILIES`; `default` None, since no file of the
+        home names the tool's default model."""
+        return model_offer(plan, PLAN_FAMILIES, FAMILIES, None)
 
     def doctor_profiles(self) -> list[dict]:
         """What `ao doctor` reads of each Grok profile (design §4.7, §4.3 *Reads*): its home and whether it is

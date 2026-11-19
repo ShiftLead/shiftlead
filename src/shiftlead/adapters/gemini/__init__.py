@@ -35,6 +35,7 @@ from sessionorc.adapters import (
     MailDelivery,
     Transcript,
     account_match,
+    model_offer,
     oldest_first,
     read_version,
     same_home,
@@ -122,9 +123,21 @@ CLI_INSTALL_LINE = "npm install -g @google/gemini-cli"
 # what the tool writes under a home's `.gemini/`: its accounts, its credentials, its install id (§4.2b `is_home`);
 # never `settings.json`, which a repo's own `.gemini/` holds too
 HOME_MARKS = ("google_accounts.json", "oauth_creds.json", "gemini-credentials.json", "installation_id")
+# the model families Gemini CLI's names carry, the version between `gemini-` and the family (design §4.2b `models`)
+FAMILIES = ("pro", "flash", "flash-lite")
+# the families each plan (`selectedType`) offers, only where a host has run each: none is confirmed yet (an API key ran
+# flash and flash-lite on kmaster, pro unread, 2026-11-19), so every plan offers every family, unconfirmed
+PLAN_FAMILIES: dict[str, tuple[str, ...]] = {}
 # how each `selectedType` is billed, as `identity` suggests it (§4.2b): a Google sign-in's quota windows, or a key's
 # metered use; another type says nothing
 SELECTED_BILLING = {"oauth-personal": "subscription", "gemini-api-key": "metered", "vertex-ai": "metered"}
+
+
+def model_family(model: object) -> str | None:
+    """A model's family by its name — `gemini-3.5-flash-lite`, `gemini-3-flash-preview` → `flash-lite`, `flash`; None
+    for a name it does not cover."""
+    m = re.match(r"gemini-[\d.]+-(flash-lite|flash|pro)(?:-|$)", model) if isinstance(model, str) else None
+    return m.group(1) if m else None
 
 
 def wanted_file() -> Path:
@@ -291,7 +304,7 @@ class GeminiAdapter:
     implements: frozenset[str] = frozenset(
         {
             *("background", "composer", "context", "conversations", "links", "mail", "spend", "title"),
-            *("find", "home_env", "install_command", "signin_command", "is_home", "identity"),
+            *("find", "home_env", "install_command", "signin_command", "is_home", "identity", "models"),
         }
     )
 
@@ -522,6 +535,16 @@ class GeminiAdapter:
             "plan": selected,
             "billing": SELECTED_BILLING.get(selected or ""),
         }
+
+    def models(self, home: Path, plan: str | None) -> dict:
+        """The model families the account offers (§4.2b), from `PLAN_FAMILIES`; `default` the family of the model the
+        home's `.gemini/settings.json` names (`model.name`), None where it names none."""
+        try:
+            doc = json.loads((Path(home).expanduser() / ".gemini" / "settings.json").read_text(encoding="utf-8"))
+            named = (doc.get("model") or {}).get("name")
+        except (OSError, ValueError, AttributeError):
+            named = None
+        return model_offer(plan, PLAN_FAMILIES, FAMILIES, model_family(named))
 
     def doctor_profiles(self) -> list[dict]:
         """What `ao doctor` reads of each Gemini profile (design §4.7, §4.3): its home, its credential, a

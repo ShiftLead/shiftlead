@@ -251,6 +251,10 @@ class Adapter(Protocol):
     #                                                      exception holds it); `display` a name, never an email;
     #                                                      `billing` the tool's record read as `subscription` or
     #                                                      `metered`, None where it does not say — only a suggestion
+    #   models(home: Path, plan: str | None) -> dict      the model families the account offers (§4.2b):
+    #                                                      {families, default, unconfirmed} — `model_offer` over the
+    #                                                      adapter's tables of each plan's families; a plan the table
+    #                                                      does not know offers every family, `unconfirmed`
     #   setup_note() -> dict | None                       what the machine needs a person for before this
     #                                                      adapter's sessions run (design §4.3, TD-875): None
     #                                                      with nothing to say; {key: None} all as wanted;
@@ -293,6 +297,7 @@ OPTIONAL_METHODS = (
     "is_home",
     "links",
     "mail",
+    "models",
     "prompts",
     "signin_command",
     "spend",
@@ -312,6 +317,37 @@ def plain_name(value: object) -> str | None:
     if not isinstance(value, str) or not value.strip() or "@" in value:
         return None
     return value.strip()
+
+
+def model_offer(
+    plan: str | None, plan_families: Mapping[str, tuple[str, ...]], families: tuple[str, ...], default: str | None
+) -> dict:
+    """`models`' reply (design §4.2b): the families `plan` offers by the adapter's table, else every family the adapter
+    knows, marked `unconfirmed`; `default` the family of the tool's default, None where it is not known."""
+    known = plan_families.get(plan) if plan else None
+    return {
+        "families": list(known if known is not None else families),
+        "default": default,
+        "unconfirmed": known is None,
+    }
+
+
+def known_tools() -> list[dict]:
+    """The tools the Tools page names with no adapter (design §4.2b *Known tools without an adapter*): the rows of every
+    `shiftlead.known_tools` table, each `{name, label, binary, path}`, `path` its binary on the PATH alone or None; a
+    row whose name is a registered adapter is that adapter's, so it is left out."""
+    rows: list[dict] = []
+    for ep in entry_points(group="shiftlead.known_tools"):
+        try:
+            table = ep.load()
+        except Exception:  # noqa: BLE001 — a broken table never takes the agent down
+            log.exception("known-tools table %s failed to load", getattr(ep, "name", ep))
+            continue
+        for row in table:
+            if row["name"] in names() or any(r["name"] == row["name"] for r in rows):
+                continue
+            rows.append({**row, "path": shutil.which(row["binary"])})
+    return rows
 
 
 def same_home(a: Path | str, b: Path | str) -> bool:
