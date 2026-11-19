@@ -111,3 +111,9 @@ async def test_a_login_signed_in_whose_account_is_at_a_cap_is_limited_till_its_r
     assert agent._tools_kept["tools"][0]["logins"][0]["state"] == "signed_in"  # on a copy
     agent._usage_acct["claude-code:paul"]["windows"][1]["pct"] = 40  # the cap lifts at the next read
     assert (await agent.rpc_tools())["tools"][0]["logins"][0]["state"] == "signed_in"
+    week = reset + timedelta(days=3)  # two windows at a cap: limited till the later lifts
+    agent._usage_acct["claude-code:paul"]["windows"] = [
+        {"label": "5h", "pct": 100, "resets": _iso(reset)},
+        {"label": "week", "pct": 100, "resets": _iso(week)},
+    ]
+    assert (await agent.rpc_tools())["tools"][0]["logins"][0]["till"] == _iso(week)

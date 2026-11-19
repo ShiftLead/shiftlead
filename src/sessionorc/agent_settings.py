@@ -117,8 +117,9 @@ class SettingsMixin:
         """The `tools` read with each account's `gauges` filled (design §4.2b *The gauge*, *The read*; TD-1975), on
         a copy, so the kept read is never written: from the `gate` reply's entry for its key and the account's last
         reading, by `usage.gauges` — the one builder. A read of a host not switched has no accounts to fill. A login
-        *signed in* whose account's reading is at a cap (`cap_window`, the poll's own test) is `limited`, its `till`
-        that cap's reset (None: unknown), as §4.2b *A login's state* draws it; a metered login never is (§4.2a)."""
+        *signed in* whose account's reading is at a cap (`cap_window`, the poll's own test, on each window) is
+        `limited`, its `till` the latest capped window's reset (None: one is unknown), as §4.2b *A login's state* draws
+        it; a metered login never is (§4.2a)."""
         if not read.get("switched"):
             return read
         gate, now = await self.rpc_gate(), datetime.now(UTC)
@@ -133,8 +134,10 @@ class SettingsMixin:
                 reading = self._usage_acct.get(key) or next((self._usage[p] for p in names if p in self._usage), None)
                 g = usage_mod.gauges(entry, reading, max_age, now, acct.get("billing"), spend_mod.LABELS)
                 accounts.append({**acct, "gauges": g})
-                if g["billing"] != "metered" and (cap := agent_common.cap_window(reading)):
-                    caps[key] = cap[1]
+                capped = [agent_common.cap_window({"windows": [w]}) for w in (reading or {}).get("windows") or ()]
+                resets = [c[1] for c in capped if c]
+                if g["billing"] != "metered" and resets:  # the latest reset: limited till every cap has lifted
+                    caps[key] = None if None in resets else max(r for r in resets if r is not None)
             logins = []
             for lg in card.get("logins") or []:
                 key = str(lg.get("account") or "")

@@ -1112,7 +1112,9 @@ def login_tree(card: dict[str, Any], home: str, weights: Mapping[str, Any] | Non
         lg["shown"] = _shown_folder(str(lg.get("folder") or ""), home)
         lg["said"] = LOGIN_STATES.get(str(lg.get("state")), str(lg.get("state") or ""))
         if lg.get("state") == "limited" and (till := setmod._when(lg.get("till"))):  # §4.2b *A login's state*
-            lg["said"] = f"limited till {usage_clock(till, datetime.now(UTC))}"
+            local = till.astimezone()  # the weekday in front once the reset is not today: a week's cap
+            shape = "%H:%M" if local.date() == datetime.now().astimezone().date() else "%a %H:%M"
+            lg["said"] = f"limited till {local:{shape}}"
         lg["warned"] = [LOGIN_WARNINGS.get(w, w) for w in lg.get("warnings") or []]
         lg["form"] = {k: _setting_text(v) for k, v in (lg.get("settings") or {}).items()}  # the Settings form's values
         lg["form"]["pin"] = _setting_text(lg.get("pin"))

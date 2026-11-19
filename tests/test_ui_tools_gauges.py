@@ -74,6 +74,11 @@ def test_a_limited_login_draws_limited_till_its_reset_in_local_time_or_limited_w
     card["logins"][1].update(state="limited", till=None)
     tree = app_mod.login_tree(card, "/home/x")
     said = {lg["name"]: lg["said"] for lg in card["logins"]}
-    assert said[card["logins"][0]["name"]] == f"limited till {till.astimezone():%H:%M}"
+    today = till.astimezone().date() == datetime.now().astimezone().date()  # +2h may cross local midnight
+    assert said[card["logins"][0]["name"]] == f"limited till {till.astimezone():{'%H:%M' if today else '%a %H:%M'}}"
     assert said[card["logins"][1]["name"]] == "limited"
     assert tree["accounts"]
+    week = NOW + timedelta(days=3)  # a reset not today has its weekday in front
+    card["logins"][0].update(state="limited", till=_iso(week))
+    app_mod.login_tree(card, "/home/x")
+    assert card["logins"][0]["said"] == f"limited till {week.astimezone():%a %H:%M}"
