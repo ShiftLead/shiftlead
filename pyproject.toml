@@ -34,6 +34,9 @@ claude-code = "shiftlead.adapters.claude_code:ClaudeCodeAdapter"
 gemini = "shiftlead.adapters.gemini:GeminiAdapter"
 grok = "shiftlead.adapters.grok:GrokAdapter"
 
+[project.entry-points."shiftlead.known_tools"]
+table = "shiftlead.adapters.known:KNOWN_TOOLS"
+
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"

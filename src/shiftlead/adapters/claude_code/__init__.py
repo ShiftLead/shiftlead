@@ -33,6 +33,7 @@ from sessionorc.adapters import (
     Prompt,
     Transcript,
     account_match,
+    model_offer,
     oldest_first,
     plain_name,
     read_version,
@@ -491,6 +492,20 @@ INSTALL_LINE = "curl -fsSL https://claude.ai/install.sh | bash"
 # what the tool writes into a home of its own: its sign-in record or its credentials (§4.2b `is_home`) — never a
 # directory name as plain as `projects/`, which any workspace may hold
 HOME_MARKS = (".claude.json", ".credentials.json")
+# the model families Claude Code names (its `--model` aliases), newest first (design §4.2b `models`, TD-1971)
+FAMILIES = ("fable", "opus", "sonnet", "haiku")
+# the families each plan offers, by `planDisplayName`, only where a host has run each (TD-1971: `Ultra` ran all four on
+# kmaster, 2026-11-19); a plan not here offers every family, unconfirmed
+PLAN_FAMILIES: dict[str, tuple[str, ...]] = {"Ultra": FAMILIES}
+
+
+def model_family(model: object) -> str | None:
+    """A model's family by its name — `claude-opus-5-5`, `opus`, `opus[1m]` → `opus`; None for a name it does not
+    cover."""
+    if not isinstance(model, str):
+        return None
+    word = re.split(r"[-\[]", model.removeprefix("claude-").lower(), maxsplit=1)[0]
+    return word if word in FAMILIES else None
 
 
 # A launch with no prompt (`ao new` without one, Add entry's **Open a session**) lands at the composer:
@@ -610,6 +625,7 @@ class ClaudeCodeAdapter:
         {
             *("background", "composer", "context", "conversations", "links", "prompts", "spend", "title"),
             *("usage_report", "find", "home_env", "install_command", "signin_command", "is_home", "identity"),
+            "models",
         }
     )
     marks_errors = True  # a tool result's `is_error` (design §4.3 `read_transcript`, TD-1491)
@@ -1053,6 +1069,15 @@ class ClaudeCodeAdapter:
             "plan": account.get("planDisplayName") if isinstance(account.get("planDisplayName"), str) else None,
             "billing": "subscription" if isinstance(billing, str) and "subscription" in billing else None,
         }
+
+    def models(self, home: Path, plan: str | None) -> dict:
+        """The model families the account offers (§4.2b), from `PLAN_FAMILIES`; `default` the family of the `model`
+        the home's `settings.json` names, None where it names none (the tool's own default, which no file records)."""
+        try:
+            named = json.loads((Path(home).expanduser() / "settings.json").read_text(encoding="utf-8")).get("model")
+        except (OSError, ValueError, AttributeError):
+            named = None
+        return model_offer(plan, PLAN_FAMILIES, FAMILIES, model_family(named))
 
     def doctor_profiles(self) -> list[dict]:
         """What `ao doctor` reads of each profile this adapter runs (design §4.7 **`ao doctor`**
