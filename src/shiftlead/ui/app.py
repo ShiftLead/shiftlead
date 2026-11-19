@@ -5247,7 +5247,6 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # `profiles.yml` first, on a worker thread: the `settings` read takes its names, answering each
         # one's window labels for the **schedule** field's window pick (§4.5a *Settings page: Teams*, TD-1346)
         profiles, default, profile_notes = await asyncio.to_thread(settings_profiles)
-        home_keys = await asyncio.to_thread(setmod.home_accounts)  # a switched home's: the Tools page's (TD-1975)
         # Every read the page makes at once (§4.5 *Page loads*, TD-884): the RPCs, none waiting on
         # another, and this host's other files on a worker thread, so the loop is not held by a YAML load
         first, local_files = await asyncio.gather(
@@ -5258,6 +5257,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 read("list"),
                 read("repos", omit=[*REPOS_OMIT_PAGE, "completed"]),  # numbers alone (TD-746)
                 read("gate"),  # the usage chip's lines, handed to it below
+                read("tools"),  # a switched home's accounts, whose reserves are the Tools page's (TD-1975)
             ),
             asyncio.to_thread(settings_files),
         )
@@ -5285,6 +5285,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             k: None if isinstance(r, HTTPException) else r
             for k, r in (("usage", first[1]), ("gate", first[5]), ("host", first[2]))
         }
+        home_keys = setmod.tools_accounts(None if isinstance(first[6], HTTPException) else first[6])
         org, local = local_files["org"], local_files["local"]
         notes: list[str] = [why] if why else []
         notes += profile_notes + local_files["notes"]

@@ -26,7 +26,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import hosts, logins, paths, work
+from sessionorc import hosts, paths, work
 from sessionorc import settings as settings_mod
 from sessionorc import spend as spend_mod
 from sessionorc.models import tokens_short
@@ -1003,15 +1003,11 @@ def gauge_view(g: Mapping[str, Any] | None, billing: Any = None) -> dict[str, An
     return out
 
 
-def home_accounts() -> set[str] | None:
-    """The accounts of the home's host once it is switched (design §4.2b *The gauge*, TD-1975): their gauges and
-    reserves are the Tools page's, so the Settings page's Usage card leaves them and keeps an account seen only on a
-    node. None before the switch, and for a `logins.yml` that does not read, where the card keeps every account."""
-    try:
-        data = logins.load()
-    except logins.LoginError:
+def tools_accounts(read: Mapping[str, Any] | None) -> set[str] | None:
+    """The accounts the Tools page draws on a switched home (design §4.2b *The gauge*, TD-1975): their gauges and
+    reserves are its own, so the Settings page's Usage card leaves them and keeps every other — an account seen only
+    on a node, or one no signed-in login draws. None before the switch, or where the agent served no read, where the
+    card keeps every account."""
+    if not isinstance(read, Mapping) or not read.get("switched"):
         return None
-    if data is None:
-        return None
-    named = {str(e["account"]) for e in (data.get("logins") or {}).values() if isinstance(e, dict) and e.get("account")}
-    return named | {str(k) for k in data.get("accounts") or {}}
+    return {str(a.get("key")) for c in read.get("tools") or [] for a in c.get("accounts") or [] if a.get("key")}

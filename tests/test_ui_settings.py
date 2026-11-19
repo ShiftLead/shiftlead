@@ -1131,17 +1131,19 @@ def test_the_ledger_row_says_the_resolved_ledger_and_whether_the_file_set_it(tmp
     assert a == {"key": "ledger", "value": "docs/technical_debt.md", "default": False}
 
 
-def test_a_switched_home_leaves_its_accounts_usage_cards_to_the_tools_page(client, subprocess_agent, grind_profile):
-    """§4.2b *The gauge* (TD-1975): once the home has a `logins.yml`, an account of its host keeps its reserve on the
-    Tools page, so the Usage card leaves it; with no `logins.yml` the card is drawn as before."""
-    from sessionorc import logins, paths
+def test_a_switched_home_leaves_its_accounts_usage_cards_to_the_tools_page(
+    client, subprocess_agent, grind_profile, monkeypatch
+):
+    """§4.2b *The gauge* (TD-1975): an account the Tools page draws on a switched home keeps its reserve there, so the
+    Usage card leaves it; before the switch (the agent's `tools` read not switched) the card is drawn as before."""
+    from shiftlead.ui import settings_page as setmod
 
-    assert 'data-account="claude-code:paul"' in client.get("/settings").text
-    logins.save({"logins": {"claude-code:grind": {"folder": "/h/.claude", "account": "claude-code:paul"}},
-                 "accounts": {}, "forgotten": {}}, "fixture", paths.home())  # fmt: skip
-    try:
-        page = client.get("/settings").text
-        assert 'data-section="usage" data-account="claude-code:paul"' not in page
-        assert "keep their reserves beside their gauges" in page
-    finally:
-        logins.path(paths.home()).unlink(missing_ok=True)
+    page = client.get("/settings").text
+    assert 'data-account="claude-code:paul"' in page and "keep their reserves beside their gauges" not in page
+    seen = []
+    real = setmod.tools_accounts
+    monkeypatch.setattr(setmod, "tools_accounts", lambda r: seen.append(r) or {"claude-code:paul"})
+    page = client.get("/settings").text
+    assert 'data-section="usage" data-account="claude-code:paul"' not in page
+    assert "keep their reserves beside their gauges" in page
+    assert real(seen[0]) is None  # the agent's own read: not switched

@@ -62,11 +62,6 @@ def test_the_tools_page_draws_the_reads_gauges_and_keep_back_writes_through_the_
     assert not any(m in ("usage", "gate") for m, _ in calls[:2])  # the page reads no usage of its own
 
 
-def test_a_switched_home_leaves_its_accounts_usage_cards_to_the_tools_page(tmp_path, monkeypatch):
-    from sessionorc import logins
-
-    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
-    assert setmod.home_accounts() is None  # not switched: the card keeps every account
-    logins.save({"logins": {"claude-code:paul": {"folder": "/h/.claude", "account": "claude-code:paul"}},
-                 "accounts": {"gemini:key": {"label": "k"}}, "forgotten": {}}, "fixture", tmp_path)  # fmt: skip
-    assert setmod.home_accounts() == {"claude-code:paul", "gemini:key"}
+def test_a_switched_home_leaves_only_the_accounts_the_tools_page_draws():
+    assert setmod.tools_accounts(None) is None and setmod.tools_accounts({"switched": False, "tools": []}) is None
+    assert setmod.tools_accounts(read()) == {"claude-code:paul", "gemini:paul-google"}
