@@ -121,10 +121,11 @@ def test_naming_an_account_takes_a_key_or_a_name_and_refuses_a_retired_name():
 
 def test_naming_an_account_is_refused_where_the_matches_would_disagree():
     d = _data()
-    m = {"claude-code:paul": "claude-code\0a", "claude-code:grind": "claude-code\0a", "claude-code:api": "claude-code\0b"}
+    a, b = "claude-code\0a", "claude-code\0b"
+    m = {"claude-code:paul": a, "claude-code:grind": a, "claude-code:api": b}
     with pytest.raises(logins.LoginError, match="under claude-code:paul-k and reads another account"):
         logins.join(d, "api", "paul-k", matches=m)
-    m["claude-code:api"] = "claude-code\0a"
+    m["claude-code:api"] = a
     with pytest.raises(logins.LoginError, match="reads the same account as claude-code:api"):
         logins.join(d, "api", "work", matches=m)
     assert logins.join(d, "api", "paul-k", matches=m) == "claude-code:api joined claude-code:paul-k"
