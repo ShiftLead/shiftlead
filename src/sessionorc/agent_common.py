@@ -19,9 +19,10 @@ import socket
 import stat
 import struct
 import tarfile
+import threading
 import time
 import unicodedata
-from collections.abc import Collection, Mapping
+from collections.abc import Callable, Collection, Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -1389,3 +1390,31 @@ def stat_dir(dir: str) -> dict[str, Any]:
     d = Path(str(dir or "")).expanduser()
     exists = bool(str(dir or "").strip()) and d.is_dir()
     return {"dir": str(d), "exists": exists, "root": toplevel(d) if exists else ""}
+
+
+async def in_daemon_thread(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    """`fn(*args, **kwargs)` on a daemon thread of its own, awaited (TD-2001). Unlike `asyncio.to_thread`, a stop
+    never waits for it: `asyncio.run` joins the loop's executor at exit, so a slow read there (the Tools read's
+    `--version` probes, up to `adapters.VERSION_TIMEOUT` each) held a stopping host agent past its SIGTERM. Cancelled,
+    the await ends at once and the thread's result is dropped."""
+    loop = asyncio.get_running_loop()
+    fut: asyncio.Future[Any] = loop.create_future()
+
+    def settle(ok: bool, value: Any) -> None:
+        if fut.done():
+            return
+        if ok:
+            fut.set_result(value)
+        else:
+            fut.set_exception(value)
+
+    def run() -> None:
+        try:
+            out: tuple[bool, Any] = (True, fn(*args, **kwargs))
+        except BaseException as e:  # noqa: BLE001 — handed to the awaiter
+            out = (False, e)
+        with contextlib.suppress(RuntimeError):  # the loop closed meanwhile: nobody awaits it
+            loop.call_soon_threadsafe(settle, *out)
+
+    threading.Thread(target=run, name=getattr(fn, "__name__", "read"), daemon=True).start()
+    return await fut

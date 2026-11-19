@@ -3943,7 +3943,8 @@ class HostAgent(
         """Read this host's tools again and keep the read (design §4.2b *What the adapter reads*, TD-1973)."""
         async with self._tools_lock:
             try:
-                got = await asyncio.to_thread(tools_mod.read, self._tools_salt)
+                # a daemon thread, never the loop's executor: a stop must not wait on a tool's `--version` (TD-2001)
+                got = await agent_common.in_daemon_thread(tools_mod.read, self._tools_salt)
             except Exception as e:  # noqa: BLE001 — a failed read is said to the asker; the kept one stands
                 log.exception("the tools read failed")
                 raise RpcError(f"this host's tools could not be read: {type(e).__name__}") from None
