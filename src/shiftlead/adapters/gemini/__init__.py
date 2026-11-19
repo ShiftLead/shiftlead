@@ -121,10 +121,10 @@ REFUSED = "the Gemini layer is not installed — run the line `ao doctor` prints
 CLI_INSTALL_LINE = "npm install -g @google/gemini-cli"
 # what the tool writes under a home's `.gemini/`: its accounts, its credentials, its install id (§4.2b `is_home`);
 # never `settings.json`, which a repo's own `.gemini/` holds too
+HOME_MARKS = ("google_accounts.json", "oauth_creds.json", "gemini-credentials.json", "installation_id")
 # how each `selectedType` is billed, as `identity` suggests it (§4.2b): a Google sign-in's quota windows, or a key's
 # metered use; another type says nothing
 SELECTED_BILLING = {"oauth-personal": "subscription", "gemini-api-key": "metered", "vertex-ai": "metered"}
-HOME_MARKS = ("google_accounts.json", "oauth_creds.json", "gemini-credentials.json", "installation_id")
 
 
 def wanted_file() -> Path:

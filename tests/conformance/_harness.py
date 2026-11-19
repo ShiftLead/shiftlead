@@ -321,8 +321,12 @@ class ClaudeCodeHarness:
         }
         (home / ".claude.json").write_text(json.dumps({"oauthAccount": account}), encoding="utf-8")
 
-    def corrupt_identity(self, home: Path) -> None:
-        (home / ".claude.json").write_text("{not json", encoding="utf-8")
+    def corrupt_identity(self, home: Path) -> list[str]:
+        """Records `identity` reads as none: broken, and well-formed of the wrong shape, each written in turn."""
+        return ["{not json", "[]", json.dumps({"oauthAccount": "x"}), json.dumps({"oauthAccount": {"accountUuid": 5}})]
+
+    def write_identity(self, home: Path, text: str) -> None:
+        (home / ".claude.json").write_text(text, encoding="utf-8")
 
     def hook_command(self, argv: list[str], env: dict[str, str]) -> str:
         """The hook command the launch's `--settings` layer names for every event."""
@@ -430,9 +434,12 @@ class GeminiHarness:
         self.sign_in(home)
         (home / ".gemini" / "google_accounts.json").write_text(json.dumps({"active": key, "old": []}), encoding="utf-8")
 
-    def corrupt_identity(self, home: Path) -> None:
+    def corrupt_identity(self, home: Path) -> list[str]:
+        return ["{not json", "[]", json.dumps({"active": 5}), json.dumps({"active": ""})]
+
+    def write_identity(self, home: Path, text: str) -> None:
         (home / ".gemini").mkdir(exist_ok=True)
-        (home / ".gemini" / "google_accounts.json").write_text("{not json", encoding="utf-8")
+        (home / ".gemini" / "google_accounts.json").write_text(text, encoding="utf-8")
 
     def hook_command(self, argv: list[str], env: dict[str, str]) -> str:
         """The hook command the machine layer the launch names (`GEMINI_CLI_SYSTEM_SETTINGS_PATH`) holds."""
@@ -543,8 +550,11 @@ class GrokHarness:
         entry = {"user_id": key, "first_name": display, "email": "someone@example.com", "auth_mode": "oidc"}
         (home / "auth.json").write_text(json.dumps({"https://auth.x.ai::client": entry}), encoding="utf-8")
 
-    def corrupt_identity(self, home: Path) -> None:
-        (home / "auth.json").write_text("{not json", encoding="utf-8")
+    def corrupt_identity(self, home: Path) -> list[str]:
+        return ["{not json", "[1]", json.dumps({"k": "x"}), json.dumps({"k": {"user_id": 5}})]
+
+    def write_identity(self, home: Path, text: str) -> None:
+        (home / "auth.json").write_text(text, encoding="utf-8")
 
     def hook_command(self, argv: list[str], env: dict[str, str]) -> str:
         """The command the hook file in the launch's `GROK_HOME` names for every event."""

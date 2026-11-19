@@ -1565,6 +1565,7 @@ def test_identity_reads_the_record_a_launch_on_the_home_reads(tmp_path, monkeypa
     from shiftlead.adapters.claude_code import ClaudeCodeAdapter
 
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "elsewhere"))  # the home is the argument, never the variable
     (tmp_path / ".claude").mkdir()
     account = {"accountUuid": "u-1", "displayName": "Ada", "planDisplayName": "Max", "billingType": "x_subscription"}
     (tmp_path / ".claude.json").write_text(json.dumps({"oauthAccount": account}), encoding="utf-8")

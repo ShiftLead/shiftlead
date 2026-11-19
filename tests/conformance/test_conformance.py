@@ -449,8 +449,10 @@ def test_identity_is_none_before_a_sign_in_and_on_a_record_it_cannot_read(name, 
     home = tmp_path / "login"
     home.mkdir()
     assert ad.identity(home, b"salt") is None
-    HARNESSES[name].corrupt_identity(home)
-    assert ad.identity(home, b"salt") is None
+    harness = HARNESSES[name]
+    for text in harness.corrupt_identity(home):
+        harness.write_identity(home, text)
+        assert ad.identity(home, b"salt") is None, text
 
 
 @pytest.mark.parametrize("name", AGENTS)
