@@ -77,6 +77,12 @@ def test_settings_follow_the_profile_rules():
         ok(d, "api", "billing", "", **_rules())
     with pytest.raises(logins.LoginError, match="default home"):
         ok(d, "claude-code:paul", "billing", "metered", **_rules(default_home=True))
+    d["logins"]["claude-code:other"] = {"folder": "/h/.claude-grind", "account": "claude-code:someone"}
+    with pytest.raises(logins.LoginError, match="shares its folder with claude-code:other, another account"):
+        ok(d, "grind", "billing", "metered", **_rules())
+    del d["logins"]["claude-code:other"]
+    with pytest.raises(logins.LoginError, match="not a login's setting"):
+        ok(d, "grind", "bogus", "", **_rules())  # an unknown key is refused before a clear
     with pytest.raises(logins.LoginError, match="reports no spend"):
         ok(d, "grind", "billing", "metered", **_rules(spends=False))
     with pytest.raises(logins.LoginError, match="subscription, not 'free'|subscription or metered, not 'free'"):
@@ -117,6 +123,9 @@ def test_naming_an_account_takes_a_key_or_a_name_and_refuses_a_retired_name():
     with pytest.raises(logins.LoginError, match="forgotten account's key"):
         logins.join(d, "api", "held", reserve_keys=["claude-code:held"])  # a reserve with no login retires it too
     assert logins.join(d, "api", "claude-code:gone") == "claude-code:api joined claude-code:gone"  # rejoined
+    d["accounts"]["claude-code:gone"] = {"label": "old"}
+    logins.join(d, "api", "work")
+    assert "claude-code:gone" not in d["accounts"]  # its last login left it: its entry leaves too
 
 
 def test_naming_an_account_is_refused_where_the_matches_would_disagree():
@@ -210,9 +219,35 @@ async def test_the_verbs_are_the_persons_and_refused_before_the_switch(agent, tm
         }
         assert on_disk["accounts"]["claude-code:paul-k"] == {"label": "Paul K"}
         assert agent._tools_kept is None  # a write drops the kept read: the page reads afresh
+        agent._tools_kept = {
+            "tools": [
+                {
+                    "adapter": "claude-code",
+                    "logins": [{"name": "grind", "account": "k"}],
+                    "accounts": [{"key": "k", "models": {"families": ["sonnet"]}}],
+                }
+            ]
+        }
+        await c.call("login_note", login="grind", text="x")  # drops the kept read again
+        kept = agent._tools_kept
+        agent.rpc_tools = lambda: _reread(agent, kept)
+        assert (await c.call("login_set", login="grind", key="pin", value="sonnet"))["change"].endswith("pin set")
         async with LocalClient(caller="ao-repo-worker") as w:
             for m, k in calls.items():
                 with pytest.raises(AgentError, match="ao-repo-worker cannot"):
                     await w.call(m, **k)
         assert (await c.call("login_forget", login="grind"))["change"] == "claude-code:grind forgotten"
         assert "claude-code:grind" in yaml.safe_load(logins.path(paths.home()).read_text())["forgotten"]
+
+
+async def _reread(agent, kept):
+    agent._tools_kept = {
+        "tools": [
+            {
+                "adapter": "claude-code",
+                "logins": [{"name": "grind", "account": "k"}],
+                "accounts": [{"key": "k", "models": {"families": ["sonnet"]}}],
+            }
+        ]
+    }
+    return agent._tools_kept

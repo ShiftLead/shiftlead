@@ -96,6 +96,8 @@ class LoginsMixin:
         `billing`, `prices`, `extra_args`, `unattended_args`, `permission_wait`, `pin`, checked by §4.2a's rules; an
         empty value clears it."""
         agent_common.person_only(caller, "change a login's settings", SECTION, self._graph())
+        if key == "pin" and self._tools_kept is None:  # a write dropped the kept read: the families are read afresh
+            await self.rpc_tools()
         kept = {lk: self._login_kept(lk) for lk in await self._login_keys()}  # read in the loop
 
         def edit(d: dict[str, Any]) -> str:

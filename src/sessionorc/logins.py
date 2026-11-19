@@ -400,6 +400,8 @@ def setting_value(
     `default_home`: the login's folder is its tool's default home; `spends`: its adapter reports spend; `families`: the
     model families its account offers, None where no read has them."""
     e = data["logins"][lk]
+    if k not in SETTINGS:
+        raise LoginError(f"{k!r} is not a login's setting ({', '.join(SETTINGS)})")
     if v is None or v == "":
         if k == "billing" and e.get("prices"):
             raise LoginError(f"{lk} has prices: clear them before its billing")
@@ -415,6 +417,18 @@ def setting_value(
                 )
             if not spends:
                 raise LoginError(f"{lk} cannot be metered: its tool reports no spend, so an amount would bind nothing")
+            folder = Path(str(e.get("folder") or "")).expanduser()
+            mine = account_of(lk, e)
+            for other, oe in sorted(data["logins"].items()):
+                if (
+                    other != lk
+                    and Path(str(oe.get("folder") or "")).expanduser().resolve() == folder.resolve()
+                    and account_of(other, oe) != mine
+                ):
+                    raise LoginError(
+                        f"{lk} shares its folder with {other}, another account: a metered login's spend would count "
+                        "that account's turns (design §4.2a)"
+                    )
         elif e.get("prices"):
             raise LoginError(f"{lk} has prices, a metered login's: clear them before making it a subscription")
         return v
@@ -504,7 +518,10 @@ def join(
             raise LoginError(f"{other} reads the same account as {lk} and is under {under}: name that one instead")
         if under == acct and theirs != mine:
             raise LoginError(f"{other} is under {acct} and reads another account than {lk}")
+    left = account_of(lk, e)
     _put(e, "account", None if acct == lk else acct)
+    if left not in live_keys(data):  # its last login gone, the account's entry leaves `accounts:`, as forget's does
+        data["accounts"].pop(left, None)
     return f"{lk} joined {acct}"
 
 
