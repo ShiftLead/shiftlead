@@ -349,3 +349,46 @@ async def test_a_loop_too_slow_to_answer_keeps_the_worktree_and_holds_no_lock_la
         await asyncio.sleep(0.05)  # the late take runs, then gives back what it took
     assert got == [None]
     assert not any(lock.locked() for lock in agent._dir_locks.values())
+
+
+def landed_old(repo: Path, name: str) -> Path:
+    """A worktree the rule would remove: its work squash-merged, clean, past its keep."""
+    w = wt_of(repo, name)
+    commit(w, f"{name}.txt", msg=name)
+    squash_merge(repo, w, name)
+    age(w)
+    return w
+
+
+def test_idle_is_asked_again_under_the_locks_just_before_the_removal(repo):
+    """A session that starts in the worktree between its weigh and its removal keeps it: the second ask, under the
+    create's locks, answers with the reason, and the locks are given back."""
+    w = landed_old(repo, "late")
+    asks, released = [], []
+
+    def idle(wt):
+        asks.append(wt.name)
+        return None if len(asks) == 1 else "in use by ao-late"
+
+    got = run(repo, idle=idle, hold=lambda wt, main: lambda: released.append(wt.name))
+    assert got.removed == [] and dict(got.kept) == {str(w): "in use by ao-late"} and w.exists()
+    assert asks == ["late", "late"] and released == ["late"]
+
+
+def test_a_refused_removal_is_kept_with_the_refusal_and_never_reported_removed(repo, monkeypatch):
+    w = landed_old(repo, "stuck")
+    monkeypatch.setattr(worktreesweep, "remove", lambda wt, main, timeout=worktreesweep.STEP: False)
+    got = run(repo)
+    assert got.removed == [] and dict(got.kept) == {str(w): "git worktree remove refused"} and w.exists()
+
+
+def test_a_worktree_path_that_is_a_symlink_is_kept_as_not_a_directory(repo):
+    """git lists the worktree at its own path, which is now a link to the directory moved beside it, inside the root:
+    the rule never weighs, nor removes, through a link."""
+    w = landed_old(repo, "linked")
+    moved = w.parent / "linked-moved"
+    w.rename(moved)
+    w.symlink_to(moved)
+    got = run(repo)
+    assert got.removed == [] and dict(got.kept) == {str(w): "not a directory"}
+    assert w.is_symlink() and moved.is_dir()
