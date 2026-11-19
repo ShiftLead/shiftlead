@@ -44,9 +44,11 @@ def worktree_root(repo: Path) -> Path:
     except (OSError, ValueError):
         got = None
     if isinstance(got, str) and got.strip() and not os.path.isabs(got):
-        parts = Path(got.strip()).parts
-        if ".." not in parts:
-            rel = str(Path(*parts))
+        parts = [p for p in Path(got.strip()).parts if p != "."]
+        if parts and ".." not in parts:
+            inside = Path(os.path.realpath(repo / Path(*parts)))
+            if inside != Path(os.path.realpath(repo)) and inside.is_relative_to(os.path.realpath(repo)):
+                rel = str(Path(*parts))
     return repo / rel
 
 
@@ -170,6 +172,7 @@ def sweep(
     now = time.time() if now is None else now
     troots = list(transcript_roots)
     found: list[tuple[Path, Path, str | None]] = []
+    seen: set[str] = set()  # two roots naming one repo list its worktrees twice: each is weighed once
     for r in sorted({str(Path(x)) for x in repos}):
         repo = Path(r)
         root = worktree_root(repo)
@@ -178,7 +181,9 @@ def sweep(
             log.warning("worktree sweep: %s's worktrees could not be listed", repo)
             continue
         for wt, branch in got:
-            if Path(os.path.realpath(wt)).parent == Path(os.path.realpath(root)):
+            real = os.path.realpath(wt)
+            if Path(real).parent == Path(os.path.realpath(root)) and real not in seen:
+                seen.add(real)
                 found.append((wt, repo, branch))
     found.sort(key=lambda x: str(x[0]))
     after = [x for x in found if str(x[0]) > cursor] if cursor else found
@@ -189,31 +194,50 @@ def sweep(
         if time.monotonic() - start >= budget:
             break
         out.cursor = str(wt)
-        deadline = time.monotonic() + gitinfo.REAP_WITHIN
-        why = weigh(
-            wt,
-            repo,
-            branch,
-            now=now,
-            keep_days=keep_days,
-            deadline=deadline,
-            idle=(lambda w=wt: idle(w)) if idle is not None else None,
-            transcript_roots=troots,
-        )
-        if why is None:
-            release = hold(wt, repo) if hold is not None else (lambda: None)
-            if release is None:
-                why = "busy: a start is using it"
-            else:
-                try:
-                    why = idle(wt) if idle is not None else None
-                    if why is None and not remove(wt, repo):
-                        why = "git worktree remove refused"
-                finally:
-                    release()
+        try:
+            why = _one(wt, repo, branch, now, keep_days, idle, hold, troots)
+        except Exception:  # noqa: BLE001 — one worktree that cannot be weighed never starves the rest
+            log.exception("worktree sweep: %s could not be weighed", wt)
+            why = gitinfo.NOT_WEIGHED
         if why is None:
             out.removed.append(str(wt))
             log.info("worktree sweep: removed %s", wt)
         else:
             out.kept.append((str(wt), why))
     return out
+
+
+def _one(
+    wt: Path,
+    repo: Path,
+    branch: str | None,
+    now: float,
+    keep_days: float,
+    idle: Callable[[Path], str | None] | None,
+    hold: Callable[[Path, Path], Callable[[], None] | None] | None,
+    troots: list[Path],
+) -> str | None:
+    """One worktree's weigh and, where nothing keeps it, its removal under the create's locks: its why, or None."""
+    deadline = time.monotonic() + gitinfo.REAP_WITHIN
+    why = weigh(
+        wt,
+        repo,
+        branch,
+        now=now,
+        keep_days=keep_days,
+        deadline=deadline,
+        idle=(lambda w=wt: idle(w)) if idle is not None else None,
+        transcript_roots=troots,
+    )
+    if why is None:
+        release = hold(wt, repo) if hold is not None else (lambda: None)
+        if release is None:
+            why = "busy: a start is using it"
+        else:
+            try:
+                why = idle(wt) if idle is not None else None
+                if why is None and not remove(wt, repo):
+                    why = "git worktree remove refused"
+            finally:
+                release()
+    return why

@@ -14,6 +14,7 @@ import json
 import os
 import re
 import shutil
+import threading
 import time
 from collections.abc import Callable, Collection, Mapping
 from datetime import UTC, date, datetime, timedelta
@@ -5569,12 +5570,13 @@ class TickMixin:
         except gitinfo.WorktreeError:
             main = repo
         keys = [f"worktree:{main}:{wt.name}", str(wt)]
+        abandoned = threading.Event()  # the sweep stopped waiting: whatever `take` holds, it lets go
 
         async def take() -> list[asyncio.Lock] | None:
             got: list[asyncio.Lock] = []
             for k in keys:
                 lock = self._dir_locks[k]
-                if lock.locked():
+                if lock.locked() or abandoned.is_set():
                     for g in got:
                         g.release()
                     return None
@@ -5582,18 +5584,21 @@ class TickMixin:
                 got.append(lock)
             return got
 
+        def let_go(held: list[asyncio.Lock] | None) -> None:
+            for lock in held or []:
+                with contextlib.suppress(RuntimeError):  # the loop closed: nobody waits on the lock
+                    loop.call_soon_threadsafe(lock.release)
+
+        fut = asyncio.run_coroutine_threadsafe(take(), loop)
         try:
-            held = asyncio.run_coroutine_threadsafe(take(), loop).result(timeout=gitinfo.REAP_STEP)
-        except Exception:  # noqa: BLE001 — a loop that cannot answer keeps the worktree
+            held = fut.result(timeout=gitinfo.REAP_STEP)
+        except Exception:  # noqa: BLE001 — a loop that cannot answer keeps the worktree, and takes nothing late
+            abandoned.set()
+            fut.add_done_callback(lambda f: let_go(f.result()) if not f.cancelled() and not f.exception() else None)
             return None
         if held is None:
             return None
-
-        def release() -> None:
-            for lock in held:
-                loop.call_soon_threadsafe(lock.release)
-
-        return release
+        return lambda: let_go(held)
 
     async def _clear_gone_kept(self) -> None:
         """A closed record still saying its worktree is kept stops saying so once the directory is gone, such as

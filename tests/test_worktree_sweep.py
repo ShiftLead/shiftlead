@@ -296,3 +296,56 @@ async def test_the_host_agent_keeps_a_live_records_worktree_and_one_a_create_hol
     del agent.sessions["ao-live"]
     await asyncio.to_thread(agent._sweep_worktrees, datetime.now(UTC))
     assert made["live"].exists()
+
+
+def test_an_odd_worktree_root_reads_the_default(repo, tmp_path):
+    (repo / "docs").mkdir()
+    for value in (".", "./", "../elsewhere", "/abs"):
+        (repo / "docs/cadence.toml").write_text(f"worktree-root = {value!r}\n")
+        assert worktreesweep.worktree_root(repo) == repo / ".claude/worktrees", value
+    (tmp_path / "out").mkdir()
+    (repo / "link").symlink_to(tmp_path / "out")  # inside by name, outside in fact
+    (repo / "docs/cadence.toml").write_text('worktree-root = "link"\n')
+    assert worktreesweep.worktree_root(repo) == repo / ".claude/worktrees"
+
+
+def test_one_worktree_that_cannot_be_weighed_never_starves_the_rest_and_two_roots_of_one_repo_weigh_it_once(
+    repo, tmp_path
+):
+    for n in ("a", "b"):
+        w = wt_of(repo, n)
+        commit(w, f"{n}.txt", msg=n)
+        squash_merge(repo, w, n)
+        age(w)
+    (tmp_path / "alias").symlink_to(repo)
+
+    def idle(wt):
+        if wt.name == "a":
+            raise OSError("cannot read")
+        return None
+
+    got = worktreesweep.sweep([repo, tmp_path / "alias"], cursor="", keep_days=7, idle=idle)
+    assert [Path(p).name for p in got.removed] == ["b"]
+    assert [(Path(p).name, why) for p, why in got.kept] == [("a", gitinfo.NOT_WEIGHED)]
+    assert got.cursor.endswith("/b")
+
+
+@pytest.mark.integration
+async def test_a_loop_too_slow_to_answer_keeps_the_worktree_and_holds_no_lock_late(agent, monkeypatch, tmp_path):
+    import asyncio
+    import threading
+
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    monkeypatch.setattr(gitinfo, "REAP_STEP", 0.1)
+    agent._sweep_loop = asyncio.get_running_loop()
+    wt, got = tmp_path / "w", []
+    t = threading.Thread(target=lambda: got.append(agent._hold_create_locks(wt, tmp_path)))
+    t.start()
+    time.sleep(0.5)  # the loop stalls past the sweep's wait
+    t.join()
+    for _ in range(3):
+        await asyncio.sleep(0.05)  # the late take runs, then gives back what it took
+    assert got == [None]
+    assert not any(lock.locked() for lock in agent._dir_locks.values())
