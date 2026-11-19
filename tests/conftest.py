@@ -243,20 +243,20 @@ def _scratch_root():
     from sessionorc import hosts
 
     sweep_stale_scratch_roots()
-    root = tempfile.mkdtemp(prefix="aoscr-", dir="/tmp")
-    name = os.path.basename(root)
-    with contextlib.suppress(OSError):
-        OWNERS.mkdir(exist_ok=True)
-        (OWNERS / name).write_text(str(os.getpid()))
-    mp = pytest.MonkeyPatch()
-    mp.setattr(hosts, "DEFAULT_SCRATCH_ROOT", root)
-    mp.setenv("AO_TEST_SCRATCH_ROOT", root)
-    try:
-        yield root
-    finally:
-        mp.undo()
-        _rmtree_writable(root)
-        _forget_owner(name)
+    with tempfile.TemporaryDirectory(prefix="aoscr-", dir="/tmp", ignore_cleanup_errors=True) as root:
+        name = os.path.basename(root)
+        with contextlib.suppress(OSError):
+            OWNERS.mkdir(exist_ok=True)
+            (OWNERS / name).write_text(str(os.getpid()))
+        mp = pytest.MonkeyPatch()
+        mp.setattr(hosts, "DEFAULT_SCRATCH_ROOT", root)
+        mp.setenv("AO_TEST_SCRATCH_ROOT", root)
+        try:
+            yield root
+        finally:
+            mp.undo()
+            _rmtree_writable(root)
+            _forget_owner(name)
 
 
 @pytest.fixture(scope="session", autouse=True)
