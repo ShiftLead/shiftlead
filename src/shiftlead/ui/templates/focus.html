@@ -323,7 +323,11 @@
     </details>{% endif %}
     {# a reaped record has no tree to read: no Git card (§4.1 *Kept, and said*, TD-979) #}
     {% if not s.reaped %}<details class="card pad side" data-side="git" id="gitcard" open>
-      <summary class="row gap"><span class="h2">Git</span><span class="mono muted small" id="gitline">{% if s.git %}{{ s.git.branch }}{% if s.git.unpushed %} · {{ s.git.unpushed }} unpushed{% if s.git.pushed_against %} vs {{ s.git.pushed_against }}{% endif %}{% endif %}{% if s.git.ahead %} · {{ s.git.ahead }} ahead{% endif %}{% if s.git.behind %} · {{ s.git.behind }} behind{% endif %}{% else %}not a git directory{% endif %}</span></summary>
+      <summary class="row gap"><span class="h2">Git</span><span class="mono muted small" id="gitline">{% if s.git %}{{ s.git_head }}{% if s.git.unpushed %} · {{ s.git.unpushed }} unpushed{% if s.git.pushed_against %} vs {{ s.git.pushed_against }}{% endif %}{% endif %}{% if s.git.ahead %} · {{ s.git.ahead }} ahead{% endif %}{% if s.git.behind %} · {{ s.git.behind }} behind{% endif %}{% else %}not a git directory{% endif %}</span></summary>
+      {# §4.5a *Git card: working in* (TD-1959, built by TD-1988): where the session's tool reports working, when
+         that is another worktree or repository or outside any (`cwd_root`): the path cut from its left, whole on
+         hover, a link to `editor.cwd_url`, text where the view serves none #}
+      <div class="mono small muted gitcwd{% if not s.cwd_root %} hidden{% endif %}" id="gitcwd">working in <span class="gitcwdpath" title="{{ s.cwd_root or '' }}">{% if s.editor and s.editor.cwd_url %}<a class="link editor" id="gitcwdlink" href="{{ s.editor.cwd_url }}" data-label="{{ s.editor.label }}"><bdi>{{ s.cwd_root }}</bdi></a>{% else %}<bdi>{{ s.cwd_root or '' }}</bdi>{% endif %}</span></div>
       {# §4.5a *Git card: the pick · ↑ · ↓* (TD-856, built by TD-862): what the lines list — Working tree
          (the pushed record's porcelain), one of the newest ten commits, or Session — read through the
          `git_files` route on a pick; drawn while the card has a git directory. #}

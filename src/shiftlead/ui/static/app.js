@@ -7570,6 +7570,27 @@
   // eight runs at most per ask, so a path met twice is asked once; a failed ask, or a run the answer
   // leaves out, keeps nothing.
   AO.TRANSCRIPT_TEXT = ".ttext, .targ, .tbody";
+  // §4.5a *Focus side panel, Git card: working in* (TD-1959, built by TD-1988): the line under the summary where the
+  // record has `cwd_root` — the path whole on hover and cut from its left by the stylesheet, a link to the view's
+  // `editor.cwd_url` (the editor button's folder form, so it carries the button's label for its toast), text where
+  // the view serves none; hidden without `cwd_root`
+  AO.paintWorkingIn = function (el, v) {
+    const root = (v && v.cwd_root) || "";
+    el.classList.toggle("hidden", !root);
+    const span = el.querySelector(".gitcwdpath");
+    if (!span) return;
+    span.title = root;
+    span.textContent = "";
+    const bdi = document.createElement("bdi");
+    bdi.textContent = root;
+    const url = v.editor && v.editor.cwd_url;
+    if (url) {
+      const a = document.createElement("a");
+      a.className = "link editor"; a.id = "gitcwdlink"; a.href = url; a.dataset.label = v.editor.label || "";
+      a.appendChild(bdi); span.appendChild(a);
+    } else span.appendChild(bdi);
+  };
+
   AO.pathsAsker = function (ask) {
     const known = new Map();
     let chain = Promise.resolve();
@@ -9231,7 +9252,7 @@
         // the one measure first (design §4.2, TD-080: *only on this machine*), then `ahead`, which
         // is *unmerged* and a different question — the template renders the same three parts
         const unpushed = v.git.unpushed ? ` · ${v.git.unpushed} unpushed${v.git.pushed_against ? ` vs ${v.git.pushed_against}` : ""}` : "";
-        $("#gitline").textContent = v.git.branch + unpushed + (v.git.ahead ? ` · ${v.git.ahead} ahead` : "") + (v.git.behind ? ` · ${v.git.behind} behind` : "");
+        $("#gitline").textContent = (v.git_head || v.git.branch) + unpushed + (v.git.ahead ? ` · ${v.git.ahead} ahead` : "") + (v.git.behind ? ` · ${v.git.behind} behind` : "");
         // §4.5a *Git card: changed files* (TD-628): each path a link by the recent files' form, joined
         // to the worktree's top level the page was served (`s.git_root`), the same on load and each delta
         // …under the pick (TD-862): Working tree draws them; a commit or Session reads `git_files`
@@ -9239,6 +9260,8 @@
         else $("#gitfiles").innerHTML = AO.gitFiles(v, s.editor, s.git_root);
       }
       const gp = $("#gitpick"); if (gp) gp.classList.toggle("hidden", !v.git);
+      // §4.5a *Git card: working in* (TD-1988): redrawn from each view, a link where it serves `editor.cwd_url`
+      const gc = $("#gitcwd"); if (gc) AO.paintWorkingIn(gc, v);
       // the person's `file_link` read again with each view (§4.5a *Settings page: You, file link*: *read by the
       // next file link, no reload*; TD-536) — in place, since the pane's link provider holds this object
       if (s.editor && v.editor) { s.editor.first = v.editor.first; s.editor.wait = v.editor.wait; }

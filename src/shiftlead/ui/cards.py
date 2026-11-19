@@ -427,6 +427,7 @@ def view(
     else:
         d["branch_full"] = "" if s.get("repo") else str(s.get("dir") or "")
     d["branch_line"] = _middle(d["branch_full"], BRANCH_SHOWN)
+    d["git_head"] = git_head(git)
     # what leads row 3 outside a team's own group, where the header does not say it: `host / repo ·`,
     # or `host /` before the directory of a session with no repo
     d["place_prefix"] = f"{d['place']} · " if s.get("repo") else f"{d['host']} / "
@@ -932,6 +933,21 @@ def gated_view(raw: Any) -> dict[str, str] | None:
 
 
 BRANCH_SHOWN = 34  # characters of row 3's branch a card shows before it shortens it in the middle
+
+
+def git_head(git: Mapping[str, Any]) -> str:
+    """The Focus Git card's summary before its counts (§4.5a *Focus side panel, Git card*, TD-1988): the branch;
+    where `dir` is a linked worktree (`git.worktree`, its folder name) that is not the branch's name, *worktree
+    <folder> · on branch <branch>*, and on a detached head there *worktree <folder> · detached at <sha>*. Read
+    from the record, so a remote record's card draws it too; a main checkout's reads as before."""
+    branch = str(git.get("branch") or "")
+    wt = str(git.get("worktree") or "")
+    if not wt:
+        return branch
+    if branch == "(detached)":
+        oid = str(git.get("oid") or "")
+        return f"worktree {wt} · " + (f"detached at {oid[:7]}" if oid else "detached")
+    return branch if wt == branch else f"worktree {wt} · on branch {branch}"
 
 
 def _middle(text: str, width: int) -> str:
