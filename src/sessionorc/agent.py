@@ -3916,8 +3916,13 @@ class HostAgent(
             self.sessions[sid] = s
             self.store.save(s)
             if typed:
-                self._record_send(s, SYSTEM, typed, own=True)  # the host agent's own typing: no secret
-                await asyncio.to_thread(self.tmux.send_literal, sid, typed)  # no Enter: the person presses it
+                entry = self._record_send(s, SYSTEM, typed, own=True)  # the host agent's own typing: no secret
+                try:
+                    await asyncio.to_thread(self.tmux.send_literal, sid, typed)  # no Enter: the person presses it
+                except TmuxError as e:  # the shell is open; its command is not typed, and the record says so
+                    entry.verdict = f"not typed: {e}"[:200]
+                    self.store.save(s)
+                    raise RpcError(f"{sid} is open, but its command could not be typed: {e}") from None
             await self._push_changes()
             return s.view()
 

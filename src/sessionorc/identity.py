@@ -40,8 +40,8 @@ ALARMS_KEEP = 20
 # `TOOLS_GATED`'s: `tail` and `explain` read a caller for one thing alone, to refuse a Tools page's tools
 # shell's pane to a session (design §4.2b *The tools shell*, §9 invariant 11's one exception, TD-1972).
 # From under a pane the claim is replaced by the pane's own session (`_identify`), so a session's own
-# read is its own; a process outside every pane could still claim the person, which is the bound
-# §4.2b states (the same unix user could run `tmux capture-pane` itself).
+# read is its own; under `observe`, from a channel judged unknown, or from outside every pane a claim
+# of the person still stands, which is the bound §4.2b and §4.8a state (the same unix user could run `tmux capture-pane` itself).
 TOOLS_GATED = frozenset({"tail", "explain"})
 READS = frozenset(
     {

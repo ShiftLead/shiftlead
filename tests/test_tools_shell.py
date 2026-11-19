@@ -157,3 +157,54 @@ def adapters_install(tool: str) -> str:
 
 def _person_tail(agent, sid: str) -> list[str]:
     return agent.tmux.capture_tail(sid, 10, tools=naming.is_tools(sid))
+
+
+async def test_the_tick_keeps_nothing_it_is_handed_of_a_tools_shells_pane(agent):
+    """`_observe` itself drops a non-empty tail and a title the pane set, so no capture path can leak one."""
+    from datetime import UTC, datetime
+
+    from sessionorc.tmux import PaneInfo
+
+    await park_ticks(agent)
+    s = Session(id="ao--tools-gemini-x", name="tools-gemini-x", kind="interactive", adapter="shell", dir="", log=False)
+    pane = PaneInfo(session=s.id, created=0, current_command="bash", pane_pid=1, dead=False, dead_status=None)
+    pane = PaneInfo(**{**pane.__dict__, "title": "you@example.com — code ABCD-1234"})
+    agent._observe(s, pane, ["Paste your API key: sk-secret"], datetime.now(UTC))
+    assert s.tail == [] and s.title is None
+
+
+async def test_the_persons_own_shell_reads_it_and_a_real_session_does_not(agent, tmp_path):
+    await park_ticks(agent)
+    s = await agent.rpc_tools_install("claude-code")
+    sid = s["id"]
+    async with LocalClient() as c:
+        mine = await c.call("create", name="mine", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        other = tmp_path / "w"
+        other.mkdir()
+        worker = await c.call(
+            "create", name="w", dir=str(other), adapter="shell", argv=["bash", "--norc"], controllers=[mine["id"]]
+        )
+    async with LocalClient(caller=mine["id"]) as m:  # the person's own shell is the person (§4.8)
+        assert isinstance(await m.call("tail", id=sid, lines=3), list)
+    async with LocalClient(caller=worker["id"]) as w:  # a session with a record and a controller is not
+        with pytest.raises(AgentError, match="cannot read a tools shell"):
+            await w.call("tail", id=sid)
+        with pytest.raises(AgentError, match="cannot explain a tools shell"):
+            await w.call("explain", id=sid)
+
+
+async def test_a_permission_from_a_tools_shell_is_never_waited_on(agent):
+    await park_ticks(agent)
+    s = await agent.rpc_tools_install("claude-code")
+    assert await agent._await_permission(s["id"], {"kind": "permission", "text": "Bash(ls)"}) is None
+    assert not agent._waiters and not agent.sessions[s["id"]].pendings
+
+
+async def test_a_press_on_an_ended_tools_shell_starts_it_afresh(agent):
+    await park_ticks(agent)
+    sid = (await agent.rpc_tools_install("claude-code"))["id"]
+    await asyncio.to_thread(agent.tmux.run, "send-keys", "-t", f"={sid}:", "C-u", "exit", "Enter")
+    assert await wait_for(lambda: (agent.tmux.main_panes(naming.PREFIX).get(sid) or object()).__dict__.get("dead"))
+    again = await agent.rpc_tools_install("claude-code")
+    assert again["id"] == sid and not agent.tmux.main_panes(naming.PREFIX)[sid].dead
+    assert [e.text for e in agent.sessions[sid].sends] == [adapters_install("claude-code")]
