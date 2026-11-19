@@ -225,6 +225,20 @@ class Adapter(Protocol):
     #                                                      the smoke*, TD-1650) and by the seat smoke: as
     #                                                      `read_version` reads the adapter's binary in `env`;
     #                                                      never in `implements`. None, or no method: no version
+    #   credentials_ok(profile_or_home) -> bool | None    whether a sign-in carries on without a person, read of
+    #                                                      a profile or, for the Tools page, of a home given as a
+    #                                                      path (design §4.2b, TD-1971); None for no credential
+    #   find() -> str | None                              the binary a launch finds, by absolute path, asked without
+    #                                                      launching: the PATH, then the places the adapter knows
+    #                                                      (design §4.2b *What the adapter reads*, TD-1971)
+    #   home_env(home: Path) -> dict[str, str]            the environment a launch on `home` sets — empty where
+    #                                                      `home` is the tool's `default_home`, as a launch on a
+    #                                                      profile with no `config_dir` sets nothing (§4.2b)
+    #   install_command() -> str                          the vendor's documented install line, the person's to run
+    #   signin_command() -> list[str]                     the sign-in command alone, its environment `home_env`'s
+    #   is_home(path: Path) -> bool                       whether a folder is this tool's home, by the files the tool
+    #                                                      writes there (§4.2b); each of these five is declared in
+    #                                                      `implements`, and none launches the tool or sends anything
     #   setup_note() -> dict | None                       what the machine needs a person for before this
     #                                                      adapter's sessions run (design §4.3, TD-875): None
     #                                                      with nothing to say; {key: None} all as wanted;
@@ -260,13 +274,24 @@ OPTIONAL_METHODS = (
     "composer",
     "context",
     "conversations",
+    "find",
+    "home_env",
+    "install_command",
+    "is_home",
     "links",
     "mail",
     "prompts",
+    "signin_command",
     "spend",
     "title",
     "usage_report",
 )
+
+
+def same_home(a: Path | str, b: Path | str) -> bool:
+    """Whether two homes are one folder, each expanded and resolved (design §4.2b `home_env`)."""
+    return Path(a).expanduser().resolve() == Path(b).expanduser().resolve()
+
 
 # The live walk's `--capture` (design §4.3 *The conformance suite*, TD-784): set in a launch's environment,
 # it names a directory where the adapter's hook appends each payload its tool hands it, as received, one

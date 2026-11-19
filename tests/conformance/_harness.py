@@ -298,6 +298,18 @@ class ClaudeCodeHarness:
         """Nothing for the layer, which is the `--settings` file the launch writes; the suite's hook on `PATH`."""
         suite_bin(tmp, monkeypatch)
 
+    # a home of the tool's, for §4.2b's reads (TD-1971): what a sign-in writes, what the tool writes there, and
+    # what a folder that is no home may hold (a repo's own `.claude/` has settings alone)
+    def sign_in(self, home: Path) -> None:
+        (home / ".credentials.json").write_text(json.dumps({"claudeAiOauth": {"accessToken": "t"}}), encoding="utf-8")
+
+    def mark_home(self, home: Path) -> None:
+        (home / ".claude.json").write_text("{}", encoding="utf-8")
+
+    def not_a_home(self, path: Path) -> None:
+        (path / "settings.json").write_text("{}", encoding="utf-8")
+        (path / "projects").mkdir(exist_ok=True)  # a workspace's own directory of that name
+
     def hook_command(self, argv: list[str], env: dict[str, str]) -> str:
         """The hook command the launch's `--settings` layer names for every event."""
         layer = json.loads(Path(_flag(argv, "--settings") or "").read_text(encoding="utf-8"))
@@ -383,6 +395,21 @@ class GeminiHarness:
         monkeypatch.setattr(gemini, "MACHINE_LAYER", machine)
         monkeypatch.setattr(gemini, "_lstat", _rooted)
         machine.write_text(gemini.layer_text(str(hook)), encoding="utf-8")  # the person ran the install line
+
+    def sign_in(self, home: Path) -> None:
+        gem = home / ".gemini"
+        gem.mkdir(exist_ok=True)
+        auth = {"security": {"auth": {"selectedType": "oauth-personal"}}}
+        (gem / "settings.json").write_text(json.dumps(auth), encoding="utf-8")
+        (gem / "oauth_creds.json").write_text("{}", encoding="utf-8")
+
+    def mark_home(self, home: Path) -> None:
+        (home / ".gemini").mkdir(exist_ok=True)
+        (home / ".gemini" / "installation_id").write_text("i\n", encoding="utf-8")
+
+    def not_a_home(self, path: Path) -> None:
+        (path / ".gemini").mkdir(exist_ok=True)
+        (path / ".gemini" / "settings.json").write_text("{}", encoding="utf-8")
 
     def hook_command(self, argv: list[str], env: dict[str, str]) -> str:
         """The hook command the machine layer the launch names (`GEMINI_CLI_SYSTEM_SETTINGS_PATH`) holds."""
@@ -475,6 +502,17 @@ class GrokHarness:
         person.mkdir(exist_ok=True)
         monkeypatch.setattr(grok, "PERSON_HOME", person)
         monkeypatch.setattr(grok, "MANAGED_SETTINGS", tmp / "etc" / "claude-code" / "managed-settings.json")
+
+    def sign_in(self, home: Path) -> None:
+        (home / "auth.json").write_text("{}", encoding="utf-8")
+
+    def mark_home(self, home: Path) -> None:
+        (home / "auth.json").write_text("{}", encoding="utf-8")
+
+    def not_a_home(self, path: Path) -> None:
+        (path / "hooks").mkdir(exist_ok=True)
+        (path / "hooks" / "shiftlead.json").write_text("{}", encoding="utf-8")  # ShiftLead's own, not the tool's
+        (path / "sessions").mkdir(exist_ok=True)  # another program's directory of that name
 
     def hook_command(self, argv: list[str], env: dict[str, str]) -> str:
         """The command the hook file in the launch's `GROK_HOME` names for every event."""
