@@ -65,3 +65,20 @@ def test_the_tools_page_draws_the_reads_gauges_and_keep_back_writes_through_the_
 def test_a_switched_home_leaves_only_the_accounts_the_tools_page_draws():
     assert setmod.tools_accounts(None) is None and setmod.tools_accounts({"switched": False, "tools": []}) is None
     assert setmod.tools_accounts(read()) == {"claude-code:paul", "gemini:paul-google"}
+
+
+def test_a_limited_login_draws_limited_till_its_reset_in_local_time_or_limited_with_none():
+    card = read()["tools"][0]
+    till = NOW + timedelta(hours=2)
+    card["logins"][0].update(state="limited", till=_iso(till))
+    card["logins"][1].update(state="limited", till=None)
+    tree = app_mod.login_tree(card, "/home/x")
+    said = {lg["name"]: lg["said"] for lg in card["logins"]}
+    today = till.astimezone().date() == datetime.now().astimezone().date()  # +2h may cross local midnight
+    assert said[card["logins"][0]["name"]] == f"limited till {till.astimezone():{'%H:%M' if today else '%a %H:%M'}}"
+    assert said[card["logins"][1]["name"]] == "limited"
+    assert tree["accounts"]
+    week = NOW + timedelta(days=3)  # a reset not today has its weekday in front
+    card["logins"][0].update(state="limited", till=_iso(week))
+    app_mod.login_tree(card, "/home/x")
+    assert card["logins"][0]["said"] == f"limited till {week.astimezone():%a %H:%M}"

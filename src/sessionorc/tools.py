@@ -269,6 +269,7 @@ def _login_tree(
                 "folder": str(e.get("folder", "")),
                 "account": key,
                 "state": st,
+                "till": None,  # a `limited` login's reset, set by the host agent at each `tools` read (TD-1975)
                 "mismatch": n in settled.mismatch,
                 "warnings": warnings,
                 "note": e.get("note"),
