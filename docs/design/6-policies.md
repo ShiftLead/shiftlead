@@ -1224,7 +1224,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      unattended session live, the clients calling it with the same records, so the card and the
      tick never disagree. Where a lead under the manager also holds `control` and is listed
      (manager → lead → worker), the manager is the one no other such record controls, and the
-     lead is a member. **Which members count.** An ended (`closed` or `exited`) record carrying a Wind down's `wind_down` mark is passed over,
+     lead is a member. **Which members count.** An ended (`closed` or `exited`) member carrying a Wind down's `wind_down` mark (a member's, never the manager's lead mark) is passed over,
      as a sat-out one is, and a live one is a clause, *<name> winding down*, so the reading holds only
      once every marked member is gone (§4.9a *A wind-down closes its members*, TD-1895). A live member with `out_of_work` is finished; a
      `closed` or `exited` one with `out_of_work` is finished too; a member `exited` with `pane`
@@ -1323,7 +1323,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      member it just closed is never read as one at work. One left open with work is closed the tick its
      work reads pushed; one on a dialog is left open and named, never killed. It needs no
      `FINISHED_SETTLE` (the press is not a reading that could stop holding) and is never taken back by
-     a member at work (that member is simply not settled yet). Where any record of the team carries a
+     a member at work (that member is simply not settled yet). Where any member of the team carries a
      mark of this run (§4.9a *A mark counts for its run only*) whose `by` is the person, this rule writes no note, and owes none (`_finished_owed` is not
      written for such a team). Where only a session pressed it, the note is written once, on the tick
      whose `wind_down` close leaves the team with no live marked record and nobody live in its crew, in
@@ -1335,7 +1335,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      wound-down team's words — *your team was wound down by <presser>; its members are closed* — since
      its members may have closed undeclared; after the line, the check that takes the manager's
      wind-down back passes over a marked member. Every pass that holds off a record under a wrap-up
-     reads one predicate, `winding` (`wrapup_at`, `wrapup_sent_at` or `wind_down`), rule 7's changed-brief restart
+     reads one predicate, `winding` (`wrapup_at`, `wrapup_sent_at` or a `wind_down` without `lead`), rule 7's changed-brief restart
      (`_brief_restart`) and rule 1's lost-brief replay (`_lost_brief`) among them;
      rule 1's `_crashed` already holds off a wrap-up and reads the predicate, and rule 2, which holds off
      none today, gains it, so neither restarts a marked record.
