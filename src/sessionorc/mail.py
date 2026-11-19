@@ -253,6 +253,13 @@ PERSON_ONLY = frozenset(
         "add_repo",
         "tools_install",
         "tools_check",
+        "login_label",
+        "account_label",
+        "login_note",
+        "login_set",
+        "login_account",
+        "login_forget",
+        "login_shell",
     }
 )
 

@@ -314,3 +314,212 @@ def state(identity: Mapping[str, Any] | None, creds: bool | None) -> str:
     if identity is not None:
         return "sign_in_again" if creds is False else "signed_in"
     return "signed_in" if creds is True else "not_signed_in"
+
+
+# ---- the verbs' edits (§4.2b *Controls and verbs*): each edits the file as it stands, inside `update`, and returns
+# its change's words, or raises `LoginError` in the person's words ----
+
+LABEL_MAX = 40
+NOTE_MAX = 300
+BILLINGS = ("subscription", "metered")
+PRICE_KINDS = ("input", "output", "cache_read", "cache_write")
+
+
+def _one_line(text: object, what: str, most: int) -> str | None:
+    """A label's or a note's text: one line of at most `most`; empty or None clears it."""
+    if text is None:
+        return None
+    if not isinstance(text, str):
+        raise LoginError(f"a {what} is text, not {type(text).__name__}")
+    text = text.strip()
+    if "\n" in text or "\r" in text:
+        raise LoginError(f"a {what} is one line")
+    if len(text) > most:
+        raise LoginError(f"a {what} is at most {most} characters")
+    return text or None
+
+
+def _put(entry: dict[str, Any], k: str, v: Any) -> None:
+    if v is None:
+        entry.pop(k, None)
+    else:
+        entry[k] = v
+
+
+def label_login(data: dict[str, Any], ref: str, label: object, sent: str | None = None) -> str:
+    """`ao login label <login> [<label>]`: a label only, the name fixed; none clears it."""
+    lk, e = resolve(data, ref)
+    check_version(e, sent, lk)
+    text = _one_line(label, "label", LABEL_MAX)
+    _put(e, "label", text)
+    return f"{lk} labelled {text!r}" if text else f"{lk}'s label cleared"
+
+
+def label_account(data: dict[str, Any], key: str, label: object, sent: str | None = None) -> str:
+    """`ao account label <key> [<label>]`: an account named by its key, one a login of this host is under."""
+    if key not in live_keys(data):
+        raise LoginError(f"no account {key} on this host: an account is named by its key, <tool>:<name>")
+    entry = data["accounts"].get(key)
+    check_version(entry, sent, key)
+    text = _one_line(label, "label", LABEL_MAX)
+    entry = dict(entry or {})
+    _put(entry, "label", text)
+    if entry:
+        data["accounts"][key] = entry
+    else:
+        data["accounts"].pop(key, None)
+    return f"account {key} labelled {text!r}" if text else f"account {key}'s label cleared"
+
+
+def note_login(data: dict[str, Any], ref: str, text: object, sent: str | None = None) -> str:
+    """`ao login note <login> <text>`: the note drawn in italics under the login; empty clears it."""
+    lk, e = resolve(data, ref)
+    check_version(e, sent, lk)
+    got = _one_line(text, "note", NOTE_MAX)
+    _put(e, "note", got)
+    return f"{lk}'s note set" if got else f"{lk}'s note cleared"
+
+
+def _arg_list(v: object, k: str) -> list[str]:
+    if not isinstance(v, list) or not all(isinstance(a, str) for a in v):
+        raise LoginError(f"{k} is a list of arguments, not {v!r}")
+    return list(v)
+
+
+def setting_value(
+    data: Mapping[str, Any],
+    lk: str,
+    k: str,
+    v: object,
+    *,
+    default_home: bool,
+    spends: bool,
+    families: Iterable[str] | None,
+) -> Any:
+    """A login's Settings value checked by §4.2a's rules (§4.2b *A login's Settings*), or None to clear it.
+    `default_home`: the login's folder is its tool's default home; `spends`: its adapter reports spend; `families`: the
+    model families its account offers, None where no read has them."""
+    e = data["logins"][lk]
+    if v is None or v == "":
+        if k == "billing" and e.get("prices"):
+            raise LoginError(f"{lk} has prices: clear them before its billing")
+        return None
+    if k == "billing":
+        if v not in BILLINGS:
+            raise LoginError(f"billing is {' or '.join(BILLINGS)}, not {v!r}")
+        if v == "metered":
+            if default_home:
+                raise LoginError(
+                    f"{lk} is on its tool's default home: a metered login's spend is read from its own folder's "
+                    "transcripts, so it needs a folder of its own (design §4.2a)"
+                )
+            if not spends:
+                raise LoginError(f"{lk} cannot be metered: its tool reports no spend, so an amount would bind nothing")
+        elif e.get("prices"):
+            raise LoginError(f"{lk} has prices, a metered login's: clear them before making it a subscription")
+        return v
+    if k == "prices":
+        if e.get("billing") != "metered":
+            raise LoginError(f"prices belong to a metered login: set {lk}'s billing to metered first")
+        if not isinstance(v, dict):
+            raise LoginError(f"prices is a mapping of {', '.join(PRICE_KINDS)} to a price per million tokens")
+        out: dict[str, float] = {}
+        for kind, p in v.items():
+            if kind not in PRICE_KINDS:
+                raise LoginError(f"prices.{kind} is not a token kind ({', '.join(PRICE_KINDS)})")
+            if isinstance(p, bool) or not isinstance(p, int | float) or p < 0:
+                raise LoginError(f"prices.{kind} is a price per million tokens, not {p!r}")
+            out[str(kind)] = float(p)
+        return out
+    if k in ("extra_args", "unattended_args"):
+        return _arg_list(v, k)
+    if k == "permission_wait":
+        if isinstance(v, bool) or not isinstance(v, int) or v < 0:
+            raise LoginError(f"permission_wait is a number of seconds, not {v!r}")
+        return v
+    if k == "pin":
+        if not isinstance(v, str):
+            raise LoginError(f"a pin is a model family's name, not {v!r}")
+        offered = list(families or [])
+        if not offered:
+            raise LoginError(f"{lk}'s account has no model families read yet: Check again, then pin")
+        if v not in offered:
+            raise LoginError(f"{v!r} is not a family {lk}'s account offers ({', '.join(offered)})")
+        return v
+    raise LoginError(f"{k!r} is not a login's setting ({', '.join(SETTINGS)})")
+
+
+def set_setting(data: dict[str, Any], ref: str, k: str, v: object, sent: str | None = None, **rules: Any) -> str:
+    """`ao login set <login> <key> <value>`, the key one of `SETTINGS` (§4.2b *A login's Settings*)."""
+    lk, e = resolve(data, ref)
+    check_version(e, sent, lk)
+    got = setting_value(data, lk, k, v, **rules)
+    _put(e, k, got)
+    return f"{lk} {k} set" if got is not None else f"{lk} {k} cleared"
+
+
+def join(
+    data: dict[str, Any],
+    ref: str,
+    target: str,
+    sent: str | None = None,
+    *,
+    reserve_keys: Iterable[str] = (),
+    matches: Mapping[str, str] | None = None,
+) -> str:
+    """`ao login account <login> <key or new name>` (§4.2b *Matching across a restart*): an account's key, or its
+    name (the key `<tool>:<name>`), a name no account has making a new key. A bare name composing to a retired key is
+    refused; its full key rejoins it deliberately. Refused where the result would leave a mismatch: a match another
+    account's logins read, or an account whose logins read another. `matches` is this run's last match of each
+    login (`Memory.last`); a login with none is compared with nothing."""
+    lk, e = resolve(data, ref)
+    check_version(e, sent, lk)
+    tool = split(lk)[0]
+    target = str(target or "").strip()
+    if ":" in target:
+        acct = target
+        a, n = split(acct)
+        if a != tool:
+            raise LoginError(f"{acct} is an account of {a}, and {lk} is a {tool} login")
+        if not valid_name(n):
+            raise LoginError(f"{acct} is not an account's key: <tool>:<name>, the name at most 24 letters and digits")
+    else:
+        if not valid_name(target):
+            raise LoginError(f"{target!r} is not an account name: at most 24 letters, digits, '-' and '_'")
+        acct = key(tool, target)
+        if acct in retired(data, reserve_keys):
+            raise LoginError(
+                f"{acct} is a forgotten account's key: give the full key, {acct}, to rejoin it and its reserve, "
+                "or another name"
+            )
+    if acct == account_of(lk, e):
+        raise LoginError(f"{lk} is under {acct} already")
+    mine = (matches or {}).get(lk)
+    for other, oe in sorted(data["logins"].items()):
+        theirs = (matches or {}).get(other)
+        if other == lk or not mine or not theirs:
+            continue
+        under = account_of(other, oe)
+        if theirs == mine and under != acct:
+            raise LoginError(f"{other} reads the same account as {lk} and is under {under}: name that one instead")
+        if under == acct and theirs != mine:
+            raise LoginError(f"{other} is under {acct} and reads another account than {lk}")
+    _put(e, "account", None if acct == lk else acct)
+    return f"{lk} joined {acct}"
+
+
+def forget(data: dict[str, Any], ref: str, sent: str | None = None, *, in_use: Iterable[str] = ()) -> str:
+    """`ao login forget <login>` (§4.2b *⋯ on a login*): moved to `forgotten:` with its folder and account, the folder
+    left on disk. Refused, naming them, while `in_use` names anything that runs on it or names it. An account whose last
+    login this was leaves `accounts:`; its key is then retired."""
+    lk, e = resolve(data, ref)
+    check_version(e, sent, lk)
+    users = sorted(set(in_use))
+    if users:
+        raise LoginError(f"{lk} cannot be forgotten while {', '.join(users)} use it")
+    acct = account_of(lk, e)
+    data["forgotten"][lk] = {"folder": e.get("folder"), "account": acct}
+    del data["logins"][lk]
+    if acct not in live_keys(data):
+        data["accounts"].pop(acct, None)
+    return f"{lk} forgotten"

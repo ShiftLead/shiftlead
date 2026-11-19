@@ -20,6 +20,8 @@ from datetime import time as dt_time
 from importlib import resources
 from typing import Any
 
+import yaml
+
 from sessionorc import agent_ids as ids_mod
 from sessionorc import board as board_mod
 from sessionorc import client as clientmod
@@ -844,6 +846,43 @@ def cmd_tools_install(args: argparse.Namespace) -> int:
             f"Enter to run it\nattach: tmux attach -t {s['id']}"
         ),
     )
+
+
+def cmd_login(args: argparse.Namespace) -> int:
+    """`ao login …` and `ao account label` (design §4.2b *Controls and verbs*, TD-1974): the Tools page's login and
+    account controls, each a person's own act acting on this host, refused before the switch-over. A login is named by
+    its name (`<tool>:<name>` where a bare one is ambiguous), an account by its key."""
+    act = args.login_action
+    if act == "shell":
+        s = call_sync("login_shell", login=args.login)
+        if getattr(args, "attach", False):
+            return _attach(args, s["id"], s)
+        return emit(
+            args,
+            s,
+            lambda: print(
+                f"{s['id']}  (tools shell, in {s['dir']}): its sign-in command is typed, not run — attach and press "
+                f"Enter to run it\nattach: tmux attach -t {s['id']}"
+            ),
+        )
+    if act == "account-label":
+        r = call_sync("account_label", key=args.key, label=args.label)
+    elif act == "label":
+        r = call_sync("login_label", login=args.login, label=args.label)
+    elif act == "note":
+        r = call_sync("login_note", login=args.login, text=" ".join(args.text))
+    elif act == "account":
+        r = call_sync("login_account", login=args.login, account=args.account)
+    elif act == "forget":
+        r = call_sync("login_forget", login=args.login)
+    else:  # set: the value read as YAML, so a list, a mapping and a number say what they are; empty clears it
+        try:
+            value = yaml.safe_load(args.value) if args.value.strip() else None
+        except yaml.YAMLError as e:
+            print(f"ao login set: {args.value!r} does not read as a value: {e}", file=sys.stderr)
+            return 2
+        r = call_sync("login_set", login=args.login, key=args.key, value=value)
+    return emit(args, r, lambda: print(r.get("change") or "nothing changed"))
 
 
 def _tools_prose(r: dict[str, Any]) -> None:
@@ -5732,6 +5771,43 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("tool", help="the tool's adapter (claude-code, gemini, grok)")
     q.add_argument("--attach", action="store_true", help="then attach this terminal to it (tmux attach)")
     q.set_defaults(fn=cmd_tools_install)
+
+    p = add("login", help="this host's logins: the Tools page's login controls, a person's own acts (§4.2b)")
+    login_sub = p.add_subparsers(dest="login_action", required=True)
+
+    def add_login(name: str, **kw: Any) -> argparse.ArgumentParser:
+        q = login_sub.add_parser(name, **kw)
+        q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the RPC result as JSON")
+        q.set_defaults(fn=cmd_login)
+        return q
+
+    login_help = "the login: its name, or <tool>:<name> where two tools have it"
+    q = add_login("label", help="label a login (its name stays); no label clears it")
+    q.add_argument("login", help=login_help)
+    q.add_argument("label", nargs="?")
+    q = add_login("account", help="name the account a login is under: an account's key, or a name (a new key)")
+    q.add_argument("login", help=login_help)
+    q.add_argument("account", help="<tool>:<name>, or a name")
+    q = add_login("set", help="change one of a login's settings; an empty value clears it")
+    q.add_argument("login", help=login_help)
+    q.add_argument("key", choices=("billing", "prices", "extra_args", "unattended_args", "permission_wait", "pin"))
+    q.add_argument("value", help="read as YAML: metered, 600, '[--flag]', '{input: 3, output: 15}'")
+    q = add_login("note", help="the note shown under a login (never a secret: the file is committed); empty clears it")
+    q.add_argument("login", help=login_help)
+    q.add_argument("text", nargs="*")
+    q = add_login("forget", help="forget a login, leaving its folder on disk; refused while a session runs on it")
+    q.add_argument("login", help=login_help)
+    q = add_login("shell", help="open the login's tools shell, its sign-in command typed and not run")
+    q.add_argument("login", help=login_help)
+    q.add_argument("--attach", action="store_true", help="then attach this terminal to it (tmux attach)")
+
+    p = add("account", help="this host's accounts: the Tools page's account controls, a person's own acts (§4.2b)")
+    account_sub = p.add_subparsers(dest="account_action", required=True)
+    q = account_sub.add_parser("label", help="label an account (its key stays); no label clears it")
+    q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the RPC result as JSON")
+    q.add_argument("key", help="the account's key, <tool>:<name>")
+    q.add_argument("label", nargs="?")
+    q.set_defaults(fn=cmd_login, login_action="account-label")
 
     p = add("shell", help="start a plain shell session here")
     p.add_argument("name", nargs="?")
