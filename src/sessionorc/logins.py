@@ -488,12 +488,15 @@ def join(
     *,
     reserve_keys: Iterable[str] = (),
     matches: Mapping[str, str] | None = None,
+    families: Callable[[str], Iterable[str] | None] = lambda acct: None,
 ) -> str:
     """`ao login account <login> <key or new name>` (§4.2b *Matching across a restart*): an account's key, or its
     name (the key `<tool>:<name>`), a name no account has making a new key. A bare name composing to a retired key is
     refused; its full key rejoins it deliberately. Refused where the result would leave a mismatch: a match another
     account's logins read, or an account whose logins read another. `matches` is this run's last match of each
-    login (`Memory.last`); a login with none is compared with nothing."""
+    login (`Memory.last`); a login with none is compared with nothing. `families` gives the model families an account
+    offers, None where no read has them: a pin is a family the login's account offers (§4.2b *A login's Settings*), so
+    a pin the joined account does not offer, or one no read can check, is cleared."""
     lk, e = resolve(data, ref)
     check_version(e, sent, lk)
     acct = account_key(data, split(lk)[0], target, reserve_keys, who=lk)
@@ -516,11 +519,24 @@ def join(
                 f"{lk} shares its folder with {other}, and {metered} is metered: under {acct} its spend would count "
                 "another account's turns (design §4.2a)"
             )
-    left = account_of(lk, e)
+    left, new = account_of(lk, e), acct not in live_keys(data)
     _put(e, "account", None if acct == lk else acct)
     if left not in live_keys(data):  # its last login gone, the account's entry leaves `accounts:`, as forget's does
         data["accounts"].pop(left, None)
-    return f"{lk} joined {acct}"
+    pin = e.get("pin")
+    if not pin:
+        return f"{lk} joined {acct}"
+    offered = families(acct)
+    if offered is not None and pin in set(offered):
+        return f"{lk} joined {acct}"
+    del e["pin"]
+    if offered is not None:
+        why = f"{acct} offers no {pin}"
+    elif new:
+        why = f"{acct} is a new account no read has yet: pin it once it is signed in"
+    else:
+        why = f"{acct}'s families are not read yet: Check again, then pin"
+    return f"{lk} joined {acct}; its pin {pin} cleared, as {why}"
 
 
 def account_key(
