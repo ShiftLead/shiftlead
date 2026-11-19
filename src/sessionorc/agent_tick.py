@@ -461,7 +461,10 @@ class TickMixin:
             # detached for the same reason the usage refresh is: `gh` talks to the network, and the
             # tick and its push must not wait on it (review 2026-09-11)
             self._derive_task = asyncio.create_task(self._derive_reports(snapshot_at))
-        if snapshot_at - self._pruned_at > PRUNE_EVERY:
+        # the hourly sweep is a detached pass (§4.6 *The disk sweep*, TD-1945): a tick that finds the last pass still
+        # running, or a dry run holding its lock, starts none and leaves `_pruned_at` as it was, to try at the next
+        sweeping = (self._prune_task is not None and not self._prune_task.done()) or self._sweep_lock.locked()
+        if snapshot_at - self._pruned_at > PRUNE_EVERY and not sweeping:
             self._pruned_at = snapshot_at
             # the live set is read here, on the loop (the class's one-writer rule); only the file
             # work goes to the thread
@@ -477,12 +480,9 @@ class TickMixin:
                 for s in self.sessions.values()
                 if s.scratch and s.state not in ended and s.host == self.host
             }
-            # kept as a pass (TD-1506): a thread outlives the tick that started it, so a cancelled tick
-            # leaves the sweep running; `_prune_task` is what waits for it, as every `*_task` pass is waited for
-            self._prune_task = asyncio.ensure_future(
-                asyncio.to_thread(self._prune_runs, snapshot_at, live, live_ids, scratch)
-            )
-            await asyncio.shield(self._prune_task)
+            # kept as a pass (TD-1506) the tick never waits on (TD-1945): `_prune_task` is what the tests drain, as
+            # every `*_task` pass is drained
+            self._prune_task = asyncio.create_task(self._sweep(snapshot_at, live, live_ids, scratch))
         if self.mode == "home":
             self._supervise_containers()
             day = datetime.now().astimezone().date().isoformat()
@@ -5355,6 +5355,25 @@ class TickMixin:
         except Exception:  # noqa: BLE001 — a detached task: log, and try again tomorrow
             log.exception("the nightly backup of the store failed")
 
+    async def _sweep(
+        self, now: datetime, live: set[str], live_ids: set[str] | None, scratch: dict[str, str] | None
+    ) -> None:
+        """One pass of the hourly sweep, in a thread, under the one lock a pass holds (§4.6 *The disk sweep*,
+        TD-1945); a detached task, so a failure is logged here, never left to vanish."""
+
+        def run() -> None:
+            if not self._sweep_lock.acquire(blocking=False):
+                return  # a dry run holds it: the next tick tries again
+            try:
+                self._prune_runs(now, live, live_ids, scratch)
+            finally:
+                self._sweep_lock.release()
+
+        try:
+            await asyncio.to_thread(run)
+        except Exception:  # noqa: BLE001 — a detached task: log, and the next pass tries again
+            log.exception("the hourly sweep failed")
+
     def _prune_runs(
         self,
         now: datetime,
@@ -5393,8 +5412,10 @@ class TickMixin:
                     log.info("pruned attachment upload %s (nothing written for an hour)", f)
             except OSError:
                 continue
-        keep = hosts.local_host().runs_keep_days
+        local = hosts.local_host()
+        keep = local.runs_keep_days
         _prune_drafts(now, keep, live_ids)
+        _prune_runs_by_size(local.runs_keep_mb, live, live_ids)
         if keep <= 0:
             return
         cutoff = (now - timedelta(days=keep)).timestamp()
@@ -7123,6 +7144,59 @@ def merge_prompts(
         out.insert(0, entry)
     out.sort(key=lambda x: _when(x.get("at")) or datetime.min.replace(tzinfo=UTC), reverse=True)
     return out[:RECENT_PROMPTS]
+
+
+def _tree_size(p: Path) -> tuple[int, float]:
+    """A file's, or a folder's files', bytes and newest modification time (a folder's own time only when it holds
+    no file: removing a file moves it); never through a symlink."""
+    st = p.lstat()
+    if not p.is_dir() or p.is_symlink():
+        return st.st_size, st.st_mtime
+    size, newest = 0, 0.0
+    for f in p.rglob("*"):
+        with contextlib.suppress(OSError):
+            if f.is_symlink() or not f.is_dir():
+                fs = f.lstat()
+                size += fs.st_size
+                newest = max(newest, fs.st_mtime)
+    return size, newest or st.st_mtime
+
+
+def _prune_runs_by_size(keep_mb: int, live: set[str], live_ids: set[str] | None) -> None:
+    """Run logs past `runs_keep_mb` (§4.6 *The disk sweep*, TD-1945): while the ended runs' logs and attachment
+    folders together exceed it, the oldest go first — a live record's earlier runs among them, a live run's never.
+    A base id's rounds log, the promote logs and the draft folders neither count nor go by it. `0` is no bound;
+    with `live_ids` None no attachment folder counts, as the age rule sweeps none."""
+    if keep_mb <= 0:
+        return
+    items: list[tuple[float, int, Path]] = []
+    for f in paths.runs_dir().glob("*.log"):
+        if f.name.endswith(".rounds.log") or str(f) in live or f.is_symlink():
+            continue
+        with contextlib.suppress(OSError):
+            size, at = _tree_size(f)
+            items.append((at, size, f))
+    if live_ids is not None:
+        for d in paths.attachments_dir().glob("*"):
+            if d.name in live_ids or d.is_symlink() or not d.is_dir() or paths.DRAFT.fullmatch(d.name):
+                continue
+            with contextlib.suppress(OSError):
+                size, at = _tree_size(d)
+                items.append((at, size, d))
+    total, bound = sum(i[1] for i in items), keep_mb * 1024 * 1024
+    for _at, size, p in sorted(items, key=lambda i: (i[0], str(i[2]))):
+        if total <= bound:
+            break
+        try:
+            if p.is_dir():
+                shutil.rmtree(p)
+            else:
+                p.unlink()
+        except OSError as e:
+            log.warning("could not prune %s past runs_keep_mb: %s", p, e)
+            continue
+        total -= size
+        log.info("pruned %s (the ended runs are past runs_keep_mb, %d MB)", p, keep_mb)
 
 
 def _prune_drafts(now: datetime, keep: int, live_ids: set[str] | None) -> None:

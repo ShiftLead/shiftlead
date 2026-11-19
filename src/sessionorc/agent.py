@@ -25,6 +25,7 @@ import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
@@ -784,7 +785,8 @@ class HostAgent(
         # must still know that the killed run's own `SessionEnd`, landing late, is not the new run's end.
         self._killed_run_at: dict[str, float] = {}
         self._derive_task: asyncio.Task[None] | None = None
-        self._prune_task: asyncio.Task[None] | None = None  # the hourly sweep's thread (TD-1506)
+        self._prune_task: asyncio.Task[None] | None = None  # the hourly sweep's pass (TD-1506, TD-1945)
+        self._sweep_lock = threading.Lock()  # one pass, or a dry run, at a time (§4.6 *The disk sweep*, TD-1945)
         self._seat_count_task: asyncio.Task[None] | None = None  # §6 rule 3's `gh` read, detached
         self._seat_counted_at = datetime.min.replace(tzinfo=UTC)
         # rule 7's mark (TD-217 slice 3): the detached read of every brief's sources, when it last
