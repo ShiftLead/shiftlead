@@ -13,7 +13,13 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from conftest import park_ticks
-from test_cache_sweep import OLD, PINNED, YOUNG, tree
+from test_cache_sweep import (  # noqa: F401 (autouse: its read-only trees, TD-2015)
+    OLD,
+    PINNED,
+    YOUNG,
+    _writable_at_teardown,
+    tree,
+)
 from test_disk_sweep import MB, _put
 from test_scratch_sweep import age as age_scratch
 from test_scratch_sweep import made
