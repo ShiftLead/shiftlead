@@ -461,7 +461,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the newest end and those within `FINISHED_SETTLE` of it are read as rule 8 reads a stopped team's
      (`_how_stopped`: the person's Stop, Close, Kill or a Wind down left undeclared is `person`; the team's stop
      time is `until`), and the seat is held where they say `person` or `until` — one helper,
-     `work.seats_held_by(records, started_at) -> {by, at} | None` (`started_at` the team's `teams.<team>.started_at`, which every caller at the home passes, §4.9a *A mark counts for its run only*); and one predicate over it, `work.held_for(r, records, started_at)` — a
+     `work.seats_held_by(records, started_at) -> {by, at} | None` (`started_at` the team's `teams.<team>.started_at`, which every caller at the home passes, §4.9a *A mark counts for its run only*); and one predicate over it, `work.held_for(r, records, started_at)` (its records may hold every team's; `started_at` is `r.team`'s, which the caller reads from the host record for the seat it asks about, as it does for `held_words`) — a
      record that is a seat (`seat` set), supervised, unattended, neither suspended nor sat out, whose team's
      `seats_held_by` gives a word — the single test for the fill's hold, `stop_held`, `seats_held` and the
      reply line (§4.10). It reads ends, not whether the team wound down, so a
@@ -1006,7 +1006,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      one a person closed — its `closer` names the person, §4.7 — or anyone killed — a kill writes no
      closer and destroys the pane, `pane: false` — is *stopped* and left unread while its team
      runs on — *A team that stopped*, below, reads only a team with nobody live; one closed `why:
-     wind_down` is the presser's ending and left unread too, TD-1895), while a seat or a member of its team is live (nobody live and not wound down is
+     wind_down`, or any ended record carrying a member's mark, is the presser's ending and left unread too, TD-1895), while a seat or a member of its team is live (nobody live and not wound down is
      *stopped*), whose lane holds a matching id its `lane_seen` lacks while its team is not wound
      down, is this rule's news as a wound-down team's member is: after `WORK_SETTLE` the home writes
      the same `work_waiting` mark, `members` naming it, and the team's `on_work` follows. **What a
