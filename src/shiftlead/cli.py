@@ -3632,6 +3632,70 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 0 if got["ok"] else 1
 
 
+def _bytes(n: Any) -> str:
+    """`n` bytes as a person reads them: B, KB, MB, GB or TB, powers of 1024, one decimal past KB."""
+    size = float(n or 0)
+    for unit in ("B", "KB", "MB", "GB"):
+        if size < 1024:
+            return f"{size:.0f} {unit}" if unit in ("B", "KB") else f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} TB"
+
+
+def disk_lines(by_host: dict[str, Any]) -> list[str]:
+    """`ao disk`'s prose (design §4.7, §4.6 *The sweep's reading*, TD-1946): per host its last pass, per kind the
+    bytes held (*partial* where not every item is measured), removed in the pass and in 30 days, each kept item with
+    why, and the free space under `scratch_root`, under a tenth of bytes or inodes a warning; an error entry is one
+    line, *unreachable* or the host's own refusal."""
+    out: list[str] = []
+    for host, e in by_host.items():
+        if not isinstance(e, dict) or "error" in e:
+            why = e.get("error") if isinstance(e, dict) else e
+            out.append(f"{host}: {why}" if "unreachable" in str(why) else f"{host}: unreachable — {why}")
+            continue
+        out.append(f"{host}: {'last pass ' + e['at'] if e.get('at') else 'no pass yet'}")
+        for kind, k in (e.get("kinds") or {}).items():
+            held = _bytes(k.get("held")) + (" (partial)" if k.get("partial") else "")
+            out.append(
+                f"  {kind:<10} held {held}, removed {_bytes(k.get('removed'))} last pass, "
+                f"{_bytes(k.get('removed_30d'))} in 30 days"
+            )
+            for kept in k.get("kept") or []:
+                out.append(f"    kept {kept.get('path')} — {kept.get('why')}")
+        free = e.get("free") or {}
+        if "error" in free:
+            out.append(f"  free under {free.get('path')}: unreadable — {free['error']}")
+        elif free:
+            inodes = (
+                f", {free.get('inodes_free', 0):,} of {free['inodes_total']:,} inodes"
+                if free.get("inodes_total")
+                else ""
+            )
+            out.append(
+                f"  free under {free.get('path')}: {_bytes(free.get('bytes_free'))} of "
+                f"{_bytes(free.get('bytes_total'))}{inodes}"
+            )
+        for w in e.get("warnings") or []:
+            out.append(f"  ⚠ {free.get('path')}: {w}")
+    return out
+
+
+def cmd_disk(args: argparse.Namespace) -> int:
+    """`ao disk [--host <host>] [--json]` (design §4.7, §4.6 *The sweep's reading*, TD-1946): the disk sweep's reading
+    for every host, or one. `--json` prints `{host: entry}` whichever was asked: a bare reading (one host's, or a
+    node's own) is keyed by the `host` it carries. A read, under no grant; it waits `DIGEST_TIMEOUT` plus
+    `CALL_TIMEOUT`, as `ao feedback`'s reads do."""
+    params = {"host": args.host} if args.host else {}
+    try:
+        got = call_sync("disk", _timeout=feedback.WAIT, **params)
+    except AgentError as e:
+        if "unknown method" not in str(e):
+            raise
+        raise AgentError(f"{e}: the running host agent predates `ao disk` (the next promote brings it)") from e
+    by_host = {str(got.get("host")): got} if isinstance(got, dict) and "kinds" in got else dict(got or {})
+    return emit(args, by_host, lambda: print("\n".join(disk_lines(by_host))))
+
+
 def _doctor_repos(node: bool) -> dict[str, Any]:
     """The repo facts the **repos** line draws (§4.7): the home's `repos` reading, on a node cut to the
     node's own checkouts. Nothing is read from a checkout here."""
@@ -6109,6 +6173,9 @@ def build_parser() -> argparse.ArgumentParser:
         "a person's own; after the check: ao doctor hooks --probe [profile]",
     )
     p.set_defaults(fn=cmd_doctor)
+    p = add("disk", help="the disk sweep's reading for every host: held, removed, kept and free (§4.7)")
+    p.add_argument("--host", metavar="host", help="this host alone (at a node, only its own)")
+    p.set_defaults(fn=cmd_disk)
     p = add("doing", help="say in one line what this session is doing now (design §4.8)")
     p.add_argument("words", nargs="*", metavar="line", help="one line; the last one replaces the one before")
     p.add_argument("--clear", action="store_true", help="empty the line: this session is saying nothing")

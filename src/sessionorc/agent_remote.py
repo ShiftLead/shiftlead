@@ -31,7 +31,9 @@ from sessionorc.agent_common import (
     ACT_TIMEOUT,
     DIGEST_READS,
     DIGEST_TIMEOUT,
+    DISK_ACTS,
     HOME_EDITS,
+    HOST_ADDRESSED,
     INTENT_FIELDS,
     NODE_ACTS,
     NODE_READS,
@@ -169,7 +171,7 @@ class RemoteMixin:
         (and `name_check`'s) `host`. None means *here*, and the method runs as it always has."""
         if method not in NODE_ACTS and method not in HOME_EDITS and method not in NODE_READS:
             return None
-        if method in ("create", "name_check"):
+        if method in HOST_ADDRESSED:
             h = str(params.get("host") or "")
         else:
             _rid, h = naming.split_address(str(params.get("id") or ""))
@@ -517,7 +519,7 @@ class RemoteMixin:
         A home-owned edit is applied to this home's copy after the node took it, so the two agree
         and the caller's reply is the home's view."""
         rid, _h = naming.split_address(str(params.get("id") or ""))
-        if method not in ("create", "name_check") and rid not in self.remote.get(host, {}):
+        if method not in HOST_ADDRESSED and rid not in self.remote.get(host, {}):
             raise RpcError(f"no session {rid}@{host}")
         if method == "create":
             await self._check_occupancy_for(host, params)
@@ -545,7 +547,7 @@ class RemoteMixin:
         # caller, so the node records *person* as who typed and seeds no creator (§4.8, TD-801)
         person = mail.as_person(caller, self._graph())
         who = None if person else self._to_host(caller, host)
-        timeout: float | None = ACT_TIMEOUT
+        timeout: float | None = DIGEST_TIMEOUT if method in DISK_ACTS else ACT_TIMEOUT
         if method == "send" and sent.get("wait"):
             timeout = None if sent.get("timeout") is None else float(sent["timeout"]) + ACT_TIMEOUT
         try:

@@ -58,6 +58,7 @@ READS = frozenset(
         "git_files",
         "occupancy",
         "name_check",
+        "disk",
         "recent_dirs",
         "usage",
         "repos",
