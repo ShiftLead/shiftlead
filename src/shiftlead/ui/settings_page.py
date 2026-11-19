@@ -698,7 +698,11 @@ def host_card(raw: Mapping[str, Any], local: hosts.Host, home: str, nodes: Mappi
         _row("volatile", local.volatile, is_default="volatile" not in raw),
         _row("repos_registry", str(local.repos_registry), is_default="repos_registry" not in raw),
         _row("runs_keep_days", local.runs_keep_days, is_default="runs_keep_days" not in raw),
+        _row("runs_keep_mb", local.runs_keep_mb, is_default="runs_keep_mb" not in raw),  # §4.6, TD-1945
         _row("scratch_root", local.scratch_root, is_default="scratch_root" not in raw),  # §4.6, TD-1944
+        _row("scratch_keep_hours", local.scratch_keep_hours, is_default="scratch_keep_hours" not in raw),
+        _row("worktree_keep_days", local.worktree_keep_days, is_default="worktree_keep_days" not in raw),
+        _row("cache_keep_days", local.cache_keep_days, is_default="cache_keep_days" not in raw),
         _row("identity", local.identity or "enforce", is_default="identity" not in raw),
         _row("person", local.person, is_default="person" not in raw),
         _row("home", home, is_default=home == local.name),
