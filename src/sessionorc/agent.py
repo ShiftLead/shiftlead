@@ -802,6 +802,7 @@ class HostAgent(
         # reads for the way back to `idle` (§4.2 *A tick's `working` at a waiting composer*, TD-1807)
         self._composer_tails: dict[str, list[str]] = {}
         self._git_checked: dict[str, datetime] = {}
+        self._cwd_raw: dict[str, str] = {}  # the last raw hook `cwd` per record (§4.2 *The record's `cwd`*, TD-1988)
         # the status each record's recent files were last read at (§4.2, TD-538): `(oid, dirty, porcelain)`
         self._files_read: dict[str, tuple[Any, ...]] = {}
         self._derived_at: dict[str, datetime] = {}
@@ -2054,6 +2055,7 @@ class HostAgent(
                 dropped = None if kept else self._address(holder)
             s.worktree_made = made or _inherits_made(s, holder)
             self.sessions[sid] = s
+            self._cwd_raw.pop(sid, None)  # a new run starts in `dir`: its first report resolves afresh (TD-1988)
             room.clear()  # counted live now, as a record
             self.store.save(s)
             if dropped and self.mode != "node":

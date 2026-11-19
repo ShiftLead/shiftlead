@@ -106,6 +106,8 @@ NODE_OWNED = frozenset(
         "exit_code",
         "ended",
         "git",
+        "cwd",
+        "cwd_root",
         "model",
         "context",
         "subagents",
@@ -1242,6 +1244,10 @@ class Session:
     closer: dict[str, Any] | None = None
     seen_at: str | None = None  # the last turn a person saw: a look stamps its `turn_at` (§4.2 *Unseen*, TD-1228)
     git: dict[str, Any] | None = None  # branch, dirty, ahead, behind, files (sessionorc.gitinfo)
+    # the working directory the tool last reported where it is not `dir`, as a real path, and its root as the status
+    # read writes it (design §4.2 *The record's `cwd`*, TD-1988): for the page alone, never read by what `dir` drives
+    cwd: str | None = None
+    cwd_root: str | None = None
     capabilities: list[str] = field(default_factory=list)  # grants, from GRANTS (design §4.8)
     # Membership (design §4.8, TD-036): the session ids that may act on *this* session. The list
     # lives on the target, not on the lead, so the gate is one lookup and nothing has to be

@@ -43,9 +43,17 @@ class GitInfo:
     # the commit HEAD is at, so a detached HEAD can be named by it (design §4.5 *The card's
     # anatomy*, row 3, TD-095: *detached at <short sha>*); "" in a repo with no commit yet
     oid: str = ""
+    # `dir`'s top level as a real path, which the press's choice of folder reads, and the folder name of that top
+    # level where it is a linked worktree by git's test, absent on a main checkout (§4.2 *The record's `cwd`*,
+    # TD-1988)
+    top: str = ""
+    worktree: str | None = None
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        d = asdict(self)
+        if not self.worktree:
+            d.pop("worktree")
+        return d
 
 
 class WorktreeError(RuntimeError):
@@ -246,6 +254,7 @@ def git_info(directory: Path | str, timeout: float = 5.0) -> GitInfo | None:
             # u XY sub m1 m2 m3 mW h1 h2 h3 path
             files.append(f"UU {line.split(' ', 10)[10]}")
     unpushed, against = _unpushed(directory, branch, upstream, ahead, timeout)
+    top, worktree = _top(directory, timeout)
     return GitInfo(
         branch=branch,
         dirty=len(files),
@@ -256,7 +265,43 @@ def git_info(directory: Path | str, timeout: float = 5.0) -> GitInfo | None:
         unpushed=unpushed,
         pushed_against=against,
         oid=oid,
+        top=top,
+        worktree=worktree,
     )
+
+
+def _top(directory: Path | str, timeout: float) -> tuple[str, str | None]:
+    """`directory`'s top level as a real path, and its folder name where it is a linked worktree — git's own test,
+    `--git-dir` differing from `--git-common-dir`, so a submodule (whose `.git` is a file too) is not one; ("",
+    None) where git cannot say (§4.2 *The record's `cwd`*, TD-1988)."""
+    out = _git(directory, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-dir", "--git-common-dir",
+               timeout=timeout)  # fmt: skip
+    lines = (out or "").splitlines()
+    if len(lines) != 3 or not lines[0]:
+        return "", None
+    top = os.path.realpath(lines[0])
+    linked = os.path.realpath(lines[1]) != os.path.realpath(lines[2])
+    return top, (os.path.basename(top) if linked else None)
+
+
+def _under(path: str, root: str) -> bool:
+    return path == root or path.startswith(root.rstrip(os.sep) + os.sep)
+
+
+def cwd_root(directory: Path | str, cwd: str, timeout: float = 5.0) -> str | None:
+    """The record's `cwd_root` (§4.2 *The record's `cwd`*, TD-1988): the git top level of `cwd` (a real path) where
+    it is not `directory`'s top level; `cwd` itself where it lies in no repository and outside `directory`; None
+    where `cwd` is not an existing directory, or is in `directory`'s own top level. Where `directory` is in no
+    repository, `cwd`'s top level where it has one, else `cwd` outside `directory`."""
+    if not cwd or not os.path.isdir(cwd):
+        return None
+    here = os.path.realpath(directory)
+    dtop = toplevel(directory, timeout)
+    ctop = toplevel(cwd, timeout)
+    dtop, ctop = (os.path.realpath(dtop) if dtop else ""), (os.path.realpath(ctop) if ctop else "")
+    if ctop:
+        return ctop if ctop != dtop else None
+    return None if _under(os.path.realpath(cwd), here) else os.path.realpath(cwd)
 
 
 def changed_files(directory: Path | str, base_ref: str | None, limit: int, timeout: float = 5.0) -> list[dict] | None:

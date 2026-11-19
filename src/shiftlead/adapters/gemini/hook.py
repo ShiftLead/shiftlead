@@ -72,6 +72,10 @@ def translate(payload: dict[str, Any]) -> dict[str, Any] | None:
     # `""` until the tool starts recording: the record's transcript is the first payload that names one
     if (path := payload.get("transcript_path")) and isinstance(path, str):
         out["transcript"] = path
+    # the folder the tool works in, on every event (design §4.2 *The record's `cwd`*, TD-1988); Gemini CLI's
+    # events carry no subagent mark, so a subagent's writes it as the main thread's does
+    if (cwd := payload.get("cwd")) and isinstance(cwd, str):
+        out["cwd"] = cwd
     if ev == "SessionStart":
         # `startup`, `resume` and `clear` all land at the composer: the first hook the first prompt waits for
         return {**out, "state": "idle", "pending": None}
