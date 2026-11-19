@@ -102,6 +102,14 @@ td:last-child { color:var(--soft); }
 .fixedrow b { color:var(--ink); font-weight:500; }
 .runs { font-size:13.5px; }
 .runs .ok::before { content:"● "; color:var(--on); } .runs .nok::before { content:"● "; color:var(--bad); }
+nav a.back { font:400 13px "IBM Plex Sans", sans-serif; color:var(--used); padding-left:0; margin-bottom:10px; }
+nav a.pal { font:500 13.5px "IBM Plex Sans", sans-serif; background:var(--sheet); border:1px solid var(--rule); box-shadow:inset 3px 0 0 var(--c); margin-bottom:4px; padding:4px 8px; cursor:grab; }
+nav a.pal .grip { color:var(--off); font-size:11px; }
+nav a.pal i { float:right; font-style:normal; font-weight:400; font-size:12px; color:var(--off); }
+nav a.pal.need { border-color:var(--bad); }
+nav h4.needh { color:var(--bad); }
+nav p.why { font-size:12.5px; color:var(--bad); margin:2px 0 0; line-height:1.4; }
+.does li.drop.need { border-color:var(--bad); color:var(--bad); }
 .cap { margin:0 0 14px; padding:8px 12px; background:#FFF7E6; border:1px solid #E7C98A; border-radius:4px; font-size:13px; color:#5C4514; }
 """
 
@@ -119,8 +127,8 @@ def nav(sel):
 
     return (
         "<nav><h4>Built in</h4>"
-        + a("td", "td", "design → build → read")
-        + a("br", "build-review", "build → read")
+        + a("td", "td", "design → build → second read")
+        + a("br", "build-review", "build → second read")
         + a("b", "build", "build")
         + "<h4>This install</h4>"
         + a("solo", "one-owner", "design+build → review", "●" if sel == "solo" else "")
@@ -147,7 +155,7 @@ def step(n, color, name, role, takes, m, acts, count="", note="", tag="step"):
     nt = f'<div class="note">{note}</div>' if note else ""
     return (
         f'<div class="step"><div class="n" style="background:var(--{color})">{n}</div>'
-        f'<div class="who"><div class="nm">{name}</div><dl><dt>Role</dt><dd>{role}</dd>'
+        f'<div class="who"><div class="nm">{name}</div><dl>'
         f"<dt>Model</dt><dd>{m}</dd><dt>Takes</dt><dd>{takes}</dd>{c}</dl></div>"
         f'<ul class="does">{"".join(acts)}</ul>{nt}</div>'
     )
@@ -179,8 +187,7 @@ def catalogue(used):
         ("Design rounds", "design", "fresh readers review a design"),
         ("Fact-check", "review", "check a doc against the repo"),
         ("Build", "build", "change the code, test it"),
-        ("Review", "review", "an independent read of the PR"),
-        ("Read held paths", "review", "a seat's verdict on a held PR"),
+        ("Review", "review", "an independent read of a PR: every PR, or some paths"),
         ("Merge", "build", "the gate, then the squash"),
         ("Board answers", "orders", "carry out what you answered"),
         ("Unheld PRs", "orders", "PRs nobody holds: sync, red, lift, sweep, filing"),
@@ -195,6 +202,39 @@ def catalogue(used):
         un = "" if n in used else " un"
         out.append(f'<span class="chip{un}" style="--c:var(--{c})">{n} <small>{d}</small></span>')
     return '<div class="cat">' + "".join(out) + "</div>"
+
+
+def palette():
+    def it(name, c, note="", cls=""):
+        n = f"<i>{note}</i>" if note else ""
+        return f'<a class="pal {cls}" style="--c:var(--{c})"><span class="grip">⠿</span> {name}{n}</a>'
+
+    return (
+        '<nav><a class="back">‹ All flows</a>'
+        "<h4 class='needh'>Still needed</h4>"
+        + it("Merge", "build", "", "need")
+        + '<p class="why">Build opens pull requests and nothing merges them.</p>'
+        + "<h4>In the path</h4>"
+        + it("Find", "find")
+        + it("Design", "design", "step 1")
+        + it("Design rounds", "design")
+        + it("Fact-check", "review", "step 1")
+        + it("Build", "build", "step 1")
+        + it("Review", "review", "step 2")
+        + "<h4>Work orders</h4>"
+        + it("Board answers", "orders", "step 3")
+        + it("Unheld PRs", "orders", "step 3")
+        + it("Live checks", "orders", "step 3")
+        + "<h4>On call</h4>"
+        + it("Answer", "call")
+        + it("Draft an entry", "call")
+        + it("Audit", "call")
+        + it("Sweep", "call")
+        + "<h4>Yours</h4>"
+        + it("Build, docs only", "build")
+        + '<p class="why" style="color:var(--soft)">An action already placed can be dragged in again where that makes '
+        "sense: a second Review, a second Build that takes other entries.</p></nav>"
+    )
 
 
 def page(sel, body, cap, title='Flows', sub='the path an entry takes: who does what, in what order, on which model', navhtml=''):
@@ -218,15 +258,15 @@ def td():
         + '<div class="hand">the builds it filed become pickable</div>'
         + step(2, "build", "Build", "builder", "every other entry", model("opus"), [
             act("Build", "the change, its tests, the PR"),
-            act("Review", "one independent read; its evidence on the PR", fresh(model("sonnet"))),
+            act("Review", "every PR: one independent read, its evidence on the PR", fresh(model("sonnet"))),
             act("Merge", "on the gate, unless the PR touches a held path"),
             act("Board answers", "an answered card is carried out before any entry"),
             act("Unheld PRs", "a PR nobody holds: sync, red, lift, sweep, filing"),
             act("Live checks", "once a build is live, confirm it on the running system"),
         ], count="1 – 4, set on the team")
         + '<div class="hand">a PR on a held path is asked of the reader</div>'
-        + step(3, "review", "Read", "the question seat", "PRs on held paths", model("opus"), [
-            act("Read held paths", "findings, or pass; unread after 2 h it goes to you"),
+        + step(3, "review", "Second read", "", "PRs on held paths · held by the question seat", model("opus"), [
+            act("Review", "held paths only: findings, or pass; unread after 2 h it goes to you", "this seat"),
             act("Merge", "once it passes"),
         ])
     )
@@ -239,23 +279,23 @@ def td():
     cov = cover([
         ("", "✓", "Merge a PR", "its author; a held PR, the reader"),
         ("", "✓", "Review evidence", "a fresh reader, in Design and Build"),
-        ("", "✓", "Read a held path", "step 3"),
+        ("", "✓", "Read a held path", "step 3, the second Review"),
         ("", "✓", "Answer a member", "the question seat"),
         ("", "✓", "Notice a stall", "the manager and the host"),
     ])
     body = (
-        '<div class="ro"><div class="fhead"><h2>Design, build, read</h2><span class="id">td</span>'
+        '<div class="ro"><div class="fhead"><h2>Design, build, second read</h2><span class="id">td</span>'
         '<span class="tag">built in · read only</span><div class="act"><button class="pri">Copy to edit</button></div></div>'
         '<p class="used">Run by <b>ao-grind</b> (now), <b>cm-grind</b>, <b>ss-grind</b>.</p>'
         '<div class="path"><span style="background:var(--design)">design</span><i>→</i>'
-        '<span style="background:var(--build)">build</span><i>→</i><span style="background:var(--review)">read</span>'
+        '<span style="background:var(--build)">build</span><i>→</i><span style="background:var(--review)">second read</span>'
         '<i>→</i><span class="you">you, through the question seat</span></div>'
         "<h3>Steps</h3><p>Each step is one session's sitting. It does its actions top to bottom; "
         "an action marked <i>a fresh reader</i> is handed to a new session on that model, never done by the author.</p>"
         f"{steps}<h3>On call</h3><p>Seats outside the path, started when their trigger fires.</p>{calls}"
         f"{FIXED}<div class='foot'><div><h3>Every task has someone</h3><p></p>{cov}</div>"
         "<div><h3>Actions</h3><p>Dashed ones are not used by this flow. Each has its brief on the Actions page.</p>"
-        f'{catalogue({"Design", "Design rounds", "Fact-check", "Build", "Review", "Read held paths", "Merge", "Answer", "Audit", "Board answers", "Unheld PRs", "Live checks", "Draft an entry"})}'
+        f'{catalogue({"Design", "Design rounds", "Fact-check", "Build", "Review", "Merge", "Answer", "Audit", "Board answers", "Unheld PRs", "Live checks", "Draft an entry"})}'
         '<h3>Where it can run</h3><p class="runs"><span class="ok">ao-grind</span> — every model has a signed-in login '
         'and a smoke pass<br><span class="nok">cm-grind</span> — no smoke pass for sonnet as manager on contractmatch</p>'
         "</div></div></div>"
@@ -274,8 +314,8 @@ def solo():
         ], count="1 – 4, set on the team", note="No login on ao-grind offers flash-lite — pick another model, or add a login on the Tools page.")
         + '<div class="hand">every PR is asked of the reviewer</div>'
         + step(2, "review", "Review", "reviewer", "every PR", model("sonnet"), [
-            act("Review", "the independent read, by this seat instead of a fresh reader"),
-            act("Merge", "once it passes"),
+            act("Review", "every PR: the independent read, by this seat", "this seat"),
+            '<li class="drop need">Merge is still needed — drop it here, or in step 1</li>',
         ])
         + '<div class="hand">beside the path: a cheaper seat takes the work orders</div>'
         + step(3, "orders", "Chores", "builder", "work orders only", model("sonnet"), [
@@ -290,9 +330,9 @@ def solo():
         + '<div class="addstep" style="margin-left:0">+ Add an on-call seat</div>'
     )
     cov = cover([
-        ("", "✓", "Merge a PR", "step 2"),
+        ("no", "✕", "Merge a PR", "nobody: Build opens PRs and nothing merges them"),
         ("", "✓", "Review evidence", "step 2"),
-        ("", "–", "Read a held path", "nobody: no step reads held paths, so held: does nothing"),
+        ("", "–", "Read a held path", "nobody: no Review is set to held paths, so held: does nothing"),
         ("", "–", "Answer a member", "you: this flow has no question seat"),
         ("", "✓", "Notice a stall", "the manager and the host"),
     ])
@@ -300,19 +340,19 @@ def solo():
         '<div class="fhead"><h2><span class="ed">One owner, then a review</span></h2><span class="id">one-owner</span>'
         '<span class="tag">this install · unsaved changes</span><div class="act"><button class="quiet">Discard</button>'
         '<button class="quiet">Copy</button><button class="pri">Save</button></div></div>'
-        '<p class="used">Run by no team yet. Saved at once; a repo\'s flow is saved as a pull request.</p>'
+        '<p class="used">Run by no team yet. It can be saved as it is, and run once nothing is still needed.</p>'
         '<div class="path"><span style="background:var(--build)">design and build</span><i>→</i>'
         '<span style="background:var(--review)">review</span><i>→</i><span class="you">you, directly</span></div>'
         "<h3>Steps</h3><p>Drag a step to reorder it, drag an action between steps, pick each step's model. "
         "An action is offered only where it can go: a review is never the author's own.</p>"
         f"{steps}<h3>On call</h3><p></p>{calls}{FIXED}"
         f"<div class='foot'><div><h3>Every task has someone</h3><p></p>{cov}</div>"
-        "<div><h3>Actions</h3><p>Drag one into a step to use it. Yours are listed with the built-in ones.</p>"
-        f'{catalogue({"Design", "Fact-check", "Build", "Review", "Merge", "Board answers", "Unheld PRs", "Live checks"})}'
+        "<div>"
         '<h3>Where it can run</h3><p class="runs"><span class="nok">ao-grind</span> — no login offers flash-lite</p>'
         "</div></div>"
     )
-    return page("solo", body, "B — a copy being edited: one session designs and builds, a reviewer seat reads every PR.")
+    cap = "B — a copy being edited. The side bar becomes the actions: what is still needed first, then everything that can be dragged in."
+    return page("solo", body, cap, navhtml=palette())
 
 
 ACSS = """
@@ -341,7 +381,7 @@ def anav(sel):
 
     groups = [
         ("Every session", [("ShiftLead mechanics", ""), ("Taking work", "lane steps")]),
-        ("In the path", [(n, "") for n in ("Find", "Design", "Design rounds", "Fact-check", "Build", "Review", "Read held paths", "Merge")]),
+        ("In the path", [(n, "") for n in ("Find", "Design", "Design rounds", "Fact-check", "Build", "Review", "Merge")]),
         ("Work orders", [(n, "") for n in ("Board answers", "Unheld PRs", "Live checks")]),
         ("On call", [(n, "") for n in ("Answer", "Draft an entry", "Audit", "Sweep", "Manage")]),
         ("Yours", [("Build, docs only", "this install")]),
