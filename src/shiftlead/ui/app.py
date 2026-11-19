@@ -98,6 +98,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     fill_words,  # noqa: F401
     flow_mark,  # noqa: F401
     gated_view,  # noqa: F401
+    git_head,  # noqa: F401
     group_place,  # noqa: F401
     held_words,  # noqa: F401
     host_volatile,  # noqa: F401
