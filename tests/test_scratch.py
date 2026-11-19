@@ -318,6 +318,30 @@ async def test_the_hourly_sweep_brings_back_a_live_record_s_scratch(agent, tmp_p
 
 
 @pytest.mark.integration
+async def test_the_hourly_sweep_leaves_another_host_s_record_s_scratch_alone(agent, tmp_path):
+    """The sweep keeps alive only the scratch of live records on this host (§4.6, TD-1944): a record held here that
+    lives on another host names a path this host does not own, so its removed scratch is not made again."""
+    from datetime import UTC, datetime
+
+    await park_ticks(agent)
+    view = await agent.rpc_create(name="x", dir=str(tmp_path), adapter="shell")
+    rec = agent.sessions[view["id"]]
+    d = Path(rec.scratch)
+    for f in d.iterdir():
+        f.unlink()
+    d.rmdir()
+    rec.host = "elsewhere"
+    try:
+        agent._pruned_at = datetime.min.replace(tzinfo=UTC)
+        await agent.tick()
+        await agent._prune_task
+        assert not d.exists()
+    finally:
+        rec.host = agent.host
+    await agent.rpc_kill(view["id"])
+
+
+@pytest.mark.integration
 async def test_a_node_keeps_a_scratch_the_home_hands_its_create_and_makes_a_foreign_one_anew(agent, tmp_path):
     """A node's restart (§4.6): the home closes the record and routes a create carrying its `scratch` over the
     link, as every create param goes. The node keeps it only where it is its own record's under its own parent,
