@@ -440,3 +440,59 @@ async def test_forget_and_naming_an_account_read_what_runs_and_what_is_retired(a
         assert (await c.call("login_account", login="api", account="claude-code:old"))["change"] == (
             "claude-code:api joined claude-code:old"  # its full key rejoins it deliberately
         )
+
+
+def test_a_reserve_moves_to_the_account_its_last_login_joins():
+    from sessionorc import settings
+
+    def gate(**g):
+        return {"usage_gate": g}
+
+    doc = gate(**{"claude-code:api": {"week": 5, "5h": {"per_day": 3}, "day": "$5"}})
+    said = settings.move_reserve(doc, "claude-code:api", "claude-code:paul-k", False)
+    assert doc == gate(**{"claude-code:paul-k": {"week": 5, "5h": {"per_day": 3}}})
+    assert said == [
+        "claude-code:paul-k takes claude-code:api's 5h reserve 3/day",
+        "claude-code:api's day reserve $5 is dropped: claude-code:paul-k takes it nowhere, as it does not fit its "
+        "billing",
+        "claude-code:paul-k takes claude-code:api's week reserve 5",
+    ]
+    doc = gate(**{"a:x": {"week": 5, "day": 20}, "a:y": {"week": 10, "day": 7, "5h": 1}})
+    said = settings.move_reserve(doc, "a:x", "a:y", False)  # the larger percent kept, the joined one's on a tie
+    assert doc == gate(**{"a:y": {"week": 10, "day": 20, "5h": 1}})
+    assert said == ["a:y takes a:x's day reserve 20 over its own 7", "a:y keeps its week reserve 10 over a:x's 5"]
+    doc = gate(**{"a:x": {"day": "$5", "week": "$9"}, "a:y": {"day": "$8", "week": "2M tok"}})
+    settings.move_reserve(doc, "a:x", "a:y", True)  # metered: the smaller amount, money before tokens
+    assert doc == gate(**{"a:y": {"day": "$5", "week": "$9"}})
+    doc = gate(**{"a:x": {"day": 5}})
+    assert settings.move_reserve(doc, "a:x", "a:y", None) == [
+        "a:x's day reserve 5 is dropped: a:y takes it nowhere, as its logins disagree on billing"
+    ]
+    assert doc == gate()
+    assert settings.move_reserve(gate(**{"a:y": {"day": 5}}), "a:x", "a:y", False) is None  # none to move
+
+
+@pytest.mark.integration
+async def test_a_join_that_empties_an_account_moves_its_reserve(agent, tmp_path):
+    from conftest import park_ticks
+
+    from sessionorc import paths
+    from sessionorc import settings as settings_mod
+    from sessionorc.client import LocalClient
+
+    await park_ticks(agent)
+    logins.save(_data(), "fixture", paths.home())
+    (paths.home() / "settings.yml").write_text(
+        'usage_gate: {"claude-code:api": {week: 20, day: "$5"}, "claude-code:paul-k": {week: 10}}\n'
+    )
+    async with LocalClient() as c:
+        got = await c.call("login_account", login="api", account="paul-k")
+        assert got["change"] == (
+            "claude-code:api joined claude-code:paul-k; claude-code:api's day reserve $5 is dropped: "
+            "claude-code:paul-k takes it nowhere, as it does not fit its billing; claude-code:paul-k takes "
+            "claude-code:api's week reserve 20 over its own 10"
+        )
+        assert settings_mod.read()["usage_gate"] == {"claude-code:paul-k": {"week": 20}}
+        got = await c.call("login_account", login="grind", account="work")  # paul-k keeps paul and api: it stays
+        assert got["change"] == "claude-code:grind joined claude-code:work"
+        assert settings_mod.read()["usage_gate"] == {"claude-code:paul-k": {"week": 20}}
