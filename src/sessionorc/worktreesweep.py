@@ -20,8 +20,9 @@ import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
-from sessionorc import gitinfo
+from sessionorc import diskbook, gitinfo
 from sessionorc.scratch import overlaps
 
 log = logging.getLogger(__name__)
@@ -164,11 +165,13 @@ def sweep(
     transcript_roots: Iterable[Path] = (),
     budget: float = SWEEP_WORKTREE_S,
     now: float | None = None,
+    tally: Any = None,
 ) -> Pass:
     """One pass of the worktree rule over every worktree under each repo's worktree root, in path order from the
     first path after `cursor` (wrapping), until `budget` seconds are spent. `idle(wt)` is the host agent's
     `_reap_idle`; `hold(wt, main)` takes the create's locks without waiting and returns their release, or None when
-    either is busy (*busy: a start is using it*); it is asked, and `idle` again, just before each removal."""
+    either is busy (*busy: a start is using it*); it is asked, and `idle` again, just before each removal. `tally`
+    (a `diskbook.Tally`) lists every worktree found and sizes each one weighed, a removed one's bytes counted."""
     now = time.time() if now is None else now
     troots = list(transcript_roots)
     found: list[tuple[Path, Path, str | None]] = []
@@ -179,6 +182,8 @@ def sweep(
         got = listed(repo)
         if got is None:
             log.warning("worktree sweep: %s's worktrees could not be listed", repo)
+            if tally is not None:
+                tally.unlisted = True  # the last reading stands, *partial*
             continue
         for wt, branch in got:
             real = os.path.realpath(wt)
@@ -186,6 +191,9 @@ def sweep(
                 seen.add(real)
                 found.append((wt, repo, branch))
     found.sort(key=lambda x: str(x[0]))
+    if tally is not None:
+        for wt, _repo, _branch in found:
+            tally.list(wt)
     after = [x for x in found if str(x[0]) > cursor] if cursor else found
     order = after + [x for x in found if x not in after]
     out = Pass(cursor=cursor)
@@ -194,6 +202,9 @@ def sweep(
         if time.monotonic() - start >= budget:
             break
         out.cursor = str(wt)
+        known = tally is not None and tally.known(wt)
+        if tally is not None and not known:  # sized before the weigh, which may remove it
+            tally.measure(wt, deadline=min(start + budget, diskbook.deadline()))
         try:
             why = _one(wt, repo, branch, now, keep_days, idle, hold, troots)
         except Exception:  # noqa: BLE001 — one worktree that cannot be weighed never starves the rest
@@ -202,8 +213,14 @@ def sweep(
         if why is None:
             out.removed.append(str(wt))
             log.info("worktree sweep: removed %s", wt)
+            if tally is not None:
+                tally.gone(wt)
         else:
             out.kept.append((str(wt), why))
+            if tally is not None:
+                if known:  # weighed again: its size as now, within what the budget leaves
+                    tally.measure(wt, deadline=min(start + budget, diskbook.deadline()))
+                tally.keep(wt, why)
     return out
 
 

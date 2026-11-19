@@ -25,6 +25,7 @@ from sessionorc import (
     adapters,
     agent_common,
     cachesweep,
+    diskbook,
     gitinfo,
     hosts,
     link,
@@ -5403,6 +5404,46 @@ class TickMixin:
         live_ids: set[str] | None = None,
         scratch: dict[str, str] | None = None,
         named: dict[str, tuple[str, float | None]] | None = None,
+    ) -> dict[str, Any]:
+        """One pass's rules (`_prune_rules`) and its result (§4.6 *The sweep's reading*, TD-1945): per kind the
+        bytes held, *partial* until each item is measured, the bytes removed and each kept item with why
+        (`diskbook`), kept as `_disk_result` for TD-1946's `disk.json`, and returned."""
+        tallies = self._disk_book.tallies()
+        if named is None:  # the scratch rule does not run: what it would list stands as last read, *partial*
+            tallies["scratch"].unlisted = True
+        try:
+            before = _run_items(live_ids)
+        except Exception:  # noqa: BLE001 — the reading never stops a pass
+            log.exception("the sweep's reading of the runs failed")
+            before = None
+        try:
+            self._prune_rules(now, live, live_ids, scratch, named, tallies)
+        finally:
+            runs = tallies["runs"]
+            try:
+                after = _run_items(live_ids)
+            except Exception:  # noqa: BLE001
+                log.exception("the sweep's reading of the runs failed")
+                after = None
+            if before is None or after is None:
+                runs.unlisted = True
+            else:
+                for path, size in before.items():
+                    if path not in after:
+                        runs.gone(path, size)
+                for path, size in after.items():
+                    runs.measure(path, size)
+            self._disk_result = self._disk_book.close(tallies)
+        return self._disk_result
+
+    def _prune_rules(
+        self,
+        now: datetime,
+        live: set[str],
+        live_ids: set[str] | None,
+        scratch: dict[str, str] | None,
+        named: dict[str, tuple[str, float | None]] | None,
+        tallies: dict[str, diskbook.Tally],
     ) -> None:
         """Run-log retention (design §4.6): a log older than `runs_keep_days` goes unless it is in
         `live`, the logs of sessions still running (never truncate a live log: invariant 3). Logs
@@ -5422,11 +5463,12 @@ class TickMixin:
         root = getattr(hosts.local_host(), "scratch_root", None) or hosts.DEFAULT_SCRATCH_ROOT
         if scratch:
             try:
-                large = scratch_mod.keep_alive(root, scratch, paths.home(), time.time_ns())
+                large = scratch_mod.keep_alive(root, scratch, paths.home(), time.time_ns(), tallies["scratch"])
             except Exception:  # noqa: BLE001 — a bad record's scratch never stops the rest of the sweep
                 log.exception("scratch sweep failed")
                 large = []
             for rid in large:
+                tallies["scratch"].keep(scratch[rid], "large scratch")
                 log.warning("large scratch: %s holds more than %d stale files", rid, scratch_mod.SWEEP_TOUCH_FILES)
         if named is not None:
             ended_states = ("exited", "closed")
@@ -5438,6 +5480,7 @@ class TickMixin:
             try:
                 troots, blind = adapters.transcript_roots()
                 if blind:  # an adapter that cannot name its stores could have one inside a scratch: none goes
+                    tallies["scratch"].unlisted = True
                     log.warning("scratch removal skipped: %s named no transcript roots", ", ".join(blind))
                 else:
                     kept = scratch_mod.sweep(
@@ -5448,13 +5491,15 @@ class TickMixin:
                         time.time(),
                         live_now,
                         troots,
+                        tallies["scratch"],
                     )
             except Exception:  # noqa: BLE001 — the scratch rule never stops the rest of the sweep
+                tallies["scratch"].unlisted = True
                 log.exception("scratch removal failed")
             for path, why in kept:
                 log.info("scratch kept: %s (%s)", path, why)
-        self._sweep_caches(now)
-        self._sweep_worktrees(now)
+        self._sweep_caches(now, tallies["caches"])
+        self._sweep_worktrees(now, tallies["worktrees"])
         idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
         for f in paths.attachments_dir().glob("*/*.part"):
             try:
@@ -5516,7 +5561,7 @@ class TickMixin:
             with contextlib.suppress(OSError):  # not empty: a younger file keeps it
                 folder.rmdir()
 
-    def _sweep_caches(self, now: datetime) -> None:
+    def _sweep_caches(self, now: datetime, tally: diskbook.Tally | None = None) -> None:
         """The cache rule of §4.6 *The disk sweep* (TD-1945): agent-cadence trees no registered repo's `origin`
         default branch pins, older than `cache_keep_days`, removed only by the default home's host agent and only
         where it registers a repo (a home with no roster leaves every tree), every pin read or none removed."""
@@ -5526,11 +5571,15 @@ class TickMixin:
         try:
             pinned = cachesweep.pins(roots)
             if pinned is not None:
-                cachesweep.sweep_trees(pinned, hosts.local_host().cache_keep_days, now.timestamp())
+                cachesweep.sweep_trees(pinned, hosts.local_host().cache_keep_days, now.timestamp(), tally=tally)
+            elif tally is not None:
+                cachesweep.tally_trees(tally)  # no pin read, none removed: the trees are still held
         except Exception:  # noqa: BLE001 — the cache rule never stops the rest of the sweep
+            if tally is not None:
+                tally.unlisted = True
             log.exception("cache sweep failed")
 
-    def _sweep_worktrees(self, now: datetime) -> None:
+    def _sweep_worktrees(self, now: datetime, tally: diskbook.Tally | None = None) -> None:
         """The worktree rule of §4.6 *The disk sweep* (TD-1945, `worktreesweep`): only the default home's host agent
         (`_worktree_scope` where a test gives it), over each registered repo, from the cursor, for at most
         `SWEEP_WORKTREE_S`. Runs in the sweep's thread; a create's two locks are taken on the loop."""
@@ -5541,6 +5590,8 @@ class TickMixin:
         try:
             troots, blind = adapters.transcript_roots()
             if blind:  # an adapter that cannot name its stores could have one inside a worktree: none goes
+                if tally is not None:
+                    tally.unlisted = True
                 log.warning("worktree sweep skipped: %s named no transcript roots", ", ".join(blind))
                 return
             got = worktreesweep.sweep(
@@ -5551,8 +5602,11 @@ class TickMixin:
                 hold=self._hold_create_locks,
                 transcript_roots=troots,
                 now=now.timestamp(),
+                tally=tally,
             )
         except Exception:  # noqa: BLE001 — the worktree rule never stops the rest of the sweep
+            if tally is not None:
+                tally.unlisted = True
             log.exception("worktree sweep failed")
             return
         self._worktree_cursor = got.cursor
@@ -7308,6 +7362,24 @@ def _tree_size(p: Path) -> tuple[int, float]:
                 size += fs.st_size
                 newest = max(newest, fs.st_mtime)
     return size, newest or st.st_mtime
+
+
+def _run_items(live_ids: set[str] | None) -> dict[str, int]:
+    """The run logs (a rounds log aside) and, with `live_ids` given, the attachment folders (drafts aside) the
+    sweep's reading counts as *runs*, each with its bytes (§4.6 *The sweep's reading*)."""
+    out: dict[str, int] = {}
+    for f in paths.runs_dir().glob("*.log"):
+        if f.name.endswith(".rounds.log") or f.is_symlink():
+            continue
+        with contextlib.suppress(OSError):
+            out[str(f)] = f.lstat().st_size
+    if live_ids is not None:
+        for d in paths.attachments_dir().glob("*"):
+            if d.is_symlink() or not d.is_dir() or paths.DRAFT.fullmatch(d.name):
+                continue
+            with contextlib.suppress(OSError):
+                out[str(d)] = _tree_size(d)[0]
+    return out
 
 
 def _prune_runs_by_size(

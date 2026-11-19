@@ -17,6 +17,9 @@ import stat
 import subprocess
 import time
 from pathlib import Path
+from typing import Any
+
+from sessionorc import diskbook
 
 MAX_ROOT = 48  # bytes: a scratch home's `agent.sock` at `$SHIFTLEAD_SCRATCH/home` binds within 107 (§4.6)
 OWNER = "owner.json"
@@ -154,13 +157,15 @@ SWEEP_TOUCH_FILES = 200_000  # files a record a pass the sweep touches at most; 
 TOUCH_AFTER_S = 86_400  # a file not accessed for a day is touched (§4.6)
 
 
-def _touch(path: Path, now_ns: int, cap: int) -> bool:
+def _touch(path: Path, now_ns: int, cap: int, size: list[int] | None = None) -> bool:
     """Move the access time of every file under `path` not accessed for a day to `now_ns`, its modification
     time left true (§4.6): `systemd-tmpfiles` ages a file by its own times, so a seat that runs past its age
     keeps what it wrote. A symlink is skipped, never touched through; a `.git` is descended into as any
-    directory. True where more than `cap` files wanted touching: the rest wait for the next pass."""
+    directory. True where more than `cap` files wanted touching: the rest wait for the next pass. A walk that
+    reaches the end appends the bytes it saw to `size` (each entry's own size, the sweep's reading)."""
     stale = now_ns - TOUCH_AFTER_S * 1_000_000_000
     touched = 0
+    total = 0
     todo = [path]
     while todo:
         try:
@@ -169,6 +174,8 @@ def _touch(path: Path, now_ns: int, cap: int) -> bool:
             continue
         for e in entries:
             try:
+                st = e.stat(follow_symlinks=False)
+                total += st.st_size
                 if e.is_symlink():
                     continue
                 if e.is_dir(follow_symlinks=False):
@@ -176,7 +183,6 @@ def _touch(path: Path, now_ns: int, cap: int) -> bool:
                     continue
                 if not e.is_file(follow_symlinks=False):
                     continue
-                st = e.stat(follow_symlinks=False)
                 if st.st_atime_ns >= stale:
                     continue
                 if touched >= cap:
@@ -185,15 +191,20 @@ def _touch(path: Path, now_ns: int, cap: int) -> bool:
                 touched += 1
             except OSError:
                 continue
+    if size is not None:
+        size.append(total)
     return False
 
 
-def keep_alive(root: str | Path, records: dict[str, str], home: str | Path, now_ns: int) -> list[str]:
+def keep_alive(
+    root: str | Path, records: dict[str, str], home: str | Path, now_ns: int, tally: Any = None
+) -> list[str]:
     """The hourly sweep's part for live records (§4.6): `records` maps each live record of this host to its
     `scratch`. A directory straight under this host's `shiftlead-<uid>/` that is gone is made again (`0700`,
     `owner.json`, empty), one missing its `owner.json` gains it, and its stale files are touched (`_touch`).
     One elsewhere, not this uid's, or whose `owner.json` names another record or home is left alone. Returns
-    the ids past `SWEEP_TOUCH_FILES`, each logged *large scratch* by the caller."""
+    the ids past `SWEEP_TOUCH_FILES`, each logged *large scratch* by the caller. `tally` (a `diskbook.Tally`)
+    lists each directory touched and takes its size where the walk reached the end."""
     try:
         p = ensure_parent(root)
     except (ScratchError, OSError):
@@ -219,8 +230,14 @@ def keep_alive(root: str | Path, records: dict[str, str], home: str | Path, now_
                 continue
         except OSError:
             continue
-        if _touch(path, now_ns, SWEEP_TOUCH_FILES):
+        size: list[int] = []
+        if _touch(path, now_ns, SWEEP_TOUCH_FILES, size):
             large.append(record)
+        if tally is not None:
+            if size:
+                tally.measure(path, size[0] + st.st_size)  # the directory's own entry too, as `size_of` counts
+            else:  # a large scratch's touch walk stopped short: sized by a bounded walk of its own, else as last
+                tally.measure(path, deadline=diskbook.deadline())
     return large
 
 
@@ -396,6 +413,21 @@ def _remove(path: Path) -> None:
     shutil.rmtree(path, onexc=again)
 
 
+def _keep(kept: list[tuple[str, str]], tally: Any, path: Path, why: str) -> None:
+    """A directory a rule would otherwise take, kept: with why, and measured for the sweep's reading."""
+    kept.append((str(path), why))
+    if tally is not None:
+        tally.measure(path, deadline=diskbook.deadline())
+        tally.keep(path, why)
+
+
+def _measure_once(tally: Any, path: Path, live: bool) -> None:
+    """A directory no rule takes this pass is measured only where nothing has sized it yet; a live record's is
+    sized by `keep_alive`'s touch walk."""
+    if tally is not None and not live and not tally.known(path):
+        tally.measure(path, deadline=diskbook.deadline())
+
+
 def sweep(
     root: str | Path,
     home: str | Path,
@@ -404,6 +436,7 @@ def sweep(
     now_s: float,
     live_now,
     transcript_roots: list[Path],
+    tally: Any = None,
 ) -> list[tuple[str, str]]:
     """The hourly sweep's scratch rule for directories no live record holds (§4.6 *The disk sweep*). `named` maps
     a directory to the record naming it in the snapshot and when that record ended (None: live). A directory
@@ -412,7 +445,9 @@ def sweep(
     newest write — unless `live_now(path)` (the records read again just before the removal) says a live record
     holds it, or it holds git work or a transcript store. Never one naming another home that exists, nor one with
     no readable `owner.json`. After a removal, `git worktree prune` runs in each repo a worktree under it named.
-    Returns the kept directories with why, and logs each removal."""
+    Returns the kept directories with why, and logs each removal. `tally` (a `diskbook.Tally`) lists each directory
+    this home holds, measures each one the pass removes or keeps and each it has no size for, and counts what goes;
+    one naming another home that exists is kept *another home*, its bytes that home's."""
     import logging
     import shutil
 
@@ -424,7 +459,11 @@ def sweep(
         if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
             return kept
         entries = sorted(os.scandir(p), key=lambda e: e.name)
+    except FileNotFoundError:
+        return kept  # no scratch yet: none held
     except OSError:
+        if tally is not None:
+            tally.unlisted = True  # the last reading stands, *partial*
         return kept
     for e in entries:
         path = Path(e.path)
@@ -435,32 +474,45 @@ def sweep(
                 continue
             got = owner(path)
             if not got or not isinstance(got.get("home"), str):
-                kept.append((str(path), "no owner"))
+                _keep(kept, tally, path, "no owner")
                 continue
             rid, ended = named.get(str(path), (None, None))
             if got["home"] != str(home):
                 if Path(got["home"]).exists():
-                    continue  # another home's own agent sweeps it (*another home*, never taken by this one)
+                    # another home's own agent sweeps it, never this one: reported kept, its bytes that home's
+                    kept.append((str(path), "another home"))
+                    if tally is not None:
+                        tally.keep(path, "another home")
+                    continue
                 rid = None
+            if tally is not None:
+                tally.list(path)
             if rid is not None:
                 if ended is None or now_s - ended < keep_hours * 3600:
+                    _measure_once(tally, path, ended is None)
                     continue
             elif now_s - _newest_write(path) < UNNAMED_AFTER_S:
+                _measure_once(tally, path, False)
                 continue
             if live_now(str(path)):
-                kept.append((str(path), "live record"))
+                _keep(kept, tally, path, "live record")
                 continue
             if any(overlaps(path, t) for t in transcript_roots):
-                kept.append((str(path), "transcripts"))
+                _keep(kept, tally, path, "transcripts")
                 continue
             if git_work(path):
-                kept.append((str(path), GIT_WORK))
+                _keep(kept, tally, path, GIT_WORK)
                 continue
             mains = _worktree_mains(path)
             if live_now(str(path)):  # read again just before the removal: the weigh can take a while
-                kept.append((str(path), "live record"))
+                _keep(kept, tally, path, "live record")
                 continue
+            size = None
+            if tally is not None:
+                size = tally.measure(path, deadline=diskbook.deadline())  # None past it: removed as last measured
             _remove(path)
+            if tally is not None:
+                tally.gone(path, size)
             log.info("removed scratch %s (%s)", path, f"ended {rid}" if rid else "named by no live record")
             for m in mains:
                 git = shutil.which("git") or "git"

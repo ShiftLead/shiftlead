@@ -4,6 +4,7 @@ cache's lock; a pinned tree, a young one and every tree where a pin cannot be re
 
 from __future__ import annotations
 
+import contextlib
 import fcntl
 import os
 import subprocess
@@ -47,6 +48,19 @@ def repo(tmp_path: Path, name: str, toml: str | None) -> Path:
     git(c, "commit", "-qm", "c")
     git(c, "push", "-q", "-u", "origin", "main")
     return c
+
+
+@pytest.fixture(autouse=True)
+def _writable_at_teardown(tmp_path):
+    """The trees are read-only, as the launcher makes them: made writable again after each test, so pytest's own
+    clean-up of old temp directories can remove them."""
+    yield
+    for d, dirs, _files in os.walk(tmp_path):
+        for n in dirs:
+            p = os.path.join(d, n)
+            if not os.path.islink(p):
+                with contextlib.suppress(OSError):
+                    os.chmod(p, 0o755)
 
 
 def tree(cache: Path, name: str, days: float) -> Path:

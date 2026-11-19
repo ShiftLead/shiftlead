@@ -76,9 +76,13 @@ async def test_ended_runs_go_oldest_first_past_runs_keep_mb_and_a_live_run_never
     _put(gone / "a.png", 1, 25)
     _put(paths.attachments_dir() / "ao-live-1" / "b.png", 2, 45)  # a live record's folder
     _put(paths.attachments_dir() / "draft-0123abcd" / "c.png", 2, 45)  # a draft goes by its claim
-    agent._prune_runs(datetime.now(UTC), {str(live)}, {"ao-live-1"})
+    got = agent._prune_runs(datetime.now(UTC), {str(live)}, {"ao-live-1"})
     # 4 MB of ended runs against a 3 MB bound: the oldest, `earlier`, goes and the rest fit
     assert not earlier.exists() and old.exists() and young.exists() and gone.exists()
+    # the pass result (§4.6 *The sweep's reading*): every run log and attachment folder held, a live one's too,
+    # but a rounds log and a draft; the bytes removed
+    assert got["runs"] == {"held": 7 * MB, "partial": False, "removed": 1 * MB, "kept": []}
+    assert agent._disk_result is got
     (paths.home() / "hosts.yml").write_text("local:\n  runs_keep_days: 0\n  runs_keep_mb: 1\n")
     agent._prune_runs(datetime.now(UTC), {str(live)}, {"ao-live-1"})
     assert not old.exists() and not gone.exists() and young.exists()
