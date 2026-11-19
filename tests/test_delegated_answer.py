@@ -132,3 +132,79 @@ def test_a_board_answers_foot_names_the_delegate(line, words):
     got["line"] = {"key": "board:1", "open": False, **line}
     now = datetime(2026, 11, 14, 12, tzinfo=UTC)
     assert inbox._held_answered(got, [], {"s-1": "grinder"}, now)["words"] == words
+
+
+# TD-1957: the three places that draw who answered, each read end to end from the board's own reading, so that
+# dropping the line in `board_hold`, `inbox_row.html` or `repo_part.html` that names the delegate fails a test here.
+
+NOW = datetime(2026, 11, 14, 12, tzinfo=UTC)
+
+
+def _own(tmp_path: Path) -> Path:
+    """The same board with every answer the person's own: no line delegated."""
+    root = tmp_path / "own"
+    (root / "docs").mkdir(parents=True)
+    write_board(root, "\n".join(["# Board", "", OPEN, CLOSED, PLAIN, ""]))
+    return root
+
+
+def _hold(root: Path) -> dict | None:
+    reading = workorders.read_boards(root, fetch=False)
+    member = {"repo": "repo", "id": "TD-90"}
+    return queue_mod.board_hold(member, {"repo": reading["boards"]}, {}, NOW, claims={}, entries={}, live={})
+
+
+@pytest.mark.unit
+def test_board_hold_carries_the_delegate_and_scope_to_the_queues_foot(tmp_path):
+    """`board_hold` copies a delegated line's `delegate` and `scope` into the held answer's `line`, so the Queue's
+    foot names the delegate; a person's own answer's `line` has neither and reads *you answered*."""
+    got = _hold(_repo(tmp_path))
+    assert got is not None and (got["line"]["delegate"], got["line"]["scope"]) == ("director", "merge-line")
+    words = inbox._held_answered(got, [], {}, NOW)["words"]
+    assert words == "director answered “Merge” for you on the board (merge-line)"
+    own = _hold(_own(tmp_path))
+    assert own is not None and "delegate" not in own["line"] and "scope" not in own["line"]
+    assert inbox._held_answered(own, [], {}, NOW)["words"] == "you answered “Merge” on the board"
+
+
+def _inbox_html(root: Path) -> str:
+    from shiftlead.ui.app import templates
+
+    (row,) = inbox.board_rows(workorders.read_boards(root, fetch=False))
+    return str(templates.env.get_template("inbox_row.html").module.row(row, "later"))
+
+
+@pytest.mark.unit
+def test_the_inbox_board_rows_html_names_the_delegate(tmp_path):
+    """The Inbox board row of a delegated `Decided:` draws *decided: … · director for you (merge-line)*; a person's
+    own answer draws no *for you*."""
+    assert "decided: Merge · Nov 12 · director for you (merge-line)</div>" in _inbox_html(_repo(tmp_path))
+    own = _inbox_html(_own(tmp_path))
+    assert "decided: Merge · Nov 12</div>" in own and "for you" not in own
+
+
+@pytest.mark.unit
+def test_the_repo_pages_decided_line_names_the_delegate(tmp_path, monkeypatch):
+    """The Repo page's decided-lines row (`repo_part.html`'s `order_row`) draws *decided … · <date> · director for
+    you (merge-line)*; a person's own answer draws no *for you*."""
+    from test_ui_repo_page import ORDER, client, fake, reading, rec
+
+    root = str(tmp_path / "samscrape")
+
+    def debt(decided: dict) -> str:
+        r = {**reading(root), "work_orders": {"orders": [{**ORDER, "decided": decided}]}}
+        html = (
+            client(monkeypatch, tmp_path, fake({root: r}, [rec("g1", root, lane=["free-pick"])]))
+            .get("/repo/samscrape")
+            .text
+        )
+        row = html[html.index('id="debt"') :]
+        row = row[row.index(f'id="{ORDER["id"]}"') :]
+        return row[: row.index("</div>")]
+
+    plain = {"text": "keep", "date": "2026-10-03"}
+    assert "decided keep · 2026-10-03 · director for you (merge-line) ·" in debt(
+        {**plain, "delegate": "director", "scope": "merge-line"}
+    )
+    own = debt(plain)
+    assert "decided keep · 2026-10-03 ·" in own and "for you" not in own and "director" not in own
