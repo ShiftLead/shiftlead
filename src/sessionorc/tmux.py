@@ -14,7 +14,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from sessionorc import paths
+from sessionorc import naming, paths
 
 HISTORY_LIMIT = 50000
 _FMT = (
@@ -282,9 +282,16 @@ class Tmux:
         logfile.parent.mkdir(parents=True, exist_ok=True)
         self.run("pipe-pane", "-t", f"={name}:", f"cat >> '{logfile}'")
 
-    def capture_tail(self, name: str, lines: int = 8, raw: bool = False) -> list[str]:
+    def capture_tail(self, name: str, lines: int = 8, raw: bool = False, *, tools: bool = False) -> list[str]:
         """The pane's last `lines` rows. `raw` keeps the SGR attributes (`-e`), for readers that
-        must tell painted text from dim placeholder text (an adapter's `composer`, TD-027)."""
+        must tell painted text from dim placeholder text (an adapter's `composer`, TD-027).
+
+        A tools shell's pane (`naming.is_tools`, design §4.2b *The tools shell*) reads as nothing —
+        the tick's capture, a composer read, a wake — unless `tools` says the caller is the person's
+        own read (`tail`, `explain`), checked before it is passed: a sign-in prints an email, links and
+        codes, and an API key is pasted there."""
+        if naming.is_tools(name) and not tools:
+            return []
         args = ["capture-pane", "-p", "-J"] + (["-e"] if raw else []) + ["-t", f"={name}:", "-S", f"-{lines}"]
         cp = self.run(*args, check=False)
         if cp.returncode != 0:

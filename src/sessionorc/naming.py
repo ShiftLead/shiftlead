@@ -49,6 +49,39 @@ def is_ours(tmux_session_name: str) -> bool:
     return tmux_session_name.startswith(PREFIX)
 
 
+# A Tools page's tools shell (design §4.2b *The tools shell*, §4.1, TD-1972): `ao--tools-…`, an id no
+# repo, directory or name can yield, since `slug` strips a leading `-`. Every rule that keeps a tools
+# shell's pane to the person matches this prefix, never a name.
+TOOLS_PREFIX = PREFIX + "-tools-"
+
+
+def is_tools(sid: str) -> bool:
+    """Whether an id (or an address) is a tools shell's: its pane is read by the person alone, it has
+    no run log, and nothing of it is kept or handed to a session (§4.2b)."""
+    return split_address(sid)[0].startswith(TOOLS_PREFIX)
+
+
+def fold(text: str) -> str:
+    """A login's or an adapter's name as a tools shell's id carries it: lowercased, `_` turned to `-`."""
+    return str(text).lower().replace("_", "-")
+
+
+def tools_id(adapter: str, login: str) -> str:
+    """A login's tools shell: `ao--tools-<adapter>-<login folded>` (§4.2b)."""
+    return f"{TOOLS_PREFIX}{fold(adapter)}-{fold(login)}"
+
+
+def tools_install_id(adapter: str) -> str:
+    """An install shell: `ao--tools-install-<adapter>` (§4.2b)."""
+    return f"{TOOLS_PREFIX}install-{fold(adapter)}"
+
+
+def adopted_name(sid: str) -> str:
+    """The name a record-less pane of ours is adopted under: its id less the prefix — `ao-` for a
+    session's, `ao--` for a tools shell's, so no name starts with `-` (§4.2b)."""
+    return sid[len(PREFIX) + 1 :] if is_tools(sid) else sid[len(PREFIX) :]
+
+
 # -- addresses (design §4.4a, TD-057 step 1) --------------------------------------------------------
 #
 # The org-wide address of a record is `<id>@<host>`. A bare id means *the record's own host*, so a

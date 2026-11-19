@@ -17,6 +17,7 @@ from sessionorc import (
     adapters,
     agent_common,
     mail,
+    naming,
     waits,
 )
 from sessionorc.agent_common import (
@@ -119,6 +120,8 @@ class WakeMixin:
         """Why the doorbell may not ring for `s` now, or None when it may. The order is the
         design's: a session that cannot be rung at all, then a pending stop, then — in `_ring`, the
         wake decision — the budget and new mail."""
+        if naming.is_tools(s.id):
+            return "a tools shell"  # the person's own pane: no doorbell, no read of it (§4.2b, TD-1972)
         if s.state != "idle" or not s.told:
             return "not hook-confirmed idle"  # never a scraped idle or `stalled?` (a takeover)
         if self._first_prompt_due(s):

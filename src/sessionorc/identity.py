@@ -36,7 +36,14 @@ ALARMS_KEEP = 20
 # **A read here must not decide anything on its `caller`**: the envelope's claim reaches it
 # unjudged from outside a pane. `host_files` was listed until the red-team of PR #248 — it
 # authorises on `caller` (the person, or a `control` holder), so a session that left its `caller`
-# out read a checkout as the person. `tests/test_identity.py` pins the rule for every name here.
+# out read a checkout as the person. `tests/test_identity.py` pins the rule for every name here, but
+# `TOOLS_GATED`'s: `tail` and `explain` read a caller for one thing alone, to refuse a Tools page's tools
+# shell's pane to a session (design §4.2b *The tools shell*, §9 invariant 11's one exception, TD-1972).
+# From under a pane the claim is replaced by the pane's own session (`_identify`), so a session's own
+# read is its own; under `observe`, from a channel judged unknown, or from outside every pane a claim
+# of the person still stands, which is the bound §4.2b and §4.8a state (the same unix user could run
+# `tmux capture-pane` itself).
+TOOLS_GATED = frozenset({"tail", "explain"})
 READS = frozenset(
     {
         "list",

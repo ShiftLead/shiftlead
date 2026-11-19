@@ -829,6 +829,23 @@ def cmd_shell(args: argparse.Namespace) -> int:
     return cmd_new(args)
 
 
+def cmd_tools_install(args: argparse.Namespace) -> int:
+    """`ao tools install <tool>` (design §4.2b *The tools shell*, TD-1972): the tool's install shell, in the
+    person's home, its install command typed and not run — press Enter there to run it. A person's own act:
+    refused to a session."""
+    s = call_sync("tools_install", tool=args.tool)
+    if getattr(args, "attach", False):
+        return _attach(args, s["id"], s)
+    return emit(
+        args,
+        s,
+        lambda: print(
+            f"{s['id']}  (install shell, in {s['dir']}): its install command is typed, not run — attach and press "
+            f"Enter to run it\nattach: tmux attach -t {s['id']}"
+        ),
+    )
+
+
 def cmd_roles(args: argparse.Namespace) -> int:
     """`ao roles` (design §4.7, §4.8): every preset that resolves in this repo — the package's
     built-ins and what the repo's `.shiftlead.yml` redefines or adds — with where each came from."""
@@ -5671,6 +5688,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     q = add_team("list", help="every definition, its source file and whether it is live")
     q.set_defaults(fn=cmd_team_list)
+
+    p = add("tools", help="the coding tools on this host (§4.2b, the Tools page)")
+    tools_sub = p.add_subparsers(dest="action", required=True)
+    q = tools_sub.add_parser("install", help="open the tool's install shell, its install command typed (§4.2b)")
+    q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the RPC result as JSON")
+    q.add_argument("tool", help="the tool's adapter (claude-code, gemini, grok)")
+    q.add_argument("--attach", action="store_true", help="then attach this terminal to it (tmux attach)")
+    q.set_defaults(fn=cmd_tools_install)
 
     p = add("shell", help="start a plain shell session here")
     p.add_argument("name", nargs="?")

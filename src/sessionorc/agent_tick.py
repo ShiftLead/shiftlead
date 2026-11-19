@@ -6235,16 +6235,18 @@ class TickMixin:
             self._observe(s, pane, tails.get(sid, []), now)
         # tmux sessions with our prefix that we have no record of (created by hand, or the
         # store was lost): adopt them minimally as shells so they appear in the Org. A pane whose
-        # create is still starting it is that create's, not a stranger's (TD-952).
+        # create is still starting it is that create's, not a stranger's (TD-952). A tools shell's
+        # (`ao--tools-…`, §4.2b) is adopted as one: `log: false`, named its id less `ao--`.
         for name, pane in panes.items():
             if name not in self.sessions and name not in self._starting and not self._is_removed_pane(name, pane):
                 s = Session(
                     id=name,
-                    name=name[len(naming.PREFIX) :],
+                    name=naming.adopted_name(name),
                     kind="interactive",
                     adapter="shell",
                     dir="",
                     host=self.host,
+                    log=not naming.is_tools(name),
                 )
                 s.created = datetime.fromtimestamp(pane.created, UTC).isoformat().replace("+00:00", "Z")
                 self.sessions[name] = s
@@ -6288,8 +6290,9 @@ class TickMixin:
 
     def _observe(self, s: Session, pane: PaneInfo, tail: list[str], now: datetime) -> None:
         adapter = adapters.get(s.adapter)
-        s.tail = [_clean(t) for t in tail]
-        s.title = _pane_title(adapter, pane.title)
+        tools = naming.is_tools(s.id)  # a tools shell: nothing of its pane is kept (§4.2b *The tools shell*)
+        s.tail = [] if tools else [_clean(t) for t in tail]
+        s.title = None if tools else _pane_title(adapter, pane.title)
         s.pane = True
         if s.run_log:
             with contextlib.suppress(OSError):
@@ -6337,7 +6340,7 @@ class TickMixin:
                 s.set_state(saved[0], confidence=saved[2], pending=saved[1])
         elif self._title_verdict(s, adapter, pane, now):
             pass  # the tool's own title replaced the record's state (§4.2 *A title the tool writes its state into*)
-        if not pane.dead and adapter.state_source != "scraped":
+        if not pane.dead and adapter.state_source != "scraped" and not tools:
             self._stall_check(s, adapter, now)
         self.store.save(s)
 
