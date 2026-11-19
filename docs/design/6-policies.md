@@ -1109,7 +1109,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        alone); a run whose last end in the window is a member's is read as before. The run is read by
        `teams.<team>.started_at`, which every caller at the home passes (`stopped_by`, `seats_held_by`,
        `team_stopped`, `held_for`, `held_words`, `stuck.team_reason`), every mark counting only where none was
-       ever written. It is `person` where one of those records was
+       ever written. Otherwise it is `person` where one of the window's records was
        ended by the person:
        - its `ended.by`, or for a record with no `ended` its `closer.by`, names the person (Stop
          now, a Close, a Kill); or
@@ -1231,7 +1231,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      unattended session live, the clients calling it with the same records, so the card and the
      tick never disagree. Where a lead under the manager also holds `control` and is listed
      (manager → lead → worker), the manager is the one no other such record controls, and the
-     lead is a member. **Which members count.** An ended (`closed` or `exited`) record carrying a member's `wind_down` mark (on a record that is not the one `work.manager_of` names; a `wind_down` on the manager's record is inert) is passed over,
+     lead is a member. **Which members count.** An ended (`closed` or `exited`) record carrying a member's `wind_down` mark (on a record that is not the one `work.manager_of` names; a `wind_down` on the manager's record is inert here, read only by the one-record readings, §4.9a *The manager is not marked*) is passed over,
      as a sat-out one is, and a live one is a clause, *<name> winding down*, so the reading holds only
      once every marked member is gone (§4.9a *A wind-down closes its members*, TD-1895). A live member with `out_of_work` is finished; a
      `closed` or `exited` one with `out_of_work` is finished too; a member `exited` with `pane`
