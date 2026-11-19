@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import secrets
 import time
 from datetime import UTC, datetime, timedelta
@@ -54,6 +55,7 @@ class HookMixin:
         # `wait`: the event is a foreground CI watch the hook refuses only for an unattended record, whose
         # mode it cannot know itself (§4.3 *A wait the guard refuses*) — on a node, the replica's field
         wants_wait = bool(event.pop("wait", False))
+        await self._resolve_cwd(session, event)
         self._apply_event(session, event)
         await self._push_changes()
         reply: dict[str, Any] = {}
@@ -62,6 +64,31 @@ class HookMixin:
         if wants_wait and (s := self.sessions.get(session)) is not None and s.unattended:
             reply["refuse_wait"] = True
         return reply or None
+
+    async def _resolve_cwd(self, session: str, event: dict[str, Any]) -> None:
+        """The payload's `cwd` made the record's (design §4.2 *The record's `cwd`*, TD-1988): compared raw with the
+        last raw value first and resolved to its real path only on a change, off the event loop, and handed to the
+        apply as `cwd_real` — None where it is `dir` itself — only where the raw value is still the last one when
+        the resolve ends, so an older event's slow resolve never overwrites a newer one. A subagent's event writes
+        none; a queued one never comes here, and the apply reads `cwd_real` from a live event alone."""
+        raw = event.pop("cwd", None)
+        event.pop("cwd_real", None)  # the host agent's own words, never a caller's
+        event.pop("cwd_raw", None)
+        s = self.sessions.get(session)
+        if not isinstance(raw, str) or not raw or event.get("subagent") or s is None or not s.dir:
+            return
+        if raw == self._cwd_raw.get(session):
+            self._cwd_asking.pop(session, None)  # back where it was: an older resolve under way hands nothing on
+            return
+        self._cwd_asking[session] = raw  # the newest raw value asked: a slower, older resolve hands nothing on
+        try:
+            real, here = await asyncio.to_thread(lambda: (os.path.realpath(raw), os.path.realpath(s.dir)))
+        except (OSError, ValueError):  # a path no file system takes (a NUL in it): no `cwd`, the event still applies
+            return
+        if self._cwd_asking.get(session) == raw:
+            # the apply marks `raw` as the last one only where it writes it, so an event it drops early (a late
+            # turn's end, a closed record) leaves the next event with this `cwd` to resolve it again
+            event["cwd_real"], event["cwd_raw"] = (None if real == here else real), raw
 
     def _unread_of(self, session: str) -> int:
         """The record's unread mail: the inbox at the home, the count the home last pushed on a node

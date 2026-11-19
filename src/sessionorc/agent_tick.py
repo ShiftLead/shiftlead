@@ -5811,7 +5811,19 @@ class TickMixin:
         ]
         if not due:
             return
-        results = await asyncio.gather(*(asyncio.to_thread(git_info, s.dir) for s in due), return_exceptions=True)
+        # the record's `cwd` taken before git runs, its root written only where `cwd` is still that value when it
+        # ends (§4.2 *The record's `cwd`*, TD-1988): a read in flight never writes the old folder's root
+        cwds = {s.id: s.cwd for s in due}
+        roots: dict[str, str | None] = {}
+
+        def _read(s: Session) -> gitinfo.GitInfo | None:
+            try:  # a root that cannot be read is none, and never costs the record its `git`
+                roots[s.id] = gitinfo.cwd_root(s.dir, cwds[s.id]) if cwds[s.id] else None
+            except (OSError, ValueError):
+                roots[s.id] = None
+            return git_info(s.dir)
+
+        results = await asyncio.gather(*(asyncio.to_thread(_read, s) for s in due), return_exceptions=True)
         infos = {s.id: (r if not isinstance(r, BaseException) else None) for s, r in zip(due, results, strict=True)}
         # the recent files (§4.2 *The record's `files`*, TD-538): read again only when the status's
         # `oid` or its porcelain moved since the last read, or none was read for this record yet
@@ -5823,11 +5835,16 @@ class TickMixin:
             live = self.sessions.get(s.id)
             if live is None:
                 continue  # forgotten while git ran: no side-table key outlives it (TD-463)
-            self._git_checked[s.id] = now
             info = infos.get(s.id)
             new = info.to_dict() if info else None
             changed = new != live.git
             live.git = new
+            if live.cwd == cwds[s.id]:
+                self._git_checked[s.id] = now
+                root = roots.get(s.id)
+                changed = changed or root != live.cwd_root
+                live.cwd_root = root
+            # else a hook moved `cwd` while git ran: no root written, and the record stays due
             if s.id in files:  # a read that failed keeps the list it had, and is taken again next time
                 self._files_read[s.id] = keys[s.id]
                 changed = changed or files[s.id] != live.files
@@ -6921,6 +6938,13 @@ class TickMixin:
             s.adapter_id = aid
         if (path := event.get("transcript")) and isinstance(path, str):
             s.transcript = path  # the tool's file for this run, pushed with the id (§4.2, TD-578)
+        if "cwd_real" in event and not queued:  # the main thread's live report, resolved by the hook RPC (TD-1988)
+            cwd = event["cwd_real"] if isinstance(event["cwd_real"], str) else None
+            if isinstance(event.get("cwd_raw"), str):
+                self._cwd_raw[sid] = event["cwd_raw"]  # the last raw value, marked where it is written
+            if cwd != s.cwd:
+                s.cwd, s.cwd_root = cwd, None  # its root is the status read's to write: the read made due now
+                self._git_checked.pop(sid, None)
         if (model := event.get("model")) and str(model) != s.model:
             s.model = str(model)  # SessionStart's `model`, or a `/model` switch (TD-031)
             agent_common.write_model_file(s)  # the commit hook's trailer follows it (§4.2, TD-638)
@@ -7297,6 +7321,8 @@ class TickMixin:
         forgotten or replaced in place by a new session of the same name (§4.1)."""
         for side in (
             self._git_checked,
+            self._cwd_raw,
+            self._cwd_asking,
             self._files_read,
             self._derived_at,
             self._model_checked,

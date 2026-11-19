@@ -133,6 +133,10 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
     # mid-session reports itself. Read both generically: an event without one says nothing about it.
     if model := payload.get("model"):
         out["model"] = model
+    # the folder the tool works in, on every event (design §4.2 *The record's `cwd`*, TD-1988): the host agent keeps
+    # it where it is not the record's `dir`, from the main thread's events alone
+    if (cwd := payload.get("cwd")) and isinstance(cwd, str):
+        out["cwd"] = cwd
     # an event from inside a subagent names it (design §4.2 *A subagent's dialog is held back*, TD-950):
     # its own pending, waiter and open calls are that subagent's thread, not the main one's
     if agent := payload.get("agent_id"):
