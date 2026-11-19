@@ -223,11 +223,11 @@ def _days(v: object) -> int:
 
 
 def _root(v: object) -> str:
-    """`scratch_root`: a non-empty string, `~` expanded, else the default; its length is the host agent's
-    to refuse at start (§4.6), never silently replaced here."""
+    """`scratch_root`: a non-empty string, `~` expanded and made absolute, else the default; its length is the
+    host agent's to refuse at start (§4.6), never silently replaced here."""
     if not isinstance(v, str) or not v.strip():
         return DEFAULT_SCRATCH_ROOT
-    return os.path.expanduser(v.strip())
+    return os.path.abspath(os.path.expanduser(v.strip()))  # a relative root would give a relative TMPDIR
 
 
 def local_host() -> Host:

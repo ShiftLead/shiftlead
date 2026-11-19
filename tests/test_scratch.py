@@ -113,6 +113,10 @@ def test_scratch_root_is_read_from_hosts_yml_and_shown_on_the_hosts_card(tmp_pat
     (tmp_path / "hosts.yml").write_text("local:\n  scratch_root: ~/scr\n")
     local = hosts.local_host()
     assert local.scratch_root == os.path.expanduser("~/scr")
+    (tmp_path / "hosts.yml").write_text("local:\n  scratch_root: rel\n")
+    assert os.path.isabs(hosts.local_host().scratch_root)  # never a relative TMPDIR
+    (tmp_path / "hosts.yml").write_text("local:\n  scratch_root: ~/scr\n")
+    local = hosts.local_host()
     rows = {r["key"]: r for r in settings_page.host_card({"scratch_root": "~/scr"}, local, local.name, {})["rows"]}
     assert rows["scratch_root"]["value"] == local.scratch_root and not rows["scratch_root"]["default"]
 
