@@ -51,7 +51,7 @@ from sessionorc.models import (
     tokens_short,
 )
 from sessionorc.tmux import attach_argv
-from shiftlead import connect, doctor, feedback, orgcheck, repoconfig, service, teamrun, teams
+from shiftlead import connect, doctor, feedback, layers, orgcheck, repoconfig, service, teamrun, teams
 from shiftlead import org as orgmod
 from shiftlead.cardtext import (  # `ao card`'s names, kept where they were (TD-1903)
     CARD_NOT_MAIL,  # noqa: F401
@@ -553,6 +553,27 @@ def _team_slots(args: argparse.Namespace, cfg: repoconfig.RepoConfig | None = No
     return teams.brief_ids(org, name, hosts.local_host().name, getattr(args, "role", None), cfg)
 
 
+def _person(role: repoconfig.Role, cfg: repoconfig.RepoConfig) -> list[dict[str, Any]]:
+    """The person's own additions to `role`'s brief (design §4.8 *The person's own additions*, TD-1016), for a role
+    whose template has a place for them: listed under the session's repo, else the agent-cadence source among the
+    org's repos here. A listing that fails stops the start (`ValueError`, by name)."""
+    if role.template is None and role.defined is None:
+        return []
+    try:
+        org, _notes = _org_notes()
+        here = hosts.local_host().name
+        roots = [pathlib.Path(c).expanduser() for r in org.checkouts if (c := org.checkout(r, here)) is not None]
+    except ValueError:
+        roots = []
+    try:
+        return layers.person(role.name, cfg.root, roots)
+    except layers.NoSource:  # named, and the start goes on with none (§4.8)
+        print(f"{layers.NO_SOURCE} — the person's own additions are not read", file=sys.stderr)
+        return []
+    except layers.ListingError as e:
+        raise ValueError(str(e)) from None
+
+
 def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
     """What the repo's `.shiftlead.yml` and the `--role` preset fill in for `ao new` (design §4.8,
     §5): the brief from the role's template with `{lane}` filled, its lane, its grants (plus any
@@ -588,7 +609,9 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
         supplement = brief or None
         # what the brief was made from goes with it (design §6 rule 7); a typed --prompt fills nothing
         prompt, prompt_from = (
-            (args.prompt, None) if args.prompt else role.compose(lane, supplement=supplement, **_team_slots(args, cfg))
+            (args.prompt, None)
+            if args.prompt
+            else role.compose(lane, supplement=supplement, person=_person(role, cfg), **_team_slots(args, cfg))
         )
         # TD-114's transition (design §4.8): a whole brief given as a supplement repeats the template
         for heading in repoconfig.repeated_headings(prompt or "") if supplement else []:

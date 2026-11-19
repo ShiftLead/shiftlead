@@ -39,6 +39,7 @@ from typing import Any
 
 import yaml
 
+from sessionorc import brief as brief_mod
 from sessionorc import cadence, paths, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
@@ -115,6 +116,10 @@ NO_CONTEXT = "none"
 # *This repo's rules* section; `none` where the repo gives nothing, and the template stands alone.
 REPO_PLACEHOLDER = "{repo}"
 NO_REPO = "none"
+# The person's own additions (design §4.8 *The person's own additions*, TD-1016): each layer's
+# `shiftlead/briefs/<role>.md`, filled into *Your own rules* just before *This repo's rules*; `none` without one.
+PERSON_PLACEHOLDER = "{person}"
+NO_PERSON = "none"
 # What a new ledger entry needs (design §4.9 *Add an entry to the ledger*, TD-219): written once, in
 # the package's `entry.md`, and read both ways — a section of the techlead's brief, where `{entry}`
 # takes it with its own slots said in words (the repo and type ride on the handed message), and the
@@ -631,6 +636,7 @@ class Role:
         on_call: bool = False,
         flow: UnderFlow | None = None,
         template_file: Path | None = None,
+        person: list[dict[str, Any]] | None = None,
     ) -> tuple[str | None, dict[str, Any] | None]:
         """The opening prompt this role gives a session: its template with `{repo}` filled from the
         repo's brief (design §4.8 *A repo's brief is a supplement*, TD-114) — `supplement`, a path,
@@ -649,7 +655,10 @@ class Role:
         preset's template wraps it, flow or none — the designer's too, since TD-310 cut its one repo
         brief to a supplement (§4.9c *The designer gets a template*). `template_file` replaces the role's
         template, composed with the same slots — the seat smoke's `--brief`, replaying an older brief (design
-        §4.3 *The live smoke, unattended*, TD-1648).
+        §4.3 *The live smoke, unattended*, TD-1648). `person` is the person's own additions (§4.8 *The person's
+        own additions*, TD-1016): `shiftlead.layers.brief_parts`, filled into `{person}` under *Your own rules*,
+        `none` when no layer has one or none was read. It is filled right after `{repo}`, so a slot word the
+        person writes (`{lane}`, `{gate}`) is filled as in the repo's text, on a replay alike.
 
         Beside the text, what it was made from (design §6 *Keeping a team running* rule 7, TD-217):
         `prompt_from = {base, slots}` — `base` the template's path as installed, or the repo's brief
@@ -682,6 +691,14 @@ class Role:
             added = self._read(extra, read).strip() if extra else ""
             text = text.replace(REPO_PLACEHOLDER, added or NO_REPO)
             slots[REPO_PLACEHOLDER] = {"file": str(self._path(extra))} if extra else {"text": NO_REPO}
+            if PERSON_PLACEHOLDER in text:  # a role's own template may have no place for them (§4.9c)
+                if person:
+                    mine, _ = brief_mod.layered(person)
+                    slots[PERSON_PLACEHOLDER] = {"layers": [dict(part) for part in person]}
+                else:
+                    mine = NO_PERSON
+                    slots[PERSON_PLACEHOLDER] = {"text": NO_PERSON}
+                text = text.replace(PERSON_PLACEHOLDER, mine)
             stage = flow.stage if flow is not None else default_stage
             text = text.replace(FLOW_PLACEHOLDER, flow.text if flow is not None else NO_FLOW)
             slots[FLOW_PLACEHOLDER] = {"text": flow.text if flow is not None else NO_FLOW}

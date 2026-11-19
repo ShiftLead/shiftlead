@@ -2829,3 +2829,20 @@ def test_a_one_team_repo_starts_with_nothing_declared(world):
     state["repos"] = {str(tmp_path / "shiftlead"): {"name": "shiftlead", "ledger": {"declared_teams": []}}}
     assert cli.main(["team", "start", "ao-grind"]) == 0
     assert creates(state)
+
+
+def test_no_agent_cadence_to_list_the_persons_layers_is_said_once_and_the_team_starts(world, capsys, monkeypatch):
+    """Design §4.8 *The person's own additions* (TD-1016): a layer named on the machine, and agent-cadence neither
+    under the team's repo nor among the home's: the start names it once for its members and goes on."""
+    from shiftlead import layers
+
+    tmp_path, state = world
+    reg = tmp_path / "reg"
+    reg.mkdir()
+    (reg / "cadence.toml").write_text('[[layers]]\npath = "~/x.md"\n')
+    monkeypatch.setenv("AGENT_CADENCE_REG_DIR", str(reg))
+    layers._listed.clear()
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    err = capsys.readouterr().err
+    assert err.count(layers.NO_SOURCE) == 1 and "grind-1, grind-2" in err
+    assert creates(state)

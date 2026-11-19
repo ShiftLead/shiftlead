@@ -95,11 +95,84 @@ def read(path: str, merged: bool = True) -> tuple[str, str]:
     return _text(data), blob_sha(data)
 
 
+def read_layer(path: str, ref: str | None, root: str | None = None) -> tuple[str, str]:
+    """`(text, sha)` of one file of the person's agent-cadence layer (design §4.8 *The person's own additions*,
+    TD-1016): one's own layer (`ref` None) from its working tree, as the person last saved it — never as merged,
+    since the layer is theirs and nobody reviews it; a followed layer's at its pinned `ref`, by `git show
+    <ref>:<path in its repo>`, from the layer's `root` where given — its checkout may stand at another commit,
+    without the file's directory. `Unreadable` when it is not there."""
+    if ref is None:
+        return read(path, merged=False)
+    p = Path(path)
+    if root is not None:
+        top: Path | None = Path(root)
+    else:
+        got = _git(p.parent, "rev-parse", "--show-toplevel") if p.parent.is_dir() else None
+        top = Path(got.decode().strip()) if got is not None else None
+    if top is None or not top.is_dir():
+        raise Unreadable(f"{path} is in no checkout to read at {ref}")
+    try:
+        rel = p.relative_to(top).as_posix()
+    except ValueError:
+        try:
+            rel = p.resolve().relative_to(top.resolve()).as_posix()
+        except ValueError:
+            raise Unreadable(f"{path} is not under {top}") from None
+    data = _git(top, "show", f"{ref}:{rel}")
+    if data is None:
+        raise Unreadable(f"{rel} is not at {ref} in {top}")
+    return _text(data), blob_sha(data)
+
+
+def layered(parts: Any) -> tuple[str, list[dict[str, str]]]:
+    """The `{person}` slot's text and its sources (§4.8 *The person's own additions*): each layer's file in
+    the listing's order, its `head` line (the source, as the session reads it) above its text, joined by a
+    blank line; `none` when no part reads. A part is `{path, ref, root, head}`, `ref` None for one's own layer;
+    a source keeps its `ref` and `root`, so rule 7's comparison reads it the same way. A part whose file is gone
+    now is left out, as it would be at a start; one that did not exist then is no source, so writing it later
+    applies at the next start, not by rule 7 (§4.8: each file *read* is among the sources)."""
+    texts: list[str] = []
+    sources: list[dict[str, str]] = []
+    for part in parts if isinstance(parts, list) else []:
+        path = part.get("path") if isinstance(part, dict) else None
+        if not isinstance(path, str):
+            raise Unreadable("a layer part names no path")
+        ref = part.get("ref") if isinstance(part.get("ref"), str) else None
+        root = part.get("root") if isinstance(part.get("root"), str) else None
+        try:
+            got, sha = read_layer(path, ref, root)
+        except Unreadable:
+            continue
+        if not got.strip():
+            continue
+        head = part.get("head")
+        texts.append(f"{head}\n\n{got.strip()}" if isinstance(head, str) and head else got.strip())
+        sources.append(
+            {
+                "path": path,
+                "sha": sha,
+                **({"ref": ref, **({"root": root} if root else {})} if ref else {"layer": "own"}),
+            }
+        )
+    return ("\n\n".join(texts) or "none"), sources
+
+
+def _read_source(src: dict[str, Any]) -> tuple[str, str]:
+    """A source as it was read: a layer's file by `read_layer`, any other as merged."""
+    path = src["path"]
+    if isinstance(src.get("ref"), str):
+        return read_layer(path, src["ref"], src["root"] if isinstance(src.get("root"), str) else None)
+    if src.get("layer") == "own":
+        return read_layer(path, None)
+    return read(path, True)
+
+
 def fill(prompt_from: dict[str, Any], merged: bool = True) -> tuple[str, list[dict[str, str]]]:
     """The prompt `prompt_from` makes now, and `[{path, sha}]` for every file read: `base`, then
     each slot in order by plain replacement of its name — a file's text stripped, `none` when
     empty — then `prefix` in front. `Unreadable` when a file cannot be read or the shape is not
-    one a client hands.
+    one a client hands. A slot `{layers: [{path, ref, head}]}` is the person's layer additions, read by
+    `layered` (§4.8 *The person's own additions*, TD-1016).
 
     A record built on a template (its slots name `{repo}`) whose template has since gained a slot
     its `slots` do not name — every record written before `{flow}` and `{stage}` existed — is told
@@ -137,8 +210,11 @@ def fill(prompt_from: dict[str, Any], merged: bool = True) -> tuple[str, list[di
             value = got.strip() or "none"
         elif isinstance(spec, dict) and isinstance(spec.get("text"), str):
             value = spec["text"]
+        elif isinstance(spec, dict) and isinstance(spec.get("layers"), list):
+            value, read_ = layered(spec["layers"])
+            sources.extend(read_)
         else:
-            raise Unreadable(f"slot {slot} is neither a file nor a text")
+            raise Unreadable(f"slot {slot} is neither a file, a text nor a layer's")
         text = text.replace(str(slot), value)
     if TEMPLATE_SLOT in slots and (unnamed := [n for n in LAYOUT_SLOTS if n in text and n not in slots]):
         raise Unreadable(f"made before the brief named {', '.join(unnamed)}: told what it was told, the stored prompt")
@@ -169,7 +245,7 @@ def changed(brief: dict[str, Any] | None) -> tuple[list[str], tuple[str, ...], b
         if not isinstance(path, str):
             continue
         try:
-            sha = read(path, True)[1]
+            sha = _read_source(src)[1]
         except Unreadable:
             whole = False
             continue

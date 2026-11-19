@@ -271,6 +271,8 @@ def _never_this_machines_home(tmp_path_factory):
     # the live server is the host agent's, whose own env never carries a session's model (§4.2)
     mp.delenv("AGENT_MODEL", raising=False)
     mp.delenv("AGENT_MODEL_FILE", raising=False)
+    # …nor this machine's agent-cadence layers: a brief a test composes carries no person's rules (TD-1016)
+    mp.setenv("AGENT_CADENCE_REG_DIR", str(tmp_path_factory.mktemp("no-cadence-machine")))
     # …and nor is its ancestry: the exit-3 sentence reads the pane's environment above `ao` (TD-089)
     from shiftlead import cli
 
