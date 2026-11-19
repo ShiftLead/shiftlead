@@ -437,7 +437,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
 
 - Org (§4.9): the teams each registered repo defines in its own `.shiftlead.yml`, aggregated with
   the org file, which holds what no one repo can: the project headings over repos, a team kept out of its repo's file, `place:`
-  and the install's `roles:` overlay; `org.yml`, `profiles.yml` and `settings.yml` are tracked by a git work tree in `~/.shiftlead/` at the home (§4.9 *The org is an aggregate*, *What is
+  and the install's `roles:` overlay; `org.yml`, `profiles.yml`, `settings.yml` and `logins.yml` (§4.2b, TD-1953's build) are tracked by a git work tree in `~/.shiftlead/` at the home (§4.9 *The org is an aggregate*, *What is
   left at the home has a history*).
   The org file: `~/.shiftlead/org.yml` on the UI host — projects, teams, and an org-wide `roles:`
   roster that sits between the package's built-ins and a repo's own, each preset checked key by key
