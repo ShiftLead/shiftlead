@@ -1,0 +1,145 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --page:#E7EBEC; --sheet:#FAFBFB; --ink:#1F272C; --soft:#5D6970; --rule:#C6CFD3; --rule2:#DDE3E5;
+  --on:#2E8A57; --used:#2D5F86; --keep:#C27A1A; --off:#9AA5AA; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--page); color:var(--ink); font:15px/1.5 "IBM Plex Sans", system-ui, sans-serif; }
+.wrap { max-width:1080px; margin:0 auto; padding:28px 24px 64px; }
+header { display:flex; align-items:flex-end; gap:18px; flex-wrap:wrap; border-bottom:2px solid var(--ink); padding-bottom:12px; }
+header h1 { font-size:34px; line-height:1; margin:0; font-weight:700; letter-spacing:-.01em; }
+header .host { font:500 14px "IBM Plex Mono", monospace; color:var(--soft); }
+header .host b { color:var(--ink); }
+header .chk { margin-left:auto; font-size:13px; color:var(--soft); }
+header .chk button { font:inherit; color:var(--ink); background:none; border:1px solid var(--ink); border-radius:3px; padding:3px 10px; margin-left:8px; cursor:pointer; }
+.lede { color:var(--soft); margin:10px 0 28px; max-width:62ch; }
+
+.tool { margin-bottom:30px; }
+.tool > h2 { margin:0; display:flex; align-items:baseline; gap:12px; font-size:20px; font-weight:600; }
+.tool > h2 span { font:400 13px "IBM Plex Mono", monospace; color:var(--soft); }
+.tool > h2 a { margin-left:auto; font-size:13px; font-weight:400; color:var(--used); }
+
+/* the tree */
+.acct { position:relative; margin:12px 0 0 9px; padding:0 0 4px 26px; border-left:2px solid var(--rule); }
+.acct:last-child { border-left-color:transparent; }
+.acct::before { content:""; position:absolute; left:-2px; top:0; width:20px; height:22px; border-left:2px solid var(--rule); border-bottom:2px solid var(--rule); border-bottom-left-radius:6px; }
+.acct-row { display:grid; grid-template-columns: 240px 1fr; gap:24px; align-items:start; background:var(--sheet); border:1px solid var(--rule2); border-radius:6px; padding:12px 16px; }
+.acct-name { font-weight:600; font-size:16px; }
+.acct-name small { display:block; font-weight:400; color:var(--soft); font-size:13px; }
+.models { margin-top:6px; font:500 12.5px "IBM Plex Mono", monospace; color:var(--ink); }
+.models s { text-decoration:none; color:var(--soft); }
+
+/* the gauge: used fills from the left, the reserve is a bay held from the right */
+.gauge { position:relative; height:26px; border:1px solid var(--rule); border-radius:3px; background:var(--sheet); overflow:hidden; }
+.gauge .used { position:absolute; left:0; top:0; bottom:0; background:var(--used); }
+.gauge .keep { position:absolute; right:0; top:0; bottom:0; background:repeating-linear-gradient(-45deg, var(--keep) 0 2px, transparent 2px 7px); border-left:2px solid var(--keep); }
+.gauge .room { position:absolute; top:0; bottom:0; display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--soft); }
+.gauge.unread { background:repeating-linear-gradient(90deg, var(--rule2) 0 6px, transparent 6px 12px); }
+.glegend { display:flex; gap:16px; flex-wrap:wrap; font-size:13px; color:var(--soft); margin-top:6px; }
+.glegend b { color:var(--ink); font-weight:600; }
+.glegend .k { display:inline-flex; align-items:center; gap:6px; }
+.glegend .k input { width:52px; font:500 13px "IBM Plex Mono", monospace; text-align:right; border:1px solid var(--rule); border-radius:3px; padding:1px 5px; background:#fff; color:var(--ink); }
+.smoke { font-size:13px; color:var(--soft); margin-top:8px; }
+
+.logins { margin:0 0 0 18px; }
+.login { position:relative; display:grid; grid-template-columns: 190px 1fr auto; gap:16px; align-items:center; padding:7px 0 7px 26px; }
+.login::before { content:""; position:absolute; left:0; top:0; height:50%; width:18px; border-left:2px solid var(--rule); border-bottom:2px solid var(--rule); border-bottom-left-radius:6px; }
+.login + .login::after { content:""; position:absolute; left:0; top:-50%; height:50%; border-left:2px solid var(--rule); }
+.login .nm { font:600 14px "IBM Plex Mono", monospace; }
+.login .nm::after { content:" ✎"; font-weight:400; color:var(--off); font-size:12px; }
+.login .dir { font:400 13px "IBM Plex Mono", monospace; color:var(--soft); }
+.login .dir em { font:italic 13px "IBM Plex Sans", sans-serif; margin-left:10px; }
+.login .state { font-size:13px; display:flex; align-items:center; gap:7px; white-space:nowrap; }
+.login .state::before { content:""; width:9px; height:9px; border-radius:50%; background:var(--on); }
+.login .state.lim::before { background:var(--keep); }
+.add { margin:2px 0 0 44px; font-size:13px; color:var(--used); }
+
+.also { margin-top:36px; padding-top:12px; border-top:1px solid var(--rule); color:var(--soft); font-size:14px; display:flex; gap:22px; flex-wrap:wrap; align-items:baseline; }
+.also b { color:var(--ink); font-weight:500; }
+.also code { font:12.5px "IBM Plex Mono", monospace; }
+.also button { font:inherit; font-size:13px; background:none; border:1px solid var(--soft); color:var(--ink); border-radius:3px; padding:1px 8px; margin-left:6px; }
+
+.order { margin-top:30px; }
+.order h3 { margin:0; font-size:16px; font-weight:600; }
+.order p { color:var(--soft); margin:2px 0 12px; font-size:14px; max-width:68ch; }
+.order ol { list-style:none; margin:0; padding:0; display:flex; gap:0; flex-wrap:wrap; counter-reset:o; }
+.order li { counter-increment:o; display:flex; align-items:center; font:600 14px "IBM Plex Mono", monospace; background:var(--sheet); border:1px solid var(--rule); padding:6px 14px 6px 10px; margin-right:-1px; }
+.order li::before { content:counter(o); font:600 12px "IBM Plex Sans"; color:#fff; background:var(--ink); border-radius:50%; width:20px; height:20px; display:inline-grid; place-items:center; margin-right:10px; }
+.order li:first-child { border-radius:4px 0 0 4px; } .order li:last-child { border-radius:0 4px 4px 0; }
+
+@media (max-width:760px) {
+  .wrap { padding:18px 16px 48px; }
+  header h1 { font-size:28px; }
+  header .chk { margin-left:0; width:100%; }
+  .acct { margin-left:4px; padding-left:16px; }
+  .acct::before { width:12px; }
+  .acct-row { grid-template-columns:1fr; gap:10px; padding:10px 12px; }
+  .logins { margin-left:8px; }
+  .login { grid-template-columns:1fr auto; gap:2px 10px; padding-left:22px; }
+  .login .dir { grid-column:1 / -1; grid-row:2; }
+  .login .dir em { display:block; margin:0; }
+  .order li { margin-bottom:6px; }
+}
+</style></head><body><div class="wrap">
+<header><h1>Tools</h1><span class="host">on <b>kmaster</b> · 1 of 2 hosts</span><span class="chk">read 2 min ago<button>Check again</button></span></header>
+<p class="lede">What can run here: each tool, the accounts it signs into, and the folders that hold those sign-ins. The hatched end of each bar is what you keep back for yourself; unattended seats stop when they reach it.</p>
+
+<section class="tool"><h2>Claude Code <span>2.1.327</span><a>Update to 2.1.330</a></h2>
+  <div class="acct">
+    <div class="acct-row">
+      <div><div class="acct-name">paul<small>Max plan</small></div><div class="models">opus · sonnet · fable · haiku</div></div>
+      <div><div class="gauge"><div class="used" style="width:6%"></div><div class="keep" style="width:15%"></div><div class="room" style="left:6%;right:15%">room for unattended work: 79%</div></div>
+        <div class="glegend"><span><b>6%</b> of the week used · resets Tue 17:00</span><span class="k">keep back <input value="15%"></span></div>
+        <div class="smoke">Smoke-tested: opus in every built-in role; sonnet as manager, hunter and auditor; fable as reviewer.</div></div>
+    </div>
+    <div class="logins">
+      <div class="login"><span class="nm">claude-paul</span><span class="dir">~/.claude</span><span class="state">signed in</span></div>
+      <div class="login"><span class="nm">claude-conformance</span><span class="dir">~/.claude-conformance<em>conformance walks record here</em></span><span class="state">signed in</span></div>
+    </div>
+    <div class="add">+ Add a login to this account</div>
+  </div>
+</section>
+
+<section class="tool"><h2>Grok <span>1.0.77</span></h2>
+  <div class="acct">
+    <div class="acct-row">
+      <div><div class="acct-name">paul-supergrok<small>SuperGrok</small></div><div class="models">grok-4.7</div></div>
+      <div><div class="gauge unread"></div>
+        <div class="glegend"><span>No usage reading yet, so nothing to keep back against.</span></div></div>
+    </div>
+    <div class="logins">
+      <div class="login"><span class="nm">grok-paul</span><span class="dir">~/.config/grok-reader</span><span class="state">signed in</span></div>
+      <div class="login"><span class="nm">grok-conformance</span><span class="dir">~/.config/grok-conformance<em>conformance walks copy it</em></span><span class="state">signed in</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="tool"><h2>Gemini <span>0.66.0</span></h2>
+  <div class="acct">
+    <div class="acct-row">
+      <div><div class="acct-name">paul-google<small>AI Studio key · free tier</small></div><div class="models">flash-lite <s>(pinned)</s></div></div>
+      <div><div class="gauge unread"></div><div class="glegend"><span>No usage reading yet.</span></div></div>
+    </div>
+    <div class="logins"><div class="login"><span class="nm">gemini-paul</span><span class="dir">~/.gemini-reader</span><span class="state">signed in</span></div></div>
+  </div>
+  <div class="acct">
+    <div class="acct-row">
+      <div><div class="acct-name">paul-gemini<small>Google sign-in</small></div><div class="models">flash-lite <s>(pinned)</s></div></div>
+      <div><div class="gauge unread"></div><div class="glegend"><span>No usage reading yet.</span></div></div>
+    </div>
+    <div class="logins"><div class="login"><span class="nm">gemini-conformance</span><span class="dir">~/.gemini-conformance<em>conformance walks record here</em></span><span class="state lim">limited till 08:00</span></div></div>
+  </div>
+</section>
+
+<div class="also">
+  <span><b>Codex</b> <code>0.163.0</code> is installed, but no seat can run on it until ShiftLead has its adapter.</span>
+  <span><b>opencode</b> is not installed<button>Install</button></span>
+  <span>+ Add tool</span>
+</div>
+
+<section class="order"><h3>When no team says otherwise</h3>
+  <p>Sessions you start yourself take the first login on this list that is signed in, has room, and offers the model asked for.</p>
+  <ol><li>claude-paul</li><li>grok-paul</li><li>gemini-paul</li></ol>
+</section>
+</div></body></html>

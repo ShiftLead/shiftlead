@@ -1,0 +1,173 @@
+<style>
+.tl { max-width: 1120px; margin: 0 auto; padding: 18px 20px 60px; }
+.tl-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.tl-head h1 { font-size: 22px; margin: 0; font-weight: 600; }
+.tl-head .tl-host { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.tl-head .tl-host span { padding: 3px 10px; font-size: var(--t-btn); background: var(--card); border-right: 1px solid var(--border); color: var(--muted); }
+.tl-head .tl-host span:last-child { border-right: 0; }
+.tl-head .tl-host span.on { background: var(--primary); color: var(--primary-fg); }
+.tl-head .tl-right { margin-left: auto; display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: var(--t-small); }
+.tl-sub { color: var(--muted); margin: 4px 0 20px; }
+
+.tl-tool { background: var(--card); border: 1px solid var(--line); border-radius: 6px; margin-bottom: 14px; }
+.tl-th { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line2); flex-wrap: wrap; }
+.tl-th b { font-size: 16px; }
+.tl-th .tl-ver { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); color: var(--strong); }
+.tl-th .tl-tag { font-size: var(--t-cap); font-weight: 600; padding: 1px 7px; border-radius: 3px; background: var(--done-bg); color: var(--done-fg); }
+.tl-th .tl-tag.no { background: var(--ended-bg); color: var(--ended-fg); }
+.tl-th .tl-act { margin-left: auto; display: flex; gap: 6px; align-items: center; font-size: var(--t-small); color: var(--muted); }
+
+.tl-acct { padding: 10px 14px 6px; border-bottom: 1px solid var(--line2); }
+.tl-acct:last-of-type { border-bottom: 0; }
+.tl-ah { display: grid; grid-template-columns: minmax(200px, 1fr) 0.9fr 1.7fr; gap: 14px; align-items: center; }
+.tl-an { font-weight: 600; }
+.tl-an small { font-weight: 400; color: var(--muted); margin-left: 6px; }
+.tl-models { display: flex; gap: 4px; flex-wrap: wrap; }
+.tl-models span { font-size: var(--t-small); border: 1px solid var(--line); border-radius: 10px; padding: 0 8px; background: var(--bg); }
+.tl-models span.pin { border-style: dashed; }
+.tl-use { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; font-size: var(--t-small); color: var(--muted); }
+.tl-bar { position: relative; height: 8px; background: var(--line2); border-radius: 4px; overflow: hidden; }
+.tl-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--idle); }
+.tl-bar u { position: absolute; top: 0; bottom: 0; right: 0; background: repeating-linear-gradient(135deg, var(--needs) 0 3px, transparent 3px 6px); opacity: .7; }
+.tl-res { display: flex; align-items: center; gap: 6px; color: var(--strong); }
+.tl-res .input { width: 54px; padding: 1px 6px; font-size: 13px; text-align: right; }
+.tl-smoke { font-size: var(--t-small); color: var(--muted); margin: 6px 0 2px; }
+.tl-smoke b { color: var(--working-fg); font-weight: 600; }
+
+.tl-logins { margin: 6px 0 4px 14px; border-left: 2px solid var(--line); }
+.tl-login { display: grid; grid-template-columns: 170px minmax(200px, 1fr) 1.2fr auto; gap: 12px; align-items: center; padding: 5px 10px; }
+.tl-login:hover { background: var(--hover); }
+.tl-login .tl-ln { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); font-weight: 600; border-bottom: 1px dashed var(--border); justify-self: start; }
+.tl-login .tl-dir { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); color: var(--muted); }
+.tl-login .tl-st { font-size: var(--t-small); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tl-login .tl-st .st { font-size: 11px; }
+.tl-login .tl-st em { color: var(--muted); font-style: normal; }
+.tl-login .tl-more { color: var(--muted); padding: 0 6px; }
+.tl-addl { margin: 2px 0 8px 14px; font-size: var(--t-small); color: var(--link); }
+
+.tl-others { margin-top: 18px; }
+.tl-others h2 { font-size: var(--t-title); margin: 0 0 6px; font-weight: 600; }
+.tl-oth { display: grid; grid-template-columns: 170px 110px 1fr auto; gap: 12px; align-items: center; padding: 7px 14px; border: 1px solid var(--line2); border-radius: 6px; margin-bottom: 6px; color: var(--muted); background: color-mix(in srgb, var(--card) 50%, var(--bg)); }
+.tl-oth b { color: var(--strong); font-weight: 600; }
+.tl-oth code { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); }
+.tl-addtool { font-size: var(--t-small); color: var(--link); margin-left: 14px; }
+
+.tl-def { margin-top: 26px; }
+.tl-def h2 { font-size: var(--t-title); margin: 0 0 2px; font-weight: 600; }
+.tl-def p { color: var(--muted); margin: 0 0 10px; font-size: 14px; }
+.tl-order { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.tl-order span { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 3px 10px; }
+.tl-order span::before { content: "⋮⋮ "; color: var(--muted); }
+.tl-order i { color: var(--muted); font-style: normal; }
+
+.tl-pop { position: absolute; right: 30px; top: 26px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,.12); padding: 4px 0; min-width: 210px; z-index: 2; font-size: var(--t-btn); }
+.tl-pop div { padding: 5px 12px; }
+.tl-pop div small { display: block; color: var(--muted); font-size: var(--t-cap); }
+
+@media (max-width: 760px) {
+  .tl { padding: 14px 12px 40px; }
+  .tl-ah { grid-template-columns: 1fr; gap: 6px; }
+  .tl-login { grid-template-columns: 1fr auto; gap: 2px 8px; }
+  .tl-login .tl-dir, .tl-login .tl-st { grid-column: 1; }
+  .tl-login .tl-more { grid-column: 2; grid-row: 1; }
+  .tl-oth { grid-template-columns: 1fr auto; }
+  .tl-oth span:nth-child(3) { grid-column: 1 / -1; }
+  .tl-pop { display: none; }
+}
+</style>
+
+<div class="tl">
+  <div class="tl-head">
+    <h1>Tools</h1>
+    <span class="tl-host"><span class="on">kmaster</span><span>contractmatch node</span></span>
+    <span class="tl-right">checked 2m ago <a class="btn">Check again</a></span>
+  </div>
+  <div class="tl-sub">The coding tools on this host, the accounts they sign into, and what you keep back of each account for yourself.</div>
+
+  <div class="tl-tool">
+    <div class="tl-th"><b>Claude Code</b><span class="tl-ver">2.1.327</span><span class="tl-tag">supported</span>
+      <span class="tl-act">2.1.330 is out · <a class="btn">Update</a></span></div>
+    <div class="tl-acct">
+      <div class="tl-ah">
+        <div class="tl-an">paul <small>Max plan</small></div>
+        <div class="tl-models"><span>opus</span><span>sonnet</span><span>fable</span><span>haiku</span></div>
+        <div class="tl-use"><div class="tl-bar"><i style="width:6%"></i><u style="width:15%"></u></div><span>week 6% · resets Tue 17:00</span>
+          <span class="tl-res">Reserve <span class="input">15%</span></span><span>unattended seats stop at 85%</span></div>
+      </div>
+      <div class="tl-smoke">Smoke passes: <b>opus</b> as every built-in role · <b>sonnet</b> as manager, hunter, auditor · <b>fable</b> as reviewer</div>
+      <div class="tl-logins" style="position:relative">
+        <div class="tl-login"><span class="tl-ln">claude-paul</span><span class="tl-dir">~/.claude</span>
+          <span class="tl-st"><span class="st working">SIGNED IN</span><em>9 sessions run here</em></span><span class="tl-more">⋯</span></div>
+        <div class="tl-login"><span class="tl-ln">claude-conformance</span><span class="tl-dir">~/.claude-conformance</span>
+          <span class="tl-st"><span class="st working">SIGNED IN</span><em>conformance walks record here</em></span><span class="tl-more">⋯</span></div>
+      </div>
+      <div class="tl-addl">+ Add login</div>
+    </div>
+  </div>
+
+  <div class="tl-tool">
+    <div class="tl-th"><b>Grok</b><span class="tl-ver">1.0.77</span><span class="tl-tag">supported</span><span class="tl-act">current</span></div>
+    <div class="tl-acct">
+      <div class="tl-ah">
+        <div class="tl-an">paul-supergrok <small>SuperGrok</small></div>
+        <div class="tl-models"><span>grok-4.7</span></div>
+        <div class="tl-use"><div class="tl-bar"></div><span>no usage read yet</span>
+          <span class="tl-res">Reserve <span class="input">—</span></span><span>set once a reading arrives</span></div>
+      </div>
+      <div class="tl-logins">
+        <div class="tl-login"><span class="tl-ln">grok-paul</span><span class="tl-dir">~/.config/grok-reader</span>
+          <span class="tl-st"><span class="st working">SIGNED IN</span></span><span class="tl-more">⋯</span></div>
+        <div class="tl-login"><span class="tl-ln">grok-conformance</span><span class="tl-dir">~/.config/grok-conformance</span>
+          <span class="tl-st"><span class="st working">SIGNED IN</span><em>conformance walks copy it</em></span><span class="tl-more">⋯</span></div>
+      </div>
+      <div class="tl-addl">+ Add login</div>
+    </div>
+  </div>
+
+  <div class="tl-tool">
+    <div class="tl-th"><b>Gemini</b><span class="tl-ver">0.66.0</span><span class="tl-tag">supported</span><span class="tl-act">current</span></div>
+    <div class="tl-acct">
+      <div class="tl-ah">
+        <div class="tl-an">paul-google <small>AI Studio key · free tier</small></div>
+        <div class="tl-models"><span class="pin">flash-lite</span></div>
+        <div class="tl-use"><div class="tl-bar"></div><span>no usage read yet</span>
+          <span class="tl-res">Reserve <span class="input">—</span></span><span></span></div>
+      </div>
+      <div class="tl-logins">
+        <div class="tl-login"><span class="tl-ln">gemini-paul</span><span class="tl-dir">~/.gemini-reader</span>
+          <span class="tl-st"><span class="st working">SIGNED IN</span></span><span class="tl-more">⋯</span></div>
+      </div>
+    </div>
+    <div class="tl-acct">
+      <div class="tl-ah">
+        <div class="tl-an">paul-gemini <small>Google sign-in</small></div>
+        <div class="tl-models"><span class="pin">flash-lite</span></div>
+        <div class="tl-use"><div class="tl-bar"></div><span>no usage read yet</span>
+          <span class="tl-res">Reserve <span class="input">—</span></span><span></span></div>
+      </div>
+      <div class="tl-logins" style="position:relative">
+        <div class="tl-login"><span class="tl-ln">gemini-conformance</span><span class="tl-dir">~/.gemini-conformance</span>
+          <span class="tl-st"><span class="st limited">LIMITED</span><em>till 08:00 · conformance walks record here</em></span><span class="tl-more">⋯</span></div><div class="tl-pop">
+          <div>Rename<small>the name is a label; teams keep their place</small></div>
+          <div>Open a shell here<small>CLAUDE_CONFIG_DIR set, for /login</small></div>
+          <div>Run the smoke…</div>
+          <div>Edit note</div>
+          <div>Forget this login<small>the folder stays on disk</small></div>
+        </div>
+      </div>
+      <div class="tl-addl">+ Add login</div>
+    </div>
+  </div>
+
+  <div class="tl-others">
+    <div class="tl-oth"><b>Codex</b><code>0.163.0</code><span>installed · ShiftLead has no adapter for it yet, so no seat can run on it</span><span></span></div>
+    <div class="tl-oth"><b>opencode</b><span>not installed</span><span>supported once installed · <code>npm i -g opencode-ai</code></span><a class="btn">Install</a></div>
+    <span class="tl-addtool">+ Add tool</span>
+  </div>
+
+  <div class="tl-def">
+    <h2>Default logins</h2>
+    <p>For sessions no team runs (+ New, a Shell's agent). Each launch takes the first one that is usable and offers the model.</p>
+    <div class="tl-order"><span>claude-paul</span><i>then</i><span>grok-paul</span><i>then</i><span>gemini-paul</span><a class="tl-addtool">+ add</a></div>
+  </div>
+</div>
