@@ -1007,7 +1007,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      closer and destroys the pane, `pane: false` — is *stopped* and left unread while its team
      runs on — *A team that stopped*, below, reads only a team with nobody live; one closed `why:
      wind_down`, or any ended record carrying a member's mark, is the presser's ending and left unread too, and
-     none is read while any live record of the crew reads `winding`, TD-1895), while a seat or a member of its team is live (nobody live and not wound down is
+     none is read while any live record of the crew reads `winding`, TD-1895, after which a live seat or member is a team that runs on), while a seat or a member of its team is live (nobody live and not wound down is
      *stopped*), whose lane holds a matching id its `lane_seen` lacks while its team is not wound
      down, is this rule's news as a wound-down team's member is: after `WORK_SETTLE` the home writes
      the same `work_waiting` mark, `members` naming it, and the team's `on_work` follows. **What a
@@ -1103,8 +1103,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        remains). A member the person closed a day earlier, while other members ran
        on and ended later, does not decide how the team stopped; where the team ran on only on its seats
        after that Close, rule 3's closes are left out and that Close is its ending — the person's (TD-1564). The
-       manager's rule 9 close after a wind-down is read by the `wound_down_by` that close carries (rule 9 *A
-       wind-down's close*, §4.9a *The manager is not marked*), so a manager with no `wrapup_by`, restarted or its
+       manager's rule 9 close after a wind-down is read by the `wound_down_by` that close carries, and a manager
+       rule 9 finds closed after its line by its `closed_for`'s (rule 9 *A wind-down's close*, §4.9a *The manager
+       is not marked*), so a manager with no `wrapup_by`, restarted or its
        wrap-up refused, still reads the person's where the person wound the run down. Otherwise it is `person` where one of the window's records was
        ended by the person:
        - its `ended.by`, or for a record with no `ended` its `closer.by`, names the person (Stop
