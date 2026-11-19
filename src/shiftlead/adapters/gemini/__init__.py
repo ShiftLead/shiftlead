@@ -28,7 +28,16 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from sessionorc import identity, paths
-from sessionorc.adapters import Conversation, LaunchSpec, Link, MailDelivery, Transcript, oldest_first, read_version
+from sessionorc.adapters import (
+    Conversation,
+    LaunchSpec,
+    Link,
+    MailDelivery,
+    Transcript,
+    oldest_first,
+    read_version,
+    same_home,
+)
 from sessionorc.identity import ProcReader
 from sessionorc.models import Confidence, Pending, State
 from sessionorc.screen import Manifest, Match, painted_text
@@ -106,6 +115,12 @@ INSTALL_LINE = (
     "~/.shiftlead/gemini-settings/layer.json /etc/shiftlead/gemini-settings.json"
 )
 REFUSED = "the Gemini layer is not installed — run the line `ao doctor` prints"
+# the vendor's documented install line for the CLI itself (design §4.2b `install_command`, TD-1971); `INSTALL_LINE`
+# above installs the machine's layer, not the CLI
+CLI_INSTALL_LINE = "npm install -g @google/gemini-cli"
+# what the tool writes under a home's `.gemini/`: its accounts, its credentials, its install id (§4.2b `is_home`);
+# never `settings.json`, which a repo's own `.gemini/` holds too
+HOME_MARKS = ("google_accounts.json", "oauth_creds.json", "gemini-credentials.json", "installation_id")
 
 
 def wanted_file() -> Path:
@@ -269,7 +284,10 @@ class GeminiAdapter:
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): the rest come
     # with TD-786's later slices
     implements: frozenset[str] = frozenset(
-        {"background", "composer", "context", "conversations", "links", "mail", "spend", "title"}
+        {
+            *("background", "composer", "context", "conversations", "links", "mail", "spend", "title"),
+            *("find", "home_env", "install_command", "signin_command", "is_home"),
+        }
     )
 
     def __init__(self, binary: str | None = None, rules: Path | None = None):
@@ -426,11 +444,13 @@ class GeminiAdapter:
         own = None if "SHIFTLEAD_SESSION" in env else env.get("GEMINI_CLI_HOME")
         return Path(own or "~").expanduser()
 
-    def credentials_ok(self, profile: Profile) -> bool | None:
+    def credentials_ok(self, profile: Profile | Path) -> bool | None:
         """Whether the home can start without the auth picker (design §4.3): its `settings.json` names
         `security.auth.selectedType` and the credential exists — the file store, its older name, or
-        `GEMINI_API_KEY` in the environment. None for no credential; signing in is the person's."""
-        gem = home(profile) / ".gemini"
+        `GEMINI_API_KEY` in the environment. The home is a profile's, or one given as a path (§4.2b, TD-1971).
+        None for no credential; signing in is the person's."""
+        where = Path(profile).expanduser() if isinstance(profile, (str, os.PathLike)) else home(profile)
+        gem = where / ".gemini"
         try:
             doc = json.loads((gem / "settings.json").read_text(encoding="utf-8"))
             selected = ((doc.get("security") or {}).get("auth") or {}).get("selectedType")
@@ -441,6 +461,37 @@ class GeminiAdapter:
         if os.environ.get("GEMINI_API_KEY"):
             return True
         return True if any((gem / f).is_file() for f in ("gemini-credentials.json", "oauth_creds.json")) else None
+
+    # -- the Tools page's reads (design §4.2b *What the adapter reads*, TD-1971) -----------------
+
+    def find(self) -> str | None:
+        """The binary a launch finds, asked without launching (§4.2b): the PATH, then npm's user prefix, as
+        `binary` finds it; None where neither has it."""
+        if self._binary not in (None, "gemini"):
+            return shutil.which(self._binary)
+        npm = NPM_BINARY.expanduser()
+        return shutil.which("gemini") or (str(npm) if npm.is_file() else None)
+
+    def home_env(self, home: Path) -> dict[str, str]:
+        """The environment a launch on `home` sets (§4.2b): `GEMINI_CLI_HOME`, the parent of its `.gemini/`;
+        nothing for the tool's default home."""
+        if same_home(home, self.default_home(os.environ)):
+            return {}
+        return {"GEMINI_CLI_HOME": str(Path(home).expanduser())}
+
+    def install_command(self) -> str:
+        """The vendor's documented install line for the CLI (§4.2b), for the person to run."""
+        return CLI_INSTALL_LINE
+
+    def signin_command(self) -> list[str]:
+        """The sign-in command alone, run with `home_env(home)` (§4.2b): the tool itself, signed in with its own
+        `/login`, then quit."""
+        return [self.binary]
+
+    def is_home(self, path: Path) -> bool:
+        """Whether `path` is a home of this tool, by what the tool writes under its `.gemini/` (§4.2b)."""
+        gem = Path(path).expanduser() / ".gemini"
+        return any((gem / mark).exists() for mark in HOME_MARKS)
 
     def doctor_profiles(self) -> list[dict]:
         """What `ao doctor` reads of each Gemini profile (design §4.7, §4.3): its home, its credential, a

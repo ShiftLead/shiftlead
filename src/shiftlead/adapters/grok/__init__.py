@@ -26,7 +26,7 @@ import uuid
 from collections.abc import Mapping
 from pathlib import Path
 
-from sessionorc.adapters import LaunchSpec, Transcript, read_version
+from sessionorc.adapters import LaunchSpec, Transcript, read_version, same_home
 from sessionorc.models import Confidence, State
 from sessionorc.screen import painted_text
 from sessionorc.tmux import PaneInfo
@@ -41,6 +41,8 @@ OWN_HOME = Path("~/.grok")  # the tool's own default home, never written (§4.2a
 BINARY = OWN_HOME / "bin" / "grok"  # the install's link, by absolute path (§4.3 `launch`)
 INSTALL_LINE = "curl -fsSL https://x.ai/cli/install.sh | bash"  # the person's, by hand (§4.3 *The install*)
 HOOK_FILE = Path("hooks") / "shiftlead.json"  # under the profile's GROK_HOME
+# what the tool writes into a home of its own: its sign-in and its sessions (design §4.2b `is_home`, TD-1971)
+HOME_MARKS = ("auth.json", "sessions")
 # every event the state feed reads (§4.3 *The state feed*; the guide's *Hook Events*)
 HOOK_EVENTS = (
     "SessionStart",
@@ -146,7 +148,9 @@ class GrokAdapter:
     asking_args = ASKING_ARGS  # added to an unattended launch under `permission_prompts: all` (§4.3, TD-823)
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): the reads of its
     # transcript come with TD-1637's later slices
-    implements: frozenset[str] = frozenset({"composer", "title"})
+    implements: frozenset[str] = frozenset(
+        {"composer", "title", "find", "home_env", "install_command", "signin_command", "is_home"}
+    )
     # its title does not tell a question tool's wait from a turn's spinner (§4.3 *The title as the check*)
     state_in_title = False
     # rows its repaints move, masked from the liveness clock (design §4.3 *An adapter names its volatile rows*):
@@ -296,12 +300,43 @@ class GrokAdapter:
         own = None if "SHIFTLEAD_SESSION" in env else env.get("GROK_HOME")
         return Path(own).expanduser() if own else self.own_home
 
-    def credentials_ok(self, profile: Profile) -> bool | None:
-        """Whether the home is signed in: `<GROK_HOME>/auth.json` exists (§4.3 *Sign-in*). None where it does
-        not, or the profile names no home; signing a home in is the person's (`GROK_HOME=<dir> grok login`)."""
-        if not profile.config_dir:
+    def credentials_ok(self, profile: Profile | Path) -> bool | None:
+        """Whether the home is signed in: `<GROK_HOME>/auth.json` exists (§4.3 *Sign-in*). The home is a profile's
+        `config_dir`, or one given as a path (design §4.2b, TD-1971). None where it does not, or the profile names
+        no home; signing a home in is the person's (`GROK_HOME=<dir> grok login`)."""
+        home = profile if isinstance(profile, (str, os.PathLike)) else profile.config_dir
+        if not home:
             return None
-        return True if (Path(profile.config_dir).expanduser() / "auth.json").is_file() else None
+        return True if (Path(home).expanduser() / "auth.json").is_file() else None
+
+    # -- the Tools page's reads (design §4.2b *What the adapter reads*, TD-1971) -----------------
+
+    def find(self) -> str | None:
+        """The binary a launch finds (§4.2b): the install's link, by absolute path, as `launch` runs it; None where
+        it is missing."""
+        return self.binary if Path(self.binary).is_file() else None
+
+    def home_env(self, home: Path) -> dict[str, str]:
+        """The environment a launch on `home` sets (§4.2b): `GROK_HOME`, with `HOME` its launch home beside it
+        (`launch_home.path_for`, made by the launch, not here); nothing for the tool's default home."""
+        if same_home(home, self.default_home(os.environ)):
+            return {}
+        h = Path(home).expanduser()
+        return {"GROK_HOME": str(h), "HOME": str(launch_home_mod.path_for(h))}
+
+    def install_command(self) -> str:
+        """The vendor's documented install line (§4.2b, §4.3 *The install*), for the person to run."""
+        return INSTALL_LINE
+
+    def signin_command(self) -> list[str]:
+        """The sign-in command alone, run with `home_env(home)` (§4.2b): `grok login`."""
+        return [self.binary, "login"]
+
+    def is_home(self, path: Path) -> bool:
+        """Whether `path` is a home of this tool, by what the tool writes there (§4.2b): its sign-in or its
+        sessions — never ShiftLead's own hook file alone."""
+        p = Path(path).expanduser()
+        return any((p / mark).exists() for mark in HOME_MARKS)
 
     def doctor_profiles(self) -> list[dict]:
         """What `ao doctor` reads of each Grok profile (design §4.7, §4.3 *Reads*): its home and whether it is

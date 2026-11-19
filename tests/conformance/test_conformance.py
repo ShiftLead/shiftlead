@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -360,3 +361,75 @@ def test_mail_says_how_a_session_is_handed_its_mail(name):
     if "mail" not in adapters.implements(ad):
         pytest.skip(f"{name} does not declare mail: its sessions are handed mail by a pane write")
     ad.mail()  # None, or a delivery: never an error
+
+
+# -- the Tools page's reads (design §4.2b *What the adapter reads*, TD-1971) -------------------------------
+
+
+def _declares(name: str, method: str):
+    ad = adapters.get(name)
+    if method not in adapters.implements(ad):
+        pytest.skip(f"{name} does not declare {method}")
+    return ad
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_find_is_the_binary_by_absolute_path_or_none(name, tmp_path):
+    """`find()` asks for the binary a launch would run without launching it: by absolute path, or None."""
+    ad = _declares(name, "find")
+    stub = tmp_path / "bin" / "tool"
+    stub.parent.mkdir()
+    stub.write_text("#!/bin/sh\nexit 99\n", encoding="utf-8")  # never run: a run would be a launch
+    stub.chmod(0o755)
+    assert type(ad)(binary=str(stub)).find() == str(stub)
+    assert type(ad)(binary=str(tmp_path / "missing")).find() is None
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_home_env_is_empty_for_the_default_home_and_names_any_other(name, tmp_path):
+    """`home_env(home)` is what a launch on `home` sets: nothing for the tool's default home, as a launch on a
+    profile with no `config_dir` sets nothing; another home named in it, every key and value a string."""
+    ad = _declares(name, "home_env")
+    assert ad.home_env(ad.default_home(os.environ)) == {}
+    login = tmp_path / "login"
+    env = ad.home_env(login)
+    assert env and all(isinstance(k, str) and isinstance(v, str) for k, v in env.items())
+    assert str(login) in env.values()
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_credentials_ok_reads_a_home_given_as_a_path(name, tmp_path, monkeypatch):
+    """`credentials_ok` takes a home as a path beside a profile (§4.2b): None before a sign-in, True after."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    ad = adapters.get(name)
+    login = tmp_path / "login"
+    login.mkdir()
+    assert ad.credentials_ok(login) is None
+    HARNESSES[name].sign_in(login)
+    assert ad.credentials_ok(login) is True
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_is_home_reads_what_the_tool_writes_there(name, tmp_path):
+    """`is_home(path)`: a folder is the tool's home by the files the tool writes there, never by settings a repo
+    holds too, nor ShiftLead's own files."""
+    ad = _declares(name, "is_home")
+    harness = HARNESSES[name]
+    folder = tmp_path / "folder"
+    folder.mkdir()
+    assert ad.is_home(folder) is False
+    harness.not_a_home(folder)
+    assert ad.is_home(folder) is False
+    harness.mark_home(folder)
+    assert ad.is_home(folder) is True
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_install_and_signin_commands_are_the_persons_to_run(name):
+    """`install_command()` is one line of text; `signin_command()` an argv whose first word is the binary."""
+    ad = _declares(name, "install_command")
+    line = ad.install_command()
+    assert isinstance(line, str) and line.strip() and "\n" not in line
+    ad = _declares(name, "signin_command")
+    argv = ad.signin_command()
+    assert argv and all(isinstance(a, str) for a in argv) and argv[0] == ad.binary

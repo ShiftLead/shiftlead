@@ -34,6 +34,7 @@ from sessionorc.adapters import (
     Transcript,
     oldest_first,
     read_version,
+    same_home,
 )
 from sessionorc.identity import ProcReader
 from sessionorc.models import Confidence, State
@@ -483,6 +484,10 @@ def _instant(at: object) -> datetime | None:
 
 
 RULES_FILE = Path(__file__).with_name("screen_rules.toml")
+# the vendor's documented install line, the native installer (design §4.2b `install_command`, TD-1971)
+INSTALL_LINE = "curl -fsSL https://claude.ai/install.sh | bash"
+# what the tool writes into a home of its own: its sign-in record, its credentials, its transcripts (§4.2b `is_home`)
+HOME_MARKS = (".claude.json", ".credentials.json", "projects")
 
 
 # A launch with no prompt (`ao new` without one, Add entry's **Open a session**) lands at the composer:
@@ -597,7 +602,10 @@ class ClaudeCodeAdapter:
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112); no `mail`: a
     # session of this tool is handed its mail by a pane write (§4.10)
     implements = frozenset(
-        {"background", "composer", "context", "conversations", "links", "prompts", "spend", "title", "usage_report"}
+        {
+            *("background", "composer", "context", "conversations", "links", "prompts", "spend", "title"),
+            *("usage_report", "find", "home_env", "install_command", "signin_command", "is_home"),
+        }
     )
     marks_errors = True  # a tool result's `is_error` (design §4.3 `read_transcript`, TD-1491)
     usage_report = staticmethod(usage_report)  # the status line's windows, read by the hook command (§4.4 *Usage*)
@@ -962,8 +970,9 @@ class ClaudeCodeAdapter:
 
     # -- account ---------------------------------------------------------------------------------
 
-    def _creds(self, profile: Profile) -> dict | None:
-        p = config_dir(profile) / ".credentials.json"
+    def _creds(self, profile: Profile | Path) -> dict | None:
+        d = Path(profile).expanduser() if isinstance(profile, (str, os.PathLike)) else config_dir(profile)
+        p = d / ".credentials.json"
         try:
             return json.loads(p.read_text(encoding="utf-8")).get("claudeAiOauth")
         except (OSError, ValueError, AttributeError):
@@ -976,7 +985,9 @@ class ClaudeCodeAdapter:
         own = None if "SHIFTLEAD_SESSION" in env else env.get("CLAUDE_CONFIG_DIR")
         return Path(own or "~/.claude").expanduser()
 
-    def credentials_ok(self, profile: Profile) -> bool | None:
+    def credentials_ok(self, profile: Profile | Path) -> bool | None:
+        """Whether a sign-in can carry on without a person: a profile's config dir, or a home given as a path
+        (design §4.2b, TD-1971) — True, False for a dead refresh token, None for no credential."""
         c = self._creds(profile)
         if not c:
             return None
@@ -986,6 +997,35 @@ class ClaudeCodeAdapter:
         if not exp:
             return True
         return datetime.fromtimestamp(int(exp) / 1000, UTC) > datetime.now(UTC)
+
+    # -- the Tools page's reads (design §4.2b *What the adapter reads*, TD-1971) -----------------
+
+    def find(self) -> str | None:
+        """The binary a launch finds, by absolute path, asked without launching (§4.2b): the PATH; None for none."""
+        return shutil.which(self.binary)
+
+    def home_env(self, home: Path) -> dict[str, str]:
+        """The environment a launch on `home` sets (§4.2b): `CLAUDE_CONFIG_DIR`, and nothing for the tool's default
+        home, as a launch on a profile with no `config_dir` sets nothing (the variable set to `~/.claude` would read
+        `~/.claude/.claude.json`, another sign-in record, where the unset launch reads `~/.claude.json`)."""
+        if same_home(home, self.default_home(os.environ)):
+            return {}
+        return {"CLAUDE_CONFIG_DIR": str(Path(home).expanduser())}
+
+    def install_command(self) -> str:
+        """The vendor's documented install line (§4.2b), for the person to run."""
+        return INSTALL_LINE
+
+    def signin_command(self) -> list[str]:
+        """The sign-in command alone, run with `home_env(home)` (§4.2b): the tool itself, signed in with its own
+        `/login`, then quit."""
+        return [self.binary]
+
+    def is_home(self, path: Path) -> bool:
+        """Whether `path` is a home of this tool, by what the tool writes there (§4.2b): its sign-in record, its
+        credentials or its transcripts' directory — never a repo's `.claude/` of settings alone."""
+        p = Path(path).expanduser()
+        return any((p / mark).exists() for mark in HOME_MARKS)
 
     def doctor_profiles(self) -> list[dict]:
         """What `ao doctor` reads of each profile this adapter runs (design §4.7 **`ao doctor`**
