@@ -63,18 +63,25 @@ def _writable_at_teardown(tmp_path):
                     os.chmod(p, 0o755)
 
 
-def tree(cache: Path, name: str, days: float) -> Path:
-    """A read-only tree as the launcher makes one, fetched `days` ago."""
+def tree(cache: Path, name: str, days: float, extra=None) -> Path:
+    """A read-only tree as the launcher makes one, fetched `days` ago; `extra(t)` adds to it before it is aged."""
     t = cache / "trees" / name
     (t / "files" / "scripts").mkdir(parents=True)
     (t / "files" / "scripts" / "s.py").write_text("x")
+    if extra is not None:
+        extra(t)
+    age(t, days)
+    return t
+
+
+def age(t: Path, days: float) -> None:
+    """Every entry under `t` written `days` ago and every directory read-only, never through a link."""
     when = time.time() - days * DAY
     for d, dirs, files in os.walk(t, topdown=False):
         for n in files + dirs:
-            os.utime(os.path.join(d, n), (when, when))
+            os.utime(os.path.join(d, n), (when, when), follow_symlinks=False)
         os.chmod(d, 0o555)
         os.utime(d, (when, when))
-    return t
 
 
 def test_the_pin_is_read_on_origin_s_default_branch(tmp_path):
@@ -147,3 +154,78 @@ def test_a_half_removed_aside_is_cleared_and_other_names_are_never_the_rule_s(tm
     link.symlink_to(tmp_path)  # a link named like a commit is never followed nor removed
     assert cachesweep.sweep_trees(set(), 14, time.time(), cache) == []
     assert not stale.exists() and link.is_symlink() and tmp_path.exists()
+
+
+def outside(tmp_path: Path, days: float) -> Path:
+    """A read-only directory outside the cache, written `days` ago, for a link to point at."""
+    t = tmp_path / "outside"
+    (t / "sub").mkdir(parents=True)
+    (t / "sub" / "f").write_text("x")
+    age(t, days)
+    return t
+
+
+def test_an_old_link_named_like_a_commit_or_an_aside_is_never_followed_nor_removed(tmp_path):
+    """Only the symlink guards keep these: the link is as old as the directory it names, past `cache_keep_days`."""
+    cache = tmp_path / "cache"
+    target = outside(tmp_path, 30)
+    (cache / "trees").mkdir(parents=True)
+    link = cache / "trees" / OLD
+    link.symlink_to(target)
+    aside = cache / "trees" / ".tmp-sweep-y-1"
+    aside.symlink_to(target)
+    for p in (link, aside):
+        os.utime(p, (time.time() - 30 * DAY,) * 2, follow_symlinks=False)
+    assert cachesweep.sweep_trees(set(), 14, time.time(), cache) == []
+    assert link.is_symlink() and aside.is_symlink() and (target / "sub" / "f").exists()
+    assert sorted(os.listdir(cache / "trees")) == sorted([OLD, aside.name])
+    assert target.stat().st_mode & 0o777 == 0o555 and (target / "sub").stat().st_mode & 0o777 == 0o555
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads every directory")
+def test_a_tree_holding_an_unreadable_directory_counts_as_written_now(tmp_path):
+    cache = tmp_path / "cache"
+    shut = tree(cache, OLD, 30, extra=lambda t: (t / "files" / "shut").mkdir())
+    os.chmod(shut / "files" / "shut", 0o000)
+    assert cachesweep._newest_write(shut) > time.time() - 60
+    assert cachesweep.sweep_trees(set(), 14, time.time(), cache) == []
+    assert shut.exists()
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads every directory")
+def test_a_tree_holding_an_entry_that_cannot_be_stat_ed_counts_as_written_now(tmp_path):
+    """A directory that can be listed but not searched: its entries are named, and each `lstat` is refused."""
+    cache = tmp_path / "cache"
+    blind = tree(cache, OLD, 30)
+    os.chmod(blind / "files" / "scripts", 0o444)
+    assert cachesweep._newest_write(blind) > time.time() - 60
+    assert cachesweep.sweep_trees(set(), 14, time.time(), cache) == []
+    assert blind.exists()
+
+
+def test_a_read_only_directory_a_tree_links_to_is_never_made_writable(tmp_path):
+    cache = tmp_path / "cache"
+    target = outside(tmp_path, 30)
+    old = tree(cache, OLD, 30, extra=lambda t: (t / "files" / "elsewhere").symlink_to(target))
+    assert cachesweep.sweep_trees(set(), 14, time.time(), cache) == [str(old)]
+    assert not old.exists() and (target / "sub" / "f").exists()
+    assert target.stat().st_mode & 0o777 == 0o555
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads every file")
+def test_a_checkout_s_unreadable_pin_file_removes_nothing(tmp_path):
+    pinned = repo(tmp_path, "p", f'[agent-cadence]\nsource = "/x"\nref = "{PINNED}"\n')
+    wt = tmp_path / "wt"
+    git(pinned, "worktree", "add", "-q", "-b", "bump", str(wt))
+    os.chmod(wt / "docs" / "cadence.toml", 0o000)
+    assert cachesweep.checkout_pins(pinned) == (False, set())
+    assert cachesweep.pins([pinned]) is None
+
+
+def test_a_pin_file_missing_from_the_object_store_is_no_reading(tmp_path):
+    """The commit's tree lists `docs/cadence.toml`, but its blob is gone: a broken store, never *no pin*."""
+    pinned = repo(tmp_path, "p", f'[agent-cadence]\nsource = "/x"\nref = "{PINNED}"\n')
+    blob = git(pinned, "rev-parse", "origin/main:docs/cadence.toml").strip()
+    (pinned / ".git" / "objects" / blob[:2] / blob[2:]).unlink()
+    assert cachesweep.pin_of(pinned) == (False, None)
+    assert cachesweep.pins([pinned]) is None
