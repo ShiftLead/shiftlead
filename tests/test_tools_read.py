@@ -60,7 +60,7 @@ def test_a_found_tool_is_a_card_and_one_not_found_is_not_ready_with_its_install(
     assert alpha["adapter"] == "alpha" and alpha["installed"] and alpha["supported"]
     assert alpha["version"] == "1.2.3 (Stub)" and alpha["binary"] == "/bin/alpha"
     assert alpha["accounts"] == [] and alpha["logins"] == []  # before the switch-over, no accounts or logins
-    assert alpha["found"] == [{"folder": str(tmp_path / "a"), "own_home": False}]
+    assert alpha["found"] == [{"folder": str(tmp_path / "a"), "own_home": False, "billing": None}]
     [beta] = r["not_ready"]
     assert beta["adapter"] == "beta" and not beta["installed"] and beta["supported"]
     assert beta["install_command"].startswith("curl ") and beta["version"] is None and beta["found"] == []
@@ -76,14 +76,18 @@ def test_a_found_row_is_drawn_only_for_a_signed_in_default_home(monkeypatch, tmp
         _Stub("fresh", found="/bin/f", home=tmp_path / "f"),  # nothing recorded
     )
     got = {t["adapter"]: t["found"] for t in tools.read(b"s" * 32, env={}, home=tmp_path)["tools"]}
-    assert got == {"keyed": [{"folder": str(tmp_path / "k"), "own_home": False}], "expired": [], "fresh": []}
+    assert got == {
+        "keyed": [{"folder": str(tmp_path / "k"), "own_home": False, "billing": None}],
+        "expired": [],
+        "fresh": [],
+    }
 
 
 def test_an_own_home_tools_found_row_says_so(monkeypatch, tmp_path):
     own = tmp_path / ".grok"
     _registry(monkeypatch, _Stub("own", found="/bin/o", home=own, creds=True, own_home=own))
     [card] = tools.read(b"s" * 32, env={}, home=tmp_path)["tools"]
-    assert card["found"] == [{"folder": str(own), "own_home": True}]
+    assert card["found"] == [{"folder": str(own), "own_home": True, "billing": None}]
 
 
 def test_one_tools_failing_read_leaves_the_others_and_says_nothing_of_it(monkeypatch, tmp_path):

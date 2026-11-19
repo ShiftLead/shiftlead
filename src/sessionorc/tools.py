@@ -63,12 +63,15 @@ def _ask(ad: object, method: str, fallback: Any, *args: Any) -> Any:
         return fallback
 
 
-def _signed_in(ad: object, home: Path, salt: bytes) -> bool:
+def _signed_in(ad: object, home: Path, salt: bytes) -> tuple[bool, str | None]:
     """Whether `home` is signed in (design §4.2b *A login's state*): an identity the tool records, or credentials that
-    stand (an API key with no identity)."""
-    if _ask(ad, "identity", None, home, salt) is not None:
-        return True
-    return _ask(ad, "credentials_ok", None, home) is True
+    stand (an API key with no identity); and the identity's reading of its billing, which Add offers (§4.2b *A
+    login's Settings*), None where there is none or it is not one of `logins.BILLINGS`."""
+    ident = _ask(ad, "identity", None, home, salt)
+    if ident is not None:
+        billing = ident.get("billing") if isinstance(ident, dict) else None
+        return True, billing if billing in logins.BILLINGS else None
+    return _ask(ad, "credentials_ok", None, home) is True, None
 
 
 def _version(ad: object, env: Mapping[str, str]) -> str | None:
@@ -104,10 +107,19 @@ def _card(name: str, ad: object, env: Mapping[str, str], salt: bytes, folders: l
     except Exception:  # noqa: BLE001
         home = None
     own = getattr(ad, "own_home", None)
-    if home is not None and not any(adapters.same_home(home, f) for f in folders) and _signed_in(ad, home, salt):
+    signed, billing = (
+        _signed_in(ad, home, salt)
+        if home is not None and not any(adapters.same_home(home, f) for f in folders)
+        else (False, None)
+    )
+    if home is not None and signed:
         # the tool's default home, signed in and not yet a login; an `own_home` adapter's may never be one (§4.2a)
         card["found"].append(
-            {"folder": str(home), "own_home": own is not None and adapters.same_home(home, Path(own).expanduser())}
+            {
+                "folder": str(home),
+                "own_home": own is not None and adapters.same_home(home, Path(own).expanduser()),
+                "billing": billing,
+            }
         )
     return card
 

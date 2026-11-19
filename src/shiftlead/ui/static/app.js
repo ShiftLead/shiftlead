@@ -5952,13 +5952,19 @@
       f.addEventListener("submit", (ev) => {
         ev.preventDefault();
         const v = (n) => $(`[name="${n}"]`, f).value.trim();
-        sent("/api/tools/add", { tool: f.dataset.tool, name: v("name"), path: v("path"), account: v("account") }, $('[type="submit"]', f));
+        sent("/api/tools/add", { tool: f.dataset.tool, name: v("name"), path: v("path"), account: v("account"), billing: v("billing") }, $('[type="submit"]', f));
       });
     });
+    // Add on a found row opens its card's form with the folder filled and identity's billing chosen, which the
+    // person can change before Add: offered, never applied (§4.2b *A login's Settings*)
     $$(".tooladdfound", page).forEach((b) => b.addEventListener("click", () => {
-      const name = prompt(`Add ${b.dataset.path} as a login: its name (empty: suggested from who is signed in)`, "");
-      if (name === null) return;
-      sent("/api/tools/add", { tool: b.dataset.tool, path: b.dataset.path, name }, b);
+      const f = $("form.tooladdform", b.closest("section") || page);
+      if (!f) return;
+      f.reset();
+      $('[name="path"]', f).value = b.dataset.path;
+      $('[name="billing"]', f).value = b.dataset.billing || "";
+      f.hidden = false;
+      $('[name="name"]', f).focus();
     }));
   };
   // The Queue page (design §4.5 screen 12, §4.5a *Queue page*; TD-771): the cards (`AO.qcards`), the

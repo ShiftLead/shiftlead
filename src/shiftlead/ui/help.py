@@ -1003,8 +1003,9 @@ HELP: tuple[Help, ...] = (
         "Add",
         "Tools page: a found row",
         (
-            "Adds the tool's default home, found signed in here, as a login: you give its name, or leave it empty to "
-            "have one suggested from who is signed in. It is never added unasked, since it may be a scratch copy."
+            "Adds the tool's default home, found signed in here, as a login: it opens + Add login with the folder "
+            "filled and the billing the tool's record reads chosen, which you may change; leave the name empty to have "
+            "one suggested from who is signed in. It is never added unasked, since it may be a scratch copy."
         ),
     ),
 )
