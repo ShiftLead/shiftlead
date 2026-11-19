@@ -370,6 +370,9 @@ class GeminiHarness:
     its first record naming the session, and hands each hook payload to `shiftlead-hook --adapter gemini`,
     whose `translate` makes the host agent's `hook` params."""
 
+    # an environment whose one key signs in every login on the host (`env_signin`, §4.2b)
+    signin_env = {"GEMINI_API_KEY": "fixture-key"}
+
     tool_fields = frozenset(
         {
             "type",
