@@ -1336,7 +1336,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      its `since` the earliest `wind_down.at` among this run's marks; `_finished_owed` is never written for a
      team with a member's mark of this run, and an entry written before the press is dropped once the pass
      finds one; where the last marked member is closed by another hand (a `--close`, a person's Close) none is
-     written. While a marked member stays open the reading carries its clause and a live
+     written. With no live manager, the reading-held path writes nothing for a team with a member's mark of this
+     run, so a declared member the press did not reach, closed by this rule after, brings no second note. While a marked member stays open the reading carries its clause and a live
      manager is neither told nor closed. A manager the reading then finds alone is told and closed as
      above — `FINISHED_SETTLE` from the last member's close, then `WRAPUP_GRACE` — the line in a
      wound-down team's words — *your team was wound down by <presser>; its members are closed*, `<presser>`
