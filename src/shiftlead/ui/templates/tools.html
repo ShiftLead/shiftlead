@@ -30,7 +30,8 @@
         {%- for w in lg.warned %}<div class="note toolwarn">{{ w }}</div>{% endfor %}
         <form class="toolsettings" data-billing="{{ lg.form.billing }}" hidden>
           <label>billing <select name="billing" data-was="{{ lg.form.billing }}"><option value="">not set</option>{% for b in ("subscription", "metered") %}<option{% if lg.form.billing == b %} selected{% endif %}>{{ b }}</option>{% endfor %}</select></label>
-          <label>prices <input class="mono" name="prices" value="{{ lg.form.prices }}" data-was="{{ lg.form.prices }}" placeholder='{"input": 3, "output": 15}' title="a metered login's price per million tokens of each kind (input, output, cache_read, cache_write); empty: a self-hosted model read in tokens"></label>
+          <label>prices <input class="mono" name="prices" value="{{ lg.form.prices }}" data-was="{{ lg.form.prices }}" placeholder='{"input": 3, "output": 15}' title="a metered login's price per million tokens of each kind (input, output, cache_read, cache_write); empty: a self-hosted model read in tokens{% if lg.fills %}; the Settings page's weights are offered as a fill-in{% endif %}"{% if lg.fills %} list="{{ lg.fill_id }}"{% endif %}></label>
+          {%- if lg.fills %}<datalist id="{{ lg.fill_id }}">{% for f in lg.fills %}<option value="{{ f.prices }}" label="{{ f.model }}"></option>{% endfor %}</datalist>{% endif %}
           <label>extra_args <input class="mono" name="extra_args" value="{{ lg.form.extra_args }}" data-was="{{ lg.form.extra_args }}" placeholder='["--flag"]'></label>
           <label>unattended_args <input class="mono" name="unattended_args" value="{{ lg.form.unattended_args }}" data-was="{{ lg.form.unattended_args }}" placeholder='["--flag"]'></label>
           <label>permission_wait <input class="mono" name="permission_wait" value="{{ lg.form.permission_wait }}" data-was="{{ lg.form.permission_wait }}" placeholder="seconds" inputmode="numeric"></label>
