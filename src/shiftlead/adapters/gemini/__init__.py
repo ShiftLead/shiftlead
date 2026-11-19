@@ -636,6 +636,15 @@ class GeminiAdapter:
 
     # -- reads (design §4.3 *Reads*, TD-786) -----------------------------------------------------
 
+    def transcript_roots(self) -> list[Path]:
+        """Every directory Gemini CLI keeps transcripts under (design §4.3, §9 invariant 16, TD-1945): the whole
+        `<home>/.gemini/tmp` of `~`, of `GEMINI_CLI_HOME` where this process has it, and of each of its profiles'
+        homes, read from the profile file itself, so the disk sweep never removes inside one."""
+        homes = {Path("~").expanduser(), home(Profile(name="default", adapter=NAME))}
+        profs, _ = profiles_mod.load()
+        homes |= {home(p) for p in profs.values() if p.adapter == self.name}
+        return sorted(transcript_mod.chats_root(h) for h in homes)
+
     def transcript_path(self, session_id: str, cwd: Path, profile: Profile | str | None = None) -> Path | None:
         """The session's chat under the profile's home: the file of a project's `chats/` named for the id
         whose first record names it (`transcript.find`); None when there is none."""

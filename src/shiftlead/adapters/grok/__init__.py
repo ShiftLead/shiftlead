@@ -272,6 +272,14 @@ class GrokAdapter:
 
     # -- reads (design §4.3 *Reads*) ---------------------------------------------------------------
 
+    def transcript_roots(self) -> list[Path]:
+        """Every directory Grok Build keeps transcripts under (design §4.3, §9 invariant 16, TD-1945): each of its
+        profiles' `<config_dir>/sessions`, read from the profile file itself; none for a profile with no
+        `config_dir`, which launches nothing (never the person's own `~/.grok`)."""
+        profs, _ = profiles_mod.load()
+        homes = {Path(p.config_dir).expanduser() for p in profs.values() if p.adapter == self.name and p.config_dir}
+        return sorted(transcript_mod.sessions_root(h) for h in homes)
+
     def transcript_path(self, session_id: str, cwd: Path, profile: Profile | str | None = None) -> Path | None:
         """The session's log under the profile's home, found by the session id's own directory
         (`sessions/*/<id>/updates.jsonl`), never by encoding `cwd`; None where there is none or the profile names no

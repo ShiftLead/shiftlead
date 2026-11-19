@@ -343,3 +343,68 @@ async def test_a_node_keeps_a_scratch_the_home_hands_its_create_and_makes_a_fore
 
     with pytest.raises(link.LinkError, match="a session cannot give it"):
         await agent._act({"rpc": "create", "params": {**params, "name": "u"}, "caller": "ao-lead@kmaster"})
+
+
+@pytest.mark.unit
+def test_each_adapter_names_its_transcript_roots_from_the_profile_file(tmp_path, monkeypatch):
+    """TD-1945, design §4.3 `transcript_roots`, §9 invariant 16: Claude Code `projects` under `~/.claude`, its
+    `CLAUDE_CONFIG_DIR` and each profile's `config_dir`; Gemini CLI the whole `<home>/.gemini/tmp`; Grok Build each
+    profile's `<config_dir>/sessions` (a Grok profile with none is refused at load); the core gathers them all."""
+    from sessionorc import adapters
+
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "cc"))
+    monkeypatch.delenv("GEMINI_CLI_HOME", raising=False)
+    (home / "profiles.yml").write_text(
+        "profiles:\n"
+        "  default: {adapter: claude-code}\n"
+        f"  other: {{adapter: claude-code, config_dir: {tmp_path / 'cc2'}}}\n"
+        f"  gem: {{adapter: gemini, config_dir: {tmp_path / 'g'}}}\n"
+        f"  grok: {{adapter: grok, config_dir: {tmp_path / 'x'}}}\n"
+    )
+    mine = Path.home()
+    assert claude_code.ClaudeCodeAdapter().transcript_roots() == sorted(
+        [mine / ".claude" / "projects", tmp_path / "cc" / "projects", tmp_path / "cc2" / "projects"]
+    )
+    assert gemini.GeminiAdapter().transcript_roots() == sorted(
+        [mine / ".gemini" / "tmp", tmp_path / "g" / ".gemini" / "tmp"]
+    )
+    assert grok.GrokAdapter().transcript_roots() == [tmp_path / "x" / "sessions"]
+    roots, blind = adapters.transcript_roots()
+    assert not blind and {tmp_path / "cc2" / "projects", tmp_path / "x" / "sessions"} <= set(roots)
+
+
+@pytest.mark.unit
+def test_a_scratch_root_inside_or_holding_a_transcript_root_is_refused(tmp_path):
+    """§4.6, §9 invariant 16 (TD-1945): inside, holding, the same, or reached through a symlink."""
+    t = tmp_path / "cfg" / "projects"
+    t.mkdir(parents=True)
+    for bad in (tmp_path, tmp_path / "cfg", t, t / "deeper"):
+        with pytest.raises(scratch.ScratchError, match="transcripts"):
+            scratch.check_transcripts(bad, [t])
+    (tmp_path / "link").symlink_to(t)
+    with pytest.raises(scratch.ScratchError, match="transcripts"):
+        scratch.check_transcripts(tmp_path / "link" / "s", [t])
+    scratch.check_transcripts(tmp_path / "elsewhere", [t])
+    scratch.check_transcripts(tmp_path / "cfg" / "projectsX", [t])  # a sibling by name is not inside
+
+
+@pytest.mark.integration
+async def test_the_host_agent_refuses_to_start_on_a_root_holding_or_inside_a_transcript_store(
+    tmp_path, short, monkeypatch
+):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    (tmp_path / "home").mkdir()
+    root = short / "r"
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(root / "claude"))  # its `projects` under the root: held by it
+    (tmp_path / "home" / "hosts.yml").write_text(f"local:\n  scratch_root: {root}\n")
+    a = HostAgent(tmux=Tmux(socket_name="ao-test-never-started"))
+    with pytest.raises(scratch.ScratchError, match="transcripts"):
+        await a.serve(tmp_path / "s.sock")
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(short / "c"))
+    (tmp_path / "home" / "hosts.yml").write_text(f"local:\n  scratch_root: {short / 'c' / 'projects' / 's'}\n")
+    with pytest.raises(scratch.ScratchError, match="transcripts"):
+        await a.serve(tmp_path / "s.sock")
+    assert not (tmp_path / "s.sock").exists() and not (root / f"shiftlead-{os.getuid()}").exists()

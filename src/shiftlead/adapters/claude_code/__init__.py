@@ -747,6 +747,15 @@ class ClaudeCodeAdapter:
         p = base / f"{session_id}.jsonl"
         return p if p.is_file() else None
 
+    def transcript_roots(self) -> list[Path]:
+        """Every directory Claude Code keeps transcripts under (design §4.3, §9 invariant 16, TD-1945): `projects`
+        under `~/.claude`, under `CLAUDE_CONFIG_DIR` where this process has it, and under each of its profiles'
+        `config_dir`s, read from the profile file itself, so the disk sweep never removes inside one."""
+        dirs = {Path("~/.claude").expanduser(), config_dir(Profile(name="default"))}
+        profs, _ = profiles_mod.load()
+        dirs |= {Path(p.config_dir).expanduser() for p in profs.values() if p.adapter == self.name and p.config_dir}
+        return sorted(d / "projects" for d in dirs)
+
     def _last_turns(self, session_id: str, cwd: Path, profile: str) -> Iterator[dict]:
         """The transcript's top-level `assistant` entries, newest first, from its last
         TRANSCRIPT_TAIL bytes: the one read `model_in_use` and `context` share. Never a sidechain
