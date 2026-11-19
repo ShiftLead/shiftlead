@@ -8,5 +8,5 @@ with sync_playwright() as p:
         for w in (1440,420):
             pg=b.new_page(viewport={'width':w,'height':900})
             pg.set_content(html, wait_until='networkidle'); pg.wait_for_timeout(800)
-            pg.screenshot(path=f'{name}2-{w}.png', full_page=True); pg.close()
+            pg.screenshot(path=f'{name}3-{w}.png', full_page=True); pg.close()
     b.close()
