@@ -1101,7 +1101,12 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        records whose end falls within `FINISHED_SETTLE` of the newest end that remains (`other` where none
        remains). A member the person closed a day earlier, while other members ran
        on and ended later, does not decide how the team stopped; where the team ran on only on its seats
-       after that Close, rule 3's closes are left out and that Close is its ending — the person's (TD-1564). It is `person` where one of those records was
+       after that Close, rule 3's closes are left out and that Close is its ending — the person's (TD-1564). It is
+       also `person`, whatever the end's distance from the newest, where any current record carries a member's
+       mark (a `wind_down` without `lead`) of the team's current run whose `by` is the person (§4.9a *What it
+       leaves*: the manager's rule 9 close comes after the window, and a manager left unmarked would otherwise
+       decide alone); the run is read by `teams.<team>.started_at`, which the home's callers pass, every mark
+       counting where none is passed. It is `person` where one of those records was
        ended by the person:
        - its `ended.by`, or for a record with no `ended` its `closer.by`, names the person (Stop
          now, a Close, a Kill); or
