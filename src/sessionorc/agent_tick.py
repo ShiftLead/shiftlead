@@ -5424,19 +5424,23 @@ class TickMixin:
             def live_now(path: str) -> bool:
                 return any(s.scratch == path and s.state not in ended_states for s in list(self.sessions.values()))
 
+            kept: list[tuple[str, str]] = []
             try:
-                kept = scratch_mod.sweep(
-                    root,
-                    paths.home(),
-                    named,
-                    hosts.local_host().scratch_keep_hours,
-                    time.time(),
-                    live_now,
-                    adapters.transcript_roots()[0],
-                )
+                troots, blind = adapters.transcript_roots()
+                if blind:  # an adapter that cannot name its stores could have one inside a scratch: none goes
+                    log.warning("scratch removal skipped: %s named no transcript roots", ", ".join(blind))
+                else:
+                    kept = scratch_mod.sweep(
+                        root,
+                        paths.home(),
+                        named,
+                        hosts.local_host().scratch_keep_hours,
+                        time.time(),
+                        live_now,
+                        troots,
+                    )
             except Exception:  # noqa: BLE001 — the scratch rule never stops the rest of the sweep
                 log.exception("scratch removal failed")
-                kept = []
             for path, why in kept:
                 log.info("scratch kept: %s (%s)", path, why)
         idle = now.timestamp() - paths.ATTACH_PART_IDLE_S

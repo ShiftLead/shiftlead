@@ -15,6 +15,7 @@ import os
 import secrets
 import stat
 import subprocess
+import time
 from pathlib import Path
 
 MAX_ROOT = 48  # bytes: a scratch home's `agent.sock` at `$SHIFTLEAD_SCRATCH/home` binds within 107 (§4.6)
@@ -239,7 +240,7 @@ def _git_dirs(path: Path) -> list[tuple[str, Path]]:
     while todo:
         d = todo.pop()
         names = {e.name: e for e in os.scandir(d)}
-        if d != path and "HEAD" in names and "objects" in names and "refs" in names:
+        if "HEAD" in names and "objects" in names and "refs" in names:
             found.append(("clone", d))  # a bare repo
             continue
         for name, e in names.items():
@@ -360,21 +361,24 @@ def _worktree_mains(path: Path) -> list[Path]:
 
 
 def _newest_write(path: Path) -> float:
-    """The newest modification time of anything under `path`, itself included, not following a symlink."""
+    """The newest modification time of anything under `path`, itself included, not following a symlink; an entry
+    that cannot be read counts as written now, so it never ages a directory past its hour."""
     newest = path.lstat().st_mtime
     todo = [path]
     while todo:
         try:
             entries = list(os.scandir(todo.pop()))
         except OSError:
-            continue
+            return time.time()
         for e in entries:
             try:
                 newest = max(newest, e.stat(follow_symlinks=False).st_mtime)
                 if e.is_dir(follow_symlinks=False):
                     todo.append(Path(e.path))
-            except OSError:
+            except FileNotFoundError:
                 continue
+            except OSError:
+                return time.time()
     return newest
 
 
@@ -453,6 +457,9 @@ def sweep(
                 kept.append((str(path), GIT_WORK))
                 continue
             mains = _worktree_mains(path)
+            if live_now(str(path)):  # read again just before the removal: the weigh can take a while
+                kept.append((str(path), "live record"))
+                continue
             _remove(path)
             log.info("removed scratch %s (%s)", path, f"ended {rid}" if rid else "named by no live record")
             for m in mains:

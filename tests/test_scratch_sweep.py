@@ -290,3 +290,73 @@ async def test_the_hourly_pass_takes_an_ended_record_s_scratch(agent):
     assert not ended.exists() and back.exists()
     for rid in ("ao-e-1", "ao-b-2"):
         del agent.sessions[rid]
+
+
+def test_a_symlink_inside_is_removed_as_a_link_and_its_target_kept(root, tmp_path):
+    home = str(tmp_path / "home")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "keep.txt").write_text("k")
+    d = made(root, home)
+    (d / "link").symlink_to(outside)
+    (d / "flink").symlink_to(outside / "keep.txt")
+    age(d, 2 * HOUR)
+    sweep(root, home)
+    assert not d.exists() and (outside / "keep.txt").read_text() == "k"
+
+
+@pytest.mark.parametrize("where", ["nested", "top"])
+def test_a_bare_repo_with_work_on_no_remote_is_git_work(where, origin, root, tmp_path):
+    home = str(tmp_path / "home")
+    d = made(root, home)
+    work = tmp_path / "w"
+    git(tmp_path, "init", "-q", "-b", "main", str(work))
+    commit(work, "x.txt", "x\n")
+    bare = d / "b.git" if where == "nested" else d
+    git(tmp_path, "init", "-q", "--bare", "-b", "main", str(bare))
+    git(work, "push", "-q", str(bare), "main")
+    age(d, 2 * HOUR)
+    assert sweep(root, home) == [(str(d), scratch.GIT_WORK)]
+
+
+def test_the_snapshot_names_each_scratch_with_its_latest_end_and_a_live_record_wins():
+    from sessionorc.agent_tick import _scratch_named
+
+    now = datetime.now(UTC)
+
+    def rec(rid, state, path, ended=None, since="2026-11-01T00:00:00+00:00", host="h"):
+        return Session(
+            id=rid, name=rid, kind="interactive", adapter="shell", dir="/", state=state, scratch=path,
+            host=host, ended=ended, since=since,
+        )  # fmt: skip
+
+    records = [
+        rec("a", "exited", "/s/1", {"at": "2026-11-02T00:00:00+00:00"}),
+        rec("b", "closed", "/s/1", {"at": "2026-11-03T00:00:00+00:00"}),
+        rec("c", "exited", "/s/2", {"at": "2026-11-03T00:00:00+00:00"}),
+        rec("d", "idle", "/s/2"),
+        rec("e", "closed", "/s/3", None, since="garbage"),
+        rec("f", "exited", "/s/4", None),
+        rec("g", "idle", "/s/5", host="other"),
+    ]
+    got = _scratch_named(records, "h", now)
+    assert got["/s/1"] == ("b", datetime(2026, 11, 3, tzinfo=UTC).timestamp())
+    assert got["/s/2"] == ("d", None)
+    assert got["/s/3"] == ("e", now.timestamp())  # no readable end: kept a full keep from now
+    assert got["/s/4"] == ("f", datetime(2026, 11, 1, tzinfo=UTC).timestamp())  # `since` once exited
+    assert "/s/5" not in got
+
+
+@pytest.mark.integration
+async def test_an_adapter_that_names_no_transcript_roots_stops_the_scratch_rule(agent, monkeypatch):
+    from sessionorc import adapters
+
+    await park_ticks(agent)
+    d = made(hosts.DEFAULT_SCRATCH_ROOT, str(paths.home()), "ao-o-1")
+    age(d, 48 * HOUR)
+    monkeypatch.setattr(adapters, "transcript_roots", lambda: ([], ["broken"]))
+    agent._prune_runs(datetime.now(UTC), set(), set(), None, {})
+    assert d.exists()
+    monkeypatch.setattr(adapters, "transcript_roots", lambda: ([], []))
+    agent._prune_runs(datetime.now(UTC), set(), set(), None, {})
+    assert not d.exists()
