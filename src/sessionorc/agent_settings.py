@@ -116,14 +116,16 @@ class SettingsMixin:
     async def _tools_gauges(self, read: dict[str, Any]) -> dict[str, Any]:
         """The `tools` read with each account's `gauges` filled (design §4.2b *The gauge*, *The read*; TD-1975), on
         a copy, so the kept read is never written: from the `gate` reply's entry for its key and the account's last
-        reading, by `usage.gauges` — the one builder. A read of a host not switched has no accounts to fill."""
+        reading, by `usage.gauges` — the one builder. A read of a host not switched has no accounts to fill. A login
+        *signed in* whose account's reading is at a cap (`cap_window`, the poll's own test) is `limited`, its `till`
+        that cap's reset (None: unknown), as §4.2b *A login's state* draws it; a metered login never is (§4.2a)."""
         if not read.get("switched"):
             return read
         gate, now = await self.rpc_gate(), datetime.now(UTC)
         max_age = settings_mod.max_age(settings_mod.load())
         cards = []
         for card in read.get("tools") or []:
-            accounts = []
+            accounts, caps = [], {}
             for acct in card.get("accounts") or []:
                 key = str(acct.get("key") or "")
                 entry = gate["accounts"].get(key)
@@ -131,7 +133,17 @@ class SettingsMixin:
                 reading = self._usage_acct.get(key) or next((self._usage[p] for p in names if p in self._usage), None)
                 g = usage_mod.gauges(entry, reading, max_age, now, acct.get("billing"), spend_mod.LABELS)
                 accounts.append({**acct, "gauges": g})
-            cards.append({**card, "accounts": accounts})
+                if g["billing"] != "metered" and (cap := agent_common.cap_window(reading)):
+                    caps[key] = cap[1]
+            logins = []
+            for lg in card.get("logins") or []:
+                key = str(lg.get("account") or "")
+                metered = (lg.get("settings") or {}).get("billing") == "metered"
+                if lg.get("state") == "signed_in" and key in caps and not metered:
+                    till = caps[key]
+                    lg = {**lg, "state": "limited", "till": till.isoformat().replace("+00:00", "Z") if till else None}
+                logins.append(lg)
+            cards.append({**card, "accounts": accounts, "logins": logins})
         return {**read, "tools": cards}
 
     def _gate_accounts(

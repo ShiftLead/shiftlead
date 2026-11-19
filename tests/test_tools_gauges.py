@@ -86,3 +86,28 @@ async def test_the_tools_read_fills_each_accounts_gauges_afresh_and_never_writes
     assert (await agent.rpc_tools())["tools"][0]["accounts"][0]["gauges"]["windows"][0]["pct"] == 30.0  # afresh
     agent._tools_kept = {"switched": False, "tools": [{"accounts": []}]}
     assert await agent.rpc_tools() == agent._tools_kept  # not switched: nothing to fill
+
+
+async def test_a_login_signed_in_whose_account_is_at_a_cap_is_limited_till_its_reset_and_a_metered_one_never(agent):
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    reset = datetime.now(UTC).replace(microsecond=0) + timedelta(hours=2)
+    agent._usage_acct["claude-code:paul"] = {"fetched": _iso(datetime.now(UTC)), "windows": [
+        {"label": "week", "pct": 30}, {"label": "5h", "pct": 100, "resets": _iso(reset)}]}  # fmt: skip
+    agent._usage_acct["claude-code:k"] = {"fetched": _iso(datetime.now(UTC)), "windows": [{"label": "5h", "pct": 100}]}
+
+    def login(name, account, state="signed_in", billing=None):
+        return {"name": name, "account": account, "state": state, "till": None, "settings": {"billing": billing}}
+
+    agent._tools_kept = {"switched": True, "tools": [{"adapter": "claude-code", "accounts": [
+        {"key": "claude-code:paul", "billing": "subscription", "gauges": None},
+        {"key": "claude-code:k", "billing": "mixed", "gauges": None}], "logins": [
+        login("work", "claude-code:paul"), login("again", "claude-code:paul", "sign_in_again"),
+        login("unknown", "claude-code:k"), login("key", "claude-code:k", billing="metered")]}]}  # fmt: skip
+    got = {lg["name"]: (lg["state"], lg["till"]) for lg in (await agent.rpc_tools())["tools"][0]["logins"]}
+    assert got == {"work": ("limited", _iso(reset)), "again": ("sign_in_again", None),
+                   "unknown": ("limited", None), "key": ("signed_in", None)}  # fmt: skip
+    assert agent._tools_kept["tools"][0]["logins"][0]["state"] == "signed_in"  # on a copy
+    agent._usage_acct["claude-code:paul"]["windows"][1]["pct"] = 40  # the cap lifts at the next read
+    assert (await agent.rpc_tools())["tools"][0]["logins"][0]["state"] == "signed_in"

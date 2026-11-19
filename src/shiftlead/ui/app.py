@@ -1106,11 +1106,13 @@ def price_fills(weights: Mapping[str, Any], families: list[str]) -> list[dict[st
 def login_tree(card: dict[str, Any], home: str, weights: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """A tool card's logins as the Tools page draws them on a switched host (design §4.2b *The page*, TD-1974): each
     account with its logins under it, then *Not signed in* (the logins with no identity to read), then the logins
-    signed in whose account is still to be named. Each login carries its folder as drawn, its state's words and its
-    warnings' words."""
+    signed in whose account is still to be named. Each login carries its folder as drawn, its state's words (*limited
+    till 17:50*, its account at a cap, TD-1975) and its warnings' words."""
     for lg in card.get("logins") or []:
         lg["shown"] = _shown_folder(str(lg.get("folder") or ""), home)
         lg["said"] = LOGIN_STATES.get(str(lg.get("state")), str(lg.get("state") or ""))
+        if lg.get("state") == "limited" and (till := setmod._when(lg.get("till"))):  # §4.2b *A login's state*
+            lg["said"] = f"limited till {usage_clock(till, datetime.now(UTC))}"
         lg["warned"] = [LOGIN_WARNINGS.get(w, w) for w in lg.get("warnings") or []]
         lg["form"] = {k: _setting_text(v) for k, v in (lg.get("settings") or {}).items()}  # the Settings form's values
         lg["form"]["pin"] = _setting_text(lg.get("pin"))
