@@ -25,7 +25,6 @@ import signal
 import socket
 import subprocess
 import sys
-import tempfile
 import time
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
@@ -56,6 +55,7 @@ from sessionorc import balance as balance_mod
 from sessionorc import cadence as cadence_mod
 from sessionorc import digest as digest_mod
 from sessionorc import ledger as ledger_mod
+from sessionorc import scratch as scratch_mod
 from sessionorc import seats as seats_mod
 from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
@@ -1033,6 +1033,9 @@ class HostAgent(
 
     async def serve(self, sock: Path | None = None) -> None:
         sock = sock or paths.socket_path()
+        # §4.6 *A session's scratch* (TD-1944): a `scratch_root` past 48 bytes, or a `shiftlead-<uid>/` that is a
+        # symlink or another uid's, stops the start, as nothing a session puts there could be trusted
+        await asyncio.to_thread(scratch_mod.ensure_parent, _scratch_root())
         sock.parent.mkdir(parents=True, exist_ok=True)
         with contextlib.suppress(FileNotFoundError):
             sock.unlink()
@@ -1574,8 +1577,15 @@ class HostAgent(
         team_start: bool = False,
         draft: str = "",
         succeeds: str | None = None,
+        scratch: str | None = None,
     ) -> dict[str, Any]:
-        """`draft` (design §4.4 *The Add entry form's draft*, TD-630): the Add entry form's draft
+        """`scratch` (design §4.6 *A session's scratch*, TD-1944): the old run's scratch directory, which a
+        restart hands the create so the new run keeps it, as a Resume of the name's own conversation keeps its
+        record's; kept only where it lies under this host's `shiftlead-<uid>/` and its `owner.json` names the
+        record and this home (or it is gone, and is made again), else a new one is made. Never a session's own
+        to give: refused with a session as the caller.
+
+        `draft` (design §4.4 *The Add entry form's draft*, TD-630): the Add entry form's draft
         folder, which **Open a session** hands to the create — claimed for the new session once it
         exists (`claimed.json` `{by: <its id>, at}`), so the folder then lives as that session's own
         attachments do. A person's own, as `attach` is; refused beside `start_at` or `held`, and
@@ -1638,6 +1648,9 @@ class HostAgent(
             # Routed before the method runs (`_act_host`) when this is the home; a node asked for
             # another host's create got here through the link, and the link is one host's.
             raise RpcError(f"{host} is not this host ({self.host}): a create lands on the host it names")
+        if scratch is not None and caller and not mail.is_person(caller):
+            # the old run's scratch is the home's to hand a restart, never a session's own `ao new` (§4.6)
+            raise RpcError("scratch is handed by a restart alone: a session cannot give it (design §4.6)")
         directory = Path(dir).expanduser().resolve()
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
@@ -1850,6 +1863,11 @@ class HostAgent(
                 # its row ended because the person opened it, which is the word the trail wants —
                 # `_take_name` would otherwise write the ending of a record merely replaced (§4.10)
                 self._attention_ended(holder.id, "resumed", "*")
+            # the run's scratch (§4.6, TD-1944), made once, before the attempts at a free id: a restart's
+            # handed one, or a Resume's of the name's own conversation, kept where it may be; else a new one
+            if scratch is None and isinstance(holder, Session) and resume and holder.adapter_id == resume:
+                scratch = holder.scratch
+            run_scratch = await asyncio.to_thread(self._run_scratch, scratch, holder)
             previous_run, freed = await self._take_name(holder)
             model_env = await asyncio.to_thread(agent_common.model_env, adapter, spec.model, directory)
             # read after the supersede, so the id it freed is not `taken` and gets reused
@@ -1875,8 +1893,9 @@ class HostAgent(
                 # AGENT_MODEL_FILE name the model for its `Agent-Model:` trailer (§4.2, TD-638).
                 shown = name if sid == base else name + sid[len(base) :]  # a shown suffix, never a hidden one
                 env = {
-                    "TMPDIR": tempfile.gettempdir(),  # §4.2, TD-1487: a systemd unit gives none; the adapter's wins
                     **spec.env,
+                    # §4.2, §4.6: the run's scratch, after the adapter's env so ours win (`TMPDIR` too)
+                    **scratch_mod.env(run_scratch, getattr(ad, "scratch_env", None)),
                     "SHIFTLEAD_SESSION": sid,
                     "SHIFTLEAD_HOME": str(paths.home()),
                     "AGENT_NAME": shown,
@@ -1903,6 +1922,8 @@ class HostAgent(
                     self._starting.discard(sid)  # nothing awaits between here and `self.sessions[sid] = s`
             else:
                 raise RpcError(f"could not find a free session name for {name!r} in {directory}")
+            if run_scratch:  # whose it is: the id this run took, which a kept one's last run may not have had
+                await asyncio.to_thread(scratch_mod.write_owner, run_scratch, sid, paths.home())
             s = Session(
                 id=sid,
                 name=shown,
@@ -1941,6 +1962,7 @@ class HostAgent(
                 start_context=start_context,
                 first_prompt=first_prompt,
                 model_file=model_env.get("AGENT_MODEL_FILE"),
+                scratch=run_scratch,
                 tool_version=tool_version if isinstance(tool_version, str) and tool_version else None,
             )
             if self.mode != "node":
@@ -2369,6 +2391,18 @@ class HostAgent(
                 hint=verdict["hint"],
             )
         return holder
+
+    def _run_scratch(self, given: str | None, holder: Session | str | None) -> str:
+        """The run's scratch directory (design §4.6 *A session's scratch*, TD-1944): `given` — the old run's,
+        handed by a restart or carried by a Resume — kept where it lies under this host's `shiftlead-<uid>/`
+        and its `owner.json` names `holder`'s record and this home (made again, empty, where it is gone);
+        else a new one. Off the loop: it touches the disk."""
+        root, home = _scratch_root(), paths.home()
+        record = holder.id if isinstance(holder, Session) else ""
+        try:
+            return (record and scratch_mod.kept(root, given, record, home)) or scratch_mod.make(root, record, home)
+        except (scratch_mod.ScratchError, OSError) as e:
+            raise RpcError(f"no scratch directory for the run: {e}") from None
 
     async def _take_name(self, holder: Session | str | None) -> tuple[str | None, str | None]:
         """Supersede what `_name_holder` found, returning `(previous_run, the id it freed)`. The
@@ -2984,6 +3018,8 @@ class HostAgent(
         s = self._find(id)
         now = datetime.now(UTC)
         params = self._restart_check(s, now)
+        if s.scratch:
+            params["scratch"] = s.scratch  # a restart keeps the run's scratch, as it keeps the worktree (§4.6)
         entry: dict[str, Any] = {"at": now_iso(), "why": "person"}
         if s.seat is not None:
             # a seat at its fill ceiling (§6 rule 3, TD-1422): the mark cleared, nothing created — rule 3
@@ -4833,6 +4869,11 @@ class HostAgent(
         if host not in self._remote_stores:
             self._remote_stores[host] = SessionStore(paths.remote_dir(host))
         return self._remote_stores[host]
+
+
+def _scratch_root() -> str:
+    """This host's `scratch_root` (§4.6), the default where a reading of the host carries none."""
+    return getattr(hosts.local_host(), "scratch_root", None) or hosts.DEFAULT_SCRATCH_ROOT
 
 
 async def serve_until_signal(agent: HostAgent, sock: Path | None = None) -> None:

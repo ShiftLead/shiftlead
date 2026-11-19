@@ -254,6 +254,7 @@ class GeminiAdapter:
     label = "Gemini"  # the tool's display name: the usage chip's first word, never a key (§4.3, TD-122)
     marks_errors = True  # a tool call's `status` word (design §4.3 `read_transcript`, TD-1719)
     state_source: Confidence = "hook"
+    scratch_env: str | None = None  # Gemini CLI names no temp variable of its own: `TMPDIR` (§4.3, §4.6)
     # the tool writes its state into its terminal title: the tick asks `explain` with the pane's title
     # and writes its verdict with `confidence: title` (design §4.2 *A title the tool writes its state into*)
     state_in_title = True

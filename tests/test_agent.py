@@ -3,8 +3,9 @@
 import asyncio
 import dataclasses
 import json
+import os
+import stat
 import subprocess
-import tempfile
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -2412,12 +2413,15 @@ async def test_a_launch_tells_the_start_hook_whose_board_to_nudge_from(agent, tm
             await c.call("kill", id=s["id"])
 
 
-async def test_a_launch_sets_tmpdir_to_the_host_agents_temp_directory(agent, tmp_path, monkeypatch):
-    """TD-1487 (design §4.2): every launch sets `TMPDIR` — the host agent's temp directory, `/tmp` where a systemd
-    unit gave it none — so a session's `$TMPDIR/pc.log` is never `/pc.log`."""
-    want = tmp_path / "tmpd"
-    want.mkdir()
-    monkeypatch.setattr(tempfile, "tempdir", str(want))  # what gettempdir() answers, as from the agent's env
+async def test_a_launch_sets_tmpdir_to_the_runs_own_scratch_whatever_the_adapter_sets(agent, tmp_path, monkeypatch):
+    """TD-1487, TD-1944 (design §4.2, §4.6 *A session's scratch*): every launch sets `TMPDIR` and
+    `SHIFTLEAD_SCRATCH` to the run's own `0700` scratch directory, named in its record's `scratch` and holding
+    `owner.json` (its id, the home), after the adapter's launch env, so an adapter's own `TMPDIR` loses."""
+    ad = adapters.get("command")
+    launch = ad.launch
+    monkeypatch.setattr(
+        ad, "launch", lambda **kw: dataclasses.replace(launch(**kw), env={"TMPDIR": "/elsewhere"}), raising=False
+    )
     out = tmp_path / "tmpdir.txt"
     async with LocalClient() as c:
         s = await c.call(
@@ -2425,13 +2429,17 @@ async def test_a_launch_sets_tmpdir_to_the_host_agents_temp_directory(agent, tmp
             name="tmpdir",
             dir=str(tmp_path),
             adapter="command",
-            argv=["bash", "-c", f'echo "$TMPDIR" > {out}; sleep 30'],
+            argv=["bash", "-c", f'echo "$TMPDIR $SHIFTLEAD_SCRATCH" > {out}; sleep 30'],
         )
         for _ in range(50):
             if out.exists() and out.read_text().strip():
                 break
             await asyncio.sleep(0.1)
-        assert out.read_text().strip() == str(want)
+        scratch = agent.sessions[s["id"]].scratch
+        assert scratch and out.read_text().split() == [scratch, scratch]
+        assert Path(scratch).parent.name == f"shiftlead-{os.getuid()}" and len(Path(scratch).name) == 8
+        assert stat.S_IMODE(Path(scratch).stat().st_mode) == 0o700
+        assert json.loads((Path(scratch) / "owner.json").read_text()) == {"id": s["id"], "home": str(paths.home())}
         await c.call("kill", id=s["id"])
 
 

@@ -140,6 +140,7 @@ class GrokAdapter:
     name = NAME
     label = "Grok"  # the tool's display name: the usage chip's first word, never a key (§4.3, TD-122)
     state_source: Confidence = "hook"
+    scratch_env: str | None = None  # Grok Build names no temp variable of its own: `TMPDIR` (§4.3, §4.6)
     own_home = OWN_HOME.expanduser()  # a profile names a config_dir of its own (§4.2a, TD-1550)
     permission_channel = False  # a Grok hook cannot answer a prompt (§4.3 *No permission channel*)
     start_context = False  # no Grok hook hands the model context at the start (§4.3 `start_context`)
