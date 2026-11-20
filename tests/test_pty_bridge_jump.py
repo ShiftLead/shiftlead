@@ -82,13 +82,14 @@ def test_the_openings_a_jump_takes():
 
 
 def test_the_read_and_the_argvs():
-    assert jump_read("282\nrow 0\nrow 1\n") == (282, ["row 0", "row 1"])
-    assert jump_read("0\n") == (0, [])
+    assert jump_read("282 7\nrow 0\nrow 1\n") == (282, 7, ["row 0", "row 1"])
+    assert jump_read("0 0\n") == (0, 0, [])
     assert jump_read("") is None and jump_read("can't find pane\n") is None
+    assert jump_read("282\nrow 0\n") is None, "the cursor's row is read beside the history's size"
     argv = pty_bridge.jump_argv("ao-x", socket_name="s")
     assert argv[:3] == ["tmux", "-L", "s"]
     assert " ".join(argv[3:]) == (
-        "copy-mode -q -t =ao-x: ; copy-mode -e -t =ao-x: ; display-message -p -t =ao-x: #{history_size} ; "
+        "copy-mode -q -t =ao-x: ; copy-mode -e -t =ao-x: ; display-message -p -t =ao-x: #{history_size} #{cursor_y} ; "
         "capture-pane -p -S - -E - -t =ao-x:"
     )
     assert land_argv("ao-x", 82) == ["tmux", "send-keys", "-X", "-t", "=ao-x:", "goto-line", "82"]
@@ -112,13 +113,15 @@ def _jump(out: str | None, openings: list[dict], *, land_fails: bool = False):
 
 
 def test_run_jump_lands_or_leaves():
-    out = "3\n❯ hello\n⏺ hi\nmore\n❯ next\n⏺ ok\n"  # three rows of history, then the screen
-    assert _jump(out, [op("❯ hello")]) == (True, [land_argv("ao-x", 3)])
-    assert _jump(out, [op("❯ next")]) == (True, [land_argv("ao-x", 0)])  # on the live screen
-    assert _jump(out, [op("❯ gone")]) == (False, [leave_argv("ao-x")])
-    assert _jump(None, [op("❯ hello")]) == (False, [leave_argv("ao-x")])  # a read past `JUMP_WITHIN`
-    assert _jump("oops", [op("❯ hello")]) == (False, [leave_argv("ao-x")])
-    assert _jump(out, [op("❯ hello")], land_fails=True)[0] is False
+    out = "3 2\n❯ hello\n⏺ hi\nmore\n❯ next\n⏺ ok\n"  # three rows of history, then the screen
+    # the answer is (the landed row, the cursor's): a history row lands at the top, row 0 (design §4.6)
+    assert _jump(out, [op("❯ hello")]) == ((0, 2), [land_argv("ao-x", 3)])
+    assert _jump(out, [op("❯ next")]) == ((0, 2), [land_argv("ao-x", 0)])  # the live screen's first row
+    assert _jump(out, [op("⏺ ok")]) == ((1, 2), [land_argv("ao-x", 0)])  # its second row: no clamp moves it
+    assert _jump(out, [op("❯ gone")]) == (None, [leave_argv("ao-x")])
+    assert _jump(None, [op("❯ hello")]) == (None, [leave_argv("ao-x")])  # a read past `JUMP_WITHIN`
+    assert _jump("oops", [op("❯ hello")]) == (None, [leave_argv("ao-x")])
+    assert _jump(out, [op("❯ hello")], land_fails=True)[0] is None
 
 
 class FakePty:

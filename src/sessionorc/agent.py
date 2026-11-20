@@ -1124,6 +1124,8 @@ class HostAgent(
         self.tmux.ensure_server()
         if quieted := self.tmux.status_off(naming.PREFIX):  # sessions from before TD-1410 (design §4.6)
             log.info("tmux status bar turned off on %d session(s)", len(quieted))
+        if pinned := self.tmux.pin_windows(naming.PREFIX):  # every window pinned at its size (§4.6, TD-1919)
+            log.info("tmux window pinned on %d session(s)", len(pinned))
         self._witness_loop = asyncio.get_running_loop()
         self._witness_begin()
         await asyncio.to_thread(self._recover_reaps)  # a reap a promote cut off (§4.1, TD-979)
@@ -2746,7 +2748,8 @@ class HostAgent(
 
     def _start(self, sid: str, cwd: Path, argv: list[str] | None, env: dict[str, str], run_log: Path) -> None:
         self.tmux.ensure_server()
-        self.tmux.new_session(sid, cwd, argv, env, logfile=run_log)  # log from the first byte (invariant 3)
+        grid = settings_mod.terminal_grid(settings_mod.load())  # read at each start (§5, TD-1919)
+        self.tmux.new_session(sid, cwd, argv, env, logfile=run_log, grid=grid)  # log from the first byte (invariant 3)
         self._pane_cgroup(sid)
 
     def _pane_cgroup(self, sid: str) -> None:
@@ -4119,7 +4122,10 @@ class HostAgent(
 
     def _start_tools(self, sid: str, cwd: Path, env: dict[str, str]) -> None:
         self.tmux.ensure_server()
-        self.tmux.new_session(sid, cwd, None, env)  # no logfile: a tools shell has no run log (§9 invariant 3)
+        grid = settings_mod.terminal_grid(settings_mod.load())  # pinned as a session is (§4.6, TD-1919)
+        self.tmux.new_session(
+            sid, cwd, None, env, grid=grid
+        )  # no logfile: a tools shell has no run log (§9 invariant 3)
         self._pane_cgroup(sid)
 
     async def rpc_transcript(

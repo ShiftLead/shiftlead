@@ -60,9 +60,9 @@ const timers = () => {
   const first = j.press([{ drawn: "❯ yes", whole: true }]);
   out.second = j.press([{ drawn: "❯ x", whole: true }]);
   out.wait = t.ms;
-  j.frame({ jumped: true });
+  out.pending = j.frame({ jumped: true });
   out.landed = await first;
-  j.frame({ jumped: false });
+  out.none_pending = j.frame({ jumped: false });
   out.sent = sent.length;
   // a miss frame; no frame in time; a socket that closed first; a socket not open
   const miss = j.press([]); j.frame({ jumped: false }); out.miss = await miss;
@@ -126,6 +126,7 @@ def test_one_press_pending_and_its_frame(got):
     assert got["second"] is None and got["sent"] == 1  # a press while one waits is ignored
     assert got["wait"] == 7000  # JUMP_WITHIN and two seconds more
     assert got["landed"] is True
+    assert got["pending"] is True and got["none_pending"] is False  # a frame says whether a press was pending
     assert got["miss"] is False and got["late"] is False and got["shut"] is False
     assert got["unsent"] is False and got["busy"] is False  # a socket not open: a miss at the page
     assert got["threw"] is False and got["threwBusy"] is False  # a send that throws frees the press
@@ -158,8 +159,10 @@ def test_the_frame_is_never_written_to_the_terminal():
     js = (UI / "static" / "app.js").read_text()
     focus = js[js.index("AO.focus = function") :]
     onmsg = focus[focus.index("ws.onmessage = (m) => {") :]
-    frame = 'if (c && "jumped" in c) { jumper.frame(c); return; }'
+    frame = 'if (c && "jumped" in c) {\n            if (!jumper.frame(c)) return;'
     assert frame in onmsg and onmsg.index(frame) < onmsg.index("term.write(")
+    # a landing shows its row at the top of the rows shown and keeps them; a miss ends any keep (§4.6, TD-1919)
+    assert "keeper.land(c.row, c.cursor, viewAt().maxStart);" in onmsg and "} else keeper.release();" in onmsg
     # a socket that closes, a reattach, and the pane's end each resolve the pending press as a miss
     assert focus.count("jumper.closed();") == 3
     assert "ws.send(JSON.stringify({ jump: ops }))" in focus

@@ -1043,6 +1043,13 @@ def attach_max(doc: dict[str, Any]) -> int:
     return attach_bytes(person(doc).get("attach", {}).get("max", ATTACH_MAX_DEFAULT))
 
 
+def terminal_grid(doc: dict[str, Any]) -> tuple[int, int]:
+    """The grid a new session's window is pinned at (§4.6, §5 `person.terminal.grid`, TD-1919): the person's
+    setting, or `TERMINAL_GRID_DEFAULT`."""
+    g = person(doc).get("terminal", {}).get("grid")
+    return (g[0], g[1]) if g else TERMINAL_GRID_DEFAULT
+
+
 def parse_board_show(v: Any) -> str:
     """`person.inbox.board_show` (§5, §4.5 screen 6 *The board's horizon*, TD-220): which board items the
     Inbox lists before they are due — `next:<n>` per team (n from 1 to 50), `due`, `<n>d` (n from 1 to

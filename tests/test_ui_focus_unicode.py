@@ -85,10 +85,9 @@ def test_focus_loads_the_addon_where_the_terminal_is_built():
     built = focus.index("const term = new Terminal(")
     # the `unicode` API is proposed in xterm 6: without the option, setting the version throws
     assert "allowProposedApi: true" in focus[built : focus.index("\n", built)]
-    # once, beside the fit addon, before the terminal opens (a popped-out window is the same page)
+    # once, right after the terminal is made, before it opens (a popped-out window is the same page)
     assert focus.count("AO.termUnicode(term)") == 1
-    assert built < focus.index("new FitAddon.FitAddon()") < focus.index("AO.termUnicode(term)")
-    assert focus.index("AO.termUnicode(term)") < focus.index('term.open($("#term"))')
+    assert built < focus.index("AO.termUnicode(term)") < focus.index("term.open(boxEl)")
     assert js.count("new Terminal(") == 1  # no other terminal to miss
 
 
