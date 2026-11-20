@@ -4872,7 +4872,7 @@ def _pass_up(args: argparse.Namespace, words: list[str]) -> int:
         print(warn, file=sys.stderr)
 
     def prose() -> None:
-        print(f"{got['msg']} passed up → person, recommending: {got['recommend']['text']}")
+        print(f"{got['msg']} passed up → {got.get('id') or 'person'}, recommending: {got['recommend']['text']}")
         for i, a in enumerate(got.get("answers") or [], 1):
             print(f"  {i}. {a}")
 
@@ -5004,7 +5004,10 @@ def cmd_inbox(args: argparse.Namespace) -> int:
             if e.get("default"):  # a steer says what it will do unless answered (design §4.10)
                 print(f"  default: {e['default']}")
             if r := e.get("recommend"):  # passed up: the passer's line, labelled as its own (design §4.9b)
-                print(f"  passed up by {r.get('by')}, who recommends: {r.get('text')}")
+                passes = [p for p in (e.get("passes") or []) if isinstance(p, dict) and p.get("recommend")]
+                # one line per pass, the latest first: the director's, then the techlead's (TD-661)
+                for one in [p["recommend"] for p in reversed(passes)] if len(passes) > 1 else [r]:
+                    print(f"  passed up by {one.get('by')}, who recommends: {one.get('text')}")
             if e.get("source"):  # answered from the record, and where (design §4.9b)
                 print(f"  source: {e['source']}")
             if a := e.get("answered"):  # the person's FYI for such an answer (design §4.9b)

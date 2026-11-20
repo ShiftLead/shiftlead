@@ -2873,6 +2873,38 @@ def test_a_passed_up_question_is_the_askers_row_with_the_recommendation_drawn_as
 
 
 @pytest.mark.unit
+def test_a_question_passed_through_the_director_draws_both_recommendations_the_directors_first():
+    """§4.5a **Inbox row: passed up** (TD-661): a question the techlead passed to the director and the director
+    to the person draws both recommendations, the director's first, each passer by the name it is known by."""
+    tl = {"by": "ao-tl", "text": "keep the old name"}
+    d = {"by": "ao-director", "text": "keep it, the design names it", "question": "Should the flag be renamed?"}
+    passes = [
+        {"by": "ao-tl", "at": "2026-09-19T10:20:00Z", "to": "ao-director", "recommend": tl},
+        {"by": "ao-director", "at": "2026-09-19T10:30:00Z", "to": "person", "recommend": d},
+    ]
+    html = rows(
+        "needs",
+        [
+            passed_up(
+                "m-1",
+                recommend=d,
+                passes=passes,
+                passer_name="director",
+                passer_names={"ao-tl": "tl", "ao-director": "director"},
+            )
+        ],
+    )
+    first, second = (
+        html.index("director recommends: keep it, the design names it"),
+        html.index("tl recommends: keep the old name"),
+    )
+    assert first < second
+    # one pass draws its one line, as before
+    one = rows("needs", [passed_up("m-2", passes=[{**passes[0], "to": "person"}])])
+    assert one.count("recommends:") == 1 and "tl recommends: keep the old name" in one
+
+
+@pytest.mark.unit
 def test_a_question_not_passed_up_has_no_recommendation_and_its_answers_are_the_senders():
     """The line keys on `passed_up` and a structured `recommend` together; an ordinary question —
     or one whose `recommend` is malformed — draws neither the line nor another name on its answers,
