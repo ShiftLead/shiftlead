@@ -207,6 +207,8 @@ def write_director(call: Call, org: orgmod.Org, caller: str | None = None) -> li
     unknown, a brief not read), a refused create or a home not read is said and the start stands, as an extra's
     is — the director is the org's, never the team's. A session's own Start or Apply (`caller`) writes none and
     says so: the seat holds `permit`, which a session cannot grant (§4.8)."""
+    if getattr(org, "director", None) is None:  # no director defined: nothing to read or write
+        return []
     try:
         params = teams.director_create(org)
     except teams.TeamError as e:
