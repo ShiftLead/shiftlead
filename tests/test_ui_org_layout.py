@@ -336,7 +336,8 @@ def test_the_directors_card_is_a_section_of_its_own_above_every_heading(tmp_path
     assert '<span class="h2">Director</span>' in head and "Start" not in head and "Wind down" not in head
     assert html.index('data-key="director"') < html.index('data-key="repo:main"')
     assert "ao-director" in [m["id"] for _, m in rollup_counted(items)]
-    assert "director" not in [r.get("hash") for r in rollup(items, views)["rows"]]
+    ro = rollup(items, views)
+    assert len(ro["rows"]) == 2, "the rows are the team and No repo: the director's section is no row"
     # no director record, no section
     assert "director" not in shape(layout([sess("t1", team="t", repo="/r/main")], [row("t", "main")], ["main"]))
 

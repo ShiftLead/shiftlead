@@ -3094,7 +3094,8 @@
       // A card the server did not list keeps its place on the page — somewhere it can be seen: the
       // first group may now be a stopped team, folded (review of PR #226), so *No team* or a live
       // team is preferred.
-      const dest = keep.find((k) => !k.dataset.team) || keep.find((k) => +k.dataset.live) || keep[0];
+      // never the director's section, which holds its card alone (§4.9 *The Sessions page*, TD-642)
+      const dest = keep.find((k) => !k.dataset.team && k.dataset.key !== "director") || keep.find((k) => +k.dataset.live) || keep[0];
       const home = !drop && dest && $(".grid", dest);
       $$(".sc:not(.plus)", sec).forEach((c) => { if (home) home.appendChild(c); else { AO.handRing(c); c.remove(); } });
       sec.remove();

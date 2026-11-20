@@ -1034,10 +1034,13 @@ def rollup(groups: list[dict[str, Any]] | None, views: Collection[dict[str, Any]
     asked = [(g["team"], g["summary"]["asked"]) for g in groups or [] if (g.get("summary") or {}).get("asked")]
     oldest = min(asked, key=lambda ta: ta[1]["at"], default=None)
     rows = rollup_rows(groups, {m["id"] for _, m in counted}) if groups is not None else []
+    directors = {m["id"] for g in groups or [] if g.get("kind") == "director" for m in g.get("members") or []}
     return {
         "rows": rows,
-        # every row's number added up: the rows partition the counted set, so it is the two counts' sum
-        "n_from_teams": answer_members(answers) + sum(a["n"] for _, a in asked),
+        # every row's number added up: the rows partition the counted set but the director's, whose section is
+        # no row (§4.9 *The Sessions page*, TD-642), so it is the two counts' sum less the director's
+        "n_from_teams": answer_members([a for a in answers if a["id"] not in directors])
+        + sum(a["n"] for _, a in asked),
         "agents": agents,
         "n_unseen": n_unseen,
         "n_agents": len(counted),
