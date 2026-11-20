@@ -23,7 +23,7 @@ from typing import Any
 
 from sessionorc import adapters, ledgerboard, naming
 from sessionorc.models import (
-    GRANTS,
+    ALL_GRANTS,
     PERSON,
     SYSTEM,
     MailEntry,
@@ -31,6 +31,7 @@ from sessionorc.models import (
     clean_shots_at,
     clean_shots_ref,
     has_control,
+    has_permit,
     start_note,
 )
 
@@ -676,6 +677,21 @@ def self_decide_refusal(caller: Any) -> str:
     return f"{caller} cannot decide itself: a session does not answer its own permission prompt (design §4.8)"
 
 
+def by_permit(
+    records: Mapping[str, Session], caller: Any, params: Mapping[str, Any], *, controllers: Controllers = _own
+) -> bool:
+    """Whether a session's `decide` on another's prompt passes by the `permit` grant alone (design §4.8, TD-642):
+    the caller a session holding `permit`, the target not its own, and the caller not one of the target's
+    controllers holding `control` — which answers by `control` as before, with no check of the director's."""
+    if as_person(caller, records) or params.get("id") == caller:
+        return False
+    me = records.get(str(caller))
+    if me is None or not has_permit(me.capabilities):
+        return False
+    target = records.get(str(params.get("id", "")))
+    return not (has_control(me.capabilities) and target is not None and str(caller) in controllers(target))
+
+
 def act_gate(
     records: Mapping[str, Session],
     caller: Any,
@@ -710,6 +726,19 @@ def act_gate(
     if method not in ("create", "set_grants", "set_controllers") and params.get("id") == caller:
         return None
     me = records.get(str(caller))
+    if method == "decide" and by_permit(records, caller, params, controllers=controllers):
+        # the director seat's `permit` (§4.8, TD-642): `decide` on any unattended record of the org, without
+        # being among its controllers — an interactive one stays out of reach (§9 invariant 5)
+        target_id = str(params.get("id", ""))
+        target = records.get(target_id)
+        if target is not None and target.kind == "interactive" and not target.unattended:
+            return (
+                f"{caller} cannot decide {target_id}: it is interactive, and no session acts on an "
+                f"interactive session — only a person does (design §9 invariant 5)"
+            )
+        if target is not None and not target.unattended:
+            return f"{caller} cannot decide {target_id}: `permit` answers an unattended record's prompt alone (§4.8)"
+        return None
     if me is None or not has_control(me.capabilities):
         target = "a new session" if method == "create" else params.get("id", "?")
         # a person's session with an agent in it (§4.8a *A tool's shell escape is the session's*, TD-1051):
@@ -721,7 +750,7 @@ def act_gate(
         # No target to be a member of yet. What create is gated on instead is attenuation: the
         # child's grants must be a subset of the creator's (design §4.8, capability attenuation).
         excess = [
-            g for g in dict.fromkeys(params.get("capabilities") or []) if g in GRANTS and g not in me.capabilities
+            g for g in dict.fromkeys(params.get("capabilities") or []) if g in ALL_GRANTS and g not in me.capabilities
         ]
         if excess:
             return (

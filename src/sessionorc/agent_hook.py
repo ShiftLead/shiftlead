@@ -138,6 +138,7 @@ class HookMixin:
         fut: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
         key = (session, tool_use_id)
         self._waiters[key] = (fut, subagent)
+        self._prompt_calls[key] = (event.get("tool"), event.get("input"))
         await self._push_changes()
         try:
             decision = await asyncio.wait_for(fut, timeout=wait)
@@ -159,6 +160,7 @@ class HookMixin:
             return None if decision.get("terminal") else decision
         finally:
             self._waiters.pop(key, None)
+            self._prompt_calls.pop(key, None)
 
     async def _by_rule(self, s: Any, event: dict[str, Any]) -> dict[str, Any] | None:
         """The person's written rules, the first line in front of them (design §4.9b *The director seat
@@ -259,10 +261,19 @@ class HookMixin:
         self.person_store.save(self.person_inbox)
 
     async def rpc_decide(
-        self, id: str, tool_use_id: str, behavior: str, reason: str | None = None, caller: Any = None
+        self,
+        id: str,
+        tool_use_id: str,
+        behavior: str,
+        reason: str | None = None,
+        caller: Any = None,
+        permit: bool = False,
     ) -> None:
         """Answer a pending permission through the hook (design §4.2). An act, gated like `send`
-        (§4.8, TD-116): a session answers another's only as one of its controllers holding `control`."""
+        (§4.8, TD-116): a session answers another's only as one of its controllers holding `control`,
+        or as the director seat by its `permit` (TD-642) — `permit` set by the gate, never the caller:
+        its answer carries a reason, its *allow* of a prompt that always reaches the person is refused
+        (a deny stands), and the home tells the person (`_answered_by_director`)."""
         s = self._get(id)
         if not adapters.permission_channel(s.adapter):
             # the backstop to `ao allow`/`ao deny` and the page (§4.3 *Permissions: no channel*, TD-785)
@@ -272,7 +283,18 @@ class HookMixin:
             raise RpcError("no pending permission with that id (answered, timed out, or in the terminal)")
         if behavior not in ("allow", "deny"):
             raise RpcError("behavior must be allow or deny")
+        if permit:
+            if not (reason or "").strip():
+                raise RpcError(f"{caller} cannot {behavior} {s.name}'s prompt without a reason: the person is told it")
+            if behavior == "allow" and (why := self._kept_for_person(s, tool_use_id)):
+                raise RpcError(
+                    f"{caller} cannot allow {s.name}'s prompt: {why}, so it always reaches the person — "
+                    "a deny stands (design §4.9b *What always reaches the person*)"
+                )
+        prompt = next((p.text for p in s.pendings if p.tool_use_id == tool_use_id), "") or "a permission prompt"
         fut.set_result({"behavior": behavior, "reason": reason})
+        if permit and self.mode == "home":
+            self._answered_by_director(s, prompt, behavior, str(reason), caller)
         # the row ends here and the home knows how (design §4.10 *The Inbox is a queue*): the trail
         # says who answered — *you* for a person, the controller's name for a session — and a
         # person's answer is never too quick to record
@@ -287,6 +309,45 @@ class HookMixin:
             self._refill(s)  # a person's answer to its permission; a controller's refills nothing (§4.10)
         self.store.save(s)
         await self._push_changes()
+
+    def _kept_for_person(self, s: Any, tool_use_id: str) -> str | None:
+        """Why the prompt `tool_use_id` waiting on `s` always reaches the person (`permits.always_the_person`, design
+        §4.9b), or None. A prompt whose call this agent did not keep is the person's: nothing places it."""
+        tool, tool_input = self._prompt_calls.get((s.id, tool_use_id)) or (None, None)
+        if not isinstance(tool, str) or not tool:
+            return "its call cannot be read here"
+        try:
+            strings = getattr(adapters.get(s.adapter), "prompt_strings", lambda *_: None)(tool, tool_input)
+        except KeyError:
+            strings = None
+        touched = permits.all_strings(tool_input) if strings is None else strings
+        return permits.always_the_person(touched, s.dir, s.repo)
+
+    def _answered_by_director(self, s: Any, prompt: str, behavior: str, reason: str, caller: Any) -> None:
+        """The *Answered for you* FYI for a prompt the director seat answered by `permit` (§4.9b, TD-642): the
+        shape a rule's has, the director as the answerer and its reason as the source. Written by the home, mail's
+        one writer (§9 invariant 15), for a node's record too (`_route_act`)."""
+        verdict = "allowed" if behavior == "allow" else "denied"
+        who = self._graph().get(self._addr(caller))
+        name = who.name if who is not None else str(caller)
+        note = MailEntry(
+            id="m-" + secrets.token_hex(6),
+            from_=SYSTEM,
+            to=[PERSON],
+            at=now_iso(),
+            kind="note",
+            text=f"{verdict} by {name}: {reason}"[: mail.SOURCE_CAP * 2],
+        )
+        note.team = getattr(s, "team", "") or None
+        note.subject = mail.subject_of(f"{verdict}: {prompt}")
+        note.answered = {
+            "question": prompt,
+            "asker": self._address(s),
+            "answerer": self._addr(caller),
+            "source": reason[: mail.SOURCE_CAP],
+        }
+        self.person_inbox.append(note)
+        self.person_store.save(self.person_inbox)
 
     def _answered_by(self, behavior: str, caller: Any) -> str:
         """The trail's word for a decided permission: *allowed by you* when a person pressed it,

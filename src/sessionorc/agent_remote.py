@@ -528,7 +528,29 @@ class RemoteMixin:
             # any close clears the tick's mark; the tick writes its own after this returns (§6 rule 2, TD-237)
             home_copy.closed_for = None
             self._save(home_copy)
+        if method == "decide" and params.get("permit") and params.get("behavior") == "allow":
+            # the node refuses the director's allow of a prompt kept for the person, where the prompt's call is
+            # (TD-642); a node on another build may not know `permit` and would drop it unread, so it is refused
+            ours, theirs = containers.home_build(), str((self.links.get(host) or {}).get("build") or "")
+            if not ours or theirs != ours:
+                raise RpcError(
+                    f"{params.get('id')}: {host} runs build {theirs or 'unknown'}, not this home's, so the director's "
+                    "allow is refused there — a deny stands, and the person answers it"
+                )
         mux = self._node_mux(host)
+        asked_rec = self.remote.get(host, {}).get(rid) if method == "decide" and params.get("permit") else None
+        # the prompt's words as the home's copy holds them before the node ends it, for the director's FYI (TD-642)
+        permit_prompt = (
+            next(
+                (
+                    p.text
+                    for p in (asked_rec.pendings if asked_rec else [])
+                    if p.tool_use_id == params.get("tool_use_id")
+                ),
+                "",
+            )
+            or "a permission prompt"
+        )
         sent = dict(params)
         sent.pop("prompt_from", None)  # the launch record's alone, and the home writes a node's (§6 rule 7)
         sent.pop("via", None)  # a mode change's control: the home stamps its copy, the node writes nothing (TD-1439)
@@ -566,6 +588,11 @@ class RemoteMixin:
         # was pressed — or the trail would read *resolved* for every node-hosted row (review of #269).
         if method == "decide" and rid:
             self._attention_ended(f"{rid}@{host}", self._answered_by(str(params.get("behavior")), caller))
+            if params.get("permit") and (asked := self.remote.get(host, {}).get(rid)) is not None:
+                # the director's answer is told by the home, mail's one writer (§9 invariant 15, TD-642)
+                self._answered_by_director(
+                    asked, permit_prompt, str(params.get("behavior")), str(params.get("reason") or ""), caller
+                )
         elif method == "identity_ack" and rid:
             # the control is **Dismiss**; `identity_ack` is only its wire name, which stays because
             # it is in `NODE_ACTS` and renaming it there is a protocol change that buys a person

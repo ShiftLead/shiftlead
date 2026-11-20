@@ -32,14 +32,23 @@ SOURCES = ("declared", "derived", "scraped")
 ProgressStatus = Literal["claimed", "done", "dropped"]
 PROGRESS_STATUSES = ("claimed", "done", "dropped")
 
-# Grants a session record can hold in `capabilities` (design §4.8). `control`: the session may
-# act on other sessions through the host agent (§9 invariant 11).
+# Grants the person gives a session (design §4.8): the New session form's boxes, `ao grant`, the Focus
+# grants chip. `control`: the session may act on other sessions through the host agent (§9 invariant 11).
 GRANTS = ("control",)
+# Every grant a record can hold in `capabilities`: the person's, and `permit`, the director seat's —
+# `decide` alone, on any unattended record of the org, without being among its controllers (TD-642) —
+# written with the seat at its start, never offered on a form or by `ao grant`.
+ALL_GRANTS = (*GRANTS, "permit")
 
 
 def has_control(capabilities: list[str] | None) -> bool:
     """Whether a record's grants include `control`."""
     return "control" in (capabilities or [])
+
+
+def has_permit(capabilities: list[str] | None) -> bool:
+    """Whether a record's grants include `permit` (design §4.8, TD-642)."""
+    return "permit" in (capabilities or [])
 
 
 # Message kinds (design §4.10): a small closed set, so a message's purpose is read off its envelope.
