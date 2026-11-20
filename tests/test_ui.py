@@ -2153,6 +2153,25 @@ def test_copy_on_select_is_the_persons_and_on_by_default(client, tmp_path):
     call_sync("set_settings", person={"terminal": {"copy_on_select": None}})  # TD-275
 
 
+def test_the_focus_settings_route_takes_the_terminal_grid(client):
+    """§5 `person.terminal.grid` (§4.6, TD-1919, TD-1947): the Focus page's settings route takes
+    `{terminal: {grid: [cols, rows]}}` beside `copy_on_select`, through `set_settings`; a grid outside
+    the bounds, or two keys at once, is refused."""
+    from sessionorc.client import call_sync
+
+    for bad in (
+        {"terminal": {"grid": [19, 40]}},
+        {"terminal": {"grid": [120, 201]}},
+        {"terminal": {"grid": "120x40"}},
+        {"terminal": {"grid": [120, 40], "copy_on_select": True}},
+    ):
+        assert client.post("/api/settings/person", json=bad).status_code == 400, bad
+    assert client.post("/api/settings/person", json={"terminal": {"grid": [132, 43]}}).json()["ok"]
+    assert call_sync("settings")["person"]["terminal"]["grid"] == [132, 43]
+    call_sync("set_settings", person={"terminal": {"grid": None}})
+    assert "grid" not in (call_sync("settings")["person"].get("terminal") or {})
+
+
 def test_a_copy_on_release_says_so_with_copys_own_toast():
     """TD-273: a drag-and-release in the Focus terminal copied and said nothing, and a refused copy
     was silent too. It goes through Copy's own path, which toasts *copied* or *clipboard blocked*."""

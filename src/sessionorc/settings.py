@@ -631,8 +631,12 @@ ON_WORK_DEFAULT = (
     "start"  # §6 rule 8, §5: what a team with no `on_work` key has (Paul, 2026-10-08, TD-457; `ask` until then)
 )
 BALANCE_KEYS = ("prs", "oldest", "review")
-TERMINAL_KEYS = ("size", "face", "copy_on_select")
+TERMINAL_KEYS = ("size", "face", "copy_on_select", "grid")
 TERMINAL_SIZE = (8, 32)  # a readable monospace size in px, either way of the Focus pane's default 13
+# §4.6 *Attach behaviour with another client present*, §5 `person.terminal.grid` (TD-1919): the columns and rows a
+# pinned window may take, the setting's bounds and the bridge's `fit`'s, and the grid when nothing is set
+TERMINAL_GRID = ((20, 500), (5, 200))
+TERMINAL_GRID_DEFAULT = (120, 40)
 INBOX_KEYS = ("board_show",)
 BOARD_SHOW_DEFAULT = "next:10"  # §4.5 screen 6 *The board's horizon*: what the page reads when nothing is set
 BOARD_SHOW_NEXT = (1, 50)  # `next:<n>`, the soonest n per team
@@ -948,9 +952,26 @@ def parse_file_link(v: Any, drop: bool = False) -> dict[str, Any]:
     return _each(_fields(v, FILE_LINK_KEYS, "file_link", drop), {"folder_first": folder_first, "wait": wait}, drop)
 
 
+def parse_terminal_grid(g: Any) -> list[int]:
+    """`person.terminal.grid` (§5, TD-1919): `[columns, rows]`, two whole numbers within `TERMINAL_GRID` —
+    the grid a new session's window is pinned at (§4.6)."""
+    (clo, chi), (rlo, rhi) = TERMINAL_GRID
+    if (
+        not isinstance(g, (list, tuple))
+        or len(g) != 2
+        or any(isinstance(n, bool) or not isinstance(n, int) for n in g)
+        or not clo <= g[0] <= chi
+        or not rlo <= g[1] <= rhi
+    ):
+        raise ValueError(
+            f"terminal.grid is [columns, rows], columns from {clo} to {chi} and rows from {rlo} to {rhi}, not {g!r}"
+        )
+    return [g[0], g[1]]
+
+
 def parse_person(value: Any, drop: bool = False) -> dict[str, Any]:
     """`person:` — `open_in`, `file_link: {folder_first, wait}` (TD-536), `terminal: {size, face,
-    copy_on_select}` (§5, goal 12, TD-164), `inbox: {board_show}` (TD-220), `attach: {max}` (TD-478) and
+    copy_on_select, grid}` (§5, goal 12, TD-164, TD-1919), `inbox: {board_show}` (TD-220), `attach: {max}` (TD-478) and
     `composer` (TD-500)."""
 
     def terminal(v: Any) -> dict[str, Any]:
@@ -972,7 +993,7 @@ def parse_person(value: Any, drop: bool = False) -> dict[str, Any]:
                 raise ValueError(f"terminal.copy_on_select is true or false, not {b!r}")
             return b
 
-        return _each(v, {"size": size, "face": face, "copy_on_select": flag}, drop)
+        return _each(v, {"size": size, "face": face, "copy_on_select": flag, "grid": parse_terminal_grid}, drop)
 
     def inbox(v: Any) -> dict[str, Any]:
         return _each(_fields(v, INBOX_KEYS, "inbox", drop), {"board_show": parse_board_show}, drop)
