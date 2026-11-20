@@ -9296,10 +9296,10 @@
     }
     // **the hold** (§4.6 *Fit to window*): from the press until the box's pixels are kept the layout holds; a turn
     // ends it with its note, a hidden page with none, and a press during it is ignored
-    function holdEnd(note) {
+    function holdEnd(note, keepLayout) {
       if (!fitHold) return;
       cancelAnimationFrame(fitHold.raf); fitHold = null;
-      phone.hold(false);
+      if (!keepLayout) phone.hold(false);
       if (note) AO.toast(note);
     }
     function holdTick(ev) {
@@ -9309,7 +9309,10 @@
       const got = AO.holdStep(fitHold.h, { ev, now: Date.now(), height: r.height, editing: phone.editing(), scale: vScale() });
       if (got.do === "wait") return;
       const wide = fitHold.wide;
-      holdEnd();
+      holdEnd(null, true);  // the layout held until the fit is under way, so its own crossing cancels it
+      try { fitKept(got, wide); } finally { phone.hold(false); }
+    }
+    function fitKept(got, wide) {
       let p = got.do === "keep" ? pxNow() : null;
       // the phone's hold keeps the phone's pixels, its fallback the pixels kept before; a coarse-pointer wide page's
       // are this fit's alone, and it keeps none before its hold
@@ -9332,10 +9335,10 @@
     // it is absent) drops the kept pixels and ends a hold or a waiting fit with its note
     const turned = () => {
       if (!coarse()) return;
-      kept = null;
+      kept = null;  // kept again by the box observer once the turned box is laid out
       if (fitHold) holdEnd(AO.FIT_TURNED);
       if (fitWait) fitEnd(AO.FIT_TURNED);
-      keepBox(); drawFit();
+      drawFit();
     };
     if (window.screen && screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener("change", turned);
     else window.addEventListener("orientationchange", turned);
@@ -9384,7 +9387,7 @@
       AO.TERM_OPTS.fontSize = size; term.options.fontSize = size;  // this terminal only; no other is this layout's
       relayout();  // the grid stays the pane's
       // it drops the phone's kept pixels too, and cancels a waiting fit (TD-1948)
-      kept = null; if (fitWait) fitEnd(AO.FIT_TURNED); keepBox();
+      kept = null; if (fitWait) fitEnd(AO.FIT_TURNED);  // kept again by the box observer
       drawFit();
     });
     // the soft-key row's height is one variable (`--softh` on the wrap, 0 while it is hidden), which `fill()`

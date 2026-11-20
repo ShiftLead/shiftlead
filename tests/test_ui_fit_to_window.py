@@ -246,7 +246,7 @@ def test_the_phone_keeps_its_pixels_and_a_turn_or_a_crossing_drops_them():
     assert 'window.addEventListener("orientationchange", turned)' in fit  # where screen.orientation is absent
     js = APP.read_text()
     relaid = js[js.index("    phone.relaid(() => {\n      fill();") :]
-    assert "kept = null; if (fitWait) fitEnd(AO.FIT_TURNED); keepBox();" in relaid[: relaid.index("\n    });\n")]
+    assert "kept = null; if (fitWait) fitEnd(AO.FIT_TURNED);" in relaid[: relaid.index("\n    });\n")]
 
 
 @pytest.mark.unit
@@ -255,6 +255,8 @@ def test_a_phone_or_coarse_press_blurs_holds_then_fits():
     begin = fit[fit.index("function holdBegin()") :]
     assert begin.index("a.blur()") < begin.index("phone.close();") < begin.index("phone.hold(true);")
     tick = fit[fit.index("function holdTick(ev)") : fit.index("function holdBegin()")]
+    # the layout is released only once the fit is under way, so a crossing it causes cancels that fit
+    assert "holdEnd(null, true);" in tick and "try { fitKept(got, wide); } finally { phone.hold(false); }" in tick
     assert "if (document.hidden) { holdEnd(); return; }" in tick  # a hidden page: nothing kept, no note
     # the phone's hold keeps the phone's pixels and falls back to those kept before; a wide page's are its own
     assert "if (!wide) { if (p) kept = p; p = keptNow(); }" in tick
