@@ -1,7 +1,7 @@
-"""TD-288: a terminal size saved on Settings reached an open Focus (`AO.setTermLook` set the size
-and refitted the grid) and tmux was never told: only the pane box's observer sent a resize, so the
-pane kept drawing at the old width under a grid of another. The look's change is JavaScript, run as
-itself under node; where the resize is sent from is read from the source."""
+"""A terminal size saved on Settings reaches an open Focus (`AO.setTermLook`, TD-288) and changes how many of the
+pane's columns the box shows, never the grid (design §4.6, TD-1919): the terminal draws at the pane's grid, which only
+the bridge's `grid` frame sets, so the look's change lays the terminal out again and sends nothing. The look's change
+is JavaScript, run as itself under node; that the page sends no grid is read from the source."""
 
 import json
 import pathlib
@@ -29,26 +29,19 @@ global.location = { pathname: "/", protocol: "http:", host: "x" };
 global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
 const AO = window.AO;
-// a terminal whose grid follows its cell size in a fixed box, as xterm.js and the fit addon do
-const sent = [];
-const term = { options: { fontSize: 13, fontFamily: "" }, cols: 100, rows: 22,
-  onResize(f) { this.listener = f; } };
-term.onResize(({ cols, rows }) => sent.push([cols, rows]));
-const fit = { fit() {
-  const cols = Math.floor(700 / (term.options.fontSize * 0.54));
-  const rows = Math.floor(400 / (term.options.fontSize * 1.38));
-  if (cols !== term.cols || rows !== term.rows) { term.cols = cols; term.rows = rows; term.listener({ cols, rows }); }
-} };
-AO.terms.push({ term, fit });
+// an open terminal: its grid is the pane's, and its `relayout` is what follows a new cell
+const laid = [];
+const term = { options: { fontSize: 13, fontFamily: "" }, cols: 100, rows: 22 };
+AO.terms.push({ term, relayout: () => laid.push(term.options.fontSize) });
 AO.setTermLook({ size: 17 });
 const after = { size: term.options.fontSize, grid: [term.cols, term.rows] };
 AO.setTermLook({ size: 99 });  // out of range: the default
-console.log(JSON.stringify({ after, fallback: term.options.fontSize, sent }));
+console.log(JSON.stringify({ after, fallback: term.options.fontSize, laid }));
 """
 
 
 @pytest.mark.unit
-def test_a_saved_size_reaches_an_open_terminal_and_refits_it():
+def test_a_saved_size_reaches_an_open_terminal_and_keeps_its_grid():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
@@ -57,21 +50,22 @@ def test_a_saved_size_reaches_an_open_terminal_and_refits_it():
     out = subprocess.run([node, str(probe), str(JS)], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
     got = json.loads(out.stdout)
-    assert got["after"]["size"] == 17
-    assert got["after"]["grid"] != [100, 22]  # the grid was refitted to the larger cells
-    assert got["sent"][0] == got["after"]["grid"]  # …and the grid's change is what the terminal reports
+    assert got["after"] == {"size": 17, "grid": [100, 22]}  # the pane's grid, whatever the cell
+    assert got["laid"] == [17, 13]  # laid out again at each new cell
     assert got["fallback"] == 13
 
 
 @pytest.mark.unit
-def test_focus_tells_tmux_every_change_of_the_grid():
+def test_focus_sends_no_grid_and_sizes_the_terminal_by_the_bridges_frame():
     js = JS.read_text()
     start = js.index("const term = new Terminal(")
     body = js[start : js.index("\n  };\n", start)]  # to the end of `AO.focus`, which grows (TD-989, TD-990)
-    # the resize goes from the terminal's own resize event, so a refit by a look change sends it too…
-    # (through the sender, one per gesture: TD-794, tests/test_ui_term_resize.py)
-    assert "term.onResize(({ cols, rows }) => sendGrid(cols, rows));" in body
-    assert "ws && ws.readyState === 1" in body[body.index("const sendGrid = AO.resizeSender(") :][:200]
-    # …and the box's observer only fits, never sends a resize of its own
-    obs = body[body.index("new ResizeObserver(") :]
+    # no resize message, no `onResize` wiring, no fit addon, no grid on the socket's address
+    for gone in ("resize:", "term.onResize(", "FitAddon", "fit.fit(", "?cols="):
+        assert gone not in body, gone
+    # the terminal is resized by the `grid` frame alone, and only by one that differs from its own
+    assert "if (gc !== term.cols || gr !== term.rows) term.resize(gc, gr);" in body
+    assert body.count("term.resize(") == 1
+    # …and the box's observer sets the view, never a grid
+    obs = body[body.index("new ResizeObserver(() => { keeper") :]
     assert "ws.send" not in obs[: obs.index(".observe(")]
