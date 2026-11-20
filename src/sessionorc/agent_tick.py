@@ -4111,7 +4111,47 @@ class TickMixin:
         # a `prs`, `every` or `swept` due met while the seat ran is the next run's cause (TD-700, TD-1090)
         if (s.seat or {}).get("trigger") in ("prs", "every", "swept"):
             return True
-        return (s.seat or {}).get("trigger") == "team" and s.seat_due.get("by") != "asks"
+        # a manager on call's member reading, or a director's prompt, that came due after its fill is the next
+        # fill's: a fill starts cold on the one reading its `seat_due` names (§6 rule 3, TD-259, TD-642)
+        return (s.seat or {}).get("trigger") in ("team", "prompt") and s.seat_due.get("by") != "asks"
+
+    @staticmethod
+    def _permission_pending(r: Session) -> bool:
+        """A hook-confirmed `needs-you` on a permission a seat may answer (§6 rule 3): a question or a menu is
+        a person's, and a permission only the terminal answers is never a seat's (§4.3, TD-785)."""
+        return (
+            r.state == "needs-you"
+            and r.told
+            and r.pending is not None
+            and r.pending.kind == "permission"
+            and bool(adapters.permission_channel(r.adapter))
+        )
+
+    @staticmethod
+    def _is_director(r: Session) -> bool:
+        """The org's director seat (§4.9b *The director seat*, TD-642): the record whose seat's trigger is
+        `prompt`, the director's alone — kept while it is not superseded or suspended."""
+        return (r.seat or {}).get("trigger") == "prompt" and not r.superseded_by and not r.suspended
+
+    def _prompt_causes(self, s: Session, records: list[Session]) -> list[dict[str, Any]]:
+        """What the director seat is filled for (§6 rule 3, §4.9b *The director seat*, TD-642), in this order:
+        `asks` — each question passed up to it, by id; then `prompt` — each unattended supervised record of
+        the org, never itself, with a permission no rule of the person's answered pending (a rule answers at
+        the hook, so one still pending is unanswered), by member. An interactive record's prompt is the
+        person's alone, as is one only its terminal answers."""
+        causes: list[dict[str, Any]] = [{"by": "asks", "ask": i} for i in s.asks_ids(home=self.host)]
+        for r in records:
+            if (
+                r is not s
+                and r.id != s.id
+                and r.supervised
+                and r.unattended
+                and not r.superseded_by
+                and not r.suspended
+                and self._permission_pending(r)
+            ):
+                causes.append({"by": "prompt", "member": self._address(r)})
+        return causes
 
     def _team_causes(self, s: Session, records: list[Session]) -> list[dict[str, Any]]:
         """What a manager on call is filled for (§6 rule 3, TD-259), each a reading of the records
@@ -4127,17 +4167,13 @@ class TickMixin:
             for r in records
             if r is not s and r.supervised and not r.superseded_by and not r.suspended and me in self._ctl(r)
         ]
+        # with a director seat the manager's triage of permissions stands aside — one judge, not two: an unattended
+        # member's prompt goes to the director before a manager (§4.9b *The director seat*, TD-642)
+        director = any(self._is_director(r) for r in records if r is not s)
         for by in ("pending", "stalled", "open"):
             for r in members:
                 if by == "pending":
-                    met = (
-                        r.state == "needs-you"
-                        and r.told
-                        and r.pending is not None
-                        and r.pending.kind == "permission"
-                        # a permission only the terminal answers is never a seat's (§4.3, §6 rule 3, TD-785)
-                        and adapters.permission_channel(r.adapter)
-                    )
+                    met = self._permission_pending(r) and not (director and r.unattended)
                 elif by == "stalled":
                     met = r.state == "stalled?"
                 else:
@@ -4157,8 +4193,8 @@ class TickMixin:
         has gone, here, and a due whose cause went before the fill is cleared as `asks` is."""
         seat = s.seat or {}
         trigger = seat.get("trigger")
-        if trigger == "team":
-            causes = self._team_causes(s, records)
+        if trigger in ("team", "prompt"):
+            causes = self._team_causes(s, records) if trigger == "team" else self._prompt_causes(s, records)
 
             def same(a: dict[str, Any], b: dict[str, Any]) -> bool:
                 return all(a.get(k) == b.get(k) for k in ("by", "member", "ask"))
@@ -4412,7 +4448,7 @@ class TickMixin:
         tagged = bool(seat.get("tags")) and (s.seat_due or {}).get("by") == "tag"
         # a manager on call's cause, a tagging seat's `tag` (TD-730), or a sweep seat's `swept`, which is
         # remembered so it fills once (TD-1090) but says nothing (`filled_for`); a techlead's `asks` fill has none
-        cause = s.seat_due if seat.get("trigger") in ("team", "swept") or tagged else None
+        cause = s.seat_due if seat.get("trigger") in ("team", "prompt", "swept") or tagged else None
         # a manager on call says why it came (§6 rule 3 *A fill says why it came*, TD-410): its first
         # act is the reading `seat_due` names, read back from the record, never `ao status` first
         said = filled_for(cause)
