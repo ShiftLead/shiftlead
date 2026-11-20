@@ -461,7 +461,7 @@
     {% if s.state != 'scheduled' %}<div class="shacts" id="fsheetacts">
       {%- set acts = [('fclose', '✓', 'Close session'), ('fmodeact', '⇄', s.mode_act or 'Take over')] if s.agent else [('fclose', '✓', 'Close session')] %}
       {%- if s.agent %}{% set acts = acts + [('fmessage', '✉', 'Message'), ('fwrapup', '⏎', 'Wrap up')] %}{% endif %}
-      {%- set acts = acts + [('ftranscript', '☰', 'Transcript'), ('fshell', '⌘', 'Open shell here'), ('tpaste', '⎘', 'Paste')] %}
+      {%- set acts = acts + [('ftranscript', '☰', 'Transcript'), ('fshell', '⌘', 'Open shell here'), ('tpaste', '⎘', 'Paste'), ('tfit', '⤢', 'Fit to window')] %}
       {%- if s.agent %}{% set acts = acts + [('fmodemenu', '⇄', s.mode_act or 'Hand back')] %}{% endif %}
       {%- for src, glyph, label in acts %}
       <button type="button" class="act{% if src in ('fclose', 'fmodeact') %} next{% endif %}" data-for="{{ src }}"><span class="ic" aria-hidden="true">{{ glyph }}</span><span class="al">{{ label }}</span></button>

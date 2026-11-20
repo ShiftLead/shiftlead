@@ -154,7 +154,10 @@ def test_the_pinch_is_the_terminals_on_a_phone_and_sends_one_grid_when_the_finge
     # drawn as they move, the grid the pane's throughout (TD-1919): kept when they lift, laid out again, and the note
     assert "AO.pinchKeep(size);" in pinch and "relayout();" in pinch and "fit" not in pinch.replace("pinchNote", "")
     assert "pinchNote(AO.pinchSays(size, AO.boxGrid(), term.cols));" in pinch  # the box's columns and the pane's
-    assert "new ResizeObserver(() => { keeper.release(); schedule(); drawFit(); }).observe(boxEl);" in focus
+    assert (
+        "new ResizeObserver(() => { keeper.release(); schedule(); keepBox(); fitRekeep(); drawFit(); }).observe(boxEl);"
+        in focus
+    )
     # a crossing of the narrow query draws the size its layout reads
     relaid = focus[focus.index("    phone.relaid(() => {") :]
     relaid = relaid[: relaid.index("\n    });\n")]

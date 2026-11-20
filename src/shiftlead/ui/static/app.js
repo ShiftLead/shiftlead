@@ -3919,6 +3919,34 @@
   AO.fitTitle = (pane, box) => `give the pane this window's size (pane ${pane[0]} × ${pane[1]}, window ${box ? `${box[0]} × ${box[1]}` : "—"}) — waits until the session is idle; a smaller size can repeat or drop the last lines of the history`;
   // the pinch's note (§4.5a **a pinch**): the size, the box's columns at it and the pane's
   AO.pinchSays = (size, box, paneCols) => (box ? `${size} px · ${box[0]} of ${paneCols} columns` : `${size} px · ${paneCols} columns`);
+  // **The press's hold** (§4.6 *Fit to window*, TD-1948): on a phone, or a wide page on a coarse pointer, a press
+  // blurs any focused field, closes the sheet and keeps the box's pixels at the first frame at which its height has
+  // not changed for `HOLD_STEADY` with nothing editable focused — counted from the press when nothing was focused,
+  // else from the first `visualViewport` `resize` after the blur. One second (`HOLD_LIMIT`) bounds the wait for that
+  // `resize` (none, and nothing focused: the box as it is), and one second from it bounds the hold; a field focused
+  // when either passes takes the fallback (the pixels kept before). A `resize` whose `scale` differs from the last
+  // one's is a zoom, never the keyboard's fall. `AO.holdStart` makes the hold; `AO.holdStep(h, c)` is one moment of
+  // it — `c.ev` `"frame"` or `"resize"`, `now`, `height` (the box's), `editing`, `scale` — `{do: "wait"}`,
+  // `{do: "keep"}` or `{do: "fallback"}`.
+  AO.HOLD_STEADY = 100;
+  AO.HOLD_LIMIT = 1000;
+  AO.holdStart = (now, focused, height, scale) => ({ since: now, base: focused ? null : now, steadyAt: now, lastH: height, scale });
+  AO.holdStep = (h, c) => {
+    if (c.ev === "resize") {
+      if (c.scale !== h.scale) { h.scale = c.scale; return { do: "wait" }; }  // a zoom
+      if (h.base == null) { h.base = c.now; h.steadyAt = c.now; h.lastH = c.height; }
+      return { do: "wait" };
+    }
+    if (h.base == null) {  // a field was focused: waiting for the keyboard's fall
+      if (c.now - h.since < AO.HOLD_LIMIT) return { do: "wait" };
+      return { do: c.editing ? "fallback" : "keep" };
+    }
+    if (c.height !== h.lastH) { h.lastH = c.height; h.steadyAt = c.now; }
+    if (!c.editing && c.now - h.steadyAt >= AO.HOLD_STEADY) return { do: "keep" };
+    return c.now - h.base >= AO.HOLD_LIMIT ? { do: "fallback" } : { do: "wait" };
+  };
+  AO.FIT_TURNED = "not fitted — the screen changed, press again";
+  AO.FIT_NO_BOX = "put the keyboard down, then press again";
   // The soft-key row (design §4.5a **Focus pane: soft-key row**, TD-990): a key's name to the bytes xterm.js
   // sends for it — an arrow `ESC [ A`–`D`, or `ESC O A`–`D` while the program has set application cursor
   // keys; null for a name the row does not have
@@ -8272,8 +8300,10 @@
       root.style.setProperty("--vvt", `${Math.max(0, Math.round(vv.offsetTop))}px`);
     };
     if (vv) { vv.addEventListener("resize", viewport); vv.addEventListener("scroll", viewport); }
+    // a Fit to window press holds the layout from the press until its hold ends, as a focused field does (TD-1948)
+    let holding = false;
     const relay = () => {
-      const n = AO.narrowNext(narrow, !!(mq && mq.matches), !!popped || body.classList.contains("popped"), editing());
+      const n = AO.narrowNext(narrow, !!(mq && mq.matches), !!popped || body.classList.contains("popped"), editing() || holding);
       if (n === narrow) return;
       narrow = n; root.classList.toggle("phonefocus", n);
       if (!n) close();  // not quiet: the composer's sheet folds the composer back (its `closed` hook) on a crossing
@@ -8281,8 +8311,14 @@
       hooks.relaid.forEach((f) => f(n));
     };
     if (mq && mq.addEventListener) mq.addEventListener("change", relay);
-    // read again on blur: a frame later, once the focus has landed wherever it goes
-    document.addEventListener("focusout", () => setTimeout(relay, 0));
+    // read again after a blur at the next `visualViewport` `resize` or one second on, whichever is first, so a control
+    // that takes focus as it is pressed (more ▾'s toggle) reads the query once the keyboard has fallen (TD-1948)
+    document.addEventListener("focusout", () => {
+      let t = null, done = false;
+      const go = () => { if (done) return; done = true; clearTimeout(t); if (vv) vv.removeEventListener("resize", go); relay(); };
+      t = setTimeout(go, 1000);
+      if (vv) vv.addEventListener("resize", go);
+    });
     relay(); viewport();
     // the sheets: one open at a time over a dimmed Focus; closing one gives the terminal its refit
     const scrim = $("#fscrim");
@@ -8352,6 +8388,7 @@
         b.disabled = !!(src && src.disabled);
         const al = $(".al", b);
         if (al && src && /^fmode/.test(src.id)) al.textContent = src.textContent.trim();
+        if (al && src && src.id === "tfit") al.textContent = src.textContent.replace(/^⤢\s*/, "").trim();  // or Cancel fit
       });
       const text = (sel) => { const e = $(sel); return e ? e.textContent.trim() : ""; };
       const checks = $$("#checks > div");
@@ -8417,6 +8454,9 @@
     return {
       narrow: () => narrow,
       opened: () => !!open,
+      editing,
+      // a Fit to window press's hold: the layout held while it runs, the query read again once it ends
+      hold(on) { holding = !!on; if (!on) relay(); },
       show, close,
       relaid: (f) => hooks.relaid.push(f),
       closed: (f) => hooks.closed.push(f),
@@ -8521,14 +8561,30 @@
     };
     // **One helper measures** (§4.6 *Fit to window*): the box's rendered size less its padding and borders, and the
     // terminal's own border (the gap), over the cell — whether or not the sideways scrollbar shows
-    AO.boxGrid = () => {
+    const boxEdges = () => {
       const cs = getComputedStyle(boxEl), xt = $(".xterm", boxEl), xs = xt ? getComputedStyle(xt) : null;
       const x = px(cs, "paddingLeft") + px(cs, "paddingRight") + px(cs, "borderLeftWidth") + px(cs, "borderRightWidth")
         + (xs ? px(xs, "borderLeftWidth") + px(xs, "borderRightWidth") : 0);
       const y = px(cs, "paddingTop") + px(cs, "paddingBottom") + px(cs, "borderTopWidth") + px(cs, "borderBottomWidth")
         + (xs ? px(xs, "borderTopWidth") + px(xs, "borderBottomWidth") : 0);
-      return AO.gridOf(boxEl.getBoundingClientRect(), { x, y }, cell());
+      return { x, y };
     };
+    // **The phone's kept pixels** (§4.6 *Fit to window*, TD-1948): the box with the keyboard and every sheet down,
+    // kept on load and on any box change so, on the phone layout and never a box with no size, with the screen's
+    // orientation they were kept in — dropped on a turn (pixels of another orientation than the screen's are stale)
+    // or a crossing of the narrow query. On a phone the helper divides them by the current cell, so a pinch or a
+    // font changes the grid with no new measurement; until some are kept it reads the live box.
+    const orient = () => (window.screen && screen.orientation && screen.orientation.type)
+      || (typeof window.orientation === "number" ? `deg${window.orientation}` : "");
+    let kept = null, fitHold = null;  // the hold of a Fit to window press (below)
+    const pxNow = () => { const r = boxEl.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? { width: r.width, height: r.height, type: orient() } : null; };
+    const keptNow = () => { if (kept && kept.type !== orient()) kept = null; return kept; };
+    const keepBox = () => {
+      if (!phone.narrow() || phone.editing() || phone.opened() || fitHold) return;
+      const p = pxNow(); if (p) kept = p;
+    };
+    const gridOfPx = (p) => (p ? AO.gridOf(p, boxEdges(), cell()) : null);
+    AO.boxGrid = () => gridOfPx((phone.narrow() && keptNow()) || boxEl.getBoundingClientRect());
     const lastTextRow = () => {
       const b = term.buffer.active;
       for (let i = term.rows - 1; i > 0; i--) {
@@ -9111,7 +9167,8 @@
     $("#tpaste").addEventListener("click", pasteClip);
     // No box change sizes the grid (§4.6, TD-1919): the put away, the phone's keyboard, a turn, a pinch and the sheets
     // send nothing. A box change sets the vertical view again and ends any keep.
-    new ResizeObserver(() => { keeper.release(); schedule(); drawFit(); }).observe(boxEl);
+    // It keeps the phone's pixels (`keepBox`) and a waiting coarse-pointer fit's (`fitRekeep`, TD-1948).
+    new ResizeObserver(() => { keeper.release(); schedule(); keepBox(); fitRekeep(); drawFit(); }).observe(boxEl);
     toTerm();
     // *The keyboard is up for the terminal* is the terminal's focus, never a guess from the viewport: the input bar
     // goes while it has it (TD-1299)
@@ -9159,33 +9216,41 @@
     // **Fit to window** (§4.6 *Fit to window*, §4.5a, TD-1919, TD-1948): the box's grid (`AO.boxGrid()`) sent as
     // `{fit}` once the pane is quiet (`AO.fitStep`, read each quarter second while it waits, and on a `grid` frame);
     // a record with no agent fits at once. While it waits the item reads **Cancel fit** and the terminal mark
-    // *fitting when idle…*; a press on Cancel fit, a closed socket or a reload ends it. On the wide layout's own
-    // Focus (not a phone, not a Pop out) the grid is also written as `person.terminal.grid`, once the first `grid`
-    // frame on that socket equal to it answers within ten seconds. Not drawn on an ended record, nor (unless it
-    // waits) when the box's grid is the pane's, tested as *more ▾* opens and on a `grid` frame while it is open;
-    // drawn on a read-only Focus, since it types nothing. The phone's sheet and its measure are not yet drawn.
+    // *fitting when idle…*; a press on Cancel fit, a closed socket, a reload, a turn of the phone or a crossing of
+    // the narrow query ends it. On the wide layout's own Focus (not a phone, not a Pop out) the grid is also written
+    // as `person.terminal.grid`, once the first `grid` frame on that socket equal to it answers within ten seconds.
+    // Not drawn on an ended record, nor on the wide layout (unless it waits) when the box's grid is the pane's,
+    // tested as *more ▾* opens and on a `grid` frame while it is open; a phone draws it in the sheet on every live
+    // record with a terminal. Drawn on a read-only Focus, since it types nothing. On a phone, or a wide page on a
+    // coarse pointer, a press first blurs and holds (`AO.holdStep`): the phone's fit divides the pixels it kept, the
+    // coarse-pointer wide page's those its own hold kept, kept again on every box change while it waits.
     const fitEl = $("#tfit");
     const fitLabel = fitEl ? fitEl.textContent : "";
     let fitWait = null, fitTick = null, fitAnswer = null;
     const fitOwn = () => !phone.narrow() && !popped && !document.body.classList.contains("popped");
+    const coarse = () => !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+    const vvp = window.visualViewport;
+    const vScale = () => (vvp ? vvp.scale : 1);
     function drawFit() {
       if (!fitEl) return;
       const g = AO.boxGrid(), v = lastV || s, pane = [term.cols, term.rows];
       fitEl.textContent = fitWait ? "Cancel fit" : fitLabel;
       fitEl.title = AO.fitTitle(pane, g);
-      fitEl.classList.toggle("hidden", !fitWait && (phone.narrow() || paneGone || ["exited", "closed"].includes(v.state)
-        || !g || AO.sameGrid(g, pane)));
+      fitEl.classList.toggle("hidden", !fitWait && (paneGone || ["exited", "closed"].includes(v.state)
+        || (!phone.narrow() && (!g || AO.sameGrid(g, pane)))));
     }
     function fitEnd(note) {
       fitWait = null; clearInterval(fitTick); fitTick = null;
       mk.fitting = false; drawMark(); drawFit();
       if (note) AO.toast(note);
     }
+    // the grid a waiting fit sends: the coarse-pointer wide page's own pixels, else the helper's
+    const fitBox = () => (fitWait && fitWait.px ? gridOfPx(fitWait.px) : AO.boxGrid());
     function fitRun() {
       if (!fitWait) return;
       const step = AO.fitStep(fitWait, {
         v: lastV || s, lastByte: mk.lastByte, now: Date.now(), hidden: document.hidden,
-        box: AO.boxGrid(), pane: [term.cols, term.rows],
+        box: fitBox(), pane: [term.cols, term.rows],
       });
       if (step.do === "wait") return;
       if (step.do === "end") { fitEnd(step.note); return; }
@@ -9212,23 +9277,82 @@
         if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
       }).catch((e) => AO.toast(`fitted, but not kept for later sessions: ${e.message}`));
     }
+    // the press measured: the equal test and the bounds, then the quiet wait (`px` the coarse-pointer wide page's)
+    // a coarse-pointer wide page's waiting fit keeps its pixels again on every box change with nothing editable
+    // focused and no sheet open: its send divides them by the current cell however the keyboard stands by then
+    function fitRekeep() {
+      if (!fitWait || !fitWait.px || phone.editing() || phone.opened()) return;
+      const p = pxNow(); if (p) fitWait.px = p;
+    }
+    function fitPress(g, px) {
+      if (!g) return;  // no size, or a proposal that is not finite: nothing sent
+      if (AO.sameGrid(g, [term.cols, term.rows])) { AO.toast("already this size", true); return; }
+      const refused = AO.fitRefused(g);
+      if (refused) { AO.toast(refused); return; }
+      fitWait = { since: Date.now(), px: px || null };
+      mk.fitting = true; drawMark(); drawFit();
+      fitTick = setInterval(fitRun, 250);
+      fitRun();
+    }
+    // **the hold** (§4.6 *Fit to window*): from the press until the box's pixels are kept the layout holds; a turn
+    // ends it with its note, a hidden page with none, and a press during it is ignored
+    function holdEnd(note, keepLayout) {
+      if (!fitHold) return;
+      cancelAnimationFrame(fitHold.raf); fitHold = null;
+      if (!keepLayout) phone.hold(false);
+      if (note) AO.toast(note);
+    }
+    function holdTick(ev) {
+      if (!fitHold) return;
+      if (document.hidden) { holdEnd(); return; }  // nothing kept, no note
+      const r = boxEl.getBoundingClientRect();
+      const got = AO.holdStep(fitHold.h, { ev, now: Date.now(), height: r.height, editing: phone.editing(), scale: vScale() });
+      if (got.do === "wait") return;
+      const wide = fitHold.wide;
+      holdEnd(null, true);  // the layout held until the fit is under way, so its own crossing cancels it
+      try { fitKept(got, wide); } finally { phone.hold(false); }
+    }
+    function fitKept(got, wide) {
+      let p = got.do === "keep" ? pxNow() : null;
+      // the phone's hold keeps the phone's pixels, its fallback the pixels kept before; a coarse-pointer wide page's
+      // are this fit's alone, and it keeps none before its hold
+      if (!wide) { if (p) kept = p; p = keptNow(); }
+      if (!p) { pinchNote(AO.FIT_NO_BOX); return; }
+      fitPress(gridOfPx(p), wide ? p : null);
+    }
+    function holdBegin() {
+      const focused = phone.editing(), a = document.activeElement;
+      if (focused && a && a.blur) a.blur();
+      phone.close();
+      phone.hold(true);
+      const r = boxEl.getBoundingClientRect();
+      fitHold = { h: AO.holdStart(Date.now(), focused, r.height, vScale()), wide: !phone.narrow(), raf: 0 };
+      const frame = () => { if (!fitHold) return; holdTick("frame"); if (fitHold) fitHold.raf = requestAnimationFrame(frame); };
+      fitHold.raf = requestAnimationFrame(frame);
+    }
+    if (vvp) vvp.addEventListener("resize", () => holdTick("resize"));
+    // a turn of the phone (`screen.orientation`'s `change`, read on a coarse pointer alone; `orientationchange` where
+    // it is absent) drops the kept pixels and ends a hold or a waiting fit with its note
+    const turned = () => {
+      if (!coarse()) return;
+      kept = null;  // kept again by the box observer once the turned box is laid out
+      if (fitHold) holdEnd(AO.FIT_TURNED);
+      if (fitWait) fitEnd(AO.FIT_TURNED);
+      drawFit();
+    };
+    if (window.screen && screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener("change", turned);
+    else window.addEventListener("orientationchange", turned);
     if (fitEl) {
       const more = fitEl.closest("details");
       if (more) more.addEventListener("toggle", () => { if (more.open) drawFit(); });
       fitEl.addEventListener("click", () => {
         if (more) more.open = false;  // the menu folds on the press, as any menu does
+        if (fitHold) return;  // a press while a hold runs is ignored
         if (fitWait) { fitEnd(); return; }  // Cancel fit: measures nothing, sends nothing
-        const g = AO.boxGrid();
-        if (!g) return;  // no size, or a proposal that is not finite: nothing sent
-        if (AO.sameGrid(g, [term.cols, term.rows])) { AO.toast("already this size", true); return; }
-        const refused = AO.fitRefused(g);
-        if (refused) { AO.toast(refused); return; }
-        fitWait = { since: Date.now() };
-        mk.fitting = true; drawMark(); drawFit();
-        fitTick = setInterval(fitRun, 250);
-        fitRun();
+        if (phone.narrow() || coarse()) { holdBegin(); return; }  // every press but Cancel fit's measures afresh
+        fitPress(AO.boxGrid());
       });
-      document.addEventListener("visibilitychange", fitRun);
+      document.addEventListener("visibilitychange", () => { if (fitHold) holdTick("frame"); fitRun(); });
       drawFit();
     }
     compose.addEventListener("input", () => drawAsk(lastV));
@@ -9262,6 +9386,8 @@
       const size = AO.termSize(AO.termLook);
       AO.TERM_OPTS.fontSize = size; term.options.fontSize = size;  // this terminal only; no other is this layout's
       relayout();  // the grid stays the pane's
+      // it drops the phone's kept pixels too, and cancels a waiting fit (TD-1948)
+      kept = null; if (fitWait) fitEnd(AO.FIT_TURNED);  // kept again by the box observer
       drawFit();
     });
     // the soft-key row's height is one variable (`--softh` on the wrap, 0 while it is hidden), which `fill()`
