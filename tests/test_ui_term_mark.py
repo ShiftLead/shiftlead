@@ -49,8 +49,12 @@ console.log(JSON.stringify({
   silent_closed: mark({ open: false }, 90000),
   silent_no_byte: mark({ lastByte: null }, 90000),
   precedence_retry: mark({ retryAt: 0 }, 40000),
-  titles: ["reconnecting", "silent"].map((k) => {
-    const o = { reconnecting: { retryAt: 0 }, silent: {} }[k];
+  fitting: mark({ fitting: true, state: "idle" }, 0),
+  precedence_fit_over_silent: mark({ fitting: true }, 40000),
+  precedence_retry_over_fit: mark({ retryAt: 0, fitting: true }, 40000),
+  fit_in_retry_grace: mark({ retryAt: 0, fitting: true }, 1000),
+  titles: ["reconnecting", "fitting", "silent"].map((k) => {
+    const o = { reconnecting: { retryAt: 0 }, fitting: { fitting: true }, silent: {} }[k];
     const m = AO.termMark({ ...base, ...o }, 40000); return [m.kind, m.title];
   }),
   grace: [AO.TERM_GRACE, AO.TERM_SILENT],
@@ -62,8 +66,9 @@ console.log(JSON.stringify({
 def test_the_mark_is_one_in_order_each_after_its_grace(tmp_path):
     """Under node: *reconnecting…* only three seconds after a retry was scheduled and until a pane byte
     clears it; *no output for Ns* after thirty seconds of silence on an open socket of a working
-    session, counting up — never on idle, closed, or before any byte; no *resized* mark whatever the
-    state says of other clients. One mark, in that order; each hover in §4.5a's words."""
+    session, counting up — never on idle, closed, or before any byte; *fitting when idle…* while a Fit to window
+    waits, with no grace, between the two (TD-1948); no *resized* mark whatever the state says of other clients.
+    One mark, in that order; each hover in §4.5a's words."""
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
@@ -74,6 +79,8 @@ def test_the_mark_is_one_in_order_each_after_its_grace(tmp_path):
     got = json.loads(run.stdout)
     assert got.pop("titles") == [
         ["reconnecting", "the terminal socket dropped and retries on its own — reload if it stays"],
+        ["fitting", "Fit to window waits for the pane to be quiet, so the tool is not made to repaint while it draws"
+                    " — press it again to cancel"],
         ["silent", "the session reads working and the pane has drawn nothing"
                    " — Transcript or `ao tail` say whether it is thinking or stuck"],
     ]  # fmt: skip
@@ -83,6 +90,8 @@ def test_the_mark_is_one_in_order_each_after_its_grace(tmp_path):
         "silent_before": None, "silent": "no output for 30s", "silent_counts": "no output for 45s",
         "silent_idle": None, "silent_closed": None, "silent_no_byte": None,
         "precedence_retry": "reconnecting…",
+        "fitting": "fitting when idle…", "precedence_fit_over_silent": "fitting when idle…",
+        "precedence_retry_over_fit": "reconnecting…", "fit_in_retry_grace": "fitting when idle…",
         "grace": [3000, 30000],
     }  # fmt: skip
 
