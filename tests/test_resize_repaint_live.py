@@ -14,9 +14,10 @@ tmux's own history is intact):
 - a **reattach** at another size: repeats, and one paragraph missing;
 - the prompt echoed twice after any of them;
 - a **pinned** window (`window-size manual`; here the real `new_session`, TD-1919; then the same churn and
-  reattaches): clean, 8 of 8 runs (two each of steady, width, height and reattach, in a script, then the combined churn here). Waiting for the
-  pane to be idle first does not help (a width change repeats the last paragraphs, a height change loses 3 to 4),
-  and `attach -f ignore-size` alone does not either (the window still followed the one client).
+  reattaches): clean, 8 of 8 runs (two each of steady, width, height and reattach, in a script, then the combined
+  churn here). Waiting for the pane to be idle first does not help (a width change repeats the last paragraphs, a
+  height change loses 3 to 4), and `attach -f ignore-size` alone does not either (the window still followed the one
+  client).
 
 The known-bad modes are `xfail` (not strict), so a mitigation that holds the pane's grid still turns them into
 passes without breaking the file. A mode that starts failing where it passed is a regression.
