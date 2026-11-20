@@ -234,6 +234,53 @@ def sweep_stale_scratch_roots(base: str = "/tmp") -> None:
         _forget_owner(name)
 
 
+def _pid_running(pid: int) -> bool:
+    """Is `pid` running? A signal 0 sends nothing; a process of another user's (`PermissionError`) counts as alive."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def sweep_dead_pytest_runs(own: Path) -> None:
+    """Remove each sibling `pytest-N` of this run's base temp whose `.lock` names a pid no longer running (TD-2028).
+
+    pytest keeps one run (`tmp_path_retention_count = 1`, TD-1890), but a run that dies before its end — a
+    precheck's timeout, a killed suite, the workers' deaths of TD-2012 — leaves its `.lock`, and pytest's own
+    cleanup skips a locked directory until the lock is three days old, so each dead run held 27k–53k inodes of
+    the shared `/tmp` for three days in every seat that ran it. A lock that is empty or unreadable is a run still
+    starting (pytest creates the file, then writes its pid), so it counts as live, as does a directory with no
+    lock (a finished run, pytest's own to keep or remove); `pytest-current`, a link, and this run's own are
+    never touched. A recycled pid makes a dead run look live: that costs one skipped sweep."""
+    parent = own.parent
+    if not own.name.startswith("pytest-") or not parent.name.startswith("pytest-of-"):
+        return  # a --basetemp of the caller's own: not pytest's numbered runs
+    for d in parent.glob("pytest-*"):
+        if d == own or d.is_symlink() or not d.is_dir():
+            continue
+        try:
+            pid = int((d / ".lock").read_text().strip())
+        except (OSError, ValueError):
+            continue  # no lock, or one still being written
+        if pid != os.getpid() and not _pid_running(pid):
+            _rmtree_writable(str(d))
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """The dead runs' sweep (TD-2028), in the xdist controller alone (a worker's base temp is inside the
+    controller's run), from the controller's own base temp."""
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        return
+    factory = getattr(session.config, "_tmp_path_factory", None)
+    if factory is None:
+        return
+    with contextlib.suppress(OSError):
+        sweep_dead_pytest_runs(factory.getbasetemp())
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _scratch_root():
     """Every run's scratch directory (design §4.6, TD-1944) under a short root of the test run's own, never
