@@ -4159,10 +4159,12 @@ class TickMixin:
                 and self._permission_pending(r)
             ):
                 # a prompt is a cause by its own id, as a question is (§6 rule 3): a second prompt the member
-                # raised before any tick saw the first answered is a new cause, never the filled one standing
-                p = r.pending
-                which = (p.tool_use_id or p.text) if p else None
-                causes.append({"by": "prompt", "member": self._address(r), "prompt": which})
+                # raised before any tick saw the first answered is a new cause, never the filled one standing;
+                # each open permission on the stack is one, so a prompt under another keeps its own entry
+                stack = [p for p in r.pendings if p.kind == "permission"] or ([r.pending] if r.pending else [])
+                causes += [
+                    {"by": "prompt", "member": self._address(r), "prompt": p.tool_use_id or p.text} for p in stack
+                ]
         return causes
 
     def _team_causes(self, s: Session, records: list[Session]) -> list[dict[str, Any]]:
