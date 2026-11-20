@@ -3811,6 +3811,10 @@
   // TD-1919). The rows a box shows: its `clientHeight` (a sideways scrollbar taken out) less `pad`, over the cell,
   // floored, at least one.
   AO.boxRows = (clientHeight, pad, cell) => Math.max(1, Math.floor((clientHeight - pad) / (cell || 16)));
+  // the box's `scrollTop` for a run starting at `top`: row r sits `gapTop` (the terminal's own top border, the gap)
+  // plus r cells down, so a run below the top row starts at its row, never a part of the row above; the top row shows
+  // the gap above it
+  AO.viewScroll = (top, cell, gapTop) => (top > 0 ? Math.round(top * (cell || 16) + (gapTop || 0)) : 0);
   // the first row shown when no keep stands: the box-height run ending at the lower of the cursor's row and the last
   // row with any text on it, a run that would start above the top row starting at it and one that would leave the
   // cursor's row above it starting at that row
@@ -8510,7 +8514,10 @@
       const v = viewAt();
       const top = keeper.frame(v.cur, bytesSince, v.auto, v.maxStart);
       bytesSince = false;
-      if (top !== shownTop) { shownTop = top; boxEl.scrollTop = Math.round(top * cellH()); }
+      if (top !== shownTop) {
+        const xt = $(".xterm", boxEl);
+        shownTop = top; boxEl.scrollTop = AO.viewScroll(top, cellH(), xt ? px(getComputedStyle(xt), "borderTopWidth") : 0);
+      }
       // the cursor's column kept in view while the terminal has the focus, as keys are typed
       if (document.activeElement === term.textarea) {
         const x = term.buffer.active.cursorX * cellW(), w = boxEl.clientWidth;
@@ -8520,15 +8527,16 @@
       if (keeper.unsettled(v.cur)) schedule();
     };
     const schedule = () => { if (!viewFrame) viewFrame = requestAnimationFrame(showView); };
-    // the terminal at the grid's pixel size (the renderer's canvas), a cell's room under it so the last run shows
-    // whole, and the view again
+    // the terminal at the grid's pixel size (the renderer's canvas), a cell's room and its top gap under it so the
+    // last run shows whole, and the view again
     const relayout = () => {
       const d = term._core && term._core._renderService && term._core._renderService.dimensions;
       const xt = $(".xterm", boxEl);
       if (xt && d && d.css && d.css.canvas && d.css.canvas.width > 0) {
         xt.style.width = `${d.css.canvas.width}px`;
         xt.style.height = `${d.css.canvas.height}px`;
-        xt.style.marginBottom = `${cellH()}px`;
+        // a cell and the top gap: the scroll past the terminal's top border (`AO.viewScroll`) is never clamped short
+        xt.style.marginBottom = `${cellH() + px(getComputedStyle(xt), "borderTopWidth")}px`;
       }
       shownTop = -1; schedule();
     };

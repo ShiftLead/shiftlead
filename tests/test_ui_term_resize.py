@@ -39,6 +39,8 @@ const out = {};
 out.start = [AO.viewStart(3, 3, 10, 40), AO.viewStart(39, 39, 10, 40), AO.viewStart(10, 39, 10, 40),
   AO.viewStart(5, 30, 10, 40), AO.viewStart(39, 39, 40, 40), AO.viewStart(39, 39, 50, 40)];
 out.rows = [AO.boxRows(200, 0, 17), AO.boxRows(10, 0, 17), AO.boxRows(212, 12, 20)];
+// the scroll offset of a run: the top row shows the gap; a run below it starts at its row past the terminal's border
+out.scroll = [AO.viewScroll(0, 20, 6), AO.viewScroll(30, 20, 6), AO.viewScroll(30, 20, 0), AO.viewScroll(7, 17.5, 4)];
 out.page = [AO.pageRows(10, 40), AO.pageRows(1, 40), AO.pageRows(40, 40)];
 out.axis = [AO.touchAxis(3, 9), AO.touchAxis(12, 4), AO.touchAxis(4, -12), AO.touchAxis(-10, 10)];
 out.grid = [AO.gridOf({ width: 812, height: 412 }, { x: 12, y: 12 }, { width: 8, height: 20 }),
@@ -102,6 +104,7 @@ def test_the_run_shown_the_rows_the_page_and_the_box_grid():
     assert got["start"] == [0, 30, 10, 5, 0, 0]  # the cursor's row never above the run
     assert got["rows"] == [11, 1, 10]
     assert got["page"] == [9, 1, None]
+    assert got["scroll"] == [0, 606, 600, 127]  # never a part of the row above the run (TD-1947)
     assert got["axis"] == [None, "x", "y", "y"]
     assert got["grid"] == [[100, 20], None, None]
     assert got["fits"] == [True, True, False, False]
