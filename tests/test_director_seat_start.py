@@ -181,3 +181,22 @@ async def test_the_home_writes_the_director_held(agent, tmp_path, monkeypatch):
     s = agent.sessions[rec["id"]]
     assert s.state == "closed" and s.seat == {"trigger": "prompt"} and "permit" in s.capabilities
     assert s.unattended and s.supervised and not s.team and not s.project and s.dir == p["dir"]
+
+
+@pytest.mark.unit
+def test_a_sessions_start_writes_no_director_and_says_so(tmp_path, monkeypatch):
+    """§4.8: the seat holds `permit`, which no session grants, so a session's own Start or Apply writes none."""
+    org = _org(tmp_path, monkeypatch, {})
+    call, calls = _fake()
+    assert teamrun.write_director(call, org, "ao-alpha-lead") == [f"director: {teamrun.DIRECTOR_BY_PERSON}"]
+    assert not any(m == "create" for m, _ in calls)
+
+
+@pytest.mark.unit
+def test_a_default_profile_that_asks_is_refused_too(tmp_path, monkeypatch):
+    org = _org(tmp_path, monkeypatch, {})
+    (tmp_path / "home" / "profiles.yml").write_text(
+        "default: asks\nprofiles:\n  asks: {adapter: claude-code, permission_prompts: ask}\n"
+    )
+    with pytest.raises(teams.TeamError, match=r"permission_prompts: ask"):
+        teams.director_create(org)

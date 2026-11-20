@@ -305,12 +305,14 @@ def director_create(org: orgmod.Org) -> dict[str, Any] | None:
     where = f"director {d.name}"
     profile = d.profile or ""
     adapter = profiles.DEFAULT_ADAPTER
-    if profile:
-        try:
-            p = profiles.get(profile)
-        except (KeyError, ValueError) as e:
+    try:  # the default profile too: one that asks is no director's either
+        p = profiles.get(profile or None)
+    except (KeyError, ValueError) as e:
+        if profile:
             raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
-        adapter = p.adapter
+        p = None  # no profiles file and no default: the tool's own default, which skips
+    if p is not None:
+        adapter = p.adapter or adapter
         if adapter == profiles.SHELL_ADAPTER:
             raise TeamError(f"{where}: profile {profile!r} runs a shell, and the director is an agent (design §4.9b)")
         if p.permission_prompts in DIRECTOR_REFUSED_PROMPTS:
