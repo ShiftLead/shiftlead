@@ -243,3 +243,10 @@ def test_the_agents_start_pins_every_ao_window_at_its_size(tmux):
     assert read("ao-t-unpinned", "#{window_width}x#{window_height}") == "88x22"
     assert opt("mine") != "manual"
     assert tmux.run("show-options", "-gwv", "window-size").stdout.strip() != "manual"
+
+
+def test_the_pins_default_grid_is_the_settings():
+    from sessionorc import settings
+    from sessionorc import tmux as tmux_module
+
+    assert tmux_module.GRID_DEFAULT == settings.TERMINAL_GRID_DEFAULT

@@ -15,9 +15,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from sessionorc import naming, paths
-from sessionorc.settings import TERMINAL_GRID_DEFAULT as GRID_DEFAULT
 
 HISTORY_LIMIT = 50000
+# the grid a window is pinned at when nothing is set (§4.6, TD-1919): `settings.TERMINAL_GRID_DEFAULT`, held here
+# too since settings' imports reach back to this module
+GRID_DEFAULT = (120, 40)
 _FMT = (
     "#{session_name}\t#{session_created}\t#{pane_current_command}\t#{pane_pid}\t#{pane_dead}\t#{pane_dead_status}"
     "\t#{window_index}\t#{pane_index}\t#{pane_tty}\t#{pane_title}"
