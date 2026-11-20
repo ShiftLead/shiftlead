@@ -903,3 +903,5 @@ def test_the_package_ships_the_directors_brief_with_its_org_slot():
     """TD-642: `director.md` is the seat's brief (§4.9b), its `{org}` the Org block a start fills."""
     text = (Path(org.__file__).parent / "briefs" / "director.md").read_text(encoding="utf-8")
     assert "{org}" in text and "ao allow <session>" in text and "ao deny <session>" in text
+    # Fix 4: a prompt it cannot weigh is passed up in words, the prompt left `needs-you`
+    assert "**Pass it up** — `ao msg person --kind note" in text and "answer nothing" in text
