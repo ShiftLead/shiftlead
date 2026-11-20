@@ -240,8 +240,8 @@ def _pid_running(pid: int) -> bool:
         os.kill(pid, 0)
     except ProcessLookupError:
         return False
-    except PermissionError:
-        return True
+    except (PermissionError, OverflowError):
+        return True  # another user's, or a lock no pid could write: never swept
     return True
 
 
@@ -277,7 +277,7 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     factory = getattr(session.config, "_tmp_path_factory", None)
     if factory is None:
         return
-    with contextlib.suppress(OSError):
+    with contextlib.suppress(OSError, ValueError, OverflowError):  # a sweep never stops the run
         sweep_dead_pytest_runs(factory.getbasetemp())
 
 

@@ -33,12 +33,15 @@ def test_only_a_dead_runs_locked_directory_is_removed(tmp_path):
     live = _run(parent, 2, str(os.getppid()))  # pytest's parent: running, and not this process
     starting = _run(parent, 3, "")  # created, its pid not yet written
     finished = _run(parent, 4, None)  # ended cleanly: pytest's own retention decides
+    huge = _run(parent, 6, "9" * 25)  # no pid could have written it: kept, and the sweep goes on
+    mine = _run(parent, 7, str(os.getpid()))
     own = _run(parent, 5, str(_dead_pid()))  # this run's, whatever its lock says
     (parent / "pytest-current").symlink_to(own)
 
     sweep_dead_pytest_runs(own)
 
     assert not dead.exists()
+    assert huge.exists() and mine.exists()
     assert live.exists() and starting.exists() and finished.exists() and own.exists()
     assert (parent / "pytest-current").is_symlink()
 
