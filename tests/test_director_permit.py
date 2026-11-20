@@ -49,7 +49,7 @@ async def test_the_director_decides_an_unattended_prompt_with_a_reason_and_tells
     rulestub,  # noqa: F811 — the fixture, imported above
     tmp_path,
 ):
-    for d in ("w", "d", "i"):
+    for d in ("w", "d", "i", "l"):
         (tmp_path / d).mkdir()
     async with LocalClient() as c:
         w = (
@@ -96,9 +96,27 @@ async def test_the_director_decides_an_unattended_prompt_with_a_reason_and_tells
             await task
             with pytest.raises(AgentError, match="control grant"):
                 await dc.call("send", id=w, text="hi")
-        # a person's own decide is no director's: nothing more is told
-        task = asyncio.create_task(_hook(w, "Bash", "ls", "t4"))
+        # a person's own decide is no director's, though it names `permit`: the gate sets it, nothing more is told
+        task = asyncio.create_task(_hook(w, "Bash", "cat ~/.claude/x", "t4"))
         await wait_state(c, w, "needs-you")
-        await c.call("decide", id=w, tool_use_id="t4", behavior="allow")
-        await task
+        await c.call("decide", id=w, tool_use_id="t4", behavior="allow", permit=True)
+        assert (await task)["behavior"] == "allow"
         assert len([e for e in agent.person_inbox if e.answered]) == 2
+        # `permit` is no grant the person offers, and an edit of the person's grants keeps it
+        with pytest.raises(AgentError, match="unknown grant permit"):
+            await c.call("set_grants", id=w, add=["permit"])
+        got = await c.call("set_grants", id=d, add=["control"])
+        assert got["capabilities"] == ["control", "permit"]
+        got = await c.call("set_grants", id=d, remove=["control"])
+        assert got["capabilities"] == ["permit"]
+        # a session (not the person's own shell, which is the person) cannot start one holding `permit` unless it
+        # holds it itself
+        lead = (
+            await c.call(
+                "create", name="lead", dir=str(tmp_path / "l"), adapter="rulestub", unattended=True,
+                capabilities=["control"],
+            )
+        )["id"]  # fmt: skip
+        async with LocalClient(caller=lead) as lc:
+            with pytest.raises(AgentError, match="holding permit"):
+                await lc.call("create", name="x", dir=str(tmp_path / "w"), adapter="shell", capabilities=["permit"])

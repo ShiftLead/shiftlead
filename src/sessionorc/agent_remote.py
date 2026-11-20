@@ -528,6 +528,15 @@ class RemoteMixin:
             # any close clears the tick's mark; the tick writes its own after this returns (§6 rule 2, TD-237)
             home_copy.closed_for = None
             self._save(home_copy)
+        if method == "decide" and params.get("permit") and params.get("behavior") == "allow":
+            # the node refuses the director's allow of a prompt kept for the person, where the prompt's call is
+            # (TD-642); a node on another build may not know `permit` and would drop it unread, so it is refused
+            ours, theirs = containers.home_build(), str((self.links.get(host) or {}).get("build") or "")
+            if not ours or theirs != ours:
+                raise RpcError(
+                    f"{params.get('id')}: {host} runs build {theirs or 'unknown'}, not this home's, so the director's "
+                    "allow is refused there — a deny stands, and the person answers it"
+                )
         mux = self._node_mux(host)
         asked_rec = self.remote.get(host, {}).get(rid) if method == "decide" and params.get("permit") else None
         # the prompt's words as the home's copy holds them before the node ends it, for the director's FYI (TD-642)

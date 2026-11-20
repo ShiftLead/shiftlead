@@ -5119,6 +5119,8 @@ class HostAgent(
             # a decide that passed by `permit` alone is the director's (§4.8, TD-642): its *allow* of a prompt kept
             # for the person is refused where the prompt waits, and its answer told — set here, never by the caller
             params["permit"] = mail.by_permit(graph, caller, params, controllers=self._ctl)
+            if params["permit"] and not str(params.get("reason") or "").strip():
+                raise RpcError(f"{caller} cannot decide {params.get('id')} without a reason: the person is told it")
         if method == "send" and not mail.as_person(caller, graph) and params.get("id") != caller:
             # design §6 *Usage gate*: while gated, a controller's send is refused here, at the home,
             # read from the record's `gated` — a node-owned field, so a replica carries it. A person's
