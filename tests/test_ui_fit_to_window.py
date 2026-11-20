@@ -162,11 +162,14 @@ def test_the_send_and_the_setting_written_on_the_bridges_answer():
 def test_the_socket_and_the_grid_frame_reach_the_fit():
     js = APP.read_text()
     focus = js[js.index("  AO.focus = function") :]
-    assert "keeper.release(); relayout(); drawFit();\n              fitAnswered([gc, gr], ws);" in focus
+    assert "keeper.release(); relayout(); drawFit();\n              fitAnswered([gc, gr], sock);" in focus
+    assert "const sock = ws;" in focus  # the frame's own socket, never a later attach's
     close = focus[focus.index("      ws.onclose = (e) => {") :]
     assert close.index("if (fitWait) fitEnd();") < close.index("if (paneGone) return;")  # a closed socket cancels
     ended = focus[focus.index("    function endTerm(text) {") :]
     assert ended.index("if (fitWait) fitEnd();") < ended.index("function openTerm()")
+    reattach = focus[focus.index("    function reattach() {") :]
+    assert reattach.index("if (fitWait) fitEnd();") < reattach.index("openTerm();")  # a mode change's new attach
 
 
 @pytest.mark.unit

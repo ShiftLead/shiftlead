@@ -8716,6 +8716,7 @@
       // no grid on the address: the bridge opens at the window's and says so in its `grid` frame (§4.6, TD-1919)
       ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/term/${encodeURIComponent(id)}`);
       ws.binaryType = "arraybuffer";
+      const sock = ws;  // this attach's own socket: a frame is credited to the socket it came on
       ws.onopen = () => {
         mk.open = true; mk.lastByte = Date.now(); tlog("open"); drawMark();
         AO.dropRead(id, s.team || "");  // the disconnect card's reading, at load and at each reconnect
@@ -8752,7 +8753,7 @@
               tlog("grid", [gc, gr]);
               if (gc !== term.cols || gr !== term.rows) term.resize(gc, gr);
               keeper.release(); relayout(); drawFit();
-              fitAnswered([gc, gr], ws);
+              fitAnswered([gc, gr], sock);
             }
             return;
           }
@@ -8794,6 +8795,7 @@
     function reattach() {
       if (paneGone) return;
       jumper.closed();
+      if (fitWait) fitEnd();  // its socket closes: a closed socket cancels a waiting fit (§4.6)
       if (ws) { try { ws.onclose = null; ws.close(); } catch (e) { /* already closing */ } }
       delay = 500; openTerm();
     }
