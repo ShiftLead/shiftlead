@@ -574,7 +574,7 @@ def test_the_terminal_font_and_renderer_are_bundled_and_served(client):
     html = (static.parent / "templates" / "focus.html").read_text()
     assert html.index("vendor/xterm.js") < html.index("vendor/addon-webgl.js")
     js = (static / "app.js").read_text()
-    assert "onContextLoss" in js and "AO.termRenderer(term)" in js and "AO.termFont(term, fit)" in js
+    assert "onContextLoss" in js and "AO.termRenderer(term)" in js and "AO.termFont(term)" in js
     readme = (static / "vendor" / "README.md").read_text()
     for f in (static / "vendor").rglob("*"):
         if f.suffix in (".js", ".css", ".woff2"):
