@@ -344,8 +344,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      supervised record listing it in `controllers`) hook-confirmed `needs-you` with a `permission`
      pending, its adapter having a permission channel (§4.3 `permission_channel`: one without it is
      the terminal's, never the seat's; a question or a menu fills nothing: it is a person's, and the Inbox's state row has
-     it), and never an unattended member's while a director seat stands (a `prompt` seat not suspended: its prompt
-     is the director's, one judge, not two, §4.9b *The director seat*, TD-642); **`stalled`** — a member `stalled?`; **`open`** — a member *idle · open work*:
+     it), and never an unattended member's while a director seat stands (a `prompt` seat this rule would fill — not
+     suspended, sat out or refused its last fill: its prompt is the director's, one judge, not two, §4.9b *The director seat*, TD-642); **`stalled`** — a member `stalled?`; **`open`** — a member *idle · open work*:
      `nudged_at` set and the member still hook-confirmed idle `IDLE_NUDGE` after it with the same
      work open, which the tick writes as **`idle_open: {at, ref}`** on the member's record
      (home-owned; a member's alone, never a seat's; `ref` the first open reference when it was

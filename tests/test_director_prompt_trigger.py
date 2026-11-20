@@ -120,8 +120,18 @@ async def test_with_a_director_the_manager_leaves_an_unattended_members_prompt(a
         rd = agent.sessions[d]
         assert agent._team_causes(rm, [rm, rw, rd]) == [], "a director: one judge, not two"
         assert [c["by"] for c in agent._prompt_causes(rd, [rm, rw, rd])] == ["prompt"]
-        # a suspended director is passed by, and the manager reads it again
+        # an interactive member's permission stays the manager's: the director never answers one
+        h = await _make(person, tmp_path, "h", controllers=[mgr], unattended=False)
+        rh = agent.sessions[h]
+        _ask(rh)
+        assert [c["member"] for c in agent._team_causes(rm, [rm, rw, rh, rd])] == [h]
+        assert [c["member"] for c in agent._prompt_causes(rd, [rm, rw, rh, rd])] == [w]
+        # a director that cannot be filled is passed by, and the manager reads its member again
+        agent.unfillable[d] = "fill ceiling"
+        assert [c["member"] for c in agent._team_causes(rm, [rm, rw, rd])] == [w]
+        agent.unfillable.pop(d)
         rd.suspended = {"at": "x", "by": "person"}
         assert [c["by"] for c in agent._team_causes(rm, [rm, rw, rd])] == ["pending"]
+        await person.call("kill", id=h)
         for sid in (w, mgr, d):
             await person.call("kill", id=sid)

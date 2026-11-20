@@ -4127,11 +4127,20 @@ class TickMixin:
             and bool(adapters.permission_channel(r.adapter))
         )
 
-    @staticmethod
-    def _is_director(r: Session) -> bool:
-        """The org's director seat (§4.9b *The director seat*, TD-642): the record whose seat's trigger is
-        `prompt`, the director's alone — kept while it is not superseded or suspended."""
-        return (r.seat or {}).get("trigger") == "prompt" and not r.superseded_by and not r.suspended
+    def _is_director(self, r: Session) -> bool:
+        """A director seat that stands (§4.9b *The director seat*, TD-642): the record whose seat's trigger is
+        `prompt`, the director's alone, that rule 3 would fill — supervised, unattended, not superseded,
+        suspended or sat out, and not refused a fill at the last pass (`unfillable`: its fill ceiling, a paused
+        profile, TD-1443). One that cannot be filled is passed by, as for a question passed up to it."""
+        return (
+            (r.seat or {}).get("trigger") == "prompt"
+            and r.supervised
+            and r.unattended
+            and not r.superseded_by
+            and not r.suspended
+            and not (r.sit_out or work_mod.sat_out(r))
+            and r.id not in self.unfillable
+        )
 
     def _prompt_causes(self, s: Session, records: list[Session]) -> list[dict[str, Any]]:
         """What the director seat is filled for (§6 rule 3, §4.9b *The director seat*, TD-642), in this order:
@@ -4143,7 +4152,6 @@ class TickMixin:
         for r in records:
             if (
                 r is not s
-                and r.id != s.id
                 and r.supervised
                 and r.unattended
                 and not r.superseded_by
