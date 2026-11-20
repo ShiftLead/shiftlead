@@ -202,3 +202,44 @@ def test_the_agents_start_turns_off_the_bar_on_older_ao_sessions_only(tmux):
     show = lambda n: tmux.run("show-options", "-v", "-t", f"={n}:", "status").stdout.strip()  # noqa: E731
     assert show("ao-t-old") == "off"
     assert show("mine") != "off" and tmux.run("show-options", "-gv", "status").stdout.strip() == "on"
+
+
+def test_a_new_session_is_pinned_at_its_grid(tmux):
+    """`new-session -x -y` starts the tool at the person's grid and `window-size manual` pins it, so no
+    client sizes the window after (design §4.6 *Attach behaviour with another client present*, TD-1919);
+    tmux 3.5a makes a detached window exactly that grid with its status line off."""
+    tmux.new_session("ao-t-pin", "/", ["sleep", "30"], {}, grid=(97, 31))
+    read = lambda f: tmux.run("display-message", "-p", "-t", "=ao-t-pin:", f).stdout.strip()  # noqa: E731
+    assert tmux.run("show-options", "-wv", "-t", "=ao-t-pin:", "window-size").stdout.strip() == "manual"
+    assert (read("#{pane_width}"), read("#{pane_height}")) == ("97", "31")
+    tmux.new_session("ao-t-pin-default", "/", ["sleep", "30"], {})
+    w = tmux.run("display-message", "-p", "-t", "=ao-t-pin-default:", "#{pane_width}x#{pane_height}")
+    assert w.stdout.strip() == "120x40", "no setting: 120 x 40"
+
+
+def test_the_pin_resizes_nothing_while_the_tool_starts(tmux, monkeypatch):
+    """No `resize-window` in the invocation: the grid is the window's from its first byte (TD-1919)."""
+    seen: list[tuple[str, ...]] = []
+    real = tmux.run
+    monkeypatch.setattr(tmux, "run", lambda *a, **k: (seen.append(a), real(*a, **k))[1])
+    tmux.new_session("ao-t-argv", "/", ["sleep", "30"], {}, grid=(80, 24))
+    (args,) = seen
+    assert "resize-window" not in args
+    assert args[args.index("-x") + 1 : args.index("-x") + 4] == ("80", "-y", "24")
+    i = args.index("window-size")
+    assert args[i - 4 : i + 2] == ("set-option", "-w", "-t", "=ao-t-argv:", "window-size", "manual")
+
+
+def test_the_agents_start_pins_every_ao_window_at_its_size(tmux):
+    """A session made before the pin follows its clients until the host agent's start pins it, at the size it
+    has; a session not named `ao-…` is the person's and keeps following its clients, and the server's global
+    option is untouched (TD-1919)."""
+    for name in ("ao-t-unpinned", "mine"):
+        tmux.run("new-session", "-d", "-s", name, "-x", "88", "-y", "22", "sleep", "30")
+    assert "ao-t-unpinned" in tmux.pin_windows() and "mine" not in tmux.pin_windows()
+    read = lambda n, f: tmux.run("display-message", "-p", "-t", f"={n}:", f).stdout.strip()  # noqa: E731
+    opt = lambda n: tmux.run("show-options", "-wv", "-t", f"={n}:", "window-size").stdout.strip()  # noqa: E731
+    assert opt("ao-t-unpinned") == "manual"
+    assert read("ao-t-unpinned", "#{window_width}x#{window_height}") == "88x22"
+    assert opt("mine") != "manual"
+    assert tmux.run("show-options", "-gwv", "window-size").stdout.strip() != "manual"

@@ -13,8 +13,8 @@ tmux's own history is intact):
 - the **height** changes: whole paragraphs missing from the history (3 to 4 of 30), none repeated;
 - a **reattach** at another size: repeats, and one paragraph missing;
 - the prompt echoed twice after any of them;
-- a **pinned** window (`window-size manual`, one `resize-window`, then the same churn and reattaches): clean, 8 of 8
-  runs (two each of steady, width, height and reattach, in a script, then the combined churn here). Waiting for the
+- a **pinned** window (`window-size manual`; here the real `new_session`, TD-1919; then the same churn and
+  reattaches): clean, 8 of 8 runs (two each of steady, width, height and reattach, in a script, then the combined churn here). Waiting for the
   pane to be idle first does not help (a width change repeats the last paragraphs, a height change loses 3 to 4),
   and `attach -f ignore-size` alone does not either (the window still followed the one client).
 
@@ -103,8 +103,31 @@ def _ready(sock: str, p) -> None:
     pytest.fail("claude never showed its input box:\n" + _tmux(sock, "capture-pane", "-p", "-t", "=ao-live:"))
 
 
-def _run(sock: str, cwd, mode: str) -> tuple[list[str], list[str], int]:
-    """(paragraphs missing, paragraphs repeated, times the prompt is echoed) after a reply streamed through `mode`."""
+def _run(sock: str, cwd, mode: str, *, fit: tuple[int, int] | None = None) -> tuple[list[str], list[str], int]:
+    """(paragraphs missing, paragraphs repeated, times the prompt is echoed) after a reply streamed through `mode`,
+    and, with `fit`, a Fit to window at idle once it has (design §4.6 *Fit to window*, TD-1919)."""
+    if mode == "pinned":  # the real start: `new-session -x -y` and `window-size manual` in one invocation (TD-1919)
+        Tmux(socket_name=sock).new_session("ao-live", cwd, ["sh", "-c", CLAUDE_CMD], {}, grid=(100, 20))
+    else:
+        _start_following(sock, cwd)
+    p = _attach(sock, 100, 20)
+    try:
+        p = _stream(sock, p, mode)
+        if fit is not None:  # the reply is done and the pane quiet: the person's fit, as the bridge sends it
+            _drain(p, 3)
+            _tmux(sock, "resize-window", "-t", "=ao-live:", "-x", str(fit[0]), "-y", str(fit[1]))
+            _drain(p, 3)
+    finally:
+        p.terminate(force=True)
+    out = _history(sock)
+    seen = Counter(re.findall(r"^(?:● | {2})P(\d\d)\b", out, re.M))
+    missing = [f"P{i:02d}" for i in range(1, PARAS + 1) if f"{i:02d}" not in seen]
+    repeated = sorted(f"P{k}" for k, v in seen.items() if v > 1)
+    return missing, repeated, len(re.findall(r"^❯ Write ", out, re.M))
+
+
+def _start_following(sock: str, cwd) -> None:
+    """A window that follows its clients, as every window did before the pin."""
     subprocess.run(
         [
             "tmux",
@@ -124,48 +147,42 @@ def _run(sock: str, cwd, mode: str) -> tuple[list[str], list[str], int]:
         ],
         check=True,
     )
-    if mode == "pinned":  # tmux stops sizing the window to its clients: one grid, whatever attaches
-        _tmux(sock, "set-option", "-w", "-t", "=ao-live:", "window-size", "manual")
-        _tmux(sock, "resize-window", "-t", "=ao-live:", "-x", "100", "-y", "20")
-    p = _attach(sock, 100, 20)
-    try:
-        _ready(sock, p)
-        _drain(p, 3)  # the box takes keys a moment after it is drawn
-        p.write(PROMPT.encode())
-        time.sleep(0.5)
-        p.write(b"\r")
-        end = time.monotonic() + 15
-        while time.monotonic() < end and not re.search(r"^❯ Write ", _history(sock), re.M):
-            _drain(p, 0.5)
-        if not re.search(r"^❯ Write ", _history(sock), re.M):
-            pytest.fail("the prompt was never submitted:\n" + _tmux(sock, "capture-pane", "-p", "-t", "=ao-live:"))
-        deadline = time.monotonic() + 45
-        while time.monotonic() < deadline and not re.search(r"^● P01", _history(sock), re.M):
-            _drain(p, 0.5)  # churn starts once the reply is streaming, so it lands on live paragraphs
-        if mode == "reattach":
-            for cols, rows in SEQUENCES[mode]:
+
+
+def _stream(sock: str, p, mode: str):
+    """Ask for the paragraphs, churn the client through `mode` while they stream, and wait for the last; the
+    client attached at the end, which a reattach replaces."""
+    _ready(sock, p)
+    _drain(p, 3)  # the box takes keys a moment after it is drawn
+    p.write(PROMPT.encode())
+    time.sleep(0.5)
+    p.write(b"\r")
+    end = time.monotonic() + 15
+    while time.monotonic() < end and not re.search(r"^❯ Write ", _history(sock), re.M):
+        _drain(p, 0.5)
+    if not re.search(r"^❯ Write ", _history(sock), re.M):
+        pytest.fail("the prompt was never submitted:\n" + _tmux(sock, "capture-pane", "-p", "-t", "=ao-live:"))
+    deadline = time.monotonic() + 45
+    while time.monotonic() < deadline and not re.search(r"^● P01", _history(sock), re.M):
+        _drain(p, 0.5)  # churn starts once the reply is streaming, so it lands on live paragraphs
+    if mode == "reattach":
+        for cols, rows in SEQUENCES[mode]:
+            p.terminate(force=True)
+            p = _attach(sock, cols, rows)
+            _drain(p, 1.0)
+    else:
+        for cols, rows in SEQUENCES.get(mode, []):
+            p.setwinsize(rows, cols)
+            _drain(p, 1.0)
+        if mode == "pinned":
+            for cols, rows in SEQUENCES["reattach"][:6]:
                 p.terminate(force=True)
                 p = _attach(sock, cols, rows)
                 _drain(p, 1.0)
-        else:
-            for cols, rows in SEQUENCES.get(mode, []):
-                p.setwinsize(rows, cols)
-                _drain(p, 1.0)
-            if mode == "pinned":
-                for cols, rows in SEQUENCES["reattach"][:6]:
-                    p.terminate(force=True)
-                    p = _attach(sock, cols, rows)
-                    _drain(p, 1.0)
-        deadline = time.monotonic() + 60
-        while time.monotonic() < deadline and not re.search(rf"^(?:● | {{2}})P{PARAS:02d}\b", _history(sock), re.M):
-            _drain(p, 0.5)
-    finally:
-        p.terminate(force=True)
-    out = _history(sock)
-    seen = Counter(re.findall(r"^(?:● | {2})P(\d\d)\b", out, re.M))
-    missing = [f"P{i:02d}" for i in range(1, PARAS + 1) if f"{i:02d}" not in seen]
-    repeated = sorted(f"P{k}" for k, v in seen.items() if v > 1)
-    return missing, repeated, len(re.findall(r"^❯ Write ", out, re.M))
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline and not re.search(rf"^(?:● | {{2}})P{PARAS:02d}\b", _history(sock), re.M):
+        _drain(p, 0.5)
+    return p
 
 
 @pytest.fixture
@@ -189,6 +206,13 @@ def test_a_pinned_window_leaves_every_paragraph_once_through_any_resize_or_reatt
     sock, cwd = live
     missing, repeated, echoes = _run(sock, cwd, "pinned")
     assert (missing, repeated, echoes) == ([], [], 1)
+
+
+def test_a_fit_at_idle_that_grows_the_grid_leaves_every_paragraph_once(live):
+    sock, cwd = live
+    missing, repeated, echoes = _run(sock, cwd, "pinned", fit=(120, 30))
+    assert (missing, repeated, echoes) == ([], [], 1)
+    assert _tmux(sock, "display-message", "-p", "-t", "=ao-live:", "#{window_width}x#{window_height}") == "120x30"
 
 
 @pytest.mark.parametrize("mode", [pytest.param(m, marks=KNOWN_BAD) for m in SEQUENCES if m != "pinned"])

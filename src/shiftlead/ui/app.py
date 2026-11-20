@@ -457,16 +457,19 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     team_summary,  # noqa: F401
 )
 from .pty_bridge import (
+    GRID_READ_WITHIN,
     JUMP_WITHIN,
     LEAVE_WITHIN,
+    GridKeeper,
     PtySession,
     attach_argv,
-    clients_argv,
+    grid_argv,
+    grid_read,
     leave_argv,
     pump,
+    resize_window_argv,
     run_jump,
     scroll_argv,
-    watch_clients,
 )
 from .queue import (
     GROUP_WORD,
@@ -934,14 +937,6 @@ def _form_index(body: Mapping[str, Any]) -> int | None:
         return int(raw)
     except (TypeError, ValueError):
         raise HTTPException(400, "a form is the index of the form pressed") from None
-
-
-def _int_param(raw: str | None, default: int, lo: int, hi: int) -> int:
-    try:
-        v = int(float(raw)) if raw not in (None, "") else default
-    except (TypeError, ValueError, OverflowError):  # "abc", "NaN", "inf" / "1e999"
-        return default
-    return max(lo, min(hi, v))
 
 
 class _WsAttemptLog:
@@ -6648,11 +6643,8 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.websocket("/term/{sid}")
     async def term(ws: WebSocket, sid: str):
-        # Size comes from the query, leniently: a bad or missing value falls back to a default
-        # instead of a 403 before accept, which a browser can only report as an opaque 1006
-        # (first-use finding 2026-09-06). The client re-sends its real size on open anyway.
-        cols = _int_param(ws.query_params.get("cols"), 120, 10, 500)
-        rows = _int_param(ws.query_params.get("rows"), 32, 2, 200)
+        # No size comes from the query: the pty opens at the window's grid, read below (design §4.6, TD-1919),
+        # and `cols` and `rows` on the address are ignored
         await ws.accept()
         try:
             s = await call("get", id=sid)
@@ -6685,20 +6677,11 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             await ws.send_bytes(b"\r\n[shiftlead] this session's pane is gone (see the banner).\r\n")
             await ws.close(code=4404)
             return
-        try:
-            pty = PtySession(argv, cols=cols, rows=rows)
-        except Exception as e:  # noqa: BLE001 — no silent failure path (design §4.5)
-            await ws.send_bytes(f"\r\n[shiftlead] could not attach a terminal: {type(e).__name__}: {e}\r\n".encode())
-            await ws.close()
-            return
-
         # design §4.6 *A read-only attach* (TD-096): the mode is read once, here, and a read-only attach
         # tells the page so in its first frame — a text frame, which is the page's to read and not
         # pane output, so it neither counts as a painted screen nor resets the page's backoff. An
         # attach that sends none takes keys. A mode change re-attaches.
         read_only = bool(s.get("unattended"))
-        if read_only:
-            await ws.send_text(json.dumps({"read_only": True}))
         produced = False
 
         async def send(data: bytes) -> None:
@@ -6772,23 +6755,53 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     reapers.add(asyncio.ensure_future(proc.wait()))
             return out.decode(errors="replace") if proc.returncode == 0 else None
 
-        async def read_clients() -> str | None:
-            # tmux's clients and window for the terminal mark (design §4.6, TD-480)
-            return await read_tmux(clients_argv(sid, socket_name=sock), 3)
+        async def read_window() -> str | None:
+            # the window's size, the pty's grid and the page's (design §4.6, TD-1919)
+            return await read_tmux(grid_argv(sid, socket_name=sock), GRID_READ_WITHIN)
 
-        async def jump(openings: list[dict]) -> bool:
+        # The attach's pty opens at the window's grid, so tmux draws this client as the window (design §4.6
+        # *Attach behaviour with another client present*, TD-1919); a failed reading opens it at the person's
+        # grid, and the five-second reading resizes it at its first good one that differs
+        grid = grid_read(await read_window())
+        if grid is None:
+            grid = settings_mod.terminal_grid(await asyncio.to_thread(settings_mod.load))
+        try:
+            pty = PtySession(argv, cols=grid[0], rows=grid[1])
+        except Exception as e:  # noqa: BLE001 — no silent failure path (design §4.5)
+            await ws.send_bytes(f"\r\n[shiftlead] could not attach a terminal: {type(e).__name__}: {e}\r\n".encode())
+            await ws.close()
+            return
+        # the attach's own words, before the first pane byte: text frames, the page's to read and not pane
+        # output, so they neither count as a painted screen nor reset the page's backoff
+        if read_only:
+            await ws.send_text(json.dumps({"read_only": True}))
+        await ws.send_text(json.dumps({"grid": list(grid)}))
+        keeper = GridKeeper(pty, read_window, ws.send_text, grid)
+
+        async def resize_window(g: tuple[int, int]) -> None:
+            await run_tmux(resize_window_argv(sid, g[0], g[1], socket_name=sock))
+
+        async def fit(g: tuple[int, int]) -> None:
+            # The person's Fit to window (design §4.6 *Fit to window*, TD-1919): the window, read again, the
+            # pty, and the `grid` frame
+            await keeper.fit(g, resize_window)
+
+        async def jump(openings: list[dict]) -> tuple[int, int] | None:
             # A press on a Prompts row (design §4.6 *A jump to a prompt*, TD-975): the read bounded at
             # `JUMP_WITHIN`, the walk and the landing, then the page's text frame — its own word, as
-            # `clients` is, never pane output
+            # `grid` is, never pane output — with the landed row and the cursor's
             read = functools.partial(read_tmux, within=JUMP_WITHIN)
             landed = await run_jump(openings, read, run_tmux, sid, socket_name=sock)
+            answer: dict[str, Any] = {"jumped": landed is not None}
+            if landed is not None:
+                answer["row"], answer["cursor"] = landed
             with contextlib.suppress(Exception):
-                await ws.send_text(json.dumps({"jumped": landed}))
+                await ws.send_text(json.dumps(answer))
             return landed
 
-        watcher = asyncio.ensure_future(watch_clients(read_clients, ws.send_text))
+        watcher = asyncio.ensure_future(keeper.watch())
         try:
-            await pump(pty, send, recv, scroll, leave=leave, jump=jump, read_only=read_only, name=sid)
+            await pump(pty, send, recv, scroll, leave=leave, jump=jump, fit=fit, read_only=read_only, name=sid)
         finally:
             watcher.cancel()
             for f in reapers:
