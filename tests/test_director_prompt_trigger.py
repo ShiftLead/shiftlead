@@ -135,3 +135,69 @@ async def test_with_a_director_the_manager_leaves_an_unattended_members_prompt(a
         await person.call("kill", id=h)
         for sid in (w, mgr, d):
             await person.call("kill", id=sid)
+
+
+async def test_a_second_prompt_raised_before_a_tick_saw_the_first_answered_fills_the_director_afresh(agent, tmp_path):
+    """The techlead's note on #4264: a prompt is a cause by its own id (§6 rule 3), so a member that answered one
+    prompt and raised the next between two ticks is not left on the first fill's `seat_filled` entry."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        d = await _make(person, tmp_path, "director", prompt="brief", seat={"trigger": "prompt"})
+        _end(agent, d)
+        w = await _make(person, tmp_path, "w")
+        rw = agent.sessions[w]
+        rw.state, rw.confidence = "needs-you", "hook"
+        rw.pending = Pending("permission", "Bash(curl example.com)", tool_use_id="toolu_1")
+        ended = agent.sessions[d]
+        await agent._keep_running(now)
+        first = agent.sessions[d]
+        assert first is not ended and ended.seat_due["prompt"] == "toolu_1"
+        assert [(e["member"], e["prompt"]) for e in first.seat_filled] == [(w, "toolu_1")]
+        _end(agent, d)
+        # the director answered it and the member asked again before any tick read it working
+        rw.pending = Pending("permission", "Bash(curl example.com)", tool_use_id="toolu_2")
+        await agent._keep_running(now + timedelta(minutes=1))
+        second = agent.sessions[d]
+        assert second is not first, "the new prompt fills the director afresh"
+        assert [(e["member"], e["prompt"]) for e in second.seat_filled] == [(w, "toolu_2")]
+        # with no tool_use_id the prompt's text is its id: the same text standing fills nothing more
+        _end(agent, d)
+        rw.pending = Pending("permission", "Bash(ls)")
+        await agent._keep_running(now + timedelta(minutes=2))
+        third = agent.sessions[d]
+        assert third is not second and [e["prompt"] for e in third.seat_filled] == ["Bash(ls)"]
+        _end(agent, d)
+        await agent._keep_running(now + timedelta(minutes=3))
+        assert agent.sessions[d] is third and third.seat_due is None
+        for sid in (w, d):
+            await person.call("kill", id=sid)
+
+
+async def test_a_prompt_under_another_keeps_its_own_fill(agent, tmp_path):
+    """Each open permission on a member's stack is a cause of its own (§6 rule 3): two parallel calls fill the
+    director once each, and the first coming back to the top after the second is answered fills nothing more."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        d = await _make(person, tmp_path, "director", prompt="brief", seat={"trigger": "prompt"})
+        _end(agent, d)
+        w = await _make(person, tmp_path, "w")
+        rw = agent.sessions[w]
+        a = Pending("permission", "Bash(curl a)", tool_use_id="toolu_a")
+        b = Pending("permission", "Bash(curl b)", tool_use_id="toolu_b")
+        rw.state, rw.confidence, rw.pending, rw.pendings = "needs-you", "hook", a, [a]
+        await agent._keep_running(now)
+        first = agent.sessions[d]
+        _end(agent, d)
+        rw.pending, rw.pendings = b, [a, b]
+        await agent._keep_running(now + timedelta(minutes=1))
+        second = agent.sessions[d]
+        assert second is not first
+        assert sorted(e["prompt"] for e in second.seat_filled) == ["toolu_a", "toolu_b"]
+        _end(agent, d)
+        rw.pending, rw.pendings = a, [a]
+        await agent._keep_running(now + timedelta(minutes=2))
+        assert agent.sessions[d] is second and [e["prompt"] for e in second.seat_filled] == ["toolu_a"]
+        for sid in (w, d):
+            await person.call("kill", id=sid)

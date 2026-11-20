@@ -235,7 +235,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      ids}`, so a fill is once per set of ids (§4.4 *An entry names its team*, TD-730) — and `prompt`, the org's director seat's alone: due while a prompt no rule of the
      person's answered is pending on an unattended record of the org whose adapter has a permission
      channel (§4.3 `permission_channel`: one without it is the terminal's, never the seat's), cleared when none is, §4.9b
-     *The director seat*, TD-636; the director's seat is also due by `asks` while a question passed
+     *The director seat*, TD-636, **a prompt a cause by its own id** — the due and its `seat_filled` entry carry
+     `prompt`, the hook's `tool_use_id` (the prompt's text where it gave none), beside `member`, one for each open permission
+     the record holds, so a second prompt a member raises before any tick saw the first answered fills the seat afresh; the director's seat is also due by `asks` while a question passed
      up to it is open in its inbox, and by **`groom`** once `director.groom` has passed since its last
      groom pass concluded (with none concluded, at once) or at a press of **Groom now**, never while
      its proposal stands, §4.9b *The director answers what is passed

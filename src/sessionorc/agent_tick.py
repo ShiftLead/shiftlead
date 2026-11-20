@@ -4158,7 +4158,13 @@ class TickMixin:
                 and not r.suspended
                 and self._permission_pending(r)
             ):
-                causes.append({"by": "prompt", "member": self._address(r)})
+                # a prompt is a cause by its own id, as a question is (§6 rule 3): a second prompt the member
+                # raised before any tick saw the first answered is a new cause, never the filled one standing;
+                # each open permission on the stack is one, so a prompt under another keeps its own entry
+                stack = [p for p in r.pendings if p.kind == "permission"] or ([r.pending] if r.pending else [])
+                causes += [
+                    {"by": "prompt", "member": self._address(r), "prompt": p.tool_use_id or p.text} for p in stack
+                ]
         return causes
 
     def _team_causes(self, s: Session, records: list[Session]) -> list[dict[str, Any]]:
@@ -4205,7 +4211,7 @@ class TickMixin:
             causes = self._team_causes(s, records) if trigger == "team" else self._prompt_causes(s, records)
 
             def same(a: dict[str, Any], b: dict[str, Any]) -> bool:
-                return all(a.get(k) == b.get(k) for k in ("by", "member", "ask"))
+                return all(a.get(k) == b.get(k) for k in ("by", "member", "ask", "prompt"))
 
             kept = [e for e in s.seat_filled if isinstance(e, dict) and any(same(e, c) for c in causes)]
             if kept != s.seat_filled:
