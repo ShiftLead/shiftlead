@@ -155,7 +155,7 @@
           <button id="tpaste" title="paste the clipboard into the terminal (Ctrl+V, Ctrl+Shift+V, Shift+Insert, or right-click){% if s.unattended %} — not while you are watching: Take over first{% endif %}">⎘ Paste <span class="key">Ctrl+V</span></button>
           {#- design §4.5a **Fit to window** (TD-1919), plain until TD-1948: the wide layout's own Focus alone; the page
               draws it, hidden on an ended record and when the box's grid is the pane's already -#}
-          {% if not popped %}<button id="tfit" class="hidden" title="Set this session's terminal to this window's size; a smaller size can repeat or drop the last lines of the history">⤢ Fit to window</button>{% endif %}
+          <button id="tfit" class="hidden" title="give the pane this window's size — waits until the session is idle; a smaller size can repeat or drop the last lines of the history">⤢ Fit to window</button>
           {# design §4.5a *Focus: copy on select* (TD-164, built by TD-174): the person's, in settings.yml, on by default #}
           <label id="tcopyselrow" class="menutoggle" title="copy on select: a selection is copied as soon as you release the mouse (or Shift+click), silently — Ctrl+C and Copy work either way. Yours everywhere: settings.yml person.terminal.copy_on_select"><input type="checkbox" id="tcopysel"{% if copy_on_select %} checked{% endif %}> Copy on select</label>
           {% if s.agent %}<button id="fmodemenu" data-act="mode" data-via="focus" data-id="{{ s.id }}" data-unattended="{{ 1 if s.unattended else 0 }}"{% if s.mode_place != 'menu' %} hidden{% endif %}

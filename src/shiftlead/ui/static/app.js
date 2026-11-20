@@ -3888,6 +3888,37 @@
   AO.GRID_BOUNDS = [[20, 500], [5, 200]];
   AO.gridFits = (g) => !!g && g[0] >= AO.GRID_BOUNDS[0][0] && g[0] <= AO.GRID_BOUNDS[0][1]
     && g[1] >= AO.GRID_BOUNDS[1][0] && g[1] <= AO.GRID_BOUNDS[1][1];
+  // **Fit to window** (§4.6 *Fit to window*, §4.5a, TD-1948): the note for a grid outside the bridge's bounds, or null
+  AO.fitRefused = (g) => {
+    if (!g || AO.gridFits(g)) return null;
+    const small = g[0] < AO.GRID_BOUNDS[0][0] || g[1] < AO.GRID_BOUNDS[1][0];
+    return `not fitted — this box is too ${small ? "small" : "large"}`;
+  };
+  AO.sameGrid = (a, b) => !!a && !!b && a[0] === b[0] && a[1] === b[1];
+  // the pane is quiet: a record with no agent always; one with an agent `idle`, nothing of its own running (the
+  // view's `own_work` empty, §4.2 *Working on its own*) and no pane byte for two seconds — any other state waits
+  AO.FIT_QUIET = 2000;
+  AO.FIT_LIMIT = 5 * 60 * 1000;
+  AO.FIT_ANSWER = 10000;
+  AO.fitQuiet = (v, lastByte, now) => !!v && (v.agent === false
+    || (v.state === "idle" && !v.own_work && (lastByte == null || now - lastByte >= AO.FIT_QUIET)));
+  // One moment of a waiting fit: `w` the wait (`since`, when it was pressed), `c` what the page reads now —
+  // `v` the record, `lastByte`, `now`, `hidden` (the page), `box` (`AO.boxGrid()`, null with no size or no finite
+  // proposal), `pane` (the terminal's grid). `{do: "wait"}`, `{do: "send", grid}`, or `{do: "end", note}` (a null
+  // note ends it quietly: the box became the pane's, another browser's fit or the window resized back).
+  AO.fitStep = (w, c) => {
+    if (c.now - w.since >= AO.FIT_LIMIT) return { do: "end", note: "not fitted — the session stayed busy" };
+    if (c.hidden || !c.box) return { do: "wait" };  // held until visible with a size; the five minutes still count
+    if (AO.sameGrid(c.box, c.pane)) return { do: "end", note: null };
+    const refused = AO.fitRefused(c.box);
+    if (refused) return { do: "end", note: refused };
+    if (!AO.fitQuiet(c.v, c.lastByte, c.now)) return { do: "wait" };
+    return { do: "send", grid: c.box };
+  };
+  // its `title` (§4.5a **Fit to window**), the two grids the live ones
+  AO.fitTitle = (pane, box) => `give the pane this window's size (pane ${pane[0]} × ${pane[1]}, window ${box ? `${box[0]} × ${box[1]}` : "—"}) — waits until the session is idle; a smaller size can repeat or drop the last lines of the history`;
+  // the pinch's note (§4.5a **a pinch**): the size, the box's columns at it and the pane's
+  AO.pinchSays = (size, box, paneCols) => (box ? `${size} px · ${box[0]} of ${paneCols} columns` : `${size} px · ${paneCols} columns`);
   // The soft-key row (design §4.5a **Focus pane: soft-key row**, TD-990): a key's name to the bytes xterm.js
   // sends for it — an arrow `ESC [ A`–`D`, or `ESC O A`–`D` while the program has set application cursor
   // keys; null for a name the row does not have
@@ -3986,12 +4017,16 @@
   // order — the socket closed with a retry pending, past a three-second grace (`retryAt`: when the
   // retry was scheduled, cleared by the next pane byte); a `working` session whose pane has drawn nothing
   // for thirty seconds on an open socket (`lastByte`, counted up each second; never on `idle`, where
-  // silence is normal). Null when none holds. No client sizes a pinned window, so no mark says one did (TD-1919).
+  // silence is normal). Null when none holds. No client sizes a pinned window, so no mark says one did (TD-1919);
+  // *fitting when idle…* takes its place while a **Fit to window** waits (`fitting`, no grace; TD-1948).
   AO.TERM_GRACE = 3000;
   AO.TERM_SILENT = 30000;
   AO.termMark = function (st, now) {
     if (st.retryAt != null && now - st.retryAt >= AO.TERM_GRACE) {
       return { kind: "reconnecting", text: "reconnecting…", title: "the terminal socket dropped and retries on its own — reload if it stays" };
+    }
+    if (st.fitting) {
+      return { kind: "fitting", text: "fitting when idle…", title: "Fit to window waits for the pane to be quiet, so the tool is not made to repaint while it draws — press it again to cancel" };
     }
     if (st.open && st.state === "working" && st.lastByte != null && now - st.lastByte >= AO.TERM_SILENT) {
       const n = Math.floor((now - st.lastByte) / 1000);
@@ -8668,6 +8703,7 @@
     function endTerm(text) {
       paneGone = true;
       jumper.closed();
+      if (fitWait) fitEnd();
       if (ws) { try { ws.onclose = null; ws.close(); } catch (e) { /* already closing */ } }
       mk.retryAt = null; mk.open = false; drawMark();
       if (softEl) softEl.classList.add("hidden");  // no terminal, no keys
@@ -8680,6 +8716,7 @@
       // no grid on the address: the bridge opens at the window's and says so in its `grid` frame (§4.6, TD-1919)
       ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/term/${encodeURIComponent(id)}`);
       ws.binaryType = "arraybuffer";
+      const sock = ws;  // this attach's own socket: a frame is credited to the socket it came on
       ws.onopen = () => {
         mk.open = true; mk.lastByte = Date.now(); tlog("open"); drawMark();
         AO.dropRead(id, s.team || "");  // the disconnect card's reading, at load and at each reconnect
@@ -8716,6 +8753,7 @@
               tlog("grid", [gc, gr]);
               if (gc !== term.cols || gr !== term.rows) term.resize(gc, gr);
               keeper.release(); relayout(); drawFit();
+              fitAnswered([gc, gr], sock);
             }
             return;
           }
@@ -8730,6 +8768,7 @@
       ws.addEventListener("open", () => { opened = true; });
       ws.onclose = (e) => {
         jumper.closed();
+        if (fitWait) fitEnd();  // a closed socket cancels a waiting fit (§4.6)
         if (paneGone) return;  // the push already ended it
         // …and a pane the page's latest view knows is gone writes no retry line (TD-964, TD-1405): the banner says it
         if (AO.paneIsGone(lastV)) { endTerm(""); return; }
@@ -8756,6 +8795,7 @@
     function reattach() {
       if (paneGone) return;
       jumper.closed();
+      if (fitWait) fitEnd();  // its socket closes: a closed socket cancels a waiting fit (§4.6)
       if (ws) { try { ws.onclose = null; ws.close(); } catch (e) { /* already closing */ } }
       delay = 500; openTerm();
     }
@@ -8953,7 +8993,7 @@
       pinch = null;
       AO.pinchKeep(size);
       relayout();  // the grid stays the pane's: the size changes how many of its columns the box shows
-      pinchNote(`${size} px · ${term.cols} columns`);
+      pinchNote(AO.pinchSays(size, AO.boxGrid(), term.cols));
     };
     termEl.addEventListener("touchend", pinchEnd, { capture: true, passive: false });
     termEl.addEventListener("touchcancel", pinchEnd, { capture: true, passive: false });
@@ -9116,31 +9156,79 @@
       ask.classList.toggle("off", off);
     };
     let lastV = s;
-    // **Fit to window**, plain (§4.6 *Fit to window*, §4.5a, TD-1919; TD-1948 grows it into the whole control): on the
-    // wide layout's own Focus, the box's grid (`AO.boxGrid()`) sent as `{fit}` at once — it waits for nothing and
-    // writes no setting. Not drawn on an ended record, on a phone, in a Pop out (its template draws none), nor when the
-    // box's grid is the pane's already, tested as *more ▾* opens and on a `grid` frame while it is open.
+    // **Fit to window** (§4.6 *Fit to window*, §4.5a, TD-1919, TD-1948): the box's grid (`AO.boxGrid()`) sent as
+    // `{fit}` once the pane is quiet (`AO.fitStep`, read each quarter second while it waits, and on a `grid` frame);
+    // a record with no agent fits at once. While it waits the item reads **Cancel fit** and the terminal mark
+    // *fitting when idle…*; a press on Cancel fit, a closed socket or a reload ends it. On the wide layout's own
+    // Focus (not a phone, not a Pop out) the grid is also written as `person.terminal.grid`, once the first `grid`
+    // frame on that socket equal to it answers within ten seconds. Not drawn on an ended record, nor (unless it
+    // waits) when the box's grid is the pane's, tested as *more ▾* opens and on a `grid` frame while it is open;
+    // drawn on a read-only Focus, since it types nothing. The phone's sheet and its measure are not yet drawn.
     const fitEl = $("#tfit");
+    const fitLabel = fitEl ? fitEl.textContent : "";
+    let fitWait = null, fitTick = null, fitAnswer = null;
+    const fitOwn = () => !phone.narrow() && !popped && !document.body.classList.contains("popped");
     function drawFit() {
       if (!fitEl) return;
-      const g = AO.boxGrid(), v = lastV || s;
-      fitEl.classList.toggle("hidden", phone.narrow() || paneGone || ["exited", "closed"].includes(v.state)
-        || !g || (g[0] === term.cols && g[1] === term.rows));
+      const g = AO.boxGrid(), v = lastV || s, pane = [term.cols, term.rows];
+      fitEl.textContent = fitWait ? "Cancel fit" : fitLabel;
+      fitEl.title = AO.fitTitle(pane, g);
+      fitEl.classList.toggle("hidden", !fitWait && (phone.narrow() || paneGone || ["exited", "closed"].includes(v.state)
+        || !g || AO.sameGrid(g, pane)));
+    }
+    function fitEnd(note) {
+      fitWait = null; clearInterval(fitTick); fitTick = null;
+      mk.fitting = false; drawMark(); drawFit();
+      if (note) AO.toast(note);
+    }
+    function fitRun() {
+      if (!fitWait) return;
+      const step = AO.fitStep(fitWait, {
+        v: lastV || s, lastByte: mk.lastByte, now: Date.now(), hidden: document.hidden,
+        box: AO.boxGrid(), pane: [term.cols, term.rows],
+      });
+      if (step.do === "wait") return;
+      if (step.do === "end") { fitEnd(step.note); return; }
+      if (!(ws && ws.readyState === 1)) { fitEnd(); return; }  // the socket closed under it: a closed socket cancels
+      tlog("fit", step.grid);
+      ws.send(JSON.stringify({ fit: step.grid }));
+      // the setting is the wide layout's own: written only once the bridge's answer on this socket says so
+      if (fitOwn()) {
+        clearTimeout(fitAnswer && fitAnswer.timer);
+        const at = ws;
+        fitAnswer = { grid: step.grid, ws: at, timer: setTimeout(() => { if (fitAnswer && fitAnswer.ws === at) { fitAnswer = null; AO.toast("not fitted"); } }, AO.FIT_ANSWER) };
+      }
+      fitEnd();
+    }
+    // the bridge's `grid` frame: the first on the fit's socket equal to the grid sent writes it as the setting
+    function fitAnswered(grid, sock) {
+      if (fitWait) fitRun();  // a box that became the pane's ends the wait quietly
+      if (!fitAnswer || fitAnswer.ws !== sock || !AO.sameGrid(grid, fitAnswer.grid)) return;
+      clearTimeout(fitAnswer.timer); fitAnswer = null;
+      fetch("/api/settings/person", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ terminal: { grid } }),
+      }).then(async (r) => {
+        if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
+      }).catch((e) => AO.toast(`fitted, but not kept for later sessions: ${e.message}`));
     }
     if (fitEl) {
       const more = fitEl.closest("details");
       if (more) more.addEventListener("toggle", () => { if (more.open) drawFit(); });
       fitEl.addEventListener("click", () => {
+        if (more) more.open = false;  // the menu folds on the press, as any menu does
+        if (fitWait) { fitEnd(); return; }  // Cancel fit: measures nothing, sends nothing
         const g = AO.boxGrid();
-        if (!g) return;
-        if (g[0] === term.cols && g[1] === term.rows) { AO.toast("already this size", true); return; }
-        if (!AO.gridFits(g)) {
-          const small = g[0] < AO.GRID_BOUNDS[0][0] || g[1] < AO.GRID_BOUNDS[1][0];
-          AO.toast(`not fitted — this box is too ${small ? "small" : "large"}`);
-          return;
-        }
-        if (ws && ws.readyState === 1) ws.send(JSON.stringify({ fit: g }));
+        if (!g) return;  // no size, or a proposal that is not finite: nothing sent
+        if (AO.sameGrid(g, [term.cols, term.rows])) { AO.toast("already this size", true); return; }
+        const refused = AO.fitRefused(g);
+        if (refused) { AO.toast(refused); return; }
+        fitWait = { since: Date.now() };
+        mk.fitting = true; drawMark(); drawFit();
+        fitTick = setInterval(fitRun, 250);
+        fitRun();
       });
+      document.addEventListener("visibilitychange", fitRun);
       drawFit();
     }
     compose.addEventListener("input", () => drawAsk(lastV));
