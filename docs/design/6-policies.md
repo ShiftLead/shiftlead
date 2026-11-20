@@ -1123,8 +1123,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        - it closed itself (its closer's `by` its own id) after the person's wrap-up, or, marked, left on
          its own naming nobody after the person wound it down, its `wind_down.by` the person where a
          later send of the person's cleared its `wrapup_by`, read by its `wind_down.at` against the stop
-         time's stamp as `wrapup_at` is (TD-1895). The manager (`work.manager_of`) is never marked (§4.9a
-         *The manager is not marked*) and reads by its `wrapup_by`; an unmarked record reads as before. A tick's close for any
+         time's stamp as `wrapup_at` is (TD-1895). The manager (`work.manager_of`) carries no member's mark
+         (§4.9a *The manager is not marked*; an inert one changes nothing here) and reads by its `wrapup_by`; an unmarked record reads as before. A tick's close for any
          other cause names nobody, as before; such a close after a session's wind-down reads as that
          session's, `other`.
 
