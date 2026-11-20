@@ -192,6 +192,47 @@ def on_call_gate(x: teams.Launch) -> dict[str, Any]:
     return {"held": True} if x.lead and x.trigger and x.unattended else {}
 
 
+# The line a Start or an Apply says for the director seat it wrote held (§4.9b *The director seat*, TD-642)
+DIRECTOR_LINE = "the org's director seat written — comes when a prompt no rule answered is pending"
+
+
+DIRECTOR_BY_PERSON = "the org's director seat is a person's Start's or Apply's to write: no session grants permit"
+
+
+def write_director(call: Call, org: orgmod.Org, caller: str | None = None) -> list[str]:
+    """Any Start or Apply writes the org's director seat (design §4.9b *The director seat*, TD-642) when `org.yml`
+    defines it (`teams.director_create`) and no record holds it — a record of its trigger, not superseded, in any
+    state: the seat is there, held or filled, and its next fill reads its launch record. Its directory is made
+    first. Returns the notes to say: the line written, or why not. A director refused (a profile that asks, one
+    unknown, a brief not read), a refused create or a home not read is said and the start stands, as an extra's
+    is — the director is the org's, never the team's. A session's own Start or Apply (`caller`) writes none and
+    says so: the seat holds `permit`, which a session cannot grant (§4.8)."""
+    if getattr(org, "director", None) is None:  # no director defined: nothing to read or write
+        return []
+    try:
+        params = teams.director_create(org)
+    except teams.TeamError as e:
+        return [f"the org's director seat not written — {e}"]
+    if params is None:
+        return []
+    try:
+        held = any(
+            isinstance(r.get("seat"), Mapping)
+            and r["seat"].get("trigger") == params["seat"]["trigger"]
+            and not r.get("superseded_by")
+            for r in call("list")
+        )
+        if held:
+            return []
+        if caller is not None:  # a session's start: the create's attenuation would refuse `permit` (§4.8)
+            return [f"{params['name']}: {DIRECTOR_BY_PERSON}"]
+        Path(params["dir"]).mkdir(parents=True, exist_ok=True)
+        call("create", **params)
+    except Exception as e:  # noqa: BLE001 — whatever the transport or the home raised, the start stands
+        return [f"{params['name']}: the org's director seat not written — {e}"]
+    return [f"{params['name']}: {DIRECTOR_LINE}"]
+
+
 def pool_gate(x: teams.Launch) -> dict[str, Any]:
     """`create`'s `held` for a pool's member after the first (§4.9b *The members*, TD-1476): written
     closed with no pane, as a manager on call is, so rule 3 fills it only when its pool routes a question
@@ -1197,6 +1238,7 @@ def start(
         raise PartialStart(name, created, plan, e) from e
     extras, extra_notes = write_extras(call, plan, [lead_id] if lead_id else [], caller)
     notes += extra_notes
+    notes += write_director(call, org, caller)
     # §9 invariant 5, as TD-041 made it a gate: no session acts on an interactive one, so a member
     # the definition starts interactive carries `controllers: [lead]` that can never fire. The list
     # is set and the start stands — it is a fact about the definition — but it is said out loud.
@@ -1987,10 +2029,12 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
     a removal is the sit-out form with `dropped` — on a stopped team too, since rule 8 replays its ended
     records."""
     team = teams.find(org, name)
+    director = write_director(call, org, caller)  # the org's, whatever the team's state (TD-642)
     sessions = call("list")
     stays = stays_with(name, sessions)
     if not crew(name, sessions):  # no records: its next start compiles the flow
-        return {"team": name, "flow": teams.current_flow(team), "applied": [], "skipped": [], "stays": stays}
+        flow = teams.current_flow(team)
+        return {"team": name, "flow": flow, "applied": [], "skipped": [], "stays": stays, "notes": director}
     plan = teams.plan(org, name, host, files=files_via(call))
     diffs = differences(plan, sessions)  # a stopped team's renames and removals alone
     # a manager on call is the controller closed as live (TD-269): the members Apply starts name it
@@ -2003,7 +2047,14 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
         None,
     )
     lead_id = str(lead["id"]) if lead else ""
-    out: dict[str, Any] = {"team": name, "flow": plan.flow, "applied": [], "skipped": [], "stays": stays}
+    out: dict[str, Any] = {
+        "team": name,
+        "flow": plan.flow,
+        "applied": [],
+        "skipped": [],
+        "stays": stays,
+        "notes": director,
+    }
     for d in diffs:
         row = d.as_dict(plan.flow)
         rec = d.record or {}
@@ -2047,7 +2098,7 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
         # Apply's *starts* write the extras a Start would (§4.9 *Scaling with the work*, TD-1545)
         extras, said = write_extras(call, plan, [lead_id] if lead_id else [], caller)
         out["extras"] = [str(r.get("id")) for r in extras]
-        out["notes"] = said
+        out["notes"] = [*director, *said]
     if out["applied"]:
         witness_press(call, "apply", name, team_dir(plan))
     return out

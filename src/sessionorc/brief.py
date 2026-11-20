@@ -167,12 +167,40 @@ def _read_source(src: dict[str, Any]) -> tuple[str, str]:
     return read(path, True)
 
 
+# The director's Org block (design §4.9b *The director seat*, TD-642): read at each fill, so a repo registered since
+# the start is in it; `checkouts` is the slot that names it, its `headings` the start's `{repo: project heading}`.
+ORG_HEAD = "## The org's checkouts"
+ORG_NONE = "none registered on this host"
+
+
+def org_block(headings: Any, roots: list[str] | None = None) -> str:
+    """The Org block (§4.9b *The director seat*): every registered checkout on this host, from the repo registry
+    (§5 *Repos*) — never from `projects:` — one line each, `<repo>: <path>`, named with its project heading where
+    `headings` (`{repo: heading}`, the repo by its checkout's directory name) gives one. `roots` stands in for the
+    registry where given; one that cannot be read is no checkouts, never a failed fill."""
+    from sessionorc import hosts  # read at the fill, as the registry stands then
+
+    if roots is None:
+        try:
+            roots = hosts.local_host().repos()
+        except (OSError, ValueError):
+            roots = []
+    named = headings if isinstance(headings, dict) else {}
+    lines = []
+    for root in roots:
+        repo = Path(root).name
+        heading = named.get(repo)
+        lines.append(f"- {repo}: {root}" + (f" (project {heading})" if isinstance(heading, str) and heading else ""))
+    return "\n".join([ORG_HEAD, "", *(lines or [ORG_NONE])])
+
+
 def fill(prompt_from: dict[str, Any], merged: bool = True) -> tuple[str, list[dict[str, str]]]:
     """The prompt `prompt_from` makes now, and `[{path, sha}]` for every file read: `base`, then
     each slot in order by plain replacement of its name — a file's text stripped, `none` when
     empty — then `prefix` in front. `Unreadable` when a file cannot be read or the shape is not
     one a client hands. A slot `{layers: [{path, ref, head}]}` is the person's layer additions, read by
-    `layered` (§4.8 *The person's own additions*, TD-1016).
+    `layered` (§4.8 *The person's own additions*, TD-1016); a slot `{checkouts: {headings}}` is the director's
+    Org block, read from the repo registry as it stands (`org_block`, §4.9b *The director seat*, TD-642).
 
     A record built on a template (its slots name `{repo}`) whose template has since gained a slot
     its `slots` do not name — every record written before `{flow}` and `{stage}` existed — is told
@@ -213,8 +241,10 @@ def fill(prompt_from: dict[str, Any], merged: bool = True) -> tuple[str, list[di
         elif isinstance(spec, dict) and isinstance(spec.get("layers"), list):
             value, read_ = layered(spec["layers"])
             sources.extend(read_)
+        elif isinstance(spec, dict) and isinstance(spec.get("checkouts"), dict):
+            value = org_block(spec["checkouts"].get("headings"))
         else:
-            raise Unreadable(f"slot {slot} is neither a file, a text nor a layer's")
+            raise Unreadable(f"slot {slot} is neither a file, a text, a layer's nor the org's checkouts")
         text = text.replace(str(slot), value)
     if TEMPLATE_SLOT in slots and (unnamed := [n for n in LAYOUT_SLOTS if n in text and n not in slots]):
         raise Unreadable(f"made before the brief named {', '.join(unnamed)}: told what it was told, the stored prompt")
