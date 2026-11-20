@@ -529,6 +529,19 @@ class RemoteMixin:
             home_copy.closed_for = None
             self._save(home_copy)
         mux = self._node_mux(host)
+        asked_rec = self.remote.get(host, {}).get(rid) if method == "decide" and params.get("permit") else None
+        # the prompt's words as the home's copy holds them before the node ends it, for the director's FYI (TD-642)
+        permit_prompt = (
+            next(
+                (
+                    p.text
+                    for p in (asked_rec.pendings if asked_rec else [])
+                    if p.tool_use_id == params.get("tool_use_id")
+                ),
+                "",
+            )
+            or "a permission prompt"
+        )
         sent = dict(params)
         sent.pop("prompt_from", None)  # the launch record's alone, and the home writes a node's (§6 rule 7)
         sent.pop("via", None)  # a mode change's control: the home stamps its copy, the node writes nothing (TD-1439)
@@ -566,6 +579,11 @@ class RemoteMixin:
         # was pressed — or the trail would read *resolved* for every node-hosted row (review of #269).
         if method == "decide" and rid:
             self._attention_ended(f"{rid}@{host}", self._answered_by(str(params.get("behavior")), caller))
+            if params.get("permit") and (asked := self.remote.get(host, {}).get(rid)) is not None:
+                # the director's answer is told by the home, mail's one writer (§9 invariant 15, TD-642)
+                self._answered_by_director(
+                    asked, permit_prompt, str(params.get("behavior")), str(params.get("reason") or ""), caller
+                )
         elif method == "identity_ack" and rid:
             # the control is **Dismiss**; `identity_ack` is only its wire name, which stays because
             # it is in `NODE_ACTS` and renaming it there is a protocol change that buys a person

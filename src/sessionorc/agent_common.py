@@ -973,12 +973,13 @@ def _source(source: str) -> str:
     return source
 
 
-def _grants(names: list[str]) -> list[str]:
-    """Validate a list of grant names against `GRANTS`, in canonical order."""
-    bad = [n for n in names if n not in GRANTS]
+def _grants(names: list[str], allowed: tuple[str, ...] = GRANTS) -> list[str]:
+    """Validate a list of grant names against `allowed` (the person's `GRANTS`; a create takes `ALL_GRANTS`, the
+    seat's `permit` too, TD-642), in canonical order."""
+    bad = [n for n in names if n not in allowed]
     if bad:
-        raise RpcError(f"unknown grant {', '.join(map(str, bad))}; grants are: {', '.join(GRANTS)}")
-    return [g for g in GRANTS if g in names]
+        raise RpcError(f"unknown grant {', '.join(map(str, bad))}; grants are: {', '.join(allowed)}")
+    return [g for g in allowed if g in names]
 
 
 async def _falsy(coro: Any) -> bool:

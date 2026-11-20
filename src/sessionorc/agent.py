@@ -285,7 +285,7 @@ from sessionorc.gitinfo import (
 )
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
 from sessionorc.models import (
-    GRANTS,
+    ALL_GRANTS,
     PERSON,
     PROGRESS_STATUSES,
     SYSTEM,
@@ -793,6 +793,8 @@ class HostAgent(
         # (session id, tool_use_id) → the hook's pending decision and the thread that asked it: a
         # subagent's id, or None for the main thread (design §4.2 *A waiter is keyed by its call*, TD-950)
         self._waiters: dict[tuple[str, str], tuple[asyncio.Future[dict[str, Any]], str | None]] = {}
+        # each waiting prompt's tool and input, for the director's allow (§4.9b *What always reaches the person*)
+        self._prompt_calls: dict[tuple[str, str], tuple[Any, Any]] = {}
         # session id → thread (a subagent's id, or None) → its open calls, `(tool_use_id, call_sig)` oldest
         # first: what a permission, which names no call, is matched to (§4.2, TD-950). In memory only.
         self._open_calls: dict[str, dict[str | None, list[tuple[str, str]]]] = {}
@@ -1741,7 +1743,8 @@ class HostAgent(
         directory = Path(dir).expanduser().resolve()
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
-        grants, references = _grants(capabilities or []), _lane(lane or [])  # validate before anything starts
+        grants = _grants(capabilities or [], ALL_GRANTS)  # validate before anything starts
+        references = _lane(lane or [])
         reading, bound, extra = _review(review), _context_bound(context_bound), _scale(scale)
         scale = extra  # the launch record keeps the mark as the record does (`launch_params(locals())`)
         starts = _start_time(start_at, unattended, run_until)
@@ -4511,7 +4514,7 @@ class HostAgent(
         effect on the target's next call — the gate reads the record, not a cached copy."""
         s = self._find(id)  # the home's own copy of another host's record too (4a)
         adding, removing = _grants(add or []), _grants(remove or [])
-        s.capabilities = [g for g in GRANTS if (g in s.capabilities or g in adding) and g not in removing]
+        s.capabilities = [g for g in ALL_GRANTS if (g in s.capabilities or g in adding) and g not in removing]
         self._save(s)
         await self._push_changes()
         return self._view(s)
@@ -5107,11 +5110,15 @@ class HostAgent(
         """`mail.act_gate` over this agent's records (design §4.8, §9 invariants 5 and 11): a
         function over a record map, so a node can forward and the home can answer (§4.4a)."""
         if method == "create" and params.get("capabilities"):
-            _grants(params["capabilities"])  # an unknown grant name is refused before the gate reads it
+            _grants(params["capabilities"], ALL_GRANTS)  # an unknown grant name is refused before the gate reads it
         graph = self._graph()
         reason = mail.act_gate(graph, caller, method, params, controllers=self._ctl)
         if reason:
             raise RpcError(reason)
+        if method == "decide":
+            # a decide that passed by `permit` alone is the director's (§4.8, TD-642): its *allow* of a prompt kept
+            # for the person is refused where the prompt waits, and its answer told — set here, never by the caller
+            params["permit"] = mail.by_permit(graph, caller, params, controllers=self._ctl)
         if method == "send" and not mail.as_person(caller, graph) and params.get("id") != caller:
             # design §6 *Usage gate*: while gated, a controller's send is refused here, at the home,
             # read from the record's `gated` — a node-owned field, so a replica carries it. A person's
