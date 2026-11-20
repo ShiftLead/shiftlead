@@ -129,8 +129,8 @@ not mix:
   `Hold: <note>` on a design's end-of-rounds item, a look's `Not right: <what>`. Drawn as **<head>…**, it opens
   the word box begun with its head and is never sent as written; words that start with its head fill it, and
   on a board line they decide the line even when typed into Answer… or Reply (design §4.4 *Decide*, TD-1557).
-- **held build** — a build waiting on its design's end-of-rounds question: an open entry `Part of` a design, or in its
-  end-of-rounds item's `Parts:`, carrying the same `decision (paul)` hold as the design. It reads *waits on TD-n's
+- **held build** — a build waiting on its design's end-of-rounds question: an open entry the design's newest
+  end-of-rounds item lists in `Parts:`, carrying the same `decision (paul)` hold as the design. It reads *waits on TD-n's
   question* and asks nothing of its own; the design's **Go now — build …** lifts it with the design (design §4.4
   *A design's question is asked once, on the design*, TD-2021). — *proposed* 2026-11-19.
 - **answer bar** — the one row of controls every item on the Queue and a card's page ends in, its slots in a fixed order: the item's answers, **Answer…**, Start session, then **Dismiss**, **Open** and **⋯** at the right (design §4.5 screen 12 *One answer set*, TD-1832). *Not:* the Queue's **bar**, the Refresh bar at the page's top. — *proposed* 2026-11-14.
