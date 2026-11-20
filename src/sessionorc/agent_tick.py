@@ -4146,8 +4146,9 @@ class TickMixin:
         """What the director seat is filled for (§6 rule 3, §4.9b *The director seat*, TD-642), in this order:
         `asks` — each question passed up to it, by id; then `prompt` — each unattended supervised record of
         the org, never itself, with a permission no rule of the person's answered pending (a rule answers at
-        the hook, so one still pending is unanswered), by member. An interactive record's prompt is the
-        person's alone, as is one only its terminal answers."""
+        the hook, so one still pending is unanswered), one for each open permission on its stack, keyed by
+        member and the prompt's own id (`prompt`: its `tool_use_id`, else its text). An interactive record's
+        prompt is the person's alone, as is one only its terminal answers."""
         causes: list[dict[str, Any]] = [{"by": "asks", "ask": i} for i in s.asks_ids(home=self.host)]
         for r in records:
             if (
@@ -4202,7 +4203,8 @@ class TickMixin:
         `asks` is a question waiting now, so it clears again if none is. `prs` reads `seat_count`,
         which `_count_seats` keeps; `every` is the time since this record was created; `swept` reads
         the repo's board's stamp (`_swept_met`). `team` is a
-        manager on call's (TD-259): `{at, by, member}` — `ask` in `member`'s place for `asks` — the
+        manager on call's (TD-259), and `prompt` the director's: `{at, by, member}` — `ask` in `member`'s place
+        for `asks`, and `prompt`, the prompt's own id, beside `member` for a director's `prompt` — the
         first cause standing that no fill was made for; `seat_filled` loses each entry whose cause
         has gone, here, and a due whose cause went before the fill is cleared as `asks` is."""
         seat = s.seat or {}
