@@ -634,11 +634,11 @@ details.side > summary .sumval.warnish { color: var(--warn-fg); }
 details.side > summary .sumval .waiting, #sentlist .st.waiting { color: var(--warn-fg); }  /* the Sent card's open asks (TD-1409) */
 details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side .kv dd .controllers { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 /* §4.6 *A box smaller than the grid* (TD-1919): the box is the scroll container, sideways with a scrollbar, vertically
-   moved by the page alone; the terminal sits in it at the pane's grid, its pixel size set by the page. The gap is the
-   box's border, which never scrolls (no part-row above the rows shown), and on the inline end the terminal's own,
-   which a scroll area may not drop as it may a padding. */
-.termbox { height: 60vh; min-height: 360px; background: var(--term); border-radius: 6px; padding: 0; border: 6px solid var(--term); border-inline-end-width: 0; overflow-x: auto; overflow-y: hidden; }
-.termbox .xterm { border-inline-end: 6px solid var(--term); box-sizing: content-box; }
+   moved by the page alone; the terminal sits in it at the pane's grid, its pixel size set by the page. Only the grid
+   is the terminal's colour: the gap is the terminal's own border, and a larger box leaves the room right of and below
+   it in the page's background (§4.6 *A larger box*). */
+.termbox { height: 60vh; min-height: 360px; background: transparent; padding: 0; border: 0; overflow-x: auto; overflow-y: hidden; }
+.termbox .xterm { background: var(--term); border: 6px solid var(--term); border-radius: 6px; box-sizing: content-box; }
 /* a finger's drag on the terminal is tmux's scroll, never the page's (§4.6, TD-989); xterm.js's viewport is a scroll
    container of its own, so its layers carry the value too; two fingers still zoom the page */
 .termbox, .termbox .xterm, .termbox .xterm-viewport, .termbox .xterm-screen { touch-action: pinch-zoom; }
@@ -746,8 +746,8 @@ html.phonefocus #side, html.phonefocus #fhead, html.phonefocus #facts, html.phon
 html.phonefocus .focus .termro, html.phonefocus .composerbar, html.phonefocus .cfoldhint { display: none !important; }
 html.phonefocus .focus .inline-banner, html.phonefocus .focus .dropcard, html.phonefocus .focus .endcard { margin: 0; border-radius: 0; flex: none; }
 html.phonefocus .termwrap { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--term); }
-html.phonefocus .termwrap .termbox, html.phonefocus .termwrap.cfold .termbox { flex: 1; min-height: 0; height: auto; border-radius: 0; border-width: 4px 0 0 4px; }
-html.phonefocus .termbox .xterm { border-inline-end-width: 4px; }
+html.phonefocus .termwrap .termbox, html.phonefocus .termwrap.cfold .termbox { flex: 1; min-height: 0; height: auto; }
+html.phonefocus .termbox .xterm { border-radius: 0; border-width: 4px 4px 0 4px; }
 /* a touch selects nothing and a long press is the link's (§4.6): no selection handles, no iOS callout; the helper text
    box at 16 px, so iOS does not zoom the page when ⌨ focuses it; two fingers are the terminal's (TD-1301's pinch) */
 html.phonefocus .termbox, html.phonefocus .termbox * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }

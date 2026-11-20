@@ -3872,7 +3872,7 @@
     return k;
   };
   // **One helper measures** (§4.6 *Fit to window*): `.termbox`'s rendered size less its padding and borders (and the
-  // terminal's own inline-end border, the box's gap), whether or not its sideways scrollbar shows, over the
+  // terminal's own border, the gap), whether or not its sideways scrollbar shows, over the
   // renderer's CSS cell, each floored. `rect` the box's `getBoundingClientRect()`, `edges` `{x, y}` the pixels to
   // take out each way, `cell` `{width, height}`; null where the box has no size or the cell is not known.
   AO.gridOf = function (rect, edges, cell) {
@@ -8476,16 +8476,18 @@
     const px = (cs, k) => parseFloat(cs[k]) || 0;
     // the rows the box shows (its `clientHeight` less its padding, over the cell), never more than the grid's
     const shownRows = () => {
-      const cs = getComputedStyle(boxEl);
-      return Math.min(term.rows, AO.boxRows(boxEl.clientHeight, px(cs, "paddingTop") + px(cs, "paddingBottom"), cellH()));
+      const cs = getComputedStyle(boxEl), xt = $(".xterm", boxEl), xs = xt ? getComputedStyle(xt) : null;
+      const gap = xs ? px(xs, "borderTopWidth") + px(xs, "borderBottomWidth") : 0;
+      return Math.min(term.rows, AO.boxRows(boxEl.clientHeight, px(cs, "paddingTop") + px(cs, "paddingBottom") + gap, cellH()));
     };
     // **One helper measures** (§4.6 *Fit to window*): the box's rendered size less its padding and borders, and the
-    // terminal's own inline-end border, over the cell — whether or not the sideways scrollbar shows
+    // terminal's own border (the gap), over the cell — whether or not the sideways scrollbar shows
     AO.boxGrid = () => {
       const cs = getComputedStyle(boxEl), xt = $(".xterm", boxEl), xs = xt ? getComputedStyle(xt) : null;
       const x = px(cs, "paddingLeft") + px(cs, "paddingRight") + px(cs, "borderLeftWidth") + px(cs, "borderRightWidth")
-        + (xs ? px(xs, "borderRightWidth") : 0);
-      const y = px(cs, "paddingTop") + px(cs, "paddingBottom") + px(cs, "borderTopWidth") + px(cs, "borderBottomWidth");
+        + (xs ? px(xs, "borderLeftWidth") + px(xs, "borderRightWidth") : 0);
+      const y = px(cs, "paddingTop") + px(cs, "paddingBottom") + px(cs, "borderTopWidth") + px(cs, "borderBottomWidth")
+        + (xs ? px(xs, "borderTopWidth") + px(xs, "borderBottomWidth") : 0);
       return AO.gridOf(boxEl.getBoundingClientRect(), { x, y }, cell());
     };
     const lastTextRow = () => {
