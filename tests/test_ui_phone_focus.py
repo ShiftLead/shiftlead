@@ -102,6 +102,7 @@ def test_the_narrow_template_draws_the_strip_the_bars_and_a_sheet_row_per_card(t
         "ftranscript",
         "fshell",
         "tpaste",
+        "tfit",
         "fmodemenu",
         "fkill",
     ]
@@ -410,7 +411,10 @@ def test_focus_wires_the_screen_the_press_the_grid_and_the_reconnects():
         not in focus[focus.index("const press = AO.linkTouch") : focus.index("const press = AO.linkTouch") + 900]
     )
     # no box change sizes the grid, a sheet's neither (TD-1919); the terminal focused only off the phone
-    assert "new ResizeObserver(() => { keeper.release(); schedule(); drawFit(); }).observe(boxEl);" in focus
+    assert (
+        "new ResizeObserver(() => { keeper.release(); schedule(); keepBox(); fitRekeep(); drawFit(); }).observe(boxEl);"
+        in focus
+    )
     assert "fit.fit" not in focus and "toTerm();" in focus
     # the keyboard is the terminal's focus, read from xterm.js's helper text box
     assert 'term.textarea.addEventListener("focusin"' in focus and 'term.textarea.addEventListener("focusout"' in focus
