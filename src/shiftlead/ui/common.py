@@ -230,17 +230,26 @@ def passed_question(e: Any) -> str:
 
 
 def _recommends_html(e: Mapping[str, Any]) -> str:
-    """*`<passer>` recommends: `<line>`*, labelled and drawn as text (§4.5a *Inbox row: passed up*)."""
+    """*`<passer>` recommends: `<line>`*, labelled and drawn as text (§4.5a *Inbox row: passed up*) — one line per
+    pass, the latest first, so a question the techlead passed to the director and the director to the person shows
+    both, the director's first (`passes`, TD-661)."""
     rec = e.get("recommend")
     if not isinstance(rec, Mapping) or not rec.get("text"):
         return ""
-    by = Markup.escape(str(rec.get("by") or ""))
-    who = Markup.escape(str(e.get("passer_name") or rec.get("by") or ""))
-    line = Markup.escape(str(rec["text"]))
-    return (
-        f'<div class="st dflt recommends" title="passed up to you by {by}: its recommendation, not the asker\'s">'
-        f"{who} recommends: {line}</div>"
-    )
+    passes = [p for p in (e.get("passes") or []) if isinstance(p, Mapping) and isinstance(p.get("recommend"), Mapping)]
+    recs = [p["recommend"] for p in reversed(passes) if p["recommend"].get("text")] if len(passes) > 1 else [rec]
+    names = e.get("passer_names") if isinstance(e.get("passer_names"), Mapping) else {}
+    html = ""
+    for one in recs:
+        by = Markup.escape(str(one.get("by") or ""))
+        name = names.get(str(one.get("by") or "")) or (e.get("passer_name") if one is rec else None)
+        who = Markup.escape(str(name or one.get("by") or ""))
+        line = Markup.escape(str(one["text"]))
+        html += (
+            f'<div class="st dflt recommends" title="passed up by {by}: its recommendation, not the asker\'s">'
+            f"{who} recommends: {line}</div>"
+        )
+    return html
 
 
 def _from_asker_html(e: Mapping[str, Any], text: str, origin: str | None, default: Any = None) -> str:

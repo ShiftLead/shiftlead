@@ -541,6 +541,11 @@ class MailEntry:
     # first; the asker's and the passer's copies keep their own.
     passed_up: str | None = None
     recommend: dict[str, str] | None = None
+    # One pass per passer (design §4.9b, TD-661): `{by, at, to, recommend}`, oldest first — a techlead's pass to
+    # the org's director seat, then the director's to the person. `to` is who holds it to answer after that pass
+    # (the director's address, or `person`); `recommend` keeps each passer's own line, `recommend` above the
+    # latest. Empty on an entry never passed up, and on one passed before TD-661 (`passed_to` reads it then).
+    passes: list[dict[str, Any]] = field(default_factory=list)
     # Answered from the record (design §4.9b, TD-075 step 2). `source` is on a **reply**: one line
     # saying where its answer is written down (a file and section, a dated decision), at most
     # `mail.SOURCE_CAP` characters, only ever drawn as text. `answered` is on the **FYI** the home
@@ -611,7 +616,8 @@ class MailEntry:
             # one moved from a seat that could not answer owes on its copy, not here (§4.9b, TD-1480)
             return self.from_ == PERSON and not self.outcome and self.closed_reason != "rerouted"
         return (
-            (PERSON in self.to or bool(self.passed_up))  # a question passed up is the person's to answer (§4.9b)
+            # passed up to the person: theirs to answer (§4.9b); one a director seat answered is not (TD-661)
+            (PERSON in self.to or self.passed_to == PERSON)
             and self.kind in ASK_KINDS
             and self.closed_reason in ("replied", "go_with_it")
             and not self.outcome
@@ -645,6 +651,22 @@ class MailEntry:
         if self.closed_reason:
             return False
         return not (self.closed_by or self.expired_at)
+
+    @property
+    def passed_to(self) -> str | None:
+        """Who holds a passed-up question to answer (design §4.9b, TD-661): the latest pass's `to` — the
+        director seat's address or `person` — and `person` for a pass made before `passes` was kept; None
+        while it was never passed up."""
+        if not self.passed_up:
+            return None
+        return str((self.passes[-1] if self.passes else {}).get("to") or PERSON)
+
+    def passers(self) -> list[str]:
+        """Each seat that passed this question up, oldest first (design §4.9b, TD-661)."""
+        if self.passes:
+            return [str(p.get("by") or "") for p in self.passes]
+        by = str((self.recommend or {}).get("by") or "") if self.passed_up else ""
+        return [by] if by else []
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -1673,8 +1695,8 @@ class Session:
             if (
                 (e.owes and e.id not in asking)
                 if e.handed_entry
-                else (e.open and e.kind in ("ask", "steer") and not e.passed_up)
-            )  # passed up: the person's to answer now (§4.9b), no seat need be filled for it
+                else (e.open and e.kind in ("ask", "steer") and (not e.passed_up or where(e.passed_to or "") == mine))
+            )  # passed up: the holder's to answer now — the director's, else the person's (§4.9b, TD-661)
             and any(where(x) == mine for x in e.to)
             and (not handed_only or e.handed_entry)
         ]

@@ -905,3 +905,6 @@ def test_the_package_ships_the_directors_brief_with_its_org_slot():
     assert "{org}" in text and "ao allow <session>" in text and "ao deny <session>" in text
     # Fix 4: a prompt it cannot weigh is passed up in words, the prompt left `needs-you`
     assert "**Pass it up** — `ao msg person --kind note" in text and "answer nothing" in text
+    # TD-661 Fix 4: the question half — a pass to it answered with `--source` or passed on to the person
+    assert "## Each question passed up" in text and "ao msg --reply-to <id> --source" in text
+    assert "ao msg --pass-up <id> --recommend" in text and "Passing up buys no time" in text

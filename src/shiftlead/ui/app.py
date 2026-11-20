@@ -552,6 +552,13 @@ from .transcript import TRANSCRIPT_TURNS, transcript_editor, transcript_paths, t
 # -- the Inbox's board reading, kept here: the suite patches both names on the app (TD-196) --------
 
 
+def _passer_names(e: Mapping[str, Any], names: Mapping[Any, Any]) -> dict[str, str]:
+    """Each passer of a question passed up, by the name it is known by (§4.5a *Inbox row: passed up*, TD-661)."""
+    passes = e.get("passes") if isinstance(e.get("passes"), list) else []
+    bys = {str(p.get("by")) for p in passes if isinstance(p, dict) and p.get("by")}
+    return {by: str(names.get(by, by)) for by in bys}
+
+
 def repo_teams(org: orgmod.Org, host: str) -> dict[str, str]:
     """Each checkout on `host` → the first team whose `repo:` is it, in definition order (design §4.9
     *Teams*): a repo has any number of teams, and where one must be named — Add entry's hand-to
@@ -1854,6 +1861,7 @@ class Readings:
             rec = e.get("recommend")
             if e.get("passed_up") and isinstance(rec, dict) and rec.get("by"):
                 e["passer_name"] = names.get(str(rec["by"]), str(rec["by"]))
+                e["passer_names"] = _passer_names(e, names)
             # §4.9b: an *answered for you* row names **who asked** — the session Overrule writes
             # to — by the name it is known by, and opens it while it is here
             asker = str(_answered_of(e).get("asker") or "")
@@ -5816,6 +5824,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 rec = e.get("recommend")
                 if isinstance(rec, dict) and rec.get("by"):
                     e["passer_name"] = names.get(str(rec["by"]), str(rec["by"]))
+                    e["passer_names"] = _passer_names(e, names)
         if e is None:
             raise HTTPException(404, f"{key or 'no key'}: gone — reload")
         with timing.step("render"):

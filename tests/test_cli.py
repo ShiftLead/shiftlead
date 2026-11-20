@@ -2346,6 +2346,38 @@ def test_msg_pass_up_and_the_inbox_line_that_shows_it(subprocess_agent, tmp_path
         call_sync("kill", id=sid)
 
 
+def test_a_pass_through_the_director_prints_both_recommendations(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-661 (design §4.9b): with a director seat the techlead's pass goes to it, and the line says so; the
+    director's pass reaches the person, whose `ao inbox` prints both recommendations, the director's first."""
+    shell = {"adapter": "agentshell", "unattended": True, "supervised": True}
+    ids = []
+    for n, kw in (
+        ("pd-asker", {"team": "pd-t"}),
+        ("pd-tl", {"team": "pd-t"}),
+        ("pd-dir", {"seat": {"trigger": "prompt"}}),
+    ):
+        (tmp_path / n).mkdir()
+        ids.append(call_sync("create", name=n, dir=str(tmp_path / n), **shell, **kw)["id"])
+    asker, tl, d = ids
+    monkeypatch.setenv("SHIFTLEAD_SESSION", asker)
+    assert cli.main(["--json", "msg", tl, "delete the old branch?", "--kind", "ask"]) == 0
+    q = json.loads(capsys.readouterr().out)["entry"]
+    monkeypatch.setenv("SHIFTLEAD_SESSION", tl)
+    assert cli.main(["msg", "--pass-up", q["id"], "--recommend", "keep it"]) == 0
+    assert f"{q['id']} passed up → {d}, recommending: keep it" in capsys.readouterr().out
+    monkeypatch.setenv("SHIFTLEAD_SESSION", d)
+    up = ["msg", "--pass-up", q["id"], "--recommend", "keep it, it is merged", "--question", "Delete the branch?"]
+    assert cli.main(up) == 0
+    capsys.readouterr()
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
+    assert cli.main(["inbox"]) == 0
+    out = capsys.readouterr().out
+    first = out.index(f"passed up by {d}, who recommends: keep it, it is merged")
+    assert first < out.index(f"passed up by {tl}, who recommends: keep it\n")
+    for sid in ids:
+        call_sync("kill", id=sid)
+
+
 def test_msg_withdraw_prints_one_line_and_takes_the_id_alone(subprocess_agent, tmp_path, capsys, monkeypatch):
     """TD-1382 (design §4.10 *Withdrawing a question*, §4.7): `ao msg --withdraw <id>` takes the
     caller's own open question to the person back, prints one line and no *when it is read* line,
