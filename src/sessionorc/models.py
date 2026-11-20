@@ -616,7 +616,8 @@ class MailEntry:
             # one moved from a seat that could not answer owes on its copy, not here (§4.9b, TD-1480)
             return self.from_ == PERSON and not self.outcome and self.closed_reason != "rerouted"
         return (
-            (PERSON in self.to or bool(self.passed_up))  # a question passed up is the person's to answer (§4.9b)
+            # passed up to the person: theirs to answer (§4.9b); one a director seat answered is not (TD-661)
+            (PERSON in self.to or self.passed_to == PERSON)
             and self.kind in ASK_KINDS
             and self.closed_reason in ("replied", "go_with_it")
             and not self.outcome

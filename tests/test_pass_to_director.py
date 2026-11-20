@@ -99,6 +99,10 @@ async def test_the_director_answers_a_pass_and_the_asker_has_it(agent, tmp_path)
             assert w in got["delivered"] and got["closed"] == q["id"]
             assert all(not e.open for e in _copies(agent, q["id"]))
             assert (await person.call("get", id=d))["asks_waiting"] == 0
+            # the person answered nothing: the asker owes the person no outcome on it (review of #4275)
+            assert q["id"] not in agent.sessions[w].owed()
+            # a question the director itself asked is never passed up to it: it goes to the person
+            assert agent._director_to_pass_to(tl, d) is None and agent._director_to_pass_to(tl, w) == d
         for sid in (w, tl, d):
             await person.call("kill", id=sid)
 

@@ -1752,12 +1752,9 @@ class InboxMixin:
         # director, the techlead's pass to the director standing (§4.9b, TD-661)
         prior = [dict(p) for p in e.passes[:-1]]
         last = prior[-1] if prior else None
-        self._mark(
-            msg,
-            passes=prior,
-            passed_up=last["at"] if last else None,
-            recommend=dict(last["recommend"]) if last else None,
-        )
+        for copy in [x for r in self._graph().values() for x in r.holds(msg)]:
+            copy.passes = [dict(p) for p in prior]  # each copy its own list, saved by the `_mark` below
+        self._mark(msg, passed_up=last["at"] if last else None, recommend=dict(last["recommend"]) if last else None)
         if e.paused_at:  # resumed as `inbox_resume` resumes it, so its bound runs again
             held = datetime.now(UTC) - _parse(e.paused_at)
             bound = (

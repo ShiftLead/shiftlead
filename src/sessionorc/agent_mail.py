@@ -2594,7 +2594,7 @@ class MailMixin:
                 "(design §4.10)"
             )
         asked = _clean_question(question)
-        if director := self._director_to_pass_to(mine):
+        if director := self._director_to_pass_to(mine, self._addr(e.from_)):
             if asked:
                 raise RpcError(PASS_UP_TO_DIRECTOR)
             return await self._pass_to_director(e, me.id, director, line, picks)
@@ -2623,12 +2623,12 @@ class MailMixin:
             got["warnings"] = warnings
         return got
 
-    def _director_to_pass_to(self, passer: str) -> str | None:
+    def _director_to_pass_to(self, passer: str, asker: str) -> str | None:
         """The org's director seat a pass goes to (design §4.9b *The director answers what is passed up to it*,
         TD-661): its address where one stands that can be filled (`_is_director`: not suspended, sat out or at
-        its fill ceiling) and the passer is not it; else None, and the pass goes to the person."""
+        its fill ceiling) and neither the passer nor the asker is it; else None, and the pass goes to the person."""
         for key, r in self._graph().items():
-            if key != passer and self._is_director(r):
+            if key not in (passer, asker) and self._is_director(r):
                 return key
         return None
 
