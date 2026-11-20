@@ -897,3 +897,9 @@ def test_the_org_file_may_define_its_director_seat(tmp_path):
     ):
         with pytest.raises(ValueError, match=re.escape(says)):
             org.load(write(tmp_path, {**ORG, "director": bad}))
+
+
+def test_the_package_ships_the_directors_brief_with_its_org_slot():
+    """TD-642: `director.md` is the seat's brief (§4.9b), its `{org}` the Org block a start fills."""
+    text = (Path(org.__file__).parent / "briefs" / "director.md").read_text(encoding="utf-8")
+    assert "{org}" in text and "ao allow <session>" in text and "ao deny <session>" in text
