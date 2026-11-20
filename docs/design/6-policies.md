@@ -1007,7 +1007,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      closer and destroys the pane, `pane: false` — is *stopped* and left unread while its team
      runs on — *A team that stopped*, below, reads only a team with nobody live; one closed `why:
      wind_down`, or any ended record carrying a member's mark, is the presser's ending and left unread too, and
-     none is read while any live record of the crew reads `winding`, TD-1895), while a seat or a member of its team is live (nobody live and not wound down is
+     none is read while any live record of the crew reads `winding`, TD-1895, after which a live seat or member is a team that runs on), while a seat or a member of its team is live (nobody live and not wound down is
      *stopped*), whose lane holds a matching id its `lane_seen` lacks while its team is not wound
      down, is this rule's news as a wound-down team's member is: after `WORK_SETTLE` the home writes
      the same `work_waiting` mark, `members` naming it, and the team's `on_work` follows. **What a
@@ -1103,8 +1103,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        remains). A member the person closed a day earlier, while other members ran
        on and ended later, does not decide how the team stopped; where the team ran on only on its seats
        after that Close, rule 3's closes are left out and that Close is its ending — the person's (TD-1564). The
-       manager's rule 9 close after a wind-down is read by the `wound_down_by` that close carries (rule 9 *A
-       wind-down's close*, §4.9a *The manager is not marked*), so a manager with no `wrapup_by`, restarted or its
+       manager's rule 9 close after a wind-down is read by the `wound_down_by` that close carries, and a manager
+       rule 9 finds closed after its line by its `closed_for`'s (rule 9 *A wind-down's close*, §4.9a *The manager
+       is not marked*), so a manager with no `wrapup_by`, restarted or its
        wrap-up refused, still reads the person's where the person wound the run down. Otherwise it is `person` where one of the window's records was
        ended by the person:
        - its `ended.by`, or for a record with no `ended` its `closer.by`, names the person (Stop
@@ -1277,7 +1278,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      not close*, under *Needs you* — drawn from `finished_sent_at` past its grace on a live record,
      nothing more stored. A manager that closed itself, as the line asks (`closed`; one that
      `exited` is rule 1's or a person's kill, and is left) gets the same mark on the tick that
-     finds it gone, so the team reads *wound down* without its declaration. **A member live and
+     finds it gone, by a step that runs ahead of rule 3's fill in the tick (§4.9a *The manager is not
+     marked*), so the team reads *wound down* without its declaration. **A member live and
      not finished after the send takes the wind-down back** — one working, one that never
      declared, one that now wants a restart, or one now waiting — on the person, or on a reader for
      its own PR (above) —: `finished_sent_at` is removed and the reading is
@@ -1335,7 +1337,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      its `since` the earliest `wind_down.at` among this run's marks; `_finished_owed` is never written for a
      team with a member's mark of this run, and an entry written before the press is dropped once the pass
      finds one; where the last marked member is closed by another hand (a `--close`, a person's Close) none is
-     written. While a marked member stays open the reading carries its clause and a live
+     written. With no live manager, the reading-held path writes nothing for a team with a member's mark of this
+     run, so a declared member the press did not reach, closed by this rule after, brings no second note. While a marked member stays open the reading carries its clause and a live
      manager is neither told nor closed. A manager the reading then finds alone is told and closed as
      above — `FINISHED_SETTLE` from the last member's close, then `WRAPUP_GRACE` — the line in a
      wound-down team's words — *your team was wound down by <presser>; its members are closed*, `<presser>`
