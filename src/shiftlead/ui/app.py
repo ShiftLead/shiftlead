@@ -34,6 +34,7 @@ from sessionorc import board as board_mod
 from sessionorc import gitinfo, hosts, mail, naming, paths, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
+from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
 from sessionorc.agent_common import PATHS_RUN_CHARS, PATHS_RUNS_MAX
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
@@ -748,6 +749,9 @@ def counts_of(sections: Mapping[str, Any], build: Any) -> dict[str, Any]:
         "agent_down": False,
     }
 
+
+# what `/api/settings/person` takes (§5 `person.terminal`, TD-1947): one key a call
+PERSON_TERMINAL_SEND = "person: send {terminal: {copy_on_select: true|false}} or {terminal: {grid: [cols, rows]}}"
 
 # design §4.5a **Focus (exited / closed)** → **Resume** (TD-081 step 2; the plumbing is step 1,
 # PR #282). What a one-press resume carries, and what it deliberately does not.
@@ -6044,17 +6048,24 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
     @app.post("/api/settings/person")
     async def api_settings_person(request: Request):
         """A person's own settings from a page (design §5 `person:`, §4.4a *Settings, replicated*):
-        today the Focus pane's **copy on select** toggle (§4.5a, TD-174), `{terminal: {copy_on_select}}`
+        the Focus pane's **copy on select** toggle (§4.5a, TD-174), `{terminal: {copy_on_select}}`, and
+        the grid a new session is pinned at (§4.6, TD-1919), `{terminal: {grid: [cols, rows]}}`, each
         through `set_settings`, which validates it and refuses a session. The page's next settings
         read takes it up, so the choice survives a reload."""
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         term = body.get("terminal") if isinstance(body, dict) else None
-        if (
-            not isinstance(term, dict)
-            or set(term) != {"copy_on_select"}
-            or not isinstance(term["copy_on_select"], bool)
-        ):
-            raise HTTPException(400, "person: send {terminal: {copy_on_select: true|false}}")
+        if not isinstance(term, dict) or len(term) != 1:
+            raise HTTPException(400, PERSON_TERMINAL_SEND)
+        if "copy_on_select" in term:
+            if not isinstance(term["copy_on_select"], bool):
+                raise HTTPException(400, "person: send {terminal: {copy_on_select: true|false}}")
+        elif "grid" in term:
+            try:
+                settings_mod.parse_terminal_grid(term["grid"])
+            except ValueError as e:
+                raise HTTPException(400, f"person: {e}") from None
+        else:
+            raise HTTPException(400, PERSON_TERMINAL_SEND)
         got = await call("set_settings", person={"terminal": term})
         h.settings_at["at"] = 0.0  # read it again before the next page is drawn
         h.counts.stir()  # the counts move with the person's settings (TD-616)
