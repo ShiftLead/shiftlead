@@ -2797,6 +2797,8 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
                 print(f"  {d['line']}")
             for x in applied.get("stays") or []:
                 print(f"  {x['line']}")
+            for said in applied.get("notes") or []:
+                print(f"  {said}")
         elif out.get("unread"):
             print(f"the records are not compared: {out['unread']}")
         elif out["differences"]:

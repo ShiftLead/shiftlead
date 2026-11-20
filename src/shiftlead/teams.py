@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from sessionorc import brief as brief_mod
 from sessionorc import naming
 from sessionorc.models import REVIEW_BOUND
 
@@ -275,6 +276,78 @@ def reach_block(org: orgmod.Org, here: Path | str, host: str) -> tuple[str, str]
     if not repo:
         return "", ""
     return org.project_of(repo), project_block(org, repo, host)
+
+
+# The director seat's directory, its own outside every repo (§4.9b *The director seat*, §9 invariant 2, TD-642)
+DIRECTOR_DIR = "~/.local/share/shiftlead/director"
+DIRECTOR_ROLE = "director"
+# the profiles whose prompts reach a seat rather than being skipped (§4.2a): a director on one would wait on itself
+DIRECTOR_REFUSED_PROMPTS = ("ask", "all")
+
+
+def director_dir() -> Path:
+    """The director seat's own directory (§4.9b *The director seat*): a plain directory no other session shares."""
+    return Path(DIRECTOR_DIR).expanduser()
+
+
+def director_create(org: orgmod.Org) -> dict[str, Any] | None:
+    """The `create` arguments that write the org's director seat (design §4.9b *The director seat*, TD-642), None
+    where `org.yml` defines no `director:`: the first seat of no team and no project — held, as a manager on
+    call is, for rule 3 to fill on its `prompt` trigger; unattended and supervised; holding `permit` and no
+    controller; in its own directory (`director_dir`). Its brief is the package's `director.md`, or the file
+    `director.brief` names (relative to the org file), whose `{org}` is the Org block the home reads from the repo
+    registry at each fill (`brief.org_block`), each repo named with its project heading. Raises `TeamError` for a
+    profile that is unknown, runs a shell, or does not skip prompts (`ask`, `all`, §4.2a): nothing above the
+    director would answer its own."""
+    d = org.director
+    if d is None:
+        return None
+    where = f"director {d.name}"
+    profile = d.profile or ""
+    adapter = profiles.DEFAULT_ADAPTER
+    if profile:
+        try:
+            p = profiles.get(profile)
+        except (KeyError, ValueError) as e:
+            raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
+        adapter = p.adapter
+        if adapter == profiles.SHELL_ADAPTER:
+            raise TeamError(f"{where}: profile {profile!r} runs a shell, and the director is an agent (design §4.9b)")
+        if p.permission_prompts in DIRECTOR_REFUSED_PROMPTS:
+            raise TeamError(
+                f"{where}: profile {profile!r} has permission_prompts: {p.permission_prompts}, and nothing above the "
+                "director would answer its own prompts — give it a profile that skips them "
+                "(design §4.9b Its first read)"
+            )
+    if d.brief:
+        base = Path(d.brief).expanduser()
+        base = base if base.is_absolute() else orgmod.org_file().parent / base
+    else:
+        base = Path(orgmod.__file__).parent / "briefs" / "director.md"
+    headings = {r: (h.title or h.name) for h in org.projects.values() for r in h.repos}
+    prompt_from = {"base": str(base), "slots": {"{org}": {"checkouts": {"headings": headings}}}}
+    try:
+        prompt = brief_mod.fill(prompt_from, merged=False)[0]
+    except brief_mod.Unreadable as e:
+        raise TeamError(f"{where}: its brief cannot be read ({e})") from None
+    return {
+        "name": d.name,
+        "dir": str(director_dir()),
+        "adapter": adapter,
+        "unattended": True,
+        "resume": None,
+        "profile": profile,
+        "prompt": prompt,
+        "prompt_from": prompt_from,
+        "capabilities": [orgmod.DIRECTOR_GRANT],
+        "controllers": [],
+        "lane": [],
+        "role": DIRECTOR_ROLE,
+        **gate_prompts(True),
+        "supervised": True,
+        "seat": {"trigger": orgmod.DIRECTOR_TRIGGER},
+        "held": True,
+    }
 
 
 # A lead, a member and the techlead seat are shaped alike where a launch is concerned (§4.9): each
