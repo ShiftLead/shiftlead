@@ -311,3 +311,46 @@ def test_the_client_places_headings_and_lines_and_hides_them_under_a_filter(tmp_
     assert got["none"] == ["head:p", "repo:one", "team:a", "repo:two", "team:b"]
     assert got["cleared"] == []
     assert got["after"] == ["head:p", "repo:one", "team:a"]
+
+
+def test_the_directors_card_is_a_section_of_its_own_above_every_heading(tmp_path, monkeypatch):
+    """§4.9 *The Sessions page*, §4.9b *The director seat* (TD-642 Fix 6a): the org's director seat is drawn in a
+    section of its own at the top, under no heading, its card alone, headed *Director* — never in *No repo* — and
+    the rollup counts it but draws no row for it, its rows being teams and repos."""
+    from shiftlead.ui.org import rollup, rollup_counted
+
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    views = [
+        sess("t1", team="t", repo="/r/main"),
+        sess("ao-director", repo="", director=True, state="working"),
+        sess("scratch", repo=""),
+    ]
+    items = layout(views, [row("t", "main")], ["main"])
+    assert shape(items) == ["director", "repo:main*", "team:t", "norepo"]
+    top, none = items[0], items[-1]
+    assert top["kind"] == "director" and top["label"] == "Director" and top["ids"] == ["ao-director"]
+    assert none["ids"] == ["scratch"], "the director is never under No repo"
+    html = page(items)
+    sec = html[html.index('data-key="director"') :]
+    head = sec[: sec.index('<div class="grid">')]
+    assert '<span class="h2">Director</span>' in head and "Start" not in head and "Wind down" not in head
+    assert html.index('data-key="director"') < html.index('data-key="repo:main"')
+    assert "ao-director" in [m["id"] for _, m in rollup_counted(items)]
+    assert "director" not in [r.get("hash") for r in rollup(items, views)["rows"]]
+    # no director record, no section
+    assert "director" not in shape(layout([sess("t1", team="t", repo="/r/main")], [row("t", "main")], ["main"]))
+
+
+def test_seat_ids_draw_the_director_on_call_only_where_the_org_defines_it():
+    """An exited director between prompts is *on call*, as any seat is (§4.5 *The card's anatomy*), where
+    `org.yml` defines `director:`; a superseded record or one with a team badge is not it."""
+    from shiftlead import teamrun
+
+    director = {"id": "ao-director", "name": "director", "seat": {"trigger": "prompt"}, "state": "exited"}
+    org = orgmod.Org()
+    assert teamrun.seat_ids(org, [director]) == {}
+    org.director = orgmod.DirectorDef()
+    assert set(teamrun.seat_ids(org, [director])) == {"ao-director"}
+    assert not teamrun.is_director({**director, "superseded_by": "x"})
+    assert not teamrun.is_director({**director, "team": "t"})
+    assert not teamrun.is_director({**director, "seat": {"trigger": "asks"}})
