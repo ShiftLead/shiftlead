@@ -750,9 +750,11 @@ def counts_of(sections: Mapping[str, Any], build: Any) -> dict[str, Any]:
     }
 
 
+# what `/api/settings/person` takes (§5 `person.terminal`, TD-1947): one key a call
+PERSON_TERMINAL_SEND = "person: send {terminal: {copy_on_select: true|false}} or {terminal: {grid: [cols, rows]}}"
+
 # design §4.5a **Focus (exited / closed)** → **Resume** (TD-081 step 2; the plumbing is step 1,
 # PR #282). What a one-press resume carries, and what it deliberately does not.
-PERSON_TERMINAL_SEND = "person: send {terminal: {copy_on_select: true|false}} or {terminal: {grid: [cols, rows]}}"
 RESUME_CARRIES = ("name", "dir", "adapter", "profile", "repo", "role", "team", "project", "lane", "controllers")
 # The first prompt **Reopen and push** writes (§4.5a *Inbox row: state*, TD-081). Fixed text, in
 # the source: it is the page's sentence, never anything a session said (§4.2), and what comes of it
