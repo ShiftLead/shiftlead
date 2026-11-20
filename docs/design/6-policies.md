@@ -1278,7 +1278,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      not close*, under *Needs you* — drawn from `finished_sent_at` past its grace on a live record,
      nothing more stored. A manager that closed itself, as the line asks (`closed`; one that
      `exited` is rule 1's or a person's kill, and is left) gets the same mark on the tick that
-     finds it gone, so the team reads *wound down* without its declaration. **A member live and
+     finds it gone, by a step that runs ahead of rule 3's fill in the tick (§4.9a *The manager is not
+     marked*), so the team reads *wound down* without its declaration. **A member live and
      not finished after the send takes the wind-down back** — one working, one that never
      declared, one that now wants a restart, or one now waiting — on the person, or on a reader for
      its own PR (above) —: `finished_sent_at` is removed and the reading is
