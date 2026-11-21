@@ -3514,6 +3514,8 @@ class HostAgent(
         caller: Any = None,
         wrapup: bool = False,
         key: str | None = None,
+        wind_down: bool = False,
+        manager: str | None = None,
     ) -> dict | None:
         """Type a prompt. With `wait` (TD-016, design §4.2): return the record once the session has
         started on *this* prompt and settled again (`SETTLED`). A session that is busy queues the
@@ -3526,7 +3528,10 @@ class HostAgent(
         (the card's Wrap up, `ao team stop`): it is stamped on the record as `wrapup_at`, which holds
         the doorbell off, and a send without it clears the stamp (§4.10 "A pending stop beats mail").
         `key` is the page's id for this send (§4.10 *A send lands once*, TD-806): a repeat of it from the
-        same caller within `SEND_KEY_SECONDS` answers as that send did, before anything else here."""
+        same caller within `SEND_KEY_SECONDS` answers as that send did, before anything else here.
+        `wind_down` (with `wrapup`) is a Wind down's member send, which marks the record once the prompt is
+        submitted, and `manager` the home's reading of the team's manager, handed to a node (`_wind_down_after`,
+        §4.9a *A wind-down closes its members*, TD-1898)."""
         s = self._get(id)
         if key:
             first = self._keyed_send(s, caller, str(key))
@@ -3579,6 +3584,7 @@ class HostAgent(
                     else:
                         typing.set_exception(RpcError(entry.verdict))
                 typing.exception()  # read here, so a failure no repeat awaited is not logged as unread
+        self._wind_down_after(s, caller, wrapup=wrapup, wind_down=wind_down, manager=manager)
         if not wait:
             return None
         end = None if timeout is None else time.monotonic() + timeout
@@ -3616,6 +3622,49 @@ class HostAgent(
         if not await self._wait_state(s, lambda x: x.state in SETTLED and x.rev != rev_before, left()):
             self._raise_not_settled(s, timeout)
         return s.view()
+
+    def _wind_down_after(self, s: Session, caller: Any, *, wrapup: bool, wind_down: bool, manager: Any) -> None:
+        """A submitted send's effect on the Wind down's mark (design §4.9a *A wind-down closes its members*,
+        TD-1898), stamped only once `_submit` returned, so a refused or failed send leaves the mark as it was.
+        A Wind down's member send (`wrapup` and `wind_down`, never on a seat) writes `{at, by, waits: true}`,
+        `by` the caller's as `wrapup_by` is, a `person` already there kept. On a record already marked: a
+        person's send moves `at` and sets `waits`, and sets `by` to `person` on a member's mark (the manager's
+        own, which is inert, keeps its `by`); a session's wrap-up that carries no `wind_down` leaves it as it is;
+        a controller's plain send clears it, the record an ordinary member again; a session's send to its own
+        record leaves it."""
+        if wrapup and wind_down and s.seat is None:
+            by = closer_of(caller, None, "")["by"]
+            if (s.wind_down or {}).get("by") == "person":
+                by = "person"  # a second Wind down by a session keeps the person's word
+            s.wind_down = {"at": now_iso(), "by": by, "waits": True}
+        elif not s.wind_down:
+            return
+        elif mail.as_person(caller, self._graph()):
+            moved = {**s.wind_down, "at": now_iso(), "waits": True}
+            if not self._is_team_manager(s, manager):
+                moved["by"] = "person"
+            s.wind_down = moved
+        elif wrapup or str(caller) == s.id:
+            return  # a session's wrap-up with no `wind_down`, or its send to its own record, leaves the mark as it is
+        else:
+            s.wind_down = None  # a controller's new instruction: a run carrying on, as `wrapup_at` is cleared
+        self._save(s)
+
+    def _team_manager(self, team: str | None) -> str | None:
+        """The address of the record `work.manager_of` reads as `team`'s manager, over the team's records as
+        rule 9 reads them (unattended, not superseded), at the home; None where there is none."""
+        if not team:
+            return None
+        mine = [r for r in self._graph().values() if r.team == team and r.unattended and not r.superseded_by]
+        top = work_mod.manager_of(mine)
+        return self._address(top) if top is not None else None
+
+    def _is_team_manager(self, s: Session, manager: Any) -> bool:
+        """Whether `s` is its team's manager: the home reads it itself, and a node reads the `manager` the home's
+        route handed it (absent: a member's), since only the home holds the team's records (§4.4a)."""
+        if self.mode == "home":
+            return self._team_manager(s.team) == self._address(s)
+        return bool(manager) and naming.split_address(str(manager))[0] == s.id
 
     @staticmethod
     def _refuse_gone(s: Session) -> None:

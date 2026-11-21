@@ -36,6 +36,7 @@ from sessionorc.models import (
     SendEntry,
     Session,
     now_iso,
+    winding,
 )
 
 
@@ -134,7 +135,7 @@ class WakeMixin:
             return "holding its mail unread"  # rung and answered with nothing read, DOORBELL_HELD times (TD-347)
         if getattr(adapters.get(s.adapter), "composer", None) is None:
             return "no composer"  # without a submit confirmation a ring could land on a half-typed line
-        if s.wrapup_sent_at or s.wrapup_at or (s.run_until and now >= _parse(s.run_until)):
+        if winding(s) or (s.run_until and now >= _parse(s.run_until)):
             return "a wrap-up under way"  # mail never pushes a session past its stop
         if s.gated:
             return "paused by the usage gate"  # mail never wakes a session the gate paused (§6)

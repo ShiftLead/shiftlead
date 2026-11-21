@@ -552,6 +552,9 @@ class RemoteMixin:
             or "a permission prompt"
         )
         sent = dict(params)
+        if method == "send":  # the home's reading of the team's manager, which a node cannot make (TD-1898)
+            routed = self.remote.get(host, {}).get(rid)
+            sent["manager"] = self._team_manager(routed.team if routed is not None else None)
         sent.pop("prompt_from", None)  # the launch record's alone, and the home writes a node's (§6 rule 7)
         sent.pop("via", None)  # a mode change's control: the home stamps its copy, the node writes nothing (TD-1439)
         if home_copy is not None and sent.get("reap", True) is True and host in containers.container_nodes():

@@ -20,7 +20,7 @@ from sessionorc import settings as settings_mod
 from sessionorc import work as work_mod
 from sessionorc.agent_common import FILL_CEILING, FILL_WINDOW, LEASE_TTL, SCALE_STEP, _parse, _recent, log, on_its_own
 from sessionorc.agent_tick import _orders
-from sessionorc.models import ProgressEntry, Session, now_iso
+from sessionorc.models import ProgressEntry, Session, now_iso, winding
 
 DEAD = work_mod.DEAD
 
@@ -261,7 +261,7 @@ class ScaleMixin:
         if not live:
             return "unstaffed"
         if team in self._finished_first or any(
-            r.wrapup_at for r in crew if r.state not in DEAD and r.seat is None and not r.scale
+            winding(r) for r in crew if r.state not in DEAD and r.seat is None and not r.scale
         ):
             return "the team winds down"
         if any(r.state not in DEAD and _last(r).get("did") == "fill" and not _claimed(r) for r in extras):

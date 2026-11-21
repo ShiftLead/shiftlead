@@ -121,6 +121,7 @@ from sessionorc.models import (
     context_over_text,
     lane_refs,
     now_iso,
+    winding,
 )
 from sessionorc.tmux import PaneInfo
 
@@ -1332,8 +1333,7 @@ class TickMixin:
             and s.pane
             and not s.out_of_work
             and not s.restart_wanted
-            and not s.wrapup_at
-            and not s.wrapup_sent_at
+            and not winding(s)
             and not (s.run_until and now >= _parse(s.run_until))
             and not s.gated
             and not s.suspended
@@ -1420,7 +1420,7 @@ class TickMixin:
             why = "killed"
         elif s.restart_ceiling:
             why = "exited past its restart ceiling"
-        elif s.wrapup_at or s.wrapup_sent_at:
+        elif winding(s):
             why = "exited after a wrap-up"
         elif s.out_of_work:
             why = "exited after declaring out of work"
@@ -1455,7 +1455,7 @@ class TickMixin:
             return False
         if not retry and (s.first_prompt_error != agent_common.FIRST_PROMPT_NO_HOOK or s.state in ("exited", "closed")):
             return False
-        if s.restart_ceiling or (s.run_until and now >= _parse(s.run_until)) or s.wrapup_at or s.wrapup_sent_at:
+        if s.restart_ceiling or (s.run_until and now >= _parse(s.run_until)) or winding(s):
             return False
         if s.gated or self._profile_gated(s.profile, now, s.team):
             return False
@@ -1562,6 +1562,8 @@ class TickMixin:
             return
         if s.superseded_by or s.suspended or s.gated or s.sit_out or work_mod.sat_out(s):
             return  # a member its flow sits out is never started again by the tick (§4.9c)
+        if winding(s):
+            return  # a member being wound down is never restarted: its ending is under way (§4.9a, TD-1898)
         # A ceiling guards against a crash loop, not a member that has worked since (TD-186): a clean
         # declaration is acted on once the window holds fewer than the ceiling's restarts; the new
         # record carries no mark. Inside the window the mark stands, as it does for rule 1.
@@ -1767,7 +1769,7 @@ class TickMixin:
             waiting = {id(e) for e in self._waiting_claims(s)} if why == "brief" and not s.relaunch else set()
             if any(e.status == "claimed" and e.source == "declared" and id(e) not in waiting for e in s.progress):
                 return
-        if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
+        if winding(s) or (s.run_until and now >= _parse(s.run_until)):
             return
         if self._profile_gated(s.profile, now, s.team) or self._just_restarted(s, now):
             return
@@ -1914,7 +1916,7 @@ class TickMixin:
             return  # counted from the later of `since`, `subagent_at` and `shells_at` (TD-734, TD-766)
         if s.nudged_at and _parse(s.nudged_at) >= _parse(s.since):
             return  # this stretch was nudged already: never a second before the first is answered
-        if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
+        if winding(s) or (s.run_until and now >= _parse(s.run_until)):
             return
         if s.gated or self._profile_gated(s.profile, now, s.team):
             return
@@ -2026,7 +2028,7 @@ class TickMixin:
             return  # a claim in progress: the clause on its `ao` replies says it, and it declares after
         if s.context_sent_at and now - _parse(s.context_sent_at) < CONTEXT_AGAIN:
             return
-        if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
+        if winding(s) or (s.run_until and now >= _parse(s.run_until)):
             return
         if s.gated or self._profile_gated(s.profile, now, s.team):
             return
@@ -2143,7 +2145,7 @@ class TickMixin:
                 continue
             typed = s.host == self.host and s.unattended and not s.suspended
             if typed and s.state == "idle":
-                if not s.told or s.pending or s.wrapup_at or s.wrapup_sent_at:
+                if not s.told or s.pending or winding(s):
                     continue
                 if s.gated or self._profile_gated(s.profile, now, s.team):
                     continue
@@ -2396,7 +2398,7 @@ class TickMixin:
             return
         if not (s.host == self.host and s.unattended and not s.suspended and s.state == "idle"):
             return
-        if not s.told or s.pending or s.wrapup_at or s.wrapup_sent_at:
+        if not s.told or s.pending or winding(s):
             return
         if s.gated or self._profile_gated(s.profile, now, s.team):
             return
@@ -2497,7 +2499,7 @@ class TickMixin:
         drops = self._lane_drops(s, [i for i in ids if i in seen])
         if not (new or drops) or s.state in ("exited", "closed") or s.suspended:
             return
-        if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
+        if winding(s) or (s.run_until and now >= _parse(s.run_until)):
             return
         if s.gated or self._profile_gated(s.profile, now, s.team):
             return

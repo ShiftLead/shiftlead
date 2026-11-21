@@ -138,6 +138,7 @@ NODE_OWNED = frozenset(
         "gated",
         "wrapup_at",
         "wrapup_by",
+        "wind_down",
         "doorbell_failed",
         "ring_seen",
         "tool_version",
@@ -238,6 +239,14 @@ STATE_RANK: dict[str, int] = {
     "exited": 7,
     "closed": 8,
 }
+
+
+def winding(s: Any) -> bool:
+    """Whether a record, or its view, is being wound down (design §4.9a *A wind-down closes its members*, TD-1898):
+    a wrap-up typed (`wrapup_at`), the stop time's sent (`wrapup_sent_at`), or a Wind down's mark (`wind_down`).
+    The one reading every pass that holds a stopping record off — the doorbell, the nudges, the restarts — reads."""
+    get = s.get if isinstance(s, Mapping) else lambda k: getattr(s, k, None)
+    return bool(get("wrapup_at") or get("wrapup_sent_at") or get("wind_down"))
 
 
 def now_iso() -> str:
@@ -1562,6 +1571,12 @@ class Session:
     # read from the caller as `closer` is; set and cleared with `wrapup_at`. A record that leaves on its own
     # after the person's Wind down names nobody at its end, and this is what says the person stopped it.
     wrapup_by: str | None = None
+    # A Wind down's mark (design §4.9a *A wind-down closes its members*, TD-1898): `{at, by, waits}`, stamped by a
+    # `send(wrapup=True, wind_down=True)` once its prompt is submitted — `by` read from the caller as `wrapup_by`
+    # is, `waits` true while the wrap-up's turn is still to run. A person's send moves `at` and sets `waits` (and,
+    # on a member's mark, `by` to `person`); a controller's plain send clears it; mail never touches it. It holds
+    # the record off every pass that holds a wrapped-up record off (`winding`), as `wrapup_at` does.
+    wind_down: dict[str, Any] | None = None
     # A doorbell that failed to submit twice (design §4.10): `{at, error}`, so the sender and the
     # page can see that the ring did not land; cleared by the next ring that does.
     doorbell_failed: dict[str, str] | None = None

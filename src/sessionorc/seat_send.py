@@ -13,7 +13,7 @@ from typing import Any
 
 from sessionorc import work as work_mod
 from sessionorc.agent_common import on_its_own
-from sessionorc.models import TOLD, Session
+from sessionorc.models import TOLD, Session, winding
 
 DEAD = work_mod.DEAD
 BUSY = ("working", "needs-you")
@@ -75,7 +75,7 @@ KEPT_FROM_RUNNING = ("profile gated", "suspended", "sat out", "not supervised")
 def stopping(r: Session, now: datetime) -> bool:
     """A wrap-up under way, its run's end passed, paused by the usage gate, or suspended: live and neither busy nor
     free (§4.9 *An own record that is live but neither busy nor free*)."""
-    if r.wrapup_sent_at or r.wrapup_at or r.gated or r.suspended:
+    if winding(r) or r.gated or r.suspended:
         return True
     if r.run_until:
         try:
