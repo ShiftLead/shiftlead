@@ -173,3 +173,16 @@ async def test_the_home_hands_a_nodes_send_its_reading_of_the_manager(agent, mon
     monkeypatch.setattr(agent, "mode", "node")
     assert agent._is_team_manager(w, "ao-w@node") and not agent._is_team_manager(w, "ao-mgr")
     assert not agent._is_team_manager(w, None)
+
+
+def test_a_mark_alone_holds_a_record_off_as_a_wrap_up_does():
+    """The readers read `winding`, so a mark a person's send left without `wrapup_at` still holds the record off."""
+    from datetime import UTC, datetime
+
+    from sessionorc import seat_send
+
+    r = Session(id="x", name="x", kind="interactive", adapter="claude-code", dir="/tmp", host="h", state="idle")
+    now = datetime.now(UTC)
+    assert not seat_send.stopping(r, now)
+    r.wind_down = {"at": "2026-01-01T00:00:00Z", "by": "person", "waits": True}
+    assert r.wrapup_at is None and seat_send.stopping(r, now)
