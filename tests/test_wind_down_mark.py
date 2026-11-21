@@ -112,6 +112,16 @@ async def test_a_card_wrap_up_on_a_finished_marked_member_sets_waits(agent, monk
     assert w.wind_down["waits"] is True and w.wind_down["by"] == "person"
 
 
+async def test_a_sessions_wrap_up_without_wind_down_leaves_the_mark_as_it_is(agent, monkeypatch):
+    await park_ticks(agent)
+    t = Typist(agent, monkeypatch)
+    _, w = _team(agent)
+    mark = {"at": "2026-01-01T00:00:00Z", "by": "ao-mgr", "waits": False}
+    w.wind_down = dict(mark)
+    await agent.rpc_send(id=w.id, text="wrap up", wrapup=True, caller="ao-mgr")
+    assert t.typed == ["wrap up"] and w.wind_down == mark, "not moved, not waiting, and not cleared"
+
+
 async def test_the_managers_inert_mark_keeps_its_by_under_the_persons_send(agent, monkeypatch):
     await park_ticks(agent)
     Typist(agent, monkeypatch)

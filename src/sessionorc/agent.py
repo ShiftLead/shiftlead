@@ -3628,9 +3628,10 @@ class HostAgent(
         TD-1898), stamped only once `_submit` returned, so a refused or failed send leaves the mark as it was.
         A Wind down's member send (`wrapup` and `wind_down`, never on a seat) writes `{at, by, waits: true}`,
         `by` the caller's as `wrapup_by` is, a `person` already there kept. On a record already marked: a
-        person's send, or any wrap-up, moves `at` and sets `waits`, and a person's sets `by` to `person` on a
-        member's mark (the manager's own, which is inert, keeps its `by`); a controller's plain send clears
-        it, the record an ordinary member again; a session's send to its own record leaves it."""
+        person's send moves `at` and sets `waits`, and sets `by` to `person` on a member's mark (the manager's
+        own, which is inert, keeps its `by`); a session's wrap-up that carries no `wind_down` leaves it as it is;
+        a controller's plain send clears it, the record an ordinary member again; a session's send to its own
+        record leaves it."""
         if wrapup and wind_down and s.seat is None:
             by = closer_of(caller, None, "")["by"]
             if (s.wind_down or {}).get("by") == "person":
@@ -3643,12 +3644,10 @@ class HostAgent(
             if not self._is_team_manager(s, manager):
                 moved["by"] = "person"
             s.wind_down = moved
-        elif wrapup:
-            s.wind_down = {**s.wind_down, "at": now_iso(), "waits": True}
-        elif str(caller) != s.id:
-            s.wind_down = None  # a controller's new instruction: a run carrying on, as `wrapup_at` is cleared
+        elif wrapup or str(caller) == s.id:
+            return  # a session's wrap-up with no `wind_down`, or its send to its own record, leaves the mark as it is
         else:
-            return
+            s.wind_down = None  # a controller's new instruction: a run carrying on, as `wrapup_at` is cleared
         self._save(s)
 
     def _team_manager(self, team: str | None) -> str | None:
