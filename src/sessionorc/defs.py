@@ -1,7 +1,7 @@
 """The home's definition files have a history (design §4.9 *What is left at the home has a history*,
 TD-210, TD-229 slice 5): at the home, `~/.shiftlead` is a git work tree that tracks `org.yml`,
-`profiles.yml` and `settings.yml`, and the org's `flows/` and `roles/` directories (§4.9c, TD-313), and
-ignores the rest — sessions, runs and mail are state, and
+`profiles.yml`, `logins.yml` (§4.2b, TD-1974) and `settings.yml`, and the org's `flows/` and `roles/`
+directories (§4.9c, TD-313), and ignores the rest — sessions, runs and mail are state, and
 `hosts.yml` is this machine's own. The home's host agent is the one committer; it reads none of the
 files for meaning, only whether each `.yml` parses as YAML. Nothing here adds a remote or pushes."""
 
@@ -17,7 +17,8 @@ from sessionorc import paths
 
 log = logging.getLogger(__name__)
 
-TRACKED = ("org.yml", "profiles.yml", "settings.yml")
+# `logins.yml` beside `profiles.yml` until the switch-over takes that out (§4.2b *Where it lives*, TD-1974, TD-1976)
+TRACKED = ("org.yml", "profiles.yml", "logins.yml", "settings.yml")
 # the org's flow and role directories (§4.9c *Where flows and roles live*, TD-313): whole files under each
 TRACKED_DIRS = ("flows", "roles")
 DEFINITIONS = (*TRACKED, *TRACKED_DIRS)
@@ -75,7 +76,7 @@ def head(home: Path | None = None) -> str:
 
 
 def init(home: Path | None = None) -> bool:
-    """Make the home a work tree that tracks the three files (`ao service install`, at the home and
+    """Make the home a work tree that tracks the definition files (`ao service install`, at the home and
     never on a node), and commit what it holds as the first entry. False when it already is one."""
     home = home or paths.home()
     if is_tree(home):
@@ -116,15 +117,15 @@ def commit(message: str, *, home: Path | None = None, files: tuple[str, ...] = D
     """Commit `files` as they stand with `message`, and True when a commit was made. A name in
     `TRACKED_DIRS` stands for every file under that directory. A `.yml` file that does not parse as
     YAML is left out until it does; one removed is committed as removed; a home that is no work tree
-    commits nothing. A `.gitignore` that lacks a directory's lines gains them, in the same commit. A git
+    commits nothing. A `.gitignore` that lacks one of `IGNORE`'s lines (a file or a directory added to the
+    tracked ones after the home became a tree) gains it, in the same commit, so the file is never ignored. A git
     that fails is logged, never raised: the write it follows has already happened and stands."""
     home = home or paths.home()
     if not is_tree(home):
         return False
     try:
         tracked = set(_git(home, "ls-files", "-z").stdout.split("\0"))
-        dirs = [f for f in files if f in TRACKED_DIRS]
-        if dirs and _let_in(home):
+        if _let_in(home):
             files = (".gitignore", *files)
         take = []
         for f in _expand(home, files, tracked):

@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Tools · ShiftLead{% endblock %}
+{% block icon %}page-settings{% endblock %}
+{# design §4.2b *The page*, §4.5 screen 14 **Tools** (TD-1953, built by TD-1973; mockup
+   `docs/mockups/reviews/2026-11-18-td1953-tools-own5-{1440,420}.png`): the coding tools on the home's host — a card
+   per supported tool found, headed by its name and version, its found rows; then *Not ready to run here*. Before the
+   switch-over it draws no accounts or logins; on a switched host (`t.switched`) each card draws them as a tree, each
+   account and its logins, *Not signed in*, then the logins whose account is to be named (TD-1974; the gauges are
+   TD-1975's). Drawn from the host agent's kept
+   `tools` read; **Check again** posts `/api/tools/check` (`tools_check`), **Install** `/api/tools/install`
+   (`tools_install`), which opens the install shell's Focus. A login's and an account's controls (TD-1974) post
+   `/api/tools/login/<verb>` and `/api/tools/account/label`, each its `ao login` / `ao account` verb. #}
+{% macro login_row(c, lg) %}
+      <div class="toollogin row gap wrap" data-login="{{ c.adapter }}:{{ lg.name }}" data-version="{{ lg.version or '' }}" data-label="{{ lg.label or '' }}" data-note="{{ lg.note or '' }}"><span class="mono toolloginname">{{ lg.label or lg.name }}</span>{% if lg.label %}<span class="mono note">{{ lg.name }}</span>{% endif %}
+        <button class="btn sm link toolpen" type="button" data-tool-act="label" title="{{ help_title('tools-label') }}" aria-label="label {{ lg.name }}">✎</button>
+        <span class="mono note toolfolder">{{ lg.shown }}</span>
+        {%- if lg.pin or lg.note %}<span class="note toolnote"><i>{% if lg.pin %}pinned: {{ lg.pin }}{% endif %}{% if lg.pin and lg.note %} · {% endif %}{{ lg.note or "" }}</i></span>{% endif %}
+        <span class="grow"></span><span class="toolstate state-{{ lg.state }}">{{ lg.said }}</span>
+        {%- if lg.state == 'not_signed_in' %}<button class="btn sm toolact" type="button" data-tool-act="shell" title="{{ help_title('tools-sign-in') }}">Sign in</button>
+        {%- elif lg.state == 'sign_in_again' %}<button class="btn sm toolact" type="button" data-tool-act="shell" title="{{ help_title('tools-sign-in') }}">Sign in again</button>{% endif %}
+        {%- if lg.state == 'name_account' or lg.mismatch %}<button class="btn sm toolact" type="button" data-tool-act="account" title="{{ help_title('tools-name-account') }}">Name its account</button>{% endif %}
+        <details class="more"><summary class="btn sm link" title="more">⋯</summary>
+          <div class="menu">
+            <button type="button" data-tool-act="shell" title="{{ help_title('tools-login-shell') }}">Open a shell here</button>
+            <button type="button" data-tool-act="settings" title="{{ help_title('tools-settings') }}">Settings</button>
+            <button type="button" data-tool-act="note" title="{{ help_title('tools-note') }}">Edit note</button>
+            <button type="button" data-tool-act="forget" title="{{ help_title('tools-forget') }}">Forget this login</button>
+          </div></details>
+        {%- if lg.mismatch %}<div class="note toolwarn">these logins read different accounts: this one launches nothing until they agree</div>{% endif %}
+        {%- for w in lg.warned %}<div class="note toolwarn">{{ w }}</div>{% endfor %}
+        <form class="toolsettings" data-billing="{{ lg.form.billing }}" hidden>
+          <label>billing <select name="billing" data-was="{{ lg.form.billing }}"><option value="">not set</option>{% for b in ("subscription", "metered") %}<option{% if lg.form.billing == b %} selected{% endif %}>{{ b }}</option>{% endfor %}</select></label>
+          <label>prices <input class="mono" name="prices" value="{{ lg.form.prices }}" data-was="{{ lg.form.prices }}" placeholder='{"input": 3, "output": 15}' title="a metered login's price per million tokens of each kind (input, output, cache_read, cache_write); empty: a self-hosted model read in tokens{% if lg.fills %}; the Settings page's weights are offered as a fill-in{% endif %}"{% if lg.fills %} list="{{ lg.fill_id }}"{% endif %}></label>
+          {%- if lg.fills %}<datalist id="{{ lg.fill_id }}">{% for f in lg.fills %}<option value="{{ f.prices }}" label="{{ f.model }}"></option>{% endfor %}</datalist>{% endif %}
+          <label>extra_args <input class="mono" name="extra_args" value="{{ lg.form.extra_args }}" data-was="{{ lg.form.extra_args }}" placeholder='["--flag"]'></label>
+          <label>unattended_args <input class="mono" name="unattended_args" value="{{ lg.form.unattended_args }}" data-was="{{ lg.form.unattended_args }}" placeholder='["--flag"]'></label>
+          <label>permission_wait <input class="mono" name="permission_wait" value="{{ lg.form.permission_wait }}" data-was="{{ lg.form.permission_wait }}" placeholder="seconds" inputmode="numeric"></label>
+          <label>pin <select name="pin" data-was="{{ lg.form.pin }}"><option value="">none</option>{% for f in lg.families %}<option{% if lg.form.pin == f %} selected{% endif %}>{{ f }}</option>{% endfor %}{% if lg.form.pin and lg.form.pin not in lg.families %}<option selected>{{ lg.form.pin }}</option>{% endif %}</select></label>
+          <div class="row gap"><button class="btn sm" type="submit">Save</button><button class="btn sm ghost" type="button" data-cancel>Cancel</button></div>
+        </form></div>
+{% endmacro %}
+{#- an account's gauges (§4.2b *The gauge*, §4.5a *Tools page: an account*; TD-1975): one per window, the use from
+    the left, the reserve a hatched bay from the right, and under each the keep-back field `ao gate` takes -#}
+{% macro gauges(a) -%}
+{%- set g = a.gauge -%}
+<div class="toolgauges" data-account="{{ a.key }}"{% if g.metered %} data-metered="1"{% endif %}>
+  {%- if g.mixed %}
+  <div class="note">its logins disagree on billing ({{ g.each }}), so it takes no reserve: give them one billing in each login's Settings</div>
+  {%- else %}
+  {%- for w in g.gauges %}
+  <div class="toolgauge">
+    <div class="gauge{% if w.used is none %} unread{% endif %}{% if g.stale %} stale{% endif %}">
+      {%- if w.used is not none %}<div class="used" style="width:{{ w.used }}%"></div>{% endif %}
+      {%- if w.keep %}<div class="keep" style="width:{{ w.keep }}%"></div>{% endif %}
+      {%- if w.room is not none and not g.metered %}<div class="room" style="left:{{ w.used }}%;right:{{ w.keep or 0 }}%">room for unattended work: {{ w.room }}%</div>{% endif %}
+    </div>
+    <div class="glegend row gap wrap">
+      {%- if g.metered %}<span title="{{ g.age }}">{{ w.label }} · {{ w.line }}{% if g.stale and w.used is not none %} · <span class="toolstale">stale</span>{% endif %}</span>
+      {%- elif w.used is none %}<span>No usage reading yet{% if g.gauges | length > 1 or w.label != "week" %} · {{ w.label }}{% endif %}</span>
+      {%- else %}<span title="{{ g.age }}"><b>{{ w.used | round | int }}%</b> of the {{ w.label }} used{% if w.resets %} · resets {{ w.resets }}{% endif %}{% if g.stale %} · <span class="toolstale">stale</span>{% endif %}</span>{% endif %}
+      <label class="k" title="{{ help_title('tools-keep-back') }}">{{ "amount" if g.metered else "keep back" }} <input class="mono toolkeep" name="{{ w.label }}" value="{{ w.value }}" data-was="{{ w.value }}" placeholder="—" autocomplete="off" spellcheck="false" aria-label="{{ a.key }} {{ w.label }} {{ 'amount' if g.metered else 'reserve' }}"></label>
+      {%- if w.value and w.line and not g.metered %}<span class="note">{{ w.line }}</span>{% endif %}
+    </div>
+  </div>
+  {%- endfor %}
+  {%- if g.unread %}<div class="note">no reading yet, so the labels are not checked</div>{% endif %}
+  {%- for x in g.gone %}
+  <div class="glegend row gap wrap"><span class="note">{{ x.label }} reserve {{ x.value }}: {{ x.line }}</span><button class="btn sm link toolkeepgone" type="button" data-label="{{ x.label }}">Remove</button></div>
+  {%- endfor %}
+  {%- endif %}
+</div>
+{%- endmacro %}
+{% block body %}
+<div class="page inboxpage toolspage" id="toolspage">
+  <div class="row gap wrap toolshead"><span class="h1">Tools</span>{% if t %}<span class="note">on <span class="mono">{{ t.host }}</span></span>{% endif %}<span class="grow"></span>
+    {% if t %}<span class="note" id="toolsread" title="{{ t.read_at }}">read {{ t.read_ago }} ago</span>{% endif %}
+    <button class="btn sm" type="button" id="toolscheck" title="{{ help_title('tools-check') }}"{% if agent_down %} disabled{% endif %}>Check again</button></div>
+  <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable{% if volatile %} (a volatile host: asleep?){% endif %} — this host's tools cannot be read until it is back <span class="grow"></span><a class="btn sm ghost" href="/tools">Retry</a></div>
+  {% if why %}<div class="note warn">{{ why }}</div>{% endif %}
+  <div class="note toolssaid" id="toolssaid" hidden></div>
+  {% if t %}
+  <div class="note">What can run here: each coding tool ShiftLead has an adapter for and found on this host, its version, and the folder it is signed in from.</div>
+  {% for c in t.tools %}
+  <section class="toolcard" data-adapter="{{ c.adapter }}">
+    <div class="row gap toolname"><span class="h2">{{ c.label }}</span><span class="mono note" title="{{ c.version or '' }} · {{ c.binary }}">{{ c.short or "version not read" }}</span></div>
+    {% if c.tree %}
+    {% for a in c.tree.accounts %}
+    <div class="toolbranch">
+      <div class="toolacct hasgauge" data-account="{{ a.key }}" data-version="{{ a.version or '' }}" data-label="{{ a.label or '' }}"><div><span class="toolacctname">{{ a.label or a.name }}</span>{% if a.label %} <span class="mono note">{{ a.name }}</span>{% endif %}
+        <button class="btn sm link toolpen" type="button" data-tool-act="label" title="{{ help_title('tools-label') }}" aria-label="label {{ a.name }}">✎</button>
+        <div class="note">{{ a.plan or "plan not recorded by the tool" }}{% if a.billing %} · {{ a.billing }}{% endif %}</div>
+        {% if a.models and a.models.families %}<div class="mono toolfams">{{ a.models.families | join(" · ") }}</div>{% endif %}</div>
+        {{ gauges(a) }}</div>
+      {% for lg in a.logins %}{{ login_row(c, lg) }}{% endfor %}
+    </div>
+    {% endfor %}
+    {% if c.tree.unsigned %}
+    <div class="toolbranch">
+      <div class="toolacct toolunsigned"><span class="toolacctname">Not signed in</span><div class="note">a folder joins its account once signed in</div></div>
+      {% for lg in c.tree.unsigned %}{{ login_row(c, lg) }}{% endfor %}
+    </div>
+    {% endif %}
+    {% if c.tree.naming %}
+    <div class="toolbranch">
+      <div class="toolacct toolunsigned"><span class="toolacctname">Signed in, account not named</span><div class="note">a login launches nothing until its account is named</div></div>
+      {% for lg in c.tree.naming %}{{ login_row(c, lg) }}{% endfor %}
+    </div>
+    {% endif %}
+    {% endif %}
+    {% for f in c.found %}
+    <div class="toolfound row gap wrap"><span class="mono">{{ f.shown }}</span>
+      {%- if f.own_home %}<span class="note">the tool's own home: ShiftLead launches {{ c.label }} into a folder of its own</span>
+      {%- else %}<span class="note">found here, signed in</span>{% if c.tree %}<span class="grow"></span><button class="btn sm tooladdfound" type="button" data-tool="{{ c.adapter }}" data-path="{{ f.folder }}" data-billing="{{ f.offer or '' }}" title="{{ help_title('tools-add-found') }}">Add</button>{% endif %}{% endif %}</div>
+    {% else %}
+    <div class="toolfound row gap wrap"><span class="note">no signed-in folder found at the tool's default home</span></div>
+    {% endfor %}
+    {% if c.tree %}
+    <div class="tooladdlogin"><button class="btn sm link tooladd" type="button" title="{{ help_title('tools-add-login') }}">+ Add login</button>
+      <form class="tooladdform row gap wrap" data-tool="{{ c.adapter }}" hidden>
+        <label>name <input class="mono" name="name" placeholder="e.g. {{ c.adapter }}-work"></label>
+        <label>folder <input class="mono" name="path" placeholder="empty: a new folder beside the tool's own" title="Use an existing folder: a {{ c.label }} home, or an empty or missing folder to make one"></label>
+        <label>account <input class="mono" name="account" placeholder="optional: its account's name"></label>
+        <label>billing <select name="billing" title="the person's: a found folder's Add chooses what the tool's record reads, which you may change"><option value="">not set</option>{% for b in ("subscription", "metered") %}<option>{{ b }}</option>{% endfor %}</select></label>
+        <button class="btn sm" type="submit">Add</button><button class="btn sm ghost" type="button" data-cancel>Cancel</button>
+      </form></div>
+    {% endif %}
+  </section>
+  {% else %}
+  <div class="note">No coding tool ShiftLead has an adapter for is found on this host.</div>
+  {% endfor %}
+  {% if t.not_ready %}
+  <section class="toolsnotready">
+    <div class="h2">Not ready to run here</div>
+    {% for c in t.not_ready %}
+    <div class="toolnr row gap wrap" data-adapter="{{ c.adapter }}"><span class="toolnrname">{{ c.label }}</span>
+      <span class="mono toolnrver">{% if c.installed %}{{ c.short or "version not read" }} installed{% else %}not installed{% endif %}</span>
+      {%- if c.supported %}<span class="note grow">Not installed on this host.</span>
+        {%- if c.install_command %}<button class="btn sm toolinstall" type="button" data-tool="{{ c.adapter }}" title="{{ help_title('tools-install') }}"{% if agent_down %} disabled{% endif %}>Install</button>{% endif %}
+      {%- elif c.installed %}<span class="note grow">ShiftLead has no adapter for it yet, so no seat can run on it.</span>
+      {%- else %}<span class="note grow">No adapter yet. Its install appears here once there is one.</span>{% endif %}</div>
+    {% endfor %}
+  </section>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}<script>AO.tools();</script>{% endblock %}

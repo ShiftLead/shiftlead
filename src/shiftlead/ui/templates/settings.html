@@ -50,7 +50,7 @@
   {# **Usage** (§4.5a *Settings page: Usage*) #}
   {% set info_usage = "The reserves the usage gate pauses a profile's unattended sessions at: what you keep back of each window for your own work, per profile, per window as the tool names it. Grouped by account, since the reading is the account's. Each field takes what ao gate takes — 30, 10/day, empty to clear — and the line beside it is what the chip will show. A change applies on the next tick. Written to settings.yml through set_settings; never by hand while the agent runs." %}
   <section class="isec" id="sec-usage">
-    <div class="row gap sechead"><span class="h2">Usage</span>{{ imark("usage", "Usage", info_usage) }}</div>
+    <div class="row gap sechead"><span class="h2">Usage</span>{{ imark("usage", "Usage", info_usage) }}<span class="grow"></span><a class="note" href="/tools" title="the Tools page: the coding tools on this host, their versions, and what is not ready to run here">tools on this host →</a></div>
     {{ panel("usage", info_usage) }}
     {#- **trust a reading for** (§4.5a *Settings page: Usage*, §6 *A reading the gate can no longer
         trust*; TD-233): `usage.max_age`, one setting for every account -#}
@@ -62,6 +62,7 @@
     </form>
     {#- a card per account (§4.5a *Settings page: Usage*, §6 *A reserve is the account's*; TD-1610): its badge
         the profiles on it, its Save `set_settings {account, reserves}` -#}
+    {% if usage_moved %}<div class="note">This host's accounts keep their reserves beside their gauges on the <a href="/tools">Tools page</a>; an account seen only on a node keeps its card here.</div>{% endif %}
     {% for c in usage_cards %}
       <form class="card pad setcard" data-section="usage" data-account="{{ c.account }}">
         <div class="row gap wrap"><span class="h2 mono">{{ c.account }}</span><span class="note">{{ c.badge }}</span>{% if c.metered or c.mixed %}{{ filehead(profiles_file, "billing and prices in") }}{% endif %}</div>

@@ -14,9 +14,12 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from sessionorc import paths
+from sessionorc import naming, paths
 
 HISTORY_LIMIT = 50000
+# the grid a window is pinned at when nothing is set (§4.6, TD-1919): `settings.TERMINAL_GRID_DEFAULT`, held here
+# too since settings' imports reach back to this module
+GRID_DEFAULT = (120, 40)
 _FMT = (
     "#{session_name}\t#{session_created}\t#{pane_current_command}\t#{pane_pid}\t#{pane_dead}\t#{pane_dead_status}"
     "\t#{window_index}\t#{pane_index}\t#{pane_tty}\t#{pane_title}"
@@ -133,18 +136,30 @@ class Tmux:
         return self.run("has-session", "-t", f"={name}", check=False).returncode == 0
 
     def new_session(
-        self, name: str, cwd: Path | str, argv: list[str] | None, env: dict[str, str], logfile: Path | None = None
+        self,
+        name: str,
+        cwd: Path | str,
+        argv: list[str] | None,
+        env: dict[str, str],
+        logfile: Path | None = None,
+        grid: tuple[int, int] = GRID_DEFAULT,
     ) -> None:
         """Create a detached session. `remain-on-exit` and the run-log `pipe-pane` are chained into
         the same tmux invocation: a command that exits at once still leaves a dead pane (exit status
         readable) and the log has its first byte (design §9 invariant 3) — a second invocation
-        would find the pane already gone."""
-        args = ["new-session", "-d", "-s", name, "-c", str(cwd)]
+        would find the pane already gone.
+
+        The window is pinned at `grid`, `(columns, rows)` (design §4.6 *Attach behaviour with another client
+        present*, TD-1919): `-x`/`-y` start the tool at it, so it is never resized while it starts, and
+        `window-size manual` in the same invocation keeps every client from sizing it after."""
+        cols, rows = grid
+        args = ["new-session", "-d", "-s", name, "-c", str(cwd), "-x", str(int(cols)), "-y", str(int(rows))]
         for k, v in env.items():
             args += ["-e", f"{k}={v}"]
         if argv:
             args += ["--", *self._fit(name, argv, around=sum(len(a.encode()) + 1 for a in args))]
         args += [";", "set-option", "-w", "-t", f"={name}:", "remain-on-exit", "on"]
+        args += [";", "set-option", "-w", "-t", f"={name}:", "window-size", "manual"]  # the pin (§4.6, TD-1919)
         args += [";", "set-option", "-t", f"={name}:", "status", "off"]  # Focus's header says it (§4.6, TD-1410)
         if logfile is not None:
             logfile.parent.mkdir(parents=True, exist_ok=True)
@@ -233,6 +248,20 @@ class Tmux:
             self.run("set-option", "-t", f"={n}:", "status", "off", check=False)
         return names
 
+    def pin_windows(self, prefix: str = "ao-") -> list[str]:
+        """Set `window-size manual` on the window of every session named `prefix…`, at the size it has, and
+        return their names: the host agent's start pins sessions made before `new_session` pinned them (design
+        §4.6 *Attach behaviour with another client present*, TD-1919). Unconditional — a window that reads
+        `manual` through the server's global option is pinned on its own all the same — and never through the
+        server's global options, so the person's own sessions keep following their clients."""
+        cp = self.run("list-sessions", "-F", "#{session_name}", check=False)
+        if cp.returncode != 0:
+            return []  # no server
+        names = [n for n in cp.stdout.splitlines() if n.startswith(prefix)]
+        for n in names:
+            self.run("set-option", "-w", "-t", f"={n}:", "window-size", "manual", check=False)
+        return names
+
     def server_pid(self) -> int | None:
         """The tmux server's pid, or None with no server: what design §4.8a's detached-process check
         compares cgroups against."""
@@ -282,9 +311,16 @@ class Tmux:
         logfile.parent.mkdir(parents=True, exist_ok=True)
         self.run("pipe-pane", "-t", f"={name}:", f"cat >> '{logfile}'")
 
-    def capture_tail(self, name: str, lines: int = 8, raw: bool = False) -> list[str]:
+    def capture_tail(self, name: str, lines: int = 8, raw: bool = False, *, tools: bool = False) -> list[str]:
         """The pane's last `lines` rows. `raw` keeps the SGR attributes (`-e`), for readers that
-        must tell painted text from dim placeholder text (an adapter's `composer`, TD-027)."""
+        must tell painted text from dim placeholder text (an adapter's `composer`, TD-027).
+
+        A tools shell's pane (`naming.is_tools`, design §4.2b *The tools shell*) reads as nothing —
+        the tick's capture, a composer read, a wake — unless `tools` says the caller is the person's
+        own read (`tail`, `explain`), checked before it is passed: a sign-in prints an email, links and
+        codes, and an API key is pasted there."""
+        if naming.is_tools(name) and not tools:
+            return []
         args = ["capture-pane", "-p", "-J"] + (["-e"] if raw else []) + ["-t", f"={name}:", "-S", f"-{lines}"]
         cp = self.run(*args, check=False)
         if cp.returncode != 0:

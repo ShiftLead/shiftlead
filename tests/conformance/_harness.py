@@ -298,6 +298,36 @@ class ClaudeCodeHarness:
         """Nothing for the layer, which is the `--settings` file the launch writes; the suite's hook on `PATH`."""
         suite_bin(tmp, monkeypatch)
 
+    # a home of the tool's, for §4.2b's reads (TD-1971): what a sign-in writes, what the tool writes there, and
+    # what a folder that is no home may hold (a repo's own `.claude/` has settings alone)
+    def sign_in(self, home: Path) -> None:
+        (home / ".credentials.json").write_text(json.dumps({"claudeAiOauth": {"accessToken": "t"}}), encoding="utf-8")
+
+    def mark_home(self, home: Path) -> None:
+        (home / ".claude.json").write_text("{}", encoding="utf-8")
+
+    def not_a_home(self, path: Path) -> None:
+        (path / "settings.json").write_text("{}", encoding="utf-8")
+        (path / "projects").mkdir(exist_ok=True)  # a workspace's own directory of that name
+
+    def sign_in_as(self, home: Path, key: str, display: str) -> None:
+        """The sign-in record a launch on `home` reads (§4.2b `identity`), naming the account `key`."""
+        account = {
+            "accountUuid": key,
+            "displayName": display,
+            "emailAddress": "someone@example.com",
+            "planDisplayName": "Max",
+            "billingType": "stripe_subscription",
+        }
+        (home / ".claude.json").write_text(json.dumps({"oauthAccount": account}), encoding="utf-8")
+
+    def corrupt_identity(self, home: Path) -> list[str]:
+        """Records `identity` reads as none: broken, and well-formed of the wrong shape, each written in turn."""
+        return ["{not json", "[]", json.dumps({"oauthAccount": "x"}), json.dumps({"oauthAccount": {"accountUuid": 5}})]
+
+    def write_identity(self, home: Path, text: str) -> None:
+        (home / ".claude.json").write_text(text, encoding="utf-8")
+
     def hook_command(self, argv: list[str], env: dict[str, str]) -> str:
         """The hook command the launch's `--settings` layer names for every event."""
         layer = json.loads(Path(_flag(argv, "--settings") or "").read_text(encoding="utf-8"))
@@ -339,6 +369,9 @@ class GeminiHarness:
     """Gemini CLI keeps a session's chat at `<home>/.gemini/tmp/<slug>/chats/session-<minute>-<id[:8]>.jsonl`,
     its first record naming the session, and hands each hook payload to `shiftlead-hook --adapter gemini`,
     whose `translate` makes the host agent's `hook` params."""
+
+    # an environment whose one key signs in every login on the host (`env_signin`, §4.2b)
+    signin_env = {"GEMINI_API_KEY": "fixture-key"}
 
     tool_fields = frozenset(
         {
@@ -383,6 +416,33 @@ class GeminiHarness:
         monkeypatch.setattr(gemini, "MACHINE_LAYER", machine)
         monkeypatch.setattr(gemini, "_lstat", _rooted)
         machine.write_text(gemini.layer_text(str(hook)), encoding="utf-8")  # the person ran the install line
+
+    def sign_in(self, home: Path) -> None:
+        gem = home / ".gemini"
+        gem.mkdir(exist_ok=True)
+        auth = {"security": {"auth": {"selectedType": "oauth-personal"}}}
+        (gem / "settings.json").write_text(json.dumps(auth), encoding="utf-8")
+        (gem / "oauth_creds.json").write_text("{}", encoding="utf-8")
+
+    def mark_home(self, home: Path) -> None:
+        (home / ".gemini").mkdir(exist_ok=True)
+        (home / ".gemini" / "installation_id").write_text("i\n", encoding="utf-8")
+
+    def not_a_home(self, path: Path) -> None:
+        (path / ".gemini").mkdir(exist_ok=True)
+        (path / ".gemini" / "settings.json").write_text("{}", encoding="utf-8")
+
+    def sign_in_as(self, home: Path, key: str, display: str) -> None:
+        """The active account of `home`'s `.gemini/` (§4.2b `identity`), an email; the tool records no other name."""
+        self.sign_in(home)
+        (home / ".gemini" / "google_accounts.json").write_text(json.dumps({"active": key, "old": []}), encoding="utf-8")
+
+    def corrupt_identity(self, home: Path) -> list[str]:
+        return ["{not json", "[]", json.dumps({"active": 5}), json.dumps({"active": ""})]
+
+    def write_identity(self, home: Path, text: str) -> None:
+        (home / ".gemini").mkdir(exist_ok=True)
+        (home / ".gemini" / "google_accounts.json").write_text(text, encoding="utf-8")
 
     def hook_command(self, argv: list[str], env: dict[str, str]) -> str:
         """The hook command the machine layer the launch names (`GEMINI_CLI_SYSTEM_SETTINGS_PATH`) holds."""
@@ -475,6 +535,29 @@ class GrokHarness:
         person.mkdir(exist_ok=True)
         monkeypatch.setattr(grok, "PERSON_HOME", person)
         monkeypatch.setattr(grok, "MANAGED_SETTINGS", tmp / "etc" / "claude-code" / "managed-settings.json")
+
+    def sign_in(self, home: Path) -> None:
+        (home / "auth.json").write_text("{}", encoding="utf-8")
+
+    def mark_home(self, home: Path) -> None:
+        (home / "auth.json").write_text("{}", encoding="utf-8")
+
+    def not_a_home(self, path: Path) -> None:
+        (path / "hooks").mkdir(exist_ok=True)
+        (path / "hooks" / "shiftlead.json").write_text("{}", encoding="utf-8")  # ShiftLead's own, not the tool's
+        (path / "sessions").mkdir(exist_ok=True)  # another program's directory of that name
+
+    def sign_in_as(self, home: Path, key: str, display: str) -> None:
+        """`home`'s `auth.json` as `grok login` writes it (§4.2b `identity`): one entry under the issuer and client id,
+        the same for every account, its `user_id` the account."""
+        entry = {"user_id": key, "first_name": display, "email": "someone@example.com", "auth_mode": "oidc"}
+        (home / "auth.json").write_text(json.dumps({"https://auth.x.ai::client": entry}), encoding="utf-8")
+
+    def corrupt_identity(self, home: Path) -> list[str]:
+        return ["{not json", "[1]", json.dumps({"k": "x"}), json.dumps({"k": {"user_id": 5}})]
+
+    def write_identity(self, home: Path, text: str) -> None:
+        (home / "auth.json").write_text(text, encoding="utf-8")
 
     def hook_command(self, argv: list[str], env: dict[str, str]) -> str:
         """The command the hook file in the launch's `GROK_HOME` names for every event."""

@@ -43,9 +43,17 @@ class GitInfo:
     # the commit HEAD is at, so a detached HEAD can be named by it (design §4.5 *The card's
     # anatomy*, row 3, TD-095: *detached at <short sha>*); "" in a repo with no commit yet
     oid: str = ""
+    # `dir`'s top level as a real path, which the press's choice of folder reads, and the folder name of that top
+    # level where it is a linked worktree by git's test, absent on a main checkout (§4.2 *The record's `cwd`*,
+    # TD-1988)
+    top: str = ""
+    worktree: str | None = None
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        d = asdict(self)
+        if not self.worktree:
+            d.pop("worktree")
+        return d
 
 
 class WorktreeError(RuntimeError):
@@ -246,6 +254,7 @@ def git_info(directory: Path | str, timeout: float = 5.0) -> GitInfo | None:
             # u XY sub m1 m2 m3 mW h1 h2 h3 path
             files.append(f"UU {line.split(' ', 10)[10]}")
     unpushed, against = _unpushed(directory, branch, upstream, ahead, timeout)
+    top, worktree = _top(directory, timeout)
     return GitInfo(
         branch=branch,
         dirty=len(files),
@@ -256,7 +265,43 @@ def git_info(directory: Path | str, timeout: float = 5.0) -> GitInfo | None:
         unpushed=unpushed,
         pushed_against=against,
         oid=oid,
+        top=top,
+        worktree=worktree,
     )
+
+
+def _top(directory: Path | str, timeout: float) -> tuple[str, str | None]:
+    """`directory`'s top level as a real path, and its folder name where it is a linked worktree — git's own test,
+    `--git-dir` differing from `--git-common-dir`, so a submodule (whose `.git` is a file too) is not one; ("",
+    None) where git cannot say (§4.2 *The record's `cwd`*, TD-1988)."""
+    out = _git(directory, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-dir", "--git-common-dir",
+               timeout=timeout)  # fmt: skip
+    lines = (out or "").splitlines()
+    if len(lines) != 3 or not lines[0]:
+        return "", None
+    top = os.path.realpath(lines[0])
+    linked = os.path.realpath(lines[1]) != os.path.realpath(lines[2])
+    return top, (os.path.basename(top) if linked else None)
+
+
+def _under(path: str, root: str) -> bool:
+    return path == root or path.startswith(root.rstrip(os.sep) + os.sep)
+
+
+def cwd_root(directory: Path | str, cwd: str, timeout: float = 5.0) -> str | None:
+    """The record's `cwd_root` (§4.2 *The record's `cwd`*, TD-1988): the git top level of `cwd` (a real path) where
+    it is not `directory`'s top level; `cwd` itself where it lies in no repository and outside `directory`; None
+    where `cwd` is not an existing directory, or is in `directory`'s own top level. Where `directory` is in no
+    repository, `cwd`'s top level where it has one, else `cwd` outside `directory`."""
+    if not cwd or not os.path.isdir(cwd):
+        return None
+    here = os.path.realpath(directory)
+    dtop = toplevel(directory, timeout)
+    ctop = toplevel(cwd, timeout)
+    dtop, ctop = (os.path.realpath(dtop) if dtop else ""), (os.path.realpath(ctop) if ctop else "")
+    if ctop:
+        return ctop if ctop != dtop else None
+    return None if _under(os.path.realpath(cwd), here) else os.path.realpath(cwd)
 
 
 def changed_files(directory: Path | str, base_ref: str | None, limit: int, timeout: float = 5.0) -> list[dict] | None:
@@ -508,7 +553,9 @@ def pushed_since(directory: Path | str, since_iso: str, timeout: float = 5.0) ->
     return None
 
 
-def _unpushed(directory: Path | str, branch: str, upstream: str | None, ahead: int, timeout: float) -> tuple[int, str]:
+def _unpushed(
+    directory: Path | str, branch: str, upstream: str | None, ahead: int, timeout: float, ref: str = "HEAD"
+) -> tuple[int, str]:
     """How many commits exist **only on this machine**, and what that was measured against (design
     §4.2 *one measure*, TD-080). The first rule that applies answers:
 
@@ -524,22 +571,25 @@ def _unpushed(directory: Path | str, branch: str, upstream: str | None, ahead: i
        sits on a detached `origin/main`) and otherwise **not pushed**, which is the stranded work
        the check exists for.
 
+    `ref` is what is measured, `HEAD` for a checkout's status; the disk sweep passes a branch's own ref, and
+    its `ahead` read against that branch's upstream (§4.6 *The disk sweep*, TD-1945).
+
     A read that cannot be made leaves the count at the porcelain's, never at a confident 0."""
     if branch and branch != "(detached)":
-        ref = f"refs/remotes/origin/{branch}"
-        if _git(directory, "rev-parse", "--verify", "-q", ref, timeout=timeout) is not None:
-            out = _git(directory, "rev-list", "--count", f"origin/{branch}..HEAD", timeout=timeout)
+        own = f"refs/remotes/origin/{branch}"
+        if _git(directory, "rev-parse", "--verify", "-q", own, timeout=timeout) is not None:
+            out = _git(directory, "rev-list", "--count", f"origin/{branch}..{ref}", timeout=timeout)
             if out is not None and out.strip().isdigit():
                 return int(out.strip()), f"origin/{branch}"
     if upstream:
-        return _not_in_upstream(directory, upstream, ahead, timeout), upstream
-    out = _git(directory, "rev-list", "--count", "HEAD", "--not", "--remotes", timeout=timeout)
+        return _not_in_upstream(directory, upstream, ahead, timeout, ref), upstream
+    out = _git(directory, "rev-list", "--count", ref, "--not", "--remotes", timeout=timeout)
     if out is not None and out.strip().isdigit():
         return int(out.strip()), "remote branches"
     return ahead, ""
 
 
-def _not_in_upstream(directory: Path | str, upstream: str, ahead: int, timeout: float) -> int:
+def _not_in_upstream(directory: Path | str, upstream: str, ahead: int, timeout: float, ref: str = "HEAD") -> int:
     """Rule 2's count (TD-701): of the commits ahead of `upstream`, those whose patch it does not
     hold — a squash merge lands one under another sha. A squash of several commits matches no
     single patch, so when some remain, the branch is 0 if merging `HEAD` into the upstream would
@@ -547,12 +597,14 @@ def _not_in_upstream(directory: Path | str, upstream: str, ahead: int, timeout: 
     which is never 0 then. A read that cannot be made leaves the porcelain's *ahead*."""
     if not ahead:
         return 0
-    out = _git(directory, "rev-list", "--count", "--cherry-pick", "--right-only", f"{upstream}...HEAD", timeout=timeout)
+    out = _git(
+        directory, "rev-list", "--count", "--cherry-pick", "--right-only", f"{upstream}...{ref}", timeout=timeout
+    )
     if out is None or not out.strip().isdigit():
         return ahead
     left = int(out.strip())
     if left:
-        merged = _git(directory, "merge-tree", "--write-tree", upstream, "HEAD", timeout=timeout)
+        merged = _git(directory, "merge-tree", "--write-tree", upstream, ref, timeout=timeout)
         tree = _git(directory, "rev-parse", f"{upstream}^{{tree}}", timeout=timeout)
         if merged and tree and merged.split("\n", 1)[0].strip() == tree.strip():
             return 0
@@ -895,3 +947,190 @@ def reap_worktree(
         return {"kept": said[-1].removeprefix("fatal: ") if said else TIMED_OUT}
     deleted, kept = weigh_branches(repo, [branch, launch])
     return {"reaped": True, "branches_deleted": deleted, "branch_kept": kept}
+
+
+# -- the disk sweep's *landed* test (design §4.6 *The disk sweep*, TD-1945) ----------------------------------------
+# Ported from agent-cadence's `reap_worktrees.sh` (`landed_of`, `default_branch`) and `check_cadence.py`
+# (`landed_since_edited`, `_patch_id`, `_main_patch_ids`), never imported: a repo with no pin is weighed too.
+
+LANDED = ("yes", "since", "empty")  # the answers the sweep reads *landed*; `no`, `reverted` and `unreadable` are not
+PIN_FILE = "docs/cadence.toml"
+
+
+def _git_rc(directory: Path | str, *args: str, timeout: float) -> int | None:
+    """One read-only git command's exit code, or None when it could not be run."""
+    try:
+        cp = subprocess.run(
+            ["git", "-C", str(directory), *args], capture_output=True, timeout=timeout, env=read_only_env()
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return cp.returncode
+
+
+def default_branch(directory: Path | str, timeout: float = REAP_STEP) -> str:
+    """The repo's default branch name by the cadence's rule (cadence.md §9 *Default-branch rule*): the first of
+    `origin/HEAD`'s target, `init.defaultBranch`, `main`, `master` that exists on origin; else `main`."""
+    head = _git(directory, "symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD", timeout=timeout)
+    cfg = _git(directory, "config", "init.defaultBranch", timeout=timeout)
+    for b in ((head or "").strip().removeprefix("origin/"), (cfg or "").strip(), "main", "master"):
+        if (
+            b
+            and _git(directory, "rev-parse", "--verify", "-q", f"refs/remotes/origin/{b}", timeout=timeout) is not None
+        ):
+            return b
+    return "main"
+
+
+def _pin_readable(root: Path | str | None, need: bool) -> bool:
+    """Whether the repo's `docs/cadence.toml` lets the test answer: one that cannot be parsed never does, and a
+    missing one does only where it is not `need`ed (a worktree root's repo with no pin is weighed the same; a
+    repo inside scratch is read against its own pin, §4.6)."""
+    if root is None:
+        return not need
+    f = Path(root) / PIN_FILE
+    try:
+        text = f.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return not need
+    except OSError:
+        return False
+    try:
+        import tomllib
+
+        tomllib.loads(text)
+    except (ImportError, ValueError):
+        return False
+    return True
+
+
+def _patch_id(directory: Path | str, diff: str | None, timeout: float) -> str | None:
+    """`git patch-id --stable` of a diff's text, or None."""
+    if not diff:
+        return None
+    try:
+        cp = subprocess.run(
+            ["git", "-C", str(directory), "patch-id", "--stable"],
+            input=diff,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=read_only_env(),
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    out = cp.stdout.split()
+    return out[0] if cp.returncode == 0 and out else None
+
+
+def _main_patch_ids(directory: Path | str, base: str, ref: str, names: list[str], timeout: float) -> set[str] | None:
+    """The patch-ids over `names` of the first-parent commits in `base..ref` that touch every one of them, in two
+    batched reads; None where they cannot be had this way, and the caller asks commit by commit."""
+    if any("\x01" in f or f != f.strip("\n") for f in names):
+        return None
+    listing = _git(
+        directory, "log", "--first-parent", "--no-diff-merges", "--name-only", "-z", "--format=%x01%H",
+        f"{base}..{ref}", "--", *names, timeout=timeout,
+    )  # fmt: skip
+    if listing is None:
+        return None
+    want, cands = set(names), []
+    for chunk in listing.split("\x01")[1:]:
+        sha, _, rest = chunk.partition("\n")
+        if {f.strip("\n") for f in rest.split("\0")} - {""} == want:
+            cands.append(sha.strip("\0\n"))
+    ids: set[str] = set()
+    for i in range(0, len(cands), 200):  # bounded argv
+        log_ = _git(
+            directory, "log", "--no-walk=unsorted", "--no-diff-merges", "--format=commit %H", "-p",
+            *cands[i : i + 200], "--", *names, timeout=timeout,
+        )  # fmt: skip
+        if log_ is None:
+            return None
+        try:
+            cp = subprocess.run(
+                ["git", "-C", str(directory), "patch-id", "--stable"],
+                input=log_,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env=read_only_env(),
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        if cp.returncode != 0:
+            return None
+        ids.update(line.split()[0] for line in cp.stdout.splitlines() if line.split())
+    return ids
+
+
+def landed_since_edited(directory: Path | str, ref: str, base_ref: str, timeout: float = REAP_STEP) -> str | None:
+    """`check_cadence.landed_since_edited`'s offline answer (TD-059), ported: the branch's patch over its own
+    files is a first-parent commit of `base_ref` since the merge-base — `yes`, or `reverted` where `base_ref`'s
+    tip has those files back at the merge-base — else None."""
+    base = (_git(directory, "merge-base", base_ref, ref, timeout=timeout) or "").strip()
+    if not base:
+        return None
+    names = [
+        f
+        for f in (_git(directory, "diff", "--name-only", "-z", base, ref, "--", timeout=timeout) or "").split("\0")
+        if f
+    ]
+    if not names:
+        return None
+    mine = _patch_id(directory, _git(directory, "diff", base, ref, "--", *names, timeout=timeout), timeout)
+    if mine is None:
+        return None
+    ids = _main_patch_ids(directory, base, base_ref, names, timeout)
+    if ids is not None:
+        found = mine in ids
+    else:
+        commits = _git(directory, "rev-list", "--first-parent", f"{base}..{base_ref}", "--", *names, timeout=timeout)
+        found = any(
+            _patch_id(directory, _git(directory, "show", "--format=", c, "--", *names, timeout=timeout), timeout)
+            == mine
+            for c in (commits or "").split()
+        )
+    if not found:
+        return None
+    undone = _git_rc(directory, "diff", "--quiet", base, base_ref, "--", *names, timeout=timeout)
+    return "reverted" if undone == 0 else "yes"
+
+
+def landed_of(
+    directory: Path | str,
+    ref: str,
+    *,
+    root: Path | str | None = None,
+    need_pin: bool = False,
+    timeout: float = REAP_STEP,
+) -> str:
+    """The scoped *landed* test (§4.6 *The disk sweep*), `reap_worktrees.sh`'s `landed_of` ported: `yes` (the
+    branch's own files, from its merge-base with `origin/<default>`, read the same there), `since` (its patch over
+    them is a first-parent commit of `origin/<default>` since, not undone at its tip), `empty` (no files of its
+    own), `no`, `reverted`, or `unreadable` — a `docs/cadence.toml` under `root` that cannot be parsed (or is
+    missing where `need_pin`), no `origin/<default>` ref, or a read that failed. Git reads run in `directory`;
+    `LANDED` is what the sweep reads *landed*."""
+    if not _pin_readable(root, need_pin):
+        return "unreadable"
+    base_ref = f"origin/{default_branch(directory, timeout)}"
+    if _git(directory, "rev-parse", "--verify", "-q", f"refs/remotes/{base_ref}", timeout=timeout) is None:
+        return "unreadable"
+    if _git(directory, "rev-parse", "--verify", "-q", f"{ref}^{{commit}}", timeout=timeout) is None:
+        return "unreadable"
+    base = (_git(directory, "merge-base", base_ref, ref, timeout=timeout) or "").strip()
+    if not base:
+        return "no"
+    out = _git(directory, "diff", "--name-only", "-z", base, ref, "--", timeout=timeout)
+    if out is None:
+        return "unreadable"
+    files = [f for f in out.split("\0") if f]
+    if not files:
+        return "empty"
+    rc = _git_rc(directory, "diff", "--quiet", base_ref, ref, "--", *files, timeout=timeout)
+    if rc == 0:
+        return "yes"
+    if rc != 1:
+        return "unreadable"
+    since = landed_since_edited(directory, ref, base_ref, timeout)
+    return {"yes": "since", "reverted": "reverted"}.get(since or "", "no")

@@ -31,7 +31,9 @@ from sessionorc.agent_common import (
     ACT_TIMEOUT,
     DIGEST_READS,
     DIGEST_TIMEOUT,
+    DISK_ACTS,
     HOME_EDITS,
+    HOST_ADDRESSED,
     INTENT_FIELDS,
     NODE_ACTS,
     NODE_READS,
@@ -169,7 +171,7 @@ class RemoteMixin:
         (and `name_check`'s) `host`. None means *here*, and the method runs as it always has."""
         if method not in NODE_ACTS and method not in HOME_EDITS and method not in NODE_READS:
             return None
-        if method in ("create", "name_check"):
+        if method in HOST_ADDRESSED:
             h = str(params.get("host") or "")
         else:
             _rid, h = naming.split_address(str(params.get("id") or ""))
@@ -517,7 +519,7 @@ class RemoteMixin:
         A home-owned edit is applied to this home's copy after the node took it, so the two agree
         and the caller's reply is the home's view."""
         rid, _h = naming.split_address(str(params.get("id") or ""))
-        if method not in ("create", "name_check") and rid not in self.remote.get(host, {}):
+        if method not in HOST_ADDRESSED and rid not in self.remote.get(host, {}):
             raise RpcError(f"no session {rid}@{host}")
         if method == "create":
             await self._check_occupancy_for(host, params)
@@ -526,8 +528,33 @@ class RemoteMixin:
             # any close clears the tick's mark; the tick writes its own after this returns (§6 rule 2, TD-237)
             home_copy.closed_for = None
             self._save(home_copy)
+        if method == "decide" and params.get("permit") and params.get("behavior") == "allow":
+            # the node refuses the director's allow of a prompt kept for the person, where the prompt's call is
+            # (TD-642); a node on another build may not know `permit` and would drop it unread, so it is refused
+            ours, theirs = containers.home_build(), str((self.links.get(host) or {}).get("build") or "")
+            if not ours or theirs != ours:
+                raise RpcError(
+                    f"{params.get('id')}: {host} runs build {theirs or 'unknown'}, not this home's, so the director's "
+                    "allow is refused there — a deny stands, and the person answers it"
+                )
         mux = self._node_mux(host)
+        asked_rec = self.remote.get(host, {}).get(rid) if method == "decide" and params.get("permit") else None
+        # the prompt's words as the home's copy holds them before the node ends it, for the director's FYI (TD-642)
+        permit_prompt = (
+            next(
+                (
+                    p.text
+                    for p in (asked_rec.pendings if asked_rec else [])
+                    if p.tool_use_id == params.get("tool_use_id")
+                ),
+                "",
+            )
+            or "a permission prompt"
+        )
         sent = dict(params)
+        if method == "send":  # the home's reading of the team's manager, which a node cannot make (TD-1898)
+            routed = self.remote.get(host, {}).get(rid)
+            sent["manager"] = self._team_manager(routed.team if routed is not None else None)
         sent.pop("prompt_from", None)  # the launch record's alone, and the home writes a node's (§6 rule 7)
         sent.pop("via", None)  # a mode change's control: the home stamps its copy, the node writes nothing (TD-1439)
         if home_copy is not None and sent.get("reap", True) is True and host in containers.container_nodes():
@@ -545,7 +572,7 @@ class RemoteMixin:
         # caller, so the node records *person* as who typed and seeds no creator (§4.8, TD-801)
         person = mail.as_person(caller, self._graph())
         who = None if person else self._to_host(caller, host)
-        timeout: float | None = ACT_TIMEOUT
+        timeout: float | None = DIGEST_TIMEOUT if method in DISK_ACTS else ACT_TIMEOUT
         if method == "send" and sent.get("wait"):
             timeout = None if sent.get("timeout") is None else float(sent["timeout"]) + ACT_TIMEOUT
         try:
@@ -564,6 +591,11 @@ class RemoteMixin:
         # was pressed — or the trail would read *resolved* for every node-hosted row (review of #269).
         if method == "decide" and rid:
             self._attention_ended(f"{rid}@{host}", self._answered_by(str(params.get("behavior")), caller))
+            if params.get("permit") and (asked := self.remote.get(host, {}).get(rid)) is not None:
+                # the director's answer is told by the home, mail's one writer (§9 invariant 15, TD-642)
+                self._answered_by_director(
+                    asked, permit_prompt, str(params.get("behavior")), str(params.get("reason") or ""), caller
+                )
         elif method == "identity_ack" and rid:
             # the control is **Dismiss**; `identity_ack` is only its wire name, which stays because
             # it is in `NODE_ACTS` and renaming it there is a protocol change that buys a person
@@ -615,7 +647,11 @@ class RemoteMixin:
         elif isinstance(result, dict) and result.get("host") == host and result.get("id"):
             # the node answered with its view of the record: the caller gets this home's, addressed
             held = self.remote.get(host, {}).get(str(result["id"]))
-            result = self._view(held) if held is not None else {**result, "id": f"{result['id']}@{host}"}
+            killed = {"brief_killed": True} if result.get("brief_killed") else {}  # a send's kill, said (TD-1898)
+            result = {
+                **(self._view(held) if held is not None else {**result, "id": f"{result['id']}@{host}"}),
+                **killed,
+            }
         await self._push_changes()
         return result
 
@@ -844,22 +880,25 @@ class RemoteMixin:
         queued, as the intent push is: a node whose link is down is sent the file on its next dial."""
         if self.mode != "home":
             return
-        doc = await asyncio.to_thread(settings_mod.read)
-        if doc is None:
-            # absent or broken: not settings. `load` reads it as `{}`, which gates nothing here while
-            # it is mended — sent, it would replace every node's good replica with nothing
-            log.warning("settings.yml is absent or cannot be read: not sent, and each node keeps its replica")
-            return
-        for h, mux in list(self._link_muxes.items()):
-            if host is not None and h != host:
-                continue
-            try:
-                async with asyncio.timeout(agent_common.REPORT_WRITE):
-                    await mux.notify("settings", doc=doc)
-            except link.LinkClosed:
-                continue
-            except (link.LinkError, TimeoutError) as e:
-                log.warning("the settings did not reach %s: %s — it is sent again on its next dial", h, e)
+        # one push at a time, read and sends together: a dial's push that read the file before a write would
+        # otherwise land after the write's own and put the old file back on the node (TD-1870)
+        async with self._settings_push_lock:
+            doc = await asyncio.to_thread(settings_mod.read)
+            if doc is None:
+                # absent or broken: not settings. `load` reads it as `{}`, which gates nothing here while
+                # it is mended — sent, it would replace every node's good replica with nothing
+                log.warning("settings.yml is absent or cannot be read: not sent, and each node keeps its replica")
+                return
+            for h, mux in list(self._link_muxes.items()):
+                if host is not None and h != host:
+                    continue
+                try:
+                    async with asyncio.timeout(agent_common.REPORT_WRITE):
+                        await mux.notify("settings", doc=doc)
+                except link.LinkClosed:
+                    continue
+                except (link.LinkError, TimeoutError) as e:
+                    log.warning("the settings did not reach %s: %s — it is sent again on its next dial", h, e)
 
     async def _push_intent(self) -> None:
         """What changed in the home-owned fields, or the unread count, of a linked node's records

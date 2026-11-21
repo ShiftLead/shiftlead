@@ -33,6 +33,7 @@ class Fleet:
         self.verdicts: dict[str, dict] = {}
         self.repos: dict[str, dict] = {}
         self.waiting: dict[str, list] = {}  # the `host` reading's (TD-274)
+        self.refuse: dict[str, str] = {}  # an act's refusal, by record id
 
     def handle(self, method: str, params: dict):
         self.calls.append((method, params))
@@ -79,6 +80,10 @@ class Fleet:
             return {"teams": params.get("teams") or {}}
         if method == "relaunch":  # §4.9c *Switching*: the home's half, kept in the call log (TD-309)
             return next(s for s in self.sessions if s["id"] == params["id"])
+        if method in ("send", "kill", "mark_wind_down") and (why := self.refuse.get(params["id"])):
+            raise uiapp.AgentError(why)
+        if method == "mark_wind_down":  # a Wind down's mark on a finished member (§4.9a, TD-1898)
+            return None
         if method in ("send", "kill", "seen"):
             for s in self.sessions:
                 if s["id"] == params["id"]:
@@ -579,6 +584,27 @@ def test_stop_now_kills_every_badged_session_in_one_call(world, client):
     body = r.json()
     assert sorted(fleet.sent("kill")) == ["grind-1", "orc-ao"] and not fleet.sent("send")
     assert body["manager"] is None and "killed 2 sessions" in body["text"]
+
+
+def test_stop_says_who_the_wrap_up_reached_who_was_marked_and_who_refused(world, client, monkeypatch):
+    """§4.9a *A wind-down closes its members* (TD-1898): *wrap-up sent to N* counts only the members the
+    wrap-up reached, then *, m finished and marked* and *, n refused: <name> (<why>)*; Stop now's toast takes
+    the same refused tail."""
+    tmp_path, fleet = world
+    monkeypatch.setattr(teamrun, "stop_lead", lambda call, st, **kw: st)
+    done = {**badged("grind-1", "ao-grind", state="idle"), "out_of_work": {"at": "2026-11-20T00:00:00Z"}}
+    fleet.sessions += [badged("orc-ao", "ao-grind"), done, badged("grind-2", "ao-grind"), badged("hunt", "ao-grind")]
+    fleet.refuse["hunt"] = "hunt has a pending permission; answer it in the terminal"
+    body = client.post("/api/teams/ao-grind/stop", json={}).json()
+    assert fleet.sent("mark_wind_down") == ["grind-1"] and fleet.sent("send") == ["grind-2", "hunt"]
+    assert [p.get("wind_down") for m, p in fleet.calls if m == "send"] == [True, True]
+    assert body["text"].startswith(
+        "ao-grind: wrap-up sent to 1 session, 1 finished and marked, "
+        "1 refused: hunt (hunt has a pending permission; answer it in the terminal)"
+    )
+    fleet.refuse["hunt"] = "n1 is unreachable"
+    body = client.post("/api/teams/ao-grind/stop", json={"now": True}).json()
+    assert body["text"].startswith("ao-grind: killed 3 sessions, 1 refused: hunt (n1 is unreachable)")
 
 
 def test_stop_sends_the_wrap_up_to_the_members_and_leaves_the_lead_to_the_background(world, client, monkeypatch):
@@ -1270,3 +1296,20 @@ def test_start_with_a_role_carries_the_persons_layer_additions_and_a_failed_list
     r = client.post("/new", data={**data, "name": "h2"}, follow_redirects=False)
     assert r.status_code == 400 and "agent-cadence's layer listing exited 2" in r.text
     assert fleet.creates() == []
+
+    # TD-1995 (§4.8 *A listing that fails*): a typed prompt is the whole opening prompt, so it reads no layer and
+    # starts while the listing fails, as `ao new --prompt` does; a prompt of spaces is no prompt, and is refused
+    asked.clear()
+    monkeypatch.setattr(layers, "person", lambda *a: (asked.append(a), failed(*a)))
+    typed = {**data, "name": "h4", "prompt": "fix the flaky test in test_link.py"}
+    assert client.post("/new", data=typed, follow_redirects=False).status_code == 303
+    (made,) = fleet.creates()
+    assert made["prompt"].endswith("fix the flaky test in test_link.py") and asked == []
+    assert "prompt_from" not in made
+    fleet.calls.clear()
+    r = client.post("/new", data={**typed, "name": "h5", "prompt": "   "}, follow_redirects=False)
+    assert r.status_code == 400 and "agent-cadence's layer listing exited 2" in r.text
+    assert fleet.creates() == []
+    # a role with neither a template nor a definition reads no layer, so it starts with no prompt typed
+    assert client.post("/new", data={**data, "name": "h6", "role": "plain"}, follow_redirects=False).status_code == 303
+    assert len(fleet.creates()) == 1

@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 from datetime import date
@@ -190,6 +191,9 @@ def test_a_sweep_opens_a_lift_pr_and_a_board_pr_and_merges_neither(repo):
     assert "**Context:** TD-8 decision (paul)" in board and "Should it go?" in board
     state = json.loads((root.parent / "r-origin.git" / "fake-gh.json").read_text())
     assert [p["state"] for p in state["prs"].values()] == ["open", "open"], "the home opens them, never merges"
+    lift_pr, board_pr = state["prs"].values()
+    assert "TD-7" in lift_pr["title"], "a lift's title names the entry it touches"
+    assert not re.search(r"TD-\d", board_pr["title"]), f"a board PR's title names no ledger id (TD-2022): {board_pr}"
     assert _git("-C", str(root), "show", "main:docs/ledger/TD-7.md") == EVENT, "main is untouched"
     assert _git("-C", str(root), "branch", "--list", "lift/*", "sweep/*") == "", "no local branch is left"
     assert len(_git("-C", str(root), "worktree", "list").splitlines()) == 1, "no worktree is left"

@@ -230,17 +230,26 @@ def passed_question(e: Any) -> str:
 
 
 def _recommends_html(e: Mapping[str, Any]) -> str:
-    """*`<passer>` recommends: `<line>`*, labelled and drawn as text (§4.5a *Inbox row: passed up*)."""
+    """*`<passer>` recommends: `<line>`*, labelled and drawn as text (§4.5a *Inbox row: passed up*) — one line per
+    pass, the latest first, so a question the techlead passed to the director and the director to the person shows
+    both, the director's first (`passes`, TD-661)."""
     rec = e.get("recommend")
     if not isinstance(rec, Mapping) or not rec.get("text"):
         return ""
-    by = Markup.escape(str(rec.get("by") or ""))
-    who = Markup.escape(str(e.get("passer_name") or rec.get("by") or ""))
-    line = Markup.escape(str(rec["text"]))
-    return (
-        f'<div class="st dflt recommends" title="passed up to you by {by}: its recommendation, not the asker\'s">'
-        f"{who} recommends: {line}</div>"
-    )
+    passes = [p for p in (e.get("passes") or []) if isinstance(p, Mapping) and isinstance(p.get("recommend"), Mapping)]
+    recs = [p["recommend"] for p in reversed(passes) if p["recommend"].get("text")] if len(passes) > 1 else [rec]
+    names = e.get("passer_names") if isinstance(e.get("passer_names"), Mapping) else {}
+    html = ""
+    for one in recs:
+        by = Markup.escape(str(one.get("by") or ""))
+        name = names.get(str(one.get("by") or "")) or (e.get("passer_name") if one is rec else None)
+        who = Markup.escape(str(name or one.get("by") or ""))
+        line = Markup.escape(str(one["text"]))
+        html += (
+            f'<div class="st dflt recommends" title="passed up by {by}: its recommendation, not the asker\'s">'
+            f"{who} recommends: {line}</div>"
+        )
+    return html
 
 
 def _from_asker_html(e: Mapping[str, Any], text: str, origin: str | None, default: Any = None) -> str:
@@ -1230,6 +1239,25 @@ def editor_link(directory: str, reach: str = "") -> dict[str, str] | None:
     person's own*, TD-095): `{label, url}`, or None for no button."""
     h = hosts.local_host()
     return uiconf.editor_link(directory, local=h.local, remote=h.vscode_host, reach=reach)
+
+
+def under_cwd_root(path: str, s: Mapping[str, Any]) -> bool:
+    """Whether a resolved `path` of record `s` takes its `cwd_root`'s folder link first (design §4.6 *A path
+    in the pane is a link*, the press's first launch; §4.2 *The record's `cwd`*, TD-1988): `cwd_root` holds
+    it and is the deeper of `cwd_root` and `dir`'s top level (`git.top`, else `dir`) that does — a worktree
+    nested under the main checkout lies under both, and the inner wins, as `checkout_of` takes it. Real
+    paths compared as strings: the host wrote `cwd_root` and `git.top` as real paths, `paths` answers one."""
+    root = str(s.get("cwd_root") or "")
+    if not root or not path:
+        return False
+
+    def holds(top: str) -> bool:
+        return bool(top) and (path == top or path.startswith(top.rstrip("/") + "/"))
+
+    if not holds(root):
+        return False
+    top = str((s.get("git") or {}).get("top") or s.get("dir") or "")
+    return not holds(top) or len(root) > len(top)
 
 
 def editor_file(reach: str = "") -> str | None:

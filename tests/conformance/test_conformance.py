@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import inspect
 import json
+import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -360,3 +362,224 @@ def test_mail_says_how_a_session_is_handed_its_mail(name):
     if "mail" not in adapters.implements(ad):
         pytest.skip(f"{name} does not declare mail: its sessions are handed mail by a pane write")
     ad.mail()  # None, or a delivery: never an error
+
+
+# -- the Tools page's reads (design §4.2b *What the adapter reads*, TD-1971) -------------------------------
+
+
+def _declares(name: str, method: str):
+    ad = adapters.get(name)
+    if method not in adapters.implements(ad):
+        pytest.skip(f"{name} does not declare {method}")
+    return ad
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_find_is_the_binary_by_absolute_path_or_none(name, tmp_path):
+    """`find()` asks for the binary a launch would run without launching it: by absolute path, or None."""
+    ad = _declares(name, "find")
+    stub = tmp_path / "bin" / "tool"
+    stub.parent.mkdir()
+    stub.write_text("#!/bin/sh\nexit 99\n", encoding="utf-8")  # never run: a run would be a launch
+    stub.chmod(0o755)
+    assert type(ad)(binary=str(stub)).find() == str(stub)
+    assert type(ad)(binary=str(tmp_path / "missing")).find() is None
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_home_env_is_empty_for_the_default_home_and_names_any_other(name, tmp_path):
+    """`home_env(home)` is what a launch on `home` sets: nothing for the tool's default home, as a launch on a
+    profile with no `config_dir` sets nothing; another home named in it, every key and value a string."""
+    ad = _declares(name, "home_env")
+    assert ad.home_env(ad.default_home(os.environ)) == {}
+    login = tmp_path / "login"
+    env = ad.home_env(login)
+    assert env and all(isinstance(k, str) and isinstance(v, str) for k, v in env.items())
+    assert str(login) in env.values()
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_credentials_ok_reads_a_home_given_as_a_path(name, tmp_path, monkeypatch):
+    """`credentials_ok` takes a home as a path beside a profile (§4.2b): None before a sign-in, True after."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    ad = adapters.get(name)
+    login = tmp_path / "login"
+    login.mkdir()
+    assert ad.credentials_ok(login) is None
+    HARNESSES[name].sign_in(login)
+    assert ad.credentials_ok(login) is True
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_is_home_reads_what_the_tool_writes_there(name, tmp_path):
+    """`is_home(path)`: a folder is the tool's home by the files the tool writes there, never by settings a repo
+    holds too, nor ShiftLead's own files."""
+    ad = _declares(name, "is_home")
+    harness = HARNESSES[name]
+    folder = tmp_path / "folder"
+    folder.mkdir()
+    assert ad.is_home(folder) is False
+    harness.not_a_home(folder)
+    assert ad.is_home(folder) is False
+    harness.mark_home(folder)
+    assert ad.is_home(folder) is True
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_new_home_suggests_a_folder_and_make_home_makes_one_a_sign_in_fills(name, tmp_path, monkeypatch):
+    """`new_home(name)` suggests a new login's folder beside the tool's default, its name in it, and makes nothing;
+    `make_home(path)` makes any folder one the tool's sign-in can write into, 0700, and a home only once signed in."""
+    ad = _declares(name, "new_home")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    got = ad.new_home("work-2")
+    assert isinstance(got, Path) and got.is_absolute() and "work-2" in got.name and not got.exists()
+    assert not adapters.same_home(got, ad.default_home({}))
+    ad = _declares(name, "make_home")
+    folder = tmp_path / "deep" / "login"
+    ad.make_home(folder)
+    assert folder.is_dir() and folder.stat().st_mode & 0o777 == 0o700 and ad.is_home(folder) is False
+    ad.make_home(folder)  # again: nothing changes
+    HARNESSES[name].mark_home(folder)
+    assert ad.is_home(folder) is True
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_env_signin_reads_the_environment_it_is_given(name):
+    """`env_signin(env)` is True for the environment whose one key signs in every login, False for an empty one."""
+    ad = _declares(name, "env_signin")
+    assert ad.env_signin({}) is False
+    assert ad.env_signin(HARNESSES[name].signin_env) is True
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_install_and_signin_commands_are_the_persons_to_run(name):
+    """`install_command()` is one line of text; `signin_command()` an argv whose first word is the binary."""
+    ad = _declares(name, "install_command")
+    line = ad.install_command()
+    assert isinstance(line, str) and line.strip() and "\n" not in line
+    ad = _declares(name, "signin_command")
+    argv = ad.signin_command()
+    assert argv and all(isinstance(a, str) for a in argv) and argv[0] == ad.binary
+
+
+def _signed_in(name: str, root: Path, folder: str, key: str, display: str = "Ada") -> Path:
+    home = root / folder
+    home.mkdir()
+    HARNESSES[name].sign_in_as(home, key, display)
+    return home
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_identity_is_none_before_a_sign_in_and_on_a_record_it_cannot_read(name, tmp_path):
+    """`identity(home, salt)` is None with no account recorded, and None, never an exception, on a broken record."""
+    ad = _declares(name, "identity")
+    home = tmp_path / "login"
+    home.mkdir()
+    assert ad.identity(home, b"salt") is None
+    harness = HARNESSES[name]
+    for text in harness.corrupt_identity(home):
+        harness.write_identity(home, text)
+        assert ad.identity(home, b"salt") is None, text
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_identity_matches_compare_within_one_salt_only(name, tmp_path):
+    """One key under two salts gives two matches; two homes with one key give one; two keys give two (§4.2b)."""
+    ad = _declares(name, "identity")
+    one = _signed_in(name, tmp_path, "one", "acct-1@example.com")
+    two = _signed_in(name, tmp_path, "two", "acct-1@example.com")
+    other = _signed_in(name, tmp_path, "other", "acct-2@example.com")
+    a, b = ad.identity(one, b"salt-a"), ad.identity(one, b"salt-b")
+    assert a["match"] != b["match"]
+    assert ad.identity(two, b"salt-a")["match"] == a["match"]
+    assert ad.identity(other, b"salt-a")["match"] != a["match"]
+    assert set(a) == {"match", "display", "plan", "billing"}
+    assert a["billing"] in ("subscription", "metered", None)
+    assert a["plan"] is None or isinstance(a["plan"], str)
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_identity_never_lets_the_account_key_out(name, tmp_path, caplog, capsys):
+    """The key never leaves the adapter: not in the reply, a log line or printed output (§4.2b); `display` is a
+    name, never an email or part of one."""
+    ad = _declares(name, "identity")
+    key = "f00dfeed-secret-key@example.com"
+    caplog.set_level("DEBUG")
+    home = _signed_in(name, tmp_path, "login", key, display="Ada")
+    reply = ad.identity(home, b"salt")
+    assert reply is not None and reply["display"] in ("Ada", None)
+    seen = repr(reply) + caplog.text + "".join(capsys.readouterr())
+    assert "f00dfeed" not in seen and key not in seen
+    emailed = _signed_in(name, tmp_path, "emailed", key, display="ada@example.com")
+    assert ad.identity(emailed, b"salt")["display"] is None
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_models_offers_the_plans_families_or_every_family_unconfirmed(name, tmp_path):
+    """`models(home, plan)` (§4.2b): a plan the adapter's table knows offers its families, confirmed; one it does not
+    know offers the whole list, `unconfirmed`; `default` a family the adapter knows, or None."""
+    ad = _declares(name, "models")
+    mod = sys.modules[type(ad).__module__]
+    home = tmp_path / "login"
+    home.mkdir()
+    unknown = ad.models(home, "a plan nobody has")
+    assert set(unknown) == {"families", "default", "unconfirmed"}
+    assert unknown["unconfirmed"] is True and unknown["families"] == list(mod.FAMILIES)
+    assert ad.models(home, None)["unconfirmed"] is True
+    for plan, families in mod.PLAN_FAMILIES.items():
+        got = ad.models(home, plan)
+        assert got["unconfirmed"] is False and got["families"] == list(families)
+        assert set(families) <= set(mod.FAMILIES)
+    assert unknown["default"] is None or unknown["default"] in mod.FAMILIES
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_each_family_is_read_from_the_models_names_it_covers(name):
+    """The adapter's table maps a model's name to its family (§4.2b `models`, the switch-over's pin): every family is
+    some name's, and a name the table does not cover is none."""
+    ad = _declares(name, "models")
+    mod = sys.modules[type(ad).__module__]
+    assert mod.model_family("no-such-model") is None and mod.model_family(None) is None
+    for family, model in NAMED_MODELS[name]:
+        assert mod.model_family(model) == family, model
+    assert {f for f, _ in NAMED_MODELS[name]} == set(mod.FAMILIES)
+
+
+# names each tool has run on kmaster (TD-1971), one or more per family
+NAMED_MODELS = {
+    "claude-code": [
+        ("fable", "claude-fable-5-2"),
+        ("opus", "claude-opus-5-5"),
+        ("opus", "opus[1m]"),
+        ("sonnet", "sonnet"),
+        ("haiku", "claude-haiku-5-5"),
+    ],
+    "gemini": [
+        ("flash-lite", "gemini-3.5-flash-lite"),
+        ("flash", "gemini-3-flash-preview"),
+        ("flash", "gemini-3.8-flash"),
+        ("pro", "gemini-3.5-pro"),
+    ],
+    "grok": [("grok", "grok-4.7"), ("build-fast", "grok-4.7-build-fast")],
+}
+
+
+# the settings file naming a model in a home, where the adapter reads its default from one (§4.2b `models`)
+DEFAULT_SETTINGS = {
+    "claude-code": ("settings.json", {"model": "claude-sonnet-5-5"}, "sonnet"),
+    "gemini": (".gemini/settings.json", {"model": {"name": "gemini-3.5-flash-lite"}}, "flash-lite"),
+}
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_models_default_is_the_family_the_homes_settings_name(name, tmp_path):
+    """`default` is the family of the model the home's settings name, and None where they name none."""
+    ad = _declares(name, "models")
+    if name not in DEFAULT_SETTINGS:
+        pytest.skip(f"{name} reads no default from a file")
+    rel, doc, family = DEFAULT_SETTINGS[name]
+    home = tmp_path / "login"
+    (home / rel).parent.mkdir(parents=True)
+    assert ad.models(home, None)["default"] is None
+    (home / rel).write_text(json.dumps(doc), encoding="utf-8")
+    assert ad.models(home, None)["default"] == family

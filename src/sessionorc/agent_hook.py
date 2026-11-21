@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import secrets
 import time
 from datetime import UTC, datetime, timedelta
@@ -19,6 +20,7 @@ from sessionorc import (
     agent_common,
     link,
     mail,
+    naming,
     permits,
 )
 from sessionorc import settings as settings_mod
@@ -38,7 +40,13 @@ log = logging.getLogger(__name__)
 
 class HookMixin:
     async def rpc_hook(self, session: str, **event: Any) -> dict[str, Any] | None:
-        """Called by an adapter's hook script. A `permission` event blocks until answered or timed out."""
+        """Called by an adapter's hook script. A `permission` event blocks until answered or timed out.
+
+        A tools shell's report (a tool started there for `/login` runs the login's hooks) is dropped at
+        once, and a `permission` one answered without a waiter, so the tool asks in its own pane, which
+        is the person's (design §4.2b *The tools shell*, TD-1972)."""
+        if naming.is_tools(session):
+            return None
         if event.get("kind") == "permission":
             return await self._await_permission(session, event)
         # `mail`: the hook hands the turn its mail line (an adapter whose `mail` is a turn's, design §4.3),
@@ -47,6 +55,7 @@ class HookMixin:
         # `wait`: the event is a foreground CI watch the hook refuses only for an unattended record, whose
         # mode it cannot know itself (§4.3 *A wait the guard refuses*) — on a node, the replica's field
         wants_wait = bool(event.pop("wait", False))
+        await self._resolve_cwd(session, event)
         self._apply_event(session, event)
         await self._push_changes()
         reply: dict[str, Any] = {}
@@ -55,6 +64,31 @@ class HookMixin:
         if wants_wait and (s := self.sessions.get(session)) is not None and s.unattended:
             reply["refuse_wait"] = True
         return reply or None
+
+    async def _resolve_cwd(self, session: str, event: dict[str, Any]) -> None:
+        """The payload's `cwd` made the record's (design §4.2 *The record's `cwd`*, TD-1988): compared raw with the
+        last raw value first and resolved to its real path only on a change, off the event loop, and handed to the
+        apply as `cwd_real` — None where it is `dir` itself — only where the raw value is still the last one when
+        the resolve ends, so an older event's slow resolve never overwrites a newer one. A subagent's event writes
+        none; a queued one never comes here, and the apply reads `cwd_real` from a live event alone."""
+        raw = event.pop("cwd", None)
+        event.pop("cwd_real", None)  # the host agent's own words, never a caller's
+        event.pop("cwd_raw", None)
+        s = self.sessions.get(session)
+        if not isinstance(raw, str) or not raw or event.get("subagent") or s is None or not s.dir:
+            return
+        if raw == self._cwd_raw.get(session):
+            self._cwd_asking.pop(session, None)  # back where it was: an older resolve under way hands nothing on
+            return
+        self._cwd_asking[session] = raw  # the newest raw value asked: a slower, older resolve hands nothing on
+        try:
+            real, here = await asyncio.to_thread(lambda: (os.path.realpath(raw), os.path.realpath(s.dir)))
+        except (OSError, ValueError):  # a path no file system takes (a NUL in it): no `cwd`, the event still applies
+            return
+        if self._cwd_asking.get(session) == raw:
+            # the apply marks `raw` as the last one only where it writes it, so an event it drops early (a late
+            # turn's end, a closed record) leaves the next event with this `cwd` to resolve it again
+            event["cwd_real"], event["cwd_raw"] = (None if real == here else real), raw
 
     def _unread_of(self, session: str) -> int:
         """The record's unread mail: the inbox at the home, the count the home last pushed on a node
@@ -66,8 +100,8 @@ class HookMixin:
 
     async def _await_permission(self, session: str, event: dict[str, Any]) -> dict[str, Any] | None:
         s = self.sessions.get(session)
-        if s is None:
-            return None
+        if s is None or naming.is_tools(session):
+            return None  # a tools shell's is the person's own pane, never waited on (§4.2b)
         self._last_hook[session] = datetime.now(UTC)
         self._live_hook_at[session] = time.time()
         if not s.hook_seen_at:  # the first hook (§4.1, TD-720): saved now, since a rule's answer saves nothing
@@ -104,6 +138,7 @@ class HookMixin:
         fut: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
         key = (session, tool_use_id)
         self._waiters[key] = (fut, subagent)
+        self._prompt_calls[key] = (event.get("tool"), event.get("input"))
         await self._push_changes()
         try:
             decision = await asyncio.wait_for(fut, timeout=wait)
@@ -125,6 +160,7 @@ class HookMixin:
             return None if decision.get("terminal") else decision
         finally:
             self._waiters.pop(key, None)
+            self._prompt_calls.pop(key, None)
 
     async def _by_rule(self, s: Any, event: dict[str, Any]) -> dict[str, Any] | None:
         """The person's written rules, the first line in front of them (design §4.9b *The director seat
@@ -225,10 +261,19 @@ class HookMixin:
         self.person_store.save(self.person_inbox)
 
     async def rpc_decide(
-        self, id: str, tool_use_id: str, behavior: str, reason: str | None = None, caller: Any = None
+        self,
+        id: str,
+        tool_use_id: str,
+        behavior: str,
+        reason: str | None = None,
+        caller: Any = None,
+        permit: bool = False,
     ) -> None:
         """Answer a pending permission through the hook (design §4.2). An act, gated like `send`
-        (§4.8, TD-116): a session answers another's only as one of its controllers holding `control`."""
+        (§4.8, TD-116): a session answers another's only as one of its controllers holding `control`,
+        or as the director seat by its `permit` (TD-642) — `permit` set by the gate, never the caller:
+        its answer carries a reason, its *allow* of a prompt that always reaches the person is refused
+        (a deny stands), and the home tells the person (`_answered_by_director`)."""
         s = self._get(id)
         if not adapters.permission_channel(s.adapter):
             # the backstop to `ao allow`/`ao deny` and the page (§4.3 *Permissions: no channel*, TD-785)
@@ -238,7 +283,18 @@ class HookMixin:
             raise RpcError("no pending permission with that id (answered, timed out, or in the terminal)")
         if behavior not in ("allow", "deny"):
             raise RpcError("behavior must be allow or deny")
+        if permit:
+            if not (reason or "").strip():
+                raise RpcError(f"{caller} cannot {behavior} {s.name}'s prompt without a reason: the person is told it")
+            if behavior == "allow" and (why := self._kept_for_person(s, tool_use_id)):
+                raise RpcError(
+                    f"{caller} cannot allow {s.name}'s prompt: {why}, so it always reaches the person — "
+                    "a deny stands (design §4.9b *What always reaches the person*)"
+                )
+        prompt = next((p.text for p in s.pendings if p.tool_use_id == tool_use_id), "") or "a permission prompt"
         fut.set_result({"behavior": behavior, "reason": reason})
+        if permit and self.mode == "home":
+            self._answered_by_director(s, prompt, behavior, str(reason), caller)
         # the row ends here and the home knows how (design §4.10 *The Inbox is a queue*): the trail
         # says who answered — *you* for a person, the controller's name for a session — and a
         # person's answer is never too quick to record
@@ -253,6 +309,45 @@ class HookMixin:
             self._refill(s)  # a person's answer to its permission; a controller's refills nothing (§4.10)
         self.store.save(s)
         await self._push_changes()
+
+    def _kept_for_person(self, s: Any, tool_use_id: str) -> str | None:
+        """Why the prompt `tool_use_id` waiting on `s` always reaches the person (`permits.always_the_person`, design
+        §4.9b), or None. A prompt whose call this agent did not keep is the person's: nothing places it."""
+        tool, tool_input = self._prompt_calls.get((s.id, tool_use_id)) or (None, None)
+        if not isinstance(tool, str) or not tool:
+            return "its call cannot be read here"
+        try:
+            strings = getattr(adapters.get(s.adapter), "prompt_strings", lambda *_: None)(tool, tool_input)
+        except KeyError:
+            strings = None
+        touched = permits.all_strings(tool_input) if strings is None else strings
+        return permits.always_the_person(touched, s.dir, s.repo)
+
+    def _answered_by_director(self, s: Any, prompt: str, behavior: str, reason: str, caller: Any) -> None:
+        """The *Answered for you* FYI for a prompt the director seat answered by `permit` (§4.9b, TD-642): the
+        shape a rule's has, the director as the answerer and its reason as the source. Written by the home, mail's
+        one writer (§9 invariant 15), for a node's record too (`_route_act`)."""
+        verdict = "allowed" if behavior == "allow" else "denied"
+        who = self._graph().get(self._addr(caller))
+        name = who.name if who is not None else str(caller)
+        note = MailEntry(
+            id="m-" + secrets.token_hex(6),
+            from_=SYSTEM,
+            to=[PERSON],
+            at=now_iso(),
+            kind="note",
+            text=f"{verdict} by {name}: {reason}"[: mail.SOURCE_CAP * 2],
+        )
+        note.team = getattr(s, "team", "") or None
+        note.subject = mail.subject_of(f"{verdict}: {prompt}")
+        note.answered = {
+            "question": prompt,
+            "asker": self._address(s),
+            "answerer": self._addr(caller),
+            "source": reason[: mail.SOURCE_CAP],
+        }
+        self.person_inbox.append(note)
+        self.person_store.save(self.person_inbox)
 
     def _answered_by(self, behavior: str, caller: Any) -> str:
         """The trail's word for a decided permission: *allowed by you* when a person pressed it,

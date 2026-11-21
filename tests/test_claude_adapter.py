@@ -1557,3 +1557,22 @@ async def test_a_hook_limited_ended_by_the_next_prompt_leaves_no_mark(agent, hoo
         assert s.limited_hook_at == landed  # the answer is no hook of the tool's: the mark stands
         await _hook(sid, hook_event_name="Stop", session_id="u1")
         assert (s.state, s.limited_hook_at) == ("idle", None)
+
+
+def test_identity_reads_the_record_a_launch_on_the_home_reads(tmp_path, monkeypatch):
+    """`identity` on `~/.claude` reads `~/.claude.json`, as an unset `CLAUDE_CONFIG_DIR` does; on another folder its
+    own `.claude.json` (design §4.2b, TD-1971)."""
+    from shiftlead.adapters.claude_code import ClaudeCodeAdapter
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "elsewhere"))  # the home is the argument, never the variable
+    (tmp_path / ".claude").mkdir()
+    account = {"accountUuid": "u-1", "displayName": "Ada", "planDisplayName": "Max", "billingType": "x_subscription"}
+    (tmp_path / ".claude.json").write_text(json.dumps({"oauthAccount": account}), encoding="utf-8")
+    ad = ClaudeCodeAdapter()
+    got = ad.identity(tmp_path / ".claude", b"s")
+    assert got is not None and got["display"] == "Ada" and got["plan"] == "Max" and got["billing"] == "subscription"
+    assert ad.identity(Path("~/.claude"), b"s") == got
+    other = tmp_path / "other"
+    other.mkdir()
+    assert ad.identity(other, b"s") is None

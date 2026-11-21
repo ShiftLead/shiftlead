@@ -3,6 +3,7 @@ validation, a repo's own `teams:` folded in, and the per-host checkout lookup.""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -875,3 +876,35 @@ def test_a_team_named_as_a_seat_ledger_reading_is_refused(tmp_path, name):
         org.load(write(tmp_path, doc))
     with pytest.raises(ValueError, match=rf"`{name}` is reserved"):
         org.merge_repo_teams(org.Org(), tmp_path / "solo", {name: {"members": [{"role": "g"}]}})
+
+
+def test_the_org_file_may_define_its_director_seat(tmp_path):
+    """TD-642, design §5 `org.yml` `director:`, §4.9b *The director seat*: absent, no director; `{}` one on the
+    defaults; its name, trigger and grant are fixed, so a key for them is refused naming it."""
+    assert org.load(write(tmp_path, ORG)).director is None
+    assert org.load(write(tmp_path, {**ORG, "director": None})).director is None
+    d = org.load(write(tmp_path, {**ORG, "director": {}})).director
+    assert d == org.DirectorDef() and d.name == org.DIRECTOR_NAME == "director"
+    d = org.load(write(tmp_path, {**ORG, "director": {"profile": "grind", "brief": "~/briefs/director.md"}})).director
+    assert (d.profile, d.brief) == ("grind", "~/briefs/director.md")
+    o = org.load(write(tmp_path, {**ORG, "director": {"profile": "grind"}}))
+    assert o.copy().director == o.director
+    for bad, says in (
+        ({"name": "boss"}, "director: unknown key(s) ['name']"),
+        ({"trigger": "asks"}, "unknown key(s) ['trigger']"),
+        ("grind", "director must be a mapping"),
+        ({"profile": ["a"]}, "director.profile must be a string"),
+    ):
+        with pytest.raises(ValueError, match=re.escape(says)):
+            org.load(write(tmp_path, {**ORG, "director": bad}))
+
+
+def test_the_package_ships_the_directors_brief_with_its_org_slot():
+    """TD-642: `director.md` is the seat's brief (§4.9b), its `{org}` the Org block a start fills."""
+    text = (Path(org.__file__).parent / "briefs" / "director.md").read_text(encoding="utf-8")
+    assert "{org}" in text and "ao allow <session>" in text and "ao deny <session>" in text
+    # Fix 4: a prompt it cannot weigh is passed up in words, the prompt left `needs-you`
+    assert "**Pass it up** — `ao msg person --kind note" in text and "answer nothing" in text
+    # TD-661 Fix 4: the question half — a pass to it answered with `--source` or passed on to the person
+    assert "## Each question passed up" in text and "ao msg --reply-to <id> --source" in text
+    assert "ao msg --pass-up <id> --recommend" in text and "Passing up buys no time" in text

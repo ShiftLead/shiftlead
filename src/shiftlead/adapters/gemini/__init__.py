@@ -27,8 +27,21 @@ import uuid
 from collections.abc import Mapping
 from pathlib import Path
 
+import yaml
+
 from sessionorc import identity, paths
-from sessionorc.adapters import Conversation, LaunchSpec, Link, MailDelivery, Transcript, oldest_first, read_version
+from sessionorc.adapters import (
+    Conversation,
+    LaunchSpec,
+    Link,
+    MailDelivery,
+    Transcript,
+    account_match,
+    model_offer,
+    oldest_first,
+    read_version,
+    same_home,
+)
 from sessionorc.identity import ProcReader
 from sessionorc.models import Confidence, Pending, State
 from sessionorc.screen import Manifest, Match, painted_text
@@ -106,6 +119,27 @@ INSTALL_LINE = (
     "~/.shiftlead/gemini-settings/layer.json /etc/shiftlead/gemini-settings.json"
 )
 REFUSED = "the Gemini layer is not installed — run the line `ao doctor` prints"
+# the vendor's documented install line for the CLI itself (design §4.2b `install_command`, TD-1971); `INSTALL_LINE`
+# above installs the machine's layer, not the CLI
+CLI_INSTALL_LINE = "npm install -g @google/gemini-cli"
+# what the tool writes under a home's `.gemini/`: its accounts, its credentials, its install id (§4.2b `is_home`);
+# never `settings.json`, which a repo's own `.gemini/` holds too
+HOME_MARKS = ("google_accounts.json", "oauth_creds.json", "gemini-credentials.json", "installation_id")
+# the model families Gemini CLI's names carry, the version between `gemini-` and the family (design §4.2b `models`)
+FAMILIES = ("pro", "flash", "flash-lite")
+# the families each plan (`selectedType`) offers, only where a host has run each: none is confirmed yet (an API key ran
+# flash and flash-lite on kmaster, pro unread, 2026-11-19), so every plan offers every family, unconfirmed
+PLAN_FAMILIES: dict[str, tuple[str, ...]] = {}
+# how each `selectedType` is billed, as `identity` suggests it (§4.2b): a Google sign-in's quota windows, or a key's
+# metered use; another type says nothing
+SELECTED_BILLING = {"oauth-personal": "subscription", "gemini-api-key": "metered", "vertex-ai": "metered"}
+
+
+def model_family(model: object) -> str | None:
+    """A model's family by its name — `gemini-3.5-flash-lite`, `gemini-3-flash-preview` → `flash-lite`, `flash`; None
+    for a name it does not cover."""
+    m = re.match(r"gemini-[\d.]+-(flash-lite|flash|pro)(?:-|$)", model) if isinstance(model, str) else None
+    return m.group(1) if m else None
 
 
 def wanted_file() -> Path:
@@ -254,6 +288,7 @@ class GeminiAdapter:
     label = "Gemini"  # the tool's display name: the usage chip's first word, never a key (§4.3, TD-122)
     marks_errors = True  # a tool call's `status` word (design §4.3 `read_transcript`, TD-1719)
     state_source: Confidence = "hook"
+    scratch_env: str | None = None  # Gemini CLI names no temp variable of its own: `TMPDIR` (§4.3, §4.6)
     # the tool writes its state into its terminal title: the tick asks `explain` with the pane's title
     # and writes its verdict with `confidence: title` (design §4.2 *A title the tool writes its state into*)
     state_in_title = True
@@ -269,7 +304,11 @@ class GeminiAdapter:
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): the rest come
     # with TD-786's later slices
     implements: frozenset[str] = frozenset(
-        {"background", "composer", "context", "conversations", "links", "mail", "spend", "title"}
+        {
+            *("background", "composer", "context", "conversations", "links", "mail", "spend", "title"),
+            *("find", "home_env", "install_command", "signin_command", "is_home", "identity", "models"),
+            *("new_home", "make_home", "env_signin"),
+        }
     )
 
     def __init__(self, binary: str | None = None, rules: Path | None = None):
@@ -426,11 +465,13 @@ class GeminiAdapter:
         own = None if "SHIFTLEAD_SESSION" in env else env.get("GEMINI_CLI_HOME")
         return Path(own or "~").expanduser()
 
-    def credentials_ok(self, profile: Profile) -> bool | None:
+    def credentials_ok(self, profile: Profile | Path) -> bool | None:
         """Whether the home can start without the auth picker (design §4.3): its `settings.json` names
         `security.auth.selectedType` and the credential exists — the file store, its older name, or
-        `GEMINI_API_KEY` in the environment. None for no credential; signing in is the person's."""
-        gem = home(profile) / ".gemini"
+        `GEMINI_API_KEY` in the environment. The home is a profile's, or one given as a path (§4.2b, TD-1971).
+        None for no credential; signing in is the person's."""
+        where = Path(profile).expanduser() if isinstance(profile, (str, os.PathLike)) else home(profile)
+        gem = where / ".gemini"
         try:
             doc = json.loads((gem / "settings.json").read_text(encoding="utf-8"))
             selected = ((doc.get("security") or {}).get("auth") or {}).get("selectedType")
@@ -441,6 +482,88 @@ class GeminiAdapter:
         if os.environ.get("GEMINI_API_KEY"):
             return True
         return True if any((gem / f).is_file() for f in ("gemini-credentials.json", "oauth_creds.json")) else None
+
+    # -- the Tools page's reads (design §4.2b *What the adapter reads*, TD-1971) -----------------
+
+    def env_signin(self, env: Mapping[str, str]) -> bool:
+        """Whether one key in `env` signs in every Gemini login on the host (design §4.2b *A login's state*): a
+        `GEMINI_API_KEY`, which `credentials_ok` takes for any home with a selected auth type."""
+        return bool(env.get("GEMINI_API_KEY"))
+
+    def find(self) -> str | None:
+        """The binary a launch finds, asked without launching (§4.2b): the PATH, then npm's user prefix, as
+        `binary` finds it; None where neither has it."""
+        if self._binary not in (None, "gemini"):
+            return shutil.which(self._binary)
+        npm = NPM_BINARY.expanduser()
+        return shutil.which("gemini") or (str(npm) if npm.is_file() else None)
+
+    def home_env(self, home: Path) -> dict[str, str]:
+        """The environment a launch on `home` sets (§4.2b): `GEMINI_CLI_HOME`, the parent of its `.gemini/`;
+        nothing for the tool's default home."""
+        if same_home(home, self.default_home(os.environ)):
+            return {}
+        return {"GEMINI_CLI_HOME": str(Path(home).expanduser())}
+
+    def install_command(self) -> str:
+        """The vendor's documented install line for the CLI (§4.2b), for the person to run."""
+        return CLI_INSTALL_LINE
+
+    def signin_command(self) -> list[str]:
+        """The sign-in command alone, run with `home_env(home)` (§4.2b): the tool itself, signed in with its own
+        `/login`, then quit."""
+        return [self.binary]
+
+    def is_home(self, path: Path) -> bool:
+        """Whether `path` is a home of this tool, by what the tool writes under its `.gemini/` (§4.2b)."""
+        gem = Path(path).expanduser() / ".gemini"
+        return any((gem / mark).exists() for mark in HOME_MARKS)
+
+    def new_home(self, name: str) -> Path:
+        """A new login's suggested folder (§4.2b *How a login is found and made*): `~/.gemini-<name>`, the parent of
+        the `.gemini/` `make_home` puts in it; made by nothing here."""
+        return Path(f"~/.gemini-{name}").expanduser()
+
+    def make_home(self, path: Path) -> None:
+        """Make `path` a home a sign-in can write into (§4.2b): the folder and its `.gemini/`, each 0700 —
+        `GEMINI_CLI_HOME` names the parent, and the tool writes under `.gemini/`."""
+        (Path(path).expanduser() / ".gemini").mkdir(mode=0o700, parents=True, exist_ok=True)
+        Path(path).expanduser().chmod(0o700)
+
+    def identity(self, home: Path, salt: bytes) -> dict | None:
+        """Who `home` is signed in as (§4.2b): the active account of its `.gemini/google_accounts.json`, an email,
+        which never leaves here but salted as `match`; no `display`, since the tool records none but the email;
+        `plan` the `selectedType` of its `.gemini/settings.json`, an API key's read as metered. None with no
+        active account (signed out, or a key alone)."""
+        gem = Path(home).expanduser() / ".gemini"
+        try:
+            key = json.loads((gem / "google_accounts.json").read_text(encoding="utf-8")).get("active")
+        except (OSError, ValueError, AttributeError):
+            return None
+        if not isinstance(key, str) or not key:
+            return None
+        try:
+            doc = json.loads((gem / "settings.json").read_text(encoding="utf-8"))
+            selected = ((doc.get("security") or {}).get("auth") or {}).get("selectedType")
+        except (OSError, ValueError, AttributeError):
+            selected = None
+        selected = selected if isinstance(selected, str) else None
+        return {
+            "match": account_match(salt, key),
+            "display": None,
+            "plan": selected,
+            "billing": SELECTED_BILLING.get(selected or ""),
+        }
+
+    def models(self, home: Path, plan: str | None) -> dict:
+        """The model families the account offers (§4.2b), from `PLAN_FAMILIES`; `default` the family of the model the
+        home's `.gemini/settings.json` names (`model.name`), None where it names none."""
+        try:
+            doc = json.loads((Path(home).expanduser() / ".gemini" / "settings.json").read_text(encoding="utf-8"))
+            named = (doc.get("model") or {}).get("name")
+        except (OSError, ValueError, AttributeError):
+            named = None
+        return model_offer(plan, PLAN_FAMILIES, FAMILIES, model_family(named))
 
     def doctor_profiles(self) -> list[dict]:
         """What `ao doctor` reads of each Gemini profile (design §4.7, §4.3): its home, its credential, a
@@ -531,6 +654,19 @@ class GeminiAdapter:
         return {"billing": prof.billing, "prices": dict(prof.prices)}
 
     # -- reads (design §4.3 *Reads*, TD-786) -----------------------------------------------------
+
+    def transcript_roots(self) -> list[Path]:
+        """Every directory Gemini CLI keeps transcripts under (design §4.3, §9 invariant 16, TD-1945): the whole
+        `<home>/.gemini/tmp` of `~`, of `GEMINI_CLI_HOME` where this process has it, and of each of its profiles'
+        homes, read from the profile file itself, so the disk sweep never removes inside one."""
+        homes = {Path("~").expanduser(), home(Profile(name="default", adapter=NAME))}
+        try:
+            profs, _ = profiles_mod.load()
+        except (OSError, ValueError, yaml.YAMLError):  # an unreadable profile file still names the tool's own
+            log.exception("profiles.yml unreadable: transcript roots are the tool's own alone")
+            profs = {}
+        homes |= {home(p) for p in profs.values() if p.adapter == self.name}
+        return sorted(transcript_mod.chats_root(h) for h in homes)
 
     def transcript_path(self, session_id: str, cwd: Path, profile: Profile | str | None = None) -> Path | None:
         """The session's chat under the profile's home: the file of a project's `chats/` named for the id

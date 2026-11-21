@@ -61,13 +61,15 @@
   // a cell measured on the fallback font leaves every glyph misplaced once it lands. So when the
   // face was not ready at open, measure again when it is. Two sets, because xterm.js ignores an
   // option set to the value it already has.
-  AO.termFont = function (term, fit) {
+  // The grid is the pane's (§4.6, TD-1919): a face changes how many of its columns the box shows, never the grid, so
+  // what follows the new cell is the terminal's own `relayout` (its pixel size and the view), where it has one.
+  AO.termFont = function (term) {
     const spec = `${AO.TERM_OPTS.fontSize}px ${AO.termFace || '"JetBrains Mono"'}`;
     if (!document.fonts || document.fonts.check(spec)) return;
     document.fonts.load(spec).then(() => {
       term.options.fontFamily = "monospace";
       term.options.fontFamily = AO.TERM_OPTS.fontFamily;
-      fit.fit();
+      AO.terms.forEach((t) => { if (t.term === term && t.relayout) t.relayout(); });
     }).catch(() => { /* the fallback stack stays: still a monospace pane */ });
   };
   // The person's face and size (goal 12, §5 `person.terminal`, the Settings page; TD-148): the page
@@ -106,11 +108,11 @@
     AO.TERM_OPTS.fontSize = AO.termSize(look);
     AO.TERM_OPTS.fontFamily = AO.termFamily(face);
     AO.termFace = face ? `"${face.replace(/["\\]/g, "")}"` : "";
-    AO.terms.forEach(({ term, fit }) => {
+    AO.terms.forEach(({ term, relayout }) => {
       term.options.fontSize = AO.TERM_OPTS.fontSize;
       term.options.fontFamily = AO.TERM_OPTS.fontFamily;
-      try { fit.fit(); } catch (e) { /* a pane not laid out yet fits on its next resize */ }
-      AO.termFont(term, fit);
+      if (relayout) relayout();  // the grid stays the pane's: only its pixels and the view follow the cell
+      AO.termFont(term);
     });
   };
   if (document.body && document.body.dataset) AO.setTermLook({ size: document.body.dataset.termSize, face: document.body.dataset.termFace });
@@ -436,23 +438,6 @@
       },
       cancel() { rec.cancel(); id = null; leave(); },
     };
-  };
-  // The grid tmux is told (TD-794): one `{resize}` per gesture, the last grid once the box has been still
-  // for `wait` ms, and none when it is the grid tmux already has. A drag of the panel's edge or a put away
-  // fires the observer once a frame, and each resize makes the tool repaint over lines tmux keeps.
-  // `send` answers whether the grid went (the socket open); `mark` records a grid sent another way.
-  // The timers are wrapped: a browser's `setTimeout` called as a method of another object throws.
-  AO.resizeSender = function (send, wait = 150, timers = { set: (f, ms) => setTimeout(f, ms), clear: (id) => clearTimeout(id) }) {
-    let timer = null, last = "";
-    const fn = (cols, rows) => {
-      timers.clear(timer);
-      timer = timers.set(() => {
-        timer = null;
-        if (`${cols}x${rows}` !== last && send([cols, rows])) last = `${cols}x${rows}`;
-      }, wait);
-    };
-    fn.mark = (cols, rows) => { timers.clear(timer); timer = null; last = `${cols}x${rows}`; };
-    return fn;
   };
   // The bar's wiring, its elements handed in so it runs under node (TD-500). Opening unfolds the overlay
   // and focuses the box; folding hides it, keeps the draft, redraws the bar and gives the terminal the
@@ -3094,7 +3079,8 @@
       // A card the server did not list keeps its place on the page — somewhere it can be seen: the
       // first group may now be a stopped team, folded (review of PR #226), so *No team* or a live
       // team is preferred.
-      const dest = keep.find((k) => !k.dataset.team) || keep.find((k) => +k.dataset.live) || keep[0];
+      // never the director's section, which holds its card alone (§4.9 *The Sessions page*, TD-642)
+      const dest = keep.find((k) => !k.dataset.team && k.dataset.key !== "director") || keep.find((k) => +k.dataset.live) || keep[0];
       const home = !drop && dest && $(".grid", dest);
       $$(".sc:not(.plus)", sec).forEach((c) => { if (home) home.appendChild(c); else { AO.handRing(c); c.remove(); } });
       sec.remove();
@@ -3815,6 +3801,152 @@
     if (!sent && Math.abs(total) < AO.TOUCH_SLOP) return { add: 0, sent: 0 };
     return { add: total - sent, sent: total };
   };
+  // …locked to the axis on which it first travels the slop (§4.6, TD-1919): `"x"` sets the box's `scrollLeft`, `"y"`
+  // scrolls; null while it has moved less than the slop on either axis, so it is still a tap
+  AO.touchAxis = function (dx, dy) {
+    if (Math.abs(dx) < AO.TOUCH_SLOP && Math.abs(dy) < AO.TOUCH_SLOP) return null;
+    return Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+  };
+  // **The terminal draws at the pane's grid, not at its box's** (§4.6 *Attach behaviour with another client present*,
+  // TD-1919). The rows a box shows: its `clientHeight` (a sideways scrollbar taken out) less `pad`, over the cell,
+  // floored, at least one.
+  AO.boxRows = (clientHeight, pad, cell) => Math.max(1, Math.floor((clientHeight - pad) / (cell || 16)));
+  // the box's `scrollTop` for a run starting at `top`: row r sits `gapTop` (the terminal's own top border, the gap)
+  // plus r cells down, so a run below the top row starts at its row, never a part of the row above; the top row shows
+  // the gap above it
+  AO.viewScroll = (top, cell, gapTop) => (top > 0 ? Math.round(top * (cell || 16) + (gapTop || 0)) : 0);
+  // the first row shown when no keep stands: the box-height run ending at the lower of the cursor's row and the last
+  // row with any text on it, a run that would start above the top row starting at it and one that would leave the
+  // cursor's row above it starting at that row
+  AO.viewStart = function (cursor, lastText, shown, rows) {
+    if (shown >= rows) return 0;
+    const start = Math.min(Math.max(cursor, lastText) - shown + 1, cursor);
+    return Math.max(0, Math.min(start, rows - shown));
+  };
+  // a page (Shift+PageUp, Shift+PageDown, a wheel event in pages): the box's rows less one, at least one, while the
+  // box is shorter than the grid; null where it is not, a bare page tmux takes as the pane's height
+  AO.pageRows = (shown, rows) => (shown < rows ? Math.max(1, shown - 1) : null);
+  // The view's keep (§4.6): from the view's own move, a sent `scroll` or a landed jump until a typed key, a box change,
+  // a `grid` frame or a change of the cursor's row, the view keeps the rows it had. A change of the cursor's row counts
+  // once the same new row reads on two frames running, or on a frame with no pane byte since the last, against the
+  // row read settled the same way once the keep starts (never refreshed within it); until one settles no change of
+  // the cursor's row releases it. A landed jump starts it anew with the answer's cursor as its settled row. Pure.
+  AO.viewKeep = function () {
+    let keep = false, top = 0, base = null, last = null;
+    const k = {
+      keeping: () => keep,
+      top: () => top,
+      release() { keep = false; base = null; last = null; },
+      // one animation frame: `cursor` the cursor's row, `bytes` whether a pane byte came since the last frame, `auto`
+      // the start with no keep (`AO.viewStart`), `maxStart` the grid's last box-height run's; the start to show
+      frame(cursor, bytes, auto, maxStart) {
+        if (keep) {
+          const settled = cursor === last || !bytes;
+          if (base === null) { if (settled) base = cursor; } else if (settled && cursor !== base) k.release();
+          last = cursor;
+        }
+        if (!keep) top = auto;
+        top = Math.max(0, Math.min(top, maxStart));
+        return top;
+      },
+      // whether another frame must read the cursor's row for the keep to settle or release
+      unsettled: (cursor) => keep && (base === null || cursor !== base),
+      // the wheel's, a drag's or a page's `n` rows, negative upward: first within the grid, upward as far as its top
+      // row and downward as far as `auto`, the run it would show; `{dir, lines}` the rest, sent as `scroll`, or null.
+      // A downward move while no keep stands sends its lines and starts none; any other starts one.
+      move(n, auto) {
+        if (!n) return null;
+        if (n < 0) {
+          const take = Math.min(-n, top);
+          top -= take;
+          if (!keep) { keep = true; base = null; last = null; }
+          return -n - take ? { dir: "up", lines: -n - take } : null;
+        }
+        const take = keep ? Math.min(n, Math.max(0, auto - top)) : 0;
+        top += take;
+        return n - take ? { dir: "down", lines: n - take } : null;
+      },
+      // a jump's answer: the landed row at the top shown (no lower than `maxStart` allows), the keep anew
+      land(row, cursor, maxStart) {
+        keep = true; base = cursor; last = cursor;
+        top = Math.max(0, Math.min(row, maxStart));
+        return top;
+      },
+    };
+    return k;
+  };
+  // **One helper measures** (§4.6 *Fit to window*): `.termbox`'s rendered size less its padding and borders (and the
+  // terminal's own border, the gap), whether or not its sideways scrollbar shows, over the
+  // renderer's CSS cell, each floored. `rect` the box's `getBoundingClientRect()`, `edges` `{x, y}` the pixels to
+  // take out each way, `cell` `{width, height}`; null where the box has no size or the cell is not known.
+  AO.gridOf = function (rect, edges, cell) {
+    if (!rect || !cell || !(cell.width > 0) || !(cell.height > 0)) return null;
+    const cols = Math.floor((rect.width - edges.x) / cell.width), rows = Math.floor((rect.height - edges.y) / cell.height);
+    return Number.isFinite(cols) && Number.isFinite(rows) && cols > 0 && rows > 0 ? [cols, rows] : null;
+  };
+  // the bridge's bounds, `person.terminal.grid`'s (§5): columns 20–500, rows 5–200
+  AO.GRID_BOUNDS = [[20, 500], [5, 200]];
+  AO.gridFits = (g) => !!g && g[0] >= AO.GRID_BOUNDS[0][0] && g[0] <= AO.GRID_BOUNDS[0][1]
+    && g[1] >= AO.GRID_BOUNDS[1][0] && g[1] <= AO.GRID_BOUNDS[1][1];
+  // **Fit to window** (§4.6 *Fit to window*, §4.5a, TD-1948): the note for a grid outside the bridge's bounds, or null
+  AO.fitRefused = (g) => {
+    if (!g || AO.gridFits(g)) return null;
+    const small = g[0] < AO.GRID_BOUNDS[0][0] || g[1] < AO.GRID_BOUNDS[1][0];
+    return `not fitted — this box is too ${small ? "small" : "large"}`;
+  };
+  AO.sameGrid = (a, b) => !!a && !!b && a[0] === b[0] && a[1] === b[1];
+  // the pane is quiet: a record with no agent always; one with an agent `idle`, nothing of its own running (the
+  // view's `own_work` empty, §4.2 *Working on its own*) and no pane byte for two seconds — any other state waits
+  AO.FIT_QUIET = 2000;
+  AO.FIT_LIMIT = 5 * 60 * 1000;
+  AO.FIT_ANSWER = 10000;
+  AO.fitQuiet = (v, lastByte, now) => !!v && (v.agent === false
+    || (v.state === "idle" && !v.own_work && (lastByte == null || now - lastByte >= AO.FIT_QUIET)));
+  // One moment of a waiting fit: `w` the wait (`since`, when it was pressed), `c` what the page reads now —
+  // `v` the record, `lastByte`, `now`, `hidden` (the page), `box` (`AO.boxGrid()`, null with no size or no finite
+  // proposal), `pane` (the terminal's grid). `{do: "wait"}`, `{do: "send", grid}`, or `{do: "end", note}` (a null
+  // note ends it quietly: the box became the pane's, another browser's fit or the window resized back).
+  AO.fitStep = (w, c) => {
+    if (c.now - w.since >= AO.FIT_LIMIT) return { do: "end", note: "not fitted — the session stayed busy" };
+    if (c.hidden || !c.box) return { do: "wait" };  // held until visible with a size; the five minutes still count
+    if (AO.sameGrid(c.box, c.pane)) return { do: "end", note: null };
+    const refused = AO.fitRefused(c.box);
+    if (refused) return { do: "end", note: refused };
+    if (!AO.fitQuiet(c.v, c.lastByte, c.now)) return { do: "wait" };
+    return { do: "send", grid: c.box };
+  };
+  // its `title` (§4.5a **Fit to window**), the two grids the live ones
+  AO.fitTitle = (pane, box) => `give the pane this window's size (pane ${pane[0]} × ${pane[1]}, window ${box ? `${box[0]} × ${box[1]}` : "—"}) — waits until the session is idle; a smaller size can repeat or drop the last lines of the history`;
+  // the pinch's note (§4.5a **a pinch**): the size, the box's columns at it and the pane's
+  AO.pinchSays = (size, box, paneCols) => (box ? `${size} px · ${box[0]} of ${paneCols} columns` : `${size} px · ${paneCols} columns`);
+  // **The press's hold** (§4.6 *Fit to window*, TD-1948): on a phone, or a wide page on a coarse pointer, a press
+  // blurs any focused field, closes the sheet and keeps the box's pixels at the first frame at which its height has
+  // not changed for `HOLD_STEADY` with nothing editable focused — counted from the press when nothing was focused,
+  // else from the first `visualViewport` `resize` after the blur. One second (`HOLD_LIMIT`) bounds the wait for that
+  // `resize` (none, and nothing focused: the box as it is), and one second from it bounds the hold; a field focused
+  // when either passes takes the fallback (the pixels kept before). A `resize` whose `scale` differs from the last
+  // one's is a zoom, never the keyboard's fall. `AO.holdStart` makes the hold; `AO.holdStep(h, c)` is one moment of
+  // it — `c.ev` `"frame"` or `"resize"`, `now`, `height` (the box's), `editing`, `scale` — `{do: "wait"}`,
+  // `{do: "keep"}` or `{do: "fallback"}`.
+  AO.HOLD_STEADY = 100;
+  AO.HOLD_LIMIT = 1000;
+  AO.holdStart = (now, focused, height, scale) => ({ since: now, base: focused ? null : now, steadyAt: now, lastH: height, scale });
+  AO.holdStep = (h, c) => {
+    if (c.ev === "resize") {
+      if (c.scale !== h.scale) { h.scale = c.scale; return { do: "wait" }; }  // a zoom
+      if (h.base == null) { h.base = c.now; h.steadyAt = c.now; h.lastH = c.height; }
+      return { do: "wait" };
+    }
+    if (h.base == null) {  // a field was focused: waiting for the keyboard's fall
+      if (c.now - h.since < AO.HOLD_LIMIT) return { do: "wait" };
+      return { do: c.editing ? "fallback" : "keep" };
+    }
+    if (c.height !== h.lastH) { h.lastH = c.height; h.steadyAt = c.now; }
+    if (!c.editing && c.now - h.steadyAt >= AO.HOLD_STEADY) return { do: "keep" };
+    return c.now - h.base >= AO.HOLD_LIMIT ? { do: "fallback" } : { do: "wait" };
+  };
+  AO.FIT_TURNED = "not fitted — the screen changed, press again";
+  AO.FIT_NO_BOX = "put the keyboard down, then press again";
   // The soft-key row (design §4.5a **Focus pane: soft-key row**, TD-990): a key's name to the bytes xterm.js
   // sends for it — an arrow `ESC [ A`–`D`, or `ESC O A`–`D` while the program has set application cursor
   // keys; null for a name the row does not have
@@ -3911,19 +4043,18 @@
   // **The terminal mark** (design §4.6 *Reconnect contract*, *Attach behaviour with another client
   // present*; §4.5a; TD-474, TD-480): what the Focus terminal is doing, one mark at a time, in this
   // order — the socket closed with a retry pending, past a three-second grace (`retryAt`: when the
-  // retry was scheduled, cleared by the next pane byte); another tmux client sizing the pane (the
-  // bridge's `{clients, window}` frame: more than one client and a window that is not this grid);
-  // a `working` session whose pane has drawn nothing for thirty seconds on an open socket (`lastByte`,
-  // counted up each second; never on `idle`, where silence is normal). Null when none holds.
+  // retry was scheduled, cleared by the next pane byte); a `working` session whose pane has drawn nothing
+  // for thirty seconds on an open socket (`lastByte`, counted up each second; never on `idle`, where
+  // silence is normal). Null when none holds. No client sizes a pinned window, so no mark says one did (TD-1919);
+  // *fitting when idle…* takes its place while a **Fit to window** waits (`fitting`, no grace; TD-1948).
   AO.TERM_GRACE = 3000;
   AO.TERM_SILENT = 30000;
   AO.termMark = function (st, now) {
     if (st.retryAt != null && now - st.retryAt >= AO.TERM_GRACE) {
       return { kind: "reconnecting", text: "reconnecting…", title: "the terminal socket dropped and retries on its own — reload if it stays" };
     }
-    const w = st.window, g = st.grid;
-    if (st.clients > 1 && w && g && (w[0] !== g[0] || w[1] !== g[1])) {
-      return { kind: "resized", text: "resized by another client", title: "another tmux client (a VS Code attach, a second tab) is sizing this pane — use one, or detach the other" };
+    if (st.fitting) {
+      return { kind: "fitting", text: "fitting when idle…", title: "Fit to window waits for the pane to be quiet, so the tool is not made to repaint while it draws — press it again to cancel" };
     }
     if (st.open && st.state === "working" && st.lastByte != null && now - st.lastByte >= AO.TERM_SILENT) {
       const n = Math.floor((now - st.lastByte) / 1000);
@@ -5857,6 +5988,135 @@
     return ok;
   };
 
+  // The Tools page (design §4.2b *The page*, §4.5 screen 14, TD-1973): **Check again** reads this host's tools again
+  // and draws the page afresh; **Install** opens the tool's install shell (TD-1972) and goes to its Focus, where the
+  // install line waits typed for the person's Enter. A refusal is the host agent's words, in place.
+  AO.tools = function () {
+    const page = $("#toolspage"); if (!page) return;
+    const said = $("#toolssaid", page);
+    const say = (text) => { said.textContent = text; said.hidden = false; said.classList.add("warn"); };
+    const post = async (path, body) => {
+      const r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body || {}) });
+      if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
+      return r.json();
+    };
+    const check = $("#toolscheck", page);
+    if (check) check.addEventListener("click", async () => {
+      check.disabled = true; check.textContent = "Checking…";
+      try { await post("/api/tools/check"); location.reload(); }
+      catch (e) { say(e.message); check.disabled = false; check.textContent = "Check again"; }
+    });
+    $$(".toolinstall", page).forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try { const s = await post("/api/tools/install", { tool: b.dataset.tool }); location.href = "/focus/" + encodeURIComponent(s.id); }
+      catch (e) { say(e.message); b.disabled = false; }
+    }));
+    // a login's and an account's controls on a switched host (§4.5a *Tools page: a login*, *an account*; TD-1974):
+    // each its `ao login` / `ao account` verb, sending back the version the page read; a write draws the page afresh,
+    // a shell goes to its Focus, and a refusal is the host agent's words, in place. A prompt left empty clears.
+    // `data-tool-act`, never `data-act`: the page-wide handler sends every `[data-act]` press as a session's action
+    const act = async (b) => {
+      const row = b.closest("[data-login], [data-account]"); if (!row) return;
+      const what = b.dataset.toolAct, v = row.dataset.version || null, login = row.dataset.login;
+      let path, body;
+      if (!login) {  // ✎ on an account
+        const label = prompt(`Label for ${row.dataset.account} (empty clears it)`, row.dataset.label || "");
+        if (label === null) return;
+        path = "/api/tools/account/label"; body = { key: row.dataset.account, label, version: v };
+      } else if (what === "shell") {
+        path = "/api/tools/login/shell"; body = { login };
+      } else if (what === "label") {
+        const label = prompt(`Label for ${login} (empty clears it)`, row.dataset.label || "");
+        if (label === null) return;
+        path = "/api/tools/login/label"; body = { login, label, version: v };
+      } else if (what === "note") {
+        const text = prompt(`Note on ${login}: one line, no secret, as the file is kept in git (empty clears it)`, row.dataset.note || "");
+        if (text === null) return;
+        path = "/api/tools/login/note"; body = { login, text, version: v };
+      } else if (what === "account") {
+        const account = prompt(`Which account is ${login} signed into? An account's key, or a new account's name`, "");
+        if (!account) return;
+        path = "/api/tools/login/account"; body = { login, account, version: v };
+      } else if (what === "settings") {  // the login's Settings form, under its row (TD-1974)
+        const f = $("form.toolsettings", row); if (f) { f.hidden = !f.hidden; if (!f.hidden) { const x = $("select, input", f); if (x) x.focus(); } }
+        return;
+      } else if (what === "forget") {
+        if (!confirm(`Forget ${login}? Its folder stays on disk, and adding that folder again takes back its name.`)) return;
+        path = "/api/tools/login/forget"; body = { login, version: v };
+      } else return;
+      b.disabled = true;
+      try {
+        const got = await post(path, body);
+        if (what === "shell" && got && got.id) location.href = "/focus/" + encodeURIComponent(got.id);
+        else location.reload();
+      } catch (e) { say(e.message); b.disabled = false; }
+    };
+    $$(".toollogin [data-tool-act], .toolacct [data-tool-act]", page).forEach((b) => b.addEventListener("click", () => {
+      const d = b.closest("details.more"); if (d) d.open = false;
+      act(b);
+    }));
+    // a send whose reply opens a tools shell goes to its Focus; any other draws the page afresh
+    const sent = async (path, body, b) => {
+      b.disabled = true;
+      try {
+        const got = await post(path, body);
+        if (got && got.shell && got.shell.id) {
+          if (got.billing_error) alert(got.billing_error);  // the login was added and its shell opened: say, then go
+          location.href = "/focus/" + encodeURIComponent(got.shell.id);
+        }
+        else { if (got && got.shell_error) alert(got.shell_error); location.reload(); }
+      } catch (e) { say(e.message); b.disabled = false; }
+    };
+    // an account's keep-back field (§4.2b *The gauge*, TD-1975): `ao gate`'s forms written to the home's settings.yml
+    // through the Settings card's own write, on Enter or on leaving the field; Remove clears a reserve on a window
+    // the reading no longer reports
+    const keep = async (box, label, value, b) => {
+      if (b) b.disabled = true;
+      try { await post("/api/settings/usage", { account: box.dataset.account, reserves: { [label]: value } }); location.reload(); }
+      catch (e) { say(e.message); if (b) b.disabled = false; }
+    };
+    $$(".toolgauges", page).forEach((box) => {
+      $$("input.toolkeep", box).forEach((x) => {
+        const go = () => { if (x.value.trim() !== (x.dataset.was || "")) { x.dataset.was = x.value.trim(); keep(box, x.name, x.value.trim(), null); } };
+        x.addEventListener("change", go);
+        x.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); go(); } });
+      });
+      $$(".toolkeepgone", box).forEach((b) => b.addEventListener("click", () => keep(box, b.dataset.label, "", b)));
+    });
+    // Settings: the keys changed since the page drew them, one write each (§4.2b *Controls and verbs*)
+    $$("form.toolsettings", page).forEach((f) => {
+      $("[data-cancel]", f).addEventListener("click", () => { f.reset(); f.hidden = true; });
+      f.addEventListener("submit", (ev) => {
+        ev.preventDefault();
+        const row = f.closest("[data-login]"), changes = {};
+        $$("[name]", f).forEach((x) => { if (x.value !== (x.dataset.was || "")) changes[x.name] = x.value; });
+        if (!Object.keys(changes).length) { f.hidden = true; return; }
+        sent("/api/tools/login/settings", { login: row.dataset.login, version: row.dataset.version || null, billing: f.dataset.billing || null, changes }, $('[type="submit"]', f));
+      });
+    });
+    // + Add login, Use an existing folder (its folder field), and Add on a found row (§4.2b *How a login is found and made*)
+    $$(".tooladdlogin", page).forEach((w) => {
+      const f = $("form", w);
+      $(".tooladd", w).addEventListener("click", () => { f.hidden = !f.hidden; if (!f.hidden) $("input", f).focus(); });
+      $("[data-cancel]", f).addEventListener("click", () => { f.reset(); f.hidden = true; });
+      f.addEventListener("submit", (ev) => {
+        ev.preventDefault();
+        const v = (n) => $(`[name="${n}"]`, f).value.trim();
+        sent("/api/tools/add", { tool: f.dataset.tool, name: v("name"), path: v("path"), account: v("account"), billing: v("billing") }, $('[type="submit"]', f));
+      });
+    });
+    // Add on a found row opens its card's form with the folder filled and identity's billing chosen, which the
+    // person can change before Add: offered, never applied (§4.2b *A login's Settings*)
+    $$(".tooladdfound", page).forEach((b) => b.addEventListener("click", () => {
+      const f = $("form.tooladdform", b.closest("section") || page);
+      if (!f) return;
+      f.reset();
+      $('[name="path"]', f).value = b.dataset.path;
+      $('[name="billing"]', f).value = b.dataset.billing || "";
+      f.hidden = false;
+      $('[name="name"]', f).focus();
+    }));
+  };
   // The Queue page (design §4.5 screen 12, §4.5a *Queue page*; TD-771): the cards (`AO.qcards`), the
   // Recently completed window picker — its choice remembered in this browser, *day* first — a completed
   // line that opens to what was done, `/queue#TD-n` opening the card that holds the entry, and the lists
@@ -7354,31 +7614,65 @@
   // order of start, so the first the host resolves is the link. Each is `{run, path, line, col, start,
   // end}`, `start`/`end` the run's columns in the row's text (end exclusive). The shape only asks: the
   // host says which are files.
+  // **A brace set** (§4.6, TD-1959, TD-1989): a run may hold one `{a,b,…}` after its first `/` — two to eight
+  // choices, each a non-empty run of the segment characters without `/`, `,`, `{` or `}` — and is given as its
+  // expansions in the set's order, each its own entry with the run's `start`, `end` and `run` and its own `path`,
+  // marked `expansion` (`choice` its place in the set), the literal run never; the set's `,` is no piece separator,
+  // and a `#`, `,` or `=` outside it makes pieces as above, each expanded. The tail strip spares the set's own `}`.
+  // A second set, a nested one, a set before the first `/` or a stray brace cuts the run at its first brace, the part
+  // before it, its trailing `/` dropped, a candidate where it holds a `/`.
   AO.pathRuns = function (text) {
     const urls = [];
     for (const m of String(text).matchAll(/[A-Za-z][A-Za-z0-9+.-]*:\/\/\S+/g)) urls.push([m.index, m.index + m[0].length]);
     const seg = "[\\p{L}\\p{M}\\p{N}_.@+-]";
-    const wide = new RegExp(`(?:~|\\.{1,2})?\\/?${seg}+(?:\\/[\\p{L}\\p{M}\\p{N}_.@+#,=-]+)+(?::\\d+(?::\\d+)?)?`, "gu");
+    const wide = new RegExp(`(?:~|\\.{1,2})?\\/?${seg}+(?:\\/[\\p{L}\\p{M}\\p{N}_.@+#,={}-]+)+(?::\\d+(?::\\d+)?)?`, "gu");
     const narrow = new RegExp(`(?:~|\\.{1,2})?\\/?${seg}+(?:\\/${seg}+)+(?::\\d+(?::\\d+)?)?`, "gu");
+    const choice = /^[\p{L}\p{M}\p{N}_.@+#=-]+$/u;
+    const strip = (p) => p.replace(/[.,;:)\]}'"]+$/, "");
+    // a path's one valid set (`set`: [open, close, choices]) with what follows it stripped where the run has no
+    // `:line` tail; or the path cut at its first brace (`cut`); or, with no brace, the path stripped as ever
+    const braces = (path, tail) => {
+      const open = path.search(/[{}]/);
+      if (open < 0) return { path: tail ? path : strip(path) };
+      const close = path.indexOf("}", open + 1);
+      const cut = { path: strip(path.slice(0, open).replace(/\/+$/, "")), cut: true };  // as main read `a/b/{c`: `a/b`
+      if (path[open] !== "{" || close < 0 || open < path.indexOf("/")) return cut;
+      const body = path.slice(open + 1, close).split(",");
+      const after = tail ? path.slice(close + 1) : strip(path.slice(close + 1));
+      if (body.length < 2 || body.length > 8 || !body.every((c) => choice.test(c)) || /[{}]/.test(after)) return cut;
+      return { path: path.slice(0, close + 1) + after, set: [open, close, body] };
+    };
+    const expand = (r, set) => set[2].map((c, k) => ({ ...r,
+      path: r.path.slice(0, set[0]) + c + r.path.slice(set[1] + 1), expansion: true, choice: k }));
     const scan = (s, re, base) => {
       const got = [];
       for (const m of s.matchAll(re)) {
         const start = base + m.index;
-        let run = m[0];
-        if (urls.some(([a, b]) => start < b && start + run.length > a)) continue;
-        const lc = run.match(/:(\d+)(?::(\d+))?$/);
-        let path = lc ? run.slice(0, lc.index) : run;
-        if (!lc) { path = path.replace(/[.,;:)\]}'"]+$/, ""); run = path; }
+        if (urls.some(([a, b]) => start < b && start + m[0].length > a)) continue;
+        const lc = m[0].match(/:(\d+)(?::(\d+))?$/);
+        const b = braces(lc ? m[0].slice(0, lc.index) : m[0], !!lc);
+        const path = b.path, tail = lc && !b.cut, run = tail ? m[0] : path;
         if (!path.includes("/") || /^\.*\/*$/.test(path) || path.length > 512) continue;  // the read's bound
-        got.push({ run, path, line: lc ? +lc[1] : null, col: lc && lc[2] ? +lc[2] : null, start, end: start + run.length });
+        got.push({ run, path, line: tail ? +lc[1] : null, col: tail && lc[2] ? +lc[2] : null, start,
+          end: start + run.length, set: b.set || null });
       }
       return got;
     };
     const out = [];
+    const MASK = "\uA66E";  // a letter no path names: the set's columns while its run is cut into pieces
     for (const r of scan(String(text), wide, 0)) {
-      out.push(r);
-      if (!/[#,=]/.test(r.run)) continue;
-      out.push(...scan(r.run, narrow, r.start).filter((p) => p.run !== r.run).map((p) => ({ ...p, piece: true })));
+      const { set, ...whole } = r;
+      out.push(...(set ? expand(whole, set) : [whole]));
+      const at = set ? set[0] : -1, masked = set ? whole.run.slice(0, at) + MASK.repeat(set[1] + 1 - at)
+        + whole.run.slice(set[1] + 1) : whole.run;
+      if (!/[#,=]/.test(masked)) continue;
+      for (const { set: _none, ...p } of scan(masked, narrow, whole.start)) {
+        if (p.run === masked) continue;
+        const from = p.start - whole.start, run = whole.run.slice(from, from + p.run.length);
+        const piece = { ...p, run, path: whole.run.slice(from, from + p.path.length), piece: true };
+        const lo = at - from, hi = set ? set[1] - from : -1;
+        out.push(...(set && lo >= 0 && hi < p.path.length ? expand(piece, [lo, hi, set[2]]) : [piece]));
+      }
     }
     return out;
   };
@@ -7395,10 +7689,37 @@
     const at = vscode ? `:${line || 1}${line && col ? `:${col}` : ""}` : "";
     return file.replace("{path}", path + at).replaceAll("{line}", String(line || 1));
   };
+  // **Which folder goes first** for a resolved path (§4.6 *The press is two launches*, §4.2 *The record's `cwd`*,
+  // TD-1988): the record's `cwd_root` where it holds the path and is the deeper of it and `dir`'s top level
+  // (`git.top`, else `dir`) that does — a worktree nested under the main checkout lies under both, and the inner
+  // wins — the server's `common.under_cwd_root`, compared as strings since the host wrote both as real paths
+  AO.underCwdRoot = function (path, root, top) {
+    const holds = (t) => !!t && (path === t || path.startsWith(String(t).replace(/\/+$/, "") + "/"));
+    if (!root || !path || !holds(root)) return false;
+    return !holds(top) || String(root).length > String(top).length;
+  };
+  // …the editor a press of `resolved` opens by: the view's `editor.cwd_url` in place of the Session card's folder
+  // link where the path lies under `cwd_root` by that rule, and the editor as it is otherwise
+  AO.pressEditor = function (editor, resolved) {
+    if (!editor || !editor.cwd_url || !AO.underCwdRoot(String(resolved || ""), editor.cwd_root, editor.top)) return editor;
+    return { ...editor, url: editor.cwd_url };
+  };
+  // …the Focus page's editor object, which the pane's provider holds, given the record's `cwd`, `cwd_root` and the
+  // top level (`git.top`, else `dir`) beside the view's `cwd_url`, so the provider's cache keys on `cwd` and a
+  // press picks its folder by `AO.pressEditor`; true when `cwd` changed, so the page drops the provider's cache
+  AO.focusCwd = function (ed, v) {
+    if (!ed || !v) return false;
+    const was = ed.cwd || "";
+    Object.assign(ed, {
+      cwd: v.cwd || "", cwd_root: v.cwd_root || "", top: (v.git && v.git.top) || v.dir || "",
+      cwd_url: (v.editor && v.editor.cwd_url) || null,
+    });
+    return was !== ed.cwd;
+  };
   AO.pathLink = function (event, editor, resolved, line, col, open) {
     const file = editor && editor.file;
     if (!(event && (event.ctrlKey || event.metaKey)) || !file || !resolved) return false;
-    AO.openFile(editor, AO.fileUrl(file, resolved, line, col), open);
+    AO.openFile(AO.pressEditor(editor, resolved), AO.fileUrl(file, resolved, line, col), open);
     return true;
   };
   // **A path in a transcript is a link too** (§4.6, §4.5a *Transcript*, TD-691): the pane's shape
@@ -7407,6 +7728,27 @@
   // eight runs at most per ask, so a path met twice is asked once; a failed ask, or a run the answer
   // leaves out, keeps nothing.
   AO.TRANSCRIPT_TEXT = ".ttext, .targ, .tbody";
+  // §4.5a *Focus side panel, Git card: working in* (TD-1959, built by TD-1988): the line under the summary where the
+  // record has `cwd_root` — the path whole on hover and cut from its left by the stylesheet, a link to the view's
+  // `editor.cwd_url` (the editor button's folder form, so it carries the button's label for its toast), text where
+  // the view serves none; hidden without `cwd_root`
+  AO.paintWorkingIn = function (el, v) {
+    const root = (v && v.cwd_root) || "";
+    el.classList.toggle("hidden", !root);
+    const span = el.querySelector(".gitcwdpath");
+    if (!span) return;
+    span.title = root;
+    span.textContent = "";
+    const bdi = document.createElement("bdi");
+    bdi.textContent = root;
+    const url = v.editor && v.editor.cwd_url;
+    if (url) {
+      const a = document.createElement("a");
+      a.className = "link editor"; a.id = "gitcwdlink"; a.href = url; a.dataset.label = v.editor.label || "";
+      a.appendChild(bdi); span.appendChild(a);
+    } else span.appendChild(bdi);
+  };
+
   AO.pathsAsker = function (ask) {
     const known = new Map();
     let chain = Promise.resolve();
@@ -7430,13 +7772,16 @@
   };
   // …a text with each resolved run an `a.editor` the click handler opens on Ctrl or Cmd alone
   // (`data-ctrl`), the session's folder first as the recent files' links, the rest escaped text
+  // (the moved folder's link, `cwd_url`, for a path under the record's `cwd_root`: `AO.pressEditor`, TD-1988)
   AO.pathLinksHtml = function (text, paths, editor) {
     const s = String(text), label = editor.label || "the editor";
-    const folder = editor.url ? ` data-folder="${esc(editor.url)}"${typeof editor.wait === "number" ? ` data-wait="${editor.wait}"` : ""}` : "";
+    const wait = typeof editor.wait === "number" ? ` data-wait="${editor.wait}"` : "";
     let out = "", at = 0;
     for (const r of AO.pathRuns(s)) {
       const to = paths[r.path];
       if (!to || r.start < at) continue;
+      const url = AO.pressEditor(editor, to).url;
+      const folder = url ? ` data-folder="${esc(url)}"${wait}` : "";
       out += esc(s.slice(at, r.start)) + `<a class="editor tpath" data-ctrl href="${esc(AO.fileUrl(editor.file, to, r.line, r.col))}"${folder}`
         + ` data-label="${esc(label)}" title="${esc(`Ctrl+click: ${to} in ${label}`)}">${esc(r.run)}</a>`;
       at = r.end;
@@ -7459,11 +7804,15 @@
   // in a row the server gave a context (`data-paths-ctx`: `id:<record>`, `repo:<root>` or `home`), asked of
   // `POST /api/paths` on the row's first hover by one asker per context, kept for the page's life. A context
   // the route refused, or whose first answer has no file form, goes quiet: every later batch answers `null`
-  // with no fetch. The answer's `file`, `label` and `wait` are kept from the first answer.
+  // with no fetch. The answer's `file`, `label` and `wait` are kept from the first answer. An `id:` row carries the
+  // record's `cwd` as it was rendered (`data-paths-cwd`, TD-1988), and the asker, its `meta` with it, is one per
+  // context and `cwd` pair, so a session that moved has each run asked again; the `ctx` sent is unchanged.
   AO.ITEM_TEXT = ".body, .boardreply";
   const itemAskers = new Map();
-  AO.itemAsker = function (ctx) {
-    if (itemAskers.has(ctx)) return itemAskers.get(ctx);
+  const itemKey = (ctx, cwd) => `${ctx}\n${cwd || ""}`;
+  AO.itemAsker = function (ctx, cwd) {
+    const key = itemKey(ctx, cwd);
+    if (itemAskers.has(key)) return itemAskers.get(key);
     const meta = { file: null, label: "", wait: undefined, answered: false, quiet: false };
     const asker = AO.pathsAsker(async (runs) => {
       if (meta.quiet) return { paths: Object.fromEntries(runs.map((r) => [r, null])) };
@@ -7481,7 +7830,7 @@
       return got;
     });
     const one = { asker, meta };
-    itemAskers.set(ctx, one);
+    itemAskers.set(key, one);
     return one;
   };
   // …each answered run in an element's text nodes an `a.editor` the click handler opens on Ctrl or Cmd,
@@ -7524,12 +7873,12 @@
   // …the texts under `box` (a row, or a fold's body inside one), their runs asked — or, `cacheOnly`, read
   // from what the row's context already knows — and linked
   AO.linkItem = function (row, box, cacheOnly) {
-    const ctx = row && row.dataset && row.dataset.pathsCtx;
-    if (!ctx || (cacheOnly && !itemAskers.has(ctx))) return null;
+    const ctx = row && row.dataset && row.dataset.pathsCtx, cwd = (row && row.dataset && row.dataset.pathsCwd) || "";
+    if (!ctx || (cacheOnly && !itemAskers.has(itemKey(ctx, cwd)))) return null;
     const els = [...(box || row).querySelectorAll(AO.ITEM_TEXT)];
     const paths = [...new Set(els.flatMap((el) => AO.pathRuns(el.textContent).map((r) => r.path)))];
     if (!paths.length) return null;
-    const { asker, meta } = AO.itemAsker(ctx);
+    const { asker, meta } = AO.itemAsker(ctx, cwd);
     const link = (got) => els.forEach((el) => AO.linkItemText(el, got, meta));
     if (cacheOnly) { link(asker.cached(paths)); return null; }
     return asker.resolve(paths).then(link);
@@ -7788,9 +8137,9 @@
         const joined = AO.pathRuns(text).filter((r) => at[r.start].y <= y && y <= at[r.end - 1].y);
         const alone = AO.pathRuns(own).map((r) => ({ ...r, start: r.start + off, end: r.end + off }))
           .filter((r) => !joined.some((j) => j.start === r.start && j.end === r.end));
-        // eight runs, each with its pieces (TD-1262), asked eight paths at a time
+        // eight runs, each with its pieces (TD-1262) and a brace set's expansions (TD-1989), asked eight paths at a time
         let whole = 0;
-        const runs = [...joined, ...alone].filter((r) => (r.piece ? whole <= 8 : ++whole <= 8));
+        const runs = [...joined, ...alone].filter((r) => (r.piece || r.choice > 0 ? whole <= 8 : ++whole <= 8));
         if (!runs.length) { callback(undefined); return; }
         // a joined run the host resolved wins over a run of the row alone it covers
         const links = (paths) => runs.filter((r) => paths[r.path]).filter((r, i, ok) =>
@@ -7805,7 +8154,7 @@
             leave: () => rec.clear({ uri: r.run }),
           } : {}),
         }));
-        const key = `${off}|${text}`;
+        const key = `${editor.cwd || ""}|${off}|${text}`;  // keyed by the record's `cwd` as well (TD-1988)
         if (known.has(key)) { const l = links(known.get(key)); callback(l.length ? l : undefined); return; }
         const asked = era;
         const want = [...new Set(runs.map((r) => r.path))], batches = [];
@@ -7892,7 +8241,7 @@
           if (pending) pending.timer = t.set(() => settle(false), AO.JUMP_WAIT);
         });
       },
-      frame(c) { settle(!!(c && c.jumped)); },
+      frame(c) { const was = !!pending; settle(!!(c && c.jumped)); return was; },
       closed() { settle(false); },
       busy() { return !!pending; },
     };
@@ -7951,8 +8300,10 @@
       root.style.setProperty("--vvt", `${Math.max(0, Math.round(vv.offsetTop))}px`);
     };
     if (vv) { vv.addEventListener("resize", viewport); vv.addEventListener("scroll", viewport); }
+    // a Fit to window press holds the layout from the press until its hold ends, as a focused field does (TD-1948)
+    let holding = false;
     const relay = () => {
-      const n = AO.narrowNext(narrow, !!(mq && mq.matches), !!popped || body.classList.contains("popped"), editing());
+      const n = AO.narrowNext(narrow, !!(mq && mq.matches), !!popped || body.classList.contains("popped"), editing() || holding);
       if (n === narrow) return;
       narrow = n; root.classList.toggle("phonefocus", n);
       if (!n) close();  // not quiet: the composer's sheet folds the composer back (its `closed` hook) on a crossing
@@ -7960,8 +8311,14 @@
       hooks.relaid.forEach((f) => f(n));
     };
     if (mq && mq.addEventListener) mq.addEventListener("change", relay);
-    // read again on blur: a frame later, once the focus has landed wherever it goes
-    document.addEventListener("focusout", () => setTimeout(relay, 0));
+    // read again after a blur at the next `visualViewport` `resize` or one second on, whichever is first, so a control
+    // that takes focus as it is pressed (more ▾'s toggle) reads the query once the keyboard has fallen (TD-1948)
+    document.addEventListener("focusout", () => {
+      let t = null, done = false;
+      const go = () => { if (done) return; done = true; clearTimeout(t); if (vv) vv.removeEventListener("resize", go); relay(); };
+      t = setTimeout(go, 1000);
+      if (vv) vv.addEventListener("resize", go);
+    });
     relay(); viewport();
     // the sheets: one open at a time over a dimmed Focus; closing one gives the terminal its refit
     const scrim = $("#fscrim");
@@ -8031,6 +8388,7 @@
         b.disabled = !!(src && src.disabled);
         const al = $(".al", b);
         if (al && src && /^fmode/.test(src.id)) al.textContent = src.textContent.trim();
+        if (al && src && src.id === "tfit") al.textContent = src.textContent.replace(/^⤢\s*/, "").trim();  // or Cancel fit
       });
       const text = (sel) => { const e = $(sel); return e ? e.textContent.trim() : ""; };
       const checks = $$("#checks > div");
@@ -8096,6 +8454,9 @@
     return {
       narrow: () => narrow,
       opened: () => !!open,
+      editing,
+      // a Fit to window press's hold: the layout held while it runs, the query read again once it ends
+      hold(on) { holding = !!on; if (!on) relay(); },
       show, close,
       relaid: (f) => hooks.relaid.push(f),
       closed: (f) => hooks.closed.push(f),
@@ -8165,21 +8526,119 @@
     // the held press's recorder (TD-1299): each of the terminal's link readers is given its `hover` / `leave`
     const rec = AO.linkPress();
     const term = new Terminal({ ...AO.TERM_OPTS, theme: { ...AO.TERM_THEME }, scrollback: 0, allowProposedApi: true, linkHandler: AO.paneLinkHandler($("#term"), rec) });
-    const fit = new FitAddon.FitAddon(); term.loadAddon(fit);
     AO.termUnicode(term);
     const links = new WebLinksAddon.WebLinksAddon((e, uri) => AO.paneLink(e, uri), AO.webLinkOptions(rec));  // on a read-only Focus too
     term.loadAddon({ activate: (t) => links.activate(AO.cutRows(t)), dispose: () => links.dispose() });
-    // **a path is a link** (TD-501): only where the Session card draws its editor button
+    // **a path is a link** (TD-501): only where the Session card draws its editor button; the editor object
+    // carries the record's folder fields (`AO.focusCwd`, TD-1988), read again with each view
+    AO.focusCwd(s.editor, s);
     const pathLinks = s.editor && s.editor.file ? AO.pathProvider(term, id, s.editor, undefined, rec) : null;
     if (pathLinks) term.registerLinkProvider(pathLinks);
-    term.open($("#term")); fit.fit();
+    // **The terminal draws at the pane's grid, not at its box's** (§4.6, TD-1919): it opens here, is sized by the
+    // bridge's `grid` frame (`term.resize`), never by its box, and sits in the box (`.termbox`, the scroll container)
+    // at the grid's own pixel size; the page sends no grid. Vertically the box shows a run of the grid's rows
+    // (`AO.viewStart`, `AO.viewKeep`), sideways it scrolls from the left.
+    const boxEl = $("#term");
+    term.open(boxEl);
     AO.termRenderer(term);
-    AO.termFont(term, fit);
-    AO.terms.push({ term, fit });
+    // the helper text box takes the focus without the browser moving the box itself
+    if (term.textarea) {
+      const ta = term.textarea, focus0 = ta.focus;
+      ta.focus = function (o) { return focus0.call(ta, { ...(o || {}), preventScroll: true }); };
+    }
+    // the renderer's CSS cell; null before it has measured
+    const cell = () => {
+      const d = term._core && term._core._renderService && term._core._renderService.dimensions;
+      return d && d.css && d.css.cell && d.css.cell.height > 0 ? d.css.cell : null;
+    };
+    const cellH = () => (cell() || {}).height || 16, cellW = () => (cell() || {}).width || 8;
+    const px = (cs, k) => parseFloat(cs[k]) || 0;
+    // the rows the box shows (its `clientHeight` less its padding, over the cell), never more than the grid's
+    const shownRows = () => {
+      const cs = getComputedStyle(boxEl), xt = $(".xterm", boxEl), xs = xt ? getComputedStyle(xt) : null;
+      const gap = xs ? px(xs, "borderTopWidth") + px(xs, "borderBottomWidth") : 0;
+      return Math.min(term.rows, AO.boxRows(boxEl.clientHeight, px(cs, "paddingTop") + px(cs, "paddingBottom") + gap, cellH()));
+    };
+    // **One helper measures** (§4.6 *Fit to window*): the box's rendered size less its padding and borders, and the
+    // terminal's own border (the gap), over the cell — whether or not the sideways scrollbar shows
+    const boxEdges = () => {
+      const cs = getComputedStyle(boxEl), xt = $(".xterm", boxEl), xs = xt ? getComputedStyle(xt) : null;
+      const x = px(cs, "paddingLeft") + px(cs, "paddingRight") + px(cs, "borderLeftWidth") + px(cs, "borderRightWidth")
+        + (xs ? px(xs, "borderLeftWidth") + px(xs, "borderRightWidth") : 0);
+      const y = px(cs, "paddingTop") + px(cs, "paddingBottom") + px(cs, "borderTopWidth") + px(cs, "borderBottomWidth")
+        + (xs ? px(xs, "borderTopWidth") + px(xs, "borderBottomWidth") : 0);
+      return { x, y };
+    };
+    // **The phone's kept pixels** (§4.6 *Fit to window*, TD-1948): the box with the keyboard and every sheet down,
+    // kept on load and on any box change so, on the phone layout and never a box with no size, with the screen's
+    // orientation they were kept in — dropped on a turn (pixels of another orientation than the screen's are stale)
+    // or a crossing of the narrow query. On a phone the helper divides them by the current cell, so a pinch or a
+    // font changes the grid with no new measurement; until some are kept it reads the live box.
+    const orient = () => (window.screen && screen.orientation && screen.orientation.type)
+      || (typeof window.orientation === "number" ? `deg${window.orientation}` : "");
+    let kept = null, fitHold = null;  // the hold of a Fit to window press (below)
+    const pxNow = () => { const r = boxEl.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? { width: r.width, height: r.height, type: orient() } : null; };
+    const keptNow = () => { if (kept && kept.type !== orient()) kept = null; return kept; };
+    const keepBox = () => {
+      if (!phone.narrow() || phone.editing() || phone.opened() || fitHold) return;
+      const p = pxNow(); if (p) kept = p;
+    };
+    const gridOfPx = (p) => (p ? AO.gridOf(p, boxEdges(), cell()) : null);
+    AO.boxGrid = () => gridOfPx((phone.narrow() && keptNow()) || boxEl.getBoundingClientRect());
+    const lastTextRow = () => {
+      const b = term.buffer.active;
+      for (let i = term.rows - 1; i > 0; i--) {
+        const line = b.getLine(b.viewportY + i);
+        if (line && line.translateToString(true) !== "") return i;
+      }
+      return 0;
+    };
+    const viewAt = () => {
+      const shown = shownRows(), cur = term.buffer.active.cursorY;
+      return { shown, cur, auto: AO.viewStart(cur, lastTextRow(), shown, term.rows), maxStart: Math.max(0, term.rows - shown) };
+    };
+    // the view, set once an animation frame: on every cursor move, box change, face or size change and `grid` frame
+    const keeper = AO.viewKeep();
+    let viewFrame = 0, bytesSince = false, shownTop = -1;
+    const showView = () => {
+      viewFrame = 0;
+      const v = viewAt();
+      const top = keeper.frame(v.cur, bytesSince, v.auto, v.maxStart);
+      bytesSince = false;
+      if (top !== shownTop) {
+        const xt = $(".xterm", boxEl);
+        shownTop = top; boxEl.scrollTop = AO.viewScroll(top, cellH(), xt ? px(getComputedStyle(xt), "borderTopWidth") : 0);
+      }
+      // the cursor's column kept in view while the terminal has the focus, as keys are typed
+      if (document.activeElement === term.textarea) {
+        const x = term.buffer.active.cursorX * cellW(), w = boxEl.clientWidth;
+        if (x < boxEl.scrollLeft) boxEl.scrollLeft = x;
+        else if (x + cellW() > boxEl.scrollLeft + w) boxEl.scrollLeft = x + cellW() - w;
+      }
+      if (keeper.unsettled(v.cur)) schedule();
+    };
+    const schedule = () => { if (!viewFrame) viewFrame = requestAnimationFrame(showView); };
+    // the terminal at the grid's pixel size (the renderer's canvas), a cell's room and its top gap under it so the
+    // last run shows whole, and the view again
+    const relayout = () => {
+      const d = term._core && term._core._renderService && term._core._renderService.dimensions;
+      const xt = $(".xterm", boxEl);
+      if (xt && d && d.css && d.css.canvas && d.css.canvas.width > 0) {
+        xt.style.width = `${d.css.canvas.width}px`;
+        xt.style.height = `${d.css.canvas.height}px`;
+        // a cell and the top gap: the scroll past the terminal's top border (`AO.viewScroll`) is never clamped short
+        xt.style.marginBottom = `${cellH() + px(getComputedStyle(xt), "borderTopWidth")}px`;
+      }
+      shownTop = -1; schedule();
+    };
+    relayout();
+    AO.termFont(term);
+    AO.terms.push({ term, relayout });
+    term.onCursorMove(schedule);
+    term.onWriteParsed(schedule);
     let ws, delay = 500, paneGone = false, retry = null;
-    const sendGrid = AO.resizeSender((grid) => !!(ws && ws.readyState === 1) && (ws.send(JSON.stringify({ resize: grid })), true));
     // The terminal mark's state (`AO.termMark`, above), redrawn each second and on each change
-    const mk = { retryAt: null, clients: 0, window: null, grid: null, open: false, state: s.state, lastByte: null };
+    const mk = { retryAt: null, open: false, state: s.state, lastByte: null };
     const markEl = $("#ftermmark");
     // the soft-key row (§4.5a, TD-990): dimmed while the attach cannot take its keys — cosmetic, since a
     // press reads the same two things itself
@@ -8280,7 +8739,6 @@
     const drawMark = () => {
       if (softEl) softEl.classList.toggle("dim", !(ws && ws.readyState === 1) || readOnly);
       if (!markEl) return;
-      mk.grid = [term.cols, term.rows];
       const m = AO.termMark(mk, Date.now());
       markEl.classList.toggle("hidden", !m);
       if (m && (markEl.textContent !== m.text || markEl.title !== m.title)) { markEl.textContent = m.text; markEl.title = m.title; }
@@ -8301,6 +8759,7 @@
     function endTerm(text) {
       paneGone = true;
       jumper.closed();
+      if (fitWait) fitEnd();
       if (ws) { try { ws.onclose = null; ws.close(); } catch (e) { /* already closing */ } }
       mk.retryAt = null; mk.open = false; drawMark();
       if (softEl) softEl.classList.add("hidden");  // no terminal, no keys
@@ -8310,14 +8769,11 @@
       if (paneGone) return;
       readOnly = false;  // until this attach says otherwise, in its first frame
       if (roLine) roLine.classList.add("hidden");
-      const cols = Number.isFinite(term.cols) && term.cols > 0 ? term.cols : 120, rows = Number.isFinite(term.rows) && term.rows > 0 ? term.rows : 32;
-      ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/term/${encodeURIComponent(id)}?cols=${cols}&rows=${rows}`);
+      // no grid on the address: the bridge opens at the window's and says so in its `grid` frame (§4.6, TD-1919)
+      ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/term/${encodeURIComponent(id)}`);
       ws.binaryType = "arraybuffer";
-      // the grid as it is now, not as it was at the dial: a refit while connecting sends nothing (TD-288)
+      const sock = ws;  // this attach's own socket: a frame is credited to the socket it came on
       ws.onopen = () => {
-        const grid = [term.cols > 0 ? term.cols : cols, term.rows > 0 ? term.rows : rows];
-        ws.send(JSON.stringify({ resize: grid }));
-        sendGrid.mark(...grid);
         mk.open = true; mk.lastByte = Date.now(); tlog("open"); drawMark();
         AO.dropRead(id, s.team || "");  // the disconnect card's reading, at load and at each reconnect
         if (pathLinks) pathLinks.clear();  // a re-attach asks the host again (TD-501)
@@ -8335,18 +8791,32 @@
             drawMark();
             return;
           }
-          // the bridge's reading of tmux's clients and window (§4.6), sent when it changes
-          // a jump's answer (§4.6): the pending press's, never pane output
-          if (c && "jumped" in c) { jumper.frame(c); return; }
-          if (c && "clients" in c) {
-            mk.clients = Number(c.clients) || 0; mk.window = Array.isArray(c.window) ? c.window : null;
-            tlog("clients", mk.clients, "window", mk.window, "grid", [term.cols, term.rows]); drawMark();
+          // a jump's answer (§4.6): the pending press's, never pane output; a landing shows its row at the top of
+          // the rows shown and keeps them, a miss ends any keep, and a frame with no press pending does neither
+          if (c && "jumped" in c) {
+            if (!jumper.frame(c)) return;
+            if (c.jumped && Number.isInteger(c.row) && Number.isInteger(c.cursor)) {
+              keeper.land(c.row, c.cursor, viewAt().maxStart); shownTop = -1;
+            } else keeper.release();
+            schedule();
+            return;
+          }
+          // the pane's grid (§4.6, TD-1919): before the first pane byte and whenever the bridge's reading of the
+          // window changes; the terminal is resized only by a grid that differs from its own
+          if (c && Array.isArray(c.grid)) {
+            const [gc, gr] = c.grid.map(Number);
+            if (Number.isInteger(gc) && Number.isInteger(gr) && gc > 0 && gr > 0) {
+              tlog("grid", [gc, gr]);
+              if (gc !== term.cols || gr !== term.rows) term.resize(gc, gr);
+              keeper.release(); relayout(); drawFit();
+              fitAnswered([gc, gr], sock);
+            }
             return;
           }
         }
         const t = Date.now();
         if (mk.lastByte != null && t - mk.lastByte >= AO.TERM_SILENT) tlog(`output after ${Math.floor((t - mk.lastByte) / 1000)}s`);
-        mk.lastByte = t;
+        mk.lastByte = t; bytesSince = true;
         if (mk.retryAt != null) { mk.retryAt = null; drawMark(); }
         delay = 500; term.write(typeof m.data === "string" ? m.data : new Uint8Array(m.data));
       };
@@ -8354,6 +8824,7 @@
       ws.addEventListener("open", () => { opened = true; });
       ws.onclose = (e) => {
         jumper.closed();
+        if (fitWait) fitEnd();  // a closed socket cancels a waiting fit (§4.6)
         if (paneGone) return;  // the push already ended it
         // …and a pane the page's latest view knows is gone writes no retry line (TD-964, TD-1405): the banner says it
         if (AO.paneIsGone(lastV)) { endTerm(""); return; }
@@ -8380,6 +8851,7 @@
     function reattach() {
       if (paneGone) return;
       jumper.closed();
+      if (fitWait) fitEnd();  // its socket closes: a closed socket cancels a waiting fit (§4.6)
       if (ws) { try { ws.onclose = null; ws.close(); } catch (e) { /* already closing */ } }
       delay = 500; openTerm();
     }
@@ -8419,7 +8891,7 @@
     // its path is pasted here — a bracketed paste, so it lands in the tool's input unsent (TD-479)
     let attachFiles = null;
     const live = () => ws && ws.readyState === 1;
-    const pasteText = (t) => { if (live()) term.paste(t); };
+    const pasteText = (t) => { if (live()) { keeper.release(); schedule(); term.paste(t); } };
     const pasteFile = (f) => attachFiles && attachFiles([f], (path) => { if (live()) term.paste(path); });
     // the menu's Paste and right-click have no paste event: they read the clipboard by script
     const pasteClip = () => {
@@ -8436,7 +8908,9 @@
       // reads ^V as "paste an image from the clipboard", which over ssh only produces a "try scp"
       // message (first-use finding). The paste itself is the browser's event (`AO.wireTermPaste`).
       if (AO.pasteKey(e)) return false;
-      if (e.shiftKey && (e.key === "PageUp" || e.key === "PageDown")) { ws && ws.readyState === 1 && ws.send(JSON.stringify({ scroll: e.key === "PageUp" ? "up" : "down" })); return false; }
+      if (e.shiftKey && (e.key === "PageUp" || e.key === "PageDown")) { pageMove(e.key === "PageUp" ? -1 : 1); return false; }
+      // a typed key passed on to the pane ends the view's keep (§4.6); a modifier alone types nothing
+      if (!["Shift", "Control", "Alt", "Meta"].includes(e.key)) { keeper.release(); schedule(); }
       return true;
     });
     // A long press fires `contextmenu` too, and it is no right-click (§4.6 *A touch does not select*,
@@ -8452,7 +8926,18 @@
     // notches of one animation frame in one message. A read-only attach passes it, as every scroll.
     let wheelAcc = 0, wheelFrame = 0;
     let touch = null;  // the finger on the terminal, below
-    const cellH = () => (term.rows ? $("#term").clientHeight / term.rows : 16) || 16;
+    // The view moves within the grid first (§4.6, TD-1919): `n` rows, negative upward; only the rest goes to tmux as
+    // `scroll`, so the lines scrolled pass through the rows shown
+    const sendScroll = (r) => { if (r && ws && ws.readyState === 1) ws.send(JSON.stringify({ scroll: r.dir, lines: r.lines })); };
+    const rowsMove = (n) => { sendScroll(keeper.move(n, viewAt().auto)); schedule(); };
+    // a page: the box's rows less one while the box is shorter than the grid, else tmux's own page of the pane's height
+    const pageMove = (sign) => {
+      const v = viewAt(), page = AO.pageRows(v.shown, term.rows);
+      if (page !== null) { rowsMove(sign * page); return; }
+      if (sign < 0 && !keeper.keeping()) keeper.move(-1, v.auto);  // a sent scroll starts the keep, as the wheel's
+      if (ws && ws.readyState === 1) ws.send(JSON.stringify({ scroll: sign < 0 ? "up" : "down" }));
+      schedule();
+    };
     // a touch's travel not yet taken goes into the accumulator first: one step per frame, and one at its end
     const touchTake = () => {
       if (!touch || !touch.scrolling) return;
@@ -8467,12 +8952,19 @@
         touchTake();
         const { msg, rest } = AO.wheelStep(wheelAcc);
         wheelAcc = rest;
-        if (msg && ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
+        if (msg) rowsMove(msg.scroll === "up" ? -msg.lines : msg.lines);
       });
     };
     $("#term").addEventListener("wheel", (e) => {
       e.preventDefault(); e.stopPropagation();
-      wheelAcc += e.deltaMode === 1 ? e.deltaY : e.deltaMode === 2 ? e.deltaY * (term.rows || 24) : e.deltaY / cellH();
+      // sideways (Shift, or more sideways than vertical travel) moves the box and sends no `scroll` (§4.6, TD-1919)
+      if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+        boxEl.scrollLeft += d * (e.deltaMode === 1 ? cellW() : e.deltaMode === 2 ? boxEl.clientWidth : 1);
+        return;
+      }
+      const v = viewAt(), page = AO.pageRows(v.shown, term.rows) || v.shown;
+      wheelAcc += e.deltaMode === 1 ? e.deltaY : e.deltaMode === 2 ? e.deltaY * page : e.deltaY / cellH();
       scrollFrame();
     }, { capture: true, passive: false });
     // A finger's drag scrolls it too (§4.6, TD-989): a touch screen sends no `wheel`, so a one-finger touch's
@@ -8502,7 +8994,7 @@
         return;
       }
       const t = e.targetTouches[0];
-      touch = { id: t.identifier, y0: t.clientY, total: 0, sent: 0, scrolling: false, dead: false };
+      touch = { id: t.identifier, x0: t.clientX, y0: t.clientY, left0: boxEl.scrollLeft, axis: null, total: 0, sent: 0, scrolling: false, dead: false };
     }, { capture: true, passive: false });
     termEl.addEventListener("touchmove", (e) => {
       press.move(e);
@@ -8510,8 +9002,15 @@
       if (touch.dead) { if (touch.scrolled) e.preventDefault(); return; }
       const t = Array.from(e.targetTouches).find((x) => x.identifier === touch.id);
       if (!t) return;
+      // locked to the axis it first travels 10 px on (§4.6, TD-1919): sideways moves the box, as a wheel's sideways
+      if (!touch.axis) touch.axis = AO.touchAxis(t.clientX - touch.x0, t.clientY - touch.y0);
+      if (touch.axis === "x") {
+        e.preventDefault(); e.stopPropagation();
+        boxEl.scrollLeft = touch.left0 - (t.clientX - touch.x0);
+        return;
+      }
       touch.total = t.clientY - touch.y0;
-      if (!touch.scrolling && Math.abs(touch.total) >= AO.TOUCH_SLOP) touch.scrolling = true;
+      if (!touch.scrolling && touch.axis === "y") touch.scrolling = true;
       if (!touch.scrolling) return;
       e.preventDefault(); e.stopPropagation();
       scrollFrame();
@@ -8519,7 +9018,7 @@
     const touchEnd = (e) => {
       if (e.type === "touchcancel") press.cancel(); else if (e.targetTouches.length === 0) press.end(e);
       if (!touch) return;
-      if ((touch.scrolling || touch.scrolled) && e.cancelable) e.preventDefault();
+      if ((touch.scrolling || touch.scrolled || touch.axis === "x") && e.cancelable) e.preventDefault();
       if (!touch.dead && touch.scrolling) { touchTake(); scrollFrame(); }
       if (e.targetTouches.length === 0) touch = null;
       else if (!touch.dead) touch = { dead: true, scrolled: touch.scrolling };
@@ -8527,8 +9026,8 @@
     termEl.addEventListener("touchend", touchEnd, { capture: true, passive: false });
     termEl.addEventListener("touchcancel", touchEnd, { capture: true, passive: false });
     // **A pinch** (§4.5a *a pinch*, TD-1301): on a phone two fingers on the terminal set its font size, drawn as they
-    // move and kept when they lift, when the grid is sent once (the fit, through `sendGrid`) with a passing note of the
-    // size and the columns it gives. Its own listeners beside TD-986's: a second finger already ends a scroll there.
+    // move and kept when they lift, with a passing note of the size and the pane's columns (the grid is the pane's,
+    // TD-1919; TD-1948 rewrites the note). Its own listeners beside TD-986's: a second finger already ends a scroll there.
     // The two-finger `touchmove`'s default is prevented here, which is what stops iOS Safari zooming the page.
     let pinch = null;
     const span = (e) => { const [a, b] = e.targetTouches; return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1; };
@@ -8549,8 +9048,8 @@
       const { size } = pinch;
       pinch = null;
       AO.pinchKeep(size);
-      try { fit.fit(); } catch (_) { /* laid out on its next resize */ }
-      pinchNote(`${size} px · ${term.cols} columns`);
+      relayout();  // the grid stays the pane's: the size changes how many of its columns the box shows
+      pinchNote(AO.pinchSays(size, AO.boxGrid(), term.cols));
     };
     termEl.addEventListener("touchend", pinchEnd, { capture: true, passive: false });
     termEl.addEventListener("touchcancel", pinchEnd, { capture: true, passive: false });
@@ -8642,7 +9141,8 @@
     }, { capture: true });
     document.addEventListener("mousemove", (e) => {
       if (!mark || !mark.drag) return;
-      const scr = document.querySelector("#term .xterm-screen");
+      // the rows shown: the box's edge where it is shorter than the grid, else the screen's (§4.6, TD-1919)
+      const scr = shownRows() < term.rows ? boxEl : document.querySelector("#term .xterm-screen");
       if (scr) mark = AO.edgeMark(mark, { type: "move", edge: AO.pastEdge(e.clientY, scr.getBoundingClientRect(), cellH()) }).mark;
     });
     document.addEventListener("mouseup", () => {  // the page's: a drag may end outside the pane
@@ -8665,14 +9165,10 @@
       cos.addEventListener("change", () => AO.setCopyOnSelect(cos));
     }
     $("#tpaste").addEventListener("click", pasteClip);
-    // tmux is told the grid whatever changed it: the pane's box (the observer) or the person's
-    // face and size from Settings (`AO.setTermLook`, which refits) — TD-288: the second resized the
-    // grid here and left the pane drawing at the old width; one send per gesture (`AO.resizeSender`, TD-794)
-    term.onResize(({ cols, rows }) => sendGrid(cols, rows));
-    // every sheet lies over the terminal and changes nothing: while one is open no grid is sent, and the terminal
-    // refits once it closes (§4.5 *What the terminal's grid does*); a crossing of the narrow query refits it once
-    new ResizeObserver(() => { if (!phone.opened() && !pinch) fit.fit(); }).observe($("#term"));
-    phone.closed(() => fit.fit());
+    // No box change sizes the grid (§4.6, TD-1919): the put away, the phone's keyboard, a turn, a pinch and the sheets
+    // send nothing. A box change sets the vertical view again and ends any keep.
+    // It keeps the phone's pixels (`keepBox`) and a waiting coarse-pointer fit's (`fitRekeep`, TD-1948).
+    new ResizeObserver(() => { keeper.release(); schedule(); keepBox(); fitRekeep(); drawFit(); }).observe(boxEl);
     toTerm();
     // *The keyboard is up for the terminal* is the terminal's focus, never a guess from the viewport: the input bar
     // goes while it has it (TD-1299)
@@ -8717,6 +9213,148 @@
       ask.classList.toggle("off", off);
     };
     let lastV = s;
+    // **Fit to window** (§4.6 *Fit to window*, §4.5a, TD-1919, TD-1948): the box's grid (`AO.boxGrid()`) sent as
+    // `{fit}` once the pane is quiet (`AO.fitStep`, read each quarter second while it waits, and on a `grid` frame);
+    // a record with no agent fits at once. While it waits the item reads **Cancel fit** and the terminal mark
+    // *fitting when idle…*; a press on Cancel fit, a closed socket, a reload, a turn of the phone or a crossing of
+    // the narrow query ends it. On the wide layout's own Focus (not a phone, not a Pop out) the grid is also written
+    // as `person.terminal.grid`, once the first `grid` frame on that socket equal to it answers within ten seconds.
+    // Not drawn on an ended record, nor on the wide layout (unless it waits) when the box's grid is the pane's,
+    // tested as *more ▾* opens and on a `grid` frame while it is open; a phone draws it in the sheet on every live
+    // record with a terminal. Drawn on a read-only Focus, since it types nothing. On a phone, or a wide page on a
+    // coarse pointer, a press first blurs and holds (`AO.holdStep`): the phone's fit divides the pixels it kept, the
+    // coarse-pointer wide page's those its own hold kept, kept again on every box change while it waits.
+    const fitEl = $("#tfit");
+    const fitLabel = fitEl ? fitEl.textContent : "";
+    let fitWait = null, fitTick = null, fitAnswer = null;
+    const fitOwn = () => !phone.narrow() && !popped && !document.body.classList.contains("popped");
+    const coarse = () => !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+    const vvp = window.visualViewport;
+    const vScale = () => (vvp ? vvp.scale : 1);
+    function drawFit() {
+      if (!fitEl) return;
+      const g = AO.boxGrid(), v = lastV || s, pane = [term.cols, term.rows];
+      fitEl.textContent = fitWait ? "Cancel fit" : fitLabel;
+      fitEl.title = AO.fitTitle(pane, g);
+      fitEl.classList.toggle("hidden", !fitWait && (paneGone || ["exited", "closed"].includes(v.state)
+        || (!phone.narrow() && (!g || AO.sameGrid(g, pane)))));
+    }
+    function fitEnd(note) {
+      fitWait = null; clearInterval(fitTick); fitTick = null;
+      mk.fitting = false; drawMark(); drawFit();
+      if (note) AO.toast(note);
+    }
+    // the grid a waiting fit sends: the coarse-pointer wide page's own pixels, else the helper's
+    const fitBox = () => (fitWait && fitWait.px ? gridOfPx(fitWait.px) : AO.boxGrid());
+    function fitRun() {
+      if (!fitWait) return;
+      const step = AO.fitStep(fitWait, {
+        v: lastV || s, lastByte: mk.lastByte, now: Date.now(), hidden: document.hidden,
+        box: fitBox(), pane: [term.cols, term.rows],
+      });
+      if (step.do === "wait") return;
+      if (step.do === "end") { fitEnd(step.note); return; }
+      if (!(ws && ws.readyState === 1)) { fitEnd(); return; }  // the socket closed under it: a closed socket cancels
+      tlog("fit", step.grid);
+      ws.send(JSON.stringify({ fit: step.grid }));
+      // the setting is the wide layout's own: written only once the bridge's answer on this socket says so
+      if (fitOwn()) {
+        clearTimeout(fitAnswer && fitAnswer.timer);
+        const at = ws;
+        fitAnswer = { grid: step.grid, ws: at, timer: setTimeout(() => { if (fitAnswer && fitAnswer.ws === at) { fitAnswer = null; AO.toast("not fitted"); } }, AO.FIT_ANSWER) };
+      }
+      fitEnd();
+    }
+    // the bridge's `grid` frame: the first on the fit's socket equal to the grid sent writes it as the setting
+    function fitAnswered(grid, sock) {
+      if (fitWait) fitRun();  // a box that became the pane's ends the wait quietly
+      if (!fitAnswer || fitAnswer.ws !== sock || !AO.sameGrid(grid, fitAnswer.grid)) return;
+      clearTimeout(fitAnswer.timer); fitAnswer = null;
+      fetch("/api/settings/person", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ terminal: { grid } }),
+      }).then(async (r) => {
+        if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
+      }).catch((e) => AO.toast(`fitted, but not kept for later sessions: ${e.message}`));
+    }
+    // the press measured: the equal test and the bounds, then the quiet wait (`px` the coarse-pointer wide page's)
+    // a coarse-pointer wide page's waiting fit keeps its pixels again on every box change with nothing editable
+    // focused and no sheet open: its send divides them by the current cell however the keyboard stands by then
+    function fitRekeep() {
+      if (!fitWait || !fitWait.px || phone.editing() || phone.opened()) return;
+      const p = pxNow(); if (p) fitWait.px = p;
+    }
+    function fitPress(g, px) {
+      if (!g) return;  // no size, or a proposal that is not finite: nothing sent
+      if (AO.sameGrid(g, [term.cols, term.rows])) { AO.toast("already this size", true); return; }
+      const refused = AO.fitRefused(g);
+      if (refused) { AO.toast(refused); return; }
+      fitWait = { since: Date.now(), px: px || null };
+      mk.fitting = true; drawMark(); drawFit();
+      fitTick = setInterval(fitRun, 250);
+      fitRun();
+    }
+    // **the hold** (§4.6 *Fit to window*): from the press until the box's pixels are kept the layout holds; a turn
+    // ends it with its note, a hidden page with none, and a press during it is ignored
+    function holdEnd(note, keepLayout) {
+      if (!fitHold) return;
+      cancelAnimationFrame(fitHold.raf); fitHold = null;
+      if (!keepLayout) phone.hold(false);
+      if (note) AO.toast(note);
+    }
+    function holdTick(ev) {
+      if (!fitHold) return;
+      if (document.hidden) { holdEnd(); return; }  // nothing kept, no note
+      const r = boxEl.getBoundingClientRect();
+      const got = AO.holdStep(fitHold.h, { ev, now: Date.now(), height: r.height, editing: phone.editing(), scale: vScale() });
+      if (got.do === "wait") return;
+      const wide = fitHold.wide;
+      holdEnd(null, true);  // the layout held until the fit is under way, so its own crossing cancels it
+      try { fitKept(got, wide); } finally { phone.hold(false); }
+    }
+    function fitKept(got, wide) {
+      let p = got.do === "keep" ? pxNow() : null;
+      // the phone's hold keeps the phone's pixels, its fallback the pixels kept before; a coarse-pointer wide page's
+      // are this fit's alone, and it keeps none before its hold
+      if (!wide) { if (p) kept = p; p = keptNow(); }
+      if (!p) { pinchNote(AO.FIT_NO_BOX); return; }
+      fitPress(gridOfPx(p), wide ? p : null);
+    }
+    function holdBegin() {
+      const focused = phone.editing(), a = document.activeElement;
+      if (focused && a && a.blur) a.blur();
+      phone.close();
+      phone.hold(true);
+      const r = boxEl.getBoundingClientRect();
+      fitHold = { h: AO.holdStart(Date.now(), focused, r.height, vScale()), wide: !phone.narrow(), raf: 0 };
+      const frame = () => { if (!fitHold) return; holdTick("frame"); if (fitHold) fitHold.raf = requestAnimationFrame(frame); };
+      fitHold.raf = requestAnimationFrame(frame);
+    }
+    if (vvp) vvp.addEventListener("resize", () => holdTick("resize"));
+    // a turn of the phone (`screen.orientation`'s `change`, read on a coarse pointer alone; `orientationchange` where
+    // it is absent) drops the kept pixels and ends a hold or a waiting fit with its note
+    const turned = () => {
+      if (!coarse()) return;
+      kept = null;  // kept again by the box observer once the turned box is laid out
+      if (fitHold) holdEnd(AO.FIT_TURNED);
+      if (fitWait) fitEnd(AO.FIT_TURNED);
+      drawFit();
+    };
+    if (window.screen && screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener("change", turned);
+    else window.addEventListener("orientationchange", turned);
+    if (fitEl) {
+      const more = fitEl.closest("details");
+      if (more) more.addEventListener("toggle", () => { if (more.open) drawFit(); });
+      fitEl.addEventListener("click", () => {
+        if (more) more.open = false;  // the menu folds on the press, as any menu does
+        if (fitHold) return;  // a press while a hold runs is ignored
+        if (fitWait) { fitEnd(); return; }  // Cancel fit: measures nothing, sends nothing
+        if (phone.narrow() || coarse()) { holdBegin(); return; }  // every press but Cancel fit's measures afresh
+        fitPress(AO.boxGrid());
+      });
+      document.addEventListener("visibilitychange", () => { if (fitHold) holdTick("frame"); fitRun(); });
+      drawFit();
+    }
     compose.addEventListener("input", () => drawAsk(lastV));
     compose.addEventListener("keydown", (e) => {
       if (e.key === "Escape") closeComposer();
@@ -8747,7 +9385,10 @@
       fill();
       const size = AO.termSize(AO.termLook);
       AO.TERM_OPTS.fontSize = size; term.options.fontSize = size;  // this terminal only; no other is this layout's
-      if (!phone.opened()) fit.fit();  // under a sheet no grid is sent: its close refits
+      relayout();  // the grid stays the pane's
+      // it drops the phone's kept pixels too, and cancels a waiting fit (TD-1948)
+      kept = null; if (fitWait) fitEnd(AO.FIT_TURNED);  // kept again by the box observer
+      drawFit();
     });
     // the soft-key row's height is one variable (`--softh` on the wrap, 0 while it is hidden), which `fill()`
     // adds to the bar's and the composer and a popped-out terminal read; registered folded or not
@@ -9068,7 +9709,7 @@
         // the one measure first (design §4.2, TD-080: *only on this machine*), then `ahead`, which
         // is *unmerged* and a different question — the template renders the same three parts
         const unpushed = v.git.unpushed ? ` · ${v.git.unpushed} unpushed${v.git.pushed_against ? ` vs ${v.git.pushed_against}` : ""}` : "";
-        $("#gitline").textContent = v.git.branch + unpushed + (v.git.ahead ? ` · ${v.git.ahead} ahead` : "") + (v.git.behind ? ` · ${v.git.behind} behind` : "");
+        $("#gitline").textContent = (v.git_head || v.git.branch) + unpushed + (v.git.ahead ? ` · ${v.git.ahead} ahead` : "") + (v.git.behind ? ` · ${v.git.behind} behind` : "");
         // §4.5a *Git card: changed files* (TD-628): each path a link by the recent files' form, joined
         // to the worktree's top level the page was served (`s.git_root`), the same on load and each delta
         // …under the pick (TD-862): Working tree draws them; a commit or Session reads `git_files`
@@ -9076,9 +9717,12 @@
         else $("#gitfiles").innerHTML = AO.gitFiles(v, s.editor, s.git_root);
       }
       const gp = $("#gitpick"); if (gp) gp.classList.toggle("hidden", !v.git);
+      // §4.5a *Git card: working in* (TD-1988): redrawn from each view, a link where it serves `editor.cwd_url`
+      const gc = $("#gitcwd"); if (gc) AO.paintWorkingIn(gc, v);
       // the person's `file_link` read again with each view (§4.5a *Settings page: You, file link*: *read by the
       // next file link, no reload*; TD-536) — in place, since the pane's link provider holds this object
       if (s.editor && v.editor) { s.editor.first = v.editor.first; s.editor.wait = v.editor.wait; }
+      if (AO.focusCwd(s.editor, v) && pathLinks) pathLinks.clear();  // a move: each run asked again (TD-1988)
       AO.paintRecent(v, s.editor, $("#frecent"), $("#frecentdt"));
       // the Session card's summary (TD-964): the model once read, the tool until then; its hover the profile line
       const fmodel = $("#fmodel");
@@ -9131,8 +9775,8 @@
       renderRail(v, ready && v.state !== "closed");  // a closed record has no Ready to close card to open
     }
     // **» put away** / **«** (§4.5 *The panel put away*, §4.5a, TD-412): the panel to a 28px rail,
-    // the terminal taking the width (the fit's observer on `#term` refits it and the pty hears the
-    // new columns as a window resize). Remembered per browser (`focus.side`), read by the template
+    // the terminal's box taking the width while the pane's grid stays (§4.6, TD-1919; Fit to window gives
+    // the pane the width). Remembered per browser (`focus.side`), read by the template
     // before the first paint; the folds inside are untouched. The rail's glyphs are drawn from the
     // same delta the cards are, so it is as current as the panel: one per card with something to say.
     let railV = s, railReady = false, inboxN = 0;

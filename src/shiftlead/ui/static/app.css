@@ -633,7 +633,12 @@ details.side > summary .h2 { flex: none; } details.side > summary .sumval { min-
 details.side > summary .sumval.warnish { color: var(--warn-fg); }
 details.side > summary .sumval .waiting, #sentlist .st.waiting { color: var(--warn-fg); }  /* the Sent card's open asks (TD-1409) */
 details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side .kv dd .controllers { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-.termbox { height: 60vh; min-height: 360px; background: var(--term); border-radius: 6px; padding: 6px; } .termbox .xterm { height: 100%; }
+/* §4.6 *A box smaller than the grid* (TD-1919): the box is the scroll container, sideways with a scrollbar, vertically
+   moved by the page alone; the terminal sits in it at the pane's grid, its pixel size set by the page. Only the grid
+   is the terminal's colour: the gap is the terminal's own border, and a larger box leaves the room right of and below
+   it in the page's background (§4.6 *A larger box*). */
+.termbox { height: 60vh; min-height: 360px; background: transparent; padding: 0; border: 0; overflow-x: auto; overflow-y: hidden; }
+.termbox .xterm { background: var(--term); border: 6px solid var(--term); border-radius: 6px; box-sizing: content-box; }
 /* a finger's drag on the terminal is tmux's scroll, never the page's (§4.6, TD-989); xterm.js's viewport is a scroll
    container of its own, so its layers carry the value too; two fingers still zoom the page */
 .termbox, .termbox .xterm, .termbox .xterm-viewport, .termbox .xterm-screen { touch-action: pinch-zoom; }
@@ -675,7 +680,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .endcard .ecfoot { font-size: var(--t-small); }
 .inline-banner { padding: 8px 10px; border-radius: 4px; background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-fg); font-size: var(--t-body); }
 .kv { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 4px 10px; font-size: var(--t-body); margin: 8px 0 0; } .kv dt { color: var(--muted); } .kv dd { margin: 0; overflow: hidden; text-overflow: ellipsis; }
-.gitfiles { line-height: 1.7; margin-top: 6px; } .gitpick { margin-top: 8px; flex-wrap: nowrap; } .gitpick select { flex: 1; min-width: 0; width: auto; height: 26px; padding: 0 6px; font-size: var(--t-small); text-overflow: ellipsis; } .gitpickline { margin-top: 6px; overflow-wrap: anywhere; } .recentfiles { line-height: 1.7; overflow-wrap: anywhere; } .recentfiles .fmark { font-weight: 600; } .recentlinks { line-height: 1.7; min-width: 0; } .recentlinks div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .checks { display: flex; flex-direction: column; gap: 5px; font-size: var(--t-body); margin: 8px 0; } .checks .ok { color: var(--done-fg); } .checks .bad { color: var(--stalled-fg); }
+.gitfiles { line-height: 1.7; margin-top: 6px; } .gitpick { margin-top: 8px; flex-wrap: nowrap; } .gitpick select { flex: 1; min-width: 0; width: auto; height: 26px; padding: 0 6px; font-size: var(--t-small); text-overflow: ellipsis; } .gitpickline { margin-top: 6px; overflow-wrap: anywhere; } .gitcwd { margin-top: 6px; display: flex; gap: 0.5ch; min-width: 0; white-space: nowrap; } .gitcwd .gitcwdpath { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; } .gitcwd bdi { direction: ltr; unicode-bidi: isolate; } .recentfiles { line-height: 1.7; overflow-wrap: anywhere; } .recentfiles .fmark { font-weight: 600; } .recentlinks { line-height: 1.7; min-width: 0; } .recentlinks div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .checks { display: flex; flex-direction: column; gap: 5px; font-size: var(--t-body); margin: 8px 0; } .checks .ok { color: var(--done-fg); } .checks .bad { color: var(--stalled-fg); }
 @media (max-width: 720px) {
   /* §4.5 screen 6 *Narrow* (TD-137): one column; the rail leaves the page for the sheet, a chip row
      stands under the title, and a row's controls are 44 px high as the phone's Org cards' are */
@@ -741,7 +746,8 @@ html.phonefocus #side, html.phonefocus #fhead, html.phonefocus #facts, html.phon
 html.phonefocus .focus .termro, html.phonefocus .composerbar, html.phonefocus .cfoldhint { display: none !important; }
 html.phonefocus .focus .inline-banner, html.phonefocus .focus .dropcard, html.phonefocus .focus .endcard { margin: 0; border-radius: 0; flex: none; }
 html.phonefocus .termwrap { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--term); }
-html.phonefocus .termwrap .termbox, html.phonefocus .termwrap.cfold .termbox { flex: 1; min-height: 0; height: auto; border-radius: 0; padding: 4px 4px 0; }
+html.phonefocus .termwrap .termbox, html.phonefocus .termwrap.cfold .termbox { flex: 1; min-height: 0; height: auto; }
+html.phonefocus .termbox .xterm { border-radius: 0; border-width: 4px 4px 0 4px; }
 /* a touch selects nothing and a long press is the link's (§4.6): no selection handles, no iOS callout; the helper text
    box at 16 px, so iOS does not zoom the page when ⌨ focuses it; two fingers are the terminal's (TD-1301's pinch) */
 html.phonefocus .termbox, html.phonefocus .termbox * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
@@ -1098,6 +1104,52 @@ html.phonefocus .composer.nopen #send { min-height: 40px; border-radius: 20px; m
    column (TD-082) at a reading width — a section is a heading with its i mark, a row is a card; a
    field is a label, its input and what it makes today, on one line that wraps on a phone */
 .inboxpage.setpage { max-width: 880px; display: flex; flex-direction: column; gap: 18px; }
+/* the Tools page (design §4.2b *The page*, §4.5 screen 14, TD-1973): the Settings column; a card per tool found, its
+   found rows dashed, then *Not ready to run here* as greyed dashed rows (mockup `2026-11-18-td1953-tools-own5`) */
+.inboxpage.toolspage { max-width: 880px; display: flex; flex-direction: column; gap: 16px; }
+.toolspage .toolshead { align-items: baseline; border-bottom: 2px solid var(--strong); padding-bottom: 6px; }
+.toolspage .toolcard { display: flex; flex-direction: column; gap: 8px; }
+.toolspage .toolname { align-items: baseline; }
+.toolspage .toolfound, .toolspage .toolnr { border: 1px dashed var(--line); border-radius: 6px; padding: 8px 12px; align-items: center; min-width: 0; }
+.toolspage .toolfound .mono { min-width: 12em; overflow-wrap: anywhere; }
+.toolspage .toolsnotready { display: flex; flex-direction: column; gap: 8px; }
+.toolspage .toolnr { color: var(--muted); }
+.toolspage .toolnrname { font-weight: 600; min-width: 8em; }
+.toolspage .toolnrver { min-width: 12em; }
+/* the login tree on a switched host (§4.2b *The page*, TD-1974): an account, its logins hanging under it */
+.toolspage .toolbranch { border-left: 1px solid var(--line); margin-left: 10px; padding-left: 14px; display: flex; flex-direction: column; gap: 4px; }
+.toolspage .toolacct { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; }
+.toolspage .toolacct.toolunsigned { background: transparent; border-style: dashed; }
+.toolspage .toolacctname { font-weight: 600; }
+.toolspage .toolfams { margin-top: 4px; }
+.toolspage .toolacct.hasgauge { display: grid; grid-template-columns: minmax(160px, 250px) 1fr; gap: 10px 24px; align-items: start; }
+@media (max-width: 640px) { .toolspage .toolacct.hasgauge { grid-template-columns: 1fr; } }
+/* the gauge (§4.2b *The gauge*, TD-1975): the use fills from the left, the reserve is a hatched bay from the right */
+.toolspage .toolgauges { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.toolspage .gauge { position: relative; height: 24px; border: 1px solid var(--line); border-radius: 3px; background: var(--bg); overflow: hidden; }
+.toolspage .gauge .used { position: absolute; left: 0; top: 0; bottom: 0; background: var(--link); }
+.toolspage .gauge .keep { position: absolute; right: 0; top: 0; bottom: 0; border-left: 2px solid var(--scraped); background: repeating-linear-gradient(-45deg, var(--scraped) 0 2px, transparent 2px 7px); }
+.toolspage .gauge .room { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; font-size: var(--t-small); color: var(--muted); white-space: nowrap; overflow: hidden; }
+.toolspage .gauge.unread { background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 12px); }
+.toolspage .gauge.stale .used { opacity: .5; }
+.toolspage .glegend { margin-top: 4px; font-size: var(--t-body); align-items: baseline; }
+.toolspage .glegend .k { display: inline-flex; gap: 6px; align-items: baseline; }
+.toolspage .toolkeep { width: 64px; text-align: right; }
+.toolspage .toolstale { color: var(--warn-fg); }
+.toolspage .toollogin { padding: 4px 0 4px 14px; align-items: baseline; min-width: 0; }
+.toolspage .toolloginname { min-width: 11em; font-weight: 600; }
+.toolspage .toolfolder { overflow-wrap: anywhere; }
+.toolspage .toolstate::before { content: "●"; margin-right: 6px; color: var(--muted); }
+.toolspage .toolstate.state-signed_in::before { color: var(--working); }
+.toolspage .toolstate.state-limited::before, .toolspage .toolstate.state-sign_in_again::before,
+.toolspage .toolstate.state-name_account::before { color: var(--needs); }
+.toolspage .toolwarn { flex-basis: 100%; color: var(--needs); }
+.toolspage .toolsettings { flex-basis: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16em), 1fr)); gap: 8px 14px; padding: 8px 0 4px; }
+.toolspage .toolsettings label, .toolspage .tooladdform label { display: flex; flex-direction: column; gap: 2px; font-size: var(--t-small); color: var(--muted); min-width: 0; }
+.toolspage .toolsettings input, .toolspage .toolsettings select, .toolspage .tooladdform input { min-width: 0; }
+.toolspage .tooladdlogin { padding: 6px 0 0 14px; }
+.toolspage .tooladdform { padding: 6px 0; align-items: flex-end; }
+.toolspage .toolsettings[hidden], .toolspage .tooladdform[hidden] { display: none; }
 .setpage .setcard { display: flex; flex-direction: column; gap: 10px; }
 .setpage .setrow { display: grid; grid-template-columns: 150px minmax(0, 220px) minmax(0, 1fr); gap: 10px; align-items: center; }
 .setpage .setpullcol { display: flex; flex-wrap: wrap; column-gap: 10px; row-gap: 2px; align-items: baseline; min-width: 0; }  /* the pull row's note and its reading, one column (TD-296 #17) */

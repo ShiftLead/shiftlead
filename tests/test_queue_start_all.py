@@ -68,12 +68,13 @@ def test_two_answered_items_alone_draw_the_plain_headers_start_session():
 
 
 def test_two_items_follow_the_holder_rule_on_start():
-    """Two whose entries another session holds still count; where it holds `start` the header draws nothing
-    (the row says *held by <name>*), and where the person's own session is on the card it is Open session."""
+    """Two whose entries another session holds still count; where it holds `start` the header draws its Start
+    session all the same, its press starting beside the holder (the row still says *held by <name>*, TD-1984), and
+    where the person's own session is on the card it is Open session."""
     got = {"needs": [_item("samscrape#TD-012", kind="decide"), _item("samscrape#TD-009", kind="decide")]}
     c, head = _head(got, fleet=[_rec("g1", "/x/samscrape", "TD-009", name="grinder-1")])
-    assert c["items_n"] == 2 and c["session"]["other"] == "grinder-1"
-    assert ">Start session<" not in head and ">Open session<" not in head
+    assert c["items_n"] == 2 and c["session"]["other"]["name"] == "grinder-1"
+    assert ">Start session<" in head and ALL in head and ">Open session<" not in head
     c, head = _head(got, fleet=[_rec("mine", "/x/samscrape", "TD-020", unattended=False)])
     assert ">Open session<" in head and ">Start session<" not in head
 

@@ -24,6 +24,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from sessionorc import cadence, identity, paths
 from sessionorc.adapters import (
     Conversation,
@@ -32,8 +34,12 @@ from sessionorc.adapters import (
     Link,
     Prompt,
     Transcript,
+    account_match,
+    model_offer,
     oldest_first,
+    plain_name,
     read_version,
+    same_home,
 )
 from sessionorc.identity import ProcReader
 from sessionorc.models import Confidence, State
@@ -483,6 +489,25 @@ def _instant(at: object) -> datetime | None:
 
 
 RULES_FILE = Path(__file__).with_name("screen_rules.toml")
+# the vendor's documented install line, the native installer (design §4.2b `install_command`, TD-1971)
+INSTALL_LINE = "curl -fsSL https://claude.ai/install.sh | bash"
+# what the tool writes into a home of its own: its sign-in record or its credentials (§4.2b `is_home`) — never a
+# directory name as plain as `projects/`, which any workspace may hold
+HOME_MARKS = (".claude.json", ".credentials.json")
+# the model families Claude Code names (its `--model` aliases), newest first (design §4.2b `models`, TD-1971)
+FAMILIES = ("fable", "opus", "sonnet", "haiku")
+# the families each plan offers, by `planDisplayName`, only where a host has run each (TD-1971: `Ultra` ran all four on
+# kmaster, 2026-11-19); a plan not here offers every family, unconfirmed
+PLAN_FAMILIES: dict[str, tuple[str, ...]] = {"Ultra": FAMILIES}
+
+
+def model_family(model: object) -> str | None:
+    """A model's family by its name — `claude-opus-5-5`, `opus`, `opus[1m]` → `opus`; None for a name it does not
+    cover."""
+    if not isinstance(model, str):
+        return None
+    word = re.split(r"[-\[]", model.removeprefix("claude-").lower(), maxsplit=1)[0]
+    return word if word in FAMILIES else None
 
 
 # A launch with no prompt (`ao new` without one, Add entry's **Open a session**) lands at the composer:
@@ -578,6 +603,8 @@ class ClaudeCodeAdapter:
     name = "claude-code"
     label = "Claude"  # the tool's display name: the usage chip's first word, never a key (§4.3, TD-122)
     state_source: Confidence = "hook"
+    # its per-session scratchpad and background-task files go under the run's scratch (§4.3, §4.6, TD-1944)
+    scratch_env: str | None = "CLAUDE_CODE_TMPDIR"
     # rows its repaints move, masked from the liveness clock (design §4.3 *An adapter names its volatile rows*,
     # TD-1475): the spinner line (*✶ Hatching… (4m 50s · ↓ 19.3k tokens …)*), and everything under the
     # composer's lower rule — the mode line and the status line
@@ -597,7 +624,11 @@ class ClaudeCodeAdapter:
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112); no `mail`: a
     # session of this tool is handed its mail by a pane write (§4.10)
     implements = frozenset(
-        {"background", "composer", "context", "conversations", "links", "prompts", "spend", "title", "usage_report"}
+        {
+            *("background", "composer", "context", "conversations", "links", "prompts", "spend", "title"),
+            *("usage_report", "find", "home_env", "install_command", "signin_command", "is_home", "identity"),
+            *("models", "new_home", "make_home"),
+        }
     )
     marks_errors = True  # a tool result's `is_error` (design §4.3 `read_transcript`, TD-1491)
     usage_report = staticmethod(usage_report)  # the status line's windows, read by the hook command (§4.4 *Usage*)
@@ -717,6 +748,19 @@ class ClaudeCodeAdapter:
         base = config_dir(profile or profiles_mod.get(None)) / "projects" / munge(cwd)
         p = base / f"{session_id}.jsonl"
         return p if p.is_file() else None
+
+    def transcript_roots(self) -> list[Path]:
+        """Every directory Claude Code keeps transcripts under (design §4.3, §9 invariant 16, TD-1945): `projects`
+        under `~/.claude`, under `CLAUDE_CONFIG_DIR` where this process has it, and under each of its profiles'
+        `config_dir`s, read from the profile file itself, so the disk sweep never removes inside one."""
+        dirs = {Path("~/.claude").expanduser(), config_dir(Profile(name="default"))}
+        try:
+            profs, _ = profiles_mod.load()
+        except (OSError, ValueError, yaml.YAMLError):  # an unreadable profile file still names the tool's own
+            log.exception("profiles.yml unreadable: transcript roots are the tool's own alone")
+            profs = {}
+        dirs |= {Path(p.config_dir).expanduser() for p in profs.values() if p.adapter == self.name and p.config_dir}
+        return sorted(d / "projects" for d in dirs)
 
     def _last_turns(self, session_id: str, cwd: Path, profile: str) -> Iterator[dict]:
         """The transcript's top-level `assistant` entries, newest first, from its last
@@ -962,8 +1006,9 @@ class ClaudeCodeAdapter:
 
     # -- account ---------------------------------------------------------------------------------
 
-    def _creds(self, profile: Profile) -> dict | None:
-        p = config_dir(profile) / ".credentials.json"
+    def _creds(self, profile: Profile | Path) -> dict | None:
+        d = Path(profile).expanduser() if isinstance(profile, (str, os.PathLike)) else config_dir(profile)
+        p = d / ".credentials.json"
         try:
             return json.loads(p.read_text(encoding="utf-8")).get("claudeAiOauth")
         except (OSError, ValueError, AttributeError):
@@ -976,7 +1021,9 @@ class ClaudeCodeAdapter:
         own = None if "SHIFTLEAD_SESSION" in env else env.get("CLAUDE_CONFIG_DIR")
         return Path(own or "~/.claude").expanduser()
 
-    def credentials_ok(self, profile: Profile) -> bool | None:
+    def credentials_ok(self, profile: Profile | Path) -> bool | None:
+        """Whether a sign-in can carry on without a person: a profile's config dir, or a home given as a path
+        (design §4.2b, TD-1971) — True, False for a dead refresh token, None for no credential."""
         c = self._creds(profile)
         if not c:
             return None
@@ -986,6 +1033,75 @@ class ClaudeCodeAdapter:
         if not exp:
             return True
         return datetime.fromtimestamp(int(exp) / 1000, UTC) > datetime.now(UTC)
+
+    # -- the Tools page's reads (design §4.2b *What the adapter reads*, TD-1971) -----------------
+
+    def find(self) -> str | None:
+        """The binary a launch finds, by absolute path, asked without launching (§4.2b): the PATH; None for none."""
+        return shutil.which(self.binary)
+
+    def home_env(self, home: Path) -> dict[str, str]:
+        """The environment a launch on `home` sets (§4.2b): `CLAUDE_CONFIG_DIR`, and nothing for the tool's default
+        home, as a launch on a profile with no `config_dir` sets nothing (the variable set to `~/.claude` would read
+        `~/.claude/.claude.json`, another sign-in record, where the unset launch reads `~/.claude.json`)."""
+        if same_home(home, self.default_home(os.environ)):
+            return {}
+        return {"CLAUDE_CONFIG_DIR": str(Path(home).expanduser())}
+
+    def install_command(self) -> str:
+        """The vendor's documented install line (§4.2b), for the person to run."""
+        return INSTALL_LINE
+
+    def signin_command(self) -> list[str]:
+        """The sign-in command alone, run with `home_env(home)` (§4.2b): the tool itself, signed in with its own
+        `/login`, then quit."""
+        return [self.binary]
+
+    def is_home(self, path: Path) -> bool:
+        """Whether `path` is a home of this tool, by what the tool writes there (§4.2b): its sign-in record or its
+        credentials — never a repo's `.claude/` of settings alone."""
+        p = Path(path).expanduser()
+        return any((p / mark).exists() for mark in HOME_MARKS)
+
+    def new_home(self, name: str) -> Path:
+        """A new login's suggested folder (§4.2b *How a login is found and made*): `~/.claude-<name>`, beside the
+        tool's default; made by nothing here."""
+        return Path(f"~/.claude-{name}").expanduser()
+
+    def make_home(self, path: Path) -> None:
+        """Make `path` a home a sign-in can write into (§4.2b): the folder alone, 0700 — the tool writes the rest."""
+        Path(path).expanduser().mkdir(mode=0o700, parents=True, exist_ok=True)
+
+    def identity(self, home: Path, salt: bytes) -> dict | None:
+        """Who `home` is signed in as (§4.2b): the `oauthAccount` of the `.claude.json` a launch on it reads —
+        `~/.claude.json` for `~/.claude`, the folder's own otherwise. `match` is the salted `accountUuid`, which never
+        leaves here; `display` is `displayName`, never an email; `plan` `planDisplayName`; `billing` read from
+        `billingType`. None with no account recorded (signed out, or an API key alone)."""
+        h = Path(home).expanduser()
+        record = Path("~/.claude.json").expanduser() if same_home(h, "~/.claude") else h / ".claude.json"
+        try:
+            account = json.loads(record.read_text(encoding="utf-8")).get("oauthAccount")
+        except (OSError, ValueError, AttributeError):
+            return None
+        key = account.get("accountUuid") if isinstance(account, dict) else None
+        if not isinstance(key, str) or not key:
+            return None
+        billing = account.get("billingType")
+        return {
+            "match": account_match(salt, key),
+            "display": plain_name(account.get("displayName")),
+            "plan": account.get("planDisplayName") if isinstance(account.get("planDisplayName"), str) else None,
+            "billing": "subscription" if isinstance(billing, str) and "subscription" in billing else None,
+        }
+
+    def models(self, home: Path, plan: str | None) -> dict:
+        """The model families the account offers (§4.2b), from `PLAN_FAMILIES`; `default` the family of the `model`
+        the home's `settings.json` names, None where it names none (the tool's own default, which no file records)."""
+        try:
+            named = json.loads((Path(home).expanduser() / "settings.json").read_text(encoding="utf-8")).get("model")
+        except (OSError, ValueError, AttributeError):
+            named = None
+        return model_offer(plan, PLAN_FAMILIES, FAMILIES, model_family(named))
 
     def doctor_profiles(self) -> list[dict]:
         """What `ao doctor` reads of each profile this adapter runs (design §4.7 **`ao doctor`**

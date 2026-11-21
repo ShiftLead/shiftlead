@@ -438,7 +438,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
 
 - Org (§4.9): the teams each registered repo defines in its own `.shiftlead.yml`, aggregated with
   the org file, which holds what no one repo can: the project headings over repos, a team kept out of its repo's file, `place:`
-  and the install's `roles:` overlay; `org.yml`, `profiles.yml` (after the switch-over `logins.yml`, §4.2b) and `settings.yml` are tracked by a git work tree in `~/.shiftlead/` at the home (§4.9 *The org is an aggregate*, *What is
+  and the install's `roles:` overlay; `org.yml`, `profiles.yml` (until the switch-over takes it out), `logins.yml` (§4.2b) and `settings.yml` are tracked by a git work tree in `~/.shiftlead/` at the home (§4.9 *The org is an aggregate*, *What is
   left at the home has a history*).
   The org file: `~/.shiftlead/org.yml` on the UI host — projects, teams, and an org-wide `roles:`
   roster that sits between the package's built-ins and a repo's own, each preset checked key by key
@@ -456,7 +456,7 @@ teams:
       - {role: grinder, count: 2, name: grinder-ao, lane: free-pick}
 roles:
   grinder: {profile: grind}
-director: {profile: grind, brief: docs/briefs/director.md}   # TD-636, §4.9b *The director seat*: the org's one seat of no team, trigger `prompt` (with `asks` and `groom`, TD-657); absent, none
+director: {profile: grind, brief: briefs/director.md}   # TD-636, §4.9b *The director seat*: the org's one seat of no team, trigger `prompt` (with `asks` and `groom`, TD-657); absent, none. `brief`: a file that replaces the package's director.md, a relative path read beside this file (~/.shiftlead/briefs/director.md under the default home, TD-2025); absent, the package's
 ```
 
 A repo without the file gets defaults: `adapter: claude-code`, worktrees under

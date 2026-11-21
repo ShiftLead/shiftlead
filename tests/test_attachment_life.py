@@ -73,8 +73,12 @@ async def test_the_tick_reads_a_record_as_live_until_it_ends(agent, tmp_path):
     f = _files(tmp_path, {"ao-run-5/old.png": 8, "ao-end-6/old.png": 8})
     seen = []
     real = agent._prune_runs
-    agent._prune_runs = lambda now, live, live_ids=None: (seen.append(live_ids), real(now, live, live_ids))
+    agent._prune_runs = lambda now, live, live_ids=None, scratch=None, named=None: (
+        seen.append(live_ids),
+        real(now, live, live_ids, scratch),
+    )
     agent._pruned_at = datetime.min.replace(tzinfo=UTC)
     await agent.tick()
+    await agent._prune_task  # a detached pass the tick never waits on (§4.6 *The disk sweep*, TD-1945)
     assert seen and "ao-run-5" in seen[-1] and "ao-end-6" not in seen[-1]
     assert f["ao-run-5/old.png"].exists() and not f["ao-end-6/old.png"].exists()

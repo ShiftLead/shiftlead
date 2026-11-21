@@ -698,6 +698,11 @@ def host_card(raw: Mapping[str, Any], local: hosts.Host, home: str, nodes: Mappi
         _row("volatile", local.volatile, is_default="volatile" not in raw),
         _row("repos_registry", str(local.repos_registry), is_default="repos_registry" not in raw),
         _row("runs_keep_days", local.runs_keep_days, is_default="runs_keep_days" not in raw),
+        _row("runs_keep_mb", local.runs_keep_mb, is_default="runs_keep_mb" not in raw),  # §4.6, TD-1945
+        _row("scratch_root", local.scratch_root, is_default="scratch_root" not in raw),  # §4.6, TD-1944
+        _row("scratch_keep_hours", local.scratch_keep_hours, is_default="scratch_keep_hours" not in raw),
+        _row("worktree_keep_days", local.worktree_keep_days, is_default="worktree_keep_days" not in raw),
+        _row("cache_keep_days", local.cache_keep_days, is_default="cache_keep_days" not in raw),
         _row("identity", local.identity or "enforce", is_default="identity" not in raw),
         _row("person", local.person, is_default="person" not in raw),
         _row("home", home, is_default=home == local.name),
@@ -942,3 +947,67 @@ def push_card(
         "last_line": "" if last_line == paused else last_line,
         "https": url if url.startswith("https://") else "",
     }
+
+
+def gauge_view(g: Mapping[str, Any] | None, billing: Any = None) -> dict[str, Any]:
+    """An account's gauges as the Tools page draws them (design §4.2b *The gauge*, TD-1975): the `tools` read's
+    `gauges` (`sessionorc.usage.gauges`, the one builder) with the words each window shows — the reserve as the field
+    takes it back, the line it makes or a metered window's spend, and its reset in local time. An older agent's read,
+    whose `gauges` are not filled, draws as an account with no reading, a metered one its home's windows."""
+    if not isinstance(g, Mapping):
+        g = {"billing": billing or "subscription", "unread": True, "windows": [], "gone": []}
+        if g["billing"] == "metered":
+            labels = sorted(spend_mod.LABELS, key=lambda x: x != "week")  # the week's first (§4.2b)
+            g["windows"] = [{"label": x, "pct": None, "reserve": None} for x in labels]
+        else:
+            g["windows"] = [{"label": "week", "pct": None, "reserve": None}]
+    metered = g.get("billing") == "metered"
+    out: dict[str, Any] = {
+        "metered": metered,
+        "mixed": g.get("billing") == "mixed",
+        "unread": bool(g.get("unread")) and not metered,
+        "stale": bool(g.get("stale")),
+        "age": f"read {ago} ago" if (ago := _age(g.get("read_at"), datetime.now(UTC))) else "",
+        "gauges": [],
+        "gone": [],
+    }
+    reported = [str(w.get("label")) for w in g.get("windows") or []]
+    for w in g.get("windows") or []:
+        pct = w.get("pct") if _is_num(w.get("pct")) else None
+        value = reserve_text(w.get("reserve"))
+        if metered:
+            spent = {"spent": w.get("spent"), "pct": None if pct is None else round(pct), "resets": w.get("resets")}
+            line = spend_text(spent, "tok" if value.endswith("tok") else "")
+        else:
+            line = line_text({"line": w.get("line"), "reserve": w.get("reserve"), "resets": w.get("resets")})
+        resets = _when(w.get("resets"))
+        out["gauges"].append(
+            {
+                "label": str(w.get("label")),
+                "value": value,
+                "used": pct,
+                "keep": w.get("keep"),
+                "room": w.get("room"),
+                "resets": f"{resets.astimezone():%a %H:%M}" if resets else "",
+                "line": line,
+            }
+        )
+    for x in g.get("gone") or []:
+        out["gone"].append(
+            {
+                "label": str(x.get("label")),
+                "value": reserve_text(x.get("reserve")),
+                "line": f"not reported: its reading reports {', '.join(reported)}",
+            }
+        )
+    return out
+
+
+def tools_accounts(read: Mapping[str, Any] | None) -> set[str] | None:
+    """The accounts the Tools page draws on a switched home (design §4.2b *The gauge*, TD-1975): their gauges and
+    reserves are its own, so the Settings page's Usage card leaves them and keeps every other — an account seen only
+    on a node, or one no signed-in login draws. None before the switch, or where the agent served no read, where the
+    card keeps every account."""
+    if not isinstance(read, Mapping) or not read.get("switched"):
+        return None
+    return {str(a.get("key")) for c in read.get("tools") or [] for a in c.get("accounts") or [] if a.get("key")}

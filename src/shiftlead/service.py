@@ -407,7 +407,7 @@ def install(
         wheel = None
     if wheel is not None:
         written.append(str(wheel))
-    # At the home the directory becomes a work tree that tracks its three definition files (design
+    # At the home the directory becomes a work tree that tracks its definition files (design
     # §4.9 *What is left at the home has a history*, TD-229); never on a node, never fatal to the units.
     try:
         tree = _home_history(home)
@@ -415,7 +415,7 @@ def install(
         print(f"shiftlead: the home's history could not be set up ({type(e).__name__}: {e})", file=sys.stderr)
         tree = None
     if tree is not None:
-        print(f"shiftlead: {tree} now keeps the history of org.yml, profiles.yml and settings.yml")
+        print(f"shiftlead: {tree} now keeps the history of org.yml, profiles.yml, logins.yml and settings.yml")
     _systemctl("daemon-reload")
     # Always enable (a reboot must not need a human, design §8); --no-start only defers the start.
     cp = _systemctl("enable", *(["--now"] if start else []), *[f"{u}.service" for u in UNITS])
@@ -430,7 +430,7 @@ def install(
 
 
 def _home_history(home: str | None) -> str | None:
-    """`~/.shiftlead` made a git work tree tracking `org.yml`, `profiles.yml` and `settings.yml`, when
+    """`~/.shiftlead` made a git work tree tracking `org.yml`, `profiles.yml`, `logins.yml` and `settings.yml`, when
     this host is the home and it is not one yet: its `.git`, or None."""
     from sessionorc import defs, hosts, paths
 

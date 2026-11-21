@@ -26,7 +26,15 @@ import uuid
 from collections.abc import Mapping
 from pathlib import Path
 
-from sessionorc.adapters import LaunchSpec, Transcript, read_version
+from sessionorc.adapters import (
+    LaunchSpec,
+    Transcript,
+    account_match,
+    model_offer,
+    plain_name,
+    read_version,
+    same_home,
+)
 from sessionorc.models import Confidence, State
 from sessionorc.screen import painted_text
 from sessionorc.tmux import PaneInfo
@@ -41,6 +49,30 @@ OWN_HOME = Path("~/.grok")  # the tool's own default home, never written (§4.2a
 BINARY = OWN_HOME / "bin" / "grok"  # the install's link, by absolute path (§4.3 `launch`)
 INSTALL_LINE = "curl -fsSL https://x.ai/cli/install.sh | bash"  # the person's, by hand (§4.3 *The install*)
 HOOK_FILE = Path("hooks") / "shiftlead.json"  # under the profile's GROK_HOME
+# what the tool writes into a home of its own: its sign-in (design §4.2b `is_home`, TD-1971) — never a directory
+# name as plain as `sessions/`, which another program's folder may hold
+HOME_MARKS = ("auth.json",)
+# how each `auth_mode` is billed, as `identity` suggests it (§4.2b): a signed-in account's plan (`oidc`, the mode
+# `grok login` writes, read off the installed tool's file at the build); an API key comes from the environment and
+# writes no entry; another mode says nothing
+AUTH_BILLING = {"oidc": "subscription"}
+# the model families Grok Build's names carry: `grok-4.7` is `grok`, `grok-4.7-build-fast` is `build-fast` (design §4.2b
+# `models`, TD-1971; the names read off its `models_cache.json` on kmaster, 2026-11-19)
+FAMILIES = ("grok", "build-fast")
+# Grok Build records no plan (`identity`'s `plan` is None), so no row is confirmed: every family, unconfirmed
+PLAN_FAMILIES: dict[str, tuple[str, ...]] = {}
+
+
+def model_family(model: object) -> str | None:
+    """A model's family by its name — `grok-4.7` → `grok`, `grok-4.7-build-fast` → `build-fast`; None for a name it
+    does not cover."""
+    m = re.fullmatch(r"grok-[\d.]+(?:-(.+))?", model) if isinstance(model, str) else None
+    if not m:
+        return None
+    family = m.group(1) or "grok"
+    return family if family in FAMILIES else None
+
+
 # every event the state feed reads (§4.3 *The state feed*; the guide's *Hook Events*)
 HOOK_EVENTS = (
     "SessionStart",
@@ -140,13 +172,19 @@ class GrokAdapter:
     name = NAME
     label = "Grok"  # the tool's display name: the usage chip's first word, never a key (§4.3, TD-122)
     state_source: Confidence = "hook"
+    scratch_env: str | None = None  # Grok Build names no temp variable of its own: `TMPDIR` (§4.3, §4.6)
     own_home = OWN_HOME.expanduser()  # a profile names a config_dir of its own (§4.2a, TD-1550)
     permission_channel = False  # a Grok hook cannot answer a prompt (§4.3 *No permission channel*)
     start_context = False  # no Grok hook hands the model context at the start (§4.3 `start_context`)
     asking_args = ASKING_ARGS  # added to an unattended launch under `permission_prompts: all` (§4.3, TD-823)
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): the reads of its
     # transcript come with TD-1637's later slices
-    implements: frozenset[str] = frozenset({"composer", "title"})
+    implements: frozenset[str] = frozenset(
+        {
+            *("composer", "title", "find", "home_env", "install_command", "signin_command", "is_home", "identity"),
+            *("models", "new_home", "make_home"),
+        }
+    )
     # its title does not tell a question tool's wait from a turn's spinner (§4.3 *The title as the check*)
     state_in_title = False
     # rows its repaints move, masked from the liveness clock (design §4.3 *An adapter names its volatile rows*):
@@ -237,6 +275,14 @@ class GrokAdapter:
 
     # -- reads (design §4.3 *Reads*) ---------------------------------------------------------------
 
+    def transcript_roots(self) -> list[Path]:
+        """Every directory Grok Build keeps transcripts under (design §4.3, §9 invariant 16, TD-1945): each of its
+        profiles' `<config_dir>/sessions`, read from the profile file itself; none for a profile with no
+        `config_dir`, which launches nothing (never the person's own `~/.grok`)."""
+        profs, _ = profiles_mod.load()
+        homes = {Path(p.config_dir).expanduser() for p in profs.values() if p.adapter == self.name and p.config_dir}
+        return sorted(transcript_mod.sessions_root(h) for h in homes)
+
     def transcript_path(self, session_id: str, cwd: Path, profile: Profile | str | None = None) -> Path | None:
         """The session's log under the profile's home, found by the session id's own directory
         (`sessions/*/<id>/updates.jsonl`), never by encoding `cwd`; None where there is none or the profile names no
@@ -296,12 +342,78 @@ class GrokAdapter:
         own = None if "SHIFTLEAD_SESSION" in env else env.get("GROK_HOME")
         return Path(own).expanduser() if own else self.own_home
 
-    def credentials_ok(self, profile: Profile) -> bool | None:
-        """Whether the home is signed in: `<GROK_HOME>/auth.json` exists (§4.3 *Sign-in*). None where it does
-        not, or the profile names no home; signing a home in is the person's (`GROK_HOME=<dir> grok login`)."""
-        if not profile.config_dir:
+    def credentials_ok(self, profile: Profile | Path) -> bool | None:
+        """Whether the home is signed in: `<GROK_HOME>/auth.json` exists (§4.3 *Sign-in*). The home is a profile's
+        `config_dir`, or one given as a path (design §4.2b, TD-1971). None where it does not, or the profile names
+        no home; signing a home in is the person's (`GROK_HOME=<dir> grok login`)."""
+        home = profile if isinstance(profile, (str, os.PathLike)) else profile.config_dir
+        if not home:
             return None
-        return True if (Path(profile.config_dir).expanduser() / "auth.json").is_file() else None
+        return True if (Path(home).expanduser() / "auth.json").is_file() else None
+
+    # -- the Tools page's reads (design §4.2b *What the adapter reads*, TD-1971) -----------------
+
+    def find(self) -> str | None:
+        """The binary a launch finds (§4.2b): the install's link, by absolute path, as `launch` runs it; None where
+        it is missing."""
+        return self.binary if Path(self.binary).is_file() else None
+
+    def home_env(self, home: Path) -> dict[str, str]:
+        """The environment a launch on `home` sets (§4.2b): `GROK_HOME`, with `HOME` its launch home beside it
+        (`launch_home.path_for`, made by the launch, not here); nothing for the tool's default home."""
+        if same_home(home, self.default_home(os.environ)):
+            return {}
+        h = Path(home).expanduser()
+        return {"GROK_HOME": str(h), "HOME": str(launch_home_mod.path_for(h))}
+
+    def install_command(self) -> str:
+        """The vendor's documented install line (§4.2b, §4.3 *The install*), for the person to run."""
+        return INSTALL_LINE
+
+    def signin_command(self) -> list[str]:
+        """The sign-in command alone, run with `home_env(home)` (§4.2b): `grok login`."""
+        return [self.binary, "login"]
+
+    def is_home(self, path: Path) -> bool:
+        """Whether `path` is a home of this tool, by what the tool writes there (§4.2b): its sign-in — never
+        ShiftLead's own hook file alone."""
+        p = Path(path).expanduser()
+        return any((p / mark).exists() for mark in HOME_MARKS)
+
+    def new_home(self, name: str) -> Path:
+        """A new login's suggested folder (§4.2b *How a login is found and made*): `~/.config/grok-<name>`; made by
+        nothing here."""
+        return Path(f"~/.config/grok-{name}").expanduser()
+
+    def make_home(self, path: Path) -> None:
+        """Make `path` a home a sign-in can write into (§4.2b): the folder alone, 0700 — `grok login` writes the
+        rest, and its launch home beside it is the launch's to make."""
+        Path(path).expanduser().mkdir(mode=0o700, parents=True, exist_ok=True)
+
+    def identity(self, home: Path, salt: bytes) -> dict | None:
+        """Who `home` is signed in as (§4.2b): the entry of its `auth.json` — the account key is the entry's
+        `user_id` (the entry is stored under the issuer and client id, the same for every account), which never
+        leaves here but salted as `match`; `display` its `first_name`; no `plan`, which the tool does not name;
+        `billing` read from `auth_mode`. None with no entry holding a user id."""
+        try:
+            doc = json.loads((Path(home).expanduser() / "auth.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        entries = [e for e in doc.values() if isinstance(e, dict)] if isinstance(doc, dict) else []
+        entry = next((e for e in entries if isinstance(e.get("user_id"), str) and e["user_id"]), None)
+        if entry is None:
+            return None
+        return {
+            "match": account_match(salt, entry["user_id"]),
+            "display": plain_name(entry.get("first_name")),
+            "plan": None,
+            "billing": AUTH_BILLING.get(entry.get("auth_mode") if isinstance(entry.get("auth_mode"), str) else ""),
+        }
+
+    def models(self, home: Path, plan: str | None) -> dict:
+        """The model families the account offers (§4.2b), from `PLAN_FAMILIES`; `default` None, since no file of the
+        home names the tool's default model."""
+        return model_offer(plan, PLAN_FAMILIES, FAMILIES, None)
 
     def doctor_profiles(self) -> list[dict]:
         """What `ao doctor` reads of each Grok profile (design §4.7, §4.3 *Reads*): its home and whether it is

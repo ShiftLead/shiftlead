@@ -88,9 +88,9 @@ def test_focus_loads_the_addon_with_the_handler_on_every_focus():
     made = "const links = new WebLinksAddon.WebLinksAddon((e, uri) => AO.paneLink(e, uri), AO.webLinkOptions(rec));"
     load = "term.loadAddon({ activate: (t) => links.activate(AO.cutRows(t)), dispose: () => links.dispose() });"
     assert made in focus and load in focus
-    # beside the fit addon, before the attach decides read-only: no condition on the mode
-    fit, ro = focus.index("new FitAddon.FitAddon()"), focus.index("let readOnly = false")
-    assert fit < focus.index(made) < focus.index(load) < ro
+    # beside the unicode addon, before the attach decides read-only: no condition on the mode
+    uni, ro = focus.index("AO.termUnicode(term)"), focus.index("let readOnly = false")
+    assert uni < focus.index(made) < focus.index(load) < ro
 
 
 @pytest.mark.unit

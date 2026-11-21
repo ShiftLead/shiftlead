@@ -23,10 +23,13 @@ import contextlib
 import glob
 import json
 import os
+import shutil
 import signal
 import socket
 import subprocess
 import sys
+import tempfile
+import threading
 import time
 import uuid
 from collections.abc import Callable
@@ -34,6 +37,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
+from _pytest.faulthandler import fault_handler_stderr_fd_key
 from _stubs import AgentShellStub, ComposerStub, HookFedStub
 
 from sessionorc import paths
@@ -96,6 +100,16 @@ def _person_text_off_unless_marked(request: pytest.FixtureRequest, monkeypatch: 
 
     if request.node.get_closest_marker("person_text") is None:
         monkeypatch.setattr(mail, "PERSON_TEXT_CHECK", False)
+
+
+@pytest.fixture(autouse=True)
+def _no_start_tools_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The host agent reads this host's tools when it starts (design §4.2b, TD-1973): every tool's real `--version`,
+    a node process each for some. The suite starts hundreds of host agents, so a test makes none of those reads; a
+    test of the start's read sets `tools.READ_AT_START` back (a child agent: `AO_TEST_TOOLS_AT_START=1`, TD-2002)."""
+    from sessionorc import tools
+
+    monkeypatch.setattr(tools, "READ_AT_START", False)
 
 
 @pytest.fixture(autouse=True)
@@ -189,6 +203,134 @@ def sweep_stale_test_servers() -> None:
         with contextlib.suppress(OSError):
             os.unlink(sock)
         _forget_owner(name)
+
+
+def _rmtree_writable(path: str) -> None:
+    """Remove a tree even where a test left a read-only directory in it (TD-2015): every directory in it, never
+    through a link, is made writable and searchable first; what still cannot be removed is left."""
+    if os.path.islink(path) or not os.path.isdir(path):
+        return
+    with contextlib.suppress(OSError):
+        os.chmod(path, 0o700)
+    for d, dirs, _files in os.walk(path):
+        for n in dirs:
+            p = os.path.join(d, n)
+            if not os.path.islink(p):
+                with contextlib.suppress(OSError):
+                    os.chmod(p, 0o700)
+    shutil.rmtree(path, ignore_errors=True)
+
+
+def sweep_stale_scratch_roots(base: str = "/tmp") -> None:
+    """A test run whose workers are killed, or whose session restarts mid-run, never reaches its scratch
+    root's cleanup, so its `aoscr-*` directory used to stay in `/tmp` for good: 182 of them held about
+    45,000 inodes of the shared tmpfs on 2026-11-19, which then refused every test's setup (TD-2015). The
+    sweep removes the roots of runs that have ended — an owner file naming a pid no longer running — and
+    leaves a live run's alone, as the tmux sweep does. A root no owner file names (one made before TD-2015)
+    is never touched: whose it is cannot be read, so it is left for a person to clear."""
+    for root in glob.glob(os.path.join(base, "aoscr-*")):
+        name = os.path.basename(root)
+        if not (OWNERS / name).exists() or _owner_alive(name):
+            continue
+        _rmtree_writable(root)
+        _forget_owner(name)
+
+
+def _pid_running(pid: int) -> bool:
+    """Is `pid` running? A signal 0 sends nothing; a process of another user's (`PermissionError`) counts as alive."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except (PermissionError, OverflowError):
+        return True  # another user's, or a lock no pid could write: never swept
+    return True
+
+
+def sweep_dead_pytest_runs(own: Path) -> None:
+    """Remove each sibling `pytest-N` of this run's base temp whose `.lock` names a pid no longer running (TD-2028).
+
+    pytest keeps one run (`tmp_path_retention_count = 1`, TD-1890), but a run that dies before its end — a
+    precheck's timeout, a killed suite, the workers' deaths of TD-2012 — leaves its `.lock`, and pytest's own
+    cleanup skips a locked directory until the lock is three days old, so each dead run held 27k–53k inodes of
+    the shared `/tmp` for three days in every seat that ran it. A lock that is empty or unreadable is a run still
+    starting (pytest creates the file, then writes its pid), so it counts as live, as does a directory with no
+    lock (a finished run, pytest's own to keep or remove); `pytest-current`, a link, and this run's own are
+    never touched. A recycled pid makes a dead run look live: that costs one skipped sweep.
+
+    Where this run's base temp lies in a seat's scratch (`<root>/shiftlead-<uid>/<token>/pytest-of-<user>/`,
+    design §4.6 *A session's scratch*), every seat's `pytest-of-<user>/` under that root is swept, not only this
+    one's (TD-2032): a seat that runs no suite after its run died — an idle designer — otherwise kept 160k inodes
+    of the shared `/tmp` for as long as it lived, since the host agent's disk sweep never removes a live record's
+    scratch. A run outside a seat sweeps its own base temp's parent alone."""
+    parent = own.parent
+    if not own.name.startswith("pytest-") or not parent.name.startswith("pytest-of-"):
+        return  # a --basetemp of the caller's own: not pytest's numbered runs
+    for base in _run_parents(parent):
+        with contextlib.suppress(OSError):  # one seat's scratch going away mid-sweep never stops the others'
+            _sweep_dead_runs_in(base, own)
+
+
+def _run_parents(parent: Path) -> list[Path]:
+    """The `pytest-of-<user>/` directories to sweep: every seat's under this one's `shiftlead-<uid>/` root, where
+    this run's lies in a seat's scratch, else this run's alone."""
+    root = parent.parent.parent
+    if root.name != f"shiftlead-{os.getuid()}" or root.is_symlink():
+        return [parent]
+    seats = [
+        p for p in root.glob(f"*/{parent.name}") if p.is_dir() and not p.is_symlink() and not p.parent.is_symlink()
+    ]
+    return seats if parent in seats else [parent, *seats]
+
+
+def _sweep_dead_runs_in(parent: Path, own: Path) -> None:
+    for d in parent.glob("pytest-*"):
+        if d == own or d.is_symlink() or not d.is_dir():
+            continue
+        try:
+            pid = int((d / ".lock").read_text().strip())
+        except (OSError, ValueError):
+            continue  # no lock, or one still being written
+        if pid != os.getpid() and not _pid_running(pid):
+            _rmtree_writable(str(d))
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """The dead runs' sweep (TD-2028), in the xdist controller alone (a worker's base temp is inside the
+    controller's run), from the controller's own base temp,
+    over every seat's scratch where it lies in one (TD-2032)."""
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        return
+    factory = getattr(session.config, "_tmp_path_factory", None)
+    if factory is None:
+        return
+    with contextlib.suppress(OSError, ValueError, OverflowError):  # a sweep never stops the run
+        sweep_dead_pytest_runs(factory.getbasetemp())
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _scratch_root():
+    """Every run's scratch directory (design §4.6, TD-1944) under a short root of the test run's own, never
+    the host's `/tmp/shiftlead-<uid>/`: short, since a root past 48 bytes is refused, so not `tmp_path`.
+    The subprocess agent reads it from `AO_TEST_SCRATCH_ROOT` (`_agent_child.py`). Its owner is recorded,
+    and the roots of runs that have ended are swept first (TD-2015)."""
+    from sessionorc import hosts
+
+    sweep_stale_scratch_roots()
+    with tempfile.TemporaryDirectory(prefix="aoscr-", dir="/tmp", ignore_cleanup_errors=True) as root:
+        name = os.path.basename(root)
+        with contextlib.suppress(OSError):
+            OWNERS.mkdir(exist_ok=True)
+            (OWNERS / name).write_text(str(os.getpid()))
+        mp = pytest.MonkeyPatch()
+        mp.setattr(hosts, "DEFAULT_SCRATCH_ROOT", root)
+        mp.setenv("AO_TEST_SCRATCH_ROOT", root)
+        try:
+            yield root
+        finally:
+            mp.undo()
+            _rmtree_writable(root)
+            _forget_owner(name)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -461,6 +603,46 @@ async def agent(tmp_path, monkeypatch):
 
 # -- the subprocess agent -----------------------------------------------------------------------
 
+# **A hang shows the agent's side too** (TD-2037). A test that waits on a child agent past the hang bound is ended by
+# pytest-timeout, and pyproject's `faulthandler_timeout` prints the worker's own stacks just before, but those show
+# only the test waiting on a reply. So, ten seconds before them, every live child agent is sent SIGUSR1 (it dumps all
+# its threads to its stderr file, `_agent_child.py`) and the file's tail is written to the worker's stderr, which
+# xdist prints. A test that takes no child agent arms nothing.
+_LIVE_CHILDREN: dict[int, Path] = {}  # pid → its stderr file, while the module's agent runs
+HANG_WATCH = 100.0  # seconds: below pyproject's faulthandler_timeout (110) and timeout (120)
+HANG_TAIL = 20_000  # bytes of each child's stderr shown
+
+
+def _show_children_stacks(nodeid: str, fd: int) -> None:
+    for pid in list(_LIVE_CHILDREN):
+        with contextlib.suppress(OSError):
+            os.kill(pid, signal.SIGUSR1)
+    time.sleep(1.0)
+    for pid, path in list(_LIVE_CHILDREN.items()):
+        try:
+            tail = path.read_bytes()[-HANG_TAIL:]
+        except OSError as e:
+            tail = f"(cannot read {path}: {e})".encode()
+        head = f"\n--- TD-2037: {nodeid} still running after {HANG_WATCH:.0f}s; child agent {pid}'s stderr tail ---\n"
+        with contextlib.suppress(OSError):
+            os.write(fd, head.encode() + tail + b"\n--- end of child agent stderr ---\n")
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_protocol(item, nextitem):
+    timer = None
+    if _LIVE_CHILDREN or "subprocess_agent" in getattr(item, "fixturenames", ()):
+        # the stderr pytest's faulthandler writes to: fd 2 itself is captured while a test runs
+        fd = item.config.stash.get(fault_handler_stderr_fd_key, 2)
+        timer = threading.Timer(HANG_WATCH, _show_children_stacks, args=(item.nodeid, fd))
+        timer.daemon = True
+        timer.start()
+    try:
+        yield
+    finally:
+        if timer is not None:
+            timer.cancel()
+
 
 class ChildAgent(NamedTuple):
     home: Path
@@ -486,35 +668,47 @@ def subprocess_agent(tmp_path_factory):
         mp.delenv("SHIFTLEAD_SESSION", raising=False)
         # the board write-back lands an edit through `gh` (§4.4, TD-264): the child gets the fake
         mp.setenv("PATH", f"{fake_gh_bin(home / 'fake-bin')}{os.pathsep}{os.environ.get('PATH', '')}")
-        proc = subprocess.Popen(
-            [sys.executable, str(CHILD), sock_name],
-            env=dict(os.environ),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        # its stderr goes to a file, never an unread pipe (TD-2037): the agent lives for the whole module and logs
+        # as it goes, and a pipe nobody drains blocks its next write once full, which freezes every request to it
+        err_path = home / "agent.stderr"
+        with open(err_path, "w") as err_file:
+            proc = subprocess.Popen(
+                [sys.executable, str(CHILD), sock_name],
+                env=dict(os.environ),
+                stdout=subprocess.DEVNULL,
+                stderr=err_file,
+                text=True,
+            )
+
+        def err() -> str:
+            return err_path.read_text(errors="replace")
+
+        _LIVE_CHILDREN[proc.pid] = err_path
         sock = home / "agent.sock"
         if not wait_for_sync(lambda: sock.exists() or proc.poll() is not None, timeout=10.0):
             proc.kill()
-            raise RuntimeError(f"child agent never opened {sock}:\n{proc.communicate(timeout=5)[1]}")
+            proc.wait(timeout=5)
+            raise RuntimeError(f"child agent never opened {sock}:\n{err()}")
         if proc.poll() is not None:
-            raise RuntimeError(f"child agent exited {proc.returncode}:\n{proc.communicate(timeout=5)[1]}")
+            raise RuntimeError(f"child agent exited {proc.returncode}:\n{err()}")
         yield ChildAgent(home=home, sock_name=sock_name, proc=proc)
         proc.send_signal(signal.SIGTERM)
         try:
-            _, err = proc.communicate(timeout=5)
+            proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             proc.kill()
-            _, err = proc.communicate(timeout=5)
-            raise RuntimeError(f"child agent ignored SIGTERM:\n{err}") from None
+            proc.wait(timeout=5)
+            raise RuntimeError(f"child agent ignored SIGTERM:\n{err()}") from None
     finally:
+        if proc is not None:
+            _LIVE_CHILDREN.pop(proc.pid, None)
         # runs on setup failure too, so the env never leaks into later modules
         if proc is not None and proc.poll() is None:
             proc.kill()
         kill_private_server(Tmux(socket_name=sock_name))
         mp.undo()
     if proc.returncode not in (0, -signal.SIGTERM):
-        raise RuntimeError(f"child agent exited {proc.returncode}:\n{err}")
+        raise RuntimeError(f"child agent exited {proc.returncode}:\n{err()}")
 
 
 # -- hook-fed stub adapter ----------------------------------------------------------------------

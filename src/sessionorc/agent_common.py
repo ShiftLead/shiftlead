@@ -41,6 +41,7 @@ from sessionorc.models import (
     normalize_review,
     owner_word,
     report_line,
+    winding,
 )
 
 log = logging.getLogger("shiftlead.agent")
@@ -207,12 +208,37 @@ DIGEST_TIMEOUT = 300.0
 DIGEST_READS = frozenset({"conversations", "transcript_digest"})
 # What the home routes to the node whose name is the record's `host` (design §4.4a "A node reports
 # and executes; the home decides"): the acts that touch a pane or the node's waiters, executed
-# there with no gate of their own. `name_check` is a read, routed with a `host` for a team start.
+# there with no gate of their own. `name_check` is a read, routed with a `host` for a team start, and so is
+# `disk` (§4.6 *The sweep's reading*, TD-1946): reads that name no record, addressed by a `host` param.
 # `identity_ack` is here for the same reason (§4.8a, review of PR #251): a record's identity alarms
 # are **node-owned**, observed where the socket is, so the node clears its own list and the home
 # learns it from the reply's record — a home that cleared its replica would have it back on the
 # next report. Without an `id` the RPC is the home's own list and never leaves this host.
-NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "decide", "create", "name_check", "identity_ack"})
+NODE_ACTS = frozenset(
+    {
+        "send",
+        "keys",
+        "kill",
+        "close",
+        "remove",
+        "decide",
+        "create",
+        "name_check",
+        "disk",
+        "disk_dry_run",
+        "identity_ack",
+        "mark_wind_down",
+    }
+)
+# The acts addressed by a `host` param rather than an `id`'s address (§4.4a *Acts across the link*): the link pops
+# the param before the handler runs at the node.
+HOST_ADDRESSED = frozenset({"create", "name_check", "disk", "disk_dry_run"})
+# The sweep's reading (§4.6, TD-1946) is waited for DIGEST_TIMEOUT across the link, chosen by the method's name as
+# DIGEST_READS chooses a read's; every other act waits ACT_TIMEOUT.
+DISK_ACTS = frozenset({"disk", "disk_dry_run"})
+# A dry run's one deadline over every kind (§4.6 *The sweep's reading*, TD-1946): inside the link's DIGEST_TIMEOUT,
+# checked between steps, so the reply comes at most one step past it.
+SWEEP_DRY_S = 240.0
 # What the home owns and edits on its own copy (§4.4a "Each field has one owner"), and pushes to
 # the node's replica in the same call so its stopping policies read the same intent. 4b generalises
 # the push to every home-owned field on reconnect.
@@ -365,10 +391,14 @@ def restart_waits_of(rec: Any) -> dict[str, Any] | None:
 def closer_of(caller: Any, closer: Any, at: str) -> dict[str, Any]:
     """A close's `closer: {by, why, at}` (§4.5 row 5 (b), TD-265): `closer` as handed in — the
     tick's word, or the home's over the link — only from a call with no session caller; otherwise
-    `person` for no caller and the caller's id for a session, which the acting gate verified."""
+    `person` for no caller and the caller's id for a session, which the acting gate verified. A handed-in
+    `wound_down_by` (rule 9's close of a manager after a Wind down, TD-1898) is kept on the same terms."""
     if mail.is_person(caller) and isinstance(closer, dict) and closer.get("by"):
         why = closer.get("why")
-        return {"by": str(closer["by"]), "why": str(why) if why else None, "at": at}
+        out = {"by": str(closer["by"]), "why": str(why) if why else None, "at": at}
+        if closer.get("wound_down_by"):
+            out["wound_down_by"] = str(closer["wound_down_by"])  # rule 9's manager close after a Wind down (TD-1898)
+        return out
     return {"by": "person" if mail.is_person(caller) else str(caller), "why": None, "at": at}
 
 
@@ -399,6 +429,7 @@ BACKUP_MEMBERS = (
     "org.yml",
     "hosts.yml",
     "profiles.yml",
+    "logins.yml",  # the host's logins (§4.2b *Where it lives*, TD-1974)
     "settings.yml",
     "witnessed",  # the witness log (§4.4 *The home keeps a log of what it witnesses*, TD-1386)
     "host-log.toml",  # its host file, the person's once written (§4.4 *The host file*, TD-1390)
@@ -948,12 +979,13 @@ def _source(source: str) -> str:
     return source
 
 
-def _grants(names: list[str]) -> list[str]:
-    """Validate a list of grant names against `GRANTS`, in canonical order."""
-    bad = [n for n in names if n not in GRANTS]
+def _grants(names: list[str], allowed: tuple[str, ...] = GRANTS) -> list[str]:
+    """Validate a list of grant names against `allowed` (the person's `GRANTS`; a create takes `ALL_GRANTS`, the
+    seat's `permit` too, TD-642), in canonical order."""
+    bad = [n for n in names if n not in allowed]
     if bad:
-        raise RpcError(f"unknown grant {', '.join(map(str, bad))}; grants are: {', '.join(GRANTS)}")
-    return [g for g in GRANTS if g in names]
+        raise RpcError(f"unknown grant {', '.join(map(str, bad))}; grants are: {', '.join(allowed)}")
+    return [g for g in allowed if g in names]
 
 
 async def _falsy(coro: Any) -> bool:
@@ -1342,7 +1374,7 @@ def tick_ready(s: Session, now: datetime) -> bool:
         and not s.out_of_work
         and not s.restart_wanted
         and not any(e.status == "claimed" and e.source == "declared" for e in s.progress)
-        and not (s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)))
+        and not (winding(s) or (s.run_until and now >= _parse(s.run_until)))
         and all(isinstance(git.get(k), int) for k in ("dirty", "unpushed"))
         and git.get("dirty") == 0
         and git.get("unpushed") == 0

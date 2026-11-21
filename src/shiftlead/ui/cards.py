@@ -323,6 +323,8 @@ def view(
     # is in every payload. A seat ends between questions by design, and drawn as *exited* the one
     # card behaving exactly as designed looked like the one that had failed.
     seats = seats or {}
+    # the org's director seat (§4.9b *The director seat*, TD-642): drawn in a row of its own at the Org's top
+    d["director"] = teamrun.is_director(s)
     d["seat"] = state in DEAD and s.get("id") in seats and not s.get("scale")  # a held extra is not on call
     # design §4.5a **Restart** (§6 rule 2 *A person's restart*, TD-250): where the control is drawn — a
     # supervised record that is idle, exited or closed and is not a seat (rule 3 fills one); the
@@ -394,6 +396,11 @@ def view(
     if d["editor"]:
         fl = uiconf.file_link()
         d["editor"] = {**d["editor"], "file": editor_file(reach), "first": fl["folder_first"], "wait": fl["wait"]}
+        # …and the folder the session's tool works in (§4.5a *Focus side panel, Git card: working in*, §4.2 *The
+        # record's `cwd`*, TD-1988): the same form for `cwd_root`, under the same gate, served under
+        # `folder_first: false` too — that changes only a press's first launch
+        if (root := str(s.get("cwd_root") or "")) and (cwd := editor_link(root, reach)):
+            d["editor"]["cwd_url"] = cwd["url"]
     # Focus header **‹› VS Code** on the transcript (§4.5a, TD-578): the Transcript page's own link, from
     # the record's `transcript`. Drawn only for a record on this host under an `open_in:` (`drawn`), and
     # hidden there until the hook reports the file; another host's file is not at that path here
@@ -422,6 +429,7 @@ def view(
     else:
         d["branch_full"] = "" if s.get("repo") else str(s.get("dir") or "")
     d["branch_line"] = _middle(d["branch_full"], BRANCH_SHOWN)
+    d["git_head"] = git_head(git)
     # what leads row 3 outside a team's own group, where the header does not say it: `host / repo ·`,
     # or `host /` before the directory of a session with no repo
     d["place_prefix"] = f"{d['place']} · " if s.get("repo") else f"{d['host']} / "
@@ -927,6 +935,21 @@ def gated_view(raw: Any) -> dict[str, str] | None:
 
 
 BRANCH_SHOWN = 34  # characters of row 3's branch a card shows before it shortens it in the middle
+
+
+def git_head(git: Mapping[str, Any]) -> str:
+    """The Focus Git card's summary before its counts (§4.5a *Focus side panel, Git card*, TD-1988): the branch;
+    where `dir` is a linked worktree (`git.worktree`, its folder name) that is not the branch's name, *worktree
+    <folder> · on branch <branch>*, and on a detached head there *worktree <folder> · detached at <sha>*. Read
+    from the record, so a remote record's card draws it too; a main checkout's reads as before."""
+    branch = str(git.get("branch") or "")
+    wt = str(git.get("worktree") or "")
+    if not wt:
+        return branch
+    if branch == "(detached)":
+        oid = str(git.get("oid") or "")
+        return f"worktree {wt} · " + (f"detached at {oid[:7]}" if oid else "detached")
+    return branch if wt == branch else f"worktree {wt} · on branch {branch}"
 
 
 def _middle(text: str, width: int) -> str:

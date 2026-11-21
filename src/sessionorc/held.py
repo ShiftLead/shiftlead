@@ -261,8 +261,8 @@ def _named(name: str, repos: dict[str, dict[str, Any]]) -> set[str]:
 
 def _read_state(e: Any, to: str, extras: dict[str, str] | None = None) -> str:
     """`open`, `answered` or `closed`, for the addressee `to`'s copy `e`: a seat that passed the ask up reads
-    `closed` from the pass on, whatever later closes its copy (§4.9b) — the passer by its `recommend.by`."""
-    if e.passed_up and to != PERSON and as_seat(str((e.recommend or {}).get("by") or ""), extras) == to:
+    `closed` from the pass on, whatever later closes its copy (§4.9b) — each passer by its `passes` entry."""
+    if e.passed_up and to != PERSON and any(as_seat(by, extras) == to for by in e.passers()):
         return "closed"
     if e.closed_by:
         return "answered"

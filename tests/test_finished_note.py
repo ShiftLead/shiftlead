@@ -158,3 +158,22 @@ async def test_a_live_seat_is_passed_over_so_a_start_beside_it_keeps_the_reading
     assert agent._host_rec["teams"]["g"]["usage_at_start"] == {"grind": {"week": 33}}
     agent._usage.clear()
     del agent.sessions[seat.id]
+
+
+async def test_a_start_writes_its_own_instant_and_a_running_team_keeps_it(agent):
+    """`teams.<team>.started_at` (§4.9a *A mark counts for its run only*, TD-1898): each counted start writes its own
+    instant, which a member started beside a running one, and a reading with no usage, leave or write as they count."""
+    await park_ticks(agent)
+    agent._usage.clear()
+    done = _rec("g1")
+    agent.sessions[done.id] = done
+    agent._mark_team_start("g")
+    first = agent._host_rec["teams"]["g"]["started_at"]
+    assert first and "usage_at_start" not in agent._host_rec["teams"]["g"]
+    live = _rec("g2", state="idle")
+    agent.sessions[live.id] = live
+    agent._host_rec["teams"]["g"]["started_at"] = "2026-01-01T00:00:00Z"
+    agent._mark_team_start("g")  # g2 runs: no start, so the instant stands
+    assert agent._host_rec["teams"]["g"]["started_at"] == "2026-01-01T00:00:00Z"
+    agent._mark_team_start("g", but=live)  # a replay of the one that runs is a start
+    assert agent._host_rec["teams"]["g"]["started_at"] != "2026-01-01T00:00:00Z"

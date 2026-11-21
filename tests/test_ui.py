@@ -45,7 +45,7 @@ def wait_state(client, sid, state, timeout=6.0):
 
 def pane_bytes(ws, words=None):
     """The next pane frame of a `/term/` socket. The attach's own words — text frames, the bridge's
-    `{clients, window}` reading among them (design §4.6, TD-480) — are not pane output: collected
+    `{grid}` reading among them (design §4.6, TD-1919) — are not pane output: collected
     into `words` when given, and passed over."""
     while True:
         msg = ws.receive()
@@ -189,7 +189,8 @@ def test_terminal_bridge(client, subprocess_agent, tmp_path):
     sid = r.headers["location"].rsplit("/", 1)[-1]
     wait_state(client, sid, "idle")
     with client.websocket_connect(f"/term/{sid}?cols=100&rows=20") as ws:
-        ws.send_text(json.dumps({"resize": [120, 30]}))
+        ws.send_text(json.dumps({"resize": [80, 24]}))  # changes nothing: the window is pinned (TD-1919)
+        ws.send_text(json.dumps({"fit": [120, 30]}))
         ws.send_text("echo BRIDGE-$((40+2))\r")
         buf = b""
         deadline = time.time() + 8
@@ -207,34 +208,23 @@ def test_terminal_bridge(client, subprocess_agent, tmp_path):
     client.post(f"/api/sessions/{sid}/kill")
 
 
-def test_the_term_socket_sends_the_clients_frame_for_the_real_window(client, subprocess_agent, tmp_path, monkeypatch):
-    """The `/term/` route wires `watch_clients` to a real tmux reading (design §4.6 *Attach behaviour
-    with another client present*, TD-522): the socket carries `{clients, window}` for the session's own
-    window, the attach counted among its clients. Read faster than the route's 5 s so a reading taken
-    before the attach's resize is followed by the one after it."""
-    import functools
-
-    from shiftlead.ui import app as ui_app
-
-    monkeypatch.setattr(ui_app, "watch_clients", functools.partial(ui_app.watch_clients, every=0.2))
+def test_the_term_socket_sends_the_grid_frame_for_the_real_window(client, subprocess_agent, tmp_path):
+    """The `/term/` route reads the session's window before it attaches and sends `{grid}` before the first pane
+    byte, whatever the address asks (design §4.6 *Attach behaviour with another client present*, TD-1919): a new
+    session's window is pinned at the person's grid, 120 x 40 with nothing set, and an attach leaves it so."""
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "clients"}, follow_redirects=False)
     sid = r.headers["location"].rsplit("/", 1)[-1]
     wait_state(client, sid, "idle")
     tmux = Tmux(socket_name=subprocess_agent.sock_name)
     with client.websocket_connect(f"/term/{sid}?cols=100&rows=20") as ws:
+        first = ws.receive()
+        assert first.get("text") and json.loads(first["text"]) == {"grid": [120, 40]}
+        ws.send_text("\r")
         words: list = []
-        frames = lambda: [w for w in words if "clients" in w]  # noqa: E731
-        deadline = time.time() + 8
-        while time.time() < deadline and not any(f["window"] == [100, 20] and f["clients"] >= 1 for f in frames()):
-            ws.send_text("\r")  # pane bytes keep `pane_bytes` returning while the words collect
-            pane_bytes(ws, words)
-        assert frames(), "no {clients, window} frame reached the page"
-        assert all(set(f) == {"clients", "window"} for f in frames())
-        got = frames()[-1]
-        out = tmux.run("display", "-p", "-t", f"={sid}:", "#{session_attached} #{window_width} #{window_height}")
-        n, w, h = (int(x) for x in out.stdout.split())
-        # no status line (TD-1410): the window's rows are the client's, none counted for the bar
-        assert got == {"clients": n, "window": [w, h]} == {"clients": 1, "window": [100, 20]}
+        pane_bytes(ws, words)
+        out = tmux.run("display", "-p", "-t", f"={sid}:", "#{window_width} #{window_height}")
+        # no status line (TD-1410): the window's rows are the grid's, none counted for the bar
+        assert out.stdout.split() == ["120", "40"], "the attach sized nothing"
     client.post(f"/api/sessions/{sid}/kill")
 
 
@@ -584,7 +574,7 @@ def test_the_terminal_font_and_renderer_are_bundled_and_served(client):
     html = (static.parent / "templates" / "focus.html").read_text()
     assert html.index("vendor/xterm.js") < html.index("vendor/addon-webgl.js")
     js = (static / "app.js").read_text()
-    assert "onContextLoss" in js and "AO.termRenderer(term)" in js and "AO.termFont(term, fit)" in js
+    assert "onContextLoss" in js and "AO.termRenderer(term)" in js and "AO.termFont(term)" in js
     readme = (static / "vendor" / "README.md").read_text()
     for f in (static / "vendor").rglob("*"):
         if f.suffix in (".js", ".css", ".woff2"):
@@ -2151,6 +2141,25 @@ def test_copy_on_select_is_the_persons_and_on_by_default(client, tmp_path):
     assert 'id="tcopysel" checked' in client.get(f"/focus/{sid}").text
     client.post(f"/api/sessions/{sid}/kill")
     call_sync("set_settings", person={"terminal": {"copy_on_select": None}})  # TD-275
+
+
+def test_the_focus_settings_route_takes_the_terminal_grid(client):
+    """§5 `person.terminal.grid` (§4.6, TD-1919, TD-1947): the Focus page's settings route takes
+    `{terminal: {grid: [cols, rows]}}` beside `copy_on_select`, through `set_settings`; a grid outside
+    the bounds, or two keys at once, is refused."""
+    from sessionorc.client import call_sync
+
+    for bad in (
+        {"terminal": {"grid": [19, 40]}},
+        {"terminal": {"grid": [120, 201]}},
+        {"terminal": {"grid": "120x40"}},
+        {"terminal": {"grid": [120, 40], "copy_on_select": True}},
+    ):
+        assert client.post("/api/settings/person", json=bad).status_code == 400, bad
+    assert client.post("/api/settings/person", json={"terminal": {"grid": [132, 43]}}).json()["ok"]
+    assert call_sync("settings")["person"]["terminal"]["grid"] == [132, 43]
+    call_sync("set_settings", person={"terminal": {"grid": None}})
+    assert "grid" not in (call_sync("settings")["person"].get("terminal") or {})
 
 
 def test_a_copy_on_release_says_so_with_copys_own_toast():

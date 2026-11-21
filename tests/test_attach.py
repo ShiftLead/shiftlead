@@ -639,7 +639,10 @@ async def test_a_link_that_fails_leaves_no_part(agent, tmp_path, monkeypatch):
         with pytest.raises(AgentError):
             await c.call("attach", id=s.id, data=_b64(b"4567"), upload=up, offset=4)
         # the folder emptied can be gone too: the tick's prune removes an empty attachments folder (TD-1663)
-        left = sorted(f.name for f in where.iterdir()) if where.is_dir() else []
+        try:  # read once: the prune can take the folder between a check and the listing
+            left = sorted(f.name for f in where.iterdir())
+        except FileNotFoundError:
+            left = []
         assert left == [], f"{where} still holds {left}"
         assert not agent._uploads, f"uploads still open: {list(agent._uploads)}"
 

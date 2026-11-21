@@ -193,6 +193,10 @@ def _replaces(outcome: dict[str, Any], intent: str) -> bool:
     return outcome.get("state") == "blocked" and intent in ("done", "dropped", "thread")
 
 
+PASS_UP_TO_DIRECTOR = (
+    "this pass goes to the org's director seat, which reads the asker's own text: send it again without "
+    "--question (design §4.9b *The director answers what is passed up to it*)"
+)
 PASS_UP_QUESTION = (
     "a pass to the person carries --question: the asker's question in one plain sentence, then its context "
     "(design §4.9b)"
@@ -1173,8 +1177,9 @@ class MailMixin:
         if e.kind not in ("ask", "steer"):
             raise RpcError(f"{mid} is a {e.kind}: only an ask or a steer is taken to the person on its thread")
         if e.passed_up:
+            holder = "the person" if e.passed_to == PERSON else f"the director seat {e.passed_to}"
             raise RpcError(
-                f"{mid} was passed up at {e.passed_up}: the person holds it already — wait for their answer "
+                f"{mid} was passed up at {e.passed_up}: {holder} holds it already — wait for their answer "
                 "(design §4.9b)"
             )
         if not e.open:
@@ -2559,8 +2564,13 @@ class MailMixin:
             raise RpcError(f"{id} is a {e.kind}: only an ask or a steer is passed up (design §4.9b)")
         if me.id not in e.to:
             raise RpcError(f"{id} was copied to you, not addressed to you: its addressee passes it up (design §4.9b)")
-        if e.passed_up:
-            raise RpcError(f"{id} was passed up at {e.passed_up}: a question goes to the person once (design §4.9b)")
+        mine = self._addr(str(caller))
+        if me.id in e.passers() or mine in e.passers():
+            raise RpcError(f"{id} was passed up at {e.passed_up}: each seat passes a question up once (design §4.9b)")
+        if e.passed_up and e.passed_to != mine:
+            raise RpcError(
+                f"{id} was passed up at {e.passed_up}: {e.passed_to} holds it now, wait for their answer (design §4.9b)"
+            )
         if not e.open:
             raise RpcError(f"{id} is already closed ({e.closed_reason}): there is nothing to pass up (design §4.9b)")
         if e.from_ == PERSON:
@@ -2584,6 +2594,10 @@ class MailMixin:
                 "(design §4.10)"
             )
         asked = _clean_question(question)
+        if director := self._director_to_pass_to(mine, self._addr(e.from_)):
+            if asked:
+                raise RpcError(PASS_UP_TO_DIRECTOR)
+            return await self._pass_to_director(e, me.id, director, line, picks)
         if not asked:
             raise RpcError(PASS_UP_QUESTION)
         if len(asked.encode()) > mail.TEXT_CAP:
@@ -2597,11 +2611,10 @@ class MailMixin:
         self._check_person_depth(e.from_, question=True)  # it is the asker's question in the person inbox
         at = now_iso()
         rec = {"by": me.id, "text": line, "question": asked}
-        up = self._copy(e)
+        self._mark_pass(id, {"by": me.id, "at": at, "to": PERSON, "recommend": rec})  # every copy says it went up
+        up = self._copy(next(x for x in me.inbox if x.id == id))
         up.read_at = None
         up.answers = picks
-        up.passed_up, up.recommend = at, rec
-        self._mark(id, passed_up=at, recommend=rec)  # every copy says it went up, and with what
         self.person_inbox.append(up)
         self.person_store.save(self.person_inbox)
         await self._push_changes()
@@ -2609,6 +2622,54 @@ class MailMixin:
         if warnings:
             got["warnings"] = warnings
         return got
+
+    def _director_to_pass_to(self, passer: str, asker: str) -> str | None:
+        """The org's director seat a pass goes to (design §4.9b *The director answers what is passed up to it*,
+        TD-661): its address where one stands that can be filled (`_is_director`: not suspended, sat out or at
+        its fill ceiling) and neither the passer nor the asker is it; else None, and the pass goes to the person."""
+        for key, r in self._graph().items():
+            if key not in (passer, asker) and self._is_director(r):
+                return key
+        return None
+
+    def _mark_pass(self, msg: str, one: dict[str, Any]) -> None:
+        """A pass written on every copy of `msg` (§4.9b, TD-661): `passes` gains it, `passed_up` and `recommend`
+        are the latest's, and a pass to a seat adds the seat to the entry's `to`, so the person's reply is copied
+        to every passer and the seat's copy is addressed to it. Each copy gets its own lists."""
+        copies = [e for r in self._graph().values() for e in r.holds(msg)] + [
+            e for e in self.person_inbox if e.id == msg
+        ]
+        for e in copies:
+            e.passes = [*[dict(p) for p in e.passes], dict(one)]
+            e.passed_up, e.recommend = one["at"], dict(one["recommend"])
+            if one["to"] != PERSON and one["to"] not in e.to:
+                e.to = [*e.to, one["to"]]
+        for r in self._graph().values():
+            if r.holds(msg):
+                self._save(r)
+        if any(e.id == msg for e in self.person_inbox):
+            self.person_store.save(self.person_inbox)
+
+    async def _pass_to_director(
+        self, e: MailEntry, by: str, director: str, line: str, picks: list[str]
+    ) -> dict[str, Any]:
+        """A pass to the org's director seat (design §4.9b, TD-661): the asker's own entry in the director's
+        inbox — never refused as full, since the question is already counted on the asker's side — which makes
+        the seat due by `asks` (§6 rule 3), carrying the passer's answers, its recommendation first. The
+        director answers it with `--source`, or passes it on to the person, its pass the last."""
+        at = now_iso()
+        rec = {"by": by, "text": line}
+        self._mark_pass(e.id, {"by": by, "at": at, "to": director, "recommend": rec})
+        d = self._graph()[director]
+        if not any(x.id == e.id for x in d.inbox):  # an addressee already holds its copy, now passed to it
+            mine = self._copy(next(x for r in self._graph().values() for x in r.holds(e.id)))
+            mine.read_at = None
+            mine.answers = picks
+            d.inbox.append(mine)
+        self._save(d)
+        self._poke_waits()
+        await self._push_changes()
+        return {"id": director, "msg": e.id, "passed_up": at, "recommend": rec, "answers": picks}
 
     async def rpc_msg_withdraw(self, id: str, caller: Any = None) -> dict[str, Any]:
         """`ao msg --withdraw <id>` (design §4.10 *Withdrawing a question*, TD-1382): a sender takes

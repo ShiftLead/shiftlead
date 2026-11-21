@@ -1,7 +1,9 @@
-"""The Focus terminal tells tmux its grid once per gesture (TD-794, design §4.6 *Attach behaviour with
-another client present*): a drag or a put away fires the box's observer once a frame, and each resize
-makes the tool repaint over lines tmux keeps. `AO.resizeSender` sends the last grid once the box has been
-still, and nothing when tmux already has it. The page's rule runs as itself under node."""
+"""The Focus terminal draws at the pane's grid, not at its box's (design §4.6 *Attach behaviour with another client
+present*, TD-1919): a box shorter than the grid shows a run of its rows — the box-height run ending at the lower of the
+cursor's row and the last row with text (`AO.viewStart`) — and the view's keep (`AO.viewKeep`) holds the rows it had
+from its own move, a scroll or a jump until a key, a box change, a `grid` frame or a settled change of the cursor's row.
+The wheel, a drag and a page move the view within the grid first and send only the rest. The page's rules run as
+themselves under node."""
 
 from __future__ import annotations
 
@@ -31,29 +33,56 @@ global.location = { pathname: "/", protocol: "http:", host: "x" };
 global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
 const AO = window.AO;
-// a clock the probe moves: `tick(ms)` runs what is due
-let now = 0, seq = 0; const due = new Map();
-const timers = { set: (f, ms) => { due.set(++seq, { f, at: now + ms }); return seq; }, clear: (id) => due.delete(id) };
-const tick = (ms) => { now += ms; for (const [id, t] of [...due]) if (t.at <= now) { due.delete(id); t.f(); } };
-let open = true; const sent = [];
-const send = AO.resizeSender((grid) => open && (sent.push(grid.join("x")), true), 150, timers);
 const out = {};
-// a drag: a grid a frame for half a second, then still
-for (let c = 120; c > 90; c--) { send(c, 40); tick(16); }
-out.during = sent.slice(); tick(150); out.drag = sent.slice();
-// the same grid again (a refit that changed nothing): nothing sent
-send(91, 40); tick(200); out.same = sent.slice();
-// a closed socket sends nothing, and the grid is tried again on the next change
-open = false; send(100, 40); tick(200); open = true; send(100, 40); tick(200); out.closed = sent.slice();
-// a grid sent at attach (`mark`) is not sent again, and a pending one is dropped
-send(80, 30); send.mark(110, 40); tick(200); send(110, 40); tick(200); out.marked = sent.slice();
-// the default timers call `setTimeout` as a browser needs, never as a method of another object
-const later = [];
-const bound = (self) => { if (self !== undefined) throw new TypeError("Illegal invocation"); };
-global.setTimeout = function (f) { "use strict"; bound(this); later.push(f); return later.length; };
-global.clearTimeout = function () { "use strict"; bound(this); };
-const plain = []; const dflt = AO.resizeSender((grid) => (plain.push(grid.join("x")), true));
-dflt(70, 20); later.forEach((f) => f()); out.defaults = plain;
+// the run shown, with no keep: a fresh shell's prompt at its top, a full screen, the cursor above the last text, a box
+// as tall as the grid
+out.start = [AO.viewStart(3, 3, 10, 40), AO.viewStart(39, 39, 10, 40), AO.viewStart(10, 39, 10, 40),
+  AO.viewStart(5, 30, 10, 40), AO.viewStart(39, 39, 40, 40), AO.viewStart(39, 39, 50, 40)];
+out.rows = [AO.boxRows(200, 0, 17), AO.boxRows(10, 0, 17), AO.boxRows(212, 12, 20)];
+// the scroll offset of a run: the top row shows the gap; a run below it starts at its row past the terminal's border
+out.scroll = [AO.viewScroll(0, 20, 6), AO.viewScroll(30, 20, 6), AO.viewScroll(30, 20, 0), AO.viewScroll(7, 17.5, 4)];
+out.page = [AO.pageRows(10, 40), AO.pageRows(1, 40), AO.pageRows(40, 40)];
+out.axis = [AO.touchAxis(3, 9), AO.touchAxis(12, 4), AO.touchAxis(4, -12), AO.touchAxis(-10, 10)];
+out.grid = [AO.gridOf({ width: 812, height: 412 }, { x: 12, y: 12 }, { width: 8, height: 20 }),
+  AO.gridOf({ width: 0, height: 0 }, { x: 12, y: 12 }, { width: 8, height: 20 }),
+  AO.gridOf({ width: 812, height: 412 }, { x: 0, y: 0 }, null)];
+out.fits = [AO.gridFits([20, 5]), AO.gridFits([500, 200]), AO.gridFits([19, 40]), AO.gridFits([100, 201])];
+// a short shell paged up: nothing above the top row to move through, so the page goes to tmux and the keep holds the
+// rows, its history passing through them (the cursor kept on its row by copy mode)
+let k = AO.viewKeep();
+k.frame(3, true, 0, 30);
+out.short = { sent: k.move(-9, 0), keeping: k.keeping(), tops: [k.frame(3, true, 0, 30), k.frame(3, false, 0, 30)] };
+// a full screen, the box ten rows: a scroll first moves the view up through the grid, then goes to tmux; at tmux's
+// history top the grid's top rows show
+k = AO.viewKeep(); k.frame(39, true, 30, 30);
+out.full = { first: k.move(-9, 30), top1: k.frame(39, true, 30, 30) };
+out.full.second = k.move(-30, 30); out.full.top2 = k.frame(39, true, 30, 30);
+out.full.down = k.move(5, 30); out.full.top3 = k.frame(39, false, 30, 30);
+out.full.past = k.move(40, 30); out.full.top4 = k.frame(39, false, 30, 30);
+// …then cleared from the composer: the cursor's row, read the same on two frames, releases the keep
+out.cleared = [k.frame(0, true, 0, 30), k.keeping(), k.frame(0, true, 0, 30), k.keeping()];
+// a keep while the pane streams: a row that moves between two socket messages of one redraw releases nothing, and a
+// change is measured against the row settled when the keep started
+k = AO.viewKeep(); k.frame(39, true, 30, 30); k.move(-5, 30); k.frame(39, true, 30, 30); k.frame(39, true, 30, 30);
+const stream = [];
+for (const r of [38, 39, 37, 39, 38, 39]) stream.push(k.frame(r, true, 30, 30));
+out.stream = { tops: stream, keeping: k.keeping(), unsettled: k.unsettled(39) };
+k.frame(20, true, 30, 30); out.stream.moved_once = k.keeping();
+k.frame(20, true, 30, 30); out.stream.moved = k.keeping();
+// a downward move while no keep stands sends its lines and starts none
+k = AO.viewKeep(); k.frame(39, true, 30, 30);
+out.down = { sent: k.move(4, 30), keeping: k.keeping() };
+// a jump in a ten-row box on a forty-row grid: a history row lands at the top (row 0); one on the live screen above the
+// clamp is the top row shown; one inside the grid's last rows as near the top as they allow; a keep anew, its row the
+// answer's cursor
+k = AO.viewKeep();
+out.jump = [k.land(0, 39, 30), k.land(12, 39, 30), k.land(35, 39, 30)];
+out.jump_keeps = [k.frame(39, true, 30, 30), k.frame(39, false, 30, 30), k.keeping()];
+// a jump within a standing keep keeps the landed row; a miss (`release`) ends it
+k.move(-3, 30); out.jump_again = k.land(7, 39, 30); out.jump_again_top = k.frame(39, true, 30, 30);
+k.release(); out.miss = [k.keeping(), k.frame(39, true, 30, 30)];
+// a jump's settled row is the answer's: the cursor reading another row on two frames releases it
+k.land(5, 20, 30); k.frame(21, true, 30, 30); out.jump_moved = [k.keeping(), (k.frame(21, true, 30, 30), k.keeping())];
 console.log(JSON.stringify(out));
 """
 
@@ -70,19 +99,50 @@ def _probe() -> dict:
 
 
 @pytest.mark.unit
-def test_a_gesture_sends_one_resize_with_its_last_grid_and_an_unchanged_grid_none():
+def test_the_run_shown_the_rows_the_page_and_the_box_grid():
     got = _probe()
-    assert got["during"] == []  # nothing while the box still moves
-    assert got["drag"] == ["91x40"]  # 30 frames, one send, the final grid
-    assert got["same"] == ["91x40"]
-    assert got["closed"] == ["91x40", "100x40"]  # not counted as sent while the socket was closed
-    assert got["marked"] == ["91x40", "100x40"]  # the attach's grid is tmux's already; the pending one dropped
-    assert got["defaults"] == ["70x20"]  # a browser's setTimeout, called unbound
+    assert got["start"] == [0, 30, 10, 5, 0, 0]  # the cursor's row never above the run
+    assert got["rows"] == [11, 1, 10]
+    assert got["page"] == [9, 1, None]
+    assert got["scroll"] == [0, 606, 600, 127]  # never a part of the row above the run (TD-1947)
+    assert got["axis"] == [None, "x", "y", "y"]
+    assert got["grid"] == [[100, 20], None, None]
+    assert got["fits"] == [True, True, False, False]
 
 
 @pytest.mark.unit
-def test_the_focus_terminal_sends_its_grid_through_the_sender():
-    js = (UI / "static" / "app.js").read_text()
-    assert "term.onResize(({ cols, rows }) => sendGrid(cols, rows));" in js
-    assert "sendGrid.mark(...grid);" in js  # the grid sent at attach
-    assert js.count("JSON.stringify({ resize:") == 2  # the attach's and the sender's, nothing else
+def test_a_short_shell_paged_up_shows_its_history_through_the_rows_it_had():
+    got = _probe()
+    assert got["short"] == {"sent": {"dir": "up", "lines": 9}, "keeping": True, "tops": [0, 0]}
+
+
+@pytest.mark.unit
+def test_a_scroll_moves_the_view_through_the_grid_first_and_a_clear_releases_the_keep():
+    full = _probe()["full"]
+    assert full["first"] is None and full["top1"] == 21  # within the grid: nothing sent
+    assert full["second"] == {"dir": "up", "lines": 9} and full["top2"] == 0  # the rest to tmux; the top rows show
+    assert full["down"] is None and full["top3"] == 5  # back down within the grid
+    assert full["past"] == {"dir": "down", "lines": 15} and full["top4"] == 30  # past the run it would show: sent
+    assert _probe()["cleared"] == [30, True, 0, False]  # one frame's reading releases nothing; two do
+
+
+@pytest.mark.unit
+def test_a_keep_holds_while_the_pane_streams_against_its_settled_row():
+    stream = _probe()["stream"]
+    assert stream["tops"] == [25] * 6 and stream["keeping"] is True
+    assert stream["moved_once"] is True and stream["moved"] is False
+
+
+@pytest.mark.unit
+def test_a_downward_move_with_no_keep_sends_its_lines_and_starts_none():
+    assert _probe()["down"] == {"sent": {"dir": "down", "lines": 4}, "keeping": False}
+
+
+@pytest.mark.unit
+def test_a_jump_lands_on_the_top_row_shown_and_keeps_it():
+    got = _probe()
+    assert got["jump"] == [0, 12, 30]
+    assert got["jump_keeps"] == [30, 30, True]
+    assert got["jump_again"] == 7 and got["jump_again_top"] == 7
+    assert got["miss"] == [False, 30]
+    assert got["jump_moved"] == [True, False]

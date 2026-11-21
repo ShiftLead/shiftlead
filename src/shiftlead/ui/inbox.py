@@ -55,7 +55,7 @@ from . import render as rendermod
 from . import uiconf
 from .cards import MODE_VIA_WORDS, _clock, _first_line, alarm_note, alarm_to_view, fill_words, subagent_held
 from .common import _age, _countdown, _instant, _iso, _left, editor_file_link, host_name, templates
-from .queue import HOLDER, HOLDER_ROWS, asker_repos, design_link, item_home
+from .queue import HOLDER, HOLDER_ROWS, asker_repos, beside_td, design_link, item_home, same_td
 
 # -- the Inbox page (design §4.5 screen 6, §4.5a **Inbox page**, §4.10; TD-069 step 1) -------------
 
@@ -3235,7 +3235,9 @@ def ledger_for_you(
     `applying_words` while a press on it lands (§4.4 *A press is drawn as it lands*, TD-1508),
     `root` and `url`, and for **Start session** (TD-678) the entry's `type`, `why` (`yours` or
     `decision`) and `holder`, the id of the first live record claiming it — with `held` the names of
-    the live records of that repo claiming it; an entry an
+    the live records of that repo claiming it (by `same_td`), and `own`, the person's own live session on it by its
+    claim or its `with-td-` name (`queue.beside_td`), first by id, where **Open session** goes first (TD-1984); an
+    entry an
     open decided line's `Context:` names (the repo's work orders' `refs`) is left out; the team the
     rail's *Teams* picks filter by — the definitions' team for the repo (`named`, by resolved
     checkout), else the team most of its live records carry, else none; the link the Repo page
@@ -3320,11 +3322,17 @@ def ledger_for_you(
                 s
                 for s in mine
                 if any(
-                    isinstance(p, dict) and p.get("ref") == e["id"] and p.get("status") == "claimed"
+                    isinstance(p, dict) and same_td(p.get("ref"), e["id"]) and p.get("status") == "claimed"
                     for p in s.get("progress") or []
                 )
             ]
             held = [str(s.get("name") or s.get("id")) for s in holders]
+            # the person's own live session on it, by its claim or its `with-td-` name, by id: the row's **Open
+            # session** goes there first, though nothing holds the entry (§4.5a *Inbox row: ledger entry*, TD-1984)
+            own = sorted(
+                (s for s in mine if not s.get("unattended") and (s in holders or beside_td(s.get("name"), e["id"]))),
+                key=lambda s: str(s.get("id")),
+            )
             owner = str(e.get("owner") or "").lower() == ledger_mod.PERSON_OWNER
             # the labels and, beside each, what it leads to (§4.10 *The answers' split*, TD-913): a card draws both
             got = e.get("consequences") if isinstance(e.get("consequences"), list) else []
@@ -3378,6 +3386,7 @@ def ledger_for_you(
                     "pri": (str(e.get("priority") or "")[:1] or "?").upper(),
                     "held": ", ".join(held),
                     "holder": str(holders[0].get("id") or "") if holders else "",  # **Open session** (TD-678)
+                    "own": str(own[0].get("id") or "") if own else "",  # the person's own, first (TD-1984)
                     "type": str(e.get("type") or ""),  # the role **Start session** takes, by `entries:`
                     "why": "yours" if owner else "decision",  # `repoconfig.WORK_OPENING`'s key
                     "until": str(e.get("until") or ""),  # *held until <it>* (TD-795)

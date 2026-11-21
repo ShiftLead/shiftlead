@@ -38,7 +38,7 @@ async def _committed(agent) -> None:
     await asyncio.wait_for(drained(), 15)
 
 
-def test_init_tracks_the_three_files_and_ignores_the_rest(tmp_path):
+def test_init_tracks_the_definition_files_and_ignores_the_rest(tmp_path):
     home = tmp_path / "home"
     home.mkdir()
     for f in ("org.yml", "settings.yml", "hosts.yml"):
@@ -56,7 +56,7 @@ def test_init_tracks_the_three_files_and_ignores_the_rest(tmp_path):
     assert defs.commit("edited by hand", home=home) is False, "nothing changed: no commit"
 
 
-def test_a_gitignore_of_the_persons_own_is_kept_and_the_three_let_in(tmp_path):
+def test_a_gitignore_of_the_persons_own_is_kept_and_the_definitions_let_in(tmp_path):
     home = tmp_path / "home"
     home.mkdir()
     (home / ".gitignore").write_text("*.bak\n")

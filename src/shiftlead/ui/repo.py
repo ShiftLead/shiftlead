@@ -959,7 +959,7 @@ def seat_names(row: Mapping[str, Any]) -> list[str]:
 
 
 # the keys the client keys the page's elements on, each kind its own prefix, so no name meets another's
-TEAM_KEY, STRIP, REPO_LINE, HEADING, NO_REPO = "team:", "strip:", "repo:", "head:", "norepo"
+TEAM_KEY, STRIP, REPO_LINE, HEADING, NO_REPO, DIRECTOR = "team:", "strip:", "repo:", "head:", "norepo", "director"
 
 
 def strip_group(key: str, label: str, members: list[dict[str, Any]], repo: str, project: str) -> dict[str, Any]:
@@ -1020,7 +1020,11 @@ def org_layout(
     and last **No repo**, the sessions in no registered repo. A registered repo with no team is its
     line alone; a project's repo this host neither reads nor has a team on is not drawn.
 
-    Each item carries `kind` (`heading`, `repo`, `team`, `strip`, `norepo`) and `key`, which the
+    First of all, where a record holds it, **the org's director seat** (`kind: director`): a section of its own
+    above every heading, its card alone, as *No repo* is drawn, and no row of the rollup's, which lists teams and
+    repos (§4.9 *The Sessions page*, §4.9b *The director seat*, TD-642).
+
+    Each item carries `kind` (`director`, `heading`, `repo`, `team`, `strip`, `norepo`) and `key`, which the
     client keys its elements on. None for the flat page."""
     if groups is None:
         return None
@@ -1035,6 +1039,9 @@ def org_layout(
     roots = {name: root for root, name in by_root.items()}  # *New session here*'s directory (TD-1204)
     teams = [g for g in groups if g["team"] != NO_TEAM]
     loose = next((g["members"] for g in groups if g["team"] == NO_TEAM), [])
+    # the org's director seat, in a section of its own at the top, under no heading (§4.9b *The director seat*)
+    directors = [m for m in loose if m.get("director")]
+    loose = [m for m in loose if not m.get("director")]
     by_repo: dict[str, list[dict[str, Any]]] = {}
     for g in teams:
         by_repo.setdefault(str(g.get("repo") or ""), []).append(g)
@@ -1052,6 +1059,8 @@ def org_layout(
     # a repo in no project is its own heading, under no project's key: a project named like it is another's
     heads += [("", n, [n]) for n in rest]
     out: list[dict[str, Any]] = []
+    if directors:
+        out.append({**strip_group(DIRECTOR, "Director", directors, "", ""), "kind": "director"})
     for key, label, names in heads:
         names = [n for n in names if n in readings or n in by_repo or n in strays]
         if not names:

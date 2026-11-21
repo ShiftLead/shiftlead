@@ -53,12 +53,13 @@ def persons_own(r: Session) -> bool:
 def open_asks(records: Mapping[str, Session]) -> list[MailEntry]:
     """Every open `ask` to a session (§6 rule 13 *The work it reads*), once per id, in the order the records hold
     them: an `ask` open in a session's mailbox — a handed entry among them — never one whose `to` includes the
-    person, nor one a seat passed up (`passed_up`). A `steer` is never one: it lapses to its default."""
+    person, nor one a seat passed up to the person (`passed_to`); one passed up to the director seat is the director's
+    open ask (TD-661). A `steer` is never one: it lapses to its default."""
     seen: set[str] = set()
     out: list[MailEntry] = []
     for r in records.values():
         for e in r.inbox:
-            if e.id in seen or e.kind != "ask" or not e.open or e.passed_up or PERSON in e.to:
+            if e.id in seen or e.kind != "ask" or not e.open or e.passed_to == PERSON or PERSON in e.to:
                 continue
             seen.add(e.id)
             out.append(e)

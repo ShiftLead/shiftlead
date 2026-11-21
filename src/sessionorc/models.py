@@ -32,14 +32,23 @@ SOURCES = ("declared", "derived", "scraped")
 ProgressStatus = Literal["claimed", "done", "dropped"]
 PROGRESS_STATUSES = ("claimed", "done", "dropped")
 
-# Grants a session record can hold in `capabilities` (design §4.8). `control`: the session may
-# act on other sessions through the host agent (§9 invariant 11).
+# Grants the person gives a session (design §4.8): the New session form's boxes, `ao grant`, the Focus
+# grants chip. `control`: the session may act on other sessions through the host agent (§9 invariant 11).
 GRANTS = ("control",)
+# Every grant a record can hold in `capabilities`: the person's, and `permit`, the director seat's —
+# `decide` alone, on any unattended record of the org, without being among its controllers (TD-642) —
+# written with the seat at its start, never offered on a form or by `ao grant`.
+ALL_GRANTS = (*GRANTS, "permit")
 
 
 def has_control(capabilities: list[str] | None) -> bool:
     """Whether a record's grants include `control`."""
     return "control" in (capabilities or [])
+
+
+def has_permit(capabilities: list[str] | None) -> bool:
+    """Whether a record's grants include `permit` (design §4.8, TD-642)."""
+    return "permit" in (capabilities or [])
 
 
 # Message kinds (design §4.10): a small closed set, so a message's purpose is read off its envelope.
@@ -106,6 +115,8 @@ NODE_OWNED = frozenset(
         "exit_code",
         "ended",
         "git",
+        "cwd",
+        "cwd_root",
         "model",
         "context",
         "subagents",
@@ -127,6 +138,7 @@ NODE_OWNED = frozenset(
         "gated",
         "wrapup_at",
         "wrapup_by",
+        "wind_down",
         "doorbell_failed",
         "ring_seen",
         "tool_version",
@@ -211,7 +223,7 @@ HOME_OWNED = frozenset(
 )
 IDENTITY = frozenset({
     "id", "name", "kind", "adapter", "dir", "profile", "repo", "worktree", "adapter_id", "transcript", "created",
-    "host", "start_context", "model_file",
+    "host", "start_context", "model_file", "scratch", "log",
 })  # fmt: skip
 
 # Urgent-first order (design §4.5). Lower sorts first. `unreachable` is placed by the UI
@@ -227,6 +239,14 @@ STATE_RANK: dict[str, int] = {
     "exited": 7,
     "closed": 8,
 }
+
+
+def winding(s: Any) -> bool:
+    """Whether a record, or its view, is being wound down (design §4.9a *A wind-down closes its members*, TD-1898):
+    a wrap-up typed (`wrapup_at`), the stop time's sent (`wrapup_sent_at`), or a Wind down's mark (`wind_down`).
+    The one reading every pass that holds a stopping record off — the doorbell, the nudges, the restarts — reads."""
+    get = s.get if isinstance(s, Mapping) else lambda k: getattr(s, k, None)
+    return bool(get("wrapup_at") or get("wrapup_sent_at") or get("wind_down"))
 
 
 def now_iso() -> str:
@@ -530,6 +550,11 @@ class MailEntry:
     # first; the asker's and the passer's copies keep their own.
     passed_up: str | None = None
     recommend: dict[str, str] | None = None
+    # One pass per passer (design §4.9b, TD-661): `{by, at, to, recommend}`, oldest first — a techlead's pass to
+    # the org's director seat, then the director's to the person. `to` is who holds it to answer after that pass
+    # (the director's address, or `person`); `recommend` keeps each passer's own line, `recommend` above the
+    # latest. Empty on an entry never passed up, and on one passed before TD-661 (`passed_to` reads it then).
+    passes: list[dict[str, Any]] = field(default_factory=list)
     # Answered from the record (design §4.9b, TD-075 step 2). `source` is on a **reply**: one line
     # saying where its answer is written down (a file and section, a dated decision), at most
     # `mail.SOURCE_CAP` characters, only ever drawn as text. `answered` is on the **FYI** the home
@@ -600,7 +625,8 @@ class MailEntry:
             # one moved from a seat that could not answer owes on its copy, not here (§4.9b, TD-1480)
             return self.from_ == PERSON and not self.outcome and self.closed_reason != "rerouted"
         return (
-            (PERSON in self.to or bool(self.passed_up))  # a question passed up is the person's to answer (§4.9b)
+            # passed up to the person: theirs to answer (§4.9b); one a director seat answered is not (TD-661)
+            (PERSON in self.to or self.passed_to == PERSON)
             and self.kind in ASK_KINDS
             and self.closed_reason in ("replied", "go_with_it")
             and not self.outcome
@@ -634,6 +660,22 @@ class MailEntry:
         if self.closed_reason:
             return False
         return not (self.closed_by or self.expired_at)
+
+    @property
+    def passed_to(self) -> str | None:
+        """Who holds a passed-up question to answer (design §4.9b, TD-661): the latest pass's `to` — the
+        director seat's address or `person` — and `person` for a pass made before `passes` was kept; None
+        while it was never passed up."""
+        if not self.passed_up:
+            return None
+        return str((self.passes[-1] if self.passes else {}).get("to") or PERSON)
+
+    def passers(self) -> list[str]:
+        """Each seat that passed this question up, oldest first (design §4.9b, TD-661)."""
+        if self.passes:
+            return [str(p.get("by") or "") for p in self.passes]
+        by = str((self.recommend or {}).get("by") or "") if self.passed_up else ""
+        return [by] if by else []
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -1219,6 +1261,10 @@ class Session:
     tool_open_at: str | None = None
     stalled_ticks: int = 0
     run_log: str | None = None
+    # False for a Tools page's tools shell alone (design §4.2b *The tools shell*, TD-1972): its pane is
+    # piped to no run log, the tick captures nothing of it, and a send to it keeps no text. Set at its
+    # start and never changed, so identity.
+    log: bool = True
     # The run log of the exited session of the same name this one replaced (design §4.1, TD-030):
     # the name is reused, so the previous run stays reachable from the record that took it over.
     previous_run: str | None = None
@@ -1238,6 +1284,10 @@ class Session:
     closer: dict[str, Any] | None = None
     seen_at: str | None = None  # the last turn a person saw: a look stamps its `turn_at` (§4.2 *Unseen*, TD-1228)
     git: dict[str, Any] | None = None  # branch, dirty, ahead, behind, files (sessionorc.gitinfo)
+    # the working directory the tool last reported where it is not `dir`, as a real path, and its root as the status
+    # read writes it (design §4.2 *The record's `cwd`*, TD-1988): for the page alone, never read by what `dir` drives
+    cwd: str | None = None
+    cwd_root: str | None = None
     capabilities: list[str] = field(default_factory=list)  # grants, from GRANTS (design §4.8)
     # Membership (design §4.8, TD-036): the session ids that may act on *this* session. The list
     # lives on the target, not on the lead, so the gate is one lookup and nothing has to be
@@ -1257,6 +1307,9 @@ class Session:
     # writes with `<adapter>/<model>` whenever `model` is set or changes, for a commit hook's
     # `Agent-Model:` trailer (design §4.2 *And the model*, TD-638); None outside a git tree or with no agent.
     model_file: str | None = None
+    # The run's scratch directory, `<scratch_root>/shiftlead-<uid>/<token>/` (design §4.6 *A session's scratch*,
+    # TD-1944): `SHIFTLEAD_SCRATCH` and `TMPDIR` in its env; a restart and a Resume keep it, a fresh start a new one.
+    scratch: str | None = None
     # `{tokens, at, window}`: how much context the session's last turn sent, when the adapter can
     # tell (design §4.3 `context`, §6 rule 5, TD-190) — `at` the turn's own time, `window` the
     # model's, kept beside the tokens because the model may change mid-run. Observed like `model`:
@@ -1518,6 +1571,12 @@ class Session:
     # read from the caller as `closer` is; set and cleared with `wrapup_at`. A record that leaves on its own
     # after the person's Wind down names nobody at its end, and this is what says the person stopped it.
     wrapup_by: str | None = None
+    # A Wind down's mark (design §4.9a *A wind-down closes its members*, TD-1898): `{at, by, waits}`, stamped by a
+    # `send(wrapup=True, wind_down=True)` once its prompt is submitted — `by` read from the caller as `wrapup_by`
+    # is, `waits` true while the wrap-up's turn is still to run. A person's send moves `at` and sets `waits` (and,
+    # on a member's mark, `by` to `person`); a controller's plain send clears it; mail never touches it. It holds
+    # the record off every pass that holds a wrapped-up record off (`winding`), as `wrapup_at` does.
+    wind_down: dict[str, Any] | None = None
     # A doorbell that failed to submit twice (design §4.10): `{at, error}`, so the sender and the
     # page can see that the ring did not land; cleared by the next ring that does.
     doorbell_failed: dict[str, str] | None = None
@@ -1651,8 +1710,8 @@ class Session:
             if (
                 (e.owes and e.id not in asking)
                 if e.handed_entry
-                else (e.open and e.kind in ("ask", "steer") and not e.passed_up)
-            )  # passed up: the person's to answer now (§4.9b), no seat need be filled for it
+                else (e.open and e.kind in ("ask", "steer") and (not e.passed_up or where(e.passed_to or "") == mine))
+            )  # passed up: the holder's to answer now — the director's, else the person's (§4.9b, TD-661)
             and any(where(x) == mine for x in e.to)
             and (not handed_only or e.handed_entry)
         ]

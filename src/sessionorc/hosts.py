@@ -12,7 +12,12 @@ local:
   repos_registry: ~/my-repos.txt   # one main-checkout path per line, `#` comments, in place of both rosters;
                                    # unset: `repos.txt` under the home, then agent-cadence's
                                    # ~/.config/agent-cadence/repos.txt imported on the default home (§5)
-  runs_keep_days: 30       # run logs of exited/closed sessions older than this are deleted; 0 keeps all
+  runs_keep_days: 30       # run logs of exited/closed sessions older than this are deleted; 0 turns the age rule off
+  runs_keep_mb: 2000       # past this, ended runs' logs and attachment folders go oldest first (§4.6); 0 no bound
+  scratch_root: /tmp       # each run's scratch directory goes under <this>/shiftlead-<uid>/ (§4.6); at most 48 bytes
+  scratch_keep_hours: 24   # an ended record's scratch is removed this long after it ended (§4.6 The disk sweep)
+  worktree_keep_days: 7    # a landed, clean, idle worktree untouched this long is removed (§4.6 The disk sweep)
+  cache_keep_days: 14      # an agent-cadence tree no repo pins, fetched this long ago, is removed (§4.6)
 ```
 
 A top-level **`home: <host name>`** (design §4.4a, TD-057 step 2) makes this host agent a *node* of
@@ -39,6 +44,7 @@ other field takes its default. A malformed file is the same as no file: never a 
 from __future__ import annotations
 
 import functools
+import os
 import socket
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -49,6 +55,12 @@ from sessionorc import paths
 
 AGENT_CADENCE_ROSTER = "~/.config/agent-cadence/repos.txt"
 DEFAULT_RUNS_KEEP_DAYS = 30
+# the disk sweep's bounds (design §4.6 *The disk sweep*, §5, TD-1945)
+DEFAULT_RUNS_KEEP_MB = 2000
+DEFAULT_SCRATCH_KEEP_HOURS = 24
+DEFAULT_WORKTREE_KEEP_DAYS = 7
+DEFAULT_CACHE_KEEP_DAYS = 14
+DEFAULT_SCRATCH_ROOT = "/tmp"  # §4.6 *A session's scratch*: where each run's scratch directory is made
 
 
 def default_repos_registry() -> Path:
@@ -76,6 +88,12 @@ class Host:
     # read after `repos_registry`, a missing file adding nothing; None when `repos_registry:` is set
     repos_import: Path | None = field(default_factory=default_repos_import)
     runs_keep_days: int = DEFAULT_RUNS_KEEP_DAYS
+    runs_keep_mb: int = DEFAULT_RUNS_KEEP_MB  # §4.6 *The disk sweep* (TD-1945): 0 no bound
+    scratch_keep_hours: int = DEFAULT_SCRATCH_KEEP_HOURS
+    worktree_keep_days: int = DEFAULT_WORKTREE_KEEP_DAYS
+    cache_keep_days: int = DEFAULT_CACHE_KEEP_DAYS
+    # §4.6 *A session's scratch* (TD-1944): read at each create, so a test may patch the default
+    scratch_root: str = field(default_factory=lambda: DEFAULT_SCRATCH_ROOT)
     # design §4.8a: `off | observe | enforce`, read by `sessionorc.identity.mode_of` ('' = the default)
     identity: str = ""
     # design §4.4a *A node that carries no person*: false on an agents-only node
@@ -210,11 +228,20 @@ def _flag(v: object) -> bool:
     return v is True
 
 
-def _days(v: object) -> int:
-    """`runs_keep_days`: a non-negative int, else the default (a string, a float, a negative)."""
+def _days(v: object, default: int = DEFAULT_RUNS_KEEP_DAYS) -> int:
+    """`runs_keep_days` and the disk sweep's bounds (§4.6, TD-1945): a non-negative int, else the default (a
+    string, a float, a negative)."""
     if isinstance(v, bool) or not isinstance(v, int) or v < 0:
-        return DEFAULT_RUNS_KEEP_DAYS
+        return default
     return v
+
+
+def _root(v: object) -> str:
+    """`scratch_root`: a non-empty string, `~` expanded and made absolute, else the default; its length is the
+    host agent's to refuse at start (§4.6), never silently replaced here."""
+    if not isinstance(v, str) or not v.strip():
+        return DEFAULT_SCRATCH_ROOT
+    return os.path.abspath(os.path.expanduser(v.strip()))  # a relative root would give a relative TMPDIR
 
 
 def local_host() -> Host:
@@ -232,6 +259,11 @@ def local_host() -> Host:
         repos_registry=Path(str(registry)).expanduser() if registry else default_repos_registry(),
         repos_import=None if registry else default_repos_import(),
         runs_keep_days=_days(data.get("runs_keep_days", DEFAULT_RUNS_KEEP_DAYS)),
+        runs_keep_mb=_days(data.get("runs_keep_mb"), DEFAULT_RUNS_KEEP_MB),
+        scratch_root=_root(data.get("scratch_root")),
+        scratch_keep_hours=_days(data.get("scratch_keep_hours"), DEFAULT_SCRATCH_KEEP_HOURS),
+        worktree_keep_days=_days(data.get("worktree_keep_days"), DEFAULT_WORKTREE_KEEP_DAYS),
+        cache_keep_days=_days(data.get("cache_keep_days"), DEFAULT_CACHE_KEEP_DAYS),
         identity=str(data.get("identity") or ""),
         person=data.get("person") is not False,
     )

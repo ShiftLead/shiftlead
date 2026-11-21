@@ -42,8 +42,9 @@ HELP: tuple[Help, ...] = (
         "Wind down",
         "team card",
         (
-            "Sends the wrap-up to every member and then to the manager: each finishes what it holds, pushes, "
-            "and exits. Press it when the team should stop after the work in hand, not in the middle of it. "
+            "Sends the wrap-up to every member and then to the manager: each finishes what it holds and pushes, "
+            "and the home closes each member once it settles; one on a dialog stays open, in the Inbox. "
+            "Press it when the team should stop after the work in hand, not in the middle of it. "
             "It kills nothing — Stop now does — but for a member whose brief is not in yet, which it stops, "
             "and forgets nothing."
         ),
@@ -902,6 +903,123 @@ HELP: tuple[Help, ...] = (
         "Queue card",
         "This item was answered or closed elsewhere; Refresh takes it away.",
     ),
+    Help(
+        "tools-check",
+        "Check again",
+        "Tools page",
+        (
+            "Reads this host's coding tools again: each tool's binary on the PATH, its version and its default home. "
+            "Press it after installing or updating a tool, or signing one in outside ShiftLead. It installs, updates "
+            "and signs in nothing, and reads no other host."
+        ),
+    ),
+    Help(
+        "tools-install",
+        "Install",
+        "Tools page: Not ready to run here",
+        (
+            "Opens the tool's install shell, its vendor's install line typed and not run: you press Enter there. "
+            "Press it to install a tool ShiftLead supports that this host lacks, then Check again. ShiftLead runs "
+            "no install itself, and a tool with no adapter has no Install."
+        ),
+    ),
+    Help(
+        "tools-label",
+        "✎",
+        "Tools page: a login, an account",
+        (
+            "Gives this login or account a label of your own, drawn in place of its name with the name beside it. "
+            "The name stays fixed and is what `ao` takes; an empty label clears it."
+        ),
+    ),
+    Help(
+        "tools-name-account",
+        "Name its account",
+        "Tools page: a login",
+        (
+            "Says which account this login is signed into: an account's key, or a new account's name. A login "
+            "whose account is not named, or whose logins read different accounts, launches nothing until you name "
+            "it."
+        ),
+    ),
+    Help(
+        "tools-sign-in",
+        "Sign in",
+        "Tools page: a login",
+        (
+            "Opens this login's tools shell with the tool's sign-in command typed and not run: you press Enter "
+            "there. The login moves under its account as soon as the tool has written the sign-in; Sign in again "
+            "does the same for a login whose sign-in has lapsed."
+        ),
+    ),
+    Help(
+        "tools-login-shell",
+        "Open a shell here",
+        "Tools page: a login",
+        (
+            "Opens this login's tools shell, a shell of your own with the tool pointed at this login's folder. A "
+            "second press reopens the same shell; nothing in it is kept or handed to a session."
+        ),
+    ),
+    Help(
+        "tools-note",
+        "Edit note",
+        "Tools page: a login",
+        (
+            "Writes one line under this login, drawn in italics; an empty note clears it. It must hold no secret, "
+            "as the logins file is kept in git."
+        ),
+    ),
+    Help(
+        "tools-forget",
+        "Forget this login",
+        "Tools page: a login",
+        (
+            "Takes this login off the page and leaves its folder on disk; adding that folder again takes back its "
+            "name. Refused, naming them, while a session runs on it."
+        ),
+    ),
+    Help(
+        "tools-settings",
+        "Settings",
+        "Tools page: a login",
+        (
+            "Opens this login's settings under it: its billing, a metered login's prices, the arguments added to "
+            "every launch and to an unattended one, how long a permission prompt waits, and a model pin. Save writes "
+            "only what you changed, each checked as the design's login rules say; an empty field clears it."
+        ),
+    ),
+    Help(
+        "tools-add-login",
+        "+ Add login",
+        "Tools page",
+        (
+            "Adds a login of this tool: a name, and a folder that is empty to make a new one beside the tool's own, "
+            "or an existing folder to use. A new folder's tools shell opens for Sign in; the account is named when it"
+            " signs in, or now."
+        ),
+    ),
+    Help(
+        "tools-add-found",
+        "Add",
+        "Tools page: a found row",
+        (
+            "Adds the tool's default home, found signed in here, as a login: it opens + Add login with the folder "
+            "filled and the billing the tool's record reads chosen, which you may change; leave the name empty to have "
+            "one suggested from who is signed in. It is never added unasked, since it may be a scratch copy."
+        ),
+    ),
+    Help(
+        "tools-keep-back",
+        "keep back",
+        "Tools page: an account",
+        (
+            "Holds back this much of the account's window for your own use: unattended sessions pause when the "
+            "use reaches the hatched end. It takes what ao gate takes, a percent (30) or a percent per day "
+            "(10/day), and a metered account an amount ($5, 20M tok); empty clears it. It is the account's, so "
+            "every login on it shares it."
+        ),
+    ),
 )
 
 BY_KEY: dict[str, Help] = {h.key: h for h in HELP}
@@ -1025,6 +1143,24 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ),
     ("settings", "Settings", ("on-work", "balance", "schedule", "file-link", "telegram", "telegram-test")),
     ("spend", "Spend", ("usage-chip", "spend-view", "spend-picks", "spend-bar")),
+    (
+        "tools",
+        "Tools",
+        (
+            "tools-check",
+            "tools-install",
+            "tools-label",
+            "tools-name-account",
+            "tools-sign-in",
+            "tools-login-shell",
+            "tools-note",
+            "tools-forget",
+            "tools-settings",
+            "tools-add-login",
+            "tools-add-found",
+            "tools-keep-back",
+        ),
+    ),
 )
 
 

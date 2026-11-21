@@ -289,3 +289,80 @@ def project(
             {**w, "pct": round(pct, 1), "projected": {"from": w.get("pct"), "rate": round(r, 2), "age": round(age)}}
         )
     return out
+
+
+def _bay(reserve: Any) -> int | None:
+    """A reserve as the gauge's bay: a whole percent held from the right; None for none and for a percent per day
+    (`{per_day: n}`), whose share of the window moves through it."""
+    return reserve if isinstance(reserve, int) and not isinstance(reserve, bool) and 0 < reserve <= 100 else None
+
+
+def gauges(
+    entry: dict[str, Any] | None,
+    reading: dict[str, Any] | None,
+    max_age: float | None,
+    now: datetime,
+    billing: Any = None,
+    metered_labels: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    """An account's gauges, as the `tools` read carries them (design §4.2b *The gauge*, *The read*; TD-1975):
+    `{billing, read_at, stale, unread, windows: [{label, pct, reserve, keep, room, line, resets, spent}], gone:
+    [{label, reserve}]}`, from its `gate` entry (`entry`, as `rpc_gate` answers each of its `accounts`) and its last
+    reading. A subscription account has one window per window its reading reports, the week's first: `pct` its use,
+    `reserve` the reserve as kept (a percent, `{per_day: n}`, or None), `keep` that reserve as a bay held from the
+    right (a percent per day draws none), `room` what is left between them, `line` the gate's line today. With no
+    reading it is `unread`, with a window per label it has a reserve on (none: `week`), each `pct` None. A metered
+    account has one window per label it sums (`metered_labels`), `reserve` that window's amount as written and `pct`
+    its spend over it (None with no amount), `spent` the reading's spend. A reading older than `max_age` seconds is
+    `stale`; an account whose logins disagree on billing (`mixed`) has no windows, so takes no reserve. A reserve on a
+    label a reading no longer reports is in `gone`. `billing` is the account's where no gate entry names it yet."""
+    entry = entry or {}
+    bill = str(entry.get("billing") or billing or "subscription")
+    reading = reading or {}
+    fetched = _instant(reading.get("fetched"))
+    out: dict[str, Any] = {
+        "billing": bill,
+        "read_at": fetched.isoformat().replace("+00:00", "Z") if fetched else None,
+        "stale": bool(fetched and max_age is not None and (now - fetched).total_seconds() > max_age),
+        "unread": False,
+        "windows": [],
+        "gone": [],
+    }
+    if bill == "mixed":
+        return out
+    read = {str(w["label"]): w for w in reading.get("windows") or () if isinstance(w, dict) and w.get("label")}
+
+    def window(label: str, pct: Any, reserve: Any, w: dict[str, Any]) -> dict[str, Any]:
+        used = _pct(pct)
+        used = None if used is None else min(100.0, used)
+        keep = None if bill == "metered" else _bay(reserve)
+        resets = _instant(w.get("resets"))
+        return {
+            "label": label,
+            "pct": used,
+            "reserve": reserve,
+            "keep": keep,
+            "room": None if used is None or bill == "metered" else max(0, round(100 - used - (keep or 0))),
+            "line": lines.get(label),
+            "resets": resets.isoformat().replace("+00:00", "Z") if resets and resets > now else None,
+            **({"spent": w["spent"]} if bill == "metered" and isinstance(w.get("spent"), dict) else {}),
+        }
+
+    lines = {str(r.get("label")): r.get("line") for r in entry.get("windows") or () if isinstance(r, dict)}
+    if bill == "metered":
+        amounts = entry.get("amounts") or {}
+        for label in metered_labels:
+            w = read.get(label) or {}
+            out["windows"].append(window(label, w.get("pct") if label in amounts else None, amounts.get(label), w))
+        out["unread"] = not read
+    else:
+        reserves = entry.get("reserves") or {}
+        for label, w in read.items():
+            out["windows"].append(window(label, w.get("pct"), reserves.get(label), w))
+        if read:
+            out["gone"] = [{"label": k, "reserve": v} for k, v in reserves.items() if k not in read]
+        else:
+            out["unread"] = True
+            out["windows"] = [window(k, None, v, {}) for k, v in reserves.items()] or [window("week", None, None, {})]
+    out["windows"].sort(key=lambda w: 0 if w["label"] == "week" else 1)  # the week's first (§4.2b)
+    return out

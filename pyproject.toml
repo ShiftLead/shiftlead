@@ -34,6 +34,9 @@ claude-code = "shiftlead.adapters.claude_code:ClaudeCodeAdapter"
 gemini = "shiftlead.adapters.gemini:GeminiAdapter"
 grok = "shiftlead.adapters.grok:GrokAdapter"
 
+[project.entry-points."shiftlead.known_tools"]
+table = "shiftlead.adapters.known:KNOWN_TOOLS"
+
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
@@ -129,6 +132,12 @@ tmp_path_retention_count = 1
 # job with none, and the stacks are the whole point (review of PR #314).
 timeout = 120
 timeout_method = "thread"
+# **Under xdist that dump is lost** (TD-2037): it goes to the worker's terminal reporter, which xdist drops, so a
+# worker the timeout ends reads only *worker 'gw3' crashed while running …*, with no stack and nothing to say it was
+# a hang rather than a crash. pytest's own faulthandler writes every thread's stack straight to the worker's stderr,
+# which the controller does print, so it is armed ten seconds before the kill: a crash a precheck shows then carries
+# the stacks of the hang that caused it.
+faulthandler_timeout = 110
 markers = [
     "unit: no tmux, sockets, or subprocesses; sub-second",
     "integration: spawns tmux, a host agent, git, or the hook script",

@@ -24,6 +24,7 @@ roles:
   grinder: {profile: grind}
 place:
   sam-grind: devenv                   # a repo-defined team that lands on a node (§4.9 *Where a repo's team lands*)
+director: {profile: grind}            # optional: the org's one seat of no team, answering prompts (§4.9b)
 ```
 
 A repo's `.shiftlead.yml` may carry `teams:` of its own (teams on that repo, `repo:` unsaid), and
@@ -91,6 +92,22 @@ class ManagerDef:
     unattended: bool = True
     # a seat filled on §6 rule 3's `team` trigger and closed when it has acted, or a standing session (§4.9, TD-247)
     on_call: bool = ON_CALL_DEFAULT
+
+
+DIRECTOR_NAME = "director"  # the org's one director seat's session name (§4.9b *The director seat*, TD-642)
+DIRECTOR_TRIGGER = "prompt"  # its trigger, the director's alone (§6 rule 3)
+DIRECTOR_GRANT = "permit"  # its grant (§4.8), which only the director seat holds
+
+
+@dataclass
+class DirectorDef:
+    """The org's director seat (design §4.9b *The director seat*, §5 `org.yml` `director:`, TD-642): one per
+    org, the first seat of no team and no project, trigger `prompt`, holding `permit`. `profile` the profile
+    it launches on (the role's precedence where unsaid), `brief` a file overriding the package's `director.md`."""
+
+    profile: str | None = None
+    brief: str | None = None
+    name: str = DIRECTOR_NAME
 
 
 @dataclass
@@ -414,6 +431,8 @@ class Org:
     # where each repo is checked out, per host (design §4.9 *Projects*, TD-722): every project's `repos:`
     # and each registered checkout — the one store `checkout` reads, a project keeping only the names
     checkouts: dict[str, dict[str, Path]] = field(default_factory=dict)
+    # the org's director seat where `director:` defines it, else None: no director (§4.9b, TD-642)
+    director: DirectorDef | None = None
 
     def copy(self) -> Org:
         """A copy whose maps can be written without touching this one's (`with_repos` lands teams on it)."""
@@ -490,6 +509,8 @@ def load(path: Path | None = None) -> Org:
                 "`place:` is for a team a repo defines (design §4.9 *Where a repo's team lands*)"
             )
         org.place[str(tname)] = host
+    if data.get("director") is not None:
+        org.director = _director(data["director"], f"{label}: director")
     _validate(org, label)
     for team in org.teams.values():
         _entries_resolve(org, team, f"{label}: teams.{team.name}.entries", ())
@@ -844,6 +865,7 @@ ENTRY_TYPES = ("debt", "feature")
 # the ledger's `Priority:` values, the Add entry form's **Priority** pick (§4.9, TD-851)
 ENTRY_PRIORITIES = ("high", "medium", "low")
 TECHLEAD_KEYS = ("name", "profile", "brief", "context")
+DIRECTOR_KEYS = ("profile", "brief")
 TECHLEAD_ROLE = "techlead"
 # `anchor:` on a team is retired (design §4.9b *No anchor seat*, §4.9 *A definition written before
 # TD-722*, TD-757): kept among the keys so `anchor: false`, which says what is now true, is passed over;
@@ -1011,6 +1033,18 @@ def _entries(raw: Any, key: str) -> dict[str, str]:
                 raise ValueError(f"{key}.{t}: {PERSON!r} is not a role a session takes")
             out[t] = role
     return out
+
+
+def _director(raw: Any, key: str) -> DirectorDef:
+    """`director: {profile, brief}` (design §5 `org.yml`, §4.9b *The director seat*, TD-642): the org file's
+    alone, since a repo's `.shiftlead.yml` defines teams on its own repo and the director is no team's. Its
+    name, trigger and grant are fixed, so a key for them is refused as a typo is; `director: {}` is a
+    director on the defaults."""
+    raw = _mapping(raw, key)
+    _no_stray(raw, DIRECTOR_KEYS, key)
+    return DirectorDef(
+        profile=_opt_str(raw.get("profile"), f"{key}.profile"), brief=_opt_str(raw.get("brief"), f"{key}.brief")
+    )
 
 
 def _techlead(team: str, raw: Any, key: str, old: dict[str, Any]) -> TechleadDef:

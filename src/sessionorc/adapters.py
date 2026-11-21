@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 import shutil
 import subprocess
@@ -69,6 +71,9 @@ class Adapter(Protocol):
     name: str
     label: str  # the tool's display name ("Claude"): the usage chip's first word, never a key (§4.3, TD-122)
     state_source: Confidence
+    # `scratch_env` (design §4.3, §4.6 *A session's scratch*, TD-1944): the tool's own temp-directory variable,
+    # set by the core to the run's scratch directory after `launch`'s env; None where the tool has none.
+    # Optional, read with getattr as `shell` and `command` are, so an adapter written before it has none.
 
     def launch(
         self, *, profile: str, resume: str | None, prompt: str | None, unattended: bool, cwd: Path, name: str = ""
@@ -225,6 +230,33 @@ class Adapter(Protocol):
     #                                                      the smoke*, TD-1650) and by the seat smoke: as
     #                                                      `read_version` reads the adapter's binary in `env`;
     #                                                      never in `implements`. None, or no method: no version
+    #   credentials_ok(profile_or_home) -> bool | None    whether a sign-in carries on without a person, read of
+    #                                                      a profile or, for the Tools page, of a home given as a
+    #                                                      path (design §4.2b, TD-1971); None for no credential
+    #   find() -> str | None                              the binary a launch finds, by absolute path, asked without
+    #                                                      launching: the PATH, then the places the adapter knows
+    #                                                      (design §4.2b *What the adapter reads*, TD-1971)
+    #   home_env(home: Path) -> dict[str, str]            the environment a launch on `home` sets — empty where
+    #                                                      `home` is the tool's `default_home`, as a launch on a
+    #                                                      profile with no `config_dir` sets nothing (§4.2b)
+    #   install_command() -> str                          the vendor's documented install line, the person's to run
+    #   env_signin(env: Mapping) -> bool                  whether one key in `env` (the host agent's environment)
+    #                                                      signs in every login of the tool on the host (§4.2b)
+    #   signin_command() -> list[str]                     the sign-in command alone, its environment `home_env`'s
+    #   is_home(path: Path) -> bool                       whether a folder is this tool's home, by the files the tool
+    #                                                      writes there (§4.2b); each of these five is declared in
+    #                                                      `implements`, and none launches the tool or sends anything
+    #   identity(home: Path, salt: bytes) -> dict | None  who a home is signed in as (§4.2b): {match, display, plan,
+    #                                                      billing}, or None with no account recorded. `match` is
+    #                                                      `account_match(salt, key)` of the tool's account key; the
+    #                                                      key itself never leaves the adapter (no reply, log line or
+    #                                                      exception holds it); `display` a name, never an email;
+    #                                                      `billing` the tool's record read as `subscription` or
+    #                                                      `metered`, None where it does not say — only a suggestion
+    #   models(home: Path, plan: str | None) -> dict      the model families the account offers (§4.2b):
+    #                                                      {families, default, unconfirmed} — `model_offer` over the
+    #                                                      adapter's tables of each plan's families; a plan the table
+    #                                                      does not know offers every family, `unconfirmed`
     #   setup_note() -> dict | None                       what the machine needs a person for before this
     #                                                      adapter's sessions run (design §4.3, TD-875): None
     #                                                      with nothing to say; {key: None} all as wanted;
@@ -260,18 +292,95 @@ OPTIONAL_METHODS = (
     "composer",
     "context",
     "conversations",
+    "env_signin",
+    "find",
+    "home_env",
+    "install_command",
+    "identity",
+    "is_home",
     "links",
     "mail",
+    "make_home",
+    "models",
+    "new_home",
     "prompts",
+    "signin_command",
     "spend",
     "title",
     "usage_report",
 )
 
+
+def account_match(salt: bytes, key: str) -> str:
+    """An account key's match (design §4.2b `identity`): HMAC-SHA256 under the host agent's in-memory salt, so two
+    logins' matches compare within one run and nothing written anywhere can be checked against a guessed key."""
+    return hmac.new(salt, key.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def plain_name(value: object) -> str | None:
+    """A display name the tool recorded, or None — never an email or part of one (design §4.2b `identity`)."""
+    if not isinstance(value, str) or not value.strip() or "@" in value:
+        return None
+    return value.strip()
+
+
+def model_offer(
+    plan: str | None, plan_families: Mapping[str, tuple[str, ...]], families: tuple[str, ...], default: str | None
+) -> dict:
+    """`models`' reply (design §4.2b): the families `plan` offers by the adapter's table, else every family the adapter
+    knows, marked `unconfirmed`; `default` the family of the tool's default, None where it is not known."""
+    known = plan_families.get(plan) if plan else None
+    return {
+        "families": list(known if known is not None else families),
+        "default": default,
+        "unconfirmed": known is None,
+    }
+
+
+def known_tools() -> list[dict]:
+    """The tools the Tools page names with no adapter (design §4.2b *Known tools without an adapter*): the rows of every
+    `shiftlead.known_tools` table, each `{name, label, binary, path}`, `path` its binary on the PATH alone or None; a
+    row whose name is a registered adapter is that adapter's, so it is left out."""
+    rows: list[dict] = []
+    for ep in entry_points(group="shiftlead.known_tools"):
+        try:
+            table = ep.load()
+        except Exception:  # noqa: BLE001 — a broken table never takes the agent down
+            log.exception("known-tools table %s failed to load", getattr(ep, "name", ep))
+            continue
+        for row in table:
+            if row["name"] in names() or any(r["name"] == row["name"] for r in rows):
+                continue
+            rows.append({**row, "path": shutil.which(row["binary"])})
+    return rows
+
+
+def same_home(a: Path | str, b: Path | str) -> bool:
+    """Whether two homes are one folder, each expanded and resolved (design §4.2b `home_env`)."""
+    return Path(a).expanduser().resolve() == Path(b).expanduser().resolve()
+
+
 # The live walk's `--capture` (design §4.3 *The conformance suite*, TD-784): set in a launch's environment,
 # it names a directory where the adapter's hook appends each payload its tool hands it, as received, one
 # JSON line per payload to `<dir>/<kind>.jsonl` — the fixtures the offline suite reads.
 CAPTURE_ENV = "SHIFTLEAD_CAPTURE"
+
+
+def transcript_roots() -> tuple[list[Path], list[str]]:
+    """Every adapter's `transcript_roots()` (design §4.3, §9 invariant 16, TD-1945), and the names of those that
+    raised: the paths no sweep removes inside, nor any path holding one. An adapter with none names none."""
+    out: set[Path] = set()
+    blind: list[str] = []
+    for name in names():
+        fn = getattr(get(name), "transcript_roots", None)
+        if fn is None:
+            continue
+        try:
+            out.update(Path(p) for p in fn())
+        except Exception:  # noqa: BLE001 — a broken profile file or adapter never hides the others' roots
+            log.exception("adapter %s could not name its transcript roots", name)
+            blind.append(name)
+    return sorted(out), blind
 
 
 def implements(adapter: object) -> frozenset[str]:
@@ -528,6 +637,7 @@ class ShellAdapter:
     name = "shell"
     label = "Shell"  # a display name like any adapter's; a shell reports no quota, so it draws no chip
     state_source: Confidence = "scraped"
+    scratch_env: str | None = None  # a shell has no temp variable of its own: `TMPDIR` (§4.6)
     agent = False  # what is typed at it runs as a command line, never a turn (§4.3, TD-665)
     permission_channel = False  # a shell asks no permission (§4.3, TD-112)
 

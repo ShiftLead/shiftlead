@@ -17,6 +17,7 @@ from sessionorc import (
     adapters,
     agent_common,
     mail,
+    naming,
     waits,
 )
 from sessionorc.agent_common import (
@@ -35,6 +36,7 @@ from sessionorc.models import (
     SendEntry,
     Session,
     now_iso,
+    winding,
 )
 
 
@@ -119,6 +121,8 @@ class WakeMixin:
         """Why the doorbell may not ring for `s` now, or None when it may. The order is the
         design's: a session that cannot be rung at all, then a pending stop, then — in `_ring`, the
         wake decision — the budget and new mail."""
+        if naming.is_tools(s.id):
+            return "a tools shell"  # the person's own pane: no doorbell, no read of it (§4.2b, TD-1972)
         if s.state != "idle" or not s.told:
             return "not hook-confirmed idle"  # never a scraped idle or `stalled?` (a takeover)
         if self._first_prompt_due(s):
@@ -131,7 +135,7 @@ class WakeMixin:
             return "holding its mail unread"  # rung and answered with nothing read, DOORBELL_HELD times (TD-347)
         if getattr(adapters.get(s.adapter), "composer", None) is None:
             return "no composer"  # without a submit confirmation a ring could land on a half-typed line
-        if s.wrapup_sent_at or s.wrapup_at or (s.run_until and now >= _parse(s.run_until)):
+        if winding(s) or (s.run_until and now >= _parse(s.run_until)):
             return "a wrap-up under way"  # mail never pushes a session past its stop
         if s.gated:
             return "paused by the usage gate"  # mail never wakes a session the gate paused (§6)

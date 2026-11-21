@@ -10,14 +10,16 @@ pending-task traceback — `test_agent_restart.py` asserts exactly that on this 
 """
 
 import asyncio
+import faulthandler
 import logging
 import os
+import signal
 import sys
 from datetime import timedelta
 
 from _stubs import AgentShellStub, HookFedStub
 
-from sessionorc import adapters, gatesweep, hosts, mail
+from sessionorc import adapters, gatesweep, hosts, mail, tools
 from sessionorc import agent_common as agent_mod
 from sessionorc.agent import HostAgent, serve_until_signal
 from sessionorc.tmux import Tmux
@@ -27,10 +29,14 @@ async def _run(socket_name: str) -> None:
     # never the person's agent-cadence roster: the home reads repo facts (`gh`, git) for every repo
     # on it (design §4.4 *Repo facts*), as conftest's `_no_real_repos_registry` says for this process
     hosts.AGENT_CADENCE_ROSTER = os.path.join(os.environ["SHIFTLEAD_HOME"], "no-roster", "repos.txt")
+    # never the host's own /tmp/shiftlead-<uid>: conftest's `_scratch_root` names a short one for the run (TD-1944)
+    hosts.DEFAULT_SCRATCH_ROOT = os.environ.get("AO_TEST_SCRATCH_ROOT") or hosts.DEFAULT_SCRATCH_ROOT
     # never the real gate sweep (TD-1376), which opens PRs on the forge: conftest's `_no_real_gate_sweep`
     gatesweep.eligible = lambda root: (False, "tests run no gate sweep")
     # never the person-text check (TD-1846) but in a test marked for it: conftest's `_person_text_off_unless_marked`
     mail.PERSON_TEXT_CHECK = False
+    # never this machine's real tools at start (TD-2002): conftest's `_no_start_tools_read`
+    tools.READ_AT_START = os.environ.get("AO_TEST_TOOLS_AT_START") == "1"
     adapters.load_all()
     adapters.register(HookFedStub())  # test-only, hook-fed: see _stubs.py
     adapters.register(AgentShellStub())  # test-only, a shell that counts as an agent
@@ -44,6 +50,9 @@ async def _run(socket_name: str) -> None:
 
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    # TD-2037: conftest's hang watchdog sends SIGUSR1 to a child agent a test is stuck on, so a request that never
+    # comes back shows where the agent is, not only the test's side of the wait
+    faulthandler.register(signal.SIGUSR1, all_threads=True)
     asyncio.run(_run(sys.argv[1]))
     return 0
 

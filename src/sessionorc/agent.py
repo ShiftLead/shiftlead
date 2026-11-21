@@ -17,18 +17,20 @@ import binascii
 import contextlib
 import copy
 import fnmatch
+import functools
 import json
 import logging
 import os
 import secrets
+import shlex
 import signal
 import socket
 import subprocess
 import sys
-import tempfile
+import threading
 import time
 from collections import OrderedDict, defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -40,6 +42,7 @@ from sessionorc import (
     build,
     containers,
     defs,
+    diskbook,
     hosts,
     identity,
     ledgerboard,
@@ -56,11 +59,13 @@ from sessionorc import balance as balance_mod
 from sessionorc import cadence as cadence_mod
 from sessionorc import digest as digest_mod
 from sessionorc import ledger as ledger_mod
+from sessionorc import scratch as scratch_mod
 from sessionorc import seats as seats_mod
 from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
 from sessionorc import spend as spend_mod
 from sessionorc import stuck as stuck_mod
+from sessionorc import tools as tools_mod
 from sessionorc import work as work_mod
 from sessionorc.agent_attention import AttentionMixin
 from sessionorc.agent_ci import CiMixin
@@ -86,6 +91,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     DERIVE_EVERY,  # noqa: F401
     DIGEST_READS,  # noqa: F401
     DIGEST_TIMEOUT,
+    DISK_ACTS,  # noqa: F401
     DOORBELL_TRIES,  # noqa: F401
     ENTRY_PRIORITIES,  # noqa: F401
     ENTRY_TYPES,  # noqa: F401
@@ -104,6 +110,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     GIT_EVERY,  # noqa: F401
     HELD_MAIL,  # noqa: F401
     HOME_EDITS,  # noqa: F401
+    HOST_ADDRESSED,  # noqa: F401
     ID_RECHECK,  # noqa: F401
     IDLE_NUDGE,  # noqa: F401
     INTENT_FIELDS,  # noqa: F401
@@ -151,6 +158,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     SHELL_WAIT,  # noqa: F401
     STALL_AFTER,  # noqa: F401
     SUBMIT_SECONDS,  # noqa: F401
+    SWEEP_DRY_S,  # noqa: F401
     TAIL_LINES,  # noqa: F401
     TICK_SECONDS,  # noqa: F401
     TITLE_CAP,  # noqa: F401
@@ -244,6 +252,7 @@ from sessionorc.agent_identity import IdentityMixin
 from sessionorc.agent_ids import IdsMixin
 from sessionorc.agent_inbox import InboxMixin
 from sessionorc.agent_link import LinkMixin
+from sessionorc.agent_logins import LoginsMixin
 from sessionorc.agent_mail import MailMixin
 from sessionorc.agent_notify import NotifyMixin
 from sessionorc.agent_promote import PromoteMixin
@@ -276,9 +285,10 @@ from sessionorc.gitinfo import (
 )
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
 from sessionorc.models import (
-    GRANTS,
+    ALL_GRANTS,
     PERSON,
     PROGRESS_STATUSES,
+    SYSTEM,
     WRAPUP_PROMPT,
     FindingEntry,
     MailEntry,
@@ -300,7 +310,7 @@ from sessionorc.store import (
     SessionStore,
     UsageStore,
 )
-from sessionorc.tmux import ARG_LIMIT, DuplicateSession, Tmux
+from sessionorc.tmux import ARG_LIMIT, DuplicateSession, Tmux, TmuxError
 
 
 def _window_bound(value: Any, name: str) -> datetime | None:
@@ -395,6 +405,16 @@ def _resolve_paths(runs: list[str], cwd: Path) -> dict[str, str | None]:
         except (OSError, ValueError, RuntimeError):
             out[run] = None
     return out
+
+
+def _resolve_in(runs: list[str], cwd: str | None, dir: Path) -> dict[str, str | None]:
+    """`rpc_paths`' record form (design §4.6 *A path in the pane is a link*, TD-1988): each run resolved
+    against the record's `cwd` where it has one, then each that answered nothing against `dir` — both
+    passes in the one ask, so the folder the tool is in comes first and a path printed before a move
+    still finds `dir`'s copy. An absolute or `~/` run answers the same in either pass."""
+    got = _resolve_paths(runs, Path(cwd)) if cwd else {}
+    rest = [r for r in runs if got.get(r) is None]
+    return {**got, **_resolve_paths(rest, dir)} if rest else got
 
 
 def _registered_checkout(repo: Any) -> Path | None:
@@ -519,6 +539,36 @@ def _bound(path: Path) -> socket.socket:
     return s
 
 
+async def _in_daemon_thread(fn: Callable[..., Any], *args: Any) -> Any:
+    """`fn(*args)` in a daemon thread of its own, awaited (design §4.2b, TD-2002). `asyncio.to_thread` runs it on the
+    loop's default executor, which `asyncio.run` joins at its end, so a stop waited for every tool's `--version` the
+    read had left to run (up to its bound each) — a host agent told to stop did not. A daemon thread holds no exit:
+    a read cut short by one is lost, and the next run reads again."""
+    loop = asyncio.get_running_loop()
+    fut: asyncio.Future[Any] = loop.create_future()
+
+    def settle(ok: bool, value: Any) -> None:
+        if not fut.done():
+            (fut.set_result if ok else fut.set_exception)(value)
+
+    def run() -> None:
+        try:
+            got, ok = fn(*args), True
+        except BaseException as e:  # noqa: BLE001 — handed to the awaiting task, which says it
+            got, ok = e, False
+        with contextlib.suppress(RuntimeError):  # the loop closed under the read: nobody waits for it
+            loop.call_soon_threadsafe(settle, ok, got)
+
+    threading.Thread(target=run, name="tools-read", daemon=True).start()
+    return await fut
+
+
+# how often a login's open tools shell has its identity read again (design §4.2b *The tools shell*: every few seconds)
+TOOLS_POLL_SECONDS = 5.0
+# how long a tools shell's poll waits after a full read that failed (§4.2b): it runs every tool's `--version`
+TOOLS_FULL_RETRY_SECONDS = 60.0
+
+
 class HostAgent(
     ServeMixin,
     TickMixin,
@@ -541,6 +591,7 @@ class HostAgent(
     DoctorMixin,
     RemoteMixin,
     LinkMixin,
+    LoginsMixin,
 ):
     def __init__(
         self,
@@ -633,6 +684,9 @@ class HostAgent(
         # node: the same shape for its one link to the home.
         self.links: dict[str, dict[str, Any]] = {}
         self._link_muxes: dict[str, link.Mux] = {}
+        # one settings push at a time, its read and its sends together, so a dial's frame read before a write never
+        # lands after the write's own frame (§4.4a *Settings, replicated*, TD-1870)
+        self._settings_push_lock = asyncio.Lock()
         # Rule 3's refusal for each seat it would not fill this tick (§4.9b *A seat that cannot answer is
         # routed around*, TD-1443): `{record_id: why}`, written each tick by `_seat_pass` and `_fill`, read by
         # `seat_able`. In memory only; empty before the first tick, which reads as fillable.
@@ -742,6 +796,8 @@ class HostAgent(
         # (session id, tool_use_id) → the hook's pending decision and the thread that asked it: a
         # subagent's id, or None for the main thread (design §4.2 *A waiter is keyed by its call*, TD-950)
         self._waiters: dict[tuple[str, str], tuple[asyncio.Future[dict[str, Any]], str | None]] = {}
+        # each waiting prompt's tool and input, for the director's allow (§4.9b *What always reaches the person*)
+        self._prompt_calls: dict[tuple[str, str], tuple[Any, Any]] = {}
         # session id → thread (a subagent's id, or None) → its open calls, `(tool_use_id, call_sig)` oldest
         # first: what a permission, which names no call, is matched to (§4.2, TD-950). In memory only.
         self._open_calls: dict[str, dict[str | None, list[tuple[str, str]]]] = {}
@@ -761,6 +817,8 @@ class HostAgent(
         # reads for the way back to `idle` (§4.2 *A tick's `working` at a waiting composer*, TD-1807)
         self._composer_tails: dict[str, list[str]] = {}
         self._git_checked: dict[str, datetime] = {}
+        self._cwd_raw: dict[str, str] = {}  # the last raw hook `cwd` per record (§4.2 *The record's `cwd`*, TD-1988)
+        self._cwd_asking: dict[str, str] = {}  # the newest raw `cwd` whose resolve is under way (TD-1988)
         # the status each record's recent files were last read at (§4.2, TD-538): `(oid, dirty, porcelain)`
         self._files_read: dict[str, tuple[Any, ...]] = {}
         self._derived_at: dict[str, datetime] = {}
@@ -784,7 +842,17 @@ class HostAgent(
         # must still know that the killed run's own `SessionEnd`, landing late, is not the new run's end.
         self._killed_run_at: dict[str, float] = {}
         self._derive_task: asyncio.Task[None] | None = None
-        self._prune_task: asyncio.Task[None] | None = None  # the hourly sweep's thread (TD-1506)
+        self._prune_task: asyncio.Task[None] | None = None  # the hourly sweep's pass (TD-1506, TD-1945)
+        self._sweep_roots: list[str] = []  # the registered repos the cache and worktree rules read, set by the tick
+        # the worktree rule's place (§4.6 *The disk sweep*, TD-1945): the path of the last worktree a pass weighed,
+        # held in memory only, so a restart starts at the first; and its scope, None reading `default_home()` (a test
+        # gives True to run the rule on a scratch home)
+        self._worktree_cursor = ""
+        self._disk_book = diskbook.Book()  # the sweep's sizes, in memory: a restart reads *partial* (TD-1945)
+        self._disk_result: dict[str, Any] | None = None  # the last pass's result (§4.6 *The sweep's reading*)
+        self._worktree_scope: bool | None = None
+        self._sweep_loop: asyncio.AbstractEventLoop | None = None
+        self._sweep_lock = threading.Lock()  # one pass, or a dry run, at a time (§4.6 *The disk sweep*, TD-1945)
         self._seat_count_task: asyncio.Task[None] | None = None  # §6 rule 3's `gh` read, detached
         self._seat_counted_at = datetime.min.replace(tzinfo=UTC)
         # rule 7's mark (TD-217 slice 3): the detached read of every brief's sources, when it last
@@ -972,6 +1040,11 @@ class HostAgent(
         # team → that reading's first tick, where no manager is live to carry `finished_sent_at` and a
         # member was left open with work: the note to the person is owed until the last one is gone
         self._finished_owed: dict[str, datetime] = {}
+        # rule 9's wind-down close (§4.9a *A wind-down closes its members*, TD-1898): record address → `{at, seen,
+        # idle}` — the mark's `at` this was read for, the first tick that read that mark, and the first tick that
+        # read the member idle after the wrap-up's turn (None until then, and again on any tick that reads it not
+        # idle); in memory, as `_finished_first` is, so a restart of the home starts both windows again
+        self._wind_first: dict[str, dict[str, Any]] = {}
         # The promote's readings per repo (design §6 *Promote*, TD-132): in memory, re-read at start —
         # what must survive a restart (a run in flight, a failure) is in its intent files.
         self._promotes: dict[str, dict[str, Any]] = {}
@@ -1028,17 +1101,39 @@ class HostAgent(
         self._witness_pruned = ""  # the UTC month the witness log was last pruned in (§4.4, TD-1386)
         self._witness_loop: asyncio.AbstractEventLoop | None = None
         self._backup_task: asyncio.Task[None] | None = None
+        # the Tools page's read (design §4.2b, TD-1973): made at start and on Check again, kept; its salt is made here
+        # and kept only in memory, so an identity's match compares within this run and is written nowhere
+        self._tools_salt = secrets.token_bytes(32)
+        self._tools_kept: dict[str, Any] | None = None
+        # what this run knows of the logins' matches (§4.2b *Matching across a restart*): in memory only, never written
+        self._tools_memory = tools_mod.logins.Memory()
+        # bumped by each logins write: a read begun before it settled on the file as it was, so it is never kept
+        self._tools_gen = 0
+        self._tools_lock = asyncio.Lock()
+        self._tools_task: asyncio.Task[Any] | None = None
+        # a tools shell's poll (§4.2b *The tools shell*): the pass in flight, and when the last one started
+        self._tools_poll_task: asyncio.Task[Any] | None = None
+        self._tools_polled_at = -TOOLS_POLL_SECONDS  # the first poll is due at once
+        self._tools_poll_failing = False  # a failing poll is logged once, until one succeeds
+        # whether the last kept read was switched over: a logins write clears the read, and the poll goes on after it
+        self._tools_was_switched = False
 
     # -- lifecycle ------------------------------------------------------------------------------
 
     async def serve(self, sock: Path | None = None) -> None:
         sock = sock or paths.socket_path()
+        # §4.6 *A session's scratch* (TD-1944): a `scratch_root` past 48 bytes, or a `shiftlead-<uid>/` that is a
+        # symlink or another uid's, stops the start, as nothing a session puts there could be trusted; so does one
+        # inside or holding a tool's transcript store (§9 invariant 16, TD-1945), which the disk sweep must never weigh
+        await asyncio.to_thread(_check_scratch_root, _scratch_root())
         sock.parent.mkdir(parents=True, exist_ok=True)
         with contextlib.suppress(FileNotFoundError):
             sock.unlink()
         self.tmux.ensure_server()
         if quieted := self.tmux.status_off(naming.PREFIX):  # sessions from before TD-1410 (design §4.6)
             log.info("tmux status bar turned off on %d session(s)", len(quieted))
+        if pinned := self.tmux.pin_windows(naming.PREFIX):  # every window pinned at its size (§4.6, TD-1919)
+            log.info("tmux window pinned on %d session(s)", len(pinned))
         self._witness_loop = asyncio.get_running_loop()
         self._witness_begin()
         await asyncio.to_thread(self._recover_reaps)  # a reap a promote cut off (§4.1, TD-979)
@@ -1051,6 +1146,9 @@ class HostAgent(
         # Kept on the agent as well as locally: a test that must own the clock cancels it rather
         # than racing it with a sleep, which is the shape TD-078 and TD-088 keep catching. The
         # `finally` below cancels it either way — cancelling a cancelled task is a no-op.
+        # the Tools page's read at start (§4.2b): in the background, as each tool's `--version` is bounded but slow
+        if tools_mod.READ_AT_START:
+            self._tools_task = asyncio.create_task(self._tools_start())
         ticker = self._ticker = asyncio.create_task(self._tick_loop())
         dialer = asyncio.create_task(self._dial_home()) if self.mode == "node" else None
         try:
@@ -1070,6 +1168,10 @@ class HostAgent(
                         w.close()
         finally:
             ticker.cancel()
+            if self._tools_task is not None:
+                self._tools_task.cancel()
+            if self._tools_poll_task is not None:
+                self._tools_poll_task.cancel()
             if dialer is not None:
                 dialer.cancel()
             for m in list(self._link_muxes.values()):
@@ -1574,8 +1676,15 @@ class HostAgent(
         team_start: bool = False,
         draft: str = "",
         succeeds: str | None = None,
+        scratch: str | None = None,
     ) -> dict[str, Any]:
-        """`draft` (design §4.4 *The Add entry form's draft*, TD-630): the Add entry form's draft
+        """`scratch` (design §4.6 *A session's scratch*, TD-1944): the old run's scratch directory, which a
+        restart hands the create so the new run keeps it, as a Resume of the name's own conversation keeps its
+        record's; kept only where it lies under this host's `shiftlead-<uid>/` and its `owner.json` names the
+        record and this home (or it is gone, and is made again), else a new one is made. Never a session's own
+        to give: refused with a session as the caller.
+
+        `draft` (design §4.4 *The Add entry form's draft*, TD-630): the Add entry form's draft
         folder, which **Open a session** hands to the create — claimed for the new session once it
         exists (`claimed.json` `{by: <its id>, at}`), so the folder then lives as that session's own
         attachments do. A person's own, as `attach` is; refused beside `start_at` or `held`, and
@@ -1638,10 +1747,14 @@ class HostAgent(
             # Routed before the method runs (`_act_host`) when this is the home; a node asked for
             # another host's create got here through the link, and the link is one host's.
             raise RpcError(f"{host} is not this host ({self.host}): a create lands on the host it names")
+        if scratch is not None and caller and not mail.is_person(caller):
+            # the old run's scratch is the home's to hand a restart, never a session's own `ao new` (§4.6)
+            raise RpcError("scratch is handed by a restart alone: a session cannot give it (design §4.6)")
         directory = Path(dir).expanduser().resolve()
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
-        grants, references = _grants(capabilities or []), _lane(lane or [])  # validate before anything starts
+        grants = _grants(capabilities or [], ALL_GRANTS)  # validate before anything starts
+        references = _lane(lane or [])
         reading, bound, extra = _review(review), _context_bound(context_bound), _scale(scale)
         scale = extra  # the launch record keeps the mark as the record does (`launch_params(locals())`)
         starts = _start_time(start_at, unattended, run_until)
@@ -1850,6 +1963,11 @@ class HostAgent(
                 # its row ended because the person opened it, which is the word the trail wants —
                 # `_take_name` would otherwise write the ending of a record merely replaced (§4.10)
                 self._attention_ended(holder.id, "resumed", "*")
+            # the run's scratch (§4.6, TD-1944), made once, before the attempts at a free id: a restart's
+            # handed one, or a Resume's of the name's own conversation, kept where it may be; else a new one
+            if scratch is None and isinstance(holder, Session) and resume and holder.adapter_id == resume:
+                scratch = holder.scratch
+            run_scratch = await asyncio.to_thread(self._run_scratch, scratch, holder)
             previous_run, freed = await self._take_name(holder)
             model_env = await asyncio.to_thread(agent_common.model_env, adapter, spec.model, directory)
             # read after the supersede, so the id it freed is not `taken` and gets reused
@@ -1875,8 +1993,9 @@ class HostAgent(
                 # AGENT_MODEL_FILE name the model for its `Agent-Model:` trailer (§4.2, TD-638).
                 shown = name if sid == base else name + sid[len(base) :]  # a shown suffix, never a hidden one
                 env = {
-                    "TMPDIR": tempfile.gettempdir(),  # §4.2, TD-1487: a systemd unit gives none; the adapter's wins
                     **spec.env,
+                    # §4.2, §4.6: the run's scratch, after the adapter's env so ours win (`TMPDIR` too)
+                    **scratch_mod.env(run_scratch, getattr(ad, "scratch_env", None)),
                     "SHIFTLEAD_SESSION": sid,
                     "SHIFTLEAD_HOME": str(paths.home()),
                     "AGENT_NAME": shown,
@@ -1903,6 +2022,8 @@ class HostAgent(
                     self._starting.discard(sid)  # nothing awaits between here and `self.sessions[sid] = s`
             else:
                 raise RpcError(f"could not find a free session name for {name!r} in {directory}")
+            if run_scratch:  # whose it is: the id this run took, which a kept one's last run may not have had
+                await asyncio.to_thread(scratch_mod.write_owner, run_scratch, sid, paths.home())
             s = Session(
                 id=sid,
                 name=shown,
@@ -1941,6 +2062,7 @@ class HostAgent(
                 start_context=start_context,
                 first_prompt=first_prompt,
                 model_file=model_env.get("AGENT_MODEL_FILE"),
+                scratch=run_scratch,
                 tool_version=tool_version if isinstance(tool_version, str) and tool_version else None,
             )
             if self.mode != "node":
@@ -1957,6 +2079,8 @@ class HostAgent(
                 dropped = None if kept else self._address(holder)
             s.worktree_made = made or _inherits_made(s, holder)
             self.sessions[sid] = s
+            self._cwd_raw.pop(sid, None)  # a new run starts in `dir`: its first report resolves afresh (TD-1988)
+            self._cwd_asking.pop(sid, None)
             room.clear()  # counted live now, as a record
             self.store.save(s)
             if dropped and self.mode != "node":
@@ -2370,6 +2494,18 @@ class HostAgent(
             )
         return holder
 
+    def _run_scratch(self, given: str | None, holder: Session | str | None) -> str:
+        """The run's scratch directory (design §4.6 *A session's scratch*, TD-1944): `given` — the old run's,
+        handed by a restart or carried by a Resume — kept where it lies under this host's `shiftlead-<uid>/`
+        and its `owner.json` names `holder`'s record and this home (made again, empty, where it is gone);
+        else a new one. Off the loop: it touches the disk."""
+        root, home = _scratch_root(), paths.home()
+        record = holder.id if isinstance(holder, Session) else ""
+        try:
+            return (record and scratch_mod.kept(root, given, record, home)) or scratch_mod.make(root, record, home)
+        except (scratch_mod.ScratchError, OSError) as e:
+            raise RpcError(f"no scratch directory for the run: {e}") from None
+
     async def _take_name(self, holder: Session | str | None) -> tuple[str | None, str | None]:
         """Supersede what `_name_holder` found, returning `(previous_run, the id it freed)`. The
         dead pane is killed and the record's run log handed on; the record itself is **replaced in
@@ -2620,7 +2756,8 @@ class HostAgent(
 
     def _start(self, sid: str, cwd: Path, argv: list[str] | None, env: dict[str, str], run_log: Path) -> None:
         self.tmux.ensure_server()
-        self.tmux.new_session(sid, cwd, argv, env, logfile=run_log)  # log from the first byte (invariant 3)
+        grid = settings_mod.terminal_grid(settings_mod.load())  # read at each start (§5, TD-1919)
+        self.tmux.new_session(sid, cwd, argv, env, logfile=run_log, grid=grid)  # log from the first byte (invariant 3)
         self._pane_cgroup(sid)
 
     def _pane_cgroup(self, sid: str) -> None:
@@ -2905,12 +3042,13 @@ class HostAgent(
             s.branch_kept,
         )
 
-    def _reap_idle(self, s: Session, wt: Path) -> str | None:
+    def _reap_idle(self, s: Session | None, wt: Path) -> str | None:
         """The reaper's *idle*, through ShiftLead's own seams (§4.1): no live record of any adapter, a shell's
         included, has its `dir` inside `wt` — this host's, and while their link is up those of the container
         nodes that share the directory (a link down keeps as *<host> unreachable*) — and no session outside
-        ShiftLead is inside; a blind adapter keeps. `s` itself, and an outside session whose tool id is one of
-        ours, never count. Run in a thread: it reads copies of the maps."""
+        ShiftLead is inside; a blind adapter keeps. `s` itself (None for the disk sweep, which closes no record),
+        and an outside session whose tool id is one of ours, never count. Run in a thread: it reads copies of the
+        maps."""
         wt = wt.resolve()
 
         def inside(d: str) -> bool:
@@ -2920,7 +3058,7 @@ class HostAgent(
         mine = list(self.sessions.values())
         ours = {r.adapter_id for r in mine if r.adapter_id}
         for r in mine:
-            if r.id != s.id and r.state not in ("exited", "closed") and r.dir and inside(r.dir):
+            if (s is None or r.id != s.id) and r.state not in ("exited", "closed") and r.dir and inside(r.dir):
                 return f"in use by {r.id}"
         if self.mode == "home" and self.remote:
             for host in containers.container_nodes():
@@ -2984,6 +3122,8 @@ class HostAgent(
         s = self._find(id)
         now = datetime.now(UTC)
         params = self._restart_check(s, now)
+        if s.scratch:
+            params["scratch"] = s.scratch  # a restart keeps the run's scratch, as it keeps the worktree (§4.6)
         entry: dict[str, Any] = {"at": now_iso(), "why": "person"}
         if s.seat is not None:
             # a seat at its fill ceiling (§6 rule 3, TD-1422): the mark cleared, nothing created — rule 3
@@ -3382,6 +3522,8 @@ class HostAgent(
         caller: Any = None,
         wrapup: bool = False,
         key: str | None = None,
+        wind_down: bool = False,
+        manager: str | None = None,
     ) -> dict | None:
         """Type a prompt. With `wait` (TD-016, design §4.2): return the record once the session has
         started on *this* prompt and settled again (`SETTLED`). A session that is busy queues the
@@ -3394,7 +3536,10 @@ class HostAgent(
         (the card's Wrap up, `ao team stop`): it is stamped on the record as `wrapup_at`, which holds
         the doorbell off, and a send without it clears the stamp (§4.10 "A pending stop beats mail").
         `key` is the page's id for this send (§4.10 *A send lands once*, TD-806): a repeat of it from the
-        same caller within `SEND_KEY_SECONDS` answers as that send did, before anything else here."""
+        same caller within `SEND_KEY_SECONDS` answers as that send did, before anything else here.
+        `wind_down` (with `wrapup`) is a Wind down's member send, which marks the record once the prompt is
+        submitted, and `manager` the home's reading of the team's manager, handed to a node (`_wind_down_after`,
+        §4.9a *A wind-down closes its members*, TD-1898)."""
         s = self._get(id)
         if key:
             first = self._keyed_send(s, caller, str(key))
@@ -3405,7 +3550,8 @@ class HostAgent(
             # a session whose brief (and the start hooks' text riding it) is not in never began its work:
             # a wrap-up stops it, as a stop time does one with no wrap-up prompt, the press's own kill
             # (§4.3 *No send until it is in*, TD-1637) — before a dialog's refusal and before any stamp
-            return await self.rpc_kill(id, caller=caller)
+            # its view says why, so a Wind down names it *killed (brief not in)*, never *wrap-up sent* (TD-1898)
+            return {**await self.rpc_kill(id, caller=caller), "brief_killed": True}
         if s.pending and s.pending.pane_held:
             # a subagent's dialog is not drawn while the hook blocks (§4.2 *A subagent's dialog is held
             # back*, TD-950): the buttons are its one channel until the deadline, never the terminal
@@ -3447,6 +3593,7 @@ class HostAgent(
                     else:
                         typing.set_exception(RpcError(entry.verdict))
                 typing.exception()  # read here, so a failure no repeat awaited is not logged as unread
+        self._wind_down_after(s, caller, wrapup=wrapup, wind_down=wind_down, manager=manager)
         if not wait:
             return None
         end = None if timeout is None else time.monotonic() + timeout
@@ -3484,6 +3631,72 @@ class HostAgent(
         if not await self._wait_state(s, lambda x: x.state in SETTLED and x.rev != rev_before, left()):
             self._raise_not_settled(s, timeout)
         return s.view()
+
+    def _wind_down_after(self, s: Session, caller: Any, *, wrapup: bool, wind_down: bool, manager: Any) -> None:
+        """A submitted send's effect on the Wind down's mark (design §4.9a *A wind-down closes its members*,
+        TD-1898), stamped only once `_submit` returned, so a refused or failed send leaves the mark as it was.
+        A Wind down's member send (`wrapup` and `wind_down`, never on a seat) writes `{at, by, waits: true}`,
+        `by` the caller's as `wrapup_by` is, a `person` already there kept. On a record already marked: a
+        person's send moves `at` and sets `waits`, and sets `by` to `person` on a member's mark (the manager's
+        own, which is inert, keeps its `by`); a session's wrap-up that carries no `wind_down` leaves it as it is;
+        a controller's plain send clears it, the record an ordinary member again; a session's send to its own
+        record leaves it."""
+        if wrapup and wind_down and s.seat is None:
+            by = closer_of(caller, None, "")["by"]
+            if (s.wind_down or {}).get("by") == "person":
+                by = "person"  # a second Wind down by a session keeps the person's word
+            s.wind_down = {"at": now_iso(), "by": by, "waits": True}
+        elif not s.wind_down:
+            return
+        elif mail.as_person(caller, self._graph()):
+            moved = {**s.wind_down, "at": now_iso(), "waits": True}
+            if not self._is_team_manager(s, manager):
+                moved["by"] = "person"
+            s.wind_down = moved
+        elif wrapup or str(caller) == s.id:
+            return  # a session's wrap-up with no `wind_down`, or its send to its own record, leaves the mark as it is
+        else:
+            s.wind_down = None  # a controller's new instruction: a run carrying on, as `wrapup_at` is cleared
+        self._save(s)
+
+    async def rpc_mark_wind_down(self, id: str, caller: Any = None) -> dict[str, Any]:
+        """A Wind down's mark on a finished member it sends nothing (design §4.9a *A wind-down closes its
+        members*, TD-1898): declared and settled, so no wrap-up is typed, and `{at, by, waits: false}` is
+        written for rule 9 to close it once it settles. An acting call (`mail.ACTING_RPCS`), so the gate
+        checks it as `send`'s; routed to a node's member as `send` is. `by` is the caller's, as `closer_of`
+        reads it, a `person` already there kept; on a record already marked `at` stays, since it moves only where a
+        new wrap-up is sent. Only an unattended record is marked, never a seat."""
+        s = self._get(id)
+        if s.state in ("closed", "exited"):
+            raise RpcError(f"{s.id} is {s.state}: a Wind down marks only a live member")
+        if s.seat is not None:
+            raise RpcError(f"{s.name} holds a seat: a Wind down marks a member, never a seat (design §4.9a)")
+        if not s.unattended:
+            raise RpcError(f"{s.name} is a person's session: a Wind down never marks it (design §4.9a)")
+        by = closer_of(caller, None, "")["by"]
+        if (s.wind_down or {}).get("by") == "person":
+            by = "person"  # a second Wind down by a session keeps the person's word
+        at = (s.wind_down or {}).get("at") or now_iso()  # nothing is sent, so a mark's clock stays where it was
+        s.wind_down = {"at": at, "by": by, "waits": False}
+        self._save(s)
+        await self._push_changes()
+        return s.view()
+
+    def _team_manager(self, team: str | None) -> str | None:
+        """The address of the record `work.manager_of` reads as `team`'s manager, over the team's records as
+        rule 9 reads them (unattended, not superseded), at the home; None where there is none."""
+        if not team:
+            return None
+        mine = [r for r in self._graph().values() if r.team == team and r.unattended and not r.superseded_by]
+        top = work_mod.manager_of(mine)
+        return self._address(top) if top is not None else None
+
+    def _is_team_manager(self, s: Session, manager: Any) -> bool:
+        """Whether `s` is its team's manager: the home reads it itself, and a node reads the `manager` the home's
+        route handed it (absent: a member's), since only the home holds the team's records (§4.4a)."""
+        if self.mode == "home":
+            return self._team_manager(s.team) == self._address(s)
+        return bool(manager) and naming.split_address(str(manager))[0] == s.id
 
     @staticmethod
     def _refuse_gone(s: Session) -> None:
@@ -3526,11 +3739,16 @@ class HostAgent(
 
         return answer()
 
-    def _record_send(self, s: Session, caller: Any, text: str, key: str | None = None) -> SendEntry:
+    def _record_send(
+        self, s: Session, caller: Any, text: str, key: str | None = None, *, own: bool = False
+    ) -> SendEntry:
         """`sends` (design §4.10): what was typed into this pane and by whom, minted and stamped
         here like a message, bounded to the last `SENDS_KEEP`. Written at the gate — before the
         paste, since a paste that then sticks still reached the pane — and its verdict amended if
-        the submit fails."""
+        the submit fails. A tools shell's keeps no text but the host agent's own typed command (`own`):
+        a sign-in's codes and a pasted key are typed there (design §4.2b *The tools shell*, TD-1972)."""
+        if naming.is_tools(s.id) and not own:
+            text = ""
         who = PERSON if mail.is_person(caller) else str(caller)
         entry = SendEntry(id="s-" + secrets.token_hex(6), from_=who, at=now_iso(), text=text, key=key)
         s.sends = (s.sends + [entry])[-mail.SENDS_KEEP :]
@@ -3641,13 +3859,15 @@ class HostAgent(
             self._refill(s)  # keys are how a person answers a menu or a question in the pane
         await asyncio.to_thread(lambda: self.tmux.run("send-keys", "-t", f"={id}:", *keys))
 
-    async def rpc_explain(self, id: str, lines: int = 40) -> dict[str, Any]:
+    async def rpc_explain(self, id: str, lines: int = 40, caller: Any = None) -> dict[str, Any]:
         """Why the session shows the state it does (design §4.2, TD-015): the current screen, the
         record's state and confidence, the screen rule that would fire on it with its evidence, and
-        whether that verdict applies (no fresher hook state) or is outranked."""
+        whether that verdict applies (no fresher hook state) or is outranked. A tools shell's screen is
+        the person's alone (§4.2b *The tools shell*): refused to a session."""
         s = self._get(id)
+        tools = self._tools_read(s.id, caller, "explain")
         adapter = adapters.get(s.adapter)
-        tail = [_clean(t) for t in await asyncio.to_thread(self.tmux.capture_tail, id, lines)]
+        tail = [_clean(t) for t in await asyncio.to_thread(self.tmux.capture_tail, s.id, lines, tools=tools)]
         explain = getattr(adapter, "explain", None)
         now = datetime.now(UTC)
         out: dict[str, Any] = {
@@ -3789,9 +4009,205 @@ class HostAgent(
         self._uploads[upload] = {"session": owner, "part": part, "name": name, "total": total}
         return {"upload": upload, "bytes": len(raw), **said}
 
-    async def rpc_tail(self, id: str, lines: int = 40) -> list[str]:
-        self._get(id)
-        return await asyncio.to_thread(self.tmux.capture_tail, id, lines)
+    async def rpc_tail(self, id: str, lines: int = 40, caller: Any = None) -> list[str]:
+        s = self._get(id)
+        tools = self._tools_read(s.id, caller, "read")
+        return await asyncio.to_thread(self.tmux.capture_tail, s.id, lines, tools=tools)
+
+    def _tools_read(self, sid: str, caller: Any, verb: str) -> bool:
+        """Whether a pane read is of a tools shell, refusing it to a session (design §4.2b *The tools shell*,
+        §9 invariant 11's one exception, TD-1972): a sign-in prints an email, links and codes, and an API
+        key is pasted there, so every read of its pane is the person's, their own shell's included."""
+        if not naming.is_tools(sid):
+            return False
+        agent_common.person_only(caller, f"{verb} a tools shell's pane", "§4.2b *The tools shell*", self._graph())
+        return True
+
+    async def rpc_tools_install(self, tool: str, caller: Any = None) -> dict[str, Any]:
+        """`ao tools install <tool>`, the Tools page's **Install** (design §4.2b *The tools shell*, TD-1972): the
+        tool's install shell, `ao--tools-install-<adapter>`, in the person's home, its adapter's
+        `install_command()` typed with no Enter — the person presses it, and ShiftLead runs no install (§4.3).
+        One of each: a second press reopens it. A person's own act."""
+        agent_common.person_only(caller, "open an install shell", "§4.2b *The tools shell*", self._graph())
+        try:
+            ad = adapters.get(str(tool))
+        except KeyError as e:
+            raise RpcError(str(e).strip('"')) from None
+        if "install_command" not in adapters.implements(ad):
+            raise RpcError(f"the {tool} adapter names no install command (design §4.2b)")
+        return await self._tools_shell(naming.tools_install_id(str(tool)), ad.install_command(), {})
+
+    async def _login_shell(self, tool: str, login: str, home: Path) -> dict[str, Any]:
+        """A login's tools shell (design §4.2b *The tools shell*, TD-1972): `ao--tools-<adapter>-<login>`, its
+        environment the adapter's `home_env(home)` and its `signin_command()` typed with no Enter. Opened by the
+        logins' verbs (`ao login shell`, + Add login), which check the login and the caller first."""
+        try:
+            ad = adapters.get(str(tool))
+        except KeyError as e:
+            raise RpcError(str(e).strip('"')) from None
+        if not {"signin_command", "home_env"} <= adapters.implements(ad):
+            raise RpcError(f"the {tool} adapter names no sign-in command (design §4.2b)")
+        typed = shlex.join(ad.signin_command())
+        return await self._tools_shell(naming.tools_id(str(tool), login), typed, dict(ad.home_env(Path(home))))
+
+    async def _tools_shell(self, sid: str, typed: str, env: dict[str, str]) -> dict[str, Any]:
+        """Open a tools shell (design §4.2b *The tools shell*, TD-1972), or reopen the one open: a `shell`
+        session with no parent, its id the caller's `ao--tools-…`, in the person's home, with `env` (the
+        login's `home_env`), **no run log** (`log: false`, no `pipe-pane`), and `typed` typed with no Enter.
+        Its pane is the person's own shell (`mail.person_shell`: no role, no controller), so `ao` there acts
+        as the person. Only the command is recorded in `sends`: what the person types there never is."""
+        if not naming.is_tools(sid):
+            raise RpcError(f"{sid} is not a tools shell's id (design §4.2b)")
+        async with self._dir_locks[f"tools:{sid}"]:
+            held = self.sessions.get(sid)
+            panes = await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX)
+            pane = panes.get(sid)
+            if pane is not None and not pane.dead and held is not None:
+                return held.view()  # one of each: a second press reopens it
+            if pane is not None:  # a dead pane, or one no record holds: the press starts it afresh
+                await asyncio.to_thread(lambda: self.tmux.run("kill-session", "-t", f"={sid}", check=False))
+            home = Path.home()
+            full = {**env, "SHIFTLEAD_SESSION": sid, "SHIFTLEAD_HOME": str(paths.home())}
+            self._starting.add(sid)
+            try:
+                await asyncio.to_thread(self._start_tools, sid, home, full)
+            except TmuxError as e:
+                raise RpcError(str(e)) from None
+            finally:
+                self._starting.discard(sid)
+            s = Session(
+                id=sid,
+                name=naming.adopted_name(sid),
+                kind="interactive",
+                adapter="shell",
+                dir=str(home),
+                host=self.host,
+                confidence=adapters.get("shell").state_source,
+                log=False,
+            )
+            if self.mode != "node":
+                s.by_person = True
+            self.sessions[sid] = s
+            self.store.save(s)
+            if typed:
+                entry = self._record_send(s, SYSTEM, typed, own=True)  # the host agent's own typing: no secret
+                try:
+                    await asyncio.to_thread(self.tmux.send_literal, sid, typed)  # no Enter: the person presses it
+                except TmuxError as e:  # the shell is open; its command is not typed, and the record says so
+                    entry.verdict = f"not typed: {e}"[:200]
+                    self.store.save(s)
+                    raise RpcError(f"{sid} is open, but its command could not be typed: {e}") from None
+            await self._push_changes()
+            return s.view()
+
+    async def _tools_reread(self) -> dict[str, Any]:
+        """Read this host's tools again and keep the read (design §4.2b *What the adapter reads*, TD-1973)."""
+        async with self._tools_lock:
+            return await self._tools_read_held()
+
+    async def _tools_read_held(self, *, say: bool = True) -> dict[str, Any]:
+        """A full read, `_tools_lock` held: kept where no logins write came while it ran (`_tools_keep`). `say`: a
+        failure is logged (a poll's, once until one succeeds)."""
+        gen, memory = self._tools_gen, copy.deepcopy(self._tools_memory)
+        try:
+            got = await _in_daemon_thread(functools.partial(tools_mod.read, self._tools_salt, memory=memory))
+        except Exception as e:  # noqa: BLE001 — a failed read is said to the asker; the kept one stands
+            if say:
+                log.exception("the tools read failed")
+            raise RpcError(f"this host's tools could not be read: {type(e).__name__}") from None
+        self._tools_keep(gen, got, memory)
+        return got
+
+    def _tools_keep(self, gen: int, got: dict[str, Any], memory: Any) -> None:
+        """Keep a read and the memory it settled, on the loop: the read's thread settled a copy, so nothing on the loop
+        reads the memory mid-pass. A logins write since the read began (`_tools_gen` moved) made it stale: neither is
+        kept, and the next read settles the file as it stands."""
+        if gen == self._tools_gen:
+            self._tools_kept, self._tools_memory = got, memory
+            self._tools_was_switched = bool(got.get("switched"))
+
+    def _tools_poll_due(self, panes: Mapping[str, Any]) -> None:
+        """Start a tools shell's poll where one is due (design §4.2b *The tools shell*), from the tick: while a login's
+        tools shell is open (its pane alive; an install shell reads no login), every `TOOLS_POLL_SECONDS` one pass
+        of reads over the logins, so a login moves under its account as soon as the tool has written the sign-in.
+        Detached, as the tick waits on no tool's files; one pass at a time, and none before the run's first read. A
+        logins write clears the kept read; the poll goes on after it, its next pass a full read."""
+        if self._tools_poll_task is not None and not self._tools_poll_task.done():
+            return
+        kept = self._tools_kept
+        if not (kept.get("switched") if kept is not None else self._tools_was_switched):
+            return
+        now = time.monotonic()
+        if now - self._tools_polled_at < TOOLS_POLL_SECONDS:
+            return
+        install = naming.TOOLS_PREFIX + "install-"
+        if not any(
+            naming.is_tools(sid) and not sid.startswith(install) and not getattr(p, "dead", False)
+            for sid, p in panes.items()
+        ):
+            return
+        self._tools_polled_at = now
+        self._tools_poll_task = asyncio.create_task(self._tools_poll())
+
+    async def _tools_poll(self) -> None:
+        """One tools shell's poll (§4.2b): the logins read again on the kept read's cards (`tools.repoll`), and kept.
+        A full read in flight (the start's, Check again) settles a pass itself, so the poll yields to it; a failed
+        poll is logged and the kept read stands, the next poll trying again."""
+        if self._tools_lock.locked():
+            return
+        async with self._tools_lock:
+            kept = self._tools_kept
+            if kept is None:  # a logins write cleared it: this pass reads in full, and the polls after it repoll
+                try:
+                    await self._tools_read_held(say=not self._tools_poll_failing)
+                except RpcError:  # every tool's --version again in 5 s is too dear: the next full read waits longer
+                    self._tools_poll_failing = True
+                    self._tools_polled_at = time.monotonic() + TOOLS_FULL_RETRY_SECONDS - TOOLS_POLL_SECONDS
+                    return
+                self._tools_poll_failing = False
+                return
+            gen, memory = self._tools_gen, copy.deepcopy(self._tools_memory)
+            try:
+                got = await _in_daemon_thread(
+                    functools.partial(tools_mod.repoll, kept, self._tools_salt, memory=memory)
+                )
+            except Exception:  # noqa: BLE001 — a poll is never worth more than a log line, and one until it mends
+                if not self._tools_poll_failing:
+                    log.exception("a tools shell's poll failed; its next failures are not logged until one succeeds")
+                self._tools_poll_failing = True
+                return
+            self._tools_poll_failing = False
+            self._tools_keep(gen, got, memory)
+
+    async def _tools_start(self) -> None:
+        """The start's read (§4.2b): a failure is logged, and the next `tools` call reads again."""
+        with contextlib.suppress(RpcError):
+            await self._tools_reread()
+
+    async def rpc_tools(self) -> dict[str, Any]:
+        """`ao tools`, the Tools page (design §4.2b *The page*, TD-1973): the read the host agent keeps, made at start
+        and on Check again — the tool cards, their versions, the found rows and *Not ready to run here*. Read only,
+        so any caller may ask; a run that has made none yet makes it now. Each account's `gauges` are filled afresh
+        at each read, from its readings as they stand (TD-1975)."""
+        if self._tools_kept is None:
+            async with self._tools_lock:  # the start's read in flight: take it rather than read twice
+                pass
+        kept = self._tools_kept if self._tools_kept is not None else await self._tools_reread()
+        return await self._tools_gauges(kept)
+
+    async def rpc_tools_check(self, caller: Any = None) -> dict[str, Any]:
+        """`ao tools check`, the Tools page's **Check again** (design §4.2b, TD-1973): read this host's tools again
+        — the PATH, the versions, the default homes — and keep it. A person's own act."""
+        agent_common.person_only(caller, "check this host's tools again", "§4.2b *The page*", self._graph())
+        return await self._tools_gauges(await self._tools_reread())
+
+    def _start_tools(self, sid: str, cwd: Path, env: dict[str, str]) -> None:
+        self.tmux.ensure_server()
+        grid = settings_mod.terminal_grid(settings_mod.load())  # pinned as a session is (§4.6, TD-1919)
+        self.tmux.new_session(
+            sid, cwd, None, env, grid=grid
+        )  # no logfile: a tools shell has no run log (§9 invariant 3)
+        self._pane_cgroup(sid)
 
     async def rpc_transcript(
         self,
@@ -3944,7 +4360,8 @@ class HostAgent(
         host that this user can read (TD-688), its real path judged, so a symlink answers its target —
         else `None`: a directory, a missing or unreadable file, and a path `PATHS_PRIVATE` holds (a
         credential file stays text) alike, since the page needs no reason. A relative run is resolved
-        against `dir`, `~` is this user's home. It stats and reads nothing else. Served
+        against the record's `cwd` where it has one, then, where that answers nothing, against `dir`
+        (§4.2 *The record's `cwd`*, TD-1988); `~` is this user's home. It stats and reads nothing else. Served
         here, on the record's host — a node's record reaches its node through `read` (`NODE_READS`).
         With `repo` in place of `id` (§4.6 *A path in the Inbox and the Queue is a link too*, TD-1108)
         a relative run resolves against that main checkout, answered only when its real path is one of
@@ -3960,7 +4377,8 @@ class HostAgent(
         if id is not None and repo is not None:
             raise RpcError("paths takes id or repo, not both (design §4.6)")
         if id is not None:
-            return {"paths": await asyncio.to_thread(_resolve_paths, runs, Path(self._get(id).dir))}
+            s = self._get(id)
+            return {"paths": await asyncio.to_thread(_resolve_in, runs, s.cwd, Path(s.dir))}
         if repo is not None:
             root = await asyncio.to_thread(_registered_checkout, repo)
             if root is None:
@@ -4183,7 +4601,7 @@ class HostAgent(
         effect on the target's next call — the gate reads the record, not a cached copy."""
         s = self._find(id)  # the home's own copy of another host's record too (4a)
         adding, removing = _grants(add or []), _grants(remove or [])
-        s.capabilities = [g for g in GRANTS if (g in s.capabilities or g in adding) and g not in removing]
+        s.capabilities = [g for g in ALL_GRANTS if (g in s.capabilities or g in adding) and g not in removing]
         self._save(s)
         await self._push_changes()
         return self._view(s)
@@ -4779,11 +5197,17 @@ class HostAgent(
         """`mail.act_gate` over this agent's records (design §4.8, §9 invariants 5 and 11): a
         function over a record map, so a node can forward and the home can answer (§4.4a)."""
         if method == "create" and params.get("capabilities"):
-            _grants(params["capabilities"])  # an unknown grant name is refused before the gate reads it
+            _grants(params["capabilities"], ALL_GRANTS)  # an unknown grant name is refused before the gate reads it
         graph = self._graph()
         reason = mail.act_gate(graph, caller, method, params, controllers=self._ctl)
         if reason:
             raise RpcError(reason)
+        if method == "decide":
+            # a decide that passed by `permit` alone is the director's (§4.8, TD-642): its *allow* of a prompt kept
+            # for the person is refused where the prompt waits, and its answer told — set here, never by the caller
+            params["permit"] = mail.by_permit(graph, caller, params, controllers=self._ctl)
+            if params["permit"] and not str(params.get("reason") or "").strip():
+                raise RpcError(f"{caller} cannot decide {params.get('id')} without a reason: the person is told it")
         if method == "send" and not mail.as_person(caller, graph) and params.get("id") != caller:
             # design §6 *Usage gate*: while gated, a controller's send is refused here, at the home,
             # read from the record's `gated` — a node-owned field, so a replica carries it. A person's
@@ -4833,6 +5257,21 @@ class HostAgent(
         if host not in self._remote_stores:
             self._remote_stores[host] = SessionStore(paths.remote_dir(host))
         return self._remote_stores[host]
+
+
+def _check_scratch_root(root: str) -> None:
+    """The start's scratch checks (§4.6): the root's length and transcript stores, then `shiftlead-<uid>/` made."""
+    scratch_mod.check_root(root)
+    roots, blind = adapters.transcript_roots()
+    if blind:
+        log.warning("transcript roots unread for %s: the scratch_root check covers the rest", ", ".join(blind))
+    scratch_mod.check_transcripts(root, roots)
+    scratch_mod.ensure_parent(root)
+
+
+def _scratch_root() -> str:
+    """This host's `scratch_root` (§4.6), the default where a reading of the host carries none."""
+    return getattr(hosts.local_host(), "scratch_root", None) or hosts.DEFAULT_SCRATCH_ROOT
 
 
 async def serve_until_signal(agent: HostAgent, sock: Path | None = None) -> None:

@@ -151,15 +151,18 @@ def test_the_pinch_is_the_terminals_on_a_phone_and_sends_one_grid_when_the_finge
     # two fingers, on a phone; their touchmove's default prevented (iOS's page zoom)
     assert "if (!phone.narrow() || e.targetTouches.length !== 2) return;" in pinch
     assert pinch.count("e.preventDefault();") >= 2
-    # drawn as they move, the grid untouched until they lift: then kept, fit once, and the note
-    assert "AO.pinchKeep(size);" in pinch and "fit.fit();" in pinch
-    assert "pinchNote(`${size} px · ${term.cols} columns`);" in pinch
-    assert "new ResizeObserver(() => { if (!phone.opened() && !pinch) fit.fit(); })" in focus
+    # drawn as they move, the grid the pane's throughout (TD-1919): kept when they lift, laid out again, and the note
+    assert "AO.pinchKeep(size);" in pinch and "relayout();" in pinch and "fit" not in pinch.replace("pinchNote", "")
+    assert "pinchNote(AO.pinchSays(size, AO.boxGrid(), term.cols));" in pinch  # the box's columns and the pane's
+    assert (
+        "new ResizeObserver(() => { keeper.release(); schedule(); keepBox(); fitRekeep(); drawFit(); }).observe(boxEl);"
+        in focus
+    )
     # a crossing of the narrow query draws the size its layout reads
     relaid = focus[focus.index("    phone.relaid(() => {") :]
     relaid = relaid[: relaid.index("\n    });\n")]
-    # only this terminal's size, and no grid under a sheet (its close refits)
+    # only this terminal's size, the grid the pane's (TD-1919)
     assert "AO.TERM_OPTS.fontSize = size; term.options.fontSize = size;" in relaid
-    assert "if (!phone.opened()) fit.fit();" in relaid and "AO.setTermLook" not in relaid
+    assert "relayout();" in relaid and "fit.fit" not in relaid and "AO.setTermLook" not in relaid
     # the pinch's move sets no size it could not read
     assert "if (size != null && size !== pinch.size)" in focus

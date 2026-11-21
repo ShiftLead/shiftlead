@@ -20,6 +20,8 @@ from datetime import time as dt_time
 from importlib import resources
 from typing import Any
 
+import yaml
+
 from sessionorc import agent_ids as ids_mod
 from sessionorc import board as board_mod
 from sessionorc import client as clientmod
@@ -827,6 +829,107 @@ def cmd_shell(args: argparse.Namespace) -> int:
     args.grant, args.lane, args.controller, args.role = [], [], [], None
     args.name = args.name or ""  # the agent names it (`shell`, `shell-2`): one name, one session
     return cmd_new(args)
+
+
+def cmd_tools_install(args: argparse.Namespace) -> int:
+    """`ao tools install <tool>` (design §4.2b *The tools shell*, TD-1972): the tool's install shell, in the
+    person's home, its install command typed and not run — press Enter there to run it. A person's own act:
+    refused to a session."""
+    s = call_sync("tools_install", tool=args.tool)
+    if getattr(args, "attach", False):
+        return _attach(args, s["id"], s)
+    return emit(
+        args,
+        s,
+        lambda: print(
+            f"{s['id']}  (install shell, in {s['dir']}): its install command is typed, not run — attach and press "
+            f"Enter to run it\nattach: tmux attach -t {s['id']}"
+        ),
+    )
+
+
+def cmd_login(args: argparse.Namespace) -> int:
+    """`ao login …` and `ao account label` (design §4.2b *Controls and verbs*, TD-1974): the Tools page's login and
+    account controls, each a person's own act acting on this host, refused before the switch-over. A login is named by
+    its name (`<tool>:<name>` where a bare one is ambiguous), an account by its key."""
+    act = args.login_action
+    if act == "add":
+        r = call_sync("login_add", tool=args.tool, path=args.path, name=args.name, account=args.account)
+        s = r.get("shell")
+        if s and getattr(args, "attach", False):
+            return _attach(args, s["id"], s)
+
+        def prose() -> None:
+            print(r.get("change"))
+            if s:
+                print(f"{s['id']}  (tools shell): its sign-in command is typed, not run — attach and press Enter")
+                print(f"attach: tmux attach -t {s['id']}")
+            elif r.get("shell_error"):
+                print(f"its tools shell did not open: {r['shell_error']} — ao login shell {r['login']} opens it")
+
+        return emit(args, r, prose)
+    if act == "shell":
+        s = call_sync("login_shell", login=args.login)
+        if getattr(args, "attach", False):
+            return _attach(args, s["id"], s)
+        return emit(
+            args,
+            s,
+            lambda: print(
+                f"{s['id']}  (tools shell, in {s['dir']}): its sign-in command is typed, not run — attach and press "
+                f"Enter to run it\nattach: tmux attach -t {s['id']}"
+            ),
+        )
+    if act == "account-label":
+        r = call_sync("account_label", key=args.key, label=args.label)
+    elif act == "label":
+        r = call_sync("login_label", login=args.login, label=args.label)
+    elif act == "note":
+        r = call_sync("login_note", login=args.login, text=" ".join(args.text))
+    elif act == "account":
+        r = call_sync("login_account", login=args.login, account=args.account)
+    elif act == "forget":
+        r = call_sync("login_forget", login=args.login)
+    else:  # set: the value read as YAML, so a list, a mapping and a number say what they are; empty clears it
+        try:
+            value = yaml.safe_load(args.value) if args.value.strip() else None
+        except yaml.YAMLError as e:
+            print(f"ao login set: {args.value!r} does not read as a value: {e}", file=sys.stderr)
+            return 2
+        r = call_sync("login_set", login=args.login, key=args.key, value=value)
+    return emit(args, r, lambda: print(r.get("change") or "nothing changed"))
+
+
+def _tools_prose(r: dict[str, Any]) -> None:
+    """The Tools page as lines (design §4.2b, TD-1973): each tool found, its version and found rows, then *Not ready
+    to run here*."""
+    print(f"Tools on {r.get('host')}  (read {_age(str(r.get('read_at') or ''))} ago)")
+    for t in r.get("tools") or []:
+        print(f"{t['label']}  {t.get('version') or 'version not read'}  ({t.get('binary')})")
+        for f in t.get("found") or []:
+            if f.get("own_home"):
+                print(f"  {f['folder']}  the tool's own home: ShiftLead launches {t['label']} into a folder of its own")
+            else:
+                print(f"  {f['folder']}  found here, signed in")
+    if r.get("not_ready"):
+        print("Not ready to run here:")
+    for t in r.get("not_ready") or []:
+        version = f"{t.get('version') or 'version not read'} installed" if t.get("installed") else "not installed"
+        if t.get("supported"):
+            why = f"install it: ao tools install {t['adapter']}" if t.get("install_command") else "no install command"
+        elif t.get("installed"):
+            why = "ShiftLead has no adapter for it yet, so no seat can run on it"
+        else:
+            why = "no adapter yet"
+        print(f"  {t['label']}  {version}  — {why}")
+
+
+def cmd_tools(args: argparse.Namespace) -> int:
+    """`ao tools [--json]` and `ao tools check` (design §4.2b *Controls and verbs*, TD-1973): the coding tools on this
+    host, as the Tools page draws them — the read the host agent keeps, or (`check`, the page's **Check again**, a
+    person's own act) read again."""
+    r = call_sync("tools_check" if getattr(args, "action", None) == "check" else "tools")
+    return emit(args, r, lambda: _tools_prose(r))
 
 
 def cmd_roles(args: argparse.Namespace) -> int:
@@ -2694,6 +2797,8 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
                 print(f"  {d['line']}")
             for x in applied.get("stays") or []:
                 print(f"  {x['line']}")
+            for said in applied.get("notes") or []:
+                print(f"  {said}")
         elif out.get("unread"):
             print(f"the records are not compared: {out['unread']}")
         elif out["differences"]:
@@ -3527,6 +3632,83 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     emit(args, {k: v for k, v in got.items() if k != "line"}, prose)
     return 0 if got["ok"] else 1
+
+
+def _bytes(n: Any) -> str:
+    """`n` bytes as a person reads them: B, KB, MB, GB or TB, powers of 1024, one decimal past KB."""
+    size = float(n or 0)
+    for unit in ("B", "KB", "MB", "GB"):
+        if size < 1024:
+            return f"{size:.0f} {unit}" if unit in ("B", "KB") else f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} TB"
+
+
+def disk_lines(by_host: dict[str, Any]) -> list[str]:
+    """`ao disk`'s prose (design §4.7, §4.6 *The sweep's reading*, TD-1946): per host its last pass, per kind the
+    bytes held (*partial* where not every item is measured), removed in the pass and in 30 days, each kept item with
+    why, and the free space under `scratch_root`, under a tenth of bytes or inodes a warning; an error entry is one
+    line, *unreachable* or the host's own refusal."""
+    out: list[str] = []
+    for host, e in by_host.items():
+        if not isinstance(e, dict) or "error" in e:
+            why = e.get("error") if isinstance(e, dict) else e
+            silent = "did not answer" in str(why) or "dropped" in str(why)  # a refusal is printed as the host's own
+            out.append(f"{host}: unreachable — {why}" if silent and "unreachable" not in str(why) else f"{host}: {why}")
+            continue
+        if e.get("dry_run"):
+            short = " (partial: it stopped short)" if e.get("partial") else ""
+            out.append(f"{host}: a dry run, nothing removed{short}")
+            for kind, k in (e.get("kinds") or {}).items():
+                held = _bytes(k.get("held")) + (" (partial)" if k.get("partial") else "")
+                out.append(f"  {kind:<10} held {held}, would remove {_bytes(k.get('removed'))}")
+                for gone in k.get("would_remove") or []:
+                    out.append(f"    would remove {gone.get('path')} ({_bytes(gone.get('bytes'))})")
+                for kept in k.get("kept") or []:
+                    out.append(f"    kept {kept.get('path')} — {kept.get('why')}")
+            continue
+        out.append(f"{host}: {'last pass ' + e['at'] if e.get('at') else 'no pass yet'}")
+        for kind, k in (e.get("kinds") or {}).items():
+            held = _bytes(k.get("held")) + (" (partial)" if k.get("partial") else "")
+            out.append(
+                f"  {kind:<10} held {held}, removed {_bytes(k.get('removed'))} last pass, "
+                f"{_bytes(k.get('removed_30d'))} in 30 days"
+            )
+            for kept in k.get("kept") or []:
+                out.append(f"    kept {kept.get('path')} — {kept.get('why')}")
+        free = e.get("free") or {}
+        if "error" in free:
+            out.append(f"  free under {free.get('path')}: unreadable — {free['error']}")
+        elif free:
+            inodes = (
+                f", {free.get('inodes_free', 0):,} of {free['inodes_total']:,} inodes"
+                if free.get("inodes_total")
+                else ""
+            )
+            out.append(
+                f"  free under {free.get('path')}: {_bytes(free.get('bytes_free'))} of "
+                f"{_bytes(free.get('bytes_total'))}{inodes}"
+            )
+        for w in e.get("warnings") or []:
+            out.append(f"  ⚠ {free.get('path')}: {w}")
+    return out
+
+
+def cmd_disk(args: argparse.Namespace) -> int:
+    """`ao disk [--host <host>] [--dry-run] [--json]` (design §4.7, §4.6 *The sweep's reading*, TD-1946): the disk
+    sweep's reading for every host, or one; `--dry-run` asks each host agent for a pass that removes nothing and
+    prints what it would remove. `--json` prints `{host: entry}` whichever was asked: a bare reading (one host's, or a
+    node's own) is keyed by the `host` it carries. A read, under no grant; it waits `DIGEST_TIMEOUT` plus
+    `CALL_TIMEOUT`, as `ao feedback`'s reads do."""
+    params = {"host": args.host} if args.host else {}
+    try:
+        got = call_sync("disk_dry_run" if args.dry_run else "disk", _timeout=feedback.WAIT, **params)
+    except AgentError as e:
+        if "unknown method" not in str(e):
+            raise
+        raise AgentError(f"{e}: the running host agent predates `ao disk` (the next promote brings it)") from e
+    by_host = {str(got.get("host")): got} if isinstance(got, dict) and "kinds" in got else dict(got or {})
+    return emit(args, by_host, lambda: print("\n".join(disk_lines(by_host))))
 
 
 def _doctor_repos(node: bool) -> dict[str, Any]:
@@ -4690,7 +4872,7 @@ def _pass_up(args: argparse.Namespace, words: list[str]) -> int:
         print(warn, file=sys.stderr)
 
     def prose() -> None:
-        print(f"{got['msg']} passed up → person, recommending: {got['recommend']['text']}")
+        print(f"{got['msg']} passed up → {got.get('id') or 'person'}, recommending: {got['recommend']['text']}")
         for i, a in enumerate(got.get("answers") or [], 1):
             print(f"  {i}. {a}")
 
@@ -4822,7 +5004,10 @@ def cmd_inbox(args: argparse.Namespace) -> int:
             if e.get("default"):  # a steer says what it will do unless answered (design §4.10)
                 print(f"  default: {e['default']}")
             if r := e.get("recommend"):  # passed up: the passer's line, labelled as its own (design §4.9b)
-                print(f"  passed up by {r.get('by')}, who recommends: {r.get('text')}")
+                passes = [p for p in (e.get("passes") or []) if isinstance(p, dict) and p.get("recommend")]
+                # one line per pass, the latest first: the director's, then the techlead's (TD-661)
+                for one in [p["recommend"] for p in reversed(passes)] if len(passes) > 1 else [r]:
+                    print(f"  passed up by {one.get('by')}, who recommends: {one.get('text')}")
             if e.get("source"):  # answered from the record, and where (design §4.9b)
                 print(f"  source: {e['source']}")
             if a := e.get("answered"):  # the person's FYI for such an answer (design §4.9b)
@@ -5672,6 +5857,61 @@ def build_parser() -> argparse.ArgumentParser:
     q = add_team("list", help="every definition, its source file and whether it is live")
     q.set_defaults(fn=cmd_team_list)
 
+    p = add("tools", help="the coding tools on this host (§4.2b, the Tools page)")
+    p.set_defaults(fn=cmd_tools)
+    tools_sub = p.add_subparsers(dest="action")
+    q = tools_sub.add_parser("check", help="read this host's tools again: the page's Check again (§4.2b)")
+    q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the RPC result as JSON")
+    q.set_defaults(fn=cmd_tools)
+    q = tools_sub.add_parser("install", help="open the tool's install shell, its install command typed (§4.2b)")
+    q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the RPC result as JSON")
+    q.add_argument("tool", help="the tool's adapter (claude-code, gemini, grok)")
+    q.add_argument("--attach", action="store_true", help="then attach this terminal to it (tmux attach)")
+    q.set_defaults(fn=cmd_tools_install)
+
+    p = add("login", help="this host's logins: the Tools page's login controls, a person's own acts (§4.2b)")
+    login_sub = p.add_subparsers(dest="login_action", required=True)
+
+    def add_login(name: str, **kw: Any) -> argparse.ArgumentParser:
+        q = login_sub.add_parser(name, **kw)
+        q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the RPC result as JSON")
+        q.set_defaults(fn=cmd_login)
+        return q
+
+    login_help = "the login: its name, or <tool>:<name> where two tools have it"
+    q = add_login("label", help="label a login (its name stays); no label clears it")
+    q.add_argument("login", help=login_help)
+    q.add_argument("label", nargs="?")
+    q = add_login("account", help="name the account a login is under: an account's key, or a name (a new key)")
+    q.add_argument("login", help=login_help)
+    q.add_argument("account", help="<tool>:<name>, or a name")
+    q = add_login("set", help="change one of a login's settings; an empty value clears it")
+    q.add_argument("login", help=login_help)
+    q.add_argument("key", choices=("billing", "prices", "extra_args", "unattended_args", "permission_wait", "pin"))
+    q.add_argument("value", help="read as YAML: metered, 600, '[--flag]', '{input: 3, output: 15}'")
+    q = add_login("note", help="the note shown under a login (never a secret: the file is committed); empty clears it")
+    q.add_argument("login", help=login_help)
+    q.add_argument("text", nargs="*")
+    q = add_login("forget", help="forget a login, leaving its folder on disk; refused while a session runs on it")
+    q.add_argument("login", help=login_help)
+    q = add_login("add", help="add a login: a folder that is the tool's home, or a new or empty one made one")
+    q.add_argument("tool", help="the tool's adapter (claude-code, gemini, grok)")
+    q.add_argument("--path", help="its folder: the tool's home, or one that does not exist or is empty")
+    q.add_argument("--name", help="its name; with no --path, its folder is suggested from it (~/.claude-<name>)")
+    q.add_argument("--account", help="the account it is under: <tool>:<name>, or a name")
+    q.add_argument("--attach", action="store_true", help="then attach this terminal to its tools shell, if opened")
+    q = add_login("shell", help="open the login's tools shell, its sign-in command typed and not run")
+    q.add_argument("login", help=login_help)
+    q.add_argument("--attach", action="store_true", help="then attach this terminal to it (tmux attach)")
+
+    p = add("account", help="this host's accounts: the Tools page's account controls, a person's own acts (§4.2b)")
+    account_sub = p.add_subparsers(dest="account_action", required=True)
+    q = account_sub.add_parser("label", help="label an account (its key stays); no label clears it")
+    q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the RPC result as JSON")
+    q.add_argument("key", help="the account's key, <tool>:<name>")
+    q.add_argument("label", nargs="?")
+    q.set_defaults(fn=cmd_login, login_action="account-label")
+
     p = add("shell", help="start a plain shell session here")
     p.add_argument("name", nargs="?")
     p.add_argument("-d", "--dir")
@@ -5951,6 +6191,10 @@ def build_parser() -> argparse.ArgumentParser:
         "a person's own; after the check: ao doctor hooks --probe [profile]",
     )
     p.set_defaults(fn=cmd_doctor)
+    p = add("disk", help="the disk sweep's reading for every host: held, removed, kept and free (§4.7)")
+    p.add_argument("--host", metavar="host", help="this host alone (at a node, only its own)")
+    p.add_argument("--dry-run", action="store_true", help="run a pass that removes nothing and print what it would")
+    p.set_defaults(fn=cmd_disk)
     p = add("doing", help="say in one line what this session is doing now (design §4.8)")
     p.add_argument("words", nargs="*", metavar="line", help="one line; the last one replaces the one before")
     p.add_argument("--clear", action="store_true", help="empty the line: this session is saying nothing")

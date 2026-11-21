@@ -2,7 +2,7 @@
 card: Start session / Open session*, *Inbox row: ledger entry: Start session*: once per card, the person's own
 session on the card's `start` entry — its one `Owner: paul` entry, else its first `decision (paul)` entry, else its
 top entry, by key alone — told the card's entries; **Open session** while the person's own session holds any of
-them, refused while another holds `start`."""
+them; beside another holder of `start` the person's own session starts beside it, never refused (TD-1984)."""
 
 from __future__ import annotations
 
@@ -88,6 +88,9 @@ def test_the_cards_ids_are_its_decide_and_do_entries_then_the_rest_in_key_order(
 # -- who a card's press meets -------------------------------------------------------------------------------
 
 
+G1 = {"id": "g1", "name": "grinder-1", "branch": "", "pr": None, "review_pr": None, "git_branch": ""}
+
+
 def _rec(rid: str, repo: str, *refs: str, unattended: bool = True, state: str = "working", name: str = "") -> dict:
     claims = [{"ref": r, "status": "claimed"} for r in refs]
     return {"id": rid, "name": name or rid, "repo": repo, "state": state, "unattended": unattended, "progress": claims}
@@ -100,26 +103,33 @@ def _card() -> dict:
 
 def test_card_session_opens_the_persons_own_and_names_another_holder_of_start():
     c = _card()
-    assert card_session(c, []) == {"start": "s#TD-009", "own": "", "other": ""}
+    assert card_session(c, []) == {"start": "s#TD-009", "own": "", "other": {}}
     # the person's own session on any entry of the card, the one holding `start` first
     own = [_rec("p2", "/x/s", "TD-20", unattended=False), _rec("p1", "/x/s", "TD-9", unattended=False)]
     assert card_session(c, own)["own"] == "p1"
     assert card_session(c, own[:1])["own"] == "p2"
     # before the tick derives its claim, a session named `td-<n>` in the entry's repo holds it
     assert card_session(c, [_rec("ao-s-td-9", "/x/s", unattended=False, name="td-9")])["own"] == "ao-s-td-9"
-    # a worker on `start`, none of the person's: no button, the press refused
+    # a worker on `start`, none of the person's: the holder as a small dict, which hides no button (TD-1984)
     assert card_session(c, [_rec("g1", "/x/s", "TD-009", name="grinder-1")]) == {
         "start": "s#TD-009",
         "own": "",
-        "other": "grinder-1",
+        "other": G1,
+    }
+    # the person's own `with-td-` session counts as theirs on that entry, beside the holder (TD-1984)
+    beside = _rec("p3", "/x/s", unattended=False, name="with-td-9-2")
+    assert card_session(c, [_rec("g1", "/x/s", "TD-009", name="grinder-1"), beside]) == {
+        "start": "s#TD-009",
+        "own": "p3",
+        "other": {},
     }
     # a worker on another entry, an ended session, another repo's: nothing met
     others = [_rec("g1", "/x/s", "TD-020"), _rec("p", "/x/s", "TD-9", unattended=False, state="closed")]
     assert card_session(c, [*others, _rec("q", "/x/other", "TD-9", unattended=False)])["own"] == ""
-    assert card_session(c, others)["other"] == ""
+    assert card_session(c, others)["other"] == {}
 
 
-def test_the_card_draws_start_session_open_session_or_nothing(tmp_path, monkeypatch):
+def test_the_card_draws_start_session_beside_another_holder_or_open_session(tmp_path, monkeypatch):
     q = queue()
     for c in q["cards"]:
         c["start"] = c["id"]
@@ -137,7 +147,7 @@ def test_the_card_draws_start_session_open_session_or_nothing(tmp_path, monkeypa
         return html[i : html.index('<span class="qgap">', i)]
 
     html = page([_rec("g1", "/x/s", "TD-10", name="grinder-1")])
-    assert ">Start session<" not in head(html, held["id"]), "another holds `start`: no button"
+    assert ">Start session<" in head(html, held["id"]), "another holds `start`: drawn all the same (TD-1984)"
     up = head(html, "s#TD-20")
     assert ">Start session<" in up and 'data-card="s#TD-20"' in up and 'data-ref="TD-20"' in up
     assert 'data-repo="s"' in up and 'data-act="ledger_start"' in up
@@ -145,7 +155,7 @@ def test_the_card_draws_start_session_open_session_or_nothing(tmp_path, monkeypa
     assert ">Open session<" in head(html, "s#TD-20") and ">Start session<" not in head(html, "s#TD-20")
     # the view carries what the button reads
     v = queue_view(q, NOW, fleet=[_rec("mine", "/x/s", "TD-21", unattended=False)])
-    assert v["up_next"][0]["session"] == {"start": "s#TD-20", "own": "mine", "other": ""}
+    assert v["up_next"][0]["session"] == {"start": "s#TD-20", "own": "mine", "other": {}}
 
 
 # -- the road, widened (`/api/ledger/start` with `card`) ----------------------------------------------------
@@ -229,20 +239,22 @@ def test_a_stale_card_press_is_refused_and_starts_nothing(tmp_path, monkeypatch)
     assert created == []
 
 
-def test_a_card_press_goes_to_the_persons_session_and_refuses_another_holder_of_start(tmp_path, monkeypatch):
-    def press(name: str, holder: dict) -> Any:
+def test_a_card_press_goes_to_the_persons_session_and_starts_beside_another_holder_of_start(tmp_path, monkeypatch):
+    def press(name: str, holder: dict) -> tuple[Any, list[dict]]:
         repo, c, created = _start_world(tmp_path / name, monkeypatch, fleet=[MANAGER, holder], queue=_q())
         holder["repo"] = str(repo.resolve())  # the fake serves this very dict: its repo is the world's
         r = c.post("/api/ledger/start", json={"repo": "samscrape", "id": "TD-009", "card": "samscrape#TD-020"})
-        assert created == [], "nothing is started"
-        return r
+        return r, created
 
     # the person's own session on another of the card's entries: its Focus, a stale page's press included
-    r = press("own", _rec("ao-samscrape-mine", "", "TD-12", unattended=False))
+    r, created = press("own", _rec("ao-samscrape-mine", "", "TD-12", unattended=False))
     assert r.status_code == 200 and r.json() == {"ok": True, "focus": "ao-samscrape-mine"}, r.text
-    # a worker holding `start`: refused in words
-    r = press("worker", _rec("ao-samscrape-g1", "", "TD-9", name="grinder-1"))
-    assert r.status_code == 409 and "held by grinder-1" in r.text
+    assert created == [], "nothing is started"
+    # a worker holding `start`: never refused, the person's own session starts beside it (TD-1984)
+    r, created = press("worker", _rec("ao-samscrape-g1", "", "TD-9", name="grinder-1"))
+    assert r.status_code == 200 and r.json()["name"] == "with-td-9", r.text
+    (kw,) = created
+    assert kw["worktree"] == "with-td-9" and kw["lane"] == []
 
 
 def test_an_inbox_press_names_its_entrys_card(tmp_path, monkeypatch):
@@ -277,8 +289,9 @@ def test_an_items_id_is_its_board_key_mail_id_entry_or_pr_and_waits_on_me_names_
 def test_card_session_reads_the_entry_an_item_starts_on():
     c = _card()  # start s#TD-009; TD-020 its top
     worker = _rec("g1", "/x/s", "TD-009", name="grinder-1")
-    assert card_session(c, [worker], on="s#TD-020") == {"start": "s#TD-009", "own": "", "other": ""}
-    assert card_session(c, [_rec("g2", "/x/s", "TD-20", name="grinder-2")], on="s#TD-020")["other"] == "grinder-2"
+    assert card_session(c, [worker], on="s#TD-020") == {"start": "s#TD-009", "own": "", "other": {}}
+    got = card_session(c, [_rec("g2", "/x/s", "TD-20", name="grinder-2")], on="s#TD-020")["other"]
+    assert got["name"] == "grinder-2" and got["id"] == "g2"
     # the person's own session anywhere on the card still opens, whichever entry the item reads
     own = _rec("p", "/x/s", "TD-9", unattended=False)
     assert card_session(c, [own], on="s#TD-020")["own"] == "p"
@@ -333,9 +346,12 @@ def test_a_ledger_items_press_starts_on_its_own_entry_by_the_holder_rules_of_tha
     (kw,) = created
     assert kw["worktree"] == "td-12" and kw["lane"] == ["TD-12"]
     assert kw["prompt"].startswith("I opened this session from the Queue about samscrape#TD-12, on the card around")
-    # an unattended worker holds TD-12: refused in words, never its Focus
+    # an unattended worker holds TD-12: never its Focus, never refused — started beside it (TD-1984)
     r, created = press("held", "TD-12", [_rec("ao-samscrape-g2", "", "TD-12", name="grinder-2")])
-    assert r.status_code == 409 and "held by grinder-2" in r.text and created == []
+    assert r.status_code == 200 and "focus" not in r.json(), r.text
+    (kw,) = created
+    assert kw["worktree"] == "with-td-12" and kw["lane"] == []
+    assert "TD-12 is held by grinder-2, so while it holds it" in kw["prompt"]
     # the item names another repo's TD-12: not this card's item
     repo, c, created = _start_world(tmp_path / "other", monkeypatch, fleet=[MANAGER], queue=_q())
     body = {"repo": "samscrape", "id": "TD-12", "card": "samscrape#TD-020", "item": "otherrepo#TD-12"}
@@ -363,7 +379,7 @@ def test_the_roads_record_is_the_persons_own_end_with_the_manager_its_controller
 
 def test_an_items_start_reads_the_entry_it_starts_on():
     c = _card()  # start s#TD-009 (the person's Do); TD-020 its top, no need
-    go = {"repo": "s", "card": "s#TD-020", "own": ""}
+    go = {"repo": "s", "card": "s#TD-020", "own": "", "held": ""}
     # a board line or a mail item starts on the card's `start`; a ledger item on its own Decide or Do entry
     assert item_start(c, "board:bb", []) == {"item": "board:bb", "ref": "TD-009", **go}
     assert item_start(c, "m-1", []) == {"item": "m-1", "ref": "TD-009", **go}
@@ -372,8 +388,14 @@ def test_an_items_start_reads_the_entry_it_starts_on():
     assert item_start(c, "s#TD-020", []) == {}
     assert item_start(c, "s#12", []) == {}
     assert item_start({**c, "start": ""}, "board:bb", []) == {}
-    # another session on the entry it starts on, none of the person's: no button (the road refuses 409)
-    assert item_start(c, "board:bb", [_rec("g1", "/x/s", "TD-9", name="grinder-1")]) == {}
+    # another session on the entry it starts on, none of the person's: drawn all the same, its holder named, the
+    # press starting beside it (TD-1984)
+    assert item_start(c, "board:bb", [_rec("g1", "/x/s", "TD-9", name="grinder-1")]) == {
+        "item": "board:bb",
+        "ref": "TD-009",
+        **go,
+        "held": "grinder-1",
+    }
     # the person's own session on the card: Open session, to that one
     assert item_start(c, "board:bb", [_rec("p", "/x/s", "TD-20", unattended=False)])["own"] == "p"
 
@@ -387,7 +409,9 @@ def test_an_item_on_a_free_entry_starts_though_a_worker_holds_start():
     c = {**card(top, rows), "start": "s#TD-009"}
     worker = [_rec("g1", "/x/s", "TD-9", name="grinder-1")]
     assert item_start(c, "s#TD-012", worker)["ref"] == "TD-012"
-    assert item_start(c, "s#TD-009", worker) == {} and item_start(c, "m-1", worker) == {}
+    assert item_start(c, "s#TD-012", worker)["held"] == "", "a free entry: no holder"
+    # the entry the worker holds draws its button all the same, beside it (TD-1984)
+    assert item_start(c, "s#TD-009", worker)["held"] == "grinder-1" and item_start(c, "m-1", worker)["held"]
 
 
 def test_attach_hands_each_decide_and_do_item_its_start_but_a_red_pr():

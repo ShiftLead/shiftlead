@@ -38,7 +38,7 @@ def _tmux(sock: str, *args: str) -> str:
     return subprocess.run(["tmux", "-L", sock, *args], capture_output=True, text=True, timeout=5).stdout.strip()
 
 
-def _jump(sock: str, openings: list[dict]) -> bool:
+def _jump(sock: str, openings: list[dict]) -> tuple[int, int] | None:
     async def read(argv):
         p = await asyncio.create_subprocess_exec(*argv, stdout=asyncio.subprocess.PIPE)
         out, _ = await asyncio.wait_for(p.communicate(), 5)
@@ -55,7 +55,9 @@ def test_a_found_prompt_lands_at_the_top_and_a_miss_leaves_copy_mode(pane):
     sock = pane
     assert wait_for_sync(lambda: "after 100" in _tmux(sock, "capture-pane", "-p", "-t", "=ao-j:"), timeout=8)
     # the older of the two *hello there*s: passed the newer on the way
-    assert _jump(sock, [{"drawn": "❯ hello there", "whole": True}, {"drawn": "❯ hello there", "whole": True}])
+    landed = _jump(sock, [{"drawn": "❯ hello there", "whole": True}, {"drawn": "❯ hello there", "whole": True}])
+    # a history row lands at the top; the cursor's row is the one copy mode keeps through the landing
+    assert landed == (0, int(_tmux(sock, "display-message", "-p", "-t", "=ao-j:", "#{cursor_y}")))
     assert _tmux(sock, "display-message", "-p", "-t", "=ao-j:", "#{pane_in_mode}") == "1"
     _tmux(sock, "send-keys", "-X", "-t", "=ao-j:", "top-line")
     assert _tmux(sock, "display-message", "-p", "-t", "=ao-j:", "#{copy_cursor_line}").startswith(
@@ -65,5 +67,5 @@ def test_a_found_prompt_lands_at_the_top_and_a_miss_leaves_copy_mode(pane):
     assert (
         _tmux(sock, "display-message", "-p", "-t", "=ao-j:", "#{copy_cursor_line}") == "⏺ hi back"
     )  # the reply under it
-    assert not _jump(sock, [{"drawn": "❯ never said", "whole": True}])
+    assert _jump(sock, [{"drawn": "❯ never said", "whole": True}]) is None
     assert _tmux(sock, "display-message", "-p", "-t", "=ao-j:", "#{pane_in_mode}") == "0"

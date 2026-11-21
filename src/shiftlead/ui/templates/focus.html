@@ -153,6 +153,9 @@
           {% if not popped %}<button data-act="popout" data-id="{{ s.id }}" title="open this session in its own browser window, for alt-tab — a second press raises it">⇱ Pop out</button>{% endif %}
           <button id="tcopy" title="copy the terminal selection — drag to select, Shift+click to grow or shrink it (Ctrl+Shift+C, or Ctrl+C with a selection). Wheel or Shift+PageUp scrolls history; Shift+PageDown, q or Esc returns">⧉ Copy <span class="key">Ctrl+Shift+C</span></button>
           <button id="tpaste" title="paste the clipboard into the terminal (Ctrl+V, Ctrl+Shift+V, Shift+Insert, or right-click){% if s.unattended %} — not while you are watching: Take over first{% endif %}">⎘ Paste <span class="key">Ctrl+V</span></button>
+          {#- design §4.5a **Fit to window** (TD-1919), plain until TD-1948: the wide layout's own Focus alone; the page
+              draws it, hidden on an ended record and when the box's grid is the pane's already -#}
+          <button id="tfit" class="hidden" title="give the pane this window's size — waits until the session is idle; a smaller size can repeat or drop the last lines of the history">⤢ Fit to window</button>
           {# design §4.5a *Focus: copy on select* (TD-164, built by TD-174): the person's, in settings.yml, on by default #}
           <label id="tcopyselrow" class="menutoggle" title="copy on select: a selection is copied as soon as you release the mouse (or Shift+click), silently — Ctrl+C and Copy work either way. Yours everywhere: settings.yml person.terminal.copy_on_select"><input type="checkbox" id="tcopysel"{% if copy_on_select %} checked{% endif %}> Copy on select</label>
           {% if s.agent %}<button id="fmodemenu" data-act="mode" data-via="focus" data-id="{{ s.id }}" data-unattended="{{ 1 if s.unattended else 0 }}"{% if s.mode_place != 'menu' %} hidden{% endif %}
@@ -323,7 +326,11 @@
     </details>{% endif %}
     {# a reaped record has no tree to read: no Git card (§4.1 *Kept, and said*, TD-979) #}
     {% if not s.reaped %}<details class="card pad side" data-side="git" id="gitcard" open>
-      <summary class="row gap"><span class="h2">Git</span><span class="mono muted small" id="gitline">{% if s.git %}{{ s.git.branch }}{% if s.git.unpushed %} · {{ s.git.unpushed }} unpushed{% if s.git.pushed_against %} vs {{ s.git.pushed_against }}{% endif %}{% endif %}{% if s.git.ahead %} · {{ s.git.ahead }} ahead{% endif %}{% if s.git.behind %} · {{ s.git.behind }} behind{% endif %}{% else %}not a git directory{% endif %}</span></summary>
+      <summary class="row gap"><span class="h2">Git</span><span class="mono muted small" id="gitline">{% if s.git %}{{ s.git_head }}{% if s.git.unpushed %} · {{ s.git.unpushed }} unpushed{% if s.git.pushed_against %} vs {{ s.git.pushed_against }}{% endif %}{% endif %}{% if s.git.ahead %} · {{ s.git.ahead }} ahead{% endif %}{% if s.git.behind %} · {{ s.git.behind }} behind{% endif %}{% else %}not a git directory{% endif %}</span></summary>
+      {# §4.5a *Git card: working in* (TD-1959, built by TD-1988): where the session's tool reports working, when
+         that is another worktree or repository or outside any (`cwd_root`): the path cut from its left, whole on
+         hover, a link to `editor.cwd_url`, text where the view serves none #}
+      <div class="mono small muted gitcwd{% if not s.cwd_root %} hidden{% endif %}" id="gitcwd">working in <span class="gitcwdpath" title="{{ s.cwd_root or '' }}">{% if s.editor and s.editor.cwd_url %}<a class="link editor" id="gitcwdlink" href="{{ s.editor.cwd_url }}" data-label="{{ s.editor.label }}"><bdi>{{ s.cwd_root }}</bdi></a>{% else %}<bdi>{{ s.cwd_root or '' }}</bdi>{% endif %}</span></div>
       {# §4.5a *Git card: the pick · ↑ · ↓* (TD-856, built by TD-862): what the lines list — Working tree
          (the pushed record's porcelain), one of the newest ten commits, or Session — read through the
          `git_files` route on a pick; drawn while the card has a git directory. #}
@@ -454,7 +461,7 @@
     {% if s.state != 'scheduled' %}<div class="shacts" id="fsheetacts">
       {%- set acts = [('fclose', '✓', 'Close session'), ('fmodeact', '⇄', s.mode_act or 'Take over')] if s.agent else [('fclose', '✓', 'Close session')] %}
       {%- if s.agent %}{% set acts = acts + [('fmessage', '✉', 'Message'), ('fwrapup', '⏎', 'Wrap up')] %}{% endif %}
-      {%- set acts = acts + [('ftranscript', '☰', 'Transcript'), ('fshell', '⌘', 'Open shell here'), ('tpaste', '⎘', 'Paste')] %}
+      {%- set acts = acts + [('ftranscript', '☰', 'Transcript'), ('fshell', '⌘', 'Open shell here'), ('tpaste', '⎘', 'Paste'), ('tfit', '⤢', 'Fit to window')] %}
       {%- if s.agent %}{% set acts = acts + [('fmodemenu', '⇄', s.mode_act or 'Hand back')] %}{% endif %}
       {%- for src, glyph, label in acts %}
       <button type="button" class="act{% if src in ('fclose', 'fmodeact') %} next{% endif %}" data-for="{{ src }}"><span class="ic" aria-hidden="true">{{ glyph }}</span><span class="al">{{ label }}</span></button>
@@ -489,7 +496,6 @@
 {% endblock %}
 {% block scripts %}
 <script src="/static/vendor/xterm.js"></script>
-<script src="/static/vendor/addon-fit.js"></script>
 <script src="/static/vendor/addon-web-links.js"></script>
 <script src="/static/vendor/addon-unicode-graphemes.js"></script>
 <script src="/static/vendor/addon-webgl.js"></script>

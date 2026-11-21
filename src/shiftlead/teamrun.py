@@ -192,6 +192,47 @@ def on_call_gate(x: teams.Launch) -> dict[str, Any]:
     return {"held": True} if x.lead and x.trigger and x.unattended else {}
 
 
+# The line a Start or an Apply says for the director seat it wrote held (§4.9b *The director seat*, TD-642)
+DIRECTOR_LINE = "the org's director seat written — comes when a prompt no rule answered is pending"
+
+
+DIRECTOR_BY_PERSON = "the org's director seat is a person's Start's or Apply's to write: no session grants permit"
+
+
+def write_director(call: Call, org: orgmod.Org, caller: str | None = None) -> list[str]:
+    """Any Start or Apply writes the org's director seat (design §4.9b *The director seat*, TD-642) when `org.yml`
+    defines it (`teams.director_create`) and no record holds it — a record of its trigger, not superseded, in any
+    state: the seat is there, held or filled, and its next fill reads its launch record. Its directory is made
+    first. Returns the notes to say: the line written, or why not. A director refused (a profile that asks, one
+    unknown, a brief not read), a refused create or a home not read is said and the start stands, as an extra's
+    is — the director is the org's, never the team's. A session's own Start or Apply (`caller`) writes none and
+    says so: the seat holds `permit`, which a session cannot grant (§4.8)."""
+    if getattr(org, "director", None) is None:  # no director defined: nothing to read or write
+        return []
+    try:
+        params = teams.director_create(org)
+    except teams.TeamError as e:
+        return [f"the org's director seat not written — {e}"]
+    if params is None:
+        return []
+    try:
+        held = any(
+            isinstance(r.get("seat"), Mapping)
+            and r["seat"].get("trigger") == params["seat"]["trigger"]
+            and not r.get("superseded_by")
+            for r in call("list")
+        )
+        if held:
+            return []
+        if caller is not None:  # a session's start: the create's attenuation would refuse `permit` (§4.8)
+            return [f"{params['name']}: {DIRECTOR_BY_PERSON}"]
+        Path(params["dir"]).mkdir(parents=True, exist_ok=True)
+        call("create", **params)
+    except Exception as e:  # noqa: BLE001 — whatever the transport or the home raised, the start stands
+        return [f"{params['name']}: the org's director seat not written — {e}"]
+    return [f"{params['name']}: {DIRECTOR_LINE}"]
+
+
 def pool_gate(x: teams.Launch) -> dict[str, Any]:
     """`create`'s `held` for a pool's member after the first (§4.9b *The members*, TD-1476): written
     closed with no pane, as a manager on call is, so rule 3 fills it only when its pool routes a question
@@ -506,7 +547,16 @@ def seat_ids(org: orgmod.Org, sessions: list[dict[str, Any]]) -> dict[str, str]:
         mine = badged(t.name, sessions)
         whens = _seat_of(t, mine)
         out.update({str(s["id"]): whens[s["name"]] for s in mine if s.get("id") and s.get("name") in whens})
+    if getattr(org, "director", None) is not None:  # the org's seat of no team, where defined (§4.9b, TD-642)
+        out.update({str(s["id"]): "comes on a prompt no rule answered" for s in sessions if is_director(s)})
     return out
+
+
+def is_director(s: Mapping[str, Any]) -> bool:
+    """The org's director seat's record (§4.9b *The director seat*, TD-642): a record of the `prompt` trigger,
+    the director's alone, with no team badge — never a superseded one."""
+    trigger = (s.get("seat") or {}).get("trigger") if isinstance(s.get("seat"), dict) else None
+    return trigger == orgmod.DIRECTOR_TRIGGER and not s.get("team") and not s.get("superseded_by")
 
 
 def size_words(size: Mapping[str, Any] | None, team: orgmod.TeamDef | None) -> list[str]:
@@ -1197,6 +1247,7 @@ def start(
         raise PartialStart(name, created, plan, e) from e
     extras, extra_notes = write_extras(call, plan, [lead_id] if lead_id else [], caller)
     notes += extra_notes
+    notes += write_director(call, org, caller)
     # §9 invariant 5, as TD-041 made it a gate: no session acts on an interactive one, so a member
     # the definition starts interactive carries `controllers: [lead]` that can never fire. The list
     # is set and the start stands — it is a fact about the definition — but it is said out loud.
@@ -1987,10 +2038,12 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
     a removal is the sit-out form with `dropped` — on a stopped team too, since rule 8 replays its ended
     records."""
     team = teams.find(org, name)
+    director = write_director(call, org, caller)  # the org's, whatever the team's state (TD-642)
     sessions = call("list")
     stays = stays_with(name, sessions)
     if not crew(name, sessions):  # no records: its next start compiles the flow
-        return {"team": name, "flow": teams.current_flow(team), "applied": [], "skipped": [], "stays": stays}
+        flow = teams.current_flow(team)
+        return {"team": name, "flow": flow, "applied": [], "skipped": [], "stays": stays, "notes": director}
     plan = teams.plan(org, name, host, files=files_via(call))
     diffs = differences(plan, sessions)  # a stopped team's renames and removals alone
     # a manager on call is the controller closed as live (TD-269): the members Apply starts name it
@@ -2003,7 +2056,14 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
         None,
     )
     lead_id = str(lead["id"]) if lead else ""
-    out: dict[str, Any] = {"team": name, "flow": plan.flow, "applied": [], "skipped": [], "stays": stays}
+    out: dict[str, Any] = {
+        "team": name,
+        "flow": plan.flow,
+        "applied": [],
+        "skipped": [],
+        "stays": stays,
+        "notes": director,
+    }
     for d in diffs:
         row = d.as_dict(plan.flow)
         rec = d.record or {}
@@ -2047,7 +2107,7 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
         # Apply's *starts* write the extras a Start would (§4.9 *Scaling with the work*, TD-1545)
         extras, said = write_extras(call, plan, [lead_id] if lead_id else [], caller)
         out["extras"] = [str(r.get("id")) for r in extras]
-        out["notes"] = said
+        out["notes"] = [*director, *said]
     if out["applied"]:
         witness_press(call, "apply", name, team_dir(plan))
     return out
@@ -2175,13 +2235,9 @@ def stop_members(call: Call, org: orgmod.Org, name: str, *, now: bool = False, c
     for s in members:
         if not now and s.get("out_of_work") and s["state"] in SETTLED:
             # Finished (§4.9a): it declared, and it is not mid-turn. There is nothing to wrap up, and
-            # a prompt would only start a turn that `--close` could then land in the middle of. Unread
-            # mail says it is not finished for these words: the doorbell rings it (§4.9, TD-1051)
-            n = int(s.get("unread") or 0)
-            action = (
-                f"out of work, {n} unread — left idle for the doorbell" if n else "finished (out of work), nothing sent"
-            )
-            st.acted.append({**_entry(s, "member"), "action": action, "state": s["state"], "unread": n})
+            # a prompt would only start a turn that `--close` could then land in the middle of. It is marked
+            # instead, closed once it settles, its unread mail kept for the name's next start (§4.9, TD-1898)
+            st.acted.append(_mark_finished(call, s))
             continue
         st.acted.append(_stop_one(call, s, "member", now=now))
     if now and lead is not None:  # a kill has nothing to wait for: the lead goes with them
@@ -2215,7 +2271,14 @@ def stop_lead(call: Call, st: Stopping, *, timeout: float = STOP_TIMEOUT, close:
 
 
 def _close_settled(call: Call, entry: dict[str, Any], record: dict[str, Any] | None) -> None:
-    if record is None or record["state"] == "closed":
+    if record is not None and record["state"] == "closed":
+        closer = record.get("closer")
+        if isinstance(closer, dict) and closer.get("by") == "tick" and closer.get("why") == "wind_down":
+            # rule 9 came first: that close stands, and is said (§4.9a *What it leaves*, TD-1898)
+            entry["action"] = "closed by the tick after the wind-down"
+            entry["state"] = "closed"
+        return
+    if record is None:
         return
     if record["state"] not in SETTLED:
         entry["left_open"] = f"still {record['state']}"
@@ -2257,17 +2320,49 @@ def _own_end(lead: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _mark_finished(call: Call, s: dict[str, Any]) -> dict[str, Any]:
+    """A finished member's entry in a Wind down (design §4.9a *A wind-down closes its members*, TD-1898): it
+    declared and is not mid-turn, so nothing is typed, and the `mark_wind_down` call marks it for rule 9 to close
+    once it settles, its unread mail kept for the name's next start. A seat is never marked, and keeps the old
+    words (a seat with unread mail is rung for it); a refused mark is this entry's outcome, as a refused send is."""
+    n = int(s.get("unread") or 0)
+    entry = {**_entry(s, "member"), "state": s["state"], "unread": n}
+    if s.get("seat"):
+        action = (
+            f"out of work, {n} unread — left idle for the doorbell" if n else "finished (out of work), nothing sent"
+        )
+        return {**entry, "action": action}
+    try:
+        call("mark_wind_down", id=s["id"])
+    except Exception as e:  # noqa: BLE001 — the transport's error is the reason, whichever it is
+        return {**entry, "action": f"refused: {e}", "refused": True}
+    action = (
+        f"out of work, {n} unread — marked, closed once it settles, mail kept"
+        if n
+        else "finished (out of work), marked"
+    )
+    return {**entry, "action": action, "marked": True}
+
+
 def _stop_one(call: Call, s: dict[str, Any], role: str, *, now: bool) -> dict[str, Any]:
     """One member's or the lead's stop. A refusal — its host unreachable (§4.4a), a pending prompt
     — is this entry's outcome, not the stop's: the rest of the team is still wrapped up, and the
-    refused one is named with the reason (TD-057 step 4a, the 3b leftover)."""
+    refused one is named with the reason (TD-057 step 4a, the 3b leftover).
+
+    A member's wrap-up carries `wind_down` (§4.9a *A wind-down closes its members*, TD-1898), so the record is
+    marked once it is submitted — never the lead's, a seat's, or a kill's. A member whose brief was not in is
+    killed by the send itself and reads *killed (brief not in)*, never *wrap-up sent*."""
+    sent: Any = None
     try:
         if now or s.get("agent") is False:  # a record with no agent is killed at once, typed nothing (§4.3)
             call("kill", id=s["id"])
         else:
-            call("send", id=s["id"], text=teams.WRAPUP_PROMPT, wrapup=True)
+            mark = {"wind_down": True} if role == "member" and not s.get("seat") else {}
+            sent = call("send", id=s["id"], text=teams.WRAPUP_PROMPT, wrapup=True, **mark)
     except Exception as e:  # noqa: BLE001 — the transport's error is the reason, whichever it is
         return {**_entry(s, role), "action": f"refused: {e}", "state": s.get("state") or "?", "refused": True}
+    if isinstance(sent, dict) and sent.get("brief_killed"):
+        return {**_entry(s, role), "action": "killed (brief not in)", "state": "killed", "brief_killed": True}
     killed = now or s.get("agent") is False
     return {**_entry(s, role), "action": "killed" if killed else "wrap-up sent", "state": "killed" if killed else "?"}
 

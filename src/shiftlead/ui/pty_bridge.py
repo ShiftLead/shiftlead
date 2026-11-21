@@ -17,6 +17,7 @@ from collections.abc import Awaitable, Callable
 import ptyprocess
 
 from sessionorc.models import RECENT_PROMPTS
+from sessionorc.settings import TERMINAL_GRID
 from sessionorc.tmux import attach_argv as tmux_attach_argv
 
 # The bridge's queue is bounded in bytes (TD-611 slice 5): past `QUEUE_HIGH` unsent the pty is no
@@ -173,13 +174,14 @@ JUMP_DRAWN_MAX = 200  # characters of one opening in a `jump` message
 def jump_argv(session_id: str, *, socket_name: str | None = None) -> list[str]:
     """A jump's one read, the view held (design §4.6 *A jump to a prompt*, TD-975): leave any copy mode
     (`copy-mode -e` on a pane already in mode keeps that mode's older view), enter it again, and print
-    `history_size` and then every row of the pane, history and screen, as plain text."""
+    `history_size` and the cursor's row (`cursor_y`, which copy mode keeps through the landing), then every
+    row of the pane, history and screen, as plain text."""
     argv = ["tmux", "-L", socket_name] if socket_name else ["tmux"]
     t = f"={session_id}:"
     return argv + [
         *("copy-mode", "-q", "-t", t, ";"),
         *("copy-mode", "-e", "-t", t, ";"),
-        *("display-message", "-p", "-t", t, "#{history_size}", ";"),
+        *("display-message", "-p", "-t", t, "#{history_size} #{cursor_y}", ";"),
         *("capture-pane", "-p", "-S", "-", "-E", "-", "-t", t),
     ]
 
@@ -239,16 +241,17 @@ def jump_walk(rows: list[str], openings: list[dict]) -> int | None:
     return stood
 
 
-def jump_read(out: str) -> tuple[int, list[str]] | None:
-    """`jump_argv`'s output as `(history_size, rows)`: its first line is `history_size`, row *i* the
-    *i*-th line after it. None for output that does not start with a number."""
+def jump_read(out: str) -> tuple[int, int, list[str]] | None:
+    """`jump_argv`'s output as `(history_size, cursor_y, rows)`: its first line is `history_size` and
+    `cursor_y`, row *i* the *i*-th line after it. None for output that does not start with two numbers."""
     lines = out.split("\n")
-    if not lines or not lines[0].strip().isdigit():
+    head = lines[0].split() if lines else []
+    if len(head) != 2 or not all(h.isdigit() for h in head):
         return None
     rows = lines[1:]
     if rows and rows[-1] == "":
         rows.pop()  # the newline that ends the capture
-    return int(lines[0].strip()), rows
+    return int(head[0]), int(head[1]), rows
 
 
 async def run_jump(
@@ -258,23 +261,27 @@ async def run_jump(
     session_id: str,
     *,
     socket_name: str | None = None,
-) -> bool:
+) -> tuple[int, int] | None:
     """One jump (design §4.6): the read through `read` (bounded by the caller at `JUMP_WITHIN`; None is a
-    miss), the walk, and the landing or, on a miss, `copy-mode -q` through `run`. True when it landed."""
+    miss), the walk, and the landing or, on a miss, `copy-mode -q` through `run`. `(row, cursor)` when it
+    landed — the landed row on the terminal (0 for a history row, which `goto-line` puts at the top; its row
+    on the live screen for one there) and the cursor's — else None (test it with `is not None`: a history
+    landing's row is 0)."""
     got = None
     with contextlib.suppress(Exception):
         out = await read(jump_argv(session_id, socket_name=socket_name))
         got = jump_read(out) if out is not None else None
-    i = jump_walk(got[1], openings) if got else None
+    i = jump_walk(got[2], openings) if got else None
     try:
         if i is None:
             await run(leave_argv(session_id, socket_name=socket_name))
-            return False
-        await run(land_argv(session_id, got[0] - i, socket_name=socket_name))  # type: ignore[index]
+            return None
+        hist, cursor = got[0], got[1]  # type: ignore[index]
+        await run(land_argv(session_id, hist - i, socket_name=socket_name))
     except Exception as e:  # noqa: BLE001 — a failed landing is a miss, never the attach's end
         log.warning("a jump's landing failed: %s", type(e).__name__)
-        return False
-    return True
+        return None
+    return (0 if i < hist else i - hist), cursor
 
 
 _KEYS_THAT_COUNT = (b"\r", b"\t", b"\x7f", b"\b")
@@ -296,54 +303,108 @@ def counts_as_typing(data: bytes) -> bool:
 SCROLL_MAX = 500  # lines in one wheel message: a frame's notches are a handful, so this only bounds a bad client
 
 
-CLIENTS_EVERY = 5.0  # seconds between the bridge's readings of tmux's clients and window (design §4.6)
+GRID_EVERY = 5.0  # seconds between the bridge's readings of the window (design §4.6)
+GRID_READ_WITHIN = 3.0  # seconds a reading may take before it is no reading
 
 
-def clients_argv(session_id: str, *, socket_name: str | None = None) -> list[str]:
-    """The reading behind the terminal mark *resized by another client* (design §4.6 *Attach behaviour
-    with another client present*, TD-480): how many clients the session has attached, the window's
-    size, and how many lines tmux's status bar takes from it."""
+def grid_argv(session_id: str, *, socket_name: str | None = None) -> list[str]:
+    """The bridge's reading of the window (design §4.6 *Attach behaviour with another client present*,
+    TD-1919): its size and how many lines tmux's status bar takes from it."""
     argv = ["tmux", "-L", socket_name] if socket_name else ["tmux"]
-    fmt = "#{session_attached} #{window_width} #{window_height} #{status}"
-    return argv + ["display-message", "-p", "-t", f"={session_id}:", fmt]
+    return argv + ["display-message", "-p", "-t", f"={session_id}:", "#{window_width} #{window_height} #{status}"]
 
 
-def clients_frame(out: str) -> dict | None:
-    """`clients_argv`'s output as the page's frame, `{"clients": n, "window": [cols, rows]}`, the rows
-    counted as a client's grid counts them — the window's height and the status bar's lines (tmux's
-    `status` option: `on` one, `off` none, a number that many). None for anything else."""
-    parts = out.split()
-    if len(parts) != 4 or not all(p.isdigit() for p in parts[:3]):
+def grid_read(out: str | None) -> tuple[int, int] | None:
+    """`grid_argv`'s output as `(cols, rows)`, the rows counted as a client's grid counts them — the window's
+    height and the status bar's lines (tmux's `status` option: `on` one, `off` none, a number that many),
+    which are none on a session's window. None for anything else."""
+    parts = (out or "").split()
+    if len(parts) != 3 or not all(p.isdigit() for p in parts[:2]):
         return None
-    n, w, h = (int(p) for p in parts[:3])
-    st = parts[3]
+    w, h = int(parts[0]), int(parts[1])
+    st = parts[2]
     bar = 1 if st == "on" else 0 if st == "off" else int(st) if st.isdigit() else 0
-    return {"clients": n, "window": [w, h + bar]}
+    return w, h + bar
 
 
-async def watch_clients(
-    read: Callable[[], Awaitable[str | None]],
-    send_text: Callable[[str], Awaitable[object]],
-    *,
-    every: float = CLIENTS_EVERY,
-) -> None:
-    """While a terminal is attached, read tmux's clients and window every `every` seconds and send the
-    page a text frame when the reading changes from the last one sent (the first always): the attach's
-    own word, as `read_only` is, never pane output. A failed read sends nothing. Runs until cancelled,
-    or until a send fails."""
-    last = None
-    while True:
+def fit_grid(value: object) -> tuple[int, int] | None:
+    """A `fit` message's grid, `(cols, rows)`, or None for one outside `person.terminal.grid`'s bounds
+    (`TERMINAL_GRID`, the setting's and the fit's) or not two whole numbers (design §4.6 *Fit to window*)."""
+    (clo, chi), (rlo, rhi) = TERMINAL_GRID
+    if not isinstance(value, list) or len(value) != 2:
+        return None
+    if any(isinstance(n, bool) or not isinstance(n, int) for n in value):
+        return None
+    cols, rows = value
+    return (cols, rows) if clo <= cols <= chi and rlo <= rows <= rhi else None
+
+
+class GridKeeper:
+    """The one grid this bridge last sent the page, shared by the five-second watcher and a fit (design §4.6):
+    a changed reading resizes the bridge's own pty before its `grid` frame goes, so a fit made from another
+    browser leaves no client at the old size; one lock orders them, and a watcher reading taken before a fit
+    is dropped rather than sent after it."""
+
+    def __init__(
+        self,
+        pty: PtySession,
+        read: Callable[[], Awaitable[str | None]],
+        send_text: Callable[[str], Awaitable[object]],
+        sent: tuple[int, int],
+    ):
+        self.pty, self.read, self.send_text, self.sent = pty, read, send_text, sent
+        self.lock = asyncio.Lock()
+        self.fits = 0  # how many fits have run: a watcher reading taken before one is stale
+
+    async def _reading(self) -> tuple[int, int] | None:
         out = None
         with contextlib.suppress(Exception):
-            out = await read()
-        frame = clients_frame(out) if out else None
-        if frame is not None and frame != last:
-            try:
-                await send_text(json.dumps(frame))
-            except Exception:  # noqa: BLE001 — the socket went away: the pump's end cancels this anyway
-                return
-            last = frame
-        await asyncio.sleep(every)
+            out = await self.read()
+        return grid_read(out)
+
+    async def _take(self, grid: tuple[int, int], *, always: bool = False) -> None:
+        # under the lock: the pty first, then the page's frame
+        if grid == self.sent and not always:
+            return
+        if grid != self.sent:
+            self.pty.resize(*grid)
+        self.sent = grid
+        await self.send_text(json.dumps({"grid": list(grid)}))
+
+    async def watch(self, every: float = GRID_EVERY) -> None:
+        """Read the window every `every` seconds while attached and take a reading that differs. A failed
+        read changes nothing. Runs until cancelled, or until a send fails."""
+        while True:
+            await asyncio.sleep(every)
+            fits = self.fits
+            got = await self._reading()
+            if got is None:
+                continue
+            async with self.lock:
+                if fits != self.fits:
+                    continue  # a fit ran while this was read: its answer stands
+                try:
+                    await self._take(got)
+                except Exception:  # noqa: BLE001 — the socket went away: the pump's end cancels this anyway
+                    return
+
+    async def fit(self, grid: tuple[int, int], resize: Callable[[tuple[int, int]], Awaitable[None]]) -> None:
+        """Carry out the person's fit: `resize` the window, read it again, resize the pty to that reading and
+        answer with its `grid` frame, so a failed command answers with the grid the window kept."""
+        async with self.lock:
+            self.fits += 1
+            with contextlib.suppress(Exception):
+                await resize(grid)
+            got = await self._reading()
+            if got is not None:
+                await self._take(got, always=True)
+
+
+def resize_window_argv(session_id: str, cols: int, rows: int, *, socket_name: str | None = None) -> list[str]:
+    """A fit's command (design §4.6 *Fit to window*): the session's window to `cols` × `rows`, which also
+    keeps it `window-size manual`."""
+    argv = ["tmux", "-L", socket_name] if socket_name else ["tmux"]
+    return argv + ["resize-window", "-t", f"={session_id}:", "-x", str(int(cols)), "-y", str(int(rows))]
 
 
 async def pump(
@@ -353,14 +414,21 @@ async def pump(
     scroll: Callable[[str, int | None], Awaitable[None]] | None = None,
     *,
     leave: Callable[[], Awaitable[None]] | None = None,
-    jump: Callable[[list[dict]], Awaitable[bool]] | None = None,
+    jump: Callable[[list[dict]], Awaitable[object]] | None = None,
+    fit: Callable[[tuple[int, int]], Awaitable[None]] | None = None,
     read_only: bool = False,
     name: str = "",
 ) -> None:
     """Run both directions until either side ends. `recv` yields str (keys), bytes, or a dict
-    with `resize: [cols, rows]` or `scroll: "up" | "down"` and, for the wheel, `lines: n`; `send`
+    with `fit: [cols, rows]` or `scroll: "up" | "down"` and, for the wheel, `lines: n`; `send`
     takes raw bytes for xterm.js; `scroll` (optional) is awaited for scroll messages, which need a
     tmux command, not keys.
+
+    `fit` (optional; design §4.6 *Fit to window*, TD-1919): a `fit` message within `TERMINAL_GRID` is
+    logged as `term fit <name> <cols>x<rows>` and awaited as `fit((cols, rows))` in frame order, as a
+    scroll is; the callback resizes the window and the pty and answers the page with its text frame. One
+    outside the bounds is refused and logged. A `resize` message changes nothing — the pane's grid is the
+    window's, pinned — and is logged once per attach.
 
     `leave` (optional; design §4.6 *Typing returns the pane to the live screen*, TD-667): any scroll
     message sets the *scrolled* mark, and a key frame that counts as typing (`counts_as_typing`) while
@@ -369,8 +437,8 @@ async def pump(
     never overtakes the scroll before it.
 
     `read_only` (design §4.6 *A read-only attach*, TD-096): key frames are dropped — str and bytes
-    alike, every one: the wheel is a scroll message, never a mouse report (TD-174). Resize and
-    scroll messages pass as ever.
+    alike, every one: the wheel is a scroll message, never a mouse report (TD-174). Fit and
+    scroll messages pass as ever: it types nothing, so an `unattended` session is fitted without a Take over.
 
     `jump` (optional; design §4.6 *A jump to a prompt*, TD-975): a dict with `jump: [{drawn, whole}, …]`
     is awaited as `jump(openings)` in frame order, as a scroll is, and sets the *scrolled* mark; one
@@ -385,21 +453,31 @@ async def pump(
             return
 
     scrolled = False
+    resize_said = False
 
     async def up() -> None:
-        nonlocal scrolled
+        nonlocal scrolled, resize_said
         while True:
             msg = await recv()  # type: ignore[misc]
             if msg is None:
                 return
             if isinstance(msg, dict):
                 if "resize" in msg:
-                    cols, rows = int(msg["resize"][0]), int(msg["resize"][1])
-                    # one line per grid the page sends, so a repeated or garbled repaint can be lined up with
-                    # the resizes that preceded it (the connect line records only the grid at the dial); ints
-                    # only, so a client's odd value never reaches the log
-                    log.info("term resize %s %dx%d", name or "-", cols, rows)
-                    pty.resize(cols, rows)
+                    if not resize_said:  # an older page's: the window is pinned (TD-1919)
+                        resize_said = True
+                        log.info("term %s: a resize message changes nothing (the window is pinned)", name or "-")
+                elif "fit" in msg and fit is not None:
+                    grid = fit_grid(msg["fit"])
+                    if grid is None:
+                        # ints never reach the log from a client's odd value: the refusal says only that
+                        log.warning("term %s: a fit outside the grid's bounds refused", name or "-")
+                        continue
+                    # one line per fit, so a repeated or garbled repaint can be lined up with the fits before it
+                    log.info("term fit %s %dx%d", name or "-", *grid)
+                    try:
+                        await fit(grid)
+                    except Exception as e:  # noqa: BLE001 — a failed fit is never the attach's end
+                        log.warning("a fit failed: %s", type(e).__name__)
                 elif "scroll" in msg and scroll is not None:
                     lines = msg.get("lines")
                     scrolled = True

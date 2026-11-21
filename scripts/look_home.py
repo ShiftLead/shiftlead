@@ -12,7 +12,8 @@ anything on the default tmux server: the agent is a child this script starts wit
 socket, as `tests/conftest.py`'s fixture does, so the home, the server and the port are made and torn down
 as one.
 A SIGKILL of the script cannot tear down: its two children, its tmux server (`tmux -L ao-look-…`) and
-its `/tmp/aolook-*` home are then left for you to remove.
+its `aolook-*` home (under `$SHIFTLEAD_SCRATCH`, else `/tmp`) are then left for you to remove, or to the
+sweep of your run's scratch (design §4.6 *A session's scratch*).
 
     pdm run python scripts/look_home.py            # prints `look home: http://127.0.0.1:<port>/`
     pdm run python scripts/look_home.py --port 8799 --sessions 0
@@ -159,7 +160,10 @@ def refuse_live(home: Path) -> str | None:
     if h == live or live in h.parents:
         return f"{home} is the live shiftlead home (or under it): a scratch home never is"
     if len(str(h / "agent.sock")) > 100:
-        return f"{home} is too long a path for a unix socket; use a short one (the default is under /tmp)"
+        return (
+            f"{home} is too long a path for a unix socket; use a short one "
+            "(the default is under $SHIFTLEAD_SCRATCH, else /tmp)"
+        )
     return None
 
 
@@ -230,8 +234,12 @@ def write_fixtures(home: Path, v2: bool = False) -> Path:
     subprocess.run([*git, "add", "-A"], check=True)
     subprocess.run([*git, "commit", "-q", "-m", "fixture"], check=True)
     (home / "repos.txt").write_text(f"{repo}\n", encoding="utf-8")
+    # the sessions' scratch under the home, beside its `claude/`: the default `/tmp` would hold the home's
+    # `claude/projects`, a transcript store the host agent refuses a `scratch_root` to hold (§4.6, TD-1945)
     (home / "hosts.yml").write_text(
-        f"local:\n  name: look\n  vscode_host: look\n  repos_registry: {home / 'repos.txt'}\n", encoding="utf-8"
+        f"local:\n  name: look\n  vscode_host: look\n  repos_registry: {home / 'repos.txt'}\n"
+        f"  scratch_root: {home / 's'}\n",
+        encoding="utf-8",
     )
     (home / "claude").mkdir()
     return repo
@@ -291,7 +299,11 @@ def remove_home(home: Path, quiet: float = 1.0, limit: float = 6.0, step: float 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="look_home.py", description=__doc__.split("\n\n")[0])
     ap.add_argument("--port", type=int, default=0, help="the UI's port (default: a free one)")
-    ap.add_argument("--home", type=Path, help="the scratch SHIFTLEAD_HOME, which must not exist (default: under /tmp)")
+    ap.add_argument(
+        "--home",
+        type=Path,
+        help="the scratch SHIFTLEAD_HOME, which must not exist (default: under $SHIFTLEAD_SCRATCH, else /tmp)",
+    )
     ap.add_argument("--sessions", type=int, default=len(FIXTURE_SESSIONS), help="fixture shell sessions to start")
     ap.add_argument("--v2", action="store_true", help="the fixture repo's ledger is a v2 directory, docs/ledger/")
     ap.add_argument("--agent", metavar="SOCKET", help=argparse.SUPPRESS)  # the child's own mode
@@ -309,7 +321,9 @@ def main(argv: list[str] | None = None) -> int:
         home = args.home.expanduser().resolve()
         home.mkdir(parents=True)
     else:
-        home = Path(tempfile.mkdtemp(prefix="aolook-", dir="/tmp"))
+        # the run's own scratch (§4.6, TD-1944) where it has one: at most 78 bytes,
+        # so `agent.sock` at most 105 (AF_UNIX: 107)
+        home = Path(tempfile.mkdtemp(prefix="aolook-", dir=os.environ.get("SHIFTLEAD_SCRATCH") or "/tmp"))
     sock = f"ao-look-{uuid.uuid4().hex[:8]}"
     port = args.port or free_port()
     env = child_env(home, sock)

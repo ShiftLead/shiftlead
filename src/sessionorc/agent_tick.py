@@ -14,6 +14,7 @@ import json
 import os
 import re
 import shutil
+import threading
 import time
 from collections.abc import Callable, Collection, Mapping
 from datetime import UTC, date, datetime, timedelta
@@ -23,6 +24,9 @@ from typing import Any
 from sessionorc import (
     adapters,
     agent_common,
+    cachesweep,
+    diskbook,
+    gitinfo,
     hosts,
     link,
     mail,
@@ -31,6 +35,7 @@ from sessionorc import (
     reports,
     witness,
     workorders,
+    worktreesweep,
 )
 from sessionorc import balance as balance_mod
 from sessionorc import brief as brief_mod
@@ -41,6 +46,7 @@ from sessionorc import held as held_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc import no_lane as no_lane_mod
 from sessionorc import queue as queue_mod
+from sessionorc import scratch as scratch_mod
 from sessionorc import screen as screen_mod
 from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
@@ -81,6 +87,7 @@ from sessionorc.agent_common import (
     SEAT_PR_WAIT,
     SETTLED,
     STALL_AFTER,
+    SWEEP_DRY_S,
     TAIL_LINES,
     RpcError,
     _clean,
@@ -114,6 +121,7 @@ from sessionorc.models import (
     context_over_text,
     lane_refs,
     now_iso,
+    winding,
 )
 from sessionorc.tmux import PaneInfo
 
@@ -127,6 +135,15 @@ def _stamped(mark: dict[str, Any], stopped: dict[str, str] | None) -> dict[str, 
 
 # a `work_waiting` mark's held part (§6 rule 8 *A team that stopped*, TD-1564): the questions on its held seats
 HELD_KEYS = ("seats_held", "seats_held_by", "seats_held_at")
+
+
+def _after(a: Any, b: Any, *, equal: bool = False) -> bool:
+    """Whether instant `a` is later than `b` (or the same, with `equal`); False where either does not parse."""
+    try:
+        x, y = _parse(str(a)), _parse(str(b))
+    except (TypeError, ValueError):
+        return False
+    return x >= y if equal else x > y
 
 
 def _lane_ids(mark: dict[str, Any]) -> bool:
@@ -454,26 +471,24 @@ class TickMixin:
         await self._refresh_model(snapshot_at)
         await self._refresh_context(snapshot_at)
         await self._refresh_shells(snapshot_at, panes)
+        self._tools_poll_due(panes)  # a login's tools shell open: its identity read again (§4.2b)
         await self._refresh_links(snapshot_at)
         await self._refresh_prompts(snapshot_at)
         if self._derive_task is None or self._derive_task.done():
             # detached for the same reason the usage refresh is: `gh` talks to the network, and the
             # tick and its push must not wait on it (review 2026-09-11)
             self._derive_task = asyncio.create_task(self._derive_reports(snapshot_at))
-        if snapshot_at - self._pruned_at > PRUNE_EVERY:
-            self._pruned_at = snapshot_at
-            # the live set is read here, on the loop (the class's one-writer rule); only the file
-            # work goes to the thread
-            ended = ("exited", "closed")
-            live = {s.run_log for s in self.sessions.values() if s.run_log and s.state not in ended}
-            # a round log goes with the last record of its name (§4.6, TD-191): kept while one is live
-            live |= {str(self._rounds_log(s)) for s in self.sessions.values() if s.state not in ended}
-            # an attachment's folder is kept whole while any record of its session is live (§4.4, TD-469)
-            live_ids = {s.id for s in self.sessions.values() if s.state not in ended}
-            # kept as a pass (TD-1506): a thread outlives the tick that started it, so a cancelled tick
-            # leaves the sweep running; `_prune_task` is what waits for it, as every `*_task` pass is waited for
-            self._prune_task = asyncio.ensure_future(asyncio.to_thread(self._prune_runs, snapshot_at, live, live_ids))
-            await asyncio.shield(self._prune_task)
+        # the hourly sweep is a detached pass (§4.6 *The disk sweep*, TD-1945): a tick that finds the last pass still
+        # running, or a dry run holding its lock, starts none and leaves `_pruned_at` as it was, to try at the next
+        sweeping = (self._prune_task is not None and not self._prune_task.done()) or self._sweep_lock.locked()
+        if snapshot_at - self._pruned_at > PRUNE_EVERY and not sweeping:
+            pruned_before, self._pruned_at = self._pruned_at, snapshot_at
+            live, live_ids, scratch, named = self._sweep_snapshot(snapshot_at)
+            # kept as a pass (TD-1506) the tick never waits on (TD-1945): `_prune_task` is what the tests drain, as
+            # every `*_task` pass is drained
+            self._prune_task = asyncio.create_task(
+                self._sweep(snapshot_at, live, live_ids, scratch, pruned_before, named)
+            )
         if self.mode == "home":
             self._supervise_containers()
             day = datetime.now().astimezone().date().isoformat()
@@ -521,6 +536,7 @@ class TickMixin:
         await self._subagent_flips(snapshot_at)
         await self._retire_anchors()
         await self._work_worked(snapshot_at)  # before any replay this tick supersedes a claim (TD-1462)
+        await self._finished_closed_managers(snapshot_at)  # before rule 1 and the fills read that end (TD-1898)
         await self._keep_running(snapshot_at)
         await self._finished_pass(snapshot_at)
         await self._scale_pass(snapshot_at)  # rule 14 up, after rule 9's reading of who winds down (TD-1546)
@@ -1261,7 +1277,7 @@ class TickMixin:
         if (
             self.mode == "home" and (self._defs_task is None or self._defs_task.done())
         ) and now - self._defs_read_at > DERIVE_EVERY:
-            # a hand edit of the three files is committed on the reports' cadence (§4.9), detached
+            # a hand edit of the definition files is committed on the reports' cadence (§4.9), detached
             self._defs_read_at = now
             self._defs_task = asyncio.create_task(self._commit_defs("edited by hand"))
 
@@ -1327,8 +1343,7 @@ class TickMixin:
             and s.pane
             and not s.out_of_work
             and not s.restart_wanted
-            and not s.wrapup_at
-            and not s.wrapup_sent_at
+            and not winding(s)
             and not (s.run_until and now >= _parse(s.run_until))
             and not s.gated
             and not s.suspended
@@ -1415,7 +1430,7 @@ class TickMixin:
             why = "killed"
         elif s.restart_ceiling:
             why = "exited past its restart ceiling"
-        elif s.wrapup_at or s.wrapup_sent_at:
+        elif winding(s):
             why = "exited after a wrap-up"
         elif s.out_of_work:
             why = "exited after declaring out of work"
@@ -1450,7 +1465,7 @@ class TickMixin:
             return False
         if not retry and (s.first_prompt_error != agent_common.FIRST_PROMPT_NO_HOOK or s.state in ("exited", "closed")):
             return False
-        if s.restart_ceiling or (s.run_until and now >= _parse(s.run_until)) or s.wrapup_at or s.wrapup_sent_at:
+        if s.restart_ceiling or (s.run_until and now >= _parse(s.run_until)) or winding(s):
             return False
         if s.gated or self._profile_gated(s.profile, now, s.team):
             return False
@@ -1494,7 +1509,7 @@ class TickMixin:
                 stored = str(self._read_launch(self._address(s)).get("prompt") or "")
                 if f"\n\n{FILLED_FOR}" in stored:
                     closing = FILLED_FOR + stored.split(f"\n\n{FILLED_FOR}", 1)[1]
-        await self._replay(s, "lost-brief", closing=closing, keep_mail=True)
+        await self._replay(s, "lost-brief", closing=closing, keep_mail=True, scratch=s.scratch)  # keeps it (§4.6)
         new = self.sessions.get(s.id) if s.host == self.host else self.remote.get(s.host, {}).get(s.id)
         if new is None or new is s:
             return True  # the replay failed: its entry says so, and the next tick retries it
@@ -1557,6 +1572,8 @@ class TickMixin:
             return
         if s.superseded_by or s.suspended or s.gated or s.sit_out or work_mod.sat_out(s):
             return  # a member its flow sits out is never started again by the tick (§4.9c)
+        if winding(s):
+            return  # a member being wound down is never restarted: its ending is under way (§4.9a, TD-1898)
         # A ceiling guards against a crash loop, not a member that has worked since (TD-186): a clean
         # declaration is acted on once the window holds fewer than the ceiling's restarts; the new
         # record carries no mark. Inside the window the mark stands, as it does for rule 1.
@@ -1616,7 +1633,7 @@ class TickMixin:
                 self._save(s)
                 await self._push_changes()
                 return
-        await self._replay(s, "wanted", mark=said, keep_mail=True)
+        await self._replay(s, "wanted", mark=said, keep_mail=True, scratch=s.scratch)  # keeps it (§4.6)
 
     async def _retire_anchors(self) -> None:
         """The retired seats' records (design §4.9 *A definition written before TD-722*, §4.9b *No anchor
@@ -1762,7 +1779,7 @@ class TickMixin:
             waiting = {id(e) for e in self._waiting_claims(s)} if why == "brief" and not s.relaunch else set()
             if any(e.status == "claimed" and e.source == "declared" and id(e) not in waiting for e in s.progress):
                 return
-        if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
+        if winding(s) or (s.run_until and now >= _parse(s.run_until)):
             return
         if self._profile_gated(s.profile, now, s.team) or self._just_restarted(s, now):
             return
@@ -1802,7 +1819,8 @@ class TickMixin:
             # just before the replay, so a replay that fails again is taken again next tick (TD-334)
             self._mark_closed(s, why)
         last = s.restarts[-1] if why == "cache" else {}
-        await self._replay(s, why, mark={k: last[k] for k in ("idle", "context") if k in last}, keep_mail=True)
+        mark = {k: last[k] for k in ("idle", "context") if k in last}
+        await self._replay(s, why, mark=mark, keep_mail=True, scratch=s.scratch)  # a restart keeps it (§4.6)
 
     async def _cache_restart(self, s: Session, now: datetime) -> bool:
         """§4.10 *A lapsed cache is started again, not rung* (TD-459, built by TD-467): the doorbell has
@@ -1827,16 +1845,19 @@ class TickMixin:
                 self._save(s)
                 return False
         self._mark_closed(s, "cache")
-        await self._replay(s, "cache", mark=lapsed, keep_mail=True)
+        await self._replay(s, "cache", mark=lapsed, keep_mail=True, scratch=s.scratch)  # keeps it (§4.6)
         return True
 
     @staticmethod
-    def _mark_closed(s: Session, why: str) -> None:
+    def _mark_closed(s: Session, why: str, wound_down_by: str | None = None) -> None:
         """The tick's mark after its own close for a restart: the rule and the `closed_at` that close
         wrote — the node's own stamp for a node's member, applied from the close's reply — so a later
         Close, which writes its own `closed_at`, no longer matches, even one made at the node that the
-        home never hears of as an act (TD-238)."""
+        home never hears of as an act (TD-238). `wound_down_by` on a manager rule 9 closed after a Wind
+        down: who wound the run down (TD-1898)."""
         s.closed_for = {"why": why, "closed_at": s.closed_at}
+        if wound_down_by:
+            s.closed_for["wound_down_by"] = wound_down_by
 
     @staticmethod
     def _closed_by_tick(s: Session, why: str) -> bool:
@@ -1908,7 +1929,7 @@ class TickMixin:
             return  # counted from the later of `since`, `subagent_at` and `shells_at` (TD-734, TD-766)
         if s.nudged_at and _parse(s.nudged_at) >= _parse(s.since):
             return  # this stretch was nudged already: never a second before the first is answered
-        if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
+        if winding(s) or (s.run_until and now >= _parse(s.run_until)):
             return
         if s.gated or self._profile_gated(s.profile, now, s.team):
             return
@@ -2020,7 +2041,7 @@ class TickMixin:
             return  # a claim in progress: the clause on its `ao` replies says it, and it declares after
         if s.context_sent_at and now - _parse(s.context_sent_at) < CONTEXT_AGAIN:
             return
-        if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
+        if winding(s) or (s.run_until and now >= _parse(s.run_until)):
             return
         if s.gated or self._profile_gated(s.profile, now, s.team):
             return
@@ -2137,7 +2158,7 @@ class TickMixin:
                 continue
             typed = s.host == self.host and s.unattended and not s.suspended
             if typed and s.state == "idle":
-                if not s.told or s.pending or s.wrapup_at or s.wrapup_sent_at:
+                if not s.told or s.pending or winding(s):
                     continue
                 if s.gated or self._profile_gated(s.profile, now, s.team):
                     continue
@@ -2390,7 +2411,7 @@ class TickMixin:
             return
         if not (s.host == self.host and s.unattended and not s.suspended and s.state == "idle"):
             return
-        if not s.told or s.pending or s.wrapup_at or s.wrapup_sent_at:
+        if not s.told or s.pending or winding(s):
             return
         if s.gated or self._profile_gated(s.profile, now, s.team):
             return
@@ -2491,7 +2512,7 @@ class TickMixin:
         drops = self._lane_drops(s, [i for i in ids if i in seen])
         if not (new or drops) or s.state in ("exited", "closed") or s.suspended:
             return
-        if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
+        if winding(s) or (s.run_until and now >= _parse(s.run_until)):
             return
         if s.gated or self._profile_gated(s.profile, now, s.team):
             return
@@ -3479,6 +3500,9 @@ class TickMixin:
             if first is not None:
                 firsts[team] = first
         self._finished_first = firsts
+        live = [r for rs in by_team.values() for r in rs if r.state not in work_mod.DEAD]
+        marked = {self._address(r) for r in live if r.wind_down}
+        self._wind_first = {a: w for a, w in self._wind_first.items() if a in marked}  # a mark gone, or its record
         for team in [t for t in self._finished_owed if t not in by_team]:
             del self._finished_owed[team]  # its records are forgotten: nothing left to announce
 
@@ -3499,6 +3523,7 @@ class TickMixin:
             "controllers": self._ctl(r),
             "out_of_work": r.out_of_work,
             "restart_wanted": r.restart_wanted,
+            "wind_down": r.wind_down,
             "subagents_live": agent_common.subagents_live(r, now),
             "shells_live": agent_common.shells_live(r, now),
             "prs_waiting": r.prs_waiting(home=self.host),
@@ -3512,14 +3537,24 @@ class TickMixin:
     async def _finished_team(self, team: str, records: list[Session], now: datetime) -> datetime | None:
         """One team's pass of rule 9: when its reading first held, to keep for the next tick, or None
         when it does not hold or the wind-down is over."""
-        by_address = {self._address(r): r for r in records}
-        views = [self._finished_view(r, now) for r in records]
-        mine = [v for v in views if v["unattended"] is not False and not v["superseded_by"]]
-        top = work_mod.manager_of(mine)
-        manager = by_address[top["id"]] if top is not None else None
-        members = [
-            by_address[v["id"]] for v in mine if v["seat"] is None and v is not top and v["state"] not in work_mod.DEAD
-        ]
+        views, top, manager, members = self._finished_read(records, now)
+        wound = await self._wind_down_close(members, now)
+        if wound:
+            views, top, manager, members = self._finished_read(records, now)  # its closes are read first
+        marked = self._run_marks(team, records, top)
+        if marked:
+            self._finished_owed.pop(team, None)  # a Wind down's ending: nothing is owed by the reading (TD-1898)
+        if (
+            wound
+            and (manager is None or manager.state in work_mod.DEAD)
+            and not work_mod.closed_finished(manager)  # a manager rule 9 closed was told then, and never twice
+            and not any(r.state not in work_mod.DEAD for r in marked)
+        ):
+            # with no live manager, the tick whose close leaves no live marked member is the one that tells
+            # (a session's press; the person's own writes nothing, `_finished_tell` reads which)
+            self._finished_tell(team, records, manager, now)
+            await self._push_changes()
+        wound_by = self._wound_down_by(marked)
         first = self._finished_first.get(team)
         led = manager is not None and manager.state not in work_mod.DEAD
         if (
@@ -3539,37 +3574,20 @@ class TickMixin:
             # the manager's half: from the send on the reading is no longer asked of it — its last
             # acts are work — and only a member live and not finished takes the wind-down back
             since = first or _parse(manager.finished_sent_at) - agent_common.FINISHED_SETTLE
-            asked = work_mod.waiting_of(self.person_inbox)
-            held = work_mod.held_asks(views, home=self.host)  # a reader's wait takes it back too (TD-854)
-            if any(
-                m.state != "idle"
-                or m.restart_wanted
-                or not m.out_of_work
-                or asked.get(self._address(m))
-                or held.get(self._address(m))
-                for m in members
-            ):
-                manager.finished_sent_at = None
-                self._save(manager)
-                log.info("rule 9: %s has a member at work again — the wind-down is off", team)
+            if self._taken_back(team, manager, members, views):
                 await self._push_changes()
                 return None
             for m in members:
                 # one left open with work is closed once it is pushed, the manager live or gone
-                await self._finished_close(m)
+                if not m.wind_down:
+                    await self._finished_close(m)
             if manager.state in work_mod.DEAD:
-                if manager.state == "closed" and not work_mod.closed_finished(manager):
-                    # it closed itself, as the line asked: the mark is what lets the team read
-                    # *wound down* without its declaration, and what says the person was told. One
-                    # that `exited` — a crash, a kill — is rule 1's or a person's, and is left
-                    self._mark_closed(manager, "finished")
-                    self._save(manager)
-                    self._finished_tell(team, records, manager, since)
-                    await self._push_changes()
+                # one that closed itself after the line is marked by `_finished_closed_managers`, ahead of rule 1
+                # and the seats' fill in the tick (TD-1898); one that `exited` is rule 1's or a person's
                 return None
             grace = now - _parse(manager.finished_sent_at) >= agent_common.WRAPUP_GRACE
-            if grace and await self._finished_close(manager):
-                self._mark_closed(manager, "finished")
+            if grace and await self._finished_close(manager, wound_down_by=wound_by):
+                self._mark_closed(manager, "finished", wound_down_by=wound_by)
                 self._save(manager)
                 self._finished_tell(team, records, manager, since)
                 await self._push_changes()
@@ -3590,11 +3608,13 @@ class TickMixin:
         if manager is None or manager.state in work_mod.DEAD:
             if left:
                 # one left open with work: the note waits for the tick that finds the last one gone,
-                # kept in memory as the settle is, so a close by a person is announced too (TD-256)
-                self._finished_owed.setdefault(team, first)
+                # kept in memory as the settle is, so a close by a person is announced too (TD-256);
+                # never for a Wind down's team, whose ending the person or a session already made (TD-1898)
+                if not marked:
+                    self._finished_owed.setdefault(team, first)
                 return first
             self._finished_owed.pop(team, None)
-            if closed and not work_mod.closed_finished(manager):
+            if closed and not marked and not work_mod.closed_finished(manager):
                 # nobody live to tell; one rule 9 closed was announced then, and is never told twice
                 self._finished_tell(team, records, manager, first)
                 await self._push_changes()
@@ -3603,8 +3623,8 @@ class TickMixin:
             return first
         if manager.host != self.host:
             # a node's manager gets no line and the close alone, routed as rule 2 routes one
-            if await self._finished_close(manager):
-                self._mark_closed(manager, "finished")
+            if await self._finished_close(manager, wound_down_by=wound_by):
+                self._mark_closed(manager, "finished", wound_down_by=wound_by)
                 self._save(manager)
                 self._finished_tell(team, records, manager, first)
                 await self._push_changes()
@@ -3614,6 +3634,12 @@ class TickMixin:
             "[shiftlead] your team is finished: every member has declared. Make your last acts — "
             "`ao progress none`, the note to the person — then `ao close` yourself"
         )
+        if wound_by:  # a Wind down's run, whose members may have closed undeclared (TD-1898)
+            who = self._wound_by_words(wound_by, manager, records)
+            line = line.replace(
+                "your team is finished: every member has declared",
+                f"your team was wound down by {who}; its members are closed",
+            )
         if manager.state == "idle" and await self._policy_send(manager, line):
             manager.finished_sent_at = now_iso()
             log.info("rule 9: %s finished — its manager %s told", team, manager.name)
@@ -3621,7 +3647,157 @@ class TickMixin:
             await self._push_changes()
         return first
 
-    async def _finished_close(self, s: Session, why: str = "finished") -> bool:
+    def _finished_read(
+        self, records: list[Session], now: datetime
+    ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, Session | None, list[Session]]:
+        """Rule 9's reading of one team's records: their views, the manager's view (`work.manager_of` over the
+        unattended, unsuperseded ones) and its record, and the live members that are neither it nor a seat."""
+        by_address = {self._address(r): r for r in records}
+        views = [self._finished_view(r, now) for r in records]
+        mine = [v for v in views if v["unattended"] is not False and not v["superseded_by"]]
+        top = work_mod.manager_of(mine)
+        manager = by_address[top["id"]] if top is not None else None
+        members = [
+            by_address[v["id"]] for v in mine if v["seat"] is None and v is not top and v["state"] not in work_mod.DEAD
+        ]
+        return views, top, manager, members
+
+    def _taken_back(self, team: str, manager: Session, members: list[Session], views: list[dict[str, Any]]) -> bool:
+        """Rule 9's take-back after the manager's line: a member live and not finished — at work, wanting a
+        restart, undeclared, or waiting on the person or a reader (TD-854) — clears `finished_sent_at`, saved;
+        a marked member is the wind-down close's alone and is passed over (TD-1898). True when it was taken back."""
+        asked = work_mod.waiting_of(self.person_inbox)
+        held = work_mod.held_asks(views, home=self.host)
+        if not any(
+            m.state != "idle"
+            or m.restart_wanted
+            or not m.out_of_work
+            or asked.get(self._address(m))
+            or held.get(self._address(m))
+            for m in members
+            if not m.wind_down
+        ):
+            return False
+        manager.finished_sent_at = None
+        self._save(manager)
+        log.info("rule 9: %s has a member at work again — the wind-down is off", team)
+        return True
+
+    async def _finished_closed_managers(self, now: datetime) -> None:
+        """Rule 9's mark on a manager that closed itself after its line (design §6 rule 9, TD-1898): at the home,
+        each team whose manager is `closed` with `finished_sent_at` set and no rule 9 mark yet — unless a member
+        is at work again, which takes the wind-down back — is marked `closed_for: {why: finished}` with this
+        run's `wound_down_by`, saved, and the person told. A step of its own ahead of `_keep_running` in the tick,
+        so no seat's fill reads that end before it carries the key; `_finished_team` then finds it marked."""
+        if self.mode != "home":
+            return
+        by_team: dict[str, list[Session]] = {}
+        for r in self._graph().values():
+            if r.team:
+                by_team.setdefault(r.team, []).append(r)
+        for team in sorted(by_team):
+            records = by_team[team]
+            try:
+                views, top, manager, members = self._finished_read(records, now)
+                if manager is None or manager.state != "closed" or not manager.finished_sent_at:
+                    continue
+                if work_mod.closed_finished(manager):
+                    continue
+                if self._taken_back(team, manager, members, views):
+                    await self._push_changes()
+                    continue
+                first = self._finished_first.get(team)
+                since = first or _parse(manager.finished_sent_at) - agent_common.FINISHED_SETTLE
+                self._mark_closed(
+                    manager, "finished", wound_down_by=self._wound_down_by(self._run_marks(team, records, top))
+                )
+                self._save(manager)
+                self._finished_tell(team, records, manager, since)
+                await self._push_changes()
+            except Exception:  # noqa: BLE001 — one team's surprise is a log line, never the others'
+                log.exception("reading whether %s's manager closed itself failed", team)
+
+    @staticmethod
+    def _wound_down_by(marks: list[Session]) -> str | None:
+        """Who wound this run down (§4.9a *The manager is not marked*, TD-1898): `person` where any of this run's
+        member marks is the person's, else the newest mark's `by`; None with no mark of this run."""
+        bys = [
+            (str(r.wind_down.get("at") or ""), r.wind_down.get("by")) for r in marks if isinstance(r.wind_down, dict)
+        ]
+        if not bys:
+            return None
+        if any(by == "person" for _, by in bys):
+            return "person"
+        by = max(bys, key=lambda x: x[0])[1]
+        return str(by) if by else None
+
+    def _wound_by_words(self, by: str | None, manager: Session | None, records: list[Session]) -> str:
+        """`by` as the manager's line and the note name it: *the person*, *you* where it is the manager's own id,
+        else that session's name where a record of the team (or the home's) is it, else the id as written."""
+        if by == "person":
+            return "the person"
+        if manager is not None and by in (manager.id, self._address(manager)):
+            return "you"
+        for r in [*records, *self._graph().values()]:
+            if by in (r.id, self._address(r)):
+                return r.name
+        return str(by)
+
+    async def _wind_down_close(self, members: list[Session], now: datetime) -> bool:
+        """Rule 9's wind-down close (design §4.9a *A wind-down closes its members*, §6 rule 9 *A wind-down's
+        close*, TD-1898): each live member carrying a Wind down's mark (`members` leaves out the manager, whose
+        mark is inert, and the seats), idle with no live subagent and no live shell, is closed through
+        `_finished_close(why="wind_down")` once it has settled — its mark's `waits` false (nothing was sent);
+        or a turn after the mark's `at`, then `SEND_STALL_SECONDS` idle on the home's clock; or `WRAPUP_GRACE`
+        past the first tick that read the mark — whatever `work.finished` reads. One the close leaves open is
+        tried again each tick, never killed. True when it closed one."""
+        closed = False
+        for m in members:
+            mark = m.wind_down
+            if not isinstance(mark, dict) or m.seat is not None or not m.unattended:
+                continue
+            addr, at = self._address(m), str(mark.get("at") or "")
+            kept = self._wind_first.get(addr)
+            if kept is None or kept["at"] != at:
+                kept = self._wind_first[addr] = {"at": at, "seen": now, "idle": None}  # a mark new, or moved
+            idle = (
+                m.state == "idle" and not agent_common.subagents_live(m, now) and not agent_common.shells_live(m, now)
+            )
+            if not (idle and _after(m.turn_at, at)):
+                kept["idle"] = None  # not idle, or no turn since the wrap-up's yet: the idle window starts again
+            elif kept["idle"] is None:
+                kept["idle"] = now
+            if not idle:
+                continue
+            quiet = kept["idle"] is not None and (now - kept["idle"]).total_seconds() >= agent_common.SEND_STALL_SECONDS
+            settled = mark.get("waits") is False or quiet or now - kept["seen"] >= agent_common.WRAPUP_GRACE
+            if settled and await self._finished_close(m, why="wind_down"):
+                log.info("rule 9: %s settled after its Wind down — closed", m.name)
+                self._wind_first.pop(addr, None)
+                closed = True
+        return closed
+
+    def _run_marks(self, team: str, records: list[Session], top: dict[str, Any] | None) -> list[Session]:
+        """The team's records carrying a member's Wind down mark of this run (§4.9a *A mark counts for its run
+        only*, TD-1898): unattended, not superseded, not a seat, not the record `work.manager_of` names (`top`,
+        its view), whose mark is inert; live, or ended (`work.record_end`) at or after the home's
+        `teams.<team>.started_at`, or with no end written — every mark where the host record holds no start."""
+        teams = self._host_rec.get("teams")
+        rec = teams.get(team) if isinstance(teams, dict) else None
+        start = rec.get("started_at") if isinstance(rec, dict) else None
+        out = []
+        for r in records:
+            if not r.wind_down or not r.unattended or r.superseded_by or r.seat is not None:
+                continue
+            if top is not None and self._address(r) == top["id"]:
+                continue
+            end = work_mod.record_end(r) if r.state in work_mod.DEAD else None
+            if start and end and _after(str(start), end):
+                continue  # ended before this run's start: an earlier run's (an end that does not parse is none)
+            out.append(r)
+        return out
+
+    async def _finished_close(self, s: Session, why: str = "finished", wound_down_by: str | None = None) -> bool:
         """Rule 9's close, under the wrap-up's own safety check in the tick's form (rule 2's): only an
         `idle` record whose git fields are known and show nothing uncommitted and nothing unpushed,
         never a suspended one, and a node's only while its link is up. True when it was closed. A
@@ -3634,7 +3810,9 @@ class TickMixin:
         if s.host != self.host and s.host not in self._link_muxes:
             return False  # its link is down: looked at again next tick (§4.4a)
         try:
-            closer = {"by": "tick", "why": why}
+            closer: dict[str, Any] = {"by": "tick", "why": why}
+            if wound_down_by:
+                closer["wound_down_by"] = wound_down_by  # who wound the run down, on the manager's close (TD-1898)
             if s.host == self.host:
                 await self.rpc_close(s.id, closer=closer)
             else:
@@ -3649,7 +3827,21 @@ class TickMixin:
         the person — the pull requests the members reported `done` since the team's start, the
         earliest `created` among its records that are not superseded, and each member's
         `out_of_work.why` — written only when no `note` from the manager reached the person inbox
-        since the reading first held, so a team that dissolves is never quiet and never told twice."""
+        since the reading first held, so a team that dissolves is never quiet and never told twice. Nothing is
+        written for a team the person wound down (a member's mark of this run whose `by` is `person`, TD-1898):
+        the person ended it, and the page said so. Where only a session pressed it, the note is in a wound-down
+        team's words (§4.9a), its `since` the earliest `wind_down.at` among this run's marks."""
+        top = {"id": self._address(manager)} if manager is not None else None
+        marks = self._run_marks(team, records, top)
+        wound_by = self._wound_down_by(marks)
+        if wound_by == "person":
+            return
+        if marks:
+            ats = []
+            for r in marks:
+                with contextlib.suppress(TypeError, ValueError):
+                    ats.append(_parse(str(r.wind_down.get("at"))))
+            since = min(ats, default=since)
         if manager is not None:
             sender = self._address(manager)
             for e in self.person_inbox:
@@ -3670,9 +3862,15 @@ class TickMixin:
             }
         )
         said = "; its manager did not announce it" if manager is not None else ""
+        head = (
+            f"{team} was wound down by {self._wound_by_words(wound_by, None, records)}, and the host agent closed "
+            "its members once each settled. Nothing is asked of you."
+            if wound_by
+            else f"{team} finished and the host agent wound it down: every member declared out of work{said}. "
+            "Nothing is asked of you."
+        )
         lines = [
-            f"{team} finished and the host agent wound it down: every member declared out of work{said}. "
-            "Nothing is asked of you.",
+            head,
             "",
             ("Pull requests reported done since the team started: " + ", ".join(f"#{n}" for n in prs) + ".")
             if prs
@@ -3682,6 +3880,8 @@ class TickMixin:
             why = (r.out_of_work or {}).get("why") if isinstance(r.out_of_work, dict) else None
             if why:
                 lines.append(f"{r.name}: {why}")
+            elif wound_by:
+                lines.append(f"{r.name}: did not declare")
         if more := self._finished_more(team, mine, members, start):
             lines += ["", *more]
         self._system_note(PERSON, "\n".join(lines), team=team)
@@ -3839,7 +4039,8 @@ class TickMixin:
         schedule's start and rule 8's — each counts only when no unattended record of the team runs
         but `but`, the one being started. The home's usage readings now (the `usage` RPC's windows)
         are kept as `teams.<team>.usage_at_start: {profile: {window: pct}}` on the host record,
-        replacing the last start's; with no reading the key goes. At the home only."""
+        replacing the last start's; with no reading the key goes; `teams.<team>.started_at` is the start's own
+        instant, which `_run_marks` reads so a Wind down's mark counts for its run only (TD-1898). At the home only."""
         if self.mode != "home" or not team:
             return
         for r in self._graph().values():
@@ -3860,6 +4061,8 @@ class TickMixin:
                 readings[prof] = windows
         teams = self._host_rec.setdefault("teams", {})
         rec = teams.get(team) if isinstance(teams.get(team), dict) else {}
+        # this run's own instant, so a Wind down's mark counts for its run only (§4.9a, TD-1898)
+        rec["started_at"] = now_iso()
         if readings:
             rec["usage_at_start"] = readings
         else:
@@ -4105,7 +4308,62 @@ class TickMixin:
         # a `prs`, `every` or `swept` due met while the seat ran is the next run's cause (TD-700, TD-1090)
         if (s.seat or {}).get("trigger") in ("prs", "every", "swept"):
             return True
-        return (s.seat or {}).get("trigger") == "team" and s.seat_due.get("by") != "asks"
+        # a manager on call's member reading, or a director's prompt, that came due after its fill is the next
+        # fill's: a fill starts cold on the one reading its `seat_due` names (§6 rule 3, TD-259, TD-642)
+        return (s.seat or {}).get("trigger") in ("team", "prompt") and s.seat_due.get("by") != "asks"
+
+    @staticmethod
+    def _permission_pending(r: Session) -> bool:
+        """A hook-confirmed `needs-you` on a permission a seat may answer (§6 rule 3): a question or a menu is
+        a person's, and a permission only the terminal answers is never a seat's (§4.3, TD-785)."""
+        return (
+            r.state == "needs-you"
+            and r.told
+            and r.pending is not None
+            and r.pending.kind == "permission"
+            and bool(adapters.permission_channel(r.adapter))
+        )
+
+    def _is_director(self, r: Session) -> bool:
+        """A director seat that stands (§4.9b *The director seat*, TD-642): the record whose seat's trigger is
+        `prompt`, the director's alone, that rule 3 would fill — supervised, unattended, not superseded,
+        suspended or sat out, and not refused a fill at the last pass (`unfillable`: its fill ceiling, a paused
+        profile, TD-1443). One that cannot be filled is passed by, as for a question passed up to it."""
+        return (
+            (r.seat or {}).get("trigger") == "prompt"
+            and r.supervised
+            and r.unattended
+            and not r.superseded_by
+            and not r.suspended
+            and not (r.sit_out or work_mod.sat_out(r))
+            and r.id not in self.unfillable
+        )
+
+    def _prompt_causes(self, s: Session, records: list[Session]) -> list[dict[str, Any]]:
+        """What the director seat is filled for (§6 rule 3, §4.9b *The director seat*, TD-642), in this order:
+        `asks` — each question passed up to it, by id; then `prompt` — each unattended supervised record of
+        the org, never itself, with a permission no rule of the person's answered pending (a rule answers at
+        the hook, so one still pending is unanswered), one for each open permission on its stack, keyed by
+        member and the prompt's own id (`prompt`: its `tool_use_id`, else its text). An interactive record's
+        prompt is the person's alone, as is one only its terminal answers."""
+        causes: list[dict[str, Any]] = [{"by": "asks", "ask": i} for i in s.asks_ids(home=self.host)]
+        for r in records:
+            if (
+                r is not s
+                and r.supervised
+                and r.unattended
+                and not r.superseded_by
+                and not r.suspended
+                and self._permission_pending(r)
+            ):
+                # a prompt is a cause by its own id, as a question is (§6 rule 3): a second prompt the member
+                # raised before any tick saw the first answered is a new cause, never the filled one standing;
+                # each open permission on the stack is one, so a prompt under another keeps its own entry
+                stack = [p for p in r.pendings if p.kind == "permission"] or ([r.pending] if r.pending else [])
+                causes += [
+                    {"by": "prompt", "member": self._address(r), "prompt": p.tool_use_id or p.text} for p in stack
+                ]
+        return causes
 
     def _team_causes(self, s: Session, records: list[Session]) -> list[dict[str, Any]]:
         """What a manager on call is filled for (§6 rule 3, TD-259), each a reading of the records
@@ -4121,17 +4379,13 @@ class TickMixin:
             for r in records
             if r is not s and r.supervised and not r.superseded_by and not r.suspended and me in self._ctl(r)
         ]
+        # with a director seat the manager's triage of permissions stands aside — one judge, not two: an unattended
+        # member's prompt goes to the director before a manager (§4.9b *The director seat*, TD-642)
+        director = any(self._is_director(r) for r in records if r is not s)
         for by in ("pending", "stalled", "open"):
             for r in members:
                 if by == "pending":
-                    met = (
-                        r.state == "needs-you"
-                        and r.told
-                        and r.pending is not None
-                        and r.pending.kind == "permission"
-                        # a permission only the terminal answers is never a seat's (§4.3, §6 rule 3, TD-785)
-                        and adapters.permission_channel(r.adapter)
-                    )
+                    met = self._permission_pending(r) and not (director and r.unattended)
                 elif by == "stalled":
                     met = r.state == "stalled?"
                 else:
@@ -4146,16 +4400,17 @@ class TickMixin:
         `asks` is a question waiting now, so it clears again if none is. `prs` reads `seat_count`,
         which `_count_seats` keeps; `every` is the time since this record was created; `swept` reads
         the repo's board's stamp (`_swept_met`). `team` is a
-        manager on call's (TD-259): `{at, by, member}` — `ask` in `member`'s place for `asks` — the
+        manager on call's (TD-259), and `prompt` the director's: `{at, by, member}` — `ask` in `member`'s place
+        for `asks`, and `prompt`, the prompt's own id, beside `member` for a director's `prompt` — the
         first cause standing that no fill was made for; `seat_filled` loses each entry whose cause
         has gone, here, and a due whose cause went before the fill is cleared as `asks` is."""
         seat = s.seat or {}
         trigger = seat.get("trigger")
-        if trigger == "team":
-            causes = self._team_causes(s, records)
+        if trigger in ("team", "prompt"):
+            causes = self._team_causes(s, records) if trigger == "team" else self._prompt_causes(s, records)
 
             def same(a: dict[str, Any], b: dict[str, Any]) -> bool:
-                return all(a.get(k) == b.get(k) for k in ("by", "member", "ask"))
+                return all(a.get(k) == b.get(k) for k in ("by", "member", "ask", "prompt"))
 
             kept = [e for e in s.seat_filled if isinstance(e, dict) and any(same(e, c) for c in causes)]
             if kept != s.seat_filled:
@@ -4406,7 +4661,7 @@ class TickMixin:
         tagged = bool(seat.get("tags")) and (s.seat_due or {}).get("by") == "tag"
         # a manager on call's cause, a tagging seat's `tag` (TD-730), or a sweep seat's `swept`, which is
         # remembered so it fills once (TD-1090) but says nothing (`filled_for`); a techlead's `asks` fill has none
-        cause = s.seat_due if seat.get("trigger") in ("team", "swept") or tagged else None
+        cause = s.seat_due if seat.get("trigger") in ("team", "prompt", "swept") or tagged else None
         # a manager on call says why it came (§6 rule 3 *A fill says why it came*, TD-410): its first
         # act is the reading `seat_due` names, read back from the record, never `ao status` first
         said = filled_for(cause)
@@ -5345,7 +5600,192 @@ class TickMixin:
         except Exception:  # noqa: BLE001 — a detached task: log, and try again tomorrow
             log.exception("the nightly backup of the store failed")
 
-    def _prune_runs(self, now: datetime, live: set[str], live_ids: set[str] | None = None) -> None:
+    def _sweep_snapshot(
+        self, snapshot_at: datetime
+    ) -> tuple[set[str], set[str], dict[str, str], dict[str, tuple[str, float | None]]]:
+        """What a sweep pass, or a dry run, reads of the records: on the loop (the class's one-writer rule); only the
+        file work goes to the thread. Sets `_sweep_roots` too."""
+        ended = ("exited", "closed")
+        live = {s.run_log for s in self.sessions.values() if s.run_log and s.state not in ended}
+        # a round log goes with the last record of its name (§4.6, TD-191): kept while one is live
+        live |= {str(self._rounds_log(s)) for s in self.sessions.values() if s.state not in ended}
+        # an attachment's folder is kept whole while any record of its session is live (§4.4, TD-469)
+        live_ids = {s.id for s in self.sessions.values() if s.state not in ended}
+        # each live record's scratch on this host is kept alive by the sweep (§4.6, TD-1944)
+        scratch = {
+            s.id: s.scratch
+            for s in self.sessions.values()
+            if s.scratch and s.state not in ended and s.host == self.host
+        }
+        # and every record's, live or ended, so the pass can take an ended one's past its keep (§4.6, TD-1945)
+        named = _scratch_named(self.sessions.values(), self.host, snapshot_at)
+        # the cache and worktree rules' repos, each registered root (a reading's `root`, else its key): never
+        # keyed by name, where two repos sharing one would keep only the first's
+        self._sweep_roots = sweep_roots(self._repos)
+        return live, live_ids, scratch, named
+
+    async def _sweep(
+        self,
+        now: datetime,
+        live: set[str],
+        live_ids: set[str] | None,
+        scratch: dict[str, str] | None,
+        before: datetime | None = None,
+        named: dict[str, tuple[str, float | None]] | None = None,
+    ) -> None:
+        """One pass of the hourly sweep, in a thread, under the one lock a pass holds (§4.6 *The disk sweep*,
+        TD-1945); a detached task, so a failure is logged here, never left to vanish."""
+
+        self._sweep_loop = asyncio.get_running_loop()  # the worktree rule takes a create's locks on it
+
+        def run() -> bool:
+            if not self._sweep_lock.acquire(blocking=False):
+                return False
+            try:
+                self._prune_runs(now, live, live_ids, scratch, named)
+            finally:
+                self._sweep_lock.release()
+            return True
+
+        try:
+            if not await asyncio.to_thread(run) and before is not None and self._pruned_at == now:
+                self._pruned_at = before  # a dry run took the lock first: `_pruned_at` as it was, the next tick tries
+        except Exception:  # noqa: BLE001 — a detached task: log, and the next pass tries again
+            log.exception("the hourly sweep failed")
+
+    def _prune_runs(
+        self,
+        now: datetime,
+        live: set[str],
+        live_ids: set[str] | None = None,
+        scratch: dict[str, str] | None = None,
+        named: dict[str, tuple[str, float | None]] | None = None,
+    ) -> dict[str, Any]:
+        """One pass's rules (`_prune_rules`) and its result (§4.6 *The sweep's reading*, TD-1945): per kind the
+        bytes held, *partial* until each item is measured, the bytes removed and each kept item with why
+        (`diskbook`), kept as `_disk_result`, written to `disk.json` (TD-1946) and returned."""
+        tallies = self._disk_book.tallies()
+        if named is None:  # the scratch rule does not run: what it would list stands as last read, *partial*
+            tallies["scratch"].unlisted = True
+        try:
+            before = _run_items(live_ids)
+        except Exception:  # noqa: BLE001 — the reading never stops a pass
+            log.exception("the sweep's reading of the runs failed")
+            before = None
+        try:
+            self._prune_rules(now, live, live_ids, scratch, named, tallies)
+        finally:
+            runs = tallies["runs"]
+            try:
+                after = _run_items(live_ids)
+            except Exception:  # noqa: BLE001
+                log.exception("the sweep's reading of the runs failed")
+                after = None
+            if before is None or after is None:
+                runs.unlisted = True
+            else:
+                for path, size in before.items():
+                    if path not in after:
+                        runs.gone(path, size)
+                for path, size in after.items():
+                    runs.measure(path, size)
+            self._disk_result = self._disk_book.close(tallies)
+            try:
+                free = diskbook.free_space(self._scratch_root())
+                diskbook.write(paths.home(), self.host, self._disk_result, free, self.started_at, datetime.now(UTC))
+            except Exception:  # noqa: BLE001 — the reading never stops a pass
+                log.exception("writing the sweep's reading failed")
+        return self._disk_result
+
+    @staticmethod
+    def _scratch_root() -> str:
+        return getattr(hosts.local_host(), "scratch_root", None) or hosts.DEFAULT_SCRATCH_ROOT
+
+    def _disk_here(self) -> dict[str, Any]:
+        """This host's reading (§4.6 *The sweep's reading*, TD-1946): `disk.json`'s last pass, the 30-day totals and
+        the free space under `scratch_root` as it is now. Touches files: run off the loop."""
+        free = diskbook.free_space(self._scratch_root())
+        return diskbook.read(paths.home(), self.host, self.started_at, datetime.now(UTC), free)
+
+    async def rpc_disk(self, host: str | None = None) -> dict[str, Any]:
+        """`ao disk` (§4.7, §4.6 *The sweep's reading*, TD-1946): a read, under no grant. With `host` naming another
+        host the call never reaches here (`_act_host` routes it over the `act` link method); with it naming this one,
+        or at a node, this host's bare reading, which carries its `host`. At the home with no `host`, this host's and
+        every node's at once, `{host: entry}`, a host that fails its own `{"error": "<why>"}`, never the call's."""
+        if host or self.mode != "home":
+            return await asyncio.to_thread(self._disk_here)
+        return await self._disk_everywhere("disk", self._disk_here)
+
+    async def rpc_disk_dry_run(self, host: str | None = None) -> dict[str, Any]:
+        """`ao disk --dry-run` (§4.7, §4.6 *The sweep's reading*, TD-1946): a pass that removes nothing, routed as
+        `disk` is. It writes no `disk.json`, leaves the worktree pass's cursor and the sweep's memory as they were,
+        weighs worktrees in path order from the first, runs every kind under `SWEEP_DRY_S` (checked between steps,
+        so it answers at most one step past it) and says *partial* when it stops short; refused while a pass holds
+        the lock (*a pass runs; ask again in a minute*)."""
+        self._sweep_loop = asyncio.get_running_loop()
+        snap = self._sweep_snapshot(datetime.now(UTC))
+        if host or self.mode != "home":
+            return await asyncio.to_thread(self._disk_dry_here, snap)
+        return await self._disk_everywhere("disk_dry_run", lambda: self._disk_dry_here(snap))
+
+    def _disk_dry_here(
+        self, snap: tuple[set[str], set[str], dict[str, str], dict[str, tuple[str, float | None]]]
+    ) -> dict[str, Any]:
+        """This host's dry run, in a thread, under the pass's lock taken without waiting."""
+        if not self._sweep_lock.acquire(blocking=False):
+            raise RpcError("a pass runs; ask again in a minute")
+        try:
+            live, live_ids, _scratch, named = snap
+            book = self._disk_book.copy()
+            tallies = book.tallies()
+            with contextlib.suppress(OSError):  # the runs held now; the rules count what they would remove
+                for path, size in _run_items(live_ids).items():
+                    tallies["runs"].measure(path, size)
+            deadline = time.monotonic() + SWEEP_DRY_S
+            self._prune_rules(datetime.now(UTC), live, live_ids, None, named, tallies, dry=True, deadline=deadline)
+            kinds = book.dry(tallies)
+        finally:
+            self._sweep_lock.release()
+        return {
+            "host": self.host,
+            "dry_run": True,
+            "partial": any(k["partial"] for k in kinds.values()),
+            "kinds": kinds,
+        }
+
+    async def _disk_everywhere(self, method: str, here: Callable[[], dict[str, Any]]) -> dict[str, Any]:
+        """`method` asked of this host (`here`, in a thread) and of every node (`hosts.nodes()`, each through
+        `_route_act` with `host` set) under one `asyncio.gather`: `{host: entry}`, each entry the host's reading or
+        `{"error": "<why>"}` — a node's refusal, its link down (*unreachable since …*), its silence past
+        `DIGEST_TIMEOUT` — so one host never fails the call (§4.7 `ao disk`)."""
+        names = [n for n in hosts.nodes() if n != self.host]
+
+        async def one(h: str) -> dict[str, Any]:
+            try:
+                if h == self.host:
+                    return await asyncio.to_thread(here)
+                got = await self._route_act(method, {"host": h}, None, h)
+            except RpcError as e:
+                return {"error": str(e)}
+            except Exception as e:  # noqa: BLE001 — one host's failure is that host's entry
+                log.exception("%s on %s failed", method, h)
+                return {"error": f"{type(e).__name__}: {e}"}
+            return got if isinstance(got, dict) else {"error": f"{h} answered {method} with no reading"}
+
+        got = await asyncio.gather(*(one(h) for h in [self.host, *names]))
+        return dict(zip([self.host, *names], got, strict=True))
+
+    def _prune_rules(
+        self,
+        now: datetime,
+        live: set[str],
+        live_ids: set[str] | None,
+        scratch: dict[str, str] | None,
+        named: dict[str, tuple[str, float | None]] | None,
+        tallies: dict[str, diskbook.Tally],
+        dry: bool = False,
+        deadline: float | None = None,
+    ) -> None:
         """Run-log retention (design §4.6): a log older than `runs_keep_days` goes unless it is in
         `live`, the logs of sessions still running (never truncate a live log: invariant 3). Logs
         of forgotten sessions are the common case — Forget keeps the file until this sweep. `0`
@@ -5355,26 +5795,99 @@ class TickMixin:
         attachment. An attachment's `.part` nothing has written to for an hour goes whatever
         the bound (§4.4 *Attachment drop*, TD-478): a browser closed mid-upload leaves nothing.
         The Add entry form's draft folders go by their claim (`_prune_drafts`, TD-630), before the
-        early returns. Runs in a thread: touches files, never `self.sessions`."""
+        early returns, and so does `scratch`, each live record of this host's scratch directory (§4.6
+        *A session's scratch*, TD-1944): made again where it is gone, its stale files' access times moved
+        (`scratch.keep_alive`); `named`, every record's scratch on this host with when its record ended (None:
+        live), lets the scratch rule of §4.6 *The disk sweep* take what no live record holds (`scratch.sweep`),
+        the records read again from a list copy just before each removal. Runs in a thread: touches files, and
+        reads `self.sessions` only through a list copy. `dry` (a dry run's, TD-1946) removes and touches nothing,
+        each item a rule would remove counted gone in its kind's tally (the runs rules' through `_Removal`), every
+        kind under `deadline` (monotonic), checked between steps, a kind it never reached *partial*."""
+        root = self._scratch_root()
+        rm = _Removal(tallies["runs"] if dry else None)
+
+        def late(kind: str) -> bool:
+            if deadline is not None and time.monotonic() > deadline:
+                tallies[kind].unlisted = True
+                return True
+            return False
+
+        if scratch and not dry:
+            try:
+                large = scratch_mod.keep_alive(root, scratch, paths.home(), time.time_ns(), tallies["scratch"])
+            except Exception:  # noqa: BLE001 — a bad record's scratch never stops the rest of the sweep
+                log.exception("scratch sweep failed")
+                large = []
+            for rid in large:
+                tallies["scratch"].keep(scratch[rid], "large scratch")
+                log.warning("large scratch: %s holds more than %d stale files", rid, scratch_mod.SWEEP_TOUCH_FILES)
+        if named is not None and not late("scratch"):
+            ended_states = ("exited", "closed")
+
+            def live_now(path: str) -> bool:
+                return any(s.scratch == path and s.state not in ended_states for s in list(self.sessions.values()))
+
+            kept: list[tuple[str, str]] = []
+            try:
+                troots, blind = adapters.transcript_roots()
+                if blind:  # an adapter that cannot name its stores could have one inside a scratch: none goes
+                    tallies["scratch"].unlisted = True
+                    log.warning("scratch removal skipped: %s named no transcript roots", ", ".join(blind))
+                else:
+                    kept = scratch_mod.sweep(
+                        root,
+                        paths.home(),
+                        named,
+                        hosts.local_host().scratch_keep_hours,
+                        time.time(),
+                        live_now,
+                        troots,
+                        tallies["scratch"],
+                        dry=dry,
+                        deadline=deadline,
+                    )
+            except Exception:  # noqa: BLE001 — the scratch rule never stops the rest of the sweep
+                tallies["scratch"].unlisted = True
+                log.exception("scratch removal failed")
+            for path, why in kept:
+                log.info("scratch kept: %s (%s)", path, why)
+        if not late("caches"):
+            self._sweep_caches(now, tallies["caches"], dry=dry, deadline=deadline)
+        if not late("worktrees"):
+            self._sweep_worktrees(now, tallies["worktrees"], dry=dry, deadline=deadline)
+        if late("runs"):
+            return
         idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
         for f in paths.attachments_dir().glob("*/*.part"):
             try:
                 # an upload's `.part` alone (`<name>.<16 hex>.part`): a finished file a person named
                 # `notes.part` is an attachment, kept as any other is
                 if paths.UPLOAD_PART.fullmatch(f.name) and f.stat().st_mtime < idle:
-                    f.unlink()
+                    if rm.unlink(f):
+                        continue
                     log.info("pruned attachment upload %s (nothing written for an hour)", f)
             except OSError:
                 continue
-        keep = hosts.local_host().runs_keep_days
-        _prune_drafts(now, keep, live_ids)
+        local = hosts.local_host()
+        keep = local.runs_keep_days
+        _prune_drafts(now, keep, live_ids, rm)
+        ended = ("exited", "closed")
+        _prune_runs_by_size(
+            local.runs_keep_mb,
+            live,
+            live_ids,
+            now,
+            lambda rid: any(s.id == rid and s.state not in ended for s in list(self.sessions.values())),
+            rm,
+        )
         if keep <= 0:
             return
         cutoff = (now - timedelta(days=keep)).timestamp()
         for f in paths.runs_dir().glob("*.log"):
             try:
                 if str(f) not in live and f.stat().st_mtime < cutoff:
-                    f.unlink()
+                    if rm.unlink(f):
+                        continue
                     log.info("pruned run log %s (older than %d days)", f.name, keep)
             except OSError:
                 continue
@@ -5383,7 +5896,8 @@ class TickMixin:
         for f in (paths.home() / "promotes").glob("*/*.log"):
             try:
                 if str(f) not in inflight and f.stat().st_mtime < cutoff:
-                    f.unlink()
+                    if rm.unlink(f):
+                        continue
                     log.info("pruned promote log %s (older than %d days)", f, keep)
             except OSError:
                 continue
@@ -5401,12 +5915,123 @@ class TickMixin:
             for f in files:
                 try:
                     if f.stat().st_mtime < cutoff:
-                        f.unlink()
+                        if rm.unlink(f):
+                            continue
                         log.info("pruned attachment %s (older than %d days)", f, keep)
                 except OSError as e:
                     log.warning("could not prune attachment %s: %s", f, e)
             with contextlib.suppress(OSError):  # not empty: a younger file keeps it
-                folder.rmdir()
+                rm.rmdir(folder)
+
+    def _sweep_caches(
+        self, now: datetime, tally: diskbook.Tally | None = None, dry: bool = False, deadline: float | None = None
+    ) -> None:
+        """The cache rule of §4.6 *The disk sweep* (TD-1945): agent-cadence trees no registered repo's `origin`
+        default branch pins, older than `cache_keep_days`, removed only by the default home's host agent and only
+        where it registers a repo (a home with no roster leaves every tree), every pin read or none removed."""
+        roots = list(self._sweep_roots)
+        if not roots or not cachesweep.default_home():
+            return
+        try:
+            pinned = cachesweep.pins(roots)
+            if pinned is not None:
+                cachesweep.sweep_trees(
+                    pinned, hosts.local_host().cache_keep_days, now.timestamp(), tally=tally, dry=dry, deadline=deadline
+                )
+            elif tally is not None:
+                cachesweep.tally_trees(tally)  # no pin read, none removed: the trees are still held
+        except Exception:  # noqa: BLE001 — the cache rule never stops the rest of the sweep
+            if tally is not None:
+                tally.unlisted = True
+            log.exception("cache sweep failed")
+
+    def _sweep_worktrees(
+        self, now: datetime, tally: diskbook.Tally | None = None, dry: bool = False, deadline: float | None = None
+    ) -> None:
+        """The worktree rule of §4.6 *The disk sweep* (TD-1945, `worktreesweep`): only the default home's host agent
+        (`_worktree_scope` where a test gives it), over each registered repo, from the cursor, for at most
+        `SWEEP_WORKTREE_S`. Runs in the sweep's thread; a create's two locks are taken on the loop. `dry` (TD-1946)
+        weighs from the first path, for what is left before `deadline`, removes nothing and leaves the cursor."""
+        scope = self._worktree_scope if self._worktree_scope is not None else cachesweep.default_home()
+        roots = list(self._sweep_roots)
+        if not scope or not roots:
+            return
+        try:
+            troots, blind = adapters.transcript_roots()
+            if blind:  # an adapter that cannot name its stores could have one inside a worktree: none goes
+                if tally is not None:
+                    tally.unlisted = True
+                log.warning("worktree sweep skipped: %s named no transcript roots", ", ".join(blind))
+                return
+            budget = worktreesweep.SWEEP_WORKTREE_S
+            if dry:
+                budget = max(0.0, deadline - time.monotonic()) if deadline is not None else float("inf")
+            got = worktreesweep.sweep(
+                [Path(r) for r in roots],
+                cursor="" if dry else self._worktree_cursor,
+                keep_days=hosts.local_host().worktree_keep_days,
+                idle=lambda wt: self._reap_idle(None, wt),
+                hold=self._hold_create_locks,
+                transcript_roots=troots,
+                now=now.timestamp(),
+                tally=tally,
+                budget=budget,
+                dry=dry,
+            )
+        except Exception:  # noqa: BLE001 — the worktree rule never stops the rest of the sweep
+            if tally is not None:
+                tally.unlisted = True
+            log.exception("worktree sweep failed")
+            return
+        if dry:
+            if got.stopped and tally is not None:
+                tally.unlisted = True
+            return
+        self._worktree_cursor = got.cursor
+        for path, why in got.kept:
+            log.debug("worktree kept: %s (%s)", path, why)
+
+    def _hold_create_locks(self, wt: Path, repo: Path) -> Callable[[], None] | None:
+        """Take, without waiting, the two locks a create holds before its record exists (`_dir_locks` keyed
+        `worktree:<main>:<name>` and by the directory), from the sweep's thread on the loop; their release, or None
+        when either is busy (§4.6 *The disk sweep*: *busy: a start is using it*)."""
+        loop = self._sweep_loop
+        if loop is None or loop.is_closed():
+            return None
+        try:
+            main = gitinfo.main_checkout(wt)
+        except gitinfo.WorktreeError:
+            main = repo
+        keys = [f"worktree:{main}:{wt.name}", str(wt)]
+        abandoned = threading.Event()  # the sweep stopped waiting: whatever `take` holds, it lets go
+
+        async def take() -> list[asyncio.Lock] | None:
+            got: list[asyncio.Lock] = []
+            for k in keys:
+                lock = self._dir_locks[k]
+                if lock.locked() or abandoned.is_set():
+                    for g in got:
+                        g.release()
+                    return None
+                await lock.acquire()  # free: taken at once, with no wait
+                got.append(lock)
+            return got
+
+        def let_go(held: list[asyncio.Lock] | None) -> None:
+            for lock in held or []:
+                with contextlib.suppress(RuntimeError):  # the loop closed: nobody waits on the lock
+                    loop.call_soon_threadsafe(lock.release)
+
+        fut = asyncio.run_coroutine_threadsafe(take(), loop)
+        try:
+            held = fut.result(timeout=gitinfo.REAP_STEP)
+        except Exception:  # noqa: BLE001 — a loop that cannot answer keeps the worktree, and takes nothing late
+            abandoned.set()
+            fut.add_done_callback(lambda f: let_go(f.result()) if not f.cancelled() and not f.exception() else None)
+            return None
+        if held is None:
+            return None
+        return lambda: let_go(held)
 
     async def _clear_gone_kept(self) -> None:
         """A closed record still saying its worktree is kept stops saying so once the directory is gone, such as
@@ -5435,7 +6060,19 @@ class TickMixin:
         ]
         if not due:
             return
-        results = await asyncio.gather(*(asyncio.to_thread(git_info, s.dir) for s in due), return_exceptions=True)
+        # the record's `cwd` taken before git runs, its root written only where `cwd` is still that value when it
+        # ends (§4.2 *The record's `cwd`*, TD-1988): a read in flight never writes the old folder's root
+        cwds = {s.id: s.cwd for s in due}
+        roots: dict[str, str | None] = {}
+
+        def _read(s: Session) -> gitinfo.GitInfo | None:
+            try:  # a root that cannot be read is none, and never costs the record its `git`
+                roots[s.id] = gitinfo.cwd_root(s.dir, cwds[s.id]) if cwds[s.id] else None
+            except (OSError, ValueError):
+                roots[s.id] = None
+            return git_info(s.dir)
+
+        results = await asyncio.gather(*(asyncio.to_thread(_read, s) for s in due), return_exceptions=True)
         infos = {s.id: (r if not isinstance(r, BaseException) else None) for s, r in zip(due, results, strict=True)}
         # the recent files (§4.2 *The record's `files`*, TD-538): read again only when the status's
         # `oid` or its porcelain moved since the last read, or none was read for this record yet
@@ -5447,11 +6084,16 @@ class TickMixin:
             live = self.sessions.get(s.id)
             if live is None:
                 continue  # forgotten while git ran: no side-table key outlives it (TD-463)
-            self._git_checked[s.id] = now
             info = infos.get(s.id)
             new = info.to_dict() if info else None
             changed = new != live.git
             live.git = new
+            if live.cwd == cwds[s.id]:
+                self._git_checked[s.id] = now
+                root = roots.get(s.id)
+                changed = changed or root != live.cwd_root
+                live.cwd_root = root
+            # else a hook moved `cwd` while git ran: no root written, and the record stays due
             if s.id in files:  # a read that failed keeps the list it had, and is taken again next time
                 self._files_read[s.id] = keys[s.id]
                 changed = changed or files[s.id] != live.files
@@ -6173,16 +6815,18 @@ class TickMixin:
             self._observe(s, pane, tails.get(sid, []), now)
         # tmux sessions with our prefix that we have no record of (created by hand, or the
         # store was lost): adopt them minimally as shells so they appear in the Org. A pane whose
-        # create is still starting it is that create's, not a stranger's (TD-952).
+        # create is still starting it is that create's, not a stranger's (TD-952). A tools shell's
+        # (`ao--tools-…`, §4.2b) is adopted as one: `log: false`, named its id less `ao--`.
         for name, pane in panes.items():
             if name not in self.sessions and name not in self._starting and not self._is_removed_pane(name, pane):
                 s = Session(
                     id=name,
-                    name=name[len(naming.PREFIX) :],
+                    name=naming.adopted_name(name),
                     kind="interactive",
                     adapter="shell",
                     dir="",
                     host=self.host,
+                    log=not naming.is_tools(name),
                 )
                 s.created = datetime.fromtimestamp(pane.created, UTC).isoformat().replace("+00:00", "Z")
                 self.sessions[name] = s
@@ -6226,8 +6870,9 @@ class TickMixin:
 
     def _observe(self, s: Session, pane: PaneInfo, tail: list[str], now: datetime) -> None:
         adapter = adapters.get(s.adapter)
-        s.tail = [_clean(t) for t in tail]
-        s.title = _pane_title(adapter, pane.title)
+        tools = naming.is_tools(s.id)  # a tools shell: nothing of its pane is kept (§4.2b *The tools shell*)
+        s.tail = [] if tools else [_clean(t) for t in tail]
+        s.title = None if tools else _pane_title(adapter, pane.title)
         s.pane = True
         if s.run_log:
             with contextlib.suppress(OSError):
@@ -6275,7 +6920,7 @@ class TickMixin:
                 s.set_state(saved[0], confidence=saved[2], pending=saved[1])
         elif self._title_verdict(s, adapter, pane, now):
             pass  # the tool's own title replaced the record's state (§4.2 *A title the tool writes its state into*)
-        if not pane.dead and adapter.state_source != "scraped":
+        if not pane.dead and adapter.state_source != "scraped" and not tools:
             self._stall_check(s, adapter, now)
         self.store.save(s)
 
@@ -6542,6 +7187,13 @@ class TickMixin:
             s.adapter_id = aid
         if (path := event.get("transcript")) and isinstance(path, str):
             s.transcript = path  # the tool's file for this run, pushed with the id (§4.2, TD-578)
+        if "cwd_real" in event and not queued:  # the main thread's live report, resolved by the hook RPC (TD-1988)
+            cwd = event["cwd_real"] if isinstance(event["cwd_real"], str) else None
+            if isinstance(event.get("cwd_raw"), str):
+                self._cwd_raw[sid] = event["cwd_raw"]  # the last raw value, marked where it is written
+            if cwd != s.cwd:
+                s.cwd, s.cwd_root = cwd, None  # its root is the status read's to write: the read made due now
+                self._git_checked.pop(sid, None)
         if (model := event.get("model")) and str(model) != s.model:
             s.model = str(model)  # SessionStart's `model`, or a `/model` switch (TD-031)
             agent_common.write_model_file(s)  # the commit hook's trailer follows it (§4.2, TD-638)
@@ -6918,6 +7570,8 @@ class TickMixin:
         forgotten or replaced in place by a new session of the same name (§4.1)."""
         for side in (
             self._git_checked,
+            self._cwd_raw,
+            self._cwd_asking,
             self._files_read,
             self._derived_at,
             self._model_checked,
@@ -7098,14 +7752,138 @@ def merge_prompts(
     return out[:RECENT_PROMPTS]
 
 
-def _prune_drafts(now: datetime, keep: int, live_ids: set[str] | None) -> None:
+def _tree_size(p: Path) -> tuple[int, float]:
+    """A file's, or a folder's files', bytes and newest modification time (a folder's own time only when it holds
+    no file: removing a file moves it); never through a symlink."""
+    st = p.lstat()
+    if not p.is_dir() or p.is_symlink():
+        return st.st_size, st.st_mtime
+    size, newest = 0, 0.0
+    for f in p.rglob("*"):
+        with contextlib.suppress(OSError):
+            if f.is_symlink() or not f.is_dir():
+                fs = f.lstat()
+                size += fs.st_size
+                newest = max(newest, fs.st_mtime)
+    return size, newest or st.st_mtime
+
+
+class _Removal:
+    """The run-log rules' removals (§4.6 *The disk sweep*): done, or — given a dry run's `tally` — counted gone in it
+    and left (§4.6 *The sweep's reading*, TD-1946). Each call returns whether it was dry."""
+
+    def __init__(self, tally: diskbook.Tally | None = None) -> None:
+        self.tally = tally
+
+    @property
+    def dry(self) -> bool:
+        return self.tally is not None
+
+    def unlink(self, f: Path, size: int | None = None) -> bool:
+        if self.tally is None:
+            f.unlink()
+            return False
+        self.tally.gone(f, f.lstat().st_size if size is None else size)
+        return True
+
+    def rmtree(self, d: Path, size: int | None = None) -> bool:
+        if self.tally is None:
+            shutil.rmtree(d)
+            return False
+        self.tally.gone(d, _tree_size(d)[0] if size is None else size)
+        return True
+
+    def rmdir(self, d: Path) -> bool:
+        if self.tally is None:
+            d.rmdir()
+            return False
+        if not any(d.iterdir()):
+            self.tally.gone(d, 0)
+        return True
+
+
+def _run_items(live_ids: set[str] | None) -> dict[str, int]:
+    """The run logs (a rounds log aside) and, with `live_ids` given, the attachment folders (drafts aside) the
+    sweep's reading counts as *runs*, each with its bytes (§4.6 *The sweep's reading*)."""
+    out: dict[str, int] = {}
+    for f in paths.runs_dir().glob("*.log"):
+        if f.name.endswith(".rounds.log") or f.is_symlink():
+            continue
+        with contextlib.suppress(OSError):
+            out[str(f)] = f.lstat().st_size
+    if live_ids is not None:
+        for d in paths.attachments_dir().glob("*"):
+            if d.is_symlink() or not d.is_dir() or paths.DRAFT.fullmatch(d.name):
+                continue
+            with contextlib.suppress(OSError):
+                out[str(d)] = _tree_size(d)[0]
+    return out
+
+
+def _prune_runs_by_size(
+    keep_mb: int,
+    live: set[str],
+    live_ids: set[str] | None,
+    now: datetime | None = None,
+    still_live: Callable[[str], bool] | None = None,
+    rm: _Removal | None = None,
+) -> None:
+    """Run logs past `runs_keep_mb` (§4.6 *The disk sweep*, TD-1945): while the ended runs' logs and attachment
+    folders together exceed it, the oldest go first — a live record's earlier runs among them, a live run's never.
+    A base id's rounds log, the promote logs and the draft folders neither count nor go by it. `0` is no bound;
+    with `live_ids` None no attachment folder counts, as the age rule sweeps none. The snapshot can go stale while
+    the pass runs (TD-1945 review): an item written after `now` is passed over, and a folder whose record
+    `still_live` reads live again (a list copy, read just before the removal) is kept."""
+    if keep_mb <= 0:
+        return
+    items: list[tuple[float, int, Path]] = []
+    for f in paths.runs_dir().glob("*.log"):
+        if f.name.endswith(".rounds.log") or str(f) in live or f.is_symlink():
+            continue
+        with contextlib.suppress(OSError):
+            size, at = _tree_size(f)
+            if now is None or at <= now.timestamp():
+                items.append((at, size, f))
+    if live_ids is not None:
+        for d in paths.attachments_dir().glob("*"):
+            if d.name in live_ids or d.is_symlink() or not d.is_dir() or paths.DRAFT.fullmatch(d.name):
+                continue
+            with contextlib.suppress(OSError):
+                size, at = _tree_size(d)
+                if now is None or at <= now.timestamp():
+                    items.append((at, size, d))
+    total, bound = sum(i[1] for i in items), keep_mb * 1024 * 1024
+    for _at, size, p in sorted(items, key=lambda i: (i[0], str(i[2]))):
+        if total <= bound:
+            break
+        if p.is_dir() and still_live is not None and still_live(p.name):
+            continue  # Resumed since the snapshot
+        try:
+            dry = (rm or _Removal()).rmtree(p, size) if p.is_dir() else (rm or _Removal()).unlink(p, size)
+        except OSError as e:
+            log.warning("could not prune %s past runs_keep_mb: %s", p, e)
+            continue
+        total -= size
+        if dry:
+            continue
+        log.info("pruned %s (the ended runs are past runs_keep_mb, %d MB)", p, keep_mb)
+
+
+def sweep_roots(repos: Mapping[Any, Any] | None) -> list[str]:
+    """The registered repos the disk sweep's cache and worktree rules read (§4.6 *The disk sweep*, TD-1945): each
+    reading's `root`, else its key — never keyed by name, where two repos sharing one would keep only the first's."""
+    return sorted({str(r.get("root") or k) for k, r in (repos or {}).items() if isinstance(r, Mapping)})
+
+
+def _prune_drafts(now: datetime, keep: int, live_ids: set[str] | None, rm: _Removal | None = None) -> None:
     """The Add entry form's draft folders (design §4.6 *Run-log retention*, §4.4 *The Add entry form's
     draft*, TD-630), by their `claimed.json`: one with none is removed once nothing in it was written
     for `ATTACH_PART_IDLE_S`, whatever `keep`; one claimed by a hand (`by: hand:<ask id>`) is removed
     `keep` days after its `at`, and kept under `0`; one claimed by a session lives as that session's
     own folder does — kept while its id is in `live_ids` (`None`: nothing is known, so kept), its
     files then going by age and the folder, claim and all, once nothing else is left. A claim that
-    cannot be read is kept: the person's files are the safe direction."""
+    cannot be read is kept: the person's files are the safe direction. `rm` (a dry run's) records instead."""
+    rm = rm or _Removal()
     idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
     cutoff = (now - timedelta(days=keep)).timestamp()
     for folder in paths.attachments_dir().glob("draft-*"):
@@ -7115,8 +7893,7 @@ def _prune_drafts(now: datetime, keep: int, live_ids: set[str] | None) -> None:
             claim = agent_common.read_draft_claim(folder)
             if claim is None:
                 last = max([folder.lstat().st_mtime, *(f.lstat().st_mtime for f in folder.iterdir())])
-                if last < idle:
-                    shutil.rmtree(folder)
+                if last < idle and not rm.rmtree(folder):
                     log.info("pruned draft %s (unclaimed, nothing written for an hour)", folder.name)
                 continue
             by = str(claim.get("by") or "")
@@ -7125,18 +7902,16 @@ def _prune_drafts(now: datetime, keep: int, live_ids: set[str] | None) -> None:
                     at = datetime.fromisoformat(str(claim.get("at"))).timestamp()
                 except ValueError:
                     continue
-                if keep > 0 and at < cutoff:
-                    shutil.rmtree(folder)
+                if keep > 0 and at < cutoff and not rm.rmtree(folder):
                     log.info("pruned draft %s (handed as %s, older than %d days)", folder.name, by[5:], keep)
                 continue
             if not by or live_ids is None or by in live_ids or keep <= 0:
                 continue
             files = [f for f in folder.iterdir() if f.name != paths.DRAFT_CLAIM]
             for f in files:
-                if f.is_file() and not f.is_symlink() and f.lstat().st_mtime < cutoff:
-                    f.unlink()
+                if f.is_file() and not f.is_symlink() and f.lstat().st_mtime < cutoff and not rm.unlink(f):
                     log.info("pruned attachment %s (older than %d days)", f, keep)
-            if not any(f.name != paths.DRAFT_CLAIM for f in folder.iterdir()):
+            if not rm.dry and not any(f.name != paths.DRAFT_CLAIM for f in folder.iterdir()):
                 (folder / paths.DRAFT_CLAIM).unlink(missing_ok=True)
                 folder.rmdir()
         except OSError as e:  # gone meanwhile, or not ours to remove: the next sweep tries again
@@ -7208,3 +7983,27 @@ def _instant(value: Any) -> datetime | None:
 def _iso_of(t: datetime) -> str:
     """`t` in the one spelling the schedule keeps: UTC, whole seconds, `…Z`."""
     return t.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _scratch_named(records, host: str, now: datetime) -> dict[str, tuple[str, float | None]]:
+    """Each scratch directory this host's records name, with the record and when it ended — None while any record
+    naming it is live, else the latest end: `ended.at`, else `since` once `exited` or `closed`, else the snapshot's
+    time, so an unreadable end is kept a full `scratch_keep_hours` (§4.6 *The disk sweep*, TD-1945)."""
+    out: dict[str, tuple[str, float | None]] = {}
+    for s in records:
+        if not s.scratch or s.host != host:
+            continue
+        if s.state not in ("exited", "closed"):
+            out[s.scratch] = (s.id, None)
+            continue
+        at = now.timestamp()
+        for when in ((s.ended or {}).get("at"), s.since):
+            try:
+                at = datetime.fromisoformat(str(when).replace("Z", "+00:00")).timestamp()
+                break
+            except (TypeError, ValueError):
+                continue
+        prev = out.get(s.scratch)
+        if prev is None or (prev[1] is not None and at > prev[1]):
+            out[s.scratch] = (s.id, at)
+    return out

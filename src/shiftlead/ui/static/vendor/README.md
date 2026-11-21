@@ -8,7 +8,6 @@ the xterm.js family on one release line: the addons are built against `@xterm/xt
 | file | package | version | licence |
 |---|---|---|---|
 | `xterm.js`, `xterm.css` | `@xterm/xterm` | 6.0.0 (matched 2026-11-17, TD-1918) | MIT (`LICENSE-xterm.txt`) |
-| `addon-fit.js` | `@xterm/addon-fit` | 0.11.0 (the release paired with xterm 6.0.0) | MIT (`LICENSE-addon-fit.txt`) |
 | `addon-webgl.js` | `@xterm/addon-webgl` | 0.19.0 (the release paired with xterm 6.0.0) | MIT (`LICENSE-addon-webgl.txt`) |
 | `addon-web-links.js` | `@xterm/addon-web-links` | 0.12.0 (the release paired with xterm 6.0.0; first vendored 2026-10-08, TD-422) | MIT (`LICENSE-addon-web-links.txt`) |
 | `addon-unicode-graphemes.js` | `@xterm/addon-unicode-graphemes` | 0.4.0 (the release paired with xterm 6.0.0; matched 2026-11-17, TD-1918) | MIT (`LICENSE-addon-unicode-graphemes.txt`) |

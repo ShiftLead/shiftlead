@@ -34,6 +34,7 @@ from sessionorc import board as board_mod
 from sessionorc import gitinfo, hosts, mail, naming, paths, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
+from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
 from sessionorc.agent_common import PATHS_RUN_CHARS, PATHS_RUNS_MAX
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
@@ -98,6 +99,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     fill_words,  # noqa: F401
     flow_mark,  # noqa: F401
     gated_view,  # noqa: F401
+    git_head,  # noqa: F401
     group_place,  # noqa: F401
     held_words,  # noqa: F401
     host_volatile,  # noqa: F401
@@ -225,6 +227,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     teams_for_form,  # noqa: F401
     teams_view,  # noqa: F401
     templates,  # noqa: F401
+    under_cwd_root,
     usage_accounts,  # noqa: F401
     usage_age,  # noqa: F401
     usage_chip,  # noqa: F401
@@ -454,18 +457,22 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     team_summary,  # noqa: F401
 )
 from .pty_bridge import (
+    GRID_READ_WITHIN,
     JUMP_WITHIN,
     LEAVE_WITHIN,
+    GridKeeper,
     PtySession,
     attach_argv,
-    clients_argv,
+    grid_argv,
+    grid_read,
     leave_argv,
     pump,
+    resize_window_argv,
     run_jump,
     scroll_argv,
-    watch_clients,
 )
 from .queue import (
+    BESIDE_RE,
     GROUP_WORD,
     WANTS,
     WINDOW_LABEL,
@@ -473,6 +480,7 @@ from .queue import (
     apply_picks,
     asked_once,
     attach,
+    beside_td,
     card_index,
     card_page_find,
     card_page_goto,
@@ -480,6 +488,7 @@ from .queue import (
     card_session,
     card_view,
     card_wants,
+    claim_on,
     covered,
     design_link,
     filter_chips,
@@ -548,6 +557,13 @@ from .spend import SPEND_TTL, shape_view, spend_picks, spend_view, titles_of
 from .transcript import TRANSCRIPT_TURNS, transcript_editor, transcript_paths, transcript_view
 
 # -- the Inbox's board reading, kept here: the suite patches both names on the app (TD-196) --------
+
+
+def _passer_names(e: Mapping[str, Any], names: Mapping[Any, Any]) -> dict[str, str]:
+    """Each passer of a question passed up, by the name it is known by (§4.5a *Inbox row: passed up*, TD-661)."""
+    passes = e.get("passes") if isinstance(e.get("passes"), list) else []
+    bys = {str(p.get("by")) for p in passes if isinstance(p, dict) and p.get("by")}
+    return {by: str(names.get(by, by)) for by in bys}
 
 
 def repo_teams(org: orgmod.Org, host: str) -> dict[str, str]:
@@ -740,6 +756,9 @@ def counts_of(sections: Mapping[str, Any], build: Any) -> dict[str, Any]:
     }
 
 
+# what `/api/settings/person` takes (§5 `person.terminal`, TD-1947): one key a call
+PERSON_TERMINAL_SEND = "person: send {terminal: {copy_on_select: true|false}} or {terminal: {grid: [cols, rows]}}"
+
 # design §4.5a **Focus (exited / closed)** → **Resume** (TD-081 step 2; the plumbing is step 1,
 # PR #282). What a one-press resume carries, and what it deliberately does not.
 RESUME_CARRIES = ("name", "dir", "adapter", "profile", "repo", "role", "team", "project", "lane", "controllers")
@@ -819,7 +838,9 @@ def resume_create(rec: dict[str, Any], *, prompt: str = "") -> dict[str, Any]:
         if got["role"]:
             preset = repoconfig.resolve_role(cfg, got["role"])
             got["capabilities"] = [g for g in preset.grants if g in GRANTS]
-            got["lane"] = got["lane"] or list(preset.lane)
+            # a session started beside a holder had no lane, and keeps none (TD-1984)
+            beside = BESIDE_RE.fullmatch(got["name"].lower())
+            got["lane"] = got["lane"] or ([] if beside else list(preset.lane))
             got["profile"] = got["profile"] or preset.profile or ""
     return got
 
@@ -886,12 +907,15 @@ def entry_values(repo: str, type_: str, priority: str, ledger: str) -> str:
     return f"Add entry values — repo: {repo}, Type: {type_}, Priority: {priority}, ledger: {ledger}"
 
 
-def ledger_start_form(root: str, name: str, ref: str, team: str, role: str, manager: str, prompt: str, why: str) -> str:
+def ledger_start_form(
+    root: str, name: str, lane: str, team: str, role: str, manager: str, prompt: str, why: str
+) -> str:
     """Where **Start session** lands when it cannot be silent (§4.5a *Inbox row: ledger entry*, TD-678):
     New session filled in as the press would have started it — the repo, a new worktree `td-<n>` under
     that name, the team, the role, the entry as its lane, the team's manager, the opening prompt — with
     the reason on it, as **Resume**'s press lands (`resume_form_url`). Never *Unattended*: the session
-    is the person's."""
+    is the person's. Beside another holder (TD-1984) the name is a `with-td-` one and `lane` is empty, so the
+    form carries none."""
     q = {
         "dir": root,
         "where": "worktree",
@@ -899,7 +923,7 @@ def ledger_start_form(root: str, name: str, ref: str, team: str, role: str, mana
         "name": name,
         "team": team,
         "role": role,
-        "lane": ref,
+        "lane": lane,
         "controllers": manager,
         "prompt": prompt,
         "prefilled": "1",
@@ -921,14 +945,6 @@ def _form_index(body: Mapping[str, Any]) -> int | None:
         return int(raw)
     except (TypeError, ValueError):
         raise HTTPException(400, "a form is the index of the form pressed") from None
-
-
-def _int_param(raw: str | None, default: int, lo: int, hi: int) -> int:
-    try:
-        v = int(float(raw)) if raw not in (None, "") else default
-    except (TypeError, ValueError, OverflowError):  # "abc", "NaN", "inf" / "1e999"
-        return default
-    return max(lo, min(hi, v))
 
 
 class _WsAttemptLog:
@@ -1070,6 +1086,108 @@ def refill(held: dict[str, Any], new: Mapping[str, Any]) -> None:
     held.update(new)
 
 
+def _shown_folder(folder: str, home: str) -> str:
+    """A folder as the Tools page draws it, `~` for the person's home."""
+    if folder == home:
+        return "~"
+    return "~" + folder[len(home) :] if folder.startswith(home + "/") else folder
+
+
+LOGIN_STATES = {
+    "signed_in": "signed in",
+    "limited": "limited",
+    "sign_in_again": "sign in again",
+    "not_signed_in": "not signed in",
+    "name_account": "signed in — name its account",
+}
+LOGIN_WARNINGS = {
+    "billing_mismatch": "its billing is not what the tool records",
+    "env_key": "one key from the environment signs in every Gemini login here: their reserves bind nothing in common",
+    "moved_while_running": "moved to another account while a session runs on it",
+}
+
+
+def price_fills(weights: Mapping[str, Any], families: list[str]) -> list[dict[str, str]]:
+    """The Settings page's weights a login's **prices** offer as a fill-in (design §4.2b *A login's Settings*, §5
+    `spend.weights`): each weight whose model name holds one of the login's account's families between dashes
+    (`claude-opus-5-5` for `opus`, `gemini-2.5-flash-lite` for `flash-lite`), as `{model, prices}`, the prices as the
+    form's text; none where no family is read or none matches, since another model's prices would be the wrong number
+    one press away. `as_of` is a date, not a weight."""
+    rows = {str(k): v for k, v in weights.items() if k != "as_of" and isinstance(v, dict)}
+    fams = [f"-{str(f).lower()}-" for f in families if f]
+    mine = {k for k in rows if any(f in f"-{k.lower()}-" for f in fams)}
+    return [{"model": k, "prices": _setting_text(rows[k])} for k in sorted(mine)]
+
+
+def login_tree(card: dict[str, Any], home: str, weights: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """A tool card's logins as the Tools page draws them on a switched host (design §4.2b *The page*, TD-1974): each
+    account with its logins under it, then *Not signed in* (the logins with no identity to read), then the logins
+    signed in whose account is still to be named. Each login carries its folder as drawn, its state's words (*limited
+    till 17:50*, its account at a cap, TD-1975) and its warnings' words."""
+    for lg in card.get("logins") or []:
+        lg["shown"] = _shown_folder(str(lg.get("folder") or ""), home)
+        lg["said"] = LOGIN_STATES.get(str(lg.get("state")), str(lg.get("state") or ""))
+        if lg.get("state") == "limited" and (till := setmod._when(lg.get("till"))):  # §4.2b *A login's state*
+            local = till.astimezone()  # the weekday in front once the reset is not today: a week's cap
+            shape = "%H:%M" if local.date() == datetime.now().astimezone().date() else "%a %H:%M"
+            lg["said"] = f"limited till {local:{shape}}"
+        lg["warned"] = [LOGIN_WARNINGS.get(w, w) for w in lg.get("warnings") or []]
+        lg["form"] = {k: _setting_text(v) for k, v in (lg.get("settings") or {}).items()}  # the Settings form's values
+        lg["form"]["pin"] = _setting_text(lg.get("pin"))
+    fams = {a.get("key"): ((a.get("models") or {}).get("families") or []) for a in card.get("accounts") or []}
+    for lg in card.get("logins") or []:
+        lg["families"] = fams.get(lg.get("account")) or []  # a pin's choices: its account's families
+        lg["fills"] = price_fills(weights or {}, lg["families"])  # prices' fill-in: the Settings page's weights
+        lg["fill_id"] = f"fills-{card.get('adapter')}.{lg.get('name')}"  # unique: no tool or login name holds a `.`
+    accounts = []
+    for a in card.get("accounts") or []:
+        key = str(a.get("key") or "")
+        logs = card.get("logins") or []
+        mine = [lg for lg in logs if lg.get("account") == key and lg.get("state") != "not_signed_in"]
+        accounts.append({**a, "name": key.split(":", 1)[-1], "logins": mine})
+    placed = {id(lg) for a in accounts for lg in a["logins"]}
+    rest = [lg for lg in card.get("logins") or [] if id(lg) not in placed]
+    return {
+        "accounts": accounts,
+        "unsigned": [lg for lg in rest if lg.get("state") != "name_account"],
+        "naming": [lg for lg in rest if lg.get("state") == "name_account"],
+    }
+
+
+def _setting_text(v: Any) -> str:
+    """A setting's value as the Settings form shows it, text that reads back as the same value: a list or a mapping
+    as JSON (which YAML reads), a number as its digits, unset empty."""
+    if v is None:
+        return ""
+    return json.dumps(v) if isinstance(v, list | dict) else str(v)
+
+
+LOGIN_SETTINGS = ("billing", "prices", "extra_args", "unattended_args", "permission_wait", "pin")
+
+
+def settings_writes(changes: dict[str, Any], billing: str | None) -> list[tuple[str, Any]]:
+    """A login's Settings form as its writes (design §4.2b *Controls and verbs*, TD-1974): each changed key's text read
+    as YAML, as `ao login set` reads it (a list, a mapping and a number say what they are; empty clears), in an order
+    no write of the press refuses for another: prices cleared before a billing that drops them, set after one that
+    takes them. `billing` is the login's as the page read it. A key that is not a setting, or text that does not read
+    as a value, is a 400 naming it."""
+    import yaml
+
+    out: dict[str, Any] = {}
+    for k, text in changes.items():
+        if k not in LOGIN_SETTINGS:
+            raise HTTPException(400, f"{k!r} is not a login's setting ({', '.join(LOGIN_SETTINGS)})")
+        text = "" if text is None else str(text)
+        try:
+            out[k] = yaml.safe_load(text) if text.strip() else None
+        except yaml.YAMLError:
+            raise HTTPException(400, f"{k}: {text!r} does not read as a value") from None
+    to_metered = out.get("billing", billing) == "metered" and billing != "metered"
+    first = ["prices"] if "prices" in out and not to_metered else []
+    order = [*first, "billing", *[k for k in LOGIN_SETTINGS if k not in ("billing", *first)]]
+    return [(k, out[k]) for k in order if k in out]
+
+
 async def agent_call(method: str, **params: Any) -> Any:
     """One host-agent RPC as the page makes it: down is a 503, a refusal a 400."""
     try:
@@ -1101,6 +1219,9 @@ async def agent_call_ignored(method: str, **params: Any) -> tuple[Any, list[str]
 
 # **Have a session do it**'s hand-off (TD-1660): two presses of one line are serialised, per `(repo, key)`
 _HAND_LOCKS: dict[tuple[str, str], asyncio.Lock] = {}
+# **Start session**'s presses on one entry are serialised (§4.5 screen 12 *Beside another holder*, TD-1984), per
+# `qid(repo, ref)`: two racing presses start one session, the second opening the first
+_START_LOCKS: dict[str, asyncio.Lock] = {}
 HAND_OLDER = "the host agent is older than this page (it does not know find_only): promote it"
 HAND_UNCHECKED = "could not check whether this was handed: {words}"
 
@@ -1302,8 +1423,20 @@ async def paths_for(call: Any, body: dict[str, Any]) -> dict[str, Any]:
         if not ed or not (form := editor_file(reach)):
             return {**out, "paths": none}  # no file form: its host is never asked
         got = (await call("paths", id=rest, runs=runs))["paths"]
-        folder = ed["url"] if fl["folder_first"] else None
-        return {**out, "file": form, "paths": {r: {"path": p, "folder": folder} if p else None for r, p in got.items()}}
+        # the folder sent first: the Session card's, or for a path under `cwd_root` by the deeper-root rule
+        # that folder's, built by the same `editor_link` through the same reach (§4.6, TD-1988)
+        cwd = editor_link(str(s.get("cwd_root") or ""), reach) if s.get("cwd_root") else None
+
+        def first(p: str) -> str | None:
+            if not fl["folder_first"]:
+                return None
+            return cwd["url"] if cwd and under_cwd_root(p, s) else ed["url"]
+
+        return {
+            **out,
+            "file": form,
+            "paths": {r: {"path": p, "folder": first(p)} if p else None for r, p in got.items()},
+        }
     if not (form := editor_file()):
         return {**out, "paths": none}
     if kind == "repo":
@@ -1688,6 +1821,7 @@ class Readings:
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
             e["from_open"] = e["from"] if e["from"] in names else ""
+            e["from_cwd"] = str((records.get(e["from"]) or {}).get("cwd") or "")  # its asker's key (§4.6, TD-1988)
             # the Reply dialog's line (§4.10 *When it is read*, TD-168): a reply reads as a note does,
             # but on a handed entry's thread, where it fills a seat on call as an ask does (TD-218)
             rw = (records.get(e["from"]) or {}).get("read_when") or {}
@@ -1737,6 +1871,7 @@ class Readings:
             rec = e.get("recommend")
             if e.get("passed_up") and isinstance(rec, dict) and rec.get("by"):
                 e["passer_name"] = names.get(str(rec["by"]), str(rec["by"]))
+                e["passer_names"] = _passer_names(e, names)
             # §4.9b: an *answered for you* row names **who asked** — the session Overrule writes
             # to — by the name it is known by, and opens it while it is here
             asker = str(_answered_of(e).get("asker") or "")
@@ -2614,7 +2749,11 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "error": error,
                 "editor": editor,
                 # a path in a turn is a link where **VS Code** is drawn, and absent with it (§4.6, TD-691)
-                "paths": transcript_paths(str(v.get("dir") or "")) if editor else None,
+                "paths": transcript_paths(
+                    str(v.get("dir") or ""), str(s.get("cwd_root") or ""), str((s.get("git") or {}).get("top") or "")
+                )
+                if editor
+                else None,
                 "at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "host": host_name(),
                 "active": "Sessions",
@@ -3180,14 +3319,18 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         else {}
                     )
                     # the person's own additions (§4.8, TD-1016), read at the home whatever host the session
-                    # lands on: under the repo's root here, else the agent-cadence source among the home's
-                    person = await asyncio.to_thread(form_person, preset, None if away else str(cfg.root))
-                    if away:
-                        brief, made_from = await asyncio.to_thread(
-                            preset.compose, refs or None, read=read, person=person, **ids
-                        )
-                    else:
-                        brief, made_from = preset.compose(refs or None, person=person, **ids)
+                    # lands on: under the repo's root here, else the agent-cadence source among the home's. A typed
+                    # prompt is the whole opening prompt, so no brief is composed and no layer read, as `ao new
+                    # --prompt` reads none: a failed listing refuses only a start that would send the brief (§4.8
+                    # *A listing that fails*, TD-1995)
+                    if not prompt.strip():
+                        person = await asyncio.to_thread(form_person, preset, None if away else str(cfg.root))
+                        if away:
+                            brief, made_from = await asyncio.to_thread(
+                                preset.compose, refs or None, read=read, person=person, **ids
+                            )
+                        else:
+                            brief, made_from = preset.compose(refs or None, person=person, **ids)
             except (KeyError, ValueError) as e:
                 raise HTTPException(400, str(e).strip('"')) from None
         # design §4.5a New session **Team** picker (§4.9 *A person in the team*, TD-173): a role's own
@@ -3230,7 +3373,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # Role changed (design §4.5a), so what is ticked is what was meant — including an
             # untick, which is a person deciding this session does not get the grant.
             capabilities=[g for g in dict.fromkeys(grant) if g in GRANTS],
-            lane=refs or (list(preset.lane) if preset else []),
+            # a `with-td-` name's empty lane stays empty (§4.5 screen 12 *Beside another holder*, TD-1984)
+            lane=refs or (list(preset.lane) if preset and not BESIDE_RE.fullmatch(name.strip().lower()) else []),
             role=preset.name if preset else "",
             review=review,  # who reads its PRs (design §4.9b *The reader*): the role's, else the team's
             # §4.8 *A role has a context bound*: a default one only for an unattended session (TD-249)
@@ -3744,9 +3888,11 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
     async def api_ledger_start(request: Request):
         """§4.5a *Inbox row: ledger entry* → **Start session** / **Open session** (TD-676, built by
         TD-678): `{repo, id}` — the repo by its name, as the Add entry form names it — on an entry the
-        home's repo facts sort *for you* (refused 409 in words once it is not). A live record of the
-        repo claiming the entry, or a live one named `td-<n>` there (a start the tick has not yet
-        derived a claim for), answers `{focus: <its id>}` and starts nothing. Else one press, no form,
+        home's repo facts sort *for you* (refused 409 in words once it is not). The person's own live
+        session of the repo holding the entry — by its claim (`same_td`), by the name `td-<n>` (a start
+        the tick has not yet derived a claim for) or by a `with-td-` name (`beside_td`), first by id —
+        else another live record claiming it or named `td-<n>`, answers `{focus: <its id>}` and starts
+        nothing: the Inbox road starts nothing beside a holder. Else one press, no form,
         as **Resume** is: the person's own **interactive** session on the repo's team, the role its
         `entries:` names for the entry's Type, its profile, grants and `review` as **Open a session**
         takes them, the team's live manager its controller, `lane` the id, in a new worktree and branch
@@ -3759,7 +3905,10 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         **On a Queue card** (TD-909, built by TD-912; §4.5 screen 12 *Three verbs: Start session*): `card`, the
         card's id as the `queue` reading has it, widens the road — the entry must be open and the card's `start`
         now, in place of *for you* (409 in words otherwise); the person's own session on any of the card's
-        entries answers `{focus}`, another holder of `start` is refused 409 *held by <name>* (`card_session`);
+        entries answers `{focus}` (`card_session`); another holder of `start` refuses nothing — the session
+        starts **beside** it (§4.5 screen 12 *Beside another holder*, TD-1984): its name, worktree and branch the
+        first of `with-td-<n>`, `with-td-<n>-2` … `-9` that `entry_name_why` finds free (else the form, with the
+        first's reason), no `lane`, and the prompt's holder sentence (`repoconfig.WORK_HELD`) naming the holder;
         `why_key` is the entry's — *yours*, *decision*, else *card* — and the prompt reads *from the Queue*.
         Either way the prompt names the card's ids, waits on me — its Decide and Do items (`waits_on_me`) — and
         the rest (`card_entries`); an entry on no card is the one it names.
@@ -3767,8 +3916,13 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         **Started from an item** (TD-1246, §4.5 screen 12): `item`, the item's id — `board:<key>`, `m-…` or
         `<repo>#TD-n` — beside `card`. A ledger item starts on its own entry, which must be one of the card's
         Decide or Do ledger entries or its `start` (409 otherwise); any other item on the card's `start`. The
-        holder rules read the entry it starts on (`card_session`'s `on`): another holder is refused 409 *held by
-        <name>*, never answered with its Focus. The prompt's first sentence names the item (`WORK_ITEM`)."""
+        holder rules read the entry it starts on (`card_session`'s `on`): beside another holder the session starts
+        beside it, as the header's does, never answering with its Focus. The prompt's first sentence names the item
+        (`WORK_ITEM`).
+
+        **One press per entry at a time** (TD-1984): once `ref` is settled the road holds `_START_LOCKS[qid(repo,
+        ref)]` through the `create`, re-reading the records and meeting them again under it, so of two racing
+        presses the second answers `{focus}` to the first's session."""
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         if not isinstance(body, dict):
             raise HTTPException(400, "send {repo, id}")
@@ -3820,11 +3974,6 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if kept is not None:
             ref, type_, waits = await kept_start(h, records, reading, kept, card_id, item, repo, ref)
             card, entry = kept, {"id": ref, "type": type_}
-            met = card_session(kept, records, on=qid(repo, ref))
-            if met["own"]:  # the person's own session by claim, name or lane: never a second one
-                return {"ok": True, "focus": met["own"]}
-            if met["other"]:
-                raise HTTPException(409, f"held by {met['other']} — nothing was started")
         elif card_id:  # a Queue card: the entry is the card's `start` now, not *for you*
             if card is None or entry is None:
                 raise HTTPException(409, f"the card around {card_id} is no longer open — nothing was started")
@@ -3839,160 +3988,185 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 raise HTTPException(
                     409, f"{ref} is no longer the entry this card starts on ({card.get('start')}) — nothing was started"
                 )
-            met = card_session(card, records, on=here_q)
-            if met["own"]:
-                return {"ok": True, "focus": met["own"]}
-            if met["other"]:
-                raise HTTPException(409, f"held by {met['other']} — nothing was started")
         else:
             if entry is None or entry.get("for_page") != "for-you":
                 raise HTTPException(409, f"{ref} no longer waits on you in {repo}'s ledger — nothing was started")
             card = next((c for c in cards if qid(repo, ref) in sum(card_entries(c), [])), None)
-        mine, rest = card_entries(card) if card is not None and kept is None else ([qid(repo, ref)], [])
-        walk = False  # the header's press on a card where two or more items count (TD-1340)
-        if kept is not None:  # every Decide and Do item of the kept card by its id; the rest none (TD-1618)
-            mine, rest = waits, []
-        elif card is not None:  # every Decide and Do item, by its id (§4.5 screen 12 *Started from an item*)
-            with contextlib.suppress(Exception):  # unread, *waits on me* is the card's ledger entries
-                index = card_index(reading)
-                # with the card, so an *answered — waiting on <asker>* item counts as the page drew it (TD-1843)
-                got = (await card_mail(h, records, index, None, [card]))[1]
-                wants = card_wants((got.get("cards") or {}).get(str(card.get("id"))), "", False)
-                mine = waits_on_me(mine, wants)
-                # counted afresh at the press, whatever the page drew: with two or more the walk sentence, and
-                # *waits on me* leaves out an entry *answered — waiting on <asker>*, which waits on its asker
-                if card_id and not item and items_n(wants) >= 2:
-                    walk, mine = True, walk_mine(mine, wants)
-            if item and not TD_REF.fullmatch(item) and item not in mine:  # the item pressed, read or not
-                mine.append(item)
-        name = ref.lower()  # cadence's work-branch shape: the tick derives the claim from it (§4.8)
-        live = [
-            s
-            for s in records
-            if s.get("state") not in ("exited", "closed") and s.get("repo") and Path(str(s["repo"])).resolve() == here
-        ]
-        holder = next(
-            (
+        # one press per entry at a time (TD-1984): the records read afresh under the lock, so a racing press's session
+        # is met — the person's own check, the name test and the `create` all inside it
+        async with _START_LOCKS.setdefault(qid(repo, ref), asyncio.Lock()):
+            records = await call("list")
+            held_by: dict[str, Any] = {}  # the holder beside which the session starts (`card_session`'s `other`)
+            if card_id:
+                met = card_session(card or {}, records, on=qid(repo, ref))
+                if met["own"]:  # the person's own session by claim, name or lane: never a second one
+                    return {"ok": True, "focus": met["own"]}
+                held_by = dict(met["other"])
+            mine, rest = card_entries(card) if card is not None and kept is None else ([qid(repo, ref)], [])
+            walk = False  # the header's press on a card where two or more items count (TD-1340)
+            if kept is not None:  # every Decide and Do item of the kept card by its id; the rest none (TD-1618)
+                mine, rest = waits, []
+            elif card is not None:  # every Decide and Do item, by its id (§4.5 screen 12 *Started from an item*)
+                with contextlib.suppress(Exception):  # unread, *waits on me* is the card's ledger entries
+                    index = card_index(reading)
+                    # with the card, so an *answered — waiting on <asker>* item counts as the page drew it (TD-1843)
+                    got = (await card_mail(h, records, index, None, [card]))[1]
+                    wants = card_wants((got.get("cards") or {}).get(str(card.get("id"))), "", False)
+                    mine = waits_on_me(mine, wants)
+                    # counted afresh at the press, whatever the page drew: with two or more the walk sentence, and
+                    # *waits on me* leaves out an entry *answered — waiting on <asker>*, which waits on its asker
+                    if card_id and not item and items_n(wants) >= 2:
+                        walk, mine = True, walk_mine(mine, wants)
+                if item and not TD_REF.fullmatch(item) and item not in mine:  # the item pressed, read or not
+                    mine.append(item)
+            name = ref.lower()  # cadence's work-branch shape: the tick derives the claim from it (§4.8)
+            live = [
                 s
-                for s in live
-                if any(
-                    isinstance(p, dict) and p.get("ref") == ref and p.get("status") == "claimed"
-                    for p in s.get("progress") or []
+                for s in records
+                if s.get("state") not in ("exited", "closed")
+                and s.get("repo")
+                and Path(str(s["repo"])).resolve() == here
+            ]
+            if not card_id:  # the Inbox road: **Open session**, and a second press before the tick — never a second one
+                by_id = sorted(live, key=lambda s: str(s.get("id")))
+                claims = [s for s in by_id if claim_on(s, ref) is not None]
+                # the person's own first, by claim, by `td-<n>` or by a `with-td-` name, by id; then the holder
+                # (TD-1984)
+                holder = next(
+                    (
+                        s
+                        for s in by_id
+                        if not s.get("unattended")
+                        and (s in claims or s.get("name") == name or beside_td(s.get("name"), ref))
+                    ),
+                    None,
                 )
-            ),
-            None,
-        ) or next((s for s in live if s.get("name") == name), None)
-        if holder is not None and card_id:  # `card_session` met none of the person's: never another's Focus
-            raise HTTPException(409, f"held by {holder.get('name') or holder['id']} — nothing was started")
-        if holder is not None:  # **Open session**, and a second press before the tick: never a second one
-            return {"ok": True, "focus": holder["id"]}
-        type_ = str(entry.get("type") or "")
-        type_ = type_ if type_ in orgmod.ENTRY_TYPES else orgmod.ENTRY_TYPES[0]
-        if kept is not None:  # an archived entry: neither the person's nor held by their decision
-            why_key = "card"
-        elif str(entry.get("owner") or "").lower() == ledger_mod.PERSON_OWNER:
-            why_key = "yours"
-        elif ledger_mod.decided_by(entry, ledger_mod.PERSON_OWNER) or not card_id:
-            why_key = "decision"
-        else:
-            why_key = "card"
-        org, _notes = await asyncio.to_thread(org_here)
-        team = repo_teams(org, host_name()).get(root, "")
-        role = await asyncio.to_thread(entry_role, org, team, type_)
-        manager, ledger, cfg_why = "", repoconfig.DEFAULT_LEDGER, ""
-        try:
-            cfg = await asyncio.to_thread(repoconfig.discover, root)
-            ledger = cfg.ledger
-        except ValueError as e:
-            cfg, cfg_why = None, str(e).strip('"')
-        # the person's own `work.md` additions follow the package's (§4.8 *The person's own additions*, TD-1016);
-        # a listing that fails is said in the form's words, as any other refusal of the press
-        try:
-            added, added_why = (
-                await asyncio.to_thread(layers.addition, "work.md", root, layers.roots_of(org, host_name())),
-                "",
-            )
-        except layers.ListingError as e:
-            added, added_why = "", str(e)
-        work = {
-            "added": added,
-            "where": "Queue" if card_id else "Inbox",
-            # an entry *waiting, then yours* ends *— asked once TD-n closes* (TD-1926)
-            "mine": asked_once(mine, card) if card is not None and kept is None else mine,
-            "rest": rest,
-            "item": item,
-            "walk": walk,
-            "kept": kept is not None,
-        }
-        # card-less: every `form()` below keeps it, since the form road's prompt travels in a URL (TD-1903)
-        prompt = repoconfig.work_text(ref, repo, ledger, why_key, **work)
-        t = org.teams.get(team) if team else None
-        if t is not None:
-            mid = teams.manager_id(org, t, t.host or host_name(), host_name())
-            manager = mid if mid in {s["id"] for s in teamrun.live(records)} else ""
+                holder = (
+                    holder or (claims[0] if claims else None) or next((s for s in live if s.get("name") == name), None)
+                )
+                if holder is not None:
+                    return {"ok": True, "focus": holder["id"]}
+            # beside another holder (§4.5 screen 12 *Beside another holder*, TD-1984): the first free of the nine
+            # `with-td-` names, tested before every `form()` return so each form names it, and no lane; with all nine
+            # taken the form names the first, with its reason
+            lane, name_why = ref, None
+            if held_by:
+                names = [f"with-{name}", *(f"with-{name}-{k}" for k in range(2, 10))]
+                whys: list[str] = []
+                for n_ in names:
+                    if not (w := await entry_name_why(root, n_)):
+                        break
+                    whys.append(w)
+                name, name_why = (names[len(whys)], "") if len(whys) < len(names) else (names[0], whys[0])
+                lane = ""
+            type_ = str(entry.get("type") or "")
+            type_ = type_ if type_ in orgmod.ENTRY_TYPES else orgmod.ENTRY_TYPES[0]
+            if kept is not None:  # an archived entry: neither the person's nor held by their decision
+                why_key = "card"
+            elif str(entry.get("owner") or "").lower() == ledger_mod.PERSON_OWNER:
+                why_key = "yours"
+            elif ledger_mod.decided_by(entry, ledger_mod.PERSON_OWNER) or not card_id:
+                why_key = "decision"
+            else:
+                why_key = "card"
+            org, _notes = await asyncio.to_thread(org_here)
+            team = repo_teams(org, host_name()).get(root, "")
+            role = await asyncio.to_thread(entry_role, org, team, type_)
+            manager, ledger, cfg_why = "", repoconfig.DEFAULT_LEDGER, ""
+            try:
+                cfg = await asyncio.to_thread(repoconfig.discover, root)
+                ledger = cfg.ledger
+            except ValueError as e:
+                cfg, cfg_why = None, str(e).strip('"')
+            # the person's own `work.md` additions follow the package's (§4.8 *The person's own additions*, TD-1016);
+            # a listing that fails is said in the form's words, as any other refusal of the press
+            try:
+                added, added_why = (
+                    await asyncio.to_thread(layers.addition, "work.md", root, layers.roots_of(org, host_name())),
+                    "",
+                )
+            except layers.ListingError as e:
+                added, added_why = "", str(e)
+            work = {
+                "added": added,
+                "where": "Queue" if card_id else "Inbox",
+                # an entry *waiting, then yours* ends *— asked once TD-n closes* (TD-1926)
+                "mine": asked_once(mine, card) if card is not None and kept is None else mine,
+                "rest": rest,
+                "item": item,
+                "walk": walk,
+                "kept": kept is not None,
+                "held": held_by,  # the holder sentence, on the form road's prompt too (TD-1984)
+            }
+            # card-less: every `form()` below keeps it, since the form road's prompt travels in a URL (TD-1903)
+            prompt = repoconfig.work_text(ref, repo, ledger, why_key, **work)
+            t = org.teams.get(team) if team else None
+            if t is not None:
+                mid = teams.manager_id(org, t, t.host or host_name(), host_name())
+                manager = mid if mid in {s["id"] for s in teamrun.live(records)} else ""
 
-        def form(why: str, role_: str = role) -> JSONResponse:
-            url = ledger_start_form(root, name, ref, team, role_, manager, prompt, why)
-            return JSONResponse({"ok": False, "form": url, "why": why})
+            def form(why: str, role_: str = role) -> JSONResponse:
+                url = ledger_start_form(root, name, lane, team, role_, manager, prompt, why)
+                return JSONResponse({"ok": False, "form": url, "why": why})
 
-        if t is None:  # the form's *Interactive*, not `plain`: a role pick there is a team's
-            return form(f"no team services {repo}: pick one, or start the session with no team", "")
-        if (t.host or host_name()) != host_name():
-            return form(f"{team} runs on {t.host}: this press does not cross the link")
-        if cfg is None:
-            return form(cfg_why)
-        if added_why:
-            return form(added_why)
-        if why := await entry_name_why(root, name):
-            return form(why)
-        try:
-            preset = repoconfig.resolve_role(cfg, role, org.roles)
-        except (KeyError, ValueError) as e:
-            return form(f"the role {role} does not resolve here: {str(e).strip(chr(34))}", "")
-        profs, _default = profiles_mod.load()
-        if preset.profile and preset.profile not in profs:
-            return form(f"the role {preset.name} names the profile {preset.profile}, which is not defined")
-        review = preset.review
-        got = await asyncio.to_thread(team_reader, team, root, None, preset.name)
-        if got.get("flow") or review is None:  # as **Open a session** takes it
-            review = got["review"]
-        # the `project` badge, as New session's (§4.9, TD-1043): the badge alone, not the Project block
-        project, _block = await asyncio.to_thread(teams.reach_block, org, root, host_name())
-        # the card as `ao card` prints it under a pane, read last and never on a kept card (§4.5 screen 12, TD-1903):
-        # what the card read answers but a card, or a failed read, leaves it out and never refuses the press
-        # — `sent`, never `prompt`, which `form()` reads when the create is refused below
-        card_ref = str(card.get("id") or "") if card is not None and kept is None else ""
-        sent = prompt
-        with contextlib.suppress(Exception):
-            got = json.loads(json.dumps(await h.card(card_ref, words=False), default=str)) if card_ref else None
-            if isinstance(got, dict) and isinstance(got.get("card"), dict):
-                block = cardtext.card_block(got, card_ref)
-                sent = repoconfig.work_text(ref, repo, ledger, why_key, card=block, **work)
-        try:
-            s = await call(
-                "create",
-                name=name,
-                dir=root,
-                adapter="claude-code",
-                profile=preset.profile or "",
-                prompt=sent,  # the opening prompt, never the role's brief (§4.9)
-                unattended=False,
-                **teams.gate_prompts(False),
-                worktree=name,
-                repo=root,
-                capabilities=[g for g in dict.fromkeys(preset.grants) if g in GRANTS],
-                lane=[ref],
-                role=preset.name,
-                review=review,
-                context_bound=preset.bound_for(False),
-                ledger=cfg.ledger,
-                controllers=[manager] if manager else [],
-                project=project,
-                team=team,
-            )
-        except HTTPException as e:
-            return form(str(e.detail).strip('"') or "the host agent refused the start")
-        return {"ok": True, "id": s["id"], "name": s.get("name") or name}
+            if t is None:  # the form's *Interactive*, not `plain`: a role pick there is a team's
+                return form(f"no team services {repo}: pick one, or start the session with no team", "")
+            if (t.host or host_name()) != host_name():
+                return form(f"{team} runs on {t.host}: this press does not cross the link")
+            if cfg is None:
+                return form(cfg_why)
+            if added_why:
+                return form(added_why)
+            if why := (name_why if name_why is not None else await entry_name_why(root, name)):
+                return form(why)
+            try:
+                preset = repoconfig.resolve_role(cfg, role, org.roles)
+            except (KeyError, ValueError) as e:
+                return form(f"the role {role} does not resolve here: {str(e).strip(chr(34))}", "")
+            profs, _default = profiles_mod.load()
+            if preset.profile and preset.profile not in profs:
+                return form(f"the role {preset.name} names the profile {preset.profile}, which is not defined")
+            review = preset.review
+            got = await asyncio.to_thread(team_reader, team, root, None, preset.name)
+            if got.get("flow") or review is None:  # as **Open a session** takes it
+                review = got["review"]
+            # the `project` badge, as New session's (§4.9, TD-1043): the badge alone, not the Project block
+            project, _block = await asyncio.to_thread(teams.reach_block, org, root, host_name())
+            # the card as `ao card` prints it under a pane, read last and never on a kept card (§4.5 screen 12,
+            # TD-1903): what the card read answers but a card, or a failed read, leaves it out and never refuses the
+            # press — `sent`, never `prompt`, which `form()` reads when the create is refused below
+            card_ref = str(card.get("id") or "") if card is not None and kept is None else ""
+            sent = prompt
+            with contextlib.suppress(Exception):
+                got = json.loads(json.dumps(await h.card(card_ref, words=False), default=str)) if card_ref else None
+                if isinstance(got, dict) and isinstance(got.get("card"), dict):
+                    block = cardtext.card_block(got, card_ref)
+                    sent = repoconfig.work_text(ref, repo, ledger, why_key, card=block, **work)
+            try:
+                s = await call(
+                    "create",
+                    name=name,
+                    dir=root,
+                    adapter="claude-code",
+                    profile=preset.profile or "",
+                    prompt=sent,  # the opening prompt, never the role's brief (§4.9)
+                    unattended=False,
+                    **teams.gate_prompts(False),
+                    worktree=name,
+                    repo=root,
+                    capabilities=[g for g in dict.fromkeys(preset.grants) if g in GRANTS],
+                    lane=[lane] if lane else [],  # none beside a holder (TD-1984)
+                    role=preset.name,
+                    review=review,
+                    context_bound=preset.bound_for(False),
+                    ledger=cfg.ledger,
+                    controllers=[manager] if manager else [],
+                    project=project,
+                    team=team,
+                )
+            except HTTPException as e:
+                return form(str(e.detail).strip('"') or "the host agent refused the start")
+            return {"ok": True, "id": s["id"], "name": s.get("name") or name}
 
 
 def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
@@ -4542,8 +4716,7 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
             task = asyncio.create_task(asyncio.to_thread(teamrun.stop_lead, rpc, st))
             background.add(task)
             task.add_done_callback(_lead_stopped(name, pending))
-        sent = sum(1 for e in st.acted if e["role"] != "person")  # a person's session is left alone (§4.9)
-        msg = f"{name}: {'killed' if now else 'wrap-up sent to'} {sent} session{'' if sent == 1 else 's'}"
+        msg = f"{name}: {stop_tail(st.acted, now)}"
         if pending:
             msg += f" — {pending} follows when they settle"
         for e in st.acted:
@@ -4552,6 +4725,30 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
         return JSONResponse(
             {"ok": True, "team": name, "now": now, "sessions": st.acted, "manager": pending, "text": msg}
         )
+
+
+def stop_tail(acted: list[dict[str, Any]], now: bool) -> str:
+    """What a Wind down's or a Stop now's toast says it did (design §4.9a *A wind-down closes its members*,
+    TD-1898): *wrap-up sent to N sessions*, N the sessions the wrap-up reached (Stop now's *killed N*), then
+    *, m finished and marked*, each *<name> killed (brief not in)* and *, n refused: <name> (<why>)* where there
+    are any. A person's session is left alone (§4.9) and named after it by the caller."""
+    rows = [e for e in acted if e["role"] != "person"]
+    refused = [e for e in rows if e.get("refused")]
+    marked = sum(1 for e in rows if e.get("marked"))
+    brief = [e for e in rows if e.get("brief_killed")]
+    if now:
+        n = sum(1 for e in rows if e.get("action") == "killed")
+    else:
+        n = sum(1 for e in rows if e.get("action") == "wrap-up sent")
+    msg = f"{'killed' if now else 'wrap-up sent to'} {n} session{'' if n == 1 else 's'}"
+    if marked:
+        msg += f", {marked} finished and marked"
+    for e in brief:
+        msg += f", {e.get('name') or e['id']} killed (brief not in)"
+    if refused:
+        why = ", ".join(f"{e.get('name') or e['id']} ({str(e['action']).removeprefix('refused: ')})" for e in refused)
+        msg += f", {len(refused)} refused: {why}"
+    return msg
 
 
 def _help_routes(app: FastAPI, h: SimpleNamespace) -> None:
@@ -5000,6 +5197,140 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             },
         )
 
+    @app.get("/tools", response_class=HTMLResponse)
+    async def tools_page(request: Request):
+        """design §4.2b *The page*, §4.5 screen 14 **Tools** (TD-1953, built by TD-1973): the coding tools on the home's
+        host, from the host agent's kept `tools` read — a card per supported tool found, its version and found rows,
+        then *Not ready to run here*. Before the switch-over no accounts or logins are drawn; on a switched host each
+        card draws its accounts and logins as a tree (`login_tree`, TD-1974)."""
+        from sessionorc import tools as tools_mod
+
+        agent_down, got, why = False, None, ""
+        try:
+            got = await call("tools")
+        except HTTPException as e:
+            agent_down = e.status_code == 503
+            why = "" if agent_down else f"the host agent did not serve its tools: {e.detail}"  # an older agent
+        weights: dict[str, Any] = {}
+        if got is not None and got.get("switched"):
+            try:  # prices' fill-in (§4.2b *A login's Settings*): an older agent or none drawn is no fill-in
+                weights = ((await call("settings")).get("spend") or {}).get("weights") or {}
+            except HTTPException:
+                weights = {}
+        if got is not None:
+            home = str(Path.home())
+            for c in [*got.get("tools", []), *got.get("not_ready", [])]:
+                c["short"] = tools_mod.short_version(c.get("version"))
+                for f in c.get("found", []):
+                    f["shown"] = _shown_folder(str(f.get("folder") or ""), home)
+                    # Add offers the reading where it can be taken: a found row is the tool's default home, which a
+                    # metered login may not use (§4.2a), so a metered reading is not chosen
+                    f["offer"] = f.get("billing") if f.get("billing") != "metered" else None
+                if got.get("switched"):
+                    c["tree"] = login_tree(c, home, weights)
+                    for acct in c["tree"]["accounts"]:  # its gauges as the read fills them (§4.2b *The gauge*)
+                        acct["gauge"] = setmod.gauge_view(acct.get("gauges"), acct.get("billing"))
+                        acct["gauge"]["each"] = ", ".join(
+                            f"{lg.get('name')} {(lg.get('settings') or {}).get('billing') or 'not set'}"
+                            for lg in acct["logins"]
+                        )
+            got["read_ago"] = _age(got.get("read_at"), datetime.now(UTC)) or "0s"
+        return templates.TemplateResponse(
+            request,
+            "tools.html",
+            {
+                "t": got,
+                "why": why,
+                "agent_down": agent_down,
+                "host": host_name(),
+                "active": "",
+                "volatile": hosts.local_host().volatile,
+                "usage": {} if agent_down else await chip_usage(call),
+                "build_chip": None if agent_down else await chip_build(call),
+            },
+        )
+
+    @app.post("/api/tools/check")
+    async def tools_check():
+        """§4.5a *Tools page: Check again* (TD-1973): `tools_check`, the person's own act — this host's tools read
+        again and kept; the page draws it afresh."""
+        return await call("tools_check")
+
+    @app.post("/api/tools/install")
+    async def tools_install(request: Request):
+        """§4.5a *Tools page: Install* (TD-1973): `{tool}` → `tools_install`, the tool's install shell with its install
+        command typed and not run (§4.2b *The tools shell*, TD-1972); the page opens its Focus."""
+        body = await body_of(request)
+        return await call("tools_install", tool=str(body.get("tool") or ""))
+
+    @app.post("/api/tools/login/{verb}")
+    async def tools_login(verb: str, request: Request):
+        """§4.5a *Tools page: a login* (TD-1974): a login's controls, each the person's own act (`mail.PERSON_ONLY`)
+        calling its `ao login` verb (§4.2b *Controls and verbs*) — ✎ `label`, **Name its account** `account`,
+        **Edit note** `note`, **Forget this login** `forget`, and **Sign in**, **Sign in again** and **Open a shell
+        here** `shell`, whose tools shell the page then opens. A write sends back the login's `version` the page
+        read, so one over a newer entry is refused (*changed since this page read it — reload*)."""
+        body = await body_of(request)
+        login, version = str(body.get("login") or ""), body.get("version") or None
+        if verb == "shell":
+            return await call("login_shell", login=login)
+        if verb == "label":
+            return await call("login_label", login=login, label=body.get("label") or None, version=version)
+        if verb == "note":
+            return await call("login_note", login=login, text=body.get("text") or None, version=version)
+        if verb == "account":
+            return await call("login_account", login=login, account=str(body.get("account") or ""), version=version)
+        if verb == "forget":
+            return await call("login_forget", login=login, version=version)
+        if verb == "settings":  # one write a key, the first sending the version read (§4.2b *Controls and verbs*)
+            changes = body.get("changes") if isinstance(body.get("changes"), dict) else {}
+            writes = settings_writes(changes, body.get("billing") or None)
+            saved: list[str] = []
+            for k, v in writes:
+                try:
+                    await call("login_set", login=login, key=k, value=v, version=None if saved else version)
+                except HTTPException as e:
+                    if not saved:
+                        raise
+                    raise HTTPException(e.status_code, f"{e.detail} ({', '.join(saved)} saved)") from None
+                saved.append(k)
+            return {"saved": saved}
+        raise HTTPException(404, f"no login control {verb!r}")
+
+    @app.post("/api/tools/add")
+    async def tools_add(request: Request):
+        """§4.5a *Tools page: + Add login*, *Add on a found row* (TD-1974): `{tool, name, path, account, billing}` →
+        `login_add` (`ao login add`), then, where a billing is chosen, `login_set` of it, whose refusal is a 400 naming
+        the login as added — or, where its tools shell opened, `billing_error` in the reply, so the page still goes to
+        its Focus; the person's own act — a `path` that is the tool's home is used, an empty or missing one made one,
+        and with none the adapter suggests the folder from the name; a login whose folder was made has its tools
+        shell opened for Sign in (`shell` in the reply), whose Focus the page then opens."""
+        body = await body_of(request)
+        params = {k: str(body.get(k) or "").strip() or None for k in ("name", "path", "account")}
+        got = await call("login_add", tool=str(body.get("tool") or ""), **params)
+        billing = str(body.get("billing") or "").strip()
+        if billing and isinstance(got, dict) and got.get("login"):  # the person's choice, written as Settings writes it
+            try:
+                await call("login_set", login=got["login"], key="billing", value=billing)
+            except HTTPException as e:  # the login stands; its billing's refusal is drawn in place, as Settings'
+                words = f"{got['login']} was added, but its billing was not set: {e.detail}"
+                if (got.get("shell") or {}).get("id"):  # its Sign in shell opened: the page shows these, then goes
+                    return {**got, "billing_error": words}
+                raise HTTPException(e.status_code, words) from None
+        return got
+
+    @app.post("/api/tools/account/label")
+    async def tools_account_label(request: Request):
+        """§4.5a *Tools page: an account* (TD-1974): ✎ on an account → `account_label`, a label only, its key fixed;
+        an empty one clears it. The account's `version` as the page read it goes with it."""
+        body = await body_of(request)
+        return await call(
+            "account_label",
+            key=str(body.get("key") or ""),
+            label=body.get("label") or None,
+            version=body.get("version") or None,
+        )
+
     @app.get("/settings", response_class=HTMLResponse)
     async def settings_view(request: Request):
         agent_down, got, usage, info, why = False, {}, {}, {}, ""
@@ -5025,6 +5356,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 read("list"),
                 read("repos", omit=[*REPOS_OMIT_PAGE, "completed"]),  # numbers alone (TD-746)
                 read("gate"),  # the usage chip's lines, handed to it below
+                read("tools"),  # a switched home's accounts, whose reserves are the Tools page's (TD-1975)
             ),
             asyncio.to_thread(settings_files),
         )
@@ -5052,6 +5384,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             k: None if isinstance(r, HTTPException) else r
             for k, r in (("usage", first[1]), ("gate", first[5]), ("host", first[2]))
         }
+        home_keys = setmod.tools_accounts(None if isinstance(first[6], HTTPException) else first[6])
         org, local = local_files["org"], local_files["local"]
         notes: list[str] = [why] if why else []
         notes += profile_notes + local_files["notes"]
@@ -5062,7 +5395,12 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             request,
             "settings.html",
             {
-                "usage_cards": setmod.usage_cards(profiles, got.get("usage_accounts"), usage),
+                "usage_cards": [
+                    c
+                    for c in setmod.usage_cards(profiles, got.get("usage_accounts"), usage)
+                    if home_keys is None or c["account"] not in home_keys  # on the Tools page (§4.2b *The gauge*)
+                ],
+                "usage_moved": home_keys is not None,
                 "max_age": str((got.get("usage") or {}).get("max_age") or ""),
                 # **settle** (§4.5a *Settings page: settle*, TD-710): the install's map as the field writes it
                 "settle": settle_mod.text_of(got.get("settle")),
@@ -5550,6 +5888,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 rec = e.get("recommend")
                 if isinstance(rec, dict) and rec.get("by"):
                     e["passer_name"] = names.get(str(rec["by"]), str(rec["by"]))
+                    e["passer_names"] = _passer_names(e, names)
         if e is None:
             raise HTTPException(404, f"{key or 'no key'}: gone — reload")
         with timing.step("render"):
@@ -5636,12 +5975,15 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             ctx["thread_error"] = str(err.detail)
             th = {"entries": [], "pruned": False}
         # a thread reaches senders the person inbox never heard from (a techlead's reply to its asker)
-        names = {o.get("id"): o.get("name") or o.get("id") for o in await call("list")}
+        fleet = await call("list")
+        names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+        cwds = {o.get("id"): str(o.get("cwd") or "") for o in fleet}
         ctx["thread"] = [
             {
                 **t,
                 "from_name": "person" if t.get("from") == "person" else names.get(t.get("from")) or t.get("from"),
                 "from_open": t.get("from") if t.get("from") in names else "",  # its paths' context (TD-1108)
+                "from_cwd": cwds.get(t.get("from")) or "",  # …and its asker's key (§4.6, TD-1988)
                 "age": _age(t.get("at"), datetime.now(UTC)),
             }
             for t in th.get("entries") or ()
@@ -5766,17 +6108,24 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
     @app.post("/api/settings/person")
     async def api_settings_person(request: Request):
         """A person's own settings from a page (design §5 `person:`, §4.4a *Settings, replicated*):
-        today the Focus pane's **copy on select** toggle (§4.5a, TD-174), `{terminal: {copy_on_select}}`
+        the Focus pane's **copy on select** toggle (§4.5a, TD-174), `{terminal: {copy_on_select}}`, and
+        the grid a new session is pinned at (§4.6, TD-1919), `{terminal: {grid: [cols, rows]}}`, each
         through `set_settings`, which validates it and refuses a session. The page's next settings
         read takes it up, so the choice survives a reload."""
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         term = body.get("terminal") if isinstance(body, dict) else None
-        if (
-            not isinstance(term, dict)
-            or set(term) != {"copy_on_select"}
-            or not isinstance(term["copy_on_select"], bool)
-        ):
-            raise HTTPException(400, "person: send {terminal: {copy_on_select: true|false}}")
+        if not isinstance(term, dict) or len(term) != 1:
+            raise HTTPException(400, PERSON_TERMINAL_SEND)
+        if "copy_on_select" in term:
+            if not isinstance(term["copy_on_select"], bool):
+                raise HTTPException(400, "person: send {terminal: {copy_on_select: true|false}}")
+        elif "grid" in term:
+            try:
+                settings_mod.parse_terminal_grid(term["grid"])
+            except ValueError as e:
+                raise HTTPException(400, f"person: {e}") from None
+        else:
+            raise HTTPException(400, PERSON_TERMINAL_SEND)
         got = await call("set_settings", person={"terminal": term})
         h.settings_at["at"] = 0.0  # read it again before the next page is drawn
         h.counts.stir()  # the counts move with the person's settings (TD-616)
@@ -6359,11 +6708,8 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.websocket("/term/{sid}")
     async def term(ws: WebSocket, sid: str):
-        # Size comes from the query, leniently: a bad or missing value falls back to a default
-        # instead of a 403 before accept, which a browser can only report as an opaque 1006
-        # (first-use finding 2026-09-06). The client re-sends its real size on open anyway.
-        cols = _int_param(ws.query_params.get("cols"), 120, 10, 500)
-        rows = _int_param(ws.query_params.get("rows"), 32, 2, 200)
+        # No size comes from the query: the pty opens at the window's grid, read below (design §4.6, TD-1919),
+        # and `cols` and `rows` on the address are ignored
         await ws.accept()
         try:
             s = await call("get", id=sid)
@@ -6396,20 +6742,11 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             await ws.send_bytes(b"\r\n[shiftlead] this session's pane is gone (see the banner).\r\n")
             await ws.close(code=4404)
             return
-        try:
-            pty = PtySession(argv, cols=cols, rows=rows)
-        except Exception as e:  # noqa: BLE001 — no silent failure path (design §4.5)
-            await ws.send_bytes(f"\r\n[shiftlead] could not attach a terminal: {type(e).__name__}: {e}\r\n".encode())
-            await ws.close()
-            return
-
         # design §4.6 *A read-only attach* (TD-096): the mode is read once, here, and a read-only attach
         # tells the page so in its first frame — a text frame, which is the page's to read and not
         # pane output, so it neither counts as a painted screen nor resets the page's backoff. An
         # attach that sends none takes keys. A mode change re-attaches.
         read_only = bool(s.get("unattended"))
-        if read_only:
-            await ws.send_text(json.dumps({"read_only": True}))
         produced = False
 
         async def send(data: bytes) -> None:
@@ -6483,23 +6820,53 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     reapers.add(asyncio.ensure_future(proc.wait()))
             return out.decode(errors="replace") if proc.returncode == 0 else None
 
-        async def read_clients() -> str | None:
-            # tmux's clients and window for the terminal mark (design §4.6, TD-480)
-            return await read_tmux(clients_argv(sid, socket_name=sock), 3)
+        async def read_window() -> str | None:
+            # the window's size, the pty's grid and the page's (design §4.6, TD-1919)
+            return await read_tmux(grid_argv(sid, socket_name=sock), GRID_READ_WITHIN)
 
-        async def jump(openings: list[dict]) -> bool:
+        # The attach's pty opens at the window's grid, so tmux draws this client as the window (design §4.6
+        # *Attach behaviour with another client present*, TD-1919); a failed reading opens it at the person's
+        # grid, and the five-second reading resizes it at its first good one that differs
+        grid = grid_read(await read_window())
+        if grid is None:
+            grid = settings_mod.terminal_grid(await asyncio.to_thread(settings_mod.load))
+        try:
+            pty = PtySession(argv, cols=grid[0], rows=grid[1])
+        except Exception as e:  # noqa: BLE001 — no silent failure path (design §4.5)
+            await ws.send_bytes(f"\r\n[shiftlead] could not attach a terminal: {type(e).__name__}: {e}\r\n".encode())
+            await ws.close()
+            return
+        # the attach's own words, before the first pane byte: text frames, the page's to read and not pane
+        # output, so they neither count as a painted screen nor reset the page's backoff
+        if read_only:
+            await ws.send_text(json.dumps({"read_only": True}))
+        await ws.send_text(json.dumps({"grid": list(grid)}))
+        keeper = GridKeeper(pty, read_window, ws.send_text, grid)
+
+        async def resize_window(g: tuple[int, int]) -> None:
+            await run_tmux(resize_window_argv(sid, g[0], g[1], socket_name=sock))
+
+        async def fit(g: tuple[int, int]) -> None:
+            # The person's Fit to window (design §4.6 *Fit to window*, TD-1919): the window, read again, the
+            # pty, and the `grid` frame
+            await keeper.fit(g, resize_window)
+
+        async def jump(openings: list[dict]) -> tuple[int, int] | None:
             # A press on a Prompts row (design §4.6 *A jump to a prompt*, TD-975): the read bounded at
             # `JUMP_WITHIN`, the walk and the landing, then the page's text frame — its own word, as
-            # `clients` is, never pane output
+            # `grid` is, never pane output — with the landed row and the cursor's
             read = functools.partial(read_tmux, within=JUMP_WITHIN)
             landed = await run_jump(openings, read, run_tmux, sid, socket_name=sock)
+            answer: dict[str, Any] = {"jumped": landed is not None}
+            if landed is not None:
+                answer["row"], answer["cursor"] = landed
             with contextlib.suppress(Exception):
-                await ws.send_text(json.dumps({"jumped": landed}))
+                await ws.send_text(json.dumps(answer))
             return landed
 
-        watcher = asyncio.ensure_future(watch_clients(read_clients, ws.send_text))
+        watcher = asyncio.ensure_future(keeper.watch())
         try:
-            await pump(pty, send, recv, scroll, leave=leave, jump=jump, read_only=read_only, name=sid)
+            await pump(pty, send, recv, scroll, leave=leave, jump=jump, fit=fit, read_only=read_only, name=sid)
         finally:
             watcher.cancel()
             for f in reapers:
