@@ -48,7 +48,7 @@ nav a.fl { display:block; padding:5px 10px; border-radius:4px; cursor:pointer; f
 nav a.fl small { display:block; font:400 12.5px var(--sans); color:var(--soft); }
 nav a.fl.sel { background:var(--sheet); border-color:var(--rule); box-shadow:inset 3px 0 0 var(--ink); }
 nav a.fl .dot { color:var(--bad); }
-nav .pal { display:flex; align-items:center; gap:6px; font-size:13.5px; font-weight:500; background:var(--sheet); border:1px solid var(--rule); box-shadow:inset 3px 0 0 var(--c); border-radius:4px; padding:3px 8px; margin-bottom:4px; cursor:grab; }
+nav .pal { display:block; font-size:13.5px; font-weight:500; background:var(--sheet); border:1px solid var(--rule); box-shadow:inset 3px 0 0 var(--c); border-radius:4px; padding:3px 8px; margin-bottom:4px; cursor:grab; }
 nav .pal i { margin-left:auto; font-style:normal; font-weight:400; font-size:12px; color:var(--off); }
 nav p { font-size:12.5px; color:var(--soft); margin:2px 0 6px; line-height:1.4; }
 nav button.new { margin-top:8px; }
@@ -93,6 +93,15 @@ nav button.new { margin-top:8px; }
 .you { border:1px dashed var(--soft); border-radius:3px; padding:0 7px; }
 .done { color:var(--ok); font-weight:600; }
 .same { color:var(--soft); }
+.ahead small { flex:1 1 180px; min-width:0; }
+button.lnk { border:none; padding:0; color:var(--link); font-size:12.5px; font-weight:400; text-decoration:underline; }
+.endsw { font-size:13px; color:var(--soft); margin:4px 0 2px; }
+.brief { background:var(--note); border:1px solid var(--noterule); border-radius:4px; padding:8px 10px; font-size:13px; margin:4px 0 6px; }
+.brief p { margin:4px 0 0; }
+.rec.open { box-shadow:0 0 0 2px var(--link); }
+nav .pal b { display:flex; font-weight:500; }
+nav .pal b i { margin-left:auto; }
+nav .pal small { display:block; font-size:12px; font-weight:400; color:var(--soft); line-height:1.35; }
 .addrow { margin-top:8px; font-size:13px; color:var(--soft); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .addstage { margin:0 0 14px; }
 @media (max-width:980px) { .rec { grid-template-columns:30px minmax(0,1fr); } .rec .who { border-right:none; border-bottom:1px solid var(--rule2); } .ends { grid-column:2; } .hrow { display:none; } .erow { grid-template-columns:minmax(0,1fr); gap:2px; } }
@@ -127,12 +136,13 @@ pre.file { background:var(--sheet); border:1px solid var(--rule2); border-radius
 const MODELS = ["haiku", "sonnet", "opus", "fable"];
 const PR = "it is open and its checks are green", RSN = "a reason is given", VER = "a verdict is posted on this head";
 const A = {
-  design: { label: "Design", c: "--design", outs: [["pull-request-open", PR], ["branch-pushed", "the branch is pushed, with no pull request"], ["not-needed", RSN]] },
-  build: { label: "Build", c: "--build", outs: [["pull-request-open", PR], ["branch-pushed", "the branch is pushed, with no pull request"], ["design-needs-changing", RSN], ["not-needed", RSN]] },
-  review: { label: "Review", c: "--review", outs: [["ship", VER], ["changes-wanted", "a verdict is posted"]] },
-  "review-protected": { label: "Review, protected paths", c: "--review", note: "skipped, counting as ship, when none are touched", outs: [["ship", VER], ["changes-wanted", "a verdict is posted"]] },
-  "fact-check": { label: "Fact-check", c: "--find", outs: [["ship", VER], ["changes-wanted", "a verdict is posted"]] },
-  merge: { label: "Merge", c: "--merge", outs: [["merged", "the pull request is merged"], ["cannot-merge", "it changed since review, or is red or conflicting"]] },
+  design: { label: "Design", c: "--design", desc: "Writes the design for an entry and files the builds it needs.", brief: "Read the entry and the design sections it touches. Write the design as a change to those sections, with mockups where a page changes. File each build the design needs as an entry of its own, naming this one as its parent.", outs: [["pull-request-open", PR], ["branch-pushed", "the branch is pushed, with no pull request"], ["not-needed", RSN]] },
+  build: { label: "Build", c: "--build", desc: "Writes the code and tests for an entry, on a branch of its own.", brief: "Read the entry and the design it follows. Work in a worktree of your own. Write the change with its tests, run the repo's checks until they pass, and keep the ledger entry in the same change.", outs: [["pull-request-open", PR], ["branch-pushed", "the branch is pushed, with no pull request"], ["design-needs-changing", RSN], ["not-needed", RSN]] },
+  review: { label: "Review", c: "--review", desc: "Reads every pull request against the design and posts a verdict.", brief: "Read the diff and the code around it, never the author's summary alone. Every behaviour it changes follows a sentence in the design, or the pull request changes the design too. Post one verdict: ship, or the changes you want and why.", outs: [["ship", VER], ["changes-wanted", "a verdict is posted"]] },
+  "review-protected": { label: "Review, protected paths", c: "--review", desc: "The same read, only for a pull request that touches files the repo marks as protected. Others skip it.", note: "skipped, counting as ship, when none are touched", brief: "As Review, for a pull request that touches the repo's protected paths: the files the repo says need a second, more careful read. Measure it against the design sections for those paths.", outs: [["ship", VER], ["changes-wanted", "a verdict is posted"]] },
+  "fact-check": { label: "Fact-check", c: "--find", desc: "Checks what a pull request claims against the repo, claim by claim.", brief: "Take each factual claim the pull request makes about the code, the design or the ledger, and check it against the repo. Report each one that does not hold, with where you looked.", outs: [["ship", VER], ["changes-wanted", "a verdict is posted"]] },
+  merge: { label: "Merge", c: "--merge", desc: "Merges a pull request that has its verdict and green checks.", brief: "Check the pull request is unchanged since its last verdict, its checks are green and it does not conflict. Archive the entry on the branch, then merge through the repo's merge command.", outs: [["merged", "the pull request is merged"], ["cannot-merge", "it changed since review, or is red or conflicting"]] },
+  hunt: { label: "Hunt", c: "--find", desc: "Looks for problems where a hunt entry says to look, and files what it finds.", brief: "Read the hunt entry for where to look and what kind of problem to look for. File each real finding as an entry of its own, with how to see it. Fix nothing here.", outs: [["findings-filed", "the new entries are filed"], ["nothing-found", RSN]] },
 };
 const WRITES = ["design", "build"], READS = ["review", "review-protected", "fact-check"], FIXED = ["next-action", "person", "done"];
 const SEATS = [["questions", "Questions", "answers members by mail"], ["board", "Board answers", "acts on what you decided"], ["prs", "Pull requests nobody holds", "on the clock"], ["manager", "Manager", "starts and stops sessions"]];
@@ -140,7 +150,8 @@ const slug = s => String(s).trim().toLowerCase().replace(/\s+/g, "-");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const words = o => o.replace(/-/g, " ");
 
-function st(name, model, takes, actions, stuck) { return { name, model, takes: takes || "", actions: actions.map(([a, next]) => ({ a, next: next || {} })), stuck: stuck || null }; }
+function st(name, model, takes, actions, stuck) { return { name, model, takes: takes || "", actions: actions.map(([a, next]) => ({ a, ends: next && next["branch-pushed"] ? "branch" : "pr", next: next || {} })), stuck: stuck || null }; }
+const outsOf = x => A[x.a].outs.filter(([o]) => !WRITES.includes(x.a) || o !== (x.ends === "branch" ? "pull-request-open" : "branch-pushed"));
 const to = (k, limit) => ({ to: k, limit: limit || null });
 const seats = () => ({ questions: "opus", board: "sonnet", prs: "sonnet", manager: "sonnet" });
 function builtins() {
@@ -161,6 +172,11 @@ function builtins() {
     ] },
     { id: "build", name: "build", builtin: true, blurb: "build and merge, nothing reviewed", maxMoves: 25, seats: seats(), stages: [
       st("Build", "opus", "any", [["build", { "pull-request-open": to("next-action") }], ["merge", { "cannot-merge": to("build", 3) }]]),
+    ] },
+    { id: "hunt", name: "hunt", builtin: true, blurb: "a hunt files what it finds; build, then a review that merges", maxMoves: 25, seats: seats(), stages: [
+      st("Hunt", "opus", "hunt", [["hunt", {}]]),
+      st("Build", "opus", "any", [["build", { "pull-request-open": to("review") }]]),
+      st("Review", "sonnet", "", [["review", { ship: to("next-action"), "changes-wanted": to("build", 3) }], ["merge", { "cannot-merge": to("build", 3) }]]),
     ] },
     { id: "one-owner", name: "one-owner", builtin: true, blurb: "one session designs and builds; a review merges", maxMoves: 25, seats: seats(), stages: [
       st("Design and build", "opus", "any", [["design", { "branch-pushed": to("next-action"), "not-needed": to("next-action") }], ["build", { "pull-request-open": to("review") }]]),
@@ -187,11 +203,11 @@ function examples() {
 }
 
 let S = { flows: builtins().concat(examples()), sel: "careful-build", tab: "stages", walk: null, del: false };
-try { const r = JSON.parse(localStorage.getItem("flows-proto-v2") || "null"); if (r && Array.isArray(r.own)) { S.flows = builtins().concat(r.own); S.sel = S.flows.some(f => f.id === r.sel) ? r.sel : "td"; } } catch (e) { /* storage is a convenience */ }
-function persist() { try { localStorage.setItem("flows-proto-v2", JSON.stringify({ own: S.flows.filter(f => !f.builtin), sel: S.sel })); } catch (e) { /* ignore */ } }
+try { const r = JSON.parse(localStorage.getItem("flows-proto-v3") || "null"); if (r && Array.isArray(r.own)) { S.flows = builtins().concat(r.own); S.sel = S.flows.some(f => f.id === r.sel) ? r.sel : "td"; } } catch (e) { /* storage is a convenience */ }
+function persist() { try { localStorage.setItem("flows-proto-v3", JSON.stringify({ own: S.flows.filter(f => !f.builtin), sel: S.sel })); } catch (e) { /* ignore */ } }
 const cur = () => S.flows.find(f => f.id === S.sel) || S.flows[0];
 
-function dflt(o) { return o === "merged" ? to("done") : to("person"); }
+function dflt(o) { return ["merged", "findings-filed", "nothing-found"].includes(o) ? to("done") : to("person"); }
 function dest(stage, ai, o) { return (ai === null ? stage.stuck : stage.actions[ai].next[o]) || dflt(o); }
 
 function check(f) {
@@ -220,10 +236,10 @@ function check(f) {
         if (o === "branch-pushed" && !f.stages[by[d.to]].actions.some(x => x.a === "build")) P("A pushed branch must go to a stage that has Build.", i, ai, o);
       }
     };
-    s.actions.forEach((x, ai) => A[x.a].outs.forEach(([o]) => one(ai, o)));
+    s.actions.forEach((x, ai) => outsOf(x).forEach(([o]) => one(ai, o)));
     one(null, "stuck");
   });
-  for (const kind in takes) if (takes[kind].length !== 1) P(`New ${kind === "other" ? "ordinary" : "design-first"} entries need exactly one stage that takes them; ${takes[kind].length ? takes[kind].join(" and ") + " both do" : "none does"}.`);
+  for (const kind in takes) if (takes[kind].length !== 1) P(`New entries that ${kind === "other" ? "are ready to build" : "need a design first"} need exactly one stage that takes them; ${takes[kind].length ? takes[kind].join(" and ") + " both do" : "none does"}.`);
   // every loop has a limit: find a cycle made only of moves without one
   const seenLoop = new Set();
   f.stages.forEach((s, start) => {
@@ -257,7 +273,7 @@ function yaml(f) {
   for (const s of f.stages) {
     y += `  - name: ${s.name}\n    model: ${s.model}\n` + (s.takes ? `    takes: ${s.takes}\n` : "") + "    actions:\n";
     for (const x of s.actions) {
-      const ks = A[x.a].outs.map(([o]) => o).filter(o => x.next[o]);
+      const ks = outsOf(x).map(([o]) => o).filter(o => x.next[o]);
       y += ks.length ? `      - ${x.a}:\n` + ks.map(o => `          ${o}: ${d(x.next[o])}\n`).join("") : `      - ${x.a}: {}\n`;
     }
     if (s.stuck) y += `    stuck: ${d(s.stuck)}\n`;
@@ -265,6 +281,7 @@ function yaml(f) {
   return y;
 }
 
+function openIdx(f) { return Math.min(S.open === undefined ? f.stages.length - 1 : S.open, f.stages.length - 1); }
 function stageColor(s) { const a = s.actions[0]; return a ? `var(${A[a.a].c})` : "var(--off)"; }
 function ordinal(n) { const v = n % 100, s = ["th", "st", "nd", "rd"]; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 
@@ -277,7 +294,7 @@ function nextCell(f, s, si, ai, o, ro, err) {
   }
   const opts = [["person", "you"], ["done", "done"]];
   if (ai !== null && ai < s.actions.length - 1) opts.push(["next-action", "the next action, " + A[s.actions[ai + 1].a].label]);
-  f.stages.forEach(x => opts.push([slug(x.name), "Stage: " + slug(x.name)]));
+  f.stages.forEach((x, j) => opts.push([slug(x.name), j === si ? "this stage again, with a fresh session" : "Stage: " + slug(x.name)]));
   if (!opts.some(([v]) => v === d.to)) opts.push([d.to, (d.to === "next-action" ? "the next action" : "Stage: " + d.to) + " (missing)"]);
   const id = `nx-${si}-${ai}-${o}`;
   let h = `<select id="${id}" class="${err ? "bad-f" : ""}" data-act="dest" data-si="${si}" data-ai="${ai}" data-o="${o}" aria-label="Next for ${words(o)}">` + opts.map(([v, t]) => `<option value="${esc(v)}"${v === d.to ? " selected" : ""}>${esc(t)}</option>`).join("") + "</select>";
@@ -290,18 +307,20 @@ function renderStages(f, res) {
   let h = "";
   f.stages.forEach((s, si) => {
     const errs = res.bad.filter(b => b.s === si), rowErr = (ai, o) => errs.find(b => b.o === o && b.ai === ai);
-    h += `<div class="rec${errs.length ? " err" : ""}" data-drop="${si}" style="--c:${stageColor(s)}"><div class="n">${si + 1}` +
+    h += `<div class="rec${errs.length ? " err" : ""}${!ro && openIdx(f) === si ? " open" : ""}" data-drop="${si}" style="--c:${stageColor(s)}"><div class="n">${si + 1}` +
       (ro ? "" : `<button class="ic" data-act="up" data-si="${si}" aria-label="Move up" title="Move up">▲</button><button class="ic" data-act="down" data-si="${si}" aria-label="Move down" title="Move down">▼</button>`) + "</div>";
     h += '<div class="who">' + (ro ? `<div class="nm">${esc(s.name)}</div>` : `<input type="text" class="nm" id="sn-${si}" data-act="sname" data-si="${si}" value="${esc(s.name)}" aria-label="Stage name">`) + `<span class="slug">Stage: ${esc(slug(s.name))}</span><dl>`;
     h += "<dt>Model</dt><dd>" + (ro ? `<span class="m">${s.model}</span>` : `<select id="sm-${si}" class="m" data-act="model" data-si="${si}" aria-label="Model">${MODELS.map(m => `<option${m === s.model ? " selected" : ""}>${m}</option>`).join("")}</select>`) + "</dd>";
-    const tk = [["", "nothing new"], ["design-first", "new design-first entries"], ["other", "new ordinary entries"], ["any", "every new entry"]];
+    const tk = [["", "only what other stages send it"], ["design-first", "new entries that need a design first"], ["other", "new entries that are ready to build"], ["any", "new entries of both those kinds"], ["hunt", "new hunt entries"]];
     h += "<dt>Takes</dt><dd>" + (ro ? tk.find(t => t[0] === s.takes)[1] : `<select id="st-${si}" data-act="takes" data-si="${si}" aria-label="Takes">${tk.map(([v, t]) => `<option value="${v}"${v === s.takes ? " selected" : ""}>${t}</option>`).join("")}</select>`) + "</dd></dl>";
     if (!ro) h += `<div class="addrow"><button class="quiet" data-act="delstage" data-si="${si}">Remove stage</button></div>`;
     h += '</div><div class="ends"><div class="hrow"><span>Outcome</span><span>Checked first</span><span>Next</span></div>';
     s.actions.forEach((x, ai) => {
       const a = A[x.a];
-      h += `<div class="ahead" style="--c:var(${a.c})"><span class="chip">${a.label}</span>${a.note ? `<small>${a.note}</small>` : ""}${ro ? "" : `<button class="ic" data-act="delact" data-si="${si}" data-ai="${ai}" aria-label="Remove ${a.label}" title="Remove">✕</button>`}</div>`;
-      a.outs.forEach(([o, ck]) => { const e = rowErr(ai, o); h += `<div class="erow${e ? " err" : ""}"><span>${words(o)}</span><span class="ck">${ck}</span><span class="to">${nextCell(f, s, si, ai, o, ro, e)}</span>${e ? `<span class="why">${esc(e.msg)}</span>` : ""}</div>`; });
+      h += `<div class="ahead" style="--c:var(${a.c})"><span class="chip">${a.label}</span><small>${a.desc}</small><button class="lnk" data-act="brief" data-k="${si}-${ai}">${S.brief === si + "-" + ai ? "hide brief" : "brief"}</button>${ro ? "" : `<button class="ic" data-act="delact" data-si="${si}" data-ai="${ai}" aria-label="Remove ${a.label}" title="Remove">✕</button>`}</div>`;
+      if (WRITES.includes(x.a)) h += `<div class="endsw">Ends with ${ro ? `<b>${x.ends === "branch" ? "a pushed branch, for a later Build to finish" : "a pull request"}</b>` : `<select id="en-${si}-${ai}" data-act="ends" data-si="${si}" data-ai="${ai}" aria-label="Ends with"><option value="pr"${x.ends === "pr" ? " selected" : ""}>a pull request</option><option value="branch"${x.ends === "branch" ? " selected" : ""}>a pushed branch, for a later Build to finish</option></select>`}</div>`;
+      if (S.brief === si + "-" + ai) h += `<div class="brief"><b>What the session is told</b> <span class="same">an example; the words are kept and edited on the Actions page</span><p>${a.brief}</p></div>`;
+      outsOf(x).forEach(([o, ck]) => { const e = rowErr(ai, o); h += `<div class="erow${e ? " err" : ""}"><span>${words(o)}</span><span class="ck">${ck}</span><span class="to">${nextCell(f, s, si, ai, o, ro, e)}</span>${e ? `<span class="why">${esc(e.msg)}</span>` : ""}</div>`; });
     });
     const e = rowErr(null, "stuck");
     h += `<div class="ahead" style="--c:var(--off)"><span class="chip">Any time</span></div><div class="erow${e ? " err" : ""}"><span>stuck</span><span class="ck">${RSN}</span><span class="to">${nextCell(f, s, si, null, "stuck", ro, e)}</span>${e ? `<span class="why">${esc(e.msg)}</span>` : ""}</div>`;
@@ -320,9 +339,9 @@ function renderChecks(res) {
 }
 
 function walkStart(f, kind) {
-  const i = f.stages.findIndex(s => s.takes === kind || s.takes === "any");
+  const i = f.stages.findIndex(s => s.takes === kind || (s.takes === "any" && kind !== "hunt"));
   S.walk = { kind, si: i, ai: 0, counts: {}, moves: 0, log: [], at: i < 0 ? "none" : "stage", asker: null };
-  if (i >= 0) S.walk.log.push(`A new ${kind === "other" ? "ordinary" : "design-first"} entry starts in <b>${esc(f.stages[i].name)}</b>. A fresh ${f.stages[i].model} session takes it.`);
+  if (i >= 0) S.walk.log.push(`A new entry starts in <b>${esc(f.stages[i].name)}</b>. A fresh ${f.stages[i].model} session takes it.`);
 }
 function walkStep(f, res, o) {
   const w = S.walk, s = f.stages[w.si], stuck = o === "stuck", d = dest(s, stuck ? null : w.ai, o), label = stuck ? "stuck" : `${A[s.actions[w.ai].a].label}: ${words(o)}`;
@@ -338,7 +357,7 @@ function walkStep(f, res, o) {
 }
 function renderWalk(f, res) {
   const w = S.walk;
-  let h = '<div class="walk"><div class="addrow" style="margin-top:0">Start a new entry: <button data-act="wstart" data-k="other">an ordinary entry</button><button data-act="wstart" data-k="design-first">a design-first entry</button></div>';
+  let h = '<div class="walk"><div class="addrow" style="margin-top:0">Start a new entry: <button data-act="wstart" data-k="other">one that is ready to build</button><button data-act="wstart" data-k="design-first">one that needs a design first</button><button data-act="wstart" data-k="hunt">a hunt entry</button></div>';
   if (!w) return h + '<p class="now same">Pick a kind of entry, then choose each outcome to see where the flow sends it.</p></div>';
   if (w.at === "none") h += '<p class="now">No stage takes that kind of entry.</p>';
   else if (w.at === "done") h += '<p class="now"><span class="done">Done.</span> The entry is finished.</p>';
@@ -346,7 +365,7 @@ function renderWalk(f, res) {
   else {
     const s = f.stages[w.si], x = s.actions[w.ai];
     h += `<p class="now">In <span class="key">Stage: ${esc(slug(s.name))}</span> on <span class="m">${s.model}</span>, doing <b>${x ? A[x.a].label : "nothing"}</b>. It ends as:</p><div class="btns">` +
-      (x ? A[x.a].outs.map(([o]) => `<button data-act="wout" data-o="${o}">${words(o)}</button>`).join("") : "") + '<button class="quiet" data-act="wout" data-o="stuck">stuck</button></div>';
+      (x ? outsOf(x).map(([o]) => `<button data-act="wout" data-o="${o}">${words(o)}</button>`).join("") : "") + '<button class="quiet" data-act="wout" data-o="stuck">stuck</button></div>';
   }
   return h + `<ol>${w.log.map(l => `<li>${l}</li>`).join("")}</ol><p class="same" style="font-size:13px;margin:10px 0 0">${w.moves} of ${f.maxMoves} moves used.</p></div>`;
 }
@@ -355,7 +374,7 @@ function render() {
   const f = cur(), res = check(f), own = S.flows.filter(x => !x.builtin), used = k => f.stages.filter(s => s.actions.some(x => x.a === k)).length;
   const item = x => `<a class="fl${x.id === f.id ? " sel" : ""}" data-act="pick" data-id="${esc(x.id)}" tabindex="0">${esc(x.name)}${check(x).bad.length ? ' <span class="dot" title="has problems">●</span>' : ""}<small>${esc(x.blurb || "your flow")}</small></a>`;
   let n = "<h4>Built in</h4>" + S.flows.filter(x => x.builtin).map(item).join("") + "<h4>Yours</h4>" + (own.map(item).join("") || "<p>None yet. Copy a built-in flow to start.</p>") + '<button class="new quiet" data-act="new">+ New flow</button>';
-  if (!f.builtin) n += "<h4>Actions</h4><p>Drag one onto a stage. Each brings its own outcomes.</p>" + Object.keys(A).map(k => `<div class="pal" draggable="true" data-pal="${k}" style="--c:var(${A[k].c})">${A[k].label}${used(k) ? `<i>in ${used(k)}</i>` : ""}</div>`).join("");
+  if (!f.builtin) n += `<h4>Actions</h4><p>Click one to add it to the open stage${f.stages[openIdx(f)] ? `, <b>${esc(f.stages[openIdx(f)].name)}</b>` : ""}, or drag it onto any stage.</p>` + Object.keys(A).map(k => `<div class="pal" draggable="true" data-pal="${k}" data-act="palette" data-k="${k}" tabindex="0" role="button" style="--c:var(${A[k].c})"><b>${A[k].label}${used(k) ? `<i>in ${used(k)}</i>` : ""}</b><small>${A[k].desc}</small></div>`).join("");
   document.getElementById("nav").innerHTML = n;
   let h = '<div class="fhead">' + (f.builtin ? `<h2>${esc(f.name)}</h2><span class="tagc">built in</span>` : `<input type="text" class="fname" id="fname" data-act="fname" value="${esc(f.name)}" aria-label="Flow name"><span class="tagc">yours</span>`) + '<div class="act">';
   h += res.bad.length ? `<span class="probs">${res.bad.length} problem${res.bad.length > 1 ? "s" : ""}</span>` : '<span class="okk">It flows</span>';
@@ -370,7 +389,7 @@ function render() {
 function toast(t) { const el = document.getElementById("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, 1800); }
 function uniqueName(base) { let n = base, i = 2; while (S.flows.some(f => f.name === n)) n = `${base}-${i++}`; return n; }
 function setDest(s, ai, o, d) { const same = d.to === dflt(o).to && !d.limit; if (ai === null) s.stuck = same ? null : d; else if (same) delete s.actions[ai].next[o]; else s.actions[ai].next[o] = d; }
-function addAction(f, si, k) { if (!A[k] || f.builtin) return; f.stages[si].actions.push({ a: k, next: {} }); }
+function addAction(f, si, k) { if (!A[k] || f.builtin || !f.stages[si]) return; f.stages[si].actions.push({ a: k, ends: "pr", next: {} }); }
 
 function act(el, ev) {
   const f = cur(), d = el.dataset, si = d.si === undefined ? null : +d.si, ai = d.ai === "null" || d.ai === undefined ? null : +d.ai, s = si === null ? null : f.stages[si];
@@ -393,6 +412,9 @@ function act(el, ev) {
     case "limit": { const v = parseInt(el.value, 10); setDest(s, ai, d.o, to(dest(s, ai, d.o).to, v >= 1 ? v : null)); break; }
     case "addact": addAction(f, si, el.value); break;
     case "delact": s.actions.splice(ai, 1); break;
+    case "ends": { const x = s.actions[ai]; x.ends = el.value; delete x.next["pull-request-open"]; delete x.next["branch-pushed"]; if (x.ends === "branch" && s.actions[ai + 1] && s.actions[ai + 1].a === "build") x.next["branch-pushed"] = to("next-action"); break; }
+    case "brief": S.brief = S.brief === d.k ? null : d.k; break;
+    case "palette": { const t = openIdx(f); addAction(f, t, d.k); if (f.stages[t]) toast(`${A[d.k].label} added to ${f.stages[t].name}`); break; }
     case "addstage": f.stages.push(st(uniqueStage(f), "sonnet", "", [])); break;
     case "delstage": f.stages.splice(si, 1); break;
     case "up": if (si > 0) f.stages.splice(si - 1, 0, f.stages.splice(si, 1)[0]); break;
@@ -409,9 +431,14 @@ function act(el, ev) {
 }
 function uniqueStage(f) { let n = "New stage", i = 2; while (f.stages.some(s => slug(s.name) === slug(n))) n = `New stage ${i++}`; return n; }
 
-document.addEventListener("click", ev => { const el = ev.target.closest("[data-act]"); if (el && !["SELECT", "INPUT"].includes(el.tagName)) act(el, ev); });
+document.addEventListener("click", ev => {
+  const el = ev.target.closest("[data-act]");
+  if (el && !["SELECT", "INPUT"].includes(el.tagName)) return act(el, ev);
+  const r = ev.target.closest("[data-drop]");
+  if (r && !el && !cur().builtin && S.open !== +r.dataset.drop) { S.open = +r.dataset.drop; render(); }
+});
 document.addEventListener("change", ev => { const el = ev.target.closest("[data-act]"); if (el && ["SELECT", "INPUT"].includes(el.tagName)) act(el, ev); });
-document.addEventListener("keydown", ev => { if (ev.key === "Enter" && ev.target.matches("a.fl")) act(ev.target, ev); });
+document.addEventListener("keydown", ev => { if (ev.key === "Enter" && ev.target.matches("a.fl, .pal")) act(ev.target, ev); });
 document.addEventListener("dragstart", ev => { const p = ev.target.closest && ev.target.closest("[data-pal]"); if (p) ev.dataTransfer.setData("text/plain", p.dataset.pal); });
 document.addEventListener("dragover", ev => { const r = ev.target.closest && ev.target.closest("[data-drop]"); if (r && !cur().builtin) { ev.preventDefault(); r.classList.add("over"); } });
 document.addEventListener("dragleave", ev => { const r = ev.target.closest && ev.target.closest("[data-drop]"); if (r) r.classList.remove("over"); });
