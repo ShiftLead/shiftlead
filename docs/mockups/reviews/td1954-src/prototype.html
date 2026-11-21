@@ -144,7 +144,7 @@ const K = {
 const WRITES = ["design", "build"], FIXED = ["person", "done", "merge"], CAN_MERGE = ["work-pushed", "ship"];
 const TAKES = [["", "only what other stages send it"], ["design-first", "new entries that need a design first"], ["other", "new entries that are ready to build"], ["any", "new entries of both those kinds"], ["hunt", "new hunt entries"]];
 const takesFor = k => k === "review" ? [""] : k === "hunt" ? ["", "hunt"] : ["", "design-first", "other", "any"];
-const SEATS = [["questions", "Questions", "answers members by mail"], ["board", "Board answers", "acts on what you decided"], ["prs", "Pull requests nobody holds", "on the clock"], ["manager", "Manager", "starts and stops sessions"]];
+const SEATS = [["questions", "Tech lead", "answers members' questions, by mail"], ["board", "Board answers", "acts on what you decided"], ["prs", "Pull requests nobody holds", "on the clock"], ["manager", "Manager", "starts and stops sessions"], ["docs", "Docs audit", "every 10 merged pull requests; files what it finds"], ["tests", "Test audit", "every 6 hours; files what it finds"]];
 const slug = s => String(s).trim().toLowerCase().replace(/\s+/g, "-");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const words = o => o.replace(/-/g, " ");
@@ -160,8 +160,8 @@ function ck(f, o) {
 const to = (k, limit) => ({ to: k, limit: limit || null });
 const mg = (k, limit) => ({ to: "merge", limit: null, else: k ? to(k, limit) : null });
 function st(name, kind, model, takes, next, only) { return { name, kind, model, takes: takes || "", only: only || "", next: next || {} }; }
-const outs = s => K[s.kind].outs.concat("stuck");
-const seats = () => ({ questions: "opus", board: "sonnet", prs: "sonnet", manager: "sonnet" });
+const outs = s => K[s.kind].outs.concat("cannot-finish");
+const seats = () => ({ questions: "opus", board: "sonnet", prs: "sonnet", manager: "sonnet", docs: "sonnet", tests: "sonnet" });
 const flow = (id, builtin, blurb, stages) => ({ id, name: id, builtin, blurb, maxMoves: 25, carry: "pr", seats: seats(), stages });
 function builtins() {
   return [
@@ -191,7 +191,7 @@ function builtins() {
 function examples() {
   return [
     flow("careful-build", false, "an example with problems to fix", [
-      st("Build", "build", "sonnet", "any", { "work-pushed": to("review"), stuck: to("troubleshoot", 1) }),
+      st("Build", "build", "sonnet", "any", { "work-pushed": to("review"), "cannot-finish": to("troubleshoot", 1) }),
       st("Review", "review", "haiku", "", { ship: mg("build", 3), "changes-wanted": to("build") }),
       st("Troubleshoot", "build", "opus", "", { "work-pushed": to("second-read") }),
     ]),
@@ -322,12 +322,12 @@ function renderStages(f, res) {
     h += `<div class="ahead" style="--c:var(${k.c})"><span class="chip">${k.label}</span><small>${k.desc}${s.only ? " Passed without a session, counting as ship, when no protected file is touched." : ""}</small><button class="lnk" data-act="brief" data-k="${si}">${S.brief === String(si) ? "hide brief" : "brief"}</button></div>`;
     if (S.brief === String(si)) h += `<div class="brief"><b>What the session is told</b> <span class="same">an example; the words are kept on the Actions page, where a brief of your own can replace them</span><p>${k.brief}</p></div>`;
     h += '<div class="hrow"><span>Outcome</span><span>Checked first</span><span>Next</span></div>';
-    outs(s).forEach(o => { const e = rowErr(o); h += `<div class="erow${e ? " err" : ""}"><span>${words(o)}${o === "stuck" ? ' <span class="same">(any time)</span>' : ""}</span><span class="ck">${ck(f, o)}</span><span class="to">${nextCell(f, s, si, o, ro, e)}</span>${e ? `<span class="why">${esc(e.msg)}</span>` : ""}</div>`; });
+    outs(s).forEach(o => { const e = rowErr(o); h += `<div class="erow${e ? " err" : ""}"><span>${words(o)}${o === "cannot-finish" ? ' <span class="same">(any time)</span>' : ""}</span><span class="ck">${ck(f, o)}</span><span class="to">${nextCell(f, s, si, o, ro, e)}</span>${e ? `<span class="why">${esc(e.msg)}</span>` : ""}</div>`; });
     errs.filter(b => b.o === undefined).forEach(b => { h += `<div class="why" style="margin-top:6px">${esc(b.msg)}</div>`; });
     h += "</div></div>";
   });
   if (!ro) h += `<p class="addstage"><select id="addst" data-act="addstage" aria-label="Add a stage"><option value="">+ Add a stage</option>${Object.keys(K).map(x => `<option value="${x}">${K[x].label}</option>`).join("")}</select></p>`;
-  h += "<h3>Outside the flow</h3><div class='out'>" + SEATS.map(([k, n, d]) => `<div><b>${n}</b>${ro ? `<span class="m">${f.seats[k]}</span>` : `<select id="seat-${k}" class="m" data-act="seat" data-k="${k}" aria-label="${n} model">${MODELS.map(m => `<option${m === f.seats[k] ? " selected" : ""}>${m}</option>`).join("")}</select>`} <span class="same">${d}</span></div>`).join("") + "</div>";
+  h += "<h3>Outside the flow</h3><div class='out'>" + SEATS.map(([k, n, d]) => `<div><b>${n}</b>${ro ? `<span class="m">${(f.seats[k] || "sonnet")}</span>` : `<select id="seat-${k}" class="m" data-act="seat" data-k="${k}" aria-label="${n} model">${MODELS.map(m => `<option${m === (f.seats[k] || "sonnet") ? " selected" : ""}>${m}</option>`).join("")}</select>`} <span class="same">${d}</span></div>`).join("") + "</div>";
   return h;
 }
 
@@ -354,7 +354,7 @@ function walkGo(f, res, d, label, k) {
 }
 function walkStep(f, res, o, skipped) {
   const w = S.walk, s = f.stages[w.si], d = dest(s, o);
-  const label = skipped ? `No protected file is touched, so ${esc(s.name)} is passed without a session` : o === "stuck" ? `${esc(s.name)}: stuck` : `${esc(s.name)}: ${words(o)}`;
+  const label = skipped ? `No protected file is touched, so ${esc(s.name)} is passed without a session` : o === "cannot-finish" ? `${esc(s.name)}: cannot finish` : `${esc(s.name)}: ${words(o)}`;
   if (d.to === "merge") { w.at = "merge"; w.pend = o; w.log.push(`${label}. The merge is tried: the checks are run again on what is there now.`); return; }
   walkGo(f, res, d, label, `${w.si}|${o}`);
 }
@@ -369,7 +369,7 @@ function renderWalk(f, res) {
   else {
     const s = f.stages[w.si];
     h += `<p class="now">In <span class="key">Stage: ${esc(slug(s.name))}</span> on <span class="m">${s.model}</span>, doing <b>${K[s.kind].label}</b>. It ends as:</p><div class="btns">` +
-      K[s.kind].outs.map(o => `<button data-act="wout" data-o="${o}">${words(o)}</button>`).join("") + '<button class="quiet" data-act="wout" data-o="stuck">stuck</button>' +
+      K[s.kind].outs.map(o => `<button data-act="wout" data-o="${o}">${words(o)}</button>`).join("") + '<button class="quiet" data-act="wout" data-o="cannot-finish">cannot finish</button>' +
       (s.only ? '<button class="quiet" data-act="wout" data-o="ship" data-skip="1">no protected file is touched</button>' : "") + "</div>";
   }
   return h + `<ol>${w.log.map(l => `<li>${l}</li>`).join("")}</ol><p class="same" style="font-size:13px;margin:10px 0 0">${w.moves} of ${f.maxMoves} moves used.</p></div>`;
@@ -386,7 +386,7 @@ function render() {
   h += '<button data-act="copy">Copy</button>';
   if (!f.builtin) h += (S.del ? '<button data-act="del2" class="quiet">Really delete?</button>' : '<button data-act="del" class="quiet">Delete</button>') + `<button class="pri" data-act="save"${res.bad.length ? " disabled" : ""}>Save</button>`;
   const carry = [["pr", "pull requests"], ["branch", "branches, with no pull request"]];
-  h += '</div></div><div class="lim"><span>Work is pushed and reviewed on ' + (f.builtin ? `<b>${carry.find(c => c[0] === f.carry)[1]}</b>` : `<select id="carry" data-act="carry" aria-label="Work is carried by">${carry.map(([v, t]) => `<option value="${v}"${v === f.carry ? " selected" : ""}>${t}</option>`).join("")}</select>`) + ". An entry comes to you after " + (f.builtin ? `<b class="mono">${f.maxMoves}</b>` : `<input type="number" min="2" id="maxm" data-act="maxm" value="${f.maxMoves}" aria-label="Total cap">`) + " moves between stages, wherever it is.</span></div>";
+  h += '</div></div><div class="lim"><span>An entry comes to you after ' + (f.builtin ? `<b class="mono">${f.maxMoves}</b>` : `<input type="number" min="2" id="maxm" data-act="maxm" value="${f.maxMoves}" aria-label="Total cap">`) + " moves between stages, wherever it is.</span></div>";
   h += '<div class="tabs">' + [["stages", "Stages"], ["walk", "Walk an entry"], ["file", "The file"]].map(([k, t]) => `<button data-act="tab" data-k="${k}" class="${S.tab === k ? "on" : ""}">${t}</button>`).join("") + "</div>";
   h += S.tab === "file" ? `<pre class="file">${esc(yaml(f))}</pre>` : S.tab === "walk" ? renderWalk(f, res) : renderStages(f, res);
   document.getElementById("main").innerHTML = h + renderChecks(res);
