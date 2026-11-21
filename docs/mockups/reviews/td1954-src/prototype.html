@@ -134,112 +134,114 @@ pre.file { background:var(--sheet); border:1px solid var(--rule2); border-radius
 
 <script>
 const MODELS = ["haiku", "sonnet", "opus", "fable"];
-const PR = "it is open and its checks are green", RSN = "a reason is given", VER = "a verdict is posted on this head";
-const A = {
-  design: { label: "Design", c: "--design", desc: "Writes the design for an entry and files the builds it needs.", brief: "Read the entry and the design sections it touches. Write the design as a change to those sections, with mockups where a page changes. File each build the design needs as an entry of its own, naming this one as its parent.", outs: [["pull-request-open", PR], ["branch-pushed", "the branch is pushed, with no pull request"], ["not-needed", RSN]] },
-  build: { label: "Build", c: "--build", desc: "Writes the code and tests for an entry, on a branch of its own.", brief: "Read the entry and the design it follows. Work in a worktree of your own. Write the change with its tests, run the repo's checks until they pass, and keep the ledger entry in the same change.", outs: [["pull-request-open", PR], ["branch-pushed", "the branch is pushed, with no pull request"], ["design-needs-changing", RSN], ["not-needed", RSN]] },
-  review: { label: "Review", c: "--review", desc: "Reads every pull request against the design and posts a verdict.", brief: "Read the diff and the code around it, never the author's summary alone. Every behaviour it changes follows a sentence in the design, or the pull request changes the design too. Post one verdict: ship, or the changes you want and why.", outs: [["ship", VER], ["changes-wanted", "a verdict is posted"]] },
-  "review-protected": { label: "Review, protected paths", c: "--review", desc: "The same read, only for a pull request that touches files the repo marks as protected. Others skip it.", note: "skipped, counting as ship, when none are touched", brief: "As Review, for a pull request that touches the repo's protected paths: the files the repo says need a second, more careful read. Measure it against the design sections for those paths.", outs: [["ship", VER], ["changes-wanted", "a verdict is posted"]] },
-  "fact-check": { label: "Fact-check", c: "--find", desc: "Checks what a pull request claims against the repo, claim by claim.", brief: "Take each factual claim the pull request makes about the code, the design or the ledger, and check it against the repo. Report each one that does not hold, with where you looked.", outs: [["ship", VER], ["changes-wanted", "a verdict is posted"]] },
-  merge: { label: "Merge", c: "--merge", desc: "Merges a pull request that has its verdict and green checks.", brief: "Check the pull request is unchanged since its last verdict, its checks are green and it does not conflict. Archive the entry on the branch, then merge through the repo's merge command.", outs: [["merged", "the pull request is merged"], ["cannot-merge", "it changed since review, or is red or conflicting"]] },
-  hunt: { label: "Hunt", c: "--find", desc: "Looks for problems where a hunt entry says to look, and files what it finds.", brief: "Read the hunt entry for where to look and what kind of problem to look for. File each real finding as an entry of its own, with how to see it. Fix nothing here.", outs: [["findings-filed", "the new entries are filed"], ["nothing-found", RSN]] },
+const RSN = "a reason is given";
+const K = {
+  design: { label: "Design", c: "--design", desc: "Writes the design for an entry and files the builds it needs.", brief: "Read the entry and the design sections it touches. Write the design as a change to those sections, with mockups where a page changes. File each build the design needs as an entry of its own, naming this one as its parent. Push the work when the repo's checks pass.", outs: ["work-pushed", "not-needed"] },
+  build: { label: "Build", c: "--build", desc: "Writes the code, tests or documents for an entry, on the entry's branch.", brief: "Read the entry, the design it follows, and what earlier stages left on the entry's branch: their work and any review of it. Work in a worktree of your own. Write the change with its tests, run the repo's checks until they pass, and push.", outs: ["work-pushed", "design-needs-changing", "not-needed"] },
+  review: { label: "Review", c: "--review", desc: "Reads the pushed work, whatever it holds, and gives a verdict.", brief: "Read the change itself and the code or documents around it, never the author's summary alone. Where it changes code, every behaviour it changes follows a sentence in the design. Where it changes a design or another document, every claim it makes about the repo holds. Give one verdict: ship, or the changes you want and why.", outs: ["ship", "changes-wanted"] },
+  hunt: { label: "Hunt", c: "--find", desc: "Looks for problems where a hunt entry says to look, and files what it finds.", brief: "Read the hunt entry for where to look and what kind of problem to look for. File each real finding as an entry of its own, with how to see it. Fix nothing here.", outs: ["findings-filed", "nothing-found"] },
 };
-const WRITES = ["design", "build"], READS = ["review", "review-protected", "fact-check"], FIXED = ["next-action", "person", "done"];
+const WRITES = ["design", "build"], FIXED = ["person", "done", "merge"], CAN_MERGE = ["work-pushed", "ship"];
+const TAKES = [["", "only what other stages send it"], ["design-first", "new entries that need a design first"], ["other", "new entries that are ready to build"], ["any", "new entries of both those kinds"], ["hunt", "new hunt entries"]];
+const takesFor = k => k === "review" ? [""] : k === "hunt" ? ["", "hunt"] : ["", "design-first", "other", "any"];
 const SEATS = [["questions", "Questions", "answers members by mail"], ["board", "Board answers", "acts on what you decided"], ["prs", "Pull requests nobody holds", "on the clock"], ["manager", "Manager", "starts and stops sessions"]];
 const slug = s => String(s).trim().toLowerCase().replace(/\s+/g, "-");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const words = o => o.replace(/-/g, " ");
+const work = f => f.carry === "branch" ? "branch" : "pull request";
+function ck(f, o) {
+  if (o === "work-pushed") return f.carry === "branch" ? "its branch is pushed and its checks are green" : "its pull request is open and its checks are green";
+  if (o === "ship") return "a verdict is recorded on the latest push";
+  if (o === "changes-wanted") return "a verdict is recorded";
+  if (o === "findings-filed") return "the new entries are filed";
+  return RSN;
+}
 
-function st(name, model, takes, actions, stuck) { return { name, model, takes: takes || "", actions: actions.map(([a, next]) => ({ a, ends: next && next["branch-pushed"] ? "branch" : "pr", next: next || {} })), stuck: stuck || null }; }
-const outsOf = x => A[x.a].outs.filter(([o]) => !WRITES.includes(x.a) || o !== (x.ends === "branch" ? "pull-request-open" : "branch-pushed"));
 const to = (k, limit) => ({ to: k, limit: limit || null });
+const mg = (k, limit) => ({ to: "merge", limit: null, else: k ? to(k, limit) : null });
+function st(name, kind, model, takes, next, only) { return { name, kind, model, takes: takes || "", only: only || "", next: next || {} }; }
+const outs = s => K[s.kind].outs.concat("stuck");
 const seats = () => ({ questions: "opus", board: "sonnet", prs: "sonnet", manager: "sonnet" });
+const flow = (id, builtin, blurb, stages) => ({ id, name: id, builtin, blurb, maxMoves: 25, carry: "pr", seats: seats(), stages });
 function builtins() {
   return [
-    { id: "td", name: "td", builtin: true, blurb: "design, two reads, fact-check; build, review, second read", maxMoves: 25, seats: seats(), stages: [
-      st("Design", "fable", "design-first", [["design", { "pull-request-open": to("first-design-read") }]]),
-      st("First design read", "sonnet", "", [["review", { ship: to("second-design-read"), "changes-wanted": to("design", 3) }]]),
-      st("Second design read", "opus", "", [["review", { ship: to("fact-check"), "changes-wanted": to("design", 3) }]]),
-      st("Fact-check", "sonnet", "", [["fact-check", { ship: to("next-action"), "changes-wanted": to("design", 3) }], ["merge", { "cannot-merge": to("design", 3) }]]),
-      st("Build", "opus", "other", [["build", { "pull-request-open": to("review") }]]),
-      st("Review", "sonnet", "", [["review", { ship: to("second-read"), "changes-wanted": to("build", 3) }]]),
-      st("Second read", "fable", "", [["review-protected", { ship: to("merge"), "changes-wanted": to("build", 3) }]]),
-      st("Merge", "haiku", "", [["merge", { "cannot-merge": to("build", 3) }]]),
-    ] },
-    { id: "build-review", name: "build-review", builtin: true, blurb: "build, then a review that merges", maxMoves: 25, seats: seats(), stages: [
-      st("Build", "opus", "any", [["build", { "pull-request-open": to("review") }]]),
-      st("Review", "sonnet", "", [["review", { ship: to("next-action"), "changes-wanted": to("build", 3) }], ["merge", { "cannot-merge": to("build", 3) }]]),
-    ] },
-    { id: "build", name: "build", builtin: true, blurb: "build and merge, nothing reviewed", maxMoves: 25, seats: seats(), stages: [
-      st("Build", "opus", "any", [["build", { "pull-request-open": to("next-action") }], ["merge", { "cannot-merge": to("build", 3) }]]),
-    ] },
-    { id: "hunt", name: "hunt", builtin: true, blurb: "a hunt files what it finds; build, then a review that merges", maxMoves: 25, seats: seats(), stages: [
-      st("Hunt", "opus", "hunt", [["hunt", {}]]),
-      st("Build", "opus", "any", [["build", { "pull-request-open": to("review") }]]),
-      st("Review", "sonnet", "", [["review", { ship: to("next-action"), "changes-wanted": to("build", 3) }], ["merge", { "cannot-merge": to("build", 3) }]]),
-    ] },
-    { id: "one-owner", name: "one-owner", builtin: true, blurb: "one session designs and builds; a review merges", maxMoves: 25, seats: seats(), stages: [
-      st("Design and build", "opus", "any", [["design", { "branch-pushed": to("next-action"), "not-needed": to("next-action") }], ["build", { "pull-request-open": to("review") }]]),
-      st("Review", "sonnet", "", [["review", { ship: to("next-action"), "changes-wanted": to("design-and-build", 3) }], ["merge", { "cannot-merge": to("design-and-build", 3) }]]),
-    ] },
+    flow("td", true, "design, two reads, fact-check; build, review, protected read", [
+      st("Design", "design", "fable", "design-first", { "work-pushed": to("first-design-read") }),
+      st("First design read", "review", "sonnet", "", { ship: to("second-design-read"), "changes-wanted": to("design", 3) }),
+      st("Second design read", "review", "opus", "", { ship: to("fact-check"), "changes-wanted": to("design", 3) }),
+      st("Fact-check", "review", "sonnet", "", { ship: mg("design", 3), "changes-wanted": to("design", 3) }),
+      st("Build", "build", "opus", "other", { "work-pushed": to("review") }),
+      st("Review", "review", "sonnet", "", { ship: to("protected-read"), "changes-wanted": to("build", 3) }),
+      st("Protected read", "review", "fable", "", { ship: mg("build", 3), "changes-wanted": to("build", 3) }, "protected"),
+    ]),
+    flow("build-review", true, "build, then a review; a ship is merged", [
+      st("Build", "build", "opus", "any", { "work-pushed": to("review") }),
+      st("Review", "review", "sonnet", "", { ship: mg("build", 3), "changes-wanted": to("build", 3) }),
+    ]),
+    flow("build", true, "build and merge, nothing reviewed", [
+      st("Build", "build", "opus", "any", { "work-pushed": mg("build", 3) }),
+    ]),
+    flow("hunt", true, "a hunt files what it finds; build, then a review", [
+      st("Hunt", "hunt", "opus", "hunt", {}),
+      st("Build", "build", "opus", "any", { "work-pushed": to("review") }),
+      st("Review", "review", "sonnet", "", { ship: mg("build", 3), "changes-wanted": to("build", 3) }),
+    ]),
   ];
 }
 function examples() {
   return [
-    { id: "careful-build", name: "careful-build", builtin: false, blurb: "an example with problems to fix", maxMoves: 25, seats: seats(), stages: [
-      st("Build", "sonnet", "any", [["build", { "pull-request-open": to("review") }]], to("troubleshoot", 1)),
-      st("Review", "haiku", "", [["review", { ship: to("next-action"), "changes-wanted": to("build") }], ["merge", { "cannot-merge": to("build", 3) }]]),
-      st("Troubleshoot", "opus", "", [["build", { "pull-request-open": to("second-read") }]]),
-    ] },
-    { id: "tests-first", name: "tests-first", builtin: false, blurb: "an example: failing tests, then the code", maxMoves: 25, seats: seats(), stages: [
-      st("Write tests", "sonnet", "any", [["build", { "branch-pushed": to("implement") }]]),
-      st("Implement", "opus", "", [["build", { "pull-request-open": to("first-read") }]]),
-      st("First read", "haiku", "", [["review", { ship: to("second-read"), "changes-wanted": to("implement", 3) }]]),
-      st("Second read", "fable", "", [["review", { ship: to("protected-read"), "changes-wanted": to("implement", 3) }]]),
-      st("Protected read", "fable", "", [["review-protected", { ship: to("merge"), "changes-wanted": to("implement", 2) }]]),
-      st("Merge", "haiku", "", [["merge", { "cannot-merge": to("implement", 2) }]]),
-    ] },
+    flow("careful-build", false, "an example with problems to fix", [
+      st("Build", "build", "sonnet", "any", { "work-pushed": to("review"), stuck: to("troubleshoot", 1) }),
+      st("Review", "review", "haiku", "", { ship: mg("build", 3), "changes-wanted": to("build") }),
+      st("Troubleshoot", "build", "opus", "", { "work-pushed": to("second-read") }),
+    ]),
+    flow("tests-first", false, "an example: failing tests, then the code", [
+      st("Write tests", "build", "sonnet", "any", { "work-pushed": to("implement") }),
+      st("Implement", "build", "opus", "", { "work-pushed": to("first-read") }),
+      st("First read", "review", "haiku", "", { ship: to("second-read"), "changes-wanted": to("implement", 3) }),
+      st("Second read", "review", "fable", "", { ship: to("protected-read"), "changes-wanted": to("implement", 3) }),
+      st("Protected read", "review", "fable", "", { ship: mg("implement", 2), "changes-wanted": to("implement", 2) }, "protected"),
+    ]),
   ];
 }
 
+const KEY = "flows-proto-v4";
 let S = { flows: builtins().concat(examples()), sel: "careful-build", tab: "stages", walk: null, del: false };
-try { const r = JSON.parse(localStorage.getItem("flows-proto-v3") || "null"); if (r && Array.isArray(r.own)) { S.flows = builtins().concat(r.own); S.sel = S.flows.some(f => f.id === r.sel) ? r.sel : "td"; } } catch (e) { /* storage is a convenience */ }
-function persist() { try { localStorage.setItem("flows-proto-v3", JSON.stringify({ own: S.flows.filter(f => !f.builtin), sel: S.sel })); } catch (e) { /* ignore */ } }
+try { const r = JSON.parse(localStorage.getItem(KEY) || "null"); if (r && Array.isArray(r.own)) { S.flows = builtins().concat(r.own); S.sel = S.flows.some(f => f.id === r.sel) ? r.sel : "td"; } } catch (e) { /* storage is a convenience */ }
+function persist() { try { localStorage.setItem(KEY, JSON.stringify({ own: S.flows.filter(f => !f.builtin), sel: S.sel })); } catch (e) { /* ignore */ } }
 const cur = () => S.flows.find(f => f.id === S.sel) || S.flows[0];
 
-function dflt(o) { return ["merged", "findings-filed", "nothing-found"].includes(o) ? to("done") : to("person"); }
-function dest(stage, ai, o) { return (ai === null ? stage.stuck : stage.actions[ai].next[o]) || dflt(o); }
+function dflt(o) { return ["findings-filed", "nothing-found"].includes(o) ? to("done") : to("person"); }
+function dest(s, o) { return s.next[o] || dflt(o); }
+const elseOf = d => d.else || to("person");
 
 function check(f) {
-  const bad = [], warn = [], info = [], P = (msg, s, ai, o) => bad.push({ msg, s, ai, o });
+  const bad = [], warn = [], info = [], P = (msg, s, o) => bad.push({ msg, s, o });
   const keys = f.stages.map(s => slug(s.name)), by = {};
   f.stages.forEach((s, i) => { const k = keys[i]; if (!k) P("A stage needs a name.", i); else if (k in by || FIXED.includes(k)) P(`The name ${s.name} is already used, or is a reserved word.`, i); else by[k] = i; });
   if (!(Number.isInteger(f.maxMoves) && f.maxMoves >= 2)) P("The total cap is a whole number, 2 or more.");
-  const takes = { "design-first": [], other: [] }, edges = f.stages.map(() => []), prYou = f.stages.map(() => false);
+  if (!f.stages.length) P("A flow needs at least one stage.");
+  const takes = { "design-first": [], other: [] }, edges = f.stages.map(() => []), ends = f.stages.map(() => false);
   let asks = 0;
   f.stages.forEach((s, i) => {
-    const names = s.actions.map(x => x.a);
-    if (!names.length) P(`${s.name} needs at least one action.`, i);
-    if (names.some(n => WRITES.includes(n)) && names.some(n => READS.includes(n))) P(`${s.name}: a review or fact-check cannot share a stage with Design or Build. A reader is always a different session from the writer.`, i);
-    const lastW = Math.max(...names.map((n, j) => WRITES.includes(n) ? j : -1));
-    if (names.includes("merge") && lastW >= 0 && names.indexOf("merge") < lastW) P(`${s.name}: Merge comes before the action that opens the pull request.`, i);
+    if (!takesFor(s.kind).includes(s.takes)) P(`${s.name}: a ${K[s.kind].label} stage cannot take ${TAKES.find(t => t[0] === s.takes)[1]}.`, i);
     for (const kind in takes) if (s.takes === kind || s.takes === "any") takes[kind].push(s.name);
-    const one = (ai, o) => {
-      const d = dest(s, ai, o);
-      if (d.to === "next-action") {
-        if (ai === null || ai === s.actions.length - 1) P("There is no following action in this stage.", i, ai, o);
-        else if (o === "branch-pushed" && s.actions[ai + 1].a !== "build") P("A pushed branch needs Build as the next action.", i, ai, o);
-      } else if (d.to === "person") { asks++; if (o === "pull-request-open" || o === "ship") prYou[i] = true; }
-      else if (d.to !== "done") {
-        if (!(d.to in by)) return P(`Pick a stage that exists. There is no stage ${d.to}.`, i, ai, o);
-        edges[i].push({ o, ai, to: by[d.to], limit: d.limit });
-        if (o === "branch-pushed" && !f.stages[by[d.to]].actions.some(x => x.a === "build")) P("A pushed branch must go to a stage that has Build.", i, ai, o);
-      }
+    const edge = (o, d, sub) => {
+      if (d.to === "person") { asks++; if (CAN_MERGE.includes(o) && !sub) ends[i] = true; }
+      else if (d.to === "done") { if (CAN_MERGE.includes(o)) P(`Done here would leave the ${work(f)} unmerged. Pick merge it, a stage, or you.`, i, o); }
+      else if (d.to === "merge") P("Pick where the entry goes when the merge is refused.", i, o);
+      else if (!(d.to in by)) P(`Pick a stage that exists. There is no stage ${d.to}.`, i, o);
+      else edges[i].push({ o, to: by[d.to], limit: d.limit });
     };
-    s.actions.forEach((x, ai) => outsOf(x).forEach(([o]) => one(ai, o)));
-    one(null, "stuck");
+    outs(s).forEach(o => {
+      const d = dest(s, o);
+      if (d.to !== "merge") return edge(o, d, false);
+      if (!CAN_MERGE.includes(o)) return P("Only pushed work or a ship verdict can be merged.", i, o);
+      ends[i] = true; edge(o, elseOf(d), true);
+    });
   });
   for (const kind in takes) if (takes[kind].length !== 1) P(`New entries that ${kind === "other" ? "are ready to build" : "need a design first"} need exactly one stage that takes them; ${takes[kind].length ? takes[kind].join(" and ") + " both do" : "none does"}.`);
+  if (f.stages.filter(s => s.takes === "hunt").length > 1) P("New hunt entries need at most one stage that takes them.");
   // every loop has a limit: find a cycle made only of moves without one
   const seenLoop = new Set();
   f.stages.forEach((s, start) => {
@@ -250,7 +252,7 @@ function check(f) {
         if (e.to === start) {
           const path = [start]; let p = k; while (p !== null && p !== start) { path.unshift(p); p = prev[p]; } path.unshift(start);
           const id = [...new Set(path)].sort().join(",");
-          if (!seenLoop.has(id)) { seenLoop.add(id); P(`${path.map(j => f.stages[j].name).join(" → ")} is a loop with no limit.`, k, e.ai, e.o); }
+          if (!seenLoop.has(id)) { seenLoop.add(id); P(`${path.map(j => f.stages[j].name).join(" → ")} is a loop with no limit.`, k, e.o); }
           todo.length = 0; break;
         }
         if (!(e.to in prev)) { prev[e.to] = k; todo.push(e.to); }
@@ -258,102 +260,103 @@ function check(f) {
     }
   });
   const reach = k => { const seen = new Set([k]), todo = [k]; while (todo.length) for (const e of edges[todo.pop()]) if (!seen.has(e.to)) { seen.add(e.to); todo.push(e.to); } return seen; };
-  f.stages.forEach((s, i) => { if (s.actions.some(x => WRITES.includes(x.a)) && ![...reach(i)].some(k => prYou[k] || f.stages[k].actions.some(x => x.a === "merge"))) P(`${s.name}: its pull request can never reach a Merge or you.`, i); });
+  f.stages.forEach((s, i) => { if (WRITES.includes(s.kind) && ![...reach(i)].some(k => ends[k])) P(`${s.name}: its work can never reach a merge or you.`, i); });
   const entered = new Set(edges.flat().map(e => e.to));
   f.stages.forEach((s, i) => { if (!entered.has(i) && !s.takes) P(`Nothing can reach ${s.name}.`, i); });
-  f.stages.forEach((w, wi) => { if (w.actions.some(x => WRITES.includes(x.a))) reach(wi).forEach(k => { const r = f.stages[k]; if (k !== wi && r.model === w.model && r.actions.some(x => READS.includes(x.a))) warn.push(`${r.name} reviews on ${r.model}, the same model ${w.name} writes on.`); }); });
+  f.stages.forEach((w, wi) => { if (WRITES.includes(w.kind)) reach(wi).forEach(k => { const r = f.stages[k]; if (r.kind === "review" && r.model === w.model) warn.push(`${r.name} reviews on ${r.model}, the same model ${w.name} writes on.`); }); });
   info.push(`${asks} outcomes go to you.`);
   info.push(`An entry comes to you after ${f.maxMoves} moves between stages, wherever it is.`);
   return { bad, warn, info, by };
 }
 
 function yaml(f) {
-  const d = x => x.limit ? `{to: ${x.to}, limit: ${x.limit}}` : x.to;
-  let y = `format: 2\nname: ${f.name}\n` + (f.maxMoves !== 25 ? `max-moves: ${f.maxMoves}\n` : "") + "stages:\n";
+  const one = x => x.limit ? `{to: ${x.to}, limit: ${x.limit}}` : x.to;
+  const d = x => x.to === "merge" && x.else ? `{to: merge, refused: ${one(x.else)}}` : one(x);
+  let y = `format: 3\nname: ${f.name}\n` + (f.carry === "branch" ? "work: branches\n" : "") + (f.maxMoves !== 25 ? `max-moves: ${f.maxMoves}\n` : "") + "stages:\n";
   for (const s of f.stages) {
-    y += `  - name: ${s.name}\n    model: ${s.model}\n` + (s.takes ? `    takes: ${s.takes}\n` : "") + "    actions:\n";
-    for (const x of s.actions) {
-      const ks = outsOf(x).map(([o]) => o).filter(o => x.next[o]);
-      y += ks.length ? `      - ${x.a}:\n` + ks.map(o => `          ${o}: ${d(x.next[o])}\n`).join("") : `      - ${x.a}: {}\n`;
-    }
-    if (s.stuck) y += `    stuck: ${d(s.stuck)}\n`;
+    y += `  - name: ${s.name}\n    does: ${s.kind}\n    model: ${s.model}\n` + (s.takes ? `    takes: ${s.takes}\n` : "") + (s.only ? "    only-when: protected-files\n" : "");
+    y += outs(s).filter(o => s.next[o]).map(o => `    ${o}: ${d(s.next[o])}\n`).join("");
   }
   return y;
 }
 
 function openIdx(f) { return Math.min(S.open === undefined ? f.stages.length - 1 : S.open, f.stages.length - 1); }
-function stageColor(s) { const a = s.actions[0]; return a ? `var(${A[a.a].c})` : "var(--off)"; }
 function ordinal(n) { const v = n % 100, s = ["th", "st", "nd", "rd"]; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 
-function nextCell(f, s, si, ai, o, ro, err) {
-  const d = dest(s, ai, o);
+function nextCell(f, s, si, o, ro, err) {
+  const d = dest(s, o);
   if (ro) {
-    let h = d.to === "person" ? '<span class="you">you</span>' : d.to === "done" ? '<span class="done">done</span>' : d.to === "next-action" ? `<span class="same">the next action, ${esc(A[s.actions[ai + 1] ? s.actions[ai + 1].a : "merge"].label)}</span>` : `→ <span class="key">Stage: ${esc(d.to)}</span>`;
-    if (d.limit) h += `<small>up to <b>${d.limit}</b> times; the ${ordinal(d.limit + 1)} comes to you</small>`;
-    return h;
+    const name = x => x.to === "person" ? '<span class="you">you</span>' : x.to === "done" ? '<span class="done">done</span>' : x.to === "merge" ? '<span class="done">merge it</span>' : `→ <span class="key">Stage: ${esc(x.to)}</span>`;
+    const lim = x => x.limit ? `<small>up to <b>${x.limit}</b> times; the ${ordinal(x.limit + 1)} comes to you</small>` : "";
+    return d.to === "merge" ? `${name(d)}<small>if the merge is refused: ${name(elseOf(d))}</small>${lim(elseOf(d))}` : name(d) + lim(d);
   }
-  const opts = [["person", "you"], ["done", "done"]];
-  if (ai !== null && ai < s.actions.length - 1) opts.push(["next-action", "the next action, " + A[s.actions[ai + 1].a].label]);
-  f.stages.forEach((x, j) => opts.push([slug(x.name), j === si ? "this stage again, with a fresh session" : "Stage: " + slug(x.name)]));
-  if (!opts.some(([v]) => v === d.to)) opts.push([d.to, (d.to === "next-action" ? "the next action" : "Stage: " + d.to) + " (missing)"]);
-  const id = `nx-${si}-${ai}-${o}`;
-  let h = `<select id="${id}" class="${err ? "bad-f" : ""}" data-act="dest" data-si="${si}" data-ai="${ai}" data-o="${o}" aria-label="Next for ${words(o)}">` + opts.map(([v, t]) => `<option value="${esc(v)}"${v === d.to ? " selected" : ""}>${esc(t)}</option>`).join("") + "</select>";
-  if (!FIXED.includes(d.to)) h += `<small>up to <input type="number" min="1" id="lm-${si}-${ai}-${o}" class="${err && !d.limit && /loop/.test(err.msg) ? "bad-f" : ""}" data-act="limit" data-si="${si}" data-ai="${ai}" data-o="${o}" value="${d.limit || ""}" aria-label="Limit for ${words(o)}"> times${d.limit ? `; the ${ordinal(d.limit + 1)} comes to you` : " (no limit)"}</small>`;
-  return h;
+  const pick = (x, sub) => {
+    const opts = [["person", "you"]];
+    if (!sub) { if (CAN_MERGE.includes(o)) opts.push(["merge", "merge it"]); opts.push(["done", "done"]); }
+    f.stages.forEach((y, j) => opts.push([slug(y.name), j === si ? "this stage again, with a fresh session" : "Stage: " + slug(y.name)]));
+    if (!opts.some(([v]) => v === x.to)) opts.push([x.to, (FIXED.includes(x.to) ? words(x.to) : "Stage: " + x.to) + " (missing)"]);
+    const bad = err && (sub || d.to !== "merge");
+    let h = `<select id="nx-${si}-${o}-${sub}" class="${bad ? "bad-f" : ""}" data-act="dest" data-si="${si}" data-o="${o}" data-sub="${sub}" aria-label="${sub ? "If the merge is refused" : "Next for " + words(o)}">` + opts.map(([v, t]) => `<option value="${esc(v)}"${v === x.to ? " selected" : ""}>${esc(t)}</option>`).join("") + "</select>";
+    if (!FIXED.includes(x.to)) h += `<small>up to <input type="number" min="1" id="lm-${si}-${o}-${sub}" class="${bad && !x.limit && /loop/.test(err.msg) ? "bad-f" : ""}" data-act="limit" data-si="${si}" data-o="${o}" data-sub="${sub}" value="${x.limit || ""}" aria-label="Limit"> times${x.limit ? `; the ${ordinal(x.limit + 1)} comes to you` : " (no limit)"}</small>`;
+    return h;
+  };
+  return d.to === "merge" ? pick(d, 0) + "<small>if the merge is refused:</small>" + pick(elseOf(d), 1) : pick(d, 0);
 }
 
 function renderStages(f, res) {
   const ro = f.builtin;
   let h = "";
   f.stages.forEach((s, si) => {
-    const errs = res.bad.filter(b => b.s === si), rowErr = (ai, o) => errs.find(b => b.o === o && b.ai === ai);
-    h += `<div class="rec${errs.length ? " err" : ""}${!ro && openIdx(f) === si ? " open" : ""}" data-drop="${si}" style="--c:${stageColor(s)}"><div class="n">${si + 1}` +
+    const k = K[s.kind], errs = res.bad.filter(b => b.s === si), rowErr = o => errs.find(b => b.o === o);
+    h += `<div class="rec${errs.length ? " err" : ""}${!ro && openIdx(f) === si ? " open" : ""}" data-drop="${si}" style="--c:var(${k.c})"><div class="n">${si + 1}` +
       (ro ? "" : `<button class="ic" data-act="up" data-si="${si}" aria-label="Move up" title="Move up">▲</button><button class="ic" data-act="down" data-si="${si}" aria-label="Move down" title="Move down">▼</button>`) + "</div>";
     h += '<div class="who">' + (ro ? `<div class="nm">${esc(s.name)}</div>` : `<input type="text" class="nm" id="sn-${si}" data-act="sname" data-si="${si}" value="${esc(s.name)}" aria-label="Stage name">`) + `<span class="slug">Stage: ${esc(slug(s.name))}</span><dl>`;
+    h += "<dt>Does</dt><dd>" + (ro ? k.label : `<select id="sk-${si}" data-act="kind" data-si="${si}" aria-label="Kind of work">${Object.keys(K).map(x => `<option value="${x}"${x === s.kind ? " selected" : ""}>${K[x].label}</option>`).join("")}</select>`) + "</dd>";
     h += "<dt>Model</dt><dd>" + (ro ? `<span class="m">${s.model}</span>` : `<select id="sm-${si}" class="m" data-act="model" data-si="${si}" aria-label="Model">${MODELS.map(m => `<option${m === s.model ? " selected" : ""}>${m}</option>`).join("")}</select>`) + "</dd>";
-    const tk = [["", "only what other stages send it"], ["design-first", "new entries that need a design first"], ["other", "new entries that are ready to build"], ["any", "new entries of both those kinds"], ["hunt", "new hunt entries"]];
-    h += "<dt>Takes</dt><dd>" + (ro ? tk.find(t => t[0] === s.takes)[1] : `<select id="st-${si}" data-act="takes" data-si="${si}" aria-label="Takes">${tk.map(([v, t]) => `<option value="${v}"${v === s.takes ? " selected" : ""}>${t}</option>`).join("")}</select>`) + "</dd></dl>";
+    const tk = TAKES.filter(t => takesFor(s.kind).includes(t[0]) || t[0] === s.takes);
+    h += "<dt>Takes</dt><dd>" + (ro || tk.length < 2 ? TAKES.find(t => t[0] === s.takes)[1] : `<select id="st-${si}" data-act="takes" data-si="${si}" aria-label="Takes">${tk.map(([v, t]) => `<option value="${v}"${v === s.takes ? " selected" : ""}>${t}</option>`).join("")}</select>`) + "</dd>";
+    if (s.kind === "review") { const on = [["", "every time"], ["protected", "only when the work touches protected files"]]; h += "<dt>Runs</dt><dd>" + (ro ? on.find(t => t[0] === s.only)[1] : `<select id="so-${si}" data-act="only" data-si="${si}" aria-label="Runs">${on.map(([v, t]) => `<option value="${v}"${v === s.only ? " selected" : ""}>${t}</option>`).join("")}</select>`) + "</dd>"; }
+    h += "</dl>";
     if (!ro) h += `<div class="addrow"><button class="quiet" data-act="delstage" data-si="${si}">Remove stage</button></div>`;
-    h += '</div><div class="ends"><div class="hrow"><span>Outcome</span><span>Checked first</span><span>Next</span></div>';
-    s.actions.forEach((x, ai) => {
-      const a = A[x.a];
-      h += `<div class="ahead" style="--c:var(${a.c})"><span class="chip">${a.label}</span><small>${a.desc}</small><button class="lnk" data-act="brief" data-k="${si}-${ai}">${S.brief === si + "-" + ai ? "hide brief" : "brief"}</button>${ro ? "" : `<button class="ic" data-act="delact" data-si="${si}" data-ai="${ai}" aria-label="Remove ${a.label}" title="Remove">✕</button>`}</div>`;
-      if (WRITES.includes(x.a)) h += `<div class="endsw">Ends with ${ro ? `<b>${x.ends === "branch" ? "a pushed branch, for a later Build to finish" : "a pull request"}</b>` : `<select id="en-${si}-${ai}" data-act="ends" data-si="${si}" data-ai="${ai}" aria-label="Ends with"><option value="pr"${x.ends === "pr" ? " selected" : ""}>a pull request</option><option value="branch"${x.ends === "branch" ? " selected" : ""}>a pushed branch, for a later Build to finish</option></select>`}</div>`;
-      if (S.brief === si + "-" + ai) h += `<div class="brief"><b>What the session is told</b> <span class="same">an example; the words are kept and edited on the Actions page</span><p>${a.brief}</p></div>`;
-      outsOf(x).forEach(([o, ck]) => { const e = rowErr(ai, o); h += `<div class="erow${e ? " err" : ""}"><span>${words(o)}</span><span class="ck">${ck}</span><span class="to">${nextCell(f, s, si, ai, o, ro, e)}</span>${e ? `<span class="why">${esc(e.msg)}</span>` : ""}</div>`; });
-    });
-    const e = rowErr(null, "stuck");
-    h += `<div class="ahead" style="--c:var(--off)"><span class="chip">Any time</span></div><div class="erow${e ? " err" : ""}"><span>stuck</span><span class="ck">${RSN}</span><span class="to">${nextCell(f, s, si, null, "stuck", ro, e)}</span>${e ? `<span class="why">${esc(e.msg)}</span>` : ""}</div>`;
+    h += '</div><div class="ends">';
+    h += `<div class="ahead" style="--c:var(${k.c})"><span class="chip">${k.label}</span><small>${k.desc}${s.only ? " Passed without a session, counting as ship, when no protected file is touched." : ""}</small><button class="lnk" data-act="brief" data-k="${si}">${S.brief === String(si) ? "hide brief" : "brief"}</button></div>`;
+    if (S.brief === String(si)) h += `<div class="brief"><b>What the session is told</b> <span class="same">an example; the words are kept on the Actions page, where a brief of your own can replace them</span><p>${k.brief}</p></div>`;
+    h += '<div class="hrow"><span>Outcome</span><span>Checked first</span><span>Next</span></div>';
+    outs(s).forEach(o => { const e = rowErr(o); h += `<div class="erow${e ? " err" : ""}"><span>${words(o)}${o === "stuck" ? ' <span class="same">(any time)</span>' : ""}</span><span class="ck">${ck(f, o)}</span><span class="to">${nextCell(f, s, si, o, ro, e)}</span>${e ? `<span class="why">${esc(e.msg)}</span>` : ""}</div>`; });
     errs.filter(b => b.o === undefined).forEach(b => { h += `<div class="why" style="margin-top:6px">${esc(b.msg)}</div>`; });
-    if (!ro) h += `<div class="addrow"><select id="aa-${si}" data-act="addact" data-si="${si}" aria-label="Add an action"><option value="">+ add an action</option>${Object.keys(A).map(k => `<option value="${k}">${A[k].label}</option>`).join("")}</select><span>or drag one in from the left</span></div>`;
     h += "</div></div>";
   });
-  if (!ro) h += '<p class="addstage"><button data-act="addstage">+ Add a stage</button></p>';
+  if (!ro) h += `<p class="addstage"><select id="addst" data-act="addstage" aria-label="Add a stage"><option value="">+ Add a stage</option>${Object.keys(K).map(x => `<option value="${x}">${K[x].label}</option>`).join("")}</select></p>`;
   h += "<h3>Outside the flow</h3><div class='out'>" + SEATS.map(([k, n, d]) => `<div><b>${n}</b>${ro ? `<span class="m">${f.seats[k]}</span>` : `<select id="seat-${k}" class="m" data-act="seat" data-k="${k}" aria-label="${n} model">${MODELS.map(m => `<option${m === f.seats[k] ? " selected" : ""}>${m}</option>`).join("")}</select>`} <span class="same">${d}</span></div>`).join("") + "</div>";
   return h;
 }
 
 function renderChecks(res) {
-  return '<h3>Does it flow?</h3><div class="chk">' + (res.bad.length ? res.bad.map(b => `<div class="no">${esc(b.msg)}</div>`).join("") : "<div>Every stage a Next names exists, every loop has a limit, every pull request can reach a Merge or you, and every kind of entry has one way in.</div>") +
+  return '<h3>Does it flow?</h3><div class="chk">' + (res.bad.length ? res.bad.map(b => `<div class="no">${esc(b.msg)}</div>`).join("") : "<div>Every stage a Next names exists, every loop has a limit, all pushed work can reach a merge or you, and every kind of entry has one way in.</div>") +
     res.warn.map(w => `<div class="wa">${esc(w)}</div>`).join("") + res.info.map(i => `<div class="i">${esc(i)}</div>`).join("") + "</div>";
 }
 
 function walkStart(f, kind) {
   const i = f.stages.findIndex(s => s.takes === kind || (s.takes === "any" && kind !== "hunt"));
-  S.walk = { kind, si: i, ai: 0, counts: {}, moves: 0, log: [], at: i < 0 ? "none" : "stage", asker: null };
+  S.walk = { kind, si: i, counts: {}, moves: 0, log: [], at: i < 0 ? "none" : "stage", asker: null, pend: null };
   if (i >= 0) S.walk.log.push(`A new entry starts in <b>${esc(f.stages[i].name)}</b>. A fresh ${f.stages[i].model} session takes it.`);
 }
-function walkStep(f, res, o) {
-  const w = S.walk, s = f.stages[w.si], stuck = o === "stuck", d = dest(s, stuck ? null : w.ai, o), label = stuck ? "stuck" : `${A[s.actions[w.ai].a].label}: ${words(o)}`;
-  if (d.to === "next-action" && w.ai < s.actions.length - 1) { w.ai++; w.log.push(`${label}. The same session goes on to <b>${A[s.actions[w.ai].a].label}</b>.`); return; }
+function walkGo(f, res, d, label, k) {
+  const w = S.walk;
   if (d.to === "done") { w.at = "done"; w.log.push(`${label}. The entry is <b>done</b>.`); return; }
   if (d.to === "person" || !(d.to in res.by)) { w.at = "you"; w.asker = w.si; w.log.push(`${label}. The entry waits for <b>you</b>, with a question on your board.`); return; }
-  const k = `${w.si}|${w.ai}|${o}`; w.counts[k] = (w.counts[k] || 0) + 1; w.moves++;
+  w.counts[k] = (w.counts[k] || 0) + 1; w.moves++;
   if (d.limit && w.counts[k] > d.limit) { w.at = "you"; w.asker = w.si; w.log.push(`${label}, for the ${ordinal(w.counts[k])} time. The limit is ${d.limit}, so the entry comes to <b>you</b>.`); return; }
   if (w.moves > f.maxMoves) { w.at = "you"; w.asker = w.si; w.log.push(`${label}. That is move ${w.moves}, past the total cap of ${f.maxMoves}, so the entry comes to <b>you</b>.`); return; }
-  w.si = res.by[d.to]; w.ai = 0;
+  w.si = res.by[d.to]; w.at = "stage";
   const n = f.stages[w.si];
   w.log.push(`${label}. The entry moves to <b>${esc(n.name)}</b>${d.limit ? ` (${w.counts[k]} of ${d.limit})` : ""}. A fresh ${n.model} session takes it.`);
+}
+function walkStep(f, res, o, skipped) {
+  const w = S.walk, s = f.stages[w.si], d = dest(s, o);
+  const label = skipped ? `No protected file is touched, so ${esc(s.name)} is passed without a session` : o === "stuck" ? `${esc(s.name)}: stuck` : `${esc(s.name)}: ${words(o)}`;
+  if (d.to === "merge") { w.at = "merge"; w.pend = o; w.log.push(`${label}. The merge is tried: the checks are run again on what is there now.`); return; }
+  walkGo(f, res, d, label, `${w.si}|${o}`);
 }
 function renderWalk(f, res) {
   const w = S.walk;
@@ -361,26 +364,29 @@ function renderWalk(f, res) {
   if (!w) return h + '<p class="now same">Pick a kind of entry, then choose each outcome to see where the flow sends it.</p></div>';
   if (w.at === "none") h += '<p class="now">No stage takes that kind of entry.</p>';
   else if (w.at === "done") h += '<p class="now"><span class="done">Done.</span> The entry is finished.</p>';
-  else if (w.at === "you") h += `<p class="now">Waiting for <span class="you">you</span>.</p><div class="btns"><button data-act="wanswer">Answer: back to ${esc(f.stages[w.asker].name)}</button><button data-act="wmerged">I merged the pull request</button></div>`;
+  else if (w.at === "you") h += `<p class="now">Waiting for <span class="you">you</span>.</p><div class="btns"><button data-act="wanswer">Answer: back to ${esc(f.stages[w.asker].name)}</button><button data-act="wmerged">I merged the ${work(f)}</button></div>`;
+  else if (w.at === "merge") h += `<p class="now">Merging the ${work(f)}. It ends as:</p><div class="btns"><button data-act="wmerge" data-k="ok">merged</button><button data-act="wmerge" data-k="no">refused: it changed since the verdict, is red, or conflicts</button></div>`;
   else {
-    const s = f.stages[w.si], x = s.actions[w.ai];
-    h += `<p class="now">In <span class="key">Stage: ${esc(slug(s.name))}</span> on <span class="m">${s.model}</span>, doing <b>${x ? A[x.a].label : "nothing"}</b>. It ends as:</p><div class="btns">` +
-      (x ? outsOf(x).map(([o]) => `<button data-act="wout" data-o="${o}">${words(o)}</button>`).join("") : "") + '<button class="quiet" data-act="wout" data-o="stuck">stuck</button></div>';
+    const s = f.stages[w.si];
+    h += `<p class="now">In <span class="key">Stage: ${esc(slug(s.name))}</span> on <span class="m">${s.model}</span>, doing <b>${K[s.kind].label}</b>. It ends as:</p><div class="btns">` +
+      K[s.kind].outs.map(o => `<button data-act="wout" data-o="${o}">${words(o)}</button>`).join("") + '<button class="quiet" data-act="wout" data-o="stuck">stuck</button>' +
+      (s.only ? '<button class="quiet" data-act="wout" data-o="ship" data-skip="1">no protected file is touched</button>' : "") + "</div>";
   }
   return h + `<ol>${w.log.map(l => `<li>${l}</li>`).join("")}</ol><p class="same" style="font-size:13px;margin:10px 0 0">${w.moves} of ${f.maxMoves} moves used.</p></div>`;
 }
 
 function render() {
-  const f = cur(), res = check(f), own = S.flows.filter(x => !x.builtin), used = k => f.stages.filter(s => s.actions.some(x => x.a === k)).length;
+  const f = cur(), res = check(f), own = S.flows.filter(x => !x.builtin), used = k => f.stages.filter(s => s.kind === k).length;
   const item = x => `<a class="fl${x.id === f.id ? " sel" : ""}" data-act="pick" data-id="${esc(x.id)}" tabindex="0">${esc(x.name)}${check(x).bad.length ? ' <span class="dot" title="has problems">●</span>' : ""}<small>${esc(x.blurb || "your flow")}</small></a>`;
   let n = "<h4>Built in</h4>" + S.flows.filter(x => x.builtin).map(item).join("") + "<h4>Yours</h4>" + (own.map(item).join("") || "<p>None yet. Copy a built-in flow to start.</p>") + '<button class="new quiet" data-act="new">+ New flow</button>';
-  if (!f.builtin) n += `<h4>Actions</h4><p>Click one to add it to the open stage${f.stages[openIdx(f)] ? `, <b>${esc(f.stages[openIdx(f)].name)}</b>` : ""}, or drag it onto any stage.</p>` + Object.keys(A).map(k => `<div class="pal" draggable="true" data-pal="${k}" data-act="palette" data-k="${k}" tabindex="0" role="button" style="--c:var(${A[k].c})"><b>${A[k].label}${used(k) ? `<i>in ${used(k)}</i>` : ""}</b><small>${A[k].desc}</small></div>`).join("");
+  if (!f.builtin) n += `<h4>Kinds of stage</h4><p>Click one to add a stage${f.stages[openIdx(f)] ? ` after <b>${esc(f.stages[openIdx(f)].name)}</b>` : ""}, or drag it to where it belongs.</p>` + Object.keys(K).map(k => `<div class="pal" draggable="true" data-pal="${k}" data-act="palette" data-k="${k}" tabindex="0" role="button" style="--c:var(${K[k].c})"><b>${K[k].label}${used(k) ? `<i>in ${used(k)}</i>` : ""}</b><small>${K[k].desc}</small></div>`).join("");
   document.getElementById("nav").innerHTML = n;
   let h = '<div class="fhead">' + (f.builtin ? `<h2>${esc(f.name)}</h2><span class="tagc">built in</span>` : `<input type="text" class="fname" id="fname" data-act="fname" value="${esc(f.name)}" aria-label="Flow name"><span class="tagc">yours</span>`) + '<div class="act">';
   h += res.bad.length ? `<span class="probs">${res.bad.length} problem${res.bad.length > 1 ? "s" : ""}</span>` : '<span class="okk">It flows</span>';
   h += '<button data-act="copy">Copy</button>';
   if (!f.builtin) h += (S.del ? '<button data-act="del2" class="quiet">Really delete?</button>' : '<button data-act="del" class="quiet">Delete</button>') + `<button class="pri" data-act="save"${res.bad.length ? " disabled" : ""}>Save</button>`;
-  h += '</div></div><div class="lim"><span>An entry comes to you after ' + (f.builtin ? `<b class="mono">${f.maxMoves}</b>` : `<input type="number" min="2" id="maxm" data-act="maxm" value="${f.maxMoves}" aria-label="Total cap">`) + " moves between stages, wherever it is.</span></div>";
+  const carry = [["pr", "pull requests"], ["branch", "branches, with no pull request"]];
+  h += '</div></div><div class="lim"><span>Work is pushed and reviewed on ' + (f.builtin ? `<b>${carry.find(c => c[0] === f.carry)[1]}</b>` : `<select id="carry" data-act="carry" aria-label="Work is carried by">${carry.map(([v, t]) => `<option value="${v}"${v === f.carry ? " selected" : ""}>${t}</option>`).join("")}</select>`) + ". An entry comes to you after " + (f.builtin ? `<b class="mono">${f.maxMoves}</b>` : `<input type="number" min="2" id="maxm" data-act="maxm" value="${f.maxMoves}" aria-label="Total cap">`) + " moves between stages, wherever it is.</span></div>";
   h += '<div class="tabs">' + [["stages", "Stages"], ["walk", "Walk an entry"], ["file", "The file"]].map(([k, t]) => `<button data-act="tab" data-k="${k}" class="${S.tab === k ? "on" : ""}">${t}</button>`).join("") + "</div>";
   h += S.tab === "file" ? `<pre class="file">${esc(yaml(f))}</pre>` : S.tab === "walk" ? renderWalk(f, res) : renderStages(f, res);
   document.getElementById("main").innerHTML = h + renderChecks(res);
@@ -388,48 +394,68 @@ function render() {
 
 function toast(t) { const el = document.getElementById("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, 1800); }
 function uniqueName(base) { let n = base, i = 2; while (S.flows.some(f => f.name === n)) n = `${base}-${i++}`; return n; }
-function setDest(s, ai, o, d) { const same = d.to === dflt(o).to && !d.limit; if (ai === null) s.stuck = same ? null : d; else if (same) delete s.actions[ai].next[o]; else s.actions[ai].next[o] = d; }
-function addAction(f, si, k) { if (!A[k] || f.builtin || !f.stages[si]) return; f.stages[si].actions.push({ a: k, ends: "pr", next: {} }); }
+function uniqueStage(f, base) { let n = base, i = 2; while (f.stages.some(s => slug(s.name) === slug(n))) n = `${base} ${i++}`; return n; }
+function setDest(s, o, d) { if (d.to === dflt(o).to && !d.limit && !d.else) delete s.next[o]; else s.next[o] = d; }
+function addStage(f, k, after) {
+  if (!K[k] || f.builtin) return;
+  const at = Math.min(after + 1, f.stages.length), s = st(uniqueStage(f, K[k].label), k, "sonnet", "", {});
+  f.stages.splice(at, 0, s); S.open = at; toast(`${s.name} added`);
+}
 
 function act(el, ev) {
-  const f = cur(), d = el.dataset, si = d.si === undefined ? null : +d.si, ai = d.ai === "null" || d.ai === undefined ? null : +d.ai, s = si === null ? null : f.stages[si];
+  const f = cur(), d = el.dataset, si = d.si === undefined ? null : +d.si, s = si === null ? null : f.stages[si], sub = d.sub === "1";
   S.del = d.act === "del";
   switch (d.act) {
-    case "pick": S.sel = d.id; S.walk = null; break;
+    case "pick": S.sel = d.id; S.walk = null; S.open = undefined; S.brief = null; break;
     case "tab": S.tab = d.k; break;
     case "copy": { const c = JSON.parse(JSON.stringify(f)); c.builtin = false; c.name = uniqueName(f.name + "-copy"); c.id = c.name + "-" + Date.now(); c.blurb = "copied from " + f.name; S.flows.push(c); S.sel = c.id; S.tab = "stages"; S.walk = null; toast("Copied. This one is yours to change."); break; }
-    case "new": { const nm = uniqueName("my-flow"); S.flows.push({ id: nm + "-" + Date.now(), name: nm, builtin: false, blurb: "your flow", maxMoves: 25, seats: seats(), stages: [st("Build", "sonnet", "any", [["build", {}]])] }); S.sel = S.flows[S.flows.length - 1].id; S.tab = "stages"; S.walk = null; break; }
+    case "new": { const nm = uniqueName("my-flow"), n = flow(nm + "-" + Date.now(), false, "your flow", [st("Build", "build", "sonnet", "any", {})]); n.name = nm; S.flows.push(n); S.sel = n.id; S.tab = "stages"; S.walk = null; break; }
     case "del": break;
     case "del2": S.flows = S.flows.filter(x => x.id !== f.id); S.sel = "td"; S.walk = null; toast("Deleted"); break;
     case "save": persist(); toast("Saved in this browser"); return;
     case "fname": f.name = el.value.trim() || f.name; break;
     case "maxm": f.maxMoves = parseInt(el.value, 10); break;
-    case "sname": { const old = slug(s.name), nw = el.value.trim(); if (!nw) break; s.name = nw; const k = slug(nw); f.stages.forEach(x => { x.actions.forEach(a => Object.values(a.next).forEach(v => { if (v.to === old) v.to = k; })); if (x.stuck && x.stuck.to === old) x.stuck.to = k; }); break; }
+    case "carry": f.carry = el.value; break;
+    case "sname": { const old = slug(s.name), nw = el.value.trim(); if (!nw) break; s.name = nw; const k = slug(nw); f.stages.forEach(x => Object.values(x.next).forEach(v => { if (v.to === old) v.to = k; if (v.else && v.else.to === old) v.else.to = k; })); break; }
+    case "kind": s.kind = el.value; s.next = {}; s.only = ""; if (!takesFor(s.kind).includes(s.takes)) s.takes = ""; break;
     case "model": s.model = el.value; break;
     case "takes": s.takes = el.value; break;
+    case "only": s.only = el.value; break;
     case "seat": f.seats[d.k] = el.value; break;
-    case "dest": { const prev = dest(s, ai, d.o); setDest(s, ai, d.o, to(el.value, FIXED.includes(el.value) ? null : prev.limit)); break; }
-    case "limit": { const v = parseInt(el.value, 10); setDest(s, ai, d.o, to(dest(s, ai, d.o).to, v >= 1 ? v : null)); break; }
-    case "addact": addAction(f, si, el.value); break;
-    case "delact": s.actions.splice(ai, 1); break;
-    case "ends": { const x = s.actions[ai]; x.ends = el.value; delete x.next["pull-request-open"]; delete x.next["branch-pushed"]; if (x.ends === "branch" && s.actions[ai + 1] && s.actions[ai + 1].a === "build") x.next["branch-pushed"] = to("next-action"); break; }
+    case "dest": {
+      const c = dest(s, d.o), v = el.value, keep = x => FIXED.includes(v) ? null : x.limit;
+      if (sub) setDest(s, d.o, { to: "merge", limit: null, else: to(v, keep(elseOf(c))) });
+      else if (v === "merge") setDest(s, d.o, mg());
+      else setDest(s, d.o, to(v, keep(c)));
+      break;
+    }
+    case "limit": {
+      const c = dest(s, d.o), v = parseInt(el.value, 10), n = v >= 1 ? v : null;
+      if (sub) setDest(s, d.o, { to: "merge", limit: null, else: to(elseOf(c).to, n) }); else setDest(s, d.o, to(c.to, n));
+      break;
+    }
     case "brief": S.brief = S.brief === d.k ? null : d.k; break;
-    case "palette": { const t = openIdx(f); addAction(f, t, d.k); if (f.stages[t]) toast(`${A[d.k].label} added to ${f.stages[t].name}`); break; }
-    case "addstage": f.stages.push(st(uniqueStage(f), "sonnet", "", [])); break;
+    case "palette": addStage(f, d.k, openIdx(f)); break;
+    case "addstage": addStage(f, el.value, f.stages.length - 1); break;
     case "delstage": f.stages.splice(si, 1); break;
-    case "up": if (si > 0) f.stages.splice(si - 1, 0, f.stages.splice(si, 1)[0]); break;
-    case "down": if (si < f.stages.length - 1) f.stages.splice(si + 1, 0, f.stages.splice(si, 1)[0]); break;
+    case "up": if (si > 0) { f.stages.splice(si - 1, 0, f.stages.splice(si, 1)[0]); S.open = si - 1; } break;
+    case "down": if (si < f.stages.length - 1) { f.stages.splice(si + 1, 0, f.stages.splice(si, 1)[0]); S.open = si + 1; } break;
     case "wstart": walkStart(f, d.k); break;
-    case "wout": walkStep(f, check(f), d.o); break;
-    case "wanswer": S.walk.at = "stage"; S.walk.si = S.walk.asker; S.walk.ai = 0; S.walk.counts = {}; S.walk.moves = 0; S.walk.log.push(`You answer. The entry goes back to <b>${esc(f.stages[S.walk.si].name)}</b>, a fresh session reads your answer, and the counts start again.`); break;
-    case "wmerged": S.walk.at = "done"; S.walk.log.push("You merge the pull request by hand. A merged pull request ends its entry: <b>done</b>."); break;
+    case "wout": walkStep(f, check(f), d.o, d.skip === "1"); break;
+    case "wmerge": {
+      const w = S.walk, st0 = f.stages[w.si], dd = dest(st0, w.pend);
+      if (d.k === "ok") { w.at = "done"; w.log.push(`The ${work(f)} is merged. The entry is <b>done</b>.`); }
+      else walkGo(f, check(f), elseOf(dd), "The merge is refused", `${w.si}|${w.pend}|refused`);
+      break;
+    }
+    case "wanswer": S.walk.at = "stage"; S.walk.si = S.walk.asker; S.walk.counts = {}; S.walk.moves = 0; S.walk.log.push(`You answer. The entry goes back to <b>${esc(f.stages[S.walk.si].name)}</b>, a fresh session reads your answer, and the counts start again.`); break;
+    case "wmerged": S.walk.at = "done"; S.walk.log.push(`You merge the ${work(f)} by hand. Merged work ends its entry: <b>done</b>.`); break;
     default: return;
   }
   if (!f.builtin || ["pick", "copy", "new", "del2"].includes(d.act)) persist();
   render();
   if (ev && el.id) { const again = document.getElementById(el.id); if (again) again.focus(); }
 }
-function uniqueStage(f) { let n = "New stage", i = 2; while (f.stages.some(s => slug(s.name) === slug(n))) n = `New stage ${i++}`; return n; }
 
 document.addEventListener("click", ev => {
   const el = ev.target.closest("[data-act]");
@@ -442,6 +468,6 @@ document.addEventListener("keydown", ev => { if (ev.key === "Enter" && ev.target
 document.addEventListener("dragstart", ev => { const p = ev.target.closest && ev.target.closest("[data-pal]"); if (p) ev.dataTransfer.setData("text/plain", p.dataset.pal); });
 document.addEventListener("dragover", ev => { const r = ev.target.closest && ev.target.closest("[data-drop]"); if (r && !cur().builtin) { ev.preventDefault(); r.classList.add("over"); } });
 document.addEventListener("dragleave", ev => { const r = ev.target.closest && ev.target.closest("[data-drop]"); if (r) r.classList.remove("over"); });
-document.addEventListener("drop", ev => { const r = ev.target.closest && ev.target.closest("[data-drop]"); if (!r) return; ev.preventDefault(); addAction(cur(), +r.dataset.drop, ev.dataTransfer.getData("text/plain")); persist(); render(); });
+document.addEventListener("drop", ev => { const r = ev.target.closest && ev.target.closest("[data-drop]"); if (!r) return; ev.preventDefault(); addStage(cur(), ev.dataTransfer.getData("text/plain"), +r.dataset.drop); persist(); render(); });
 render();
 </script>
