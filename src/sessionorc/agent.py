@@ -684,6 +684,9 @@ class HostAgent(
         # node: the same shape for its one link to the home.
         self.links: dict[str, dict[str, Any]] = {}
         self._link_muxes: dict[str, link.Mux] = {}
+        # one settings push at a time, its read and its sends together, so a dial's frame read before a write never
+        # lands after the write's own frame (§4.4a *Settings, replicated*, TD-1870)
+        self._settings_push_lock = asyncio.Lock()
         # Rule 3's refusal for each seat it would not fill this tick (§4.9b *A seat that cannot answer is
         # routed around*, TD-1443): `{record_id: why}`, written each tick by `_seat_pass` and `_fill`, read by
         # `seat_able`. In memory only; empty before the first tick, which reads as fillable.

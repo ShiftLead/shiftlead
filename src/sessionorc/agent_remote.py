@@ -880,22 +880,25 @@ class RemoteMixin:
         queued, as the intent push is: a node whose link is down is sent the file on its next dial."""
         if self.mode != "home":
             return
-        doc = await asyncio.to_thread(settings_mod.read)
-        if doc is None:
-            # absent or broken: not settings. `load` reads it as `{}`, which gates nothing here while
-            # it is mended — sent, it would replace every node's good replica with nothing
-            log.warning("settings.yml is absent or cannot be read: not sent, and each node keeps its replica")
-            return
-        for h, mux in list(self._link_muxes.items()):
-            if host is not None and h != host:
-                continue
-            try:
-                async with asyncio.timeout(agent_common.REPORT_WRITE):
-                    await mux.notify("settings", doc=doc)
-            except link.LinkClosed:
-                continue
-            except (link.LinkError, TimeoutError) as e:
-                log.warning("the settings did not reach %s: %s — it is sent again on its next dial", h, e)
+        # one push at a time, read and sends together: a dial's push that read the file before a write would
+        # otherwise land after the write's own and put the old file back on the node (TD-1870)
+        async with self._settings_push_lock:
+            doc = await asyncio.to_thread(settings_mod.read)
+            if doc is None:
+                # absent or broken: not settings. `load` reads it as `{}`, which gates nothing here while
+                # it is mended — sent, it would replace every node's good replica with nothing
+                log.warning("settings.yml is absent or cannot be read: not sent, and each node keeps its replica")
+                return
+            for h, mux in list(self._link_muxes.items()):
+                if host is not None and h != host:
+                    continue
+                try:
+                    async with asyncio.timeout(agent_common.REPORT_WRITE):
+                        await mux.notify("settings", doc=doc)
+                except link.LinkClosed:
+                    continue
+                except (link.LinkError, TimeoutError) as e:
+                    log.warning("the settings did not reach %s: %s — it is sent again on its next dial", h, e)
 
     async def _push_intent(self) -> None:
         """What changed in the home-owned fields, or the unread count, of a linked node's records
