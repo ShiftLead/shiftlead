@@ -2275,7 +2275,14 @@ def stop_lead(call: Call, st: Stopping, *, timeout: float = STOP_TIMEOUT, close:
 
 
 def _close_settled(call: Call, entry: dict[str, Any], record: dict[str, Any] | None) -> None:
-    if record is None or record["state"] == "closed":
+    if record is not None and record["state"] == "closed":
+        closer = record.get("closer")
+        if isinstance(closer, dict) and closer.get("by") == "tick" and closer.get("why") == "wind_down":
+            # rule 9 came first: that close stands, and is said (§4.9a *What it leaves*, TD-1898)
+            entry["action"] = "closed by the tick after the wind-down"
+            entry["state"] = "closed"
+        return
+    if record is None:
         return
     if record["state"] not in SETTLED:
         entry["left_open"] = f"still {record['state']}"

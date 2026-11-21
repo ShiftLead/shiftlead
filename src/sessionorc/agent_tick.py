@@ -4039,7 +4039,8 @@ class TickMixin:
         schedule's start and rule 8's — each counts only when no unattended record of the team runs
         but `but`, the one being started. The home's usage readings now (the `usage` RPC's windows)
         are kept as `teams.<team>.usage_at_start: {profile: {window: pct}}` on the host record,
-        replacing the last start's; with no reading the key goes. At the home only."""
+        replacing the last start's; with no reading the key goes; `teams.<team>.started_at` is the start's own
+        instant, which `_run_marks` reads so a Wind down's mark counts for its run only (TD-1898). At the home only."""
         if self.mode != "home" or not team:
             return
         for r in self._graph().values():
@@ -4060,6 +4061,8 @@ class TickMixin:
                 readings[prof] = windows
         teams = self._host_rec.setdefault("teams", {})
         rec = teams.get(team) if isinstance(teams.get(team), dict) else {}
+        # this run's own instant, so a Wind down's mark counts for its run only (§4.9a, TD-1898)
+        rec["started_at"] = now_iso()
         if readings:
             rec["usage_at_start"] = readings
         else:

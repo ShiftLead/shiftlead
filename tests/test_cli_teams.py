@@ -2846,3 +2846,26 @@ def test_no_agent_cadence_to_list_the_persons_layers_is_said_once_and_the_team_s
     err = capsys.readouterr().err
     assert err.count(layers.NO_SOURCE) == 1 and "grind-1, grind-2" in err
     assert creates(state)
+
+
+def test_close_says_a_member_the_tick_closed_after_the_wind_down(world, capsys, monkeypatch):
+    """§4.9a *What it leaves* (TD-1898): under `--close` the tick may close a marked member first; that close
+    stands, and the entry reads *closed by the tick after the wind-down*."""
+    tmp_path, state = world
+    started(state)
+    capsys.readouterr()
+    by_id = {s["id"]: s for s in state["sessions"]}
+    real = cli.call_sync
+
+    def call(method, **params):
+        out = real(method, **params)
+        if method == "send" and params["id"] == "ao-shiftlead-grind-1":
+            by_id["ao-shiftlead-grind-1"].update(
+                state="closed", closer={"by": "tick", "why": "wind_down", "at": "2026-11-21T00:00:00Z"}
+            )
+        return out
+
+    monkeypatch.setattr(cli, "call_sync", call)
+    assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
+    assert "ao-shiftlead-grind-1" not in [p["id"] for m, p in state["calls"] if m == "close"]
+    assert "closed by the tick after the wind-down" in capsys.readouterr().out

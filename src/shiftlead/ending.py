@@ -40,6 +40,15 @@ def closer_words(s: Mapping[str, Any], names: Mapping[str, str] | None = None) -
         return "closed by you"
     if by == s.get("id"):
         return "closed itself"
+    if by == "tick" and c.get("why") == "wind_down":
+        # a Wind down's close names its presser from the record's mark (§4.9a *What it leaves*, TD-1898)
+        mark = s.get("wind_down")
+        presser = str(mark.get("by") or "") if isinstance(mark, Mapping) else ""
+        if presser == "person":
+            return "closed by the tick · after your Wind down"
+        if presser:
+            return f"closed by the tick · after {(names or {}).get(presser) or presser}'s Wind down"
+        return "closed by the tick · after a Wind down"
     if by == "tick":
         why = TICK_WHY.get(str(c.get("why") or ""))
         return "closed by the tick" + (f" · {why}" if why else "")
