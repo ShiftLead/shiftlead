@@ -137,6 +137,15 @@ def _stamped(mark: dict[str, Any], stopped: dict[str, str] | None) -> dict[str, 
 HELD_KEYS = ("seats_held", "seats_held_by", "seats_held_at")
 
 
+def _after(a: Any, b: Any, *, equal: bool = False) -> bool:
+    """Whether instant `a` is later than `b` (or the same, with `equal`); False where either does not parse."""
+    try:
+        x, y = _parse(str(a)), _parse(str(b))
+    except (TypeError, ValueError):
+        return False
+    return x >= y if equal else x > y
+
+
 def _lane_ids(mark: dict[str, Any]) -> bool:
     """Whether a `work_waiting` mark names any reference under its `members` — lane news or a question's end; a
     held-only mark names none."""
@@ -3487,6 +3496,9 @@ class TickMixin:
             if first is not None:
                 firsts[team] = first
         self._finished_first = firsts
+        live = [r for rs in by_team.values() for r in rs if r.state not in work_mod.DEAD]
+        marked = {self._address(r) for r in live if r.wind_down}
+        self._wind_first = {a: w for a, w in self._wind_first.items() if a in marked}  # a mark gone, or its record
         for team in [t for t in self._finished_owed if t not in by_team]:
             del self._finished_owed[team]  # its records are forgotten: nothing left to announce
 
@@ -3507,6 +3519,7 @@ class TickMixin:
             "controllers": self._ctl(r),
             "out_of_work": r.out_of_work,
             "restart_wanted": r.restart_wanted,
+            "wind_down": r.wind_down,
             "subagents_live": agent_common.subagents_live(r, now),
             "shells_live": agent_common.shells_live(r, now),
             "prs_waiting": r.prs_waiting(home=self.host),
@@ -3521,13 +3534,25 @@ class TickMixin:
         """One team's pass of rule 9: when its reading first held, to keep for the next tick, or None
         when it does not hold or the wind-down is over."""
         by_address = {self._address(r): r for r in records}
-        views = [self._finished_view(r, now) for r in records]
-        mine = [v for v in views if v["unattended"] is not False and not v["superseded_by"]]
-        top = work_mod.manager_of(mine)
-        manager = by_address[top["id"]] if top is not None else None
-        members = [
-            by_address[v["id"]] for v in mine if v["seat"] is None and v is not top and v["state"] not in work_mod.DEAD
-        ]
+
+        def read() -> tuple[list[dict[str, Any]], dict[str, Any] | None, Session | None, list[Session]]:
+            views = [self._finished_view(r, now) for r in records]
+            mine = [v for v in views if v["unattended"] is not False and not v["superseded_by"]]
+            top = work_mod.manager_of(mine)
+            manager = by_address[top["id"]] if top is not None else None
+            members = [
+                by_address[v["id"]]
+                for v in mine
+                if v["seat"] is None and v is not top and v["state"] not in work_mod.DEAD
+            ]
+            return views, top, manager, members
+
+        views, top, manager, members = read()
+        if await self._wind_down_close(members, now):
+            views, top, manager, members = read()  # its closes are read before anything below
+        marked = self._run_marks(team, records, top)
+        if marked:
+            self._finished_owed.pop(team, None)  # a Wind down's ending: nothing is owed by the reading (TD-1898)
         first = self._finished_first.get(team)
         led = manager is not None and manager.state not in work_mod.DEAD
         if (
@@ -3556,6 +3581,7 @@ class TickMixin:
                 or asked.get(self._address(m))
                 or held.get(self._address(m))
                 for m in members
+                if not m.wind_down  # a marked member is the wind-down close's alone (TD-1898)
             ):
                 manager.finished_sent_at = None
                 self._save(manager)
@@ -3564,7 +3590,8 @@ class TickMixin:
                 return None
             for m in members:
                 # one left open with work is closed once it is pushed, the manager live or gone
-                await self._finished_close(m)
+                if not m.wind_down:
+                    await self._finished_close(m)
             if manager.state in work_mod.DEAD:
                 if manager.state == "closed" and not work_mod.closed_finished(manager):
                     # it closed itself, as the line asked: the mark is what lets the team read
@@ -3598,11 +3625,13 @@ class TickMixin:
         if manager is None or manager.state in work_mod.DEAD:
             if left:
                 # one left open with work: the note waits for the tick that finds the last one gone,
-                # kept in memory as the settle is, so a close by a person is announced too (TD-256)
-                self._finished_owed.setdefault(team, first)
+                # kept in memory as the settle is, so a close by a person is announced too (TD-256);
+                # never for a Wind down's team, whose ending the person or a session already made (TD-1898)
+                if not marked:
+                    self._finished_owed.setdefault(team, first)
                 return first
             self._finished_owed.pop(team, None)
-            if closed and not work_mod.closed_finished(manager):
+            if closed and not marked and not work_mod.closed_finished(manager):
                 # nobody live to tell; one rule 9 closed was announced then, and is never told twice
                 self._finished_tell(team, records, manager, first)
                 await self._push_changes()
@@ -3628,6 +3657,60 @@ class TickMixin:
             self._save(manager)
             await self._push_changes()
         return first
+
+    async def _wind_down_close(self, members: list[Session], now: datetime) -> bool:
+        """Rule 9's wind-down close (design §4.9a *A wind-down closes its members*, §6 rule 9 *A wind-down's
+        close*, TD-1898): each live member carrying a Wind down's mark (`members` leaves out the manager, whose
+        mark is inert, and the seats), idle with no live subagent and no live shell, is closed through
+        `_finished_close(why="wind_down")` once it has settled — its mark's `waits` false (nothing was sent);
+        or a turn after the mark's `at`, then `SEND_STALL_SECONDS` idle on the home's clock; or `WRAPUP_GRACE`
+        past the first tick that read the mark — whatever `work.finished` reads. One the close leaves open is
+        tried again each tick, never killed. True when it closed one."""
+        closed = False
+        for m in members:
+            mark = m.wind_down
+            if not isinstance(mark, dict) or m.seat is not None or not m.unattended:
+                continue
+            addr, at = self._address(m), str(mark.get("at") or "")
+            kept = self._wind_first.get(addr)
+            if kept is None or kept["at"] != at:
+                kept = self._wind_first[addr] = {"at": at, "seen": now, "idle": None}  # a mark new, or moved
+            idle = (
+                m.state == "idle" and not agent_common.subagents_live(m, now) and not agent_common.shells_live(m, now)
+            )
+            if not (idle and _after(m.turn_at, at)):
+                kept["idle"] = None  # not idle, or no turn since the wrap-up's yet: the idle window starts again
+            elif kept["idle"] is None:
+                kept["idle"] = now
+            if not idle:
+                continue
+            quiet = kept["idle"] is not None and (now - kept["idle"]).total_seconds() >= agent_common.SEND_STALL_SECONDS
+            settled = mark.get("waits") is False or quiet or now - kept["seen"] >= agent_common.WRAPUP_GRACE
+            if settled and await self._finished_close(m, why="wind_down"):
+                log.info("rule 9: %s settled after its Wind down — closed", m.name)
+                self._wind_first.pop(addr, None)
+                closed = True
+        return closed
+
+    def _run_marks(self, team: str, records: list[Session], top: dict[str, Any] | None) -> list[Session]:
+        """The team's records carrying a member's Wind down mark of this run (§4.9a *A mark counts for its run
+        only*, TD-1898): unattended, not superseded, not a seat, not the record `work.manager_of` names (`top`,
+        its view), whose mark is inert; live, or ended (`work.record_end`) at or after the home's
+        `teams.<team>.started_at`, or with no end written — every mark where the host record holds no start."""
+        teams = self._host_rec.get("teams")
+        rec = teams.get(team) if isinstance(teams, dict) else None
+        start = rec.get("started_at") if isinstance(rec, dict) else None
+        out = []
+        for r in records:
+            if not r.wind_down or not r.unattended or r.superseded_by or r.seat is not None:
+                continue
+            if top is not None and self._address(r) == top["id"]:
+                continue
+            end = work_mod.record_end(r) if r.state in work_mod.DEAD else None
+            if start and end and not _after(end, str(start), equal=True):
+                continue
+            out.append(r)
+        return out
 
     async def _finished_close(self, s: Session, why: str = "finished") -> bool:
         """Rule 9's close, under the wrap-up's own safety check in the tick's form (rule 2's): only an
@@ -3657,7 +3740,12 @@ class TickMixin:
         the person — the pull requests the members reported `done` since the team's start, the
         earliest `created` among its records that are not superseded, and each member's
         `out_of_work.why` — written only when no `note` from the manager reached the person inbox
-        since the reading first held, so a team that dissolves is never quiet and never told twice."""
+        since the reading first held, so a team that dissolves is never quiet and never told twice. Nothing is
+        written for a team the person wound down (a member's mark of this run whose `by` is `person`, TD-1898):
+        the person ended it, and the page said so."""
+        top = {"id": self._address(manager)} if manager is not None else None
+        if any((r.wind_down or {}).get("by") == "person" for r in self._run_marks(team, records, top)):
+            return
         if manager is not None:
             sender = self._address(manager)
             for e in self.person_inbox:

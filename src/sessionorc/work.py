@@ -402,6 +402,9 @@ def finished(
       (rule 1's crash), or dead with `restart_wanted` (rule 2's), **blocks** the reading until that
       rule has acted, since a team about to have a member back has not finished; any other dead
       record, and a superseded one, is passed over;
+    - a **member** carrying a Wind down's mark (`wind_down`, §4.9a *A wind-down closes its members*, TD-1898) is,
+      live, *grinder-ao-1 winding down* in place of every test below, and, ended, passed over as a sat-out one is;
+      the manager's own mark is inert and read as above;
     - a live member **waiting** on the person — `waiting` (`waiting_of` over the person inbox) holds
       a question from it, keyed by its `id` — blocks the reading whatever it declared, its clause
       naming the reference and the bound (§4.9a *Waiting is read, never declared*, TD-274). A
@@ -443,6 +446,12 @@ def finished(
                 why.append(f"{name} idle, subagent live")
             elif shell:
                 why.append(f"{name} idle, shell live")
+            continue
+        if _f(r, "wind_down"):
+            # a member's Wind down mark (§4.9a *A wind-down closes its members*, TD-1898): live, it is being wound
+            # down whatever it declared, and only the tick's own close ends it; ended, it is passed over
+            if live:
+                why.append(f"{name} winding down")
             continue
         wants, out = _said(r, "restart_wanted"), _said(r, "out_of_work")
         asked = (waiting or {}).get(str(_f(r, "id"))) if live else None
