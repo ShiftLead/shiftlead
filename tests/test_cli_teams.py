@@ -131,9 +131,16 @@ def world(tmp_path, monkeypatch):
                 s["relaunch"] = {"at": "now", **({"name": n} if (n := params["launch"].get("name")) else {})}
                 s["seat"] = params["launch"].get("seat")  # written on the record at once (TD-1435)
             return s
-        if method in ("send", "kill", "close"):
+        if method in ("send", "kill", "close", "mark_wind_down"):
             if (why := state.get("refuse", {}).get(params["id"])) is not None:
                 raise cli.AgentError(why)
+            if method == "mark_wind_down":
+                return None
+            if method == "send" and params["id"] in state.get("brief_held", ()):  # the send's own kill (TD-1637)
+                for s in state["sessions"]:
+                    if s["id"] == params["id"]:
+                        s["state"] = "exited"
+                return {"id": params["id"], "state": "exited", "brief_killed": True}
             for s in state["sessions"]:
                 if s["id"] == params["id"]:
                     s["state"] = "idle" if method == "send" else "closed"
@@ -727,6 +734,9 @@ def test_stop_wraps_the_members_up_before_the_lead_and_now_kills(world, capsys):
         "ao-shiftlead-grind-1", "ao-shiftlead-grind-2", "ao-shiftlead-hunt", "ao-shiftlead-orc-ao",
     ]  # fmt: skip
     assert all(p["text"] == teams.WRAPUP_PROMPT and p["wrapup"] is True for p in sent)  # holds the doorbell off
+    # each member's wrap-up carries the Wind down's mark, never the lead's (§4.9a, TD-1898)
+    assert [p["id"] for p in sent if p.get("wind_down")] == [p["id"] for p in sent[:3]]
+    assert "wind_down" not in sent[3]
     assert "wrap-up sent" in capsys.readouterr().out
     state["calls"].clear()
     for s in state["sessions"]:
@@ -784,7 +794,28 @@ def test_a_finished_member_gets_no_wrap_up_prompt_and_is_closed(world, capsys, m
     assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
     assert [p["id"] for m, p in state["calls"] if m == "send"] == ["ao-shiftlead-grind-2", "ao-shiftlead-hunt"]
     assert "ao-shiftlead-grind-1" in [p["id"] for m, p in state["calls"] if m == "close"]
-    assert "finished (out of work), nothing sent, closed" in capsys.readouterr().out
+    # a Wind down marks it, so rule 9 closes it once it settles (§4.9a *A wind-down closes its members*, TD-1898)
+    assert [p["id"] for m, p in state["calls"] if m == "mark_wind_down"] == ["ao-shiftlead-grind-1"]
+    assert "finished (out of work), marked, closed" in capsys.readouterr().out
+
+
+def test_a_wind_down_names_a_brief_kill_and_a_refused_mark_apart(world, capsys, monkeypatch):
+    """§4.9a *A wind-down closes its members* (TD-1898): a member whose brief was not in is killed by the
+    send itself and reads *killed (brief not in)*, never *wrap-up sent*; a finished member whose mark is
+    refused is named *refused: <why>*, and the rest of the team is still wound down."""
+    tmp_path, state = world
+    started(state)
+    capsys.readouterr()
+    by_id = {s["id"]: s for s in state["sessions"]}
+    by_id["ao-shiftlead-grind-1"].update(state="idle", out_of_work={"at": "2026-09-17T06:00:00Z", "why": "x"})
+    state["refuse"] = {"ao-shiftlead-grind-1": "ao-shiftlead-grind-1@n1: n1 is unreachable"}
+    state["brief_held"] = {"ao-shiftlead-grind-2"}
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-shiftlead-orc-ao")
+    assert cli.main(["team", "stop", "ao-grind", "--timeout", "0"]) == 0
+    out = capsys.readouterr().out
+    assert "refused: ao-shiftlead-grind-1@n1: n1 is unreachable" in out
+    assert "killed (brief not in)" in out
+    assert [p["id"] for m, p in state["calls"] if m == "send"] == ["ao-shiftlead-grind-2", "ao-shiftlead-hunt"]
 
 
 @pytest.mark.parametrize("close", [False, True])
@@ -808,7 +839,8 @@ def test_an_out_of_work_member_with_unread_mail_is_not_called_finished(world, ca
     if close:
         assert "closed with 2 unread, kept for the name's next start" in out
     else:
-        assert "out of work, 2 unread — left idle for the doorbell" in out
+        assert "out of work, 2 unread — marked, closed once it settles, mail kept" in out
+    assert [p["id"] for m, p in state["calls"] if m == "mark_wind_down"] == ["ao-shiftlead-grind-1"]
 
 
 def test_close_needs_proof_of_pushed_not_an_absent_count(world, capsys):

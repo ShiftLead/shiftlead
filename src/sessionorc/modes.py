@@ -131,7 +131,7 @@ IDS = frozenset({"td_next", "td_take"})
 RANKS = frozenset({"rank_move"})
 # What a session may do to itself offline, and a person to any session on this host: the node is
 # the single tmux writer for its host, whether or not home can be reached.
-NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "create", "seen", "decide", "hook"})
+NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "create", "seen", "decide", "hook", "mark_wind_down"})
 # What a person's request forwarded from a node may do only to that node's records (design §4.4a:
 # "a person's request arriving over a link (no caller) may act only on that node's records"):
 # every act and every home-owned edit, a create for another host, and a delete from an inbox — and

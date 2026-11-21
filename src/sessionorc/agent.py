@@ -3547,7 +3547,8 @@ class HostAgent(
             # a session whose brief (and the start hooks' text riding it) is not in never began its work:
             # a wrap-up stops it, as a stop time does one with no wrap-up prompt, the press's own kill
             # (§4.3 *No send until it is in*, TD-1637) — before a dialog's refusal and before any stamp
-            return await self.rpc_kill(id, caller=caller)
+            # its view says why, so a Wind down names it *killed (brief not in)*, never *wrap-up sent* (TD-1898)
+            return {**await self.rpc_kill(id, caller=caller), "brief_killed": True}
         if s.pending and s.pending.pane_held:
             # a subagent's dialog is not drawn while the hook blocks (§4.2 *A subagent's dialog is held
             # back*, TD-950): the buttons are its one channel until the deadline, never the terminal
@@ -3654,6 +3655,29 @@ class HostAgent(
         else:
             s.wind_down = None  # a controller's new instruction: a run carrying on, as `wrapup_at` is cleared
         self._save(s)
+
+    async def rpc_mark_wind_down(self, id: str, caller: Any = None) -> dict[str, Any]:
+        """A Wind down's mark on a finished member it sends nothing (design §4.9a *A wind-down closes its
+        members*, TD-1898): declared and settled, so no wrap-up is typed, and `{at, by, waits: false}` is
+        written for rule 9 to close it once it settles. An acting call (`mail.ACTING_RPCS`), so the gate
+        checks it as `send`'s; routed to a node's member as `send` is. `by` is the caller's, as `closer_of`
+        reads it, a `person` already there kept; on a record already marked `at` stays, since it moves only where a
+        new wrap-up is sent. Only an unattended record is marked, never a seat."""
+        s = self._get(id)
+        if s.state in ("closed", "exited"):
+            raise RpcError(f"{s.id} is {s.state}: a Wind down marks only a live member")
+        if s.seat is not None:
+            raise RpcError(f"{s.name} holds a seat: a Wind down marks a member, never a seat (design §4.9a)")
+        if not s.unattended:
+            raise RpcError(f"{s.name} is a person's session: a Wind down never marks it (design §4.9a)")
+        by = closer_of(caller, None, "")["by"]
+        if (s.wind_down or {}).get("by") == "person":
+            by = "person"  # a second Wind down by a session keeps the person's word
+        at = (s.wind_down or {}).get("at") or now_iso()  # nothing is sent, so a mark's clock stays where it was
+        s.wind_down = {"at": at, "by": by, "waits": False}
+        self._save(s)
+        await self._push_changes()
+        return s.view()
 
     def _team_manager(self, team: str | None) -> str | None:
         """The address of the record `work.manager_of` reads as `team`'s manager, over the team's records as
