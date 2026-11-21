@@ -18,6 +18,7 @@ A flow says how a ledger entry moves from filed to done. It is one YAML file. Yo
 ```yaml
 format: 2
 name: my-flow
+max-moves: 25                  # optional: see "A limit"
 stages:
   - name: Build                # free text, unique in the flow
     model: sonnet              # haiku, sonnet, opus or fable (cheapest to strongest)
@@ -57,7 +58,10 @@ What the less obvious outcomes mean:
   A stage with nothing else to do is then passed without starting a session. Which paths are protected is
   the repo's setting, not the flow's.
 
-Every stage can also end as `stuck` (the session cannot go on). Its destination is the stage's `stuck:` key.
+Every stage can also end as `stuck` (the session cannot go on). Its destination is the stage's `stuck:` key;
+a stage with no `stuck:` key sends a stuck entry to the person.
+
+A design's builds are separate entries: the design files them, and each starts as a new entry of its own.
 
 ## Destinations
 
@@ -74,7 +78,12 @@ outcome out is allowed, and is the usual way to hand a rare case to the person.
 ### A limit
 
 `{to: build, limit: 3}` means: this entry may take this move 3 times; a 4th time it goes to the person
-instead. The count is per entry and per move. A limit may sit on any move to a stage.
+instead. So "show me after three rounds of changes" is `limit: 2`, because the third is the one the person
+sees. The count is per entry and per move. A limit may sit on any move to a stage.
+
+`max-moves`, at the top of the file, caps the whole trip: after that many moves between stages, an entry
+goes to the person wherever it is. It is 25 when you leave it out. Set it lower when several limited loops
+together could keep an entry travelling longer than you want.
 
 ### The person
 
@@ -105,6 +114,8 @@ another stage sends it.
   `branch-pushed` and `not-needed` to `next-action`.
 - **A second try on a stronger model:** a second stage with the same action and another model; send the
   first stage's `stuck` to it with `limit: 1`.
+- **Do not spend a strong model on merging:** a stage whose only action is `review-protected` is passed
+  with no session when there is nothing to read; put `merge` in a stage of its own on a cheap model after it.
 
 ## Rules the check enforces
 
@@ -120,6 +131,9 @@ another stage sends it.
 7. Each kind of new entry has exactly one way in.
 8. Stage names are unique; every stage has a model from the list and at least one action.
 9. Every stage can be reached: by `takes`, or as some outcome's destination.
+10. `max-moves`, when given, is a whole number of 2 or more.
+
+The check warns, without failing, when a reviewing stage uses the same model as a stage that writes.
 
 When a flow is OK the check also prints what goes to the person, so you can see whether that is what you meant.
 

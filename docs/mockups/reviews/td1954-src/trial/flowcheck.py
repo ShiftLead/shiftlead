@@ -26,10 +26,13 @@ def check(doc):
     if not isinstance(doc, dict) or not isinstance(doc.get("stages"), list) or not doc["stages"]:
         return ["the file needs a `stages:` list with at least one stage"], info
     for k in doc:
-        if k not in ("format", "name", "stages"):
+        if k not in ("format", "name", "stages", "max-moves"):
             bad.append(f"unknown key at the top: `{k}`")
     if doc.get("format") != 2:
         bad.append("`format: 2` is required")
+    mm = doc.get("max-moves", 25)
+    if not isinstance(mm, int) or isinstance(mm, bool) or mm < 2:
+        bad.append("`max-moves` is a whole number, 2 or more (rule 10)")
     stages, takes = {}, {"design-first": [], "other": []}
     for i, st in enumerate(doc["stages"], 1):
         if not isinstance(st, dict) or not st.get("name"):
@@ -163,6 +166,12 @@ def check(doc):
     for key, st in stages.items():
         if key not in entered:
             bad.append(f"{st['name']}: nothing can reach this stage (rule 9)")
+    wm = {doc_st.get("model") for doc_st in doc["stages"] if isinstance(doc_st, dict) and set(stages.get(slug(doc_st.get("name", "")), {}).get("names", [])) & WRITES}
+    for doc_st in doc["stages"]:
+        st = stages.get(slug(doc_st.get("name", ""))) if isinstance(doc_st, dict) else None
+        if st and set(st["names"]) & READS and doc_st.get("model") in wm:
+            info.append(f"warning: {st['name']} reviews on {doc_st.get('model')}, the same model as a stage that writes")
+    info.append(f"an entry goes to the person after {mm} moves between stages, wherever it is")
     for st in stages.values():
         if st["asks"]:
             info.append(f"{st['name']}: goes to the person on {', '.join(st['asks'])}")
