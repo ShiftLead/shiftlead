@@ -784,10 +784,11 @@ def items_n(wants: Mapping[str, Any]) -> int:
     """The items on a card that count for the header's **Start session** (§4.5 screen 12 *Started from the header
     on a card with items*, TD-1338, built by TD-1340): every Decide and Do item but a red PR or a fork's PR, one
     whose entry another session holds included, and every item *with you in <name>*; an item *answered — waiting
-    on <asker>*, in `wants['answered']`, only where it draws its Start session (`starts`, no other session holding
-    its entry, TD-1843) — an *applying*, *waits until* or *handed to <seat>* item never. With one the item's button is
-    the header's; with two or more the header draws its own beside them, and its press walks them all. A stopped
-    holder's state row and a stuck row are outside them (TD-1468, TD-1497)."""
+    on <asker>*, in `wants['answered']`, only where no other session holds its entry (`starts`, TD-1843; beside a
+    holder it draws its button all the same, TD-1984, but does not count) — an *applying*, *waits until* or
+    *handed to <seat>* item never. With one the item's button is the header's; with two or more the header draws
+    its own beside them, and its press walks them all. A stopped holder's state row and a stuck row are outside them
+    (TD-1468, TD-1497)."""
     n = sum(
         1
         for w in WANTS
@@ -799,7 +800,8 @@ def items_n(wants: Mapping[str, Any]) -> int:
 
 def walk_mine(mine: Iterable[str], wants: Mapping[str, Any]) -> list[str]:
     """*waits on me* on the header's press that walks the card (TD-1340): the same ids but an entry whose item is
-    in `wants['answered']` and draws no Start session (TD-1843), which waits on its asker, not the person."""
+    in `wants['answered']` and does not count (`starts`, TD-1843: another session holds its entry, TD-1984), which
+    waits on its asker, not the person."""
     gone = {str(m.get("item") or "") for m in wants.get("answered") or () if not m.get("starts")}
     gone |= set(wants.get("hidden") or ())  # an item given way to its outcome (TD-1843)
     return [m for m in mine if m not in gone]
@@ -952,7 +954,8 @@ def attach(
             return
         # starts no session (TD-1246, TD-1292, TD-1468, TD-1497)
         pr_row = e.get("row") in ("red_pr", "fork_pr", "stuck", *HOLDER_ROWS) or stuck_line(e)
-        # an item *answered — waiting on <asker>* draws one too, where no other session holds its entry (TD-1843)
+        # an item *answered — waiting on <asker>* draws one too (TD-1843), beside a holder as any item's (TD-1984);
+        # it counts only where no other session holds its entry (`starts`, below)
         waiting = want == "answered" and answered_case(e) == "waiting"
         go = (
             start(card, ref, str(e.get("on_row") or ""))
@@ -979,8 +982,9 @@ def attach(
                 # …and a decided line moved there while stuck, drawn as the stuck row (TD-1497 slice 2)
                 **({"stuck": True} if e.get("row") == "stuck" or stuck_line(e) else {}),
                 "running": sec == "steering",
-                # an *answered — waiting on <asker>* item that draws its Start session counts (TD-1843)
-                **({"starts": True} if waiting and go else {}),
+                # an *answered — waiting on <asker>* item counts where no other session holds its entry (TD-1843,
+                # TD-1984): its button is drawn beside a holder, its count is not
+                **({"starts": True} if waiting and go and not go.get("held") else {}),
                 "on_row": e["on_row"],
                 # the design PR it links, *· design #n* (TD-1531), and its synopsis (TD-1536)
                 **({"design_pr": e["design_pr"]} if e.get("design_pr") else {}),
@@ -1219,15 +1223,44 @@ def same_td(a: Any, b: Any) -> bool:
     return a == b
 
 
+# the name of the person's own session started **beside another holder** (§4.5 screen 12 *Beside another holder*,
+# TD-1984): `with-td-<n>`, else `with-td-<n>-<k>` for the second to the ninth, tested on the lower-cased name
+BESIDE_RE = re.compile(r"^with-td-(\d+)(?:-[2-9])?$")
+
+
+def beside_td(name: Any, ref: Any) -> bool:
+    """`name` is a `with-td-` name (`BESIDE_RE`) on `ref`, its digits compared through `same_td` as `TD-<digits>`
+    (so `with-td-1` never meets `TD-12`, and `with-td-012` is `TD-12`)."""
+    m = BESIDE_RE.fullmatch(str(name or "").lower())
+    return bool(m) and same_td(f"TD-{m.group(1)}", ref)
+
+
+def claim_on(s: Mapping[str, Any], ref: str) -> Mapping[str, Any] | None:
+    """The record's live claim on `ref` (`same_td`, so `TD-9` meets `TD-009`), or None."""
+    return next(
+        (
+            p
+            for p in s.get("progress") or ()
+            if isinstance(p, Mapping) and same_td(p.get("ref"), ref) and p.get("status") == "claimed"
+        ),
+        None,
+    )
+
+
 def card_session(card: Mapping[str, Any], fleet: Iterable[Mapping[str, Any]] | None, on: str = "") -> dict[str, Any]:
     """Who a card's **Start session** meets (§4.5a *Queue card: Start session / Open session*, TD-912), one answer
     the button and `/api/ledger/start` both read: `start`, the reading's entry to start on; `own`, the person's
     own session (`unattended: false`) holding any of the card's open entries — the one holding `start`, else the
-    first by id — whose Focus the press opens; `other`, the name of any other live session holding `start` while
-    none of the person's does, when the button is absent and a press is refused. A session holds an entry by its
-    claim, or by the name `td-<n>` in the entry's repo before the tick derives the claim (TD-678). `on` is the entry
-    an item's press starts on where that is not `start` (§4.5 screen 12 *Started from an item*, TD-1246): the
-    holder rules read it in `start`'s place, so `other` is its holder and `own` the one holding it first.
+    first by id — whose Focus the press opens; `other`, while none of the person's is on the card, the holder of
+    `start` as a small dict (`id`, `name`, its claim's `branch`, `pr` and `review_pr`, the record's `git_branch`):
+    the first live record by id whose claim holds it, else the live session named `td-<n>` — `{}` with none. It
+    hides no button: a press beside it starts the person's own session beside it (§4.5 screen 12 *Beside another
+    holder*, TD-1984), and the prompt's holder sentence reads it. A session holds an entry by its claim, or by the
+    name `td-<n>` in the entry's repo before the tick derives the claim (TD-678); the person's own live session
+    named `with-td-<n>` or `with-td-<n>-<k>` (`beside_td`) also counts as theirs there — the button's marker alone,
+    never a holder. `on` is the entry an item's press starts on where that is not `start` (§4.5 screen 12 *Started
+    from an item*, TD-1246): the holder rules read it in `start`'s place, so `other` is its holder and `own` the one
+    holding it first.
 
     A card with no `start` is a **completed card** (§4.5 screen 12 *Three verbs: An item on a kept card*, TD-1618):
     the `queue` reading's or `_kept_card`'s, whose `ids` are the archived entries a session may hold. There `own`
@@ -1244,46 +1277,53 @@ def card_session(card: Mapping[str, Any], fleet: Iterable[Mapping[str, Any]] | N
         ]
     live = [s for s in fleet or () if s.get("state") not in ("exited", "closed") and s.get("repo")]
 
-    def holders(q: str) -> list[Mapping[str, Any]]:
+    def of(q: str) -> tuple[str, list[Mapping[str, Any]]]:
         repo, _, ref = q.partition("#")
-        return [
-            s
-            for s in live
-            if Path(str(s["repo"])).name == repo
-            and (
-                same_td(str(s.get("name") or "").upper(), ref)
-                or any(
-                    isinstance(p, Mapping) and same_td(p.get("ref"), ref) and p.get("status") == "claimed"
-                    for p in s.get("progress") or ()
-                )
-            )
-        ]
+        return ref, [s for s in live if Path(str(s["repo"])).name == repo]
+
+    def holders(q: str) -> list[Mapping[str, Any]]:
+        ref, here = of(q)
+        return [s for s in here if same_td(str(s.get("name") or "").upper(), ref) or claim_on(s, ref) is not None]
 
     def mine(ss: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
         return sorted((s for s in ss if not s.get("unattended")), key=lambda s: str(s.get("id")))
 
     def laned(q: str) -> list[Mapping[str, Any]]:  # a kept card's marker: the person's own session's lane
-        repo, _, ref = q.partition("#")
-        return [
-            s
-            for s in live
-            if not s.get("unattended")
-            and Path(str(s["repo"])).name == repo
-            and any(same_td(x, ref) for x in s.get("lane") or ())
-        ]
+        ref, here = of(q)
+        return [s for s in here if not s.get("unattended") and any(same_td(x, ref) for x in s.get("lane") or ())]
+
+    def beside(q: str) -> list[Mapping[str, Any]]:  # the person's own `with-td-` session: the button's marker
+        ref, here = of(q)
+        return [s for s in here if not s.get("unattended") and beside_td(s.get("name"), ref)]
 
     def marks(q: str) -> list[Mapping[str, Any]]:  # the sessions that count as the person's on `q`, and others
-        return [*holders(q), *(laned(q) if kept else ())]
+        return [*holders(q), *beside(q), *(laned(q) if kept else ())]
+
+    def holder(q: str) -> dict[str, Any]:  # the first claimer by id, else the live `td-<n>`
+        ref, here = of(q)
+        by_id = sorted(here, key=lambda s: str(s.get("id")))
+        s = next((s for s in by_id if claim_on(s, ref) is not None), None)
+        s = s or next((s for s in here if same_td(str(s.get("name") or "").upper(), ref)), None)
+        if s is None:
+            return {}
+        p = claim_on(s, ref) or {}
+        git = s.get("git") if isinstance(s.get("git"), Mapping) else {}
+        return {
+            "id": str(s.get("id") or ""),
+            "name": str(s.get("name") or s.get("id") or ""),
+            "branch": str(p.get("branch") or ""),
+            "pr": p.get("pr") or None,
+            "review_pr": p.get("review_pr") or None,
+            "git_branch": str(git.get("branch") or ""),
+        }
 
     on = on or start
-    on_start = holders(on) if on else []
     own = mine(marks(on)) if on else []
     own = own or mine(s for r in rows for s in marks(str(r.get("qid") or "")))
-    other = on_start[0] if on_start and not own else {}
     return {
         "start": start,
         "own": str(own[0]["id"]) if own else "",
-        "other": str(other.get("name") or other.get("id") or ""),
+        "other": holder(on) if on and not own else {},
     }
 
 
@@ -1299,9 +1339,10 @@ def item_start(
     """What an item's **Start session** / **Open session** on a card sends and reads (§4.5 screen 12 *Started from
     an item*, TD-1246): `{item, repo, ref, card, own}` — the entry it starts on (a ledger item's own where it is one
     of the card's Decide or Do entries, any other item the card's `start`) and the person's own session the press
-    opens — or `{}` where it draws no button: a red PR, a ledger item the road would refuse, or another session
-    holding the entry it starts on while none of the person's is on the card. On a **completed card** (one with no
-    `start`: a kept card, §4.5 screen 12 *Three verbs: An item on a kept card*, TD-1618) the item starts on
+    opens, and `held`, the name of another session holding that entry while none of the person's is on the card
+    (`card_session`'s `other`), beside which the press starts (§4.5 screen 12 *Beside another holder*, TD-1984) —
+    or `{}` where it draws no button: a red PR or a ledger item the road would refuse. On a **completed card** (one
+    with no `start`: a kept card, §4.5 screen 12 *Three verbs: An item on a kept card*, TD-1618) the item starts on
     `on_row`, the archived entry it is tied to, which must be one of the card's `ids`; a loose card draws none."""
     if not item or re.fullmatch(r"[\w.-]+#\d+", item):  # a red PR draws none
         return {}
@@ -1318,10 +1359,17 @@ def item_start(
                 return {}
             on = item
     met = card_session(card, fleet, on=on)
-    if met["other"]:
-        return {}
     repo, _, ref = on.partition("#")
-    return {"item": item, "repo": repo, "ref": ref, "card": str(card.get("id") or ""), "own": met["own"]}
+    return {
+        "item": item,
+        "repo": repo,
+        "ref": ref,
+        "card": str(card.get("id") or ""),
+        "own": met["own"],
+        # another session holds the entry it starts on: the button is drawn all the same and its press starts
+        # beside that holder (TD-1984); read by the answered item's count (`starts`) alone
+        "held": str(met["other"].get("name") or ""),
+    }
 
 
 def _mail_status(status: str, wants: Mapping[str, Any]) -> str:

@@ -30,7 +30,7 @@ from __future__ import annotations
 import copy
 import re
 import tomllib
-from collections.abc import Callable, Collection, Iterable, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from functools import lru_cache
 from importlib import resources
@@ -131,7 +131,7 @@ ENTRY_PLACEHOLDER = "{entry}"
 # not a brief — its first sentence `WORK_OPENING`'s by the chosen entry's `why_key` (its own slots the page it
 # was pressed on, the id, the repo and the ledger file), then the card's ids, waits on me and the rest.
 WORK_TEMPLATE = "work.md"
-WORK_SLOTS = ("{opening}", "{mine}", "{rest}")
+WORK_SLOTS = ("{opening}", "{mine}", "{rest}", "{held}")
 WORK_CARD = "{card}"  # filled last, after `WORK_SLOTS` (TD-1903)
 WORK_OPENING = {
     "yours": "I opened this session from the {where} to work {id} of {repo}'s ledger ({ledger}) myself: it waits "
@@ -159,6 +159,23 @@ WORK_ALL = (
     "I opened this session from the Queue to work through every item that waits on me on the card around {id} of "
     "{repo}'s ledger ({ledger}), one at a time: for each, read it, tell me its goal and what each answer leads to, "
     "and wait for my answer before the next."
+)
+# The holder sentence (design §4.5 screen 12 *Beside another holder*, TD-1984): another session holds the entry the
+# press starts on, so the person's session starts beside it; `{held}` ends `work.md`'s first line, empty with no
+# holder. `{name}` the holder, `{branch}` *on its branch <branch>* and `{review}` *, in review #m*, each "" with none;
+# on a kept card `WORK_HELD_TAKE`, the take-over clause, is left out (a claim on an archived entry is in no lane)
+WORK_HELD = (
+    "{id} is held by {name}{branch}{review}, so while it holds it, it is that session's work. Read its branch and its "
+    "PR, but never push to them, and open no PR of your own on {id}. Where it should change course, tell me what you "
+    "would write to it with `ao msg {name}`, and send it once I agree (where `ao msg` refuses, tell me instead)."
+)
+WORK_HELD_TAKE = (
+    " If it lets go (`ao repo` names who holds {id} now) and I ask you to take {id} over, declare a claim with "
+    "`ao progress claim {id}` first."
+)
+# The `card` key's first sentence beside a holder (TD-1984): the work is the holder's, so *look into*, never *work*
+WORK_CARD_BESIDE = (
+    "I opened this session from the Queue to look into the card around {id} of {repo}'s ledger ({ledger}) with me."
 )
 WORK_ITEM_READ = {"board:": " with `ao board show {item}`", "m-": " with `ao inbox --thread {item}`"}
 # A template's shape for a seat on call (design §6 *What is left is judgement, and a seat holds it*,
@@ -351,6 +368,7 @@ def work_text(
     kept: bool = False,
     card: Sequence[str] = (),
     added: str = "",
+    held: Mapping[str, Any] | None = None,
 ) -> str:
     """`work.md` filled: the opening prompt **Start session** sends (TD-678, TD-912). `why` a key of
     `WORK_OPENING` — *yours* (`Owner: paul`), *decision* (`decision (paul)`), *card* (any other entry a
@@ -362,9 +380,13 @@ def work_text(
     `card`, the card's block as `cardtext.card_block` builds it (TD-1903), fills `{card}` last, so no card line is
     read as a slot; with none the slot and its blank lines go. `added`, the person's own `work.md` additions
     (`shiftlead.layers.addition`, §4.8 *The person's own additions*, TD-1016), follows the package's text, each
-    part under the line naming its source; `""` adds nothing."""
+    part under the line naming its source; `""` adds nothing. `held`, the holder of the entry the press starts on
+    (`ui.queue.card_session`'s `other`: its `name`, its claim's `branch`, `pr` and `review_pr`, the record's
+    `git_branch`; TD-1984), fills `{held}` with `WORK_HELD` (*on its branch* the claim's branch, else the record's;
+    *in review* the claim's `pr`, else its `review_pr`), its take-over clause left out on a kept card, and the `card`
+    key's sentence reads `WORK_CARD_BESIDE`; with none `{held}` is empty."""
     text = resources.files("shiftlead").joinpath("briefs", WORK_TEMPLATE).read_text(encoding="utf-8")
-    opening = WORK_OPENING[why]
+    opening = WORK_CARD_BESIDE if held and why == "card" else WORK_OPENING[why]
     if item:
         read = next((r for k, r in WORK_ITEM_READ.items() if item.startswith(k)), "")
         read = read or (", in the ledger" if re.fullmatch(r"(?:[\w.-]+#)?TD-\d+", item) else "")
@@ -374,11 +396,30 @@ def work_text(
     for slot, value in (("{where}", where), ("{id}", id_), ("{repo}", repo), ("{ledger}", ledger)):
         opening = opening.replace(slot, value)
     ids = [", ".join(mine) or "none", ", ".join(rest) or "none"]
-    for slot, value in zip(WORK_SLOTS, (opening, *ids), strict=True):
+    for slot, value in zip(WORK_SLOTS, (opening, *ids, _held(held, id_, kept)), strict=True):
         text = text.replace(slot, value)
     # no card: the slot and its blank lines go, one paragraph as before the slot (TD-1903)
     text = text.replace(WORK_CARD, "\n".join(card)) if card else text.replace(f"\n\n{WORK_CARD}\n\n", " ")
     return _with(text.strip(), added)
+
+
+def _held(held: Mapping[str, Any] | None, id_: str, kept: bool) -> str:
+    """`{held}` filled: `" "` and `WORK_HELD` where another session holds `id_`, else `""` (TD-1984)."""
+    held = held or {}
+    name = str(held.get("name") or "")
+    if not name:
+        return ""
+    branch = str(held.get("branch") or held.get("git_branch") or "")
+    pr = held.get("pr") or held.get("review_pr")
+    text = WORK_HELD + ("" if kept else WORK_HELD_TAKE)
+    for slot, value in (
+        ("{branch}", f" on its branch {branch}" if branch else ""),
+        ("{review}", f", in review #{pr}" if pr else ""),
+        ("{name}", name),
+        ("{id}", id_),
+    ):
+        text = text.replace(slot, value)
+    return " " + text
 
 
 def _with(text: str, added: str) -> str:
