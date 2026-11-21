@@ -291,3 +291,18 @@ def test_closer_of_keeps_wound_down_by_from_the_tick_and_drops_it_from_a_session
     handed = {"by": "tick", "why": "finished", "wound_down_by": "person"}
     assert closer_of(None, handed, "t") == {"by": "tick", "why": "finished", "at": "t", "wound_down_by": "person"}
     assert closer_of("ao-t-manager", handed, "t") == {"by": "ao-t-manager", "why": None, "at": "t"}
+
+
+async def test_a_last_marked_close_after_the_managers_told_close_writes_no_second_note(agent, monkeypatch):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    g1 = _rec("g1", wind_down=_mark(now, by=MANAGER, waits=False), git={"branch": "w", "dirty": 1, "unpushed": 0})
+    manager = _manager(finished_sent_at=_iso(now))
+    home = _Home(agent, monkeypatch, g1, manager)
+    manager.set_state("closed", confidence="scraped")
+    manager.closed_at = _iso(now)
+    await agent._finished_closed_managers(now + timedelta(seconds=1))
+    assert work.closed_finished(manager) and len(home.notes()) == 1
+    g1.git = dict(CLEAN)
+    await agent._finished_pass(now + timedelta(seconds=2))
+    assert home.closed == ["g1"] and len(home.notes()) == 1, "told once"

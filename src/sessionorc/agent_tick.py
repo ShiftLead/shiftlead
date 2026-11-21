@@ -3547,6 +3547,7 @@ class TickMixin:
         if (
             wound
             and (manager is None or manager.state in work_mod.DEAD)
+            and not work_mod.closed_finished(manager)  # a manager rule 9 closed was told then, and never twice
             and not any(r.state not in work_mod.DEAD for r in marked)
         ):
             # with no live manager, the tick whose close leaves no live marked member is the one that tells
