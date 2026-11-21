@@ -1,4 +1,4 @@
-{opening} Its entries are: waits on me — {mine}; the rest — {rest}.
+{opening} Its entries are: waits on me — {mine}; the rest — {rest}.{held}
 
 {card}
 

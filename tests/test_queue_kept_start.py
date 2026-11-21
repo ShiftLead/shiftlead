@@ -116,7 +116,7 @@ def _live(rid: str, *refs: str, repo: str = "/x/samscrape", lane=(), unattended=
 def test_an_item_on_a_kept_card_starts_on_the_archived_entry_it_is_tied_to():
     c = _completed()
     got = item_start(c, "m-41", [], "samscrape#TD-031")
-    assert got == {"item": "m-41", "repo": "samscrape", "ref": "TD-031", "card": KEPT_ID, "own": ""}
+    assert got == {"item": "m-41", "repo": "samscrape", "ref": "TD-031", "card": KEPT_ID, "own": "", "held": ""}
     assert item_start(c, "board:91aa0c3e", [], KEPT_ID)["ref"] == "TD-030"
     assert item_start(c, "m-41", [], "samscrape#TD-099") == {}, "a row not of the card"
     assert item_start(c, "samscrape#12", [], KEPT_ID) == {}, "a red PR draws none"
@@ -138,12 +138,13 @@ def test_the_button_is_open_session_by_the_persons_name_claim_or_lane_on_any_ent
     # the person's session in another repo, its lane the same number: not theirs here
     elsewhere = _live("q", repo="/x/other", lane=["TD-031"])
     assert item_start(c, "m-41", [elsewhere], "samscrape#TD-031")["own"] == ""
-    # another session holding the item's entry by claim: no button
-    assert item_start(c, "m-41", [_live("g1", "TD-031", unattended=True, name="grinder-1")], "samscrape#TD-031") == {}
-    assert (
-        card_session(c, [_live("g1", "TD-031", unattended=True, name="grinder-1")], on="samscrape#TD-031")["other"]
-        == "grinder-1"
-    )
+    # another session holding the item's entry by claim: the button all the same, beside it (TD-1984)
+    g1 = _live("g1", "TD-031", unattended=True, name="grinder-1")
+    assert item_start(c, "m-41", [g1], "samscrape#TD-031")["held"] == "grinder-1"
+    assert card_session(c, [g1], on="samscrape#TD-031")["other"]["name"] == "grinder-1"
+    # the person's own `with-td-` session of the archived entry: Open session to it (TD-1984)
+    beside = _live("p", name="with-td-031")
+    assert item_start(c, "m-41", [g1, beside], "samscrape#TD-031")["own"] == "p"
 
 
 def test_an_open_cards_session_reads_no_lane():
@@ -229,12 +230,18 @@ def test_a_taken_name_answers_the_form_and_a_session_under_another_name_is_opene
     assert r.json() == {"ok": True, "focus": "ao-samscrape-review-31"} and created2 == []
 
 
-def test_another_holder_of_the_entry_refuses_the_press_and_a_workers_lane_does_not(tmp_path, monkeypatch):
+def test_another_holder_of_the_entry_starts_the_press_beside_it_and_a_workers_lane_marks_nothing(tmp_path, monkeypatch):
     held = _live("ao-samscrape-g1", "TD-31", unattended=True, name="grinder-1")
     repo, c, created = _start_world(tmp_path, monkeypatch, fleet=[MANAGER, held], queue=_kq(), inbox=[_ask()])
     held["repo"] = str(repo.resolve())
     r = _press(c, id="TD-031", item="m-41")
-    assert r.status_code == 409 and "held by grinder-1" in r.text and created == []
+    assert r.status_code == 200 and r.json()["name"] == "with-td-031", r.text  # never 409 *held by* (TD-1984)
+    (kw,) = created
+    assert kw["worktree"] == "with-td-031" and kw["lane"] == []
+    # the kept card's holder sentence leaves out its take-over clause, `<n>` the archived entry
+    assert "TD-031 is held by grinder-1, so while it holds it, it is that session's work." in kw["prompt"]
+    assert "If it lets go" not in kw["prompt"] and "ao progress claim" not in kw["prompt"]
+    created.clear()
     laned = _live("ao-samscrape-g2", lane=["TD-031"], unattended=True)
     repo, c, created = _start_world(tmp_path / "w", monkeypatch, fleet=[MANAGER, laned], queue=_kq(), inbox=[_ask()])
     laned["repo"] = str(repo.resolve())

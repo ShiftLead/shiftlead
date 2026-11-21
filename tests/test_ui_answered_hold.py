@@ -149,9 +149,10 @@ def _world(tmp_path, inbox, asks=(), fleet=FLEET):
 
 
 def test_the_card_draws_the_item_grey_and_counts_it_only_where_it_draws_start_session(tmp_path):
-    """TD-1843 (§4.5 screen 12 *A press is never left stranded*): an item *answered — waiting on <asker>* draws Start
-    session where no other session holds its entry, and only then counts for the header's rule and its walk; held
-    by its asker (the usual case) it draws none and counts for neither."""
+    """TD-1843 (§4.5 screen 12 *A press is never left stranded*): an item *answered — waiting on <asker>* counts for
+    the header's rule and its walk only where no other session holds its entry; held by its asker (the usual case)
+    it draws its Start session all the same, its press starting beside the asker (TD-1984), and counts for
+    neither."""
     from shiftlead.ui.queue import items_n, walk_mine
 
     v, drawn = _world(tmp_path, [_ask()])
@@ -162,12 +163,13 @@ def test_the_card_draws_the_item_grey_and_counts_it_only_where_it_draws_start_se
     assert e["want"] == "answered" and e["start"]["item"] == "r#TD-060"
     assert c["wants"]["answered"][0]["starts"] is True and c["items_start"] is True and c["items_n"] == 1
     assert walk_mine(["r#TD-060"], c["wants"]) == ["r#TD-060"], "in the walk while it draws its button"
-    # its asker holds it: no button, no count, out of the walk
+    # its asker holds it: the button beside it, no count, out of the walk (TD-1984)
     held = [{**FLEET[0], "unattended": True, "progress": [{"ref": "TD-60", "status": "claimed"}]}]
     v, drawn = _world(tmp_path, [_ask()], fleet=held)
     (c,) = v["up_next"]
     (e,) = drawn
-    assert e["want"] == "answered" and e["start"] == {} and c["wants"]["answered"][0]["kind"] == ""
+    assert e["want"] == "answered" and e["start"]["held"] and c["wants"]["answered"][0]["kind"] == ""
+    assert e["start"]["item"] == "r#TD-060" and not e["start"]["own"]
     assert "starts" not in c["wants"]["answered"][0] and c["items_start"] is False and items_n(c["wants"]) == 0
     assert walk_mine(["r#TD-060"], c["wants"]) == []
     from shiftlead.ui.app import templates
