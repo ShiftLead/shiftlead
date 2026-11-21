@@ -208,10 +208,14 @@ async def test_mark_wind_down_marks_a_finished_member_with_no_wait(agent, monkey
     assert w.wind_down["by"] == "ao-mgr" and w.wind_down["waits"] is False and w.wind_down["at"]
     assert view["wind_down"] == w.wind_down and agent.store.load(w.id).wind_down == w.wind_down
     assert winding(w) and not t.typed
+    at = w.wind_down["at"] = "2026-11-21T00:00:00Z"  # a second press sends nothing: the mark's clock stays
     await agent.rpc_mark_wind_down(id=w.id)
-    assert w.wind_down["by"] == "person"
+    assert w.wind_down == {"at": at, "by": "person", "waits": False}
     await agent.rpc_mark_wind_down(id=w.id, caller="ao-mgr")
-    assert w.wind_down["by"] == "person"
+    assert w.wind_down["by"] == "person" and w.wind_down["at"] == at
+    w.wind_down = {"at": at, "by": "person", "waits": True}  # sent the wrap-up, then declared and settled
+    await agent.rpc_mark_wind_down(id=w.id)
+    assert w.wind_down == {"at": at, "by": "person", "waits": False}
 
 
 async def test_mark_wind_down_refuses_a_seat_a_persons_session_and_a_closed_record(agent):

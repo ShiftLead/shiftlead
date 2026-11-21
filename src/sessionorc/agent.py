@@ -3661,7 +3661,8 @@ class HostAgent(
         members*, TD-1898): declared and settled, so no wrap-up is typed, and `{at, by, waits: false}` is
         written for rule 9 to close it once it settles. An acting call (`mail.ACTING_RPCS`), so the gate
         checks it as `send`'s; routed to a node's member as `send` is. `by` is the caller's, as `closer_of`
-        reads it, a `person` already there kept. Only an unattended record is marked, never a seat."""
+        reads it, a `person` already there kept; on a record already marked `at` stays, since it moves only where a
+        new wrap-up is sent. Only an unattended record is marked, never a seat."""
         s = self._get(id)
         if s.state in ("closed", "exited"):
             raise RpcError(f"{s.id} is {s.state}: a Wind down marks only a live member")
@@ -3672,7 +3673,8 @@ class HostAgent(
         by = closer_of(caller, None, "")["by"]
         if (s.wind_down or {}).get("by") == "person":
             by = "person"  # a second Wind down by a session keeps the person's word
-        s.wind_down = {"at": now_iso(), "by": by, "waits": False}
+        at = (s.wind_down or {}).get("at") or now_iso()  # nothing is sent, so a mark's clock stays where it was
+        s.wind_down = {"at": at, "by": by, "waits": False}
         self._save(s)
         await self._push_changes()
         return s.view()

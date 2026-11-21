@@ -2235,8 +2235,8 @@ def stop_members(call: Call, org: orgmod.Org, name: str, *, now: bool = False, c
     for s in members:
         if not now and s.get("out_of_work") and s["state"] in SETTLED:
             # Finished (§4.9a): it declared, and it is not mid-turn. There is nothing to wrap up, and
-            # a prompt would only start a turn that `--close` could then land in the middle of. Unread
-            # mail says it is not finished for these words: the doorbell rings it (§4.9, TD-1051)
+            # a prompt would only start a turn that `--close` could then land in the middle of. It is marked
+            # instead, closed once it settles, its unread mail kept for the name's next start (§4.9, TD-1898)
             st.acted.append(_mark_finished(call, s))
             continue
         st.acted.append(_stop_one(call, s, "member", now=now))
