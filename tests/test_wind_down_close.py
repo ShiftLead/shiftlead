@@ -211,3 +211,83 @@ async def test_a_sessions_wind_down_still_tells_the_person(agent, monkeypatch):
     manager.finished_sent_at = _iso(now + FINISHED_SETTLE)
     await agent._finished_pass(now + FINISHED_SETTLE + WRAPUP_GRACE)
     assert home.closed == ["g1", "manager"] and len(home.notes()) == 1, "only the person's press holds it back"
+
+
+async def test_a_session_press_tells_the_manager_and_the_person_in_wound_down_words(agent, monkeypatch):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    g1 = _rec("g1", wind_down=_mark(now, by=MANAGER, waits=False))  # undeclared
+    g2 = _rec("g2", wind_down=_mark(now, by=MANAGER, waits=False), out_of_work={"at": _iso(now), "why": "all done"})
+    manager = _manager()
+    home = _Home(agent, monkeypatch, g1, g2, manager)
+    await agent._finished_pass(now)
+    await agent._finished_pass(now + FINISHED_SETTLE)
+    ((who, line),) = home.sent
+    assert who == "manager" and "your team was wound down by you; its members are closed" in line
+    manager.finished_sent_at = _iso(now + FINISHED_SETTLE)
+    await agent._finished_pass(now + FINISHED_SETTLE + WRAPUP_GRACE)
+    assert home.closers["manager"] == {"by": "tick", "why": "finished", "wound_down_by": MANAGER}
+    assert manager.closed_for["wound_down_by"] == MANAGER
+    (note,) = home.notes()
+    assert note.startswith("g was wound down by manager, and the host agent closed its members once each settled.")
+    assert "g1: did not declare" in note and "g2: all done" in note
+
+
+async def test_the_persons_press_names_the_person_on_the_managers_line_and_close(agent, monkeypatch):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    g1 = _rec("g1", wind_down=_mark(now, waits=False))
+    g2 = _rec("g2", wind_down=_mark(now + timedelta(seconds=1), by=MANAGER, waits=False))
+    manager = _manager()
+    home = _Home(agent, monkeypatch, g1, g2, manager)
+    await agent._finished_pass(now)
+    await agent._finished_pass(now + FINISHED_SETTLE)
+    assert "wound down by the person" in home.sent[0][1], "any mark the person's makes it the person's"
+    manager.finished_sent_at = _iso(now + FINISHED_SETTLE)
+    await agent._finished_pass(now + FINISHED_SETTLE + WRAPUP_GRACE)
+    assert home.closers["manager"]["wound_down_by"] == "person" and home.notes() == []
+
+
+async def test_with_no_live_manager_the_last_marked_close_tells_and_another_hands_close_does_not(agent, monkeypatch):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    boss = _rec("boss", team="other", controllers=[])
+    g1 = _rec("g1", wind_down=_mark(now, by=boss.id, waits=False))
+    g2 = _rec("g2", wind_down=_mark(now, by=boss.id, waits=False), git={"branch": "w", "dirty": 1, "unpushed": 0})
+    manager = _manager(state="closed")
+    home = _Home(agent, monkeypatch, boss, g1, g2, manager)
+    await agent._finished_pass(now)
+    assert home.closed == ["g1"] and home.notes() == [], "one marked member is still live"
+    g2.git = dict(CLEAN)
+    await agent._finished_pass(now + timedelta(seconds=10))
+    (note,) = home.notes()
+    assert note.startswith("g was wound down by boss,")
+    await agent._finished_pass(now + FINISHED_SETTLE)
+    assert len(home.notes()) == 1, "told once"
+
+    h1 = _rec("h1", team="h", controllers=[], wind_down=_mark(now, by=boss.id, waits=False), state="working")
+    home2 = _Home(agent, monkeypatch, h1)
+    await agent._finished_pass(now)
+    h1.set_state("closed", confidence="scraped")  # a person's Close: the person's own ending
+    await agent._finished_pass(now + timedelta(seconds=10))
+    assert [n for n in home2.notes() if n.startswith("h ")] == []
+
+
+async def test_a_manager_that_closed_itself_after_the_line_carries_who_wound_it_down(agent, monkeypatch):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    g1 = _rec("g1", wind_down=_mark(now, waits=False), state="closed", closed_at=_iso(now))
+    manager = _manager(finished_sent_at=_iso(now))
+    _Home(agent, monkeypatch, g1, manager)
+    manager.set_state("closed", confidence="scraped")
+    manager.closed_at = _iso(now + timedelta(minutes=1))
+    await agent._finished_closed_managers(now + timedelta(minutes=2))
+    assert manager.closed_for == {"why": "finished", "closed_at": manager.closed_at, "wound_down_by": "person"}
+
+
+def test_closer_of_keeps_wound_down_by_from_the_tick_and_drops_it_from_a_session():
+    from sessionorc.agent_common import closer_of
+
+    handed = {"by": "tick", "why": "finished", "wound_down_by": "person"}
+    assert closer_of(None, handed, "t") == {"by": "tick", "why": "finished", "at": "t", "wound_down_by": "person"}
+    assert closer_of("ao-t-manager", handed, "t") == {"by": "ao-t-manager", "why": None, "at": "t"}
