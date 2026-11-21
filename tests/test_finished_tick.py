@@ -195,7 +195,10 @@ async def test_a_manager_that_closed_itself_is_marked_and_the_person_told(agent,
     manager.set_state("closed", confidence="scraped")
     manager.closed_at = _iso(now + timedelta(minutes=3))
     await agent._finished_pass(now + timedelta(minutes=4))
+    assert manager.closed_for is None, "its own step marks it, ahead of rule 1 in the tick (TD-1898)"
+    await agent._finished_closed_managers(now + timedelta(minutes=4))
     assert manager.closed_for == {"why": "finished", "closed_at": manager.closed_at} and len(home.notes()) == 1
+    await agent._finished_closed_managers(now + timedelta(minutes=5))
     await agent._finished_pass(now + timedelta(minutes=5))
     assert len(home.notes()) == 1 and home.closed == []
 
