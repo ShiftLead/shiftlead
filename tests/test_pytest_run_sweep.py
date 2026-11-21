@@ -70,13 +70,16 @@ def test_a_run_in_a_seat_sweeps_every_seats_dead_runs(tmp_path):
     (other / "pytest-current").symlink_to(live_there)
     other_user = _run(root / "cccc3333" / "pytest-of-another", 1, str(_dead_pid()))  # not this user's runs
     (root / "loose-file").write_text("x")
+    elsewhere = tmp_path / "elsewhere"
+    linked = _run(_seat(elsewhere, "x"), 1, str(_dead_pid()))
+    (root / "dddd4444").symlink_to(elsewhere / "x")  # a seat directory that is a link: never followed
 
     sweep_dead_pytest_runs(own)
 
     assert not dead_here.exists() and not dead_there.exists()
     assert own.exists() and live_there.exists() and starting_there.exists()
     assert (other / "pytest-current").is_symlink()
-    assert other_user.exists()
+    assert other_user.exists() and linked.exists()
 
 
 @pytest.mark.unit

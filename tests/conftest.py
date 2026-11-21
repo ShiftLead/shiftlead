@@ -275,7 +275,9 @@ def _run_parents(parent: Path) -> list[Path]:
     root = parent.parent.parent
     if root.name != f"shiftlead-{os.getuid()}" or root.is_symlink():
         return [parent]
-    seats = [p for p in root.glob(f"*/{parent.name}") if p.is_dir() and not p.is_symlink()]
+    seats = [
+        p for p in root.glob(f"*/{parent.name}") if p.is_dir() and not p.is_symlink() and not p.parent.is_symlink()
+    ]
     return seats if parent in seats else [parent, *seats]
 
 
