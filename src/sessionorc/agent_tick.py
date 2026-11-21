@@ -3707,8 +3707,8 @@ class TickMixin:
             if top is not None and self._address(r) == top["id"]:
                 continue
             end = work_mod.record_end(r) if r.state in work_mod.DEAD else None
-            if start and end and not _after(end, str(start), equal=True):
-                continue
+            if start and end and _after(str(start), end):
+                continue  # ended before this run's start: an earlier run's (an end that does not parse is none)
             out.append(r)
         return out
 
