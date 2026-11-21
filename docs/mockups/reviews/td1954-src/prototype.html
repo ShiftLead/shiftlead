@@ -144,7 +144,7 @@ const K = {
 const WRITES = ["design", "build"], FIXED = ["person", "done", "merge"], CAN_MERGE = ["work-pushed", "ship"];
 const TAKES = [["", "only what other stages send it"], ["design-first", "new entries that need a design first"], ["other", "new entries that are ready to build"], ["any", "new entries of both those kinds"], ["hunt", "new hunt entries"]];
 const takesFor = k => k === "review" ? [""] : k === "hunt" ? ["", "hunt"] : ["", "design-first", "other", "any"];
-const SEATS = [["questions", "Tech lead", "answers members' questions, by mail"], ["board", "Board answers", "acts on what you decided"], ["prs", "Pull requests nobody holds", "on the clock"], ["manager", "Manager", "starts and stops sessions"], ["docs", "Docs audit", "every 10 merged pull requests; files what it finds"], ["tests", "Test audit", "every 6 hours; files what it finds"]];
+const SEATS = [["questions", "Tech lead", "answers members' questions, by mail"], ["board", "Board answers", "acts on what you decided"], ["prs", "Pull requests nobody holds", "on the clock"], ["manager", "Manager", "starts and stops sessions"], ["docs", "Docs audit", "every 10 merged pull requests; files what it finds"], ["tests", "Test audit", "every 6 hours; files what it finds"], ["sweeper", "Sweeper", "when the last sweep grows old; looks for stranded work"]];
 const slug = s => String(s).trim().toLowerCase().replace(/\s+/g, "-");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const words = o => o.replace(/-/g, " ");
@@ -165,7 +165,8 @@ const seats = () => ({ questions: "opus", board: "sonnet", prs: "sonnet", manage
 const flow = (id, builtin, blurb, stages) => ({ id, name: id, builtin, blurb, maxMoves: 25, carry: "pr", seats: seats(), stages });
 function builtins() {
   return [
-    flow("td", true, "design, two reads, fact-check; build, review, protected read", [
+    flow("td", true, "hunt; design, two reads, fact-check; build, review, protected read", [
+      st("Hunt", "hunt", "opus", "hunt", {}),
       st("Design", "design", "fable", "design-first", { "work-pushed": to("first-design-read") }),
       st("First design read", "review", "sonnet", "", { ship: to("second-design-read"), "changes-wanted": to("design", 3) }),
       st("Second design read", "review", "opus", "", { ship: to("fact-check"), "changes-wanted": to("design", 3) }),
