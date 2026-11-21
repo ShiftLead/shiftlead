@@ -254,10 +254,34 @@ def sweep_dead_pytest_runs(own: Path) -> None:
     the shared `/tmp` for three days in every seat that ran it. A lock that is empty or unreadable is a run still
     starting (pytest creates the file, then writes its pid), so it counts as live, as does a directory with no
     lock (a finished run, pytest's own to keep or remove); `pytest-current`, a link, and this run's own are
-    never touched. A recycled pid makes a dead run look live: that costs one skipped sweep."""
+    never touched. A recycled pid makes a dead run look live: that costs one skipped sweep.
+
+    Where this run's base temp lies in a seat's scratch (`<root>/shiftlead-<uid>/<token>/pytest-of-<user>/`,
+    design §4.6 *A session's scratch*), every seat's `pytest-of-<user>/` under that root is swept, not only this
+    one's (TD-2032): a seat that runs no suite after its run died — an idle designer — otherwise kept 160k inodes
+    of the shared `/tmp` for as long as it lived, since the host agent's disk sweep never removes a live record's
+    scratch. A run outside a seat sweeps its own base temp's parent alone."""
     parent = own.parent
     if not own.name.startswith("pytest-") or not parent.name.startswith("pytest-of-"):
         return  # a --basetemp of the caller's own: not pytest's numbered runs
+    for base in _run_parents(parent):
+        with contextlib.suppress(OSError):  # one seat's scratch going away mid-sweep never stops the others'
+            _sweep_dead_runs_in(base, own)
+
+
+def _run_parents(parent: Path) -> list[Path]:
+    """The `pytest-of-<user>/` directories to sweep: every seat's under this one's `shiftlead-<uid>/` root, where
+    this run's lies in a seat's scratch, else this run's alone."""
+    root = parent.parent.parent
+    if root.name != f"shiftlead-{os.getuid()}" or root.is_symlink():
+        return [parent]
+    seats = [
+        p for p in root.glob(f"*/{parent.name}") if p.is_dir() and not p.is_symlink() and not p.parent.is_symlink()
+    ]
+    return seats if parent in seats else [parent, *seats]
+
+
+def _sweep_dead_runs_in(parent: Path, own: Path) -> None:
     for d in parent.glob("pytest-*"):
         if d == own or d.is_symlink() or not d.is_dir():
             continue
@@ -271,7 +295,8 @@ def sweep_dead_pytest_runs(own: Path) -> None:
 
 def pytest_sessionstart(session: pytest.Session) -> None:
     """The dead runs' sweep (TD-2028), in the xdist controller alone (a worker's base temp is inside the
-    controller's run), from the controller's own base temp."""
+    controller's run), from the controller's own base temp,
+    over every seat's scratch where it lies in one (TD-2032)."""
     if os.environ.get("PYTEST_XDIST_WORKER"):
         return
     factory = getattr(session.config, "_tmp_path_factory", None)
