@@ -180,3 +180,34 @@ async def test_a_marked_member_takes_no_wind_down_back_and_nothing_is_owed(agent
     agent._finished_owed["g"] = now
     await agent._finished_pass(now + timedelta(seconds=2))
     assert "g" not in agent._finished_owed, "a Wind down's team owes no note by the reading"
+
+
+async def test_only_this_runs_marks_hold_the_note_back(agent, monkeypatch):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    old = _rec(
+        "g0", wind_down=_mark(now - timedelta(hours=2)), state="closed", closed_at=_iso(now - timedelta(hours=1))
+    )
+    home = _Home(agent, monkeypatch, old, _manager())
+    top = {"id": agent._address(agent.sessions[MANAGER])}
+    assert agent._run_marks("g", [old], top) == [old], "with no start written, every mark counts"
+    agent._host_rec.setdefault("teams", {})["g"] = {"started_at": _iso(now - timedelta(minutes=30))}
+    assert agent._run_marks("g", [old], top) == [], "an earlier run's mark"
+    old.closed_at = _iso(now - timedelta(minutes=30))
+    assert agent._run_marks("g", [old], top) == [old], "ended at the start counts"
+    old.closed_at = "garbled"
+    assert agent._run_marks("g", [old], top) == [old], "an end that does not parse is none"
+    assert home.closed == []
+
+
+async def test_a_sessions_wind_down_still_tells_the_person(agent, monkeypatch):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    g1 = _rec("g1", wind_down=_mark(now, by=MANAGER, waits=False))
+    manager = _manager()
+    home = _Home(agent, monkeypatch, g1, manager)
+    await agent._finished_pass(now)
+    await agent._finished_pass(now + FINISHED_SETTLE)
+    manager.finished_sent_at = _iso(now + FINISHED_SETTLE)
+    await agent._finished_pass(now + FINISHED_SETTLE + WRAPUP_GRACE)
+    assert home.closed == ["g1", "manager"] and len(home.notes()) == 1, "only the person's press holds it back"
