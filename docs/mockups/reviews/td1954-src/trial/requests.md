@@ -10,7 +10,7 @@ You are testing whether a short reference document is clear enough to write a wo
 Checker: python3 flowcheck.py <file>
 
 The request, as a person would put it:
-"I want one session to both design and build each entry, whatever kind it is. A different, cheaper model reviews every pull request, and that reviewer merges it when it is happy. If the reviewer keeps sending it back, I want to see it after three rounds."
+"Every entry, whatever kind it is, is built by one model. A different, cheaper model reviews every pull request, and it is merged once the reviewer is happy. If the reviewer keeps sending it back, I want to see it after three rounds. Separately, once a day something should look through the docs for anything that has gone stale and file what it finds."
 
 Steps:
 1. Write your first attempt to attempt-1.yml BEFORE running the checker. Run the checker on it and save its full output to attempt-1.out.
@@ -48,7 +48,7 @@ You are testing whether a short reference document is clear enough to write a wo
 Checker: python3 flowcheck.py <file>
 
 The request, as a person would put it:
-"Tests first. One session writes failing tests for the entry and hands it on without opening a pull request; a second session, on a different model, makes the tests pass and opens the pull request. Two reviewers on two different models must both pass it. After that, pull requests that touch protected paths get one more read from my strongest model, and then it is merged automatically, without spending the strongest model on pull requests it does not read. Every entry starts the same way; I have no separate design step. Nothing should be able to go round in circles for ever."
+"Tests first. One session writes failing tests for the entry; a second session, on a different model, makes the tests pass. Two reviewers on two different models must both pass it. After that, pull requests that touch protected paths get one more read from my strongest model, and then it is merged automatically, without spending the strongest model on pull requests it does not read. Every entry starts the same way; I have no separate design step. Nothing should be able to go round in circles for ever."
 
 Steps:
 1. Write your first attempt to attempt-1.yml BEFORE running the checker. Run the checker on it and save its full output to attempt-1.out.

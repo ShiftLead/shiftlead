@@ -1,0 +1,67 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&family=Martian+Mono:wght@400;600&display=swap" rel="stylesheet"><style>
+:root { --mat:#EEF1EC; --card:#FFFFFF; --ink:#18212B; --soft:#5A6672; --hair:#D3D9D2;
+  --line:#2647D8; --tag:#FFD23F; --done:#1E8E5A; --need:#D1382B; --reader:#EAF0FF; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--mat); color:var(--ink); font:15px/1.5 "Instrument Sans", system-ui, sans-serif; }
+.wrap { max-width:1180px; margin:0 auto; padding:36px 28px 72px; }
+h1 { font:800 54px/0.95 "Bricolage Grotesque", sans-serif; letter-spacing:-.02em; margin:0; }
+.top { display:flex; align-items:flex-end; gap:28px; flex-wrap:wrap; }
+.tabs { display:flex; gap:4px; flex-wrap:wrap; margin-left:auto; }
+.tabs a { padding:6px 12px; border-radius:20px; font-weight:500; font-size:14px; color:var(--soft); }
+.tabs a.on { background:var(--ink); color:#fff; }
+.tabs a small { font-weight:400; opacity:.7; }
+.flow { display:flex; align-items:baseline; gap:16px; margin:34px 0 4px; flex-wrap:wrap; }
+.flow h2 { font:600 28px/1.1 "Bricolage Grotesque", sans-serif; margin:0; }
+.flow .meta { color:var(--soft); font-size:14px; }
+.flow button { margin-left:auto; font:600 14px "Instrument Sans", sans-serif; background:var(--line); color:#fff; border:none; border-radius:6px; padding:8px 16px; }
+.say { color:var(--soft); max-width:66ch; margin:0 0 26px; }
+.key { font:600 12.5px "Martian Mono", monospace; }
+
+/* the line an entry travels */
+.line { position:relative; padding-left:64px; }
+.line::before { content:""; position:absolute; left:22px; top:14px; bottom:14px; width:4px; background:var(--line); border-radius:2px; }
+.cols { display:grid; grid-template-columns:minmax(0, 1.25fr) minmax(0, 1fr); gap:0 44px; }
+.colhead { font:600 14px "Bricolage Grotesque", sans-serif; color:var(--soft); margin:0 0 10px; }
+.hop { position:relative; display:flex; align-items:center; gap:12px; min-height:46px; color:var(--soft); font-size:14px; grid-column:1 / -1; }
+.tagv { position:absolute; left:-64px; width:48px; height:26px; }
+.own { display:inline-block; background:var(--tag); color:var(--ink); font:600 12.5px "Martian Mono", monospace; padding:4px 10px 4px 18px;
+  clip-path:polygon(10px 0, 100% 0, 100% 100%, 10px 100%, 0 50%); margin-left:-52px; position:relative; }
+.own::before { content:""; position:absolute; left:9px; top:50%; width:5px; height:5px; margin-top:-2.5px; border-radius:50%; background:var(--mat); }
+.own.none { background:#fff; outline:1.5px dashed var(--soft); outline-offset:-1.5px; clip-path:none; padding-left:10px; }
+.own.none::before { display:none; }
+.own.end { background:var(--done); color:#fff; }
+.stn { position:relative; background:var(--card); border-radius:10px; padding:16px 20px 12px; margin:6px 0; box-shadow:0 1px 0 var(--hair); }
+.stn::before { content:attr(data-n); position:absolute; left:-58px; top:14px; width:36px; height:36px; border-radius:50%; background:var(--line); color:#fff;
+  font:800 17px/36px "Bricolage Grotesque", sans-serif; text-align:center; box-shadow:0 0 0 5px var(--mat); }
+.stn h3 { font:600 21px/1.1 "Bricolage Grotesque", sans-serif; margin:0; display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+.stn h3 span { font:400 14px "Instrument Sans", sans-serif; color:var(--soft); }
+.stn h3 b { margin-left:auto; font:600 13px "Martian Mono", monospace; background:var(--ink); color:#fff; border-radius:4px; padding:3px 9px; }
+.stn ol { list-style:none; margin:12px 0 0; padding:0; counter-reset:a; }
+.stn li { counter-increment:a; display:grid; grid-template-columns:22px 128px 1fr; gap:8px; padding:6px 0; border-top:1px solid var(--hair); font-size:14px; align-items:baseline; }
+.stn li::before { content:counter(a); color:var(--soft); font-size:12.5px; }
+.stn li b { font-weight:600; }
+.stn li span { color:var(--soft); }
+.stn li em { font-style:normal; color:var(--line); font-weight:500; }
+.stn .also { margin:8px 0 0; padding-top:8px; border-top:1px solid var(--hair); font-size:13.5px; color:var(--soft); }
+.stn .also b { color:var(--ink); font-weight:500; }
+
+/* the readers beside the line: asked by mail, never on it */
+.readers { display:flex; flex-direction:column; gap:8px; justify-content:center; margin:6px 0; position:relative; }
+.rd { position:relative; background:var(--reader); border-radius:10px; padding:10px 16px; font-size:14px; }
+.rd::before { content:""; position:absolute; left:-44px; top:50%; width:44px; border-top:2px dashed var(--line); }
+.rd h4 { margin:0; font:600 15px "Instrument Sans", sans-serif; display:flex; gap:10px; align-items:baseline; }
+.rd h4 b { margin-left:auto; font:600 12.5px "Martian Mono", monospace; color:var(--line); }
+.rd p { margin:2px 0 0; color:var(--soft); font-size:13.5px; }
+
+.under { display:grid; grid-template-columns:1.25fr 1fr; gap:44px; margin-top:40px; padding-left:64px; }
+.under h3 { font:600 18px "Bricolage Grotesque", sans-serif; margin:0 0 8px; }
+.oncall div { display:grid; grid-template-columns:150px 1fr 76px; gap:10px; padding:7px 0; border-top:1px solid var(--hair); font-size:14px; }
+.oncall div b { font-weight:600; } .oncall div span { color:var(--soft); }
+.oncall div i { font:600 12.5px "Martian Mono", monospace; font-style:normal; text-align:right; }
+.check p { margin:0; padding:6px 0 6px 26px; border-top:1px solid var(--hair); font-size:14px; position:relative; color:var(--soft); }
+.check p b { color:var(--ink); font-weight:600; }
+.check p::before { content:"✓"; position:absolute; left:2px; color:var(--done); font-weight:700; }
+.check p.no::before { content:"✕"; color:var(--need); }
+.fixed { padding-left:64px; margin-top:28px; color:var(--soft); font-size:13.5px; max-width:104ch; }
+.fixed b { color:var(--ink); font-weight:500; }
+</style></head><body><div class='wrap'><div class='top'><h1>Flows</h1><div class="tabs"><a class="on">td</a><a>build-review</a><a>build</a><a>one-owner</a><a>hunt</a><a>ao-grind <small>shiftlead</small></a></div></div><div class='flow'><h2>Design, then build</h2><span class='meta'>built in, read only · run by ao-grind, cm-grind, ss-grind</span><button>Copy to edit</button></div><p class='say'>An entry travels down the line. Its Owner tag says which step holds it, and each step puts the next tag on when it is done.</p><div class="line"><div class="cols"><p class="colhead">The line: sessions that take an entry and work it</p><p class="colhead">Readers: seats a step asks by mail, a new session each time</p><div class="hop"><span class="own none">no Owner</span>A new entry joins by its kind: one marked design-first goes to Design, every other entry to Build.</div><section class="stn" data-n="1"><h3>Design <span>takes <span class="key">design</span> · 1 seat</span><b>opus</b></h3><ol><li><b>Design</b><span>the design's sections, mockups and synopsis</span></li><li><b>Design rounds</b><span>up to 4 rounds, 6 for a wide design, then the counted verdict. <em>Asks the round reader.</em></span></li><li><b>Fact-check</b><span>the whole design at round 1, each round's changes after. <em>Asks the fact-checker.</em></span></li><li><b>Merge</b><span>once the readers pass; the builds wait for your Go where the verdict asks</span></li></ol></section><div class="readers"><div class="rd"><h4>Round reader<b>sonnet, fable</b></h4><p>Reads one round of a design and returns findings. The models take turns.</p></div><div class="rd"><h4>Fact-checker<b>sonnet</b></h4><p>Checks what a document claims against the repo.</p></div></div><div class="hop"><span class="own">build</span>Design files its builds as new entries owned by the next step, and its own entry closes with the last of them.</div><section class="stn" data-n="2"><h3>Build <span>takes <span class="key">build</span> · 1 to 4 seats, set on the team</span><b>opus</b></h3><ol><li><b>Build</b><span>the change, its tests, the pull request</span></li><li><b>Review</b><span>every pull request. <em>Asks the reviewer.</em></span></li><li><b>Review</b><span>only a pull request that touches a protected path. <em>Asks the second reader.</em></span></li><li><b>Merge</b><span>once the readers pass; on a protected path the second reader merges</span></li></ol><p class="also"><b>Also takes the work orders:</b> board answers, pull requests nobody holds, live checks.</p></section><div class="readers"><div class="rd"><h4>Reviewer<b>sonnet</b></h4><p>One independent read of each pull request, with its evidence posted there.</p></div><div class="rd"><h4>Second reader<b>opus</b></h4><p>The question seat. Reads against the design; unread after 2 hours it comes to you.</p></div></div><div class="hop"><span class="own end">done</span>The entry is archived in the pull request that completes it.</div></div></div><div class="under"><div class="oncall"><h3>On call</h3><div><b>Question seat</b><span>when a member asks: answers, or passes it to you; drafts entries handed to it</span><i>opus</i></div><div><b>Docs audit</b><span>every 10 merged pull requests, against the docs</span><i>sonnet</i></div><div><b>Test audit</b><span>every 10 merged pull requests, against the tests</span><i>sonnet</i></div><div><b>Manager</b><span>every team has one: stalls, permission prompts, idle with work</span><i>sonnet</i></div></div><div class="check"><h3>Can it run?</h3><p><b>Every pull request is reviewed and merged.</b> Build opens them; the reviewer reads; the author or the second reader merges.</p><p><b>Every Owner has a step.</b> design and build are both taken.</p><p><b>ao-grind</b> has a login and a smoke pass for opus, sonnet and fable.</p><p class="no"><b>cm-grind</b> has no login that offers fable, which the round reader needs.</p></div></div><p class="fixed"><b>Whichever step holds the work also does, with no model of its own:</b> claim, worktree, open the pull request, precheck, wait for checks, archive, report done. <b>The host does:</b> settle a new entry, pull main, precheck main, promote, smoke. <b>Yours, always:</b> the last word, and anything passed up.</p></div></body></html>

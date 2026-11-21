@@ -274,10 +274,12 @@ function yaml(f) {
   const one = x => x.limit ? `{to: ${x.to}, limit: ${x.limit}}` : x.to;
   const d = x => x.to === "merge" && x.else ? `{to: merge, refused: ${one(x.else)}}` : one(x);
   let y = `format: 3\nname: ${f.name}\n` + (f.carry === "branch" ? "work: branches\n" : "") + (f.maxMoves !== 25 ? `max-moves: ${f.maxMoves}\n` : "") + "stages:\n";
-  for (const s of f.stages) {
-    y += `  - name: ${s.name}\n    does: ${s.kind}\n    model: ${s.model}\n` + (s.kind === "hunt" ? `    every: ${s.n} ${s.unit === "prs" ? "merged-pull-requests" : s.unit}\n` : s.takes ? `    takes: ${s.takes}\n` : "") + (s.only ? "    only-when: protected-files\n" : "");
+  for (const s of f.stages.filter(x => x.kind !== "hunt")) {
+    y += `  - name: ${s.name}\n    does: ${s.kind}\n    model: ${s.model}\n` + (s.takes ? `    takes: ${s.takes}\n` : "") + (s.only ? "    only-when: protected-files\n" : "");
     y += outs(s).filter(o => s.next[o]).map(o => `    ${o}: ${d(s.next[o])}\n`).join("");
   }
+  const au = f.stages.filter(x => x.kind === "hunt");
+  if (au.length) y += "audits:\n" + au.map(s => `  - name: ${s.name}\n    model: ${s.model}\n    every: ${s.n} ${s.unit === "prs" ? "merged-pull-requests" : s.unit}\n    brief: docs/briefs/${slug(s.name)}.md\n`).join("");
   return y;
 }
 
