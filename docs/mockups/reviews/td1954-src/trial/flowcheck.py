@@ -98,7 +98,8 @@ def check(doc):
         stages[key] = {"name": nm, "kind": kind, "model": st.get("model"), "outs": outs, "edges": [], "asks": [], "ends": False}
     for kind, who in takes.items():
         if len(who) != 1:
-            bad.append(f"new `{kind}` entries need exactly one stage that takes them; found {len(who)} (rule 6)")
+            tip = "; a flow with no design stage writes `takes: any` on its first build stage" if kind == "design-first" and not who else ""
+            bad.append(f"new `{kind}` entries need exactly one stage that takes them; found {len(who)}{tip} (rule 6)")
 
     def one(st, where, v, top=True):
         """Read one destination; record the move."""

@@ -54,7 +54,8 @@ What the outcomes mean:
 - `work-pushed`: the stage's work is pushed and the pull request is open. Its checks must be green, unless
   the entry goes on to another build stage, which is expected to finish the work.
 - `not-needed` on a design stage: this entry needs no design. On a build stage: it needs no work at all.
-- `design-needs-changing`: the builder found the design cannot be built as written.
+- `design-needs-changing`: the builder found the design cannot be built as written. In a flow with no
+  design stage, leave it out, so it goes to the person.
 - `ship`: the reviewer passes the pull request as it now stands.
 - `changes-wanted`: send it to a build stage (or a design stage, for a design). Its fresh session reads the
   review and fixes the same pull request.
@@ -111,8 +112,9 @@ A new entry has no stage. `takes` says which stage it starts in:
 - `takes: other`: entries that are ready to build
 - `takes: any`: both kinds
 
-Each kind must have exactly one stage that takes it. A stage with no `takes` only receives entries that
-another stage sends it. A review stage never takes new entries.
+Each kind must have exactly one stage that takes it, even in a flow with no design stage: there, the
+first build stage is written `takes: any`, and an entry that asked for a design is simply built. A stage
+with no `takes` only receives entries that another stage sends it. A review stage never takes new entries.
 
 ## A review that runs only sometimes
 
@@ -127,7 +129,7 @@ and files each problem it finds as a new entry, which then enters the flow by it
 nothing. Each audit has:
 
 - `name`, `model`
-- `every`: `<n> merged-pull-requests`, `<n> hours` or `<n> days`
+- `every`: `<n> merged-pull-requests`, `<n> hours` or `<n> days` (always the plural: `1 days`)
 - `brief`: the path of the file that says where to look and what for
 
 Nothing can be sent to an audit.
