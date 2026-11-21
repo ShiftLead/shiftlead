@@ -42,8 +42,9 @@ HELP: tuple[Help, ...] = (
         "Wind down",
         "team card",
         (
-            "Sends the wrap-up to every member and then to the manager: each finishes what it holds, pushes, "
-            "and exits. Press it when the team should stop after the work in hand, not in the middle of it. "
+            "Sends the wrap-up to every member and then to the manager: each finishes what it holds and pushes, "
+            "and the home closes each member once it settles; one on a dialog stays open, in the Inbox. "
+            "Press it when the team should stop after the work in hand, not in the middle of it. "
             "It kills nothing — Stop now does — but for a member whose brief is not in yet, which it stops, "
             "and forgets nothing."
         ),

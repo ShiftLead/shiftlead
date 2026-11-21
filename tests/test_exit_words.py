@@ -208,3 +208,20 @@ def test_status_v_says_how_an_exited_record_ended(monkeypatch, capsys):
     assert re.search(r"^\s+exited · code 4$", out, re.M)  # no `ended`: no age to give
     assert re.search(r"^ao-r-manager-1\s+idle\s+~", out, re.M)
     assert not re.search(r"^ao-r-grinder-1\s+exited\s+~", out, re.M)
+
+
+def test_a_wind_downs_close_names_its_presser_from_the_mark():
+    """§4.9a *What it leaves* (TD-1898): a tick close whose `why` is `wind_down` reads the presser from the
+    record's `wind_down.by` — *your* for the person's, the session's name where `names` knows it — and
+    *after a Wind down* where the mark is missing or malformed; any other tick close reads as before."""
+    from shiftlead.ending import closer_words
+
+    closer = {"by": "tick", "why": "wind_down", "at": "2026-11-21T00:00:00Z"}
+    rec = {"id": "ao-w", "closer": closer}
+    assert closer_words({**rec, "wind_down": {"by": "person"}}) == "closed by the tick · after your Wind down"
+    mgr = {**rec, "wind_down": {"by": "ao-mgr"}}
+    assert closer_words(mgr, {"ao-mgr": "orc-ao"}) == "closed by the tick · after orc-ao's Wind down"
+    assert closer_words(mgr) == "closed by the tick · after ao-mgr's Wind down"
+    for bad in (None, "x", {"by": None}, {}):
+        assert closer_words({**rec, "wind_down": bad}) == "closed by the tick · after a Wind down"
+    assert closer_words({**rec, "closer": {**closer, "why": "finished"}}) == "closed by the tick · team finished"
