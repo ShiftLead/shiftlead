@@ -52,7 +52,7 @@ YOU, DONE = '<span class="you">you</span>', '<span class="done">done</span>'
 
 
 def key(k):
-    return f'<span class="key">Owner: {k}</span>'
+    return f'<span class="key">Stage: {k}</span>'
 
 
 def fwd(k):
@@ -65,7 +65,7 @@ def back(k, limit=""):
 
 
 def same(a):
-    return f'<span class="same">carries on to {a}, same session</span>'
+    return f'<span class="same">the next action, {a}</span>'
 
 
 def rec(n, color, name, k, model, takes, acts, ends, cls=""):
@@ -89,9 +89,9 @@ def td():
         '<p class="used">Used by <b>ao-grind</b>, <b>docs</b>.</p>'
         '<div class="lim"><span>Rounds, ordinary design <b>3</b></span><span>Rounds, far-reaching design <b>6</b></span>'
         "<span>Review rounds on a build <b>3</b></span><span>Silent before it goes to you <b>4 h</b></span></div>"
-        + rec(1, "var(--design)", "Design", "design", "fable", "a design-first entry with no Owner", ["Design"], [
+        + rec(1, "var(--design)", "Design", "design", "fable", "a design-first entry with no stage yet", ["Design"], [
             ("pull request open and green", HELP, fwd("rounds")),
-            ("split into parts", HELP, '<span class="same">rests until its parts are done</span>'),
+            ("split into parts", HELP, '<span class="same">waits for its parts</span>'),
             ("not needed", SESS, YOU),
         ])
         + rec(2, "var(--review)", "Design rounds", "rounds", "sonnet, fable <small>in turn</small>", "", ["Review <small>reviewers in turn</small>"], [
@@ -103,14 +103,14 @@ def td():
         + rec(3, "var(--find)", "Fact-check", "facts", "sonnet", "", ["Fact-check", "Merge"], [
             ("ship", SESS, same("Merge")),
             ("changes wanted", SESS, back("design", "3")),
-            ("merged", HELP, '<span class="same">rests until its builds are done</span>'),
+            ("merged", HELP, DONE),
             ("changed since review", HELP, back("rounds", "3")),
             ("red or conflicting", HELP, back("design", "3")),
         ])
-        + rec(4, "var(--build)", "Build", "build", "opus", "any other entry with no Owner", ["Build", "Live checks"], [
+        + rec(4, "var(--build)", "Build", "build", "opus", "any other entry with no stage yet", ["Build", "Live checks"], [
             ("pull request open and green", HELP, fwd("review")),
             ("design needs changing", SESS, YOU),
-            ("split into parts", HELP, '<span class="same">rests until its parts are done</span>'),
+            ("split into parts", HELP, '<span class="same">waits for its parts</span>'),
             ("not needed", SESS, YOU),
         ])
         + rec(5, "var(--review)", "Review", "review", "sonnet", "", ["Review <small>every pull request</small>"], [
@@ -127,30 +127,30 @@ def td():
             ("changed since review", HELP, back("review", "3")),
             ("red or conflicting", HELP, back("build", "3")),
         ])
-        + rec("∗", "var(--off)", "Every step", "", "", "", [], [
+        + rec("∗", "var(--off)", "Every stage", "", "", "", [], [
             ("question", SESS, f"{YOU} <small>with a board item</small>"),
             ("stuck", SESS, YOU),
-            ("session lost", HELP, '<span class="same">the same step, offered again</span>'),
+            ("session lost", HELP, '<span class="same">offered again</span>'),
             ("silent for 4 h", HELP, YOU),
         ], cls="all")
-        + "<h3>Outside the flow</h3><p>These take no entry and file no Owner. They are here to be given a model.</p>"
+        + "<h3>Outside the flow</h3><p>These take no entry and set no stage. They are here to be given a model.</p>"
         '<div class="out"><div><b>Questions</b><span class="m">opus</span> <span>answers members by mail</span></div>'
         '<div><b>Board answers</b><span class="m">sonnet</span> <span>acts on what you decided</span></div>'
         '<div><b>Pull requests nobody holds</b><span class="m">sonnet</span> <span>on the clock</span></div>'
         '<div><b>Manager</b><span class="m">sonnet</span> <span>starts and stops sessions</span></div></div>'
         "<h3>Does it flow?</h3><p></p>"
-        '<div class="chk"><div>Every Owner a step can file has a step that takes it <small>6 of 6</small></div>'
+        '<div class="chk"><div>Every stage an ending names exists <small>6 of 6</small></div>'
         "<div>Every way back has a limit <small>10 of 10</small></div>"
         "<div>Every pull request opened can reach Merge</div>"
         "<div>Every kind of entry has a way in <small>design-first, other</small></div>"
         '<div class="i">8 endings go to you <small>none by omission</small></div>'
-        '<div class="i">A plain build files 2 state changes <small>each round back adds 2</small></div></div>'
+        '<div class="i">A plain build changes stage 2 times <small>each round back adds 2</small></div></div>'
     )
     cap = (
-        "E — the built-in flow td as records. Each step has an Owner key, a model, its actions, and every way it can end. "
-        "A yellow tag is the Owner value written to the entry."
+        "E — the built-in flow td as records. Each stage has a key, a model, its actions, and every way it can end. "
+        "A yellow tag is the stage an ending moves the entry to."
     )
-    return page("td", body, cap, sub="the steps an entry passes through, and where each ending sends it").replace(
+    return page("td", body, cap, sub="the stages an entry passes through, and where each ending sends it").replace(
         "<style>", "<style>" + TCSS
     )
 
