@@ -3630,15 +3630,16 @@ class TickMixin:
                 await self._push_changes()
                 return None
             return first
-        said = (
-            f"your team was wound down by {self._presser_words(wound_by, manager, records)}; its members are closed"
-            if wound_by
-            else "your team is finished: every member has declared"
-        )
         line = (
-            f"[shiftlead] {said}. Make your last acts — "
+            "[shiftlead] your team is finished: every member has declared. Make your last acts — "
             "`ao progress none`, the note to the person — then `ao close` yourself"
         )
+        if wound_by:  # a Wind down's run, whose members may have closed undeclared (TD-1898)
+            who = self._wound_by_words(wound_by, manager, records)
+            line = line.replace(
+                "your team is finished: every member has declared",
+                f"your team was wound down by {who}; its members are closed",
+            )
         if manager.state == "idle" and await self._policy_send(manager, line):
             manager.finished_sent_at = now_iso()
             log.info("rule 9: %s finished — its manager %s told", team, manager.name)
@@ -3730,7 +3731,7 @@ class TickMixin:
         by = max(bys, key=lambda x: x[0])[1]
         return str(by) if by else None
 
-    def _presser_words(self, by: str | None, manager: Session | None, records: list[Session]) -> str:
+    def _wound_by_words(self, by: str | None, manager: Session | None, records: list[Session]) -> str:
         """`by` as the manager's line and the note name it: *the person*, *you* where it is the manager's own id,
         else that session's name where a record of the team (or the home's) is it, else the id as written."""
         if by == "person":
@@ -3862,7 +3863,7 @@ class TickMixin:
         )
         said = "; its manager did not announce it" if manager is not None else ""
         head = (
-            f"{team} was wound down by {self._presser_words(wound_by, None, records)}, and the host agent closed "
+            f"{team} was wound down by {self._wound_by_words(wound_by, None, records)}, and the host agent closed "
             "its members once each settled. Nothing is asked of you."
             if wound_by
             else f"{team} finished and the host agent wound it down: every member declared out of work{said}. "
