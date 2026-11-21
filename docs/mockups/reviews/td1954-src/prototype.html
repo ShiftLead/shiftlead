@@ -139,7 +139,7 @@ const K = {
   design: { label: "Design", c: "--design", desc: "Writes the design for an entry and files the builds it needs.", brief: "Read the entry and the design sections it touches. Write the design as a change to those sections, with mockups where a page changes. File each build the design needs as an entry of its own, naming this one as its parent. Push the work when the repo's checks pass.", outs: ["work-pushed", "not-needed"] },
   build: { label: "Build", c: "--build", desc: "Writes the code, tests or documents for an entry, on the entry's branch.", brief: "Read the entry, the design it follows, and what earlier stages left on the entry's branch: their work and any review of it. Work in a worktree of your own. Write the change with its tests, run the repo's checks until they pass, and push.", outs: ["work-pushed", "design-needs-changing", "not-needed"] },
   review: { label: "Review", c: "--review", desc: "Reads the pushed work, whatever it holds, and gives a verdict.", brief: "Read the change itself and the code or documents around it, never the author's summary alone. Where it changes code, every behaviour it changes follows a sentence in the design. Where it changes a design or another document, every claim it makes about the repo holds. Give one verdict: ship, or the changes you want and why.", outs: ["ship", "changes-wanted"] },
-  hunt: { label: "Hunt", c: "--find", desc: "Starts on a clock, looks for problems in the area its brief names, and files what it finds.", brief: "This stage's own brief names the area to look at and the kind of problem to look for, for example what the last ten merged pull requests changed against the documents. File each real finding as an entry of its own, with how to see it. Fix nothing here.", outs: ["findings-filed", "nothing-found"] },
+  hunt: { label: "Audit", c: "--find", desc: "Starts on a clock, looks for problems in the area its brief names, and files what it finds.", brief: "This stage's own brief names the area to look at and the kind of problem to look for, for example what the last ten merged pull requests changed against the documents. File each real finding as an entry of its own, with how to see it. Fix nothing here.", outs: ["findings-filed", "nothing-found"] },
 };
 const WRITES = ["design", "build"], FIXED = ["person", "done", "merge"], CAN_MERGE = ["work-pushed", "ship"];
 const TAKES = [["", "only what other stages send it"], ["design-first", "new entries that need a design first"], ["other", "new entries that are ready to build"], ["any", "new entries of both those kinds"], ["clock", "nothing; it starts on a clock"]];
@@ -162,6 +162,7 @@ const mg = (k, limit) => ({ to: "merge", limit: null, else: k ? to(k, limit) : n
 function st(name, kind, model, takes, next, only) { return { name, kind, model, takes: takes || "", only: only || "", next: next || {} }; }
 const UNITS = [["prs", "merged pull requests"], ["hours", "hours"], ["days", "days"]];
 const hunt = (name, model, n, unit) => Object.assign(st(name, "hunt", model, "clock", {}), { n, unit });
+const KINDS = ["design", "build", "review"];
 const outs = s => K[s.kind].outs.concat("other");
 const seats = () => ({ questions: "opus", board: "sonnet", prs: "sonnet", manager: "sonnet", sweeper: "sonnet" });
 const flow = (id, builtin, blurb, stages) => ({ id, name: id, builtin, blurb, maxMoves: 25, carry: "pr", seats: seats(), stages });
@@ -204,7 +205,7 @@ function examples() {
   ];
 }
 
-const KEY = "flows-proto-v5";
+const KEY = "flows-proto-v6";
 let S = { flows: builtins().concat(examples()), sel: "careful-build", tab: "stages", walk: null, del: false };
 try { const r = JSON.parse(localStorage.getItem(KEY) || "null"); if (r && Array.isArray(r.own)) { S.flows = builtins().concat(r.own); S.sel = S.flows.some(f => f.id === r.sel) ? r.sel : "td"; } } catch (e) { /* storage is a convenience */ }
 function persist() { try { localStorage.setItem(KEY, JSON.stringify({ own: S.flows.filter(f => !f.builtin), sel: S.sel })); } catch (e) { /* ignore */ } }
@@ -230,7 +231,7 @@ function check(f) {
       else if (d.to === "done") { if (CAN_MERGE.includes(o)) P(`Done here would leave the ${work(f)} unmerged. Pick merge it, a stage, or you.`, i, o); }
       else if (d.to === "merge") P("Pick where the entry goes when the merge is refused.", i, o);
       else if (!(d.to in by)) P(`Pick a stage that exists. There is no stage ${d.to}.`, i, o);
-      else if (f.stages[by[d.to]].kind === "hunt") P("A Hunt stage starts on its clock; nothing is sent to it.", i, o);
+      else if (f.stages[by[d.to]].kind === "hunt") P("An audit starts on its clock; nothing is sent to it.", i, o);
       else edges[i].push({ o, to: by[d.to], limit: d.limit });
     };
     outs(s).forEach(o => {
@@ -293,7 +294,7 @@ function nextCell(f, s, si, o, ro, err) {
   const pick = (x, sub) => {
     const opts = [["person", "you"]];
     if (!sub) { if (CAN_MERGE.includes(o)) opts.push(["merge", "merge it"]); opts.push(["done", "done"]); }
-    f.stages.forEach((y, j) => opts.push([slug(y.name), j === si ? "this stage again, with a fresh session" : "Stage: " + slug(y.name)]));
+    f.stages.forEach((y, j) => y.kind !== "hunt" && opts.push([slug(y.name), j === si ? "this stage again, with a fresh session" : "Stage: " + slug(y.name)]));
     if (!opts.some(([v]) => v === x.to)) opts.push([x.to, (FIXED.includes(x.to) ? words(x.to) : "Stage: " + x.to) + " (missing)"]);
     const bad = err && (sub || d.to !== "merge");
     let h = `<select id="nx-${si}-${o}-${sub}" class="${bad ? "bad-f" : ""}" data-act="dest" data-si="${si}" data-o="${o}" data-sub="${sub}" aria-label="${sub ? "If the merge is refused" : "Next for " + words(o)}">` + opts.map(([v, t]) => `<option value="${esc(v)}"${v === x.to ? " selected" : ""}>${esc(t)}</option>`).join("") + "</select>";
@@ -305,20 +306,21 @@ function nextCell(f, s, si, o, ro, err) {
 
 function renderStages(f, res) {
   const ro = f.builtin;
-  let h = "";
+  let h = "", main = "", aud = "", num = 0;
   f.stages.forEach((s, si) => {
-    const k = K[s.kind], errs = res.bad.filter(b => b.s === si), rowErr = o => errs.find(b => b.o === o);
-    h += `<div class="rec${errs.length ? " err" : ""}${!ro && openIdx(f) === si ? " open" : ""}" data-drop="${si}" style="--c:var(${k.c})"><div class="n">${si + 1}` +
-      (ro ? "" : `<button class="ic" data-act="up" data-si="${si}" aria-label="Move up" title="Move up">▲</button><button class="ic" data-act="down" data-si="${si}" aria-label="Move down" title="Move down">▼</button>`) + "</div>";
+    h = "";
+    const isA = s.kind === "hunt", k = K[s.kind], errs = res.bad.filter(b => b.s === si), rowErr = o => errs.find(b => b.o === o);
+    h += `<div class="rec${errs.length ? " err" : ""}${!ro && openIdx(f) === si ? " open" : ""}" data-drop="${si}" style="--c:var(${k.c})"><div class="n">${isA ? "" : ++num}` +
+      (ro || isA ? "" : `<button class="ic" data-act="up" data-si="${si}" aria-label="Move up" title="Move up">▲</button><button class="ic" data-act="down" data-si="${si}" aria-label="Move down" title="Move down">▼</button>`) + "</div>";
     h += '<div class="who">' + (ro ? `<div class="nm">${esc(s.name)}</div>` : `<input type="text" class="nm" id="sn-${si}" data-act="sname" data-si="${si}" value="${esc(s.name)}" aria-label="Stage name">`) + `<span class="slug">Stage: ${esc(slug(s.name))}</span><dl>`;
-    h += "<dt>Does</dt><dd>" + (ro ? k.label : `<select id="sk-${si}" data-act="kind" data-si="${si}" aria-label="Kind of work">${Object.keys(K).map(x => `<option value="${x}"${x === s.kind ? " selected" : ""}>${K[x].label}</option>`).join("")}</select>`) + "</dd>";
+    if (!isA) h += "<dt>Does</dt><dd>" + (ro ? k.label : `<select id="sk-${si}" data-act="kind" data-si="${si}" aria-label="Kind of work">${KINDS.map(x => `<option value="${x}"${x === s.kind ? " selected" : ""}>${K[x].label}</option>`).join("")}</select>`) + "</dd>";
     h += "<dt>Model</dt><dd>" + (ro ? `<span class="m">${s.model}</span>` : `<select id="sm-${si}" class="m" data-act="model" data-si="${si}" aria-label="Model">${MODELS.map(m => `<option${m === s.model ? " selected" : ""}>${m}</option>`).join("")}</select>`) + "</dd>";
     const tk = TAKES.filter(t => takesFor(s.kind).includes(t[0]) || t[0] === s.takes);
     if (s.kind === "hunt") h += "<dt>Starts</dt><dd>every " + (ro ? `<b>${s.n}</b> ${UNITS.find(u => u[0] === s.unit)[1]}` : `<input type="number" min="1" id="hn-${si}" data-act="every" data-si="${si}" value="${s.n}" aria-label="Every"> <select id="hu-${si}" data-act="unit" data-si="${si}" aria-label="Unit">${UNITS.map(([v, x]) => `<option value="${v}"${v === s.unit ? " selected" : ""}>${x}</option>`).join("")}</select>`) + "</dd>";
     else h += "<dt>Takes</dt><dd>" + (ro || tk.length < 2 ? TAKES.find(t => t[0] === s.takes)[1] : `<select id="st-${si}" data-act="takes" data-si="${si}" aria-label="Takes">${tk.map(([v, t]) => `<option value="${v}"${v === s.takes ? " selected" : ""}>${t}</option>`).join("")}</select>`) + "</dd>";
     if (s.kind === "review") { const on = [["", "every time"], ["protected", "only when the work touches protected files"]]; h += "<dt>Runs</dt><dd>" + (ro ? on.find(t => t[0] === s.only)[1] : `<select id="so-${si}" data-act="only" data-si="${si}" aria-label="Runs">${on.map(([v, t]) => `<option value="${v}"${v === s.only ? " selected" : ""}>${t}</option>`).join("")}</select>`) + "</dd>"; }
     h += "</dl>";
-    if (!ro) h += `<div class="addrow"><button class="quiet" data-act="delstage" data-si="${si}">Remove stage</button></div>`;
+    if (!ro) h += `<div class="addrow"><button class="quiet" data-act="delstage" data-si="${si}">Remove ${isA ? "audit" : "stage"}</button></div>`;
     h += '</div><div class="ends">';
     h += `<div class="ahead" style="--c:var(${k.c})"><span class="chip">${k.label}</span><small>${k.desc}${s.only ? " Passed without a session, counting as ship, when no protected file is touched." : ""}</small><button class="lnk" data-act="brief" data-k="${si}">${S.brief === String(si) ? "hide brief" : "brief"}</button></div>`;
     if (S.brief === String(si)) h += `<div class="brief"><b>What the session is told</b> <span class="same">an example; the words are kept on the Actions page, where a brief of your own can replace them</span><p>${k.brief}</p></div>`;
@@ -326,9 +328,13 @@ function renderStages(f, res) {
     outs(s).forEach(o => { const e = rowErr(o); h += `<div class="erow${e ? " err" : ""}"><span>${words(o)}${o === "other" ? ' <span class="same">(when none of the above fits)</span>' : ""}</span><span class="ck">${ck(f, o)}</span><span class="to">${nextCell(f, s, si, o, ro, e)}</span>${e ? `<span class="why">${esc(e.msg)}</span>` : ""}</div>`; });
     errs.filter(b => b.o === undefined).forEach(b => { h += `<div class="why" style="margin-top:6px">${esc(b.msg)}</div>`; });
     h += "</div></div>";
+    if (isA) aud += h; else main += h;
   });
-  if (!ro) h += `<p class="addstage"><select id="addst" data-act="addstage" aria-label="Add a stage"><option value="">+ Add a stage</option>${Object.keys(K).map(x => `<option value="${x}">${K[x].label}</option>`).join("")}</select></p>`;
-  h += "<h3>Outside the flow</h3><div class='out'>" + SEATS.map(([k, n, d]) => `<div><b>${n}</b>${ro ? `<span class="m">${(f.seats[k] || "sonnet")}</span>` : `<select id="seat-${k}" class="m" data-act="seat" data-k="${k}" aria-label="${n} model">${MODELS.map(m => `<option${m === (f.seats[k] || "sonnet") ? " selected" : ""}>${m}</option>`).join("")}</select>`} <span class="same">${d}</span></div>`).join("") + "</div>";
+  h = main;
+  if (!ro) h += `<p class="addstage"><select id="addst" data-act="addstage" aria-label="Add a stage"><option value="">+ Add a stage</option>${KINDS.map(x => `<option value="${x}">${K[x].label}</option>`).join("")}</select></p>`;
+  h += '<h3>Audits</h3><p class="same" style="margin:0 0 8px;font-size:13.5px">Each starts on its own clock, looks where its brief says, and files what it finds as new entries. It takes no entry through the stages above.</p>' + (aud || '<p class="same" style="font-size:13.5px">None.</p>');
+  if (!ro) h += '<p class="addstage"><button data-act="addhunt">+ Add an audit</button></p>';
+  h += "<h3>Support</h3><p class='same' style='margin:0 0 8px;font-size:13.5px'>Built in to every flow. You choose the model each runs on.</p><div class='out'>" + SEATS.map(([k, n, d]) => `<div><b>${n}</b>${ro ? `<span class="m">${(f.seats[k] || "sonnet")}</span>` : `<select id="seat-${k}" class="m" data-act="seat" data-k="${k}" aria-label="${n} model">${MODELS.map(m => `<option${m === (f.seats[k] || "sonnet") ? " selected" : ""}>${m}</option>`).join("")}</select>`} <span class="same">${d}</span></div>`).join("") + "</div>";
   return h;
 }
 
@@ -362,7 +368,7 @@ function walkStep(f, res, o, skipped) {
 }
 function renderWalk(f, res) {
   const w = S.walk;
-  let h = '<div class="walk"><div class="addrow" style="margin-top:0">Start a new entry: <button data-act="wstart" data-k="other">one that is ready to build</button><button data-act="wstart" data-k="design-first">one that needs a design first</button></div>' + (f.stages.some(s => s.kind === "hunt") ? '<div class="addrow">Or let a clock come round: ' + f.stages.map((s, i) => s.kind === "hunt" ? `<button data-act="wstart" data-k="clock" data-si="${i}">${esc(s.name)}</button>` : "").join("") + "</div>" : "");
+  let h = '<div class="walk"><div class="addrow" style="margin-top:0">Start a new entry: <button data-act="wstart" data-k="other">one that is ready to build</button><button data-act="wstart" data-k="design-first">one that needs a design first</button></div>' + (f.stages.some(s => s.kind === "hunt") ? '<div class="addrow">Or let an audit clock come round: ' + f.stages.map((s, i) => s.kind === "hunt" ? `<button data-act="wstart" data-k="clock" data-si="${i}">${esc(s.name)}</button>` : "").join("") + "</div>" : "");
   if (!w) return h + '<p class="now same">Pick a kind of entry, then choose each outcome to see where the flow sends it.</p></div>';
   if (w.at === "none") h += '<p class="now">No stage takes that kind of entry.</p>';
   else if (w.at === "done") h += '<p class="now"><span class="done">Done.</span></p>';
@@ -381,7 +387,7 @@ function render() {
   const f = cur(), res = check(f), own = S.flows.filter(x => !x.builtin), used = k => f.stages.filter(s => s.kind === k).length;
   const item = x => `<a class="fl${x.id === f.id ? " sel" : ""}" data-act="pick" data-id="${esc(x.id)}" tabindex="0">${esc(x.name)}${check(x).bad.length ? ' <span class="dot" title="has problems">●</span>' : ""}<small>${esc(x.blurb || "your flow")}</small></a>`;
   let n = "<h4>Built in</h4>" + S.flows.filter(x => x.builtin).map(item).join("") + "<h4>Yours</h4>" + (own.map(item).join("") || "<p>None yet. Copy a built-in flow to start.</p>") + '<button class="new quiet" data-act="new">+ New flow</button>';
-  if (!f.builtin) n += `<h4>Kinds of stage</h4><p>Click one to add a stage${f.stages[openIdx(f)] ? ` after <b>${esc(f.stages[openIdx(f)].name)}</b>` : ""}, or drag it to where it belongs.</p>` + Object.keys(K).map(k => `<div class="pal" draggable="true" data-pal="${k}" data-act="palette" data-k="${k}" tabindex="0" role="button" style="--c:var(${K[k].c})"><b>${K[k].label}${used(k) ? `<i>in ${used(k)}</i>` : ""}</b><small>${K[k].desc}</small></div>`).join("");
+  if (!f.builtin) n += `<h4>Kinds of stage</h4><p>Click one to add a stage${f.stages[openIdx(f)] && f.stages[openIdx(f)].kind !== "hunt" ? ` after <b>${esc(f.stages[openIdx(f)].name)}</b>` : ""}, or drag it to where it belongs.</p>` + KINDS.map(k => `<div class="pal" draggable="true" data-pal="${k}" data-act="palette" data-k="${k}" tabindex="0" role="button" style="--c:var(${K[k].c})"><b>${K[k].label}${used(k) ? `<i>in ${used(k)}</i>` : ""}</b><small>${K[k].desc}</small></div>`).join("");
   document.getElementById("nav").innerHTML = n;
   let h = '<div class="fhead">' + (f.builtin ? `<h2>${esc(f.name)}</h2><span class="tagc">built in</span>` : `<input type="text" class="fname" id="fname" data-act="fname" value="${esc(f.name)}" aria-label="Flow name"><span class="tagc">yours</span>`) + '<div class="act">';
   h += res.bad.length ? `<span class="probs">${res.bad.length} problem${res.bad.length > 1 ? "s" : ""}</span>` : '<span class="okk">It flows</span>';
@@ -400,7 +406,8 @@ function uniqueStage(f, base) { let n = base, i = 2; while (f.stages.some(s => s
 function setDest(s, o, d) { if (d.to === dflt(o).to && !d.limit && !d.else) delete s.next[o]; else s.next[o] = d; }
 function addStage(f, k, after) {
   if (!K[k] || f.builtin) return;
-  const at = Math.min(after + 1, f.stages.length), s = k === "hunt" ? hunt(uniqueStage(f, "Hunt"), "sonnet", 1, "days") : st(uniqueStage(f, K[k].label), k, "sonnet", "", {});
+  const firstA = f.stages.findIndex(x => x.kind === "hunt"), end = firstA < 0 ? f.stages.length : firstA;
+  const at = k === "hunt" ? f.stages.length : Math.min(after + 1, end), s = k === "hunt" ? hunt(uniqueStage(f, "Audit"), "sonnet", 1, "days") : st(uniqueStage(f, K[k].label), k, "sonnet", "", {});
   f.stages.splice(at, 0, s); S.open = at; toast(`${s.name} added`);
 }
 
@@ -419,7 +426,7 @@ function act(el, ev) {
     case "maxm": f.maxMoves = parseInt(el.value, 10); break;
     case "carry": f.carry = el.value; break;
     case "sname": { const old = slug(s.name), nw = el.value.trim(); if (!nw) break; s.name = nw; const k = slug(nw); f.stages.forEach(x => Object.values(x.next).forEach(v => { if (v.to === old) v.to = k; if (v.else && v.else.to === old) v.else.to = k; })); break; }
-    case "kind": s.kind = el.value; s.next = {}; s.only = ""; if (!takesFor(s.kind).includes(s.takes)) s.takes = takesFor(s.kind)[0]; if (s.kind === "hunt" && !s.n) { s.n = 1; s.unit = "days"; } break;
+    case "kind": s.kind = el.value; s.next = {}; s.only = ""; if (!takesFor(s.kind).includes(s.takes)) s.takes = ""; break;
     case "every": s.n = parseInt(el.value, 10); break;
     case "unit": s.unit = el.value; break;
     case "model": s.model = el.value; break;
@@ -441,9 +448,10 @@ function act(el, ev) {
     case "brief": S.brief = S.brief === d.k ? null : d.k; break;
     case "palette": addStage(f, d.k, openIdx(f)); break;
     case "addstage": addStage(f, el.value, f.stages.length - 1); break;
+    case "addhunt": addStage(f, "hunt", 0); break;
     case "delstage": f.stages.splice(si, 1); break;
     case "up": if (si > 0) { f.stages.splice(si - 1, 0, f.stages.splice(si, 1)[0]); S.open = si - 1; } break;
-    case "down": if (si < f.stages.length - 1) { f.stages.splice(si + 1, 0, f.stages.splice(si, 1)[0]); S.open = si + 1; } break;
+    case "down": if (si < f.stages.length - 1 && f.stages[si + 1].kind !== "hunt") { f.stages.splice(si + 1, 0, f.stages.splice(si, 1)[0]); S.open = si + 1; } break;
     case "wstart": walkStart(f, d.k, si); break;
     case "wout": walkStep(f, check(f), d.o, d.skip === "1"); break;
     case "wmerge": {
