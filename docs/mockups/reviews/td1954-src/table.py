@@ -71,7 +71,7 @@ def same(a):
 def rec(n, color, name, k, model, takes, acts, ends, cls=""):
     a = "".join(f"<a>{x}</a>" for x in acts)
     e = "".join(f'<div class="e"><span>{t}</span>{by}<span class="to">{to}</span></div>' for t, by, to in ends)
-    kk = key(k) if k else ""
+    kk = ""
     dl = f"<dt>Model</dt><dd class='m'>{model}</dd>" if model else ""
     dl += f"<dt>Takes</dt><dd>{takes}</dd>" if takes else ""
     dl += f"<dt>Does</dt><dd class='acts'>{a}</dd>" if a else ""
@@ -88,23 +88,23 @@ def td():
         '<div class="act"><button>Copy</button></div></div>'
         '<p class="used">Used by <b>ao-grind</b>, <b>docs</b>.</p>'
         '<div class="lim"><span>Rounds, ordinary design <b>3</b></span><span>Rounds, far-reaching design <b>6</b></span>'
-        "<span>Review rounds on a build <b>3</b></span><span>Silent before it goes to you <b>4 h</b></span></div>"
+        "<span>Review rounds on a build <b>3</b></span><span>A session is silent after <b>4 h</b></span></div>"
         + rec(1, "var(--design)", "Design", "design", "fable", "a design-first entry with no stage yet", ["Design"], [
-            ("pull request open and green", HELP, fwd("rounds")),
+            ("pull request open and green", HELP, fwd("design-rounds")),
             ("split into parts", HELP, '<span class="same">waits for its parts</span>'),
             ("not needed", SESS, YOU),
         ])
-        + rec(2, "var(--review)", "Design rounds", "rounds", "sonnet, fable <small>in turn</small>", "", ["Review <small>reviewers in turn</small>"], [
-            ("ship, from each reviewer on the same head", SESS, fwd("facts")),
+        + rec(2, "var(--review)", "Design rounds", "design-rounds", "sonnet, fable <small>in turn</small>", "", ["Review <small>reviewers in turn</small>"], [
+            ("ship, from each reviewer on the same head", SESS, fwd("fact-check")),
             ("changes wanted", SESS, back("design", "3 or 6")),
             ("pull request not ready", HELP, back("design", "3")),
             ("limit reached", HELP, YOU),
         ])
-        + rec(3, "var(--find)", "Fact-check", "facts", "sonnet", "", ["Fact-check", "Merge"], [
+        + rec(3, "var(--find)", "Fact-check", "fact-check", "sonnet", "", ["Fact-check", "Merge"], [
             ("ship", SESS, same("Merge")),
             ("changes wanted", SESS, back("design", "3")),
             ("merged", HELP, DONE),
-            ("changed since review", HELP, back("rounds", "3")),
+            ("changed since review", HELP, back("design-rounds", "3")),
             ("red or conflicting", HELP, back("design", "3")),
         ])
         + rec(4, "var(--build)", "Build", "build", "opus", "any other entry with no stage yet", ["Build", "Live checks"], [
@@ -114,12 +114,12 @@ def td():
             ("not needed", SESS, YOU),
         ])
         + rec(5, "var(--review)", "Review", "review", "sonnet", "", ["Review <small>every pull request</small>"], [
-            ("ship", SESS, fwd("second")),
+            ("ship", SESS, fwd("second-read")),
             ("changes wanted", SESS, back("build", "3")),
             ("pull request not ready", HELP, back("build", "3")),
             ("limit reached", HELP, YOU),
         ])
-        + rec(6, "var(--review)", "Second read", "second", "opus", "", ["Review <small>protected paths</small>", "Merge"], [
+        + rec(6, "var(--review)", "Second read", "second-read", "opus", "", ["Review <small>protected paths</small>", "Merge"], [
             ("not on protected paths", HELP, same("Merge")),
             ("ship", SESS, same("Merge")),
             ("changes wanted", SESS, back("build", "3")),
@@ -131,7 +131,8 @@ def td():
             ("question", SESS, f"{YOU} <small>with a board item</small>"),
             ("stuck", SESS, YOU),
             ("session lost", HELP, '<span class="same">offered again</span>'),
-            ("silent for 4 h", HELP, YOU),
+            ("session silent for 4 h", HELP, '<span class="same">offered again</span>'),
+            ("silent a second time", HELP, YOU),
         ], cls="all")
         + "<h3>Outside the flow</h3><p>These take no entry and set no stage. They are here to be given a model.</p>"
         '<div class="out"><div><b>Questions</b><span class="m">opus</span> <span>answers members by mail</span></div>'
@@ -155,6 +156,141 @@ def td():
     )
 
 
+ECSS = """
+.sel { display:inline-flex; align-items:center; gap:6px; font-size:13px; border:1px solid var(--rule); border-radius:3px; padding:0 8px; background:#fff; white-space:nowrap; }
+.sel::after { content:"▾"; color:var(--soft); font-size:11px; }
+.sel .key { border:none; background:none; padding:0; }
+.sel.bad { border-color:var(--bad); color:var(--bad); background:#FBEDEA; }
+.num { display:inline-block; min-width:30px; text-align:center; font:600 13px "IBM Plex Mono", monospace; border:1px solid var(--rule); border-radius:3px; background:#fff; padding:0 6px; }
+.num { min-height:20px; vertical-align:middle; }
+.ed-ends .h, .ed-ends .e { grid-template-columns:1fr 64px 330px; }
+.num.bad { border-color:var(--bad); background:#FBEDEA; color:var(--bad); }
+.fix { color:var(--off); font-size:13px; }
+.nmf { font-weight:600; font-size:17px; border:1px solid var(--rule); border-radius:3px; background:#fff; padding:0 8px; display:inline-block; }
+.slug { display:block; margin-top:3px; font:400 12px "IBM Plex Mono", monospace; color:var(--soft); }
+.acts a .x { margin-left:6px; }
+.acts .drop { display:inline-block; font-size:12.5px; color:var(--used); border:1.5px dashed var(--used); border-radius:3px; padding:0 8px; }
+.rec .grip { color:#fff; opacity:.7; font-size:12px; margin-top:8px; }
+.rec.err { border-color:var(--bad); }
+.e.err span:first-child { color:var(--bad); }
+.why { grid-column:1 / -1; font-size:12.5px; color:var(--bad); margin-top:-2px; }
+.chg { font-size:12px; color:var(--used); }
+.chk div.no::before { content:"✗ "; color:var(--bad); font-weight:700; }
+.chk div.no { color:var(--bad); }
+.lim .num { margin-left:4px; }
+.probs { color:var(--bad); font-size:13px; align-self:center; }
+button[disabled] { border-color:var(--rule); color:var(--off); background:var(--rule2); }
+"""
+
+
+def sel(inner, bad=False):
+    return f'<span class="sel{" bad" if bad else ""}">{inner}</span>'
+
+
+def num(n, bad=False):
+    return f'<span class="num{" bad" if bad else ""}">{n}</span>'
+
+
+def to_stage(k):
+    return sel(key(k))
+
+
+def to_back(k, n, bad=False):
+    return f'<span class="back">↩</span> {sel(key(k))} <small>limit</small> {num(n, bad)}'
+
+
+def erec(n, color, name, model, takes, acts, ends, err=False):
+    a = "".join(f'<a>{x}<span class="x">✕</span></a>' for x in acts) + '<span class="drop">drop an action here</span>'
+    rows = ""
+    for row in ends:
+        t, by, to = row[:3]
+        why = f'<span class="why">{row[3]}</span>' if len(row) > 3 else ""
+        rows += f'<div class="e{" err" if why else ""}"><span>{t}</span>{by}<span class="to">{to}</span>{why}</div>'
+    slug = name.lower().replace(" ", "-")
+    dl = f"<dt>Model</dt><dd>{model}</dd>"
+    dl += f"<dt>Takes</dt><dd>{takes}</dd>" if takes else ""
+    dl += f"<dt>Does</dt><dd class='acts'>{a}</dd>"
+    return (
+        f'<div class="rec{" err" if err else ""}"><div class="n" style="background:{color}">{n}<span class="grip">⠿</span></div>'
+        f'<div class="who"><span class="nmf">{name}</span><span class="slug">Stage: {slug}</span><dl>{dl}</dl></div>'
+        f'<div class="ends ed-ends"><div class="h"><span>Ends as</span><span>Picked by</span><span>Goes to</span></div>{rows}</div></div>'
+    )
+
+
+def enav():
+    def a(name, c, used=""):
+        u = f"<i>{used}</i>" if used else ""
+        return f'<a class="pal" style="--c:var(--{c})"><span class="grip">⠿</span> {name}{u}</a>'
+
+    return (
+        '<nav><a class="back">← All flows</a><h4>Actions</h4>'
+        '<p class="why" style="color:var(--soft)">Drag one into a stage. Each brings its own endings.</p>'
+        "<h4>In the path</h4>" + a("Design", "design") + a("Build", "build", "in 1") + a("Review", "review", "in 1")
+        + a("Fact-check", "find") + a("Merge", "review", "in 1")
+        + "<h4>Chores</h4>" + a("Live checks", "orders") + a("Board answers", "orders") + a("Pull requests nobody holds", "orders")
+        + "<h4>Yours</h4>" + a("Troubleshoot", "call", "in 1") + "</nav>"
+    )
+
+
+def edit():
+    msel = lambda m: sel(f'<span class="m">{m}</span>')  # noqa: E731
+    nxt = lambda a: sel(f"the next action, {a}")  # noqa: E731
+    you = sel("you")
+    body = (
+        '<div class="fhead"><h2><span class="ed">careful-build</span></h2><span class="id">format 2</span>'
+        '<span class="tag">this install</span><span class="tag">copied from build-review</span>'
+        '<div class="act"><span class="probs">2 problems</span><button class="quiet">Discard</button><button disabled>Save</button></div></div>'
+        '<p class="used">Used by no team yet.</p>'
+        f'<div class="lim"><span>Review rounds on a build {num(3)}</span><span>A session is silent after {num(4)} h</span></div>'
+        + erec(1, "var(--build)", "Build", msel("sonnet"), "any entry with no stage yet", ["Build", "Live checks"], [
+            ("pull request open and green", HELP, to_stage("review")),
+            ("stuck", SESS, f'{to_stage("troubleshoot")} <span class="chg">was you</span>'),
+            ("design needs changing", SESS, you),
+            ("split into parts", HELP, '<span class="fix">waits for its parts</span>'),
+            ("not needed", SESS, you),
+        ])
+        + erec(2, "var(--review)", "Review", msel("sonnet"), "", ["Review <small>every pull request</small>", "Merge"], [
+            ("ship", SESS, nxt("Merge")),
+            ("changes wanted", SESS, to_back("build", "", bad=True), "A way back needs a limit."),
+            ("pull request not ready", HELP, to_back("build", 3)),
+            ("limit reached", HELP, you),
+            ("merged", HELP, sel('<span class="done">done</span>')),
+            ("changed since review", HELP, '<span class="fix">stays in this stage</span>'),
+            ("red or conflicting", HELP, to_back("build", 3)),
+        ], err=True)
+        + erec(3, "var(--call)", "Troubleshoot", msel("opus"), "", ["Troubleshoot <small>yours</small>"], [
+            ("pull request open and green", HELP, sel(key("second-read") + "", bad=True), "Pick a stage that exists. Second read was removed."),
+            ("stuck", SESS, you),
+            ("not needed", SESS, you),
+        ], err=True)
+        + '<p class="addstep">+ Add a stage</p>'
+        + rec("∗", "var(--off)", "Every stage", "", "", "", [], [
+            ("question", SESS, f"{YOU} <small>with a board item</small>"),
+            ("stuck", SESS, f"{you} <small>changed in Build</small>"),
+            ("session lost", HELP, '<span class="fix">offered again</span>'),
+            ("session silent for 4 h", HELP, '<span class="fix">offered again</span>'),
+            ("silent a second time", HELP, you),
+        ], cls="all")
+        + "<h3>Outside the flow</h3><p>These take no entry and set no stage. They are here to be given a model.</p>"
+        f'<div class="out"><div><b>Questions</b>{msel("opus")}</div><div><b>Board answers</b>{msel("sonnet")}</div>'
+        f'<div><b>Pull requests nobody holds</b>{msel("sonnet")}</div><div><b>Manager</b>{msel("sonnet")}</div></div>'
+        "<h3>Does it flow?</h3><p></p>"
+        '<div class="chk"><div class="no">Every stage an ending names exists <small>second-read does not</small></div>'
+        '<div class="no">Every way back has a limit <small>2 of 3</small></div>'
+        "<div>Every pull request opened can reach Merge</div>"
+        "<div>Every kind of entry has a way in <small>all enter at Build</small></div>"
+        '<div class="i">7 endings go to you <small>none by omission</small></div>'
+        '<div class="i">A plain build changes stage once <small>each round back adds 2</small></div></div>'
+    )
+    cap = (
+        "F — a flow of your own being edited: a copy of build-review with a Troubleshoot stage added. "
+        "Where an ending goes is a pick-list, a limit is a field, and the checks run as you edit. Grey destinations are fixed."
+    )
+    return page("", body, cap, sub="the stages an entry passes through, and where each ending sends it", navhtml=enav()).replace(
+        "<style>", "<style>" + TCSS + ECSS
+    )
+
+
 if __name__ == "__main__":
     from playwright.sync_api import sync_playwright
 
@@ -163,11 +299,11 @@ if __name__ == "__main__":
     assert CSS and nav
     with sync_playwright() as p:
         b = p.chromium.launch()
-        html = td()
-        (src / "e-states.html").write_text(html)
-        pg = b.new_page(viewport={"width": 1440, "height": 900})
-        pg.set_content(html, wait_until="networkidle")
-        pg.wait_for_timeout(600)
-        pg.screenshot(path=str(out / "2026-11-20-td1954-flows-e-states-1440.png"), full_page=True)
-        pg.close()
+        for name, html in (("e-states", td()), ("f-editing", edit())):
+            (src / f"{name}.html").write_text(html)
+            pg = b.new_page(viewport={"width": 1440, "height": 900})
+            pg.set_content(html, wait_until="networkidle")
+            pg.wait_for_timeout(600)
+            pg.screenshot(path=str(out / f"2026-11-20-td1954-flows-{name}-1440.png"), full_page=True)
+            pg.close()
         b.close()
